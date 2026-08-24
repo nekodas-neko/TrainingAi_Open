@@ -2,7 +2,8 @@
 
 > **Successor sessions are titled `🪲 BugFix Intake Agent 🟢`** — exactly, emoji included. The title is
 > how five concurrent sessions stay tellable apart; a renamed successor is a lost thread even with a
-> perfect baton.
+> perfect baton. **Flip your own light to 🔴 once this baton and every PR have landed** — see
+> `docs/agents/prompts/bugfix.md`, the last two paragraphs.
 
 The standing intake role. Owner reports (screenshots, descriptions, "why is this doing that") come
 in; each leaves as a traced backlog entry in `docs/implementation-backlog.md`, landed and merged in a
@@ -17,22 +18,27 @@ Rewrite this file **in full** — never append — before the session ends or co
 
 - **Entry IDs are `BF-<n>`, counting up forever.** Bands and the shared pointer are both gone (see
   `docs/agents/README.md` §3). Find your next number with
-  `grep -rhoE '\bBF-[0-9]+\b' docs/ | sort -t- -k2 -n | tail -1`. Legacy Q-387…449 stay valid where
-  already used — this role's last band entry was **Q-424** (2026-08-20); everything after it is `BF-`.
+  `grep -rhoE '\bBF-[0-9]+\b' docs/ | sort -t- -k2 -n | tail -1`. This role's last band entry was
+  **Q-424** (2026-08-20); everything after it is `BF-`. **Current: `BF-9` filed, next is `BF-10`.**
 - **No migration numbers.** Intake never claims one. If an entry needs a corrective migration or a new
   column, say so in the entry and hand the number to Lane A.
 - **Docs-only PRs, opened and merged without asking** (CLAUDE.md Standing Instructions). CI still has
   to be green; a markdown-only PR runs the full pipeline, because the `pull_request` trigger has no
   `paths-ignore`.
-- **Entry model to copy: Q-310, and now Q-420/Q-423.** Owner report verbatim + screenshot described in
-  words + traced file/line + measured evidence + why it is one bug with N symptoms + fix direction +
-  what would count as done. That is the bar.
+- **Entry model to copy: Q-310, Q-420/Q-423, and now BF-9.** Owner report verbatim + screenshot
+  described in words + traced file/line + measured evidence + why it is one bug with N symptoms + fix
+  direction + what would count as done. For a feature request, add the design recommendation and any
+  owner decision recorded verbatim — `BF-9` is the fullest example: design approved, population
+  accepted, and what the acceptance does *not* cover, all inside one entry.
 - **Dedup before filing** — `grep` the backlog *and* `projectOverview.md`'s Known Issues. If it is
   already filed, amend that entry in place with the new evidence. Promoting an existing entry and
   appending a note is the correct move when the owner repeats a request; filing a second number is the
   failure this repo has already had (Q-397).
 - **Escalate loudly, don't just file**, if a report reveals something destructive already happening in
   production: data loss, a security hole, auth breakage.
+- **An entry can vanish from the queue between one check and the next — that's success, not
+  corruption.** If `grep` for your own ID comes back empty, `git log -S"<ID> —" --
+  docs/implementation-backlog.md` before assuming a bad merge dropped it — it may just be shipped.
 
 ## Tools available for tracing
 
@@ -41,67 +47,77 @@ Rewrite this file **in full** — never append — before the session ends or co
 - `pnpm e2e` — the E2E harness (Q-249).
 - `POST /api/admin/db-query` over the `claude_ro` views for production. **Row-scoped to one user and
   pruned at 30 days** — every count from it is "the owner's, recently", never "the system's". Write
-  findings that way. It is the single highest-value tool this role has: on 2026-08-19 it turned "I
-  can't judge session RPE" into a measured 25.6% fill rate and a 233-vs-32 correction asymmetry, in
-  about four queries.
-- **To date a regression, `add_repo` the archive** — this repo was cut fresh 2026-08-16, so its
-  `git log` cannot. `nekodas-neko/TrainingAI_Old`, 3,225 commits. **Two traps:** it clones
-  `--depth 1`, so `fetch --unshallow` first or every `-S` answer is a lie by omission; and a
-  caret-ranged dep moves in `pnpm-lock.yaml` without touching `package.json`. Dated BF-4 to #112
-  on 2026-08-23, after that entry had merged saying no commit could be named.
+  findings that way. It is the single highest-value tool this role has — turned "the scan feels
+  slower" into a clean split by call-shape (`BF-4`) and "0 of 55 days marked" (`BF-6`) in a handful of
+  queries each.
+- **To date a regression, `add_repo` the archive.** This repo was cut fresh 2026-08-16, so its own
+  `git log` cannot answer "when did this change" for anything older; `nekodas-neko/TrainingAI_Old`
+  (3,225 commits) can. **Two traps:** it clones `--depth 1`, so `git fetch --unshallow` first or every
+  `git log -S` answer is a lie by omission; a caret-ranged dep (`^8.2.0`) can move in
+  `pnpm-lock.yaml` without touching `package.json` — check the lockfile, not the manifest.
 - The **probe pattern** for shared modules: import the real module in a scratch `.ts` inside the repo
   (so imports resolve), run it with `npx vite-node <file>`, print a table, delete before committing.
   `tsx` is not installed; `vitest run` ignores a file with no test in it.
+- `mcp__github__list_pull_requests` (search-backed) can report stale `merged: false` on a PR already
+  confirmed merged. Trust `pull_request_read` `method: get` on the specific number instead.
 
 ## Framework docs
 
 `docs/agents/README.md` is the operating model — §1 defines this role, §2 is the authority table, §4
 is the handoff ritual this file is part of. The cold-start prompt is
-[`docs/agents/prompts/bugfix.md`](../prompts/bugfix.md). §3 is where the `BF-` ID scheme replacing the
-old bands is defined — it landed 2026-08-19, mid-session, which is why an earlier version of this
-baton still described a band.
+[`docs/agents/prompts/bugfix.md`](../prompts/bugfix.md) — **read it fresh every session**, not from
+memory; it changed mid-session on 2026-08-24 to add the status-light title convention (see below), and
+will keep changing as the framework does. §3 of the README is where the `BF-` ID scheme is defined.
 
 ---
 
 ## Traps this role hits every session — read before the first PR
 
-- **`check-doc-index-size` fails every intake PR.** Intake adds an entry per report, so it trips every
-  time. Raise the baseline in the same PR, but treat the failure as a real signal first and budget
-  ~30 lines per queue entry.
-- **Baselines live in `docs/doc-size-baseline.json`** (since #254), with the reasoning appended to
-  `docs/doc-size-baseline-history.md` — the check's own failure message says both.
-- **Take the count from `node scripts/check-doc-index-size.js`, never from `wc -l`** — `wc -l` reads
-  **one lower**, and a baseline set from it leaves the branch red. Cost a resolution on 2026-08-19.
-- **Two parallel PRs can still each raise the baseline and collide, and `main` can still end up over
-  its own number** — the JSON move fixed how *often* that happens, not that it can. CI has no
-  `push: [main]` trigger, so nothing looks. Happened on 2026-08-19 and filed as **Q-424**. **If a
-  fresh branch fails a check it could not have caused, test `main` before debugging your own diff.**
-- **`get_check_runs` returning `total_count: 0` has two causes** — a stale base, or checks queuing on a
-  push you just made. `git log --oneline HEAD..origin/main` tells them apart in one command.
-- **A stacked PR conflicts once its parent squash-merges.** Check whether `main`'s side of the hunk is
-  *empty* (an added-on-one-side conflict) before choosing `--ours`, then verify with
-  `grep -c "^### .*Q-NNN —"` that each entry appears exactly once and `git diff --stat origin/main`
-  shows insertions only. A bad splice silently reprioritises someone else's work, because queue
-  position is priority.
-- **A `send_later` check-in can fire after the work is done.** Verify state before acting on a stale
-  prompt rather than re-doing a merge.
+- **`check-doc-index-size` fails almost every intake PR.** Raise the baseline in the same PR —
+  reasoning in `docs/doc-size-baseline-history.md` — but treat the failure as a real signal first.
+  **Recompute after merging `origin/main` in, not just before**: a raise can evaporate if a parallel
+  PR shrinks the same file first; if it does, say so in the history file rather than deleting the
+  reasoning. Take the count from the script, never `wc -l` (reads one lower).
+- **`get_check_runs` returning `total_count: 0`** — a stale base, or checks queuing on a push you just
+  made. `git log --oneline HEAD..origin/main` tells them apart. Fires constantly on a busy night
+  (several lanes committing every few minutes); not a stall.
+- **A stacked PR conflicts once its parent squash-merges — verify before resolving, never `--ours`
+  blind.** Confirm `main`'s side of the hunk is genuinely empty, then check `grep -c "^### .*<ID> —"`
+  gives 1 and `git diff --stat origin/main` shows insertions only. A bad splice silently reprioritises
+  someone else's work.
+- **A shallow clone re-forms after every container restart** and produces two false alarms: `git
+  merge origin/main` refuses with "unrelated histories", and `git diff --stat origin/main` shows
+  phantom deletions across untouched files — reads like reverted work, isn't. `git fetch --unshallow
+  origin` fixes both; check `.git/shallow` first.
+- **When `main` moves every few minutes**, expect to merge it locally two or three times per PR, and
+  expect `update_pull_request_branch` to hit a real conflict once it does. Merge locally, resolve,
+  push, re-verify green on the fresh head.
+- **Merging someone else's open PR needs its own explicit go-ahead**, even under a broad "go with your
+  recommendation" — that covers this role's own entries, not another session's branch. Ask once,
+  specifically.
+- **A `send_later` check-in can fire stale.** Verify checks and base freshness before acting on it.
 
 ## Method notes worth reusing
 
 - **Query the distribution before believing a mechanism.** Tag totals supported the wrong answer for
-  Q-388; the hour-of-day breakdown refuted it and pointed at the real cause.
+  Q-388; the hour-of-day breakdown refuted it. Splitting `ai_call_log` by call-shape (image vs text
+  tokens) is what let `BF-4` rule out the AI call as the regression in one query.
 - **When a module has a guard against a *related* case, read that guard's comment before assuming it
-  covers yours.** Both Q-387 protections were real and documented, and the documented rationale is
-  what proved the gap.
-- **Check the owner's incidental remarks against the code.** On 2026-08-19 the aside *"it auto
-  prefills anyways"* turned out to invalidate two assumptions in an entry already written — the rated
-  sets were not all judgements, and the scale floor was a clamp rather than an opinion. The remark was
-  not the report and would have been easy to skim past.
+  covers yours.** `BF-8` is the freshest example: `pre-workout-screen.tsx` hides the Intensity toggle
+  for a *phase* deload, and reading that guard's own comment is what revealed it has no equivalent for
+  a deload the prescription applies on its own.
+- **Check the owner's incidental remarks against the code.** A remark that isn't the report itself can
+  still invalidate an assumption already written into an entry — read every reply for content, not
+  just for a yes/no.
 - **A feature request is still filed**, but say so in the entry and point at the planning-session
-  requirement — intake does not write implementation plans. Q-389 is the shape to copy.
-- **Do not fit to a target the owner has just told you is unreliable.** Q-420 was going to be
-  calibrated against 20 paired sessions until the owner said they cannot judge that scale; the stored
-  data agreed (only 7, 8, 9 ever used). The paired data became a sanity check.
+  requirement — intake does not write implementation plans. `BF-1`, `BF-5`, `BF-7`, `BF-9` are all this
+  shape right now.
+- **Do not fit to a target the owner has just told you is unreliable**, and do not treat a small,
+  known, all-consenting user population as a reason to relax an ownership guard — those are two
+  different kinds of "the owner said it's fine", and only one of them changes what the code has to
+  check. `BF-9`'s entry states this explicitly because the temptation to conflate them is real.
+- **A dated regression needs the archived repo, not the live one, once the live repo's own history is
+  too short.** See the tool note above — this is now a first move, not a last resort.
 
 ---
 
@@ -109,52 +125,29 @@ baton still described a band.
 
 ### 2026-08-17 — first session under this role
 
-Filed **Q-387** (`[nutrition]` adaptive-TDEE counts a partially-logged day as complete; measured 6
-partial days of 14 → 514 kcal low with every gate passing), **Q-388** (`[devices][heart-rate]` ring
-battery drains ~3.5× stock; traced to `enableMeasurementSequence()` setting DAYTIME_HR + SPO2 +
-REAL_STEPS → AUTOMATIC unconditionally, with SpO₂ confirmed as the largest event source and ~75% of
-it in the reported overnight window), and **Q-389** (`[nutrition][app-shell]` printable food labels;
-the intake value was proving the app already reads QR, making "scan it back" exact and free).
+Filed **Q-387** (`[nutrition]` adaptive-TDEE counts a partially-logged day as complete), **Q-388**
+(`[devices][heart-rate]` ring battery drains ~3.5× stock), and **Q-389** (`[nutrition][app-shell]`
+printable food labels).
 
 ### 2026-08-19/20 — the workout-energy cluster
 
-One question from the owner — *"how can we make energy usage/burned from excercuse more accurate.
-what type of data can we feed to calibrate it over time"* — plus two screenshot reports either side of
-it. Output: **six entries, five merged PRs**, all docs-only. Full narrative, measurements and gotchas
-in
+Six entries from one owner question plus two screenshots. Full narrative in
 [`docs/handoff-2026-08-20-workouts-energy-accuracy-and-rpe-intake.md`](../../handoff-2026-08-20-workouts-energy-accuracy-and-rpe-intake.md).
+Three of six shipped within hours. One decision (Q-420's set-scale mapping) was superseded the same
+day by a re-measurement that checked a consumer nobody had enumerated — the lesson: *a decision about
+a number is only as good as the enumeration of who reads it.*
 
-| entry | what | state at 2026-08-20 |
-|---|---|---|
-| **Q-391** | per-session calories on the day screen's Training card — *promoted*, not re-filed, when the owner asked a second time | ✅ **shipped** (#260) |
-| **Q-419** | the done screen and the day budget disagree about the same workout; only one reads the RPE | ✅ **shipped** (#252) |
-| **Q-421** | HR-based workout energy; ONNX route rejected by the owner | ✅ **route (a) shipped** (#255); route (b) closed by the owner |
-| **Q-423** | the per-set RPE prefill is measurably low — 233 raised by hand vs 32 lowered | queued, Lane B |
-| **Q-420** | derive session RPE from the set ratings | queued — **re-measured by Lane A (#256), see below** |
-| **Q-422** | calibrate the burn against the owner's own energy balance | queued, Tuning → A |
-| **Q-424** | a shrink-only ratchet can leave `main` red and nothing looks | queued |
+### 2026-08-23/24 — nine entries, a trainer-role design, and one rescued PR
 
-**Three of the six shipped within hours of being filed.** Worth knowing as a calibration on this role:
-entries that trace to a file and carry a measurement get picked up fast, so the cost of a vague entry
-is not that it sits — it is that it gets built vaguely.
+Full narrative in
+[`docs/handoff-2026-08-24-cross-bugfix-nine-entries-trainer-role-and-admin-fix.md`](../../handoff-2026-08-24-cross-bugfix-nine-entries-trainer-role-and-admin-fix.md).
 
-**⚠ One decision recorded in this session was superseded the same day, and the correction is better
-than the original.** Q-420's amendment argued *against* mapping the 6–10 set scale onto the 1–10
-session scale, on the grounds that the only consumer was the energy tier and inventing a mapping would
-be inventing precision. **That reasoning held only for the consumer that was checked.** Lane A's
-re-measure (#256) found that Q-421 shipping had gutted the energy case — HR now takes precedence, so
-the tier decides the burn on **3** sessions, not 24 — and that the real consumer is
-`app/api/health-trends/route.ts:172`, which computes Foster's `sessionLoad = sessionRpe × durationMin`
-on the **CR-10** scale. A value floored at 6 fed into that **systematically inflates session load**,
-and ACWR thresholds downstream are calibrated on the unscaled figure. **There the mapping is not
-optional; it is the whole item.** The lesson for this role is narrow and reusable: *a decision about a
-number is only as good as the enumeration of who reads it* — grep every consumer before ruling one
-out.
+Filed **BF-1** (blood panels, gated), **BF-2** (DEXA filter), **BF-3** (dosed substances), **BF-4**
+(scan slowdown, dated to `#112` via the archive), **BF-5** (week-in-review page), **BF-6** (finished-
+logging unreachable — **shipped, #355**), **BF-7** (session-length slider, owner settled the anchor),
+**BF-8** (Intensity vs auto-deload — **owner-confirmed from experience, shipped, #353**), **BF-9** (a
+trainer role — design + population approved by the owner). Also merged **PR #124**, another session's
+stale-but-approved auth fix.
 
-**The owner decision that does stand: no Oura models.** Q-421 keeps the closed-form Keytel estimator.
-It does **not** extend to `estWorkoutKcal`, which is a ported formula rather than a model; widening it
-needs asking. Carry Lane A's caveat too — Keytel is fitted on steady-state aerobic subjects and
-over-reads for intermittent resistance work (a 150 bpm probe returned 823 kcal, against an observed
-max of 104 bpm).
-
-**Nothing mid-triage. Nothing received-but-unfiled. Nothing blocked on the owner.**
+**Seven entries remain queued** (`BF-1/2/3/4/5/7/9`). Nothing waiting on the owner, nothing
+mid-triage.
