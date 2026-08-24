@@ -961,6 +961,28 @@ Close this when all five are under ~150 lines.
   only" rather than "broken."
 - **Surface: device-only to confirm.** The mechanism traces cleanly from code + production data, but
   confirming *why* this specific device's local store is null needs the device.
+- 🚧 **THE SERIAL-FETCH HALF SHIPPED 2026-08-24 (Lane A).** `logMealItems`'s fallback branch now
+  issues its per-ingredient POSTs through `Promise.allSettled` instead of a `for` loop of
+  sequential `await fetch`es, so an N-item meal costs one round trip's wall clock rather than N.
+  **Proven by mutation, not just by passing:** all three new cases in
+  `packages/shared/src/nutrition/__tests__/log-meal-fallback.test.ts` fail against the reverted
+  serial loop (the concurrency assertion sees 1 POST instead of 3) and pass with it restored. The
+  sibling `log-meal.test.ts` could not have caught this — it mocks `getLocalStore` to a working
+  store, so it never reaches the fallback at all; the new file mocks it to `null`.
+  - **A second defect was fixed in the same change, created by the first fix.** Concurrency makes
+    the rollback's completeness load-bearing: `Promise.all` rejects on the first failure without
+    reporting which siblings succeeded, so a partial failure would strand rows the rollback cannot
+    see — invisible to the user until they reappear as duplicates on the next tap. `allSettled`
+    records every landed id before rethrowing. Serially this could not happen, which is why it
+    needed a test now and not before.
+- **⚠️ THIS DOES NOT CLOSE THE ENTRY — two halves remain, both device-gated.** (1) *Why* this
+  device's local store is null (the K4 state) is untouched; the fallback being fast is a mitigation,
+  not the cure, and the entry's own "what would count as fixed" bar wants the local-first path or a
+  visible banner. (2) The "vanished after navigating away" half is still not explained. **Nothing
+  here was observed on the S25** — the change is verified by unit test and static reading only, and
+  `pnpm dev` could not be run in the sandbox (missing `@sentry/nextjs` in `node_modules`).
+- **Keep:** the on-device check this entry already asks for — whether `LocalStoreDeadBanner` is
+  showing during a reproduction — now also tells you whether the ~20s is gone or merely shorter.
 
 ## Nutrition — pushed to the top, 2026-08-24 (owner request)
 
