@@ -3,6 +3,8 @@
 import { useState, useEffect, useSyncExternalStore } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
+import { toast } from "sonner";
+import { tabTapWouldBeSilent } from "@/components/shell/nav-offline";
 import { cn } from "@trainingai/shared/utils";
 import { useWorkoutStore, isWorkoutActive } from "@/lib/stores/workout-store";
 import { LeaveWorkoutDialog } from "@/components/workout/leave-workout-dialog";
@@ -75,8 +77,16 @@ export function BottomNav({
       return;
     }
     e.preventDefault();
-    if (onTabChange) onTabChange(key);
-    else navigateWithTransition(router, pathname, href);
+    if (onTabChange) { onTabChange(key); return; }
+    // Q-555: outside the tab shell a tap is `router.push`, and offline with no service worker in
+    // control its RSC fetch cannot be served — the push aborts and NOTHING happens. Say so rather
+    // than leaving a tap that reads as a frozen app. Keeping the user on the cached screen they can
+    // still read beats forcing a navigation to the browser's error page.
+    if (tabTapWouldBeSilent()) {
+      toast.error("Can't open that tab offline yet — it will work once the app finishes setting up");
+      return;
+    }
+    navigateWithTransition(router, pathname, href);
   };
 
   return (
