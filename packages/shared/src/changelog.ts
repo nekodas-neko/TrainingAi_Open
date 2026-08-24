@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.359.0",
+    date: "2026-08-24",
+    changes: [
+      "The Devices screen now says so when the ring has no key stored, instead of still showing it as synced from old data — this is when the ring actually can't sync at all, and the app was the last place that would tell you.",
+    ],
+  },
+  {
     version: "1.358.0",
     date: "2026-08-24",
     changes: [
