@@ -8,6 +8,7 @@ import { DEFAULT_TZ, todayInTz } from '@trainingai/shared/date-utils'
 import { textStreamResponse } from '@/lib/ai/stream'
 import { reportServerError } from '@/lib/observability'
 import { hashInsightContext, readFreshInsight } from '@/lib/ai/insight-cache'
+import { PROSE_GUARDS } from '@/lib/ai/prompt-guards'
 
 export async function GET() {
   try {
@@ -50,7 +51,9 @@ Key signals:
 - Consecutive training days: ${recommendation.consecutiveTrainingDays ?? 0}
 - Deload recommended: ${recommendation.deloadOrRestRecommended ? `yes (${recommendation.deloadStrength})` : 'no'}
 
-Write in second person. Be specific about which signals mattered. Do not use bullet points or headers.`
+Write in second person. Be specific about which signals mattered. Do not use bullet points or headers.
+
+${PROSE_GUARDS}`
 
     const contextHash = hashInsightContext(prompt)
     const cached = await readFreshInsight(repo, userId, cacheSection, today, contextHash)

@@ -4518,6 +4518,30 @@ ehr     0     0     0     0   648   208   128   556     0
   on its own day's value regardless.) Working in [`docs/reviews/2026-08-16-deferred-measurements.md`](reviews/2026-08-16-deferred-measurements.md) §5.
 - **Scope note:** 8 of 117 insights were read closely. A systematic pass over the rest is the
   natural companion and would size the problem properly.
+- ✅ **THE FORWARD FIX SHIPPED 2026-08-24** (`fix/supplement-reminder-gap`). `PROSE_GUARDS`
+  (`lib/ai/prompt-guards.ts`) is **one string interpolated by all five prose routes** —
+  health-insight's builder, daily-digest, weekly-digest, recap, session-explain. It states metric
+  units outright, forbids converting to imperial, requires numbers to be quoted rather than
+  recomputed, and **names the superlatives that were actually fabricated** ("perfect", "record",
+  "best", "all-time") rather than gesturing at the category.
+- **One string, not five,** because the wording drifting into five versions is exactly how `sleep`
+  ends up without the units clause again. `lib/ai/__tests__/prose-guards.test.ts` fails on a prose
+  route that does not import it, so a sixth route cannot be added without it.
+- ✅ **The rule amendment landed too.** CLAUDE.md's *no LLM self-reported number* rule now covers
+  numbers **shown to the user as fact**, not only numbers that gate an action — which is the gap
+  that let this through in the first place.
+- **⚠ Keep — and this is the honest part: the fix is PROMPT TEXT, so it is not proven.** No
+  before/after generation was compared, because that needs live model calls against the owner's real
+  data. The tests prove the instruction reaches every route and says the right things; they cannot
+  prove the model obeys it. **Re-run the 117-insight audit after a few weeks of new insights** — if
+  superlatives or Fahrenheit survive, the answer is to stop asking and start post-checking the
+  output deterministically.
+- **Keep:** the **12 stored superlatives and 7 Fahrenheit lines are not rewritten.** They are
+  historical text the user has already read; editing them would be fabricating a past that did not
+  happen. The unit system is also **hardcoded metric** — there is no `users.units` column, and
+  adding one is the trigger to make the guard dynamic.
+- **Keep:** the quasi-medical inference (2026-07-19) is untouched — the guard says nothing about
+  inferring illness from a temperature reading.
 
 ### [platform] Q-293 — `ai_health_insights.context_hash` is NULL on 109 of 117 rows
 
@@ -4705,6 +4729,28 @@ ehr     0     0     0     0   648   208   128   556     0
   `AI_MODEL_ID === 'gemini-3.1-flash-lite'`; find whether `COACH_MODEL_ID` exists at all, and
   whether the coach route passes it through the logged wrapper or around it.
 - **Cheap to settle, and it invalidates measurements while it stands.**
+- ✅ **SETTLED AND FIXED 2026-08-24** (`fix/supplement-reminder-gap`). **The docs were right and the
+  logging was wrong** — the second branch, the one that invalidates measurements. `COACH_MODEL_ID =
+  'gemini-3.6-flash'` does exist, `app/api/coach/route.ts` calls `coachModel()`, and the grounding
+  tool is live. What was wrong is that `logAiCall` wrote **`model: AI_MODEL_ID`, a constant**, so
+  the column recorded an assumption and could not disagree with it. Re-measured 2026-08-24: **22
+  Coach calls, first 2026-08-09** — after `COACH_MODEL_ID` shipped on 08-08 — every one filed under
+  flash-lite.
+- **It now logs what the PROVIDER says it served** (`response.modelId`), falling back to a new
+  `AiCallMeta.model` and only then to the default. Reading the response rather than the request is
+  the stronger choice: a provider may route a request elsewhere, and that substitution is exactly
+  what a model column exists to make visible. Coach passes `COACH_MODEL_ID` so its **failures**
+  attribute correctly too — a failed call has no response to read, and a Coach failure filed against
+  a model Coach does not run was the least defensible case.
+- ✅ **The binary-file oddity the entry flagged is also gone**: `instrument.ts` held a **raw NUL byte**
+  inside a template literal, which is why it grepped as binary. It is now `\0` — the same byte. A
+  pinned-hash test proves the equivalence rather than asserting it, because fingerprints are
+  **stored**, so a changed separator would silently orphan every existing one.
+- **Keep:** the **historical rows are not corrected**. Every `ai_call_log.model` value written before
+  this is an assumption, and the 22 Coach rows since 2026-08-09 were in fact `gemini-3.6-flash`. That
+  is an inference from a single deploy and a single code path, not per-row evidence, so it is
+  recorded here rather than written into the table. **Any cost or latency analysis split by model
+  must treat rows before 2026-08-24 as unattributed.**
 
 ### [platform][app-shell] Q-294 — the failure cells whose intended behaviour is undefined
 
