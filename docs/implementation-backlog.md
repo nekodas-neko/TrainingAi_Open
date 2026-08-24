@@ -3813,53 +3813,22 @@ ehr     0     0     0     0   648   208   128   556     0
   sequence has a `deload` phase at position 4 (Accumulation 4 → Intensification 3 → Peak 2 →
   Testing 1), so ~10 cycles between deloads. Long-ish, but a program-design choice.
 
-### [workouts] Q-304 — 29 sets at 13+ reps feed the 1RM estimate on the one path that skips the AMRAP correction
+### [workouts] Q-304b — recompute (or leave) the 30 `personal_records` rows written before the AMRAP correction
 
-- **Branch:** `fix/high-rep-1rm-correction`
-- **Plan:** none yet — **measure the qualifier below before changing anything**
-- **Added:** 2026-08-15 · from [`docs/reviews/2026-08-15-workout-model-round-3.md`](reviews/2026-08-15-workout-model-round-3.md) §2
-- **The model is well built — this is one gap in it, not a rewrite.** `repFactor` averages Epley and
-  Brzycki and **freezes the Brzycki term at 20 reps** so it cannot blow up toward its 37-rep pole,
-  with `REP_CEILING = 30` above which nothing is estimated. That is more careful than most
-  implementations and should not be touched.
-- **The gap:** `amrapScaleFactor` exists for exactly this problem — 1.0 / 0.97 / 0.93 / **0.88** /
-  **0.82** by rep band — and is applied by `calcAmrap1RM`. But `estimateOneRm`'s ordinary
-  (non-bodyweight, non-baseline) path calls **`calculate1RM`**, which does not apply it.
-- **Measured** (`claude_ro.set_logs`, `deleted_at IS NULL`):
-
-  | rep band | sets | **feeding the 1RM estimate** |
-  |---|---|---|
-  | 1–5 | 40 | 32 |
-  | 6–8 | 497 | 390 |
-  | 9–12 | 411 | 191 |
-  | **13–20** | **59** | **27** |
-  | **21+** | **2** | **2** |
-
-  **29 sets at 13+ reps feed the estimate**, where the band's own scale factor would cut 12–18%.
-- **✅ QUALIFIER MEASURED 2026-08-16 — it did NOT close the entry. Skip to the fix.** Of the sets
-  feeding the 1RM estimate, **28 of the 29 at 13+ reps carry no `planned_pct`** (13–20 reps: 1 of 27;
-  21+: 0 of 2), so `prescriptionFactor` returns 1 and the raw `repFactor` stands with no AMRAP
-  correction. **The proxy is exact, not approximate**: `log-exercise.ts:233` writes
-  `plannedPct: progressionStyle?.[i]?.pct` — the same value `prescriptionFactor` consumes. Working in
-  [`docs/reviews/2026-08-16-deferred-measurements.md`](reviews/2026-08-16-deferred-measurements.md) §1.
-  **So apply the band correction on the `calculate1RM` path when no prescription factor applies**, and
-  add tests at 13, 20 and 21 reps. The double-correction warning below still stands.
-- **⚠️ THE QUALIFIER — do this measurement FIRST, it may close the entry.** `prescriptionFactor`
-  rescales by `1 / ((pct/100) × repFactor(targetReps))` when a style supplies both `pct` and
-  `targetReps`. **Where a style is present, that normalisation may already absorb most of the
-  inflation.** This review did **not** establish how often a style accompanies those 29 sets, so
-  this is a flagged risk with a measurement attached, not a proven defect.
-  - Query: for the 29 sets at 13+ reps with `use_for_1rm = true`, how many had a progression style
-    with a non-null `pct` at write time? `planned_pct` on the row is the closest proxy.
-  - **If most had a style → close this entry as measured-and-rejected.** That is a fine outcome and
-    a better one than a speculative change to a shared formula.
-  - **If most did not → apply the AMRAP band correction** on the `calculate1RM` path when no
-    prescription factor applies, and add a test at 13, 20 and 21 reps.
-- **Do not simply route everything through `calcAmrap1RM`.** Double-correcting a set that already has
-  a prescription factor would deflate the estimate, which is the mirror of the current bug.
-- **Related:** `personal_records` (30 rows) is written from these estimates. If a correction lands,
-  decide separately whether historical PRs are recomputed — that edits training history and needs the
-  owner's say-so.
+- **Gate:** owner
+- **Added:** 2026-08-24 · split off Q-304 when its forward fix shipped
+- **Q-304's forward fix shipped** (`packages/shared/src/1rm.ts` — an unprescribed set now gets the
+  same `amrapScaleFactor` band discount an explicit AMRAP set already got via `calcAmrap1RM`, so a
+  13+ rep set with no progression style no longer feeds the 1RM estimate un-discounted). Verified:
+  measured against production first (1 of 29 flagged sets carried a style, so the qualifier that
+  would have closed the entry did not), 3 new tests at 13/20/21 reps plus the no-double-correction
+  case, full suite green.
+- **What is deliberately NOT done:** `personal_records` (30 rows) was written from the old,
+  un-discounted formula. Recomputing them edits training history and needs the owner's say-so —
+  same shape as Q-298's 10 historical zero-1RM rows, kept as its own decision rather than folded
+  into the forward fix. Options: leave them (only the 29 flagged sets' history is inflated, a small
+  and shrinking share as new sessions log correctly going forward), or recompute the affected rows
+  from `set_logs` with the corrected formula.
 
 ### [workouts] Q-305 — the volume landmarks are computed and never shown to anyone
 

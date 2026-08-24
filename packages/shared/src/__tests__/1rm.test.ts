@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { calc1RM, calcAmrap1RM, calculate1RM, runningEstimate1RM, oneRmTrendStatus, BW_REF, repMaxFromOneRm, rescaleBodyweightReps, resolveBodyweightStyle, estimateOneRm, repFactor, REP_CEILING, bestSetOneRm, mround, displayOneRm, displayOneRmDelta, displayOneRmSeries, oneRmLabel, oneRmUnit, describePersonalRecord, pickHeadlinePersonalRecord } from '../1rm'
+import { calc1RM, calcAmrap1RM, calculate1RM, runningEstimate1RM, oneRmTrendStatus, BW_REF, repMaxFromOneRm, rescaleBodyweightReps, resolveBodyweightStyle, estimateOneRm, repFactor, amrapScaleFactor, REP_CEILING, bestSetOneRm, mround, displayOneRm, displayOneRmDelta, displayOneRmSeries, oneRmLabel, oneRmUnit, describePersonalRecord, pickHeadlinePersonalRecord } from '../1rm'
 
 describe('calcAmrap1RM', () => {
   it('matches calc1RM for ≤5 reps (scale factor 1.0)', () => {
@@ -65,9 +65,37 @@ describe('calculate1RM', () => {
     expect(short.estimated1rm).toBeLessThan(exact.estimated1rm)
   })
 
-  it('falls back to raw calc1RM when no style is provided', () => {
+  // A single mround at the end (calculate1RM's own path) vs calcAmrap1RM's two — calc1RM rounds
+  // to 0.25 internally, then calcAmrap1RM rounds the scaled result again — occasionally differ by
+  // 0.25 (measured at 13 reps: 129 vs 129.25), so the expectation here matches calculate1RM's own
+  // arithmetic rather than assuming the two helpers agree bit-for-bit.
+  const expectedAmrapScaled = (weight: number, reps: number) =>
+    Math.round((weight * repFactor(reps) * amrapScaleFactor(reps)) / 0.25) * 0.25
+
+  it('falls back to the AMRAP-scaled estimate when no style is provided (Q-304)', () => {
+    // No style means no prescription, so a set with no style is an AMRAP set by construction —
+    // it should get the same band discount an explicit AMRAP set would, not the raw un-discounted
+    // repFactor.
     const { estimated1rm } = calculate1RM([100, 100, 100], [12, 12, 12])
-    expect(estimated1rm).toBe(calc1RM(100, 12))
+    expect(estimated1rm).toBe(expectedAmrapScaled(100, 12))
+    expect(estimated1rm).toBeLessThan(calc1RM(100, 12))
+  })
+
+  it('applies the AMRAP band correction at 13+ reps with no prescription (Q-304)', () => {
+    for (const reps of [13, 20, 21]) {
+      const { estimated1rm } = calculate1RM([100], [reps])
+      expect(estimated1rm).toBe(expectedAmrapScaled(100, reps))
+      expect(estimated1rm).toBeLessThan(calc1RM(100, reps))
+    }
+  })
+
+  it('does NOT apply the AMRAP correction on top of a real prescription (no double-correction)', () => {
+    // A prescribed 60%/12reps set at 13 reps (exceeding the prescription) must be rescaled by
+    // prescriptionFactor alone — combining it with amrapScaleFactor would deflate the estimate,
+    // the mirror of the bug this fix closes.
+    const prescribed = calculate1RM([20], [13], [{ pct: 60, reps: 12, useFor1rm: true }]).estimated1rm
+    const unprescribed = calculate1RM([20], [13]).estimated1rm
+    expect(prescribed).not.toBe(unprescribed)
   })
 
   it('only scores useFor1rm sets when the style flags them', () => {
@@ -362,10 +390,13 @@ describe('estimateOneRm — bodyweight/baseline AMRAP-scaled averaging (C3+C4)',
 
 describe('bestSetOneRm — display-only best-single-set estimate (C4 decision)', () => {
   it('returns the best single set where the session estimate averages', () => {
-    // weighted, no style: per-set calc1RM = 114.5 (100×5) and 133.25 (100×10) → best = 133.25
+    // bestSetOneRm is display-only and deliberately NEVER applies the AMRAP band correction (see
+    // its own comment) — per-set calc1RM = 114.5 (100×5) and 133.25 (100×10) → best = 133.25
     expect(bestSetOneRm([{ weightKg: 100, reps: 5 }, { weightKg: 100, reps: 10 }], { exerciseType: 'weighted' })).toBe(133.25)
-    // the saved session estimate is the average — mean(114.5, 133.25)=123.875 → mround ... = 123.875×4=495.5→round 496 → 124.0
-    expect(estimateOneRm([{ weightKg: 100, reps: 5 }, { weightKg: 100, reps: 10 }], { exerciseType: 'weighted' }).estimated1rm).toBe(124.0)
+    // the SAVED session estimate goes through calculate1RM, which DOES apply the correction
+    // (Q-304) to an unprescribed set: set 1 stays 114.5 (≤5 reps, scale 1.0), set 2 is now
+    // 100×repFactor(10)×0.93 → 124.0 (was 133.25 before the fix). mean(114.5, 124.0) = 119.25.
+    expect(estimateOneRm([{ weightKg: 100, reps: 5 }, { weightKg: 100, reps: 10 }], { exerciseType: 'weighted' }).estimated1rm).toBe(119.25)
   })
 
   it('uses AMRAP-scaled per-set values for bodyweight', () => {

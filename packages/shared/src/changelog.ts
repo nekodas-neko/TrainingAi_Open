@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.352.0",
+    date: "2026-08-24",
+    changes: [
+      "Estimated 1RM and prescribed weights are now a little more conservative on sets logged past about 6 reps with no set target — those were feeding the estimate at full strength instead of the same discount an AMRAP set already gets elsewhere, which meant a high-rep set without a specific target could push a prescription higher than it should.",
+    ],
+  },
+  {
     version: "1.351.0",
     date: "2026-08-24",
     changes: [
