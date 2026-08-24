@@ -1037,6 +1037,26 @@ export async function runOuraRollup(
           series = pts.map(p => ({ tMs: p.t, level: p.stressLevel }))
         }
 
+        // TN-3a — persist the buckets. `summarizeStressDay` reduces this series to three daily
+        // scalars, and those are too compressed to answer "which hours run hottest" (the daily
+        // aggregate spans only −0.14 … +0.23 on a [−1,+1] scale across 31 measured days). The
+        // series is written here rather than at `/api/body-battery` because THIS is the path that
+        // can back-fill: it re-derives each day from the packed raw tier, so a wide pass fills
+        // history instead of starting from today.
+        //
+        // Writing from one place also settles the two-baselines hazard the entry flags: the live
+        // route builds the same series from `restingHr` + a 28-day HRV mean, this one from
+        // `latest.rhrLowBpm` + `nightHrvMs`. Persisting both would put two numbers behind one
+        // metric. The rollup wins because it is the only one that can reach history.
+        //
+        // Failure is contained: a bucket write must never abort the readiness/resilience writes
+        // below it, which are what the user actually sees.
+        try {
+          await io.replaceStressBuckets(day, series.map(p => ({ bucketStart: new Date(p.tMs), level: p.level })))
+        } catch (err) {
+          console.error(`[rollup] stress bucket write failed for ${day}, continuing:`, err)
+        }
+
         const { rhrZ, hrvZ } = illnessZScores(prior, latest)
         const comp = computeReadinessComposite({
           rhrZ, hrvZ, tempZ: null, sleepBalanceZ: null, previousNightScore: null,

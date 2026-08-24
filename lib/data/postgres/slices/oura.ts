@@ -1760,3 +1760,70 @@ export async function getOuraRollupWatermark(db: Db, userId: string, currentEpoc
   // larger or smaller than the current counter. Refuse to narrow against it.
   return r.epoch === currentEpoch ? r.lastRolledDs : null
 }
+
+// ── TN-3a: the 30-minute daytime-stress buckets ────────────────────────────────────────────────
+
+export interface StressBucketRow {
+  bucketStart: Date
+  level: number
+}
+
+/**
+ * Replace one local day's stress buckets.
+ *
+ * A whole-day REPLACE rather than a merge, deliberately: the series is recomputed as a unit from
+ * that day's frames, so a re-run with fewer buckets (a shorter waking window, a frame that failed
+ * to decode) must SHRINK the stored day rather than leave orphans from the previous pass merged in
+ * beside the new ones. The delete and the insert share a transaction so a day is never briefly
+ * empty for a concurrent reader.
+ *
+ * Scoped to `user_id` on both statements — the rollup runs per user and a day string is not a
+ * user-scoped key on its own.
+ */
+export async function replaceDaytimeStressBuckets(
+  db: Db, userId: string, day: string, buckets: StressBucketRow[],
+): Promise<void> {
+  await db.transaction(async tx => {
+    await tx.delete(s.ouraDaytimeStressBuckets).where(
+      and(eq(s.ouraDaytimeStressBuckets.userId, userId), eq(s.ouraDaytimeStressBuckets.day, day)),
+    )
+    if (buckets.length === 0) return
+    await tx.insert(s.ouraDaytimeStressBuckets).values(
+      buckets.map(b => ({ userId, day, bucketStart: b.bucketStart, level: b.level, updatedAt: new Date() })),
+    ).onConflictDoUpdate({
+      target: [s.ouraDaytimeStressBuckets.userId, s.ouraDaytimeStressBuckets.bucketStart],
+      set: { level: sql`excluded.level`, day: sql`excluded.day`, updatedAt: new Date() },
+      // The conflict arm exists because a bucket INSTANT can land in a different local day than
+      // the pass that wrote it last (a timezone change, or a wake window shifting across midnight):
+      // the delete above only cleared THIS day, so the row may still be present under its old
+      // `day`. Updating `day` is what re-files it.
+      //
+      // `setWhere` is scoped to the user per CLAUDE.md's standing rule for `onConflictDoUpdate`
+      // arms. **It is redundant here, and that is recorded rather than left to look load-bearing**
+      // — the primary key is `(user_id, bucket_start)`, so one user's insert cannot conflict with
+      // another user's row. Verified by deleting this line and re-running the suite: nothing
+      // changed. It stays as cheap insurance against the key ever narrowing.
+      setWhere: eq(s.ouraDaytimeStressBuckets.userId, userId),
+    })
+  })
+}
+
+/** One user's buckets over an inclusive local-day range, oldest first. */
+export async function listDaytimeStressBuckets(
+  db: Db, userId: string, from: string, to: string,
+): Promise<{ day: string; bucketStart: Date; level: number }[]> {
+  const rows = await db
+    .select({
+      day: s.ouraDaytimeStressBuckets.day,
+      bucketStart: s.ouraDaytimeStressBuckets.bucketStart,
+      level: s.ouraDaytimeStressBuckets.level,
+    })
+    .from(s.ouraDaytimeStressBuckets)
+    .where(and(
+      eq(s.ouraDaytimeStressBuckets.userId, userId),
+      gte(s.ouraDaytimeStressBuckets.day, from),
+      lte(s.ouraDaytimeStressBuckets.day, to),
+    ))
+    .orderBy(asc(s.ouraDaytimeStressBuckets.bucketStart))
+  return rows.map(r => ({ day: r.day, bucketStart: r.bucketStart, level: Number(r.level) }))
+}
