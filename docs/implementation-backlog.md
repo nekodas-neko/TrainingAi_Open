@@ -4096,11 +4096,16 @@ ehr     0     0     0     0   648   208   128   556     0
 - **Sequencing matters here.** Fixing Q-289's calibration will move the delta distribution, so this
   threshold must be re-derived *after* that, not tuned now. **This entry is blocked on Q-289** and
   should be worked immediately after it.
-- **Second issue, independent: ACWR now drives three behaviours at three thresholds** —
-  `acwr > 1.5` here, `EARLY_DELOAD_ACWR_MIN = 1.2` (readiness early-deload card), and
-  `ACWR_TAPER_START = 1.5` (Activity Score taper). Q-279 already questions the evidence base for
-  ACWR at all; three uncoordinated thresholds on one contested metric should be consolidated into a
-  single named band set whatever else is decided.
+- ✅ **Second issue DONE 2026-08-24, behaviour unchanged** (`fix/consolidate-acwr-thresholds`).
+  All three now read from `ACWR_THRESHOLDS` in `packages/shared/src/ai-periodization/acwr.ts`:
+  the emergency-deload trigger and the Activity-score taper both take `highMax` — they were 1.5
+  **by coincidence of typing**, and nothing recorded that they were the same boundary — and the
+  early-deload card's 1.2 moved in as `elevatedMin`, beside the boundaries it is a deliberate
+  exception to rather than in a comment three files away. **The numbers are untouched**: moving any
+  of them changes who gets a deload or a taper, which is a scoring change and the owner's call.
+  Source-scraped tests hold it, since an imported value cannot tell a literal 1.5 from a reference.
+- **Keep:** the first issue. The trigger threshold itself is still un-re-derived and still blocked
+  on Q-289 — consolidating where the number lives does not decide what it should be.
 - **One thing that is RIGHT and should not be "fixed":** `repCompletionRate < 0.7` is null-guarded
   (`!== null`), so with the field null on ~83% of sets it mostly cannot fire. That fails **safe**,
   and it is the correct treatment — unlike the autoregulation path in **Q-299**, which reads the

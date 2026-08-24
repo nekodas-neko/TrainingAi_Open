@@ -25,8 +25,16 @@ describe('early-deload thresholds (Q-173)', () => {
     // optimal band, because it is paired with a readiness score under 45 — the pair is the signal.
     // A future tidy-up that "unifies" this with optimalMax would change who sees the card, so the
     // difference is pinned rather than left to a comment.
-    expect(constant('EARLY_DELOAD_ACWR_MIN')).toBe(1.2)
-    expect(constant('EARLY_DELOAD_ACWR_MIN')).toBeLessThan(ACWR_THRESHOLDS.optimalMax)
+    expect(ACWR_THRESHOLDS.elevatedMin).toBe(1.2)
+    expect(ACWR_THRESHOLDS.elevatedMin).toBeLessThan(ACWR_THRESHOLDS.optimalMax)
+  })
+
+  it('takes that bound from the canonical set rather than retyping it (Q-306)', () => {
+    // Q-306: three sites acted on ACWR at numbers they each declared themselves, so nothing
+    // recorded that two were the same boundary and this one deliberately was not. Scraped from
+    // source rather than imported because importing readiness-payload.ts pulls the data layer in.
+    expect(read('lib/health/readiness-payload.ts'))
+      .toContain('export const EARLY_DELOAD_ACWR_MIN = ACWR_THRESHOLDS.elevatedMin')
   })
 
   it('the readiness bound is 45', () => {
