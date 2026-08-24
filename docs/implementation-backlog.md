@@ -3858,22 +3858,6 @@ ehr     0     0     0     0   648   208   128   556     0
   applies `normalizeMuscle` before the lookup. Working correctly.
 
 
-### [workouts] Q-299b — 83% of sets carry no `planned_reps`, and nobody has traced why
-
-- **Added:** 2026-08-24 · split off Q-299 when its symmetry fix shipped
-- **Q-299's asymmetry fix shipped** (`packages/shared/src/ai-periodization/autoregulation.ts`) —
-  `metReps` is now null-safe the same way `missedReps` already was, so missing rep-completion data
-  blocks the push path instead of defaulting to "reps were met". Reversal cost was cheap (a code
-  revert, no migration, no data touched), so this was decided and shipped without an owner
-  round-trip — the entry's own two options both agreed the current optimistic-on-one-side behaviour
-  was wrong, and the conservative option (block, don't assume) is the standard default for
-  automated load adjustment acting on absent evidence.
-- **What is deliberately NOT done:** the entry's second half, unstarted. `repCompletionRate` is null
-  on ~83% of sets (of 1,009, `deleted_at IS NULL`: `planned_pct` 28%, `planned_rest_sec` 29%,
-  `planned_reps` 17%) — find out why. Whether it's sets logged outside a prescribed session, or a
-  write path that drops the planned fields, is unknown; the fix above makes the missing-data case
-  *safe*, it doesn't make the data present.
-
 ### [workouts] Q-300 — 37% of sets are taken with materially less rest than prescribed, and the RPE model has no rest term
 
 - **Branch:** `feat/rest-adherence-signal`
