@@ -118,10 +118,13 @@ test('a recipe link with no stated yield asks how many it serves before it can b
 
   // Attribution, and the ask. Neither is optional: the numbers on screen are the whole loaf.
   //
-  // `.last()` because the host can legitimately appear twice — the row falls back to it as a name
-  // until the recipe's own name arrives, so a bare text match is a strict-mode violation waiting on
-  // a slow response rather than a real assertion.
-  await expect(dialog.getByText('example.com').last()).toBeVisible({ timeout: 20_000 })
+  // BY THE ROW, not by its text position (LB-7). The host legitimately appears twice — the row falls
+  // back to it as a NAME until the recipe's own name arrives — and the old `getByText('example.com')
+  // .last()` leant on the attribution rendering after the name. Delete the attribution and `.last()`
+  // would match the name instead and the assertion would still pass, which is no guard at all.
+  const attribution = dialog.getByTestId('meal-source-attribution')
+  await expect(attribution).toBeVisible({ timeout: 20_000 })
+  await expect(attribution).toContainText('example.com')
   await expect(dialog.getByText(/How many does it serve\?/)).toBeVisible()
 
   // The whole point of the mode: a link goes out as `url`, not as free text.
@@ -142,7 +145,9 @@ test('a recipe link with no stated yield asks how many it serves before it can b
   await dialog.getByRole('button', { name: '12', exact: true }).click()
 
   await expect.poll(() => rowKcal(page), { timeout: 10_000 }).toBeLessThan(whole / 8)
-  await expect(dialog.getByText(/from a 12-serve recipe/)).toBeVisible()
+  // The serve count rides INSIDE the attribution row, so this pins the suffix to the row that owns
+  // it rather than to anywhere in the dialog.
+  await expect(attribution).toContainText('from a 12-serve recipe')
   // Offered, and already on: answering the question is the act of accepting the meal, so making the
   // user press Keep separately would be asking twice for one decision.
   await expect(keep).toBeVisible()

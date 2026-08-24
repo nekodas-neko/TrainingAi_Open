@@ -629,6 +629,50 @@ answered by subtraction rather than re-argued. Verified through the real route o
 
 ### [workouts][platform] LA-21 — ✅ SHIPPED 2026-08-24: implausible session durations are culled from statistics
 
+- **Lane:** A — `packages/shared/src/health/workout-energy.ts`, `app/api/health-trends`.
+- **Added:** 2026-08-24, found while shipping Q-420's derivation — the derived series made it visible
+  on nine points where it had been visible on one.
+- **⚠️ MEASURED IN PRODUCTION 2026-08-24, and the filing above was wrong about severity.** It said
+  *"not a live corruption… the owner's production rows do not currently show one."* **They show
+  eleven.** Of 81 completed sessions, **11 (13.6%) span 534–845 minutes — 8.9 to 14.1 hours.**
+- **The distribution is bimodal with an empty gap, which is what makes it a defect and not a long
+  workout:**
+
+  | duration | sessions |
+  |---|---:|
+  | 0–30 min | 21 |
+  | 30–60 min | 26 |
+  | 60–90 min | 21 |
+  | 90–120 min | 2 |
+  | *120–534 min* | **0** |
+  | 534–845 min | **11** |
+
+  p50 is **56 minutes**; p90 is **548**. Nothing at all sits between 92 and 534 minutes, so these are
+  not the tail of a distribution — they are a different phenomenon.
+- **They are REAL, COMPLETE workouts, which decides clamp-vs-exclude.** Each of the eleven carries
+  **5–6 exercises, 13–18 sets and 3,700–7,400 kg of volume**. Excluding them would delete genuine
+  training from the record; the duration is the only thing wrong. **Clamp, do not exclude** — the
+  earlier note guessing the opposite for the load series was written before this was measured.
+- **They all stopped, and nobody knows why.** Every one is between **2026-05-04 and 2026-05-29**, and
+  there has not been another since. Per CLAUDE.md that makes it **unexplained, not fixed** — whatever
+  produced it may still be reachable, and the fix should bound the number regardless of cause.
+- **Live exposure today is smaller than 13.6% sounds, and this is worth knowing before pricing it.**
+  None of the eleven carries a session RPE **or a single rated set**, so they are invisible to
+  `health-trends`' `sessionLoad` series — checked specifically against Q-420's derivation, which
+  reads set RPEs and therefore does *not* pull them in. And `app/api/body-metadata` only ever reads
+  **today's** workouts, so the day-energy path cannot reach a May session. What is left is the
+  per-session views: `workout-sessions/[id]/energy` and the recap, where opening one of those eleven
+  shows a calorie estimate built on a 10× duration.
+- **What.** `durationMin = (completedAt - startedAt) / 60_000` with **no upper bound anywhere**:
+  `app/api/health-trends/route.ts` (`sessionLoad = rpe × durationMin`), `estWorkoutKcal` and
+  `estSessionKcal` (`workout-energy.ts:113, 225`). Observed on the dev database: a session spanning
+  **1,176 minutes** produced `sessionLoad 10585` against a normal 440 — **24×** — and it would carry
+  the same factor into the calorie estimate and into anything reading the load series (ACWR, training
+  stress).
+- **Why it is not merely cosmetic:** ACWR is a ratio of recent to chronic load, so a single 24× point
+  distorts both windows for weeks, and it distorts them in the direction that reads as "you are
+  training far too hard".
+
 - **Lane:** A · **Branch:** `fix/cull-implausible-session-duration`
 - **Owner-decided 2026-08-24:** *"There are likely all errors from it being left on too long. Make
   sure they are culled from statistics."* Culled, not clamped — a clamped figure is still partly
@@ -932,40 +976,6 @@ residual into a correction rather than a mystery.
 - **What would count as done:** a stated multiplier with its confidence, derived only from gated
   windows, applied to active energy everywhere at once, holding at exactly 1.0 whenever the gates fail
   — and a written measurement of how many past days it moved.
-
-### [nutrition][platform] LB-7 — the recipe spec's attribution assertion can pass with no attribution
-
-> **⚠️ REWRITTEN 2026-08-24 — the diagnosis below was wrong about the cause, and the blocking failure
-> is already fixed (#359).** This entry was filed from a CI failure and reasoned that *"when the
-> scrape returns no title the name falls back to the host"*. That fallback is real, but it was not
-> what happened. **The CI server log shows `POST /api/nutrition/scan 400` three times, once per
-> failing attempt** — the request reached the real route, so the spec's `page.route` stub never
-> applied and the row fell into its could-not-resolve state, where the host IS the name.
->
-> **Why the stub was bypassed:** `public/sw-template.js` re-issues **every** `/api/` request — no
-> method filter — so once the service worker controls the page the request originates from the
-> worker, and Playwright does not intercept service-worker fetches. Whether the worker has taken
-> control by the time the POST fires is a race, which is why the same run had three failures and one
-> stubbed pass, and why it passed locally every time. Fixed with
-> `test.use({ serviceWorkers: 'block' })`; both that rule and "never `expect` inside a route handler"
-> are now in `e2e/README.md`.
->
-> **Chasing "make the scrape mock return no title" would have fixed a condition that was not
-> occurring.**
-
-- **Lane:** B — `e2e/` only now.
-- **Branch:** `fix/recipe-spec-structural-attribution`
-- **Placement:** low. Not blocking anything; the spec is green.
-
-**What is left, and it is the one point of the original entry that still stands.** The assertion is
-`dialog.getByText('example.com').last()`. `.last()` targets the attribution today because it renders
-after the name — but if the attribution row disappeared entirely, `.last()` would match the *name*
-and the assertion would still pass. A guard that survives the removal of the thing it guards is not
-a guard.
-
-**Fix shape:** assert on the attribution's structure rather than on its text position — it is the row
-carrying the `Link2` icon and the `· from a N-serve recipe` suffix. A `data-testid` on that row is
-the cheap version. Then delete the `.last()` and its comment.
 
 ### [nutrition] Q-387 — a half-logged day is indistinguishable from a light day, and it drags the calibrated maintenance down with nothing to stop it
 
