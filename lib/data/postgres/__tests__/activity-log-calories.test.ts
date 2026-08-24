@@ -57,7 +57,7 @@ describe.skipIf(!canRun)('saveActivityLog — derives calories when the caller h
     expect(log.caloriesBurned!).toBeGreaterThan(0)
   })
 
-  itVendor('agrees with the aggregate that recomputes the same activity', async () => {
+  it('agrees with the aggregate that recomputes the same activity', async () => {
     // Not "roughly" — the identical estimator at the identical intensity. If these drift, a walk's
     // own row and the day's Burned total start telling the lifter two different numbers for it.
     const { estWorkoutKcal } = await import('@trainingai/shared/health/workout-energy')

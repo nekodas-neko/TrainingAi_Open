@@ -35,6 +35,9 @@ describe('daily-energy', () => {
     expect(r).toEqual({ workoutKcal: 0, activityKcal: 0, stepsKcal: 0, total: 0, workoutKcalBySession: [] })
   })
 
+  // Still vendor-gated after Q-312, and deliberately: this asserts a MAGNITUDE, which is exactly
+  // what the synthetic constants do not carry. The floor makes the number non-zero; it cannot make
+  // it 200–400.
   itVendor('estimates a strength session in a sane range (~200-400 kcal for 55 min)', () => {
     const r = computeActiveEnergy({ profile, strengthSessions: [{ durationMin: 55 }], activities: [], pedometerSteps: null })
     expect(r.workoutKcal).toBeGreaterThan(200)
@@ -44,6 +47,17 @@ describe('daily-energy', () => {
     expect(r.total).toBe(r.workoutKcal)
   })
 
+  // Still vendor-gated, and this one is the interesting case. It PASSES on the synthetic table
+  // today — running lands at met_easy 2.6 against walking's 2.2 — but only by accident: the scrub
+  // ramps within a band on `seq % 10`, and running (id 12, position 11) and walking (id 14,
+  // position 13) happen to land 0.4 apart in the right direction. Insert one activity above
+  // position 11 in the vendor's dict and the offsets shift; the ordering can invert with no code
+  // change at all.
+  //
+  // A key-based synthetic table structurally cannot guarantee an ordering between two NAMED
+  // activities — that ordering is a fact about the vendor's table, which is what `itVendor` is for.
+  // Unguarding it would buy a test that passes by luck and fails one day for a reason unrelated to
+  // anything anyone changed, which is the same trap as a hardcoded timestamp.
   itVendor('counts a logged run and it burns more than an equal-duration walk', () => {
     const run = computeActiveEnergy({ profile, strengthSessions: [], activities: [{ activityType: 'run', durationMin: 30 }], pedometerSteps: null })
     const walk = computeActiveEnergy({ profile, strengthSessions: [], activities: [{ activityType: 'walk', durationMin: 30 }], pedometerSteps: null })
@@ -51,7 +65,7 @@ describe('daily-energy', () => {
     expect(walk.activityKcal).toBeGreaterThan(0)
   })
 
-  itVendor('estimates a logged activity duration from distance when duration is missing', () => {
+  it('estimates a logged activity duration from distance when duration is missing', () => {
     const withDur = computeActiveEnergy({ profile, strengthSessions: [], activities: [{ activityType: 'run', durationMin: 30 }], pedometerSteps: null })
     const withDist = computeActiveEnergy({ profile, strengthSessions: [], activities: [{ activityType: 'run', distanceKm: 4.5 }], pedometerSteps: null }) // ~30 min at 9km/h
     expect(withDist.activityKcal).toBeGreaterThan(0)
@@ -59,14 +73,14 @@ describe('daily-energy', () => {
     expect(Math.abs(withDist.activityKcal - withDur.activityKcal)).toBeLessThan(withDur.activityKcal * 0.15)
   })
 
-  itVendor('only counts steps above the sedentary baseline', () => {
+  it('only counts steps above the sedentary baseline', () => {
     const below = computeActiveEnergy({ profile, strengthSessions: [], activities: [], pedometerSteps: STEP_BASELINE - 500 })
     expect(below.stepsKcal).toBe(0)
     const above = computeActiveEnergy({ profile, strengthSessions: [], activities: [], pedometerSteps: STEP_BASELINE + 7000 })
     expect(above.stepsKcal).toBeGreaterThan(0)
   })
 
-  itVendor('subtracts a logged outdoor walk\'s steps from the passive total (no double-count)', () => {
+  it('subtracts a logged outdoor walk\'s steps from the passive total (no double-count)', () => {
     // 10000 pedometer steps, but a logged 5km walk (~6500 steps) happened outdoors.
     const noLog = computeActiveEnergy({ profile, strengthSessions: [], activities: [], pedometerSteps: 10000 })
     const withLog = computeActiveEnergy({
@@ -81,7 +95,7 @@ describe('daily-energy', () => {
     expect(5 * STEPS_PER_KM).toBe(6500)
   })
 
-  itVendor('sums the three sources into total', () => {
+  it('sums the three sources into total', () => {
     const r = computeActiveEnergy({
       profile,
       strengthSessions: [{ durationMin: 45 }],

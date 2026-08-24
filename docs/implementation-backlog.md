@@ -3923,33 +3923,6 @@ ehr     0     0     0     0   648   208   128   556     0
   nothing plays that role for this project's own users' identifiers. Whether that wants a second list
   or a widening of the existing one is a design decision; see the review's closing section.
 
-### [platform] Q-312 — the synthetic MET table is physiologically impossible, and it costs ~9 tests in CI
-
-- **Branch:** `fix/test-constants-met-floor`
-- **Found:** 2026-08-16, while guarding the constant-dependent tests for A4b.
-
-`scripts/generate-test-constants.js` replaces every number with a ramp in [0.1, 1.0] for fractions and
-[1, 8] for integers. Applied to `energy-expenditure-features.json` that yields METs **below 1.0** —
-impossible, since 1 MET *is* resting metabolism — and `estWorkoutKcal`'s net-MET guard therefore
-returns null for every activity.
-
-The consequence is not that a few parity assertions differ; it is that assertions with nothing to do
-with vendor magnitudes cannot run at all. Nine tests are guarded off in CI purely because both sides
-of the comparison are null: the "agrees with the aggregate that recomputes the same activity"
-consistency check in `activity-log-calories.test.ts` (a Q-230 sibling-drift guard), the run-burns-
-more-than-walk ordering, the steps-baseline subtraction, and the three-source summation in
-`daily-energy.test.ts`.
-
-**Do:** give the generator a floor for MET-shaped keys — `met_easy`/`met_moderate`/`met_hard` scrub to
-a ramp starting at 1.0, ordered easy < moderate < hard. That is public physiology, not the vendor's
-tuning, so it discloses nothing. Then remove the `itVendor` guards that were only there because the
-value was unusable rather than because the assertion is a parity check.
-
-**Constraint that decides when:** fixtures can only be regenerated on a machine that still has the
-vendor's files (`generate-test-constants.js` exits early otherwise). Since A4b that is the owner's
-machine or a restored archive — a session cannot do it. Needs the owner to run one command, or a
-session working from a temporarily restored copy.
-
 > **Q-258 FIXED and removed, 2026-08-16 (v1.317.3).** Four goal inputs in `goal-targets-section.tsx`
 > (steps, sleep, water, calories) and two in `required-info-section.tsx` (weight, body fat) had
 > `<Label>`s associated with nothing. **The convention already existed in the same file** —

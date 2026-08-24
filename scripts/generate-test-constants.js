@@ -116,10 +116,39 @@ function fakeNumber(n, seq) {
   return Number((((seq % 10) + 1) / 10).toFixed(3))
 }
 
+/**
+ * MET keys get a floored, band-separated ramp instead of the generic one (Q-312).
+ *
+ * The generic ramp puts fractions in [0.1, 1.0], which for a MET is physiologically impossible —
+ * 1 MET *is* resting metabolism — and it scrambles the tiers, so a scrubbed activity could read
+ * `met_easy 1.0, met_hard 0.2`. That is not a cosmetic wrongness: `estWorkoutKcal` computes
+ * `max(0, duration × (met − 1.5) × bmrPerMinute)`, so **every activity at every tier returns 0**,
+ * and nine assertions that have nothing to do with vendor magnitudes cannot run at all — they
+ * compare zero with zero.
+ *
+ * **The floor has to clear 1.5, not 1.0.** A ramp starting at 1.0 leaves `met − 1.5` negative and
+ * the `max(0, …)` still returns 0, so the tests stay exactly as degenerate. The bands below are
+ * disjoint, which is what makes `easy < moderate < hard` a property of the design rather than of
+ * where the value happened to land in the walk.
+ *
+ * This discloses nothing. That resting metabolism is 1 MET, and that a hard effort exceeds an easy
+ * one, is public physiology (Ainsworth et al.) — the vendor's actual per-activity tuning is still
+ * entirely absent, and no real number survives here any more than anywhere else in this file.
+ */
+const MET_BANDS = { met_easy: 2, met_moderate: 4, met_hard: 6 }
+
+function fakeMet(base, seq) {
+  return Number((base + ((seq % 10) / 10)).toFixed(3))
+}
+
 function scrub(value, state, key) {
   if (typeof value === 'number') {
     if (Number.isInteger(value) && STRUCTURAL_KEYS.has(key)) return value
-    return fakeNumber(value, state.seq++)
+    const seq = state.seq++
+    // After the increment, never instead of it: the MET keys must consume their position in the
+    // walk exactly as the generic ramp would, or every later value in the file shifts.
+    if (Object.prototype.hasOwnProperty.call(MET_BANDS, key)) return fakeMet(MET_BANDS[key], seq)
+    return fakeNumber(value, seq)
   }
   if (Array.isArray(value)) return value.map(v => scrub(v, state, key))
   if (value && typeof value === 'object') {
