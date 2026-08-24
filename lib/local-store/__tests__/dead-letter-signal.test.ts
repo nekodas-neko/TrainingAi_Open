@@ -14,6 +14,7 @@ import {
   getDeadLetterCount,
   setDeadLetterCount,
   subscribeDeadLetterCount,
+  reportEnqueueFailure,
 } from '../dead-letter-signal'
 
 function failed(id: string, domain: PendingMutation['domain']): PendingMutation {
@@ -54,5 +55,45 @@ describe('dead-letter signal', () => {
     await reconcileDeadLetters('u1')
     expect(getDeadLetterCount()).toBe(2)
     expect(toastError).not.toHaveBeenCalled()
+  })
+})
+
+// Q-486: an enqueue that THREW leaves no outbox row, so nothing else in the app can ever see it.
+describe('reportEnqueueFailure', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    localStorage.clear()
+    setDeadLetterCount(0)
+  })
+
+  it('warns and toasts for a Tier-A domain', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    reportEnqueueFailure('workout_log', new Error('no such table: outbox'))
+    await vi.waitFor(() => expect(toastError).toHaveBeenCalledTimes(1))
+    expect(warn).toHaveBeenCalled()
+    warn.mockRestore()
+  })
+
+  it('names the loss differently for a finished workout than for a set', async () => {
+    reportEnqueueFailure('complete_workout', new Error('db closed'))
+    await vi.waitFor(() => expect(toastError).toHaveBeenCalledTimes(1))
+    expect(String(toastError.mock.calls[0][0])).toContain('Finishing this workout')
+  })
+
+  it('warns but does not interrupt for a Tier-B domain', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    reportEnqueueFailure('food_logs', new Error('db closed'))
+    await new Promise(r => setTimeout(r, 10))
+    expect(toastError).not.toHaveBeenCalled()
+    expect(warn).toHaveBeenCalled()
+    warn.mockRestore()
+  })
+
+  // The badge counts rows the Data & Sync card can retry or discard; this failure has no row, so a
+  // count lit from here would be one that card could neither explain nor clear.
+  it('leaves the badge alone', async () => {
+    reportEnqueueFailure('workout_log', new Error('db closed'))
+    await vi.waitFor(() => expect(toastError).toHaveBeenCalledTimes(1))
+    expect(getDeadLetterCount()).toBe(0)
   })
 })

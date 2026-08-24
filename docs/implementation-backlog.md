@@ -370,9 +370,13 @@ Two have shipped since this block was written: **Q-399** (#163, the centred labe
 room for its ingredient list) and **Q-402** (#165, a component is told when its cache key is
 invalidated). Their entries were correctly removed on merge.
 
-**Q-359 sits above the block deliberately** — it is Lane B's follow-up to Q-402, and it reports that
-**36 other fetch-once effects carry the same latent bug**. That is the general version of the defect
-Q-402 fixed in one place, so it outranks the remaining nutrition work rather than interrupting it.
+~~**Q-359 sits above the block deliberately**~~ — **that placement expired and Q-359 has been moved
+down (2026-08-24).** It was put here because 36 fetch-once effects carried Q-402's bug and some of
+them were in the permanently-mounted shell, where it can actually bite. Four slices later the
+can-bite group is **zero**; the 12 that remain all unmount on navigate, and the check script's own
+per-site judgement is that **none of them is worth converting** — a subscription on a key nothing
+writes while the component is up adds a refetch with no reader waiting for it, which Q-359's entry
+itself warns against. It stays queued as the home of its ratchet, not as work.
 
 **Realistically today, and this is the honest split:**
 - **Achievable** — Q-401 is small, self-contained and independent of the rework. (**Q-399 and Q-402
@@ -868,162 +872,6 @@ residual into a correction rather than a mystery.
 - **What would count as done:** a stated multiplier with its confidence, derived only from gated
   windows, applied to active energy everywhere at once, holding at exactly 1.0 whenever the gates fail
   — and a written measurement of how many past days it moved.
-
-### [app-shell] Q-359 — 36 other fetch-once effects have Q-402's latent bug; only the shell ones can bite
-
-- **Branch:** `chore/adopt-use-cached-value`
-- **Added:** 2026-08-19 · Lane B, while fixing Q-402 · [`journal`](overview/entries/2026-08-19-cache-invalidation-signal.md)
-- **Placement:** low. **Latent, not broken.** Q-402 shipped the mechanism (`subscribeToInvalidation`
-  + `useCachedValue`); this is adoption, and adopting it everywhere at once is a large diff across
-  screens with no component-test route.
-- **What.** **36** `useEffect(() => { … cachedFetch … }, [])` blocks remain — 37 on `main` before
-  the one conversion below (see the counting correction above; this entry originally said 36, from a
-  scan that missed single-line effects). All of them evict correctly through `lib/cache-groups.ts` and none of them ask for a new
-  value afterwards. **That is only a bug where the component does not unmount**, which is why 36 of
-  them have never been reported: navigate away from a sheet or a screen and its next mount refetches.
-  The persistent tab shell is the exception, and it is where the owner found it.
-- **Do the shell ones first, and identify them rather than assuming.** Anything rendered by Home /
-  the tab shell that is not behind a route change: `components/home-day-timeline.tsx` (two),
-  `components/calendar-widget.tsx`, `components/health/*-card.tsx` where Home renders them. The
-  full list, regenerated:
-  ```
-  grep -rn -A6 'useEffect(() => {' app components --include='*.tsx' --include='*.ts' | grep -B6 cachedFetch
-  ```
-  (the count above came from a small AST-free scan for `useEffect(…, [])` blocks containing
-  `cachedFetch`; it is a starting list, not a proof of completeness).
-- **Not every one should convert.** A site that deliberately fetches once — a sheet that snapshots
-  data at open, `sync-provider`'s warm pass — is correct as it stands. Converting it would add
-  refetches with no reader waiting for them. Judge per site; this is not a codemod.
-- **✅ THE RATCHET SHIPPED 2026-08-19 (v1.325.4). The sweep is what remains.**
-  `scripts/check-fetch-once-effects.js` freezes all 36 with a shrink-only per-file baseline: a file
-  not listed must have zero, a listed file may only shrink, and a file that reaches zero must have
-  its row deleted. Growth is stopped; each conversion is now visible in a diff.
-  [`Journal`](overview/entries/2026-08-19-fetch-once-ratchet.md).
-  **The baseline is grouped by whether the site can actually bite: 19 / 1 / 16.** Work the first
-  group. **⚠ The grouping was wrong the first time and the correction is the reusable part:** sheets
-  do NOT unmount here — the tab screens render them unconditionally with a null prop
-  (`<ActivityDetailSheet log={selectedActivity} />`), so they are permanently mounted too. Re-checked
-  by tracing each renderer up to a tab screen, the "can bite" group went from 14 to **19**. Judge a
-  site by where it is mounted, never by its filename.
-  **⚠ The count in this entry was one low, found by mutation-checking the new rule.** The scan
-  behind it required a newline before the effect's closing brace, so it **missed single-line
-  effects entirely**. Measured on `main`: **37** with the correct pattern against 36 with the old
-  one, and `nutrition-content.tsx` has **two**, not one. One conversion below leaves **36**.
-  **`useCachedValue` gained an `onError` callback** in the same change, because the first real
-  conversion needed it — `cachedFetch` swallows `!res.ok` including this app's own rate limit, and a
-  card without it cannot tell "no data" from "the request failed".
-- **✅ SLICE 1 SHIPPED 2026-08-19 (v1.325.6) — six leaf-card files, 36 → 29.**
-  [`Journal`](overview/entries/2026-08-19-fetch-once-slice-1.md). Converted: `home-day-timeline`
-  (2), `calendar-widget` (its keyed `calendar-data:` effect too, which the ratchet does not count
-  because its deps are not `[]` but which goes stale the same way), `activity/exercise-detected-card`,
-  `health/hr-recovery-profile-card`, `health/strength-progress-card`, `cardio/trends-section`.
-  Three results worth carrying:
-  1. **`useCachedValue` gained a `today` option.** Without it the hook could only ever convert the
-     plain-`cachedFetch` half of the sweep, and the `cachedFetchToday` half would have had to
-     *switch variant* to adopt it — the exact drift the one-variant rule forbids.
-     `lib/hooks/__tests__/use-cached-value-today-agreement.test.ts` cross-checks every literal-key
-     hook call against `sync-provider`'s warm list, and is mutation-checked both ways.
-  2. **`home-day-timeline`'s bespoke `ta:oura-ble-synced` listener is gone.** Q-91 added it because
-     that widget never refetched after a BLE drain invalidated its key — Q-402's bug with a
-     hand-built workaround for one event. The invalidation signal covers every writer instead.
-     Safe because `cache-groups.test.ts` already asserts `invalidateOuraSync` clears that key.
-     **Three sibling listeners remain** (`session-select-content`, `health-content`,
-     `sleep-content`) and should go the same way when those files are converted.
-  3. **The can-bite grouping was wrong again** — see the note in the check script. It was 18, not
-     19: `cardio/trends-section` is rendered only by `/cardio`, which is not one of the five tabs.
-- **✅ SLICE 2 SHIPPED 2026-08-19 (v1.325.7) — four more files, 29 → 25.**
-  [`Journal`](overview/entries/2026-08-19-fetch-once-slice-2.md). `health/training-stress-line`
-  (the first real use of slice 1's `today` option), `activity/exercise-review-sheet`,
-  `activity/activity-detail-sheet` (the shared `hr-profile` key in both) and
-  `workout-select-content` (`muscle-recovery`). ~~The can-bite group is down to 8, all of them in
-  the four tab-screen orchestrators.~~ **That was wrong — see slice 3.**
-- **✅ SLICE 3 SHIPPED 2026-08-19 (v1.325.8) — and most of it was a correction, not a conversion.**
-  [`Journal`](overview/entries/2026-08-19-fetch-once-scanner-correction.md).
-  **`scripts/check-fetch-once-effects.js` was over-counting, and by a lot: 25 sites across 16 files
-  were really 15 across 12. Ten of the twenty-five never existed.** Its non-greedy regex started at
-  a `useEffect(() => {` and ran to the first `}, [])` *anywhere* after it, so when that effect had
-  real dependencies the match swallowed everything up to a later effect's close — other effects,
-  `useCallback` bodies, plain functions — and searched the lot for `cachedFetch`. Five lines
-  reproduce it, and they are in the script. It now brace-matches the effect body.
-  **What that changes about the work, which is the part worth reading:**
-  - `health-content` (2) and `nutrition-content` (2) have **no fetch-once effect at all**. Their
-    fetches sit in tab-group `useCallback`s re-run on `tabEpoch` — the shape this rule is *steering
-    people toward*. Two sessions' worth of "the hard ones, do them last" was aimed at nothing.
-  - `sync-provider` (1) the same: its warm pass is a plain function. The "deliberately fetch-once"
-    category that entry justified had no members and is gone.
-  - `workout-screen` (2) is a `[userId]` effect; `running-plan-content` was 3, not 4.
-  - **So the can-bite group was two sites, not eight.** This slice converts one —
-    `session-select-content`'s `more-user-profile`, which is load-bearing: two paths invalidate that
-    key, so changing a display name or avatar left Home's greeting stale until an app restart.
-  - ~~One can-bite site remains.~~ **Done in slice 4.**
-- **✅ SLICE 4 SHIPPED 2026-08-19 (v1.325.9) — the can-bite group is now ZERO.**
-  [`Journal`](overview/entries/2026-08-19-invalidation-refetch-hook.md). **12 sites across 10 files
-  remain and every one of them unmounts on navigate**, so what is left is latent by definition. The
-  shell-level half of this entry is finished.
-  - **A second hook was needed and is the reusable part**: `lib/hooks/use-invalidation-refetch.ts`.
-    `useCachedValue` replaces a read outright — it holds, seeds and fetches the value — which does
-    not fit a read that also seeds from the local SQLite store, wraps its fetch in `fetchWithRetry`,
-    or sets several pieces of state. `useInvalidationRefetch(keys, fn)` gives such a read the half it
-    does need: something asks for a new value when a write clears the old one.
-  - **The real bug it fixed, beyond the ratchet**: three screens listened for `ta:oura-ble-synced`
-    and refetched. `sleep-sessions` is also cleared by `invalidateBiometrics`, so a manually-edited
-    sleep row or a Health Connect ingest left all three stale until a remount — only the BLE path
-    self-healed, because it was the only writer that dispatched an event. All three converted
-    together per the sibling-surface rule.
-  - **It coalesces, and the three-key call site needs that**: `invalidateCache` fires once per key,
-    so a group clearing all of health-content's three would otherwise run its whole meta load three
-    times.
-- **What is left of Q-359, for whoever takes it next.** Twelve latent sites, none urgent, and the
-  entry stays queued only for them. Judge any future addition by where the component is **mounted** —
-  grep for its name and check the renderer against `components/shell/tabs.ts`. That rule has been got
-  wrong three times in this Q's own history.
-  - **The lesson is about the check, not the sweep:** a scanner's own baseline is evidence, and this
-    one had never been checked against a hand count. The mutation check it shipped with proved it
-    caught a *new* site; nothing proved the sites it already listed were real.
-- **Correction to slice 1's note about `lib/__tests__/q165-cache-seeded-reads.test.ts`:** it said
-  that test would red when the two sheets converted. **It did not, and the reason is worth keeping.**
-  It asserts `readCacheSync<` and `cachedFetch<` appear literally in three files; each sheet has
-  *two* fetches, and only the `hr-profile` one is a fetch-once site. The keyed `hr-window:` fetch
-  stays (its key changes per session, and `useCachedValue` has no way to express "no key yet" for a
-  sheet mounted with a null prop), so both strings survive. `coach/coach-history.tsx` has a single
-  fetch and is the one that will actually red — it is in the unmount group, so not soon.
-- **Lane B owns this** (`app/**` ex-`app/api`, `components/**`, `lib/hooks/**`).
-- **Not verified:** static scan for the remaining 29. **No screen was observed going stale** — they
-  are inferred from the shape, and the one confirmed instance is Q-402's, which is fixed. Slice 1's
-  six files were exercised on `pnpm dev` (Home, Health and `/cardio` render clean and fetch their
-  routes) but **the refetch-on-invalidation half was not driven end to end** — that needs the Home
-  fixture below, which still does not exist.
-- **✅ THE FIXTURE AND THE GUARD SHIPPED 2026-08-20.** `e2e/fixtures.ts` gains
-  `ensureEnergyBalanceProfile()` and `enableHomeCards(page, keys)`, and
-  `e2e/home-card-invalidation-refetch.spec.ts` drives Q-402's mechanism end to end for the first
-  time: Home stays mounted, a body-metric write from its own quick-log sheet clears
-  `energy-balance:`, and the card issues a **second** GET. Mutation-checked — restoring the
-  pre-Q-402 `useEffect(…, [])` shape makes it red with its own message.
-  [`Journal`](overview/entries/2026-08-20-home-card-invalidation-guard.md).
-  **Correction to what this bullet used to say:** the seeded user was described as missing
-  `height_cm`/`date_of_birth`/`sex`. It has height (180) and sex (male) — **only `date_of_birth`
-  was missing**, and the route names exactly one field in `missingProfileFields`. The fixture is one
-  column, not three, and `COALESCE`s the other two so it stays correct if the seed changes.
-  The second half was right: `DEFAULT_CARD_WIDGETS` is empty, so Home renders no card widgets at
-  all until `ta_ss_cards` is set.
-  **Why it asserts the request rather than the number:** a changed figure could come from a
-  remount and an unchanged one proves nothing, so only a second GET is present-only-if-working.
-- **What is still open: the twelve latent sites, and on current evidence NONE is worth converting.**
-  Judged per site 2026-08-20 and written into `scripts/check-fetch-once-effects.js` beside the
-  baseline, so the next session reads it where it is looking rather than re-deriving it. Four read
-  `hr-profile` or an HR series during or just after a run/workout, when nothing writes those keys;
-  `my-meals-picker` reads `saved-meals` and the only writer reachable from its flow runs **after**
-  `{step === 4 && …}` has unmounted it; the rest are route-level screens whose next mount refetches.
-  Converting one is not harmful but adds a refetch with no reader waiting, which this entry warns
-  against. **The limit of that judgement, stated rather than buried:** for `my-meals-picker` it is
-  "no writer found reachable", not "proven unreachable" — whether `saved-meals-sheet` can open on
-  top of the wizard was not traced. **Re-judge any site if a new writer starts clearing its key
-  while it is on screen.** The entry stays queued as the place that record lives.
-- **The check's own prose count had drifted, in the file whose lesson is about unverified counts.**
-  It read "13 sites across 11 files" against a baseline map holding **12 across 10** — a conversion
-  removed a file and left the sentence behind. Corrected, with a note to count off the map rather
-  than trust the line. Same class as the over-counting scanner it sits beside, and the reason the
-  run line prints computed totals.
 
 ### [nutrition] Q-387 — a half-logged day is indistinguishable from a light day, and it drags the calibrated maintenance down with nothing to stop it
 
@@ -1964,50 +1812,25 @@ this fits without an extraction.
 
 ### [workouts][devices] Q-486 — the outbox enqueue for a workout is the only write in the app that fails silently, and it is the last line of defence
 
+> **The code half landed 2026-08-24 (v1.346.0).** The four `queueMutation` calls in
+> `components/workout-screen.tsx` now route their rejection through `reportEnqueueFailure` in
+> `lib/local-store/dead-letter-signal.ts` — a `console.warn` matching the one already above them, and
+> a Tier-A toast naming what was lost. Control flow is unchanged and they are still fire-and-forget.
+> [`journal`](overview/entries/2026-08-24-tier-a-enqueue-visibility.md).
+>
+> **One correction to the fix shape below, and it is the reason this took a decision rather than four
+> lines.** The entry said *"signal the user through the existing dead-letter badge"*. The badge counts
+> dead-lettered outbox **rows**, which the Data & Sync card lists so they can be retried or discarded.
+> A throw leaves no row — that is the whole defect — so a badge lit from here would show a count that
+> card can neither explain, act on, nor clear. The toast fires at the moment of loss instead, which is
+> also the only moment the user can do anything about it: re-log the set.
+
 - **Branch:** `fix/tier-a-enqueue-visibility`
-- **Added:** 2026-08-18 · review sweep (swallowed failures on write paths) ·
-  [`docs/reviews/2026-08-18-tier-a-enqueue-silence.md`](reviews/2026-08-18-tier-a-enqueue-silence.md)
-- **Placement:** mid. Narrow trigger, but the loss is unrecoverable and un-diagnosable, on the domain
-  the codebase itself calls worst-case. The fix is four lines.
-- **The four sites — the ONLY `queueMutation` calls in the app that swallow, and all Tier-A:**
-  ```
-  components/workout-screen.tsx:1320  queueMutation({domain:'workout_log'}).catch(() => {})
-  components/workout-screen.tsx:1324  queueMutation({domain:'workout_log'}).catch(() => {})
-  components/workout-screen.tsx:1527  queueMutation({domain:'complete_workout'}).catch(() => {})
-  components/workout-screen.tsx:1532  queueMutation({domain:'complete_workout'}).catch(() => {})
-  ```
-  `lib/local-store/dead-letter-signal.ts` defines Tier-A and says why: *"a lost workout is the app's
-  worst-case data loss."*
-- **Read this before judging the size: the surrounding design is GOOD and must not be undone.**
-  `logWorkoutLocally` writes locally first (and logs its own failure); the **primary** send is a direct
-  `POST /api/log-exercise`, deliberately *"independent of the on-device outbox / sync-push path (which
-  can fail silently)"*; the outbox enqueue is only the **fallback**. This is not a write with no outbox
-  — it is a well-layered write whose last layer is silent.
-- **It can throw.** `queueMutation` is a bare `runSQL` INSERT (`sqlite-backend.ts:2669`), so it throws
-  whenever the local DB is unavailable — which `CLAUDE.md` records as having happened **twice** on
-  Android (*"the local DB has been silently dead … every local read returned empty"*), plus the
-  partial-migration and `disk_full` cases.
-- **The sequence that loses a set:** the POST fails (offline — the case this fallback exists for)
-  **and** the local store is broken. Then the set is not sent, not queued, not recoverable; **nothing
-  is logged**; and `hapticLight()` + `setLoggedCount(c => c + 1)` have already told the user it worked.
-- **The inconsistency is the argument.** In the same function, `logWorkoutLocally` failing is
-  `console.warn`ed and `queueMutation` failing is not — the *less* consequential failure is the visible
-  one. The warn above shows the intent; this looks like an oversight, not a decision.
-- **Fix shape (do NOT change control flow):**
-  1. `.catch(err => console.warn('queueMutation failed:', err))` ×4 — matches the line above, makes the
-     condition diagnosable at all.
-  2. Signal the user, since this loss is unrecoverable — a toast, or route it through the existing
-     `lib/local-store/dead-letter-signal.ts` so the More-tab badge lights. The mechanism already exists.
-  - **Do NOT convert these to `await`.** They are fired without blocking on purpose so the UI stays
-    instant (`Saves feel instant`); awaiting puts a SQLite write in front of the haptic.
-- **Lane B owns this** (`components/**`).
-- **NOT reproduced, and cannot be here.** Inducing it needs a broken local SQLite on a device; in the
-  web sandbox `getLocalStore` returns null, so `store_?.` short-circuits and the enqueue never runs.
-  That `queueMutation` throws on a dead local DB is read from source, not observed. **On-device is the
-  only real verification.**
-- **Clean and worth not re-checking:** **26 of ~30** `queueMutation` sites correctly `await`, so a
-  throw reaches a `try` and suppresses the success toast — `components/health/metric-log-sheet.tsx:96`
-  is the reference shape.
+- **Lane:** B
+- **Keep:** the on-device check. **Not reproduced and cannot be here** — inducing it needs a broken
+  local SQLite on a device; in the web sandbox `getLocalStore` returns null, so `store_?.`
+  short-circuits and the enqueue never runs. That `queueMutation` throws on a dead local DB is read
+  from source, not observed, and that is still true after the fix. `Gate: device`.
 
 ### [platform][body][devices] Q-321 — decide per field which discarded values should quarantine the mutation
 
@@ -2348,6 +2171,173 @@ switching from bare `fetch` to local-delete + `queueMutation`.
 - **Still not exercised:** on device (APK WebView + native local store) and offline, where
   `cachedFetch` cannot revalidate at all. Only **one** card is proven; the other eleven remain a
   worklist.
+
+### [app-shell] Q-359 — 36 other fetch-once effects have Q-402's latent bug; only the shell ones can bite
+
+> **⚠️ NOT WORTH STARTING AS WORK — moved down 2026-08-24, and the reason is in this entry already.**
+> Four slices took the can-bite group to **zero**. The 12 sites that remain all unmount on navigate,
+> and `scripts/check-fetch-once-effects.js` records a per-site judgement that **none of them is worth
+> converting**: a subscription on a key nothing writes while the component is on screen adds a
+> refetch with no reader waiting for it, which this entry warns against in its own "Not every one
+> should convert" bullet. **The last untraced site is now traced** — `my-meals-picker` sits at step 4
+> of a modal wizard, `SavedMealsSheet`'s trigger cannot be tapped underneath it, and the picker
+> writes only component state, so no writer of `saved-meals` is reachable while it is mounted.
+> **The entry stays queued as the home of its ratchet, not as a queue of work.** Re-judge a site only
+> if a NEW writer starts clearing its key while it is on screen.
+
+- **Branch:** `chore/adopt-use-cached-value`
+- **Added:** 2026-08-19 · Lane B, while fixing Q-402 · [`journal`](overview/entries/2026-08-19-cache-invalidation-signal.md)
+- **Placement:** low. **Latent, not broken.** Q-402 shipped the mechanism (`subscribeToInvalidation`
+  + `useCachedValue`); this is adoption, and adopting it everywhere at once is a large diff across
+  screens with no component-test route.
+- **What.** **36** `useEffect(() => { … cachedFetch … }, [])` blocks remain — 37 on `main` before
+  the one conversion below (see the counting correction above; this entry originally said 36, from a
+  scan that missed single-line effects). All of them evict correctly through `lib/cache-groups.ts` and none of them ask for a new
+  value afterwards. **That is only a bug where the component does not unmount**, which is why 36 of
+  them have never been reported: navigate away from a sheet or a screen and its next mount refetches.
+  The persistent tab shell is the exception, and it is where the owner found it.
+- **Do the shell ones first, and identify them rather than assuming.** Anything rendered by Home /
+  the tab shell that is not behind a route change: `components/home-day-timeline.tsx` (two),
+  `components/calendar-widget.tsx`, `components/health/*-card.tsx` where Home renders them. The
+  full list, regenerated:
+  ```
+  grep -rn -A6 'useEffect(() => {' app components --include='*.tsx' --include='*.ts' | grep -B6 cachedFetch
+  ```
+  (the count above came from a small AST-free scan for `useEffect(…, [])` blocks containing
+  `cachedFetch`; it is a starting list, not a proof of completeness).
+- **Not every one should convert.** A site that deliberately fetches once — a sheet that snapshots
+  data at open, `sync-provider`'s warm pass — is correct as it stands. Converting it would add
+  refetches with no reader waiting for them. Judge per site; this is not a codemod.
+- **✅ THE RATCHET SHIPPED 2026-08-19 (v1.325.4). The sweep is what remains.**
+  `scripts/check-fetch-once-effects.js` freezes all 36 with a shrink-only per-file baseline: a file
+  not listed must have zero, a listed file may only shrink, and a file that reaches zero must have
+  its row deleted. Growth is stopped; each conversion is now visible in a diff.
+  [`Journal`](overview/entries/2026-08-19-fetch-once-ratchet.md).
+  **The baseline is grouped by whether the site can actually bite: 19 / 1 / 16.** Work the first
+  group. **⚠ The grouping was wrong the first time and the correction is the reusable part:** sheets
+  do NOT unmount here — the tab screens render them unconditionally with a null prop
+  (`<ActivityDetailSheet log={selectedActivity} />`), so they are permanently mounted too. Re-checked
+  by tracing each renderer up to a tab screen, the "can bite" group went from 14 to **19**. Judge a
+  site by where it is mounted, never by its filename.
+  **⚠ The count in this entry was one low, found by mutation-checking the new rule.** The scan
+  behind it required a newline before the effect's closing brace, so it **missed single-line
+  effects entirely**. Measured on `main`: **37** with the correct pattern against 36 with the old
+  one, and `nutrition-content.tsx` has **two**, not one. One conversion below leaves **36**.
+  **`useCachedValue` gained an `onError` callback** in the same change, because the first real
+  conversion needed it — `cachedFetch` swallows `!res.ok` including this app's own rate limit, and a
+  card without it cannot tell "no data" from "the request failed".
+- **✅ SLICE 1 SHIPPED 2026-08-19 (v1.325.6) — six leaf-card files, 36 → 29.**
+  [`Journal`](overview/entries/2026-08-19-fetch-once-slice-1.md). Converted: `home-day-timeline`
+  (2), `calendar-widget` (its keyed `calendar-data:` effect too, which the ratchet does not count
+  because its deps are not `[]` but which goes stale the same way), `activity/exercise-detected-card`,
+  `health/hr-recovery-profile-card`, `health/strength-progress-card`, `cardio/trends-section`.
+  Three results worth carrying:
+  1. **`useCachedValue` gained a `today` option.** Without it the hook could only ever convert the
+     plain-`cachedFetch` half of the sweep, and the `cachedFetchToday` half would have had to
+     *switch variant* to adopt it — the exact drift the one-variant rule forbids.
+     `lib/hooks/__tests__/use-cached-value-today-agreement.test.ts` cross-checks every literal-key
+     hook call against `sync-provider`'s warm list, and is mutation-checked both ways.
+  2. **`home-day-timeline`'s bespoke `ta:oura-ble-synced` listener is gone.** Q-91 added it because
+     that widget never refetched after a BLE drain invalidated its key — Q-402's bug with a
+     hand-built workaround for one event. The invalidation signal covers every writer instead.
+     Safe because `cache-groups.test.ts` already asserts `invalidateOuraSync` clears that key.
+     **Three sibling listeners remain** (`session-select-content`, `health-content`,
+     `sleep-content`) and should go the same way when those files are converted.
+  3. **The can-bite grouping was wrong again** — see the note in the check script. It was 18, not
+     19: `cardio/trends-section` is rendered only by `/cardio`, which is not one of the five tabs.
+- **✅ SLICE 2 SHIPPED 2026-08-19 (v1.325.7) — four more files, 29 → 25.**
+  [`Journal`](overview/entries/2026-08-19-fetch-once-slice-2.md). `health/training-stress-line`
+  (the first real use of slice 1's `today` option), `activity/exercise-review-sheet`,
+  `activity/activity-detail-sheet` (the shared `hr-profile` key in both) and
+  `workout-select-content` (`muscle-recovery`). ~~The can-bite group is down to 8, all of them in
+  the four tab-screen orchestrators.~~ **That was wrong — see slice 3.**
+- **✅ SLICE 3 SHIPPED 2026-08-19 (v1.325.8) — and most of it was a correction, not a conversion.**
+  [`Journal`](overview/entries/2026-08-19-fetch-once-scanner-correction.md).
+  **`scripts/check-fetch-once-effects.js` was over-counting, and by a lot: 25 sites across 16 files
+  were really 15 across 12. Ten of the twenty-five never existed.** Its non-greedy regex started at
+  a `useEffect(() => {` and ran to the first `}, [])` *anywhere* after it, so when that effect had
+  real dependencies the match swallowed everything up to a later effect's close — other effects,
+  `useCallback` bodies, plain functions — and searched the lot for `cachedFetch`. Five lines
+  reproduce it, and they are in the script. It now brace-matches the effect body.
+  **What that changes about the work, which is the part worth reading:**
+  - `health-content` (2) and `nutrition-content` (2) have **no fetch-once effect at all**. Their
+    fetches sit in tab-group `useCallback`s re-run on `tabEpoch` — the shape this rule is *steering
+    people toward*. Two sessions' worth of "the hard ones, do them last" was aimed at nothing.
+  - `sync-provider` (1) the same: its warm pass is a plain function. The "deliberately fetch-once"
+    category that entry justified had no members and is gone.
+  - `workout-screen` (2) is a `[userId]` effect; `running-plan-content` was 3, not 4.
+  - **So the can-bite group was two sites, not eight.** This slice converts one —
+    `session-select-content`'s `more-user-profile`, which is load-bearing: two paths invalidate that
+    key, so changing a display name or avatar left Home's greeting stale until an app restart.
+  - ~~One can-bite site remains.~~ **Done in slice 4.**
+- **✅ SLICE 4 SHIPPED 2026-08-19 (v1.325.9) — the can-bite group is now ZERO.**
+  [`Journal`](overview/entries/2026-08-19-invalidation-refetch-hook.md). **12 sites across 10 files
+  remain and every one of them unmounts on navigate**, so what is left is latent by definition. The
+  shell-level half of this entry is finished.
+  - **A second hook was needed and is the reusable part**: `lib/hooks/use-invalidation-refetch.ts`.
+    `useCachedValue` replaces a read outright — it holds, seeds and fetches the value — which does
+    not fit a read that also seeds from the local SQLite store, wraps its fetch in `fetchWithRetry`,
+    or sets several pieces of state. `useInvalidationRefetch(keys, fn)` gives such a read the half it
+    does need: something asks for a new value when a write clears the old one.
+  - **The real bug it fixed, beyond the ratchet**: three screens listened for `ta:oura-ble-synced`
+    and refetched. `sleep-sessions` is also cleared by `invalidateBiometrics`, so a manually-edited
+    sleep row or a Health Connect ingest left all three stale until a remount — only the BLE path
+    self-healed, because it was the only writer that dispatched an event. All three converted
+    together per the sibling-surface rule.
+  - **It coalesces, and the three-key call site needs that**: `invalidateCache` fires once per key,
+    so a group clearing all of health-content's three would otherwise run its whole meta load three
+    times.
+- **What is left of Q-359, for whoever takes it next.** Twelve latent sites, none urgent, and the
+  entry stays queued only for them. Judge any future addition by where the component is **mounted** —
+  grep for its name and check the renderer against `components/shell/tabs.ts`. That rule has been got
+  wrong three times in this Q's own history.
+  - **The lesson is about the check, not the sweep:** a scanner's own baseline is evidence, and this
+    one had never been checked against a hand count. The mutation check it shipped with proved it
+    caught a *new* site; nothing proved the sites it already listed were real.
+- **Correction to slice 1's note about `lib/__tests__/q165-cache-seeded-reads.test.ts`:** it said
+  that test would red when the two sheets converted. **It did not, and the reason is worth keeping.**
+  It asserts `readCacheSync<` and `cachedFetch<` appear literally in three files; each sheet has
+  *two* fetches, and only the `hr-profile` one is a fetch-once site. The keyed `hr-window:` fetch
+  stays (its key changes per session, and `useCachedValue` has no way to express "no key yet" for a
+  sheet mounted with a null prop), so both strings survive. `coach/coach-history.tsx` has a single
+  fetch and is the one that will actually red — it is in the unmount group, so not soon.
+- **Lane B owns this** (`app/**` ex-`app/api`, `components/**`, `lib/hooks/**`).
+- **Not verified:** static scan for the remaining 29. **No screen was observed going stale** — they
+  are inferred from the shape, and the one confirmed instance is Q-402's, which is fixed. Slice 1's
+  six files were exercised on `pnpm dev` (Home, Health and `/cardio` render clean and fetch their
+  routes) but **the refetch-on-invalidation half was not driven end to end** — that needs the Home
+  fixture below, which still does not exist.
+- **✅ THE FIXTURE AND THE GUARD SHIPPED 2026-08-20.** `e2e/fixtures.ts` gains
+  `ensureEnergyBalanceProfile()` and `enableHomeCards(page, keys)`, and
+  `e2e/home-card-invalidation-refetch.spec.ts` drives Q-402's mechanism end to end for the first
+  time: Home stays mounted, a body-metric write from its own quick-log sheet clears
+  `energy-balance:`, and the card issues a **second** GET. Mutation-checked — restoring the
+  pre-Q-402 `useEffect(…, [])` shape makes it red with its own message.
+  [`Journal`](overview/entries/2026-08-20-home-card-invalidation-guard.md).
+  **Correction to what this bullet used to say:** the seeded user was described as missing
+  `height_cm`/`date_of_birth`/`sex`. It has height (180) and sex (male) — **only `date_of_birth`
+  was missing**, and the route names exactly one field in `missingProfileFields`. The fixture is one
+  column, not three, and `COALESCE`s the other two so it stays correct if the seed changes.
+  The second half was right: `DEFAULT_CARD_WIDGETS` is empty, so Home renders no card widgets at
+  all until `ta_ss_cards` is set.
+  **Why it asserts the request rather than the number:** a changed figure could come from a
+  remount and an unchanged one proves nothing, so only a second GET is present-only-if-working.
+- **What is still open: the twelve latent sites, and on current evidence NONE is worth converting.**
+  Judged per site 2026-08-20 and written into `scripts/check-fetch-once-effects.js` beside the
+  baseline, so the next session reads it where it is looking rather than re-deriving it. Four read
+  `hr-profile` or an HR series during or just after a run/workout, when nothing writes those keys;
+  `my-meals-picker` reads `saved-meals` and the only writer reachable from its flow runs **after**
+  `{step === 4 && …}` has unmounted it; the rest are route-level screens whose next mount refetches.
+  Converting one is not harmful but adds a refetch with no reader waiting, which this entry warns
+  against. **The limit of that judgement, stated rather than buried:** for `my-meals-picker` it is
+  "no writer found reachable", not "proven unreachable" — whether `saved-meals-sheet` can open on
+  top of the wizard was not traced. **Re-judge any site if a new writer starts clearing its key
+  while it is on screen.** The entry stays queued as the place that record lives.
+- **The check's own prose count had drifted, in the file whose lesson is about unverified counts.**
+  It read "13 sites across 11 files" against a baseline map holding **12 across 10** — a conversion
+  removed a file and left the sentence behind. Corrected, with a note to count off the map rather
+  than trust the line. Same class as the over-counting scanner it sits beside, and the reason the
+  run line prints computed totals.
 
 ### [app-shell] Q-491 — nine collapsible toggles still ship no `aria-expanded`, and the hand-maintained list of them has drifted
 

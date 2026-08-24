@@ -32,6 +32,41 @@ export function setDeadLetterCount(n: number): void {
   emit();
 }
 
+/**
+ * An outbox enqueue that never happened (Q-486).
+ *
+ * `queueMutation` is a bare `runSQL` INSERT, so it throws whenever the local DB is unavailable —
+ * which this project has seen twice on Android, plus the partial-migration and `disk_full` cases.
+ * On the workout path the enqueue is the *fallback* behind a direct POST, so losing a set needs
+ * both to fail at once; when they do the set is not sent, not queued and not recoverable, and the
+ * haptic has already told the user it worked.
+ *
+ * **Deliberately not the badge.** The badge counts dead-lettered outbox ROWS, which the Data & Sync
+ * card lists so they can be retried or discarded. A throw leaves no row, so a badge lit from here
+ * would show a number that card cannot explain, cannot act on and cannot clear. The toast fires at
+ * the moment of loss instead, which is the only moment the user can do anything about it — re-log
+ * the set.
+ *
+ * It reports rather than throws because the call sites are fire-and-forget on purpose: awaiting
+ * them would put a SQLite write in front of the haptic, which is the instant-feedback rule the
+ * workout screen is the reference for.
+ */
+export function reportEnqueueFailure(domain: SyncedMutationDomain, err: unknown): void {
+  // Diagnosable at all, which it was not: `logWorkoutLocally` failing one line above is warned and
+  // this — the more consequential of the two — was swallowed.
+  console.warn(`queueMutation failed (${domain}):`, err);
+  if (!TIER_A.has(domain)) return;
+
+  // Same dynamic import as reconcileDeadLetters, for the same reason.
+  void import('sonner')
+    .then(({ toast }) => toast.error(
+      domain === 'complete_workout'
+        ? "Finishing this workout didn't save — it is not on this device or the server"
+        : "That set didn't save — it is not on this device or the server",
+    ))
+    .catch(() => { /* toast unavailable — the warn above is all that is left */ });
+}
+
 function loadNotified(): Set<string> {
   try {
     const raw = typeof localStorage !== 'undefined' ? localStorage.getItem(NOTIFIED_KEY) : null;

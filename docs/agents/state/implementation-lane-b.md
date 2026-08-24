@@ -6,16 +6,11 @@
 **Updated:** 2026-08-24 · **By:** the eighth Lane B run · **Next ID:** `LB-8`
 
 ## Now
-**Open: #361** (LB-6). #355 (BF-6), #358 (queue truth) and #359 (the red spec) all merged, #353
-included.
+**Open: the Q-486 PR.** Everything else this run merged — #353, #355, #358, #359, #361.
 
-**The lesson from #359, because it will recur.** `e2e/recipe-url-to-meal.spec.ts` had TWO defects
-stacked. It asserted inside its `page.route` handler, so a failed expectation skipped
-`route.fulfill` and broke the request it was asserting about — the error then surfaced three
-assertions later as a strict-mode locator violation. Underneath that, **the service worker was
-re-issuing every `/api/` request, so `page.route` never saw it at all** (`public/sw-template.js`
-has no method filter). A spec that stubs an `/api/` route needs `test.use({ serviceWorkers:
-'block' })`. Both rules are now in `e2e/README.md`.
+**Q-486 touches `lib/local-store/dead-letter-signal.ts`, a Lane A path — claimed here.** Its backlog
+entry assigns Lane B and names that file as the mechanism; the four sites it fixes are in
+`components/workout-screen.tsx`. Release the claim when the branch merges.
 
 ## This run (2026-08-23/24) — each has a journal entry in `docs/overview/entries/`
 
@@ -26,18 +21,19 @@ has no method filter). A spec that stubs an `/api/` route needs `test.use({ serv
   survives for **LB-3**, and Q-406's last two call sites wait on Q-395a's missing drawings.
 - **LB-6** (#361) — sixteen writes revalidated around their push, not after it. The entry said six;
   its finder looked only at the six lines ABOVE each call. Custom Rules is **55**.
+- **Q-486** — the four swallowed `queueMutation` calls warn and toast. **The entry's fix shape was
+  wrong and not followed:** the badge counts outbox ROWS the Data & Sync card retries or discards,
+  and a throw leaves no row. **Its Known-Issues row and backlog `Keep:` both stay** — the failure
+  needs a broken local SQLite on a device, so the fix is read, not observed.
 - **BF-6** (#355) — the finished-logging control moves above End of Day. **Zero presses in seven
   weeks**, and the calibration excludes an unmarked day rather than treating it as light.
 - **BF-8** (#353) — a deload session says so on both workout surfaces. Owner-confirmed: he trained
   one believing it was full. Both asked `isDeloadActive` (the PHASE) rather than today's session.
-- **Q-409's Lane B half** (#346) — a recipe link becomes a meal; an unstated yield is ASKED about
-  rather than assumed to be one plate.
-- **Q-327** (#338) — the meal photo tile, the half Q-396's column had been waiting for.
-- **Q-398** (#333) — plan meals become saved meals, idempotent on the existing `saved_meal_id`.
-  **It uncovered a live outage:** five `app/api/nutrition/meal-plan*` routes read the request body
-  and then validated an unassigned `raw`, so the whole meal-plan write surface answered 400 to every
-  request. Fixed in that PR (Lane A paths, taken deliberately) with
-  `scripts/check-json-body-parsed.js` holding the class shut.
+- **Q-409's Lane B half** (#346), **Q-327** (#338) — a recipe link becomes a meal (unstated yield is
+  ASKED about, not assumed one plate); the meal photo tile Q-396's column was waiting for.
+- **Q-398** (#333) — plan meals become saved meals. **It uncovered a live outage:** five
+  `app/api/nutrition/meal-plan*` routes validated an unassigned `raw`, so the whole meal-plan write
+  surface answered 400 to every request. Fixed there, with `scripts/check-json-body-parsed.js`.
 
 ## Next
 `node scripts/next-item.js --lane B`, and **re-verify the premise first** — most entries taken this
@@ -106,3 +102,7 @@ log-plan-meal}.ts`, one line of `lib/cache-groups.ts`, and the five meal-plan AP
 - **The sandbox serves the MET table as SYNTHETIC fixtures**, so any activity's energy estimate is
   **0** here. Seed a session plus a `workout_hr_stats` row with `avg_bpm` for a real earned figure.
 - **Mutation-check every guard**, and check what a passing assertion would ACCEPT.
+- **Two `page.route` rules, both from #359 and both now in `e2e/README.md`:** never `expect` inside
+  the handler (a throw skips `fulfill` and breaks the request you are asserting about), and stubbing
+  an `/api/` route needs `serviceWorkers: 'block'` — the SW re-issues those and Playwright never
+  sees them.
