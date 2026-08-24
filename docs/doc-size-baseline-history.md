@@ -1982,3 +1982,16 @@ then up to 1148. Recorded as the single net change, since the branch squash-merg
 from the detour: do not ratchet a baseline down while the convention it measures is still being
 worked out — it bought nothing and had to be undone within the hour.
 
+
+## 2026-08-24 — `claude/tuning-agent-0q9yl7` (Tuning session close)
+
+**projectOverview.md (+8):** the handoff pointer for the Tuning session that retracted Q-528. It earns
+its lines by carrying the *rule* rather than the incident — `pg_stat_user_tables.n_live_tup` is a
+planner estimate, it read 1 against 45 real rows and 0 against 764, and a data-loss incident was filed
+off it. A reader who takes only the pointer and never opens the handoff still leaves with the thing
+that prevents a repeat.
+
+**Tuning baton: no change, and deliberately so.** It shrank 581 → 474 in this handover (rewritten in
+full, not appended). The baseline stays at 582 rather than ratcheting down: a baton is rewritten whole
+at every handover, so its size oscillates by design, and locking in a trough would make the next
+successor raise it with a note that says nothing. The shrink is visible in the diff either way.
