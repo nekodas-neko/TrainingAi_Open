@@ -2122,46 +2122,45 @@ this fits without an extraction.
 
 ### [app-shell] Q-491 — nine collapsible toggles still ship no `aria-expanded`, and the hand-maintained list of them has drifted
 
-- **Branch:** `fix/aria-expanded-collapsibles-ratchet`
-- **Added:** 2026-08-18 · review sweep (control semantics) ·
-  [`docs/reviews/2026-08-18-aria-expanded-collapsibles.md`](reviews/2026-08-18-aria-expanded-collapsibles.md)
-- **Placement:** low. **No known screen-reader user today.** Filed because the stated direction is a
-  **Play Store listing**, where accessibility is a review surface rather than a preference, and
-  because the recommended fix is a ratchet that removes a maintenance burden rather than adding one.
-- **Still 9, but not the same 9.** `CLAUDE.md` names a specific nine (re-counted 2026-08-09). Re-checked:
-  - **`more/profile-tab.tsx` is fixed** — 0 chevrons remain.
-  - **`components/weights-summary.tsx` has the defect and was never on the list.**
-  - `deload-explanation` and `signal-sections` **moved** (`app/session-select/components/`,
-    `app/session-explain/components/`) — the paths in the rule are stale.
-  - The other six are unchanged: `health/day-overlay-sheet`, `workout/active-workout-screen`,
-    `workout/ai-prescription-card`, `workout/added-weight-toggle`, `nutrition/meal-card`,
-    `nutrition/saved-meals-sheet`.
-- **One partially compensates:** `weights-summary.tsx` carries
-  `aria-label={collapsed ? "Expand" : "Collapse"}`, so state does reach a screen reader — just not
-  through the attribute that also expresses the control→region relationship. Better than the other
-  eight; still not the rule.
-- **Fix shape — prefer the ratchet over the sweep.** Adding `aria-expanded={isOpen}` (+ `aria-controls`
-  where the region has an id) to nine sites is easy and will drift again. `CLAUDE.md`'s own rule says
-  to prefer Radix `Collapsible`, **which supplies both attributes for free** — converting the worst
-  offenders is the better trade. Then add a Custom Rules step counting chevron collapsibles without
-  `aria-expanded`, shrink-only, so the list stops needing a human.
-- **⚠️ The pattern is worth more than the finding — third stale hand-maintained count this run:**
+> **✅ THE TWO REAL VIOLATORS SHIPPED 2026-08-24 (Lane B), and the count of "9" was stale even at the
+> time this entry was re-checked — this is the fourth instance of the exact pattern the entry itself
+> flags below.** Re-verified each of the nine named files against `main` directly, one by one, rather
+> than trusting the list:
+> - `health/day-overlay-sheet` — the file **no longer exists** (retired by LB-3, #370/#373).
+> - `deload-explanation`, `signal-sections`, `ai-prescription-card` — all three already use Radix
+>   `Collapsible`/`CollapsibleTrigger` (confirmed against the installed
+>   `@radix-ui/react-collapsible` source: `CollapsibleTrigger` sets `aria-expanded`/`aria-controls`
+>   on the underlying element automatically, `asChild` included). **None of these three was ever a
+>   violator by the time this entry named them** — a chevron-icon grep can't see that the toggle
+>   is a real `<button>` wired through Radix, only that a chevron exists.
+> - `nutrition/meal-card` — same: `CollapsibleTrigger asChild` wrapping a `role="button"` div, which
+>   gets Radix's props merged onto it via `Slot`. Not a violator.
+> - `workout/active-workout-screen`, `nutrition/saved-meals-sheet` — their chevron is `ChevronLeft`,
+>   a **back-button icon**, not a collapse toggle. Never violators; a plain "contains Chevron" grep
+>   can't distinguish the two.
+> - `weights-summary.tsx`, `workout/added-weight-toggle.tsx` — genuinely hand-rolled, genuinely no
+>   `aria-expanded`. **These are the only two real ones.**
+>
+> Fixed directly rather than converting to Radix (the toggle in each renders different content by
+> state, not a show/hide of one region, so a Collapsible wrap would be more code than the two-line
+> fix): `weights-summary.tsx`'s collapse `Button` and both of `added-weight-toggle.tsx`'s buttons
+> now carry `aria-expanded` + `aria-controls` pointing at an `id` on the toggled region (`useId`).
+> Verified live: clicking each button flips `aria-expanded` and the `aria-controls` target exists in
+> the DOM. [`journal`](overview/entries/2026-08-24-aria-expanded-collapsibles.md).
+>
+> **The ratchet from the fix-shape section below was NOT built.** A first attempt at the obvious
+> heuristic (files containing a Chevron icon, no `CollapsibleTrigger`, no literal `aria-expanded`)
+> matched **34 files** on current `main` — most legitimately not violators (back-button chevrons,
+> non-toggle uses), which is exactly the false-positive class this re-check just walked through by
+> hand for nine of them. A script that flags 34 candidates to save auditing 9 by hand is not a
+> ratchet, it's a bigger version of the same problem. Left as `Keep:` rather than shipped as noise.
 
-  | Rule | Recorded | Actual |
-  |---|---|---|
-  | *"Repo day-window helpers currently hardcode `DEFAULT_TZ`"* (**Q-480**) | broken | a parameter every caller passes |
-  | *"both long-standing memos in the codebase"* (**Q-490**) | 2 | **66** |
-  | *"9 hand-rolled chevron toggles"* (this) | a specific 9 | a **different** 9 |
-
-  Every **ratcheted** count is current — hex literals, TTL divergence, component size, doc-index size,
-  backlog pointers. `CLAUDE.md` already drew this lesson for hex literals (*"recorded here as improving
-  and it was not … because this line was prose and nothing measured it"*); it applies to its own prose.
-  **A count in prose is a claim with a decay date; a count in a script is a fact.** Consider a
-  standing follow-up to replace remaining prose counts with script citations.
-- **Lane B owns this** (`components/**`, `app/**` surfaces); the ratchet script is a `scripts/` addition.
-- **Not verified: no screen-reader testing.** The claim is that the attribute is absent, not that a
-  specific announcement is wrong. Not on the APK, where TalkBack is the relevant reader.
-  `app/coach/coach-content.tsx` was examined and **excluded** — its chevron is a back button.
+- **Branch:** `fix/aria-expanded-collapsibles`
+- **Lane:** B
+- **Keep:** a real ratchet script, if one is worth building — it needs to recognize a Radix
+  `CollapsibleTrigger` (direct or via `asChild`/`Slot`) as already-covered and distinguish a
+  collapse chevron from a navigation chevron, neither of which a text grep can do reliably. Also
+  not done: screen-reader/TalkBack verification on either fixed component, and no device check.
 
 ### [app-shell][platform] Q-477 — the Profile "Auto-detect timezone" button is what breaks the app's dates: the server honours the new zone, 100 of 125 client call sites do not
 
@@ -2796,24 +2795,21 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 
 ### [devices][app-shell] LB-5 — the Devices card calls the ring healthy while the service has no key
 
-- **Lane:** B
+> **Shipped 2026-08-24.** `OuraConnectionSection` now calls `hasKey()` on mount via `getOuraBle()`
+> and, when it returns `false`, replaces the whole card with an amber "No ring key stored" state
+> linking to `/admin/oura-ble` — takes priority over the normal "seen"/"not seen" card, since a ring
+> that synced recently but has no key now is not healthy whatever the server-derived freshness/
+> battery data still says. Nothing reveals or re-enters the key from this card, matching the
+> constraint below — it only navigates to the console. `getOuraBle()` returning `null` (web, old
+> APK) leaves `hasKey` at `null` and the card renders exactly as before; verified live by forcing
+> the state locally — no crash, no change to the existing web-sandbox render.
+> [`journal`](overview/entries/2026-08-24-devices-card-ring-key-state.md).
+
 - **Branch:** `fix/devices-card-ring-key-state`
-- **Added:** 2026-08-23, split out of Q-537 (whose engine half shipped the same day).
-- **What it is.** `components/more/oura-section.tsx` renders the ring's state from server data —
-  `/api/oura-ble/freshness` and the battery cache. Those keep looking fine for as long as the
-  server holds recent rows, so after an uninstall/reinstall the card shows *"Ring synced 2h ago"*
-  while the native service is logging `no key stored` and refusing to start. The one screen where
-  someone would look to find out why the ring stopped is the one screen that cannot tell them.
-- **What to do.** Call `hasKey()` on the plugin (`lib/oura-ble/plugin.ts`, already exported) and
-  show a keyless state on the card, pointing at `/admin/oura-ble` → Ring key. Catch and ignore on
-  web, where the plugin is absent — the card must not grow a web-only failure mode.
-- **⚠ Do not offer to reveal or re-enter the key from this card.** The backup affordance lives in
-  the console behind a deliberate button (Q-537); a second entry point on a routinely-visited
-  screen is the opposite of what the owner asked for (*"so it cant accidently be used"*).
-- **What would count as done:** with no key stored, the Devices card says so rather than reporting
-  a healthy ring.
-- **Surface:** device — `getOuraBle()` returns null in the web sandbox, so the keyless branch is
-  only reachable on the APK.
+- **Lane:** B
+- **Keep:** the keyless branch itself is device-only (`getOuraBle()` returns `null` in the web
+  sandbox), so it has never been seen rendering for real — only the inert web path and a locally
+  forced state were verified. `Gate: device`.
 
 ### [app-shell][devices] Q-317 — declaring a ring re-key has no button: `POST /api/oura-ble/rekey` is curl-only
 
