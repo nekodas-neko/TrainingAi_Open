@@ -237,9 +237,11 @@ describe.skipIf(!canRun)('claude_readonly role — the read-only guarantee', () 
     const tables = await exec(ADMIN_URL!, `
       SELECT count(*)::int AS n FROM information_schema.tables
       WHERE table_schema = 'public' AND table_type = 'BASE TABLE'`)
+    // Q-530's `_meta_excluded_tables`/`_meta_withheld_columns` are synthetic drift-gate views with
+    // no corresponding base table — excluded here so this stays a 1:1 table-to-view count.
     const views = await exec(ADMIN_URL!, `
       SELECT count(*)::int AS n FROM information_schema.tables
-      WHERE table_schema = 'claude_ro'`)
+      WHERE table_schema = 'claude_ro' AND table_name NOT LIKE '\\_meta\\_%'`)
     // Two tables are deliberately denied (invited_emails, rate_limits). Any OTHER mismatch means
     // the generator needs re-running after a schema change.
     expect(views.rows[0].n).toBe(tables.rows[0].n - 2)
