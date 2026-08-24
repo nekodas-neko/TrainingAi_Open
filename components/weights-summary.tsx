@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useId, useState } from "react";
 import { ChevronDownIcon, ChevronUpIcon, RefreshCwIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -16,6 +16,7 @@ interface WeightsSummaryProps {
 
 export const WeightsSummary = ({ exercises, loading, onRefresh }: WeightsSummaryProps) => {
   const [collapsed, setCollapsed] = useState(false);
+  const contentId = useId();
 
   const sessionNames = [...new Set(exercises.map(e => e.sessionName))].sort()
   const grouped = sessionNames.reduce<Record<string, ExerciseSummary[]>>((acc, name) => {
@@ -48,6 +49,8 @@ export const WeightsSummary = ({ exercises, loading, onRefresh }: WeightsSummary
             className="h-6 w-6 p-0"
             onClick={() => setCollapsed((c) => !c)}
             aria-label={collapsed ? "Expand" : "Collapse"}
+            aria-expanded={!collapsed}
+            aria-controls={contentId}
           >
             {collapsed ? <ChevronDownIcon className="size-3" /> : <ChevronUpIcon className="size-3" />}
           </Button>
@@ -55,7 +58,7 @@ export const WeightsSummary = ({ exercises, loading, onRefresh }: WeightsSummary
       </div>
 
       {!collapsed && (
-        <div className="px-4 pb-3">
+        <div id={contentId} className="px-4 pb-3">
           {loading && !hasData ? (
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
               {[1, 2, 3].map((i) => (

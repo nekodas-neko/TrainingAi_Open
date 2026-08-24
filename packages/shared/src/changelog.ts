@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.358.0",
+    date: "2026-08-24",
+    changes: [
+      "Two collapse/expand buttons (the weights summary panel, the added-weight picker) now announce their open/closed state properly to screen readers.",
+    ],
+  },
+  {
     version: "1.357.0",
     date: "2026-08-24",
     changes: [
