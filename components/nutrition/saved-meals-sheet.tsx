@@ -13,8 +13,6 @@ import { cn } from '@trainingai/shared/utils'
 import { cancelMealReminder } from '@/lib/meal-reminders'
 import { logMealItems } from '@trainingai/shared/nutrition/log-meal'
 import { mealTypeForHour } from '@trainingai/shared/nutrition/log-plan-meal'
-import { createFoodItem } from '@trainingai/shared/nutrition/create-food-item'
-import { AddFoodByHandForm, type AddFoodByHandValues } from './add-food-by-hand-form'
 import { cachedFetch, readCacheSync } from '@/lib/sqlite/cache'
 import { invalidateSavedMeals } from '@/lib/cache-groups'
 import { TTL_MEDIUM, TTL_LONG } from '@trainingai/shared/cache-ttl'
@@ -27,8 +25,7 @@ import { MealLabelSheet } from './meal-label-sheet'
 import { BulkDeleteConfirm } from './bulk-delete-confirm'
 import { IngredientRow, type QtyUnit } from './ingredient-row'
 import { qtyFromInput, steppedQty } from './saved-meal-qty'
-import { IngredientSearch, type ExternalFood } from './ingredient-search'
-import type { FoodSearchResponse } from '@/app/api/nutrition/food-search/route'
+import { IngredientPicker } from './ingredient-picker'
 
 type SheetTab = 'meals' | 'build'
 
@@ -84,18 +81,13 @@ export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate,
   // save with one more state to get wrong.
   const [mealImage, setMealImage] = useState<string | null>(null)
   const [mealServings, setMealServings] = useState(1)
-  const [query, setQuery] = useState('')
-  const [searchResults, setSearchResults] = useState<FoodItem[]>([])
-  const [dbResults, setDbResults] = useState<ExternalFood[]>([])
-  const [dbSearching, setDbSearching] = useState(false)
-  const [dbUnavailable, setDbUnavailable] = useState(false)
-  const [addingExternal, setAddingExternal] = useState<string | null>(null)
-  const [estimating, setEstimating] = useState(false)
   const [ingredients, setIngredients] = useState<IngredientEntry[]>([])
   const [unitById, setUnitById] = useState<Record<string, QtyUnit>>({})
   const [saving, setSaving] = useState(false)
-  const [showAddFood, setShowAddFood] = useState(false)
-  const [addFoodSaving, setAddFoodSaving] = useState(false)
+  // Bumped on every entry to the build form. `IngredientPicker` owns the search query, its results
+  // and the add-by-hand form (BF-11a), so remounting it on a new build session is what clears them —
+  // which is what the setters that used to sit in `openBuild` did.
+  const [buildSession, setBuildSession] = useState(0)
 
   useEffect(() => {
     if (!open) return
@@ -145,9 +137,7 @@ export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate,
     setMealImage(meal?.imageDataUri ?? null)
     setMealServings(meal?.servings ?? 1)
     setIngredients(meal ? meal.items.map(i => ({ item: i.foodItem, qty: i.quantityMultiplier })) : [])
-    setQuery('')
-    setSearchResults([])
-    setShowAddFood(false)
+    setBuildSession(n => n + 1)
     setTab('build')
   }, [])
 
@@ -156,141 +146,12 @@ export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate,
     setEditingMeal(null)
   }
 
-  useEffect(() => {
-    if (!open || tab !== 'build') return
-    let cancelled = false
-    const t = setTimeout(async () => {
-      // Local-first: instant matches from previously-logged foods (works offline).
-      const store = userId ? getLocalStore(userId) : null
-      if (store) {
-        try {
-          const local = await store.searchFoodItems(query)
-          if (!cancelled) setSearchResults(local)
-        } catch {}
-      }
-      // Revalidate from the server (a superset) when online; keep local on failure/offline.
-      try {
-        const res = await fetch(`/api/nutrition/food-items?q=${encodeURIComponent(query)}`)
-        const d = await res.json()
-        if (!cancelled && Array.isArray(d)) setSearchResults(d.slice(0, 20))
-      } catch {}
-    }, 250)
-    return () => { cancelled = true; clearTimeout(t) }
-  }, [query, open, tab, userId])
-
-  /**
-   * The food database, on its own slower clock.
-   *
-   * Your own items can only ever return what you have already saved, so the library could never
-   * grow past itself; Open Food Facts is the same source the barcode scanner uses. It is a separate
-   * effect for two reasons. It must not sit behind the food-items round trip — they are independent
-   * queries and chaining them meant a slow library fetch delayed the database section and a stalled
-   * one removed it entirely. And OFF rate-limits searches to roughly ten a minute, so typing
-   * "chicken breast" at a 250 ms debounce is enough to get 503ed; a longer pause before asking is
-   * what keeps the answer coming back at all.
-   */
-  useEffect(() => {
-    if (!open || tab !== 'build') return
-    if (query.trim().length < 2) { setDbResults([]); setDbUnavailable(false); return }
-    let cancelled = false
-    const t = setTimeout(async () => {
-      setDbSearching(true)
-      try {
-        const res = await fetch(`/api/nutrition/food-search?q=${encodeURIComponent(query)}`)
-        const d = await res.json() as FoodSearchResponse
-        if (!cancelled) {
-          setDbResults(Array.isArray(d.results) ? d.results : [])
-          setDbUnavailable(!!d.unavailable)
-        }
-      } catch {
-        if (!cancelled) { setDbResults([]); setDbUnavailable(true) }
-      } finally {
-        if (!cancelled) setDbSearching(false)
-      }
-    }, 700)
-    return () => { cancelled = true; clearTimeout(t) }
-  }, [query, open, tab])
-
-  /**
-   * An external hit is not a food item yet. Create it, then add it — so it lands in the user's own
-   * library and is searchable locally (and offline) from then on.
-   */
-  async function addExternalFood(food: ExternalFood) {
-    setAddingExternal(food.externalId)
-    try {
-      addIngredient(await createFoodItem({
-        name: food.name,
-        brand: food.brand,
-        servingSizeG: food.servingSizeG,
-        calories: food.calories,
-        proteinG: food.proteinG ?? 0,
-        carbsG: food.carbsG ?? 0,
-        fatG: food.fatG ?? 0,
-        // Found by searching the food database by name, NOT scanned. A barcode identifies one exact
-        // product; a name search returns a plausible near-match the user picked off a list, and the
-        // two deserve to be told apart in the data.
-        source: 'text',
-      }, userId))
-    } catch {
-      toast.error(offlineHint() ?? `Could not add "${food.name}"`)
-    } finally {
-      setAddingExternal(null)
-    }
-  }
-
-  async function estimateAndAdd() {
-    const text = query.trim()
-    if (!text) return
-    setEstimating(true)
-    try {
-      const res = await fetch('/api/nutrition/scan', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text }),
-      })
-      const scan = res.ok ? await res.json() : null
-      if (!scan || scan.error || !(scan.calories > 0)) {
-        toast.error(`Could not work out the macros for "${text}"`)
-        return
-      }
-      addIngredient(await createFoodItem({
-        name: scan.name || text,
-        brand: scan.brand,
-        servingSizeG: Math.round(scan.servingSizeG ?? 100),
-        calories: Math.round(scan.calories),
-        proteinG: Math.round((scan.proteinG ?? 0) * 10) / 10,
-        carbsG: Math.round((scan.carbsG ?? 0) * 10) / 10,
-        fatG: Math.round((scan.fatG ?? 0) * 10) / 10,
-        source: 'ai',
-      }, userId))
-    } catch {
-      toast.error(offlineHint() ?? 'Could not add that food')
-    } finally {
-      setEstimating(false)
-    }
-  }
-
-  /**
-   * A network-only failure, said plainly.
-   *
-   * Adding a food by hand works offline now (it goes through the outbox), but an Open Food Facts
-   * hit and an AI estimate both need the network by nature — so a generic "could not add" while
-   * offline reads as a bug rather than a fact about where you are.
-   */
-  function offlineHint(): string | null {
-    return typeof navigator !== 'undefined' && navigator.onLine === false
-      ? 'That needs a connection — search your own foods, or add it by hand.'
-      : null
-  }
-
   function addIngredient(item: FoodItem) {
     setIngredients(prev => {
       const existing = prev.find(e => e.item.id === item.id)
       if (existing) return prev.map(e => e.item.id === item.id ? { ...e, qty: e.qty + 1 } : e)
       return [...prev, { item, qty: 1 }]
     })
-    setQuery('')
-    setSearchResults([])
   }
 
   /**
@@ -319,30 +180,6 @@ export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate,
         return next == null ? [] : [{ ...e, qty: next }]
       })
     )
-  }
-
-  // Returns whether the food was created, so `AddFoodByHandForm` clears itself only on success —
-  // the previous version cleared the fields in the same block that hid the form, so a failed save
-  // would have thrown away what the user typed had it ever reached that line.
-  async function handleAddFoodAndIngredient(v: AddFoodByHandValues): Promise<boolean> {
-    if (!v.name || isNaN(v.calories)) { toast.error('Name and calories are required'); return false }
-    setAddFoodSaving(true)
-    try {
-      addIngredient(await createFoodItem({
-        name: v.name, calories: v.calories,
-        proteinG: v.proteinG, carbsG: v.carbsG, fatG: v.fatG,
-        servingSizeG: 100,
-        source: 'manual',
-      }, userId))
-      setShowAddFood(false)
-      toast.success(`${v.name} added`)
-      return true
-    } catch {
-      toast.error(offlineHint() ?? 'Failed to add food')
-      return false
-    } finally {
-      setAddFoodSaving(false)
-    }
   }
 
   const totalMacros = ingredients.reduce(
@@ -726,30 +563,12 @@ export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate,
                 </div>
               )}
 
-              <IngredientSearch
-                query={query}
-                onQueryChange={setQuery}
-                searchResults={searchResults}
+              <IngredientPicker
+                key={buildSession}
+                active={open && tab === 'build'}
+                userId={userId}
                 onAdd={addIngredient}
-                estimating={estimating}
-                onEstimate={() => void estimateAndAdd()}
-                dbResults={dbResults}
-                dbSearching={dbSearching}
-                dbUnavailable={dbUnavailable}
-                addingExternal={addingExternal}
-                onAddExternal={food => void addExternalFood(food)}
-                showAddFood={showAddFood}
-                onAddByHand={() => setShowAddFood(true)}
               />
-
-              {showAddFood && (
-                <AddFoodByHandForm
-                  saving={addFoodSaving}
-                  initialName={query.trim()}
-                  onCancel={() => setShowAddFood(false)}
-                  onSubmit={handleAddFoodAndIngredient}
-                />
-              )}
             </div>
 
             <div className="shrink-0 pt-2">

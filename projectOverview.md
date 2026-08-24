@@ -27,6 +27,11 @@
 **Version:** v1.318.10 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-08-24.
 
+**Build a Meal's ingredient picker is its own component now (BF-11a).** `saved-meals-sheet.tsx`
+774 → 590 lines — it sat 26 under the CI ceiling with four BF-11 features due to land in it. No
+behaviour change; the reset that `openBuild` did with three setters is a keyed remount, driven to
+confirm it clears the same state.
+
 **Q-319's water bug was unreachable, and the half its entry called fine was the broken one.** The
 tile already routes water to the correct sheet. But the generic sheet's water branch wrote an
 ABSOLUTE total — discarding the day's water, reintroducing SYNC-P7 — and queues `waterMlDelta` now.
