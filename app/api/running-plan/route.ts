@@ -7,7 +7,6 @@ import { DEFAULT_TZ, todayInTz, normalizeDateParam } from '@trainingai/shared/da
 import { prescribeNextRun, OVERRIDE_RATIONALE_PREFIX } from '@trainingai/shared/running/prescription'
 import { defaultFrameworkForGoal, CARDIO_GOALS } from '@trainingai/shared/running/cardio-goals'
 import { weeklyZoneTargets } from '@trainingai/shared/running/zone-targets'
-import { pacesFromVdot } from '@trainingai/shared/health/vdot'
 import type { GateAction } from '@trainingai/shared/running/recovery-gate'
 import type { GoalKind, Prescription, RunType } from '@trainingai/shared/running/types'
 import { assembleInputs, resolveSnapshot, resolvePushContext } from '@trainingai/shared/running/assemble-plan-context'
@@ -150,17 +149,6 @@ export async function POST(req: Request) {
     timePerSessionMinutes: parsed.data.timePerSessionMinutes ?? null,
     fitnessSnapshot: fitness,
     isActive: true,
-  })
-
-  const easyPaceSecPerKm = fitness.vo2max != null ? pacesFromVdot(fitness.vo2max).easySecPerKm : null
-  await repo.saveRunningBaseline(userId, {
-    planId: plan.id,
-    vo2max: fitness.vo2max,
-    maxHr: fitness.maxHr,
-    restingHr: fitness.restingHr,
-    thresholdHr: fitness.thresholdHr,
-    weeklyBaseMinutes: fitness.weeklyBaseMinutes,
-    easyPaceSecPerKm,
   })
 
   const { ctx, gate } = await assembleInputs(repo, userId, tz, fitness, plan)

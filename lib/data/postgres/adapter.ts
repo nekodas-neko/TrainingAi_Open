@@ -57,7 +57,7 @@ import {
 import { sleepImplausibleReason } from '@trainingai/shared/validation/plausibility'
 import { ActivityLogBody, deriveEndTime } from '@trainingai/shared/validation/activity-log'
 import { describeZodFailure } from './push-error-detail'
-import type { WorkoutRepository, UserGoals, EnsuredWorkoutSession, SessionLoad, YearReviewTotals, YearReviewTopExercise, UnitFixResult, SyncDelta, IncomingMutation, PushResult, OuraRawSampleInput, OuraRawSampleSummary, OuraRawSampleLatest, OuraRawSampleRow, FitnessTest, RunningPlan, RunningBaseline, PrescribedRun, PrescribedRunUpdate, AiCallLogInput, AiCallUsageSummary, ScaleRawSampleInput, ScalePendingSample, LastRealOneRm } from '../repository'
+import type { WorkoutRepository, UserGoals, EnsuredWorkoutSession, SessionLoad, YearReviewTotals, YearReviewTopExercise, UnitFixResult, SyncDelta, IncomingMutation, PushResult, OuraRawSampleInput, OuraRawSampleSummary, OuraRawSampleLatest, OuraRawSampleRow, FitnessTest, RunningPlan, PrescribedRun, PrescribedRunUpdate, AiCallLogInput, AiCallUsageSummary, ScaleRawSampleInput, ScalePendingSample, LastRealOneRm } from '../repository'
 import { FitnessTestBody } from '@trainingai/shared/validation/fitness-test'
 import { PrescribedRunPatchBody } from '@trainingai/shared/validation/prescribed-run'
 import type {
@@ -2479,23 +2479,6 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     return this.rowToRunningPlan(r)
   }
 
-  async saveRunningBaseline(userId: string, baseline: Omit<RunningBaseline, 'id' | 'userId' | 'createdAt'>): Promise<RunningBaseline> {
-    const [r] = await this.db.insert(s.runningBaselines).values({
-      userId, planId: baseline.planId,
-      vo2max: baseline.vo2max ?? null, maxHr: baseline.maxHr ?? null,
-      restingHr: baseline.restingHr ?? null, thresholdHr: baseline.thresholdHr ?? null,
-      weeklyBaseMinutes: baseline.weeklyBaseMinutes ?? null, easyPaceSecPerKm: baseline.easyPaceSecPerKm ?? null,
-    }).returning()
-    return this.rowToRunningBaseline(r)
-  }
-
-  async getRunningBaseline(userId: string, planId: string): Promise<RunningBaseline | null> {
-    const [r] = await this.db.select().from(s.runningBaselines)
-      .where(and(eq(s.runningBaselines.userId, userId), eq(s.runningBaselines.planId, planId)))
-      .limit(1)
-    return r ? this.rowToRunningBaseline(r) : null
-  }
-
   async getPrescribedRuns(userId: string, from: string, to: string): Promise<PrescribedRun[]> {
     const rows = await this.db.select().from(s.prescribedRuns)
       .where(and(
@@ -2544,15 +2527,6 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       frameworkKey: r.frameworkKey, fitnessSnapshot: r.fitnessSnapshot,
       timePerSessionMinutes: r.timePerSessionMinutes ?? null,
       isActive: r.isActive, createdAt: r.createdAt, updatedAt: r.updatedAt,
-    }
-  }
-
-  private rowToRunningBaseline(r: typeof s.runningBaselines.$inferSelect): RunningBaseline {
-    return {
-      id: r.id, userId: r.userId, planId: r.planId,
-      vo2max: r.vo2max ?? null, maxHr: r.maxHr ?? null, restingHr: r.restingHr ?? null, thresholdHr: r.thresholdHr ?? null,
-      weeklyBaseMinutes: r.weeklyBaseMinutes ?? null, easyPaceSecPerKm: r.easyPaceSecPerKm ?? null,
-      createdAt: r.createdAt,
     }
   }
 
