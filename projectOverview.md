@@ -27,24 +27,24 @@
 **Version:** v1.318.10 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-08-24.
 
+**The two BLE consoles poll the redecode job instead of guessing (Q-318).** A completed run reported
+`failed: 502`; the step backfill said "Done" at the gateway timeout. Both now wait for the real
+status. The route's default flip is Lane A's. `Gate: device`.
+
 **The Devices card stops calling the ring healthy with no key (LB-5).** Checks `hasKey()`, links to `/admin/oura-ble` when false. `Gate: device`.
 
 **Q-477 is DONE for every client component** (4 slices, 78/38 → **3 calls in 1 file**). Left is
-`workout-store.ts`: a Zustand store, no hook, and a wrong-zone stamp makes `rolloverDay()` clear the day's completed sets — a design call, analysed on the entry.
+`workout-store.ts` — a Zustand store with no hook, where a wrong-zone stamp makes `rolloverDay()` clear the day's completed sets. A design call, analysed on the entry.
 
-**"Nine hand-rolled collapsible toggles missing `aria-expanded`" was actually two (Q-491)** — one
-retired, four already Radix `Collapsible`, two a back-button chevron. `weights-summary.tsx`/
-`added-weight-toggle.tsx` were real, now fixed. A ratchet heuristic matched 34 files, mostly noise.
+**"Nine collapsibles missing `aria-expanded`" was actually two (Q-491)** — one retired, four already
+Radix, two a back chevron. `weights-summary.tsx`/`added-weight-toggle.tsx` were real, now fixed.
 
-**The end-of-workout "How hard was that session?" prompt is gone (Q-420).** The owner can't judge a
-whole session as one number (25.6% fill rate agreed); `sessionEffort()` already derives it from set
-RPEs at read time (Lane A, no schema change) — the done screen's own kcal estimate needed no change.
+**The end-of-workout "How hard was that session?" prompt is gone (Q-420).** 25.6% fill rate;
+`sessionEffort()` already derives it from set RPEs at read time, so nothing downstream changed.
 
 **Two Health cards stop vanishing on a failed fetch, and the fix needed a second one (Q-499).**
-`hr-recovery-profile-card.tsx`/`strength-progress-card.tsx` now show "Couldn't load… — pull to
-refresh" on a 429/500. Wiring `onError` alone didn't work: under StrictMode's dev double-invoke, a
-joined caller's failure was never relayed by `cachedFetchCore`'s dedup — only the torn-down owner's
-was, fixed in `lib/sqlite/cache.ts` — a race reachable in production too, not just under StrictMode.
+They now show "Couldn't load…" on a 429/500. `onError` alone didn't work: `cachedFetchCore`'s dedup
+relayed a failure only to the torn-down owner, never to a joined caller — fixed in `lib/sqlite/cache.ts`.
 
 **The database reclaim is three-quarters done, and the last quarter is one press.** The owner's
 `oura_raw_samples` vacuum reclaimed **36 MB** (93 → **57 MB**) and the automatic packer is now

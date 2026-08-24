@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.363.1",
+    date: "2026-08-24",
+    changes: [
+      "The BLE console's Redecode and the historical step backfill now wait for the work to actually finish and report what happened. Before, a long run reported \u201cfailed\u201d for work that had completed, and the backfill said \u201cDone\u201d the moment the request timed out \u2014 so a retry could kick off another full re-run of the heaviest job in the app.",
+    ],
+  },
+  {
     version: "1.363.0",
     date: "2026-08-24",
     changes: [
