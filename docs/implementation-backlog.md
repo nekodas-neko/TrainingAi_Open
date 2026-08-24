@@ -323,6 +323,168 @@ below threshold and left in place for next time.
      entries below are ordered by dependency, not by Q number. Do not re-sort them into numeric
      order; the sequence is the point. -->
 
+## Owner request, 2026-08-24 — Body Battery is flooring, and stress needs an hour-of-day record
+
+*Reported in session: "its 9:19pm here and its already at looks like its been 0 for awhile", plus
+"Are we not recording stress hour buckets? I would like that as a metric to be able to see what
+days/hours cause most stress". Measured against production the same day; the boundary direction was
+signed off by the owner in that conversation. Review:
+[`docs/reviews/2026-08-24-body-battery-charge-window-collapse.md`](reviews/2026-08-24-body-battery-charge-window-collapse.md).*
+
+### [readiness][heart-rate] TN-2 — the Body Battery charge window has closed, so the tank only drains
+
+- **Branch:** _unassigned_
+- **Added:** 2026-08-24 · owner report + production measurement
+- **Lane: A** — `packages/shared/src/health/hr-zones.ts`, `app/api/body-battery/route.ts`
+- **Owner sign-off: received 2026-08-24** for the direction (anchor the rest boundary to *waking*
+  rest, not sleeping rest). The exact offset is still to be fitted — see the pass test.
+- **Do not batch.** It re-scores every stored Body Battery day and needs a `MODEL_VERSION` bump.
+
+Body Battery charges only while HR ≤ `restingHr + HR_REST_THRESHOLD × (hrMax − restingHr)`, with
+`HR_REST_THRESHOLD = 0.05`. For the owner today that ceiling is **57.8 bpm**, against a
+5th-percentile waking HR of **62** and a median waking HR of **86**. The charge window sits *below*
+the fifth percentile of his waking heart rate, so it is structurally unreachable while awake.
+
+**Measured 2026-08-24, time-weighted over 56 days** (weighting by sample gap, because the ring
+power-gates its PPG and a per-sample percentile is not a per-time percentile — the uncorrected
+version of this number is wrong by an order of magnitude):
+
+| | |
+|---|---|
+| Waking **time** able to charge, at today's ceiling | **0.5%** (2026-08-24); median 1.6% across August |
+| Charge ceiling, 2026-06-30 → 2026-08-24 | **73.2 bpm → 57.8 bpm** |
+| Points charged/day, peak (2026-07-18) → last week | **165 → 0–6** |
+| Days ending at 0 | 7 of 56 overall, **5 of the last 8** |
+| Today | anchor 57, charged **1**, drained **79**, floored at 0 by ~12:30pm |
+
+**Both causes are the owner's data being correct, which is why nothing flagged it.** Resting HR fell
+67 → 52 (a real fitness gain) and `hrMax` fell 187 → 168 on 2026-08-05 when observed-peak resolution
+replaced the age estimate. The ceiling is `rHR + f × (hrMax − rHR)`, so both terms shrink it from
+opposite ends. At `f = 0.05` the offset above resting HR is only **5.8 bpm**; waking rest sits
+roughly 10–18 bpm above sleeping rest, so the boundary can only become less reachable as fitness
+improves. **This is Q-515's mechanism with a visible consequence** — Q-515 says the constant is not
+the lever and the anchoring is, and that still holds: the fix is to make the offset an explicit
+waking-rest quantity, not to keep multiplying a shrinking reserve.
+
+**Recommended shape:** replace the reserve-fraction offset with an explicit bpm offset above resting
+HR (`restingHr + WAKING_REST_OFFSET_BPM`), so it is immune to `hrMax` re-estimation — the 2026-08-05
+step was exactly that. Keep it anchored to resting HR so it still tracks real fitness change; keep it
+frozen per day.
+
+**The offset must be fitted, not taken from this entry.** Replay swept 6–16 bpm over 56 production
+days (replay validated first: it reproduces the stored end-of-day distribution at mean 48.7 / sd 31.6
+against a stored 48.5 / sd 30.4, mean absolute error 13 pts):
+
+| offset | mean end | sd | days @0 | days @100 |
+|---|---|---|---|---|
+| +6 bpm (≈ status quo) | 48.4 | 31.3 | 6 | 1 |
+| **+8 bpm** | **58.3** | **32.4** | **4** | **7** |
+| +10 bpm | 67.4 | 31.6 | 0 | 15 |
+| +12 bpm | 75.0 | 28.2 | 0 | 21 |
+| +14 bpm | 81.7 | 24.7 | 0 | 24 |
+| +16 bpm | 87.0 | 21.0 | 0 | 33 |
+| stored today | 48.5 | 30.4 | 7 | 1 |
+
+**+18 was tried first and is wrong** — mean 90.8, sd 17.0, nothing floored, a third of days pinned at
+100. A tank that is always full carries no information, which is the same failure the route's own
+`CHARGE_RATE` comment records from Q-57. Do not read "the battery floors too often" as licence to
+overshoot in the other direction.
+
+**⚠️ The replay omits the `STRESS_DRAIN_RATE` term**, which the shipped route applies on top and
+which fires on a measured average of 50 stress-high minutes/day. Real-world ends will therefore land
+**below** the table, which argues for the upper half of the **+8 … +12** bracket. Fit it against the
+shipped TypeScript with the stress term included, not against this table.
+
+**Pass test:** over the same 56 days, end-of-day mean **55–65**, sd **≥ 28**, **≤ 3 days at 0** and
+**≤ 6 days at 100**, with the stress-drain term active. Bump `MODEL_VERSION` to `v6` in the same PR
+so v5 and v6 days are never pooled — `docs/body-battery-tuning.md` depends on that stamp.
+
+**Not to be done here:** do not fit the boundary to a percentile of the owner's own waking HR. It is
+stable by construction, so charge goes near-constant and a genuinely restful day stops reading as
+one — the "treadmill" the activity-goal volume lane already removed (Q-190).
+
+### [readiness] TN-3a — the per-bucket daytime-stress series is computed and thrown away
+
+- **Branch:** _unassigned_
+- **Added:** 2026-08-24 · owner request
+- **Lane: A** — needs a Postgres migration, so Lane A only
+- **Do not batch** (migration).
+
+The owner asked to see *"what days/hours cause most stress"*. That question cannot be answered today.
+`buildDaytimeStressSeriesFromModel` produces a 30-minute bucket series on [−1,+1], and
+`summarizeStressDay` reduces it to **three daily scalars** — `daytime_stress_scaled`,
+`stress_high_minutes`, `recovery_high_minutes` — which are all that reach `oura_daily_derived`. The
+bucket series exists only inside the `/api/body-battery` response for **today, wake → now**. There is
+no hour-of-day record anywhere, so no query can rank hours or compare a Tuesday against a Friday.
+
+Confirmed 2026-08-24: the daily scalars are populated on 31 of 31 days and the signal is real —
+**22 of 31 days carry high-stress minutes**, mean 50/day, max 180 — but the *daily* aggregate is
+compressed to a range of **−0.14 … +0.23** (sd 0.100) on a [−1,+1] scale, so the day number alone is
+close to useless for this. The bucket series is where the information is.
+
+**Persist the buckets.** A dedicated table (`user_id`, `day`, `bucket_start`, `level`) rather than a
+JSONB array on `oura_daily_derived`: the whole point is aggregating *across* days by hour of day, and
+that wants rows, not documents. Cost is trivial — ~32 buckets per waking day, ~11.7k rows/year,
+against a database whose largest table is 57 MB.
+
+**Back-fill is available and should be part of this.** `lib/oura-ble/rollup/run.ts:1037` already
+builds the same series per day from raw frames on the rollup path, so history can be re-derived
+rather than started from today. Depth is bounded by the packed raw tier (`oura_raw_packed`, read
+through `readRawFrames` — the hot table only reaches 2026-08-17 and that is **not** data loss).
+State the achieved back-fill depth in the PR rather than assuming it reaches the HR history's
+2026-06-22.
+
+**Watch for:** the series is built in two places with different baselines — the live route uses
+`restingHr` + a 28-day HRV mean, the rollup uses `latest.rhrLowBpm` + `nightHrvMs`. Persisting only
+one of them and reading it back alongside the other is how two numbers for one metric appear. Pick
+the rollup as the writer (it is the one that can back-fill) and have the route read through, or
+record explicitly why not.
+
+### [readiness] TN-3b — surface stress by hour, and on the HR charts
+
+- **Branch:** _unassigned_
+- **Added:** 2026-08-24 · owner request
+- **Lane: B**
+- **Needs: TN-3a**
+
+Two surfaces the owner asked for, both blocked until the buckets are persisted:
+
+1. **Stress overlaid on the HR charts.** Today's chart can already do this from the
+   `/api/body-battery` response without any new storage (`stress.series` is in the payload) — but
+   **any past day cannot**, which is why this sits behind TN-3a rather than shipping alone. Doing
+   today-only first would ship a control that silently does nothing on every other day.
+2. **A stress-by-hour view** — which hours and which days run hottest, aggregated across the
+   back-filled history.
+
+Note what already exists so this is not built twice: `components/body-battery/stress-strip.tsx`
+renders a sparkline of today's series plus a High/Elevated/Calm/Recovering label and "high ~N min
+today", inside the Body Battery card. The owner did not know it was there, so **discoverability is
+part of this entry**, not only new surfaces.
+
+### [readiness][platform] TN-4 — /api/body-battery threw 31 × 500 for ten hours, then stopped on its own
+
+- **Branch:** _unassigned_
+- **Added:** 2026-08-24 · found on the session-start `error_events` read
+- **Lane: A**
+
+`daytime-stress: constants not set — call setDaytimeStressConstants() first`, **31 occurrences
+between 10:37 and 20:59 UTC on 2026-08-23**, then nothing. `buildDaytimeStressSeriesFromModel` is
+called at `app/api/body-battery/route.ts:248` outside any try, so the assertion throws past it and
+the route's outer catch returns a 500 — the **whole Body Battery card was down**, not just the stress
+strip.
+
+`ensureServerOuraConstants()` is called at boot from `instrumentation-node.ts:147`, so this is a
+request served before or without that boot step completing. Nothing was fixed; it stopped. Per
+`CLAUDE.md`, *something that stopped is not something that was fixed* — and `error_events` prunes at
+30 days, so this record disappears on 2026-09-22.
+
+**Two things worth doing regardless of root cause:** make the constants lazily self-injecting at the
+call site (the accessor already knows how to load them), and stop a stress-model failure from taking
+the battery read down with it — the readiness call two blocks above it at line 205 already has
+exactly that guard and comments saying why.
+
+*Counts above are the owner's account only (`claude_ro` is row-scoped) and within the 30-day prune.*
+
 ## Filed 2026-08-19 — the workflow review that produced the ID scheme
 
 *These four came out of reviewing the multi-agent setup itself. They are filed rather than fixed
@@ -799,6 +961,28 @@ Close this when all five are under ~150 lines.
   only" rather than "broken."
 - **Surface: device-only to confirm.** The mechanism traces cleanly from code + production data, but
   confirming *why* this specific device's local store is null needs the device.
+- 🚧 **THE SERIAL-FETCH HALF SHIPPED 2026-08-24 (Lane A).** `logMealItems`'s fallback branch now
+  issues its per-ingredient POSTs through `Promise.allSettled` instead of a `for` loop of
+  sequential `await fetch`es, so an N-item meal costs one round trip's wall clock rather than N.
+  **Proven by mutation, not just by passing:** all three new cases in
+  `packages/shared/src/nutrition/__tests__/log-meal-fallback.test.ts` fail against the reverted
+  serial loop (the concurrency assertion sees 1 POST instead of 3) and pass with it restored. The
+  sibling `log-meal.test.ts` could not have caught this — it mocks `getLocalStore` to a working
+  store, so it never reaches the fallback at all; the new file mocks it to `null`.
+  - **A second defect was fixed in the same change, created by the first fix.** Concurrency makes
+    the rollback's completeness load-bearing: `Promise.all` rejects on the first failure without
+    reporting which siblings succeeded, so a partial failure would strand rows the rollback cannot
+    see — invisible to the user until they reappear as duplicates on the next tap. `allSettled`
+    records every landed id before rethrowing. Serially this could not happen, which is why it
+    needed a test now and not before.
+- **⚠️ THIS DOES NOT CLOSE THE ENTRY — two halves remain, both device-gated.** (1) *Why* this
+  device's local store is null (the K4 state) is untouched; the fallback being fast is a mitigation,
+  not the cure, and the entry's own "what would count as fixed" bar wants the local-first path or a
+  visible banner. (2) The "vanished after navigating away" half is still not explained. **Nothing
+  here was observed on the S25** — the change is verified by unit test and static reading only, and
+  `pnpm dev` could not be run in the sandbox (missing `@sentry/nextjs` in `node_modules`).
+- **Keep:** the on-device check this entry already asks for — whether `LocalStoreDeadBanner` is
+  showing during a reproduction — now also tells you whether the ~20s is gone or merely shorter.
 
 ## Nutrition — pushed to the top, 2026-08-24 (owner request)
 
