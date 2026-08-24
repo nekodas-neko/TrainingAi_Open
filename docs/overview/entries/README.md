@@ -78,6 +78,27 @@ different ways. Both are mechanical; neither is obvious until it happens.
    link inside the entry loses a level when it moves. Missing this left 6 broken links pointing one
    directory too high.
 
+3. **Entries link to EACH OTHER by bare filename, and the sweep breaks those too** (measured
+   2026-08-24). Two sub-cases, and they need different fixes: a folded entry linking to another
+   **folded** entry should point at the history file itself (the target is now inside it), while a
+   folded entry linking to one that **stayed loose** needs an `entries/` prefix. Three of these on the
+   2026-08-24 sweep; `check-doc-links` names each one.
+4. **And the inverse: an entry that STAYS loose can link to one you folded.** That link is not in any
+   file you touched, so it is easy to miss — it surfaces as a broken link in
+   `docs/overview/entries/`, not in the history file. It needs `](../history-YYYY-MM-DD.md)`. One of
+   these on the 2026-08-24 sweep.
+
+5. **A concurrent PR can LINK an entry you already folded, and it lands as a modify/delete conflict**
+   (measured 2026-08-24). Three of the 60 became cited by a handoff doc that another lane merged
+   while this sweep was open — git surfaces only the one it also *modified*, so the other two would
+   have gone unnoticed. **After merging `main`, re-run the linked-vs-unlinked check over the folded
+   set, not just over the loose one**, and un-fold anything that has gained a citation. Folding is
+   the reversible half; a broken citation in someone else's handoff is not.
+
+**Run `node scripts/check-doc-links.js` after the fold and fix what it names — do not reason about
+which links moved.** All five traps above were found that way, in five separate passes, and each one
+looked like the last thing that could be wrong.
+
 ### The limit now counts foldable entries, not all of them (changed 2026-08-18)
 
 **Third and fourth sweeps, 2026-08-18 (same day again).** Another lane swept 61 → 41 concurrently
