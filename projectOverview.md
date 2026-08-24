@@ -803,30 +803,30 @@ order.
 
 ### [workouts][devices] 🟠 The outbox enqueue for a workout is the only write in the app that fails silently — and it is the last line of defence (Q-486, 2026-08-18)
 
-- **Following the pattern sweep 18 named** (*this app validates well and tells you badly*) to its most
-  consequential surface: a **write** that fails and reports success.
-  [`docs/reviews/2026-08-18-tier-a-enqueue-silence.md`](docs/reviews/2026-08-18-tier-a-enqueue-silence.md).
-- **Say the good part first, because it sets the size.** `workout-screen.tsx`'s log path is well
-  layered and I nearly mis-read it: `logWorkoutLocally` writes locally first **and logs its own
-  failure**; the **primary** send is a direct `POST /api/log-exercise`, deliberately *"independent of
-  the on-device outbox / sync-push path (which can fail silently)"*; the outbox enqueue is only the
-  **fallback**. This is not a write with no outbox — it is a good write whose last layer is silent.
-- **Four sites swallow, and they are the only four in the app that do** — `workout-screen.tsx`
-  :1320, :1324 (`workout_log`) and :1527, :1532 (`complete_workout`). All **Tier-A**, the tier
-  `lib/local-store/dead-letter-signal.ts` defines with *"a lost workout is the app's worst-case data
-  loss."* **26 of ~30** other `queueMutation` sites correctly `await`, so a throw suppresses their
-  success toast.
-- **It can throw:** `queueMutation` is a bare `runSQL` INSERT, so it fails whenever the local DB is
-  unavailable — which this file records as having happened **twice** on Android, plus the
-  partial-migration and `disk_full` cases.
+> **⚠️ THE CODE HALF SHIPPED 2026-08-24 (v1.346.0) — the device check is what is left.** All four
+> sites route their rejection through `reportEnqueueFailure` (`lib/local-store/dead-letter-signal.ts`):
+> a `console.warn` matching the one already above them, plus a Tier-A toast naming what was lost.
+> Control flow unchanged. **The entry's "light the dead-letter badge" was wrong and was not followed**
+> — the badge counts outbox ROWS the Data & Sync card can retry or discard, and a throw leaves no
+> row, so it would show a count that card could neither explain nor clear. **The row stays because
+> the failure still cannot be induced here** (last bullet): the fix is read, not observed.
+> [`journal`](docs/overview/entries/2026-08-24-tier-a-enqueue-visibility.md).
+
+- Sweep 18's pattern (*this app validates well and tells you badly*) at its most consequential
+  surface: a **write** that fails and reports success.
+  [`review`](docs/reviews/2026-08-18-tier-a-enqueue-silence.md).
+- **Say the good part first, because it sets the size.** The log path is well layered:
+  `logWorkoutLocally` writes locally first **and logs its own failure**, and the **primary** send is
+  a direct `POST /api/log-exercise` deliberately *"independent of the on-device outbox / sync-push
+  path (which can fail silently)"*. The enqueue is only the **fallback** — not a write with no
+  outbox, a good write whose last layer was silent.
+- **Four sites swallowed, the only four in the app that did** — `workout-screen.tsx` ×2
+  `workout_log`, ×2 `complete_workout`, all **Tier-A**. **It can throw:** `queueMutation` is a bare
+  `runSQL` INSERT, so it fails whenever the local DB is unavailable — which this file records as
+  having happened **twice** on Android, plus partial-migration and `disk_full`.
 - **The sequence that loses a set:** the POST fails (offline — the case the fallback exists for) *and*
   the local store is broken. Then the set is not sent, not queued, not recoverable, **nothing is
   logged**, and `hapticLight()` + `setLoggedCount(c => c + 1)` have already told the user it worked.
-- **The inconsistency is the argument:** in the same function the *less* consequential failure
-  (`logWorkoutLocally`) is `console.warn`ed and the *more* consequential one is not.
-- **Fix shape — do NOT change control flow.** Log it (four lines, matching the warn above), and signal
-  the user through the existing dead-letter badge. **Do not convert these to `await`** — they are
-  fire-and-forget on purpose so the UI stays instant.
 - **NOT reproduced and cannot be here:** inducing it needs a broken local SQLite on a device; in the
   web sandbox `getLocalStore` returns null so the enqueue never runs at all. **On-device is the only
   real verification.**
