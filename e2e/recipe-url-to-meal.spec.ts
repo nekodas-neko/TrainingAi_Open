@@ -21,6 +21,23 @@ import { SEED_EMAIL, settleRouteBoundary } from './fixtures'
  * JSON-LD parse; those are the route's own, tested where they live.
  */
 
+/**
+ * **Service workers off, and this is the reason the spec was flaky rather than wrong.**
+ *
+ * `public/sw-template.js` re-issues **every** `/api/` request — no method filter — as
+ * `fetch(e.request, { cache: 'no-store' })`, so once the worker controls the page the request
+ * originates from the worker and **`page.route` never sees it**. Playwright does not intercept
+ * service-worker fetches.
+ *
+ * Whether the worker has taken control by the time the POST fires is a race, which is exactly how
+ * this looked on CI: three attempts hit the real route (`POST /api/nutrition/scan 400` in the server
+ * log, three times) and a fourth was stubbed and passed. Locally the worker had never registered, so
+ * it passed every time.
+ *
+ * Any spec that stubs an `/api/` route in this app needs this line.
+ */
+test.use({ serviceWorkers: 'block' })
+
 const RECIPE_URL = 'https://example.com/recipes/spec-banana-bread'
 const WHOLE_RECIPE_KCAL = 1956
 
