@@ -1983,22 +1983,34 @@ from the detour: do not ratchet a baseline down while the convention it measures
 worked out — it bought nothing and had to be undone within the hour.
 
 
-## 2026-08-24 — `docs/agents/state/review.md` 170 → 168; `projectOverview.md` shrinks 33 lines with its number left alone
+## 2026-08-24 — `claude/tuning-agent-0q9yl7` (Tuning session close)
+
+**projectOverview.md (+8):** the handoff pointer for the Tuning session that retracted Q-528. It earns
+its lines by carrying the *rule* rather than the incident — `pg_stat_user_tables.n_live_tup` is a
+planner estimate, it read 1 against 45 real rows and 0 against 764, and a data-loss incident was filed
+off it. A reader who takes only the pointer and never opens the handoff still leaves with the thing
+that prevents a repeat.
+
+**Tuning baton: no change, and deliberately so.** It shrank 581 → 474 in this handover (rewritten in
+full, not appended). The baseline stays at 582 rather than ratcheting down: a baton is rewritten whole
+at every handover, so its size oscillates by design, and locking in a trough would make the next
+successor raise it with a note that says nothing. The shrink is visible in the diff either way.
+
+## 2026-08-24 — `docs/agents/state/review.md` 170 → 173; `projectOverview.md` shrinks 33 lines, number left alone
 
 Review session wrap-up for sweep 40.
 
-**Review baton (−2 net, after +15 and a trim):** the wrap-up added a closed-session pointer, the
+**Review baton (+3 net, after +20 and a trim):** the wrap-up added a closed-session pointer, the
 🟢/🔴 trailing-light convention, and a `Now` section saying the successor is awaiting instructions —
-15 lines of genuine state. Rather than raise the number for them, the sweep-40 section was cut from
+20 lines of genuine state — the last of them a shallow-clone trap that cost a merge attempt at the very end of the session. Rather than raise the number for them, the sweep-40 section was cut from
 35 lines to 20 by applying the baton's own rule: the handoff written in this same PR now carries that
 sweep's narrative, so the baton keeps only the three parts that are still *state* — rule (b) clean and
-rule (a) the last unevidenced one, the 27-edge FK inventory, and the PUT/POST contrast. Net shrink, so
-the ratchet goes down rather than up.
+rule (a) the last unevidenced one, the 27-edge FK inventory, and the PUT/POST contrast. Net +3, against +20 unchecked.
 
 **`projectOverview.md` — 33 lines lighter, baseline deliberately not lowered.** The RV-32…RV-34
 Known-Issues row was moved whole to `known-issues-resolved.md`; all three shipped and nothing is owed,
-re-verified in source rather than read off the closure note. The number stays at 7897 because
-**#373 is in flight raising it 7897 → 7900**, and its PR body says it went looking for a resolved
+re-verified in source rather than read off the closure note. The number stays where `main` has it (7905 by the time this merged) because
+**#373 was in flight raising it**, and its PR body says it went looking for a resolved
 Known Issue to archive for exactly this headroom and found none. A file sitting below its number is
 allowed by the ratchet's own rule; lowering it here would hand a live PR a conflict for no gain. The
 next session to touch this file should ratchet it to whatever the tree then holds.

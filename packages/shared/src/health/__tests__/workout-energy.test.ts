@@ -5,7 +5,11 @@ import {
   metForActivity,
   intensityFromRpe,
   estWorkoutKcal,
+  estWorkoutKcalFromHr,
+  estSessionKcal,
   isKnownActivity,
+  isPlausibleSessionDuration,
+  MAX_PLAUSIBLE_SESSION_MIN,
   DEFAULT_ACTIVITY_ID,
 } from '../workout-energy'
 import { COMMON_WORKOUT_ACTIVITIES } from '../workout-activities'
@@ -100,5 +104,51 @@ describe('estWorkoutKcal — MET fallback (pinned)', () => {
     expect(estWorkoutKcal({ durationMin: 0, ageYears: 30, weightKg: 80, sex: 'male', intensity: 'moderate' })).toBeNull()
     expect(estWorkoutKcal({ durationMin: 45, ageYears: NaN, weightKg: 80, sex: 'male', intensity: 'moderate' })).toBeNull()
     expect(estWorkoutKcal({ durationMin: 45, ageYears: 30, weightKg: 0, sex: 'male', intensity: 'moderate' })).toBeNull()
+  })
+})
+
+// LA-21, owner-decided 2026-08-24. Eleven of the owner's 81 completed sessions span 534–845 minutes
+// — the app left running — against a p50 of 56 and NOTHING between 92 and 534. They are real
+// workouts (5–6 exercises, 13–18 sets), so the exercise and set logs stay and the volume stays; it is
+// the clock that is wrong, and the owner's call is to cull the duration-derived numbers rather than
+// clamp them, because a clamped figure is still partly fiction.
+describe('implausible session durations are culled, not clamped', () => {
+  const base = { ageYears: 33, weightKg: 70.9, sex: 'male' as const, intensity: 'moderate' as const }
+
+  it('accepts a real session and rejects one the app was left running through', () => {
+    expect(estWorkoutKcal({ ...base, durationMin: 56 })).toBeGreaterThan(0)   // the owner's p50
+    expect(estWorkoutKcal({ ...base, durationMin: 92 })).toBeGreaterThan(0)   // longest real session
+    expect(estWorkoutKcal({ ...base, durationMin: MAX_PLAUSIBLE_SESSION_MIN })).toBeGreaterThan(0)
+    expect(estWorkoutKcal({ ...base, durationMin: 534 })).toBeNull()          // shortest bad session
+    expect(estWorkoutKcal({ ...base, durationMin: 845 })).toBeNull()          // longest bad session
+  })
+
+  // Null, never a clamped number: `estWorkoutKcal`'s contract is already "returns null when the
+  // inputs cannot support an estimate, so the caller shows nothing rather than a wrong number", and
+  // a 240-minute stand-in for a 14-hour row is exactly a wrong number.
+  it('returns null rather than the value at the bound', () => {
+    const atBound = estWorkoutKcal({ ...base, durationMin: MAX_PLAUSIBLE_SESSION_MIN })
+    expect(estWorkoutKcal({ ...base, durationMin: 600 })).not.toBe(atBound)
+    expect(estWorkoutKcal({ ...base, durationMin: 600 })).toBeNull()
+  })
+
+  // The HR path is the one that actually runs for a session with a strap, so a bound on the MET path
+  // alone would leave the whole defect in place wherever it matters most.
+  it('applies to the heart-rate path too', () => {
+    expect(estWorkoutKcalFromHr({ ...base, durationMin: 56, avgBpm: 120 })).toBeGreaterThan(0)
+    expect(estWorkoutKcalFromHr({ ...base, durationMin: 600, avgBpm: 120 })).toBeNull()
+  })
+
+  it('and therefore to estSessionKcal on both of its branches', () => {
+    expect(estSessionKcal({ ...base, durationMin: 600, rpe: 8, avgBpm: 120 }).kcal).toBeNull()
+    expect(estSessionKcal({ ...base, durationMin: 600, rpe: 8, avgBpm: null }).kcal).toBeNull()
+    expect(estSessionKcal({ ...base, durationMin: 56, rpe: 8, avgBpm: 120 }).kcal).toBeGreaterThan(0)
+  })
+
+  it('still rejects the zero and negative cases it always did', () => {
+    expect(estWorkoutKcal({ ...base, durationMin: 0 })).toBeNull()
+    expect(estWorkoutKcal({ ...base, durationMin: -5 })).toBeNull()
+    expect(isPlausibleSessionDuration(null)).toBe(false)
+    expect(isPlausibleSessionDuration(NaN)).toBe(false)
   })
 })

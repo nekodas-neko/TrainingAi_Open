@@ -131,6 +131,11 @@ None. This role's PRs are docs-only.
 - Screens: temporary specs in `e2e/`, run against the already-running server with
   `E2E_BASE_URL=http://localhost:3000` **and `DATABASE_URL=…` set** (`zero-data.setup.ts` fails loudly
   without it, before your spec runs). **Delete the spec and `test-results/` before committing.**
+- **This container's clone is SHALLOW.** After `git fetch origin main`, a merge can fail with
+  *"refusing to merge unrelated histories"* and `git merge-base HEAD origin/main` can print nothing —
+  neither means divergence. The fetched commits simply do not reach back past the shallow boundary.
+  `git fetch --unshallow origin` fixes it in one call, and the merge base appears immediately. Do not
+  reach for `--allow-unrelated-histories`; it would graft two disjoint trees together.
 - **`get_check_runs` returning `total_count: 0` has a third cause, and it is the likeliest one here.**
   `CLAUDE.md` names a stale base; the PR field to read is **`mergeable_state`**. `dirty` means a merge
   conflict, and **GitHub runs no PR checks at all while it cannot compute the merge commit** — so a
