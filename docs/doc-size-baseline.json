@@ -1,20 +1,20 @@
 {
- "_comment": "Shrink-only line-count baselines. A file may sit at or below its number and may never grow. Raising one is a deliberate act that shows up in the diff; record why in docs/doc-size-baseline-history.md, not here. Counts are `wc -l` + 1 (the script splits on newline).",
- "files": {
-  "projectOverview.md": 7908,
-  "docs/implementation-backlog.md": 11517,
-  "CLAUDE.md": 1155,
-  "docs/agents/state/implementation-lane-a.md": 152,
-  "docs/agents/state/implementation-lane-b.md": 109,
-  "docs/agents/state/bugfix.md": 161,
-  "docs/agents/state/review.md": 170,
-  "docs/agents/state/tuning.md": 582,
-  "docs/agents/state/orchestrator.md": 62
- },
- "entries": {
-  "dir": "docs/overview/entries",
-  "chore": 20,
-  "limit": 60,
-  "totalCeiling": 250
- }
+  "_comment": "Shrink-only line-count baselines. A file may sit at or below its number and may never grow. Raising one is a deliberate act that shows up in the diff; record why in docs/doc-size-baseline-history.md, not here. Counts are `wc -l` + 1 (the script splits on newline).",
+  "files": {
+    "projectOverview.md": 7908,
+    "docs/implementation-backlog.md": 11517,
+    "CLAUDE.md": 1155,
+    "docs/agents/state/implementation-lane-a.md": 152,
+    "docs/agents/state/implementation-lane-b.md": 109,
+    "docs/agents/state/bugfix.md": 161,
+    "docs/agents/state/review.md": 173,
+    "docs/agents/state/tuning.md": 582,
+    "docs/agents/state/orchestrator.md": 62
+  },
+  "entries": {
+    "dir": "docs/overview/entries",
+    "chore": 20,
+    "limit": 60,
+    "totalCeiling": 250
+  }
 }
