@@ -300,7 +300,7 @@ async function buildBodyBattery(userId: string, tz: string) {
       stressAt,
     },
   )
-  let battery = walk.battery
+  const battery = walk.battery
   const charged = walk.charged
   const drained = walk.drained
   const stressDrained = walk.stressDrained
