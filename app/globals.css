@@ -495,6 +495,13 @@ body {
   .bg-particle-snow,
   .bg-particle-fog,
   .bg-particle-lightning { animation: none !important; }
+  /* The W1 "this set is next" bounce (active-workout-screen). A functional indicator, so it freezes
+     to its static state rather than disappearing — the button is still there and still primary, it
+     just stops moving. Q-461: this is also what makes the workout write path automatable. An
+     infinite animation never gives Playwright the two consecutive stable frames its actionability
+     check needs, so `Start Set 2` hung to the test timeout while every earlier step passed, and the
+     app's core write path could not be driven past set 1 by the harness built to guard it. */
+  .animate-bounce { animation: none !important; }
   @keyframes ta-marquee { from { transform: none; } to { transform: none; } }
   .recovery-marquee { display: none; }
   .recovery-static { display: flex; }
