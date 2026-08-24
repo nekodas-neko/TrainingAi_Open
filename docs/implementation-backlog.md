@@ -1167,6 +1167,35 @@ right number.**
 - **What would count as done:** all six converted, and `grep` for the shape returns only the
   engine's three (already converted) plus the sheets you just changed.
 
+### [nutrition][platform] LB-7 — `recipe-url-to-meal.spec.ts` matches two elements when a scraped recipe has no title
+
+- **Lane:** B — `e2e/` and the component it asserts against are surface.
+- **Branch:** `fix/recipe-spec-strict-locator`
+- **Added:** 2026-08-23, from a CI failure on an unrelated PR (#345, which touches a checker script
+  and the publish dry-run and nothing this spec can see).
+- **Observed in CI, not reproducible locally.** The spec passes 4/4 against `main` on the dev
+  server; in CI it produced one hard failure and one flake in the same run.
+- **The strict-mode violation is a real latent bug, and it is diagnosed:**
+  ```
+  strict mode violation: getByRole('dialog').getByText('example.com') resolved to 2 elements:
+    1) <span class="block text-sm font-medium">example.com</span>     ← the meal NAME
+    2) <span class="truncate">example.com</span>                      ← the attribution
+  ```
+  `my-meals-picker.tsx:222` renders `m.name` and `:245` renders `hostOf(m.sourceUrl)`. **When the
+  scrape returns no title the name falls back to the host**, so both spans read `example.com` and
+  `e2e/recipe-url-to-meal.spec.ts:100` matches two. It is not a timing flake — it is deterministic
+  given that input, and the input is reachable.
+- **Fix shape:** make the attribution assertion unambiguous rather than adding `.first()`, which
+  would keep passing if the attribution disappeared entirely. The attribution row is the one
+  carrying the `Link2` icon and the `· from a N-serve recipe` suffix; assert on that structure, or
+  give the row a `data-testid`. Then the sibling case at `:146`
+  (`/from a 4-serve recipe/`, which failed on both the first run and the retry) is worth re-checking
+  under the same fixture — it may share the cause.
+- **Why it matters beyond this spec:** E2E is a required check, so a spec that fails on inputs
+  nobody controls blocks every lane's merges, and the recovery costs a full re-run each time.
+- **Surface:** browser-reproducible, but it did not reproduce on the dev server — chase it in CI or
+  by making the scrape mock return no title, which is the condition that produces the collision.
+
 ### [nutrition] Q-387 — a half-logged day is indistinguishable from a light day, and it drags the calibrated maintenance down with nothing to stop it
 
 - **✅ THE LANE A HALF SHIPPED 2026-08-19. WHAT REMAINS IS LANE B'S: the button and the counter.**
