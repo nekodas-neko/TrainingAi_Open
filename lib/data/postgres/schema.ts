@@ -1072,6 +1072,20 @@ export const rrIntervals = pgTable('rr_intervals', {
   source: text('source').notNull().default('chest_strap'),
 }, t => [unique().on(t.userId, t.at)])
 
+// TN-3a — the 30-minute daytime-stress buckets, persisted (migration 212). `summarizeStressDay`
+// reduces this series to three daily scalars on `oura_daily_derived`; those are too compressed to
+// answer "which hours run hottest" (measured span −0.14 … +0.23 on a [−1,+1] scale), so the series
+// itself is kept. Rows rather than a JSONB array because the read aggregates ACROSS days by hour.
+// `bucketStart` is the instant, not a local hour — the hour is derived in the user's timezone at
+// read time, so a timezone change does not strand rows keyed to the old one.
+export const ouraDaytimeStressBuckets = pgTable('oura_daytime_stress_buckets', {
+  userId:      uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  day:         text('day').notNull(),
+  bucketStart: timestamp('bucket_start', { withTimezone: true }).notNull(),
+  level:       doublePrecision('level').notNull(),
+  updatedAt:   timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+}, t => [primaryKey({ columns: [t.userId, t.bucketStart] })])
+
 // D5 — own daytime-HRV: per-user regression replacing Oura's dhrv_imputation ONNX model
 // (migration 149). One row per user, upserted on refit. See lib/health/daytime-hrv-model.ts.
 export const ouraDaytimeHrvModel = pgTable('oura_daytime_hrv_model', {

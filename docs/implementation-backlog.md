@@ -14,7 +14,7 @@ silently misdirecting the next session. Update them in the same PR that consumes
 
 | Pointer | Value | Source of truth |
 |---|---|---|
-| Next free Postgres migration | **212** | `lib/data/postgres/migrations/` |
+| Next free Postgres migration | **214** | `lib/data/postgres/migrations/` |
 | Local SQLite schema version | **v28** | `lib/sqlite/migrations.ts`; `lib/sqlite/__tests__/migrations.test.ts` asserts the max |
 
 > **There is no third pointer any more.** Entry IDs are not allocated from a shared counter and
@@ -474,6 +474,38 @@ State the achieved back-fill depth in the PR rather than assuming it reaches the
 one of them and reading it back alongside the other is how two numbers for one metric appear. Pick
 the rollup as the writer (it is the one that can back-fill) and have the route read through, or
 record explicitly why not.
+
+- 🚧 **THE STORAGE LAYER AND THE WRITE SHIPPED 2026-08-24 (Lane A). The entry stays open — see what
+  is NOT done.** Migration **212** creates `oura_daytime_stress_buckets` (`user_id`, `day`,
+  `bucket_start`, `level`), rows not JSONB as the entry specifies; **213** regenerates the
+  `claude_ro` views so the new table is readable (86 views — the schema is default-deny and
+  `claude-ro-readonly-role.test.ts` fails on the count divergence, so this is not bookkeeping).
+  The rollup writes at its existing per-day series build (`run.ts`), through
+  `io.replaceStressBuckets` → `replaceDaytimeStressBuckets`.
+  - **The two-baselines hazard is settled the way the entry asks: the rollup is the sole writer.**
+    The live route builds the same series from `restingHr` + a 28-day HRV mean, the rollup from
+    `latest.rhrLowBpm` + `nightHrvMs`. Only the rollup is persisted, because only the rollup can
+    back-fill. The route is **unchanged** and still computes its own for today — see below.
+  - **Whole-day REPLACE, not a merge.** The series is recomputed as a unit, so a re-run producing
+    fewer buckets (shorter waking window, a frame that failed to decode) must shrink the stored day
+    rather than leave stale buckets merged in beside the new ones, where they read as real stress.
+    Two tests catch a merge — removing the day-clearing delete fails them with `expected length 1,
+    got 3` and `expected 0, got 1`.
+  - **A correction worth keeping.** The write's `setWhere` user-scope is **redundant**: the primary
+    key is `(user_id, bucket_start)`, so a cross-user conflict cannot arise. It was first committed
+    with a comment claiming it prevented cross-user overwrite, and a test claiming to prove it —
+    removing the line left every test green. Both now say what is actually true. The line stays as
+    insurance against the key narrowing, per CLAUDE.md's `onConflictDoUpdate` rule.
+- **Keep — three things are NOT done, and none of them is verifiable from a sandbox:**
+  1. **No back-fill has been RUN, and its depth is unknown.** The write rides the existing rollup
+     path, so a wide pass will fill history from `oura_raw_packed` — but the rollup cannot execute
+     here at all (it needs the vendored constants Q-49 removed from the repo), so **no bucket has
+     ever been written by the real producer.** The entry asks for the achieved depth to be stated:
+     it cannot be, until a pass runs on Railway. Storage is proven; the producer is not.
+  2. **The route still computes its own series for today** rather than reading through. Left
+     deliberately — changing the live Body Battery read is a behaviour change on a working card and
+     belongs with TN-3b, which is the thing that needs a consistent read across days.
+  3. **TN-3b is still blocked on a back-fill existing**, not merely on the table existing.
 
 ### [readiness] TN-3b — surface stress by hour, and on the HR charts
 

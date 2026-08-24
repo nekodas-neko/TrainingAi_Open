@@ -79,6 +79,7 @@ export function createPostgresRollupIO(deps: PostgresRollupIODeps): RollupIO {
     upsertDailySummary: rows => oura.upsertOuraDailySummary(db, userId, rows),
     readDailyDerived: (from, to) => oura.getOuraDailyDerived(db, userId, from, to),
     upsertDailyDerived: (day, patch) => oura.upsertOuraDailyDerived(db, userId, day, patch),
+    replaceStressBuckets: (day, buckets) => oura.replaceDaytimeStressBuckets(db, userId, day, buckets),
 
     readDaytimeHrvModel: () => oura.getDaytimeHrvModel(db, userId),
     refitDaytimeHrvModel: timezone => deps.refitDaytimeHrvModel(userId, timezone),
