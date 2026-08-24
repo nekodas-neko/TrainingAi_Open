@@ -13,6 +13,13 @@ export const CHANGELOG: ChangelogEntry[] = [
     ],
   },
   {
+    version: "1.348.0",
+    date: "2026-08-24",
+    changes: [
+      "Typing an impossible number into a health log now says so straight away. A 5,000 kg weight used to be accepted, saved, and then quietly discarded on the way to the server \u2014 the number you typed simply never appeared again. Weight, body fat, steps, calories, the three macros and a custom water amount are all checked as you type now, against the same limits the server uses, with a message naming what the value has to be between.",
+    ],
+  },
+  {
     version: "1.347.0",
     date: "2026-08-24",
     changes: [

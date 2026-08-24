@@ -9,9 +9,10 @@ import type { WidgetDef } from "@/lib/home/home-prefs"
 import { getLocalStore } from "@/lib/local-store"
 import { pushMutations } from "@/lib/local-store/sync-engine"
 import { todayInTz, todayMidnightUtc, toAestDay } from "@trainingai/shared/date-utils"
-import { localDateString } from "@trainingai/shared/utils"
+import { cn, localDateString } from "@trainingai/shared/utils"
 import { invalidateBodyMetricWrite, invalidateReadinessInputs } from "@/lib/cache-groups"
 import type { LocalBodyMetric } from "@/lib/local-store/types"
+import { metricBoundError } from "@/components/health/metric-bounds"
 
 interface LogValueSheetProps {
   widget: WidgetDef | null
@@ -39,6 +40,9 @@ export function LogValueSheet({ widget, onClose, userId, metaToday, metaRecent, 
 
   async function handleSaveLog() {
     if (!widget || logValue.trim() === "") return;
+    // Q-321: never queue a value the server will drop. This sheet had NO bounds check at all — not
+    // even the `> 0` its sibling carried — across seven fields.
+    if (metricBoundError(widget.key, logValue)) return;
     setLogSaving(true);
     try {
       const date = todayInTz();
@@ -182,6 +186,8 @@ export function LogValueSheet({ widget, onClose, userId, metaToday, metaRecent, 
     finally { setLogSaving(false); }
   }
 
+  const boundError = widget ? metricBoundError(widget.key, logValue) : null;
+
   return (
     <Sheet open={widget !== null} onOpenChange={(open) => { if (!open) onClose(); }}>
       <SheetContent side="bottom">
@@ -192,7 +198,7 @@ export function LogValueSheet({ widget, onClose, userId, metaToday, metaRecent, 
           <Button
             className="w-full h-12 bg-brand hover:opacity-90 text-primary-foreground font-semibold"
             onClick={handleSaveLog}
-            disabled={logSaving || logValue.trim() === ""}
+            disabled={logSaving || logValue.trim() === "" || !!boundError}
           >
             {logSaving ? "Saving…" : "Save"}
           </Button>
@@ -204,12 +210,19 @@ export function LogValueSheet({ widget, onClose, userId, metaToday, metaRecent, 
               onChange={(e) => setLogValue(e.target.value)}
               placeholder={`Enter ${widget?.unit || "value"}`}
               autoFocus
-              className="flex-1 rounded-xl border bg-muted px-4 py-3 text-2xl font-bold tabular-nums focus:outline-none focus:ring-2 focus:ring-brand"
+              aria-invalid={!!boundError}
+              className={cn(
+                "flex-1 rounded-xl border bg-muted px-4 py-3 text-2xl font-bold tabular-nums focus:outline-none focus:ring-2 focus:ring-brand",
+                boundError && "border-destructive",
+              )}
             />
             {widget?.unit && (
               <span className="text-lg font-medium text-muted-foreground">{widget.unit}</span>
             )}
           </div>
+          {boundError && (
+            <p role="alert" className="text-xs text-destructive">{boundError}</p>
+          )}
         </div>
       </SheetContent>
     </Sheet>

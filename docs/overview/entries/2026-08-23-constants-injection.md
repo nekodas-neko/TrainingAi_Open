@@ -3,7 +3,7 @@
 **Branch:** `feat/inject-oura-constants` · **Lane A** · no behaviour change
 
 Last of today's Q-545 work. The [extraction](2026-08-23-oura-rollup-io-port.md) ported the I/O, the
-[runtime injection](2026-08-23-model-runtime-port.md) ported the models, and the one edge left was
+[runtime injection](../history-2026-08-24.md) ported the models, and the one edge left was
 the constants loader. It is closed.
 
 `lib/oura-ble/rollup/run.ts`, walking its import graph on value imports only:

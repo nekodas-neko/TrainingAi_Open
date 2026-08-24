@@ -16,7 +16,7 @@ export const maxDuration = 30
 const PrescribeBodySchema = z.object({
   excludeSessionId: z.string().optional(),
   durationPreset: z.enum(['short', 'standard', 'long']).optional(),
-})
+}).strict()
 
 export async function POST(
   req: NextRequest,

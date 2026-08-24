@@ -700,11 +700,24 @@ answered by subtraction rather than re-argued. Verified through the real route o
   `body-metadata` are right for the other seven. **Both stopped after 2026-05-29 and neither is
   explained**, which per CLAUDE.md is unexplained rather than fixed. The cull bounds the number
   whichever cause fires.
-- **Keep:** the **midnight-`startedAt` fallback itself is not fixed** — seven sessions recorded a start
-  time that was never captured, and the cull hides the symptom rather than restoring the real span.
-  `weekly-stats` already substitutes the exercise-log span for exactly this case; whether the other
-  duration consumers should do the same, or whether the write path should stop inventing a midnight
-  start at all, is the open half.
+- ✅ **THE MIDNIGHT FALLBACK IS FIXED TOO, 2026-08-24 — and it was still LIVE, not just history.**
+  `packages/shared/src/workout/log-exercise.ts` fell back to `aestMidnight(...)` outright whenever the
+  payload carried no `workoutStartedAt`, so a session that began at 09:00 was recorded as beginning at
+  midnight. It now walks the ladder `loggedAt` already used forty lines below: the device anchor, then
+  **the first set's start** (already in the payload as `setStartTimes`, and *inside* the session), then
+  `now` for a log dated today, then midnight only for a **back-dated** log — where the start is
+  genuinely unknown and `now` would be the worse lie, putting the session on the wrong day.
+- **The mechanism, which none of the earlier notes named:** `components/workout-screen.tsx` sends
+  `workoutStartMs ?? undefined`, and the store's abandoned-session guard sets `workoutStartMs` to
+  **null**. The guard that stops a days-old session being resumed is what leaves the next log with no
+  anchor. That is also why the cull alone was not enough — a real workout logged after an abandonment
+  would have gone on contributing nothing, because its duration would have gone on being culled.
+- **Keep:** the seven historical rows still carry their midnight `started_at`. The fix is
+  **forward-only**. A backfill would have to reconstruct each span from its exercise logs — which is
+  exactly what `weekly-stats` already does at read time — so the open question is whether it is worth
+  writing back at all, or whether the other duration consumers should derive it the way `weekly-stats`
+  does. **Not reproduced on a device:** confirming the abandonment trigger means leaving a session open
+  past four hours, restarting the app, and logging an exercise.
 
 ### [workouts] Q-420 — drop the session-RPE prompt, derive the intensity, and let it correct the HR burn estimate
 
@@ -1765,76 +1778,6 @@ this fits without an extraction.
   local SQLite on a device; in the web sandbox `getLocalStore` returns null, so `store_?.`
   short-circuits and the enqueue never runs. That `queueMutation` throws on a dead local DB is read
   from source, not observed, and that is still true after the fix. `Gate: device`.
-
-### [platform][body][devices] Q-321 — decide per field which discarded values should quarantine the mutation
-
-> **⚠️ The Lane A half SHIPPED. What is left is Lane B only** — importing the existing validators
-> into `components/health/metric-log-sheet.tsx` so a bad user-typed value is refused at the keyboard
-> instead of three layers later. `packages/shared/**` is Lane A's, so that half could not have ridden
-> in a Lane B PR without a baton claim; it is done and out of the way.
->
-> **`validStepsOrNull` rounds now**, matching `validRestingHrOrNull`/`validWaterMlDeltaOrNull` — the
-> other two `integer` columns. **One correction to the entry below, and it matters if anyone re-reads
-> it:** the finding said the push branch dropped a fractional count while the siblings rounded, which
-> is true, but it did not check `BodyMetadataPostSchema` in the same file — the **web route rejected
-> it too**, with `z.number().int()`, answering **400 for the entire body-metrics write**. So the two
-> paths agreed on policy and differed only in visibility, and fixing the validator alone would have
-> *created* the drift the sync-mirroring rule forbids. Both were changed together, with a test
-> asserting they agree. See [`entries/2026-08-19-steps-fractional-rounding.md`](overview/entries/2026-08-19-steps-fractional-rounding.md).
-
-
-- **Branch:** `feat/push-coercion-per-field-policy`
-- **Added:** 2026-08-19 · Lane A, the deliberately-deferred third step of Q-485.
-- **Lane:** B
-- **What Q-485 did and did not do.** It made the discard *visible* — a named `warnings[]` entry per
-  mutation and one `error_events` row per push, so a value the web route refuses with a message is no
-  longer dropped without a trace. It did **not** change which values are dropped, and that was on
-  purpose: the entry called it *"a product decision, not one an implementer should make in passing."*
-- **The question.** 12 of 14 `body_metrics` bounds checks coerce silently; 2 throw (`waterMlDelta`,
-  `sleep_session`) and both are defensible — a dropped *increment* loses the add entirely, and a
-  malformed sleep session is meaningless rather than incomplete. Which of the other 12 are
-  "incomplete, keep going" and which are "meaningless, quarantine"?
-- **Why it cannot just be "throw everywhere":** a throw quarantines the mutation, and the poison-pill
-  rule forbids retrying a validation failure forever. Twelve new dead-letter paths would trade an
-  invisible failure for a queue of red badges over values the user cannot correct from a badge.
-- **✅ UNBLOCKED 2026-08-19 — the owner delegated the call** (*"Unsure how to continue on this. I
-  dont understand enough - happy for you to make the best guess on how to proceed"*), and the answer
-  is **none of the twelve should quarantine.** The two that throw are the two that should, and the
-  principle behind them is real rather than a coin flip:
-  - **Quarantine when the value IS the mutation.** `waterMlDelta` is an *increment* — drop it and
-    the user's add is gone with nothing left behind. A malformed `sleep_session` is meaningless
-    rather than incomplete. Both are "the payload has no residual value".
-  - **Coerce when the field is one independent observation among many.** Every `body_metrics`
-    column is a separate daily figure on a shared row; dropping an implausible HRV still leaves a
-    valid weight, step count and macro set on the same day. Twelve new dead-letter paths would
-    trade one invisible failure for a queue of red badges over values the user cannot correct from
-    a badge — which the entry above already argues, and which holds field by field.
-- **But the framing hid the better fix, and this is the part worth building.** Coerce-vs-quarantine
-  is the wrong axis. The one that matters is **whether the person can act on it**:
-  - **Device-sourced** (`hrvMs`, `spo2Pct`, `restingHr`, `steps`, `distanceKm` from the ring or
-    Health Connect) — the user cannot fix a bad reading. Silent coercion plus the `warnings[]` entry
-    Q-485 already emits is exactly right. **No change.**
-  - **User-typed** (`weightKg`, `bodyFatPct`, the six `measurementCm` fields, macros and calories
-    entered by hand) — the user *can* fix it, and dropping it three layers later is the actual
-    defect. **Measured 2026-08-19: `components/health/metric-log-sheet.tsx:60-96` writes to the
-    local store and queues the mutation with no bounds check at all**, and
-    `packages/shared/src/validation/body-metrics.ts` — which holds every threshold already — is
-    imported by nothing under `components/` or `app/`. A 5,000 kg weight is accepted by the sheet,
-    stored locally, queued, pushed, silently dropped server-side, and the number the user typed
-    never appears anywhere.
-  - **So the work is: import the existing validators into the log sheet, reject at the keyboard with
-    an inline message, and never queue the value.** No new thresholds, no new policy, no schema — the
-    bounds are already written and shared. That is a smaller change than twelve quarantine paths and
-    it fixes the case the user can actually do something about.
-- **One bug found while deciding this, worth fixing in the same PR:** `validStepsOrNull` uses
-  `Number.isInteger`, so a **fractional** step count is rejected outright rather than rounded. Any
-  decoder or estimator that produces `8000.5` loses the whole day's steps. Every sibling validator
-  takes `Number.isFinite` and rounds where it matters (`validRestingHrOrNull` does exactly that).
-  Round it.
-- **Related, and the natural client half:** nothing renders `warnings[]` yet. Surfacing it is
-  `components/**` (Lane B). With the decision above it is **lower value than it looked** — the
-  warnings that remain are all device-sourced and unactionable, so a badge would report noise the
-  user cannot clear. Worth doing only as a diagnostic surface, not a user-facing alert.
 
 ### [activity][platform] Q-328 — deleting an activity is the one activity-log write with no outbox domain, so offline it just fails
 
@@ -3505,6 +3448,16 @@ ehr     0     0     0     0   648   208   128   556     0
   (`const { id, ...rest }`) while their clients post `{id, ...data}` — so the schema never sees `id`
   and strict is safe, which is knowable only from the handler, not the schema. Round-tripped live to
   confirm the PATCH still returns 200.
+- 🚧 **79 → 75, 2026-08-24.** The four `ai-periodization` routes: `baseline/complete`, and
+  `session/[sessionId]/{prescribe,respond,transition}`. Same method, same live verification — and one
+  of them is the shape worth naming for the next batch: **`prescribe` is called with NO BODY at all
+  by three of its four clients**, which reads as a reason not to tighten it and is not one. The route
+  does `(read.ok ? read.body : null) ?? {}`, and `{}` satisfies an all-optional schema whether or not
+  it is strict. Verified live rather than argued: a bodyless POST still reaches the handler
+  (`{"error":"Baseline not complete"}` — a business error, not `Invalid body`), an unknown key now
+  returns `Invalid body`, and `{"newPhase":"deload","force":true}` came back **200 with real state**.
+  **Read the handler's error MESSAGE, not its status:** all six probes returned 400, and half of them
+  were the handler working correctly.
 - **A fourth exemption-adjacent class, now in the script's header: a schema fed an object the ROUTE
   builds key by key.** `admin/ai-usage` reads three named `searchParams` into a literal, so an
   unknown query key cannot reach the schema at all. Strict guards nothing there *today* — it was

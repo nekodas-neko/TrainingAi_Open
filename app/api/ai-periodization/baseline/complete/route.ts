@@ -14,7 +14,7 @@ const MAX_BODY_BYTES = 8 * 1024
 // the dead branch rather than fixing its schema (YAGNI).
 const BodySchema = z.object({
   sessionId: z.string().uuid(),
-})
+}).strict()
 
 export async function POST(req: NextRequest) {
   const session = await auth()
