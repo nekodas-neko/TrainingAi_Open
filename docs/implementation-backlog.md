@@ -461,6 +461,62 @@ renders a sparkline of today's series plus a High/Elevated/Calm/Recovering label
 today", inside the Body Battery card. The owner did not know it was there, so **discoverability is
 part of this entry**, not only new surfaces.
 
+### [sleep] TN-5 — the sleep calibration's gain varies 8-fold, so the same real improvement is worth 4 points or 0.5
+
+- **Branch:** _unassigned_
+- **Added:** 2026-08-24 · owner report *"the scores have been very varied lately"*
+- **Lane: A** — `packages/shared/src/health/sleep-score.ts`
+- **Gate: owner** — a scoring change; the owner has not signed this one off (TN-2's sign-off does
+  not carry over).
+- **Do not batch.** It re-scores every night and its threshold check must run in the same PR.
+
+`SCORE_CALIBRATION` (`sleep-score.ts:155`) maps the weighted blend onto the display scale, and its
+slope is wildly non-uniform:
+
+| blend segment | display points per blend point | nights there |
+|---|---|---|
+| 65.4 – 74.0 | 1.16× | 2 |
+| **74.0 – 78.0** | **3.00×** | 4 |
+| **78.0 – 81.0** | **4.00×** | 3 |
+| 81.0 – 85.6 | 1.96× | 3 |
+| 88.7 – 91.0 | 0.87× | 8 |
+| 91.0 – 93.0 | 0.50× | 4 |
+
+**A one-point gain in real sleep quality shows as 4 displayed points at blend 79 and 0.5 at blend
+92.** Six of the last twelve nights landed on the 3.0×/4.0× segments, because the blend mean fell
+from 87.1 to 71.1 — straight into the steep zone.
+
+**Recommended curve** (gain spread 8.0× → 1.0×, endpoints and the `[93,100]` ceiling anchor
+preserved):
+
+```
+[[0,0],[20,18],[34.6,33],[50,41],[65.4,48],[74,64.2],[78,71.7],[81,77.4],[85.6,86.0],[88.7,91.9],[91,96.2],[93,100]]
+```
+
+Measured over the 41 nights that store `sleep_contributors`: displayed mean **87.0 → 85.5** (a small
+drop, so it does not lift the scale back toward its old mean — Q-511 stays satisfied), sd 18.36 →
+17.01, and `LOW_SLEEP_SCORE = 42` fires on **2/41 (5%) either way**, so no re-anchoring is needed.
+**Re-verify that firing rate against the shipped TypeScript rather than trusting this line** — the
+standing rule is that a threshold on a display scale is calibrated to that scale's distribution.
+
+**⛔ This is NOT a fix for the volatility that prompted it, and must not be sold as one.** The baton's
+standing advice was to flatten the 74–85 segment if the spread read as jitter. **That was tested and
+it fails**: the curve must climb 0 → 100 across the blend's range, so flattening one segment steepens
+another and total movement is conserved. Measured night-to-night mean |Δ| goes **13.53 → 13.75** — it
+gets marginally *worse*. Replace that line in the baton rather than leaving it to be retried.
+
+**The volatility itself is real signal, not a defect.** The pre-calibration blend moves a mean
+**9.15** points/night before 2026-08-19 and **9.27** after — unchanged. The owner's sleep is genuinely
+that variable; the calibration adds ~1.4×. Do not respond by compressing the scale: range is what the
+2026-08-17 recalibration was asked to produce, and sleep and readiness agreeing is load-bearing for
+the Body Battery anchor (Q-511).
+
+**Pass test:** gain spread ≤ 1.2× across every segment above blend 65.4; displayed mean over the
+same 41 nights within ±2 of 87.0 and **not above it**; `LOW_SLEEP_SCORE` firing rate unchanged at
+2/41; the three tests asserting the ceiling is reachable-but-not-routine still pass.
+
+Review: [`docs/reviews/2026-08-24-sleep-score-volatility.md`](reviews/2026-08-24-sleep-score-volatility.md).
+
 ### [readiness][platform] TN-4 — /api/body-battery threw 31 × 500 for ten hours, then stopped on its own
 
 - **Branch:** _unassigned_
@@ -2524,10 +2580,39 @@ this fits without an extraction.
 > class** — an `Intl.DateTimeFormat()` sweep is separate, unmeasured work.
 > [`journal`](overview/entries/2026-08-24-session-select-workout-user-timezone.md).
 >
-> **`lib/stores/workout-store.ts` (3 calls) is deliberately NOT in this slice.** It is a Zustand
-> store, not a component — no hook available — so its three calls need `tz` threaded in from every
-> caller, including `applyRehydrateFixups` on the rehydrate path. Structurally different work from
-> the rest of the sweep; left for its own slice.
+> **Fourth slice shipped 2026-08-24 (Lane B) — the sweep is DONE for every component.** 27 files,
+> 44 call sites, ratchet **47/28 → 3 calls in 1 file**. The baseline now holds exactly one entry.
+>
+> **Two more of `metric-log-sheet`'s class, found by reading rather than by the count:**
+> `log-value-sheet.tsx` POSTed `localDate: localDateString()` (device zone) while its own local
+> branch used `todayInTz(tz)` — two answers for one save. And `weekly-stats-hub.tsx`'s `todayKey`
+> needed `todayInTz(tz).replace(/-/g,"/")`, **not** a plain swap: `/api/weekly-stats` emits
+> `dateKey` as `yyyy/MM/dd`, so a dash-formatted key would have silently stopped matching and
+> killed the today-highlight. **A blind find-and-replace across this sweep would have shipped that.**
+>
+> Also threaded through three module-scope helpers that cannot call a hook (`linkPrescribedRun`,
+> `readSeed`, and `warmCache` in `sync-provider` — that last writes the `{date, data}` envelope
+> `cachedFetchToday` reads, so a zone mismatch makes every warmed today-key a permanent miss).
+> Zero lint warnings introduced across all 27 files.
+> [`journal`](overview/entries/2026-08-24-client-timezone-sweep-components-complete.md).
+>
+> **`lib/stores/workout-store.ts` is all that remains, and it is a DESIGN decision, not a
+> conversion.** It is a Zustand store, so no hook is available. **The risk is real:** `storedDate`
+> exists only to detect a day rollover, and a mismatch makes `rolloverDay()` clear `todayLogged` —
+> dropping the day's completed-set ticks. A wrong-zone stamp can both *miss* a rollover and *fire a
+> spurious one*.
+>
+> **The pure functions are already parameterised** — `applyRehydrateFixups(state, today, now)` and
+> `rolloverDay(today)` both take the date, and `workout-screen.tsx`'s visibilitychange effect
+> already passes `todayInTz(tz)`. What has no answer is the three places that *supply* the stamp:
+> the initial-state object, one reducer, and `onRehydrateStorage`, which runs at store creation
+> **outside React, before any provider mounts**.
+>
+> Two shapes, neither free: **(a)** reconcile on mount — let the store stamp `DEFAULT_TZ` and have
+> the component correct it, which adds a `rolloverDay` call whose clearing behaviour must be proven
+> not to eat a legitimate day's ticks; or **(b)** a module-level "current user tz" the store reads,
+> which is the global this entry's own header warns against. **Pick deliberately and verify the
+> clear path** — do not convert it mechanically.
 >
 > **What that slice actually proved, and what it did not.** With a seeded user on
 > `Pacific/Kiritimati` (UTC+14, currently a day *ahead* of this container's UTC clock — so the

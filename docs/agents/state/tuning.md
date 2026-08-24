@@ -115,9 +115,15 @@ and sits in Lane A's queue.
    ~19×, so the radar may then fire *too* often. That half is Tuning's; the fix is not.
 7. **Re-measure resilience once the recalibrations reach stored rows** (Q-508). All 13 existing rows
    predate both v1.319.0 and v1.321.0.
-8. **Watch the shipped Sleep Score.** If the new spread reads as jitter rather than signal, flatten
-   `SCORE_CALIBRATION`'s 74–85 segment — it amplifies ~4 blend points into ~12 displayed points around
-   the median, which is the deliberate cost of range.
+8. **The Sleep Score spread was watched, and the advice that used to sit here was WRONG.** The owner
+   reported it 2026-08-24 (*"the scores have been very varied lately"*) and the fix this line
+   prescribed — flatten `SCORE_CALIBRATION`'s 74–85 segment — **was tested and does not work**: the
+   curve must climb 0→100 across the blend's range, so flattening one segment steepens another and
+   night-to-night movement goes **13.53 → 13.75**, marginally worse. **The volatility is real
+   signal** — the pre-calibration blend moves 9.15 pts/night before the recalibration and 9.27 after,
+   unchanged. What is genuinely broken is the curve's **gain spread of 8×** (4.00× at blend 79,
+   0.50× at 92) → **TN-5**, filed as an interpretability fix and explicitly not a jitter fix.
+   [`review`](../../reviews/2026-08-24-sleep-score-volatility.md).
 
 ## Owner reports handled
 - **2026-08-20 — "that wake up time is way off, I woke up around 6am."** → Q-529, above. The score was
@@ -184,6 +190,13 @@ for this work:
 `ai-periodization/ai-dynamic.ts`, `lib/oura-models/inference/ots.ts` — check Lane A's baton first.
 
 ## Do not re-litigate
+- **A calibration curve cannot reduce displayed volatility — its total rise is conserved.** Flatten
+  a steep segment and another one steepens; measured on `SCORE_CALIBRATION`, uniform gain moved
+  night-to-night |Δ| from 13.53 to **13.75**. The only levers that genuinely reduce displayed jitter
+  are compressing the scale (which undoes the range the owner asked for, and re-opens Q-511) or
+  reducing the input's own movement (which here is real signal). **Diagnose "the score jumps around"
+  by reconstructing the pre-calibration blend first** — if the blend's night-to-night |Δ| is
+  unchanged, the model is reading real variation and no curve change will help.
 - **Contributor curves set the RANKING; a calibration on the blend sets the RANGE.** Re-shaping all
   nine sleep curves moved the mean 84.1 → 73.6 and left sd at 14.9 (from 15.9). A blend of ~10 terms
   shrinks spread by ~1/√10 — its IQR was **6 points**. Do not try to fix a range problem with curves.

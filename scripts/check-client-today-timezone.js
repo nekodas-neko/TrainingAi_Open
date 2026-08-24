@@ -53,33 +53,10 @@ const EXEMPT = new Map([
 ]);
 
 const BASELINE = {
-  'app/health/health-content.tsx': 3,
-  'app/health/hooks/use-health-calcs.ts': 1,
-  'app/nutrition/nutrition-content.tsx': 3,
-  'app/session-explain/session-explain-client.tsx': 1,
-  'app/session-select/components/log-value-sheet.tsx': 2,
-  'components/activity/done-activity-screen.tsx': 2,
-  'components/admin/day-review-tab.tsx': 2,
-  'components/admin/time-audit-card.tsx': 1,
-  'components/day-review-sheet.tsx': 2,
-  'components/exercise-history-sheet.tsx': 1,
-  'components/fitness-tests/test-result.tsx': 1,
-  'components/guided-walk/walk-summary.tsx': 1,
-  'components/health/hr-day-card.tsx': 1,
-  'components/health/injury-card.tsx': 1,
-  'components/health/injury-sheet.tsx': 3,
-  'components/health/time-in-zone-card.tsx': 1,
-  'components/health/training-stress-line.tsx': 1,
-  'components/home/home-card-widget.tsx': 2,
-  'components/nutrition/assign-step.tsx': 2,
-  'components/nutrition/food-logger-sheet.tsx': 1,
-  'components/nutrition/manage-supplements-sheet.tsx': 3,
-  'components/nutrition/saved-meals-sheet.tsx': 3,
-  'components/nutrition/supplements-section.tsx': 1,
-  'components/running/prescribed-run-card.tsx': 1,
-  'components/running/running-plan-content.tsx': 1,
-  'components/stats/weekly-stats-hub.tsx': 1,
-  'components/sync-provider.tsx': 2,
+  // Q-477 slice 4 emptied every COMPONENT file. What is left is the one place a hook cannot
+  // reach: a Zustand store. Threading `tz` into it is a design decision with real risk —
+  // `rolloverDay` clears `todayLogged`, so a wrong reconcile drops the day's completed sets —
+  // and the rehydrate path runs outside React entirely, before any provider mounts.
   'lib/stores/workout-store.ts': 3,
 };
 

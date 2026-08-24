@@ -29,8 +29,8 @@
 
 **The Devices card stops calling the ring healthy with no key (LB-5).** Checks `hasKey()`, links to `/admin/oura-ble` when false. `Gate: device`.
 
-**Q-477 slices 1–3 (calendar marker, check-in/log sheets, session-select + workout screens)** take
-the user's timezone now; ratchet 78/38 → **47/28**. Its **blind spot**: device-zone `Intl.DateTimeFormat()` reads are the same bug, uncounted.
+**Q-477 is DONE for every client component** (4 slices, 78/38 → **3 calls in 1 file**). Left is
+`workout-store.ts`: a Zustand store, no hook, and a wrong-zone stamp makes `rolloverDay()` clear the day's completed sets — a design call, analysed on the entry.
 
 **"Nine hand-rolled collapsible toggles missing `aria-expanded`" was actually two (Q-491)** — one
 retired, four already Radix `Collapsible`, two a back-button chevron. `weights-summary.tsx`/

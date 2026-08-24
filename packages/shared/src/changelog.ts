@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.363.0",
+    date: "2026-08-24",
+    changes: [
+      "Every screen now works out what day it is from your own timezone rather than the phone's or the app's default. This finishes a sweep across the whole app \u2014 health, nutrition, running, activity, stats and the workout screens \u2014 so logs, streaks and \u201ctoday\u201d markers all agree with each other when you're not in Brisbane.",
+    ],
+  },
+  {
     version: "1.362.0",
     date: "2026-08-24",
     changes: [
