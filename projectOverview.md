@@ -29,8 +29,8 @@
 
 **The Devices card stops calling the ring healthy with no key (LB-5).** Checks `hasKey()`, links to `/admin/oura-ble` when false. `Gate: device`.
 
-**Q-477 slices 1–2: the calendar today-marker, then the four check-in / log sheets** now take the
-user's timezone (`metric-log-sheet` had *both* wrong answers in one save). Ratchet 78/38 → **70/33**.
+**Q-477 slices 1–3 (calendar marker, check-in/log sheets, session-select + workout screens)** take
+the user's timezone now; ratchet 78/38 → **47/28**. Its **blind spot**: device-zone `Intl.DateTimeFormat()` reads are the same bug, uncounted.
 
 **"Nine hand-rolled collapsible toggles missing `aria-expanded`" was actually two (Q-491)** — one
 retired, four already Radix `Collapsible`, two a back-button chevron. `weights-summary.tsx`/
