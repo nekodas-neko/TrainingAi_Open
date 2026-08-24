@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.351.0",
+    date: "2026-08-24",
+    changes: [
+      "Pace now shows up on activities that have distance and duration but where nothing calculated it \u2014 32 of the last 39 logged walks and runs were missing it, which meant most of the efficiency chart was empty.",
+    ],
+  },
+  {
     version: "1.350.0",
     date: "2026-08-24",
     changes: [

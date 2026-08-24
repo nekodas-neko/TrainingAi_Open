@@ -1719,3 +1719,26 @@ with nothing at risk.
 > words. Nothing owed. The one item this entry raised that is *not* closed — the 23 unprobed FK edges
 > into user-scoped tables — is a future lens, carried in the Review baton's Next section, not an
 > outstanding obligation of these fixes.
+
+### [cardio][activity] ✅ Pace was null on 32 of the 39 activity logs that could compute it — FIXED 2026-08-24 (v1.351.0, Q-307)
+
+`avg_pace_sec_per_km` was populated on 7 of 46 logs while 39 carried both `duration_min` and
+`distance_km` — read from the column, never derived, and written as an explicit `null` at every
+save site.
+
+- **Fix:** `saveActivityLog` now derives `avgPaceSecPerKm = durationMin * 60 / distanceKm` when the
+  caller supplies none, the same shape and the same call site as the existing `caloriesBurned`
+  derivation from Q-230 — so the web route and the `pushMutations` outbox branch both get it from
+  one shared function, by construction.
+- **Migration 210** backfills the rows written before the derivation existed: an idempotent
+  `UPDATE … WHERE avg_pace_sec_per_km IS NULL AND duration_min IS NOT NULL AND distance_km IS NOT
+  NULL AND distance_km > 0`. Never touches a row that already carries a value.
+- **Verified:** five new tests (`activity-log-pace.test.ts`) mirroring the Q-230 test's shape — fills
+  a missing value, never overwrites a supplied one, stays null with either input missing, stays null
+  on a zero-distance guard. Full suite green (123 files, 761 tests). Migration round-tripped by hand
+  against three inserted rows on the local DB: one filled, one left alone, one left null.
+
+> Moved out of `projectOverview.md` on 2026-08-24, same PR as the fix. **Not exercised:** the
+> backfill has not yet run against the real 46-row production table this entry was measured
+> against — it applies automatically on the next `ensureSchema()` cold start after this deploys,
+> same as any other migration, and nothing further is owed beyond that ordinary deploy.

@@ -2091,6 +2091,14 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   async saveActivityLog(userId: string, log: Omit<ActivityLog, 'id' | 'userId' | 'createdAt'> & { id?: string }, opts?: { overwrite?: boolean }): Promise<ActivityLog> {
     const { id, ...data } = log
     const caloriesBurned = data.caloriesBurned ?? await this.deriveActivityKcal(userId, data.activityType, data.durationMin ?? null)
+    // Q-307: pace was read from the column and never derived, so it was absent on 32 of 39 logs
+    // that carried both inputs — a client either sends it or leaves it null forever. Same shape as
+    // caloriesBurned above: derive server-side when the client didn't supply one, from the two
+    // fields that are already present far more often than pace is.
+    const avgPaceSecPerKm = data.avgPaceSecPerKm
+      ?? (data.durationMin != null && data.distanceKm != null && data.distanceKm > 0
+        ? (data.durationMin * 60) / data.distanceKm
+        : null)
     const values = {
       ...(id ? { id } : {}),
       userId, date: data.date, activityType: data.activityType, title: data.title,
@@ -2104,7 +2112,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       splits: data.splits ?? null,
       bestEfforts: data.bestEfforts ?? null,
       paceSeries: data.paceSeries ?? null,
-      avgPaceSecPerKm: data.avgPaceSecPerKm ?? null,
+      avgPaceSecPerKm,
       elevationGainM: data.elevationGainM ?? null,
       elevationLossM: data.elevationLossM ?? null,
       elevationProfile: data.elevationProfile ?? null,

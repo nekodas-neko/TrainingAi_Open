@@ -14,7 +14,7 @@ silently misdirecting the next session. Update them in the same PR that consumes
 
 | Pointer | Value | Source of truth |
 |---|---|---|
-| Next free Postgres migration | **210** | `lib/data/postgres/migrations/` |
+| Next free Postgres migration | **211** | `lib/data/postgres/migrations/` |
 | Local SQLite schema version | **v28** | `lib/sqlite/migrations.ts`; `lib/sqlite/__tests__/migrations.test.ts` asserts the max |
 
 > **There is no third pointer any more.** Entry IDs are not allocated from a shared counter and
@@ -3812,38 +3812,6 @@ ehr     0     0     0     0   648   208   128   556     0
 - **Not a finding, recorded so it is not re-raised:** planned deloads exist. The program's phase
   sequence has a `deload` phase at position 4 (Accumulation 4 → Intensification 3 → Peak 2 →
   Testing 1), so ~10 cycles between deloads. Long-ish, but a program-design choice.
-
-### [cardio][activity] Q-307 — pace is null on 32 of the 39 activity logs that carry everything needed to compute it
-
-- **Branch:** `fix/derive-activity-pace`
-- **Plan:** none needed — likely the same fix as Q-230
-- **Added:** 2026-08-16 · from the load-test review §5
-- **Measured** across 46 `activity_logs` (`deleted_at IS NULL`):
-
-  | field | populated |
-  |---|---|
-  | `duration_min` | 46 / 46 |
-  | `distance_km` | 39 / 46 |
-  | `avg_hr` | 21 / 46 |
-  | `calories_burned` | **18 / 46** |
-  | `avg_pace_sec_per_km` | **7 / 46** |
-  | `steps` | **1 / 46** |
-- **Pace is `duration_min × 60 ÷ distance_km`.** 39 logs carry both inputs; 7 carry the pace. It is
-  **read from the column, never derived at render** — `components/cardio/efficiency-chart.tsx` plots
-  `p.avgPaceSecPerKm` directly and `done-activity-screen.tsx` guards on `!= null` (so the pace block
-  silently disappears rather than showing a wrong value).
-- **Consequence:** the efficiency chart has gaps for **32 of 39** distance-bearing activities, and
-  pace — the number a walker or runner actually looks at — is absent on **85%** of logs.
-- **Same shape as Q-230**, which is about `steps` and `caloriesBurned` being hardcoded `null` at save
-  on guided walks. `components/activity/exercise-review-sheet.tsx:143` writes
-  `avgPaceSecPerKm: null` explicitly, alongside `splits: null, bestEfforts: null, paceSeries: null`.
-  **Check Q-230 before starting — this is very likely one fix covering all of these fields**, and
-  doing them separately would be the sibling-surface mistake.
-- **Decide derive-at-write vs derive-at-read.** At-write matches how the column is consumed today
-  and needs a backfill for the 32 existing rows; at-read needs no backfill but must be applied at
-  every consumer. Prefer at-write with a backfill, and keep the column authoritative.
-- **Out of scope:** whether pace/HR values are physiologically *correct* where present. This entry
-  is about absence only; correctness was not assessed.
 
 ### [workouts] Q-304 — 29 sets at 13+ reps feed the 1RM estimate on the one path that skips the AMRAP correction
 

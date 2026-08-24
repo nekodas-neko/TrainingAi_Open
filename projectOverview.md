@@ -1868,11 +1868,6 @@ the threshold must be re-derived after that calibration, not tuned now. Separate
 three behaviours at three thresholds** (1.5 here, 1.2 early-deload, 1.5 activity taper) on a metric
 Q-279 already questions. Deload has fired **once in 3.5 months**, so this is not over-firing today.
 
-**🟠 Pace is null on 32 of the 39 activity logs that could compute it (Q-307).** `avg_pace_sec_per_km`
-is populated on **7 of 46** while 39 carry both duration and distance. Read from the column, never
-derived at render, and written as an explicit `null` at save — the same shape as **Q-230**, and very
-likely one fix for pace, steps and calories together.
-
 **Clean results, recorded so they are not re-swept.** **The phase engine is working** — the active
 program progresses coherently; five rows that looked like stuck `sessions_in_phase` counters belong
 to an **inactive** program (`AI-Phase1`), which is correct dormant state. **Fifth finding to die on
