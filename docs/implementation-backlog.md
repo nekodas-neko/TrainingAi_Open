@@ -3375,141 +3375,27 @@ ehr     0     0     0     0   648   208   128   556     0
   metric tile and confirm `body_metrics.water_ml` changes. The 400 above is the current behaviour to
   start from.
 
-### [platform][body][nutrition] Q-464 — request schemas are almost never `.strict()`, and on a date-bearing write route that turns a mistyped key into a silent wrong-day write
-
-- **Branch:** `fix/strict-request-schemas`
-- **Added:** 2026-08-18 · review sweep (ingest + input validation) ·
-- **Lane:** A
-  [`docs/reviews/2026-08-18-ingest-and-input-validation.md`](reviews/2026-08-18-ingest-and-input-validation.md)
-- **Placement:** mid-low. **Not a live bug** — the app's own clients send the right keys. Filed because
-  the failure mode is silent data misplacement and this repo has already paid for the class once.
-- **Measured:** of **70** files defining a `z.object(...)` request schema across `app/api` and
-  `packages/shared/src/validation`, only **6** call `.strict()`. Zod's default silently drops unknown keys.
-- **Demonstrated live** on `POST /api/body-metadata`:
-
-  | Sent | Response | Row written |
-  |---|---|---|
-  | `{"date":"2026-08-10","weightKg":81}` | `200 {"success":true,"date":"2026-08-18"}` | weight 81 on **2026-08-18** |
-  | `{"date":"3026-08-18","weightKg":81}` | `200 {"success":true,…}` | **2026-08-18** |
-  | `{"date":"not-a-date","weightKg":81}` | `200 {"success":true,…}` | **2026-08-18** |
-
-- **Do NOT change the route — it is correct.** `app/api/body-metadata/route.ts:236` reads
-  `body.localDate` and defaults to today in the user's timezone when absent, which is the documented
-  pattern. The defect is that `date` is not in the contract, the schema is not strict, so the key is
-  dropped and the write lands on today with a success response.
-- **Why file it:** the repo has already lost a full release to this exact class — the `ai-chat`
-  `localDate` regex that rejected every real request, documented at length in `CLAUDE.md`. A strict
-  schema turns that mistake into a 400 at the boundary instead of a silent wrong-day write.
-- **Eleven date-bearing write schemas are non-strict**, including `sync/push`, `health-connect/ingest`,
-  `running-plan`, `running-plan/override`, `plan-meal-answers`, and the shared `body-metrics`,
-  `activity-log` and `fitness-test` schemas. `WorkoutEntryPatchSchema` is one of the six that **is**
-  strict — use it as the reference.
-- **Fix shape:** add `.strict()`, date-bearing schemas first, then a CI rule — same shape as the
-  hex-literal and TTL-divergence ratchets, which exist because prose alone did not hold the line.
-- 🚧 **The ratchet and the demonstrated schema SHIPPED 2026-08-18; 89 non-strict remain.**
-  `scripts/check-strict-request-schemas.js` runs in the Custom Rules job (now **39** steps) with a
-  shrink-only per-file baseline: a file not listed must have zero, a listed one may only shrink, and
-  reaching zero requires deleting its row. `BodyMetadataPostSchema` — the one the entry demonstrated
-  — is strict, and all four measured wrong-key writes now 400 instead of landing on today.
-- ⚠️ **Two corrections to this entry, both found while implementing it.**
-  **(a) It IS a live bug.** The entry says "not a live bug — the app's own clients send the right
-  keys". They do not: the Water widget's web fallback posts `waterIntake`, which no schema names, and
-  the value was discarded behind a `200`. Filed as **Q-319** (Lane B) with the measurement.
-  **(b) The `sync/push` caveat is far wider than one route.** The entry singles out `sync/push`, but
-  the same argument applies to **every schema `pushMutations` parses** — `activity-log`,
-  `fitness-test`, `day-checkin`, `oura-summary`, mood, food-item, log-exercise, session-rpe,
-  complete-workout. An outbox payload is written to local SQLite by whatever bundle was current when
-  the user acted and sits there until the device syncs, so tightening any of those can reject a
-  mutation queued by an older bundle and dead-letter real data. Plus `health-connect/ingest`, whose
-  client is the owner's Tasker profile and is not in this repo. Both classes are named with their
-  reasons in the script's header rather than silently skipped.
-- **What is left is the sweep**, deliberately not done here: 89 non-strict schemas, each needing its
-  clients checked the way `BodyMetadataPostSchema`'s two were. The ratchet is the mechanism; the
-  sweep is separate and much larger, exactly as `check-hex-literals` says of its own 471.
-- 🚧 **89 → 85, 2026-08-23.** Four converted, each after reading the one client that posts to it:
-  `admin/timing-baseline`, `ai/health-insight`, `running-plan`, `running-plan/override`. All four
-  now 400 on an unknown key and still accept the real body — verified live, not just by test.
-- 🚧 **85 → 79, 2026-08-24.** Six more, all under `app/api/admin/`: `activity-types`, `ai-usage`,
-  `exercises`, `fix-exercise-units`, `generate-exercise-media`, `mirror-dataset-gifs`. Same method,
-  same live verification. **Two of them are precisely the shape a codemod would have broken:**
-  `activity-types` and `exercises` PATCH destructure `id` out of the body **before** parsing
-  (`const { id, ...rest }`) while their clients post `{id, ...data}` — so the schema never sees `id`
-  and strict is safe, which is knowable only from the handler, not the schema. Round-tripped live to
-  confirm the PATCH still returns 200.
-- 🚧 **79 → 75, 2026-08-24.** The four `ai-periodization` routes: `baseline/complete`, and
-  `session/[sessionId]/{prescribe,respond,transition}`. Same method, same live verification — and one
-  of them is the shape worth naming for the next batch: **`prescribe` is called with NO BODY at all
-  by three of its four clients**, which reads as a reason not to tighten it and is not one. The route
-  does `(read.ok ? read.body : null) ?? {}`, and `{}` satisfies an all-optional schema whether or not
-  it is strict. Verified live rather than argued: a bodyless POST still reaches the handler
-  (`{"error":"Baseline not complete"}` — a business error, not `Invalid body`), an unknown key now
-  returns `Invalid body`, and `{"newPhase":"deload","force":true}` came back **200 with real state**.
-  **Read the handler's error MESSAGE, not its status:** all six probes returned 400, and half of them
-  were the handler working correctly.
-- 🚧 **75 → 67, 2026-08-24 (Lane A).** Eight more: `workout-sessions` DELETE and `fitness-tests`
-  DELETE (single-field `{id}`/`{workoutSessionId}` bodies, no in-repo client calling either DELETE
-  route found by grep — safe regardless of what's on the other end), `exercise-gif` and
-  `nutrition/barcode` GET (both validate an object the route itself builds from `searchParams`, the
-  no-client-verification exemption class already in the script's header), `nutrition/meal-types`
-  POST, `user/goals` PATCH and `user/profile` PATCH (each read against its one real client — fields
-  match exactly, verified by reading `meal-type-manager.tsx`, `goals-section.tsx`,
-  `goal-recommendation-sheet.tsx` and `edit-profile-sheet.tsx`). **One trap caught before it
-  shipped, worth the whole batch on its own:** `push/subscribe`'s real client
-  (`lib/push-client.ts`, `sub.toJSON()`) sends a browser `PushSubscriptionJSON`, which always
-  carries `expirationTime` beside `endpoint`/`keys` — the schema named only two of the three keys,
-  so `.strict()` as first written would have 400'd every real subscribe. Fixed by adding the missing
-  field to the schema before adding `.strict()`, not by exempting the route. Verified: relevant
-  vitest suites green (`clear-a-goal`, `goal-write-invalidation`, `cache-groups`,
-  `auth-before-param-validation`, `not-found-status`, `sentry-scrub`), `tsc --noEmit` clean on every
-  touched file. **`pnpm dev` could not be exercised this session** — the sandbox's `node_modules` is
-  missing `@sentry/nextjs` even though `package.json` declares it, unrelated to this change and not
-  investigated further; static verification (reading every real client's payload against the
-  tightened schema) stood in for it.
-- 🚧 **67 → 40, 2026-08-24 (Lane A).** The largest single batch: 16 files reached zero —
-  `activity-logs` (both DELETE and the metrics PATCH), `exercise-estimates`, `exercises` (create),
-  `nutrition/dietary-restrictions`, `nutrition/targets`, `running-plan/explain`,
-  `workout-review/session/[sessionId]/apply`, `nutrition/meal-plans` (create, `[id]` PATCH,
-  `[id]/structure` PATCH, `meals/[mealId]` PATCH, `plan-meal-answers` POST+DELETE), and the shared
-  `packages/shared/src/validation/generated-program.ts` — plus `builder-chat`, `exercises/generate`,
-  `generate-program` and `meal-plans/generate{,/meal}` lowered to their `generateObject`
-  response-schema remainder (their one real request schema each is now strict). Every conversion
-  read the real client's payload against the tightened schema first; no codemod.
-  **Two more traps caught before shipping, same class as `push/subscribe`'s `expirationTime`:**
-  (a) `workout-review-sheet.tsx` sends an unread `confidence` field to
-  `workout-review/session/[sessionId]/apply` — added to the schema (documented as unread; the route
-  already computes its own deterministic confidence per CLAUDE.md's no-self-reported-number rule)
-  rather than exempting the route. (b) `builder-review.tsx` mints a `clientId` on every exercise in
-  its live `program` state (the review editor's React key) and sends that state wholesale to
-  `builder-chat` — added to `GeneratedExerciseSchema` in the shared validation file, which is where
-  it would have silently 400'd every real chat turn had it been missed.
-  Verified: the touched routes' own vitest suites (81 tests, 8 files) plus the full suite (4,693
-  passed, 51 skipped, 2 pre-existing unrelated failures — missing `qrcode` in this sandbox),
-  `tsc --noEmit` clean, `pnpm check:rules` 55 of 55. **`pnpm dev` still could not be exercised** —
-  same sandbox gap as the prior batch; static per-client verification stood in for it again.
-- **A fourth exemption-adjacent class, now in the script's header: a schema fed an object the ROUTE
-  builds key by key.** `admin/ai-usage` reads three named `searchParams` into a literal, so an
-  unknown query key cannot reach the schema at all. Strict guards nothing there *today* — it was
-  still added, because it catches the day someone swaps the literal for a spread of the search
-  params — but it needs **no client verification**, which is the expensive half of this sweep.
-  Recognise the shape before budgeting time for one.
-- **⚠ Two more exemption classes were found while doing it, and both are now in the script's header
-  with evidence rather than as a guess.** (a) **A third-party SDK's wire format:** `/api/coach` is
-  driven by `@ai-sdk/react`'s `DefaultChatTransport`, which posts `{ id, messages, trigger,
-  messageId }` — read out of `node_modules/ai/dist/index.mjs`, not assumed — against a schema naming
-  only `messages`. `.strict()` there would **400 every coach message.** (b) **`generateObject`
-  response schemas**, which the checker cannot tell apart from request schemas: `builder-chat` has
-  four `z.object`s and only one is a request. Strictness there governs the model, not a client.
-  Also: `scale-ble/samples` belongs with the outbox class, because its client is the APK's Kotlin
-  service and **the APK does not update with a Railway deploy**.
-- **The tempting shortcut does not work.** In-repo JS clients ship with the server (the APK is a
-  WebView loading Railway, so JS and server always deploy together), so a key mismatch is a bug
-  either way — but that argues a mismatch *is* a bug, not that there is none, and a silent 400 on a
-  rarely-exercised route is exactly what a codemod would introduce and no test would catch. There is
-  no substitute for reading each client.
-- **⚠️ `sync/push` needs care and is the reason not to codemod this.** Outbox payloads from an older
-  APK may legitimately carry fields the current schema does not name; making that one strict could
-  reject mutations from a device that has not updated. Handle it deliberately, or exempt it with a
-  written reason. **Lane A.**
+> **Q-464 SWEEP COMPLETE and removed, 2026-08-24.** A request schema that is not `.strict()`
+> silently DROPS an unknown key, so a mistyped or renamed field became a successful write of the
+> wrong thing rather than a 400. Demonstrated live on `POST /api/body-metadata`, where
+> `{"date":…,"weightKg":81}` answered `200 {"success":true}` and wrote the weight on **today**.
+> **89 → 37 non-strict schemas across six batches**, each conversion read against its real client's
+> actual payload — no codemod, because the shortcut argument ("in-repo clients ship with the
+> server") says a mismatch *is* a bug, not that there is none.
+> **The 37 that remain are a floor, not a debt**, and are categorised with evidence in
+> `scripts/check-strict-request-schemas.js`'s header: 16 outbox/`pushMutations` (tightening one
+> dead-letters a mutation queued by an older APK), 8 external/native-client (the APK does not update
+> with a Railway deploy), 1 third-party SDK wire format (`coach`'s `DefaultChatTransport`), and 12
+> `generateObject` RESPONSE schemas, which constrain the model's output rather than a client's input.
+> **The ratchet stays in the Custom Rules job permanently** — keeping a NEW non-strict request schema
+> out is what this entry was actually for, and prose alone did not hold it.
+> **Four client-mismatch traps were caught before shipping**, each of which `.strict()` would have
+> turned into a silent 400 on a real request: `push/subscribe`'s browser `PushSubscriptionJSON`
+> carries `expirationTime`; `workout-review/apply`'s client sends an unread `confidence`;
+> `builder-review.tsx` mints a `clientId` on every exercise and posts it to `builder-chat`. Each was
+> fixed by adding the field to the schema, never by exempting the route.
+> Journal: [`entries/2026-08-24-strict-request-schemas-batch5.md`](overview/entries/2026-08-24-strict-request-schemas-batch5.md),
+> [`entries/2026-08-24-strict-request-schemas-complete.md`](overview/entries/2026-08-24-strict-request-schemas-complete.md).
 
 > **Q-258 FIXED and removed, 2026-08-16 (v1.317.3).** Four goal inputs in `goal-targets-section.tsx`
 > (steps, sleep, water, calories) and two in `required-info-section.tsx` (weight, body fat) had
