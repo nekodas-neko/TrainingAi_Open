@@ -14,7 +14,7 @@ silently misdirecting the next session. Update them in the same PR that consumes
 
 | Pointer | Value | Source of truth |
 |---|---|---|
-| Next free Postgres migration | **210** | `lib/data/postgres/migrations/` |
+| Next free Postgres migration | **211** | `lib/data/postgres/migrations/` |
 | Local SQLite schema version | **v28** | `lib/sqlite/migrations.ts`; `lib/sqlite/__tests__/migrations.test.ts` asserts the max |
 
 > **There is no third pointer any more.** Entry IDs are not allocated from a shared counter and
@@ -778,8 +778,15 @@ answered by subtraction rather than re-argued. Verified through the real route o
 > place and losing the ability to tell them apart.
 
 
-- **Lane:** A — `packages/shared/src/health/workout-energy.ts`, `app/api/health-trends`,
-  `app/api/body-metadata`; the prompt removal is `components/workout/done-screen.tsx`.
+- **Lane:** B — **the Lane A half SHIPPED** (#368, `packages/shared/src/workout/derive-session-rpe.ts`):
+  `sessionEffort()` derives from set RPEs with no stored column, and `app/api/health-trends`'s
+  `session-rpe` view already reads it (`effort.source: 'self' | 'derived'`), labelled in the series
+  and the insight line. Owner decision items 2–4 below are done. **What remains is item 1 only** —
+  `done-screen.tsx:398` still prompts *"How hard was that session?"* — and that file is Lane B's
+  (`components/**`). The correction formula (HR × RPE combined) is explicitly not this entry; it
+  waits on Q-422/Tuning per the note below. Verified against `main` 2026-08-24 — the entry's own
+  `Lane: A` field was stale (it named files that already shipped) and is corrected here rather than
+  the entry being re-implemented.
 - **✅ DECIDED BY THE OWNER 2026-08-23. The gate is cleared and the scope changed — read this
   before the older notes below, which were written against a narrower question.**
   1. **Delete the user-facing prompt.** *"Get rid of the user facing 'how hard was the session'."*
@@ -3448,6 +3455,25 @@ ehr     0     0     0     0   648   208   128   556     0
   returns `Invalid body`, and `{"newPhase":"deload","force":true}` came back **200 with real state**.
   **Read the handler's error MESSAGE, not its status:** all six probes returned 400, and half of them
   were the handler working correctly.
+- 🚧 **75 → 67, 2026-08-24 (Lane A).** Eight more: `workout-sessions` DELETE and `fitness-tests`
+  DELETE (single-field `{id}`/`{workoutSessionId}` bodies, no in-repo client calling either DELETE
+  route found by grep — safe regardless of what's on the other end), `exercise-gif` and
+  `nutrition/barcode` GET (both validate an object the route itself builds from `searchParams`, the
+  no-client-verification exemption class already in the script's header), `nutrition/meal-types`
+  POST, `user/goals` PATCH and `user/profile` PATCH (each read against its one real client — fields
+  match exactly, verified by reading `meal-type-manager.tsx`, `goals-section.tsx`,
+  `goal-recommendation-sheet.tsx` and `edit-profile-sheet.tsx`). **One trap caught before it
+  shipped, worth the whole batch on its own:** `push/subscribe`'s real client
+  (`lib/push-client.ts`, `sub.toJSON()`) sends a browser `PushSubscriptionJSON`, which always
+  carries `expirationTime` beside `endpoint`/`keys` — the schema named only two of the three keys,
+  so `.strict()` as first written would have 400'd every real subscribe. Fixed by adding the missing
+  field to the schema before adding `.strict()`, not by exempting the route. Verified: relevant
+  vitest suites green (`clear-a-goal`, `goal-write-invalidation`, `cache-groups`,
+  `auth-before-param-validation`, `not-found-status`, `sentry-scrub`), `tsc --noEmit` clean on every
+  touched file. **`pnpm dev` could not be exercised this session** — the sandbox's `node_modules` is
+  missing `@sentry/nextjs` even though `package.json` declares it, unrelated to this change and not
+  investigated further; static verification (reading every real client's payload against the
+  tightened schema) stood in for it.
 - **A fourth exemption-adjacent class, now in the script's header: a schema fed an object the ROUTE
   builds key by key.** `admin/ai-usage` reads three named `searchParams` into a literal, so an
   unknown query key cannot reach the schema at all. Strict guards nothing there *today* — it was
@@ -3601,27 +3627,6 @@ ehr     0     0     0     0   648   208   128   556     0
   marginal risk over today is small, because `CLAUDE_DB_QUERY_SECRET` already reads exactly this data
   through the same views and the same role.
 
-### [platform] Q-263 — audit the remaining cache groups the way Q-262 audited one
-
-- **Branch:** `chore/audit-remaining-cache-groups`
-- **Plan:** none needed
-- **Added:** 2026-08-16 · the scope Q-262 deliberately did not take
-- Q-262 established the method and applied it to `invalidateGoalRecommendations()` only: for each key
-  in a group, does any call site pass `freshWithinTtl`, and is any read path seed-only? Those are the
-  only two ways an invalidation changes a settled value.
-- **The remaining groups are NOT expected to come out the same way**, which is why this is worth
-  doing rather than assuming. `lib/cache-groups.ts` comments already name `freshWithinTtl` keys
-  inside them — `workout-data:all` and `workout-card:<id>` at TTL_LONG are called out explicitly as
-  having caused a real bug (the pre-injury exercise card). Those are load-bearing; the question is
-  which others are.
-- **The valuable output is not "delete the inert ones".** It is a per-group note saying which keys
-  carry the protection, so a future session changing a fetch to `freshWithinTtl` knows it has just
-  made an invalidation matter, and a future stale-value report starts by checking condition (b)
-  rather than hunting a missing group entry.
-- Watch the static blind spot: a key built by a helper (`energyKeyFor(date)`) is invisible to a
-  literal grep. Q-262 hit this and resolved it by reading the call site; `check-cache-ttl-divergence.js`
-  reports how many such sites it skipped, which is the number to reconcile against.
-
 
 ### [workouts] Q-298 — the 10 historical zero-1RM rows: recompute or null (the code fixes shipped 2026-08-24)
 
@@ -3688,85 +3693,22 @@ ehr     0     0     0     0   648   208   128   556     0
   sequence has a `deload` phase at position 4 (Accumulation 4 → Intensification 3 → Peak 2 →
   Testing 1), so ~10 cycles between deloads. Long-ish, but a program-design choice.
 
-### [cardio][activity] Q-307 — pace is null on 32 of the 39 activity logs that carry everything needed to compute it
+### [workouts] Q-304b — recompute (or leave) the 30 `personal_records` rows written before the AMRAP correction
 
-- **Branch:** `fix/derive-activity-pace`
-- **Plan:** none needed — likely the same fix as Q-230
-- **Added:** 2026-08-16 · from the load-test review §5
-- **Measured** across 46 `activity_logs` (`deleted_at IS NULL`):
-
-  | field | populated |
-  |---|---|
-  | `duration_min` | 46 / 46 |
-  | `distance_km` | 39 / 46 |
-  | `avg_hr` | 21 / 46 |
-  | `calories_burned` | **18 / 46** |
-  | `avg_pace_sec_per_km` | **7 / 46** |
-  | `steps` | **1 / 46** |
-- **Pace is `duration_min × 60 ÷ distance_km`.** 39 logs carry both inputs; 7 carry the pace. It is
-  **read from the column, never derived at render** — `components/cardio/efficiency-chart.tsx` plots
-  `p.avgPaceSecPerKm` directly and `done-activity-screen.tsx` guards on `!= null` (so the pace block
-  silently disappears rather than showing a wrong value).
-- **Consequence:** the efficiency chart has gaps for **32 of 39** distance-bearing activities, and
-  pace — the number a walker or runner actually looks at — is absent on **85%** of logs.
-- **Same shape as Q-230**, which is about `steps` and `caloriesBurned` being hardcoded `null` at save
-  on guided walks. `components/activity/exercise-review-sheet.tsx:143` writes
-  `avgPaceSecPerKm: null` explicitly, alongside `splits: null, bestEfforts: null, paceSeries: null`.
-  **Check Q-230 before starting — this is very likely one fix covering all of these fields**, and
-  doing them separately would be the sibling-surface mistake.
-- **Decide derive-at-write vs derive-at-read.** At-write matches how the column is consumed today
-  and needs a backfill for the 32 existing rows; at-read needs no backfill but must be applied at
-  every consumer. Prefer at-write with a backfill, and keep the column authoritative.
-- **Out of scope:** whether pace/HR values are physiologically *correct* where present. This entry
-  is about absence only; correctness was not assessed.
-
-### [workouts] Q-304 — 29 sets at 13+ reps feed the 1RM estimate on the one path that skips the AMRAP correction
-
-- **Branch:** `fix/high-rep-1rm-correction`
-- **Plan:** none yet — **measure the qualifier below before changing anything**
-- **Added:** 2026-08-15 · from [`docs/reviews/2026-08-15-workout-model-round-3.md`](reviews/2026-08-15-workout-model-round-3.md) §2
-- **The model is well built — this is one gap in it, not a rewrite.** `repFactor` averages Epley and
-  Brzycki and **freezes the Brzycki term at 20 reps** so it cannot blow up toward its 37-rep pole,
-  with `REP_CEILING = 30` above which nothing is estimated. That is more careful than most
-  implementations and should not be touched.
-- **The gap:** `amrapScaleFactor` exists for exactly this problem — 1.0 / 0.97 / 0.93 / **0.88** /
-  **0.82** by rep band — and is applied by `calcAmrap1RM`. But `estimateOneRm`'s ordinary
-  (non-bodyweight, non-baseline) path calls **`calculate1RM`**, which does not apply it.
-- **Measured** (`claude_ro.set_logs`, `deleted_at IS NULL`):
-
-  | rep band | sets | **feeding the 1RM estimate** |
-  |---|---|---|
-  | 1–5 | 40 | 32 |
-  | 6–8 | 497 | 390 |
-  | 9–12 | 411 | 191 |
-  | **13–20** | **59** | **27** |
-  | **21+** | **2** | **2** |
-
-  **29 sets at 13+ reps feed the estimate**, where the band's own scale factor would cut 12–18%.
-- **✅ QUALIFIER MEASURED 2026-08-16 — it did NOT close the entry. Skip to the fix.** Of the sets
-  feeding the 1RM estimate, **28 of the 29 at 13+ reps carry no `planned_pct`** (13–20 reps: 1 of 27;
-  21+: 0 of 2), so `prescriptionFactor` returns 1 and the raw `repFactor` stands with no AMRAP
-  correction. **The proxy is exact, not approximate**: `log-exercise.ts:233` writes
-  `plannedPct: progressionStyle?.[i]?.pct` — the same value `prescriptionFactor` consumes. Working in
-  [`docs/reviews/2026-08-16-deferred-measurements.md`](reviews/2026-08-16-deferred-measurements.md) §1.
-  **So apply the band correction on the `calculate1RM` path when no prescription factor applies**, and
-  add tests at 13, 20 and 21 reps. The double-correction warning below still stands.
-- **⚠️ THE QUALIFIER — do this measurement FIRST, it may close the entry.** `prescriptionFactor`
-  rescales by `1 / ((pct/100) × repFactor(targetReps))` when a style supplies both `pct` and
-  `targetReps`. **Where a style is present, that normalisation may already absorb most of the
-  inflation.** This review did **not** establish how often a style accompanies those 29 sets, so
-  this is a flagged risk with a measurement attached, not a proven defect.
-  - Query: for the 29 sets at 13+ reps with `use_for_1rm = true`, how many had a progression style
-    with a non-null `pct` at write time? `planned_pct` on the row is the closest proxy.
-  - **If most had a style → close this entry as measured-and-rejected.** That is a fine outcome and
-    a better one than a speculative change to a shared formula.
-  - **If most did not → apply the AMRAP band correction** on the `calculate1RM` path when no
-    prescription factor applies, and add a test at 13, 20 and 21 reps.
-- **Do not simply route everything through `calcAmrap1RM`.** Double-correcting a set that already has
-  a prescription factor would deflate the estimate, which is the mirror of the current bug.
-- **Related:** `personal_records` (30 rows) is written from these estimates. If a correction lands,
-  decide separately whether historical PRs are recomputed — that edits training history and needs the
-  owner's say-so.
+- **Gate:** owner
+- **Added:** 2026-08-24 · split off Q-304 when its forward fix shipped
+- **Q-304's forward fix shipped** (`packages/shared/src/1rm.ts` — an unprescribed set now gets the
+  same `amrapScaleFactor` band discount an explicit AMRAP set already got via `calcAmrap1RM`, so a
+  13+ rep set with no progression style no longer feeds the 1RM estimate un-discounted). Verified:
+  measured against production first (1 of 29 flagged sets carried a style, so the qualifier that
+  would have closed the entry did not), 3 new tests at 13/20/21 reps plus the no-double-correction
+  case, full suite green.
+- **What is deliberately NOT done:** `personal_records` (30 rows) was written from the old,
+  un-discounted formula. Recomputing them edits training history and needs the owner's say-so —
+  same shape as Q-298's 10 historical zero-1RM rows, kept as its own decision rather than folded
+  into the forward fix. Options: leave them (only the 29 flagged sets' history is inflated, a small
+  and shrinking share as new sessions log correctly going forward), or recompute the affected rows
+  from `set_logs` with the corrected formula.
 
 ### [workouts] Q-305 — the volume landmarks are computed and never shown to anyone
 
@@ -3833,107 +3775,6 @@ ehr     0     0     0     0   648   208   128   556     0
   `DEFAULT_LANDMARKS`. It is not — `muscles.ts:17` maps `core: 'abs'` and `volume-targets.ts:58`
   applies `normalizeMuscle` before the lookup. Working correctly.
 
-### [platform] Q-458 — `.env.example` is the public configuration contract and it is wrong in both directions
-
-- **Branch:** `fix/env-example-reconcile`
-- **Added:** 2026-08-17 · review sweep (repo-migration architecture lens) ·
-  [`docs/reviews/2026-08-17-repo-migration-architecture.md`](reviews/2026-08-17-repo-migration-architecture.md)
-- **Placement:** mid. Mostly tidy-up, with one edge that names a security property the app does not
-  have.
-- **Method.** Differenced every `process.env.X` read under `lib app packages scripts
-  instrumentation*` against the keys declared in `.env.example`.
-- **Declared, read by no code — 8 keys:**
-
-  | Key | Why dead |
-  |---|---|
-  | `OURA_CLIENT_ID`, `OURA_CLIENT_SECRET`, `OURA_REDIRECT_URI`, `OURA_WEBHOOK_CALLBACK_URL`, `OURA_WEBHOOK_VERIFICATION_TOKEN` | Oura **Cloud** integration deleted 2026-08-13 |
-  | `GEMINI_API_KEY` | Retired at Q-189; `CLAUDE.md` already says nothing reads it |
-  | `TOKEN_ENC_KEY` | Nothing reads it |
-  | `AUTH_URL` | Nothing reads it |
-
-- **The sharp edge is `TOKEN_ENC_KEY`.** It reads as the key that encrypts stored tokens. An operator
-  will generate one, set it, and reasonably conclude tokens are encrypted at rest. Nothing reads it,
-  so nothing is. **A dead variable that names a security property is worse than a dead variable** —
-  fix this one even if the rest is deferred.
-- **The second edge is the five Oura Cloud keys.** `CLAUDE.md` is emphatic that the Cloud integration
-  must never be re-added (re-onboarding the official app risks a firmware update that breaks the
-  reverse-engineered BLE protocol). The public onboarding file currently invites a contributor to go
-  get credentials for exactly that. Two project files contradict each other, and the newcomer reads
-  the wrong one first.
-- **Read by code, undeclared — the real configuration** (excluding test/script knobs
-  `OURA_CONSTANTS_DIR`, `RECORD_MODEL_FIXTURES`, `CHUNKS`, `RTT_MS`, `SERIAL`):
-  `CLAUDE_RO_OWNER_USER_ID`, `LOCAL_DATABASE_URL`, `PG_POOL_MAX`, `RAILWAY_GIT_COMMIT_SHA`.
-- **Do NOT "fix" the `AWS_*` keys.** They are absent from `.env.example` deliberately —
-  `lib/exercise-storage.ts:4-24` reads `AWS_* ?? STORAGE_*` as an alias chain and
-  `constants-delivery.ts:74` reuses that module, so documenting `STORAGE_*` alone is correct. This
-  was checked and cleared; see the review.
-- **Fix shape:** delete the eight, add the four. Consider a Custom Rules step that differences the
-  two automatically — this drifted silently because nothing measured it, the same argument that
-  produced the hex-literal and TTL-divergence ratchets.
-
-### [platform][devices] Q-459 — the rolling APK release is delete-then-recreate, so the advertised public download URL 404s during every native merge
-
-- **Branch:** `fix/apk-rolling-release-no-404-window`
-- **Added:** 2026-08-17 · review sweep (repo-migration architecture lens) ·
-  [`docs/reviews/2026-08-17-repo-migration-architecture.md`](reviews/2026-08-17-repo-migration-architecture.md)
-- **Placement:** low. Short window, infrequent trigger.
-- **What.** `.github/workflows/android.yml:122-127`:
-  ```bash
-  gh release delete apk-latest --yes --cleanup-tag 2>/dev/null || true
-  gh release create apk-latest android/app/build/outputs/apk/debug/app-debug.apk …
-  ```
-  Between the two commands the release **and its tag** do not exist. `CLAUDE.md` advertises
-  `…/releases/download/apk-latest/app-debug.apk` as *"always the newest `main` build, non-expiring,
-  and genuinely no login required"*, and `/api/download-apk` resolves it via
-  `/releases/tags/apk-latest` — a 404 in that window, surfacing as "Could not fetch release info".
-- **The workflow comment explains the choice honestly** (`gh` cannot overwrite an existing asset of
-  the same name in place), so this is a known trade-off, not an oversight. **The migration is what
-  made it matter:** while the repo was private nobody could use that URL; it is now the documented
-  distribution path.
-- **Fix shape:** upload under a temporary asset name and swap, or delete only the **asset** rather
-  than the release and tag, so the release id and tag survive the swap.
-
-### [workouts] Q-299 — autoregulation's missing-data defaults make "add load" easier and "cut load" harder
-
-- **Branch:** `fix/autoreg-null-defaults`
-- **Plan:** none yet — small change, but it moves a safety-relevant behaviour
-- **Added:** 2026-08-15 · from the pillar-soundness review §1.3
-- **A prescription is recorded on a minority of sets** (of 1,009 total, `deleted_at IS NULL`):
-
-  | field | sets | share |
-  |---|---|---|
-  | `planned_pct` | 280 | 28% |
-  | `planned_rest_sec` | 296 | 29% |
-  | **`planned_reps`** | **176** | **17%** |
-
-  `repCompletionRate` is null in the remaining ~83%, and additionally requires
-  `lastSessionRanPrescription && sessionsInPhase > 0 && prescription && last5.length > 0`.
-- **What `autoregulation.ts` does with null is asymmetric:**
-  ```ts
-  // back-off (cut load)
-  const missedReps = sig.repCompletionRate != null && sig.repCompletionRate < COMPLETION_CEIL
-  if (sig.rpeDelta >= RPE_DEAD_BAND && (sig.rm1Trend === 'down' || missedReps)) { … }
-
-  // push (add reps)
-  const metReps = (sig.repCompletionRate ?? 1) >= 1
-  if (sig.rpeDelta <= -RPE_DEAD_BAND && sig.rm1Trend !== 'down' && metReps) { … }
-  ```
-  **Null makes `missedReps` false and `metReps` true.** Missing data *removes* a condition from the
-  increase path and *adds* one to the decrease path: back-off then needs the 1RM to be actively
-  falling, while push needs only the RPE delta plus a 1RM that is not falling.
-- **It compounds Q-289.** That measured a systematic **−2.19** RPE delta at expected-10, past the
-  `<= -2` threshold that adds **two** target reps — and on 83% of sets the only remaining guard is
-  auto-satisfied.
-- **Fix direction — decide the intent, then encode it symmetrically.** `?? 1` reads as "assume the
-  reps were met", which is the optimistic reading of missing data on the path that adds load. Either:
-  - treat null as **unknown and blocking on both paths** (safest: no autoregulation without
-    prescription data), or
-  - treat null as neutral on both paths.
-
-  What it must not stay is optimistic on one side and pessimistic on the other.
-- **Also worth fixing the input:** 83% of sets carrying no `planned_reps` is the root cause. Find out
-  why — whether it is sets logged outside a prescribed session, or a write path that drops the
-  planned fields.
 
 ### [workouts] Q-300 — 37% of sets are taken with materially less rest than prescribed, and the RPE model has no rest term
 

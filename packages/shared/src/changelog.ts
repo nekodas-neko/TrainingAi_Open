@@ -6,6 +6,27 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.355.0",
+    date: "2026-08-24",
+    changes: [
+      "A set with no recorded target reps can no longer nudge a prescription upward on RPE alone \u2014 it needed the same missing-data caution the app already applied when deciding whether to cut a prescription down.",
+    ],
+  },
+  {
+    version: "1.354.0",
+    date: "2026-08-24",
+    changes: [
+      "Estimated 1RM and prescribed weights are now a little more conservative on sets logged past about 6 reps with no set target \u2014 those were feeding the estimate at full strength instead of the same discount an AMRAP set already gets elsewhere, which meant a high-rep set without a specific target could push a prescription higher than it should.",
+    ],
+  },
+  {
+    version: "1.353.0",
+    date: "2026-08-24",
+    changes: [
+      "Pace now shows up on activities that have distance and duration but where nothing calculated it \u2014 32 of the last 39 logged walks and runs were missing it, which meant most of the efficiency chart was empty.",
+    ],
+  },
+  {
     version: "1.352.0",
     date: "2026-08-24",
     changes: [

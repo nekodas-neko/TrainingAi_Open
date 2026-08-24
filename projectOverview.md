@@ -1442,14 +1442,15 @@ order.
   degrades to correct rather than to a frozen release failing as "Could not fetch release info".
   **Guarded** by a test on the URL actually requested, which fails when the default is flipped back —
   the fixtures the entry flagged proved nothing about which repo is *asked*. Never a live outage.
-- **🟡 Q-458 — `.env.example` is wrong in both directions.** Eight declared keys are read by no code,
-  including **`TOKEN_ENC_KEY`, which names a security property the app does not have** (an operator
-  will set it and conclude tokens are encrypted at rest; nothing reads it), and five Oura **Cloud**
-  keys inviting a contributor to configure the one integration `CLAUDE.md` forbids re-adding. Four
-  real config vars are undeclared.
-- **🟡 Q-459 — the rolling APK release is delete-then-recreate,** so the advertised public download
-  URL 404s during every native merge. Known trade-off in the workflow's own comment; the migration is
-  what made it matter, since that URL is now the documented distribution path.
+- **🟠 Q-459 — the rolling APK release used to delete-then-recreate; fixed 2026-08-24, not yet
+  observed running.** `.github/workflows/android.yml`'s publish step now swaps only the release
+  **asset** (`gh release delete-asset` + `upload` + `edit`) when the release already exists, falling
+  back to `gh release create` only on the first-ever publish — the release id and tag survive a swap,
+  so `/releases/tags/apk-latest` (what `/api/download-apk` resolves against) no longer 404s during the
+  window. **Keep: unverified against a live `gh` run** — the `if: github.event_name == 'push'` publish
+  step only executes on a merge to `main` that touches a native path, which this session could not
+  trigger from a PR; confirm on the next such merge that the swap actually completes (`gh release
+  view apk-latest` before/after, or watch the workflow log).
 - **Also came back clean:** a fresh clone's test suite genuinely works (synthetic constants are
   committed and `vitest.config.ts` falls back to them when the real `MANIFEST.json` is absent — the
   path CI takes every run, so `NOTICE`'s claim holds); the `AWS_*`/`STORAGE_*` split is a deliberate
@@ -1881,11 +1882,6 @@ the threshold must be re-derived after that calibration, not tuned now. Separate
 three behaviours at three thresholds** (1.5 here, 1.2 early-deload, 1.5 activity taper) on a metric
 Q-279 already questions. Deload has fired **once in 3.5 months**, so this is not over-firing today.
 
-**🟠 Pace is null on 32 of the 39 activity logs that could compute it (Q-307).** `avg_pace_sec_per_km`
-is populated on **7 of 46** while 39 carry both duration and distance. Read from the column, never
-derived at render, and written as an explicit `null` at save — the same shape as **Q-230**, and very
-likely one fix for pace, steps and calories together.
-
 **Clean results, recorded so they are not re-swept.** **The phase engine is working** — the active
 program progresses coherently; five rows that looked like stuck `sessions_in_phase` counters belong
 to an **inactive** program (`AI-Phase1`), which is correct dormant state. **Fifth finding to die on
@@ -1964,12 +1960,6 @@ the 08-09 cluster passes straight through into prescription.** A zero is a value
 flows into trends, PR detection and the next prescription, and reads as −100% on a trend chart.
 **2026-08-09 also logged 1,000 `error_events`** and carries the 0.00 h sleep row from Q-274 — three
 domains, one heavy-fault day, pointing at the connection-starvation class (Q-213/Q-107).
-
-**🟠 Autoregulation's missing-data defaults favour adding load (Q-299).** `planned_reps` is recorded
-on **176 of 1,009 sets (17%)**, so `repCompletionRate` is usually null — and
-`autoregulation.ts` reads null as `missedReps = false` but `metReps = (x ?? 1) >= 1` → **true**.
-Missing data *removes* a condition from the increase path and *adds* one to the decrease path. It
-compounds **Q-289**, whose measured −2.19 delta at expected-10 already clears the `<= -2` two-rep bump.
 
 **🟠 37% of sets are rushed, and `expectedRpe` has no rest term (Q-300).** Where both are recorded
 (n = 276): mean 99 s taken vs 111 s planned; **103 rushed (< 75%)**, 44 overlong. A set at 80% with
