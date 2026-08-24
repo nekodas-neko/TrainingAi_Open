@@ -146,6 +146,29 @@ Live at the time of writing (2026-07-30):
   [`docs/overview/history-2026-08-04.md`](../../overview/history-2026-08-04.md)
   and [`docs/overview/history-2026-08-07.md`](../../overview/history-2026-08-07.md).
 
+## Decided
+
+- **The Coach KEEPS its write capability — but undo gets wired before anything drives adoption
+  (owner, 2026-08-24 — Q-472, removed from the queue).** Production measured **0 applied Coach
+  changes, ever**, across five domains, apply/preview/undo and ~1,230 lines under `lib/coach/domains/`.
+  The question filed was *"keep and drive adoption, or narrow?"* — the answer is **keep**.
+  - **The zero was the wrong number to decide on.** The Coach is used (17 calls in 30 days; **8 of 8**
+    assistant messages carried a tool call), but only **1** of those 8 carried a `change_preview`.
+    The model reaches for the write path roughly **once in eight replies**, and that one proposal was
+    declined. "Nobody wants this" and "it is almost never offered" both produce a zero, and this data
+    cannot separate them — so narrowing would have deleted a working capability on evidence that
+    mostly measures under-triggering. **Apply is not broken**: a previous sweep applied a patch
+    through the real route, and all four client call sites are wired.
+  - **The ordering is the load-bearing half of the decision, not a caveat.** **Q-467** (the Coach can
+    rewrite your programme with no in-app undo, while a complete undo subsystem sits there with no
+    caller) is currently *theoretical* only because writes never happen. Driving the proposal rate up
+    is precisely what makes it real. So Q-467 ships first — it is mostly wiring what already exists —
+    and **PS-5** (why the model rarely proposes) is explicitly gated behind it.
+  - **Scope caveat that governs every number above:** `claude_ro` is row-scoped to one user, so these
+    are *the owner's* counts. Never restate them as "no user has ever applied a Coach change".
+  - **Revisit if** PS-5 finds the rate is correct and proposals are genuinely being declined — that
+    would be the evidence narrowing needed and never had.
+
 ## History
 
 - **[`docs/overview/entries/2026-08-17-radiogroup-keyboard-nav.md`](../../overview/entries/2026-08-17-radiogroup-keyboard-nav.md)**

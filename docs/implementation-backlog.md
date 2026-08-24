@@ -3268,47 +3268,51 @@ this fits without an extraction.
   `queueMutation` at write time, so an unsyncable mutation is refused where the user can still see it.
 - **Lane A owns this** — `app/api/sync/push` and `lib/local-store/**`.
 
-### [app-shell][platform] Q-472 — the Coach's write capability has never once been used in production
+### [app-shell][platform] PS-5 — the Coach proposes a change once in eight replies; find out why before calling the write path unwanted
 
-- **Gate: owner** — the entry's own words: *"Keep and drive adoption, or narrow? **Owner's call,
-  not Lane A's.**"* There is nothing for an implementer to do until that is answered.
+- **Needs:** Q-467
+- **Lane: A** — `lib/coach/**` is reached by six `app/api/coach/**` routes, so §3 sends it to Lane A.
+- **Branch:** `investigate/coach-proposal-rate`
+- **Added:** 2026-08-24 · the second half of the owner's **Q-472** decision (*"keep it, but wire undo
+  before adoption"*). Q-472 itself is answered and out of the queue; the reasoning lives in
+  [`docs/domains/app-shell/README.md`](domains/app-shell/README.md) → *Decided*.
+- **The measurement that prompted it, and the one number that matters.** `claude_ro.coach_changes` is
+  empty — **0 applied changes, ever**. But the Coach is *used*: 5 threads, 16 messages, 17 calls in
+  30 days, and **8 of 8** assistant messages carried a tool call. Of those, 5 carried a
+  `choice_list` and only **1** carried a `change_preview`. So the model reached for the write path
+  **once in eight replies**, and that single proposal was declined.
+- **Why that reframes the zero.** "0 applied" is consistent with two very different worlds: the user
+  does not want AI writes, or the model almost never offers one. The 1-in-8 rate says the second is
+  at least strongly in play, and **the data cannot separate them** — which is exactly why the owner
+  kept the capability rather than narrowing it on this evidence.
+- **What to do.** Instrument how often a `change_preview` is emitted and under what prompting, then
+  re-measure. Whether the fix is prompt-side (the model is not told writing is available or
+  appropriate), tool-availability-side, or genuinely "the user declines", is the open question —
+  **do not assume prompt-side and start rewriting the system prompt**; Q-170 measured twice that
+  inlining more prompt context made things worse.
+- **⛔ Do not start this before Q-467.** Driving the proposal rate up is what converts Q-467's
+  missing-undo from theoretical to live. That ordering is the owner's decision, not a preference.
+- **Scope caveat that governs any number quoted here:** `claude_ro` is **row-scoped to one user**.
+  Every count above is *the owner's*, recently. Other accounts are structurally invisible — never
+  restate this as "no user has ever applied a Coach change".
+- **What would count as done:** a measured proposal rate with a stated cause, and either a fix or a
+  written finding that the rate is correct and the capability is genuinely declined. Either answer
+  closes it; a re-measure with no cause does not.
 
-- **Branch:** `docs/coach-write-usage-decision`
-- **Added:** 2026-08-18 · review sweep (this run's findings checked against production) ·
-  [`docs/reviews/2026-08-18-production-verification.md`](reviews/2026-08-18-production-verification.md)
-- **Placement:** low as work — **this is not a defect**. Filed because it re-prices Q-467/Q-468 (both
-  amended) and because "is this earning its complexity?" is an owner question a reviewer should not
-  answer alone.
-- **Measured.** `claude_ro.coach_changes` is **empty**: `total 0, ever_undone 0, first null, last null`.
-  Not "no undos" — **no applied changes at all, ever.**
-- **The Coach is not unused.** 5 threads / 16 messages (8 user, 8 assistant), latest 2026-08-13; the
-  AI-usage screen shows 17 Coach calls in 30 days. The widget vocabulary is rendering:
-
-  | | count |
-  |---|---|
-  | assistant messages | 8 |
-  | carrying any tool call | **8 of 8** |
-  | carrying a `choice_list` | 5 |
-  | carrying a **`change_preview`** | **1** |
-  | **changes applied** | **0** |
-
-  Across five conversations the model proposed a change **once**, and it was not accepted.
-- **What this does NOT mean.** Apply is **not** broken — the previous sweep applied a patch through the
-  real route successfully, and all four client call sites are wired. Whether the zero is because the
-  model rarely proposes (1 preview in 8 assistant messages) or because the single proposal was simply
-  declined is **not determinable from this data**, and the entry deliberately does not guess.
-- **Scope caveat that governs the whole entry:** `claude_ro` is **row-scoped to one user**. Zero means
-  *the owner* has never applied a Coach change; other accounts are structurally invisible here. Do not
-  restate this as "no user has ever used it".
-- **What would answer it:** a wider window, a second account, or instrumenting how often the model
-  emits a `change_preview` at all. None available from this endpoint.
-- **The decision this is really asking for:** five domain handlers, apply, preview, undo,
-  `coach_changes` and ~1,100 lines under `lib/coach/domains/` currently produce no writes. Keep and
-  drive adoption, or narrow? **Owner's call, not Lane A's.**
 
 ### [app-shell][workouts][platform] Q-467 — the Coach can change your programme and nothing in the app can undo it
 
-- **Needs:** Q-468
+- **✅ UNBLOCKED — `Needs: Q-468` is satisfied** (Q-468 shipped and left the queue; an absent target
+  counts as satisfied by the protocol). Nothing gates this now.
+- **⬆ RE-PRICED UP by the owner's Q-472 decision, 2026-08-24 — this is now a PREREQUISITE, not a
+  deferred nicety.** The owner answered Q-472 *"keep the Coach's write capability, but wire undo
+  before driving adoption"*, which makes this entry the gating step for that whole plan. The
+  2026-08-18 amendment below re-priced it *down* on the grounds that `coach_changes` is empty so the
+  harm "has not yet happened" — that reasoning is now **inverted**: the exposure is absent only
+  while nothing is driving writes, and the decision is to start driving them. **Do this before any
+  work that makes the Coach propose more.**
+- **Most of it is wiring something already built** — see the undo subsystem inventory below. That is
+  what makes it a cheap prerequisite rather than an expensive one.
 
 - **Branch:** `feat/coach-undo-control`
 - **Added:** 2026-08-18 · review sweep (the Coach write path — **the first review ever to cover it**) ·
@@ -3340,8 +3344,9 @@ this fits without an extraction.
 - **Fix shape:** an Undo control in `coach-history.tsx` for changes that are not `undoneAt` and still
   inside the window, treating the route's 409 ("you've trained since") as a first-class state rather
   than an error. **Lane B** — the route already exists.
-- **⛔ Do Q-468 first, or in the same change.** Wiring the button onto today's undo would ship the
-  defect below.
+- **✅ ~~Do Q-468 first, or in the same change~~ — Q-468 has SHIPPED and left the queue.** Converted
+  2026-08-24 from a prose blocker marker that was still parking this entry long after its reason
+  expired. The defect it guarded against is fixed; wiring the button no longer ships it.
 - **🔎 AMENDED 2026-08-18 from production — re-scoped, not closed.** `claude_ro.coach_changes` is
   **empty**: no Coach change has ever been applied by this account, so **there has never been anything
   to undo** and the harm this entry describes has not yet happened. The code path is still wrong and
