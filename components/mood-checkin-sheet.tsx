@@ -12,6 +12,7 @@ import type { EnergyLevel, BodyState, MoodLog } from "@trainingai/shared/types/m
 import { getLocalStore } from "@/lib/local-store"
 import { pushMutations } from "@/lib/local-store/sync-engine"
 import { todayInTz } from "@trainingai/shared/date-utils"
+import { useUserTimezone } from "@/components/shell/user-timezone-provider"
 import { SoreMusclePicker, SORE_MUSCLE_GROUPS } from "@/components/checkin/sore-muscle-picker"
 import type { PerExerciseDeloadInput } from "@trainingai/shared/ai-periodization/per-exercise-deload"
 import { SessionDurationPicker } from "@/components/workout/session-duration-picker"
@@ -90,6 +91,7 @@ export function MoodCheckInSheet({
   const [preset, setPreset]           = useState<DurationPreset>('standard')
   const [presetBusy, setPresetBusy]   = useState(false)
   const [issuesOpen, setIssuesOpen]   = useState(false)
+  const tz = useUserTimezone()
 
   // Seed synchronously from cache, then revalidate — the sheet must not flash an empty muscle
   // section on open. Reuses the key sync-provider already warms; never a bare fetch.
@@ -219,7 +221,7 @@ export function MoodCheckInSheet({
   async function handleSave() {
     setSaving(true)
     try {
-      const date = todayInTz()
+      const date = todayInTz(tz)
       // Preserve 'sore_muscles' flag in bodyState so AI periodization signals still work
       const bodyState: BodyState[] = [
         ...issues,
