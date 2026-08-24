@@ -3452,18 +3452,6 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
 
   // ── AI Health Insights ────────────────────────────────────────────────────
 
-  async getAiHealthInsight(userId: string, section: string, date: string): Promise<string | null> {
-    const [row] = await this.db.select({ insight: s.aiHealthInsights.insight })
-      .from(s.aiHealthInsights)
-      .where(and(
-        eq(s.aiHealthInsights.userId, userId),
-        eq(s.aiHealthInsights.section, section),
-        eq(s.aiHealthInsights.date, date),
-      ))
-      .limit(1)
-    return row?.insight ?? null
-  }
-
   async getAiHealthInsightWithHash(userId: string, section: string, date: string): Promise<{ insight: string; contextHash: string | null } | null> {
     const [row] = await this.db.select({ insight: s.aiHealthInsights.insight, contextHash: s.aiHealthInsights.contextHash })
       .from(s.aiHealthInsights)

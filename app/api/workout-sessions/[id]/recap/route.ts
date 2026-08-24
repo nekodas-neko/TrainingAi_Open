@@ -9,6 +9,7 @@ import { buildRecapFacts } from '@trainingai/shared/workout/session-recap'
 import { errorLog } from '@trainingai/shared/logger'
 import { reportServerError } from '@/lib/observability'
 import { invalidUuidResponse } from '@/lib/api/route-errors'
+import { hashInsightContext, readFreshInsight } from '@/lib/ai/insight-cache'
 
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -28,14 +29,9 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     const date = toAestDay(workoutSession.startedAt, tz)
     const cacheSection = `session-recap:${sessionId}`
 
-    const cached = await repo.getAiHealthInsight(userId, cacheSection, date)
-    if (cached) {
-      return NextResponse.json({ recap: cached }, { headers: { 'Cache-Control': 'private, no-store' } })
-    }
-
-    if (!rateLimit(`session-recap:${userId}`, 20, 60 * 60 * 1000)) {
-      return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
-    }
+    // Q-293: the cache check used to sit here. A completed session is the most static subject of
+    // the five cached insight surfaces — but not fully static: `durationVsMedianPct` moves as later
+    // sessions of the same type change the median, and the PR count moves if records are recomputed.
 
     const [recentSessions, styles, recentPRs] = await Promise.all([
       workoutSession.sessionId
@@ -85,12 +81,22 @@ ${lines}
 
 In at most 3 sentences: say what stood out about this session, and give one thing to watch next session. Write in second person. Do not use bullet points or headers.`
 
+    const contextHash = hashInsightContext(prompt)
+    const cached = await readFreshInsight(repo, userId, cacheSection, date, contextHash)
+    if (cached) {
+      return NextResponse.json({ recap: cached }, { headers: { 'Cache-Control': 'private, no-store' } })
+    }
+
+    if (!rateLimit(`session-recap:${userId}`, 20, 60 * 60 * 1000)) {
+      return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
+    }
+
     const { text } = await loggedGenerateText(
-      { section: 'workout-recap', userId, fingerprint: sessionId },
+      { section: 'workout-recap', userId, fingerprint: { sessionId, contextHash } },
       () => generateText({ model: aiModel(), prompt, maxRetries: 0 }),
     )
     const recap = text.trim()
-    await repo.upsertAiHealthInsight(userId, cacheSection, date, recap)
+    await repo.upsertAiHealthInsight(userId, cacheSection, date, recap, contextHash)
 
     return NextResponse.json({ recap })
   } catch (error) {
