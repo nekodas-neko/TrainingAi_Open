@@ -235,6 +235,10 @@ Live at the time of writing (2026-07-30):
   [`docs/handoff-2026-07-29-ai-prescription-engine.md`](../../handoff-2026-07-29-ai-prescription-engine.md)
   and [`docs/handoff-2026-07-29-ingest-and-records.md`](../../handoff-2026-07-29-ingest-and-records.md),
   both written before the domain went into handoff filenames.
+  Also [`docs/handoff-2026-08-24-workouts-review-sweep-40-write-surface.md`](../../handoff-2026-08-24-workouts-review-sweep-40-write-surface.md)
+  (Review sweep 40 — three program-config write paths accepted a progression-style id owned by another
+  user while the `PUT` twin of one refused the identical value; all three fixed, RV-32…RV-34, and the
+  write-up's FK inventory names the 23 edges still unprobed).
   Also [`docs/handoff-2026-08-02-cross-owner-bug-batch-investigation.md`](../../handoff-2026-08-02-cross-owner-bug-batch-investigation.md)
   (Q-38 — a phase transition emptying the prescription card permanently), filed under `cross` because it spans five pillars.
   Also [`docs/handoff-2026-08-03-cross-owner-bug-batch-triage.md`](../../handoff-2026-08-03-cross-owner-bug-batch-triage.md)
