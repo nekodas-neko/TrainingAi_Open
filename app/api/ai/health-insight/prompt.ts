@@ -1,3 +1,5 @@
+import { PROSE_GUARDS } from '@/lib/ai/prompt-guards'
+
 /**
  * Q-353. A metric that has no reading is **omitted**, and its name is collected instead.
  *
@@ -37,6 +39,8 @@ export function buildPrompt(section: string, dataLines: string[], absent: string
     ? `\n\nNot measured today, because no reading exists — ${absent.join(', ')}. These are missing readings, NOT zeros and NOT observed behaviour. Do not describe them as low, absent, skipped, or as anything the user did or did not do. Mention one only to say it was not recorded, and never build the tip around one.`
     : ''
   return `You are a concise health coach. Write a single insight (2-3 sentences, no markdown) for the user's ${section} data. Be specific to the numbers you are given, and never infer a value that is not listed.${absentNote}
+
+${PROSE_GUARDS}
 
 Data:
 ${dataLines.join('\n')}`

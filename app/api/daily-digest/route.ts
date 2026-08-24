@@ -13,6 +13,7 @@ import { buildAutomaticPhaseStatus } from '@trainingai/shared/phase-engine'
 import { getScheduledSessionsPerWeek } from '@trainingai/shared/schedule-utils'
 import { readJsonLimited } from '@trainingai/shared/http/request-guards'
 import { MIN_LOGGED_DAYS, DEFAULT_WINDOW_DAYS } from '@trainingai/shared/nutrition/adaptive-tdee'
+import { PROSE_GUARDS } from '@/lib/ai/prompt-guards'
 
 // An optional force flag.
 const MAX_BODY_BYTES = 4 * 1024
@@ -156,7 +157,7 @@ export async function POST(req: Request) {
       { section: 'daily-digest', userId, fingerprint: { date: todayIso, contextHash } },
       () => generateText({
         model: aiModel(),
-        prompt: `You are a personal training coach. Write a 2-3 sentence end-of-day check-in — a quick reflection, not a report. Cover what stands out most (training, nutrition, or how the day compared to the morning check-in). Be specific, warm, and brief. Use the data below — quote its numbers, never invent or recompute any. If a line below flags a domain's logging coverage as sparse, do not give corrective advice for that domain (e.g. telling the user to eat more or less of something) — one day's numbers do not support it; mention that domain only in passing, if at all.\n\n${context}`,
+        prompt: `You are a personal training coach. Write a 2-3 sentence end-of-day check-in — a quick reflection, not a report. Cover what stands out most (training, nutrition, or how the day compared to the morning check-in). Be specific, warm, and brief. Use the data below — quote its numbers, never invent or recompute any. If a line below flags a domain's logging coverage as sparse, do not give corrective advice for that domain (e.g. telling the user to eat more or less of something) — one day's numbers do not support it; mention that domain only in passing, if at all.\n\n${PROSE_GUARDS}\n\n${context}`,
         maxRetries: 0,
       }),
     ))
