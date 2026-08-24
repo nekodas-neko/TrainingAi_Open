@@ -29,6 +29,7 @@ import { buildSetSequence, nextStep } from "@trainingai/shared/workout/superset-
 import { exerciseLibraryRowsFrom } from '@/lib/local-store/program-assembler';
 import { getLocalStore } from "@/lib/local-store/index";
 import { pullDelta } from "@/lib/local-store/sync-engine";
+import { reportEnqueueFailure } from "@/lib/local-store/dead-letter-signal";
 import { todayInTz, toAestDateStr, nowDatetimeInTz } from "@trainingai/shared/date-utils";
 import { useWorkoutStore, effectiveRestSec } from "@/lib/stores/workout-store";
 import { useShallow } from "zustand/react/shallow";
@@ -1320,11 +1321,11 @@ export default function WorkoutScreen({ sessionType, userId, aiDeload, wasOverri
           }
           store_?.markWorkoutSynced(logPayload.workoutSessionId, logPayload.exerciseLogId).catch(() => {});
         } else {
-          store_?.queueMutation({ userId: userId!, domain: 'workout_log', date: rawDate, payload: logPayload }).catch(() => {});
+          store_?.queueMutation({ userId: userId!, domain: 'workout_log', date: rawDate, payload: logPayload }).catch(err => reportEnqueueFailure('workout_log', err));
         }
       })
       .catch(() => {
-        store_?.queueMutation({ userId: userId!, domain: 'workout_log', date: rawDate, payload: logPayload }).catch(() => {});
+        store_?.queueMutation({ userId: userId!, domain: 'workout_log', date: rawDate, payload: logPayload }).catch(err => reportEnqueueFailure('workout_log', err));
       });
 
     invalidateExerciseLogged(programSessionId).catch(() => {});
@@ -1527,12 +1528,12 @@ export default function WorkoutScreen({ sessionType, userId, aiDeload, wasOverri
         if (res.ok) {
           if (wsId) store_?.markSessionSynced(wsId).catch(() => {});
         } else if (wsId && userId) {
-          store_?.queueMutation({ userId, domain: 'complete_workout', date: todayInTz(), payload: { workoutSessionId: wsId, completedAtMs: endMs } }).catch(() => {});
+          store_?.queueMutation({ userId, domain: 'complete_workout', date: todayInTz(), payload: { workoutSessionId: wsId, completedAtMs: endMs } }).catch(err => reportEnqueueFailure('complete_workout', err));
         }
       })
       .catch(() => {
         if (wsId && userId) {
-          store_?.queueMutation({ userId, domain: 'complete_workout', date: todayInTz(), payload: { workoutSessionId: wsId, completedAtMs: endMs } }).catch(() => {});
+          store_?.queueMutation({ userId, domain: 'complete_workout', date: todayInTz(), payload: { workoutSessionId: wsId, completedAtMs: endMs } }).catch(err => reportEnqueueFailure('complete_workout', err));
         }
       });
 

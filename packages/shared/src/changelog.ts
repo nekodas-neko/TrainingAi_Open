@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.345.0",
+    date: "2026-08-24",
+    changes: [
+      "A workout set that fails to save now says so. Logging a set writes it to the phone, sends it to the server, and falls back to the offline queue if that send fails \u2014 but if the phone's own database was also unavailable, that last step failed with no message at all, while the buzz and the counter had already said it saved. It now warns in the log and tells you the set did not save, so it can be re-entered rather than silently lost.",
+    ],
+  },
+  {
     version: "1.344.0",
     date: "2026-08-24",
     changes: [
