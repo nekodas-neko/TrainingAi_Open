@@ -635,16 +635,19 @@ export default function NutritionContent({ userId }: { userId?: string }) {
           </motion.div>
         </AnimatePresence>
 
-        {/* End of Day deliberately stays put: it is a daily-review feature, and merging it with
-            Home's "Your Day in Review" banner is Q-112's call, not this placement change's. Moving
-            it halfway would be worse than either end state. */}
-        <button
-          onClick={() => setChatOpen(true)}
-          className="w-full min-h-[48px] flex items-center justify-center gap-2 rounded-2xl border border-border bg-muted/60 py-3 active:bg-muted/20 transition-colors"
-        >
-          <MoonIcon className="w-4 h-4 text-muted-foreground" />
-          <span className="text-sm font-semibold">End of Day</span>
-        </button>
+        {/* Directly under the meals, because the claim it makes is about them (BF-6). It shipped as
+            the last element on the argument that "I have finished logging" is about the whole day —
+            and then took **zero** presses in the seven weeks to 2026-08-24, while the calibration it
+            feeds treats an unmarked day as excluded rather than as light. A control nothing reaches
+            withholds the feature entirely, which outranks where the sentence reads best. */}
+        <FoodLoggingComplete
+          date={selectedDate}
+          isToday={selectedDate === todayStr}
+          daysLogged={balanceForDate?.maintenance?.daysLogged ?? null}
+          minDays={MIN_LOGGED_DAYS}
+          calibrated={balanceForDate?.maintenance?.source === 'calibrated'}
+          tz={tz}
+        />
 
         <WeeklyNutritionChart data={weeklyData} calorieTarget={targets?.calories ?? null} adherence={adherence} />
 
@@ -657,17 +660,17 @@ export default function NutritionContent({ userId }: { userId?: string }) {
           />
         )}
 
-        {/* Q-387 asked for this as the LAST element in the day's scroll, and that placement is the
-            point: "I have finished logging" is a claim about the whole day, so it belongs after
-            everything the day contains rather than in the header beside a running total. */}
-        <FoodLoggingComplete
-          date={selectedDate}
-          isToday={selectedDate === todayStr}
-          daysLogged={balanceForDate?.maintenance?.daysLogged ?? null}
-          minDays={MIN_LOGGED_DAYS}
-          calibrated={balanceForDate?.maintenance?.source === 'calibrated'}
-          tz={tz}
-        />
+        {/* Last on the page, which is where a day-review action belongs — the owner asked for this
+            order. The comment here used to defend the old position; it was arguing against merging
+            this button into Home's "Your Day in Review" banner (still Q-112's call, still not this
+            change), never against moving it down its own screen. */}
+        <button
+          onClick={() => setChatOpen(true)}
+          className="w-full min-h-[48px] flex items-center justify-center gap-2 rounded-2xl border border-border bg-muted/60 py-3 active:bg-muted/20 transition-colors"
+        >
+          <MoonIcon className="w-4 h-4 text-muted-foreground" />
+          <span className="text-sm font-semibold">End of Day</span>
+        </button>
       </div>
 
       <WaterLogSheet
