@@ -78,6 +78,16 @@ device-verification gate does not apply. The 92 MB high-water mark will **not** 
 deleted rows leave dead tuples that new inserts reuse, so the table stops growing but does not give
 space back until a `VACUUM FULL` — that is Q-315, still `Gate: owner`.
 
+## Sizing, from the measurement rather than from caution
+
+The batch size was 8 on a first pass and the arithmetic behind it was wrong. Four runs a day of 8 is
+32 buckets against **22.5 arriving** — a net of 9.5, which converges but would take **~12 days** to
+absorb the backlog that exists right now (measured in production 2026-08-24: **115 eligible buckets
+holding 140,487 frames**). The 2026-08-18 backfill packed **764 buckets in 246 s** — **0.32 s per
+bucket** — so 25 a run is about **8 seconds** of background work every 6 hours, and the backlog is
+gone in a day and a bit. That is what makes the follow-up `VACUUM FULL` one press rather than
+something to repeat as the tail dribbles in.
+
 **What to check after the deploy:** `oura_raw_samples` row count should stop climbing and settle at
 roughly 7 days of frames (~160k), and `oura_raw_packed` should gain ~22 blobs a day.
 `select count(*) from error_events where url='oura-autopack'` should stay 0.

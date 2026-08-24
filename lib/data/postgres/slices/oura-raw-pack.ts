@@ -302,9 +302,19 @@ export function verifyStoredBucket(
  * running: the readers span both tiers, so the only consequence of it being off is the growth curve.
  */
 export const AUTOPACK_THROTTLE_MS = 6 * 60 * 60 * 1000
-/** Bounded, because this runs behind a device request. At 22.5 buckets/day a 6-hourly run of 8 keeps
- *  up with roughly 2.8× the production rate, so it converges rather than falling behind. */
-export const AUTOPACK_MAX_BUCKETS = 8
+/**
+ * Bounded, because this runs behind a device request — but sized from the measurement, not from
+ * caution. The 2026-08-18 backfill packed **764 buckets in 246 s**, i.e. **0.32 s per bucket**, so
+ * 25 is about **8 seconds** of background work every 6 hours.
+ *
+ * 8 was the first number here and it was too small, on arithmetic that was also wrong. Four runs a
+ * day of 8 is 32 buckets against **22.5 arriving** — a net of 9.5, which converges, but would take
+ * **~12 days** to absorb the backlog that exists right now (measured in production 2026-08-24:
+ * **115 eligible buckets holding 140,487 frames**). At 25 it is ~100 a day against 22.5, and the
+ * backlog is gone in **a day and a bit** — which is what makes the follow-up `VACUUM FULL` a single
+ * press rather than something to repeat as the tail dribbles in.
+ */
+export const AUTOPACK_MAX_BUCKETS = 25
 
 const lastAutoPack = new Map<string, number>()
 
