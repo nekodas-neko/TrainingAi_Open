@@ -14,7 +14,7 @@ silently misdirecting the next session. Update them in the same PR that consumes
 
 | Pointer | Value | Source of truth |
 |---|---|---|
-| Next free Postgres migration | **207** | `lib/data/postgres/migrations/` |
+| Next free Postgres migration | **208** | `lib/data/postgres/migrations/` |
 | Local SQLite schema version | **v28** | `lib/sqlite/migrations.ts`; `lib/sqlite/__tests__/migrations.test.ts` asserts the max |
 
 > **There is no third pointer any more.** Entry IDs are not allocated from a shared counter and
@@ -3867,6 +3867,19 @@ ehr     0     0     0     0   648   208   128   556     0
 - 🚧 **89 → 85, 2026-08-23.** Four converted, each after reading the one client that posts to it:
   `admin/timing-baseline`, `ai/health-insight`, `running-plan`, `running-plan/override`. All four
   now 400 on an unknown key and still accept the real body — verified live, not just by test.
+- 🚧 **85 → 79, 2026-08-24.** Six more, all under `app/api/admin/`: `activity-types`, `ai-usage`,
+  `exercises`, `fix-exercise-units`, `generate-exercise-media`, `mirror-dataset-gifs`. Same method,
+  same live verification. **Two of them are precisely the shape a codemod would have broken:**
+  `activity-types` and `exercises` PATCH destructure `id` out of the body **before** parsing
+  (`const { id, ...rest }`) while their clients post `{id, ...data}` — so the schema never sees `id`
+  and strict is safe, which is knowable only from the handler, not the schema. Round-tripped live to
+  confirm the PATCH still returns 200.
+- **A fourth exemption-adjacent class, now in the script's header: a schema fed an object the ROUTE
+  builds key by key.** `admin/ai-usage` reads three named `searchParams` into a literal, so an
+  unknown query key cannot reach the schema at all. Strict guards nothing there *today* — it was
+  still added, because it catches the day someone swaps the literal for a spread of the search
+  params — but it needs **no client verification**, which is the expensive half of this sweep.
+  Recognise the shape before budgeting time for one.
 - **⚠ Two more exemption classes were found while doing it, and both are now in the script's header
   with evidence rather than as a guess.** (a) **A third-party SDK's wire format:** `/api/coach` is
   driven by `@ai-sdk/react`'s `DefaultChatTransport`, which posts `{ id, messages, trigger,
@@ -3885,43 +3898,6 @@ ehr     0     0     0     0   648   208   128   556     0
   APK may legitimately carry fields the current schema does not name; making that one strict could
   reject mutations from a device that has not updated. Handle it deliberately, or exempt it with a
   written reason. **Lane A.**
-
-### [platform] Q-456 — the owner's production user ID is baked into 18 committed migrations, and the documented process re-publishes it on every schema change
-
-- **Branch:** `fix/claude-ro-owner-id-out-of-committed-migrations`
-- **Added:** 2026-08-17 · review sweep (repo-migration architecture lens) ·
-  [`docs/reviews/2026-08-17-repo-migration-architecture.md`](reviews/2026-08-17-repo-migration-architecture.md)
-- **Placement:** upper-mid. Not urgent — nothing is exploitable today — but it **compounds**: the
-  documented process adds another public copy on every schema change, so the cost of fixing it only
-  goes up.
-- **What.** `fe481797-4114-4f59-824d-223e0281823e` is the owner's production `users.id`. It is in
-  **18 tracked files**: every `NNN_claude_ro_views*.sql` migration,
-  `lib/data/postgres/__tests__/claude-ro-readonly-role.test.ts:41` (`OWNER_ID`), and
-  `docs/superpowers/plans/2026-08-12-meal-plan-portions-and-editing.md` (which spells out
-  `CLAUDE_RO_OWNER_USER_ID=fe481797-…`). `scripts/generate-claude-ro-views.js` bakes it in as the
-  row-scoping predicate and the generated SQL is committed. Invisible while the repo was private.
-- **What it is NOT.** Not a credential. It grants nothing alone — `/api/admin/db-query` needs
-  `CLAUDE_DB_QUERY_SECRET` **and** `requireAdmin`, and every other route is `auth()`-scoped. No
-  health data, email or name is exposed with it. **Do not treat this as an incident.**
-- **Why it is still worth fixing, in order:**
-  1. **It is one half of a credential pair.** `WEBHOOK_USER_ID` (+ `HEALTH_CONNECT_INGEST_SECRET`)
-     and `ADMIN_EXPORT_USER_ID` (+ `ADMIN_EXPORT_SECRET`) resolve to a user id that is almost
-     certainly this one. If either secret leaks, the other half is no longer a guess.
-  2. **It cannot be rotated cheaply** — 18 files plus the production row it identifies.
-  3. **The process re-publishes it.** `CLAUDE.md` requires re-running the generator into a **new**
-     migration number whenever a table is added, so every future schema change adds another public
-     file containing it, indefinitely.
-- **Fix shape (implementer's call).** Prefer killing the class over scrubbing 18 files: have the
-  generator resolve the owner at **apply** time rather than **generate** time — views scoped on
-  `current_setting('app.claude_ro_owner')`, or a single-row private lookup seeded out-of-band, the
-  same way the `claude_readonly` role's password is already kept out of committed migrations. Then
-  the 18 existing files can be superseded by one rebuild migration rather than edited. Note
-  `CLAUDE.md`'s warning: `ensureSchema` tracks by filename, so **never edit an already-applied
-  migration** — this has to land as a new number that DROPs and rebuilds the schema.
-- **Lane A owns this** — it is migrations, and no other agent takes a migration number.
-- **Related, not filed separately:** `private-paths.json` protects a third party's IP well, and
-  nothing plays that role for this project's own users' identifiers. Whether that wants a second list
-  or a widening of the existing one is a design decision; see the review's closing section.
 
 > **Q-258 FIXED and removed, 2026-08-16 (v1.317.3).** Four goal inputs in `goal-targets-section.tsx`
 > (steps, sleep, water, calories) and two in `required-info-section.tsx` (weight, body fat) had

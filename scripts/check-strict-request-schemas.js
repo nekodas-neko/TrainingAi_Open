@@ -40,9 +40,22 @@
 //     there governs the model's output, not a client's input, and is a different decision. Check
 //     what a schema is FOR before counting it as a conversion candidate.
 //
+//   * A schema fed an object the ROUTE builds, key by key, rather than the parsed request body.
+//     `admin/ai-usage` reads three named `searchParams` into a literal — an unknown query key
+//     cannot reach the schema, so `.strict()` there guards nothing today. It is still worth adding
+//     (it costs nothing and it catches the day someone replaces the literal with a spread of
+//     `Object.fromEntries(searchParams)`), but it needs **no client verification**, which is the
+//     expensive half of the sweep. Recognise this shape before budgeting time for one.
+//
 // **The sweep is per-schema client verification, and there is no shortcut.** Four were converted on
 // 2026-08-23 (89 → 85), each after reading the one client that posts to it and confirming the keys
-// match: `admin/timing-baseline`, `ai/health-insight`, `running-plan`, `running-plan/override`. The
+// match: `admin/timing-baseline`, `ai/health-insight`, `running-plan`, `running-plan/override`.
+// Six more the same day (85 → 79), all under `app/api/admin/`: `activity-types`, `ai-usage`,
+// `exercises`, `fix-exercise-units`, `generate-exercise-media`, `mirror-dataset-gifs`. Two of those
+// deserve a note, because both are the shape that would have broken under a codemod: the
+// `activity-types` and `exercises` PATCH handlers destructure `id` out of the body **before**
+// parsing (`const { id, ...rest }`), while their clients post `{id, ...data}` — so the schema never
+// sees `id` and strict is safe, which is only knowable by reading the handler, not the schema. The
 // general argument that in-repo JS clients ship with the server (the APK is a WebView loading
 // Railway, so JS and server always deploy together) is TRUE and still not sufficient — it says a
 // mismatch is a bug, not that there is no mismatch, and a silent 400 on a rarely-exercised route is
@@ -61,12 +74,6 @@ const ROOTS = ['app/api', 'packages/shared/src/validation'];
 const BASELINE = {
   'app/api/activity-logs/[id]/metrics/route.ts': 1,
   'app/api/activity-logs/route.ts': 1,
-  'app/api/admin/activity-types/route.ts': 1,
-  'app/api/admin/ai-usage/route.ts': 1,
-  'app/api/admin/exercises/route.ts': 1,
-  'app/api/admin/fix-exercise-units/route.ts': 1,
-  'app/api/admin/generate-exercise-media/route.ts': 1,
-  'app/api/admin/mirror-dataset-gifs/route.ts': 1,
   'app/api/ai-periodization/baseline/complete/route.ts': 1,
   'app/api/ai-periodization/session/[sessionId]/prescribe/route.ts': 1,
   'app/api/ai-periodization/session/[sessionId]/respond/route.ts': 1,
