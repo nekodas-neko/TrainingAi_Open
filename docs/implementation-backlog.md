@@ -1939,10 +1939,40 @@ this fits without an extraction.
 > `clients.claim()` on activate, so it claims as early as it can; the uncontrolled window is inherent
 > to a first-ever load. The fix is in the click handler.
 >
-> **Fix shape, for Lane B to weigh rather than a prescription:** stop suppressing the native
-> navigation when there is no `onTabChange` to run — outside the shell the `preventDefault()` buys
-> nothing — or keep it and give the failed `router.push` a visible outcome. The first is smaller and
-> restores a browser behaviour the app is currently discarding.
+> **⚠️ THE RECOMMENDED FIX SHAPE DOES NOT WORK, and three more things were measured 2026-08-24
+> (Lane B). Read this before starting — an attempt got as far as a working predicate and could not
+> verify it, and the branch `fix/offline-tab-tap-native-fallback` is pushed unmerged as the record.**
+>
+> 1. **"Stop suppressing the native navigation" is not available.** These are `next/link` anchors, so
+>    Next's own click handler intercepts and calls `router.push` regardless — removing our
+>    `preventDefault()` hands the click to the same failing path. There is no native navigation to
+>    restore.
+> 2. **Forcing one is possible but worse.** Measured: a plain `<a>` click offline with no controller
+>    lands on `chrome-error://chromewebdata/`. That is "something", but it throws away the cached
+>    screen the user is looking at — the one thing that still works offline.
+> 3. **They already know they are offline.** `components/shell/offline-indicator.tsx` renders a
+>    persistent *"Offline — showing saved data"* pill from `useOnlineStatus()` whenever offline, and
+>    it is in the root layout. So the missing feedback is specifically **a response to the tap**, not
+>    a statement that the connection is down. Do not add a second offline notice.
+> 4. **The predicate is the easy half and it is written.** `components/shell/nav-offline.ts` on that
+>    branch, with `components/shell/__tests__/nav-offline.test.ts` pinning all four states (only
+>    `offline && !controller` is the bug; offline WITH a controller is the path the review measured
+>    working at ~101% of online content, so warning there would be a false alarm).
+>
+> **What blocked it, and it is the whole remaining task: nobody has reproduced the failing tap.**
+> Three Playwright attempts, each failing for a different and instructive reason:
+> - Tapping from a settled `/health` measures **`TabShell`'s in-app tab switch** (`onTabChange={show}`),
+>   not this defect. The URL does not change there either, which is exactly what makes the two look
+>   identical — the first probe was misread as a reproduction because of it.
+> - Holding a tab route open with `page.route` does put `tab-loading.tsx`'s `<BottomNav />` (the one
+>   with no `onTabChange`) on screen — `[aria-busy="true"]` confirms it — but a tap on an
+>   already-visited tab then succeeds straight from the client router cache and proves nothing.
+> - Tapping a never-visited tab from that fallback still produced no toast. **Not diagnosed.** Next
+>   step: log inside `handleNavClick` to establish whether the handler runs at all in that window,
+>   before changing any more product code.
+>
+> **Do not ship this without that reproduction.** The fix is three lines and unverifiable by reading;
+> the defect is a silent no-op, so a fix that does nothing looks exactly like a fix that works.
 - **Lane: B** — `components/shell/bottom-nav.tsx`.
 - **Not exercised — and this limit is load-bearing:** web build only. On web `cachedFetch` falls back
   to `localStorage`, so what was verified is the **seed** path, **not** the native SQLite local store
