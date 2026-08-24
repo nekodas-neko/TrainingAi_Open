@@ -4,6 +4,7 @@ import { getRepository } from '@/lib/data'
 import { generateText } from 'ai'
 import { aiModel, loggedGenerateText } from '@/lib/ai/instrument'
 import { liveReadinessByDay } from '@trainingai/shared/health/live-readiness'
+import { hashInsightContext, readFreshInsight } from '@/lib/ai/insight-cache'
 import { rateLimit } from '@/lib/rate-limit'
 import { DEFAULT_TZ, todayInTz, ageFromDob } from '@trainingai/shared/date-utils'
 import { subDays } from 'date-fns'
@@ -60,16 +61,10 @@ export async function POST(req: Request) {
 
   const repo = await getRepository()
 
-  // Cache check runs first — cached reads don't cost an AI call so don't count against the limit
-  if (!force) {
-    const cached = await repo.getAiHealthInsight(userId, section, date)
-    if (cached) return NextResponse.json({ insight: cached })
-  }
-
-  // Rate limit only applies when we actually need to call the AI
-  if (!rateLimit(`ai-insight:${userId}`, 10, 60 * 60 * 1000)) {
-    return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
-  }
+  // Q-293: the cache check used to sit here, before the reads, and served whatever was written
+  // first that day — so an insight generated before the ring synced was the one the user read all
+  // afternoon. It now runs against a hash of the assembled prompt, which means paying for the
+  // deterministic reads below on every request. They are cheap next to the model call they avoid.
 
   const since7 = formatInTimeZone(subDays(new Date(), 7), tz, 'yyyy-MM-dd')
   const [ouraRows, sleepRows, bodyMetrics, derivedRows, summaries, recentSessions, userProfile] = await Promise.all([
@@ -176,8 +171,10 @@ export async function POST(req: Request) {
   // has an unconditional line. Answer deterministically rather than paying for a model call whose
   // only honest output is "there are no readings", which is the exact prompt shape that produced
   // the invented-zero sentence in the first place.
-  // Deliberately NOT cached: the cache is keyed by (user, section, date), so persisting this would
-  // still be served after the ring syncs later the same day.
+  // Not cached, and the reason changed with Q-293: it used to be that the (user, section, date) key
+  // would keep serving this after the ring synced. The context hash handles that now — a later sync
+  // changes the prompt and misses. It stays uncached because recomputing it is free; it never calls
+  // the model.
   if (dataLines.length === 0) {
     const insight = `No ${section.replace('-', ' ')} readings were recorded for ${date}, so there is nothing to interpret yet.`
     return NextResponse.json({ insight })
@@ -185,15 +182,28 @@ export async function POST(req: Request) {
 
   if (staleNote) dataLines.unshift(staleNote)
 
+  const prompt = buildPrompt(section, dataLines, absent)
+  const contextHash = hashInsightContext(prompt)
+
+  if (!force) {
+    const cached = await readFreshInsight(repo, userId, section, date, contextHash)
+    if (cached) return NextResponse.json({ insight: cached })
+  }
+
+  // Rate limit only applies when we actually need to call the AI
+  if (!rateLimit(`ai-insight:${userId}`, 10, 60 * 60 * 1000)) {
+    return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
+  }
+
   let text: string
   try {
     // F7: route retries through the shared helper (maxRetries: 0 on the SDK call) like every other
     // AI route, so backoff + reportServerError live in one place instead of the SDK's default retry.
     ;({ text } = await loggedGenerateText(
-      { section: 'health-insight', userId, fingerprint: { section, date } },
+      { section: 'health-insight', userId, fingerprint: { section, date, contextHash } },
       () => generateText({
         model: aiModel(),
-        prompt: buildPrompt(section, dataLines, absent),
+        prompt,
         maxRetries: 0,
       }),
     ))
@@ -203,7 +213,7 @@ export async function POST(req: Request) {
   }
 
   const insight = text.trim()
-  await repo.upsertAiHealthInsight(userId, section, date, insight)
+  await repo.upsertAiHealthInsight(userId, section, date, insight, contextHash)
 
   return NextResponse.json({ insight })
 }
