@@ -6,27 +6,26 @@
 **Updated:** 2026-08-24 · **By:** the eighth Lane B run · **Next ID:** `LB-5`
 
 ## Now
-**#347** (BF-8) is open. Everything before it merged — #331, #332, #333, #338, #346.
+**Open: #355** (BF-6), **#358** (queue truth, docs-only), **#359** (a spec of mine went red ON MAIN)
+and **#360** (LB-6). Everything before them merged, #353 included.
+
+**#359 first — it is the one blocking everyone.** `e2e/recipe-url-to-meal.spec.ts` asserted inside
+its `page.route` handler, so a failed expectation skipped `route.fulfill` and broke the request it
+was asserting about; the error surfaced three assertions later as a strict-mode locator violation.
+Until it lands, every other PR's E2E is red for that reason and not its own.
 
 ## This run (2026-08-23/24) — each has a journal entry in `docs/overview/entries/`
 
-- **Q-362b** (#296) — day surfaces group by session **id**; its guard asserts on the **durations,
-  not the card count** (two cards appeared before the fix, both showing 82 min).
-- **Q-421** (#300) — a workout's kcal names its basis: `Est. HR kcal` / `Est. MET kcal`.
-- **BF-4's Lane B half** (#311) — scan photo bounded to 1024 px, **−86.6%**. **NOT shown to be the
-  owner's slowdown**; #112 and the cold-start check stay open, and are Lane A's.
-- **Q-326** (#313) — deleting a meal type with entries offers the move, not a refusal.
-- **LB-1** (#316) — edit/delete for logged training, back on `/health/day`. `day-overlay-sheet.tsx`
-  deliberately **not** deleted — **LB-3**.
-- **Q-415/Q-417** (#320) — one calorie budget, from `budgetProvenance(...).total`. Found **LB-4**.
-- **Q-323's display half** (#326) — the bar fills toward a goal notch. Its item (1) said "the macro
-  ring" but described **Home's** donut.
-- **Q-387's Lane B half** (#330) — "I've finished logging" + Undo + the N-of-10 counter. **Q-359
-  closed with it.**
-- **Q-406** (#331) — `FoodRow`; the diary row and the external-search row deliberately **not**
-  converted (that would delete the only way to correct a logged food before Q-395a exists).
-- **Q-418's screen half** (#332) — HR, steps and elevation on the free walk. The pill stays Lane A.
-- **BF-8** (#347) — a deload session says so on both workout surfaces. Owner-confirmed: he trained
+- **Merged and journalled, no state owed:** Q-362b (#296), Q-421 (#300), BF-4's Lane B half (#311),
+  Q-326 (#313), LB-1 (#316), Q-415/Q-417 (#320), Q-323's display half (#326), Q-387's Lane B half
+  (#330), Q-406 (#331), Q-418's screen half (#332). Read their entries in `docs/overview/entries/`
+  rather than re-deriving any of it. **Two carry a deliberate NOT-done:** `day-overlay-sheet.tsx`
+  survives for **LB-3**, and Q-406's last two call sites wait on Q-395a's missing drawings.
+- **LB-6** (#360) — sixteen writes revalidated around their push, not after it. The entry said six;
+  its finder looked only at the six lines ABOVE each call. Custom Rules is **55**.
+- **BF-6** (#355) — the finished-logging control moves above End of Day. **Zero presses in seven
+  weeks**, and the calibration excludes an unmarked day rather than treating it as light.
+- **BF-8** (#353) — a deload session says so on both workout surfaces. Owner-confirmed: he trained
   one believing it was full. Both asked `isDeloadActive` (the PHASE) rather than today's session.
 - **Q-409's Lane B half** (#346) — a recipe link becomes a meal; an unstated yield is ASKED about
   rather than assumed to be one plate.
@@ -35,7 +34,7 @@
   **It uncovered a live outage:** five `app/api/nutrition/meal-plan*` routes read the request body
   and then validated an unassigned `raw`, so the whole meal-plan write surface answered 400 to every
   request. Fixed in that PR (Lane A paths, taken deliberately) with
-  `scripts/check-json-body-parsed.js` holding the class shut. Custom Rules is **53**.
+  `scripts/check-json-body-parsed.js` holding the class shut.
 
 ## Next
 `node scripts/next-item.js --lane B`, and **re-verify the premise first** — most entries taken this
