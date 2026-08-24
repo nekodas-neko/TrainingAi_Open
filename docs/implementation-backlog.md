@@ -4870,6 +4870,29 @@ ehr     0     0     0     0   648   208   128   556     0
 
 ### [platform][devices] Q-285 — the web-push stack has no senders and no subscribers
 
+> **✅ OWNER DECISION 2026-08-24: option (b) — DELETE the web-push stack.** Asked with the count in
+> hand (0 subscriptions, one caller of `sendPushToUser` and it is the test route) and with Q-286
+> alongside, since (a) depended on Q-286 being the stranded consumer. It is not — see below.
+>
+> **⚠️ RE-LANED TO A.** The deletion is `lib/push.ts`, both `app/api/push/*` routes and the
+> `push_subscriptions` table — `app/api/**` plus storage, which is Lane A's by the ownership rule.
+> The Lane B half is small and rides with it: `lib/push-client.ts` and the toggle at
+> `components/more/settings-panel.tsx:78`. Lane A takes it, engine half first; the table drop is a
+> data-losing migration on a table holding **0 rows**, which is why it still wants the owner's nod at
+> merge time even with the decision made.
+>
+> **Option (a) is off the table on its own merits, not just by preference.** Its premise was that
+> Q-286 is a shipped-and-stranded consumer waiting for a transport. Q-286 turned out to be already
+> delivered — by **local notifications**, not push (see its removal note in this PR's journal). So
+> wiring web push would be building a second transport for a job that is done.
+> [`journal`](overview/entries/2026-08-24-push-decision-and-stale-reminders.md).
+>
+> **Still worth checking before the delete lands:** whether `VAPID_PUBLIC_KEY`/`VAPID_PRIVATE_KEY`/
+> `VAPID_EMAIL` are set in Railway. Not to change the decision — to know whether the stack was ever
+> live, which the delete commit should say. `sendPushToUser` returns silently when they are unset, so
+> an unconfigured deployment is indistinguishable from a working one with no subscribers.
+- **Lane:** A
+
 - **Re-measured 2026-08-23: `claude_ro.push_subscriptions` still holds 0 rows**, eight days on.
   Nothing has subscribed in the interval, so the decision below is unchanged by waiting — which is
   itself weak evidence for (b) or (c) over (a).
@@ -4898,34 +4921,6 @@ ehr     0     0     0     0   648   208   128   556     0
 - **Check before deciding:** whether `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `VAPID_EMAIL` are
   set in Railway. `sendPushToUser` returns silently when they are not (`if (!VAPID_CONFIGURED) return`),
   so an unconfigured deployment is indistinguishable from a working one with no subscribers.
-
-### [nutrition][workouts] Q-286 — a user can enable a supplement reminder that can never fire
-
-- **Branch:** `fix/stranded-reminder-toggles`
-- **Plan:** none yet
-- **Added:** 2026-08-15 · from the uncovered-lenses review §3
-- **The full path exists, and it ends nowhere.** `supplements.reminder_enabled` /
-  `reminder_time` and `program_sessions.reminder_enabled` are:
-  - **exposed as a real control** — `components/nutrition/manage-supplements-sheet.tsx:253`,
-    `<Switch checked={reminderEnabled} onCheckedChange={setReminderEnabled} />`
-  - persisted through `POST /api/supplements` and `PATCH /api/supplements/[id]`
-  - synced to the device (`lib/local-store/sqlite-backend.ts`, `sync-engine.ts`)
-  - **read by nothing that fires a notification.**
-- **Two independent reasons it cannot work**, either of which is sufficient:
-  1. `docs/module-map.md` §0: *"There is no cron layer, no job queue, and no GitHub Actions schedule
-     in this app."* Nothing exists to wake at `reminder_time`.
-  2. The only notification transport that could deliver it has no sender and no subscribers (**Q-285**).
-- **User-visible severity is the point.** The toggle persists and syncs, so it *looks* like it
-  worked. This is worse than a missing feature.
-- **Options:**
-  - **(a) Remove the toggles** until there is a scheduler. Smallest honest change; do this if (b) is
-    not being taken soon.
-  - **(b) Deliver locally, no server needed.** A Capacitor local-notification schedule set on-device
-    when the toggle flips sidesteps both blockers — no cron, no web push. This is likely the right
-    answer for a device-first app and does not violate the no-cron rule, since nothing server-side
-    schedules anything.
-- **Sibling sweep:** `program_sessions.reminder_enabled` has the same shape — check whether it has a
-  UI toggle too, and fix both together.
 
 ### [platform][readiness] Q-291 — the AI surfaces contradict each other on the same day
 
