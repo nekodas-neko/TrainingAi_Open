@@ -3306,6 +3306,29 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 
 ### [app-shell][devices] Q-318 — poll the redecode job, and stop the two consoles reporting "done" for work that has started
 
+> **✅ THE CLIENT HALF SHIPPED 2026-08-24 (Lane B, v1.363.1).** `components/oura-ble/redecode-job.ts`
+> POSTs `?async=1` and polls `GET ?jobId=…` every 3s until the server reports `done`/`failed`, then
+> hands back the same phases payload the synchronous route returned. Both consoles use it;
+> `oura-ble-debug.tsx`'s defensive empty/truncated-body parse is gone, and `step-backfill-console.tsx`
+> no longer prints "Done. Backfill applied" at the moment of the gateway timeout (it also surfaces
+> `redecodeError`, which it silently ignored). `alreadyRunning` is stated in words rather than shown
+> as progress. No client poll timeout — the server's reaper turns an abandoned run into `failed`, so
+> the loop always ends on a status the server stands behind.
+> [`journal`](overview/entries/2026-08-24-redecode-job-polling.md).
+>
+> **Verified end to end on `pnpm dev` for all three branches** (done with the phases payload;
+> `alreadyRunning` against a seeded running row, starting no second job; `failed` by finishing that
+> job with an error mid-poll). **NOT driven at runtime:** the backfill console's run path — Preview
+> reports `0 day(s) would change` on the local seed, so the fire button never renders — and
+> `oura-ble-debug.tsx`'s Redecode button, which sits behind the native-plugin gate and is
+> APK-only (the same gate BF-10 documented).
+>
+> **What remains is the last bullet, and it is Lane A's:** drop `?async=1` and delete the
+> synchronous branch in `app/api/oura-ble/samples/redecode/route.ts`. The seam that kept the default
+> alive was these two callers, and they now poll.
+- **Keep:** the on-device check of the Redecode button in the APK, and the route's default flip
+  (Lane A). `Gate: device`.
+
 - **Lane B.** `components/oura-ble/oura-ble-debug.tsx` and `components/oura-ble/step-backfill-console.tsx`
   only — the job store, the route and the reaper are Lane A's and already shipped (Q-535).
 - **Added:** 2026-08-18 (filed by Lane A, which does not own `components/**`)
