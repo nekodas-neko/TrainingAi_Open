@@ -88,8 +88,15 @@ different ways. Both are mechanical; neither is obvious until it happens.
    `docs/overview/entries/`, not in the history file. It needs `](../history-YYYY-MM-DD.md)`. One of
    these on the 2026-08-24 sweep.
 
+5. **A concurrent PR can LINK an entry you already folded, and it lands as a modify/delete conflict**
+   (measured 2026-08-24). Three of the 60 became cited by a handoff doc that another lane merged
+   while this sweep was open — git surfaces only the one it also *modified*, so the other two would
+   have gone unnoticed. **After merging `main`, re-run the linked-vs-unlinked check over the folded
+   set, not just over the loose one**, and un-fold anything that has gained a citation. Folding is
+   the reversible half; a broken citation in someone else's handoff is not.
+
 **Run `node scripts/check-doc-links.js` after the fold and fix what it names — do not reason about
-which links moved.** All four traps above were found that way, in four separate passes, and each one
+which links moved.** All five traps above were found that way, in five separate passes, and each one
 looked like the last thing that could be wrong.
 
 ### The limit now counts foldable entries, not all of them (changed 2026-08-18)
