@@ -2057,3 +2057,20 @@ re-verified in source rather than read off the closure note. The number stays wh
 Known Issue to archive for exactly this headroom and found none. A file sitting below its number is
 allowed by the ratchet's own rule; lowering it here would hand a live PR a conflict for no gain. The
 next session to touch this file should ratchet it to whatever the tree then holds.
+
+## 2026-08-24 — `projectOverview.md` 7908 → 7935 (+27); `docs/agents/state/tuning.md` 582 → 99 (−483)
+
+**Raised** `projectOverview.md` for three new Known-Issues rows from the owner's readiness/battery
+batch — **TN-2** (Body Battery floors by early afternoon), **TN-6** (the temperature baseline is
+0.363 °C low, penalising readiness on 89% of days) and **TN-5** (the sleep calibration's 8-fold gain
+spread) — plus an amendment correcting the LA-20 row's superseded figures and recording that TN-4's
+guard made its verification unfalsifiable. Known Issues are what this index is *for*, so the growth
+is the file doing its job; the one bullet that belonged elsewhere (a method rule about time-weighted
+percentiles) was moved to the Tuning baton instead of being counted here.
+
+**Lowered** the Tuning baton hard, which is the PS-4 item. It was the outlier that entry named — 582
+lines against a target of ~150, nearly 4× — and PS-4 predicted it would not come down as a
+by-product of a routine handoff because its bulk was narrative rather than state. It came down at
+this handover by moving that narrative into the three dated reviews and the handoff doc it already
+cited, keeping only state and the do-not-re-litigate list. **Five of six batons are now at or under
+~170 lines.**
