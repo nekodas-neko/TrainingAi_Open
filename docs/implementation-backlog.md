@@ -628,6 +628,71 @@ answered by subtraction rather than re-argued. Verified through the real route o
 - **Not device-verified:** only the gallery path ran here. A wrong field pair downscales silently
   never, which looks exactly like "the fix did not help".
 
+### [workouts][platform] LA-21 — a workout session's duration is uncapped, so one left running poisons its load and its calories
+
+- **Lane:** A — `packages/shared/src/health/workout-energy.ts`, `app/api/health-trends`.
+- **Branch:** `fix/cap-session-duration`
+- **Added:** 2026-08-24, found while shipping Q-420's derivation — the derived series made it visible
+  on nine points where it had been visible on one.
+- **⚠️ MEASURED IN PRODUCTION 2026-08-24, and the filing above was wrong about severity.** It said
+  *"not a live corruption… the owner's production rows do not currently show one."* **They show
+  eleven.** Of 81 completed sessions, **11 (13.6%) span 534–845 minutes — 8.9 to 14.1 hours.**
+- **The distribution is bimodal with an empty gap, which is what makes it a defect and not a long
+  workout:**
+
+  | duration | sessions |
+  |---|---:|
+  | 0–30 min | 21 |
+  | 30–60 min | 26 |
+  | 60–90 min | 21 |
+  | 90–120 min | 2 |
+  | *120–534 min* | **0** |
+  | 534–845 min | **11** |
+
+  p50 is **56 minutes**; p90 is **548**. Nothing at all sits between 92 and 534 minutes, so these are
+  not the tail of a distribution — they are a different phenomenon.
+- **They are REAL, COMPLETE workouts, which decides clamp-vs-exclude.** Each of the eleven carries
+  **5–6 exercises, 13–18 sets and 3,700–7,400 kg of volume**. Excluding them would delete genuine
+  training from the record; the duration is the only thing wrong. **Clamp, do not exclude** — the
+  earlier note guessing the opposite for the load series was written before this was measured.
+- **They all stopped, and nobody knows why.** Every one is between **2026-05-04 and 2026-05-29**, and
+  there has not been another since. Per CLAUDE.md that makes it **unexplained, not fixed** — whatever
+  produced it may still be reachable, and the fix should bound the number regardless of cause.
+- **Live exposure today is smaller than 13.6% sounds, and this is worth knowing before pricing it.**
+  None of the eleven carries a session RPE **or a single rated set**, so they are invisible to
+  `health-trends`' `sessionLoad` series — checked specifically against Q-420's derivation, which
+  reads set RPEs and therefore does *not* pull them in. And `app/api/body-metadata` only ever reads
+  **today's** workouts, so the day-energy path cannot reach a May session. What is left is the
+  per-session views: `workout-sessions/[id]/energy` and the recap, where opening one of those eleven
+  shows a calorie estimate built on a 10× duration.
+- **Placement:** low-mid — high prevalence, narrow live reach, unknown cause. The prevalence is the
+  argument for bounding it; the reach is the argument for not rushing.
+- **What.** `durationMin = (completedAt - startedAt) / 60_000` with **no upper bound anywhere**:
+  `app/api/health-trends/route.ts` (`sessionLoad = rpe × durationMin`), `estWorkoutKcal` and
+  `estSessionKcal` (`workout-energy.ts:113, 225`). Observed on the dev database: a session spanning
+  **1,176 minutes** produced `sessionLoad 10585` against a normal 440 — **24×** — and it would carry
+  the same factor into the calorie estimate and into anything reading the load series (ACWR, training
+  stress).
+- **Why it is not merely cosmetic:** ACWR is a ratio of recent to chronic load, so a single 24× point
+  distorts both windows for weeks, and it distorts them in the direction that reads as "you are
+  training far too hard".
+- **Fix shape:** one shared cap, not three — the same `One Formula, One Place` argument as everything
+  else in `workout-energy.ts`. Pick the bound from the data rather than from taste: the owner's real
+  sessions run 45–75 minutes, so a cap in the 3–4 hour region is far outside anything genuine while
+  still bounding the pathological case. Whether an over-cap session should be **clamped** or
+  **excluded** is the real decision — clamping keeps a data point that is partly fiction, excluding
+  loses a session that did happen. **The measurement above settles it: clamp.** All eleven are real
+  workouts, so excluding them would delete training that happened, and only the duration is wrong.
+- **The client already handles the restart case, which is why the cause is still open.**
+  `lib/stores/workout-store.ts:215` drops a session's whole identity on rehydrate once its start
+  anchor is over four hours old or from a previous day, so an app-kill cannot produce one of these.
+  That leaves the app being left **open** across a long gap with Complete tapped at the end —
+  `resolveCompletedAt` accepts the phone's own `completedAtMs` and only rejects it for preceding the
+  start or being in the future. Plausible, and not proven: the eleven cluster in one month and
+  nothing explains why they stopped.
+- **Also cap the seed/dev path or this stays invisible locally** — the dev database carries a
+  1,176-minute session, which is how this was found at all.
+
 ### [workouts] Q-420 — drop the session-RPE prompt, derive the intensity, and let it correct the HR burn estimate
 
 > **⚠️ RE-MEASURED 2026-08-19 after Q-421 shipped — the energy case for this entry has largely
@@ -820,6 +885,32 @@ tapping. Observed set-RPE range is 6–10, mean 7.48.
   units, with its own intensity thresholds rather than Foster's; an override survives later set edits;
   and the result is checked against the 20 paired sessions for *plausibility* — not fitted to them.
 
+- 🚧 **THE DERIVATION SHIPPED 2026-08-24 (Lane A), and it needed NO migration and NO schema change.**
+  `packages/shared/src/workout/derive-session-rpe.ts` — `deriveSessionRpe` (rounded mean of the rated
+  sets, set-RPE units, nulls ignored rather than counted as zero) and `sessionEffort`, which returns
+  `{ rpe, source: 'self' | 'derived' }` with a self-reported rating always winning.
+  `app/api/health-trends` consumes it and each series point carries its `source`.
+  **⚠️ THIS ENTRY PRESCRIBED A STORED COLUMN PLUS A SOURCE FLAG PLUS A RE-DERIVE RULE, AND ALL THREE
+  TURNED OUT TO BE AVOIDABLE.** Deriving on READ removes them together: `session_rpe` stays purely
+  self-reported, so "overridden" is just "that column is non-null"; a derived value cannot drift from
+  the sets because it is recomputed from them every time; and a later set edit is reflected for free,
+  which is the whole of the owner's *"can be overwritten if needed"*. CLAUDE.md's **Stored Counters**
+  rule says exactly this — every stored counter in this project has drifted, derive at read time —
+  and the entry's own worry about a re-derive eating a manual correction is that drift, predicted.
+  **It costs nothing:** `getWorkoutSessionsFrom` already hydrates each session's set logs, so there is
+  no extra query. Measured on the dev database: the `session-rpe` series went from **0 points to 10**
+  (9 derived, 1 self-reported), insight line *"10 sessions rated so far (9 from set ratings)"*.
+- **What is still open on this entry:**
+  - **The user-facing prompt removal** (`done-screen.tsx:398`) — **Lane B**, and it is item 1 of the
+    owner's decision. The derivation exists now, so removing the prompt no longer loses anything.
+  - **`intensityFromRpe` still applies Foster's ≤4/≥8 thresholds to a set-scale number.** The entry
+    is right that a derived value needs its own thresholds, and picking them is a **scoring change** —
+    Tuning proposes, the owner signs off. Deliberately not done here, which is why the derived value
+    is not yet wired into the energy path.
+  - **The HR + derived-intensity combination is Q-422's**, not this entry's, and it is `Gate: owner`.
+- **Keep:** the prompt removal, the derived-scale thresholds, and the plausibility check against the
+  20 paired sessions.
+
 ### [workouts][nutrition] Q-422 — calibrate the burn estimate against the owner's own energy balance
 
 - **Gate: owner** — a scoring change: Tuning proposes, the owner signs off, Lane A implements. Added
@@ -873,40 +964,6 @@ residual into a correction rather than a mystery.
 - **What would count as done:** a stated multiplier with its confidence, derived only from gated
   windows, applied to active energy everywhere at once, holding at exactly 1.0 whenever the gates fail
   — and a written measurement of how many past days it moved.
-
-### [nutrition][platform] LB-7 — the recipe spec's attribution assertion can pass with no attribution
-
-> **⚠️ REWRITTEN 2026-08-24 — the diagnosis below was wrong about the cause, and the blocking failure
-> is already fixed (#359).** This entry was filed from a CI failure and reasoned that *"when the
-> scrape returns no title the name falls back to the host"*. That fallback is real, but it was not
-> what happened. **The CI server log shows `POST /api/nutrition/scan 400` three times, once per
-> failing attempt** — the request reached the real route, so the spec's `page.route` stub never
-> applied and the row fell into its could-not-resolve state, where the host IS the name.
->
-> **Why the stub was bypassed:** `public/sw-template.js` re-issues **every** `/api/` request — no
-> method filter — so once the service worker controls the page the request originates from the
-> worker, and Playwright does not intercept service-worker fetches. Whether the worker has taken
-> control by the time the POST fires is a race, which is why the same run had three failures and one
-> stubbed pass, and why it passed locally every time. Fixed with
-> `test.use({ serviceWorkers: 'block' })`; both that rule and "never `expect` inside a route handler"
-> are now in `e2e/README.md`.
->
-> **Chasing "make the scrape mock return no title" would have fixed a condition that was not
-> occurring.**
-
-- **Lane:** B — `e2e/` only now.
-- **Branch:** `fix/recipe-spec-structural-attribution`
-- **Placement:** low. Not blocking anything; the spec is green.
-
-**What is left, and it is the one point of the original entry that still stands.** The assertion is
-`dialog.getByText('example.com').last()`. `.last()` targets the attribution today because it renders
-after the name — but if the attribution row disappeared entirely, `.last()` would match the *name*
-and the assertion would still pass. A guard that survives the removal of the thing it guards is not
-a guard.
-
-**Fix shape:** assert on the attribution's structure rather than on its text position — it is the row
-carrying the `Link2` icon and the `· from a N-serve recipe` suffix. A `data-testid` on that row is
-the cheap version. Then delete the `.last()` and its comment.
 
 ### [nutrition][app-shell] Q-406 — the shared food row: two call sites converted, two waiting on their phase
 
@@ -3200,27 +3257,6 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   `event_name` drop alone**, and that is a data-dropping migration: it needs the owner's yes before
   it merges, even though the column is derivable from `tag` and no reader has touched it since
   Q-541 Task 7.
-
-### [devices][platform] Q-542 — ANSWERED 2026-08-17: A+B+C, nothing irreversible. Keep for the audit trail, then remove.
-
-- **Plan:** [`docs/superpowers/plans/2026-08-17-db-storage-raw-samples-retention.md`](superpowers/plans/2026-08-17-db-storage-raw-samples-retention.md) §6, §7b
-- **Added:** 2026-08-17 · **Answered the same day.** No longer blocking anything.
-- **The owner chose A + B + C — index audit, row narrowing, repack. Options D and E are declined.**
-  Nothing irreversible is being done: every chosen step preserves `body_hex` byte for byte, so the
-  `CLAUDE.md` archival rule stands unchanged and needs no rewrite.
-- **The reframing the decision rested on:** the archival rule protects `body_hex`, which is **26 MB of
-  the 360 MB table — 7.3%**. The rest is indexes and row overhead, all reversible. So the expensive
-  thing and the irreplaceable thing were never the same thing.
-- **The `disk_full` incident (Q-534) did not change this and must not be read as forcing it.** That
-  was a bloat event from a full `measured_at` re-stamp, not growth; **§6 A would have prevented it and
-  neither D nor E would have.** Against the stock 500 MB target the non-destructive path alone reaches
-  ~260 MB and, with C, holds it for years.
-- **Also settled:** D4 remains the destination with **no deadline**, which lapses decision O1 and
-  unblocks Q-540. The 2026-08-02 retention decision justified the 14-day device tier *because* the
-  server keeps `body_hex` forever — that premise now holds indefinitely, so the tier needs no revision.
-- **Remove this entry** once Q-534/Q-540/Q-541 are all closed; it carries no work of its own.
-
-
 
 ### [devices][app-shell] Q-533 — the drain now reports its own ending; nobody has seen it do so
 
