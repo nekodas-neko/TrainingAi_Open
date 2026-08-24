@@ -4237,6 +4237,28 @@ ehr     0     0     0     0   648   208   128   556     0
   surfaced anywhere. Note Q-85 (a shortened session keeps full-length rest periods) is adjacent —
   check whether the rushed sets cluster in time-budget-constrained sessions before treating this as
   a user-behaviour finding.
+- ✅ **THAT CHECK IS DONE — 2026-08-24, and the answer is NO.** Full working in
+  [`docs/reviews/2026-08-24-rest-adherence-clustering.md`](reviews/2026-08-24-rest-adherence-clustering.md).
+  On n = 344 sets / 27 sessions (2026-07-18 → 08-23) rushed is **39.8%**, holding the 37% at filing.
+  It is **uniform, not episodic**: per-session rushed fraction is mean 0.411 sd 0.138, and **zero of
+  26 sessions is rush-free while zero is mostly-rushed**. A time budget is an event and would split
+  the sessions; this is one narrow cluster.
+- **⚠ Two traps this measurement walked into, recorded so they are not walked into again.**
+  (a) **Session duration correlates and the correlation is circular** — rest is a *component* of
+  duration, so rushing produces a short session. Do not use duration as a rest-adherence covariate
+  anywhere. (b) **Q-85's hypothesis has NO INSTANCES here**: every shortened session in the history
+  predates `planned_rest_sec`, and 26 of the 27 measurable sessions are the same 5-exercise shape.
+  Q-85 is neither confirmed nor refuted — it stays open on its own evidence.
+- **The better finding, which replaces the framing:** actual rest barely responds to the
+  prescription. Planned 60 s → **75 s taken** (the owner rests *longer* than asked); planned 90 →
+  65; 120 → 110; 187 → 133. Prescribed spans 60–187 s, actual spans 65–133 s. So the coaching line
+  is *"your rest ignores the plan"*, not *"you rushed today"* — the latter is meaningless when every
+  session rushes. **Within-session drift is real but secondary** (0.32 at exercise 1 → 0.47 at
+  exercise 5): time pressure explains the slope, not the 0.32 intercept, and the intercept is most
+  of it.
+- **Keep:** the surfacing itself is unbuilt, and the primary half (Q-289's bucket table split by
+  rest band) is already measured — see the ✅ above it. Surfacing is a Lane B UI change once the
+  owner has seen the framing; nothing here licenses a rest term in `expectedRpe`.
 
 ### [cardio] Q-301b — drop the `running_baselines` table itself (code already removed)
 
