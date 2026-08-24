@@ -63,8 +63,10 @@ export async function DELETE(req: NextRequest) {
 
   const repo = await getRepository()
   const deleted = await repo.deleteActivityLog(session.user.id, body.data.id)
-  // Q-556: this used to answer `{ success: true }` unconditionally with no way to tell a real
-  // delete from a miss. It now reports which happened; it deliberately does NOT 404 on a miss —
-  // see the entry for why that's the wrong fix, not just a deferred one.
+  // Q-556: activity logs are now deleted through the outbox (Q-328), so the race that made a 404
+  // unsafe here — a row created via `queueMutation` but not yet pushed — is reconciled by the push
+  // arm rather than surfaced to the user. Match every sibling delete: 404 for both a nonexistent id
+  // and someone else's.
+  if (!deleted) return NextResponse.json({ error: 'Not found' }, { status: 404 })
   return NextResponse.json({ success: true, deleted })
 }

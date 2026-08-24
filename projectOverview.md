@@ -141,6 +141,11 @@ timezone and only **9 of 22** call sites passed one. All 22 do now, nine callers
 **empty** baseline (Custom Rules is now 52 steps). Proven by the experiment that found it — the
 failing case passes 18/18 under a shifted timezone.
 
+**`DELETE /api/activity-logs` stopped reporting success for a delete that deleted nothing (Q-556).**
+Q-328's outbox delete reconciled the race that made this unsafe; it now 404s for a nonexistent or
+not-yours id, matching every sibling delete, while a double-tap or an already-gone row still matches
+and reports success. The web fallback treats a 404 the same as success rather than throwing.
+
 **Admin Device Metrics sparklines stopped stretching a partial day to full width (BF-10).**
 `Sparkline` takes optional `times`/`timeDomain` and projects `x` by position in the day rather than
 by sample index, so a night-only SpO₂/HRV signal renders with dead space either side, not apparent
@@ -220,13 +225,10 @@ With Q-525 un-suspended, both of chronic stress's countable gates were measured 
 its refusal is inside the granular layer, which records no reason for a null (**TN-1**).
 
 **Session handoff:** [`docs/handoff-2026-08-20-platform-migration-gate-and-energy-weight.md`](docs/handoff-2026-08-20-platform-migration-gate-and-energy-weight.md)
-— the CI job named **Migration Check** could not fail on a broken migration, and fixing that
-immediately caught one: `142_claude_ro_views.sql` creates a view over a table `143` creates, so on
-every fresh CI database 142 aborted and every view below it rolled back, in three green jobs. Also
-the CSP's missing `'wasm-unsafe-eval'`, and the done screen estimating calories from the first
-weight ever logged. **PS-3 closed on top of it (2026-08-20):** the four migrations that failed on a
-database already holding their objects — and so were retried on every cold start — are idempotent,
-and the dev database now records 206 of 206
+— CI's **Migration Check** couldn't fail on a broken migration; fixing that caught `142_claude_ro_views.sql`
+creating a view over a table `143` creates, aborting on every fresh CI database. Also the CSP's
+missing `'wasm-unsafe-eval'` and the done screen's first-ever-weight calorie estimate. **PS-3 closed
+on top:** the four migrations retried on every cold start are idempotent now, 206 of 206
 ([journal](docs/overview/entries/2026-08-20-non-idempotent-migrations.md)).
 
 **Q-331 closed on top of that (2026-08-20, v1.333.1):** the done screen and the day screen were
@@ -278,10 +280,8 @@ SQLSTATEs that are benign on an ordinary run are precisely the failure signal un
 ([journal](docs/overview/entries/2026-08-20-migration-replay-check.md)).
 
 **Older session handoffs:** [2026-08-20 workouts energy/RPE intake](docs/handoff-2026-08-20-workouts-energy-accuracy-and-rpe-intake.md)
-(reasoning behind the energy-accuracy work, not status) and
-[2026-08-17 agent model/device findings](docs/handoff-2026-08-17-platform-agent-model-and-device-session-findings.md)
-(**Q-536 CLOSED, confirmed on device** — 43 wrong sleep windows were a re-drain misread as a clock
-reset; its cause, **Q-314**, is still live and reopens on every re-pair).
+(reasoning, not status) and [2026-08-17 agent model/device findings](docs/handoff-2026-08-17-platform-agent-model-and-device-session-findings.md)
+(**Q-536 CLOSED, confirmed on device**; its cause **Q-314** is still live and reopens on every re-pair).
 
 **Open at the time of writing:** PR #6 (session notes the public cut did not carry), PR #10 (the
 public-repo migration handoff). Check `list_pull_requests` rather than trusting this line — it is a

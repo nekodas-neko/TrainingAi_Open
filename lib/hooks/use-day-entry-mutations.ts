@@ -194,7 +194,9 @@ export function useDayEntryMutations(
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id: log.id }),
       });
-      if (!res.ok) throw new Error();
+      // A 404 means the row is already gone (Q-556) — same outcome the user asked for, not a
+      // failure to report.
+      if (!res.ok && res.status !== 404) throw new Error();
       toast.success("Deleted");
       setDeleteActivity(null);
       await invalidateActivityWrites();
