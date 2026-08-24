@@ -12,7 +12,7 @@ const QuerySchema = z.object({
   sinceHours: z.coerce.number().int().min(1).max(24 * 90).default(168),
   windowSeconds: z.coerce.number().int().min(1).max(3600).default(120),
   bucketHours: z.coerce.number().int().min(1).max(24).default(6),
-})
+}).strict()
 
 export async function GET(req: Request) {
   const session = await auth()
