@@ -20,7 +20,7 @@ const BodySchema = z.object({
   gender: z.enum(['male', 'female']),
   model: z.string().optional(),
   force: z.boolean().optional(), // regenerate even if already exists
-});
+}).strict();
 
 // POST /api/admin/generate-exercise-media
 // Body: { exerciseName, gender, model?, force? }

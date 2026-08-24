@@ -28,7 +28,7 @@ const BodySchema = z.object({
   exerciseNames: z.array(z.string().min(1)).min(1),
   beforeDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   apply: z.boolean().optional(),
-})
+}).strict()
 
 export async function POST(req: NextRequest) {
   const session = await auth()
