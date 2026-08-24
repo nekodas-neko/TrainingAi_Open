@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useLayoutEffect, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useState } from 'react'
 import { useUserTimezone } from '@/components/shell/user-timezone-provider'
 import { ChevronLeft, Plus, Minus, Trash2, Search, X, Loader2, CheckSquare, Sparkles } from 'lucide-react'
 import { toast } from 'sonner'
@@ -136,7 +136,10 @@ export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate,
       })
     : meals
 
-  function openBuild(meal?: SavedMeal) {
+  // Q-357: `useCallback` on the five handlers the card takes, so `SavedMealCard`'s `memo()` is not
+  // defeated by a fresh identity every render. `openBuild` and `toggleSelected` touch only state
+  // setters, so `[]` is stable by React's guarantee rather than by hope.
+  const openBuild = useCallback((meal?: SavedMeal) => {
     setEditingMeal(meal ?? null)
     setMealName(meal?.name ?? '')
     setMealImage(meal?.imageDataUri ?? null)
@@ -146,7 +149,7 @@ export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate,
     setSearchResults([])
     setShowAddFood(false)
     setTab('build')
-  }
+  }, [])
 
   function backToMeals() {
     setTab('meals')
@@ -405,7 +408,7 @@ export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate,
     }
   }
 
-  async function quickLog(meal: SavedMeal) {
+  const quickLog = useCallback(async (meal: SavedMeal) => {
     // Honour the bucket the user opened this sheet from; only fall back to the
     // current time-of-day bucket when the sheet was opened without one (the
     // bottom "Saved Meals" button, which isn't bucket-scoped).
@@ -424,17 +427,17 @@ export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate,
     } finally {
       setLogging(null)
     }
-  }
+  }, [preselectedMealTypeId, mealTypes, logDate, userId, tz, onLogged])
 
-  function toggleSelected(id: string) {
+  const toggleSelected = useCallback((meal: SavedMeal) => {
     setSelectedIds(prev => {
       if (!prev) return prev
       const next = new Set(prev)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
+      if (next.has(meal.id)) next.delete(meal.id)
+      else next.add(meal.id)
       return next
     })
-  }
+  }, [])
 
   /**
    * Delete everything ticked, then leave selection mode.
@@ -459,7 +462,7 @@ export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate,
     else toast.success(`${ids.length} meal${ids.length === 1 ? '' : 's'} deleted`)
   }
 
-  async function deleteMeal(meal: SavedMeal, opts?: { silent?: boolean }) {
+  const deleteMeal = useCallback(async (meal: SavedMeal, opts?: { silent?: boolean }) => {
     const store = userId ? getLocalStore(userId) : null
     try {
       if (store) {
@@ -480,7 +483,7 @@ export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate,
       if (opts?.silent) throw new Error('delete failed')
       toast.error('Failed to delete')
     }
-  }
+  }, [userId])
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -600,11 +603,11 @@ export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate,
                   meal={meal}
                   logging={logging === meal.id}
                   selected={selectedIds ? selectedIds.has(meal.id) : null}
-                  onToggleSelected={() => toggleSelected(meal.id)}
-                  onLog={() => quickLog(meal)}
-                  onEdit={() => openBuild(meal)}
-                  onDelete={() => deleteMeal(meal)}
-                  onLabel={() => setLabelMeal(meal)}
+                  onToggleSelected={toggleSelected}
+                  onLog={quickLog}
+                  onEdit={openBuild}
+                  onDelete={deleteMeal}
+                  onLabel={setLabelMeal}
                   fromPlan={planSavedMealIds.has(meal.id)}
                 />
               ))

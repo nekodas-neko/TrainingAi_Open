@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.349.0",
+    date: "2026-08-24",
+    changes: [
+      "The saved-meals list, the meal-plan cards and the ring debug log stop redrawing themselves when nothing about them changed. Each was wrapped in a re-render guard that a detail at the call site was quietly cancelling out, so the whole saved-meals list redrew on every keystroke elsewhere on the screen.",
+    ],
+  },
+  {
     version: "1.348.0",
     date: "2026-08-24",
     changes: [

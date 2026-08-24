@@ -1779,37 +1779,6 @@ this fits without an extraction.
   short-circuits and the enqueue never runs. That `queueMutation` throws on a dead local DB is read
   from source, not observed, and that is still true after the fix. `Gate: device`.
 
-### [nutrition][app-shell] Q-357 — four memoised call sites are still defeated, and one of them is inside a list
-
-- **Branch:** `fix/memo-call-sites-stable-props`
-- **Added:** 2026-08-18 · Lane B, while shipping Q-490 · [`journal`](overview/entries/2026-08-18-memo-scalar-props.md)
-- **Placement:** low. Performance, not correctness, and it is **already frozen** —
-  `scripts/check-memo-prop-stability.js` baselines these four, so nothing new can join them. This
-  entry is for clearing the four, not for stopping the bleeding.
-- **Q-490's review said "no inline arrows exist anywhere".** There are four, on four different
-  memoised components, none of them the two Q-490 fixed. Found by running the check repo-wide:
-  ```
-  app/nutrition/nutrition-content.tsx:627   <MealPlanReviewCard>  4 inline arrows
-  app/nutrition/nutrition-content.tsx:638   <MealPlanSection>     1 inline object
-  components/nutrition/saved-meals-sheet.tsx:587  <SavedMealCard>  5 inline arrows
-  components/oura-ble/oura-ble-debug.tsx:704      <LogConsole>     1 inline arrow
-  ```
-- **`SavedMealCard` is the one that costs anything.** It renders inside `visibleMeals.map(...)`, so
-  all five arrows are rebuilt per meal per render and the memo never holds for any card. The other
-  three are single instances; their memo is defeated too, but the render they cause is one component.
-- **The list site cannot be fixed with `useCallback`** — it is inside a `.map()`, where a hook is not
-  allowed. Q-490's answer was scalars; here the shape is different, because the props are *callbacks*
-  rather than data. The fix is to change the callback contract so the parent can pass one stable
-  function: `onLog={quickLog}` with the child calling `onLog(meal)`, rather than
-  `onLog={() => quickLog(meal)}`. Six props, one component, plus its call site.
-- **Do the debug console last or not at all** — `oura-ble-debug.tsx` is an admin surface and its
-  `onClear={() => setLines([])}` costs one re-render of a console nobody is watching for performance.
-  Fixing it is one `useCallback`; skipping it is defensible. Either way, **update the baseline in the
-  same PR** — the check fails when a listed file drops below its number, which is the point.
-- **Lane B owns this** (`app/nutrition/**`, `components/nutrition/**`, `components/oura-ble/**`).
-- **Not verified:** static analysis, same as Q-490. **No render counts were measured** — the claim
-  follows from object identity and React's shallow compare, not a profiler run.
-
 ### [activity][platform] Q-328 — deleting an activity is the one activity-log write with no outbox domain, so offline it just fails
 
 > **⚠️ The Lane A half SHIPPED. What is left is Lane B only** — switching
