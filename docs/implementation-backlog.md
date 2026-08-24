@@ -964,40 +964,6 @@ residual into a correction rather than a mystery.
   windows, applied to active energy everywhere at once, holding at exactly 1.0 whenever the gates fail
   — and a written measurement of how many past days it moved.
 
-### [nutrition][platform] LB-7 — the recipe spec's attribution assertion can pass with no attribution
-
-> **⚠️ REWRITTEN 2026-08-24 — the diagnosis below was wrong about the cause, and the blocking failure
-> is already fixed (#359).** This entry was filed from a CI failure and reasoned that *"when the
-> scrape returns no title the name falls back to the host"*. That fallback is real, but it was not
-> what happened. **The CI server log shows `POST /api/nutrition/scan 400` three times, once per
-> failing attempt** — the request reached the real route, so the spec's `page.route` stub never
-> applied and the row fell into its could-not-resolve state, where the host IS the name.
->
-> **Why the stub was bypassed:** `public/sw-template.js` re-issues **every** `/api/` request — no
-> method filter — so once the service worker controls the page the request originates from the
-> worker, and Playwright does not intercept service-worker fetches. Whether the worker has taken
-> control by the time the POST fires is a race, which is why the same run had three failures and one
-> stubbed pass, and why it passed locally every time. Fixed with
-> `test.use({ serviceWorkers: 'block' })`; both that rule and "never `expect` inside a route handler"
-> are now in `e2e/README.md`.
->
-> **Chasing "make the scrape mock return no title" would have fixed a condition that was not
-> occurring.**
-
-- **Lane:** B — `e2e/` only now.
-- **Branch:** `fix/recipe-spec-structural-attribution`
-- **Placement:** low. Not blocking anything; the spec is green.
-
-**What is left, and it is the one point of the original entry that still stands.** The assertion is
-`dialog.getByText('example.com').last()`. `.last()` targets the attribution today because it renders
-after the name — but if the attribution row disappeared entirely, `.last()` would match the *name*
-and the assertion would still pass. A guard that survives the removal of the thing it guards is not
-a guard.
-
-**Fix shape:** assert on the attribution's structure rather than on its text position — it is the row
-carrying the `Link2` icon and the `· from a N-serve recipe` suffix. A `data-testid` on that row is
-the cheap version. Then delete the `.last()` and its comment.
-
 ### [nutrition] Q-387 — a half-logged day is indistinguishable from a light day, and it drags the calibrated maintenance down with nothing to stop it
 
 - **✅ THE LANE A HALF SHIPPED 2026-08-19. WHAT REMAINS IS LANE B'S: the button and the counter.**

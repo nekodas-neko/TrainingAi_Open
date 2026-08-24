@@ -240,7 +240,10 @@ export function MyMealsPicker({
                       {/* Attribution: it says where a meal came from six months later, and it is
                           the honest thing to do with someone else's recipe. */}
                       {m.sourceUrl && (
-                        <span className="mt-0.5 flex items-center gap-1 text-[11px] text-muted-foreground">
+                        <span
+                          data-testid="meal-source-attribution"
+                          className="mt-0.5 flex items-center gap-1 text-[11px] text-muted-foreground"
+                        >
                           <Link2 className="w-3 h-3 flex-none" />
                           <span className="truncate">{hostOf(m.sourceUrl)}</span>
                           {m.recipeYield != null && m.recipeYield > 1 && (
