@@ -1725,24 +1725,6 @@ entry. Queue position is priority; nothing else about either entry changed in th
   reference drawings were never committed). Part 1 §8 has the file-by-file collision table and the
   carry-across rule. **Do not plan around that chain landing, and do not wait for it.**
 
-### [nutrition] BF-11a — extract Build a Meal's ingredient picker so the rest of Part 1 can land
-
-- **Lane:** B
-- **Plan:** [`plans/2026-08-24-meal-creator.md`](superpowers/plans/2026-08-24-meal-creator.md) §3
-- **Branch:** `refactor/ingredient-picker-extract`
-- **Added:** 2026-08-24 · planning session, from BF-11.
-- **No behaviour change — that is the point.** `components/nutrition/saved-meals-sheet.tsx` is at
-  **774 lines against the 800 ceiling** and is *not* one of `check-component-size.js`'s five recorded
-  hotspots, so it fails CI the moment it crosses. Four features land in it in BF-11c/d. Extraction is
-  the precondition, not the cleanup — which is why it is its own entry rather than a first commit
-  somebody skips under time pressure.
-- **Extract the ingredient-acquisition half** (search, Open Food Facts results, the AI text estimate,
-  add-by-hand) and **carry its comments** — three are load-bearing incident records: the two separate
-  search effects and why chaining them was wrong, the 700 ms OFF debounce vs the 250 ms one (OFF
-  rate-limits ~10/min), and `addExternalFood`'s `source: 'text'` (a name search is not a barcode).
-- **Target:** under ~600 lines, so BF-11c and BF-11d do not need a second extraction mid-flight.
-- **Also helps Q-395a**, which edits the same form and is currently blocked on drawings.
-
 ### [nutrition] BF-11b — the scan route returns N candidate meals instead of one
 
 - **Lane:** A
