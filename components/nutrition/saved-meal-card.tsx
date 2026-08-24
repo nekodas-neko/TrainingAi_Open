@@ -13,11 +13,19 @@ interface Props {
   logging: boolean
   /** Non-null puts the card in selection mode; the whole card then toggles instead of expanding. */
   selected: boolean | null
-  onToggleSelected: () => void
-  onLog: () => void
-  onEdit: () => void
-  onDelete: () => void
-  onLabel: () => void
+  /**
+   * Each takes the meal (Q-357). A parameterless callback forces the CALL SITE to close over the
+   * row — five inline arrows per card, inside `visibleMeals.map(...)`, so every render of the sheet
+   * gave all five a new identity and re-rendered every card despite the `memo()`. The card already
+   * holds `meal`; handing it back lets the parent pass one stable `useCallback` per action, shared
+   * by every card. This is the "move the identity into the child" half of the memo rule, and it is
+   * the shape the mutation-callback contract asks for anyway.
+   */
+  onToggleSelected: (meal: SavedMeal) => void
+  onLog: (meal: SavedMeal) => void
+  onEdit: (meal: SavedMeal) => void
+  onDelete: (meal: SavedMeal) => void
+  onLabel: (meal: SavedMeal) => void
   /** This meal was copied from the meal plan (Q-398) — provenance, derived by join, never stored. */
   fromPlan?: boolean
 }
@@ -83,11 +91,11 @@ export const SavedMealCard = memo(function SavedMealCard({
         tabIndex={0}
         aria-expanded={selecting ? undefined : expanded}
         aria-pressed={selecting ? selected : undefined}
-        onClick={() => selecting ? onToggleSelected() : setExpanded(v => !v)}
+        onClick={() => selecting ? onToggleSelected(meal) : setExpanded(v => !v)}
         onKeyDown={e => {
           if (e.key === 'Enter' || e.key === ' ') {
             e.preventDefault()
-            selecting ? onToggleSelected() : setExpanded(v => !v)
+            selecting ? onToggleSelected(meal) : setExpanded(v => !v)
           }
         }}
         className="w-full px-4 py-3 text-left active:bg-muted/20 transition-colors"
@@ -193,7 +201,7 @@ export const SavedMealCard = memo(function SavedMealCard({
               <Button variant="secondary" size="sm" className="flex-1 min-h-[44px]" onClick={() => setConfirmingDelete(false)}>
                 Cancel
               </Button>
-              <Button variant="destructive" size="sm" className="flex-1 min-h-[44px]" onClick={onDelete}>
+              <Button variant="destructive" size="sm" className="flex-1 min-h-[44px]" onClick={() => onDelete(meal)}>
                 Delete
               </Button>
             </div>
@@ -201,7 +209,7 @@ export const SavedMealCard = memo(function SavedMealCard({
         ) : (
           <div className="flex items-center gap-2 border-t border-border/30 px-3 py-2">
             <Button
-              onClick={onLog}
+              onClick={() => onLog(meal)}
               disabled={logging}
               size="sm"
               className="flex-1 min-h-[44px] gap-1.5"
@@ -211,13 +219,13 @@ export const SavedMealCard = memo(function SavedMealCard({
             </Button>
             <Button
               variant="secondary" size="sm" className="min-h-[44px] min-w-[44px] px-3"
-              onClick={onLabel} aria-label={`Print a label for ${meal.name}`}
+              onClick={() => onLabel(meal)} aria-label={`Print a label for ${meal.name}`}
             >
               <QrCode className="w-3.5 h-3.5" />
             </Button>
             <Button
               variant="secondary" size="sm" className="min-h-[44px] min-w-[44px] px-3"
-              onClick={onEdit} aria-label={`Edit ${meal.name}`}
+              onClick={() => onEdit(meal)} aria-label={`Edit ${meal.name}`}
             >
               <Pencil className="w-3.5 h-3.5" />
             </Button>

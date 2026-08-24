@@ -120,6 +120,14 @@ export default function NutritionContent({ userId }: { userId?: string }) {
   const [planSetupOpen, setPlanSetupOpen] = useState(false);
   const [planReviewDismissed, setPlanReviewDismissed] = useState(false);
   const [planManageOpen, setPlanManageOpen] = useState(false);
+  // Q-357: `MealPlanReviewCard` and `MealPlanSection` are both `memo()`, and four inline arrows
+  // here gave them a new identity every render, so both re-rendered on every keystroke elsewhere on
+  // the screen while still reading as optimised. Setters only, so `[]` is stable by React's
+  // guarantee.
+  const dismissPlanReview = useCallback(() => setPlanReviewDismissed(true), []);
+  const rebuildPlan = useCallback(() => { setPlanReviewDismissed(true); setPlanSetupOpen(true); }, []);
+  const openPlanSetup = useCallback(() => setPlanSetupOpen(true), []);
+  const openPlanManage = useCallback(() => setPlanManageOpen(true), []);
   const [planEditOpen, setPlanEditOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [loggerOpen, setLoggerOpen] = useState(false);
@@ -591,8 +599,8 @@ export default function NutritionContent({ userId }: { userId?: string }) {
                 maintenanceKcal={energyBalance?.maintenance?.source === 'calibrated'
                   ? energyBalance.maintenance.kcal : null}
                 recommendedKcal={energyBalance?.target.recommendedKcal ?? null}
-                onDismiss={() => setPlanReviewDismissed(true)}
-                onRebuild={() => { setPlanReviewDismissed(true); setPlanSetupOpen(true); }}
+                onDismiss={dismissPlanReview}
+                onRebuild={rebuildPlan}
               />
             )}
 
@@ -609,8 +617,8 @@ export default function NutritionContent({ userId }: { userId?: string }) {
                 onSaveMeal={handleSavePlanMeal}
                 onSaveAllMeals={handleSavePlanMeals}
                 savingPositions={savingPlanPositions}
-                onCreate={() => setPlanSetupOpen(true)}
-                onViewPlan={() => setPlanManageOpen(true)}
+                onCreate={openPlanSetup}
+                onViewPlan={openPlanManage}
               />
             )}
 
