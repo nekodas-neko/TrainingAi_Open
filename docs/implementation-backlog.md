@@ -3561,6 +3561,26 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 
 ### [app-shell][platform] Q-544 — server-side disk maintenance is trapped behind a native-plugin gate, so it cannot be run from a desktop
 
+> **✅ SHIPPED 2026-08-24 (Lane B, v1.363.4).** `DbFootprintCard` **and** `DeviceMetricsPanel` moved
+> out of `OuraBleDebug` onto `app/admin/oura-ble/page.tsx`, above `<OuraBleDebug />`. Neither touches
+> the plugin — both read only `/api/oura-ble/*`. The genuinely native panels (`RawStoreStatusConsole`,
+> the SleepNet dump, the sensor probe, `SampleInspector`, which takes plugin-sourced props) stay
+> behind the gate. [`journal`](overview/entries/2026-08-24-db-maintenance-off-native-gate.md).
+>
+> **`DeviceMetricsPanel` was the second one, and the entry did not name it** — it is the panel BF-10
+> fixed and then could not observe, blocked by this same gate.
+>
+> **This entry's second half — the pack backfill having no button — shipped separately today as
+> Q-316.** This change is what makes that button reachable from anything but the phone.
+>
+> **Verified on `pnpm dev` with no native plugin** (the unavailable banner present on the page
+> throughout, confirmed rather than assumed): all three maintenance controls render, `1 bucket(s)
+> packable` shows, both cards sit above the banner, and pack was actually driven from that desktop
+> context (`packed 1 bucket(s) · 40 frames → 244 B`). **NOT exercised:** `VACUUM FULL` itself —
+> nothing to reclaim on the local seed, and it rewrites under an exclusive lock.
+- **Keep:** an on-device look — the APK's view of this page changes, with the two cards now above the
+  console rather than inside it. `Gate: device`.
+
 - **Branch:** `fix/admin-db-maintenance-off-native-gate`
 - **Added:** 2026-08-18, found while reclaiming 513 MB during the `disk_full` recovery.
 - **Lane B.** `components/oura-ble/**` + `app/admin/oura-ble/**`. No server change.
