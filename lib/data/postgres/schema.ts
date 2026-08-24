@@ -405,19 +405,6 @@ export const runningPlans = pgTable('running_plans', {
   updatedAt:        timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 })
 
-export const runningBaselines = pgTable('running_baselines', {
-  id:                 uuid('id').primaryKey().defaultRandom(),
-  userId:             uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
-  planId:             uuid('plan_id').notNull().references(() => runningPlans.id, { onDelete: 'cascade' }),
-  vo2max:             doublePrecision('vo2max'),
-  maxHr:              integer('max_hr'),
-  restingHr:          integer('resting_hr'),
-  thresholdHr:        integer('threshold_hr'),
-  weeklyBaseMinutes:  doublePrecision('weekly_base_minutes'),
-  easyPaceSecPerKm:   doublePrecision('easy_pace_sec_per_km'),
-  createdAt:          timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-}, t => [unique().on(t.planId)])
-
 export const prescribedRuns = pgTable('prescribed_runs', {
   id:            uuid('id').primaryKey().defaultRandom(),
   userId:        uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
