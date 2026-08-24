@@ -1,10 +1,19 @@
 # 📖 Review Agent — baton
 
-> **Successor sessions are titled `📖 Review Agent 🟢`** — exactly, emoji included. The title is how five
-> concurrent sessions stay tellable apart; a renamed successor is a lost thread even with a perfect baton.
+> **Successor sessions are titled `📖 Review Agent 🟢`** — exactly, both emoji included. The **leading**
+> emoji is the role and never changes; the **trailing light** is that session's own status (🟢 live,
+> 🔴 handed on) and is the only part that moves. A session self-titles 🟢 on its first instruction and
+> flips itself to 🔴 as the last step of its handoff, after the baton and every PR have landed.
 
-**Updated:** 2026-08-20 · **By:** forty sweeps (2026-08-17 ×2, 2026-08-18 ×37, 2026-08-20 ×1) ·
-**Next ID: `RV-35`.**
+**Updated:** 2026-08-24 (session closed) · **By:** forty sweeps (2026-08-17 ×2, 2026-08-18 ×37,
+2026-08-20 ×1) · **Next ID: `RV-35`.**
+
+> **The run that produced sweep 40 is closed.** Its record, including the paste-ready pickup prompt,
+> is [`docs/handoff-2026-08-24-workouts-review-sweep-40-write-surface.md`](../../handoff-2026-08-24-workouts-review-sweep-40-write-surface.md).
+> **All three of its findings — RV-32, RV-33, RV-34 — shipped and are closed**, re-verified in source
+> on 2026-08-24 rather than taken from the closure note, and their `projectOverview.md` row was moved
+> whole to [`known-issues-resolved.md`](../../overview/known-issues-resolved.md). Nothing is owed from
+> that sweep.
 
 **This baton was rewritten from 1,280 lines to this on sweep 40** (PS-4's complaint: no baton fits on a
 screen). Nothing was lost — every sweep's narrative is in its own `docs/reviews/` write-up, indexed from
@@ -41,39 +50,28 @@ reports success for a row it did not delete).
 `PATCH /api/activity-logs/<id>/metrics` — its probe payload was rejected by Zod before the ownership
 check ran, so that route's cross-user behaviour is **unknown**. Sweep 40 did not reach it either.
 
-## Now — sweep 40 (2026-08-20)
+## Now — nothing in flight
 
-**Lens: the non-workout write surface** — the program / phase-set / progression-style / template routes —
-**plus ownership rule (b)**, the one of `CLAUDE.md`'s three write-path rules the previous baton recorded
-as having no evidence behind it. Both were the top of that baton's "Next" list.
-Write-up: [`docs/reviews/2026-08-20-non-workout-write-surface-ownership.md`](../../reviews/2026-08-20-non-workout-write-surface-ownership.md).
+The next session is **awaiting the owner's instructions**, by the closing session's request: read the
+orientation docs, summarise where things stand, and wait rather than picking a lens. The sweep-40
+record below is history, kept because its Next list is still the best answer to "what is worth doing".
 
-**Filed RV-32 + RV-34 (batched, `program-write-fk-ownership`) and RV-33.**
+## Sweep 40 (2026-08-20) — closed, all findings shipped
 
-- **RV-32 — three write paths persist a `progression_styles` id owned by another user**
-  (`POST /api/phase-sets`, `POST /api/workout-templates`, `POST /api/log-exercise`), while
-  `PUT /api/phase-sets/[id]` refuses the **identical value** 400. The check exists fourteen lines away in
-  the sibling file. `listPhaseSets` then joins the style name in **unscoped**, so `GET /api/phase-sets`
-  returns the other account's style *name* — which renders in builder-review and goes into an LLM prompt.
-  It stops at the name: every other read of that table is `user_id`-scoped, and that was checked rather
-  than assumed.
-- **RV-34** — a client-supplied `program_sessions.id` that is not yours is a raw `pg 23505` 500.
-- **RV-33** — `POST /api/progression-styles` and `PATCH /api/nutrition/food-logs/[id]` answer a correct
-  ownership refusal with an **empty-bodied 500** and file it into `error_events` as a server fault
-  (Q-462/Q-463's class, two routes that fix missed).
+**Lens:** the non-workout write surface (program / phase-set / progression-style / template routes)
+plus ownership **rule (b)**. Write-up:
+[`2026-08-20-non-workout-write-surface-ownership.md`](../../reviews/2026-08-20-non-workout-write-surface-ownership.md);
+the narrative is in the handoff linked at the top. **RV-32, RV-33, RV-34 — all fixed and closed.**
 
-**✅ Rule (b) is clean, and now has evidence.** 116 mutating routes, 325 `.set()` sites, the 21 taking a
-bare identifier or spread each traced to source: all built field by field. Confirmed live —
-`PATCH /api/user/profile` sent `isAdmin`, `id` and `passwordHash` and changed none. **Rule (a) — the
-affected-row count before a dependent child write — is now the only one of the three with no evidence.**
+Three things from it that are still *state*, not story:
 
-**Method worth reusing: the FK inventory.** One `information_schema` query lists every foreign key into a
-user-scoped table — **27 edges**. Four were probed live and one class fell out of them. The remaining 23
-are the cheapest next lens this role has.
-
-**A cheap contrast beats a long argument.** The whole of RV-32 is one row of a table: *same value, same
-resource, same session — PUT 400, POST 201.* Look for the surface that already does the thing correctly
-before writing a paragraph about why it should.
+- **✅ Rule (b) is clean and now has evidence** — 116 mutating routes, 325 `.set()` sites, all built
+  field by field. **Rule (a) is the only one of the three left with none.**
+- **The FK inventory.** One `information_schema` query lists every foreign key into a user-scoped
+  table — **27 edges**. Four were probed; the remaining 23 are the cheapest next lens this role has.
+- **A cheap contrast beats a long argument.** All of RV-32 was one row of a table: *same value, same
+  resource, same session — PUT 400, POST 201.* Find the surface that already does the thing correctly
+  before writing a paragraph about why it should.
 
 ## Next — in the order they are worth doing
 
@@ -133,6 +131,11 @@ None. This role's PRs are docs-only.
 - Screens: temporary specs in `e2e/`, run against the already-running server with
   `E2E_BASE_URL=http://localhost:3000` **and `DATABASE_URL=…` set** (`zero-data.setup.ts` fails loudly
   without it, before your spec runs). **Delete the spec and `test-results/` before committing.**
+- **This container's clone is SHALLOW.** After `git fetch origin main`, a merge can fail with
+  *"refusing to merge unrelated histories"* and `git merge-base HEAD origin/main` can print nothing —
+  neither means divergence. The fetched commits simply do not reach back past the shallow boundary.
+  `git fetch --unshallow origin` fixes it in one call, and the merge base appears immediately. Do not
+  reach for `--allow-unrelated-histories`; it would graft two disjoint trees together.
 - **`get_check_runs` returning `total_count: 0` has a third cause, and it is the likeliest one here.**
   `CLAUDE.md` names a stale base; the PR field to read is **`mergeable_state`**. `dirty` means a merge
   conflict, and **GitHub runs no PR checks at all while it cannot compute the merge commit** — so a

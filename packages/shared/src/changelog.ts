@@ -6,10 +6,17 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: "1.347.0",
+    version: "1.348.0",
     date: "2026-08-24",
     changes: [
       "Typing an impossible number into a health log now says so straight away. A 5,000 kg weight used to be accepted, saved, and then quietly discarded on the way to the server \u2014 the number you typed simply never appeared again. Weight, body fat, steps, calories, the three macros and a custom water amount are all checked as you type now, against the same limits the server uses, with a message naming what the value has to be between.",
+    ],
+  },
+  {
+    version: "1.347.0",
+    date: "2026-08-24",
+    changes: [
+      "Two things you could do a fortnight ago work again. On a day's detail screen, tapping a logged exercise opens its history \u2014 the weight trend, the estimated one-rep max, every past session of it \u2014 and tapping a logged activity opens its full detail with the heart-rate chart and route. Both used to live on a panel that became unreachable when the calendar started opening the day screen instead.",
     ],
   },
   {

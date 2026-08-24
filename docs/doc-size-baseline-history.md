@@ -1983,6 +1983,49 @@ from the detour: do not ratchet a baseline down while the convention it measures
 worked out — it bought nothing and had to be undone within the hour.
 
 
+---
+
+## 2026-08-24 — LB-3, the day-overlay retirement
+
+**`projectOverview.md` 7897 → 7900, then 7905 → 7908 (+3) on merge.** A Tuning session raised the
+same number to 7905 while this branch was open, so this ended up as a second raise on top of
+theirs rather than the one it was written as.
+
+**Two sessions raised this file on the same day, and that is the finding.** The trims were tried
+first here — this PR's note went from six lines to four to three, and the two statements it had to
+correct elsewhere were rewritten shorter — and the remainder is genuinely new. But three rounds of
+shaving prose to fit four lines, twice in one day by two different sessions, is a file past its
+maintenance point, not two careless notes.
+
+**No fully-resolved Known Issue was available to archive instead**, which is the mechanism the
+wrap-up rule points at first: every ✅ entry scanned states what it still owes, and Q-479's says so
+outright — *"Kept here rather than archived: the PR states production and the 24-hour window were
+not exercised end to end… Archive it once that is confirmed against production."* Archiving one
+anyway to buy three lines is exactly what that rule forbids.
+
+**So the next session that needs room should not raise it again — it should compact the
+shipped-notes section**, which is where the growth is. Filed for Orchestrator.
+
+**The original note, as written:** A four-line note for user-visible work, on a file that
+has sat at exactly its number for several PRs in a row.
+
+The trims were tried first and the raise is what is left. This PR's own note started at six lines
+and is now four; the two statements it had to correct elsewhere in the file (both said the sheet
+still existed and was reachable, which stopped being true here) were rewritten shorter rather than
+longer. That recovered three of the six. The rest is genuinely new.
+
+**What was NOT available, and it is worth recording because it is the mechanism the wrap-up rule
+points at first.** No fully-resolved Known Issue could be moved to `known-issues-resolved.md` to
+make the room: every ✅ entry scanned states what it still owes, and Q-479's says so outright —
+*"Kept here rather than archived: the PR states production and the 24-hour window were not exercised
+end to end… Archive it once that is confirmed against production."* Archiving one anyway to buy four
+lines would be exactly the thing that rule forbids.
+
+**The pattern behind the raise, for whoever reads this next.** Trimming to fit has meant editing
+other sessions' prose three times in one day, which is a worse cost than three lines — a session
+shaving a sentence it did not write, to fit a note about work it did, is how a shared file loses
+accuracy. If this recurs, the answer is a compaction sweep of the shipped-notes section, not a
+per-PR raise.
 ## 2026-08-24 — `claude/tuning-agent-0q9yl7` (Tuning session close)
 
 **projectOverview.md (+8):** the handoff pointer for the Tuning session that retracted Q-528. It earns
@@ -1995,3 +2038,22 @@ that prevents a repeat.
 full, not appended). The baseline stays at 582 rather than ratcheting down: a baton is rewritten whole
 at every handover, so its size oscillates by design, and locking in a trough would make the next
 successor raise it with a note that says nothing. The shrink is visible in the diff either way.
+
+## 2026-08-24 — `docs/agents/state/review.md` 170 → 173; `projectOverview.md` shrinks 33 lines, number left alone
+
+Review session wrap-up for sweep 40.
+
+**Review baton (+3 net, after +20 and a trim):** the wrap-up added a closed-session pointer, the
+🟢/🔴 trailing-light convention, and a `Now` section saying the successor is awaiting instructions —
+20 lines of genuine state — the last of them a shallow-clone trap that cost a merge attempt at the very end of the session. Rather than raise the number for them, the sweep-40 section was cut from
+35 lines to 20 by applying the baton's own rule: the handoff written in this same PR now carries that
+sweep's narrative, so the baton keeps only the three parts that are still *state* — rule (b) clean and
+rule (a) the last unevidenced one, the 27-edge FK inventory, and the PUT/POST contrast. Net +3, against +20 unchecked.
+
+**`projectOverview.md` — 33 lines lighter, baseline deliberately not lowered.** The RV-32…RV-34
+Known-Issues row was moved whole to `known-issues-resolved.md`; all three shipped and nothing is owed,
+re-verified in source rather than read off the closure note. The number stays where `main` has it (7905 by the time this merged) because
+**#373 was in flight raising it**, and its PR body says it went looking for a resolved
+Known Issue to archive for exactly this headroom and found none. A file sitting below its number is
+allowed by the ratchet's own rule; lowering it here would hand a live PR a conflict for no gain. The
+next session to touch this file should ratchet it to whatever the tree then holds.

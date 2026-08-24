@@ -1,6 +1,6 @@
 # The bounds existed for months; the client never asked (Q-321)
 
-**Branch:** `feat/validate-metrics-at-the-keyboard` · **Lane B** · v1.347.0
+**Branch:** `feat/validate-metrics-at-the-keyboard` · **Lane B** · v1.348.0
 
 ## What was wrong
 
