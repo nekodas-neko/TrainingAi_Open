@@ -445,4 +445,5 @@ Live at the time of writing (2026-07-30):
   measured blast radius was 17 files not 16, and the guards had to go finer than per-`describe`.
   Runbook: [`public-repo-cut-runbook.md`](../../public-repo-cut-runbook.md), steps 8–14 remain.
 - [`overview/entries/2026-08-16-public-repo-cut-a4b.md`](../../overview/history-2026-08-15.md)
+- [`docs/overview/entries/2026-08-24-recipe-spec-structural-attribution.md`](../../overview/entries/2026-08-24-recipe-spec-structural-attribution.md) — **LB-7, the recipe spec's attribution guard, 2026-08-24** (`getByText('example.com').last()` matched the row's NAME, which is the host while the scrape resolves — measured passing with the attribution deleted and the mock delayed 8 s. It asserts on a `data-testid` row now.)
   — the A4b journal entry.
