@@ -13,7 +13,7 @@ const MAX_BODY_BYTES = 16 * 1024
 const BodySchema = z.object({
   newPhase: z.enum(['accumulation', 'intensification', 'realisation', 'deload']),
   force: z.boolean().optional(),
-})
+}).strict()
 
 // Natural cycle order the AI periodization engine progresses through — matches
 // lib/ai-periodization/prompt.ts's documented transitions (accumulation→intensification→

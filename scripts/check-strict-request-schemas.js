@@ -50,7 +50,14 @@
 // **The sweep is per-schema client verification, and there is no shortcut.** Four were converted on
 // 2026-08-23 (89 → 85), each after reading the one client that posts to it and confirming the keys
 // match: `admin/timing-baseline`, `ai/health-insight`, `running-plan`, `running-plan/override`.
-// Six more the same day (85 → 79), all under `app/api/admin/`: `activity-types`, `ai-usage`,
+// Four more on 2026-08-24 (79 → 75), the `ai-periodization` group. One of them is worth carrying
+// forward: `session/[sessionId]/prescribe` is called with NO BODY by three of its four clients, which
+// reads as a reason not to tighten it and is not one — the route does `(read.ok ? read.body : null)
+// ?? {}` and `{}` satisfies an all-optional schema, strict or not. **Verify by the error MESSAGE, not
+// the status:** every probe on these routes returns 400, and half of those are the handler working
+// (`Baseline not complete`, `No prescription`) rather than the schema rejecting.
+//
+// Six more on the same day (85 → 79), all under `app/api/admin/`: `activity-types`, `ai-usage`,
 // `exercises`, `fix-exercise-units`, `generate-exercise-media`, `mirror-dataset-gifs`. Two of those
 // deserve a note, because both are the shape that would have broken under a codemod: the
 // `activity-types` and `exercises` PATCH handlers destructure `id` out of the body **before**
@@ -74,10 +81,6 @@ const ROOTS = ['app/api', 'packages/shared/src/validation'];
 const BASELINE = {
   'app/api/activity-logs/[id]/metrics/route.ts': 1,
   'app/api/activity-logs/route.ts': 1,
-  'app/api/ai-periodization/baseline/complete/route.ts': 1,
-  'app/api/ai-periodization/session/[sessionId]/prescribe/route.ts': 1,
-  'app/api/ai-periodization/session/[sessionId]/respond/route.ts': 1,
-  'app/api/ai-periodization/session/[sessionId]/transition/route.ts': 1,
   'app/api/builder-chat/route.ts': 4,
   'app/api/coach/apply/route.ts': 1,
   'app/api/coach/options/route.ts': 1,

@@ -3479,6 +3479,16 @@ ehr     0     0     0     0   648   208   128   556     0
   (`const { id, ...rest }`) while their clients post `{id, ...data}` — so the schema never sees `id`
   and strict is safe, which is knowable only from the handler, not the schema. Round-tripped live to
   confirm the PATCH still returns 200.
+- 🚧 **79 → 75, 2026-08-24.** The four `ai-periodization` routes: `baseline/complete`, and
+  `session/[sessionId]/{prescribe,respond,transition}`. Same method, same live verification — and one
+  of them is the shape worth naming for the next batch: **`prescribe` is called with NO BODY at all
+  by three of its four clients**, which reads as a reason not to tighten it and is not one. The route
+  does `(read.ok ? read.body : null) ?? {}`, and `{}` satisfies an all-optional schema whether or not
+  it is strict. Verified live rather than argued: a bodyless POST still reaches the handler
+  (`{"error":"Baseline not complete"}` — a business error, not `Invalid body`), an unknown key now
+  returns `Invalid body`, and `{"newPhase":"deload","force":true}` came back **200 with real state**.
+  **Read the handler's error MESSAGE, not its status:** all six probes returned 400, and half of them
+  were the handler working correctly.
 - **A fourth exemption-adjacent class, now in the script's header: a schema fed an object the ROUTE
   builds key by key.** `admin/ai-usage` reads three named `searchParams` into a literal, so an
   unknown query key cannot reach the schema at all. Strict guards nothing there *today* — it was
