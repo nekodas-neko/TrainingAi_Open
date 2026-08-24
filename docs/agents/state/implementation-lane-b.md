@@ -3,16 +3,19 @@
 > **Successor sessions are titled `🚧 Implementation Agent (B) 🟢`** — exactly, emoji included. That
 > title is how six concurrent sessions stay tellable apart; a renamed successor is a lost thread.
 
-**Updated:** 2026-08-24 · **By:** the eighth Lane B run · **Next ID:** `LB-5`
+**Updated:** 2026-08-24 · **By:** the eighth Lane B run · **Next ID:** `LB-8`
 
 ## Now
-**Open: #355** (BF-6), **#358** (queue truth, docs-only), **#359** (a spec of mine went red ON MAIN)
-and **#360** (LB-6). Everything before them merged, #353 included.
+**Open: #361** (LB-6). #355 (BF-6), #358 (queue truth) and #359 (the red spec) all merged, #353
+included.
 
-**#359 first — it is the one blocking everyone.** `e2e/recipe-url-to-meal.spec.ts` asserted inside
-its `page.route` handler, so a failed expectation skipped `route.fulfill` and broke the request it
-was asserting about; the error surfaced three assertions later as a strict-mode locator violation.
-Until it lands, every other PR's E2E is red for that reason and not its own.
+**The lesson from #359, because it will recur.** `e2e/recipe-url-to-meal.spec.ts` had TWO defects
+stacked. It asserted inside its `page.route` handler, so a failed expectation skipped
+`route.fulfill` and broke the request it was asserting about — the error then surfaced three
+assertions later as a strict-mode locator violation. Underneath that, **the service worker was
+re-issuing every `/api/` request, so `page.route` never saw it at all** (`public/sw-template.js`
+has no method filter). A spec that stubs an `/api/` route needs `test.use({ serviceWorkers:
+'block' })`. Both rules are now in `e2e/README.md`.
 
 ## This run (2026-08-23/24) — each has a journal entry in `docs/overview/entries/`
 
@@ -21,7 +24,7 @@ Until it lands, every other PR's E2E is red for that reason and not its own.
   (#330), Q-406 (#331), Q-418's screen half (#332). Read their entries in `docs/overview/entries/`
   rather than re-deriving any of it. **Two carry a deliberate NOT-done:** `day-overlay-sheet.tsx`
   survives for **LB-3**, and Q-406's last two call sites wait on Q-395a's missing drawings.
-- **LB-6** (#360) — sixteen writes revalidated around their push, not after it. The entry said six;
+- **LB-6** (#361) — sixteen writes revalidated around their push, not after it. The entry said six;
   its finder looked only at the six lines ABOVE each call. Custom Rules is **55**.
 - **BF-6** (#355) — the finished-logging control moves above End of Day. **Zero presses in seven
   weeks**, and the calibration excludes an unmarked day rather than treating it as light.
@@ -45,8 +48,8 @@ its reference, is nowhere in the tree — `docs/design/` holds cardio, score-row
 and nothing for nutrition. **Do not take Q-395a/b/c**, and do not convert Q-406's last two call
 sites, until they are committed under `docs/design/`. Raised with the owner 2026-08-23.
 
-Non-blocked candidates: **BF-6** (the finished-logging control sits below everything and has been
-pressed zero times), **Q-407**, **Q-486**, **Q-321**. LB-3 sits low, as its own placement says.
+Non-blocked candidates: **Q-407**, **Q-486**, **Q-321**, **Q-420**. LB-3 sits low, as its own
+placement says.
 
 ## Do not re-litigate
 - **`lib/coach/**` is Lane A** — settled against the import trace, not the path list.

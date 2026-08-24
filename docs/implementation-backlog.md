@@ -433,7 +433,11 @@ design decision. See the correction at the top of that entry.
 
 ### [nutrition][platform] 🟠 BF-4 — the photo scan feels much slower, and the only dated change is the structured-output conversion
 
-- Lane: B — the fix is `components/nutrition/capture-step.tsx`; the payload instrumentation below is Lane A
+- Lane: A — **the Lane B half SHIPPED 2026-08-23 (v1.331.0)**: `capture-step.tsx` bounds the photo to
+  1024 px, a **-86.6%** payload cut
+  ([`journal`](overview/entries/2026-08-23-bounded-scan-photo-payload.md)). **It was NOT shown to be the
+  owner's slowdown** — #112 and the cold-start check are the open half, and both are Lane A's, which
+  is why this entry's lane is now A. Nothing here is startable by Lane B.
 
 **Owner report, 2026-08-23 (verbatim):** *"Ive noticed the nutrition scan for images is alot slower
 than it used to be; can we investigate why - from taking the photo to getting the result is much
@@ -580,60 +584,6 @@ the payload to a standing inefficiency. Open, all Lane A's:
 - **Railway cold start** — still untestable from a sandbox.
 - **Not device-verified:** only the gallery path ran here. A wrong field pair downscales silently
   never, which looks exactly like "the fix did not help".
-
-### [nutrition] 🟠 BF-6 — "I've finished logging" sits below everything, and has been pressed zero times
-
-- Lane: B — one JSX reorder in `app/nutrition/nutrition-content.tsx`
-
-**Owner report, 2026-08-23 (verbatim):** *"id also like to move the finish logging button and swap it
-with the end of day button. end of day should be at the very bottom. finish logging should be right
-after the meals."*
-
-**This reads as a layout preference and is not one.** The button feeds Q-387's adaptive-TDEE
-calibration, which treats an unmarked day as EXCLUDED — so an unpressed button does not degrade the
-estimate, it withholds it entirely. Measured in production, 2026-08-23:
-
-> **0 of 55 `day_checkins` rows have `food_logging_completed_at` set**, across 2026-07-02 → 2026-08-24.
-
-The owner's own screenshot agrees: *"0 of 10 days marked · 10 more to calibrate your maintenance"*.
-**The feature has never received a single input since it shipped**, and the calibration it exists to
-feed has therefore never run. (Standard caveat: `claude_ro` is row-scoped to one user, so this is the
-owner's days, not the system's — which is exactly the population that matters here.)
-
-**Current order on `main`** (`app/nutrition/nutrition-content.tsx`):
-
-| line | element |
-|---|---|
-| 618 | `<MealCard>` ×N |
-| 638–646 | **End of Day** button (opens the AI chat) |
-| 649 | `<WeeklyNutritionChart>` + adherence |
-| 652 | `<SupplementsSection>` (today only) |
-| 663 | **`<FoodLoggingComplete>`** ← last element on the screen |
-
-**Requested order:** meal cards → `<FoodLoggingComplete>` → chart → supplements → **End of Day last**.
-
-That places the control immediately after the thing it is about, and puts the day-review entry point
-at the end of the day's screen, which is where a day-review action belongs.
-
-**⚠️ There is a code comment that argues against this change — it must be rewritten, not ignored.**
-At line 638:
-
-> *"End of Day deliberately stays put: it is a daily-review feature, and merging it with Home's 'Your
-> Day in Review' banner is Q-112's call, not this placement change's. Moving it halfway would be
-> worse than either end state."*
-
-That comment was defending against a *merge with Home's banner*, not against moving it down the same
-screen — and it predates the measurement above. An implementer who reads it and stops has done the
-right thing with the wrong information, so **replace it in the same diff** with what is now true: the
-owner asked for this order, and the finished-logging control leads because nothing was reaching it.
-
-**Watch for, when reordering:** `<SupplementsSection>` and `<FoodLoggingComplete>` are both
-conditional on `selectedDate === todayStr` / `isToday`, so on a past date the tail of the screen
-changes shape — check the order still reads correctly on a back-dated day, not just on today.
-
-**Done looks like:** on the Nutrition screen the finished-logging card sits directly under the last
-meal card, End of Day is the last element on the page, both still behave correctly on a past date,
-and the misleading comment is gone.
 
 ### [workouts] Q-420 — drop the session-RPE prompt, derive the intensity, and let it correct the HR burn estimate
 
@@ -1039,126 +989,39 @@ residual into a correction rather than a mystery.
   than trust the line. Same class as the over-counting scanner it sits beside, and the reason the
   run line prints computed totals.
 
-### [nutrition][app-shell] Q-323 — the calorie budget grows with activity; the macro grams under it do not
+### [nutrition][platform] LB-7 — the recipe spec's attribution assertion can pass with no attribution
 
-> **⚠️ NARROWED 2026-08-23 — the budget is now correct everywhere, so only the two DISPLAY changes
-> are left.** v1.335.0 pointed Home's nutrition card and the Nutrition ring at
-> `budgetProvenance(...).total` and made the ring render `macroTargets.scaled`
-> ([`journal`](overview/entries/2026-08-23-one-calorie-budget.md)), which closes the
-> "rendering `scaled` instead of the stored row" half listed below and retires Q-415/Q-417.
-> **What remains is (1) the macro ring's grey remainder and (2) the zone bar as a progress bar.**
-> The blocking order in this entry is now satisfied — the bar can be built, because the number it
-> fills toward is right. Note `barBands`/`barPosition` live in `packages/shared` but are reached
-> only from `components/`, so claim the lane in your baton before starting.
+> **⚠️ REWRITTEN 2026-08-24 — the diagnosis below was wrong about the cause, and the blocking failure
+> is already fixed (#359).** This entry was filed from a CI failure and reasoned that *"when the
+> scrape returns no title the name falls back to the host"*. That fallback is real, but it was not
+> what happened. **The CI server log shows `POST /api/nutrition/scan 400` three times, once per
+> failing attempt** — the request reached the real route, so the spec's `page.route` stub never
+> applied and the row fell into its could-not-resolve state, where the host IS the name.
 >
-> **⚠️ THE LANE A HALF SHIPPED 2026-08-19 — what is left is Lane B**
-> ([`journal`](overview/entries/2026-08-19-macros-follow-earned-calories.md)).
-> `scaleMacrosForEarnedKcal(base, earnedKcal)` lives in
-> `packages/shared/src/nutrition/calorie-balance.ts` and **`GET /api/nutrition/energy-balance` already
-> returns the answer**: `macroTargets: { base, scaled, earnedKcal }`. Do not re-derive it client-side.
+> **Why the stub was bypassed:** `public/sw-template.js` re-issues **every** `/api/` request — no
+> method filter — so once the service worker controls the page the request originates from the
+> worker, and Playwright does not intercept service-worker fetches. Whether the worker has taken
+> control by the time the POST fires is a race, which is why the same run had three failures and one
+> stubbed pass, and why it passed locally every time. Fixed with
+> `test.use({ serviceWorkers: 'block' })`; both that rule and "never `expect` inside a route handler"
+> are now in `e2e/README.md`.
 >
-> **What is left:** the two display changes below — the macro ring's grey remainder, and the zone bar
-> as a progress bar with a short overshoot tail — plus rendering `scaled` instead of the stored row.
-> **The bar still must ship in the same PR as Q-415**, or it fills toward the wrong number.
->
-> **One precision worth carrying:** what the split preserves is the **carbs:fat energy ratio**, not
-> each macro's share of the day — protein's share necessarily falls as the budget grows. Both are
-> pinned by test. Everything below is the original entry.
+> **Chasing "make the scrape mock return no title" would have fixed a condition that was not
+> occurring.**
 
-- **Branch:** `feat/macros-follow-earned-calories`
-- **Added:** 2026-08-19 · Lane A/B split, the residual of Q-401 after both its halves landed.
-- **Lane:** B
-- **What is now true.** One TDEE model: `nutrition_targets.calories` is the **rest-day floor**, and
-  the zone bar renders `base + earned from movement`. So the calorie figure a user sees moves during
-  the day. The **macro grams do not** — they come from the same stored row and are fixed.
-- **That is deliberate for now, and it is the safer half.** Q-401's load-bearing choice was that the
-  ring keeps the SET goal, because the grams beneath it are derived from that row; pointing the ring
-  at a moving number while the bars stay fixed makes the card contradict itself internally, which is
-  worse than the gap it would close.
-- **The question this leaves.** If 300 earned kcal are added to the budget, which macro absorbs them?
-  **Not protein** — it is dosed per kg of bodyweight (`PROTEIN_G_PER_KG_BY_GOAL`) and does not scale
-  with a day's movement. Q-401's answer was *"the earned calories belong to carbs"*, which is
-  sensible and unimplemented. Fat is currently 25% of calories, so scaling it uniformly would be a
-  third answer nobody chose.
-- **Do not scale all three uniformly.** That reintroduces the Q-401 shape in a new place: the ring
-  and the bars disagreeing, this time within one card.
-- **✅ THE PRODUCT CALL IS MADE — owner, 2026-08-19. Carbs and fat scale; protein holds.** The owner
-  asked for *"%'s to calculate the protein/fat/carbs so that when it increase due to excercise; the
-  macros increase as well"*, and after the arithmetic below was put in front of them, agreed to the
-  amended version. **This unblocks the entry — implement it.**
-  - **Protein is excluded, and the reason is arithmetic rather than taste.** It is dosed per kg of
-    bodyweight (`PROTEIN_G_PER_KG_BY_GOAL`), so 150 g is ~2 g/kg. Express that as a share
-    (31.6% of a 1,900 kcal base) and apply it to a 2,447 kcal day and it becomes **193 g — 2.6 g/kg**:
-    a protein requirement that rises because the user went for a walk. Movement burns carbohydrate
-    and fat; it does not create protein demand.
-  - **Carbs take the majority and fat takes the rest, in their existing ratio.** Q-401's own answer
-    was *"the earned calories belong to carbs"*, and fat sitting at 25% of calories means a
-    carbs-only split makes fat's share drift downward as the day's movement grows. Splitting the
-    earned kcal between carbs and fat **in the proportion they already hold to each other** keeps
-    both percentages stable and needs no new constant.
-  - **This resolves the "do not scale all three uniformly" warning above rather than contradicting
-    it.** That warning was about the ring and the bars disagreeing inside one card. Here every
-    figure moves off the same budget, so the card stays internally consistent — which is the
-    property the warning was protecting.
-- **Lane A** for the arithmetic (`packages/shared/src/nutrition/calorie-balance.ts`), **Lane B** for
-  whatever renders it. **No longer blocked.**
+- **Lane:** B — `e2e/` only now.
+- **Branch:** `fix/recipe-spec-structural-attribution`
+- **Placement:** low. Not blocking anything; the spec is green.
 
-**Two display changes ride with this, from the same owner review, and they are the reason the entry
-is now worth doing as one piece.**
+**What is left, and it is the one point of the original entry that still stands.** The assertion is
+`dialog.getByText('example.com').last()`. `.last()` targets the attribution today because it renders
+after the name — but if the attribution row disappeared entirely, `.last()` would match the *name*
+and the assertion would still pass. A guard that survives the removal of the thing it guards is not
+a guard.
 
-**(1) The macro ring shows its remainder in grey.** *"I'd like the macro ring to show grey to
-indicate whats left."* Today the ring is a full 360° split by macro — it encodes *composition* and
-says nothing about progress. Sweep the coloured arc to `eaten / budget` of the circle and leave the
-remainder a neutral grey, so the same ring answers "what have I eaten" **and** "how much is left"
-without a number changing. At or past the budget there is no grey and the centre flips from
-`left` to `over`.
-
-**(2) The zone bar becomes a progress bar you finish.** *"more like Red/Orange/green; all the way
-like a progress bar with the green towards the end, and then a little orange/red bar after to depict
-going over. So it still looks like a progress bar where you want to go to the end."*
-  - The track runs **red → amber → green → amber → red** left to right, with the **green band
-    immediately before the goal notch** and only a short tail beyond it. The fill grows with intake
-    and takes the colour of the band it currently ends in.
-  - **The overshoot tail is deliberately short** — long enough to read, short enough that it does
-    not present itself as a second target to aim for.
-  - **This inverts what the bar means today**, and that is the point: it currently renders fixed
-    zones with a marker showing where you sit, which reads as a gauge. The owner wants something
-    with an end you walk toward.
-  - **Colour is not the only signal** — the remaining/over figure beside it carries the state in
-    words, per the standing rule.
-  - Drawn in three states (under, on target, over) during the 2026-08-19 review.
-
-**⚠ The Q-415 budget fix this used to wait on shipped in v1.335.0 — the bar will now fill toward the
-right number.**
-
-### [nutrition][platform] LB-7 — `recipe-url-to-meal.spec.ts` matches two elements when a scraped recipe has no title
-
-- **Lane:** B — `e2e/` and the component it asserts against are surface.
-- **Branch:** `fix/recipe-spec-strict-locator`
-- **Added:** 2026-08-23, from a CI failure on an unrelated PR (#345, which touches a checker script
-  and the publish dry-run and nothing this spec can see).
-- **Observed in CI, not reproducible locally.** The spec passes 4/4 against `main` on the dev
-  server; in CI it produced one hard failure and one flake in the same run.
-- **The strict-mode violation is a real latent bug, and it is diagnosed:**
-  ```
-  strict mode violation: getByRole('dialog').getByText('example.com') resolved to 2 elements:
-    1) <span class="block text-sm font-medium">example.com</span>     ← the meal NAME
-    2) <span class="truncate">example.com</span>                      ← the attribution
-  ```
-  `my-meals-picker.tsx:222` renders `m.name` and `:245` renders `hostOf(m.sourceUrl)`. **When the
-  scrape returns no title the name falls back to the host**, so both spans read `example.com` and
-  `e2e/recipe-url-to-meal.spec.ts:100` matches two. It is not a timing flake — it is deterministic
-  given that input, and the input is reachable.
-- **Fix shape:** make the attribution assertion unambiguous rather than adding `.first()`, which
-  would keep passing if the attribution disappeared entirely. The attribution row is the one
-  carrying the `Link2` icon and the `· from a N-serve recipe` suffix; assert on that structure, or
-  give the row a `data-testid`. Then the sibling case at `:146`
-  (`/from a 4-serve recipe/`, which failed on both the first run and the retry) is worth re-checking
-  under the same fixture — it may share the cause.
-- **Why it matters beyond this spec:** E2E is a required check, so a spec that fails on inputs
-  nobody controls blocks every lane's merges, and the recovery costs a full re-run each time.
-- **Surface:** browser-reproducible, but it did not reproduce on the dev server — chase it in CI or
-  by making the scrape mock return no title, which is the condition that produces the collision.
+**Fix shape:** assert on the attribution's structure rather than on its text position — it is the row
+carrying the `Link2` icon and the `· from a N-serve recipe` suffix. A `data-testid` on that row is
+the cheap version. Then delete the `.last()` and its comment.
 
 ### [nutrition] Q-387 — a half-logged day is indistinguishable from a light day, and it drags the calibrated maintenance down with nothing to stop it
 
@@ -1305,6 +1168,12 @@ plainly.
 
 - **Branch:** `refactor/nutrition-food-row`
 - **Lane B.** No schema, no route.
+- **Gate: owner**
+- **⛔ BLOCKED on the owner, 2026-08-24: Q-395's reference drawings are not in the repository.**
+  `unit-options.png`, which Q-395a names as its reference, is nowhere in the tree — `docs/design/`
+  holds cardio, score-row and AI-coach mockups and nothing for nutrition. The two remaining call
+  sites wait on Q-395a's quantity sheet, which cannot be built to a drawing nobody can open. Raised
+  2026-08-23; clears when the drawings land under `docs/design/`.
 - **✅ THE COMPONENT SHIPPED 2026-08-23 (v1.338.0)** — `components/nutrition/food-row.tsx`, and the
   library sheet + the food-database search row now draw it.
   [`Journal`](overview/entries/2026-08-23-shared-food-row.md). **Q-395a's `Needs: Q-406` is

@@ -6,10 +6,17 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: "1.344.0",
+    version: "1.345.0",
     date: "2026-08-24",
     changes: [
       "Fixed a class of stale numbers after a save. Sixteen places \u2014 logging water, ticking a supplement, saving an activity or a walk or a fitness test, editing a food entry, saving or deleting a meal, logging an injury, rating a session \u2014 refreshed the app's cached figures a moment too early, before the save had reached the server, so the old numbers were fetched back and kept until they aged out on their own. Deleting a food entry had the opposite fault: offline it refreshed nothing at all.",
+    ],
+  },
+  {
+    version: "1.344.0",
+    date: "2026-08-24",
+    changes: [
+      "\"Finished logging\" now sits directly under the meals instead of at the very bottom of the Nutrition screen, and End of Day moved to the end. The button had never been pressed since it shipped, and the maintenance estimate it feeds ignores any day that is not marked \u2014 so a control nobody reached was withholding the whole feature rather than just degrading it.",
     ],
   },
   {
