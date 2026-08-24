@@ -1913,6 +1913,14 @@ Ten lines: the Current Status entry for the Q-454/Q-455/Q-465 route-hardening ba
 a merge. The count moved because the surrounding section shrank underneath it, not because the entry
 grew.
 
+## 2026-08-23 — `CLAUDE.md` 1148 → 1154
+
+Six lines in the `CLAUDE_DB_READONLY_URL` section: the owner id has left the generated `claude_ro`
+views (Q-456) and is now set at boot from the environment. It belongs in the rules because the
+failure mode when *no* variable is set is *the views return zero rows* — and a session that reads
+`error_events` at start-up and gets nothing needs to recognise a missing setting rather than
+conclude production is quiet.
+
 ## 2026-08-23 — `docs/implementation-backlog.md` 11202 → 11129
 
 Removing four entries that had already shipped and were **resurrected by one of my own merge

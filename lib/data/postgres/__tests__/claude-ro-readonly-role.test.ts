@@ -10,7 +10,7 @@
 //      accounts with months of sleep/weight/food data; they cannot consent on the owner's behalf.
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import { Client } from 'pg'
-import { readFileSync } from 'fs'
+import { readFileSync, readdirSync } from 'fs'
 import { join } from 'path'
 
 const ADMIN_URL = process.env.DATABASE_URL
@@ -36,8 +36,8 @@ if (!!ADMIN_URL && !/railway|rlwy\.net/i.test(ADMIN_URL) && !isTcpUrl(ADMIN_URL)
 }
 
 const RO_PASSWORD = 'claude_ro_test_pw'
-// The committed migration hard-codes the production owner id; the fixtures below use it so the
-// generated predicates are exercised exactly as shipped, rather than a test-only variant.
+// Any uuid will do now that the migration no longer names one — this is the value the test
+// sets on the role, not a value read out of committed SQL (Q-456).
 const OWNER_ID = 'fe481797-4114-4f59-824d-223e0281823e'
 const OTHER_ID = '11111111-1111-1111-1111-111111111111'
 const roUrl = () => {
@@ -98,22 +98,63 @@ describe.skipIf(!canRun)('claude_readonly role — the read-only guarantee', () 
         ('${OTHER_ID}', '2026-07-20', now(), now(), 7)
       ON CONFLICT DO NOTHING;
     `)
-    // Pinned to the NEWEST claude_ro views migration — each one DROPs and rebuilds the whole
-    // schema, so an older file rebuilds it without the newer tables' views and the coverage
-    // assertion below then fails. Repoint this when generating a new views migration.
+    // RESOLVED, not pinned (Q-456). Each views migration DROPs and rebuilds the whole schema, so
+    // an older file rebuilds it without the newer tables' views and the coverage assertion below
+    // fails. The hardcoded name went stale silently between 181 and 185 — two migrations landed
+    // while this still read 181, and the count only noticed once one of them added a *table* rather
+    // than a column — and it was stale again at 202 when 205 existed. A green suite never proved
+    // the pin current, only that no table had been added since, which is precisely a check that
+    // reports nothing until it is too late.
     //
-    // The pin went stale silently between 181 and 185: migrations 183 and 185 both landed while this
-    // still read 181, and the coverage count only noticed once one of them added a *table* rather
-    // than a column. Re-point it in the same commit as any new views migration — and note that a
-    // green suite does not prove the pin is current, only that no table was added since.
-    const migration = readFileSync(
-      join(process.cwd(), 'lib/data/postgres/migrations/202_claude_ro_views_food_logging_complete.sql'), 'utf8',
-    )
-    await exec(ADMIN_URL!, migration)
+    // Taking the newest by filename removes the class: `ensureSchema` applies in plain filename
+    // sort order, so "newest by sort" is the same file production ends up with.
+    const dir = join(process.cwd(), 'lib/data/postgres/migrations')
+    const newest = readdirSync(dir).filter(f => /^\d+_claude_ro_views.*\.sql$/.test(f)).sort().pop()
+    if (!newest) throw new Error('no claude_ro views migration found')
+    await exec(ADMIN_URL!, readFileSync(join(dir, newest), 'utf8'))
+
+    // Q-456: the owner id is no longer baked into the SQL. The role resolves it from a setting the
+    // owner applies once, out of band, the same way the role's password is kept out of committed
+    // migrations. Without this the views return zero rows — see the fail-closed test below.
+    await exec(ADMIN_URL!, `ALTER ROLE claude_readonly SET app.claude_ro_owner = '${OWNER_ID}'`)
   }, 60_000)
 
   afterAll(async () => {
     if (canRun) await exec(ADMIN_URL!, DROP_ROLE_SQL).catch(() => {})
+  })
+
+  it('returns ZERO rows when the owner setting is absent — fail-closed (Q-456)', async () => {
+    // The property the whole change rests on. The owner id left the committed SQL and became
+    // `current_setting('app.claude_ro_owner', true)`; if that resolves to NULL the predicate is
+    // `user_id = NULL`, which is never true. So a role nobody has configured reads NOTHING rather
+    // than every user's rows — the direction a mistake has to fail in.
+    //
+    // The two-argument form is load-bearing: one-argument `current_setting` throws on an unknown
+    // setting, which would surface as a driver error from inside a view rather than an empty
+    // result a caller can diagnose.
+    await exec(ADMIN_URL!, 'ALTER ROLE claude_readonly RESET app.claude_ro_owner')
+    try {
+      const res = await exec(roUrl(), 'SELECT count(*)::int AS n FROM claude_ro.body_metrics')
+      expect(res.rows[0].n).toBe(0)
+      // And the joined (VIA) views, which scope through a parent table rather than a `user_id`.
+      const via = await exec(roUrl(), 'SELECT count(*)::int AS n FROM claude_ro.set_logs')
+      expect(via.rows[0].n).toBe(0)
+    } finally {
+      await exec(ADMIN_URL!, `ALTER ROLE claude_readonly SET app.claude_ro_owner = '${OWNER_ID}'`)
+    }
+  })
+
+  it('no committed views migration names a user id (Q-456)', async () => {
+    // The reason for the change: the generated SQL is committed, and `CLAUDE.md` requires
+    // re-running the generator into a NEW migration whenever a table is added — so a baked id was
+    // re-published on every schema change. This asserts the newest file is clean; the 18 older ones
+    // are superseded by it rather than edited, because `ensureSchema` tracks by filename and an
+    // edited already-applied migration is skipped forever.
+    const dir = join(process.cwd(), 'lib/data/postgres/migrations')
+    const newest = readdirSync(dir).filter(f => /^\d+_claude_ro_views.*\.sql$/.test(f)).sort().pop()!
+    const sql = readFileSync(join(dir, newest), 'utf8')
+    expect(sql, `${newest} still contains a bare uuid`).not.toMatch(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/)
+    expect(sql).toContain("current_setting('app.claude_ro_owner', true)")
   })
 
   it('reads the curated views', async () => {
