@@ -7,7 +7,7 @@ import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet'
 import type { FoodLogWithItem } from '@trainingai/shared/types/nutrition'
 import { useSheetBackDismiss } from '@/lib/hooks/use-sheet-back-dismiss'
 import { getLocalStore } from '@/lib/local-store'
-import { pushMutations } from '@/lib/local-store/sync-engine'
+import { pushThenRevalidate } from '@/lib/local-store/push-then-revalidate'
 import { invalidateNutritionWrite } from '@/lib/cache-groups'
 
 interface Props {
@@ -68,7 +68,7 @@ export function QuickEditLogSheet({ log, onClose, onSaved, userId }: Props) {
         onClose()
         invalidateNutritionWrite().catch(() => {})
         onSaved(updatedLog)
-        pushMutations(userId!).catch(() => {})   // reconcile in the background
+        pushThenRevalidate(userId!, invalidateNutritionWrite)
         savedLocally = true
       } catch (sqliteErr) {
         console.error('Food log edit SQLite write failed, falling back to API:', sqliteErr)

@@ -7,7 +7,7 @@ import dynamic from 'next/dynamic'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { getLocalStore } from '@/lib/local-store'
-import { pushMutations } from '@/lib/local-store/sync-engine'
+import { pushThenRevalidate } from '@/lib/local-store/push-then-revalidate'
 import { omitNullFields } from '@/lib/local-store/sync-helpers'
 import { invalidateActivityWrites } from '@/lib/cache-groups'
 import { todayInTz, msToHHMMInTz } from '@trainingai/shared/date-utils'
@@ -191,7 +191,7 @@ export function WalkSummary({ config, samples, cadence, startedAtMs, userId, onD
         })
         invalidateActivityWrites().catch(() => {})
         setSaved(true)
-        pushMutations(userId!).catch(() => {})
+        pushThenRevalidate(userId!, invalidateActivityWrites)
         savedLocally = true
         } catch (e) {
           console.error('Walk SQLite write failed, falling back to API:', e)
