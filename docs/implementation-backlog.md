@@ -329,6 +329,396 @@ below threshold and left in place for next time.
 because none of them is the change that review was for, and per **No orphaned findings** a finding
 without a queue entry is a dropped finding.*
 
+### [nutrition][app-shell] Q-406 — the shared food row: two call sites converted, two waiting on their phase
+
+- **Branch:** `refactor/nutrition-food-row`
+- **Lane B.** No schema, no route.
+- **Gate: owner**
+- **⛔ BLOCKED on the owner, 2026-08-24: Q-395's reference drawings are not in the repository.**
+  `unit-options.png`, which Q-395a names as its reference, is nowhere in the tree — `docs/design/`
+  holds cardio, score-row and AI-coach mockups and nothing for nutrition. The two remaining call
+  sites wait on Q-395a's quantity sheet, which cannot be built to a drawing nobody can open. Raised
+  2026-08-23; clears when the drawings land under `docs/design/`.
+- **✅ THE COMPONENT SHIPPED 2026-08-23 (v1.338.0)** — `components/nutrition/food-row.tsx`, and the
+  library sheet + the food-database search row now draw it.
+  [`Journal`](overview/entries/2026-08-23-shared-food-row.md). **Q-395a's `Needs: Q-406` is
+  satisfied.**
+- **The other two call sites are deliberately NOT converted, and this is the reason.** The agreed
+  row's only trailing element is a chevron.
+  - **The diary row** (`meal-card.tsx`) carries inline **edit and delete** buttons. Q-395a retires
+    the list-row editor and moves editing into the quantity sheet — but **that sheet does not exist
+    yet**, so converting the diary row now removes the only way to correct a logged food. That is
+    LB-1's failure exactly: a capability deleted by a UI move whose replacement had not been built.
+    **Convert it in Q-395a, in the same PR that adds the sheet.**
+  - **The external food-database row** (`ingredient-search.tsx:132`) carries a macro-mismatch warning
+    line and an in-flight spinner. The agreed row has nowhere to put either, and adding a slot for
+    them is what makes it a wrapper rather than a unification. **Needs a design answer** — where a
+    per-row warning goes — which belongs with Q-395's drawings.
+- **⚠ THE DRAWINGS ARE NOT IN THE REPOSITORY.** `unit-options.png`, which Q-395a names as its
+  reference for the expanded and collapsed rows, is nowhere in the tree — `docs/design/` holds
+  mockups for cardio, scores and the AI coach, none for nutrition. The row above was built from
+  Q-406's **written** description ("name · grey secondary line · calories right-aligned in a fixed
+  column · optional chevron"), which is complete enough for it. **The remaining phases are not so
+  lucky**: Q-395a/b/c reference drawings no session can open. Commit them under `docs/design/`, or
+  the phases will be built from prose and the visual match cannot be checked.
+- **The optional thumbnail is deferred.** No call site passes one, and an unused `<img>` costs a
+  `no-img-element` exemption for arbitrary user photo URLs. The phase that first shows a thumbnail
+  adds it, with the loader decision made where it can be seen.
+- **Unblocks:** Q-395a, and Q-398 which wants the same row for plan meals.
+- **⏫ MOVED TO TOP OF QUEUE 2026-08-24, on the owner's explicit direction.** Priority is settled;
+  the sole remaining blocker is the missing drawings named above. Nothing else in the queue outranks
+  this chain once that gate clears.
+
+### [nutrition][app-shell] Q-395 — the nutrition rework: the spec every phase reads, and the final checkpoint
+
+- **Lane:** B
+- **Needs:** Q-395c
+- **⚑ SPLIT INTO PHASES 2026-08-23 — this entry is now the specification, not the work.** It was a
+  269-line item describing sixteen screens, listed as one thing an implementer could pick up. The
+  work is **Q-406** (the shared row) → **Q-395a** (quantity sheet + Edit Meal) → **Q-395b** (the day
+  screen) → **Q-395c** (Log Food + the `My Foods` rename). Each phase points back here rather than
+  copying the decisions, so they still live in exactly one place. **Read this before any phase.**
+- **Why it parks behind its own last phase.** It is the completion checkpoint: when Q-395c lands,
+  this confirms the drawn screens match what shipped, sweeps the ~11 sheets finding 18 lists as
+  never drawn, and leaves the queue. Never pick it up as a work item.
+
+- **Branch:** `feat/nutrition-visual-uplift`
+- **Added:** 2026-08-18 · owner: *"can we backlog a UI uplift for the nutrition side. I think it
+- **Lane:** B
+  could have a bit of a design uplift"*, with screenshots of **Saved Meals** and **Edit Meal**.
+- **What this entry is for.** A taste request cannot be implemented from as written, so this
+  separates the part that is objectively wrong (findings 1–3, each with a CI check that already
+  measures it) from the part that is genuinely a design decision (findings 4–5, which need
+  mockups before code). Do the first half regardless of what is decided about the second.
+- **Scope.** `app/nutrition/nutrition-content.tsx` and `components/nutrition/**` — the Nutrition
+  tab, the Saved Meals sheet, the Edit Meal builder, and the meal-plan sheets that share their
+  visual language. Nothing server-side: no route, no schema, no migration.
+
+**1 — 48 hardcoded hex literals, and `#22c55e` is the one that actually breaks.**
+`--brand` is **user-selectable at runtime**: `components/theme-color-picker.tsx:38` writes
+`--brand`/`--color-brand` from a hue the user picks, and `app/globals.css:59-65` *darkens* the
+light-mode value on purpose (the comment there says why — the vivid dark-mode green is unreadable
+as light-mode text). Every `#22c55e` in nutrition opts out of both. Change the accent to blue and
+nutrition's selected chips and checkboxes stay green; switch to light mode and they stay at the
+value the CSS deliberately avoids. Sites: `saved-meal-card.tsx:75,97` · `my-meals-picker.tsx:226,270,276` ·
+`restrictions-picker.tsx:183` · `meal-plan-edit-sheet.tsx:220` · `meal-plan-manage-sheet.tsx:173` ·
+`meal-plan-setup-sheet.tsx:206,433` · `meal-plan-review-step.tsx:114,158` · `meal-plan-section.tsx:30`.
+Same story for `#ef4444` where `text-destructive` already exists — `ingredient-row.tsx:52` uses the
+token correctly, `saved-meal-card.tsx` and `meal-plan-manage-sheet.tsx:248,263` use the literal.
+
+**2 — CI is already pointed at this, which is what makes it cheap.**
+`scripts/check-hex-literals.js:91-103` carries **14 nutrition files** as shrink-only baselines
+totalling 48 literals. Lowering those numbers *is* the deliverable for finding 1, the check proves
+it, and the ratchet means a redesign structurally cannot make it worse. Do not sweep the whole repo
+(471 literals) — that is a separate, much larger job.
+
+**3 — ⚠ Both landing files are at the 800-line ceiling, and this bites on line one.**
+`app/nutrition/nutrition-content.tsx` is **exactly 800** and `components/nutrition/saved-meals-sheet.tsx`
+is **793**. Neither is in `scripts/check-component-size.js`'s BASELINE, so both are held to
+`LIMIT = 800` hard — verified by the script's own counting, not `wc`. **Adding a single line to
+`nutrition-content.tsx` fails Custom Rules.** Extraction into `components/nutrition/` children is
+the first commit, not the cleanup at the end. Note the BASELINE is shrink-only: do not add these
+files to it to buy room.
+
+- **✅ FINDINGS 1 AND 2 SHIPPED 2026-08-18 (v1.324.4, Lane B).** Every `#22c55e` and `#ef4444` in
+  the nutrition surface is now `brand` / `destructive`, so selected chips, checkboxes and the plan
+  card follow the user's chosen accent and light mode's deliberately-darkened value. **Repo total
+  471 → 428**, and **eight nutrition files came off the hex baseline entirely**, which holds them at
+  zero from here — the ratchet now makes this class structurally unable to come back in those files.
+  One site needed more than a swap: `meal-plan-section.tsx` passed its literal to `accentCardStyle()`,
+  which needs real colour channels and **returns an accent-less card for anything that is not a hex**,
+  so handing it a `var()` would have silently dropped the tint. Its gradient is now built locally with
+  `color-mix` on `var(--color-brand)`, mirroring that helper's output including the `willChange` layer
+  promotion.
+- **Finding 3 did not bite and is still true.** Replacing literals with tokens is line-for-line, so
+  nothing was added to either 800-line file — but `nutrition-content.tsx` is still exactly at the
+  limit, so **the extraction is still the first commit of any change that adds a line.**
+
+**4 — Edit Meal is three times taller than it needs to be (the design half).**
+Each `IngredientRow` (`components/nutrition/ingredient-row.tsx`) stacks four bands: name + macro
+line, a 44 px delete button, a 44 px −/qty/+ stepper row, and a serving-conversion hint. Two
+ingredients fill the S25 screen — which is exactly what the owner's screenshot shows, with the
+whole-batch total already off-screen. A five-ingredient recipe is a blind scroll. **This needs a
+decision, not a fix.** Two shapes worth drawing: a compact row that reveals its stepper on tap, or
+the stepper inline with the name. Do not pick one in code first.
+
+**5 — Card metadata has an uneven rhythm.** `saved-meal-card.tsx:102,118` gate "Makes N portions"
+and "· per portion" on `servings !== 1`, so the first card in the owner's screenshot carries two
+lines the other two do not. The behaviour is right; the ragged card heights are the cost. A
+redesign should either reserve the slot or move it into the expanded view.
+
+
+**6 — MOCKUPS AND A DESIGN-SYSTEM REVIEW EXIST (2026-08-18).** The owner asked for drawn options
+before code, so both screens were recreated at true S25 size from the real tokens and reviewed
+against the `ui-ux-pro-max` rule set. **Canvas:**
+<https://claude.ai/code/artifact/936866ab-387b-44a3-9de0-de080a8d6c3b> — nine artboards: Edit Meal
+today vs proposed, Saved Meals today vs proposed, three srv/g options, a tap-target audit and the
+theme finding drawn out. The three findings below came out of that review and are additional to 1–5.
+
+**7 — Every control on both screens is 44 px. Rule 15 says 48 dp with 8 dp between.**
+44 is the iOS floor, not this repo's. Measured: srv/g segments **40 px** (`ingredient-row.tsx:86`,
+the smallest targets on either screen); quantity steppers, row delete and all four card actions
+**44 px** (`ingredient-row.tsx:50,59,75` · `saved-meal-card.tsx:194-217` ·
+`saved-meals-sheet.tsx:628,650`); stepper gap **6 px** against the 8 dp minimum
+(`ingredient-row.tsx:55`). The only compliant control on either screen is `Update Meal`
+(`saved-meals-sheet.tsx:774`, `h-12`). Treat this as **one systemic change**, not eight fixes.
+
+**8 — The srv/g toggle is a hand-rolled segmented control, and `components/ui/segmented-tabs`
+exists (rule 24).** `ingredient-row.tsx:81-95` rebuilds the pill-tab markup inline — the exact
+pattern that was copy-pasted ~17× with drifting font sizes before the primitive was extracted.
+Whichever option below wins, the control that survives comes from the primitive.
+
+**9 — What the toggle actually is, and the three ways out.** It selects an *input mode* for a value
+the row already prints both ways: `ingredient-row.tsx:100-107` always renders
+`1 serving of X = 250 g · using 300 g`. It is also per-row (`unitById` in `saved-meals-sheet.tsx`),
+so two rows can sit in different modes at once and `1.2` beside `60` means different things.
+- **A — the unit rides on the number** (`[−] [ 60 g ▾ ] [+]`), one tap inside the field swaps it.
+  **Recommended.** It removes a control rather than relocating one, the number is never bare, and
+  the freed width is what pays for 48 px steppers.
+- **B — grams only**, the stepper stepping by one serving. No mode at all, but you can no longer
+  *type* "2 scoops" — the exact case `ingredient-row.tsx`'s own comment says both units exist for.
+- **C — the toggle moves below the value row** at full size. No behaviour change, safest, and the
+  tallest of the three, which works against the density complaint that started this.
+
+**10 — ⚠ `#22c55e` is ALSO the literal value of `MACRO_COLORS.protein`.** A find-and-replace of that
+string onto `var(--brand)` would repaint the protein macro with whatever accent the user picked.
+The selection-state literals and the macro palette are the same eight characters and must not share
+a fate — finding 1 is the former only.
+
+
+**19 — Owner answers, 2026-08-18 (asked as four blocking questions).**
+- **Scope of the design pass:** *"the full work through; the nutrition tab; and all features from
+  logging food - to creating a meal to editing a meal."* Sixteen screens are now drawn end to end.
+- **Targets stay in Profile, with a shortcut.** `components/profile/macro-targets-pane.tsx` keeps
+  ownership; Nutrition Settings gets a row that jumps to it. They are profile-level facts like
+  weight, and moving them is churn — but editing them two tabs from where they are judged is the
+  friction the shortcut removes.
+- ~~**"Complete Today's Logging" is a button at the foot of the day's log**~~ — **shipped** (Q-387,
+  Lane A half v1.319.x, Lane B half #330). It is **no longer at the foot**: BF-6 moved it directly
+  under the meals in v1.344.0 because at the foot it took zero presses in seven weeks.
+- **The meal plan becomes a generator of saved meals** — see **Q-398**.
+
+**11 — THE DIRECTION IS SETTLED, AND IT IS BIGGER THAN A VISUAL PASS (2026-08-18).** The owner sent
+MyFitnessPal screenshots and asked for a rework that reads as naturally. Six screens are drawn at
+true S25 size in our own tokens — **canvas page "Reworked screens"**,
+<https://claude.ai/code/artifact/936866ab-387b-44a3-9de0-de080a8d6c3b>: the day, add food, my meals,
+meal detail, edit meal, and the quantity sheet. What was borrowed is **structural, not visual** —
+none of the chrome, colour or type is copied.
+
+**12 — The root cause of "bulky" is that a list row carries an editor.** Findings 7–9 treated the
+srv/g control as the problem; it is a symptom. Mainstream food loggers put **no controls on a list
+row at all** — row is name, a grey line of what and how much, calories right-aligned — and every
+quantity edit happens on a separate surface. Our `IngredientRow` instead replicates a delete
+button, a stepper, a value field, a unit toggle and a conversion hint onto *every* ingredient. Two
+ingredients fill the S25 screen; the drawn version fits five with room left over.
+**This supersedes srv/g options A, B and C** as a fork: the toggle now appears once, in the quantity
+sheet, at 56 px. Option A's shape (unit chip on the number) is what that sheet uses.
+
+**13 — One row component, six call sites.** Today a food reads one way in the diary, another in
+search, another in a saved meal, another in the builder — four shapes for one thing. The drawings
+use exactly one: optional thumbnail · name · grey secondary line · calories right-aligned in a fixed
+column · optional chevron. Build it as `components/nutrition/food-row.tsx` and use it on all six
+screens; per the repo's own reuse rule a pattern at ≥2 sites gets extracted before the third copy,
+and this is the sixth.
+
+**14 — The other structural changes, in the order they pay off.**
+- **The macro summary becomes a donut with each macro as a share of calories**, next to grams.
+  `components/nutrition/macro-ring.tsx` already exists — extend it rather than adding a second one.
+- **Grouped sections with full-bleed dividers** replace gapped cards, which is most of the vertical
+  space the day screen currently spends on nothing.
+- **Source tabs on the food picker** (Recent · Frequent · My meals · Recipes) replace separate
+  sheets, so a repeat log is one tap from the top of the list.
+- **The meal name becomes the screen title**, not a labelled input box, and the three-line batch
+  explainer becomes a subtitle: *"Makes 2 portions · 278 kcal each"*.
+- **Destructive actions leave the summary row** — delete lives in the quantity sheet and behind a
+  swipe on a saved meal, not beside the button pressed daily.
+
+- **⚠ Sequencing.** This is a rework, not a repaint, and it lands in the two files that are already
+  at the 800-line ceiling (finding 3). Order: extract `food-row.tsx` first, then the quantity sheet,
+  then convert screens one at a time behind the existing behaviour. **Do not start by editing
+  `nutrition-content.tsx`** — one added line fails Custom Rules.
+- **The known cost, stated so it is not discovered late:** changing a quantity now takes a tap. For
+  a saved meal built once and logged for months that is cheap; for someone tweaking amounts while
+  assembling, inline steppers were faster. The owner has seen this trade drawn and chose the rework
+  anyway.
+- **Related:** meal thumbnails are **Q-396**, filed separately because they need a migration and a
+  sync-payload change (Lane A) while everything above is Lane B.
+
+
+**15 — OWNER REVIEW OF THE MOCKUPS, 2026-08-18. Six notes, all folded in; one caught a real gap.**
+- **Ring:** use the shipped `MacroRing` (96 px masked conic + value/target bars), not a new donut —
+  with the filled arc **split by macro** instead of a single `var(--brand)` sweep. Do not add a
+  second ring component.
+- **Log Food is one screen.** The current capture step's six scattered entry points collapse to:
+  search across everything · tabs · a bottom row of capture actions. **Both were revised by the
+  owner on 2026-08-19 and the revision wins over this line** — the tabs are **Recent · My Foods**
+  (see note 17), and the action row is ordered **Photo · Barcode · Describe or enter**, in that
+  order, not the Barcode-first order originally drawn. The order is the owner's; it is also the
+  right default, since photo is the fastest path for a plated meal and barcode only works on
+  packaged food.
+- **Describe and manual entry become one sheet.** Type what you ate and the fields fill in; skip the
+  box and type them yourself. The fields are always visible, so neither path is a hidden mode.
+- **My Meals rows carry their macro split** (P/C/F beside the calorie column) so the list can be
+  chosen from. The label/QR and the full breakdown stay **inside** the meal on the detail screen.
+- **Edit Meal keeps a real servings control** — "This recipe makes [− 2 portions +]" at 48 px, in a
+  band that also states the per-portion cost. It had been demoted to a subtitle; that was wrong.
+- **The quantity sheet must show where it came from:** the tapped ingredient row stays lit under the
+  scrim and the sheet is headed "Ingredient 1 of 5 · <meal>". Without that the sheet reads as an
+  unrelated screen.
+
+**16 — ⚠ THE COVERAGE AUDIT THE OWNER ASKED FOR, AND WHAT IT FOUND.** *"Make sure you compare each
+page/section to what's in prod right now — we don't want to silently lose any sections."* The first
+draw showed **3 of the 11 sections** the Nutrition tab actually renders. In shipped order
+(`app/nutrition/nutrition-content.tsx`): ScreenHeader + date nav · **CalorieBalanceBar** ·
+MacroRing · **NutritionActionRow (three buttons — Saved Meals had been dropped)** ·
+**MealPlanReviewCard** · **MealPlanSection** · **TdeeAdaptationCard** · MealCard × meal types ·
+**End of Day** · **WeeklyNutritionChart** · **SupplementsSection**. The eight in bold were missing
+and are now drawn. **Any implementation PR carries this list and checks it off** — a rework that
+quietly loses a section is the failure mode this entry exists to prevent.
+
+**17 — DECIDED 2026-08-19, and it went further than the question asked. The tabs are `Recent` and
+`My Foods`. Two, not four.** The question here was where to put `My Foods`; the owner answered by
+collapsing the row: ***"I Think recent tab is fine; dont think we need frequent - saved and myfoods
+I dont think need to be seperated. Saved could contain foods made or saved. Maybe we just have 'my
+foods'"***.
+- **`Frequent` is dropped.** It was a second ordering of the same list Recent already shows.
+- **`Saved meals` and `My Foods` merge into one `My Foods` list** holding anything the user made or
+  saved. This is the right call for a reason worth writing down: a saved meal and a food you built
+  were always the same kind of row wearing two labels, which is exactly what finding 13's single
+  row component says. Two lists that render identically and differ only in provenance are one list
+  with a subtitle.
+- **Nothing is lost, and check that before building.** `FoodLibrarySheet` and `SavedMealsSheet` are
+  separate components today; merging the tabs must not silently drop a capability that only one of
+  them has (bulk delete, meal-plan linkage, the label path). Diff them first and carry every action
+  across, or say in the PR which was intentionally dropped.
+- Ordering within `My Foods`: most recently used first, so the merge does not bury saved meals under
+  one-off foods.
+- **⚠ The merge is a RENAME as well as a merge, and the rename has to be swept.** The owner spotted
+  the half-done version immediately — *"So im picking up a discrepancy between My Meals and My
+  foods? Whats the difference"* — against a prototype that still had a `My Meals` screen beside a
+  `My Foods` tab. There is no difference, and that is the point: **two names for one list is the
+  defect**. Grep for every user-facing occurrence of *Saved meals*, *My Meals* and *My Foods* —
+  sheet titles, tab labels, empty states, toasts, the `+ Add food` destinations, the nav copy — and
+  land on the single name in one pass. A surface left on the old name reads as a second list that
+  is missing rows.
+
+**18 — Sheets not yet drawn, listed so they are not assumed done.** `FoodLoggerSheet` review and
+assign steps (only capture is drawn) · `QuickEditLogSheet` · `WaterLogSheet` · `FoodLibrarySheet` ·
+`MealTypeManager` and the Nutrition Settings sheet · `MealPlanSetupSheet`/`EditSheet`/`ManageSheet` ·
+`ManageSupplementsSheet` · `EndOfDayReview` and its seven children · the barcode overlay · the
+delete-log dialog. Roughly eleven more surfaces. They inherit the row language and the 48 dp floor
+whether or not anyone draws them first.
+
+**What NOT to change — all three exist because a CLAUDE.md rule required them:**
+- `MACRO_COLORS` (`@trainingai/shared/nutrition/macro-colors`) is the shared semantic palette,
+  correctly imported at every site. It is **not** finding 1 and must not be tokenised away.
+- `saved-meal-card.tsx` is well built: `role="button"` + `aria-expanded` (`:80-82`) for the
+  nested-control WebView rule, macro colour always paired with its P/C/F label (`:130-142`) for the
+  colour-only-state rule, and an inline delete confirmation (`:172+`). A visual pass keeps all three.
+- No new dependencies — `motion` v12, `@use-gesture/react` and shadcn primitives are installed.
+
+- **DECIDED BY THE OWNER, 2026-08-19 — the ingredient row is unblocked.** Both open questions were
+  answered in one reply: ***"go with A, and yes collapse the row when not editing"***.
+  1. **Option A wins** — the unit rides on the number as a chip inside the field, `60 g` ⇄ `2 srv`
+     on one tap. B and C are dead; do not revisit them. The control comes from
+     `components/ui/segmented-tabs`, not a fourth hand-rolled segmented control (finding 8).
+  2. **Rows collapse when not being edited**, one expanded at a time. The collapsed shape is
+     finding 13's single row component — name · grey secondary line · calories right-aligned ·
+     chevron — so this is not a second component, it is `food-row.tsx` with an expanded state.
+  **Read this together with finding 12, which is not contradicted by it.** Finding 12 retired A/B/C
+  *as a fork over what sits on a list row*, because the answer there is **nothing** — a diary or
+  search row carries no editor and never expands. What the owner has now chosen is the shape of the
+  quantity control **wherever it does appear**: the quantity sheet, and the expanded row in Edit
+  Meal, which is a builder rather than a list. Finding 12 already anticipated this
+  (*"Option A's shape (unit chip on the number) is what that sheet uses"*), so the decision confirms
+  it rather than reopening it. **A row in the diary that expands to edit would be a
+  misreading of both.**
+- **The drawings exist** (finding 6); `unit-options.png`'s column A is the reference for the
+  expanded row, and its `Full Cream Milk` row is the reference for the collapsed one. Findings 1, 2,
+  3, 7 and 8 never depended on this answer and can still go first — but nothing is blocked now.
+- **Still open, and deliberately not blocking: where `My Foods` lives** (note 17). Recommendation
+  stands — a **fourth tab** beside Recent, Frequent and Saved meals, because it is a list of foods
+  like the other three and a tab is where someone looks for it. Build it that way unless the owner
+  says otherwise; it is one line to move later.
+- **Lane B** — `components/nutrition/**` and `app/nutrition/**` are both Lane B's under §3, and
+  nothing here touches an engine path.
+- **Read first:** [`docs/domains/nutrition/README.md`](domains/nutrition/README.md), then the
+  `ui-ux-pro-max` skill — it is this repo's own design system and the authority for this item.
+- **Verification.** `node scripts/check-hex-literals.js` must report a **lower** number for every
+  file touched; `node scripts/check-component-size.js` clean without new BASELINE rows;
+  `pnpm check:rules`. Then the **on-device smoke run** — this is pure UI on the canonical runtime,
+  in both themes, so a green `pnpm dev` is not sufficient evidence and a Known-Issues row is the
+  fallback if no device is available.
+
+### [nutrition][app-shell] Q-395a — phase 2: the quantity sheet and Edit Meal's collapsing rows
+
+- **Lane:** B
+- **Needs:** Q-406
+- **Spec:** Q-395, findings 9, 12, 13 and the 2026-08-19 owner decision. Drawings:
+  `unit-options.png` column A (expanded row) and its `Full Cream Milk` row (collapsed).
+- **Split out of Q-395 on 2026-08-23.** **Read Q-395 first** — it holds the decisions and this
+  entry does not repeat them.
+- **Scope.** The quantity sheet (new), and `ingredient-row.tsx` becoming `food-row.tsx` plus an
+  expanded state. Option A is decided: the unit rides on the number as a chip, `60 g` ⇄ `2 srv` on
+  one tap, built from `components/ui/segmented-tabs`. B and C are dead. Rows collapse when not
+  edited, one at a time, and the collapsed shape *is* Q-406's row — not a second component.
+- **⚠ A diary row never expands.** Finding 12 retired the list-row editor outright: a diary or
+  search row carries no editor at all. This entry governs the quantity control *where it does
+  appear* — the sheet, and the builder. Building an expanding diary row misreads both.
+- **The sheet must say where it came from:** the tapped row stays lit under the scrim, and the sheet
+  is headed `Ingredient 1 of 5 · <meal>`. Without that it reads as an unrelated screen.
+- **Edit Meal rides along:** the meal name becomes the screen title, the batch explainer becomes
+  the subtitle *"Makes 2 portions · 278 kcal each"*, and the servings control stays real at 48 px —
+  it was demoted to a subtitle in an early draw and the owner corrected that.
+- **48 dp floor applies here first** (finding 7): srv/g segments are the app's smallest targets at
+  40 px, stepper gap 6 px against 8 dp. One systemic change, not eight.
+- **Verification.** `check-hex-literals` lower per file · `check-component-size` clean, no new
+  BASELINE rows · `pnpm check:rules` · **device smoke run in both themes** — pure UI on the
+  canonical runtime, so a green `pnpm dev` is not sufficient.
+
+### [nutrition][app-shell] Q-395b — phase 3: the day screen, against the 11-section coverage list
+
+- **Lane:** B
+- **Needs:** Q-395a
+- **Spec:** Q-395, findings 14 and 16.
+- **Scope.** `nutrition-content.tsx` and its cards. Grouped sections with full-bleed dividers
+  replace gapped cards — that is most of the vertical space this screen spends on nothing. Extend
+  the shipped 96 px `MacroRing` with an arc **split by macro**; do not add a second ring.
+- **⚠ This entry carries the coverage checklist and checks it off in the PR.** The first draw showed
+  **3 of the 11 sections** this tab actually renders. In shipped order: ScreenHeader + date nav ·
+  CalorieBalanceBar · MacroRing · NutritionActionRow · MealPlanReviewCard · MealPlanSection ·
+  TdeeAdaptationCard · MealCard × meal types · End of Day · WeeklyNutritionChart ·
+  SupplementsSection. **A rework that quietly loses a section is the failure mode Q-395 exists to
+  prevent**, and this is the phase where it would happen.
+- **Headroom is not free.** Q-406's first half took `nutrition-content.tsx` 800 → 732; it is not on
+  the size baseline, so it is held to 800 hard. Extract before adding.
+- **Verification.** As Q-395a, plus the checklist above ticked off in the PR body.
+
+### [nutrition][app-shell] Q-395c — phase 4: Log Food becomes one screen, and `My Foods` becomes one name
+
+- **Lane:** B
+- **Needs:** Q-395b
+- **Spec:** Q-395, findings 15 and 17.
+- **Scope.** The capture step's six scattered entry points collapse to one screen: search across
+  everything · two tabs · a bottom row of capture actions.
+- **The decided details, all owner-set:** tabs are **`Recent` and `My Foods`**, two not four
+  (`Frequent` was a second ordering of what `Recent` already shows). Action row ordered **Photo ·
+  Barcode · Describe or enter**. Describe and manual entry are one sheet with the fields always
+  visible, so neither is a hidden mode. `My Foods` rows carry their P/C/F split beside the calorie
+  column; the label/QR and full breakdown stay inside the meal.
+- **⚠ The merge is a RENAME as well as a merge, and the rename must be swept in one pass.** Saved
+  meals and My Foods become one list. The owner caught the half-done version immediately — *"So im
+  picking up a discrepancy between My Meals and My foods? Whats the difference"* — and there is no
+  difference, which is the point. **Two names for one list is the defect.** Grep every user-facing
+  occurrence of *Saved meals*, *My Meals* and *My Foods* — sheet titles, tab labels, empty states,
+  toasts, `+ Add food` destinations, nav copy — and land on the single name together. A surface left
+  on the old name reads as a second list that is missing rows.
+- **⚠ Diff `FoodLibrarySheet` against `SavedMealsSheet` before merging them.** Carry every action
+  across — bulk delete, meal-plan linkage, the label path — or say in the PR which was dropped.
+  Order `My Foods` most-recently-used first so the merge does not bury saved meals.
+- **Verification.** As Q-395a, plus a grep proving nothing user-facing still says *Saved meals* or
+  *My Meals*.
+
 ### [platform] PS-4 — the batons are the cross-lane coordination mechanism and none of them fits on a screen
 
 - **Branch:** `docs/baton-compaction`
@@ -1286,393 +1676,6 @@ residual into a correction rather than a mystery.
 - **What would count as done:** a stated multiplier with its confidence, derived only from gated
   windows, applied to active energy everywhere at once, holding at exactly 1.0 whenever the gates fail
   — and a written measurement of how many past days it moved.
-
-### [nutrition][app-shell] Q-406 — the shared food row: two call sites converted, two waiting on their phase
-
-- **Branch:** `refactor/nutrition-food-row`
-- **Lane B.** No schema, no route.
-- **Gate: owner**
-- **⛔ BLOCKED on the owner, 2026-08-24: Q-395's reference drawings are not in the repository.**
-  `unit-options.png`, which Q-395a names as its reference, is nowhere in the tree — `docs/design/`
-  holds cardio, score-row and AI-coach mockups and nothing for nutrition. The two remaining call
-  sites wait on Q-395a's quantity sheet, which cannot be built to a drawing nobody can open. Raised
-  2026-08-23; clears when the drawings land under `docs/design/`.
-- **✅ THE COMPONENT SHIPPED 2026-08-23 (v1.338.0)** — `components/nutrition/food-row.tsx`, and the
-  library sheet + the food-database search row now draw it.
-  [`Journal`](overview/entries/2026-08-23-shared-food-row.md). **Q-395a's `Needs: Q-406` is
-  satisfied.**
-- **The other two call sites are deliberately NOT converted, and this is the reason.** The agreed
-  row's only trailing element is a chevron.
-  - **The diary row** (`meal-card.tsx`) carries inline **edit and delete** buttons. Q-395a retires
-    the list-row editor and moves editing into the quantity sheet — but **that sheet does not exist
-    yet**, so converting the diary row now removes the only way to correct a logged food. That is
-    LB-1's failure exactly: a capability deleted by a UI move whose replacement had not been built.
-    **Convert it in Q-395a, in the same PR that adds the sheet.**
-  - **The external food-database row** (`ingredient-search.tsx:132`) carries a macro-mismatch warning
-    line and an in-flight spinner. The agreed row has nowhere to put either, and adding a slot for
-    them is what makes it a wrapper rather than a unification. **Needs a design answer** — where a
-    per-row warning goes — which belongs with Q-395's drawings.
-- **⚠ THE DRAWINGS ARE NOT IN THE REPOSITORY.** `unit-options.png`, which Q-395a names as its
-  reference for the expanded and collapsed rows, is nowhere in the tree — `docs/design/` holds
-  mockups for cardio, scores and the AI coach, none for nutrition. The row above was built from
-  Q-406's **written** description ("name · grey secondary line · calories right-aligned in a fixed
-  column · optional chevron"), which is complete enough for it. **The remaining phases are not so
-  lucky**: Q-395a/b/c reference drawings no session can open. Commit them under `docs/design/`, or
-  the phases will be built from prose and the visual match cannot be checked.
-- **The optional thumbnail is deferred.** No call site passes one, and an unused `<img>` costs a
-  `no-img-element` exemption for arbitrary user photo URLs. The phase that first shows a thumbnail
-  adds it, with the loader decision made where it can be seen.
-- **Unblocks:** Q-395a, and Q-398 which wants the same row for plan meals.
-
-### [nutrition][app-shell] Q-395 — the nutrition rework: the spec every phase reads, and the final checkpoint
-
-- **Lane:** B
-- **Needs:** Q-395c
-- **⚑ SPLIT INTO PHASES 2026-08-23 — this entry is now the specification, not the work.** It was a
-  269-line item describing sixteen screens, listed as one thing an implementer could pick up. The
-  work is **Q-406** (the shared row) → **Q-395a** (quantity sheet + Edit Meal) → **Q-395b** (the day
-  screen) → **Q-395c** (Log Food + the `My Foods` rename). Each phase points back here rather than
-  copying the decisions, so they still live in exactly one place. **Read this before any phase.**
-- **Why it parks behind its own last phase.** It is the completion checkpoint: when Q-395c lands,
-  this confirms the drawn screens match what shipped, sweeps the ~11 sheets finding 18 lists as
-  never drawn, and leaves the queue. Never pick it up as a work item.
-
-- **Branch:** `feat/nutrition-visual-uplift`
-- **Added:** 2026-08-18 · owner: *"can we backlog a UI uplift for the nutrition side. I think it
-- **Lane:** B
-  could have a bit of a design uplift"*, with screenshots of **Saved Meals** and **Edit Meal**.
-- **What this entry is for.** A taste request cannot be implemented from as written, so this
-  separates the part that is objectively wrong (findings 1–3, each with a CI check that already
-  measures it) from the part that is genuinely a design decision (findings 4–5, which need
-  mockups before code). Do the first half regardless of what is decided about the second.
-- **Scope.** `app/nutrition/nutrition-content.tsx` and `components/nutrition/**` — the Nutrition
-  tab, the Saved Meals sheet, the Edit Meal builder, and the meal-plan sheets that share their
-  visual language. Nothing server-side: no route, no schema, no migration.
-
-**1 — 48 hardcoded hex literals, and `#22c55e` is the one that actually breaks.**
-`--brand` is **user-selectable at runtime**: `components/theme-color-picker.tsx:38` writes
-`--brand`/`--color-brand` from a hue the user picks, and `app/globals.css:59-65` *darkens* the
-light-mode value on purpose (the comment there says why — the vivid dark-mode green is unreadable
-as light-mode text). Every `#22c55e` in nutrition opts out of both. Change the accent to blue and
-nutrition's selected chips and checkboxes stay green; switch to light mode and they stay at the
-value the CSS deliberately avoids. Sites: `saved-meal-card.tsx:75,97` · `my-meals-picker.tsx:226,270,276` ·
-`restrictions-picker.tsx:183` · `meal-plan-edit-sheet.tsx:220` · `meal-plan-manage-sheet.tsx:173` ·
-`meal-plan-setup-sheet.tsx:206,433` · `meal-plan-review-step.tsx:114,158` · `meal-plan-section.tsx:30`.
-Same story for `#ef4444` where `text-destructive` already exists — `ingredient-row.tsx:52` uses the
-token correctly, `saved-meal-card.tsx` and `meal-plan-manage-sheet.tsx:248,263` use the literal.
-
-**2 — CI is already pointed at this, which is what makes it cheap.**
-`scripts/check-hex-literals.js:91-103` carries **14 nutrition files** as shrink-only baselines
-totalling 48 literals. Lowering those numbers *is* the deliverable for finding 1, the check proves
-it, and the ratchet means a redesign structurally cannot make it worse. Do not sweep the whole repo
-(471 literals) — that is a separate, much larger job.
-
-**3 — ⚠ Both landing files are at the 800-line ceiling, and this bites on line one.**
-`app/nutrition/nutrition-content.tsx` is **exactly 800** and `components/nutrition/saved-meals-sheet.tsx`
-is **793**. Neither is in `scripts/check-component-size.js`'s BASELINE, so both are held to
-`LIMIT = 800` hard — verified by the script's own counting, not `wc`. **Adding a single line to
-`nutrition-content.tsx` fails Custom Rules.** Extraction into `components/nutrition/` children is
-the first commit, not the cleanup at the end. Note the BASELINE is shrink-only: do not add these
-files to it to buy room.
-
-- **✅ FINDINGS 1 AND 2 SHIPPED 2026-08-18 (v1.324.4, Lane B).** Every `#22c55e` and `#ef4444` in
-  the nutrition surface is now `brand` / `destructive`, so selected chips, checkboxes and the plan
-  card follow the user's chosen accent and light mode's deliberately-darkened value. **Repo total
-  471 → 428**, and **eight nutrition files came off the hex baseline entirely**, which holds them at
-  zero from here — the ratchet now makes this class structurally unable to come back in those files.
-  One site needed more than a swap: `meal-plan-section.tsx` passed its literal to `accentCardStyle()`,
-  which needs real colour channels and **returns an accent-less card for anything that is not a hex**,
-  so handing it a `var()` would have silently dropped the tint. Its gradient is now built locally with
-  `color-mix` on `var(--color-brand)`, mirroring that helper's output including the `willChange` layer
-  promotion.
-- **Finding 3 did not bite and is still true.** Replacing literals with tokens is line-for-line, so
-  nothing was added to either 800-line file — but `nutrition-content.tsx` is still exactly at the
-  limit, so **the extraction is still the first commit of any change that adds a line.**
-
-**4 — Edit Meal is three times taller than it needs to be (the design half).**
-Each `IngredientRow` (`components/nutrition/ingredient-row.tsx`) stacks four bands: name + macro
-line, a 44 px delete button, a 44 px −/qty/+ stepper row, and a serving-conversion hint. Two
-ingredients fill the S25 screen — which is exactly what the owner's screenshot shows, with the
-whole-batch total already off-screen. A five-ingredient recipe is a blind scroll. **This needs a
-decision, not a fix.** Two shapes worth drawing: a compact row that reveals its stepper on tap, or
-the stepper inline with the name. Do not pick one in code first.
-
-**5 — Card metadata has an uneven rhythm.** `saved-meal-card.tsx:102,118` gate "Makes N portions"
-and "· per portion" on `servings !== 1`, so the first card in the owner's screenshot carries two
-lines the other two do not. The behaviour is right; the ragged card heights are the cost. A
-redesign should either reserve the slot or move it into the expanded view.
-
-
-**6 — MOCKUPS AND A DESIGN-SYSTEM REVIEW EXIST (2026-08-18).** The owner asked for drawn options
-before code, so both screens were recreated at true S25 size from the real tokens and reviewed
-against the `ui-ux-pro-max` rule set. **Canvas:**
-<https://claude.ai/code/artifact/936866ab-387b-44a3-9de0-de080a8d6c3b> — nine artboards: Edit Meal
-today vs proposed, Saved Meals today vs proposed, three srv/g options, a tap-target audit and the
-theme finding drawn out. The three findings below came out of that review and are additional to 1–5.
-
-**7 — Every control on both screens is 44 px. Rule 15 says 48 dp with 8 dp between.**
-44 is the iOS floor, not this repo's. Measured: srv/g segments **40 px** (`ingredient-row.tsx:86`,
-the smallest targets on either screen); quantity steppers, row delete and all four card actions
-**44 px** (`ingredient-row.tsx:50,59,75` · `saved-meal-card.tsx:194-217` ·
-`saved-meals-sheet.tsx:628,650`); stepper gap **6 px** against the 8 dp minimum
-(`ingredient-row.tsx:55`). The only compliant control on either screen is `Update Meal`
-(`saved-meals-sheet.tsx:774`, `h-12`). Treat this as **one systemic change**, not eight fixes.
-
-**8 — The srv/g toggle is a hand-rolled segmented control, and `components/ui/segmented-tabs`
-exists (rule 24).** `ingredient-row.tsx:81-95` rebuilds the pill-tab markup inline — the exact
-pattern that was copy-pasted ~17× with drifting font sizes before the primitive was extracted.
-Whichever option below wins, the control that survives comes from the primitive.
-
-**9 — What the toggle actually is, and the three ways out.** It selects an *input mode* for a value
-the row already prints both ways: `ingredient-row.tsx:100-107` always renders
-`1 serving of X = 250 g · using 300 g`. It is also per-row (`unitById` in `saved-meals-sheet.tsx`),
-so two rows can sit in different modes at once and `1.2` beside `60` means different things.
-- **A — the unit rides on the number** (`[−] [ 60 g ▾ ] [+]`), one tap inside the field swaps it.
-  **Recommended.** It removes a control rather than relocating one, the number is never bare, and
-  the freed width is what pays for 48 px steppers.
-- **B — grams only**, the stepper stepping by one serving. No mode at all, but you can no longer
-  *type* "2 scoops" — the exact case `ingredient-row.tsx`'s own comment says both units exist for.
-- **C — the toggle moves below the value row** at full size. No behaviour change, safest, and the
-  tallest of the three, which works against the density complaint that started this.
-
-**10 — ⚠ `#22c55e` is ALSO the literal value of `MACRO_COLORS.protein`.** A find-and-replace of that
-string onto `var(--brand)` would repaint the protein macro with whatever accent the user picked.
-The selection-state literals and the macro palette are the same eight characters and must not share
-a fate — finding 1 is the former only.
-
-
-**19 — Owner answers, 2026-08-18 (asked as four blocking questions).**
-- **Scope of the design pass:** *"the full work through; the nutrition tab; and all features from
-  logging food - to creating a meal to editing a meal."* Sixteen screens are now drawn end to end.
-- **Targets stay in Profile, with a shortcut.** `components/profile/macro-targets-pane.tsx` keeps
-  ownership; Nutrition Settings gets a row that jumps to it. They are profile-level facts like
-  weight, and moving them is churn — but editing them two tabs from where they are judged is the
-  friction the shortcut removes.
-- ~~**"Complete Today's Logging" is a button at the foot of the day's log**~~ — **shipped** (Q-387,
-  Lane A half v1.319.x, Lane B half #330). It is **no longer at the foot**: BF-6 moved it directly
-  under the meals in v1.344.0 because at the foot it took zero presses in seven weeks.
-- **The meal plan becomes a generator of saved meals** — see **Q-398**.
-
-**11 — THE DIRECTION IS SETTLED, AND IT IS BIGGER THAN A VISUAL PASS (2026-08-18).** The owner sent
-MyFitnessPal screenshots and asked for a rework that reads as naturally. Six screens are drawn at
-true S25 size in our own tokens — **canvas page "Reworked screens"**,
-<https://claude.ai/code/artifact/936866ab-387b-44a3-9de0-de080a8d6c3b>: the day, add food, my meals,
-meal detail, edit meal, and the quantity sheet. What was borrowed is **structural, not visual** —
-none of the chrome, colour or type is copied.
-
-**12 — The root cause of "bulky" is that a list row carries an editor.** Findings 7–9 treated the
-srv/g control as the problem; it is a symptom. Mainstream food loggers put **no controls on a list
-row at all** — row is name, a grey line of what and how much, calories right-aligned — and every
-quantity edit happens on a separate surface. Our `IngredientRow` instead replicates a delete
-button, a stepper, a value field, a unit toggle and a conversion hint onto *every* ingredient. Two
-ingredients fill the S25 screen; the drawn version fits five with room left over.
-**This supersedes srv/g options A, B and C** as a fork: the toggle now appears once, in the quantity
-sheet, at 56 px. Option A's shape (unit chip on the number) is what that sheet uses.
-
-**13 — One row component, six call sites.** Today a food reads one way in the diary, another in
-search, another in a saved meal, another in the builder — four shapes for one thing. The drawings
-use exactly one: optional thumbnail · name · grey secondary line · calories right-aligned in a fixed
-column · optional chevron. Build it as `components/nutrition/food-row.tsx` and use it on all six
-screens; per the repo's own reuse rule a pattern at ≥2 sites gets extracted before the third copy,
-and this is the sixth.
-
-**14 — The other structural changes, in the order they pay off.**
-- **The macro summary becomes a donut with each macro as a share of calories**, next to grams.
-  `components/nutrition/macro-ring.tsx` already exists — extend it rather than adding a second one.
-- **Grouped sections with full-bleed dividers** replace gapped cards, which is most of the vertical
-  space the day screen currently spends on nothing.
-- **Source tabs on the food picker** (Recent · Frequent · My meals · Recipes) replace separate
-  sheets, so a repeat log is one tap from the top of the list.
-- **The meal name becomes the screen title**, not a labelled input box, and the three-line batch
-  explainer becomes a subtitle: *"Makes 2 portions · 278 kcal each"*.
-- **Destructive actions leave the summary row** — delete lives in the quantity sheet and behind a
-  swipe on a saved meal, not beside the button pressed daily.
-
-- **⚠ Sequencing.** This is a rework, not a repaint, and it lands in the two files that are already
-  at the 800-line ceiling (finding 3). Order: extract `food-row.tsx` first, then the quantity sheet,
-  then convert screens one at a time behind the existing behaviour. **Do not start by editing
-  `nutrition-content.tsx`** — one added line fails Custom Rules.
-- **The known cost, stated so it is not discovered late:** changing a quantity now takes a tap. For
-  a saved meal built once and logged for months that is cheap; for someone tweaking amounts while
-  assembling, inline steppers were faster. The owner has seen this trade drawn and chose the rework
-  anyway.
-- **Related:** meal thumbnails are **Q-396**, filed separately because they need a migration and a
-  sync-payload change (Lane A) while everything above is Lane B.
-
-
-**15 — OWNER REVIEW OF THE MOCKUPS, 2026-08-18. Six notes, all folded in; one caught a real gap.**
-- **Ring:** use the shipped `MacroRing` (96 px masked conic + value/target bars), not a new donut —
-  with the filled arc **split by macro** instead of a single `var(--brand)` sweep. Do not add a
-  second ring component.
-- **Log Food is one screen.** The current capture step's six scattered entry points collapse to:
-  search across everything · tabs · a bottom row of capture actions. **Both were revised by the
-  owner on 2026-08-19 and the revision wins over this line** — the tabs are **Recent · My Foods**
-  (see note 17), and the action row is ordered **Photo · Barcode · Describe or enter**, in that
-  order, not the Barcode-first order originally drawn. The order is the owner's; it is also the
-  right default, since photo is the fastest path for a plated meal and barcode only works on
-  packaged food.
-- **Describe and manual entry become one sheet.** Type what you ate and the fields fill in; skip the
-  box and type them yourself. The fields are always visible, so neither path is a hidden mode.
-- **My Meals rows carry their macro split** (P/C/F beside the calorie column) so the list can be
-  chosen from. The label/QR and the full breakdown stay **inside** the meal on the detail screen.
-- **Edit Meal keeps a real servings control** — "This recipe makes [− 2 portions +]" at 48 px, in a
-  band that also states the per-portion cost. It had been demoted to a subtitle; that was wrong.
-- **The quantity sheet must show where it came from:** the tapped ingredient row stays lit under the
-  scrim and the sheet is headed "Ingredient 1 of 5 · <meal>". Without that the sheet reads as an
-  unrelated screen.
-
-**16 — ⚠ THE COVERAGE AUDIT THE OWNER ASKED FOR, AND WHAT IT FOUND.** *"Make sure you compare each
-page/section to what's in prod right now — we don't want to silently lose any sections."* The first
-draw showed **3 of the 11 sections** the Nutrition tab actually renders. In shipped order
-(`app/nutrition/nutrition-content.tsx`): ScreenHeader + date nav · **CalorieBalanceBar** ·
-MacroRing · **NutritionActionRow (three buttons — Saved Meals had been dropped)** ·
-**MealPlanReviewCard** · **MealPlanSection** · **TdeeAdaptationCard** · MealCard × meal types ·
-**End of Day** · **WeeklyNutritionChart** · **SupplementsSection**. The eight in bold were missing
-and are now drawn. **Any implementation PR carries this list and checks it off** — a rework that
-quietly loses a section is the failure mode this entry exists to prevent.
-
-**17 — DECIDED 2026-08-19, and it went further than the question asked. The tabs are `Recent` and
-`My Foods`. Two, not four.** The question here was where to put `My Foods`; the owner answered by
-collapsing the row: ***"I Think recent tab is fine; dont think we need frequent - saved and myfoods
-I dont think need to be seperated. Saved could contain foods made or saved. Maybe we just have 'my
-foods'"***.
-- **`Frequent` is dropped.** It was a second ordering of the same list Recent already shows.
-- **`Saved meals` and `My Foods` merge into one `My Foods` list** holding anything the user made or
-  saved. This is the right call for a reason worth writing down: a saved meal and a food you built
-  were always the same kind of row wearing two labels, which is exactly what finding 13's single
-  row component says. Two lists that render identically and differ only in provenance are one list
-  with a subtitle.
-- **Nothing is lost, and check that before building.** `FoodLibrarySheet` and `SavedMealsSheet` are
-  separate components today; merging the tabs must not silently drop a capability that only one of
-  them has (bulk delete, meal-plan linkage, the label path). Diff them first and carry every action
-  across, or say in the PR which was intentionally dropped.
-- Ordering within `My Foods`: most recently used first, so the merge does not bury saved meals under
-  one-off foods.
-- **⚠ The merge is a RENAME as well as a merge, and the rename has to be swept.** The owner spotted
-  the half-done version immediately — *"So im picking up a discrepancy between My Meals and My
-  foods? Whats the difference"* — against a prototype that still had a `My Meals` screen beside a
-  `My Foods` tab. There is no difference, and that is the point: **two names for one list is the
-  defect**. Grep for every user-facing occurrence of *Saved meals*, *My Meals* and *My Foods* —
-  sheet titles, tab labels, empty states, toasts, the `+ Add food` destinations, the nav copy — and
-  land on the single name in one pass. A surface left on the old name reads as a second list that
-  is missing rows.
-
-**18 — Sheets not yet drawn, listed so they are not assumed done.** `FoodLoggerSheet` review and
-assign steps (only capture is drawn) · `QuickEditLogSheet` · `WaterLogSheet` · `FoodLibrarySheet` ·
-`MealTypeManager` and the Nutrition Settings sheet · `MealPlanSetupSheet`/`EditSheet`/`ManageSheet` ·
-`ManageSupplementsSheet` · `EndOfDayReview` and its seven children · the barcode overlay · the
-delete-log dialog. Roughly eleven more surfaces. They inherit the row language and the 48 dp floor
-whether or not anyone draws them first.
-
-**What NOT to change — all three exist because a CLAUDE.md rule required them:**
-- `MACRO_COLORS` (`@trainingai/shared/nutrition/macro-colors`) is the shared semantic palette,
-  correctly imported at every site. It is **not** finding 1 and must not be tokenised away.
-- `saved-meal-card.tsx` is well built: `role="button"` + `aria-expanded` (`:80-82`) for the
-  nested-control WebView rule, macro colour always paired with its P/C/F label (`:130-142`) for the
-  colour-only-state rule, and an inline delete confirmation (`:172+`). A visual pass keeps all three.
-- No new dependencies — `motion` v12, `@use-gesture/react` and shadcn primitives are installed.
-
-- **DECIDED BY THE OWNER, 2026-08-19 — the ingredient row is unblocked.** Both open questions were
-  answered in one reply: ***"go with A, and yes collapse the row when not editing"***.
-  1. **Option A wins** — the unit rides on the number as a chip inside the field, `60 g` ⇄ `2 srv`
-     on one tap. B and C are dead; do not revisit them. The control comes from
-     `components/ui/segmented-tabs`, not a fourth hand-rolled segmented control (finding 8).
-  2. **Rows collapse when not being edited**, one expanded at a time. The collapsed shape is
-     finding 13's single row component — name · grey secondary line · calories right-aligned ·
-     chevron — so this is not a second component, it is `food-row.tsx` with an expanded state.
-  **Read this together with finding 12, which is not contradicted by it.** Finding 12 retired A/B/C
-  *as a fork over what sits on a list row*, because the answer there is **nothing** — a diary or
-  search row carries no editor and never expands. What the owner has now chosen is the shape of the
-  quantity control **wherever it does appear**: the quantity sheet, and the expanded row in Edit
-  Meal, which is a builder rather than a list. Finding 12 already anticipated this
-  (*"Option A's shape (unit chip on the number) is what that sheet uses"*), so the decision confirms
-  it rather than reopening it. **A row in the diary that expands to edit would be a
-  misreading of both.**
-- **The drawings exist** (finding 6); `unit-options.png`'s column A is the reference for the
-  expanded row, and its `Full Cream Milk` row is the reference for the collapsed one. Findings 1, 2,
-  3, 7 and 8 never depended on this answer and can still go first — but nothing is blocked now.
-- **Still open, and deliberately not blocking: where `My Foods` lives** (note 17). Recommendation
-  stands — a **fourth tab** beside Recent, Frequent and Saved meals, because it is a list of foods
-  like the other three and a tab is where someone looks for it. Build it that way unless the owner
-  says otherwise; it is one line to move later.
-- **Lane B** — `components/nutrition/**` and `app/nutrition/**` are both Lane B's under §3, and
-  nothing here touches an engine path.
-- **Read first:** [`docs/domains/nutrition/README.md`](domains/nutrition/README.md), then the
-  `ui-ux-pro-max` skill — it is this repo's own design system and the authority for this item.
-- **Verification.** `node scripts/check-hex-literals.js` must report a **lower** number for every
-  file touched; `node scripts/check-component-size.js` clean without new BASELINE rows;
-  `pnpm check:rules`. Then the **on-device smoke run** — this is pure UI on the canonical runtime,
-  in both themes, so a green `pnpm dev` is not sufficient evidence and a Known-Issues row is the
-  fallback if no device is available.
-
-### [nutrition][app-shell] Q-395a — phase 2: the quantity sheet and Edit Meal's collapsing rows
-
-- **Lane:** B
-- **Needs:** Q-406
-- **Spec:** Q-395, findings 9, 12, 13 and the 2026-08-19 owner decision. Drawings:
-  `unit-options.png` column A (expanded row) and its `Full Cream Milk` row (collapsed).
-- **Split out of Q-395 on 2026-08-23.** **Read Q-395 first** — it holds the decisions and this
-  entry does not repeat them.
-- **Scope.** The quantity sheet (new), and `ingredient-row.tsx` becoming `food-row.tsx` plus an
-  expanded state. Option A is decided: the unit rides on the number as a chip, `60 g` ⇄ `2 srv` on
-  one tap, built from `components/ui/segmented-tabs`. B and C are dead. Rows collapse when not
-  edited, one at a time, and the collapsed shape *is* Q-406's row — not a second component.
-- **⚠ A diary row never expands.** Finding 12 retired the list-row editor outright: a diary or
-  search row carries no editor at all. This entry governs the quantity control *where it does
-  appear* — the sheet, and the builder. Building an expanding diary row misreads both.
-- **The sheet must say where it came from:** the tapped row stays lit under the scrim, and the sheet
-  is headed `Ingredient 1 of 5 · <meal>`. Without that it reads as an unrelated screen.
-- **Edit Meal rides along:** the meal name becomes the screen title, the batch explainer becomes
-  the subtitle *"Makes 2 portions · 278 kcal each"*, and the servings control stays real at 48 px —
-  it was demoted to a subtitle in an early draw and the owner corrected that.
-- **48 dp floor applies here first** (finding 7): srv/g segments are the app's smallest targets at
-  40 px, stepper gap 6 px against 8 dp. One systemic change, not eight.
-- **Verification.** `check-hex-literals` lower per file · `check-component-size` clean, no new
-  BASELINE rows · `pnpm check:rules` · **device smoke run in both themes** — pure UI on the
-  canonical runtime, so a green `pnpm dev` is not sufficient.
-
-### [nutrition][app-shell] Q-395b — phase 3: the day screen, against the 11-section coverage list
-
-- **Lane:** B
-- **Needs:** Q-395a
-- **Spec:** Q-395, findings 14 and 16.
-- **Scope.** `nutrition-content.tsx` and its cards. Grouped sections with full-bleed dividers
-  replace gapped cards — that is most of the vertical space this screen spends on nothing. Extend
-  the shipped 96 px `MacroRing` with an arc **split by macro**; do not add a second ring.
-- **⚠ This entry carries the coverage checklist and checks it off in the PR.** The first draw showed
-  **3 of the 11 sections** this tab actually renders. In shipped order: ScreenHeader + date nav ·
-  CalorieBalanceBar · MacroRing · NutritionActionRow · MealPlanReviewCard · MealPlanSection ·
-  TdeeAdaptationCard · MealCard × meal types · End of Day · WeeklyNutritionChart ·
-  SupplementsSection. **A rework that quietly loses a section is the failure mode Q-395 exists to
-  prevent**, and this is the phase where it would happen.
-- **Headroom is not free.** Q-406's first half took `nutrition-content.tsx` 800 → 732; it is not on
-  the size baseline, so it is held to 800 hard. Extract before adding.
-- **Verification.** As Q-395a, plus the checklist above ticked off in the PR body.
-
-### [nutrition][app-shell] Q-395c — phase 4: Log Food becomes one screen, and `My Foods` becomes one name
-
-- **Lane:** B
-- **Needs:** Q-395b
-- **Spec:** Q-395, findings 15 and 17.
-- **Scope.** The capture step's six scattered entry points collapse to one screen: search across
-  everything · two tabs · a bottom row of capture actions.
-- **The decided details, all owner-set:** tabs are **`Recent` and `My Foods`**, two not four
-  (`Frequent` was a second ordering of what `Recent` already shows). Action row ordered **Photo ·
-  Barcode · Describe or enter**. Describe and manual entry are one sheet with the fields always
-  visible, so neither is a hidden mode. `My Foods` rows carry their P/C/F split beside the calorie
-  column; the label/QR and full breakdown stay inside the meal.
-- **⚠ The merge is a RENAME as well as a merge, and the rename must be swept in one pass.** Saved
-  meals and My Foods become one list. The owner caught the half-done version immediately — *"So im
-  picking up a discrepancy between My Meals and My foods? Whats the difference"* — and there is no
-  difference, which is the point. **Two names for one list is the defect.** Grep every user-facing
-  occurrence of *Saved meals*, *My Meals* and *My Foods* — sheet titles, tab labels, empty states,
-  toasts, `+ Add food` destinations, nav copy — and land on the single name together. A surface left
-  on the old name reads as a second list that is missing rows.
-- **⚠ Diff `FoodLibrarySheet` against `SavedMealsSheet` before merging them.** Carry every action
-  across — bulk delete, meal-plan linkage, the label path — or say in the PR which was dropped.
-  Order `My Foods` most-recently-used first so the merge does not bury saved meals.
-- **Verification.** As Q-395a, plus a grep proving nothing user-facing still says *Saved meals* or
-  *My Meals*.
 
 ### [cardio][devices] Q-418 — the free walk's Android pill still cannot show the time (the screen half shipped)
 - **Gate: device** — and the gate is the entry's own instruction, not a formality: it says
