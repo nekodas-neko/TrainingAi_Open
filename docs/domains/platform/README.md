@@ -459,6 +459,7 @@ Live at the time of writing (2026-07-30):
   thresholds land at 900k/950k. Records that the transcript exposes no window size, so the hook
   cannot self-calibrate and this constant goes stale silently.
 - [`handoff-2026-08-16-platform-public-repo-cut-a4b.md`](../../handoff-2026-08-16-platform-public-repo-cut-a4b.md)
+- [`docs/handoff-2026-08-24-platform-lane-b-nine-prs.md`](../../handoff-2026-08-24-platform-lane-b-nine-prs.md) — **Lane B, nine PRs, 2026-08-24.** Q-486, Q-321, Q-357, Q-328, LB-3, LB-6, LB-7 and Q-359's demotion. Carries the two lessons that cost the most: read the CI *server* log before fixing a CI-only failure, and a spec stubbing an `/api/` route needs `serviceWorkers: 'block'`. **Q-555's fix is written, unmerged and unverified** on `fix/offline-tab-tap-native-fallback`.
   — Q-49 public-repo cut. **Updated at the Phase B boundary:** A4b has shipped, Oura's material is
   out of the tree, and the handoff now carries what A4b cost beyond the plan — the constants were
   still a build-time dependency and `publish-dry-run` has no build gate to see it (Q-313), the

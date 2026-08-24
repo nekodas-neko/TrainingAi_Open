@@ -105,6 +105,21 @@ report; the SpO₂ A/B is two nights of wear, not code.
 its detail were dead a fortnight, unreported. Both are on `/health/day` (the NAME is the target, not
 a third icon); `health-content.tsx` lost 167 lines; the HR chart was dropped, `done-screen` has it.
 
+**Deleting an activity works offline now (Q-328, v1.350.0).** It was the one activity-log write with
+no outbox domain — created through the queue, deleted by a bare `fetch` that simply failed with no
+connection. `softDeleteActivityLogPending`, not `deleteActivityLog`: a queued delete must stay
+`pending` or a pull clobbers it, while `'synced'` is what later lets `applyDelta` reap the tombstone.
+
+**The memo-stability baseline is empty (Q-357, v1.349.0).** All four defeated call sites cleared, so a
+new one is a regression rather than a debt row. The expensive one was inside `visibleMeals.map(...)`,
+where a hook is not allowed — its callbacks take the meal and hand it back, letting the parent share
+one `useCallback` per action across every card.
+
+**Body-metric bounds are asked at the keyboard (Q-321, v1.348.0).** `validation/body-metrics.ts` had
+held every threshold for months and nothing under `components/`/`app/` imported it, so a 5,000 kg
+weight was queued and dropped server-side. **Three** sheets, not the one the entry named:
+`log-value-sheet.tsx` had no check at all across seven fields.
+
 **Sixteen writes revalidated around their push, not after it (LB-6, v1.345.0).** The entry listed
 six — its finder read only *above* each call. `check-invalidate-after-push.js` holds it (55 steps).
 
@@ -708,10 +723,17 @@ order.
 
 ### [activity][app-shell] 🟠 Deleting an activity leaves it in the local store, so three other screens keep showing it (Q-488, 2026-08-18)
 
-> **⚠ Stale as written (noticed 2026-08-23 during LB-1, not investigated further).**
-> `deleteActivityLog` exists and the delete path calls it; Q-328 then gave the domain a real outbox
-> delete ([`journal`](docs/overview/entries/2026-08-19-activity-log-delete-outbox.md)). Not struck —
-> that needs someone to confirm nothing else this row lists is still owed.
+> **⚠️ THE SUBSTANCE IS FIXED — only the device check keeps this row here (2026-08-24).** What this
+> row describes, a delete that updates the server and never touches the local store, is no longer
+> what the code does: Q-328 routed it through the outbox, so the client writes a local tombstone
+> **first** and queues the mutation
+> ([`journal`](docs/overview/entries/2026-08-24-activity-log-delete-outbox.md)). The call site also
+> moved twice — it is `handleDeleteActivity` in `lib/hooks/use-day-entry-mutations.ts` now, not
+> `health-content.tsx`, so the line numbers below are dead.
+>
+> **Kept, not archived, per the archive rule:** `getLocalStore` returns null in the sandbox, so every
+> test of that path took the web fallback. The local write is verified by reading and unit test, never
+> on the S25. **Strike this row once it is exercised on device with the network off.**
 
 - **The successor sweep 22 named for itself:** a stale value arising *outside* Q-262's test — a write
   that updates the server without touching the local store.
