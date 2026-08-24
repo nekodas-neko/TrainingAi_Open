@@ -4463,8 +4463,25 @@ ehr     0     0     0     0   648   208   128   556     0
 
 ### [cardio] Q-301b — drop the `running_baselines` table itself (code already removed)
 
-- **Gate:** owner
-- **Added:** 2026-08-24 · Q-301's code half shipped
+- **Lane:** A — it takes a migration number.
+- **Added:** 2026-08-24 · Q-301's code half shipped · **owner authorised the DROP the same day**
+  (`Gate: owner` cleared).
+- **✅ DECIDED 2026-08-24 — DROP IT, and the emptiness is evidenced three ways, not assumed.**
+  - **`n_tup_ins = 0`** — a **lifetime** insert counter maintained on every write. Unlike
+    `n_live_tup` it is **not a planner estimate** (this database has `last_analyze` NULL on every
+    table, so `n_live_tup` alone would prove nothing — that trap filed a data-loss incident, Q-528,
+    that had never happened), and unlike a `claude_ro` `count(*)` it is **not row-scoped to one
+    user**. No row has ever been inserted by anyone.
+  - **16 kB total**, consistent with an empty heap plus index pages and no bloat.
+  - **The code trace explains why it is empty** rather than leaving it a mystery: the writer landed
+    in migration 146 *after* the only `running_plans` row was created (2026-07-21), and no plan has
+    been created since. Not a silent write failure.
+  - **Nothing can reach it:** the Drizzle `schema.ts` entry is gone, so no query in the app can name
+    the table.
+- **How to do it.** A migration whose only statement is the drop. `DROP TABLE IF EXISTS` so a re-run
+  is a no-op, and **verify `n_tup_ins` is still 0 immediately before merging** — the authorisation
+  rests on the table never having been written, so a non-zero counter at merge time invalidates the
+  decision rather than being a detail to work around.
 - **Investigation completed, in the entry's own order:**
   1. **What the 12 `prescribed_runs` actually derive from:** `resolveSnapshot()`
      (`packages/shared/src/running/assemble-plan-context.ts`), called **fresh on every request** from
