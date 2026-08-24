@@ -417,6 +417,18 @@ Live at the time of writing (2026-07-30):
 
 ## Handoffs
 
+- [`handoff-2026-08-24-platform-implementation-lane-a-engine-run.md`](../../handoff-2026-08-24-platform-implementation-lane-a-engine-run.md)
+  — **Implementation Lane A, 2026-08-24** (fifteen PRs): the raw-frame packer made automatic and its
+  phase-3 delete moved from the bucket's ds range to **row ids** (automating it is what made the race
+  reachable), `claude_ro` scoped on a boot-set setting rather than a baked user id, the fixture MET
+  floor that had been making **every** MET strength estimate `0` in CI, and LA-21's implausible
+  session durations culled after production measurement (**11 of 81, 13.6%, at 534–845 min**). Its
+  transferable half is four wrong turns: a diagnosis reached from a config file (LB-7 — the service
+  worker re-issues `/api/` requests, so `page.route` is bypassed), a severity claim taken from the
+  local seed, a cap sized by a comment rather than a measurement, and three journal-compaction traps
+  including **a concurrent PR linking an entry you already folded**. The database reclaim is now
+  three-quarters done — only `VACUUM FULL error_events` (Q-315, ~49 MB) is still owed.
+
 - [`handoff-2026-08-24-platform-orchestrator-first-run.md`](../../handoff-2026-08-24-platform-orchestrator-first-run.md)
   — the Orchestrator role's first session: cleared the 17-entry completed-work baseline (only 7 were
   actually finished), assigned the first real `Batch:`, split a 269-line nutrition rework into a

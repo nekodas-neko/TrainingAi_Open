@@ -25,20 +25,33 @@
 ## 🔖 Current Status
 
 **Version:** v1.318.10 · **Branch:** `main` · Railway auto-deploys on push to `main`.
-**Last updated:** 2026-08-23.
+**Last updated:** 2026-08-24.
 
-**The raw-frame packer runs itself, and it deletes only what it verified (Q-541 complete).** The
-2026-08-18 hand-run is verifiably clean in production — **764 blobs hold 941,233 frames in 13 MB**,
-contiguous with the hot tier — but a button does not hold a growth curve: `oura_raw_samples` was
-pruned back to 2026-08-10 by that run and had regrown to **318,183 rows / 92 MB** five days later,
-~6.5 MB/day against the ~0.4 MB/day the database is meant to grow at. It now fires from the ingest
-path, throttled **per user** (one shared timestamp lets a busy user starve another's table), and
-`OURA_AUTOPACK=off` stops it without a deploy. Automating it is also what made the delete's race
-reachable, so phase 3 deletes **by row id** rather than by the bucket's ds range — a frame arriving
-between the select and the delete was previously removed having never been packed, i.e. in neither
-tier ([`journal`](docs/overview/entries/2026-08-23-feat-oura-autopack.md)). ⚠️ **Not yet observed in
-production**, and the 92 MB high-water mark does not come back without a `VACUUM FULL` (Q-315,
-`Gate: owner`).
+**The database reclaim is three-quarters done, and the last quarter is one press.** The owner's
+`oura_raw_samples` vacuum reclaimed **36 MB** (93 → **57 MB**) and the automatic packer is now
+observed in production — four runs, **318,883 → 205,278 rows**, 0 faults. Left: **Q-315,
+`VACUUM FULL error_events`, ~49 MB**, and there is **no button for it** — the admin control covers
+`oura_raw_samples` only, so it needs `POST /api/admin/vacuum {"table":"error_events"}` with an admin
+session cookie. `Gate: owner`.
+
+**Four engine fixes, each of whose entry described something other than the defect.** A deload's
+stored `0` was being served as the previous 1RM (**Q-298** — `listPrevious1rm` gated on `IS NOT NULL`
+while its two siblings already filtered `> 0`); **11 of 81 production sessions (13.6%) ran 534–845
+min** and are real workouts left running, so **LA-21** culls the *duration* and keeps the session,
+with `isPlausibleSessionDuration()` consolidated from three copies onto both the MET and HR branches;
+the fixture MET constants sat below `estWorkoutKcal`'s 1.5 floor, so **every** MET strength estimate
+was **0** in CI and those tests passed vacuously (**Q-312**); and `sessionEffort()` now returns
+`{ rpe, source: 'self' | 'derived' }` so a mean of set RPEs is never read as a self-report
+(**Q-420**). ⚠️ **None device-verified.** Detail, and the four wrong turns that produced them, in
+[the Lane A handoff](docs/handoff-2026-08-24-platform-implementation-lane-a-engine-run.md).
+
+**The raw-frame packer runs itself, and it deletes only what it verified (Q-541 complete).** A button
+does not hold a growth curve — `oura_raw_samples` regrew to 92 MB within five days of the 2026-08-18
+hand-run, ~6.5 MB/day against the ~0.4 MB/day the database is meant to grow at. It fires from the
+ingest path now, throttled **per user** (one shared timestamp lets a busy user starve another's
+table), with `OURA_AUTOPACK=off` as the kill switch. Automating it is what made the delete's race
+reachable, so phase 3 deletes **by row id**, not by the bucket's ds range: a frame arriving between
+select and delete was previously removed having never been packed — in neither tier ([`journal`](docs/overview/entries/2026-08-23-feat-oura-autopack.md)).
 
 **Logging food evicted the caches before the server had the write (LB-4).** The invalidation fired
 correctly and too early: subscribers refetched a server that lacked the log and re-cached the
