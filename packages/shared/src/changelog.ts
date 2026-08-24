@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.352.0",
+    date: "2026-08-24",
+    changes: [
+      "Deleting an activity log that's already gone (a double-tap, or one already removed on another device) now behaves the same as before; deleting one that never belonged to you, or never existed, is now reported honestly instead of as a silent success.",
+    ],
+  },
+  {
     version: "1.351.0",
     date: "2026-08-24",
     changes: [
