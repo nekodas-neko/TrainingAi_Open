@@ -14,7 +14,7 @@ silently misdirecting the next session. Update them in the same PR that consumes
 
 | Pointer | Value | Source of truth |
 |---|---|---|
-| Next free Postgres migration | **208** | `lib/data/postgres/migrations/` |
+| Next free Postgres migration | **210** | `lib/data/postgres/migrations/` |
 | Local SQLite schema version | **v28** | `lib/sqlite/migrations.ts`; `lib/sqlite/__tests__/migrations.test.ts` asserts the max |
 
 > **There is no third pointer any more.** Entry IDs are not allocated from a shared counter and
@@ -577,10 +577,48 @@ Both client paths bounded to a 1024 px longest edge — `getPhoto` gains `width`
 4000 × 3000 → 1024 × 768, base64 2,266,776 → 302,944 chars, −86.6%.**
 
 **⚠️ Not closed, and NOT shown to be the owner's regression** — Correction 2 above already demoted
-the payload to a standing inefficiency. Open, all Lane A's:
-- **#112 is untouched.** The schema / `maxOutputTokens` experiment is a route change.
-- **Client elapsed time is still recorded nowhere.** It needs a sink — `reportClientError` writes to
-  `error_events`, which session-start reads for faults, so timing rows do not belong there.
+the payload to a standing inefficiency.
+
+**✅ THE EXPERIMENT RAN 2026-08-24, against the real model, and it retires #112.** The entry asked
+for exactly this — *"run the same photo three ways and compare"* — and a
+`GOOGLE_GENERATIVE_AI_API_KEY` is present in a session sandbox, so it was run rather than reasoned
+about. Same image, same system prompt, one variable at a time:
+
+| arm | median | output tokens |
+|---|---:|---:|
+| (a) today's `generateObject` + `ScanSchema` | **1,700 ms** | ~485 |
+| (b) same, plus `maxOutputTokens: 700` | 1,672–3,530 ms, no trend | ~500 |
+| (c) same, schema **flattened** (no nested `ingredients` array) | **1,029 ms** | ~146 |
+| (d) `generateText` + `JSON.parse` — the pre-#112 shape | **1,529 ms** | ~450 |
+
+- **`maxOutputTokens` is ruled out.** Output tokens were unchanged (~500 either way) because the model
+  was never hitting a cap. Capping something that is not binding does nothing, and (b) came out
+  *slower* than (a) on the mean.
+- **#112 is essentially exonerated.** `generateObject` costs about **10%** over the `generateText` +
+  `JSON.parse` it replaced (1,700 vs 1,529 median, n=5 each, overlapping ranges) — not the 2× the
+  entry's central hypothesis needs. **The structured-output conversion is not the regression**, so
+  CLAUDE.md's no-`JSON.parse` rule costs nothing here and there is nothing to trade away.
+- **Latency tracks OUTPUT tokens almost exactly**, and the nested `ingredients` array is ~70% of them:
+  ~485 tokens → ~1.7 s, ~146 tokens → ~1.0 s. **(c) is not a proposal** — `sumIngredients`/`perServing`
+  need the array — it isolates where the time goes.
+- **Input tokens are constant at 1,093–1,275 regardless of image bytes**, confirming the entry's
+  claim that bytes above Gemini's tile budget buy nothing.
+
+**✅ THE PAYLOAD IS NOW MEASURED SERVER-SIDE (migrations 208 + 209).** `ai_call_log.payload_bytes`
+records the decoded image size beside the model's own `latency_ms`, so a wall-clock complaint can be
+answered by subtraction rather than re-argued. Verified through the real route on `pnpm dev`: a
+17,591-byte photo logged `payload_bytes 17591`, `input_tokens 1275` — **exactly the production band**
+— and a sibling `weekly-digest` row kept a NULL, which is the point of it being nullable.
+
+**What is left, and it is smaller than it was:**
+- **The client leg still has no number** — `payload_bytes` prices the upload's *size*, not its
+  *duration*, and "photo → result" starts on the device. That half is Lane B's (`components/**`); it
+  can now send its elapsed time to a column that already exists.
+- **Railway cold start on this low-traffic route** is the one candidate never tested, and after the
+  above it is the leading one. It cannot be tested from a sandbox session.
+- **Trimming the ingredients array** is the only measured latency lever left (~700 ms). Whether fewer
+  ingredients or fewer per-ingredient fields is acceptable is a product question, not an engineering
+  one.
 - **Railway cold start** — still untestable from a sandbox.
 - **Not device-verified:** only the gallery path ran here. A wrong field pair downscales silently
   never, which looks exactly like "the fix did not help".

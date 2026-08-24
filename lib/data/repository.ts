@@ -1279,6 +1279,8 @@ export interface AiCallLogInput {
   latencyMs?: number | null
   ok: boolean
   fingerprint?: string | null
+  /** BF-4: the request payload this call carried, where the shape has one. */
+  payloadBytes?: number | null
 }
 export interface AiCallSectionStat {
   section: string

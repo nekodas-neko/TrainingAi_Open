@@ -800,6 +800,10 @@ export const aiCallLog = pgTable('ai_call_log', {
   latencyMs:    integer('latency_ms'),
   ok:           boolean('ok').notNull(),
   fingerprint:  text('fingerprint'),
+  /** BF-4 (migration 208). The request payload the call carried, for the shapes that have one —
+   *  `latency_ms` is the MODEL's time, and the leg the owner reported as slow is the one before it.
+   *  Null, not 0, where a shape has no payload. */
+  payloadBytes: integer('payload_bytes'),
   createdAt:    timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 })
 
