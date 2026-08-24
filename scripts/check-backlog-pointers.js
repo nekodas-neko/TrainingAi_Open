@@ -58,7 +58,7 @@ const queue = lines.slice(queueStart);
 // ---- 1 & 2: entry headings -------------------------------------------------
 const seen = new Map();
 const entryOrder = [];
-/** id -> { needs: [], gates: [], batch: null, lane: null, keep: false } for the most recently opened heading. */
+/** id -> { needs: [], gates: [], batch: null, lane: null, keep: false, body: 0 } for the most recently opened heading. */
 const meta = new Map();
 let currentId = null;
 
@@ -77,6 +77,7 @@ for (let i = 0; i < queue.length; i++) {
     // Body lines belong to the heading above them. `Needs:` and `Gate:` are what make readiness
     // computable instead of prose, so they are read here rather than left for a human to notice.
     if (currentId) {
+      if (line.trim() !== '') meta.get(currentId).body++;
       const needs = line.match(/^\s*[-*]\s*\*{0,2}Needs:\*{0,2}\s*(.+)$/i);
       if (needs) {
         for (const m of needs[1].matchAll(/\b((?:LA|LB|BF|RV|TN|PS|Q)-\d+[a-z]?)\b/g)) {
@@ -138,7 +139,7 @@ for (let i = 0; i < queue.length; i++) {
   const id = `${q[1]}-${q[2]}${q[3]}`;
   entryOrder.push(id);
   currentId = id;
-  if (!meta.has(id)) meta.set(id, { needs: [], gates: [], batch: null, lane: null, keep: false });
+  if (!meta.has(id)) meta.set(id, { needs: [], gates: [], batch: null, lane: null, keep: false, body: 0, heading: line });
 
   if (seen.has(id)) {
     failures.push(
@@ -147,6 +148,38 @@ for (let i = 0; i < queue.length; i++) {
     );
   } else {
     seen.set(id, line);
+  }
+}
+
+// ---- 2a: a heading with no entry under it ----------------------------------
+//
+// The signature of a resurrected entry, and the third time this class has landed on `main`.
+//
+// `docs/implementation-backlog.md` conflicts are almost always TWO DELETIONS — each PR removes the
+// entry it finished, so when two land together the markers wrap *different* completed entries and
+// "keep both" restores both. That is documented in `CLAUDE.md`, and a rule cannot reach a branch cut
+// before it was written: #348 removed four resurrected entries, and #349 — branched earlier, by
+// another agent — put LB-4 back four commits later.
+//
+// **What makes this checkable is that the restored heading carried no body at all.** A real entry
+// always has bullets: a `Branch:`, an `Added:`, something. A bare heading followed by the next
+// heading is not an entry anyone wrote, so there are no false positives to weigh.
+//
+// It is deliberately NARROWER than the class. A resurrection that restores a full entry passes this,
+// and the obvious general check — flag a queue id that also has a journal entry — was measured and
+// rejected: 25 ids sit in both today and most are legitimate, because an entry that shipped half its
+// work stays queued with a `Keep:` line. The stronger check wants git history (was this id ever
+// deleted from the backlog on `main`?), and CI checks out shallow at depth 1, so it would cost a
+// deepened fetch on every run to catch a case that has not yet occurred.
+for (const [id, m] of meta) {
+  if (m.body === 0) {
+    failures.push(
+      `${id}: a queue heading with NOTHING under it. This is the signature of a merge resolution ` +
+        `that restored a deleted entry — a backlog conflict is two deletions, and keeping both ` +
+        `sides puts shipped work back in the queue where it reads exactly like open work. If the ` +
+        `entry is genuinely open, write its body; if it shipped, delete the heading:\n    ` +
+        `${m.heading.slice(0, 120)}`,
+    );
   }
 }
 
