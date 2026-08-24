@@ -3,12 +3,14 @@
 import { useEffect, useMemo, useState } from "react";
 import { useDrag } from "@use-gesture/react";
 import { ChevronLeftIcon, ChevronRightIcon } from "lucide-react";
-import { cn, localDateString, shortSessionName } from "@trainingai/shared/utils";
+import { cn, shortSessionName } from "@trainingai/shared/utils";
+import { todayInTz } from "@trainingai/shared/date-utils";
 import { getPaletteEntry } from "@trainingai/shared/session-palette";
 import type { ProgramSession } from "@trainingai/shared/types/program";
 import { useCachedValue } from "@/lib/hooks/use-cached-value";
 import { readLocalCalendarOverlay, mergeCalendarOverlay, EMPTY_OVERLAY, type CalendarData } from "@/lib/calendar/local-overlay";
 import { TTL_LONG, TTL_MEDIUM } from '@trainingai/shared/cache-ttl';
+import { useUserTimezone } from "@/components/shell/user-timezone-provider";
 
 const DAY_LABELS = ["M", "T", "W", "T", "F", "S", "S"];
 
@@ -29,6 +31,7 @@ interface CalendarWidgetProps {
 }
 
 export function CalendarWidget({ onDayClick, userId }: CalendarWidgetProps) {
+  const tz = useUserTimezone();
   const [viewYear, setViewYear] = useState(() => new Date().getFullYear());
   const [viewMonth, setViewMonth] = useState(() => new Date().getMonth() + 1);
   const mm = String(viewMonth).padStart(2, '0');
@@ -98,7 +101,7 @@ export function CalendarWidget({ onDayClick, userId }: CalendarWidgetProps) {
     { axis: "x", filterTaps: true, pointer: { touch: true } },
   );
 
-  const todayStr = localDateString();
+  const todayStr = todayInTz(tz);
   const firstDayOfWeek = new Date(viewYear, viewMonth - 1, 1).getDay();
   const daysInMonth = new Date(viewYear, viewMonth, 0).getDate();
   const startOffset = (firstDayOfWeek + 6) % 7;
