@@ -3676,112 +3676,34 @@ ehr     0     0     0     0   648   208   128   556     0
   reports how many such sites it skipped, which is the number to reconcile against.
 
 
-### [workouts] Q-298 — a phase-level deload zeroes the 1RM and never stamps `exercise_deloaded` (diagnosed 2026-08-16, still unfixed)
+### [workouts] Q-298 — the 10 historical zero-1RM rows: recompute or null (the code fixes shipped 2026-08-24)
 
-- **⚠️ Re-checked 2026-08-20 against `f23b327`: NOT fixed.** `log-exercise.ts:196` still zeroes
-  the estimate on `exerciseDeloaded === true || (isAnyDeload && !isBaseline)` while line 264 still
-  stores `exerciseDeloaded ?? false`. The heading said RESOLVED because the *cause* was found, not
-  because the two-line fix shipped — which is precisely how a finished-looking entry outlives its
-  work. The work below is unchanged and still owed.
-
-- **Branch:** `fix/zero-estimated-1rm`
-- **Plan:** none needed for the guard; the backfill wants a decision first
-- **Added:** 2026-08-15 · from [`docs/reviews/2026-08-15-pillar-model-soundness-review.md`](reviews/2026-08-15-pillar-model-soundness-review.md) §1.1
-- **✅ RESOLVED 2026-08-16 — the cause is found, and the work is now small and specific.** All five
-  2026-08-09 rows belong to **one `Pull` session**, and `session_periodization` shows **Pull entered
-  the `deload` phase on exactly 2026-08-09**. So `estimateOneRm` was called with `deloaded: true`
-  from the phase and correctly returned 0 — the same deliberate branch that explains the 08-06
-  `Upper` session. **The zeros were never the bug.**
-  **The defect is the provenance mismatch: the phase-level deload zeroed the estimate and did not
-  stamp `exercise_deloaded` on the row.** That is exactly why Q-228's fix misses them —
-  `getLastRealOneRmBatch` filters on `exercise_deloaded`, which is `false` here, so these zeros **do**
-  leak into prescription. The original entry claimed that outcome with the wrong reason; the outcome
-  stands and now has a cause. Working in
-  [`docs/reviews/2026-08-16-multi-user-load-test.md`](reviews/2026-08-16-multi-user-load-test.md) §1.
-- **✅ PINNED TO SOURCE 2026-08-16 — the fix is one line.** `packages/shared/src/workout/log-exercise.ts`:
-  ```ts
-  188:  const isAnyDeload = currentPhaseType === 'deload' || sessionIsEarlyDeload;
-  196:    deloaded: exerciseDeloaded === true || (isAnyDeload && !isBaseline)   // zeroes the 1RM
-  264:    exerciseDeloaded: exerciseDeloaded ?? false                          // stores ONLY the AI flag
-  ```
-  Line 196 zeroes the estimate when **either** the AI flag **or the phase** says deload; line 264
-  records only the AI flag. **Line 264 should store the same predicate line 196 uses.** The file's own
-  comment at 190–191 says both cases must not feed the estimate — they don't; only one is recorded.
-  Working in [`docs/reviews/2026-08-16-deferred-measurements.md`](reviews/2026-08-16-deferred-measurements.md) §4.
-- **The work, now that it is understood — two small changes:**
-  1. **Stamp `exercise_deloaded` from the phase** wherever `estimateOneRm` is called with
-     `deloaded: true`, so the row records what actually happened and Q-228's filter works.
-  2. **Store `null`, not `0`**, for a deliberately-unestimated 1RM. A null propagates as "no
-     estimate"; a zero propagates as an estimate *of* zero, which is what read as −100% on a trend.
-  Both are cheap. The historical-row decision (recompute vs null the 10 existing rows) still edits
-  training history and still needs the owner's say-so.
-- **⚠️ AMENDED 2026-08-15, same day, before any work started — this entry was HALF WRONG as first
-  filed.** It claimed all ten rows were a defect. Reading the write path settles it: the write path
-  (`log-exercise.ts:194`) calls `estimateOneRm`, and `packages/shared/src/1rm.ts:158` is
-  `if (deloaded) return { estimated1rm: 0, target80: 0, targetPct }`. **The five 2026-08-06 rows all
-  carry `exercise_deloaded = true` and are zero ON PURPOSE** — deload work is submaximal and must not
-  feed a 1RM. That is correct behaviour. Full working in
-  [`docs/reviews/2026-08-15-workout-model-round-3.md`](reviews/2026-08-15-workout-model-round-3.md) §1.
-  **Two things survive**, and they are what this entry is now about:
-  1. **`0` is the wrong sentinel — use `null`.** A null propagates as "no estimate"; a zero
-     propagates as an estimate *of zero*. That is what produced the visible damage: a first-vs-last
-     trend query reads those exercises as **−100%**. This applies to the deliberate deload case too.
-  2. **The five 2026-08-09 rows are still unexplained**, since they carry `exercise_deloaded = false`.
-- **Narrowed to at least two mechanisms, and three rows still unaccounted for.** Their `set_logs`:
-  ```
-  Barbell Shrug           4 × 87.5 kg × 6    use_for_1rm=TRUE   → should compute ~103 kg, stored 0
-  Sumo Deadlift           4 × 82.5 kg × 6-7  use_for_1rm=TRUE   → should compute, stored 0
-  Bent-Over Barbell Row   4 × 30 kg × 6      use_for_1rm=TRUE   → should compute, stored 0
-  Dumbbell Preacher Curl  3 × 16.25 kg × 12  use_for_1rm=FALSE  → no qualifying set
-  Pull-Up                 3 × 0 kg × 5       use_for_1rm=FALSE  → bodyweight, weight_kg = 0
-  ```
-  - **Pull-Up**: `estimateOneRm` substitutes `max(1, bwRef + weightKg)` **only when
-    `exerciseType === 'bodyweight'`**. If that did not resolve, `weights` is 0, the `!(w && r)` filter
-    drops every set, `oneRMs` is empty and `calculate1RM` returns 0.
-  - **Preacher Curl**: `use_for_1rm = false` on all three sets. When the style has *some* `useFor1rm`,
-    `calculate1RM` filters to those indices; none qualify, so `oneRMs` is empty → 0.
-  - **Shrug / Sumo Deadlift / Bent-Over Row have real weights, real reps and `use_for_1rm = true`.
-    Start here — these three are the actual mystery.**
-- **The zero was written at compute time, not overwritten later.** Every one of those sets has
-  `intensity_pct = NULL`, and the write path derives it as `computeIntensityPct(weight, estimated1rm)`,
-  which is null exactly when the estimate is 0.
-- **`runningEstimate1RM` already solves the empty-`oneRMs` case** ("fall back to averaging all logged
-  sets so a number always shows from set 1") — **and `calculate1RM` does not, while the write path uses
-  `calculate1RM`.** So the live widget shows a sensible number and the saved row gets 0. That asymmetry
-  is the most likely single fix.
-- **Measured:** **10 of 355 `exercise_logs` (2.8%) have `estimated_1rm = 0`** — the value zero, not
-  null — alongside entirely real volume and reps:
-  ```
-  2026-08-09 21:36  Sumo Deadlift           e1rm=0  vol=2062.5  avg_reps=6.3  deload=false
-  2026-08-09 21:46  Bent-Over Barbell Row   e1rm=0  vol=720     avg_reps=6    deload=false
-  2026-08-09 21:56  Barbell Shrug           e1rm=0  vol=2100    avg_reps=6    deload=false
-  2026-08-09 22:04  Pull-Up                 e1rm=0  vol=1064.3  avg_reps=5    deload=false
-  2026-08-09 22:13  Dumbbell Preacher Curl  e1rm=0  vol=585     avg_reps=12   deload=false
-  2026-08-06 ×5     (all deload=true)
-  ```
-- **Two clusters; only one is explained.** The 08-06 five are `exercise_deloaded = true` — the
-  Q-115/Q-228 deload-corruption date. **The 08-09 five are `exercise_deloaded = false`, consecutive
-  over 37 minutes — one entire workout session** where every exercise stored a zero 1RM.
-- **Q-228's fix does not cover them.** That fix added an `exercise_deloaded` filter to
-  `getLastRealOneRmBatch`; the 08-09 rows have that flag false and pass straight through into
-  prescription.
-- **Zero is a value, not an absence.** Null means "could not compute"; zero is a number that flows
-  into trend charts, PR detection and the next prescription. First-vs-last e1RM reads those two
-  lifts as **−100%**.
-- **Likely common cause, worth checking first:** **2026-08-09 logged 1,000 `error_events`**, mostly
-  connection timeouts, and the same date carries a 0.00 h sleep row at 04:52 (Q-274). Three
-  anomalies in three domains on one heavy-fault day points at the connection-starvation class
-  (Q-213/Q-107). If `estimated_1rm` is computed from a query that returned nothing under contention,
-  the fix is at the computation, not the filter.
-- **Do three things, in this order:**
-  1. **Find the writer** and establish how a zero is produced from real sets. `logExerciseFromPayload`
-     (`packages/shared/src/workout/log-exercise.ts`) is the shared write path.
-  2. **Guard at the write**: refuse to persist `estimated_1rm = 0` when sets exist — store null.
-     A null is honest and every downstream reader already handles it.
-  3. **Then decide on the 10 existing rows.** Recompute from their `set_logs` if the sets survive;
-     null them if not. **Ask before writing** — this edits historical training data.
-- **Add the sibling check:** `volume = 0` is currently 0 of 355, but the same "computed and stored as
-  zero" hazard applies to it and to `avg_reps`.
+- **Branch:** `fix/deload-provenance-and-previous-1rm` · **Lane A**
+- **⚠️ THE ENTRY'S CENTRAL CLAIM WAS ALREADY FALSE ON `main`, and checking it is what found the real
+  defect.** It said the zeros *"do leak into prescription"* because `getLastRealOneRmBatch` filters
+  on `exercise_deloaded`. That query also filters `AND el.estimated_1rm > 0`, so a zero never
+  reached it — and the `-100%` trend it blamed had been fixed too, with an explicit
+  `FILTER (WHERE estimated_1rm > 0)` and a comment saying why. Both named symptoms were closed.
+- **✅ The leak was real, and in a query the entry never mentions.** `listPrevious1rm`
+  (`adapter.ts`) gated on `estimated_1rm IS NOT NULL` — the one sibling that did not use `> 0` —
+  so a deload's deliberate 0 became *"your previous 1RM"* whenever the last-but-one session for an
+  exercise was a deload.
+- **It produced a signal pair that contradicted itself, and both halves go to the AI.**
+  `oneRmTrendStatus` guards `previous <= 0` and reported **flat**; `signals.ts`'s
+  `rm1ChangeKg` (`current - prev`) has no such guard and reported the lifter's **entire 1RM as a
+  gain since last time**. Fixed at the source — one query, both consumers.
+- **✅ The provenance stamp shipped too.** The estimate and the stored flag now come from one named
+  predicate (`deloadedForEstimate`), so a phase-level deload records `exercise_deloaded = true`
+  instead of describing itself as a normal set the app happened to decline to estimate. Deliberately
+  **not** changed: what is passed to `shouldCountTowardPr`, which takes `isAnyDeload` separately
+  and already gates on it — this changes what is *stored*, not what is *decided*.
+- **Keep:** the **10 historical rows** — the owner's call, unchanged. Recompute them or null them;
+  both edit training history. Note the forward fix does not touch them, and the read-time `> 0`
+  guards mean they are inert everywhere now rather than merely inert in two places.
+- **The 0-vs-null sentinel is NOT done, and it is bigger than the entry implies.**
+  `OneRmEstimate.estimated1rm` is typed `number`, so making it nullable ripples through every
+  consumer of `calculate1RM`. With every read path now gating on `> 0`, the sentinel is a
+  correctness improvement rather than a live defect — worth doing deliberately, not as a rider.
 
 ### [workouts] Q-306 — the emergency-deload RPE trigger sits 0.07 inside a known measurement error
 

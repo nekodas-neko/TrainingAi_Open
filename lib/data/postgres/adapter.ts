@@ -1635,7 +1635,16 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
           ROW_NUMBER() OVER (PARTITION BY el.exercise_name ORDER BY el.logged_at DESC) AS rn
         FROM exercise_logs el
         JOIN workout_sessions ws ON ws.id = el.workout_session_id
-        WHERE ws.user_id = ${userId} AND el.estimated_1rm IS NOT NULL
+        -- \`> 0\`, not \`IS NOT NULL\` (Q-298). A deloaded exercise stores estimated_1rm = 0 **on
+        -- purpose** — deload work is submaximal and must not read as a max — so \`IS NOT NULL\`
+        -- admitted it as the previous estimate whenever the last-but-one session was a deload.
+        --
+        -- That produced a signal pair that contradicted itself, and both halves go to the AI:
+        -- \`oneRmTrendStatus\` guards \`previous <= 0\` and so reported **flat**, while
+        -- \`signals.ts\`'s \`rm1ChangeKg\` (\`current - prev\`) has no such guard and reported the
+        -- lifter's **entire 1RM as a gain since last time**. Every sibling query already gates on
+        -- \`> 0\`; this was the one that did not.
+        WHERE ws.user_id = ${userId} AND el.estimated_1rm > 0
           AND el.deleted_at IS NULL AND ws.deleted_at IS NULL
       ) ranked
       WHERE rn = 2
