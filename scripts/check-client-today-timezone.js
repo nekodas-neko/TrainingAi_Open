@@ -88,7 +88,7 @@ const BASELINE = {
   'components/sync-provider.tsx': 2,
   'components/workout-screen.tsx': 4,
   'components/workout/active-workout-screen.tsx': 1,
-  'components/workout/done-screen.tsx': 2,
+  'components/workout/done-screen.tsx': 1,
   'components/workout/exercise-summary-screen.tsx': 1,
   'lib/stores/workout-store.ts': 3,
 };

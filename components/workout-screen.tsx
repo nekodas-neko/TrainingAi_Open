@@ -1765,7 +1765,6 @@ export default function WorkoutScreen({ sessionType, userId, aiDeload, wasOverri
         totalVolumeKg={totalVolumeKg > 0 ? totalVolumeKg : undefined}
         totalSets={totalSets > 0 ? totalSets : undefined}
         workoutSessionId={store.workoutSessionId ?? undefined}
-        userId={userId}
       />
     );
   }

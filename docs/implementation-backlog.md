@@ -958,16 +958,26 @@ tapping. Observed set-RPE range is 6–10, mean 7.48.
   **It costs nothing:** `getWorkoutSessionsFrom` already hydrates each session's set logs, so there is
   no extra query. Measured on the dev database: the `session-rpe` series went from **0 points to 10**
   (9 derived, 1 self-reported), insight line *"10 sessions rated so far (9 from set ratings)"*.
+- ✅ **THE PROMPT REMOVAL SHIPPED 2026-08-24 (Lane B) — item 1 of the owner's decision.**
+  `done-screen.tsx`'s "How hard was that session?" 1–10 tap grid is gone, along with `sessionRpe`
+  state, `handleRpeTap`, and the now-dead `userId` prop threading (it existed only to reach the
+  local store from that handler). The energy-estimate card below it (kcal, activity picker, training
+  stress badge) is unchanged — that div held both, and only the prompt half was the owner's ask.
+  `estSessionKcal` already treats a missing RPE as `'moderate'` and HR overrides it entirely when the
+  session has one, so the done screen's own kcal estimate needed no other change.
+  [`journal`](overview/entries/2026-08-24-drop-session-rpe-prompt.md).
 - **What is still open on this entry:**
-  - **The user-facing prompt removal** (`done-screen.tsx:398`) — **Lane B**, and it is item 1 of the
-    owner's decision. The derivation exists now, so removing the prompt no longer loses anything.
   - **`intensityFromRpe` still applies Foster's ≤4/≥8 thresholds to a set-scale number.** The entry
     is right that a derived value needs its own thresholds, and picking them is a **scoring change** —
     Tuning proposes, the owner signs off. Deliberately not done here, which is why the derived value
     is not yet wired into the energy path.
   - **The HR + derived-intensity combination is Q-422's**, not this entry's, and it is `Gate: owner`.
-- **Keep:** the prompt removal, the derived-scale thresholds, and the plausibility check against the
-  20 paired sessions.
+  - **The `session_rpe` write path is now client-unreachable, not removed.** `POST
+    /api/workout-sessions/rpe`, `pushMutations`' `session_rpe` domain, and
+    `lib/local-store`'s `setSessionRpe` still exist — nothing calls them from the app any more,
+    since the prompt was their only caller. Left in place deliberately: they're Lane A files, and
+    retiring dead server/local-store code wasn't asked for here.
+- **Keep:** the derived-scale thresholds and the plausibility check against the 20 paired sessions.
 
 ### [workouts][nutrition] Q-422 — calibrate the burn estimate against the owner's own energy balance
 
