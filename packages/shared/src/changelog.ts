@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.347.0",
+    date: "2026-08-24",
+    changes: [
+      "Two things you could do a fortnight ago work again. On a day's detail screen, tapping a logged exercise opens its history \u2014 the weight trend, the estimated one-rep max, every past session of it \u2014 and tapping a logged activity opens its full detail with the heart-rate chart and route. Both used to live on a panel that became unreachable when the calendar started opening the day screen instead.",
+    ],
+  },
+  {
     version: "1.346.0",
     date: "2026-08-24",
     changes: [

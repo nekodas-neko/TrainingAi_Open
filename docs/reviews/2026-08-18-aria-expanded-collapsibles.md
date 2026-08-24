@@ -20,7 +20,7 @@ A named list with a date is checkable, which is the whole reason to write one. N
 |---|---|
 | `app/session-select/components/deload-explanation.tsx` | still 0 `aria-expanded` (**moved** from `components/workout/`) |
 | `app/session-explain/components/signal-sections.tsx` | still 0 (**moved** from `components/session-explain/`) |
-| `components/health/day-overlay-sheet.tsx` | still 0 |
+| ~~`components/health/day-overlay-sheet.tsx`~~ | **file deleted, LB-3 2026-08-24** |
 | `components/workout/active-workout-screen.tsx` | still 0 |
 | `components/workout/ai-prescription-card.tsx` | still 0 |
 | `components/workout/added-weight-toggle.tsx` | still 0 |

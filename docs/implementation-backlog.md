@@ -628,10 +628,9 @@ answered by subtraction rather than re-argued. Verified through the real route o
 - **Not device-verified:** only the gallery path ran here. A wrong field pair downscales silently
   never, which looks exactly like "the fix did not help".
 
-### [workouts][platform] LA-21 — a workout session's duration is uncapped, so one left running poisons its load and its calories
+### [workouts][platform] LA-21 — ✅ SHIPPED 2026-08-24: implausible session durations are culled from statistics
 
 - **Lane:** A — `packages/shared/src/health/workout-energy.ts`, `app/api/health-trends`.
-- **Branch:** `fix/cap-session-duration`
 - **Added:** 2026-08-24, found while shipping Q-420's derivation — the derived series made it visible
   on nine points where it had been visible on one.
 - **⚠️ MEASURED IN PRODUCTION 2026-08-24, and the filing above was wrong about severity.** It said
@@ -665,8 +664,6 @@ answered by subtraction rather than re-argued. Verified through the real route o
   **today's** workouts, so the day-energy path cannot reach a May session. What is left is the
   per-session views: `workout-sessions/[id]/energy` and the recap, where opening one of those eleven
   shows a calorie estimate built on a 10× duration.
-- **Placement:** low-mid — high prevalence, narrow live reach, unknown cause. The prevalence is the
-  argument for bounding it; the reach is the argument for not rushing.
 - **What.** `durationMin = (completedAt - startedAt) / 60_000` with **no upper bound anywhere**:
   `app/api/health-trends/route.ts` (`sessionLoad = rpe × durationMin`), `estWorkoutKcal` and
   `estSessionKcal` (`workout-energy.ts:113, 225`). Observed on the dev database: a session spanning
@@ -676,22 +673,38 @@ answered by subtraction rather than re-argued. Verified through the real route o
 - **Why it is not merely cosmetic:** ACWR is a ratio of recent to chronic load, so a single 24× point
   distorts both windows for weeks, and it distorts them in the direction that reads as "you are
   training far too hard".
-- **Fix shape:** one shared cap, not three — the same `One Formula, One Place` argument as everything
-  else in `workout-energy.ts`. Pick the bound from the data rather than from taste: the owner's real
-  sessions run 45–75 minutes, so a cap in the 3–4 hour region is far outside anything genuine while
-  still bounding the pathological case. Whether an over-cap session should be **clamped** or
-  **excluded** is the real decision — clamping keeps a data point that is partly fiction, excluding
-  loses a session that did happen. **The measurement above settles it: clamp.** All eleven are real
-  workouts, so excluding them would delete training that happened, and only the duration is wrong.
-- **The client already handles the restart case, which is why the cause is still open.**
-  `lib/stores/workout-store.ts:215` drops a session's whole identity on rehydrate once its start
-  anchor is over four hours old or from a previous day, so an app-kill cannot produce one of these.
-  That leaves the app being left **open** across a long gap with Complete tapped at the end —
-  `resolveCompletedAt` accepts the phone's own `completedAtMs` and only rejects it for preceding the
-  start or being in the future. Plausible, and not proven: the eleven cluster in one month and
-  nothing explains why they stopped.
-- **Also cap the seed/dev path or this stays invisible locally** — the dev database carries a
-  1,176-minute session, which is how this was found at all.
+
+- **Lane:** A · **Branch:** `fix/cull-implausible-session-duration`
+- **Owner-decided 2026-08-24:** *"There are likely all errors from it being left on too long. Make
+  sure they are culled from statistics."* Culled, not clamped — a clamped figure is still partly
+  fiction, and the entry's earlier guess (exclude from load, clamp for calories) is superseded.
+- **`MAX_PLAUSIBLE_SESSION_MIN` + `isPlausibleSessionDuration`** now live once, in
+  `packages/shared/src/health/workout-energy.ts`, and both `estWorkoutKcal` and `estWorkoutKcalFromHr`
+  return `null` above the bound — so `estSessionKcal` is covered on both of its branches.
+  `app/api/health-trends` drops the point from the `sessionLoad` series.
+- **⚠ The bound already existed in THREE independent copies and nobody had noticed** — `body-metadata`
+  (declared and never read), `weekly-stats`, and `daily-energy` — all `= 240`, with **two different
+  behaviours** attached: `daily-energy` clamps for activities and excludes for sessions, `weekly-stats`
+  excludes and falls back to the exercise-log span. That is the One Formula, One Place failure this
+  repo keeps paying for, and it means `body-metadata` and `weekly-stats` were **already** culling
+  while `health-trends` and the per-session energy routes were not. All four now share one export;
+  each site keeps its own deliberate clamp-or-exclude behaviour.
+- **⚠ THERE ARE TWO CAUSES, NOT ONE, AND THE LOCAL CLOCK TIMES SEPARATE THEM CLEANLY.** Of the eleven:
+
+  | local start → end | n | reading |
+  |---|---:|---|
+  | **00:00** → 08:53–14:05 | **7** | `startedAt` fell back to local midnight — the cause the existing code comments named |
+  | 07:29–11:56 → 18:12–22:52 | **4** | started for real and completed ~11 hours later — the owner's "left running", morning to after work |
+
+  So the owner's explanation is right for four of them and the comments already in `weekly-stats` and
+  `body-metadata` are right for the other seven. **Both stopped after 2026-05-29 and neither is
+  explained**, which per CLAUDE.md is unexplained rather than fixed. The cull bounds the number
+  whichever cause fires.
+- **Keep:** the **midnight-`startedAt` fallback itself is not fixed** — seven sessions recorded a start
+  time that was never captured, and the cull hides the symptom rather than restoring the real span.
+  `weekly-stats` already substitutes the exercise-log span for exactly this case; whether the other
+  duration consumers should do the same, or whether the write path should stop inventing a midnight
+  start at all, is the open half.
 
 ### [workouts] Q-420 — drop the session-RPE prompt, derive the intensity, and let it correct the HR burn estimate
 
@@ -1483,37 +1496,6 @@ whether or not anyone draws them first.
   half is not** — it needs a real Gemini turn, so run one plan end-to-end against `pnpm dev` and
   say plainly that the on-device pass (safe-area under the composer, the widget inside a scrolling
   thread) was not exercised unless it was.
-
-### [workouts][activity][app-shell] LB-3 — the day-overlay sheet is unreachable and still owns three affordances the day screen has not got
-
-- **Branch:** `feat/retire-day-overlay-sheet`
-- **Added:** 2026-08-23 · **Lane: B**
-- **Placement:** low, and it now SITS low — it was filed into the slot LB-1 vacated, near the top,
-  which contradicted this line (queue position is priority). Moved 2026-08-23. Nothing is broken by
-  leaving it: what is here is dead code plus three capabilities gone since Q-110 (2026-08-08)
-  without a report.
-
-LB-1 brought the edit/delete controls across to `/health/day` and put both callers on one shared
-hook (`lib/hooks/use-day-entry-mutations.ts`), so there is no longer a second copy of the write
-logic. What it deliberately did **not** do is delete `components/health/day-overlay-sheet.tsx`,
-because deleting it silently discards three things the day screen does not have:
-
-| unreachable affordance | where it lives |
-|---|---|
-| tap an exercise name → `ExerciseHistorySheet` (1RM trend, HR recovery, session log) | `day-overlay-sheet.tsx`, via `onExerciseTap` |
-| tap an activity → `ActivityDetailSheet` | via `onSelectActivity` |
-| expand a session → per-session HR recovery chart | `loadSessionHr` + `HrRecoveryChart` |
-
-`ExerciseHistorySheet` and `ActivityDetailSheet` are still rendered by `health-content.tsx`, but the
-only thing that ever set their open-state was the sheet — so they are unreachable from Health too,
-and `historyExercise`/`selectedActivity` can now only ever be `null` there.
-
-**The work:** decide each of the three (port to `/health/day`, or drop), port the ones worth
-keeping, then delete `day-overlay-sheet.tsx` together with `dayOverlay`, `fetchDayOverlay`,
-`refreshDayOverlay`, `sessionHrData`, `loadSessionHr` and the now-dead sheet wiring in
-`health-content.tsx`. The exercise-history tap is the one with the strongest case — it is the only
-route from a logged exercise to its 1RM trend outside Stats. Note the row already carries two 48dp
-controls, so a third target needs a layout decision rather than another icon.
 
 ### [cardio][devices] Q-418 — the free walk's Android pill still cannot show the time (the screen half shipped)
 - **Gate: device** — and the gate is the entry's own instruction, not a formality: it says
@@ -2954,7 +2936,9 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   2. **A "key present" indicator on the Devices card** (`components/more/oura-section.tsx`) — still
      worth having, since that card reads server data and shows the ring as healthy while the
      service logs `no key stored`. It is a pure Lane B surface with no storage involvement, so it
-     is filed as **LB-3** rather than reached into from here.
+     is filed as **LB-5** rather than reached into from here. (This said **LB-3** until 2026-08-24 —
+     a collision with the day-overlay entry, which has since shipped and been removed, so the
+     pointer would have led nowhere. LB-5 is the entry that actually describes this work.)
 - **Placement, still open.** The owner also asked that the key field be nested behind something
   deliberate — *"so it cant accidently be used"*. It is now behind a **Show key for backup** button
   rather than an always-visible field, which is most of that; where these screens live at all is
