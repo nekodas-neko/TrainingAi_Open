@@ -3879,47 +3879,21 @@ ehr     0     0     0     0   648   208   128   556     0
   applies `normalizeMuscle` before the lookup. Working correctly.
 
 
-### [workouts] Q-299 — autoregulation's missing-data defaults make "add load" easier and "cut load" harder
+### [workouts] Q-299b — 83% of sets carry no `planned_reps`, and nobody has traced why
 
-- **Branch:** `fix/autoreg-null-defaults`
-- **Plan:** none yet — small change, but it moves a safety-relevant behaviour
-- **Added:** 2026-08-15 · from the pillar-soundness review §1.3
-- **A prescription is recorded on a minority of sets** (of 1,009 total, `deleted_at IS NULL`):
-
-  | field | sets | share |
-  |---|---|---|
-  | `planned_pct` | 280 | 28% |
-  | `planned_rest_sec` | 296 | 29% |
-  | **`planned_reps`** | **176** | **17%** |
-
-  `repCompletionRate` is null in the remaining ~83%, and additionally requires
-  `lastSessionRanPrescription && sessionsInPhase > 0 && prescription && last5.length > 0`.
-- **What `autoregulation.ts` does with null is asymmetric:**
-  ```ts
-  // back-off (cut load)
-  const missedReps = sig.repCompletionRate != null && sig.repCompletionRate < COMPLETION_CEIL
-  if (sig.rpeDelta >= RPE_DEAD_BAND && (sig.rm1Trend === 'down' || missedReps)) { … }
-
-  // push (add reps)
-  const metReps = (sig.repCompletionRate ?? 1) >= 1
-  if (sig.rpeDelta <= -RPE_DEAD_BAND && sig.rm1Trend !== 'down' && metReps) { … }
-  ```
-  **Null makes `missedReps` false and `metReps` true.** Missing data *removes* a condition from the
-  increase path and *adds* one to the decrease path: back-off then needs the 1RM to be actively
-  falling, while push needs only the RPE delta plus a 1RM that is not falling.
-- **It compounds Q-289.** That measured a systematic **−2.19** RPE delta at expected-10, past the
-  `<= -2` threshold that adds **two** target reps — and on 83% of sets the only remaining guard is
-  auto-satisfied.
-- **Fix direction — decide the intent, then encode it symmetrically.** `?? 1` reads as "assume the
-  reps were met", which is the optimistic reading of missing data on the path that adds load. Either:
-  - treat null as **unknown and blocking on both paths** (safest: no autoregulation without
-    prescription data), or
-  - treat null as neutral on both paths.
-
-  What it must not stay is optimistic on one side and pessimistic on the other.
-- **Also worth fixing the input:** 83% of sets carrying no `planned_reps` is the root cause. Find out
-  why — whether it is sets logged outside a prescribed session, or a write path that drops the
-  planned fields.
+- **Added:** 2026-08-24 · split off Q-299 when its symmetry fix shipped
+- **Q-299's asymmetry fix shipped** (`packages/shared/src/ai-periodization/autoregulation.ts`) —
+  `metReps` is now null-safe the same way `missedReps` already was, so missing rep-completion data
+  blocks the push path instead of defaulting to "reps were met". Reversal cost was cheap (a code
+  revert, no migration, no data touched), so this was decided and shipped without an owner
+  round-trip — the entry's own two options both agreed the current optimistic-on-one-side behaviour
+  was wrong, and the conservative option (block, don't assume) is the standard default for
+  automated load adjustment acting on absent evidence.
+- **What is deliberately NOT done:** the entry's second half, unstarted. `repCompletionRate` is null
+  on ~83% of sets (of 1,009, `deleted_at IS NULL`: `planned_pct` 28%, `planned_rest_sec` 29%,
+  `planned_reps` 17%) — find out why. Whether it's sets logged outside a prescribed session, or a
+  write path that drops the planned fields, is unknown; the fix above makes the missing-data case
+  *safe*, it doesn't make the data present.
 
 ### [workouts] Q-300 — 37% of sets are taken with materially less rest than prescribed, and the RPE model has no rest term
 

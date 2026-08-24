@@ -147,6 +147,14 @@ describe('computeRpeAdjustment — push (RPE low AND progressing AND reps met)',
     expect(r.repDelta).toBe(0)
   })
 
+  it('does not push when completion is unknown (Q-299) — missing data must not read as met', () => {
+    // Before the fix, `repCompletionRate ?? 1` treated no data as a completed set, so a low RPE
+    // alone was enough to add load with zero rep-completion evidence — the mirror of the back-off
+    // path, which already treats unknown completion as "not proven missed" rather than "missed".
+    const r = computeRpeAdjustment(sig({ rpeDelta: -2.5, rm1Trend: 'up', repCompletionRate: null }), ctx())
+    expect(r).toMatchObject({ pctMultiplier: 1, repDelta: 0, setDelta: 0 })
+  })
+
   it('does not push reps in a low-rep peak (realisation)', () => {
     const r = computeRpeAdjustment(sig({ rpeDelta: -2, rm1Trend: 'up', repCompletionRate: 1 }), ctx({ phase: 'realisation' }))
     expect(r.note).toBeNull()

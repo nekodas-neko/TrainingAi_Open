@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.354.0",
+    date: "2026-08-24",
+    changes: [
+      "A set with no recorded target reps can no longer nudge a prescription upward on RPE alone — it needed the same missing-data caution the app already applied when deciding whether to cut a prescription down.",
+    ],
+  },
+  {
     version: "1.353.0",
     date: "2026-08-24",
     changes: [

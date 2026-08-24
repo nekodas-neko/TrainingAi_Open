@@ -1766,3 +1766,25 @@ individually, not taken from the entry's word).
 - **Verified:** `pnpm check:rules` 55 of 55. No dedicated env-example-vs-code CI check exists yet —
   the entry suggested one; not built here, since the drift it would catch is exactly what this fix
   just cleared and adding the check is a separable, smaller follow-up.
+
+### [workouts] ✅ Autoregulation's missing-data defaults favoured adding load — FIXED 2026-08-24, Q-299
+
+`repCompletionRate` is null on ~83% of sets, and `autoregulation.ts` read that null asymmetrically:
+`missedReps` defaulted to `false` (not proven missed) but `metReps` defaulted to `true` (`(x ?? 1)
+>= 1`, reading absent data as a completed set). Missing evidence removed a condition from the
+load-increase path and added none to it, while the decrease path got no matching benefit of the
+doubt.
+
+- **Fix:** `metReps` is now `sig.repCompletionRate != null && sig.repCompletionRate >= 1` — null-safe
+  the same shape as `missedReps`, so missing data reads the same way (not proven) on both the push
+  and back-off paths, and blocks a push it can't substantiate.
+- **Decided without an owner round-trip.** The entry offered two symmetric options — block on
+  missing data, or treat it as neutral on both paths — and both agreed the *asymmetric* status quo
+  was wrong; the conservative option (don't push without evidence) is the standard default for
+  automated load adjustment, and the change is a plain code revert if it's ever wrong, no migration
+  or data touched.
+- **What's still open, split off as Q-299b:** why 83% of sets carry no `planned_reps` in the first
+  place — untouched, and a separate, larger investigation from making the missing-data case safe.
+- **Verified:** new test (`does not push when completion is unknown`) plus the existing 32 green;
+  full suite unaffected elsewhere (no other caller of `computeRpeAdjustment`/`applyAutoregulation`
+  outside `generate-prescription.ts`, which has no dedicated test exercising this path).

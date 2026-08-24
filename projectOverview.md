@@ -1961,12 +1961,6 @@ flows into trends, PR detection and the next prescription, and reads as −100% 
 **2026-08-09 also logged 1,000 `error_events`** and carries the 0.00 h sleep row from Q-274 — three
 domains, one heavy-fault day, pointing at the connection-starvation class (Q-213/Q-107).
 
-**🟠 Autoregulation's missing-data defaults favour adding load (Q-299).** `planned_reps` is recorded
-on **176 of 1,009 sets (17%)**, so `repCompletionRate` is usually null — and
-`autoregulation.ts` reads null as `missedReps = false` but `metReps = (x ?? 1) >= 1` → **true**.
-Missing data *removes* a condition from the increase path and *adds* one to the decrease path. It
-compounds **Q-289**, whose measured −2.19 delta at expected-10 already clears the `<= -2` two-rep bump.
-
 **🟠 37% of sets are rushed, and `expectedRpe` has no rest term (Q-300).** Where both are recorded
 (n = 276): mean 99 s taken vs 111 s planned; **103 rushed (< 75%)**, 44 overlong. A set at 80% with
 60 s rest is not the stimulus the model assumes. **Re-run Q-289's bucket table split by rest
