@@ -25,7 +25,40 @@
 ## 🔖 Current Status
 
 **Version:** v1.318.10 · **Branch:** `main` · Railway auto-deploys on push to `main`.
-**Last updated:** 2026-08-23.
+**Last updated:** 2026-08-24.
+
+**The database reclaim is three-quarters done, and the last quarter is one press.** The owner ran
+the `oura_raw_samples` vacuum on 2026-08-24 and it reclaimed **36 MB** — 93 MB → **57 MB** (heap
+44→28, idx 49→29) — and the automatic packer (below) has been observed in production across four
+runs: **318,883 → 205,278 rows**, 764 → 864 buckets, **0 faults**. What is left is **Q-315,
+`VACUUM FULL error_events`, ~49 MB**, and there is **no button for it** — the admin vacuum control
+covers `oura_raw_samples` only, so it needs `POST /api/admin/vacuum {"table":"error_events"}` with an
+admin session cookie. `Gate: owner`.
+
+**A deload's stored zero was becoming the next session's previous 1RM (Q-298).** `listPrevious1rm`
+gated on `estimated_1rm IS NOT NULL` while its two sibling queries already filtered `> 0`, so a
+deload set — which stores `0` by design — was served as the reference the next prescription is built
+from. Fixed to `> 0`, and the deload decision is now a named `deloadedForEstimate` predicate used at
+**both** the estimate call and the stored provenance column, so the two cannot drift
+([`journal`](docs/overview/entries/2026-08-24-deload-provenance-and-previous-1rm.md)). The entry's own
+premise was wrong — the two queries it named already filtered correctly, and re-verifying it is what
+found the one that didn't.
+
+**Sessions left running were inflating energy, and they are real workouts (LA-21).** Production held
+**11 of 81 sessions (13.6%) at 534–845 min**, with an empty gap from 92 min — the distribution itself
+separates them. All 11 are genuine training (5–6 exercises, 13–18 sets) left running, which is why
+the **duration** is culled and the session kept: excluding the session would delete history to fix a
+calorie number. `isPlausibleSessionDuration()` /
+`MAX_PLAUSIBLE_SESSION_MIN = 4 h` now lives once in `packages/shared/src/health/workout-energy.ts`,
+consolidated from **three** pre-existing copies and applied on **both** the MET and HR branches. The
+bare midnight session-start fallback in `log-exercise.ts` is also gone, replaced by
+`workoutStartedAt` → first set start → now-if-today → midnight. ⚠️ **Not device-verified.**
+
+**Fixture MET constants sat below the calorie floor, so every MET strength estimate was 0 in CI
+(Q-312).** `generate-test-constants.js` emitted `met_moderate: 0.6` against `estWorkoutKcal`'s 1.5
+floor — those tests were passing vacuously and needed a hand-written guard to say so. It emits above
+the floor now. Separately, **session RPE can be derived when it wasn't self-reported (Q-420)**:
+`sessionEffort()` returns `{ rpe, source: 'self' | 'derived' }`, so a mean of set RPEs is never read as a self-report.
 
 **The raw-frame packer runs itself, and it deletes only what it verified (Q-541 complete).** The
 2026-08-18 hand-run is verifiably clean in production — **764 blobs hold 941,233 frames in 13 MB**,
@@ -36,9 +69,11 @@ path, throttled **per user** (one shared timestamp lets a busy user starve anoth
 `OURA_AUTOPACK=off` stops it without a deploy. Automating it is also what made the delete's race
 reachable, so phase 3 deletes **by row id** rather than by the bucket's ds range — a frame arriving
 between the select and the delete was previously removed having never been packed, i.e. in neither
-tier ([`journal`](docs/overview/entries/2026-08-23-feat-oura-autopack.md)). ⚠️ **Not yet observed in
-production**, and the 92 MB high-water mark does not come back without a `VACUUM FULL` (Q-315,
-`Gate: owner`).
+tier ([`journal`](docs/overview/entries/2026-08-23-feat-oura-autopack.md)). ✅ **Observed in
+production 2026-08-24** — four runs, 318,883 → 205,278 rows, 764 → 864 buckets, 0 faults; each deploy
+resets the per-process throttle, so a busy merge day accelerates it. The 92 MB high-water mark was
+reclaimed by the owner's `VACUUM FULL` the same day (93 → 57 MB); the equivalent for `error_events`
+is still owed (Q-315, `Gate: owner`).
 
 **Logging food evicted the caches before the server had the write (LB-4).** The invalidation fired
 correctly and too early: subscribers refetched a server that lacked the log and re-cached the
