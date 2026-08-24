@@ -3,9 +3,10 @@
 import { useState, useEffect } from "react"
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetFooter } from "@/components/ui/sheet"
 import { Button } from "@/components/ui/button"
-import { cn, localDateString } from "@trainingai/shared/utils"
+import { cn } from "@trainingai/shared/utils"
 import { toast } from "sonner"
 import { todayInTz, todayMidnightUtc, toAestDay } from "@trainingai/shared/date-utils"
+import { useUserTimezone } from "@/components/shell/user-timezone-provider"
 import { getLocalStore } from "@/lib/local-store"
 import { pushMutations } from "@/lib/local-store/sync-engine"
 import type { BodyMetaRow } from "@/app/api/body-metadata/route"
@@ -31,6 +32,7 @@ interface MetricLogSheetProps {
 export function MetricLogSheet({ logState, userId, onClose, onSaved }: MetricLogSheetProps) {
   const [value, setValue] = useState("")
   const [saving, setSaving] = useState(false)
+  const tz = useUserTimezone()
 
   useEffect(() => {
     setValue(logState?.value ?? "")
@@ -48,7 +50,7 @@ export function MetricLogSheet({ logState, userId, onClose, onSaved }: MetricLog
     if (metricBoundError(logState.field, value)) return
     setSaving(true)
     try {
-      const date = todayInTz()
+      const date = todayInTz(tz)
       const numVal = parseFloat(value)
       // Map health-content field names to LocalBodyMetric field names
       const fieldMap: Record<string, keyof Pick<import('@/lib/local-store/types').LocalBodyMetric, 'weightKg' | 'bodyFatPct' | 'steps'>> = {
@@ -148,7 +150,7 @@ export function MetricLogSheet({ logState, userId, onClose, onSaved }: MetricLog
         const res = await fetch("/api/body-metadata", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ localDate: localDateString(), [logState.field]: numVal }),
+          body: JSON.stringify({ localDate: date, [logState.field]: numVal }),
         })
         if (!res.ok) throw new Error()
       }
