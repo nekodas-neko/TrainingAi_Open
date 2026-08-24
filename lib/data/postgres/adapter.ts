@@ -4696,6 +4696,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       latencyMs: row.latencyMs ?? null,
       ok: row.ok,
       fingerprint: row.fingerprint ?? null,
+      payloadBytes: row.payloadBytes ?? null,
     })
 
     const now = Date.now()

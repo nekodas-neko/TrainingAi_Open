@@ -1,0 +1,15 @@
+-- BF-4: the upload leg of a photo scan is measured nowhere.
+--
+-- `ai_call_log.latency_ms` covers the model call only, so "photo -> result" — the thing the owner
+-- actually reported as slower — has no number anywhere. Measured 2026-08-24 against the real model,
+-- the two hypotheses the entry named are both retired: an explicit `maxOutputTokens` changes nothing
+-- (the model was never hitting a cap), and `generateObject` costs ~10% over the `generateText` +
+-- JSON.parse that #112 replaced, not a regression. Latency tracks OUTPUT tokens almost exactly.
+--
+-- What that leaves is the leg nothing times. Recording the request's payload size beside the model's
+-- own latency is what lets the next report be answered by subtraction rather than re-argued: a
+-- wall-clock complaint minus a known model time and a known upload size names its own culprit.
+--
+-- Nullable because only the image shape has a payload — the url and text shapes of the same route
+-- legitimately have none, and a 0 there would read as "measured, and it was empty".
+ALTER TABLE ai_call_log ADD COLUMN IF NOT EXISTS payload_bytes integer;

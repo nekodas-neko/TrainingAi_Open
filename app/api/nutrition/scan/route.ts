@@ -118,7 +118,10 @@ Rules:
         ? `Analyse this food photo. Additional context from user: "${userNote}". Return the nutrition JSON.`
         : 'Analyse this food photo and return the nutrition JSON.'
       result = await loggedGenerateObject(
-        { section: 'nutrition-scan', userId: session.user.id, fingerprint: { mode: 'image', note: userNote } },
+        // `imageBuffer.byteLength` is the DECODED image, not the base64 the client sent — the wire
+        // cost is ~4/3 of it. The decoded size is the honest one to store: it is what the upload
+        // actually represents, and the base64 inflation is a constant anyone can apply.
+        { section: 'nutrition-scan', userId: session.user.id, fingerprint: { mode: 'image', note: userNote }, payloadBytes: imageBuffer.byteLength },
         () => generateObject({
           model: aiModel(),
           schema: ScanSchema,
