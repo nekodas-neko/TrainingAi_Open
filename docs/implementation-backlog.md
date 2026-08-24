@@ -8747,54 +8747,6 @@ per-field merge where an AI write has no honest source rank to claim.
   existing scale-toast Known-Issues entry in `projectOverview.md` rather than adding a duplicate
   when this ships.
 
-### [sleep] ⛔ Q-102 — wire the morning sleep-feel rating into the live Sleep Score, neutral at 3/5 — OWNER DECLINED 2026-08-06
-
-- **Gate:** owner
-
-> **⛔ Owner explicitly ruled this out, in person, 2026-08-06** — walked through it live against a
-> real disrupted night: does not want `sleep_quality_feel` driving the score at all, wants it kept
-> independent for backlog/model calibration (i.e. keeps the Q-16 decision this entry would have
-> reversed). Asked for an objective awake-time criterion instead, which shipped as a separate
-> mechanism — see [`docs/overview/overview/history-2026-08-04.md`](overview/history-2026-08-04.md).
-> Do not implement this entry without the owner explicitly reopening it.
->
-> **Also moot on separate grounds** (found 2026-08-06, same session as Q-113): `sleepQualityFeel`'s
-> on-screen slider is pre-filled from the Sleep score itself (`prefillMorningScales()`), so an
-> unedited answer would have fed the score a value derived from itself — a second, independent
-> reason this direction was never safe to implement as originally scoped. See the `[readiness]`
-> Known-Issues row and **Q-113**.
-
-- **Branch:** `feat/sleep-feel-score-adjustment`
-- **Plan:** [`docs/superpowers/plans/2026-08-05-owner-ui-bug-batch.md`](../docs/superpowers/plans/2026-08-05-owner-ui-bug-batch.md) Task 17
-- **Added:** 2026-08-05 · owner-reported: wants the morning check-in's 1-5 sleep-feel rating to
-  adjust the live Sleep Score, with 3 (their typical rating) as neutral/no effect, and the
-  adjustment scaling with distance from 3 in either direction.
-- **JS-only fix — no APK needed.**
-- **⚑ Corrects a mistaken premise and reverses a prior owner decision — read before implementing.**
-  The owner believed this was already wired up; it isn't — `sleep_quality_feel` is currently
-  read-only (an admin calibration diagnostic + a separate AI-periodization signal), never an input
-  to the actual Sleep Score. Implementing this **reverses a documented 2026-07-27 decision (Q-16)**
-  that deliberately kept the self-report out of the score specifically so it could be used to
-  *validate* the score independently (feeds Q-72's own "does the score match how it felt"
-  finding). Not a blocker — the owner can reverse their own prior decision — but it means
-  `sleep-feel-calibration.ts` and any future score-vs-feel correlation work need to account for
-  the score no longer being feel-independent once this ships. Does **not** resolve the still-open
-  Q-72 (a different, still-unanswered rescale-vs-separate-signal question) — this is a third,
-  distinct direction. Seventeenth entry in the running owner UI-bug batch (see the plan doc); the
-  plan specifies the formula shape (symmetric, zero at 3, clamped to [0,100]) but leaves the
-  adjustment magnitude as an open parameter to sanity-check against real nights before shipping.
-- **⚑ Scoped 2026-08-05, not built — wider than it looks.** `computeSleepScoreSeries`/
-  `computeSleepScore` have real callers beyond the Health screen: `sleep-trend.ts`, `adapter.ts`,
-  `readiness-score/route.ts`, `body-battery/route.ts`, `score-audit/sleep.ts`,
-  `weekly-digest/route.ts` — six sites, not one. **"Thread it through every caller" is
-  underspecified**: at least two of those (readiness-score's composite, body-battery's anchor)
-  arguably want the *raw* physiological score, not one already mixed with a same-user self-report —
-  otherwise a subjective rating starts influencing a supposedly-objective composite one layer
-  removed from the Sleep Score itself, which is a bigger circularity than the calibration-module
-  concern the plan already flags. Needs a decision on which callers get the adjusted value vs. the
-  raw one before implementing, not just a magnitude for `k`. Deferred rather than guessed at.
-
-
 ### [app-shell] Q-93-followup — wire the workout Today's Timeline card to a detail screen
 
 - **Added:** 2026-08-06 · split off from Q-93 after the meal-card half shipped

@@ -170,6 +170,26 @@ stay on raw rows on purpose and say so in comments (day timeline, sleep list, `o
 daytime-HRV sleep-exclusion windows, which need naps *included* to exclude them from a daytime
 curve). **Before writing anything that treats one row as one night, call the helper.**
 
+## Decided, and deliberately not built
+
+- **The morning sleep-feel rating does NOT drive the Sleep Score, and must not (owner, in person,
+  2026-08-06 — Q-102, removed from the queue 2026-08-24).** `sleep_quality_feel` stays read-only: an
+  admin calibration diagnostic and a separate AI-periodization signal, never an input to the score.
+  **Do not implement without the owner explicitly reopening it** — this line is the standing
+  instruction the queue entry used to carry.
+  - **Why it is kept out, and it is not squeamishness:** holding the self-report *outside* the score
+    is what lets it independently **validate** the score — "does the number match how it felt" is
+    only answerable while the two are independent. That was the deliberate Q-16 decision
+    (2026-07-27), and Q-102 would have reversed it. The owner walked it through live against a real
+    disrupted night and declined, asking for an **objective awake-time criterion** instead, which
+    shipped separately.
+  - **It was also moot on independent grounds**, which is the part worth remembering: the on-screen
+    `sleepQualityFeel` slider is **pre-filled from the Sleep score itself** (`prefillMorningScales()`),
+    so an unedited answer would have fed the score a value derived from that same score. Wiring it up
+    as originally scoped would have been a feedback loop, not a signal. See Q-113.
+  - **Revisit only if** the prefill is removed *and* the owner reopens it — the second condition does
+    not follow from the first.
+
 ## History
 
 - Handoffs: `ls docs/handoff-*-sleep-*.md` — most recent:
