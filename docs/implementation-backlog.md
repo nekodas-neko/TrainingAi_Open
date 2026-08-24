@@ -438,45 +438,28 @@ design decision. See the correction at the top of that entry.
 
 ### [devices][heart-rate] BF-10 — the admin Device Metrics sparklines plot by sample index, not by time, so a night-only signal renders as if it ran all day
 
-- **Lane: B.** `components/oura-ble/device-metrics-panel.tsx` + `components/ui/sparkline.tsx`. No
-  schema, no migration, reproduces in `pnpm dev` — this is a rendering defect, not a device one.
-- **Added:** 2026-08-24 · found while answering the owner's Q-388 follow-up (the night-only
-  SpO₂/temp gating question). The owner pushed back on that answer with a screenshot of `/admin`'s
-  **Device Metrics (BLE-derived)** panel — Intraday SpO₂ and Intraday temp both show a dense
-  waveform filling the *entire* card width for every day shown, which reads as continuous all-day
-  sensing and appears to contradict the "SpO₂ is 98.9% inside 22:00–09:00" finding just written into
-  Q-388.
-- **It doesn't contradict it — the chart can't show the contradiction either way, and that's the
-  bug.** `app/api/oura-ble/device-metrics/route.ts:70-84` computes a real `tSec` (seconds since
-  local midnight) per sample and returns it on every point (`{ tSec, spo2 }` / `{ tSec, tempC }`).
-  But the panel only ever passes the *value* array to `<Sparkline>`
-  (`device-metrics-panel.tsx:31,35,39` — `.map(p => p.rmssd/tempC/spo2)`), and `Sparkline` places
-  each point at `x: i * step` (`sparkline.tsx:21-24`) — **array index, evenly spaced, `tSec` is
-  never read.** So 5,700 SpO₂ samples that all land in an 11-hour night window get stretched across
-  the same full width as 24 hours' worth of continuous data would. The panel cannot currently
-  distinguish "sampled all day" from "sampled for 11 hours, packed left-to-right" — both render
-  identically.
-- **temp's full-width fill in the same screenshot is not this bug — that one is real coverage.**
-  Q-388's hourly count confirms `temp_event`/`temp_period` genuinely fire at a flat, near-constant
-  rate across all 24 hours, so its sparkline filling the whole width is an accurate picture by
-  coincidence. SpO₂'s is not: it is the same index-projection artifact hiding an 11-hour signal
-  inside a 24-hour-looking line. Daytime HRV is index-projected the same way and has the same
-  disclosure gap, just not raised by the owner here.
-- **This is the class CLAUDE.md's sparkline section already names** (Q-154: *"the primitive projects
-  x by index"*) — but that section's audit list only ever covered call sites bypassing the primitive
-  with a hand-rolled polyline, and its exemption list is files that draw a genuine time axis
-  *outside* the shared primitive. `device-metrics-panel.tsx` is in neither list: it's an admin-only
-  diagnostic panel that was never swept, and it's the primitive itself being asked to draw
-  time-series data it structurally cannot place correctly on the x-axis.
-- **What would fix it:** project `x` from `tSec` (or add a variant/prop that does), so a gap in
-  coverage renders as a gap — or, cheaper, don't route real time-series data through the
-  index-projecting `Sparkline` for this panel at all. Either way, the fix belongs to the shared
-  primitive's known gap (Q-154), not to this panel alone — `daytimeHrv` has the identical shape.
-  **What would count as fixed:** feeding the panel one real day of SpO₂ data with a genuine 11-hour
-  active window renders as an 11-hour-wide line with visible dead space either side, not full width.
-- **Surface: web-reproducible.** No device or real ring needed — seed `oura_raw_samples` rows for
-  one user-local day with `measured_at` clustered in a window under a third of the day and load
-  `/admin/oura-ble`; the sparkline will still span the full card.
+> **Shipped 2026-08-24.** `Sparkline` takes optional `times`/`timeDomain` props and projects `x` by
+> position within the domain instead of by index when given; `device-metrics-panel.tsx` passes
+> `tSec` against the full `[0, 86_400]` day for all three curves (daytime HRV, intraday temp,
+> intraday SpO₂). Verified with a scratch route rendering the panel against seeded
+> `oura_raw_samples`/`oura_ble_clock_anchors` rows for a 2-hour window: before the fix the line
+> filled the full 120px card width, after it occupies only the ~10px matching the window's share of
+> the day, with visible dead space either side.
+>
+> **The entry's own reproduction premise was wrong, and it matters for anyone reading it next.**
+> "Surface: web-reproducible… load `/admin/oura-ble`" does not hold on current `main`:
+> `OuraBleDebug` (`components/oura-ble/oura-ble-debug.tsx:429`) returns the native-unavailable
+> banner and nothing after it whenever the native plugin isn't registered, which is always true in
+> `pnpm dev`/the web sandbox — `SampleInspector` and `DeviceMetricsPanel` are both inside that
+> unreachable tail. The panel is only reachable in the APK, on the ring's own data, which is the
+> only place the fix can be seen for real. The underlying rendering defect was real regardless (read
+> from source and confirmed by mounting `DeviceMetricsPanel` directly, off the gated page) — this
+> only corrects where it can be *observed*.
+
+- **Branch:** `fix/sparkline-time-axis`
+- **Lane:** B
+- **Keep:** the on-device check, against `/admin/oura-ble` in the APK with real ring data spanning
+  less than a full day (SpO₂/temp night-only windows are the common case). `Gate: device`.
 
 ### [nutrition][platform] 🟠 BF-4 — the photo scan feels much slower, and the only dated change is the structured-output conversion
 

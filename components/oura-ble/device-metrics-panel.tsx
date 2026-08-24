@@ -5,6 +5,8 @@ import { Sparkline } from "@/components/ui/sparkline";
 
 // Admin diagnostic: three BLE-derived device metrics (daytime HRV, intraday skin temp, ring uptime)
 // computed on-read from stored raw samples. Oura shows none of these three intraday curves.
+const DAY_DOMAIN: [number, number] = [0, 86_400]; // seconds since local midnight — a real window renders with visible dead space either side
+
 export function DeviceMetricsPanel() {
   const [data, setData] = useState<DeviceMetricsResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -28,15 +30,15 @@ export function DeviceMetricsPanel() {
           </p>
           <div className="flex items-center gap-2">
             <span className="w-24 text-muted-foreground">Daytime HRV</span>
-            {d.daytimeHrv.length ? <Sparkline values={d.daytimeHrv.map(p => p.rmssd)} /> : <span className="text-muted-foreground">—</span>}
+            {d.daytimeHrv.length ? <Sparkline values={d.daytimeHrv.map(p => p.rmssd)} times={d.daytimeHrv.map(p => p.tSec)} timeDomain={DAY_DOMAIN} /> : <span className="text-muted-foreground">—</span>}
           </div>
           <div className="flex items-center gap-2">
             <span className="w-24 text-muted-foreground">Intraday temp</span>
-            {d.intradayTemp.length ? <Sparkline values={d.intradayTemp.map(p => p.tempC)} /> : <span className="text-muted-foreground">—</span>}
+            {d.intradayTemp.length ? <Sparkline values={d.intradayTemp.map(p => p.tempC)} times={d.intradayTemp.map(p => p.tSec)} timeDomain={DAY_DOMAIN} /> : <span className="text-muted-foreground">—</span>}
           </div>
           <div className="flex items-center gap-2">
             <span className="w-24 text-muted-foreground">Intraday SpO₂</span>
-            {d.intradaySpo2.length ? <Sparkline values={d.intradaySpo2.map(p => p.spo2)} /> : <span className="text-muted-foreground">—</span>}
+            {d.intradaySpo2.length ? <Sparkline values={d.intradaySpo2.map(p => p.spo2)} times={d.intradaySpo2.map(p => p.tSec)} timeDomain={DAY_DOMAIN} /> : <span className="text-muted-foreground">—</span>}
           </div>
         </div>
       ))}
