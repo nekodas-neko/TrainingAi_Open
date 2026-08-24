@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.363.4",
+    date: "2026-08-24",
+    changes: [
+      "The database footprint readout and its disk-reclaim controls now work from a desktop browser instead of only inside the phone app. They never needed the ring \u2014 they were just rendered behind the check for it, which meant disk could not be reclaimed at all while the app was broken or being rebuilt.",
+    ],
+  },
+  {
     version: "1.363.3",
     date: "2026-08-24",
     changes: [

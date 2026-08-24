@@ -17,8 +17,6 @@ import { StepCalibration } from './step-calibration'
 import { LiveStepTest } from './live-step-test'
 import { BatterySoakTest } from './battery-soak-test'
 import { ContinuousCaptureCard } from './continuous-capture-card'
-import { DbFootprintCard } from './db-footprint-card'
-import { DeviceMetricsPanel } from './device-metrics-panel'
 import { runRedecodeJob } from './redecode-job'
 
 type Availability = 'checking' | 'unavailable' | 'ready'
@@ -591,8 +589,6 @@ export function OuraBleDebug() {
       {/* Decoded-field inspector — one newest sample per event type */}
       {summary && <SampleInspector samples={summary.latestByTag} />}
 
-      <DeviceMetricsPanel />
-
       {/* Domain sections (Sub-plan G-1) — the console is sliced by DATA DOMAIN (one chevron per
           program area) rather than by tool type, so each program feature PR drops its device-test
           card into the right section. Every lever keeps the handler defined above; only the grouping
@@ -601,8 +597,7 @@ export function OuraBleDebug() {
       {/* ① Data / Ingestion / Retention */}
       <CollapsibleSection title="Data · Ingestion · Retention" icon={<History className="h-4 w-4" />}>
         <div className="space-y-3">
-          <DbFootprintCard />
-          <div className="space-y-3 border-t border-border/60 pt-3">
+          <div className="space-y-3">
             <BtnGroup label="History & sync">
               <Button size="sm" variant="outline" onClick={() => withPlugin((p) => p.drainHistory())}><History className="mr-1 h-4 w-4" /> Drain history</Button>
               <Button size="sm" variant="outline" onClick={fullResync}><History className="mr-1 h-4 w-4" /> Full re-sync</Button>
