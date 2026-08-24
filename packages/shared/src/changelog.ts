@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.356.0",
+    date: "2026-08-24",
+    changes: [
+      "Two Health cards (HR Recovery Profile, Estimated 1RM) now say so when they can't load, instead of silently vanishing as if you had no data yet — including when you'd simply hit the app's own rate limit.",
+    ],
+  },
+  {
     version: "1.355.0",
     date: "2026-08-24",
     changes: [

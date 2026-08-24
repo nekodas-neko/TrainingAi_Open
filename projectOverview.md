@@ -27,6 +27,12 @@
 **Version:** v1.318.10 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-08-24.
 
+**Two Health cards stop vanishing on a failed fetch, and the fix needed a second one (Q-499).**
+`hr-recovery-profile-card.tsx`/`strength-progress-card.tsx` now show "Couldn't load… — pull to
+refresh" on a 429/500. Wiring `onError` alone didn't work: under StrictMode's dev double-invoke, a
+joined caller's failure was never relayed by `cachedFetchCore`'s dedup — only the torn-down owner's
+was, fixed in `lib/sqlite/cache.ts` — a race reachable in production too, not just under StrictMode.
+
 **The database reclaim is three-quarters done, and the last quarter is one press.** The owner's
 `oura_raw_samples` vacuum reclaimed **36 MB** (93 → **57 MB**) and the automatic packer is now
 observed in production — four runs, **318,883 → 205,278 rows**, 0 faults. Left: **Q-315,
