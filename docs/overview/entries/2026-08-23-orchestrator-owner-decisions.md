@@ -91,6 +91,15 @@ same class sweep 3 exists to clear, found by writing one.
 was written for someone who had read the entry, and the owner said so. Every question after it led
 with what the feature *is* in plain terms before what was being decided.
 
+### One entry needed no question at all — Q-137
+
+Walking to Q-137 (the Activity Score) expecting a fifth owner question, its own text had already
+answered it: **"DECIDED 2026-08-11 — direction C"**, with a closing line reading *"what remains on
+this entry: nothing — strike this entry once Q-188 and Q-190 land."* Both had, confirmed in source
+(`hourly-movement.ts`, `activity-score.ts`, `score-audit/activity.ts`). Removed rather than asked
+about — the live thread on the Activity Score is a later entry (Q-505) the owner had already
+delegated on 2026-08-18. Same class sweep 1 exists for, found this time by reading before asking.
+
 ### Verification
 
 `pnpm check:rules` — **54 of 54**. `check-backlog-pointers` — 192 entries, 13 `Needs:` with no
