@@ -305,41 +305,6 @@ order.
 **Fixed in v1.334.0** — `/health/day` carries edit + delete on every exercise row, delete on every session card and every activity, reusing `day-overlay-dialogs.tsx` unchanged. The four handlers moved into `lib/hooks/use-day-entry-mutations.ts`, called by the day screen *and* `health-content.tsx`, so there is one write path per domain. Guarded by `e2e/day-entry-edit-delete.spec.ts` — four cases asserting on the **database**, not on the row disappearing: every handler toasts and closes *before* its request resolves, so a control wired to nothing looks identical on screen ([`journal`](docs/overview/entries/2026-08-23-day-screen-edit-delete.md)). **How it happened:** Q-110 (2026-08-08, v1.270.0) repointed the calendar day-tap from `DayOverlaySheet` to `/health/day` and the controls stayed on the sheet, which nothing else opened — so the app's only Edit/Delete controls, and the only client callers of the three DELETE routes, sat unreachable.
 - **🟠 LB-4 — logging food invalidates BEFORE its push,** so subscribers refetch a payload the server has not got and cache it. Cause of Q-417's 42 kcal gap between Home's and Nutrition's identical cards. Lane A: local-store/outbox path. **v1.336.0 finished Q-323's display half** — the bar fills toward a goal notch (x-axis is intake, 0 → `budget + OUTER_KCAL`), Home's donut became a progress ring, and **`barPosition`/`barBands` are deleted** for `barProgress`. The entry said "the macro ring" but described Home's donut; the Nutrition ring already did the asked-for thing ([`journal`](docs/overview/entries/2026-08-23-calorie-progress-bar.md)). **Keep: not device-verified** — the sandbox serves the MET table as synthetic fixtures, so the **activity** contribution to the budget is 0 here and only the heart-rate contribution ran; the bar and ring are purely visual, judged at 412 px in Chromium, never on the Samsung WebView compositor that is the known hazard for masked conic-gradients, and never in the light/dark pair.
 
-### [workouts][platform][nutrition] 🟠 Three write paths accept another user's progression-style id; the PUT twin of one of them rejects it (RV-32…RV-34, 2026-08-20)
-
-- **The non-workout write surface, probed live with two signed-in accounts**, closing the top item on
-  the Review baton's "Next" list since sweep 3.
-  [`docs/reviews/2026-08-20-non-workout-write-surface-ownership.md`](docs/reviews/2026-08-20-non-workout-write-surface-ownership.md).
-- **🟠 RV-32 — `POST /api/phase-sets`, `POST /api/workout-templates` and `POST /api/log-exercise` all
-  persist a `progression_styles` id owned by another user.** `PUT /api/phase-sets/[id]` refuses the
-  **identical value** with `400 Invalid primaryStyleId` — same resource, same session. The check exists
-  fourteen lines away in the sibling file and was never copied into the create twin. Each accepted row
-  was read back out of Postgres with a join proving a different owner.
-- **What it costs, measured rather than assumed.** `listPhaseSets` joins the style name in **without a
-  user scope**, so `GET /api/phase-sets` returned **the other account's style name**, and that field
-  renders in the workout-builder review and goes into an LLM prompt. It stops there: every other read of
-  `progression_styles` is `user_id`-scoped, so the borrowed style's set structure never reaches the
-  borrower. Separately, all three FKs are `ON DELETE SET NULL` — **deleting your own style nulls a column
-  in another user's program and workout history.**
-- **🟡 RV-34 — a client-supplied `program_sessions.id` that is not yours is a raw `pg 23505` 500** plus an
-  `error_events` row. It fails closed, but by accident of a primary-key constraint rather than by design.
-- **🟡 RV-33 — two routes answer a correct ownership refusal with an empty-bodied 500** (`POST
-  /api/progression-styles`, `PATCH /api/nutrition/food-logs/[id]`), each filing it into `error_events` as
-  a server fault. The Q-462/Q-463 class, on two routes that fix missed. **Neither is a leak or an outbox
-  wedge** — both were checked.
-- **✅ `CLAUDE.md` write-path ownership rule (b) — a raw request body into Drizzle `.set()` — is audited
-  for the first time and is clean.** 116 mutating routes, 325 `.set()` sites, the 21 taking a bare
-  identifier or spread each traced to source: every one built field by field. Confirmed live —
-  `PATCH /api/user/profile` sent `isAdmin`, `id` and `passwordHash` and changed none of them. **Rule (a)
-  is now the only one of the three with no evidence behind it.**
-- **Not exploited in the data available:** production shows 0 of 46 phase rows, 0 of 82 styled
-  `session_exercises` and 0 of 280 styled `exercise_logs` pointing outside the owner's styles. `claude_ro`
-  is row-scoped to the owner and **the victim's rows are the ones it cannot show** — that is "no evidence",
-  not "has not happened".
-- **Not exercised:** web build only (`getLocalStore()` is null), local DB for the writes, two accounts.
-  The 23 other FK edges into user-scoped tables are inventoried in the write-up and unprobed.
-
-
 ### [platform][devices] 🟡 The CSP now permits WASM, and dropped two dead hosts — neither checked on the device (Q-546, 2026-08-20)
 
 - **What shipped.** `script-src` gained **`'wasm-unsafe-eval'`**, which permits WebAssembly

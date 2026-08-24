@@ -1982,3 +1982,23 @@ then up to 1148. Recorded as the single net change, since the branch squash-merg
 from the detour: do not ratchet a baseline down while the convention it measures is still being
 worked out — it bought nothing and had to be undone within the hour.
 
+
+## 2026-08-24 — `docs/agents/state/review.md` 170 → 168; `projectOverview.md` shrinks 33 lines with its number left alone
+
+Review session wrap-up for sweep 40.
+
+**Review baton (−2 net, after +15 and a trim):** the wrap-up added a closed-session pointer, the
+🟢/🔴 trailing-light convention, and a `Now` section saying the successor is awaiting instructions —
+15 lines of genuine state. Rather than raise the number for them, the sweep-40 section was cut from
+35 lines to 20 by applying the baton's own rule: the handoff written in this same PR now carries that
+sweep's narrative, so the baton keeps only the three parts that are still *state* — rule (b) clean and
+rule (a) the last unevidenced one, the 27-edge FK inventory, and the PUT/POST contrast. Net shrink, so
+the ratchet goes down rather than up.
+
+**`projectOverview.md` — 33 lines lighter, baseline deliberately not lowered.** The RV-32…RV-34
+Known-Issues row was moved whole to `known-issues-resolved.md`; all three shipped and nothing is owed,
+re-verified in source rather than read off the closure note. The number stays at 7897 because
+**#373 is in flight raising it 7897 → 7900**, and its PR body says it went looking for a resolved
+Known Issue to archive for exactly this headroom and found none. A file sitting below its number is
+allowed by the ratchet's own rule; lowering it here would hand a live PR a conflict for no gain. The
+next session to touch this file should ratchet it to whatever the tree then holds.
