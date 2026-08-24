@@ -1917,55 +1917,31 @@ this fits without an extraction.
 
 ### [app-shell] Q-499 — self-fetching cards cannot tell "no data" from "the fetch failed"
 
-- **Lane: B** — the fix is `onError` handlers and error states in `components/health/*.tsx`; the
-  `CLAUDE.md` wording correction rides with it.
+> **The two verified instances shipped 2026-08-24, plus a deeper bug the fix uncovered.**
+> `hr-recovery-profile-card.tsx` and `strength-progress-card.tsx` now pass `onError` to
+> `useCachedValue` and render a compact "Couldn't load… — pull to refresh" state instead of a bare
+> `return null`, following the `observed-hr-card.tsx` pattern. `CLAUDE.md`'s wording is corrected —
+> `cachedFetch`/`useCachedValue` swallow `!res.ok` **only when the caller passes no `onError`**.
+>
+> **The two-instance fix would have been unreliable without a second one.** `cachedFetchCore`'s
+> in-flight dedup relays a *successful* response to every joined "waiter" for the same key, but a
+> *failed* one only ever reached the original/owning caller — a joiner with nothing cached learned
+> nothing and stayed silently blank, defeating a correctly-wired `onError` whenever two callers
+> raced for the same key. That race is guaranteed on every dev render by React StrictMode's double
+> effect-invoke (confirmed: the fix's own e2e spec was red against `pnpm dev` until this was fixed
+> too), and is reachable for real whenever two components read the same cache key concurrently.
+> Fixed in `lib/sqlite/cache.ts` by carrying each waiter's own `onError` and cached-state alongside
+> its `onData`, so a failure is now relayed to every waiter that had nothing to fall back on — the
+> same "stale beats an error state, per caller" rule the owning caller already followed.
+> [`journal`](overview/entries/2026-08-24-card-429-error-states.md).
 
 - **Branch:** `fix/card-fetch-error-states`
-- **Added:** 2026-08-18 · review sweep (three lenses) ·
-  [`docs/reviews/2026-08-18-silent-card-failures.md`](reviews/2026-08-18-silent-card-failures.md)
-- **Placement:** low-medium. Cosmetic in the common case. The sharp edge is diagnosability: a
-  rate-limited or erroring card is **indistinguishable from an empty one**, which makes an owner
-  report of *"the card is gone"* unanswerable.
-- **⚠️ One correction to `CLAUDE.md`'s premise.** The rule says `cachedFetch` *"swallows `!res.ok`"*.
-  It does **not** unconditionally — `cachedFetchCore` accepts
-  `onError?: (info: CacheFetchErrorInfo) => void`. It swallows *unless the caller opts in*. That makes
-  this a **coverage** problem with an existing mechanism, not a missing capability, and the rule's
-  wording should name `onError` so the next reader knows the hook is there.
-- **Adoption:** 78 components call `cachedFetch`; **18 reference `onError`** — an upper bound, since
-  some are unrelated matches (`components/ai/code-block.tsx`, `components/ai/response.tsx`).
-- **Verified by hand, two instances:**
-  - `components/health/hr-recovery-profile-card.tsx` — `cachedFetch` at :48 with no `onError`, then
-    `:57 if (!profile || profile.bands.length === 0) return null`. `profile` stays `null` on failure,
-    so a failed request and an empty profile render identically.
-  - `components/health/strength-progress-card.tsx` — `:36 ).catch(() => {})` (the smell `CLAUDE.md`
-    names), then `:40 if (withData.length === 0) return null`.
-- **Scoped honestly:** a crude filter produced **12** candidates; **2 were verified**. The other ten
-  are a **worklist, not a defect count** — several `return null` paths there are legitimate empty
-  states, and telling them apart needs per-file judgement.
-- **Why it matters more than it looks:** `cachedFetch` treats **any** `!res.ok` alike, **including a
-  429 from the app's own rate limiter**. A user who trips a limit watches health cards vanish instead
-  of seeing "try again in a minute", and the same silence covers a 500. Offline it is worse —
-  `cachedFetch` cannot revalidate at all.
-- **Fix:** pass `onError` and render a compact error state. In-repo references that already do it:
-  `components/health/observed-hr-card.tsx`, `components/workout/workout-load-error.tsx`. Amend the
-  `CLAUDE.md` wording in the same PR.
-- **✅ REPRODUCED 2026-08-18 (sweep 34) —
-  [`docs/reviews/2026-08-18-card-429-reproduction.md`](reviews/2026-08-18-card-429-reproduction.md).**
-  Forced `/api/weights-summary` to 429 by Playwright route interception at the S25 viewport:
-  **`Estimated 1RM` went from 1 node at baseline to 0 under the 429, with no error wording anywhere on
-  the page.** **The control holds** — blocking a *different* endpoint (`/api/oura/stats`) in the same
-  harness left it at 1, so the disappearance is caused by blocking that card's own endpoint, not by
-  the interception. (`Ring Status` is **inconclusive**, not clean: absent at baseline too.)
-- **⚠️ The vanish is invisible on a warm cache and appears on a cold one.** A repeat visit paints the
-  seeded value and the failed refresh is silent; a first visit has no seed and the card is gone. So
-  the person most likely to hit it is opening the app fresh, and least likely to reproduce it a minute
-  later — which makes *"the card is gone"* **intermittent-looking**, inviting the "can't reproduce"
-  dismissal that `CLAUDE.md`'s report-invalidation rule exists to prevent.
-- **A paste-ready reproduction spec is in the review doc.** Deliberately not committed as a test: it
-  asserts the *correct* behaviour and is red today, so it belongs in the fix PR, not before it.
-- **Still not exercised:** on device (APK WebView + native local store) and offline, where
-  `cachedFetch` cannot revalidate at all. Only **one** card is proven; the other eleven remain a
-  worklist.
+- **Lane:** B
+- **Keep:** the other ~10–18 candidate cards from the 2026-08-18 sweep remain an unenumerated
+  worklist (the review's own file list wasn't retrievable when this shipped; a fresh grep for
+  `cachedFetch`/`useCachedValue` + `return null` + no `onError`/error wording turns up ~18 today,
+  most needing per-file judgement to tell a real gap from a legitimate empty state). Not device or
+  offline verified — `cachedFetch` cannot revalidate at all offline.
 
 ### [app-shell] Q-359 — 36 other fetch-once effects have Q-402's latent bug; only the shell ones can bite
 

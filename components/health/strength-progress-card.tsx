@@ -1,7 +1,7 @@
 'use client'
 
 import { memo, useState } from 'react'
-import { Dumbbell } from 'lucide-react'
+import { Dumbbell, TriangleAlert } from 'lucide-react'
 import { useCachedValue } from '@/lib/hooks/use-cached-value'
 import { TTL_MEDIUM } from '@trainingai/shared/cache-ttl'
 import { accentCardStyle } from '@trainingai/shared/utils'
@@ -25,9 +25,22 @@ const TREND_COLOR: Record<string, string> = {
 
 export const StrengthProgressCard = memo(function StrengthProgressCard() {
   const [mode, setMode] = useState<StrengthMode>('working')
-  const summary = useCachedValue<SummaryData>('weights-summary', '/api/weights-summary', TTL_MEDIUM)
+  const [error, setError] = useState(false)
+  const summary = useCachedValue<SummaryData>('weights-summary', '/api/weights-summary', TTL_MEDIUM, {
+    onError: () => setError(true),
+  })
 
   const withData = (summary?.exercises ?? []).filter(e => e.estimated1rm != null)
+  if (error && !summary) {
+    return (
+      <div className="rounded-xl border border-border bg-muted/20 p-4">
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <TriangleAlert className="h-3.5 w-3.5" aria-hidden />
+          Couldn&rsquo;t load your strength progress — pull to refresh.
+        </div>
+      </div>
+    )
+  }
   if (withData.length === 0) return null
 
   let lastSessionName: string | null = null

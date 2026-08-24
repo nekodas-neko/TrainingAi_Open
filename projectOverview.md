@@ -27,6 +27,14 @@
 **Version:** v1.318.10 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-08-24.
 
+**Two Health cards stop vanishing on a failed fetch, and the fix needed a second one (Q-499).**
+`hr-recovery-profile-card.tsx`/`strength-progress-card.tsx` now show "Couldn't load… — pull to
+refresh" instead of a bare `return null` on a 429/500. Wiring `onError` alone didn't work: under
+React StrictMode's dev double-invoke, a joined caller's failure was never relayed by
+`cachedFetchCore`'s in-flight dedup — only the torn-down owner's was. Fixed in `lib/sqlite/cache.ts`
+so every waiter with nothing cached now learns about a failure, not just the original caller — a
+race reachable in production too, not just under StrictMode.
+
 **The database reclaim is three-quarters done, and the last quarter is one press.** The owner's
 `oura_raw_samples` vacuum reclaimed **36 MB** (93 → **57 MB**) and the automatic packer is now
 observed in production — four runs, **318,883 → 205,278 rows**, 0 faults. Left: **Q-315,
