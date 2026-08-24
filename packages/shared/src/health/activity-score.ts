@@ -13,6 +13,7 @@
 // not *maximum effort*. Readiness reads the PRE-taper score (goal completion) so acute-load fatigue
 // lives only in readiness's own ACWR term, never double-counted. See the W-B plan.
 
+import { ACWR_THRESHOLDS } from '@trainingai/shared/ai-periodization/acwr'
 import type { DailyGoals } from '@trainingai/shared/health/daily-goals'
 
 // Lane weights (renormalised over whichever components have data). Daily-movement ≈ 55, strength ≈ 45.
@@ -24,7 +25,8 @@ const W_STRENGTH_FREQ = 25
 const W_STRENGTH_VOL  = 20
 
 // Over-exertion: taper starts once ACWR exceeds this and reaches the max penalty by +0.5 above it.
-const ACWR_TAPER_START = 1.5
+// Same boundary the emergency-deload trigger fires at — from the canonical set, not retyped (Q-306).
+const ACWR_TAPER_START = ACWR_THRESHOLDS.highMax
 const ACWR_TAPER_SPAN  = 0.5
 const MAX_TAPER        = 0.15
 
