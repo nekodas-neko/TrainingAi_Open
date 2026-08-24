@@ -79,10 +79,14 @@ export interface DayEntryControls {
   onEditExercise?: (payload: { ex: DayExercise; weights: number[]; reps: number[] }) => void;
   onDeleteExercise?: (ex: DayExercise) => void;
   onDeleteSession?: (payload: { id: string; name: string }) => void;
+  /** LB-3. Tapping a logged exercise opens its history — the only route from a logged lift to its
+   *  1RM trend outside Stats. The NAME is the target rather than a third icon: the row already
+   *  carries two 48dp controls, and the name spans the half of the row nothing else claims. */
+  onExerciseTap?: (name: string) => void;
 }
 
 export const TrainingSection = memo(function TrainingSection(
-  { data, kcalBySession, onEditExercise, onDeleteExercise, onDeleteSession }:
+  { data, kcalBySession, onEditExercise, onDeleteExercise, onDeleteSession, onExerciseTap }:
     { data: DayLogResult; kcalBySession?: Map<string, SessionKcal> } & DayEntryControls,
 ) {
   if (data.exercises.length === 0) return null;
@@ -135,7 +139,18 @@ export const TrainingSection = memo(function TrainingSection(
                 key={ex.exerciseLogId}
                 className={`flex gap-2 border-b border-white/5 ${onEditExercise || onDeleteExercise ? "items-center py-1" : "items-baseline py-2"}`}
               >
-                <span className="min-w-0 flex-1 truncate text-[12.5px]">{ex.name}</span>
+                {onExerciseTap ? (
+                  <button
+                    type="button"
+                    onClick={() => onExerciseTap(ex.name)}
+                    aria-label={`${ex.name} history`}
+                    className="min-w-0 flex-1 truncate text-left text-[12.5px] underline decoration-white/20 underline-offset-2"
+                  >
+                    {ex.name}
+                  </button>
+                ) : (
+                  <span className="min-w-0 flex-1 truncate text-[12.5px]">{ex.name}</span>
+                )}
                 <span className="flex-none text-[10.5px] tabular-nums text-muted-foreground">
                   {ex.sets ?? 0} × {ex.reps?.[0] ?? 0}
                 </span>
@@ -214,7 +229,12 @@ function paceLabel(secPerKm: number): string {
 }
 
 export const ActivitySection = memo(function ActivitySection(
-  { data, onDeleteActivity }: { data: DayLogResult; onDeleteActivity?: (log: ActivityLog) => void },
+  { data, onDeleteActivity, onSelectActivity }: {
+    data: DayLogResult;
+    onDeleteActivity?: (log: ActivityLog) => void;
+    /** LB-3, as onExerciseTap: the title is the target, beside the existing delete control. */
+    onSelectActivity?: (log: ActivityLog) => void;
+  },
 ) {
   if (data.activityLogs.length === 0) return null;
   return (
@@ -236,10 +256,22 @@ export const ActivitySection = memo(function ActivitySection(
           <div key={a.id} className="mb-2 rounded-2xl border border-white/10 bg-white/[0.04] p-3.5">
             <div className="flex items-center gap-2.5">
               <Footprints className="h-4 w-4 flex-none" style={{ color: "var(--accent-green)" }} />
-              <span className="min-w-0 flex-1">
-                <span className="block truncate text-[13px]">{a.title}</span>
-                {a.startTime && <span className="mt-0.5 block truncate text-[10.5px] text-muted-foreground">{a.startTime}</span>}
-              </span>
+              {onSelectActivity ? (
+                <button
+                  type="button"
+                  onClick={() => onSelectActivity(a)}
+                  aria-label={`${a.title} detail`}
+                  className="min-w-0 flex-1 text-left"
+                >
+                  <span className="block truncate text-[13px] underline decoration-white/20 underline-offset-2">{a.title}</span>
+                  {a.startTime && <span className="mt-0.5 block truncate text-[10.5px] text-muted-foreground">{a.startTime}</span>}
+                </button>
+              ) : (
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-[13px]">{a.title}</span>
+                  {a.startTime && <span className="mt-0.5 block truncate text-[10.5px] text-muted-foreground">{a.startTime}</span>}
+                </span>
+              )}
               {a.durationMin != null && (
                 <span className="flex-none text-[0.9rem] font-bold tabular-nums">{durationLabel(a.durationMin)}</span>
               )}

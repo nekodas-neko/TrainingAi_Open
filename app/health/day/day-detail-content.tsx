@@ -7,7 +7,7 @@ import { ChevronLeft, Zap, HeartPulse, Moon, Flame } from "lucide-react";
 import { ScreenHeader } from "@/components/shell/screen-header";
 import { useTransitionRouter } from "@/lib/view-transition";
 import { cachedFetch, readCacheSync } from "@/lib/sqlite/cache";
-import { DAY_LOG_TTL, ENERGY_BALANCE_TTL, HR_PROFILE_TTL } from "@trainingai/shared/cache-ttl";
+import { DAY_LOG_TTL, ENERGY_BALANCE_TTL, HR_PROFILE_TTL, TTL_LONG } from "@trainingai/shared/cache-ttl";
 import { todayInTz, shiftDateStr, dateStrMidnightInTz } from "@trainingai/shared/date-utils";
 import {
   TrainingSection, ActivitySection, EnergySection, SleepSection, BodySection, DayHrTrace, SectionLabel,
@@ -15,9 +15,12 @@ import {
 import type { DayLogResult } from "@/app/api/day-log/route";
 import type { EnergyBalanceResponse } from "@/app/api/nutrition/energy-balance/route";
 import type { FoodLogWithItem } from "@trainingai/shared/types/nutrition";
+import type { ActivityLog, ActivityType } from "@trainingai/shared/types";
 import { useCachedValue } from "@/lib/hooks/use-cached-value";
 import { useDayEntryMutations } from "@/lib/hooks/use-day-entry-mutations";
 import { DayOverlayDialogs } from "@/components/health/day-overlay-dialogs";
+import { ExerciseHistorySheet } from "@/components/exercise-history-sheet";
+import { ActivityDetailSheet } from "@/components/activity/activity-detail-sheet";
 import { EnergyTimelineChart } from "@/components/health/energy-timeline-chart";
 import { workoutKcalBySession } from "@/components/health/day-detail/energy-summary";
 
@@ -92,6 +95,14 @@ export function DayDetailContent({ initialDate, tz, userId }: { initialDate: str
   const [foodLogs, setFoodLogs] = useState<FoodLogWithItem[] | null>(null);
   const hrProfile = useCachedValue<{ maxHr: number; restingHr: number }>(
     'hr-profile', '/api/hr-profile', HR_PROFILE_TTL,
+  );
+  // LB-3: the two sheets the retired day-overlay owned. Both open from a row on this screen now.
+  const [historyExercise, setHistoryExercise] = useState<string | null>(null);
+  const [selectedActivity, setSelectedActivity] = useState<ActivityLog | null>(null);
+  // Only for the detail sheet's icon — not read by any section here. Same key and TTL as its four
+  // other call sites, per the one-canonical-TTL rule.
+  const activityTypes = useCachedValue<{ activityTypes: ActivityType[] }>(
+    'activity-types', '/api/activity-types', TTL_LONG,
   );
   // `loggedAt` means when the food was EATEN, not when the row was written — that is Q-413, and it
   // is the whole reason this chart can exist. Before it, every back-filled day spiked at whatever
@@ -239,9 +250,16 @@ export function DayDetailContent({ initialDate, tz, userId }: { initialDate: str
                 onEditExercise={mut.setEditEx}
                 onDeleteExercise={mut.setDeleteEx}
                 onDeleteSession={mut.setDeleteSession}
+                onExerciseTap={setHistoryExercise}
               />
             )}
-            {data && <ActivitySection data={data} onDeleteActivity={mut.setDeleteActivity} />}
+            {data && (
+              <ActivitySection
+                data={data}
+                onDeleteActivity={mut.setDeleteActivity}
+                onSelectActivity={setSelectedActivity}
+              />
+            )}
             <EnergySection energy={energy} />
             {energy?.balance && (
               <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-3.5">
@@ -286,6 +304,21 @@ export function DayDetailContent({ initialDate, tz, userId }: { initialDate: str
         onDeleteSessionClose={closeDeleteSession}
         onDeleteSessionConfirm={mut.handleDeleteSession}
         mutating={mut.mutating}
+      />
+
+      {/* LB-3: both sheets used to be reachable only from `day-overlay-sheet.tsx`, which nothing
+          could open after Q-110 pointed the calendar's day-tap at this screen. They render here
+          unconditionally with a null prop, the same shape health-content used. */}
+      <ExerciseHistorySheet
+        exerciseName={historyExercise}
+        userId={userId}
+        onClose={() => setHistoryExercise(null)}
+      />
+
+      <ActivityDetailSheet
+        log={selectedActivity}
+        icon={activityTypes?.activityTypes.find(t => t.id === selectedActivity?.activityType)?.icon ?? 'DotsThreeCircle'}
+        onOpenChange={o => { if (!o) setSelectedActivity(null); }}
       />
     </div>
   );
