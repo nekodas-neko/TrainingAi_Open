@@ -141,6 +141,11 @@ timezone and only **9 of 22** call sites passed one. All 22 do now, nine callers
 **empty** baseline (Custom Rules is now 52 steps). Proven by the experiment that found it — the
 failing case passes 18/18 under a shifted timezone.
 
+**Admin Device Metrics sparklines stopped stretching a partial day to full width (BF-10).**
+`Sparkline` takes optional `times`/`timeDomain` and projects `x` by position in the day rather than
+by sample index, so a night-only SpO₂/HRV signal renders with dead space either side, not apparent
+24-hour coverage. Native-gated — verified by mounting the component off the gated page. `Gate: device`.
+
 **Coach undo wrote over whatever was there (Q-468).** Apply refuses a moved target; undo read its
 captured `beforeState` and wrote it back. Two stacked changes on one exercise: undoing the *first*
 returned the row to its original value while the history still showed the second in effect, and
@@ -272,16 +277,11 @@ The first version was green with a migration deliberately broken, because the "a
 SQLSTATEs that are benign on an ordinary run are precisely the failure signal under replay
 ([journal](docs/overview/entries/2026-08-20-migration-replay-check.md)).
 
-**Session handoff:** [`docs/handoff-2026-08-20-workouts-energy-accuracy-and-rpe-intake.md`](docs/handoff-2026-08-20-workouts-energy-accuracy-and-rpe-intake.md)
-— the intake pass behind that energy work, from the owner's *"how can we make energy usage/burned
-from excercuse more accurate"*. Read it as reasoning rather than status: three of its six entries
-were built by Lane A within hours of being filed.
-
-**Session handoff:** [`docs/handoff-2026-08-17-platform-agent-model-and-device-session-findings.md`](docs/handoff-2026-08-17-platform-agent-model-and-device-session-findings.md)
-— the agent model itself, plus six findings from a live APK reinstall and Oura re-sync. **Q-536 is
-CLOSED (2026-08-17, confirmed on device)**: the 43 wrong sleep windows came from a re-drain misread
-as a clock reset, and migrations 189 + 190 plus a redecode took the midday cluster to 4 short
-daytime fragments. Its *cause* — **Q-314** — is still live, so every re-pair reopens it.
+**Older session handoffs:** [2026-08-20 workouts energy/RPE intake](docs/handoff-2026-08-20-workouts-energy-accuracy-and-rpe-intake.md)
+(reasoning behind the energy-accuracy work, not status) and
+[2026-08-17 agent model/device findings](docs/handoff-2026-08-17-platform-agent-model-and-device-session-findings.md)
+(**Q-536 CLOSED, confirmed on device** — 43 wrong sleep windows were a re-drain misread as a clock
+reset; its cause, **Q-314**, is still live and reopens on every re-pair).
 
 **Open at the time of writing:** PR #6 (session notes the public cut did not carry), PR #10 (the
 public-repo migration handoff). Check `list_pull_requests` rather than trusting this line — it is a
