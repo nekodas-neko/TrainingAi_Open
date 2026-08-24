@@ -285,3 +285,51 @@ describe('bodyweight volume (Q-13)', () => {
     expect(logged().volume).toBeCloseTo(1200, 1)
   })
 })
+
+// LA-21. The midnight fallback here is where **7 of the owner's 11 implausible sessions came from**:
+// each recorded `started_at` at exactly 00:00 local against a `completed_at` between 08:53 and 14:05,
+// so a real workout read as an 8-to-14-hour one. Those durations are culled from statistics now,
+// which means those sessions contribute nothing — recording a plausible start is what makes a real
+// workout count again.
+describe('logExerciseFromPayload — the session start ladder (LA-21)', () => {
+  const startOf = () => createWorkoutSession.mock.calls[0][3] as Date
+  const localMidnightMs = (isoDay: string) =>
+    new Date(`${isoDay}T00:00:00+10:00`).getTime()   // Brisbane, no DST
+
+  beforeEach(() => {
+    getActiveProgramWithPhases.mockResolvedValue(null)
+    getActiveProgram.mockResolvedValue({ id: 'p1', phaseMode: 'manual' })
+  })
+
+  it('prefers the device anchor when the payload carries one', async () => {
+    const anchor = Date.now() - 40 * 60_000
+    await logExerciseFromPayload('u1', { ...basePayload, workoutStartedAt: anchor }, TZ)
+    expect(startOf().getTime()).toBe(anchor)
+  })
+
+  // The case that produced the seven. The first set's start is already in the payload and is INSIDE
+  // the session, so it loses the warm-up rather than the hours midnight loses.
+  it('falls back to the first set start, not to midnight', async () => {
+    const firstSet = Date.now() - 25 * 60_000
+    await logExerciseFromPayload('u1', { ...basePayload, setStartTimes: [firstSet, firstSet + 120_000] }, TZ)
+    expect(startOf().getTime()).toBe(firstSet)
+  })
+
+  // `workout-screen.tsx` sends `workoutStartMs ?? undefined`, and the store's abandoned-session guard
+  // nulls `workoutStartMs` — so the guard that protects against a days-old session is what leaves the
+  // next log with no anchor at all. Logging happens during the session, so `now` is inside it.
+  it('uses now when nothing in the payload carries timing and the log is for today', async () => {
+    const before = Date.now()
+    await logExerciseFromPayload('u1', basePayload, TZ)
+    const started = startOf().getTime()
+    expect(started).toBeGreaterThanOrEqual(before)
+    expect(started).toBeLessThanOrEqual(Date.now())
+  })
+
+  // A back-dated log is the one case where we genuinely do not know, and `now` would be a worse lie
+  // than midnight — it would place the session on the wrong DAY. Midnight plus the cull is honest.
+  it('keeps midnight for a back-dated log, where the start is genuinely unknown', async () => {
+    await logExerciseFromPayload('u1', { ...basePayload, localDate: '2026-05-04' }, TZ)
+    expect(startOf().getTime()).toBe(localMidnightMs('2026-05-04'))
+  })
+})
