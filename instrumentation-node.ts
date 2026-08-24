@@ -162,6 +162,12 @@ await checkModelAssets()
 
 void warmSchema()
 void bootstrapAdmin()
+// Extracted so it is testable without importing this whole module (sentry, model
+// constants, the schema warm). See the file for why it exists.
+void (async () => {
+  const { bootstrapClaudeRoOwner } = await import('@/lib/data/postgres/claude-ro-owner')
+  await bootstrapClaudeRoOwner()
+})()
 
 // Marks this file as a module (it has no other imports/exports) so instrumentation.ts can
 // `await import('./instrumentation-node')` it for its side effect.

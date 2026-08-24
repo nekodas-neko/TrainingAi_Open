@@ -86,7 +86,7 @@ import { runOuraRollup } from '@/lib/oura-ble/rollup/run'
 import { createPostgresRollupIO } from './rollup-io'
 import { nodeModelRuntime } from '@/lib/oura-models/inference/runtime-node'
 import { ensureServerOuraConstants } from '@/lib/oura-models/constants-inject'
-import { packOuraRawBuckets, countPackableBuckets } from './slices/oura-raw-pack'
+import { packOuraRawBuckets, countPackableBuckets, claimAutoPackSlot, AUTOPACK_MAX_BUCKETS } from './slices/oura-raw-pack'
 import * as bodyBattery from './slices/body-battery'
 import { mergeSet, initialSourceMap, HEALTH_SOURCES, sourceRank, type HealthSource, type SourceColumn } from '@/lib/data/health-source'
 import type {
@@ -5133,7 +5133,45 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       WHERE user_id = ${userId} AND measured_at IS NULL
     `)
 
+    // Q-541 Task 6 — retire sealed buckets to the cold tier. Fire-and-forget after the response's
+    // work is done, throttled per user, and bounded; see `claimAutoPackSlot`.
+    if (claimAutoPackSlot(userId, Date.now())) void this.autoPackRawSamples(userId)
+
     return inserted.length
+  }
+
+  /**
+   * The unattended half of the packer.
+   *
+   * Everything here is about the fact that nobody is watching. A refused bucket is the packer
+   * declining to delete frames it could not prove were stored — the single most important signal
+   * this pipeline produces — and until Task 6 it was returned to whoever pressed the button. With no
+   * caller it has to go somewhere a session will read, which is `error_events`, per the start-of-
+   * session rule: a fault that stops on its own otherwise vanishes at the 30-day prune unrecorded.
+   *
+   * Never throws. It is invoked with `void` from an ingest path that has already done its real work,
+   * and a packing failure must not turn a successful frame ingest into a 500.
+   */
+  private async autoPackRawSamples(userId: string): Promise<void> {
+    try {
+      const res = await packOuraRawBuckets(this.db, userId, AUTOPACK_MAX_BUCKETS)
+      if (res.packed > 0) {
+        console.info(`[oura-autopack] packed ${res.packed} bucket(s), ${res.framesMoved} frames -> ${res.bytesWritten} bytes in ${res.ms}ms; ${res.remaining} left`)
+      }
+      for (const b of res.buckets) {
+        if (!b.refused) continue
+        const where = `epoch ${b.epoch} tag 0x${b.tag.toString(16)} bucket ${b.dsBucket} (${b.frames} frames)`
+        console.error(`[oura-autopack] REFUSED ${where}: ${b.refused}`)
+        await this.insertErrorEvent({
+          userId,
+          source: 'server',
+          message: `[oura-autopack] refused to pack ${where}: ${b.refused}`,
+          url: 'oura-autopack',
+        }).catch(() => {})
+      }
+    } catch (err) {
+      console.error('[oura-autopack] run failed:', err)
+    }
   }
 
   /**

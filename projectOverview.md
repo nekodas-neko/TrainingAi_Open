@@ -27,6 +27,19 @@
 **Version:** v1.318.10 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-08-23.
 
+**The raw-frame packer runs itself, and it deletes only what it verified (Q-541 complete).** The
+2026-08-18 hand-run is verifiably clean in production — **764 blobs hold 941,233 frames in 13 MB**,
+contiguous with the hot tier — but a button does not hold a growth curve: `oura_raw_samples` was
+pruned back to 2026-08-10 by that run and had regrown to **318,183 rows / 92 MB** five days later,
+~6.5 MB/day against the ~0.4 MB/day the database is meant to grow at. It now fires from the ingest
+path, throttled **per user** (one shared timestamp lets a busy user starve another's table), and
+`OURA_AUTOPACK=off` stops it without a deploy. Automating it is also what made the delete's race
+reachable, so phase 3 deletes **by row id** rather than by the bucket's ds range — a frame arriving
+between the select and the delete was previously removed having never been packed, i.e. in neither
+tier ([`journal`](docs/overview/entries/2026-08-23-feat-oura-autopack.md)). ⚠️ **Not yet observed in
+production**, and the 92 MB high-water mark does not come back without a `VACUUM FULL` (Q-315,
+`Gate: owner`).
+
 **Logging food evicted the caches before the server had the write (LB-4).** The invalidation fired
 correctly and too early: subscribers refetched a server that lacked the log and re-cached the
 pre-log figures, which then stood for the key's full TTL — Home read 42 kcal high, exactly one
@@ -52,12 +65,9 @@ with `Gate: device`. **Item (3) needed no work:** battery polls have persisted s
 (6,346 rows), so the drain the entry called unmeasurable is measured — −22, −24, −22, −38, −15
 points overnight, confirming the owner's report; the SpO₂ A/B is two nights of wear, not code.
 
-**Sixteen writes revalidated around their push rather than after it (LB-6, v1.344.0).** The
-entry listed six; its finder looked only at the six lines *above* each call, and five sites write the
-invalidation below it. Four more sit after an `if/else`, one was introduced by hand in #333, and
-`nutrition-content.tsx` had the mirror image — invalidating *only* after the push, so an offline
-food-log delete repainted nothing. `scripts/check-invalidate-after-push.js` now fails Custom Rules on
-the class (**55 steps**).
+**Sixteen writes revalidated around their push rather than after it (LB-6, v1.344.0).** The entry
+listed six — its finder looked only *above* each call, missing five below it, four after an `if/else`
+and one added by hand in #333. `scripts/check-invalidate-after-push.js` holds the class (55 steps).
 
 **A deload session says so now (BF-8, v1.343.0).** The Intensity control read "Full · As
 prescribed" while the card under it read "Deload session · Auto-applied", and the workout header

@@ -23,7 +23,7 @@ const ExerciseBody = z.object({
   exerciseType: z.enum(['weighted', 'bodyweight']).default('weighted'),
   gifUrl:       z.string().url().or(z.literal('')).nullable().optional(),
   imageUrl:     z.string().url().or(z.literal('')).nullable().optional(),
-});
+}).strict();
 
 export async function GET() {
   const session = await auth();
