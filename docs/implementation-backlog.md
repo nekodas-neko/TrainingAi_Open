@@ -745,6 +745,238 @@ work is to bring them down, and **it is not a separate task**: a baton is rewrit
 handoff, so each role compacts its own on its next one, moving narrative to a dated handoff doc.
 Close this when all five are under ~150 lines.
 
+### [nutrition][platform] BF-12 — logging a saved meal takes ~20s and the owner couldn't find it after navigating away; traced to the slow fallback firing, not a lost write
+
+- **Lane: A** — the fix is in `logMealItems`/local-store availability, not the UI. No schema.
+- **Added:** 2026-08-24 · owner: *"nutrition is loading very slow; about 20 seconds from clicking
+  log to having it show up — when I swapped pages I see that it isn't in the nutrition log anymore
+  so maybe not going through properly."* Screenshot: `saved-meals-sheet.tsx`'s "Build a Meal" list,
+  **Ninja Creami Protein Ice Cream**'s "Log this meal" mid-spin.
+- **Checked production directly (`claude_ro.food_logs`, owner's rows, `date = 2026-08-24`) — the
+  writes are NOT lost, and they carry a specific fingerprint.** Two bursts land right at the
+  reported time (9:14–9:15pm Brisbane / 11:14–11:15 UTC): `BARILLA Spaghetti Protein` /
+  `Turkey Mince` / `Passata` (three rows, `updated_at` 11:14:17.072 / .457 / .886 — **staggered
+  ~0.4s apart**) and `Whey Protein Isolate` / `Full Cream Milk` (11:15:12.513 / .977, same ~0.46s
+  stagger). A local-first batch write would land these together in one JS tick; **a per-item
+  sequential network round trip would not** — this is the fingerprint of `logMealItems`'s **web
+  fallback branch**, not its local-store branch.
+- **Traced to source: `packages/shared/src/nutrition/log-meal.ts`.** `logMealItems` has two paths.
+  When `getLocalStore(userId)` returns a real store, every write is local-first (SQLite upserts,
+  `await`ed but not network-bound) and the function returns immediately with optimistic entries —
+  fast, matching the "saves feel instant" rule. **When `getLocalStore` returns `null`, it falls
+  through to a `for` loop of sequential `await fetch('/api/nutrition/food-logs', ...)` calls, one
+  per ingredient** (lines 97-110) — exactly the "never await POSTs serially in a loop" pattern
+  CLAUDE.md already names as a smell elsewhere in this codebase. For a 2-3 item meal that's 2-3
+  sequential round trips, which the production timestamps confirm are actually happening — though
+  0.4-0.9s of measured DB-write gap alone doesn't account for the full ~20s the owner felt; the rest
+  is plausibly per-request network/API latency between those writes, not visible from `updated_at`
+  alone.
+- **What makes `getLocalStore` return null on a real device: `isLocalStoreDead()`**
+  (`lib/sqlite/sqlite-service.ts`, the "K4" state) — the on-device SQLite DB failed to open. This is
+  documented as a real, recoverable-only-by-reinstall-or-retry failure mode elsewhere in this repo's
+  migration rules, not hypothetical. **There is already a visible banner for exactly this state**
+  (`components/shell/local-store-dead-banner.tsx`, "Local storage unavailable — saving online
+  only") — neither screenshot shows it, but the banner renders above the sheet and could be
+  occluded; this needs an on-device check, not a guess from the screenshot crop.
+- **The "vanished after navigating away" half is not fully explained by the above, and is flagged
+  open rather than diagnosed.** Once a fallback-path write lands server-side (confirmed above,
+  eventually), `invalidateNutritionWrite()` does cover the `nutrition-food-logs-` prefix
+  (`lib/cache-groups.ts:445`) and `useFoodLogsLoader`'s local-store-absent branch re-fetches through
+  `cachedFetch` against that same key — so a plain re-render should show it once the fetch settles.
+  Two things this entry does NOT resolve: (1) whether the specific "Ninja Creami" tap shown
+  mid-spinner in the screenshot is among the rows that landed, or whether that specific request was
+  abandoned (e.g. navigating away before a sequential fetch chain completes, in a WebView, has not
+  been checked); (2) whether "not there" meant genuinely absent on a fresh load, or present but not
+  yet re-painted because the owner looked before the ~20s chain finished.
+- **What would confirm the mechanism:** on-device, check whether `LocalStoreDeadBanner` is showing,
+  or read `isLocalStoreDead()`/`getLocalStore(userId) === null` via an admin console during a
+  reproduction. If confirmed dead, the underlying fix is whatever heals K4 (a retry path, or at
+  minimum surfacing the failure loudly enough that "slow" doesn't read as "broken") — this entry
+  does not scope that fix, only the trace to it.
+- **What would count as fixed:** logging a saved meal on this device completes in the sub-second
+  range the local-first path is designed for, or — if the local store is genuinely and permanently
+  dead on this install — the banner is visibly showing so the 20s delay reads as "expected, online
+  only" rather than "broken."
+- **Surface: device-only to confirm.** The mechanism traces cleanly from code + production data, but
+  confirming *why* this specific device's local store is null needs the device.
+
+## Nutrition — pushed to the top, 2026-08-24 (owner request)
+
+*"push the nutrition work closer to the top"* — BF-11 and Q-407 moved up from their prior position
+(below BF-10/BF-4/LA-21/Q-420/Q-422/Q-406/Q-395abc) to sit right after the standing coordination
+entry. Queue position is priority; nothing else about either entry changed in this move.
+
+### [nutrition] BF-11 — the meal creator and meal planner need a coordinated redesign; the owner and BugFix worked out the shape together
+
+- **Lane: B**, one item needs a migration (see below). **Feature request — this entry plus its
+  linked spec are the trace and the settled design, not an implementation plan.** A planning session
+  still turns this into implementation plan(s) before Lane B builds it, per the backlog protocol.
+- **Added:** 2026-08-24 · owner: *"the meal scan by url — this was added to the meal planner — but I
+  think this needs to be moved 'create a meal' then the meal builder can reference previously made
+  meals."* Grew across three more owner messages, same session, into a full design for both the
+  meal creator and the meal planner's generation logic — BugFix traced each piece against current
+  code live as the owner described it, confirming what already exists, what's a real gap, and
+  reaching agreement on the open calls.
+- **Full design: [`docs/superpowers/specs/2026-08-24-meal-creator-and-planner-design.md`](superpowers/specs/2026-08-24-meal-creator-and-planner-design.md).**
+  Read that doc before planning this — it has the complete trace (file/line citations for every
+  claim), what's already built vs. genuinely missing, and the owner's decisions on each open
+  question. Summary only, here:
+  - **Meal Creator** (`saved-meals-sheet.tsx` "Build a Meal"): move the URL-recipe scan there from
+    the wizard (original ask); add multi-item detection so one scan can produce several meals; wire
+    in the existing food-item History list (`capture-step.tsx`) as a quick-add source; PDF upload
+    descoped (screenshot-as-image instead); duplicate-detection on scan agreed as designed.
+  - **Meal Planner** (`generate/route.ts` + `meal-plan-review-step.tsx`): reorder generation to
+    search the saved-meal library for each slot before falling back to AI; lift/redesign the
+    6-meal `keepSavedMealIds` cap for a "use my whole library" mode; add a meal-type/tag system so
+    slot-matching isn't macro-blind (pancakes ≠ dinner) — **recommends reusing `MealType`
+    (`packages/shared/src/types/nutrition.ts`) via a new `SavedMeal`↔`MealType` join, which needs a
+    migration Lane A numbers when this is planned**; extend reroll to offer a library swap before
+    AI regeneration; surface "why this meal was picked" so edits/rerolls have context; redesign the
+    meal-count-change prompt (inspired by but NOT reusing `MealTypeReassignDialog`'s mechanism,
+    which moves logged history — this needs to redistribute an in-progress draft instead).
+  - **Owner's priority, explicit:** Meal Creator ships first, on its own merits; Planner integration
+    depends on it and comes after.
+  - **Still open for the planning session** (not decided in the design conversation): the
+    no-library-match fallback (prompt-to-create vs. AI-fallback), the exact meal-count-change
+    interaction, and the upper bound for "select all" against a large library.
+- **Overlap with Q-407, not a duplicate of it.** Q-407 (below) reworks the *whole* wizard into a
+  coach conversation and does not address scanning location or planner matching logic. Whoever plans
+  either should read the other first — if Q-407 lands first, its Meals step should be designed as a
+  **picker over saved meals** from the start, per this entry's design.
+- **Surface:** web-reproducible, no device needed. Item requiring a migration is server-side only.
+
+### [nutrition][platform] Q-407 — the meal-plan wizard is seven screens for six answers, and the one piece the Coach lacks is multi-select
+
+- **Branch:** `feat/nutrition-coach-meal-plan`
+- **Added:** 2026-08-19 · BugFix Intake, from the owner · mockup rendered in-session
+- **Lane:** ?
+- **Placement:** in the nutrition cluster, after Q-398 — **which shipped 2026-08-24**, so the
+  dependency is cleared. The plan's exit route in this design is "Save all as meals", and plan meals
+  can now become ordinary saved meals; before that, a conversational plan had nowhere to land and
+  was only a nicer-looking dead end.
+- **Owner's words:** *"lets get the meal plan setup wizard mocked up too -> This could use some
+  work - its too step by step - Could we try implement this into an AI coach/meal builder type
+  thing? Where it feels like a chat with a UI? Also there should be options for 'select all' as I
+  keep clicking each grocery store."* and, on the mockup, *"This looks really good - I'd like to
+  see that in prod"*.
+
+- **What it is today.** `components/nutrition/meal-plan-setup-sheet.tsx` (445 lines) is a linear
+  stepper: `const STEPS = ['Stores', 'Avoid', 'Skip', 'Meals', 'Yours', 'Training', 'Review']`
+  (line 28), seven screens holding thirteen `useState` fields, with a fixed footer per step. It
+  works, and the docstring's reason for the stepped shape is sound (a fixed action row that never
+  scrolls away, and `SheetFooter` owning the bottom inset — this repo's most repeated on-device
+  regression). **Keep that property.** The problem is not the footer, it is that six of the seven
+  screens ask a question the app can mostly answer itself, and none of them can be skipped.
+
+- **Three of the four pieces already exist, which is why this is smaller than it sounds.**
+  - `lib/coach/widgets.ts` is a **union of client-side tool schemas**, explicitly documented as the
+    extension point: *"Adding a widget means adding a member here and a row in
+    `components/coach/widget-registry.tsx`. The union is the extension point; the protocol does not
+    change."*
+  - `CHOICE_SOURCES` (`['sessions','exercises','swap_candidates']`) is the **server-fills-the-list**
+    mechanism, and its docstring is already the token argument the owner is asking for: a
+    nine-option picker the model typed out cost **~554 output tokens**, and *"having a language
+    model re-type it is paying to transcribe your own database"*. `app/api/coach/options/route.ts`
+    is where a source is resolved.
+  - `HandoffSchema` routes to real screens (`destination: 'program_builder' | 'log_activity' |
+    'profile' | 'nutrition'`), so a conversation that must hand off to a full screen has a route.
+
+- **The one genuine gap: `choice_list` is single-select, and that is exactly the owner's complaint.**
+  `ChoiceListSchema` (lib/coach/widgets.ts) has `prompt`, `source`, `sourceId`, `options[]` — **no
+  multi flag** — and `ChoiceList`'s callback is `onChoose?: (option: { id, label }) => void`, one
+  option, singular. There is no configuration that makes it multi-select. So "I keep clicking each
+  grocery store" is not a missing convenience on top of a multi-select; the widget has never had
+  one. **Extend the schema rather than adding a second widget:**
+  - add `multi?: boolean` and `selectAll?: boolean` to `ChoiceListSchema`, defaulting false so
+    every existing call site is unchanged;
+  - `ChoiceList` gains checkbox rows, a "Select all" row (with an `n of m` count) and a Continue
+    button, resolving to a **list** of options;
+  - **flat, not a discriminated union** — the schema's own comment says why: *"Gemini's
+    function-declaration schema is fussy about unions, and this feature has already lost a day to
+    one (`z.literal(false)`)."* Do not model this as a union of single/multi variants.
+  - `MAX_VISIBLE_ROWS = 6` already scrolls the list; six stores fit, so no change needed there, but
+    check the Continue button is inside the widget and not below the scroll region.
+
+- **The stores list is the reference case for the token saving.** `STORES` is a hardcoded curated
+  six-item AU list in the component (line 21) with a docstring saying it is deliberate. The coach
+  must **never type those six names** — add a `grocery_stores` source to `CHOICE_SOURCES` and serve
+  it from `app/api/coach/options/route.ts` alongside the existing three. Same for the ingredient
+  lists (`PROTEINS`, `CARBS`, `FATS`, `VEG` — 32 more strings) and the dietary-restriction
+  catalogue, which is already an API (`/api/nutrition/dietary-restrictions`). **Every one of those
+  is a string the model would otherwise generate and the app already holds.**
+
+- **The conversation shape (from the mockup).** Three things, in order:
+  1. **Answers are widgets.** Stores as the new multi-select with Select all; restrictions as chips.
+     The coach **states what it already knows instead of asking** — *"I already know you log dairy
+     most days, so I have left it in"* — which is both the token saving and the better manner. The
+     seven steps become at most three exchanges, and any of them can be typed past instead of
+     tapped.
+  2. **The plan arrives as a widget, not prose.** A card listing each meal with its calories and
+     item count, plus **Save all as meals** (Q-398) and Redo. The plan is then disposable, because
+     the meals outlive it.
+  3. Entering from the Nutrition tab starts you **inside the nutrition scope**. **Scope it by giving
+     the coach a tool subset, not by instructing it** — a prompt that says "do not read workout
+     data" is a request the model will occasionally ignore, while a tool it never receives is a
+     boundary it cannot cross. **Make that subset a named record** (prompt section + tool subset +
+     patch domains + widget sources) rather than an inline filter, so a second coach can have one
+     without a refactor. That one line is all that survives of Q-408 — see the note below.
+
+- **Q-408 was descoped into the line above, 2026-08-19, on the owner's call.** It proposed the full
+  architecture from the owner's original message: Home as an "AI Coach" routing to scoped Nutrition,
+  Workout and Goal specialists. **Removed rather than deferred, for three reasons worth keeping so
+  nobody re-files it unexamined:**
+  1. **It is a router for one destination.** There is one coach. Routing has value when it picks
+     between coaches, and every decision in that design would have been made against imagined
+     requirements until a real second coach exists.
+  2. **Its hardest problem argues against it.** The owner's own example — *"what should I eat before
+     tomorrow's legs session?"* — is nutrition **and** workout. A strict boundary breaks it, so the
+     architecture's central question was never how to separate the coaches but how to let them talk
+     anyway, which is a harder problem than the one that motivated it.
+  3. **The token argument does not survive contact with Q-170's measurement.** Latency is almost
+     entirely *output* tokens; a shorter per-scope system prompt saves *input* tokens, which are not
+     the bottleneck. And inlining more prompt context was measured **twice** and made things worse.
+     The real saving — naming a `source` and letting the server fill the list — already exists as
+     `CHOICE_SOURCES` and is already in this entry.
+  **Reversal cost is nil.** If a second coach earns its place, write the architecture then, against
+  real requirements. The named-record shape above is what keeps that cheap.
+
+- **OWNER REVIEW OF THE PROTOTYPE, 2026-08-19 — the plan must end by writing meals, and that is not
+  optional polish.** ***"Meal plan coach needs more work - I want it to make the meal plan; then add
+  each item to the saved meals/my foods"***. The conversation is not finished when it prints a plan;
+  it is finished when **every meal in the plan exists as a row in `My Foods`**, indistinguishable
+  from one built by hand — loggable, editable, and with its own printable label.
+  - **This makes Q-398 a hard prerequisite rather than a related item.** Q-398 is the write path
+    (plan meal → saved meal, keyed on `(plan id, plan item id)` so a repeat save is a no-op). Without
+    it there is nothing for the widget's button to call, and a coach that produces an un-saveable
+    plan is the same dead end the stepper already is.
+  - **The plan is disposable once its meals are saved**, and the copy should say so. That is the
+    whole reason this beats a plan document: the user keeps meals, not a plan.
+  - The prototype demonstrates the loop end-to-end (tap *Save all to My Foods*, then find the four
+    meals under `My Foods` tagged *from your plan*) —
+    <https://claude.ai/code/artifact/4fc7f99e-71f3-442c-b88b-1bb83b5fa9d6>.
+
+- **Do not delete the stepper in this PR.** The wizard is a working flow the owner uses; ship the
+  conversation as the path behind the same entry point and keep the stepped sheet reachable until
+  the conversation has been used on-device for a plan the owner actually keeps. A conversational
+  flow that stalls mid-plan with no fallback is strictly worse than seven screens that finish.
+
+- **Lane.** Split, and **`lib/coach/**` is Lane A** — six `app/api/coach/**` routes import it
+  (nine imports; `apply.ts` and `patch.ts` also write storage), and the rule in
+  [`docs/agents/README.md`](agents/README.md) §3 sends anything reached by `app/api/**` to Lane A.
+  **No baton claim is needed**, and an earlier draft of this paragraph saying otherwise was wrong.
+  `lib/coach/widgets.ts` + `app/api/coach/options/route.ts` + `app/api/coach/route.ts` (the SYSTEM
+  prompt's widget rules, lines 27–59) are **Lane A**; `components/coach/choice-list.tsx`,
+  `components/coach/widget-registry.tsx` and `components/nutrition/meal-plan-setup-sheet.tsx` are
+  **Lane B**. The schema change lands first — the component cannot render a flag the schema does
+  not carry.
+
+- **Verification.** The multi-select half is testable in the sandbox: a widget rendered with
+  `multi: true` returns every checked id, Select all toggles all six, and an existing single-select
+  call site still resolves to one option (that regression is the actual risk). The **conversation
+  half is not** — it needs a real Gemini turn, so run one plan end-to-end against `pnpm dev` and
+  say plainly that the on-device pass (safe-area under the composer, the widget inside a scrolling
+  thread) was not exercised unless it was.
+
 ## Nutrition focus — the owner's priority, 2026-08-18
 
 *"lets focus on the nutrition changes now. id like to get this perfected today"*
@@ -1423,138 +1655,6 @@ residual into a correction rather than a mystery.
   windows, applied to active energy everywhere at once, holding at exactly 1.0 whenever the gates fail
   — and a written measurement of how many past days it moved.
 
-### [nutrition][platform] Q-407 — the meal-plan wizard is seven screens for six answers, and the one piece the Coach lacks is multi-select
-
-- **Branch:** `feat/nutrition-coach-meal-plan`
-- **Added:** 2026-08-19 · BugFix Intake, from the owner · mockup rendered in-session
-- **Lane:** ?
-- **Placement:** in the nutrition cluster, after Q-398 — **which shipped 2026-08-24**, so the
-  dependency is cleared. The plan's exit route in this design is "Save all as meals", and plan meals
-  can now become ordinary saved meals; before that, a conversational plan had nowhere to land and
-  was only a nicer-looking dead end.
-- **Owner's words:** *"lets get the meal plan setup wizard mocked up too -> This could use some
-  work - its too step by step - Could we try implement this into an AI coach/meal builder type
-  thing? Where it feels like a chat with a UI? Also there should be options for 'select all' as I
-  keep clicking each grocery store."* and, on the mockup, *"This looks really good - I'd like to
-  see that in prod"*.
-
-- **What it is today.** `components/nutrition/meal-plan-setup-sheet.tsx` (445 lines) is a linear
-  stepper: `const STEPS = ['Stores', 'Avoid', 'Skip', 'Meals', 'Yours', 'Training', 'Review']`
-  (line 28), seven screens holding thirteen `useState` fields, with a fixed footer per step. It
-  works, and the docstring's reason for the stepped shape is sound (a fixed action row that never
-  scrolls away, and `SheetFooter` owning the bottom inset — this repo's most repeated on-device
-  regression). **Keep that property.** The problem is not the footer, it is that six of the seven
-  screens ask a question the app can mostly answer itself, and none of them can be skipped.
-
-- **Three of the four pieces already exist, which is why this is smaller than it sounds.**
-  - `lib/coach/widgets.ts` is a **union of client-side tool schemas**, explicitly documented as the
-    extension point: *"Adding a widget means adding a member here and a row in
-    `components/coach/widget-registry.tsx`. The union is the extension point; the protocol does not
-    change."*
-  - `CHOICE_SOURCES` (`['sessions','exercises','swap_candidates']`) is the **server-fills-the-list**
-    mechanism, and its docstring is already the token argument the owner is asking for: a
-    nine-option picker the model typed out cost **~554 output tokens**, and *"having a language
-    model re-type it is paying to transcribe your own database"*. `app/api/coach/options/route.ts`
-    is where a source is resolved.
-  - `HandoffSchema` routes to real screens (`destination: 'program_builder' | 'log_activity' |
-    'profile' | 'nutrition'`), so a conversation that must hand off to a full screen has a route.
-
-- **The one genuine gap: `choice_list` is single-select, and that is exactly the owner's complaint.**
-  `ChoiceListSchema` (lib/coach/widgets.ts) has `prompt`, `source`, `sourceId`, `options[]` — **no
-  multi flag** — and `ChoiceList`'s callback is `onChoose?: (option: { id, label }) => void`, one
-  option, singular. There is no configuration that makes it multi-select. So "I keep clicking each
-  grocery store" is not a missing convenience on top of a multi-select; the widget has never had
-  one. **Extend the schema rather than adding a second widget:**
-  - add `multi?: boolean` and `selectAll?: boolean` to `ChoiceListSchema`, defaulting false so
-    every existing call site is unchanged;
-  - `ChoiceList` gains checkbox rows, a "Select all" row (with an `n of m` count) and a Continue
-    button, resolving to a **list** of options;
-  - **flat, not a discriminated union** — the schema's own comment says why: *"Gemini's
-    function-declaration schema is fussy about unions, and this feature has already lost a day to
-    one (`z.literal(false)`)."* Do not model this as a union of single/multi variants.
-  - `MAX_VISIBLE_ROWS = 6` already scrolls the list; six stores fit, so no change needed there, but
-    check the Continue button is inside the widget and not below the scroll region.
-
-- **The stores list is the reference case for the token saving.** `STORES` is a hardcoded curated
-  six-item AU list in the component (line 21) with a docstring saying it is deliberate. The coach
-  must **never type those six names** — add a `grocery_stores` source to `CHOICE_SOURCES` and serve
-  it from `app/api/coach/options/route.ts` alongside the existing three. Same for the ingredient
-  lists (`PROTEINS`, `CARBS`, `FATS`, `VEG` — 32 more strings) and the dietary-restriction
-  catalogue, which is already an API (`/api/nutrition/dietary-restrictions`). **Every one of those
-  is a string the model would otherwise generate and the app already holds.**
-
-- **The conversation shape (from the mockup).** Three things, in order:
-  1. **Answers are widgets.** Stores as the new multi-select with Select all; restrictions as chips.
-     The coach **states what it already knows instead of asking** — *"I already know you log dairy
-     most days, so I have left it in"* — which is both the token saving and the better manner. The
-     seven steps become at most three exchanges, and any of them can be typed past instead of
-     tapped.
-  2. **The plan arrives as a widget, not prose.** A card listing each meal with its calories and
-     item count, plus **Save all as meals** (Q-398) and Redo. The plan is then disposable, because
-     the meals outlive it.
-  3. Entering from the Nutrition tab starts you **inside the nutrition scope**. **Scope it by giving
-     the coach a tool subset, not by instructing it** — a prompt that says "do not read workout
-     data" is a request the model will occasionally ignore, while a tool it never receives is a
-     boundary it cannot cross. **Make that subset a named record** (prompt section + tool subset +
-     patch domains + widget sources) rather than an inline filter, so a second coach can have one
-     without a refactor. That one line is all that survives of Q-408 — see the note below.
-
-- **Q-408 was descoped into the line above, 2026-08-19, on the owner's call.** It proposed the full
-  architecture from the owner's original message: Home as an "AI Coach" routing to scoped Nutrition,
-  Workout and Goal specialists. **Removed rather than deferred, for three reasons worth keeping so
-  nobody re-files it unexamined:**
-  1. **It is a router for one destination.** There is one coach. Routing has value when it picks
-     between coaches, and every decision in that design would have been made against imagined
-     requirements until a real second coach exists.
-  2. **Its hardest problem argues against it.** The owner's own example — *"what should I eat before
-     tomorrow's legs session?"* — is nutrition **and** workout. A strict boundary breaks it, so the
-     architecture's central question was never how to separate the coaches but how to let them talk
-     anyway, which is a harder problem than the one that motivated it.
-  3. **The token argument does not survive contact with Q-170's measurement.** Latency is almost
-     entirely *output* tokens; a shorter per-scope system prompt saves *input* tokens, which are not
-     the bottleneck. And inlining more prompt context was measured **twice** and made things worse.
-     The real saving — naming a `source` and letting the server fill the list — already exists as
-     `CHOICE_SOURCES` and is already in this entry.
-  **Reversal cost is nil.** If a second coach earns its place, write the architecture then, against
-  real requirements. The named-record shape above is what keeps that cheap.
-
-- **OWNER REVIEW OF THE PROTOTYPE, 2026-08-19 — the plan must end by writing meals, and that is not
-  optional polish.** ***"Meal plan coach needs more work - I want it to make the meal plan; then add
-  each item to the saved meals/my foods"***. The conversation is not finished when it prints a plan;
-  it is finished when **every meal in the plan exists as a row in `My Foods`**, indistinguishable
-  from one built by hand — loggable, editable, and with its own printable label.
-  - **This makes Q-398 a hard prerequisite rather than a related item.** Q-398 is the write path
-    (plan meal → saved meal, keyed on `(plan id, plan item id)` so a repeat save is a no-op). Without
-    it there is nothing for the widget's button to call, and a coach that produces an un-saveable
-    plan is the same dead end the stepper already is.
-  - **The plan is disposable once its meals are saved**, and the copy should say so. That is the
-    whole reason this beats a plan document: the user keeps meals, not a plan.
-  - The prototype demonstrates the loop end-to-end (tap *Save all to My Foods*, then find the four
-    meals under `My Foods` tagged *from your plan*) —
-    <https://claude.ai/code/artifact/4fc7f99e-71f3-442c-b88b-1bb83b5fa9d6>.
-
-- **Do not delete the stepper in this PR.** The wizard is a working flow the owner uses; ship the
-  conversation as the path behind the same entry point and keep the stepped sheet reachable until
-  the conversation has been used on-device for a plan the owner actually keeps. A conversational
-  flow that stalls mid-plan with no fallback is strictly worse than seven screens that finish.
-
-- **Lane.** Split, and **`lib/coach/**` is Lane A** — six `app/api/coach/**` routes import it
-  (nine imports; `apply.ts` and `patch.ts` also write storage), and the rule in
-  [`docs/agents/README.md`](agents/README.md) §3 sends anything reached by `app/api/**` to Lane A.
-  **No baton claim is needed**, and an earlier draft of this paragraph saying otherwise was wrong.
-  `lib/coach/widgets.ts` + `app/api/coach/options/route.ts` + `app/api/coach/route.ts` (the SYSTEM
-  prompt's widget rules, lines 27–59) are **Lane A**; `components/coach/choice-list.tsx`,
-  `components/coach/widget-registry.tsx` and `components/nutrition/meal-plan-setup-sheet.tsx` are
-  **Lane B**. The schema change lands first — the component cannot render a flag the schema does
-  not carry.
-
-- **Verification.** The multi-select half is testable in the sandbox: a widget rendered with
-  `multi: true` returns every checked id, Select all toggles all six, and an existing single-select
-  call site still resolves to one option (that regression is the actual risk). The **conversation
-  half is not** — it needs a real Gemini turn, so run one plan end-to-end against `pnpm dev` and
-  say plainly that the on-device pass (safe-area under the composer, the widget inside a scrolling
-  thread) was not exercised unless it was.
-
 ### [cardio][devices] Q-418 — the free walk's Android pill still cannot show the time (the screen half shipped)
 - **Gate: device** — and the gate is the entry's own instruction, not a formality: it says
   *verify before adding metrics*, because background tracking with the screen off has never been
@@ -2199,6 +2299,27 @@ this fits without an extraction.
 > (Brisbane) while its web fallback POSTed `localDateString()` (device zone), two different answers
 > for the same save; the `localDateString` import is now gone from that file.
 > [`journal`](overview/entries/2026-08-24-checkin-sheets-user-timezone.md).
+>
+> **Third slice shipped 2026-08-24 (Lane B): `session-select-content` (16 calls — the single
+> largest file) and the four workout surfaces.** Ratchet down to **47 calls across 28 files** (was
+> 70/33). Two of the sixteen were in *module-scope* helpers (`isMorningCheckinPromptDone`,
+> `markMorningCheckinPromptDone`), which cannot call a hook — they take `tz` as a parameter now,
+> the shape `getGreeting(name, tz)` in the same file already used.
+>
+> **It also turned up a blind spot in the ratchet itself, worth knowing before the next slice.**
+> `session-select-content` declared two local `const tz = Intl.DateTimeFormat().resolvedOptions().timeZone`
+> — the *device's* zone — used for the early-deload dismiss key and the "is it evening yet" hour
+> check. Same Q-477 bug class, but **the ratchet cannot see it**: `BARE` only matches
+> `todayInTz()`/`localDateString()` with empty parens. One of them shadowed the component's own
+> `tz` in the same block, which is what surfaced it (a TS use-before-declaration error) rather than
+> any check. Both now use the component's `tz`. **The counted number is a floor, not the whole
+> class** — an `Intl.DateTimeFormat()` sweep is separate, unmeasured work.
+> [`journal`](overview/entries/2026-08-24-session-select-workout-user-timezone.md).
+>
+> **`lib/stores/workout-store.ts` (3 calls) is deliberately NOT in this slice.** It is a Zustand
+> store, not a component — no hook available — so its three calls need `tz` threaded in from every
+> caller, including `applyRehydrateFixups` on the rehydrate path. Structurally different work from
+> the rest of the sweep; left for its own slice.
 >
 > **What that slice actually proved, and what it did not.** With a seeded user on
 > `Pacific/Kiritimati` (UTC+14, currently a day *ahead* of this container's UTC clock — so the
@@ -3400,141 +3521,27 @@ ehr     0     0     0     0   648   208   128   556     0
   metric tile and confirm `body_metrics.water_ml` changes. The 400 above is the current behaviour to
   start from.
 
-### [platform][body][nutrition] Q-464 — request schemas are almost never `.strict()`, and on a date-bearing write route that turns a mistyped key into a silent wrong-day write
-
-- **Branch:** `fix/strict-request-schemas`
-- **Added:** 2026-08-18 · review sweep (ingest + input validation) ·
-- **Lane:** A
-  [`docs/reviews/2026-08-18-ingest-and-input-validation.md`](reviews/2026-08-18-ingest-and-input-validation.md)
-- **Placement:** mid-low. **Not a live bug** — the app's own clients send the right keys. Filed because
-  the failure mode is silent data misplacement and this repo has already paid for the class once.
-- **Measured:** of **70** files defining a `z.object(...)` request schema across `app/api` and
-  `packages/shared/src/validation`, only **6** call `.strict()`. Zod's default silently drops unknown keys.
-- **Demonstrated live** on `POST /api/body-metadata`:
-
-  | Sent | Response | Row written |
-  |---|---|---|
-  | `{"date":"2026-08-10","weightKg":81}` | `200 {"success":true,"date":"2026-08-18"}` | weight 81 on **2026-08-18** |
-  | `{"date":"3026-08-18","weightKg":81}` | `200 {"success":true,…}` | **2026-08-18** |
-  | `{"date":"not-a-date","weightKg":81}` | `200 {"success":true,…}` | **2026-08-18** |
-
-- **Do NOT change the route — it is correct.** `app/api/body-metadata/route.ts:236` reads
-  `body.localDate` and defaults to today in the user's timezone when absent, which is the documented
-  pattern. The defect is that `date` is not in the contract, the schema is not strict, so the key is
-  dropped and the write lands on today with a success response.
-- **Why file it:** the repo has already lost a full release to this exact class — the `ai-chat`
-  `localDate` regex that rejected every real request, documented at length in `CLAUDE.md`. A strict
-  schema turns that mistake into a 400 at the boundary instead of a silent wrong-day write.
-- **Eleven date-bearing write schemas are non-strict**, including `sync/push`, `health-connect/ingest`,
-  `running-plan`, `running-plan/override`, `plan-meal-answers`, and the shared `body-metrics`,
-  `activity-log` and `fitness-test` schemas. `WorkoutEntryPatchSchema` is one of the six that **is**
-  strict — use it as the reference.
-- **Fix shape:** add `.strict()`, date-bearing schemas first, then a CI rule — same shape as the
-  hex-literal and TTL-divergence ratchets, which exist because prose alone did not hold the line.
-- 🚧 **The ratchet and the demonstrated schema SHIPPED 2026-08-18; 89 non-strict remain.**
-  `scripts/check-strict-request-schemas.js` runs in the Custom Rules job (now **39** steps) with a
-  shrink-only per-file baseline: a file not listed must have zero, a listed one may only shrink, and
-  reaching zero requires deleting its row. `BodyMetadataPostSchema` — the one the entry demonstrated
-  — is strict, and all four measured wrong-key writes now 400 instead of landing on today.
-- ⚠️ **Two corrections to this entry, both found while implementing it.**
-  **(a) It IS a live bug.** The entry says "not a live bug — the app's own clients send the right
-  keys". They do not: the Water widget's web fallback posts `waterIntake`, which no schema names, and
-  the value was discarded behind a `200`. Filed as **Q-319** (Lane B) with the measurement.
-  **(b) The `sync/push` caveat is far wider than one route.** The entry singles out `sync/push`, but
-  the same argument applies to **every schema `pushMutations` parses** — `activity-log`,
-  `fitness-test`, `day-checkin`, `oura-summary`, mood, food-item, log-exercise, session-rpe,
-  complete-workout. An outbox payload is written to local SQLite by whatever bundle was current when
-  the user acted and sits there until the device syncs, so tightening any of those can reject a
-  mutation queued by an older bundle and dead-letter real data. Plus `health-connect/ingest`, whose
-  client is the owner's Tasker profile and is not in this repo. Both classes are named with their
-  reasons in the script's header rather than silently skipped.
-- **What is left is the sweep**, deliberately not done here: 89 non-strict schemas, each needing its
-  clients checked the way `BodyMetadataPostSchema`'s two were. The ratchet is the mechanism; the
-  sweep is separate and much larger, exactly as `check-hex-literals` says of its own 471.
-- 🚧 **89 → 85, 2026-08-23.** Four converted, each after reading the one client that posts to it:
-  `admin/timing-baseline`, `ai/health-insight`, `running-plan`, `running-plan/override`. All four
-  now 400 on an unknown key and still accept the real body — verified live, not just by test.
-- 🚧 **85 → 79, 2026-08-24.** Six more, all under `app/api/admin/`: `activity-types`, `ai-usage`,
-  `exercises`, `fix-exercise-units`, `generate-exercise-media`, `mirror-dataset-gifs`. Same method,
-  same live verification. **Two of them are precisely the shape a codemod would have broken:**
-  `activity-types` and `exercises` PATCH destructure `id` out of the body **before** parsing
-  (`const { id, ...rest }`) while their clients post `{id, ...data}` — so the schema never sees `id`
-  and strict is safe, which is knowable only from the handler, not the schema. Round-tripped live to
-  confirm the PATCH still returns 200.
-- 🚧 **79 → 75, 2026-08-24.** The four `ai-periodization` routes: `baseline/complete`, and
-  `session/[sessionId]/{prescribe,respond,transition}`. Same method, same live verification — and one
-  of them is the shape worth naming for the next batch: **`prescribe` is called with NO BODY at all
-  by three of its four clients**, which reads as a reason not to tighten it and is not one. The route
-  does `(read.ok ? read.body : null) ?? {}`, and `{}` satisfies an all-optional schema whether or not
-  it is strict. Verified live rather than argued: a bodyless POST still reaches the handler
-  (`{"error":"Baseline not complete"}` — a business error, not `Invalid body`), an unknown key now
-  returns `Invalid body`, and `{"newPhase":"deload","force":true}` came back **200 with real state**.
-  **Read the handler's error MESSAGE, not its status:** all six probes returned 400, and half of them
-  were the handler working correctly.
-- 🚧 **75 → 67, 2026-08-24 (Lane A).** Eight more: `workout-sessions` DELETE and `fitness-tests`
-  DELETE (single-field `{id}`/`{workoutSessionId}` bodies, no in-repo client calling either DELETE
-  route found by grep — safe regardless of what's on the other end), `exercise-gif` and
-  `nutrition/barcode` GET (both validate an object the route itself builds from `searchParams`, the
-  no-client-verification exemption class already in the script's header), `nutrition/meal-types`
-  POST, `user/goals` PATCH and `user/profile` PATCH (each read against its one real client — fields
-  match exactly, verified by reading `meal-type-manager.tsx`, `goals-section.tsx`,
-  `goal-recommendation-sheet.tsx` and `edit-profile-sheet.tsx`). **One trap caught before it
-  shipped, worth the whole batch on its own:** `push/subscribe`'s real client
-  (`lib/push-client.ts`, `sub.toJSON()`) sends a browser `PushSubscriptionJSON`, which always
-  carries `expirationTime` beside `endpoint`/`keys` — the schema named only two of the three keys,
-  so `.strict()` as first written would have 400'd every real subscribe. Fixed by adding the missing
-  field to the schema before adding `.strict()`, not by exempting the route. Verified: relevant
-  vitest suites green (`clear-a-goal`, `goal-write-invalidation`, `cache-groups`,
-  `auth-before-param-validation`, `not-found-status`, `sentry-scrub`), `tsc --noEmit` clean on every
-  touched file. **`pnpm dev` could not be exercised this session** — the sandbox's `node_modules` is
-  missing `@sentry/nextjs` even though `package.json` declares it, unrelated to this change and not
-  investigated further; static verification (reading every real client's payload against the
-  tightened schema) stood in for it.
-- 🚧 **67 → 40, 2026-08-24 (Lane A).** The largest single batch: 16 files reached zero —
-  `activity-logs` (both DELETE and the metrics PATCH), `exercise-estimates`, `exercises` (create),
-  `nutrition/dietary-restrictions`, `nutrition/targets`, `running-plan/explain`,
-  `workout-review/session/[sessionId]/apply`, `nutrition/meal-plans` (create, `[id]` PATCH,
-  `[id]/structure` PATCH, `meals/[mealId]` PATCH, `plan-meal-answers` POST+DELETE), and the shared
-  `packages/shared/src/validation/generated-program.ts` — plus `builder-chat`, `exercises/generate`,
-  `generate-program` and `meal-plans/generate{,/meal}` lowered to their `generateObject`
-  response-schema remainder (their one real request schema each is now strict). Every conversion
-  read the real client's payload against the tightened schema first; no codemod.
-  **Two more traps caught before shipping, same class as `push/subscribe`'s `expirationTime`:**
-  (a) `workout-review-sheet.tsx` sends an unread `confidence` field to
-  `workout-review/session/[sessionId]/apply` — added to the schema (documented as unread; the route
-  already computes its own deterministic confidence per CLAUDE.md's no-self-reported-number rule)
-  rather than exempting the route. (b) `builder-review.tsx` mints a `clientId` on every exercise in
-  its live `program` state (the review editor's React key) and sends that state wholesale to
-  `builder-chat` — added to `GeneratedExerciseSchema` in the shared validation file, which is where
-  it would have silently 400'd every real chat turn had it been missed.
-  Verified: the touched routes' own vitest suites (81 tests, 8 files) plus the full suite (4,693
-  passed, 51 skipped, 2 pre-existing unrelated failures — missing `qrcode` in this sandbox),
-  `tsc --noEmit` clean, `pnpm check:rules` 55 of 55. **`pnpm dev` still could not be exercised** —
-  same sandbox gap as the prior batch; static per-client verification stood in for it again.
-- **A fourth exemption-adjacent class, now in the script's header: a schema fed an object the ROUTE
-  builds key by key.** `admin/ai-usage` reads three named `searchParams` into a literal, so an
-  unknown query key cannot reach the schema at all. Strict guards nothing there *today* — it was
-  still added, because it catches the day someone swaps the literal for a spread of the search
-  params — but it needs **no client verification**, which is the expensive half of this sweep.
-  Recognise the shape before budgeting time for one.
-- **⚠ Two more exemption classes were found while doing it, and both are now in the script's header
-  with evidence rather than as a guess.** (a) **A third-party SDK's wire format:** `/api/coach` is
-  driven by `@ai-sdk/react`'s `DefaultChatTransport`, which posts `{ id, messages, trigger,
-  messageId }` — read out of `node_modules/ai/dist/index.mjs`, not assumed — against a schema naming
-  only `messages`. `.strict()` there would **400 every coach message.** (b) **`generateObject`
-  response schemas**, which the checker cannot tell apart from request schemas: `builder-chat` has
-  four `z.object`s and only one is a request. Strictness there governs the model, not a client.
-  Also: `scale-ble/samples` belongs with the outbox class, because its client is the APK's Kotlin
-  service and **the APK does not update with a Railway deploy**.
-- **The tempting shortcut does not work.** In-repo JS clients ship with the server (the APK is a
-  WebView loading Railway, so JS and server always deploy together), so a key mismatch is a bug
-  either way — but that argues a mismatch *is* a bug, not that there is none, and a silent 400 on a
-  rarely-exercised route is exactly what a codemod would introduce and no test would catch. There is
-  no substitute for reading each client.
-- **⚠️ `sync/push` needs care and is the reason not to codemod this.** Outbox payloads from an older
-  APK may legitimately carry fields the current schema does not name; making that one strict could
-  reject mutations from a device that has not updated. Handle it deliberately, or exempt it with a
-  written reason. **Lane A.**
+> **Q-464 SWEEP COMPLETE and removed, 2026-08-24.** A request schema that is not `.strict()`
+> silently DROPS an unknown key, so a mistyped or renamed field became a successful write of the
+> wrong thing rather than a 400. Demonstrated live on `POST /api/body-metadata`, where
+> `{"date":…,"weightKg":81}` answered `200 {"success":true}` and wrote the weight on **today**.
+> **89 → 37 non-strict schemas across six batches**, each conversion read against its real client's
+> actual payload — no codemod, because the shortcut argument ("in-repo clients ship with the
+> server") says a mismatch *is* a bug, not that there is none.
+> **The 37 that remain are a floor, not a debt**, and are categorised with evidence in
+> `scripts/check-strict-request-schemas.js`'s header: 16 outbox/`pushMutations` (tightening one
+> dead-letters a mutation queued by an older APK), 8 external/native-client (the APK does not update
+> with a Railway deploy), 1 third-party SDK wire format (`coach`'s `DefaultChatTransport`), and 12
+> `generateObject` RESPONSE schemas, which constrain the model's output rather than a client's input.
+> **The ratchet stays in the Custom Rules job permanently** — keeping a NEW non-strict request schema
+> out is what this entry was actually for, and prose alone did not hold it.
+> **Four client-mismatch traps were caught before shipping**, each of which `.strict()` would have
+> turned into a silent 400 on a real request: `push/subscribe`'s browser `PushSubscriptionJSON`
+> carries `expirationTime`; `workout-review/apply`'s client sends an unread `confidence`;
+> `builder-review.tsx` mints a `clientId` on every exercise and posts it to `builder-chat`. Each was
+> fixed by adding the field to the schema, never by exempting the route.
+> Journal: [`entries/2026-08-24-strict-request-schemas-batch5.md`](overview/entries/2026-08-24-strict-request-schemas-batch5.md),
+> [`entries/2026-08-24-strict-request-schemas-complete.md`](overview/entries/2026-08-24-strict-request-schemas-complete.md).
 
 > **Q-258 FIXED and removed, 2026-08-16 (v1.317.3).** Four goal inputs in `goal-targets-section.tsx`
 > (steps, sleep, water, calories) and two in `required-info-section.tsx` (weight, body fat) had
@@ -6631,6 +6638,33 @@ ehr     0     0     0     0   648   208   128   556     0
 - **Needs the owner, not just an implementer** — the capture step is physical (an actual counted
   walk/run/lifting session with the ring on), via the plan's referenced admin device-data capture
   panel or an ad-hoc capture. No code review substitutes for real frames.
+- **2026-08-24 — a third false-positive incident, and it rules out the one gate that exists.**
+  Owner: *"activity still detects for doing nothing — I have been sitting at computer for over an
+  hour."* Notification shown: `TrainingAI · Oura Ring` / `Connected · 52% battery` alongside
+  `Activity detected · Recording your walk or run…`. Sitting at a desk is not a tracked workout, a
+  Guided Walk, or a manual "Other Activity" session, so `isWorkoutInProgress`/`isGuidedWalkActive`/
+  `isActivityActive` — the only gate `dispatchGate` has against a false arm
+  (`auto-detection-service.ts:303-308`) — never engages here. This is a plain sedentary false
+  positive, not the "phantom walk during training" case Q-68/the workout gate were built for, and it
+  needs the same uncalibrated-band fix this entry already tracks, not a new gate.
+- **The 90-second sustained-window requirement (`gait-confirm.ts`, `CONFIRM_WINDOW_COUNT = 3`) is
+  not enough on its own to explain the OLD priors surviving this long, and worth recording why:**
+  it correctly rules out a single stray reading (one bad window can't confirm), but if desk-bound
+  micro-motion — typing, adjusting the ring hand, reaching for a mouse — happens to sit inside the
+  uncalibrated 1.4–2.4 Hz "walk" band for three consecutive ~30 s windows, the streak requirement is
+  satisfied by noise just as easily as by a real walk. The sustained-window gate defends against
+  *brief* false positives; it was never meant to defend against *wrong bands*, which is exactly
+  what's flagged above and still unfixed.
+- **Also worth noting for whoever runs the capture:** `shouldNotifyRingConfirmedActivity`
+  (`auto-detection-service.ts:127-140`) unconditionally trusts a ring confirmation whenever GPS has
+  fewer than 2 points (`if (args.pointCount < 2) return true`) — correct and deliberate per Q-68,
+  since a genuine indoor walk can have no GPS fix at all. But it means a stationary desk session
+  (no real movement, so GPS realistically never accumulates 2 points either) gets **zero**
+  corroboration from the one signal that could have vetoed it. Not a new bug to fix — Q-68's
+  design already chose this tradeoff on purpose — but it's why this specific scenario (sitting,
+  indoors, no GPS signal) is the least defended case today, and worth having in mind when picking
+  which sessions to capture for calibration: a real "sitting at a desk" idle capture, not just the
+  lifting-session one already named, would test exactly this path.
 
 ### [platform] Q-220 — every session pays ~194,000 tokens of orientation before it starts
 

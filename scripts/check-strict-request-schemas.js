@@ -79,6 +79,29 @@
 // written would have 400'd every real subscribe. Fixed by adding the missing field, not by skipping
 // the conversion.
 //
+// ── THE SWEEP IS COMPLETE, 2026-08-24 (40 → 37). ──────────────────────────────────────────────
+// Three more converted — `coach/apply` and `coach/threads` (each read against its real clients:
+// number-dial, change-preview and confirm-content all post `{patch, acceptedChangeIds}`;
+// coach-content posts `{threadId, messages:[{role,parts}]}`) and `coach/options` (the
+// route-builds-the-object class — it reads two named `searchParams` into a literal).
+//
+// **Every one of the 37 that remain is in an exemption class above or is not a request schema.**
+// Categorised and verified rather than assumed:
+//   * 16 outbox / `pushMutations` — the 8 shared `validation/*` files (activity-log 6, day-checkin
+//     2, fitness-test 1, food-item 1, mood-log 1, oura-summary 2, prescribed-run 1, session-rpe 1)
+//     plus `sync/push`. Tightening any of these can dead-letter a mutation queued by an older APK.
+//   * 8 external / native client — `oura-ble/{accel-chunks,live-steps,samples,step-counter-export}`
+//     (5), `scale-ble/samples`, `hr-ingest` (its Kotlin clients are `PolarStrapService.kt` and
+//     `ScaleBleService.kt`), and `health-connect-ingest` (Tasker). The APK does not update with a
+//     Railway deploy, so an old build can send a field a new schema does not name.
+//   * 1 third-party SDK wire format — `coach` (`DefaultChatTransport`).
+//   * 12 `generateObject` RESPONSE schemas — builder-chat 2, exercises/generate 1,
+//     generate-program 2, meal-plans/generate 2, meal-plans/generate/meal 2, nutrition/scan 2,
+//     nutrition-goals/recommend 1. These constrain the model's output, not a client's input.
+//
+// So the remaining count is a floor, not a debt. **The ratchet stays** — it is the mechanism that
+// keeps a NEW non-strict request schema out, which is what Q-464 was actually for.
+//
 // Reproduce the count: node scripts/check-strict-request-schemas.js --print
 'use strict';
 const fs = require('fs');
@@ -97,10 +120,7 @@ const BASELINE = {
   // mints a `clientId` on every exercise in its live program state and sends it wholesale to
   // builder-chat (added to `GeneratedExerciseSchema` in generated-program.ts for the same reason).
   'app/api/builder-chat/route.ts': 2,
-  'app/api/coach/apply/route.ts': 1,
-  'app/api/coach/options/route.ts': 1,
   'app/api/coach/route.ts': 1,
-  'app/api/coach/threads/route.ts': 1,
   'app/api/exercises/generate/route.ts': 1,
   'app/api/generate-program/route.ts': 2,
   'app/api/hr-ingest/route.ts': 1,

@@ -10,7 +10,7 @@ import { errorLog } from '@trainingai/shared/logger'
 const QuerySchema = z.object({
   source: z.enum(CHOICE_SOURCES),
   sourceId: z.string().min(1).optional(),
-})
+}).strict()
 
 /**
  * The rows behind a Coach picker, read straight from the user's own data.

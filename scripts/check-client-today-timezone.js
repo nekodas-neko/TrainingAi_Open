@@ -58,7 +58,6 @@ const BASELINE = {
   'app/nutrition/nutrition-content.tsx': 3,
   'app/session-explain/session-explain-client.tsx': 1,
   'app/session-select/components/log-value-sheet.tsx': 2,
-  'app/session-select/session-select-content.tsx': 16,
   'components/activity/done-activity-screen.tsx': 2,
   'components/admin/day-review-tab.tsx': 2,
   'components/admin/time-audit-card.tsx': 1,
@@ -81,10 +80,6 @@ const BASELINE = {
   'components/running/running-plan-content.tsx': 1,
   'components/stats/weekly-stats-hub.tsx': 1,
   'components/sync-provider.tsx': 2,
-  'components/workout-screen.tsx': 4,
-  'components/workout/active-workout-screen.tsx': 1,
-  'components/workout/done-screen.tsx': 1,
-  'components/workout/exercise-summary-screen.tsx': 1,
   'lib/stores/workout-store.ts': 3,
 };
 

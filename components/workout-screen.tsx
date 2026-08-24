@@ -755,14 +755,14 @@ export default function WorkoutScreen({ sessionType, userId, aiDeload, wasOverri
   useEffect(() => {
     const check = () => {
       if (document.visibilityState !== "visible") return;
-      const today = todayInTz();
+      const today = todayInTz(tz);
       if (useWorkoutStore.getState().storedDate !== today) {
         useWorkoutStore.getState().rolloverDay(today);
       }
     };
     document.addEventListener("visibilitychange", check);
     return () => document.removeEventListener("visibilitychange", check);
-  }, []);
+  }, [tz]);
 
   // Live HR runs while the workout is physically underway (active → the
   // per-exercise summary), and stops on pre/done and unmount to spare the ring.
@@ -1247,7 +1247,7 @@ export default function WorkoutScreen({ sessionType, userId, aiDeload, wasOverri
 
     // Outbox label date in the user's timezone (YYYY-MM-DD) — matches the
     // complete_workout mutation's date basis (WK-16), one tz source per flow.
-    const rawDate = todayInTz();
+    const rawDate = todayInTz(tz);
 
     const logPayload = {
       workoutSessionId: store.workoutSessionId,
@@ -1528,12 +1528,12 @@ export default function WorkoutScreen({ sessionType, userId, aiDeload, wasOverri
         if (res.ok) {
           if (wsId) store_?.markSessionSynced(wsId).catch(() => {});
         } else if (wsId && userId) {
-          store_?.queueMutation({ userId, domain: 'complete_workout', date: todayInTz(), payload: { workoutSessionId: wsId, completedAtMs: endMs } }).catch(err => reportEnqueueFailure('complete_workout', err));
+          store_?.queueMutation({ userId, domain: 'complete_workout', date: todayInTz(tz), payload: { workoutSessionId: wsId, completedAtMs: endMs } }).catch(err => reportEnqueueFailure('complete_workout', err));
         }
       })
       .catch(() => {
         if (wsId && userId) {
-          store_?.queueMutation({ userId, domain: 'complete_workout', date: todayInTz(), payload: { workoutSessionId: wsId, completedAtMs: endMs } }).catch(err => reportEnqueueFailure('complete_workout', err));
+          store_?.queueMutation({ userId, domain: 'complete_workout', date: todayInTz(tz), payload: { workoutSessionId: wsId, completedAtMs: endMs } }).catch(err => reportEnqueueFailure('complete_workout', err));
         }
       });
 
