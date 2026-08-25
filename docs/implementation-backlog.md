@@ -360,7 +360,17 @@ signed off by the owner in that conversation. Review:
   implementer's at all** — Tuning proposes, the owner signs off, Lane A implements.
 - **Worth deciding while sweeping:** entries that are *notes rather than work* should leave READY.
   **Q-294** says of itself *"this is a note against Q-249, not independent work"* and *"no branch of
-  its own"*, and it is currently row 2 of Lane B's queue.
+  its own"*, and it is currently row 2 of Lane B's queue. **Q-504** is titled *"REFUTED: readiness
+  should NOT get a range calibration"* and is row 8.
+- **The startable Lane B work exists; it is ~50 rows down.** Scanning the 77 unlaned entries for ones
+  whose body mentions only Lane-B surfaces (`components/`, `lib/hooks`, `lib/stores`, `.tsx`) and no
+  Lane-A surface gives **10**: Q-395b, Q-354, Q-254, Q-154, Q-168, Q-138, Q-112, Q-111, Q-93, Q-1b.
+  That is the shape of the problem — not that Lane B has nothing to do, but that fifty rows of
+  someone else's work sit on top of it.
+- **A field the queue does not have, found while checking those ten:** **Q-354** ends *"Recommendation:
+  do not pursue without a reason"* — understood, deliberately declined, and waiting on a named
+  trigger. That is neither `Gate: owner` nor `Gate: device`, so it reads as startable forever. Worth
+  settling during the sweep.
 
 ### [readiness][devices] TN-8 — the chronic-stress fever mask is a FOURTH consumer of the broken temperature baseline
 
@@ -8459,6 +8469,31 @@ ehr     0     0     0     0   648   208   128   556     0
   | emphasized last dot | `showDots` renders every dot at r=2.5, full opacity |
   | exact min/max scaling | it pads by **±0.5**, which halves the amplitude of a 0.5 kg body-weight spread |
   | grid lines | `exercise-history-sheet` draws three |
+
+- **⚠️ RE-MEASURED 2026-08-25 against `exercise-history-sheet.tsx` — the list above is FIVE needs and
+  there are SIX, and the sixth is the one that decides the entry.** Read line by line against the
+  primitive's own geometry:
+
+  | # | difference | primitive today |
+  |---|---|---|
+  | 1 | horizontal inset `PAD = 4` (`x = PAD + …*(W-2·PAD)`) | spans `0..width`, no inset |
+  | 2 | exact min/max scaling | pads by **±0.5** |
+  | 3 | `strokeWidth` 2 | hardcoded `1.5` |
+  | 4 | three grid lines | none |
+  | 5 | last dot `r=4` opacity 1, others `r=2.5` **opacity 0.45** | all dots `r=2.5`, full opacity |
+  | 6 | **a decorative halo ring on the last point** (`r=7`, stroke at 0.28 opacity) | nothing |
+
+  **(5)'s opacity and (6) are both absent from the list above.** (6) is the problem: a `haloLastDot`
+  prop is asking the shared primitive to draw one caller's specific art, which is how a primitive
+  becomes a thin wrapper over a config object — the exact failure Q-406 named when it declined to add
+  a warning slot to `FoodRow` ("adding a slot makes it a wrapper rather than a unification").
+- **So this is a DESIGN DECISION, not a conversion, and it wants an answer before code:** either the
+  primitive absorbs six props including a decorative one, or the three callers accept small visual
+  changes (drop the halo, unify the dot treatment) and the primitive stays general. **The second is
+  the better trade and it changes how a user-facing chart looks**, which is why it is not something to
+  slip into an implementation PR unasked. `Gate: owner`
+- **Not blocked on effort or on the primitive — blocked on that call.** Everything else is mechanical
+  once it is made.
 
 - **`SparklineChart` is not the answer either, and the reason is load-bearing.** It already draws
   this exact "1RM trend" shape (and `exercise-stats-sheet` + `exercise-summary-screen` use it), but
