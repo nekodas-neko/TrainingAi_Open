@@ -24,7 +24,7 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.374.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Version:** v1.375.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-08-25.
 
 **The journal sweep, and the cadence it revealed (LA-25).** `check-doc-index-size.js` failed a *migration* PR at 61 unlinked entries against a limit of 60. **25 folded into a new `history-2026-08-25.md`, unlinked 59 → 34.** The finding is worth more than the sweep: the README's "~20 loose files" trigger was written for a load that no longer exists — **seventeen entries landed on 2026-08-25 alone** across the concurrent sessions, and the count went from a post-sweep 32 on the 24th to 61 the next day, so a sweep clearing 25 buys **about a day and a half**. This is a near-daily chore now, and the practical trigger is the guard failing someone's PR. **The cheaper half is the citation habit** — cite the review or handoff doc, not the loose journal entry — and this run broke it knowingly: BF-11e cited two journal entries from the nutrition index for want of a handoff doc, which costs the linked floor **two, permanently**. A sweep can undo a fold; it cannot undo a citation.
@@ -50,6 +50,8 @@
 Read it with the baton at `docs/agents/state/implementation-lane-b.md` before taking a Lane B item:
 the entire Lane B surface was traversed and every remaining candidate is gated, declined, parked,
 needs hardware, or wants a plan first. **Nothing that run shipped is device-verified.**
+
+**There were two quantity sheets and the busier one was wrong (BF-26).** The owner's *"everything looks the same"* was literally true of the diary's: its `−`, value and `+` were the same square at the same fill. Both sheets render one `quantity-editor.tsx` now — `srv`/`g`, absolute presets, `MACRO_COLORS`. **And a font-size class on an `<input>` does nothing on a phone:** `globals.css` sets `16px !important` under 640 px for the iOS-zoom guard, so the value needed `!text-2xl` to outgrow its steppers at all. Only two other inputs carry a size class and both want ≤16 px, so it is narrow — but silent ([`journal`](docs/overview/entries/2026-08-25-quantity-sheet-convergence.md)).
 
 **The Nutrition day screen's meal grouping was inverted (BF-24, artboard 1).** The owner's *"thats not what the mockup looks like"* had a precise cause: artboard 1 groups the food ROWS within a meal — name as a label above its own card — where Q-395b grouped the MEALS within one container. Both are "grouped", which is why a coverage checklist passed while the screen still looked wrong. Header is one band now (26 px title, date as subtitle) and the meal line is a name and one number. **②③⑥⑦ deliberately not done**, each with a reason on the entry: ② touches `/health` too, ③ is Q-395c's, ⑥ is Q-406's, ⑦ is BF-28's fold rule ([`journal`](docs/overview/entries/2026-08-25-nutrition-day-artboard-parity.md)).
 
@@ -294,11 +296,9 @@ unrelated file. It now asks whether **this branch** grew the file, and reports a
 instead of failing it. Run `pnpm check:rules` for the live step count — never quote one from here
 ([journal](docs/overview/entries/2026-08-20-doc-size-ratchet-order-independence.md)).
 
-**Q-421 is Lane B's now (2026-08-20)** — route (a) shipped, route (b) is owner-rejected, and the
-per-session estimator basis (`source: 'hr' | 'met'`) is stored on both surfaces. Only the on-screen
-label remains. Retagging it exposed that **`next-item.js` let an entry's prose outrank its own lane
-tag** — Q-529 had been served to Lane A for days while its field said B
-([journal](docs/overview/entries/2026-08-20-energy-basis-and-lane-resolution.md)).
+**Q-421 is Lane B's now (2026-08-20)** — route (a) shipped, (b) is owner-rejected, the estimator
+basis is stored on both surfaces, only the label remains. Retagging it exposed that **`next-item.js`
+let an entry's prose outrank its own lane tag** ([journal](docs/overview/entries/2026-08-20-energy-basis-and-lane-resolution.md)).
 
 **LA-13 closed (2026-08-20)** — `Migration Check` ran only against a **fresh** database, where a
 non-idempotent migration cannot fail; it now replays every file against the schema it just built. Its

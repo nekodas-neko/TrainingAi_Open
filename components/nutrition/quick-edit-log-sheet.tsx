@@ -9,6 +9,8 @@ import type { FoodLogWithItem } from '@trainingai/shared/types/nutrition'
 import { getLocalStore } from '@/lib/local-store'
 import { pushThenRevalidate } from '@/lib/local-store/push-then-revalidate'
 import { invalidateNutritionWrite } from '@/lib/cache-groups'
+import { QuantityEditor } from './quantity-editor'
+import { qtyFromInput, steppedQty, type QtyUnit } from './saved-meal-qty'
 
 interface Props {
   log: FoodLogWithItem | null
@@ -21,10 +23,9 @@ interface Props {
   userId?: string
 }
 
-const PRESETS = [0.5, 1, 1.5, 2, 3]
-
 export function QuickEditLogSheet({ log, onClose, onSaved, onDelete, userId }: Props) {
   const [qty, setQty] = useState(() => log?.quantityMultiplier ?? 1)
+  const [unit, setUnit] = useState<QtyUnit>('serving')
   const [saving, setSaving] = useState(false)
 
   const item = log?.foodItem
@@ -34,8 +35,17 @@ export function QuickEditLogSheet({ log, onClose, onSaved, onDelete, userId }: P
   const previewCarbs   = item ? r1(item.carbsG   * qty) : 0
   const previewFat     = item ? r1(item.fatG     * qty) : 0
 
-  function adjustQty(delta: number) {
-    setQty(q => Math.max(0.5, r1(q + delta)))
+  // BF-26: the same arithmetic the builder's sheet uses, so grams and servings cannot diverge
+  // between the two. `null` from either helper means "the input does not apply" — here that is a
+  // no-op rather than the builder's "remove the row", because this sheet has an explicit bin.
+  const servingG = item?.servingSizeG ?? 0
+  function handleQtyChange(raw: string) {
+    const next = qtyFromInput(raw, unit, servingG)
+    if (next != null) setQty(next)
+  }
+  function handleStep(direction: 1 | -1) {
+    const next = steppedQty(qty, unit, direction, servingG)
+    if (next != null) setQty(next)
   }
 
   async function handleSave() {
@@ -110,68 +120,20 @@ export function QuickEditLogSheet({ log, onClose, onSaved, onDelete, userId }: P
           <div>
             <p className="font-semibold text-base leading-tight">{item?.name}</p>
             {item?.brand && <p className="text-xs text-muted-foreground mt-0.5">{item.brand}</p>}
-            <p className="text-xs text-muted-foreground mt-0.5">{item?.servingSizeG}g per serving</p>
           </div>
         </div>
 
-        <div className="px-4 space-y-4 pb-4">
-          {/* Quantity stepper */}
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => adjustQty(-0.5)}
-              disabled={qty <= 0.5}
-              aria-label="Decrease quantity"
-              className="w-11 h-11 rounded-xl border text-xl font-bold flex items-center justify-center disabled:opacity-30 active:bg-muted transition-colors"
-            >−</button>
-            <div className="flex-1 text-center">
-              <input
-                type="number"
-                min={0.5}
-                step={0.5}
-                value={qty}
-                onChange={e => setQty(Math.min(100, Math.max(0.5, parseFloat(e.target.value) || 0.5)))}
-                className="w-24 rounded-xl border bg-background px-3 py-2 text-center text-xl font-bold tabular-nums"
-              />
-              <p className="text-xs text-muted-foreground mt-1">servings</p>
-            </div>
-            <button
-              onClick={() => adjustQty(0.5)}
-              aria-label="Increase quantity"
-              className="w-11 h-11 rounded-xl border text-xl font-bold flex items-center justify-center active:bg-muted transition-colors"
-            >+</button>
-          </div>
-
-          {/* Preset chips */}
-          <div className="flex gap-2">
-            {PRESETS.map(p => (
-              <button
-                key={p}
-                onClick={() => setQty(p)}
-                className={`flex-1 rounded-full py-1.5 text-xs font-semibold border transition-colors ${
-                  qty === p
-                    ? 'bg-foreground text-background border-foreground'
-                    : 'border-border text-muted-foreground active:bg-muted'
-                }`}
-              >
-                ×{p}
-              </button>
-            ))}
-          </div>
-
-          {/* Live macro preview */}
-          <div className="rounded-xl bg-muted/40 p-3 grid grid-cols-4 gap-1 text-center">
-            {[
-              { label: 'kcal',    val: previewCals,    unit: '' },
-              { label: 'protein', val: previewProtein, unit: 'g' },
-              { label: 'carbs',   val: previewCarbs,   unit: 'g' },
-              { label: 'fat',     val: previewFat,     unit: 'g' },
-            ].map(({ label, val, unit }) => (
-              <div key={label}>
-                <p className="text-base font-bold tabular-nums">{val}{unit}</p>
-                <p className="text-[10px] text-muted-foreground">{label}</p>
-              </div>
-            ))}
-          </div>
+        <div className="space-y-4 px-4 pb-4">
+          {item && (
+            <QuantityEditor
+              item={item}
+              qty={qty}
+              unit={unit}
+              onUnitChange={setUnit}
+              onQtyChange={handleQtyChange}
+              onStep={handleStep}
+            />
+          )}
 
           <div className="flex gap-2">
             <button
@@ -181,10 +143,11 @@ export function QuickEditLogSheet({ log, onClose, onSaved, onDelete, userId }: P
             >
               <Trash2 className="h-5 w-5 text-destructive" />
             </button>
-            <button onClick={onClose} className="flex-1 rounded-xl border px-4 py-2.5 text-sm font-medium">
-              Cancel
-            </button>
-            <Button onClick={handleSave} disabled={saving} className="flex-1">
+            {/* BF-26: no Cancel. Artboard 6 has none, and this sheet already has two ways out —
+                the X that `SheetContent` renders and the back gesture (BF-27) — so a third sitting
+                next to a bin was the ambiguous control, not a safety net. Nothing is written until
+                Save, so leaving by any of them discards the edit. */}
+            <Button onClick={handleSave} disabled={saving} className="h-12 flex-1 font-semibold">
               {saving ? 'Saving…' : 'Save'}
             </Button>
           </div>
