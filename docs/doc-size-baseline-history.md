@@ -18,7 +18,7 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
-## 2026-08-25 — `docs/implementation-backlog.md` 11638 → 11648 (OR-1 and PS-6)
+## 2026-08-25 — OR-1 and PS-6 filed (`docs/implementation-backlog.md` raise withdrawn, again)
 
 Two queue entries, both found from one CI failure on a docs PR. **OR-1**: Q-402's only E2E guard is
 dead — `e2e/home-card-invalidation-refetch.spec.ts` waits on a `Log Body Weight` button that exists
@@ -33,6 +33,15 @@ absent, with nothing printed to say so.
 **PS-6 is filed under `PS-`, not `OR-`, on purpose** — an `OR-` entry describing this bug could not
 appear in the tool that reports it. That is recorded in the entry so the letter does not read as a
 mistake later.
+
+**The raise to 11648 was withdrawn on the rebase and the number stands at 11638** — the second time
+in one session. #454 landed while this branch was in CI and removed enough completed entries to take
+the file to **11534**, under the original baseline even carrying these two entries' +64. Ratcheting
+down to 11534 was again declined for the same reason as the earlier withdrawal: the shrink belongs
+to the PRs that made it, and banking it here would fail the next agent to add an entry. **Worth
+noticing as a pattern rather than a coincidence** — on a queue this active, a raise taken at the
+start of a CI cycle is often unnecessary by the end of it, so check the real count after the rebase
+before keeping one.
 
 ## 2026-08-25 — `projectOverview.md` 7937 → 7941 (`docs/implementation-backlog.md` raise withdrawn)
 
