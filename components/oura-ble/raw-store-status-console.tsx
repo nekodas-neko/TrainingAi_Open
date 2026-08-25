@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { Database, RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { getOuraBle } from '@/lib/oura-ble/plugin'
+import { rawStoreFindings, type RawStoreFinding } from './raw-store-health'
 
 /**
  * On-device raw-store health: total and unrolled row counts, bytes on disk, and the two health
@@ -16,10 +17,12 @@ import { getOuraBle } from '@/lib/oura-ble/plugin'
 export function RawStoreStatusConsole() {
   const [running, setRunning] = useState(false)
   const [log, setLog] = useState('')
+  const [findings, setFindings] = useState<RawStoreFinding[]>([])
 
   async function run() {
     setRunning(true)
     setLog('')
+    setFindings([])
     try {
       const ble = await getOuraBle()
       if (!ble) {
@@ -35,6 +38,9 @@ export function RawStoreStatusConsole() {
         `on disk         ${formatBytes(s.bytes)}`,
         `low disk        ${s.lowDisk ? 'YES — the service is shedding raw rows' : 'no'}`,
       ].join('\n'))
+      // Q-538: the numbers alone needed a source trace to read. `rolled up 0` is the fault, not a
+      // curiosity — it means the retention window can delete nothing.
+      setFindings(rawStoreFindings(s))
     } catch (err) {
       setLog(`ERROR: ${err instanceof Error ? err.message : String(err)}`)
     } finally {
@@ -59,6 +65,23 @@ export function RawStoreStatusConsole() {
         <pre className="mt-3 max-h-64 overflow-auto whitespace-pre-wrap rounded-md bg-muted/50 p-2 text-[11px] leading-relaxed">
           {log}
         </pre>
+      )}
+      {findings.length > 0 && (
+        <ul className="mt-2 flex flex-col gap-1.5">
+          {findings.map(f => (
+            <li
+              key={f.text}
+              className={`flex gap-1.5 text-[11px] leading-snug ${
+                f.level === 'warn' ? 'text-destructive' : 'text-muted-foreground'
+              }`}
+            >
+              {/* A symbol beside the colour, not colour alone — the repo's own rule, and this card
+                  is read on a phone in whatever light the owner happens to be standing in. */}
+              <span aria-hidden className="flex-none font-bold">{f.level === 'warn' ? '!' : '·'}</span>
+              <span>{f.text}</span>
+            </li>
+          ))}
+        </ul>
       )}
     </section>
   )

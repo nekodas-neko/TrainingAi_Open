@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.369.1",
+    date: "2026-08-25",
+    changes: [
+      "The ring\u2019s on-device storage readout now says what its numbers mean \u2014 whether the store can actually be trimmed, whether it has outgrown the phone\u2019s backup limit, and whether the service is dropping data to save space \u2014 instead of leaving you to work it out from row counts.",
+    ],
+  },
+  {
     version: "1.369.0",
     date: "2026-08-25",
     changes: [
