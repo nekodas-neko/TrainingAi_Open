@@ -18,6 +18,32 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
+## 2026-08-25 — BF-4 re-measured (`docs/implementation-backlog.md` 12005 → 12021)
+
+**+16, and this is the THIRD raise of this file in one session (11948 → 11989 → 12005 → 12021, +73
+total). That is a real cost and is recorded as one rather than absorbed.** The number is 16 rather
+than the 19 first written because LA-26 merged in between and its LA-26 → LA-28 swap freed 3 lines;
+the baseline was set to the file's real length instead of keeping the slack, which is the whole
+point of a shrink-only ratchet. All three are the same
+shape: a queue entry whose premise production contradicted, where the measurement tables are what
+stop the next session re-running the same queries.
+
+The gross addition here was **38**; half of it was paid for by deleting prose the finding made
+stale, which is the only reason the raise is 19:
+
+- The paragraph asking which structured-output strategy the SDK uses and whether `maxOutputTokens`
+  helps — migration 208's own header answered both on 2026-08-24, and the entry never caught up.
+- The "all 30 calls by shape" table, compressed to two lines now that the correlation figure
+  (r=+0.958 on input, −0.122 on output) carries the same conclusion more sharply.
+- The retry ruling-out and the unchanged-dependencies list, both settled.
+
+**If this file needs a fourth raise, compact it instead.** The entries being corrected are long
+because they were written as investigations; several are now answered and could move to
+`docs/reviews/` with a pointer left behind. That is a compaction chore, not a per-PR fix, and it is
+the right response to this trend rather than another +19.
+
+---
+
 ## 2026-08-25 — LA-27 answered (`docs/implementation-backlog.md` 11989 → 12005)
 
 **+16, and it closes an investigation rather than opening one.** LA-27 was filed hours earlier in
