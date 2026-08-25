@@ -331,6 +331,37 @@ days/hours cause most stress". Measured against production the same day; the bou
 signed off by the owner in that conversation. Review:
 [`docs/reviews/2026-08-24-body-battery-charge-window-collapse.md`](reviews/2026-08-24-body-battery-charge-window-collapse.md).*
 
+### [platform] LB-12 — 77 of 193 queue entries state no lane, so both implementers are served each other's work
+
+- **Branch:** _unassigned_ · **Lane:** B filed it; **the sweep is the Orchestrator's** (it owns lane
+  resolution, `docs/agents/README.md`).
+- **Added:** 2026-08-25 · Lane B, after correcting four entries' lanes one at a time in one session
+  (Q-403, Q-289, Q-290, Q-291) and hitting a fifth and sixth immediately after.
+- **Measured on `main`, 2026-08-25:**
+
+  | | |
+  |---|---:|
+  | queue entries | 193 |
+  | lane stated | 116 |
+  | **lane UNSTATED** | **77 (40%)** |
+  | of Lane B's 55 READY rows, how many state no lane | **53** |
+
+  So **two** of the fifty-five rows the tool offers Lane B are rows the queue actually knows are
+  Lane B's. The rest are unclassified and shown to both lanes.
+- **The tool is not wrong; the data is incomplete.** `next-item.js` shows an unlaned entry to both
+  lanes deliberately — the path rule in §3 is supposed to answer it, and hiding it from the lane that
+  might own it would be worse. **What was wrong is that it was silent**, so a reader could not tell a
+  row the queue knows is theirs from one nobody has classified. Fixed 2026-08-25: those rows now
+  print `⟨lane unstated⟩` and the header counts them. That is the visibility half and it is done.
+- **What is left is the sweep**, which is not an implementer's to do: 77 entries want a `Lane:` field
+  applied from the path rule (reached by `app/api/**` or storage → A; reached only from
+  `app/**`/`components/**` → B; both → A). A large fraction are `readiness`/`platform` scoring work
+  in `packages/shared`, which is Lane A's, and **several are scoring changes that are no
+  implementer's at all** — Tuning proposes, the owner signs off, Lane A implements.
+- **Worth deciding while sweeping:** entries that are *notes rather than work* should leave READY.
+  **Q-294** says of itself *"this is a note against Q-249, not independent work"* and *"no branch of
+  its own"*, and it is currently row 2 of Lane B's queue.
+
 ### [readiness][devices] TN-8 — the chronic-stress fever mask is a FOURTH consumer of the broken temperature baseline
 
 - **Branch:** _unassigned_
