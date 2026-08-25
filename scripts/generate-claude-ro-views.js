@@ -22,7 +22,8 @@ const { Client } = require('pg')
 // Columns that must never leave the database. Verified against the live schema 2026-07-26 with a
 // broad pattern scan (passw|secret|token|refresh|screenshot|credential|api_key|auth|endpoint|
 // p256|salt|hash|cookie|session) rather than from memory — that scan is what caught
-// oura_tokens.webhook_signing_key and the three push_subscriptions columns, which a hand-written
+// oura_tokens.webhook_signing_key (and, until Q-285 deleted them, three push_subscriptions
+// columns), which a hand-written
 // list had missed. Re-run that scan when adding tables.
 const DENY = {
   users: ['password_hash'],
@@ -34,7 +35,6 @@ const DENY = {
   // nothing fails loudly, the outbox just gets slower — so a queryable byte count is the tripwire.
   saved_meals: ['image_data_uri'],
   // All three together ARE the Web Push credential — holding them lets anyone push to the device.
-  push_subscriptions: ['endpoint', 'p256dh', 'auth'],
 }
 
 // Presence/size stand-ins for denied columns, so an audit can still answer "is a token configured?"
@@ -48,7 +48,6 @@ const DERIVED = {
   ],
   feedback_submissions: ['octet_length(t.screenshot_data) AS screenshot_bytes'],
   saved_meals: ['octet_length(t.image_data_uri) AS image_bytes'],
-  push_subscriptions: ['(t.endpoint IS NOT NULL) AS has_subscription'],
 }
 
 

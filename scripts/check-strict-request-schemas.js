@@ -74,7 +74,9 @@
 // verification needed" exemption class), `nutrition/meal-types` POST, `user/goals` PATCH and
 // `user/profile` PATCH (each read against its one real client, fields match exactly). One trap
 // caught before it shipped: `push/subscribe`'s real client body is a browser `PushSubscriptionJSON`
-// (`lib/push-client.ts`'s `sub.toJSON()`), which always carries `expirationTime` alongside
+// (`lib/push-client.ts`'s `sub.toJSON()` — both deleted by Q-285; kept here because the TRAP
+// generalises to any schema written from the field names a caller seems to send), which always
+// carries `expirationTime` alongside
 // `endpoint`/`keys` — the schema named only two of the three keys, so `.strict()` as originally
 // written would have 400'd every real subscribe. Fixed by adding the missing field, not by skipping
 // the conversion.

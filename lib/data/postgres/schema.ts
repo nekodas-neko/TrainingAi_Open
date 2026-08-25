@@ -754,15 +754,6 @@ export const aiHealthInsights = pgTable('ai_health_insights', {
   createdAt:   timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 }, t => [unique().on(t.userId, t.section, t.date)])
 
-export const pushSubscriptions = pgTable('push_subscriptions', {
-  id:        uuid('id').primaryKey().defaultRandom(),
-  userId:    uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
-  endpoint:  text('endpoint').notNull(),
-  p256dh:    text('p256dh').notNull(),
-  auth:      text('auth').notNull(),
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-}, t => [unique().on(t.userId, t.endpoint)])
-
 export const errorEvents = pgTable('error_events', {
   id:        uuid('id').primaryKey().defaultRandom(),
   userId:    uuid('user_id').references(() => users.id, { onDelete: 'set null' }),

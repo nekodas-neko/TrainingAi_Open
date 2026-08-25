@@ -37,31 +37,12 @@ self.addEventListener("activate", (e) => {
   );
 });
 
-self.addEventListener("push", (e) => {
-  if (!e.data) return;
-  let payload;
-  try { payload = e.data.json(); } catch { payload = { title: "TrainingAI", body: e.data.text() }; }
-  e.waitUntil(
-    self.registration.showNotification(payload.title ?? "TrainingAI", {
-      body: payload.body,
-      icon: payload.icon ?? "/icons/icon-192.png",
-      badge: "/icons/icon-192.png",
-      data: { url: payload.url ?? "/" },
-    })
-  );
-});
-
-self.addEventListener("notificationclick", (e) => {
-  e.notification.close();
-  const url = e.notification.data?.url ?? "/";
-  e.waitUntil(
-    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((clients) => {
-      const existing = clients.find((c) => c.url === url);
-      if (existing) return existing.focus();
-      return self.clients.openWindow(url);
-    })
-  );
-});
+// Q-285: the `push` and `notificationclick` handlers lived here. The web-push stack they served
+// had no senders and no subscribers and was deleted at the owner's decision; `notificationclick`
+// was only reachable from a notification this handler had shown. The app's real notifications are
+// native Android (OuraRingService, ScaleBleService, PolarStrapService, DeviceBatteryNotifier) and
+// Capacitor local notifications — neither goes through the service worker. The rest of this file
+// stays: it is the APK's offline cold-start, which CLAUDE.md is explicit about not removing.
 
 // Match a request against ONLY the two cache generations whose chunks still
 // exist — the current build and the one `activate` retains as `prev`. A plain

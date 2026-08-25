@@ -44,11 +44,11 @@ function assertLocalTarget(url) {
   }
 }
 
-// `push_subscriptions` cannot round-trip: all three withheld columns (endpoint, p256dh, auth) are
-// NOT NULL, so a view row can never satisfy the insert. A local dev DB has no use for real push
-// subscriptions anyway; synthesising placeholders would put a fake credential in a table whose
-// whole content is credentials (plan §5.1).
-const SKIP_TABLES = new Set(['push_subscriptions'])
+// Empty since Q-285 dropped `push_subscriptions`, which was the only entry: all three of its
+// withheld columns were NOT NULL, so a view row could never satisfy the insert. Kept as a set
+// rather than removed — the round-trip hazard it names is a property of withheld NOT NULL columns,
+// not of that one table, and the next table with them needs somewhere to go (plan §5.1).
+const SKIP_TABLES = new Set()
 
 const OWNER_PASSWORD_HASH = '$2b$10$ccKSMzFRkJGPfCkKKOhCGuv8c8kbYJnUbszPj55iS3VGyG0ih.KmS' // "testpass123", same as seed.sql
 

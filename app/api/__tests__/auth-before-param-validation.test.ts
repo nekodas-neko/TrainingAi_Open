@@ -14,7 +14,6 @@ vi.mock('@/auth', () => ({ auth: () => authMock() }))
 const getRepository = vi.fn(async () => { throw new Error('repository must not be reached anonymously') })
 vi.mock('@/lib/data', () => ({ getRepository: () => getRepository() }))
 vi.mock('@/lib/rate-limit', () => ({ rateLimit: vi.fn(() => true) }))
-vi.mock('@/lib/push', () => ({ getVapidPublicKey: vi.fn(() => null) }))
 
 import { NextRequest } from 'next/server'
 
@@ -41,16 +40,6 @@ describe('anonymous callers are refused before any parameter question is answere
   it('GET /api/exercise-history — no name', async () => {
     const { GET } = await import('@/app/api/exercise-history/route')
     const { status, body } = await statusAndBody(await GET(new NextRequest('http://x/api/exercise-history')))
-    expect(status).toBe(401)
-    expect(body.error).toBe('Unauthorized')
-  })
-
-  it('GET /api/push/subscribe — no VAPID key configured', async () => {
-    // The 503 this used to return disclosed deployment configuration — whether this instance has
-    // push keys — to anybody who asked. The key itself is public; the fact about the deployment
-    // was not meant to be.
-    const { GET } = await import('@/app/api/push/subscribe/route')
-    const { status, body } = await statusAndBody(await GET())
     expect(status).toBe(401)
     expect(body.error).toBe('Unauthorized')
   })
