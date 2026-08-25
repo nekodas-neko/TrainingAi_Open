@@ -331,6 +331,45 @@ days/hours cause most stress". Measured against production the same day; the bou
 signed off by the owner in that conversation. Review:
 [`docs/reviews/2026-08-24-body-battery-charge-window-collapse.md`](reviews/2026-08-24-body-battery-charge-window-collapse.md).*
 
+### [nutrition][app-shell] Q-395c — phase 4: Log Food becomes one screen, and `My Foods` becomes one name
+
+- **Lane:** B
+- **Spec:** Q-395, findings 15 and 17.
+- **⏫ MOVED TO THE TOP AND UNPARKED 2026-08-25, owner-directed** — *"Im mostly after the UI changes.
+  can these be pushed to the top of the queue so I can see the product quicker"*. **This is the only
+  unbuilt phase of the nutrition rework**; a/b shipped their code today and Q-406 shipped on the
+  23rd/25th, so this is the last piece between the owner and the finished surface.
+- **`Needs: Q-395b` removed, deliberately, and here is the reasoning.** It was **phase sequencing,
+  never a technical dependency** — the entry never stated one. Q-395b's code **has already shipped**
+  (v1.365.0 + v1.366.0, 2026-08-25); what keeps its entry in the queue is a `Gate: device` smoke run,
+  not unwritten code. So everything this phase would build on is on `main` already, and the two
+  phases touch different files — b was `nutrition-content.tsx` and `day-tools-section.tsx`, this is
+  the capture step, `FoodLibrarySheet` and `SavedMealsSheet`. Waiting would have blocked a buildable
+  phase behind a verification step only the owner can perform.
+- **⚠ The sibling phases are gated, not abandoned, and they are still where they were:** Q-395a and
+  Q-395b are `Gate: device` (the S25 smoke run in both themes), Q-406 carries one narrow
+  `Gate: owner` — where a per-row warning goes on the external food-database row. Moving those up
+  would be cosmetic: a parked entry at position 1 is still parked.
+- **Scope.** The capture step's six scattered entry points collapse to one screen: search across
+  everything · two tabs · a bottom row of capture actions.
+- **The decided details, all owner-set:** tabs are **`Recent` and `My Foods`**, two not four
+  (`Frequent` was a second ordering of what `Recent` already shows). Action row ordered **Photo ·
+  Barcode · Describe or enter**. Describe and manual entry are one sheet with the fields always
+  visible, so neither is a hidden mode. `My Foods` rows carry their P/C/F split beside the calorie
+  column; the label/QR and full breakdown stay inside the meal.
+- **⚠ The merge is a RENAME as well as a merge, and the rename must be swept in one pass.** Saved
+  meals and My Foods become one list. The owner caught the half-done version immediately — *"So im
+  picking up a discrepancy between My Meals and My foods? Whats the difference"* — and there is no
+  difference, which is the point. **Two names for one list is the defect.** Grep every user-facing
+  occurrence of *Saved meals*, *My Meals* and *My Foods* — sheet titles, tab labels, empty states,
+  toasts, `+ Add food` destinations, nav copy — and land on the single name together. A surface left
+  on the old name reads as a second list that is missing rows.
+- **⚠ Diff `FoodLibrarySheet` against `SavedMealsSheet` before merging them.** Carry every action
+  across — bulk delete, meal-plan linkage, the label path — or say in the PR which was dropped.
+  Order `My Foods` most-recently-used first so the merge does not bury saved meals.
+- **Verification.** As Q-395a, plus a grep proving nothing user-facing still says *Saved meals* or
+  *My Meals*.
+
 ### [readiness][devices] TN-8 — the chronic-stress fever mask is a FOURTH consumer of the broken temperature baseline
 
 - **Branch:** _unassigned_
@@ -1233,31 +1272,6 @@ whether or not anyone draws them first.
   that quietly loses one is the failure mode Q-395 exists to prevent. The list is in the journal
   linked below, corrected — this entry's own copy named 11 and mis-ordered End of Day.
 - **Verification.** As Q-395a, plus the checklist ticked in the PR body.
-
-### [nutrition][app-shell] Q-395c — phase 4: Log Food becomes one screen, and `My Foods` becomes one name
-
-- **Lane:** B
-- **Needs:** Q-395b
-- **Spec:** Q-395, findings 15 and 17.
-- **Scope.** The capture step's six scattered entry points collapse to one screen: search across
-  everything · two tabs · a bottom row of capture actions.
-- **The decided details, all owner-set:** tabs are **`Recent` and `My Foods`**, two not four
-  (`Frequent` was a second ordering of what `Recent` already shows). Action row ordered **Photo ·
-  Barcode · Describe or enter**. Describe and manual entry are one sheet with the fields always
-  visible, so neither is a hidden mode. `My Foods` rows carry their P/C/F split beside the calorie
-  column; the label/QR and full breakdown stay inside the meal.
-- **⚠ The merge is a RENAME as well as a merge, and the rename must be swept in one pass.** Saved
-  meals and My Foods become one list. The owner caught the half-done version immediately — *"So im
-  picking up a discrepancy between My Meals and My foods? Whats the difference"* — and there is no
-  difference, which is the point. **Two names for one list is the defect.** Grep every user-facing
-  occurrence of *Saved meals*, *My Meals* and *My Foods* — sheet titles, tab labels, empty states,
-  toasts, `+ Add food` destinations, nav copy — and land on the single name together. A surface left
-  on the old name reads as a second list that is missing rows.
-- **⚠ Diff `FoodLibrarySheet` against `SavedMealsSheet` before merging them.** Carry every action
-  across — bulk delete, meal-plan linkage, the label path — or say in the PR which was dropped.
-  Order `My Foods` most-recently-used first so the merge does not bury saved meals.
-- **Verification.** As Q-395a, plus a grep proving nothing user-facing still says *Saved meals* or
-  *My Meals*.
 
 ### [platform] PS-4 — the batons are the cross-lane coordination mechanism and none of them fits on a screen
 
