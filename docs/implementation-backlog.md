@@ -1490,7 +1490,7 @@ breath_avg_rpm:   9.1     9.7    10.0     9.8      9.8     <- the value it is co
 - **Branch:** _unassigned_
 - **Added:** 2026-08-24 · owner report — *"some 'isolation' type work will increase to a main level when it should be accessory sort of — like bicep curls... but what about cable dips?"*
 - **Lane: A** — `lib/data/postgres/schema.ts`, one Postgres migration, `lib/sqlite/migrations.ts` (local schema version), `packages/shared/src/workout/exercise-role.ts`, and the read fallbacks below.
-- **Ships alone.** BF-16 depends on it but is owner-gated; BF-17 is a label change that must stay separately revertable.
+- **Ships alone.** BF-16b depends on it but is owner-gated; BF-17 is a label change that must stay separately revertable. BF-16a lands *before* it — see `Needs:` below.
 - **⚑ The design is settled and written up — read [`docs/superpowers/plans/2026-08-24-exercise-roles.md`](superpowers/plans/2026-08-24-exercise-roles.md) before touching any of it.** It carries the budget-scaled session shape with its calibration, the anchor rule, the measured 90% fixture, and **four shapes that were proposed and rejected with reasons** (position-based roles, isolation→accessory, never-auto-Primary, remembered per-exercise preference). Re-proposing one costs a session.
 
 **The role decides the prescription, not a badge.** `resolveStyleForExercise`
@@ -1526,48 +1526,83 @@ budget-aware rule and wire it into those creation paths.
   1 Accessory and at 60 minutes 1 / 2 / 2; a single exercise added to a session that already has an
   anchor never silently becomes Primary; a test asserts the two schema defaults agree; and the plan's
   §4 fixture passes at ≥ 90%.
+- **⛔ Two defects must be fixed in the same PR, both found in review 2026-08-24 — plan §2.**
+  **(a)** `resolveStyleForExercise` returns `'own'` when the Accessory phase has no style, and
+  `session-data.ts:193` then keeps a `styleId` that can itself be null — an exercise with **no
+  prescribed percentages at all**. Reachable in one action: `phase-editor.tsx:112` offers a blank
+  `— select style —`. Latent today (all 8 phase-sets have a style set), but this change moves the
+  unclassified population into `accessory` and enlarges the exposed group. Make the accessory style
+  non-nullable, or make `'own'` fall back to the phase's primary style.
+  **(b)** The anchor rule must require a catalogued exercise with **≥ 3 muscles**. Without the guard
+  it picks index 0 on a session of entirely Coach-invented exercises — a silent Primary at 90% × 3
+  on a movement nobody classified, which is exactly what `UNCLASSIFIED_EXERCISE_ROLE` exists to
+  prevent. If nothing qualifies, nominate no Primary.
+- **Needs:** BF-16a — the rule reads muscle counts and that entry corrects them, so writing the
+  fixture first would pin it to data known to be wrong.
 - **Ordering and role must stay independent.** The generator orders a new session Primary →
   Secondary → Accessory by default, but **reordering an exercise must never change its role** — the
   owner's Legs day deliberately opens with a hip thrust as Secondary before the squat. Verified
   2026-08-24: nothing derives `exercise_role` from `position` today, so this holds by construction.
   An implementation that re-derives on reorder would silently overwrite that preference.
-- **Do NOT sweep existing rows in this PR** — that is BF-16, and it is owner-gated.
+- **Do NOT sweep existing role rows in this PR** — that is BF-16b, and it is owner-gated.
 - **Related, not blocking: BF-7** covers the *runtime* duration picker. This entry reads the
   session's *configured* budget, which BF-7's owner decision confirms is the anchor.
 - **Surface: server/shared + local SQLite.** The local-schema half is **not** web-reproducible
   (`getLocalStore` returns null in the sandbox), so it needs the device check or a Known-Issues row.
 
-### [workouts] BF-16 — the retired all-primary program, and the catalogue rows recorded thinner than their own siblings
+### [workouts] BF-16a — five catalogue rows record fewer muscles than their own sibling movement
+
+- **Branch:** _unassigned_
+- **Added:** 2026-08-24 · found while tracing BF-15, from production
+- **Lane: A** — data correction, no schema. `exercise_library.muscles`.
+- **Lands BEFORE BF-15.** The role rule reads muscle counts and this entry changes them, so shipping
+  it afterwards would either break BF-15's fixture or pin it to data known to be wrong. **No owner
+  gate** — adding the front delts to a dip is not a judgement call, and no role changes here.
+
+This is the real defect behind the owner's *"hip thrusts and dumbbell shoulder press should be able
+to be a secondary"*. It is a data problem, not a threshold problem — each of these records fewer
+muscles than the sibling movement it mirrors:
+
+| Exercise | Recorded | Its sibling | Missing |
+|---|---|---|---|
+| **Cable Chest Dips** | chest, triceps (2) | Barbell Bench Press (3) | shoulders |
+| **Dumbbell Shoulder Press** | shoulders, triceps (2) | Barbell Overhead Press (3) | traps |
+| **Barbell Hip Thrust** | glutes, hamstrings (2) | — | quads, lower back, adductors |
+| **Cable Pulldown** | lats, biceps (2) | Chin-Up (3) | rear delts / rhomboids |
+| **Barbell Shrug** | traps (1) | — | rhomboids, forearms |
+
+These rows also feed the muscle heatmap and every weighted-set / tonnage tally (`roleWeight`,
+`packages/shared/src/muscles.ts:29`, plus three raw-SQL copies), so the value is larger than the role
+recommendation alone.
+
+- **What would count as fixed:** each row lists the muscles its sibling movement lists, the sibling
+  comparison is recorded in the PR so the judgement is reviewable, and BF-15's fixture is measured
+  against the corrected catalogue rather than the current one.
+- **Surface: production data.** Not reproducible against the local seed — the dev database is seeded
+  correct.
+
+### [workouts] BF-16b — the retired all-primary program, and the one live session with no Primary
 
 - **Branch:** _unassigned_
 - **Added:** 2026-08-24 · found while tracing BF-15, from production
 - **Lane: A** — data correction, no schema.
 - **Needs:** BF-15
-- **Gate: owner** — any role change alters a prescribed percentage. The deliverable is an advisory
-  list approved row by row, never a silent sweep.
+- **Gate: owner** — any role change alters a prescribed percentage. An advisory list approved row by
+  row, never a silent sweep.
 
 **The owner's ACTIVE program needs no role corrections** — Shikai carries 1 Primary in four of its
-five sessions. An earlier count of "11 isolation movements at `primary`" was real but unsplit:
-almost all of it sits inside the retired `Strength + Hypertrophy`, where **every** exercise is
-`primary` — the old column default doing exactly what BF-15 describes. Correcting a program nobody
-trains on may not be worth doing at all; present it and let the owner decide.
+five sessions. An earlier count of "11 isolation movements at `primary`" was real but unsplit: almost
+all of it sits inside the retired `Strength + Hypertrophy`, where **every** exercise is `primary` —
+the old column default doing exactly what BF-15 describes. Correcting a program nobody trains on may
+not be worth doing at all; present it and let the owner decide.
 
-Two things that are worth doing, both detailed in
-[`docs/superpowers/plans/2026-08-24-exercise-roles.md`](superpowers/plans/2026-08-24-exercise-roles.md) §6:
+**`Shikai / Lower` has no Primary at all** — three Secondary and two Accessory, the only live-program
+anomaly. BF-15's rule would nominate Barbell Good Morning.
 
-1. **`Shikai / Lower` has no Primary at all** — three Secondary and two Accessory, the only
-   live-program anomaly.
-2. **Five catalogue rows record fewer muscles than their own sibling movement** — Cable Chest Dips
-   (2) against Barbell Bench Press (3), Dumbbell Shoulder Press (2) against Barbell Overhead Press
-   (3), plus Barbell Hip Thrust, Cable Pulldown and Barbell Shrug. This is the real defect behind the
-   owner's *"hip thrusts and dumbbell shoulder press should be able to be a secondary"*, and it is a
-   data problem rather than a threshold one. These rows also feed the muscle heatmap and every
-   weighted-set / tonnage tally, so fixing them is worth more than the role recommendation alone.
+Detail in [`docs/superpowers/plans/2026-08-24-exercise-roles.md`](superpowers/plans/2026-08-24-exercise-roles.md) §6.
 
-- **What would count as fixed:** each corrected row is one the owner approved, with the sibling
-  comparison recorded in the PR so the judgement is reviewable.
-- **Surface: production data.** Not reproducible against the local seed — the dev database is seeded
-  correct.
+- **What would count as fixed:** each corrected row is one the owner approved.
+- **Surface: production data.**
 
 ### [workouts][platform] BF-17 — `main` and `primary` are two axes wearing the same word, and the UI labels them backwards
 

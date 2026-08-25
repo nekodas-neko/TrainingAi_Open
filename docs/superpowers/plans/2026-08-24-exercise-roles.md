@@ -71,8 +71,33 @@ and scored 83%; correcting it to 2 took the same rule to 90%. Do not re-tune wit
 ### Anchor and role assignment
 
 - **Anchor:** most muscles → barbell → earliest position. Ties on both keys fall to order.
+  **The anchor MUST be a catalogued exercise with at least 3 muscles.** Without that guard the rule
+  picks index 0 when every exercise is uncatalogued (a session built entirely from Coach-invented
+  movements, each carrying 0 muscles) — a silent Primary, i.e. 90% × 3 in a Peak phase, on a movement
+  nobody has classified. That is exactly what `UNCLASSIFIED_EXERCISE_ROLE = 'accessory'` exists to
+  prevent, and the anchor rule must not reintroduce it. **If nothing qualifies, nominate no Primary**
+  and let the drift check surface it.
 - **Non-anchors:** rank by muscle count descending; the top `secondary` of them are Secondary;
   anything with ≤ 1 muscle is Accessory regardless; the rest are Accessory.
+
+### The `accessory` fallback has a hole, and this change widens it — fix it in the same PR
+
+`resolveStyleForExercise` sends every `accessory` exercise to the Accessory phase's `primaryStyleId`.
+When that is null it returns **`'own'`**, and `session-data.ts:193` then keeps the exercise's own
+`styleId` — **which can itself be null**, leaving the exercise with no prescribed percentages at all
+(`progressionStyle: null`, `defaultSets: 3`).
+
+**It is reachable in one action.** `components/config/phase-editor.tsx:112` offers a blank
+`— select style —` option whose handler sets `primaryStyleId: undefined`.
+
+**Latent today, not live:** measured 2026-08-24, all 8 phase-sets carry an Accessory phase with a
+style set, and all 5 slots with a null `style_id` are `primary`, so they take the phase style. But
+this change moves the *unclassified* population into `accessory`, enlarging the group standing over
+that trapdoor.
+
+**Fix one of these in the same PR:** make the accessory style non-nullable in the editor, or make
+`'own'` fall back to the phase's primary style rather than to nothing. Do not ship the default flip
+without one of them — the whole point is that being wrong should under-load, not un-prescribe.
 
 ### Ordering is separate from role, and must stay that way
 
@@ -92,6 +117,10 @@ how they are loaded.
 
 The same shape is the after-the-fact check — a session holding 3 Primary, or none, shows a nudge
 (*"most sessions have 1–2 main lifts"*). A guideline, never a block.
+
+**Count Primaries only.** Checking the Secondary and Accessory counts against the shape as well turns
+the nudge into noise: a 30-minute session with four exercises is a perfectly reasonable choice and
+must not be nagged for it. The Primary count is the one that maps to a real loading mistake.
 
 ### Override
 
@@ -127,6 +156,16 @@ Shikai (ACTIVE)   Legs 5/5   Push 5/5   Upper 5/5   Lower 4/5   Pull 3/5
 AI-Phase1         Legs 5/5   Pull 5/5   Push 5/5    Upper 5/5   Lower 3/5
 Main              Legs 4/4   Pull 4/4   Upper 4/4   Lower 3/4   Push 3/4
 ```
+
+**Two caveats on that 90%, so nobody reads it as more than it is.**
+
+1. **It is partly self-referential.** Five of the fifteen fixture sessions are `AI-Phase1` — generated
+   by the app. Measuring a replacement rule against output of the system it replaces inflates
+   agreement, and how much of `Shikai`/`Main` was hand-edited cannot be established from the data.
+   Treat 90% as a **regression guard**, not as evidence the rule is correct.
+2. **Only the 60-minute shape is measured.** Every session in production carries
+   `time_budget_minutes = 60`. The 30 / 45 / 75 / 90 rows above are extrapolated from that single
+   point and have no supporting data. They are reasonable defaults; they are not calibrated.
 
 **The seven misses, so a future session does not re-investigate them:**
 
@@ -209,9 +248,22 @@ the duplicates exist.
 The labels above already stop the collision being visible, which is what the owner asked for. Revisit
 only if the muscle system is being reworked for another reason.
 
+**The residual, stated so the next reader does not think it was overlooked:** the labels change and
+the stored values do not, so a developer reads `role === 'main'` in code while the screen says
+*Target*. The confusion moves from the user to the codebase rather than disappearing. That is the
+accepted trade — a missed SQL copy silently halving every volume number is the worse outcome — and
+the docstring in `packages/shared/src/workout/exercise-role.ts` is where the explanation belongs.
+
 ---
 
-## 6. The data corrections (BF-16)
+## 6. The data corrections (BF-16a / BF-16b)
+
+**Sequencing matters and points the opposite way to the obvious reading.** The rule in §2 reads
+muscle counts, and BF-16's catalogue corrections *change* muscle counts — so correcting the catalogue
+after §4's fixture is written either breaks the test or pins it to data known to be wrong. The
+catalogue half (**BF-16a**) therefore lands **before** BF-15, not after, and needs no owner gate:
+adding the front delts to a dip is not a judgement call. The role-row half (**BF-16b**) stays gated
+and lands after.
 
 **The owner's ACTIVE program needs no role corrections.** Split by program, 2026-08-24:
 
