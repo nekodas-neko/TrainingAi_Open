@@ -2457,3 +2457,22 @@ no device. A successor that finds the top item untouched should be able to read 
 judged or merely missed, and those are not the same thing.
 
 **A baton that is stale on its numbers is worse than a short one.** It gets trusted.
+
+## 2026-08-25 — `CLAUDE.md` raised, 1159 → 1174 (dark only)
+
+The owner pinned the app to dark and asked for **one** UI/design. That has to live in `CLAUDE.md`
+rather than only in a backlog entry, because the thing it changes is what *every future session*
+does by default: design in one theme, verify in one theme, draw mockups in one theme, and stop
+filing light-mode bugs.
+
+Fifteen lines, and two of them are the ones that earn it. The first says **do not delete the light
+palette** — unreachable CSS custom properties cost nothing at runtime, and deleting them is the only
+irreversible half of this decision. The second draws the distinction a reader will otherwise get
+wrong: **theme is pinned, accent is not.** `data-brand` is still user-picked, so a hex literal still
+bypasses the colour the user chose and `check-hex-literals.js` still ratchets it. Without that line,
+"dark only" reads as "literals are fine now", which would quietly break the brand picker.
+
+The four existing light-mode rules below it were amended in place rather than deleted, each saying
+which half of it dark-only retires and which half still binds — a deleted rule leaves no trace of why
+it went, and two of them still guard live hazards (`var(--x)` in canvas paint; a cutout painting over
+the wallpaper layer).
