@@ -2121,3 +2121,20 @@ The exercise-role *design* deliberately did **not** land here — it went to
 `docs/superpowers/plans/2026-08-24-exercise-roles.md`, which is what kept this raise to 58 rather
 than 165. That is the pattern to copy: an entry states the defect and the acceptance test; a design
 with rejected alternatives belongs in a plan.
+
+## 2026-08-25 — `docs/implementation-backlog.md` 11604 → 11615 (+11)
+
+One entry: **BF-19**, the app-load-time investigation. It is 60 lines because it is mostly
+*measurements* — the four candidates ruled out against production with their numbers, the deploy
+count that drives the one real finding, and the two limits of the method. Trimming it to fit would
+have cut the evidence, which is the part that stops the next session re-running the same queries.
+
+Deliberately not a plan doc: there is no design with rejected alternatives here, just a finding and
+a short build list. A plan would have cost more lines than the entry.
+
+## 2026-08-25 — `docs/implementation-backlog.md` 11615 → 11638 (+23)
+
+**BF-20**, filed after a scratch script (`m.mjs`, from #442) reached `main` and turned Lint red for
+every open PR. Twenty-three lines to record a failure that cost every concurrent agent a red check
+and had already happened twice under a prose-only rule, which is the argument for the guard the
+entry asks for.
