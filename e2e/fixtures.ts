@@ -150,6 +150,30 @@ export async function enableHomeCards(page: Page, keys: string[]): Promise<void>
 }
 
 /**
+ * Open a saved meal's row in the meal library so its own actions are on screen (BF-29).
+ *
+ * The row took artboard 3's shape — `name · items · calories · chevron` — and `Log this meal`,
+ * `Edit …` and `Print a label for …` moved inside the expansion, because the drawing puts those on
+ * a detail surface rather than on every row of a list. A spec that reaches for one of them opens
+ * the row first. Idempotent: a row that is already open is left alone, so this is safe inside the
+ * `toPass` retries these specs wrap their sheet-opening taps in.
+ *
+ * Matching is anchored to the START of the row's accessible name, which is the meal name followed
+ * by its grey line and calorie figure. Unanchored, it would also match `Edit <meal>` and the swipe
+ * tray's buttons once the row is open, and the locator would go strict-mode ambiguous exactly when
+ * it had succeeded.
+ */
+export async function expandSavedMeal(page: Page, mealName: string): Promise<void> {
+  const escaped = mealName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const row = page.getByRole('button', { name: new RegExp(`^${escaped}`) }).first()
+  await expect(row).toBeVisible({ timeout: 30_000 })
+  if (await row.getAttribute('aria-expanded') === 'true') return
+  const box = (await row.boundingBox())!
+  await page.touchscreen.tap(box.x + box.width / 2, box.y + box.height / 2)
+  await expect(row).toHaveAttribute('aria-expanded', 'true', { timeout: 10_000 })
+}
+
+/**
  * Suppress Home's first-open-of-day Morning Check-in prompt (OR-1).
  *
  * It is a **modal** Radix sheet, so while it is open Radix sets `aria-hidden="true"` on `<main>` and

@@ -1788,3 +1788,25 @@ doubt.
 - **Verified:** new test (`does not push when completion is unknown`) plus the existing 32 green;
   full suite unaffected elsewhere (no other caller of `computeRpeAdjustment`/`applyAutoregulation`
   outside `generate-prescription.ts`, which has no dedicated test exercising this path).
+
+### [platform] ✅ PR #1390's red E2E job — cause found, fixed (Q-297/Q-309, closed 2026-08-17)
+
+- **The cause was not environmental and not the specs.** `components/weekly-recap-banner.tsx` POSTs
+  `/api/weekly-digest` on every Home mount; that route returns **502 by design** when the model call
+  fails, which it always does in CI because the E2E job sets no `GOOGLE_GENERATIVE_AI_API_KEY`.
+  `tabs-instant-paint.spec.ts` counts any `/api/` 5xx as a page-load failure, and whether the POST
+  returns before the assertion is a race — so the Home tab was one lost race from red on every run.
+  Two runs eleven minutes apart on identical code went one each way.
+- **Fixed** in `TrainingAi_Open` #5 with a *named* exclusion (`EXPECTED_5XX = ['/api/weekly-digest']`),
+  not a blanket "ignore 502" — a 502 from any other route is still a finding, and so is a 500 from
+  this one.
+- **Correcting the old entry's suggested next step:** downloading the `playwright-report` artifact
+  cannot work. `playwright.config.ts` uses the `github`/`list` reporters, which never write that
+  directory, so the `if: failure()` upload always produces an empty artifact.
+  **What does work:** `actions_get` → `get_workflow_run_logs_url` and download the zip.
+  `get_job_logs` genuinely cannot reach the Playwright output — it caps at 5,000 lines and the
+  Postgres container dump consumes all of them.
+- **The `FATAL: role "root" does not exist` lead was not the cause** and was not pursued further. It
+  is present while the suite passes, so it is noise for this purpose rather than a finding — but
+  nobody has explained it, and it should not be re-chased as an E2E failure cause.
+- Context: [`docs/handoff-2026-08-16-platform-e2e-harness-and-backlog-run.md`](../handoff-2026-08-16-platform-e2e-harness-and-backlog-run.md).
