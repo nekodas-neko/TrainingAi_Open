@@ -5659,6 +5659,25 @@ ehr     0     0     0     0   648   208   128   556     0
   half-fix. Decide the invariant once, at the write or at `nightSessions`.
 - **First action:** re-run the rows-per-date query above over all history (not just post-re-key) to
   size the affected set before choosing between the two fixes.
+- ✅ **SIZED AND PARTLY FIXED 2026-08-25** (`fix/sleep-fragment-nights`). Working:
+  [`entries/2026-08-25-sleep-fragment-nights.md`](overview/entries/2026-08-25-sleep-fragment-nights.md).
+  All history: **17 rows under 1.5 h across 74 dates, 4 of them exactly 0.00 h**, every one starting
+  **09:32–22:14 local** — daytime detections, not short nights.
+- **⚠ TWO CLAIMS ABOVE ARE STALE — do not re-derive from them.** (a) 08-11 and 08-13 both carry
+  **2 rows** now; Q-536's clock repair (two days after filing) supplied their nights. The only
+  single-row fragment dates in all history are **2026-06-01** (1.45 h, Cloud-era) and **2026-08-22**
+  (0.00 h). (b) The readiness claim is dead: `readiness-payload`, `sleep-trend` and
+  `score-audit/sleep` **all go through `nightSessions`**, which already handles 16 of the 17.
+- **The invariant was already decided; the defect was readers bypassing it.** Both fixed:
+  `/api/day-log` took `sleepRes.value[0]` and `listSleepSessions` orders by **date only**, so on 15
+  dates it chose nap-vs-night **by coin flip**; and the sleep list rendered 2026-08-22 as a 0.00 h
+  night, because `mergeByDate`'s one-row fast path skips `primaryCluster`.
+- **⚠ NEW: there are TWO implementations of "which rows are the night"** — `sleep-night.ts`
+  (circadian band + 3 h gap) and `lib/sleep/merge-sessions.ts` (longest + 1 h contiguity). They agree
+  on this history, but *One Formula, One Place* calls that a bug by definition.
+- **Keep:** converge those two (changes the main sleep surface, wants a device check) · **nothing
+  device-verified** · the write path still stores 0.00 h rows · 2026-06-01 still classifies as a
+  1.45 h night and no decision was made about it.
 
 ### [readiness][workouts] Q-275 — readiness is structurally blind to training load, and every incumbent treats load as primary
 

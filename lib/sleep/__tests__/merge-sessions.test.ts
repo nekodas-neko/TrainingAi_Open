@@ -59,3 +59,35 @@ describe('mergeByDate — distant fragments do not distort the night (real prod 
     expect(mergeByDate([r])).toEqual([r])
   })
 })
+
+// Q-274: `primaryCluster` already picks the longest row, so a date carrying a nap AND the night
+// resolves correctly. What it could not fix is a date whose ONLY row is a zero-duration fragment —
+// with one row it returns early, and production's 2026-08-22 (17:44–18:39, duration 0.00,
+// efficiency 0) reached the sleep list as a night of zero hours.
+describe('a zero-duration row is not a night (Q-274)', () => {
+  const base = {
+    date: '2026-08-22', ouraId: 'x', deepSleepHours: null, remSleepHours: null,
+    lightSleepHours: null, awakHours: null, efficiency: 0, onsetLatencySec: null,
+    averageHrvMs: null, avgHeartRate: null, lowestHeartRate: null, restlessPeriods: null,
+    sleepScore: null, respiratoryRate: null, sleepPhase5Min: null,
+    sleepStart: '2026-08-22T07:44:00.000Z', sleepEnd: '2026-08-22T08:39:00.000Z',
+    sleepTimeRecommendation: null,
+  }
+
+  it('drops a date whose only row records no sleep', () => {
+    // Showing nothing is honest; showing 0.00 h reads as "you slept none".
+    expect(mergeByDate([{ ...base, durationHours: 0 }])).toEqual([])
+  })
+
+  it('drops a row with no duration at all', () => {
+    expect(mergeByDate([{ ...base, durationHours: null }])).toEqual([])
+  })
+
+  it('leaves the night alone when a zero-duration row shares its date', () => {
+    const night = { ...base, durationHours: 7.5, efficiency: 92,
+      sleepStart: '2026-08-21T12:30:00.000Z', sleepEnd: '2026-08-21T20:00:00.000Z' }
+    const out = mergeByDate([{ ...base, durationHours: 0 }, night])
+    expect(out).toHaveLength(1)
+    expect(out[0].durationHours).toBe(7.5)
+  })
+})

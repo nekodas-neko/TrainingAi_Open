@@ -2086,3 +2086,16 @@ backlog is edited by five agents at once, so a branch that was under its baselin
 once CI merges `main` into it — the local number and the merged number are different questions. The
 fix each time is the same: merge `origin/main`, recount, raise in the same PR. Recorded here so the
 pattern is legible rather than looking like repeated carelessness.
+
+## 2026-08-25 — `docs/implementation-backlog.md` raised, 11532 → 11571 (Q-274)
+
+**Fourth parallel-merge raise, and this one splits cleanly down the middle: 19 lines came from
+`main`'s own growth before this branch touched anything, and 19 from Q-274's queue entry** — the two
+stale-claim warnings and the `Keep:` list. The stale-claim half is the part worth the lines: the
+entry's evidence for 2026-08-11/08-13 was overtaken by Q-536's clock repair, and its readiness claim
+was overtaken by `nightSessions`. A reader who re-derives from either goes the wrong way.
+
+**The Q-274 entry was trimmed first, not raised into.** Its first draft ran 34 lines; the narrative
+moved to [`entries/2026-08-25-sleep-fragment-nights.md`](overview/entries/2026-08-25-sleep-fragment-nights.md)
+and the queue kept what a queue needs — what is still owed, and what must not be trusted. Raising
+came second, once the entry was as short as it could honestly be.
