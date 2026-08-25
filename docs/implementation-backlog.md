@@ -1830,6 +1830,143 @@ new top-level `*.mjs` / `*.js` / `*.ts` that is not on a short allowlist (`next.
   `*.json` capture, or `/tmp`-writing script has the same origin.
 - **Surface: CI only, web-reproducible.**
 
+### [platform][app-shell] BF-22 — the slow loads clear on a force restart, so they are in-memory client state; the server-distance theory was measured wrong
+
+- **Branch:** _unassigned_
+- **Added:** 2026-08-25 · owner: *"everything is loading very slowly"*, then *"actually its running a lot better after a force restart"*
+- **Lane: B** — client shell. Not a server or database entry; see the ruled-out list.
+
+**⚠ A correction to the first version of this entry, which was wrong.** It concluded that production
+was served from Virginia while the owner is in Brisbane, from `x-railway-edge: iad1` in the response
+headers plus a ~276 ms measurement. **`x-railway-edge` names the edge PoP the *caller* reaches, not
+where the container runs.** The measurement was taken from a US-adjacent sandbox, so it recorded the
+sandbox's own distance to the origin. The owner states the service is deployed in **Singapore**,
+which is the closest region Railway offered, and the numbers agree with that: a static file taking
+~276 ms *from a caller near `iad1`* means the origin is far from `iad1`, which is the opposite of
+the conclusion drawn. From Brisbane to Singapore the constant is roughly 100 ms, not 270 ms.
+**Do not re-derive a region finding from `x-railway-edge` — it describes the caller.**
+
+**The datapoint that actually locates it: a force restart fixed it.** That rules out everything
+persistent — the local SQLite store, the service-worker cache, `localStorage` and the server all
+survive a restart — and points at **in-memory state in a shell that never unmounts**.
+`components/shell/tab-shell.tsx` keeps **all five tab panels mounted** once visited (`invisible` +
+`content-visibility`, deliberately, for scroll position and state). The app is therefore one
+long-lived JS context between force-quits, and the same file already records a measured instance of
+this class: hidden panels' CSS animations once consumed **21.3% of main-thread time**, fixed with
+`tab-panel-idle`.
+
+**Ruled out by inspection 2026-08-25 — do not re-investigate these without new evidence:**
+
+| Suspect | Finding |
+|---|---|
+| Database | `SELECT 1` 3 ms, 99.90% cache hit, 0 idle-in-transaction (BF-19) |
+| Server app work | A **static file** and a dynamic route cost the same from one caller — under 10 ms of app time |
+| Home fan-out growth | **Flat**: 17 `cachedFetch`, 17 `useEffect`, 12 `readCacheSync`, ~1456 lines, unchanged across every commit touching `session-select-content.tsx` since 2026-08-19 |
+| Timers in tab panels | The five tab contents contain **zero** `setInterval`/`requestAnimationFrame`, and four of five consume `useTabVisibility` |
+| `useInvalidationRefetch` | Returns `unsubscribe()` and clears its timeout; the `addEventListener` a grep finds is in its docstring |
+| BLE/live-HR services | `battery-soak`, `continuous-capture` and `live-hr/manager` all clear their timers in `stop()`; `manager.start()` is guarded twice against double-start |
+
+**What is still worth suspecting**, in the absence of a device profile: JS heap growth across five
+permanently-mounted panels; DOM accumulation in long lists; and the interaction with BF-19's deploy
+churn, where a rewritten service-worker cache forces the shell to be re-fetched into an already-long-
+lived context.
+
+- **Needs:** BF-19 — the client reporter is what produces the device measurement this entry cannot
+  get any other way.
+- **This cannot be root-caused from a sandbox** and should not be attempted again from one. It wants
+  a heap and main-thread profile from the S25 across a long-running session.
+- **What would count as fixed:** the owner can go a normal week without a force restart changing how
+  the app feels, and there is a measurement showing why rather than an inference.
+- **Surface: device only.** Every negative above is from source inspection, not from a running S25.
+
+### [platform] BF-21 — expose `pg_stat_statements` to `claude_ro` once the owner enables it
+
+- **Branch:** _unassigned_
+- **Added:** 2026-08-25 · owner approved enabling it after BF-19's investigation
+- **Lane: A** — **this entry exists because it needs a migration number, which BugFix may not take.**
+  One `claude_ro` view + grant, at the next free number.
+- **Gate: owner** — the extension must be enabled on Railway first (owner action, needs a Postgres
+  restart). Clears when `SELECT count(*) FROM pg_extension WHERE extname='pg_stat_statements'`
+  returns 1 in production.
+
+**The owner's half, in order.** `shared_preload_libraries` must include `pg_stat_statements` before
+the extension can work; it is a start-time parameter, so it needs a Postgres **restart**, not a
+reload. Then, as a superuser: `CREATE EXTENSION pg_stat_statements;`. Verified 2026-08-25 that it is
+**available and not installed** — `pg_available_extensions` lists `default_version` 1.12 with
+`installed_version` null, on PostgreSQL 18.6.
+
+**This entry's half.** The read-only role cannot see it without a view: `current_user` is
+`claude_readonly` and `search_path` is `claude_ro` alone, and that schema is **default-deny**, so
+`pg_stat_statements` is unreachable until a view exists. Add one and grant SELECT, at the next free
+migration number, in a NEW migration file (never edit an applied one — `ensureSchema` tracks by
+filename and would skip it forever).
+
+**Safe to expose, and why it is worth stating.** Every other `claude_ro` view is row-scoped to one
+user because production holds other people's health data. This one is not user-scoped and does not
+need to be: `pg_stat_statements` stores **normalised** query text — literals are replaced with `$n`
+placeholders — so it carries query *shapes* and timings, never parameter values or row content.
+Expose `query`, `calls`, `total_exec_time`, `mean_exec_time`, `rows`; there is no reason to expose
+anything else.
+
+**Temper the expectation.** BF-19 measured the database and it is not where the reported slowness
+is: `SELECT 1` returns in **3 ms**, cache hit is **99.90%**, and nothing sits idle in transaction.
+This is worth having as a baseline and it will catch a future regression, but it is unlikely to
+explain the load times — BF-19's client-side reporter is where that answer lives. Do not close the
+slow-load question on a clean `pg_stat_statements` read.
+
+- **What would count as fixed:** a session can run
+  `SELECT query, calls, mean_exec_time FROM claude_ro.pg_stat_statements ORDER BY total_exec_time DESC LIMIT 20`
+  and get rows.
+- **Surface: production only.** Nothing to verify locally beyond the migration applying.
+
+### [app-shell][platform] BF-23 — E2E is red on `main`: Home's quick-log button never appears, and it broke in tonight's six merges
+
+- **Branch:** _unassigned_
+- **Added:** 2026-08-25 · found when PR #445, a **docs-only** change, failed E2E
+- **Lane: B** — Home card rendering. Test-or-app, see below; the implementer decides which.
+- **⚠ It does NOT block merges, and that is the reason it needs picking up rather than a reason to
+  relax.** The first version of this entry said E2E was a required check and nothing could merge.
+  **Wrong** — branch protection requires Lint, Tests, Build, Custom Rules and Migration Check
+  (`CLAUDE.md` line 5); **E2E is not among them.** #454 merged at 04:19 with this same E2E failure.
+  So a red E2E stops nobody, which means it will sit red indefinitely and every later agent will
+  read a failing E2E as normal. That is worse than a blocking break, not better.
+
+**The failure**, `e2e/home-card-invalidation-refetch.spec.ts:59`, twice (original **and** retry, so
+not a flake):
+
+```
+Error: locator.click: Test timeout of 45000ms exceeded.
+  - waiting for getByRole('button', { name: 'Log Body Weight' })
+```
+
+59 passed, 1 failed, 1 flaky (`one-calorie-budget.spec.ts`, an unrelated `ECONNRESET`).
+
+**It is a regression, not a stale test.** The spec landed **2026-08-20** in #275 and has passed
+since. PR #443 passed E2E at **02:26** tonight; this run failed at **03:46**. Six PRs merged in
+between — **#446, #444, #447, #449, #451, #448** — and one of them made that button unreachable.
+**#451** ("Give the last three vanishing cards an error state", Q-499) is the first place to look,
+because it changed what self-fetching cards do instead of `return null`; **#447** (sheet
+back-dismiss under StrictMode) is second, since this test drives a sheet.
+
+**Where the button comes from — there is no literal to grep.** `"Log Body Weight"` appears **nowhere**
+in `app/` or `components/`. It is built at `app/session-select/components/metric-tiles-card.tsx:96`
+as ``aria-label={`Log ${def.label}`}``, and `def.label` is `"Body Weight"` from
+`lib/home/home-prefs.ts:18`. The sheet it opens is `log-value-sheet.tsx`, titled
+``{widget ? `Log ${widget.label}` : "Log"}``. A future session searching for the string will find
+nothing and conclude it was deleted; it was not.
+
+**One thing that was checked and is NOT the cause:** `components/home/home-card-widget.tsx` was
+untouched tonight — its most recent change is #412 on 2026-08-24.
+
+- **What would count as fixed:** the spec passes on `main` without weakening what it asserts. It
+  guards Q-402 — that a Home card refetches on invalidation **without a remount** — and its own
+  commit notes it was mutation-checked, so loosening the selector to make it green would retire a
+  guard that took three attempts to build.
+- **Do not** simply add `metricTiles` to the spec's `enableHomeCards` list until it is established
+  that the card is genuinely meant to be pref-gated. The test passed for five days without it.
+- **Surface: E2E on CI, web-reproducible.** `pnpm exec playwright test e2e/home-card-invalidation-refetch.spec.ts`
+  reproduces without a device.
+
 ### [nutrition][platform] BF-12 — logging a saved meal takes ~20s and the owner couldn't find it after navigating away; traced to the slow fallback firing, not a lost write
 
 - **Lane: A** — the fix is in `logMealItems`/local-store availability, not the UI. No schema.
