@@ -18,6 +18,22 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
+## 2026-08-25 — `docs/implementation-backlog.md` 11638 → 11648 (OR-1 and PS-6)
+
+Two queue entries, both found from one CI failure on a docs PR. **OR-1**: Q-402's only E2E guard is
+dead — `e2e/home-card-invalidation-refetch.spec.ts` waits on a `Log Body Weight` button that exists
+nowhere outside two specs, and it is red on `main`, not on one branch. **PS-6**: the queue tooling
+has never known the `OR-` prefix, in three regexes across two scripts.
+
+Both entries are long because both are traces rather than symptoms, and PS-6's length is mostly the
+one fact that makes it urgent rather than cosmetic: `next-item.js` **drops** an entry whose heading
+matches no known prefix (`current = id ? {…} : null`), so an `OR-` entry is not mislabelled, it is
+absent, with nothing printed to say so.
+
+**PS-6 is filed under `PS-`, not `OR-`, on purpose** — an `OR-` entry describing this bug could not
+appear in the tool that reports it. That is recorded in the entry so the letter does not read as a
+mistake later.
+
 ## 2026-08-25 — `projectOverview.md` 7937 → 7941 (`docs/implementation-backlog.md` raise withdrawn)
 
 The owner supplied the Railway charts three queue entries had been parked on, and the readings
