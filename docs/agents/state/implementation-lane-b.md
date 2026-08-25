@@ -7,8 +7,8 @@
 
 ## Now
 **Nothing open — every branch merged.** This run landed **#478** (Q-93-followup), **#479** (the Q-112
-re-plan), **#483** (BF-27), **#485**/**#488** (this baton) and **#491** (BF-24). Each has a journal
-entry in `docs/overview/entries/` dated 2026-08-25.
+re-plan), **#483** (BF-27), **#491** (BF-24), **#497** (BF-26) and the baton PRs. Each has a journal
+entry in `docs/overview/entries/` dated 2026-08-25. **Every one owes only a device press.**
 
 **CI E2E here takes about ELEVEN minutes, not the three `CLAUDE.md` quotes** — measured twice, and a
 docs-only PR's E2E ran just as long, so it is the job's cost, not your change. Do not read a
@@ -42,8 +42,8 @@ role.** Three for three this run:
 ## Next
 `node scripts/next-item.js --lane B` first. Known-good candidates, in the order I would take them:
 - **Q-395c** — nutrition phase 4, and it owns BF-24's ③ tiles. Check nobody else is on it.
-- **BF-29 · BF-30 · BF-31 · BF-26** — the remaining artboard-parity entries. **Read BF-28 first**: an
-  artboard is one screenful, and a section absent from it is not thereby deleted.
+- **BF-29 · BF-30 · BF-31** — the remaining artboard-parity entries. **Read BF-28 first**: an
+  artboard is one screenful, and a section absent from it is not thereby deleted. BF-26 is done.
 - **BF-24 is PART done — do not re-take it whole.** #491 shipped ①④⑤; ②③⑥⑦ are kept on the entry
   with reasons (② also renders on `/health`, ③ is **Q-395c's**, ⑥ is Q-406's, ⑦ is decided).
 - **Q-112a** — a real one-PR entry now, with a plan behind it
