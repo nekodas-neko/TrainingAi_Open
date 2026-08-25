@@ -16,6 +16,7 @@ import type { MealPlanDayType, NutritionIngredient } from '@trainingai/shared/ty
 import { sumIngredients } from '@trainingai/shared/nutrition/scan-totals'
 import { scaleWithTopUp } from '@/lib/nutrition/meal-top-up'
 import { savedMealToIngredients } from '@trainingai/shared/nutrition/saved-meal-ingredients'
+import { selectLibraryMeals } from '@trainingai/shared/nutrition/library-match'
 import { NutritionIngredientsSchema } from '@trainingai/shared/validators/nutrition-ingredient'
 import { readJsonLimited } from '@trainingai/shared/http/request-guards'
 
@@ -45,6 +46,13 @@ const RequestSchema = z.object({
   splitTrainingRest: z.boolean().optional(),
   /** Saved meals to keep verbatim, in slot order. The model fills whatever slots are left. */
   keepSavedMealIds: z.array(z.string().uuid()).max(6).optional(),
+  /**
+   * Search the saved-meal library for every unpinned slot before asking the model (BF-11g).
+   *
+   * A boolean, not a list of ids: the route already lists the library server-side, so "use all my
+   * saved meals" costs zero payload — and, unlike a list, cannot name another user's meal.
+   */
+  useLibrary: z.boolean().optional(),
   /** Free-text descriptions of meals the user already eats, to steer the rest of the plan. */
   usualMeals: z.array(z.string().max(200)).max(10).optional(),
   /**
@@ -110,7 +118,7 @@ export async function POST(req: Request) {
 
   const tz = session.user?.timezone ?? DEFAULT_TZ
   const repo = await getRepository()
-  const [balance, targets, restrictions, currentWeightKg, savedMeals] = await Promise.all([
+  const [balance, targets, restrictions, currentWeightKg, savedMeals, mealTypes] = await Promise.all([
     computeEnergyBalance(repo, userId, tz, todayInTz(tz)),
     repo.getNutritionTargets(userId),
     repo.listUserDietaryRestrictions(userId),
@@ -119,9 +127,12 @@ export async function POST(req: Request) {
     // the user is. Q-330: `getBodyMetricsBaseline` reads `asc(date)`, i.e. the FIRST weight ever
     // logged, which is the opposite of what that sentence asks for.
     repo.getMostRecentConfirmedWeightKg(userId),
-    // Only fetched when the user asked to keep some — listing the library on every generate would
-    // be a wasted query on the common path.
-    input.keepSavedMealIds?.length ? repo.listSavedMeals(userId) : Promise.resolve([]),
+    // Fetched when EITHER flag needs it. It used to be pinned-meals only, which would have made
+    // `useLibrary` silently do nothing — the query is skipped on the common path, not on this one.
+    input.keepSavedMealIds?.length || input.useLibrary ? repo.listSavedMeals(userId) : Promise.resolve([]),
+    // The slot windows a library match filters on. Already user-configured; this is not a second
+    // definition of "which meal is this".
+    input.useLibrary ? repo.listMealTypes(userId) : Promise.resolve([]),
   ])
 
   // Meals the user already eats, converted to the same ingredient shape the model produces so the
@@ -165,10 +176,46 @@ export async function POST(req: Request) {
     ?? suggestMealCount(dailyProtein, currentWeightKg ?? 0)
     ?? 3
 
+  // §2/§3.2 — more pins than slots. `kept` took the first slots and the rest vanished with no word
+  // to the client, so a plan that quietly lost a meal the user had explicitly asked to keep looked
+  // like a bug in the pinning. Cap here and SAY what was dropped; a client that skips the prompt
+  // still gets a coherent plan.
+  const droppedPins = kept.slice(mealCount).map(k => k.name)
+  if (droppedPins.length > 0) kept.length = mealCount
+
   const allergies = restrictions.filter(r => r.severity === 'allergy').map(r => r.label)
   const avoid = restrictions.filter(r => r.severity === 'avoid').map(r => r.label)
 
   const dayTypes: MealPlanDayType[] = input.splitTrainingRest ? ['training', 'rest'] : ['all']
+
+  // BF-11g — the library pass, before the model is asked for anything.
+  //
+  // Slots are split again per variant below (a rest day shifts carbs), but the CHOICE of meal is
+  // one decision for the whole plan: the same ingredient list serves both variants and is rescaled
+  // per variant, exactly as a pinned meal already is. So the match runs once, against the
+  // unshifted slots.
+  const canonicalSlots = splitMacrosAcrossMeals(
+    { calories: dailyCalories, proteinG: dailyProtein, carbsG: dailyCarbs, fatG: dailyFat },
+    mealCount,
+    { trainingTime: input.trainingTime ?? null },
+  )
+  const libraryPicks = input.useLibrary
+    ? selectLibraryMeals(
+        // Pinned meals hold the first slots, so only what is left is the library's to fill.
+        canonicalSlots.slice(kept.length).map((slot, i) => ({
+          index: kept.length + i,
+          timeMinutes: slot.timeMinutes,
+          target: { calories: slot.calories, proteinG: slot.proteinG, carbsG: slot.carbsG, fatG: slot.fatG },
+        })),
+        savedMeals
+          // A pinned meal is already in the plan; offering it again is the duplicate this pass
+          // exists to avoid, one source earlier.
+          .filter(m => !kept.some(k => k.id === m.id))
+          .map(m => ({ id: m.id, name: m.name, mealTypeIds: m.mealTypeIds, ingredients: savedMealToIngredients(m) })),
+        mealTypes.map(t => ({ id: t.id, timeStartHour: t.timeStartHour, timeEndHour: t.timeEndHour })),
+      )
+    : []
+  const pickBySlot = new Map(libraryPicks.map(p => [p.slotIndex, p]))
 
   let draft: z.infer<typeof DraftSchema>
   try {
@@ -183,6 +230,9 @@ export async function POST(req: Request) {
           mealCount,
           dayTypes: dayTypes.join('/'),
           kept: contentKey(...kept.map(k => k.name)),
+          // Without this a plan whose library filled three slots fingerprints identically to one
+          // that filled none — the Q-471 shape, one input later.
+          library: contentKey(...libraryPicks.map(p => p.meal.name)),
           stores: contentKey(...(input.stores ?? [])),
           excluded: contentKey(...(input.excludedFoods ?? [])),
         },
@@ -194,12 +244,15 @@ export async function POST(req: Request) {
         prompt: [
           'You are a practical sports nutritionist. Design one day of eating.',
           '',
-          `Meals: exactly ${mealCount - kept.length}.`,
+          `Meals: exactly ${mealCount - kept.length - libraryPicks.length}.`,
           // Same phrasing as the per-meal route's `avoidNames`, which measurably works. The earlier
           // wording ("FIXED — do not repeat") did not: a run came back with the kept meal
           // duplicated in the very next slot.
-          kept.length
-            ? `The plan ALREADY contains these meals, which the user eats and which are not yours to change: ${kept.map(k => k.name).join('; ')}. Everything you return must be genuinely DIFFERENT food from those — different protein, different carb, different style.`
+          // Library picks join the "already there" list for the same reason the pinned ones are on
+          // it: the model duplicating a meal the plan already holds is the failure this phrasing
+          // was measured to fix, and a library pick is no less already-there than a pin.
+          kept.length + libraryPicks.length
+            ? `The plan ALREADY contains these meals, which the user eats and which are not yours to change: ${[...kept.map(k => k.name), ...libraryPicks.map(p => p.meal.name)].join('; ')}. Everything you return must be genuinely DIFFERENT food from those — different protein, different carb, different style.`
             : '',
           input.usualMeals?.length
             ? `Meals they usually eat, for style — match this kind of food where it fits: ${input.usualMeals.join('; ')}.`
@@ -232,15 +285,41 @@ export async function POST(req: Request) {
   // The model may return the wrong number of meals however firmly it was asked. Pad or trim rather
   // than failing — a plan with one meal missing is recoverable, a 500 is not.
   // Kept meals take the first slots so their position is stable across a reroll of the rest.
-  const generatedNeeded = Math.max(0, mealCount - kept.length)
+  const generatedNeeded = Math.max(0, mealCount - kept.length - libraryPicks.length)
   const generated = draft.meals.slice(0, generatedNeeded)
   while (generated.length < generatedNeeded) {
     generated.push({ name: `Meal ${kept.length + generated.length + 1}`, ingredients: [], notes: '' })
   }
-  const names: { name: string; ingredients: NutritionIngredient[]; notes: string; savedMealId?: string | null }[] = [
-    ...kept.map(k => ({ name: k.name, ingredients: k.ingredients, notes: '', savedMealId: k.id })),
-    ...generated,
-  ]
+  type PlannedMeal = {
+    name: string; ingredients: NutritionIngredient[]; notes: string
+    savedMealId?: string | null
+    source: 'kept' | 'library' | 'ai'
+    matchReason: string | null
+  }
+  // Slot order, not source order: a library pick belongs at the slot it was matched against, and
+  // the model's meals fill the gaps between them in the order it returned them.
+  const names: PlannedMeal[] = kept.map(k => ({
+    name: k.name, ingredients: k.ingredients, notes: '', savedMealId: k.id,
+    source: 'kept' as const, matchReason: null,
+  }))
+  let nextGenerated = 0
+  for (let i = kept.length; i < mealCount; i++) {
+    const pick = pickBySlot.get(i)
+    if (pick) {
+      names.push({
+        name: pick.meal.name, ingredients: pick.meal.ingredients, notes: '',
+        savedMealId: pick.meal.id, source: 'library', matchReason: pick.matchReason,
+      })
+      continue
+    }
+    const g = generated[nextGenerated++] ?? { name: `Meal ${i + 1}`, ingredients: [], notes: '' }
+    names.push({
+      ...g, source: 'ai',
+      // Only say the library was searched when it was — silence and "nothing fitted" are different
+      // answers, and BF-11h's swap reads this to decide what to offer.
+      matchReason: input.useLibrary ? 'No saved meal fitted this slot.' : null,
+    })
+  }
 
   const variants = await Promise.all(dayTypes.map(async dayType => {
     const carbShift = dayType === 'rest' ? Math.round(dailyCarbs * REST_DAY_CARB_REDUCTION) : 0
@@ -283,6 +362,10 @@ export async function POST(req: Request) {
           position: i,
           name: names[i].name,
           savedMealId: names[i].savedMealId ?? null,
+          // Where this meal came from, and why. Not decoration: BF-11h's library swap and the
+          // existing AI edit both need to know whether a slot was matched or invented.
+          source: names[i].source,
+          matchReason: names[i].matchReason,
           notes: names[i].notes || null,
           ingredients,
           actual,
@@ -311,6 +394,11 @@ export async function POST(req: Request) {
     targetFatG: dailyFat,
     // True when the saved macros did not add up to the saved calorie goal and carbs were refitted.
     macrosAdjusted,
+    // Pins the server could not honour because there were more of them than slots. Reported rather
+    // than silently truncated — a plan that quietly loses a meal the user pinned reads as a bug.
+    droppedPins,
+    // How many slots the library filled, so the review step can say so without counting.
+    libraryMatchCount: libraryPicks.length,
     variants,
     // Surfaced so the review step can render the "must not contain" list beside the ingredients.
     // Capturing restrictions reliably does not make the model's filtering reliable; the user

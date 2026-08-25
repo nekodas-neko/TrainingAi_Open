@@ -1,10 +1,10 @@
 {
   "_comment": "Shrink-only line-count baselines. A file may sit at or below its number and may never grow. Raising one is a deliberate act that shows up in the diff; record why in docs/doc-size-baseline-history.md, not here. Counts are `wc -l` + 1 (the script splits on newline).",
   "files": {
-    "projectOverview.md": 7963,
+    "projectOverview.md": 7965,
     "docs/implementation-backlog.md": 11975,
     "CLAUDE.md": 1159,
-    "docs/agents/state/implementation-lane-a.md": 158,
+    "docs/agents/state/implementation-lane-a.md": 167,
     "docs/agents/state/implementation-lane-b.md": 109,
     "docs/agents/state/bugfix.md": 161,
     "docs/agents/state/review.md": 173,

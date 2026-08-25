@@ -2410,3 +2410,18 @@ and none was spliced — each was rebuilt from `origin/main` and re-derived, bec
 in flight the number is only ever correct against the merged predecessor. If that starts feeling like
 friction rather than bookkeeping, the thing to question is whether Current Status should hold a
 paragraph per PR at this merge rate, not whether the ratchet should be looser.
+
+## 2026-08-25 — `projectOverview.md` 7963 → 7965 and the Lane A baton 158 → 167 (BF-11g)
+
+**projectOverview, +2:** the Current Status paragraph. It carries the design correction rather than
+the feature, because that is the part a future reader needs — the plan's prescribed ranking judged a
+saved meal's totals, and `scaleIngredientsToTargets` moves each macro group independently, so size is
+the one thing portioning always fixes.
+
+**Baton, +9, and seven of them are one lesson.** Three timing-dependent test defects shipped and were
+fixed in a single day, all by this session: an assertion that allowed an async write zero
+milliseconds, one that counted rows written by two racing fire-and-forget calls, and one that paid a
+4.3 s module import inside a 5 s budget. Treated as three lessons they are forgettable; the root is
+narrower — *something in the test is timed that is not the behaviour being asserted* — and that is
+short enough to actually ask before writing an assertion. The other two lines are the shipped list
+and the migration/SQLite pointers, which a baton is wrong without.
