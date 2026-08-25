@@ -877,9 +877,10 @@ without a queue entry is a dropped finding.*
 > conversion could be safe. Q-395a was meant to carry it and did not. Per-item P/C/F moved into the
 > sheet's live preview. [`journal`](overview/entries/2026-08-25-diary-row-shared-shape.md).
 >
-> **⚠ It turned up a pre-existing defect — see LB-10.** The sheet does not open in `pnpm dev` at all,
-> on `main` too: `use-sheet-back-dismiss.ts` is not double-invoke safe. Production is unaffected;
-> edit and delete were verified with `reactStrictMode: false`, then reverted.
+> **⚠ It turned up a pre-existing defect, LB-10 — fixed 2026-08-25.** The sheet would not open in
+> `pnpm dev` at all, on `main` too: `use-sheet-back-dismiss.ts` was not double-invoke safe. Verified
+> here with `reactStrictMode: false`; the hook is fixed and guarded now
+> ([`journal`](overview/entries/2026-08-25-sheet-back-dismiss-strict-mode.md)).
 
 - **Branch:** `refactor/nutrition-food-row`
 - **Lane B.** No schema, no route.
@@ -894,11 +895,11 @@ without a queue entry is a dropped finding.*
   [`Journal`](overview/entries/2026-08-23-shared-food-row.md).
 - **✅ THE DIARY ROW SHIPPED 2026-08-25 (v1.367.0)** — with the delete this entry required moved into
   `QuickEditLogSheet` first, so no capability was dropped.
-- **What is left is ONE call site: the external food-database row** (`ingredient-search.tsx:132`),
-  which carries a macro-mismatch warning and an in-flight spinner. The agreed row has nowhere to put
-  either, and adding a slot makes it a wrapper rather than a unification. **Needs a design answer —
-  where a per-row warning goes.** Q-395's drawings do not settle it (checked: none of the twelve
-  artboards shows a warning treatment).
+- **Keep:** ONE call site, the external food-database row (`ingredient-search.tsx:132`), which
+  carries a macro-mismatch warning and an in-flight spinner. The agreed row has nowhere to put
+  either, and adding a slot makes it a wrapper rather than a unification. **It needs a design answer
+  — where a per-row warning goes** — and Q-395's drawings do not settle it (checked: none of the
+  twelve artboards shows a warning treatment). `Gate: owner`.
 - **✅ RESOLVED 2026-08-24 — the drawings are in the repository.** **The lesson worth keeping: a
   mockup that lives only in a chat artifact is a mockup the queue cannot use.** These were drawn
   2026-08-18, reviewed twice, decided against — then blocked four entries for six days because
@@ -1216,21 +1217,6 @@ whether or not anyone draws them first.
   the action row), so a fixed container would draw an empty border on the days they are absent.
 - **Keep:** the **device smoke run**, the only thing left — three `divide-y` sections over
   `bg-muted/60` children now, the shape Samsung's compositor has caught out before. `Gate: device`.
-
-### [app-shell][platform] LB-10 — five sheets cannot be opened in `pnpm dev`: the back-dismiss hook is not double-invoke safe
-
-- **Lane:** B · **Added:** 2026-08-25, while converting Q-406's diary row.
-- **`lib/hooks/use-sheet-back-dismiss.ts`** pushes a history entry on open and calls `history.back()`
-  in its cleanup. Under StrictMode's double invoke that is push → `back()` → push, and the `popstate`
-  from the `back()` lands *after* the second push carrying the pre-push state — so the handler sees a
-  `sheetId` that is not its own and fires `onClose()` on the frame the sheet opened.
-- **Measured:** the sheet renders twice with a truthy `log` then flips to null; with
-  `reactStrictMode: false` it opens. Reproduced on `main`, so it predates Q-406.
-- **Production is fine** (no double-invoke), but `pnpm dev` is this repo's pre-merge test surface and
-  **five sheets are unopenable on it**: `quick-edit-log-sheet`, `food-logger-sheet`,
-  `food-library-sheet`, `morning-checkin-sheet`, `end-of-day-review` — same family as Q-461.
-- **Fix shape:** make the handler ignore a pop it caused itself — track whether the cleanup's
-  `back()` is in flight. Prove it by opening one of the five in `pnpm dev` with StrictMode ON.
 
 ### [nutrition][platform] LB-9 — the Atwater factors have four copies, two of them Lane A's
 
@@ -1786,6 +1772,143 @@ new top-level `*.mjs` / `*.js` / `*.ts` that is not on a short allowlist (`next.
 - **Sibling sweep:** check for other scratch files already committed — a root-level `*.png`,
   `*.json` capture, or `/tmp`-writing script has the same origin.
 - **Surface: CI only, web-reproducible.**
+
+### [platform][app-shell] BF-22 — the slow loads clear on a force restart, so they are in-memory client state; the server-distance theory was measured wrong
+
+- **Branch:** _unassigned_
+- **Added:** 2026-08-25 · owner: *"everything is loading very slowly"*, then *"actually its running a lot better after a force restart"*
+- **Lane: B** — client shell. Not a server or database entry; see the ruled-out list.
+
+**⚠ A correction to the first version of this entry, which was wrong.** It concluded that production
+was served from Virginia while the owner is in Brisbane, from `x-railway-edge: iad1` in the response
+headers plus a ~276 ms measurement. **`x-railway-edge` names the edge PoP the *caller* reaches, not
+where the container runs.** The measurement was taken from a US-adjacent sandbox, so it recorded the
+sandbox's own distance to the origin. The owner states the service is deployed in **Singapore**,
+which is the closest region Railway offered, and the numbers agree with that: a static file taking
+~276 ms *from a caller near `iad1`* means the origin is far from `iad1`, which is the opposite of
+the conclusion drawn. From Brisbane to Singapore the constant is roughly 100 ms, not 270 ms.
+**Do not re-derive a region finding from `x-railway-edge` — it describes the caller.**
+
+**The datapoint that actually locates it: a force restart fixed it.** That rules out everything
+persistent — the local SQLite store, the service-worker cache, `localStorage` and the server all
+survive a restart — and points at **in-memory state in a shell that never unmounts**.
+`components/shell/tab-shell.tsx` keeps **all five tab panels mounted** once visited (`invisible` +
+`content-visibility`, deliberately, for scroll position and state). The app is therefore one
+long-lived JS context between force-quits, and the same file already records a measured instance of
+this class: hidden panels' CSS animations once consumed **21.3% of main-thread time**, fixed with
+`tab-panel-idle`.
+
+**Ruled out by inspection 2026-08-25 — do not re-investigate these without new evidence:**
+
+| Suspect | Finding |
+|---|---|
+| Database | `SELECT 1` 3 ms, 99.90% cache hit, 0 idle-in-transaction (BF-19) |
+| Server app work | A **static file** and a dynamic route cost the same from one caller — under 10 ms of app time |
+| Home fan-out growth | **Flat**: 17 `cachedFetch`, 17 `useEffect`, 12 `readCacheSync`, ~1456 lines, unchanged across every commit touching `session-select-content.tsx` since 2026-08-19 |
+| Timers in tab panels | The five tab contents contain **zero** `setInterval`/`requestAnimationFrame`, and four of five consume `useTabVisibility` |
+| `useInvalidationRefetch` | Returns `unsubscribe()` and clears its timeout; the `addEventListener` a grep finds is in its docstring |
+| BLE/live-HR services | `battery-soak`, `continuous-capture` and `live-hr/manager` all clear their timers in `stop()`; `manager.start()` is guarded twice against double-start |
+
+**What is still worth suspecting**, in the absence of a device profile: JS heap growth across five
+permanently-mounted panels; DOM accumulation in long lists; and the interaction with BF-19's deploy
+churn, where a rewritten service-worker cache forces the shell to be re-fetched into an already-long-
+lived context.
+
+- **Needs:** BF-19 — the client reporter is what produces the device measurement this entry cannot
+  get any other way.
+- **This cannot be root-caused from a sandbox** and should not be attempted again from one. It wants
+  a heap and main-thread profile from the S25 across a long-running session.
+- **What would count as fixed:** the owner can go a normal week without a force restart changing how
+  the app feels, and there is a measurement showing why rather than an inference.
+- **Surface: device only.** Every negative above is from source inspection, not from a running S25.
+
+### [platform] BF-21 — expose `pg_stat_statements` to `claude_ro` once the owner enables it
+
+- **Branch:** _unassigned_
+- **Added:** 2026-08-25 · owner approved enabling it after BF-19's investigation
+- **Lane: A** — **this entry exists because it needs a migration number, which BugFix may not take.**
+  One `claude_ro` view + grant, at the next free number.
+- **Gate: owner** — the extension must be enabled on Railway first (owner action, needs a Postgres
+  restart). Clears when `SELECT count(*) FROM pg_extension WHERE extname='pg_stat_statements'`
+  returns 1 in production.
+
+**The owner's half, in order.** `shared_preload_libraries` must include `pg_stat_statements` before
+the extension can work; it is a start-time parameter, so it needs a Postgres **restart**, not a
+reload. Then, as a superuser: `CREATE EXTENSION pg_stat_statements;`. Verified 2026-08-25 that it is
+**available and not installed** — `pg_available_extensions` lists `default_version` 1.12 with
+`installed_version` null, on PostgreSQL 18.6.
+
+**This entry's half.** The read-only role cannot see it without a view: `current_user` is
+`claude_readonly` and `search_path` is `claude_ro` alone, and that schema is **default-deny**, so
+`pg_stat_statements` is unreachable until a view exists. Add one and grant SELECT, at the next free
+migration number, in a NEW migration file (never edit an applied one — `ensureSchema` tracks by
+filename and would skip it forever).
+
+**Safe to expose, and why it is worth stating.** Every other `claude_ro` view is row-scoped to one
+user because production holds other people's health data. This one is not user-scoped and does not
+need to be: `pg_stat_statements` stores **normalised** query text — literals are replaced with `$n`
+placeholders — so it carries query *shapes* and timings, never parameter values or row content.
+Expose `query`, `calls`, `total_exec_time`, `mean_exec_time`, `rows`; there is no reason to expose
+anything else.
+
+**Temper the expectation.** BF-19 measured the database and it is not where the reported slowness
+is: `SELECT 1` returns in **3 ms**, cache hit is **99.90%**, and nothing sits idle in transaction.
+This is worth having as a baseline and it will catch a future regression, but it is unlikely to
+explain the load times — BF-19's client-side reporter is where that answer lives. Do not close the
+slow-load question on a clean `pg_stat_statements` read.
+
+- **What would count as fixed:** a session can run
+  `SELECT query, calls, mean_exec_time FROM claude_ro.pg_stat_statements ORDER BY total_exec_time DESC LIMIT 20`
+  and get rows.
+- **Surface: production only.** Nothing to verify locally beyond the migration applying.
+
+### [app-shell][platform] BF-23 — E2E is red on `main`: Home's quick-log button never appears, and it broke in tonight's six merges
+
+- **Branch:** _unassigned_
+- **Added:** 2026-08-25 · found when PR #445, a **docs-only** change, failed E2E
+- **Lane: B** — Home card rendering. Test-or-app, see below; the implementer decides which.
+- **⚠ It does NOT block merges, and that is the reason it needs picking up rather than a reason to
+  relax.** The first version of this entry said E2E was a required check and nothing could merge.
+  **Wrong** — branch protection requires Lint, Tests, Build, Custom Rules and Migration Check
+  (`CLAUDE.md` line 5); **E2E is not among them.** #454 merged at 04:19 with this same E2E failure.
+  So a red E2E stops nobody, which means it will sit red indefinitely and every later agent will
+  read a failing E2E as normal. That is worse than a blocking break, not better.
+
+**The failure**, `e2e/home-card-invalidation-refetch.spec.ts:59`, twice (original **and** retry, so
+not a flake):
+
+```
+Error: locator.click: Test timeout of 45000ms exceeded.
+  - waiting for getByRole('button', { name: 'Log Body Weight' })
+```
+
+59 passed, 1 failed, 1 flaky (`one-calorie-budget.spec.ts`, an unrelated `ECONNRESET`).
+
+**It is a regression, not a stale test.** The spec landed **2026-08-20** in #275 and has passed
+since. PR #443 passed E2E at **02:26** tonight; this run failed at **03:46**. Six PRs merged in
+between — **#446, #444, #447, #449, #451, #448** — and one of them made that button unreachable.
+**#451** ("Give the last three vanishing cards an error state", Q-499) is the first place to look,
+because it changed what self-fetching cards do instead of `return null`; **#447** (sheet
+back-dismiss under StrictMode) is second, since this test drives a sheet.
+
+**Where the button comes from — there is no literal to grep.** `"Log Body Weight"` appears **nowhere**
+in `app/` or `components/`. It is built at `app/session-select/components/metric-tiles-card.tsx:96`
+as ``aria-label={`Log ${def.label}`}``, and `def.label` is `"Body Weight"` from
+`lib/home/home-prefs.ts:18`. The sheet it opens is `log-value-sheet.tsx`, titled
+``{widget ? `Log ${widget.label}` : "Log"}``. A future session searching for the string will find
+nothing and conclude it was deleted; it was not.
+
+**One thing that was checked and is NOT the cause:** `components/home/home-card-widget.tsx` was
+untouched tonight — its most recent change is #412 on 2026-08-24.
+
+- **What would count as fixed:** the spec passes on `main` without weakening what it asserts. It
+  guards Q-402 — that a Home card refetches on invalidation **without a remount** — and its own
+  commit notes it was mutation-checked, so loosening the selector to make it green would retire a
+  guard that took three attempts to build.
+- **Do not** simply add `metricTiles` to the spec's `enableHomeCards` list until it is established
+  that the card is genuinely meant to be pref-gated. The test passed for five days without it.
+- **Surface: E2E on CI, web-reproducible.** `pnpm exec playwright test e2e/home-card-invalidation-refetch.spec.ts`
+  reproduces without a device.
 
 ### [nutrition][platform] BF-12 — logging a saved meal takes ~20s and the owner couldn't find it after navigating away; traced to the slow fallback firing, not a lost write
 
@@ -3133,98 +3256,6 @@ this fits without an extraction.
   short-circuits and the enqueue never runs. That `queueMutation` throws on a dead local DB is read
   from source, not observed, and that is still true after the fix. `Gate: device`.
 
-### [app-shell][platform] Q-555 — offline, a tab tap is a silent no-op until the service worker claims the page
-
-- **Branch:** `fix/offline-first-load-navigation`
-- **Added:** 2026-08-18 · review sweep (offline read surfaces, driven for real) ·
-  [`docs/reviews/2026-08-18-offline-read-surfaces.md`](reviews/2026-08-18-offline-read-surfaces.md)
-- **Placement:** low. Narrow by construction — needs a first-ever load (or a cleared worker) plus
-  connection loss inside that window, and it self-heals on the next load.
-- **⚠️ Lead with the good news, because three of four results here are positive.** Both offline paths
-  **work** once the worker is in control: a full reload serves the precached `/offline` page verbatim,
-  and an offline tab tap navigates and paints **2515 chars against 2486 online (~101%)** with no
-  offline page and no skeleton. The offline-first design delivers.
-- **The defect is the uncontrolled window.** Measured:
-  | State | Offline tab tap |
-  |---|---|
-  | `controller: true` | navigates, paints ~101% of cached content |
-  | `controller: false` | **URL unchanged, no navigation, no offline page, no feedback at all** |
-- **The uncontrolled state is the first-ever page load** — the worker registers *during* that
-  navigation and claims only afterwards. So a genuine first session that loses connection inside that
-  window gets a tab bar where taps do nothing and nothing explains why.
-- **Why file something this narrow:** the symptom (*a tap that does nothing, silently*) is
-  indistinguishable from a frozen app, and on the APK the service worker **is** the offline cold-start
-  mechanism — so install day is exactly when a new user is most likely to be moving between networks.
-> **⚠️ DIAGNOSED 2026-08-23 (Lane A). The open question is answered and this is Lane B's to fix.**
-> ([`journal`](overview/entries/2026-08-23-q555-diagnosis.md))
->
-> **It is both, and the click handler is what makes it silent.** Read from source, no probe needed —
-> the entry guessed this would need the router's internals; it needed the call sites.
->
-> 1. `components/shell/tab-loading.tsx` — the `loading.tsx` fallback for every tab route, so **it is
->    what is on screen during the first-ever load**, which is precisely the uncontrolled window —
->    renders `<BottomNav />` **with no `onTabChange`**.
-> 2. Inside `TabShell` a tap is pure in-app state (`onTabChange={show}`) and never routes, which is
->    why the controlled case works. Outside it there is no such handler.
-> 3. `handleNavClick` (`bottom-nav.tsx:77`) calls **`e.preventDefault()` unconditionally**, then
->    `navigateWithTransition` → `router.push(href)`.
->
-> So the `<Link>`'s native navigation is suppressed on every tap, and the only remaining path is
-> `router.push`, whose RSC fetch cannot be served offline with no worker in control. **The
-> `preventDefault()` is what removes the fallback:** without it a failed navigation is a real browser
-> navigation, and the browser shows *something* — its own offline error, or the precached `/offline`
-> page once the worker controls.
->
-> **Measured vs inferred, kept apart.** Measured (the original review): controller `false` → the tap
-> does nothing. Code fact (verifiable now): the three points above. **Inferred:** that the App Router
-> aborts the failed RSC fetch without surfacing anything. Confirm that half with Playwright —
-> `context.setOffline(true)`, service worker unregistered, watch the RSC request fail — rather than
-> taking it on trust.
->
-> **No Lane A fix is hiding in the service worker.** It already does `skipWaiting()` on install and
-> `clients.claim()` on activate, so it claims as early as it can; the uncontrolled window is inherent
-> to a first-ever load. The fix is in the click handler.
->
-> **⚠️ THE RECOMMENDED FIX SHAPE DOES NOT WORK, and three more things were measured 2026-08-24
-> (Lane B). Read this before starting — an attempt got as far as a working predicate and could not
-> verify it, and the branch `fix/offline-tab-tap-native-fallback` is pushed unmerged as the record.**
->
-> 1. **"Stop suppressing the native navigation" is not available.** These are `next/link` anchors, so
->    Next's own click handler intercepts and calls `router.push` regardless — removing our
->    `preventDefault()` hands the click to the same failing path. There is no native navigation to
->    restore.
-> 2. **Forcing one is possible but worse.** Measured: a plain `<a>` click offline with no controller
->    lands on `chrome-error://chromewebdata/`. That is "something", but it throws away the cached
->    screen the user is looking at — the one thing that still works offline.
-> 3. **They already know they are offline.** `components/shell/offline-indicator.tsx` renders a
->    persistent *"Offline — showing saved data"* pill from `useOnlineStatus()` whenever offline, and
->    it is in the root layout. So the missing feedback is specifically **a response to the tap**, not
->    a statement that the connection is down. Do not add a second offline notice.
-> 4. **The predicate is the easy half and it is written.** `components/shell/nav-offline.ts` on that
->    branch, with `components/shell/__tests__/nav-offline.test.ts` pinning all four states (only
->    `offline && !controller` is the bug; offline WITH a controller is the path the review measured
->    working at ~101% of online content, so warning there would be a false alarm).
->
-> **What blocked it, and it is the whole remaining task: nobody has reproduced the failing tap.**
-> Three Playwright attempts, each failing for a different and instructive reason:
-> - Tapping from a settled `/health` measures **`TabShell`'s in-app tab switch** (`onTabChange={show}`),
->   not this defect. The URL does not change there either, which is exactly what makes the two look
->   identical — the first probe was misread as a reproduction because of it.
-> - Holding a tab route open with `page.route` does put `tab-loading.tsx`'s `<BottomNav />` (the one
->   with no `onTabChange`) on screen — `[aria-busy="true"]` confirms it — but a tap on an
->   already-visited tab then succeeds straight from the client router cache and proves nothing.
-> - Tapping a never-visited tab from that fallback still produced no toast. **Not diagnosed.** Next
->   step: log inside `handleNavClick` to establish whether the handler runs at all in that window,
->   before changing any more product code.
->
-> **Do not ship this without that reproduction.** The fix is three lines and unverifiable by reading;
-> the defect is a silent no-op, so a fix that does nothing looks exactly like a fix that works.
-- **Lane: B** — `components/shell/bottom-nav.tsx`.
-- **Not exercised — and this limit is load-bearing:** web build only. On web `cachedFetch` falls back
-  to `localStorage`, so what was verified is the **seed** path, **not** the native SQLite local store
-  that is the real source of truth on the APK. Re-check the first-load window **on device**, where the
-  worker's install timing and the WebView lifecycle differ.
-
 > **Swept 2026-08-19 — Q-552, Q-553 and Q-554 removed as complete.** All three were review findings
 > that were *fixed in the PR that filed them*, and each left behind a CI check that now enforces it:
 > `check-backlog-pointers.js`, `check-known-issue-duplication.js` and `check-index-doc-paths.js`
@@ -3259,11 +3290,21 @@ this fits without an extraction.
 
 - **Branch:** `fix/card-fetch-error-states`
 - **Lane:** B
-- **Keep:** the other ~10–18 candidate cards from the 2026-08-18 sweep remain an unenumerated
-  worklist (the review's own file list wasn't retrievable when this shipped; a fresh grep for
-  `cachedFetch`/`useCachedValue` + `return null` + no `onError`/error wording turns up ~18 today,
-  most needing per-file judgement to tell a real gap from a legitimate empty state). Not device or
-  offline verified — `cachedFetch` cannot revalidate at all offline.
+- **✅ THE REST OF THE SWEEP SHIPPED 2026-08-25 — enumerated, and it was three, not ~18.** The
+  estimate counted every self-fetching component with a bare `return null`; the shape is narrower
+  than that. Real: `health/oura-section.tsx` (its `null` means *no ring connected*, so a 429 made a
+  connected user's whole ring section vanish), `health/ai-periodization-status-card.tsx` and
+  `workout/exercise-hr-trend-card.tsx`. Judged legitimate and left alone: five *supporting* values
+  where a failure degrades a chart rather than removing a surface (`hr-profile` ×3,
+  `muscle-recovery`, `more-user-profile`), and five documented empty states
+  (`home-nutrition-zone-bar`, `food-logging-complete`, `training-stress-line`,
+  `training-stress-badge`, `exercise-detected-card` — permanently empty since the Cloud removal).
+  **`.catch()` is not the guard:** `oura-section` had one on every fetch and still vanished, because
+  `cachedFetch` resolves on a non-ok response. `e2e/card-429-error-state.spec.ts` covers all four
+  cards now, each new case confirmed red with the fix stashed.
+  [`journal`](overview/entries/2026-08-25-card-error-states-enumerated.md).
+- **Keep:** not device or offline verified — `cachedFetch` cannot revalidate at all offline, so what
+  these states do on a genuinely offline first load is untested. `Gate: device`.
 
 ### [app-shell] Q-359 — 36 other fetch-once effects have Q-402's latent bug; only the shell ones can bite
 
@@ -3278,6 +3319,8 @@ this fits without an extraction.
 > **The entry stays queued as the home of its ratchet, not as a queue of work.** Re-judge a site only
 > if a NEW writer starts clearing its key while it is on screen.
 
+- **Keep:** nothing to build. This entry is the home of `check-fetch-once-effects.js` and its
+  per-site judgements — re-judge a site only if a NEW writer starts clearing its key on screen.
 - **Branch:** `chore/adopt-use-cached-value`
 - **Added:** 2026-08-19 · Lane B, while fixing Q-402 · [`journal`](overview/entries/2026-08-19-cache-invalidation-signal.md)
 - **Placement:** low. **Latent, not broken.** Q-402 shipped the mechanism (`subscribeToInvalidation`
@@ -3474,160 +3517,53 @@ this fits without an extraction.
   collapse chevron from a navigation chevron, neither of which a text grep can do reliably. Also
   not done: screen-reader/TalkBack verification on either fixed component, and no device check.
 
-### [app-shell][platform] Q-477 — the Profile "Auto-detect timezone" button is what breaks the app's dates: the server honours the new zone, 100 of 125 client call sites do not
+### [app-shell][platform] Q-477 — the Profile "Auto-detect timezone" button is what breaks the app's dates: the server honours the new zone, the client did not
 
-> **⚠️ Step 1 (the CI ratchet) is DONE — 2026-08-19, Lane A. What is left is step 2, the sweep, which
-> is Lane B's.** `scripts/check-client-today-timezone.js` is step 50 of 50 in Custom Rules, with a
-> shrink-only per-file baseline. A new bare call in any client file now fails CI, and a file that
-> improves must lower its baseline in the same PR.
+> **✅ COMPLETE 2026-08-25.** The ratchet baseline in `scripts/check-client-today-timezone.js` is
+> **empty**: 0 bare calls across 539 client files, from a measured start of 78 across 38. A bare
+> `todayInTz()`/`localDateString()` anywhere under `app/**` (ex-`app/api`), `components/**`,
+> `lib/hooks/**` or `lib/stores/**` is a regression now, not a debt row.
 >
-> **Re-measured, and the headline count does not reproduce.** The script finds **78 bare calls across
-> 38 files** over **522 client files** (`app/**` ex-`app/api`, `components/**`, `lib/hooks/**`,
-> `lib/stores/**`), not 100 of 125. The difference is the file set, not a fix — which is the entry's
-> own argument for a script: **do not hand-count this, run
-> `node scripts/check-client-today-timezone.js --print`**, which is the maintained list.
+> **The last slice did not thread `tz` into the Zustand store — it stopped the store guessing.**
+> Both shapes this entry proposed hand the store a timezone it cannot legitimately have. But
+> `storedDate` exists only to be compared against a "today" so a rollover can clear `todayLogged`,
+> so it is now written only by a caller that knows the zone: `INITIAL_STATE` starts `''`,
+> `applyRehydrateFixups` takes `string | null` and skips the date branch on `null`, and
+> `startWorkout` no longer re-stamps. `components/shell/workout-day-rollover.tsx` — in the **root
+> layout**, so it runs on every app open rather than only those landing on the workout screen —
+> supplies the date from `useUserTimezone()`.
+> [`journal`](overview/entries/2026-08-25-workout-store-user-timezone.md).
 >
-> The sweep order in the entry still stands (calendar today-marker → write paths → display), and so
-> does the warning not to make `todayInTz()`'s default throw or read a global.
+> **The defect underneath was two answers, not one wrong one.** `onRehydrateStorage` compared
+> against Brisbane while `workout-screen.tsx`'s visibilitychange effect compared against the user's
+> zone, so a non-Brisbane user could have the day rolled over twice — and a rollover CLEARS the
+> day's completed-set ticks.
 >
-> **First slice shipped 2026-08-24 (Lane B): the calendar today-marker, the one named live symptom.**
-> `calendar-widget.tsx`'s `todayStr` now reads `todayInTz(useUserTimezone())` instead of the
-> device-local `localDateString()` — the exact site and exact bug the entry measured (Training
-> Calendar highlighting the 18th for a `Pacific/Kiritimati` user on their own 19th). Verified live,
-> the same way: set a seeded user to `Pacific/Midway` (UTC−11, currently a day behind this
-> container's UTC clock), re-logged in, and the calendar now bolds the *previous* day — the user's
-> actual today — not the container's. Ratchet down to **76 calls across 37 files** (was 78/38).
-> [`journal`](overview/entries/2026-08-24-calendar-today-marker-timezone.md). **37 files remain**,
-> ordered write paths next, then display, per the sweep order above.
->
-> **Second slice shipped 2026-08-24 (Lane B): the four check-in / log sheets — the write paths the
-> order calls for next.** `mood-checkin-sheet`, `morning-checkin-sheet`, `profile/water-log-sheet`
-> and `health/metric-log-sheet` all take `useUserTimezone()` now; all four dropped to **zero** and
-> are off the baseline. Ratchet down to **70 calls across 33 files** (was 76/37).
-> `metric-log-sheet` carried **both** bugs in one function — its local branch used `todayInTz()`
-> (Brisbane) while its web fallback POSTed `localDateString()` (device zone), two different answers
-> for the same save; the `localDateString` import is now gone from that file.
-> [`journal`](overview/entries/2026-08-24-checkin-sheets-user-timezone.md).
->
-> **Third slice shipped 2026-08-24 (Lane B): `session-select-content` (16 calls — the single
-> largest file) and the four workout surfaces.** Ratchet down to **47 calls across 28 files** (was
-> 70/33). Two of the sixteen were in *module-scope* helpers (`isMorningCheckinPromptDone`,
-> `markMorningCheckinPromptDone`), which cannot call a hook — they take `tz` as a parameter now,
-> the shape `getGreeting(name, tz)` in the same file already used.
->
-> **It also turned up a blind spot in the ratchet itself, worth knowing before the next slice.**
-> `session-select-content` declared two local `const tz = Intl.DateTimeFormat().resolvedOptions().timeZone`
-> — the *device's* zone — used for the early-deload dismiss key and the "is it evening yet" hour
-> check. Same Q-477 bug class, but **the ratchet cannot see it**: `BARE` only matches
-> `todayInTz()`/`localDateString()` with empty parens. One of them shadowed the component's own
-> `tz` in the same block, which is what surfaced it (a TS use-before-declaration error) rather than
-> any check. Both now use the component's `tz`. **The counted number is a floor, not the whole
-> class** — an `Intl.DateTimeFormat()` sweep is separate, unmeasured work.
-> [`journal`](overview/entries/2026-08-24-session-select-workout-user-timezone.md).
->
-> **Fourth slice shipped 2026-08-24 (Lane B) — the sweep is DONE for every component.** 27 files,
-> 44 call sites, ratchet **47/28 → 3 calls in 1 file**. The baseline now holds exactly one entry.
->
-> **Two more of `metric-log-sheet`'s class, found by reading rather than by the count:**
-> `log-value-sheet.tsx` POSTed `localDate: localDateString()` (device zone) while its own local
-> branch used `todayInTz(tz)` — two answers for one save. And `weekly-stats-hub.tsx`'s `todayKey`
-> needed `todayInTz(tz).replace(/-/g,"/")`, **not** a plain swap: `/api/weekly-stats` emits
-> `dateKey` as `yyyy/MM/dd`, so a dash-formatted key would have silently stopped matching and
-> killed the today-highlight. **A blind find-and-replace across this sweep would have shipped that.**
->
-> Also threaded through three module-scope helpers that cannot call a hook (`linkPrescribedRun`,
-> `readSeed`, and `warmCache` in `sync-provider` — that last writes the `{date, data}` envelope
-> `cachedFetchToday` reads, so a zone mismatch makes every warmed today-key a permanent miss).
-> Zero lint warnings introduced across all 27 files.
-> [`journal`](overview/entries/2026-08-24-client-timezone-sweep-components-complete.md).
->
-> **`lib/stores/workout-store.ts` is all that remains, and it is a DESIGN decision, not a
-> conversion.** It is a Zustand store, so no hook is available. **The risk is real:** `storedDate`
-> exists only to detect a day rollover, and a mismatch makes `rolloverDay()` clear `todayLogged` —
-> dropping the day's completed-set ticks. A wrong-zone stamp can both *miss* a rollover and *fire a
-> spurious one*.
->
-> **The pure functions are already parameterised** — `applyRehydrateFixups(state, today, now)` and
-> `rolloverDay(today)` both take the date, and `workout-screen.tsx`'s visibilitychange effect
-> already passes `todayInTz(tz)`. What has no answer is the three places that *supply* the stamp:
-> the initial-state object, one reducer, and `onRehydrateStorage`, which runs at store creation
-> **outside React, before any provider mounts**.
->
-> Two shapes, neither free: **(a)** reconcile on mount — let the store stamp `DEFAULT_TZ` and have
-> the component correct it, which adds a `rolloverDay` call whose clearing behaviour must be proven
-> not to eat a legitimate day's ticks; or **(b)** a module-level "current user tz" the store reads,
-> which is the global this entry's own header warns against. **Pick deliberately and verify the
-> clear path** — do not convert it mechanically.
->
-> **What that slice actually proved, and what it did not.** With a seeded user on
-> `Pacific/Kiritimati` (UTC+14, currently a day *ahead* of this container's UTC clock — so the
-> user's day, Brisbane's day and the device's day are three distinguishable values):
-> `metric-log-sheet` POSTed `localDate: 2026-08-25` and `morning-checkin-sheet` POSTed
-> `date: 2026-08-25`, both landing rows on **08-25** — the user's day, where before they would have
-> sent the device's/Brisbane's 08-24. Those two are proven end-to-end.
-> **The other two are not, and the reason is structural:** `water-log-sheet`'s date feeds only the
-> **local-store** write (`/api/water-log` derives its own date server-side from the session tz), and
-> `getLocalStore` is null in the web sandbox — so its fix only bites on device, where the local row
-> would otherwise be filed a day off the server's. `mood-checkin-sheet`'s date likewise feeds the
-> local write and the outbox mutation, **plus the `mood:${date}` cache key**, which *is*
-> web-reachable but was not driven here.
+> **Two blind spots this entry leaves behind, both real and neither counted by the ratchet:**
+> **(1)** a local `const tz = Intl.DateTimeFormat().resolvedOptions().timeZone` is the same bug class
+> and `BARE` cannot see it — two were found in `session-select-content` by a TypeScript error, not by
+> the check. An `Intl.DateTimeFormat()` sweep is separate, unmeasured work. **(2)** nothing here was
+> exercised against a user actually on a non-Brisbane zone in production, because there is none.
 
-- **Branch:** `fix/client-today-uses-user-timezone`
-- **Added:** 2026-08-18 · review sweep (non-default-timezone lens) ·
+- **Branch:** `fix/workout-store-day-rollover-tz`
 - **Lane:** B
-  [`docs/reviews/2026-08-18-timezone-non-default-user.md`](reviews/2026-08-18-timezone-non-default-user.md)
-- **Placement:** upper-mid. **Latent today** — every user row is `Australia/Brisbane`, so nothing is
-  broken in production — but the app ships the button that triggers it, and the fix wants a ratchet
-  before the count grows further.
-- **The inversion worth reading first.** While a user is on `Australia/Brisbane`, client and server
-  both compute Brisbane and agree; nothing is wrong. **Setting the timezone is what introduces the
-  bug** — the server moves immediately, the client does not.
-  `components/profile/edit-profile-sheet.tsx:190` exposes an **"Auto-detect timezone"** button, so the
-  intended one-tap action for anyone not in Brisbane is exactly the action that desynchronises them.
-- **Measured** with a user set to `Pacific/Kiritimati` (UTC+14) and re-logged-in so the JWT carried it,
-  at a moment when three calendar dates were live (Midway 08-17, UTC/Brisbane 08-18, Kiritimati 08-19):
-
-  | Layer | Expression | Value | |
-  |---|---|---|---|
-  | Server routes | `todayInTz(tz)` | 2026-08-19 | ✅ |
-  | Client, **25** sites | `todayInTz(tz)` via `useUserTimezone()` | 2026-08-19 | ✅ |
-  | Client, **91** sites | `todayInTz()` → `DEFAULT_TZ` | 2026-08-18 | ❌ |
-  | Client, **9** sites | `localDateString()` → the *device's* zone | 2026-08-18 (here) | ❌ |
-
-  Live: `POST /api/day-checkin` (no date) → `"logDate":"2026-08-19"`; `GET /api/workout-data?tab=<id>`
-  → `"dataDate":"2026-08-19"`.
-- **Observed on screen**, Health → Training as that user: the **Training Calendar highlights 18** and
-  Training Load highlights **"Tue"**, on a day that was Wednesday the 19th for them. Source:
-  `components/calendar-widget.tsx:110`, `const todayStr = localDateString()` — the *device's* zone, a
-  third answer that follows neither the user's setting nor the server. `CLAUDE.md` already warns
-  *"Client code has two 'today' sources … Pick one per feature"*; there are three.
-- **Nothing is missing except the argument.** `useUserTimezone()`
-  (`components/shell/user-timezone-provider.tsx:40`) is a context available anywhere in the tree, and
-  `components/profile/goals-section.tsx:114` already calls `todayInTz(user?.timezone)` correctly.
-- **Fix shape — ratchet first, then sweep by surface:**
-  1. **A Custom Rules step rejecting a bare `todayInTz()` / `localDateString()` in client code**, with
-     a shrink-only per-file baseline — same shape as `check-hex-literals.js` and
-     `check-cache-ttl-divergence.js`, both of which exist because prose alone did not hold a count.
-     That freezes the number at 100 and puts every future addition in a diff.
-  2. Sweep highest-visibility first: the calendar today-marker, then write paths, then display.
-     **Q-478 is done** (2026-08-18) — the two cache today-guards now take a `tz`, and
-     `scripts/check-tz-aware-cache-guards.js` keeps every call site passing one. Its ratchet is a
-     narrower shape than step 1 asks for: it guards two named helpers, not bare `todayInTz()`.
-     Step 1 is still owed.
-  **Do NOT** make `todayInTz`'s default throw or read a global — the function is shared with server
-  code that passes `tz` explicitly, and a global reintroduces the ambiguity somewhere harder to see.
-- **Lane B owns the sweep** (`app/**` ex-`app/api`, `components/**`, `lib/hooks/**`); the CI ratchet is
-  a `scripts/` addition either lane can carry, but it should land **first** and on its own.
-- **Not verified on:** the APK — and note the 9 `localDateString()` sites read the *phone's* zone
-  there, a third value this harness cannot reproduce. Not against production, where every user is
-  Brisbane and the symptom does not arise.
-
+- **Keep:** the device check. The rollover hangs off `visibilitychange`, which behaves differently in
+  a WebView than a desktop tab, and a real backgrounding across local midnight is the case that
+  matters. Start from Profile → **Auto-detect timezone**, the button that triggers the whole class.
+  `Gate: device`.
 ### [platform] Q-549 — Postgres holds 0.79 GB to serve 171 MB, at 0.002 vCPU
 
-- **Gate: owner** — the measurement above leaves nothing for code to change: `shared_buffers` is at
-  the default with a 99.87% hit ratio, and the one visible over-provision (`max_connections = 500`)
-  is a Railway console setting. The 0.79 GB figure also needs re-confirming over a full day, which
-  only the owner can read.
+- **Gate: owner** — narrowed 2026-08-25 (see the reading below). The 0.79 GB premise is **gone**;
+  all that is left of this entry is `max_connections = 500`, a Railway console setting worth tens of
+  MB. **The recommendation is to close this entry** — that call is one line and it is the owner's.
+
+> **⚠️⚠️ THE PREMISE IS FALSIFIED — owner pulled the Railway charts 2026-08-25.** `prod_DB` reads
+> **423 MB flat** across the 3-hour window (limit 8 GB) at **0.0 vCPU**, not 0.79 GB. This entry
+> predicted from a climbing post-restart reading that *"0.79 GB is the warmed steady state and will
+> return"*; seven days on a warm container, it has not. The 0.79 GB average spanned the 2026-08-17
+> `disk_full` outage. `shared_buffers` 128 MB / `max_connections` 500 confirmed unchanged.
+> **Full readings, caveats and the recommendation to close:**
+> [`2026-08-25-railway-and-db-readings.md`](reviews/2026-08-25-railway-and-db-readings.md) §2.
 
 > **⚠️ MEASURED against production 2026-08-19 — both named candidates are falsified. Read this before
 > starting; the entry below sends you at two dead ends.**
@@ -3697,6 +3633,12 @@ this fits without an extraction.
   offline and Railway's own tooling recovered it.
 - **One hard input either way:** Railway **cannot shrink a volume** and bills on storage *used*, so the
   5 GB provisioning is free and is not a reason to move.
+- **⚑ One input moved 2026-08-25.** Q-549's premise is falsified — `prod_DB` reads **423 MB flat**,
+  not the 0.79 GB this entry's ~$8/month floor was partly built on, so that slice was **never real
+  spend** rather than spend awaiting a fix. **Do not re-cost on it alone:** the app half is the
+  larger one and is still unmeasured at rest (Q-547's quiet-window read is still owed). Wait for
+  both halves read quiet, after Q-545.
+  [`readings`](reviews/2026-08-25-railway-and-db-readings.md) §4.
 
 ### [devices][platform] Q-545 — OWNER-DIRECTED FOCUS: move the Oura rollup onto the device (D2 Task 5) — the D-track's missing middle
 
@@ -3842,9 +3784,16 @@ this fits without an extraction.
 
 ### [platform] Q-547 — ANSWERED 2026-08-18: the app CPU is spiky (so Q-545 fixes it), and much of it is deploy churn
 
-- **Gate: owner** — the remaining work is an owner measurement, not code: confirm the dashed markers
-  on the Railway charts are deploys, then take the CPU/RAM baseline during a quiet window (a sandbox
-  cannot read Railway metrics). Everything else on this entry is answered.
+- **Gate: owner** — **halved 2026-08-25.** The deploy-marker half is corroborated (below). What is
+  still owed is only the second half: **the CPU/RAM baseline during a genuinely quiet window** — a
+  sandbox cannot read Railway metrics, and every reading taken so far has been on a shipping day.
+
+> **Deploy-marker half corroborated 2026-08-25.** The owner's `TrainingAI` chart carries the ~10-12
+> dashed markers, CPU spiking to **2.5 vCPU** and memory to ~1.2 GB off a 400 MB baseline, 649
+> requests in 3 h — and that window is independently known to hold **five merges** (#405, #406,
+> #407, #410, #408), with the largest spikes when #408 and #410 landed. **⚠️ So it is the opposite
+> of a quiet window and must NOT be used as the baseline or in any before/after comparison.**
+> [`2026-08-25-railway-and-db-readings.md`](reviews/2026-08-25-railway-and-db-readings.md) §3.
 
 - **Plan:** [`docs/superpowers/plans/2026-08-18-device-primary-compute.md`](superpowers/plans/2026-08-18-device-primary-compute.md) section 1, Task 0
 - **Branch:** *(none — an owner measurement, then a finding)*
