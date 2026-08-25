@@ -110,7 +110,7 @@ already drew a band — a hardcoded generic **10–20** — while `packages/shar
 
 **The queue tooling learns `OR-` (PS-6).** The Orchestrator prefix was never in the ID alternation, and the failure was **silent deletion**: `next-item.js` counted **194 entries with and without** a scratch `OR-99` and printed it nowhere. One shared `scripts/lib/entry-id.js` now, not four regexes. PS-6 named three sites; there were four.
 
-**The vacuum button can reach the table that needs it (Q-315).** `error_events` holds **4 live rows in 49 MB** in production and the generalised `/api/admin/vacuum` had **no caller** — the one control still posted to the `oura_raw_samples`-only route. A table picker fed by that route's own `GET` fixes it; the press is the owner's, from a desktop. `Gate: owner`.
+**The vacuum button can reach the table that needs it (Q-315).** The generalised `/api/admin/vacuum` had **no caller** — the one control still posted to the `oura_raw_samples`-only route. A table picker fed by that route's own `GET` fixed it. **The owner pressed it on 2026-08-25 and it correctly reclaimed 0 B**, because `error_events` was never bloated; see the Known-Issues row above.
 
 **The Coach's undo has a button (Q-467).** A whole undo subsystem — route, five domain handlers, a `captureBefore()` in each, the `undone_at` column, even the struck-through styling — had no caller. Its route's `invalidateProgramStructure()` runs server-side and clears nothing, so the client clears the superset instead (that trail led to **LB-13**). `Gate: device`.
 
@@ -127,11 +127,12 @@ affordance **absent** rather than covered — `getByLabel` found it and `getByRo
 
 **Two Health cards stop vanishing on a failed fetch, and the fix needed a second one (Q-499).** They show "Couldn't load…" on a 429/500 now. `onError` alone didn't work: `cachedFetchCore`'s dedup relayed a failure only to the torn-down owner, never a joined caller — fixed in `lib/sqlite/cache.ts`.
 
-**The database reclaim is three-quarters done, and the last quarter is one press.** The owner's
+**The database reclaim is DONE, and the last piece turned out to be a false premise.** The owner's
 `oura_raw_samples` vacuum reclaimed **36 MB** (93 → **57 MB**) and the automatic packer is observed in
-production — four runs, **318,883 → 205,278 rows**, 0 faults. Left: **Q-315, `VACUUM FULL
-error_events`, ~49 MB**, and there is **no button for it** — the admin control covers
-`oura_raw_samples` only, so it needs `POST /api/admin/vacuum {"table":"error_events"}` with an admin session cookie. `Gate: owner`.
+production — four runs, **318,883 → 205,278 rows**, 0 faults. **Q-315's `error_events` reclaim was
+pressed on 2026-08-25 and correctly returned 0 B**: that table was never bloated, and the "4 live
+rows in 49 MB" figure driving the entry was a stale `n_live_tup` estimate. Closed — see the
+Known-Issues row for what it really holds.
 
 **Four engine fixes, each of whose entry described something other than the defect.** A deload's
 stored `0` was being served as the previous 1RM (**Q-298** — `listPrevious1rm` gated on `IS NOT NULL`
@@ -343,9 +344,19 @@ order.
 
 **Deliberate, and recorded here because "leave it" has a live cost that nothing else states.** Before 2026-08-24, an unprescribed high-rep set was stored without the AMRAP discount, so its `exercise_logs.estimated_1rm` reads high; `amrapScaleFactor` discounts from **6 reps up**, which puts the real blast radius at **277 logs**, not the 30 cached `personal_records` the original ask assumed. The owner authorised a recompute, then withdrew it once measured: the specified method (re-derive from `set_logs`) **moves zero rows by construction** — `personal_records` derives from the stored `exercise_logs` value — and **76 of the 277** belong to a progression style edited *after* the log, so re-deriving substitutes today's prescription for the one actually trained under, with nothing in the output showing which (LA-27). That is worse than the inflation. **The accepted cost:** an inflated PR shows on the badge and in the AI chat's `getPersonalRecords`, and drives a too-heavy prescription **only** where an exercise carries a PR with no recent log — `resolveWorkingBasis` takes `lastNonDeload1rm` first, so a currently-trained lift is unaffected. **Q-304's forward fix is unaffected and correct**; this is about history alone. **Reversible:** `set_logs` is untouched and remains the source of truth, so the recompute stays available the moment LA-27's 76 rows have an answer. Q-298's 10 zero-1RM rows are the same shape and are **not** covered by this decision. [`journal`](docs/overview/entries/2026-08-25-catalogue-family-anatomy.md)
 
+### [platform] 🟢 `error_events` was never bloated — the 49 MB figure was a stale planner estimate (Q-315, 2026-08-25)
+
+**Closed by measurement after the owner pressed the button, and the correction matters more than the result.** The reclaim ran and reported `reclaimed 0 B (49 MB → 52 MB, 24 live rows) in 1.5s` — which is **correct**, not a failure. `VACUUM FULL` found nothing dead because nothing is dead: against production, `error_events` holds **6,168 rows of the owner's alone** (11 MB of messages, **45 MB of stack traces**), matching the 12 MB heap + **39 MB TOAST** the table actually occupies.
+
+**Where "4 live rows in 49 MB" came from.** `n_live_tup`, which `CLAUDE.md` warns in as many words is a planner estimate that is arbitrarily stale here — `last_analyze` and `last_autovacuum` are NULL on every table. It read 24 against 6,168 real rows. That figure was repeated through Q-315's heading, two other backlog entries, three `projectOverview` paragraphs and a Lane A baton without anyone running `count(*)`. **The rule already existed and was quoted in the same document that got it wrong.**
+
+**What the rows are: one already-fixed burst.** Three days carry 5,928 of the 6,168 and 42 of the 45 MB — 2026-08-09 (2,615), 08-12 (2,556) and 08-13 (757), almost all `[pg 21000] Failed query: insert into "oura_heartrate"`. Postgres `21000` is `cardinality_violation`: an `ON CONFLICT DO UPDATE` hitting the same conflict row twice in one command, which rejects the **whole batch** — so those were up to 5,000 HR points discarded per failure, permanently. **That is Q-214, fixed on 2026-08-13**, and the burst stops on 2026-08-13: `upsertOuraHeartrate` now collapses repeats into a `Map` keyed by timestamp before the insert. Fixed, not merely stopped — the code and the dates agree.
+
+**No action, and it resolves itself.** The 30-day prune is working (oldest row is exactly 30 days back), so those burst days age out between now and ~2026-09-12 and the table returns to a few MB. Last 7 days hold **39 rows total**. Nothing is owed.
+
 ### [platform] 🟡 The database is growing ~4x faster than `CLAUDE.md` predicts — measured, not yet a problem (Orchestrator, 2026-08-25)
 
-**Measured, filed because the rule says to, explicitly not an alarm.** `CLAUDE.md` states a **171 MB** baseline (2026-08-18) and ~0.4 MB/day expected. Like-for-like on 2026-08-25 — `sum(pg_total_relation_size)` over 87 user tables, which is what that baseline measured, **not** `pg_database_size`'s 197 MB — reads **182 MB**: **11 MB in 7 days ≈ 1.6 MB/day, ~4x the stated trend**. Almost all of it is `oura_raw_samples` (50 → **58 MB**, ≈1.1 MB/day), the BLE ingest accumulating normally. **⚠️ Two readings are not a trend and the baseline is the weak one** — 171 MB was taken immediately after both the repack and the `disk_full` incident, so a compacted heap regrowing slack inflates any rate off it. **Action: a third reading next session**; if ~1.6 holds, correct `CLAUDE.md`'s 0.4, not the database. Not urgent — ~8 years of volume headroom, ~3 cents/month. Also unchanged: `error_events` at **49 MB, 27% of the DB** (~36 MB TOAST), owned by **Q-315**. [`readings`](docs/reviews/2026-08-25-railway-and-db-readings.md) §5.
+**Measured, filed because the rule says to, explicitly not an alarm.** `CLAUDE.md` states a **171 MB** baseline (2026-08-18) and ~0.4 MB/day expected. Like-for-like on 2026-08-25 — `sum(pg_total_relation_size)` over 87 user tables, which is what that baseline measured, **not** `pg_database_size`'s 197 MB — reads **182 MB**: **11 MB in 7 days ≈ 1.6 MB/day, ~4x the stated trend**. Almost all of it is `oura_raw_samples` (50 → **58 MB**, ≈1.1 MB/day), the BLE ingest accumulating normally. **⚠️ Two readings are not a trend and the baseline is the weak one** — 171 MB was taken immediately after both the repack and the `disk_full` incident, so a compacted heap regrowing slack inflates any rate off it. **Action: a third reading next session**; if ~1.6 holds, correct `CLAUDE.md`'s 0.4, not the database. Not urgent — ~8 years of volume headroom, ~3 cents/month. **`error_events` is NOT bloat and never was** — see the row above; it is 52 MB of live rows and shrinks on its own as one already-fixed burst ages past the 30-day prune. [`readings`](docs/reviews/2026-08-25-railway-and-db-readings.md) §5.
 
 ### [platform][devices] ⚠️ `/api/body-battery` was 500ing in production; the fix is unverified there (LA-20, 2026-08-23)
 

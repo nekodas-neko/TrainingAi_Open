@@ -2632,3 +2632,25 @@ other direction: `TN-2` reads *"the charge window has closed"* and `BF-16b` *"th
 all-primary program"*, both open work, and a case-insensitive match flags both. It stays
 case-sensitive, and `ANSWERED` stays out — an investigation can conclude while its action is still
 owed, which is true of LA-27 and Q-547 today.
+
+## 2026-08-25 — `projectOverview.md` 7973 → 7977, backlog 11725 → 11710 (LA-31)
+
+**Eleven lines to retract a number that five documents had been repeating.** `error_events` was
+described everywhere as *"49 MB against 4 live rows"* — bloat, needing a `VACUUM FULL`. The owner
+pressed the button; it reclaimed **0 B**, correctly, because the table was never bloated. It holds
+**6,168 real rows** (45 MB of stack traces), and 5,928 of them are one burst from an
+`oura_heartrate` `ON CONFLICT` cardinality violation that was **fixed on 2026-08-13** (Q-214) — the
+burst stops the same day. The 30-day prune ages them out by ~2026-09-12 with no action.
+
+**The 4 came from `n_live_tup`,** which `CLAUDE.md` documents at length as a planner estimate that is
+arbitrarily stale on this database (`last_analyze` is NULL on every table) and explicitly says to
+answer with `count(*)`. Nobody ran it — including me, in a baton written an hour earlier that quotes
+the rule two sections below where it repeats the wrong figure. A retraction that only deleted the
+claim would leave the next session free to re-derive it from the same stat view, so the row says
+where the number came from, not just that it was wrong.
+
+**The backlog went DOWN fifteen** — LA-30 in, Q-315 out, and Lane B's own merge landing in between:
+a **live** bug traded for a closed one. The owner scanned a ZMA supplement, the AI read it correctly as calorie-free, and
+`review-step.tsx`'s `canSave` requires `calories > 0`, so **Next** greyed out with no message. The
+server's own schema is `z.number().min(0)`, so there is no engine half — it is Lane B's, and it is
+queue position 1.
