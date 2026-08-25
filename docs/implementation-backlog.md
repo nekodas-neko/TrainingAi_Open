@@ -4228,6 +4228,44 @@ cross-session against the local DB. Nothing user-visible changed — **no read s
 That third line is the finding. The user could not tell from the screen whether anything had happened,
 on a change that had already been written.
 
+> ### ⚠️ INVESTIGATED 2026-08-25 (Lane A). The entry asks for the transcript check *before* any
+> prompt change — it was done, and **it retires one of the two defects and reverses the proposed
+> fix.** Read this before implementing.
+>
+> **1. The ordering question is answered: it is the MODEL, not the UI.** `coach-message.tsx` maps
+> `parts` in array order with no sort, and production `coach_messages.parts` shows the same order
+> stored. Of **8 assistant messages in production, 3 carry a `text` part at all — and in all 3 it is
+> the LAST part**, after every tool call. The other 5 have no text at all, so "omit it entirely" is
+> already the common behaviour. The instruction *"Write your one sentence BEFORE calling a widget
+> tool"* is being violated **3 of 3 times** despite being explicit.
+>
+> **2. "Proposal" is the RIGHT word, and the entry's premise is wrong.** The entry says *"a
+> `session_exercise` swap applies immediately, which is why the card is past tense"*. It does not.
+> `DOMAIN_TIER` (`lib/coach/patch.ts:43`) puts `session_exercise` at **tier 2**, and
+> `widget-registry.tsx:78` routes **tier 1–2 to `ChangePreview`** — an inline confirmation with
+> per-row toggles and an **Apply button** (`change-preview.tsx:92 handleApply`). Only **tier 3**
+> (`program_phase`, the sole member) pushes a screen. **Nothing applies without the user accepting**,
+> inline or otherwise, so the swap genuinely IS a proposal at the moment the model writes the word.
+>
+> **3. So the proposed guard would make it worse.** Feeding the tier in "so *proposal* is only ever
+> available for tier 3" would stop the model correctly describing a tier-2 proposal as one. Do not
+> build it.
+>
+> **What is actually wrong is only the ordering, and it is one defect rather than two.** The sentence
+> is accurate when generated and *stale by the time it is read*: the user has already tapped Apply
+> and seen the green "Swapped" card, so a correct "Here is the proposal to…" arrives describing a
+> decision they have already made. That is exactly what produced the owner's *"Is this complete?"*
+>
+> **And prompting has already failed at it** — the rule exists and is ignored 3/3. **Hypothesis, not
+> established:** the AI SDK's multi-step loop (`stopWhen: stepCountIs(6)`) makes a final text step
+> the natural shape, so the instruction fights the mechanism rather than the model's judgement.
+> Whoever takes this should test that before writing more prompt.
+>
+> **Two candidate fixes, and the choice is a product decision:** make the sentence correct *where it
+> actually lands* (past tense, additive, or omitted — which the entry already offers and which 5 of 8
+> messages already do), **or** render text above widgets in the thread — a UI change, Lane B, and one
+> that would undo the deliberate "text on screen while the widget composes" intent.
+
 **Two defects, both against rules the prompt already states.**
 - **"Proposal" is the wrong word for this domain.** `program_phase` is **the only tier-3 domain**
   (`lib/coach/domains/program-phase.ts:8`) — the only one that routes through a confirmation screen.
