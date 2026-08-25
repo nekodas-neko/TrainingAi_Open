@@ -1851,6 +1851,7 @@ slow-load question on a clean `pg_stat_statements` read.
   `SELECT query, calls, mean_exec_time FROM claude_ro.pg_stat_statements ORDER BY total_exec_time DESC LIMIT 20`
   and get rows.
 - **Surface: production only.** Nothing to verify locally beyond the migration applying.
+
 ### [nutrition][platform] BF-12 — logging a saved meal takes ~20s and the owner couldn't find it after navigating away; traced to the slow fallback firing, not a lost write
 
 - **Lane: A** — the fix is in `logMealItems`/local-store availability, not the UI. No schema.
