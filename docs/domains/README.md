@@ -76,3 +76,29 @@ exists and where) · [`docs/implementation-backlog.md`](../implementation-backlo
 [`docs/public-launch-checklist.md`](../public-launch-checklist.md) ·
 [`docs/overview/entries/`](../overview/entries/) (session journal) ·
 [`docs/runbooks/`](../runbooks/) (ops).
+
+## Two moves that were considered and decided against (Q-27, 2026-08-04)
+
+The owner delegated the call — *"your decision. I don't read docs — so if it's better for you then
+go for it"* — and the answer to both was no. Recorded here rather than in the queue, because this is
+where someone would arrive before re-proposing either.
+
+**Moving the ~25 loose `docs/` root reference docs into their pillar folders — no.** The problem it
+solves is already solved by this file and the eleven indexes it points at: they carry **55 links** to
+those exact documents, which *is* the subject-based view the migration was meant to create. Moving
+the files breaks all 55, plus every reference in `CLAUDE.md`, `projectOverview.md` and the backlog,
+to buy physical colocation that nothing navigates by. `oura-ble-operations.md` alone is referenced
+from `CLAUDE.md`, several plans, a skill and multiple journal entries.
+
+**Splitting `projectOverview.md`'s Known Issues into per-pillar files — no.** That file is what a
+fresh session reads first to orient. Splitting it means rewriting the orientation convention in
+`CLAUDE.md` and every agent prompt so a session knows to read eleven files instead of one, and the
+`[domain]` tags on each heading already make the per-pillar view a `grep` away
+(`grep -n '^### .*\[sleep\]' projectOverview.md`).
+
+**What did ship, and is the reason either move would now be survivable:**
+`scripts/check-doc-links.js` (2026-07-30) walks every `.md` under `docs/` plus the three root docs
+and fails on any relative link that doesn't resolve. It strips fenced and inline code first — a
+regex literal or a quoted markdown example reads exactly like `[text](path)` otherwise, and both
+occur in this repo's review docs. It found 42 broken links beyond the 16 an ad hoc pre-check had
+caught. So a botched rewrite is now caught immediately; the decision above is about value, not risk.

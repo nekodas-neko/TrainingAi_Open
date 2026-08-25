@@ -2605,3 +2605,30 @@ The four existing light-mode rules below it were amended in place rather than de
 which half of it dark-only retires and which half still binds — a deleted rule leaves no trace of why
 it went, and two of them still guard live hazards (`var(--x)` in canvas paint; a cutout painting over
 the wallpaper layer).
+
+## 2026-08-25 — `projectOverview.md` 7969 → 7973, backlog 11799 → 11725 (LA-29)
+
+**Raised by four lines, and the four are one Known-Issues row.** Q-304b — the decision not to
+recompute 277 inflated historical 1RM estimates — was closed the same morning it was measured, and
+its heading said so. It was still in the queue, and `next-item.js` was handing it to an implementer
+as **READY #4**. The queue is not where a closed decision lives, but the decision has a live cost
+that nothing else in the tree stated: an inflated PR shows on the badge and in the AI chat, and
+drives a too-heavy prescription for any lift carrying a PR with no recent log. That is a
+deliberately-unfixed, user-visible defect, which is exactly the row `projectOverview.md` exists to
+carry. Four lines is the honest price of not losing it.
+
+**The 74 that came back the other way** are those two entries leaving the queue: Q-304b (27 lines)
+and Q-27 (47), the latter closed on 2026-08-04 — *"CLOSED, not doing either item"* — and never
+removed. Q-27's substance is not gone either: the reasoning against moving the loose `docs/` root
+files into pillar folders, and against splitting the Known Issues per pillar, is now at the foot of
+[`docs/domains/README.md`](domains/README.md), which is where someone would arrive before proposing
+either move again.
+
+**The reason both sat there is that the check could not see them.** `check-backlog-pointers.js`
+flags a heading that announces its own completion, and its word list had `SHIPPED`, `COMPLETE`,
+`DONE`, `SUPERSEDED`, `DROPPED`, `FIXED`, `RESOLVED`, `✅` — and not `CLOSED`. It does now. The list
+moved to `scripts/lib/completion-words.js` with a test, because widening it has a failure mode in the
+other direction: `TN-2` reads *"the charge window has closed"* and `BF-16b` *"the retired
+all-primary program"*, both open work, and a case-insensitive match flags both. It stays
+case-sensitive, and `ANSWERED` stays out — an investigation can conclude while its action is still
+owed, which is true of LA-27 and Q-547 today.

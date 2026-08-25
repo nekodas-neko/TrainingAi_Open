@@ -17,9 +17,10 @@
  *   7. Every `Gate:` value is one this project knows how to resolve.
  *   8. A `Batch:` is a kebab slug, and no batch mixes Lane A and Lane B — one batch is one PR, and
  *      one PR is one lane.
- *   9. No NEW queue entry announces its own completion in its heading. The queue tracks what is
- *      still open; the PR and the journal are the record of what shipped. The 17 that already do
- *      are baselined below and the list is shrink-only.
+ *   9. No NEW queue entry announces its own completion in its heading (word list in
+ *      `lib/completion-words.js`). The queue tracks what is still open; the PR and the journal are
+ *      the record of what shipped. The 17 that already did are baselined below, shrink-only, and
+ *      the list is now empty.
  *
  * IDs are `<letter>-<number>` with an optional lowercase suffix: LA/LB (implementer lanes), BF
  * (BugFix), RV (Review), TN (Tuning), PS (one-off planning sessions), and the legacy Q. The old "next
@@ -30,6 +31,7 @@
 const fs = require('fs');
 const path = require('path');
 const { idPattern, idPartsPattern } = require('./lib/entry-id');
+const { announcesCompletion } = require('./lib/completion-words');
 
 const ROOT = path.resolve(__dirname, '..');
 const BACKLOG = path.join(ROOT, 'docs/implementation-backlog.md');
@@ -246,12 +248,17 @@ for (const [id, m] of meta) {
 //
 // An entry genuinely worth keeping past completion (a shipped fix still owing an owner or device
 // check) states so with a `Keep:` line giving the reason, and is removed from this list.
+//
+// LA-29, 2026-08-25: the word list missed `CLOSED`, and two entries were sitting in the queue
+// because of it — Q-304b (closed the same day, and still handed to an implementer as READY #4 by
+// `next-item.js`) and Q-27 (closed three weeks earlier). The list now lives in
+// `lib/completion-words.js` so its two delicate properties can be tested: it is case-SENSITIVE,
+// and `ANSWERED` is deliberately not in it. See that file for why both matter.
 const COMPLETED_HEADING_BASELINE = new Set([]);
 {
-  const DONE = /(✅|\bSHIPPED\b|\bCOMPLETE\b|\bDONE\b|\bSUPERSEDED\b|\bDROPPED\b|\bFIXED\b|\bRESOLVED\b)/;
   const flagged = [];
   for (const [id, heading] of seen) {
-    if (!DONE.test(heading)) continue;
+    if (!announcesCompletion(heading)) continue;
     if (meta.get(id)?.keep) continue;
     if (COMPLETED_HEADING_BASELINE.has(id)) continue;
     flagged.push(`${id} — ${heading.slice(4, 110)}`);
@@ -265,7 +272,7 @@ const COMPLETED_HEADING_BASELINE = new Set([]);
         `or\n      device check), add \`- **Keep:** <what is still owed>\` and say what closes it.`,
     );
   }
-  const stale = [...COMPLETED_HEADING_BASELINE].filter((id) => !seen.has(id) || !DONE.test(seen.get(id)));
+  const stale = [...COMPLETED_HEADING_BASELINE].filter((id) => !seen.has(id) || !announcesCompletion(seen.get(id)));
   if (stale.length) {
     failures.push(
       `COMPLETED_HEADING_BASELINE lists ${stale.join(', ')}, which no longer needs baselining. ` +
