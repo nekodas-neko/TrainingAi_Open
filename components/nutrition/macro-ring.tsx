@@ -2,6 +2,7 @@
 
 import type { NutritionTargets } from '@trainingai/shared/types/nutrition'
 import { MACRO_COLORS } from '@trainingai/shared/nutrition/macro-colors'
+import { macroShares } from './macro-energy'
 
 interface Props {
   calories: number
@@ -20,6 +21,30 @@ export function MacroRing({ calories, proteinG, carbsG, fatG, targets, earnedKca
   const pct = Math.min(100, Math.round((calories / calTarget) * 100))
   const ringMask = 'radial-gradient(farthest-side, transparent 69%, black 70% 89%, transparent 90%)'
 
+  /**
+   * The arc still measures progress toward the calorie goal — its total sweep is `pct` — but it is
+   * split by where those calories came from (Q-395b). One ring, three segments: a second ring for
+   * the macros was the alternative and the design pass rejected it.
+   *
+   * Degrees are accumulated rather than each segment being placed independently, so rounding cannot
+   * open a hairline gap between two colours.
+   */
+  const shares = macroShares({ proteinG, carbsG, fatG })
+  const sweep = pct * 3.6
+  const proteinEnd = shares.protein * sweep
+  const carbsEnd = proteinEnd + shares.carbs * sweep
+  const arc = sweep > 0 && (shares.protein + shares.carbs + shares.fat) > 0
+    ? `conic-gradient(from -90deg,`
+      + ` ${MACRO_COLORS.protein} 0deg ${proteinEnd}deg,`
+      + ` ${MACRO_COLORS.carbs} ${proteinEnd}deg ${carbsEnd}deg,`
+      + ` ${MACRO_COLORS.fat} ${carbsEnd}deg ${sweep}deg,`
+      + ` transparent ${sweep}deg)`
+    // No macros logged but calories are: the goal-progress arc is still true, so it draws in brand
+    // rather than vanishing.
+    : sweep > 0
+      ? `conic-gradient(from -90deg, var(--brand) ${sweep}deg, transparent ${sweep}deg)`
+      : 'transparent'
+
   return (
     <div className="rounded-2xl bg-muted/60 border border-border px-4 py-4">
       <div className="flex items-center gap-5">
@@ -33,9 +58,7 @@ export function MacroRing({ calories, proteinG, carbsG, fatG, targets, earnedKca
           <div
             className="absolute inset-0 rounded-full"
             style={{
-              background: pct > 0
-                ? `conic-gradient(from -90deg, var(--brand) ${pct * 3.6}deg, transparent ${pct * 3.6}deg)`
-                : 'transparent',
+              background: arc,
               WebkitMask: ringMask,
               mask: ringMask,
             }}
@@ -58,9 +81,9 @@ export function MacroRing({ calories, proteinG, carbsG, fatG, targets, earnedKca
             <span className="text-xs font-semibold tabular-nums">{remaining > 0 ? `${remaining} left` : 'Goal reached'}</span>
           </div>
           <div className="space-y-2">
-            <MacroBar label="Protein" value={proteinG} target={targets?.proteinG ?? 150} color={MACRO_COLORS.protein} />
-            <MacroBar label="Carbs"   value={carbsG}   target={targets?.carbsG   ?? 250} color={MACRO_COLORS.carbs} />
-            <MacroBar label="Fat"     value={fatG}      target={targets?.fatG     ?? 80}  color={MACRO_COLORS.fat} />
+            <MacroBar label="Protein" value={proteinG} target={targets?.proteinG ?? 150} share={shares.protein} color={MACRO_COLORS.protein} />
+            <MacroBar label="Carbs"   value={carbsG}   target={targets?.carbsG   ?? 250} share={shares.carbs}   color={MACRO_COLORS.carbs} />
+            <MacroBar label="Fat"     value={fatG}      target={targets?.fatG     ?? 80}  share={shares.fat}     color={MACRO_COLORS.fat} />
           </div>
         </div>
       </div>
@@ -68,11 +91,16 @@ export function MacroRing({ calories, proteinG, carbsG, fatG, targets, earnedKca
   )
 }
 
-function MacroBar({ label, value, target, color }: { label: string; value: number; target: number; color: string }) {
+function MacroBar({ label, value, target, share, color }: { label: string; value: number; target: number; share: number; color: string }) {
   const pct = Math.min(100, Math.round((value / target) * 100))
   return (
     <div className="flex items-center gap-2">
-      <span className="text-xs text-muted-foreground w-12 shrink-0">{label}</span>
+      <span className="w-12 shrink-0 text-xs text-muted-foreground">
+        {label}
+        {/* The share the arc is drawn from, said in words beside it — a coloured segment on its own
+            does not tell you it is 34%, and the colour is the only thing tying the two together. */}
+        <i className="block text-[10px] not-italic tabular-nums opacity-70">{Math.round(share * 100)}%</i>
+      </span>
       <div className="flex-1 h-2 rounded-full bg-muted/40">
         <div
           className="h-full w-full rounded-full origin-left transition-transform duration-300 motion-reduce:transition-none"

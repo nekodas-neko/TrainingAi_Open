@@ -6,9 +6,9 @@ import { useTabVisibility } from "@/components/shell/tab-visibility";
 import dynamic from "next/dynamic";
 import { useDrag } from "@use-gesture/react";
 import { AnimatePresence, motion } from "motion/react";
-import { Settings, ChevronLeft, ChevronRight, MoonIcon } from "lucide-react";
+import { Settings, ChevronLeft, ChevronRight } from "lucide-react";
 import { MacroRing } from "@/components/nutrition/macro-ring";
-import { FoodLoggingComplete } from "@/components/nutrition/food-logging-complete";
+import { DayToolsSection } from "@/components/nutrition/day-tools-section";
 import { MIN_LOGGED_DAYS } from "@trainingai/shared/nutrition/adaptive-tdee";
 import { budgetProvenance } from "@trainingai/shared/nutrition/calorie-balance";
 import { MealCard } from "@/components/nutrition/meal-card";
@@ -16,10 +16,6 @@ import { FoodLoggerSheet } from "@/components/nutrition/food-logger-sheet";
 import { QuickEditLogSheet } from "@/components/nutrition/quick-edit-log-sheet";
 const MealTypeManager = dynamic(
   () => import("@/components/nutrition/meal-type-manager").then(m => m.MealTypeManager),
-  { ssr: false },
-);
-const WeeklyNutritionChart = dynamic(
-  () => import("@/components/nutrition/weekly-nutrition-chart").then(m => m.WeeklyNutritionChart),
   { ssr: false },
 );
 const EndOfDayReview = dynamic(
@@ -32,7 +28,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button";
 import { ScreenHeader } from "@/components/shell/screen-header";
 import { Switch } from "@/components/ui/switch";
-import { SupplementsSection } from "@/components/nutrition/supplements-section";
 import type { MealType, FoodLogWithItem, NutritionTargets, MealPlan } from "@trainingai/shared/types/nutrition";
 import type { SupplementWithStatus } from "@trainingai/shared/types/supplement";
 import { toast } from "sonner";
@@ -629,16 +624,25 @@ export default function NutritionContent({ userId }: { userId?: string }) {
               }}
             />
 
-            {mealTypes.map(mt => (
-              <MealCard
-                key={mt.id}
-                mealType={mt}
-                logs={logsByMealType.get(mt.id) ?? EMPTY_LOGS}
-                onAdd={openLogger}
-                onDeleteLog={requestDeleteLog}
-                onQuickEdit={openQuickEdit}
-              />
-            ))}
+            {/* Q-395b: the meals are ONE grouped section with full-bleed dividers, not six cards
+                with gaps between them. Measured on the seeded day, the gaps between siblings across
+                this whole screen came to 358 px of 2,394 — 15%, not the "most of the vertical
+                space" the entry claims, and the meal list was the largest single share of it. */}
+            {mealTypes.length > 0 && (
+              <div className="divide-y divide-border/50 overflow-hidden rounded-2xl border border-border">
+                {mealTypes.map(mt => (
+                  <MealCard
+                    key={mt.id}
+                    mealType={mt}
+                    logs={logsByMealType.get(mt.id) ?? EMPTY_LOGS}
+                    onAdd={openLogger}
+                    onDeleteLog={requestDeleteLog}
+                    onQuickEdit={openQuickEdit}
+                    grouped
+                  />
+                ))}
+              </div>
+            )}
 
             {loading && mealTypes.length === 0 && (
               <div className="space-y-3" aria-label="Loading meals" aria-busy="true">
@@ -650,42 +654,22 @@ export default function NutritionContent({ userId }: { userId?: string }) {
           </motion.div>
         </AnimatePresence>
 
-        {/* Directly under the meals, because the claim it makes is about them (BF-6). It shipped as
-            the last element on the argument that "I have finished logging" is about the whole day —
-            and then took **zero** presses in the seven weeks to 2026-08-24, while the calibration it
-            feeds treats an unmarked day as excluded rather than as light. A control nothing reaches
-            withholds the feature entirely, which outranks where the sentence reads best. */}
-        <FoodLoggingComplete
-          date={selectedDate}
+        <DayToolsSection
+          selectedDate={selectedDate}
           isToday={selectedDate === todayStr}
           daysLogged={balanceForDate?.maintenance?.daysLogged ?? null}
           minDays={MIN_LOGGED_DAYS}
           calibrated={balanceForDate?.maintenance?.source === 'calibrated'}
           tz={tz}
+          weeklyData={weeklyData}
+          calorieTarget={targets?.calories ?? null}
+          adherence={adherence}
+          supplements={supplements}
+          supplementsLoading={supplementsLoading}
+          onSupplementsChanged={setSupplements}
+          userId={userId}
+          onEndOfDay={() => setChatOpen(true)}
         />
-
-        <WeeklyNutritionChart data={weeklyData} calorieTarget={targets?.calories ?? null} adherence={adherence} />
-
-        {selectedDate === todayStr && (
-          <SupplementsSection
-            supplements={supplements}
-            loading={supplementsLoading}
-            onChanged={setSupplements}
-            userId={userId}
-          />
-        )}
-
-        {/* Last on the page, which is where a day-review action belongs — the owner asked for this
-            order. The comment here used to defend the old position; it was arguing against merging
-            this button into Home's "Your Day in Review" banner (still Q-112's call, still not this
-            change), never against moving it down its own screen. */}
-        <button
-          onClick={() => setChatOpen(true)}
-          className="w-full min-h-[48px] flex items-center justify-center gap-2 rounded-2xl border border-border bg-muted/60 py-3 active:bg-muted/20 transition-colors"
-        >
-          <MoonIcon className="w-4 h-4 text-muted-foreground" />
-          <span className="text-sm font-semibold">End of Day</span>
-        </button>
       </div>
 
       <WaterLogSheet

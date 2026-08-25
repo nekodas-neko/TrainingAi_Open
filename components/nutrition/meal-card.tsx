@@ -13,9 +13,11 @@ interface Props {
   onAdd: (mealTypeId: string) => void
   onDeleteLog: (logId: string) => void
   onQuickEdit: (log: FoodLogWithItem) => void
+  /** Drawn as one row of a grouped list rather than as its own card (Q-395b). */
+  grouped?: boolean
 }
 
-export const MealCard = memo(function MealCard({ mealType, logs, onAdd, onDeleteLog, onQuickEdit }: Props) {
+export const MealCard = memo(function MealCard({ mealType, logs, onAdd, onDeleteLog, onQuickEdit, grouped }: Props) {
   const [expanded, setExpanded] = useState(true)
   const totals = logs.reduce(
     (acc, l) => ({ calories: acc.calories + l.calories, proteinG: acc.proteinG + l.proteinG, carbsG: acc.carbsG + l.carbsG, fatG: acc.fatG + l.fatG }),
@@ -23,7 +25,10 @@ export const MealCard = memo(function MealCard({ mealType, logs, onAdd, onDelete
   )
 
   return (
-    <div className="rounded-2xl bg-muted/60 border border-border overflow-hidden">
+    // Q-395b: inside the grouped meal list the section owns the border and the dividers, so a card
+    // that also draws its own puts a second hairline against the first and re-opens the gaps the
+    // grouping closes. Standalone callers keep the card.
+    <div className={grouped ? 'bg-muted/60' : 'rounded-2xl bg-muted/60 border border-border overflow-hidden'}>
       <Collapsible open={expanded} onOpenChange={setExpanded}>
         {/* Header row */}
         <CollapsibleTrigger asChild>
