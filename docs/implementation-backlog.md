@@ -331,6 +331,26 @@ days/hours cause most stress". Measured against production the same day; the bou
 signed off by the owner in that conversation. Review:
 [`docs/reviews/2026-08-24-body-battery-charge-window-collapse.md`](reviews/2026-08-24-body-battery-charge-window-collapse.md).*
 
+### [platform][app-shell] LA-22 — a guard test merged that has never passed, and E2E is not a required check
+
+- **Lane: A** · **Added:** 2026-08-25, while landing TN-6a — it blocked two PRs before being traced.
+- **`e2e/home-card-invalidation-refetch.spec.ts` fails on a bare `origin/main`.** Reproduced locally
+  on untouched main (cb5f4902), and on two unrelated branches. It clicks
+  `getByRole('button', { name: 'Log Body Weight' })` on **Home**; no such button exists anywhere —
+  `metric-log-sheet.tsx` is reached only from `app/health/health-content.tsx`, and the sibling spec
+  opens it from Health's Body tab via a button named `Log`. **Home has no body-metric write
+  affordance at all**, so the test cannot pass as written.
+- **⚠️ It was added by #454 and MERGED WITH ITS OWN E2E RED** (run 32807689333, E2E `failure`). So
+  **E2E is not in the required-check set** — which also explains why merges succeed while E2E is
+  still in progress. Worth deciding deliberately: a non-required E2E is a guard that cannot block
+  anything, and this is the first case where that let a never-passing test onto `main`.
+- **Q-402 is therefore still unguarded** — the whole point of the spec. Its fix shipped and the
+  guard does not run, which is the state #454 set out to fix.
+- **Do NOT skip or delete the test to go green** — the options are to give Home the affordance the
+  guard needs, or to drive the write the way the sibling spec does and accept that it no longer
+  proves "Home stays mounted", which is the property Q-402 is about. That is a real design call and
+  belongs with the spec's author.
+
 ### [readiness][devices] TN-8 — the chronic-stress fever mask is a FOURTH consumer of the broken temperature baseline
 
 - **Branch:** _unassigned_
