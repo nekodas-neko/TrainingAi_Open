@@ -72,18 +72,40 @@ describe('computeDailySummaries', () => {
   })
 
   it('carries baselines forward independently per metric', () => {
-    const rows = computeDailySummaries([night('2026-07-01'), night('2026-07-02')])
+    // Night 2 differs on every metric. It used to reuse night 1's values and still pass, because
+    // the old cold start meant the mean was climbing from zero and moved on ANY second sample —
+    // so the test could not tell "carried forward and updated" from "still converging" (BF-13).
+    // With the first sample seeding exactly, an identical second night correctly moves nothing,
+    // which is what made this assertion fail and why the fixture now varies.
+    const rows = computeDailySummaries([
+      night('2026-07-01'),
+      night('2026-07-02', { hrvAvgMs: 61, rhrLowBpm: 48, sleepDurationHours: 6.2, metAvg: 1.9 }),
+    ])
     expect(rows[1].hrvBaseline).not.toEqual(rows[0].hrvBaseline)
     expect(rows[1].rhrBaseline).not.toEqual(rows[0].rhrBaseline)
     expect(rows[1].sleepBaseline).not.toEqual(rows[0].sleepBaseline)
     expect(rows[1].metBaseline).not.toEqual(rows[0].metBaseline)
   })
 
+  it('SEEDS each metric on its first sample rather than annealing from zero (BF-13)', () => {
+    // The defect in one assertion. `updateBaseline` — the faithful ecore port — starts from
+    // meanX8 = 0, so the first sample landed the mean at half the reading and the step size had
+    // collapsed to 1/32 long before it caught up. On the owner's temperature history that left the
+    // baseline 0.363 °C low at night FIFTY, which is 2.8 nightly sd, and four consumers read it.
+    const rows = computeDailySummaries([night('2026-07-01', { hrvAvgMs: 60, rhrLowBpm: 50 })])
+    expect(rows[0].hrvBaseline).toEqual({ meanX8: 60 * 8, devX8: 0 })
+    expect(rows[0].rhrBaseline).toEqual({ meanX8: 50 * 8, devX8: 0 })
+  })
+
   it('accrues a breathing baseline from breathAvgRpm in rpm×10 sample units', () => {
     const rows = computeDailySummaries([night('2026-07-01'), night('2026-07-02', { breathAvgRpm: 15.0 })])
-    // First-ever sample: 14.5 rpm → integer sample 145 → sampleX8 1160; warm-up band
-    // (age 0) takes half the delta → mean 580, dev 73. Deterministic — pins the ×10 units.
-    expect(rows[0].breathBaseline).toEqual({ meanX8: 580, devX8: 73 })
+    // First-ever sample SEEDS: 14.5 rpm → integer sample 145 → meanX8 1160, dev 0.
+    // Deterministic — pins the ×10 units.
+    //
+    // This asserted `{ meanX8: 580, devX8: 73 }` until BF-13, and 580 is exactly half of 1160:
+    // the old fold annealed toward the first sample from zero instead of seeding on it, so night 1
+    // reported 7.25 rpm for a 14.5 rpm reading. The test was pinning the bug rather than the units.
+    expect(rows[0].breathBaseline).toEqual({ meanX8: 1160, devX8: 0 })
     expect(rows[1].breathBaseline).not.toEqual(rows[0].breathBaseline)
   })
 

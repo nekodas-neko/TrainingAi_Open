@@ -5,7 +5,7 @@
 // can drift (nights are re-derived from oura_raw_samples on every rollup pass, same
 // pattern as the sleep/HR-series rollup steps).
 
-import { updateBaseline, type Baseline } from './personal-baseline'
+import { seedOrUpdateBaseline, type Baseline } from './personal-baseline'
 import { temperatureDeviationCentiC } from './temperature-baseline'
 import { BASELINE_MIN_NIGHTS } from './readiness-composite'
 
@@ -99,17 +99,17 @@ export function computeDailySummaries(nights: NightInput[], seed?: DailySummaryS
       ? temperatureDeviationCentiC(Math.round(night.tempMeanC * 100), tempBaseline.meanX8 / 8) / 100
       : null
 
-    if (night.hrvAvgMs != null) hrvBaseline = updateBaseline(hrvBaseline, Math.round(night.hrvAvgMs), ageDays)
-    if (night.rhrLowBpm != null) rhrBaseline = updateBaseline(rhrBaseline, Math.round(night.rhrLowBpm), ageDays)
+    if (night.hrvAvgMs != null) hrvBaseline = seedOrUpdateBaseline(hrvBaseline, Math.round(night.hrvAvgMs), ageDays)
+    if (night.rhrLowBpm != null) rhrBaseline = seedOrUpdateBaseline(rhrBaseline, Math.round(night.rhrLowBpm), ageDays)
     // Temperature baseline update is in centi-degC (matches the ported algorithm's
     // native units); sleep in minutes and MET ×10 for integer-sample resolution —
     // updateBaseline requires an integer sample (ecore's i32 contract).
-    if (night.tempMeanC != null) tempBaseline = updateBaseline(tempBaseline, Math.round(night.tempMeanC * 100), ageDays)
-    if (night.sleepDurationHours != null) sleepBaseline = updateBaseline(sleepBaseline, Math.round(night.sleepDurationHours * 60), ageDays)
-    if (night.metAvg != null) metBaseline = updateBaseline(metBaseline, Math.round(night.metAvg * 10), ageDays)
+    if (night.tempMeanC != null) tempBaseline = seedOrUpdateBaseline(tempBaseline, Math.round(night.tempMeanC * 100), ageDays)
+    if (night.sleepDurationHours != null) sleepBaseline = seedOrUpdateBaseline(sleepBaseline, Math.round(night.sleepDurationHours * 60), ageDays)
+    if (night.metAvg != null) metBaseline = seedOrUpdateBaseline(metBaseline, Math.round(night.metAvg * 10), ageDays)
     // Breathing in rpm×10 for integer-sample resolution (same trick as MET ×10) —
     // rateBrpm carries 0.1-rpm precision that a bare Math.round would destroy.
-    if (night.breathAvgRpm != null) breathBaseline = updateBaseline(breathBaseline, Math.round(night.breathAvgRpm * 10), ageDays)
+    if (night.breathAvgRpm != null) breathBaseline = seedOrUpdateBaseline(breathBaseline, Math.round(night.breathAvgRpm * 10), ageDays)
 
     nHistory += 1
     rows.push({

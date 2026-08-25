@@ -27,29 +27,35 @@
 **Version:** v1.318.10 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-08-24.
 
-**The diary row is the shared row now, and its sheet can delete (Q-406).** The pencil and bin came
-off every food row. **It turned up LB-10:** `use-sheet-back-dismiss` is not double-invoke safe, so
-five sheets cannot be opened in `pnpm dev` at all — production is fine, the pre-merge surface is not.
+**The offline tab tap is not silent, and Q-555 closes unfixed.** Driven with the worker blocked so
+`controller` is `false` throughout: offline the tap **navigates** and `app/error.tsx` says *"You're
+offline"* — in a settled tab route and on the loading fallback alike. The one failing window is
+*before hydration*, where `handleNavClick` cannot run, the anchor navigates natively and Chrome's
+error page appears — visible, not silent, and inherent: neither our JS nor the worker exists yet.
+The parked fix would be inert there and a false alarm everywhere else, so nothing merged.
 
-**The Nutrition day screen is grouped sections now, and the ring is split by macro (Q-395b).**
-Gaps **420 px → 280 px (16% → 11%)**, 111 px shorter — not the *"most of the vertical space"* the
-entry claimed. Both themes, 11 of 11 sections. `Gate: device`.
+**The diary row is the shared row now, and its sheet can delete (Q-406).** The pencil and bin came
+off every food row. **It turned up LB-10, now fixed:** `use-sheet-back-dismiss` was not double-invoke
+safe, so the quick-edit sheet could not be opened in `pnpm dev` at all — production was never
+affected, the pre-merge surface was. **The entry said five sheets; one.** The other four mount with
+`open` false, so their double-invoked run bails before pushing. `e2e/sheet-back-dismiss.spec.ts`
+guards it, and fails on the unfixed hook.
+
+**The Nutrition day screen is grouped sections now, and the ring is split by macro (Q-395b).** Gaps
+**420 px → 280 px (16% → 11%)**, 111 px shorter — not the *"most of the vertical space"* the entry claimed. Both themes, 11 of 11 sections. `Gate: device`.
 
 **A food draws one way everywhere now, and its amount is edited on its own screen (Q-395a).** The
-builder's rows became the shared `FoodRow`; `ingredient-row.tsx` is deleted and the quantity control
-lives in a new sheet. Segmented tabs went 44 → 48 px in the shared primitive, lifting 8 call sites.
+builder's rows became the shared `FoodRow`; `ingredient-row.tsx` is deleted and the quantity control lives in a new sheet. Segmented tabs went 44 → 48 px in the shared primitive, lifting 8 call sites.
 
 **Build a Meal's ingredient picker is its own component (BF-11a).** `saved-meals-sheet.tsx` 774 → 590 lines. `openBuild`'s reset setters became a keyed remount.
 
-**Q-319's water bug was unreachable, and the half its entry called fine was the broken one.** The
-generic sheet wrote an ABSOLUTE water total — reintroducing SYNC-P7 — and queues `waterMlDelta` now.
+**Q-319's water bug was unreachable, and the half its entry called fine was the broken one.** The generic sheet wrote an ABSOLUTE water total — reintroducing SYNC-P7 — and queues `waterMlDelta` now.
 
 **The workout write path can be driven past set 1 (Q-461).** The Start Set bounce never gave Playwright a stable frame — 85 ms vs 8,009 ms with and without the new reduced-motion rule.
 
 **Disk maintenance works from a desktop again (Q-544).** The DB-footprint and device-metrics cards touch no plugin but sat after `OuraBleDebug`'s native early-return. Both moved above it.
 
-**The frame packer has a button (Q-316).** In the DB-footprint card, with the packable count beside
-it. Its confirm copy does not read like the lossless VACUUM one — this is the only control that
+**The frame packer has a button (Q-316).** In the DB-footprint card, with the packable count beside it. Its confirm copy does not read like the lossless VACUUM one — this is the only control that
 DELETEs archival frames — and a refusal is listed with its reason. `Gate: device`.
 
 **Declaring a ring re-key has a button (Q-317).** On `/admin/oura-ble`, outside `OuraBleDebug`, which renders nothing without the plugin — exactly the laptop doing the re-key. `Gate: device`.
@@ -62,22 +68,18 @@ DELETEs archival frames — and a refusal is listed with its reason. `Gate: devi
 **Q-477 is DONE for every client component** (4 slices, 78/38 → **3 calls in 1 file**). Left is
 `workout-store.ts` — a Zustand store with no hook, where a wrong-zone stamp makes `rolloverDay()` clear the day's completed sets. A design call, analysed on the entry.
 
-**"Nine collapsibles missing `aria-expanded`" was actually two (Q-491)** — one retired, four already
-Radix, two a back chevron. `weights-summary.tsx`/`added-weight-toggle.tsx` were real, now fixed.
+**"Nine collapsibles missing `aria-expanded`" was actually two (Q-491)** — one retired, four already Radix, two a back chevron. `weights-summary.tsx`/`added-weight-toggle.tsx` were real, now fixed.
 
-**The end-of-workout "How hard was that session?" prompt is gone (Q-420).** 25.6% fill rate;
-`sessionEffort()` already derives it from set RPEs at read time, so nothing downstream changed.
+**The end-of-workout "How hard was that session?" prompt is gone (Q-420).** 25.6% fill rate; `sessionEffort()` already derives it from set RPEs at read time, so nothing downstream changed.
 
-**Two Health cards stop vanishing on a failed fetch, and the fix needed a second one (Q-499).**
-They now show "Couldn't load…" on a 429/500. `onError` alone didn't work: `cachedFetchCore`'s dedup
-relayed a failure only to the torn-down owner, never to a joined caller — fixed in `lib/sqlite/cache.ts`.
+**Two Health cards stop vanishing on a failed fetch, and the fix needed a second one (Q-499).** They
+show "Couldn't load…" on a 429/500 now. `onError` alone didn't work: `cachedFetchCore`'s dedup relayed a failure only to the torn-down owner, never to a joined caller — fixed in `lib/sqlite/cache.ts`.
 
 **The database reclaim is three-quarters done, and the last quarter is one press.** The owner's
-`oura_raw_samples` vacuum reclaimed **36 MB** (93 → **57 MB**) and the automatic packer is now
-observed in production — four runs, **318,883 → 205,278 rows**, 0 faults. Left: **Q-315,
-`VACUUM FULL error_events`, ~49 MB**, and there is **no button for it** — the admin control covers
-`oura_raw_samples` only, so it needs `POST /api/admin/vacuum {"table":"error_events"}` with an admin
-session cookie. `Gate: owner`.
+`oura_raw_samples` vacuum reclaimed **36 MB** (93 → **57 MB**) and the automatic packer is observed in
+production — four runs, **318,883 → 205,278 rows**, 0 faults. Left: **Q-315, `VACUUM FULL
+error_events`, ~49 MB**, and there is **no button for it** — the admin control covers
+`oura_raw_samples` only, so it needs `POST /api/admin/vacuum {"table":"error_events"}` with an admin session cookie. `Gate: owner`.
 
 **Four engine fixes, each of whose entry described something other than the defect.** A deload's
 stored `0` was being served as the previous 1RM (**Q-298** — `listPrevious1rm` gated on `IS NOT NULL`
@@ -114,15 +116,13 @@ paths, since the outbox reaches the same table
 ([`journal`](docs/overview/entries/2026-08-23-route-hardening-batch.md)).
 
 **Three ring-service fixes, none verified on the ring (Q-537, Q-533, Q-388 item 2).** Key backup
-(`/admin/oura-ble` → **Show key for backup**), a re-sync completion notification, and a connect
-sequence that resets the live-HR levers a killed session left on. **All native — inert until a new
+(`/admin/oura-ble` → **Show key for backup**), a re-sync completion notification, and a connect sequence that resets the live-HR levers a killed session left on. **All native — inert until a new
 APK is installed, and until then the ring key has one copy.** `Gate: device`. **Item (3) needed no
 work:** 6,346 battery polls measure the drain the entry called unmeasurable (−22/−24/−22/−38/−15
 overnight), confirming the owner's report; the SpO₂ A/B is wear, not code.
 
 **Two affordances came back and the sheet that owned them is gone (LB-3, v1.347.0).** Nothing opened
-`day-overlay-sheet.tsx` after Q-110, so tapping a logged exercise or an activity was dead a fortnight.
-Both on `/health/day` (the NAME is the target); `health-content.tsx` lost 167 lines.
+`day-overlay-sheet.tsx` after Q-110, so tapping a logged exercise or an activity was dead a fortnight. Both on `/health/day` (the NAME is the target); `health-content.tsx` lost 167 lines.
 
 **Deleting an activity works offline now (Q-328, v1.350.0).** The one activity-log write with no
 outbox domain — deleted by a bare `fetch` that failed with no connection. `softDeleteActivityLogPending`:

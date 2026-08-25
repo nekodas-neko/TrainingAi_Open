@@ -18,7 +18,7 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
-## 2026-08-25 — `projectOverview.md` 7937 → 7941, `docs/implementation-backlog.md` 11638 → 11658
+## 2026-08-25 — `projectOverview.md` 7937 → 7941 (`docs/implementation-backlog.md` raise withdrawn)
 
 The owner supplied the Railway charts three queue entries had been parked on, and the readings
 falsify **Q-549**'s premise: `prod_DB` holds **423 MB flat**, not 0.79 GB.
@@ -28,8 +28,14 @@ lines were *measurement*, not queue state — the settings dump, the arithmetic,
 reasoning about where 0.79 GB came from. That belongs in a reference doc, and it now lives in
 [`docs/reviews/2026-08-25-railway-and-db-readings.md`](reviews/2026-08-25-railway-and-db-readings.md)
 (new, unratcheted), linked from the platform index. What is left in the backlog is three short
-pointer blocks — the finding, the consequence for that entry, and a link — which is entry content
-and is what the +20 buys.
+pointer blocks — the finding, the consequence for that entry, and a link — which is entry content.
+
+**The backlog raise to 11658 was withdrawn on the rebase and the number stands at 11638.** #444,
+#447 and #449 landed while this branch was in CI and removed enough completed entries to take the
+file to **11572** — under the original baseline even carrying this branch's +20. Ratcheting it down
+to 11572 here was considered and rejected: that shrink is those PRs' to claim, and banking it in
+this one would fail the next agent to add an entry (BF-11's plan is imminent) for a saving this
+branch did not make.
 
 The `projectOverview.md` +4 is one new Known-Issues row: the database is growing **~1.6 MB/day
 against `CLAUDE.md`'s stated ~0.4**, almost all of it `oura_raw_samples` doing its job.
@@ -2157,3 +2163,15 @@ a short build list. A plan would have cost more lines than the entry.
 every open PR. Twenty-three lines to record a failure that cost every concurrent agent a red check
 and had already happened twice under a prose-only rule, which is the argument for the guard the
 entry asks for.
+
+## 2026-08-25 — `docs/implementation-backlog.md` raised, 11638 → 11658 (temperature-baseline batch)
+
+Twenty lines across BF-13, Q-506 and TN-8 — the three entries of one batch, so the note had to reach
+all three. **It was trimmed twice before this raise.** The first draft pasted the same ~19-line block
+into each entry; that became one full note on BF-13 (the root) and a two-line cross-reference on the
+other two, then the full note itself was cut roughly in half.
+
+What survives is the part a queue cannot do without: the **⛔ Keep** saying the data half is unrun.
+The seed fix ships in this PR, but the owner's stored baselines are still the zero-folded ones, and
+every pass test in all three entries measures the re-derivation rather than the code. An entry that
+looked finished here would be wrong in the way that matters most.

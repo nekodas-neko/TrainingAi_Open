@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { scoreAvailability, trailingBaselineZ, CORE_READINESS_INPUTS } from '@/lib/health/score-availability'
-import { updateBaseline, baselineZ } from '@trainingai/shared/health/personal-baseline'
+import { seedOrUpdateBaseline, baselineZ } from '@trainingai/shared/health/personal-baseline'
 
 describe('scoreAvailability', () => {
   it('reports full and unlimited when every core signal is present', () => {
@@ -50,10 +50,13 @@ describe('trailingBaselineZ', () => {
     expect(trailingBaselineZ([55])).toBeNull()
   })
 
-  it('matches folding the same series through updateBaseline by hand', () => {
+  it('matches folding the same series through the seeding updater by hand', () => {
+    // `seedOrUpdateBaseline`, not the raw `updateBaseline`: BF-13 moved every fold in the app onto
+    // the seeding wrapper, and the vendor port keeps its zero start because that is ecore's own
+    // ground truth. Hand-folding through the port would now be testing a different function.
     const series = [...steady(8), 60]
     let b = null as Parameters<typeof baselineZ>[0] | null
-    for (let i = 0; i < series.length - 1; i++) b = updateBaseline(b, series[i], i)
+    for (let i = 0; i < series.length - 1; i++) b = seedOrUpdateBaseline(b, series[i], i)
     expect(trailingBaselineZ(series, 4)).toBe(baselineZ(b!, 60))
   })
 
@@ -63,10 +66,21 @@ describe('trailingBaselineZ', () => {
   })
 
   it('refuses a cold baseline rather than returning its overconfident z', () => {
-    // Two samples of a steady 50 fold to mean 25 / dev 3.1, so the raw z is 8 — the composite
-    // would read that as a flawless day. Below the maturity floor it must be null instead.
+    // The maturity floor. Two samples are nowhere near enough history to score against.
     expect(trailingBaselineZ([50, 50])).toBeNull()
-    expect(trailingBaselineZ([50, 50], 1)).toBeGreaterThan(5)
+  })
+
+  it('no longer has an overconfident z for the floor to catch (BF-13)', () => {
+    // This assertion used to read `expect(trailingBaselineZ([50, 50], 1)).toBeGreaterThan(5)` —
+    // it DEMONSTRATED the hazard, since two samples of a steady 50 folded to mean 25 / dev 3.1 and
+    // a raw z of 8, which the composite would have read as a flawless resting-HR day. Seeding on
+    // the first sample removes the hazard at its source: one prior sample gives mean 50 and dev 0,
+    // and `baselineZ` returns null on a zero dev rather than a confident number.
+    //
+    // The floor above stays regardless — defence in depth, and it is what protects the samples
+    // between "seeded" and "settled". This case exists so that if the seed is ever reverted, the
+    // overconfident z comes back visibly here instead of hiding behind the floor.
+    expect(trailingBaselineZ([50, 50], 1)).toBeNull()
   })
 
   it('holds out until the maturity floor is reached, then scores', () => {

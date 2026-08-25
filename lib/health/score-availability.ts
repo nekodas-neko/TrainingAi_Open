@@ -9,7 +9,7 @@
 // weights are unchanged and missing contributors still fall back to the composite's own neutral.
 // This only labels how much of the picture the number was computed from.
 
-import { updateBaseline, baselineZ, type Baseline } from '@trainingai/shared/health/personal-baseline'
+import { seedOrUpdateBaseline, baselineZ, type Baseline } from '@trainingai/shared/health/personal-baseline'
 import { BASELINE_MIN_NIGHTS } from '@trainingai/shared/health/readiness-composite'
 
 export type ReadinessInputKey =
@@ -53,7 +53,7 @@ export function scoreAvailability(present: Partial<Record<ReadinessInputKey, boo
  * Fold a chronological series into the rolling personal baseline and return the last sample's
  * z-score against the baseline as it stood BEFORE that sample — the same pre-update relationship
  * `oura_daily_summary` persists for ring users, so a Health Connect user's contributors are on the
- * same scale as a ring user's. Uses `updateBaseline`/`baselineZ` rather than a second baseline
+ * same scale as a ring user's. Uses `seedOrUpdateBaseline`/`baselineZ` rather than a second baseline
  * implementation (One Formula, One Place).
  *
  * `minPriorSamples` is not optional discipline. A cold baseline is wildly overconfident — two
@@ -69,6 +69,6 @@ export function trailingBaselineZ(
   const priors = series.length - 1
   if (priors < Math.max(1, minPriorSamples)) return null
   let baseline: Baseline | null = null
-  for (let i = 0; i < priors; i++) baseline = updateBaseline(baseline, Math.round(series[i]), i)
+  for (let i = 0; i < priors; i++) baseline = seedOrUpdateBaseline(baseline, Math.round(series[i]), i)
   return baseline ? baselineZ(baseline, Math.round(series[series.length - 1])) : null
 }
