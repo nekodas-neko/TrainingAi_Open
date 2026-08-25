@@ -2666,3 +2666,16 @@ Q-327 — and grep proves nothing renders either one. So the entry states plainl
 **write-only**, which is a different and smaller job than "build meal photos", and names the two
 places the deferral was recorded so a reader does not trip over a stale *"deliberately not here
 yet"* comment and treat it as a live decision.
+
+## 2026-08-25 — `docs/implementation-backlog.md` raised, 11775 → 11811 (the check-in lookback)
+
+Two entries' worth of measurement, no new entry. **TN-9** gains its second cause — readiness carries
+`activityBalance` at weight 0.06 and the composite's own comment says it is *"our own 0-100 activity
+score for **today**"*, a partial day — so the score drifts ~1 point with no user action at all, which
+the check-in half alone does not fix. Its pass test is extended to demand two byte-identical reads
+twelve hours apart.
+
+The length is doing the work the entry cannot do without it: it records that the obvious follow-up,
+**imputing the check-in on unlogged days, is refuted** — LOO R² 0.047 — so the next session does not
+spend itself rediscovering that a model explaining 5% of out-of-sample variance is a fabricated
+number wearing a regression's authority.
