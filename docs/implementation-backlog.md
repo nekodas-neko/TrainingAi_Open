@@ -1384,6 +1384,92 @@ Review: [`docs/reviews/2026-08-25-threshold-sweep.md`](reviews/2026-08-25-thresh
   removed). Until it runs every pass test here is unmeasured: deviation mean within ±0.05 °C with
   ~half the nights negative; `temp_dev_c > 1.0` on 0 nights (TN-8); biomarker table re-measured,
   since every z moves ~19× and the radar may then fire too often (Q-506).
+### [readiness] TN-9 — readiness moves when the check-in is logged; the owner wants it final on first open
+
+- **Branch:** _unassigned_
+- **Added:** 2026-08-26 · owner instruction: *"we shouldn't have readiness move the number — the numbers should be fully set on first open/load."*
+- **Lane: A** — `packages/shared/src/health/readiness-composite.ts`
+- **Owner sign-off: RECEIVED 2026-08-26** for the intent (the number must be settled at first load).
+  The mechanism below is the recommendation; confirm it before shipping if it changes.
+
+`READINESS_WEIGHTS.checkin = 0.10`, and an unlogged check-in contributes
+`NEUTRAL = { score: 50, provisional: true }` (`readiness-composite.ts:72`). So **10% of readiness is
+a frozen 50 until the owner answers the card, and the score then moves.** That is exactly the
+behaviour the instruction rules out.
+
+**It also contradicts the card's own copy.** The Log Readiness card reads *"It tunes today's session,
+not your whole plan"* — but logging also shifts the readiness score the user already read at the top
+of the same screen.
+
+**Recommendation: drop `checkin` from the composite and renormalise over the remaining eight.** The
+check-in keeps driving the session prescription, which is what its card claims and what it is
+actually good for; readiness becomes fully objective and therefore final the moment the overnight
+data is in.
+
+**Measured over the 35 days holding a stored contributor set:**
+
+| | |
+|---|---|
+| days the check-in was actually logged | **32 of 35 (91%)** |
+| readiness mean, with `checkin` | **69.9** (sd 11.59) |
+| readiness mean, without | **70.4** (sd 11.79) |
+| mean per-day change | **+0.44** |
+| largest single-day move | **3.84** |
+| days moving ≥2 pts | **4 of 35** |
+| days moving ≥5 pts | **0 of 35** |
+
+So the change is nearly free — it does not shift the level, and sd rises slightly rather than
+compressing. **This is unusual and worth stating: removing a 10% contributor normally moves a score,
+and here it does not, because the logged check-in tracks the objective contributors closely enough
+that it was adding little independent information.**
+
+**What it costs:** the composite's header comment says a great check-in is what lets a day *"reach a
+true 100"*. Dropping it lowers the practical ceiling a little. Measured, nothing reached 100 anyway.
+
+**Pass test:** readiness for a given day is byte-identical before and after a check-in is logged;
+mean over the trailing 30 days within ±1 of the current mean; the Log Readiness card's copy still
+matches what logging does.
+
+**Do not instead "exclude when unlogged and include when logged"** — that still moves the number the
+moment the owner answers, which is the thing being removed.
+
+### [sleep] TN-10 — `TOTAL_SLEEP`'s comment and its curve disagree by ~15 points, on the heaviest contributor
+
+- **Branch:** _unassigned_
+- **Added:** 2026-08-26 · found while explaining a 57 on a 7.75 h night
+- **Lane: A** — `packages/shared/src/health/sleep-score.ts:60-61`
+- **Gate: owner** — changes a score. Not signed off.
+- **Sequence after TN-5** (the calibration curve) so two sleep changes are not evaluated at once.
+
+The anchors and the line documenting them do not agree:
+
+| hours | curve gives | the comment claims |
+|---|---|---|
+| 7.6 | **71.4** | *"~86"* |
+| 8.0 | **77.0** | *"8h is excellent (~92)"* |
+| 9.0 | **92.0** | *"100 at ~9h"* |
+
+The comment reads as though written against anchors one position further along than the ones present.
+**`totalSleep` carries weight 24 of 110 — the largest of the ten** — so a ~15-point error there is
+~3.3 blend points on every night in the 7.5–8 h band, which is where most of the owner's nights land.
+
+**Which is wrong is the open question, and it is not answerable from the data.** Either the comment
+is stale and the curve is deliberate, or the anchors were shifted and the comment records the
+intent. **Read the plan the comment cites**
+(`docs/superpowers/plans/2026-07-22-core-score-cards-and-activity-overhaul.md`, W-C) before changing
+either — that plan is the only record of what the shape was meant to be.
+
+**Worked example, the owner's 2026-08-26 night:** 7.75 h scored **73.5** on this contributor against
+a comment implying ~89. Blend 73.15 → displayed **57** (reproduced exactly from the stored value).
+
+**⛔ Do not fix this by raising the curve to match the comment without reading that plan.** A duration
+curve that reaches the 90s at 8 h is a different product decision from one that needs 9 h, and the
+current shape may be the deliberate one — the file's own header says the recalibration was meant to
+make a good night *"land in the 80s"*, which the curve does and the comment does not.
+
+**Pass test:** whichever way it is resolved, the comment and the anchors state the same thing, and a
+test asserts the sub-score at 7.6 / 8.0 / 9.0 h so they cannot drift apart again.
+
 ### [readiness] TN-6a — suspend the temperature penalty until its baseline is centred
 
 - **Branch:** _unassigned_

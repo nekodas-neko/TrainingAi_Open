@@ -27,6 +27,8 @@ Filed this session, all propose-only, all in the queue:
 | **TN-6a** | suspend the temperature penalty until the baseline is centred | **signed off**, ships alone, outside the batch |
 | **TN-7** | TN-4's catch only `console.error`s, disarming LA-20's verification | one line, Lane A |
 | **TN-8** | chronic-stress fever mask = a **fourth** consumer of the broken temp baseline | batched with BF-13; fixed by that seed fix |
+| **TN-9** | readiness moves when the check-in is logged; owner wants it final at first open | intent signed off — drop `checkin`, renormalise |
+| **TN-10** | `TOTAL_SLEEP`'s comment and curve disagree by ~15 pts on the heaviest contributor | `Gate: owner`; sequence after TN-5 |
 
 **Owner decisions, 2026-08-24 — all recorded on the entries, nothing left gated on them.** TN-5 and
 TN-6 signed off; **TN-6a** added (suspend the temperature penalty on a self-clearing condition, ships
@@ -91,6 +93,14 @@ sleep ✅ · readiness ✅ · activity ✅ · body ✅ · devices ✅ · workout
   **Do not propose overnight charging or an anchor redesign to fix "it starts low"** — it is a large
   change to a value Q-511 shows is load-bearing, aimed at a symptom TN-6 already removes. Re-measure
   after TN-6 lands; only then is the design question real.
+- **The Activity Score at 7 am is a PARTIAL DAY, not a low day.** Its daily-movement lane (steps 18 +
+  activeEnergy 15 + zoneMinutes 10 + moveHours 12 = **55** of 100) is near-empty first thing, while
+  the strength lane (freq 25 + volume 20 = **45**) already carries yesterday's session. So a 63 at
+  7 am with a rest of the day ahead is the score working. **Do not file "activity reads low in the
+  morning"** — it is Q-505's daily-vs-weekly split, already queued.
+- **Removing a 10% contributor normally moves a score; `checkin` does not** (TN-9) — mean 69.9 → 70.4,
+  no day moving ≥5, because the logged check-in tracks the objective contributors closely enough to
+  add little independent information. Measure before assuming a weight is load-bearing.
 - **A distribution screen is BLIND to "always fires" and "never crosses".** Run against the two known
   failures it catches neither — `temp_dev_c` has a healthy range, `illness_score` looks merely sparse.
   It finds stuck and dead scores only. Pair every threshold with its input, or the screen reads clean
