@@ -4,9 +4,10 @@
 > is how six concurrent sessions stay tellable apart; a renamed successor is a lost thread even with a
 > perfect baton.
 
-**Updated:** 2026-08-25 · **By:** the eighth session to run as Lane A · **Next ID:** `LA-25`
+**Updated:** 2026-08-25 · **By:** the eighth session to run as Lane A · **Next ID:** `LA-26`
 (`grep -rhoE '\bLA-[0-9]+\b' docs/ | sort -t- -k2 -n | tail -1` is the authority, not this line)
-**Migrations:** through 216; next free is **217**. Local SQLite **v28**, untouched this session.
+**Migrations:** through 218; next free is **219**. Local SQLite **v29** (BF-11e added the saved-meal
+tag table).
 
 ## Now
 
@@ -42,8 +43,16 @@ checked.** Two of four this session:
 
 #473 LA-23 (queue tool reads a dash Keep) · #475 BF-16a (migration **216**, catalogue muscles,
 v1.370.2) · #476 BF-18 (autopack test polls the final phase) · #477 TN-7 (Body Battery stress failure
-reports). LA-24 filed — eight more catalogue rows with BF-16a's defect, with the family precedent for
-each.
+reports) · #480 BF-11b (scan returns one candidate per meal, v1.372.0) · #481 TN-7 follow-up ·
+#482 BF-11e (migration **217/218**, local SQLite **v29**, saved-meal tags) · #484 LA-25 (journal
+sweep) · #486 BF-11b follow-up · BF-11g (library-first meal plan). **LA-24 filed** — eight more
+catalogue rows with BF-16a's defect, with the family precedent for each.
+
+**Three timing-dependent test defects shipped and were fixed in one day, all mine.** BF-18 allowed an
+async write zero milliseconds; TN-7's test counted rows written by two racing fire-and-forget calls;
+BF-11b's test paid a **4.3 s module import inside a 5 s budget**. One root, narrower than "async":
+**something in the test is timed that is not the behaviour being asserted.** Ask that before writing
+an assertion — a module import, a background write and a second writer are all answers to it.
 
 ## Standing constraints
 

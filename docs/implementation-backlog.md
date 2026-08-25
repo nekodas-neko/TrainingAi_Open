@@ -1044,33 +1044,13 @@ whether or not anyone draws them first.
   everyone's library to zero on the day it ships.
 - Independent of BF-11g; the two may run in parallel in different lanes.
 
-### [nutrition] BF-11g — the planner searches your saved meals before asking the AI
-
-- **Lane:** A
-- **Needs:** BF-11e
-- **Plan:** [`plans/2026-08-24-library-first-meal-planner.md`](superpowers/plans/2026-08-24-library-first-meal-planner.md) §5.3
-- **Branch:** `feat/library-first-meal-plan`
-- **Added:** 2026-08-24 · planning session, from BF-11 (design items 6, 7, 9, 10). **The core of Part
-  2.** Owner: *"it prefers meals already in the planner and adds other meals around it."*
-- **Today every non-pinned slot is a fresh AI recipe** — nothing reads the library. New order per
-  unpinned slot: filter by the slot's meal type (plus untagged) → rank by **`fitDistance`** → take the
-  best if `mealFit` says it is close enough → otherwise fall through to AI → either way through
-  `scaleWithTopUp`, unchanged.
-- **Do not write a second ranking function.** `fitDistance`/`mealFit`
-  (`packages/shared/src/nutrition/meal-macro-fit.ts`) is already the One-Formula-One-Place for "how
-  far is this meal from its target", relative rather than absolute, calories deliberately excluded.
-- **`useLibrary: boolean`, not a list of ids** — the route already calls `listSavedMeals(userId)`
-  server-side, so "use all my saved meals" costs zero payload and cannot name another user's meal.
-  **Keep `keepSavedMealIds.max(6)`**: it equals `MEAL_COUNT_MAX`, so it is not arbitrary. But
-  `listSavedMeals` is currently fetched only when pins exist — it must be fetched when either is set.
-- **⚠ New failure mode this change creates: a meal used twice in one day.** The "genuinely DIFFERENT
-  food" instruction constrains the *model*, and a library search never reaches the model. Track what
-  each slot consumed.
-- **Also fixes the §2 server half:** cap honoured pins at the slot count and **report the drop**,
-  so a client that skips BF-11h's prompt still gets a coherent plan instead of a silent discard.
-- `matchReason` on the response is not decoration — BF-11h's swap and the existing AI edit both need it.
-
 ### [nutrition] BF-11h — the wizard surfaces the library, the reasons, and the meal-count prompt
+
+> **⚠ BF-11g shipped the engine half. The response already carries what this entry needs to render:**
+> `source` (`'kept' | 'library' | 'ai'`) and `matchReason` per meal, `libraryMatchCount`, and
+> `droppedPins` — the pins the server could not honour because there were more of them than slots.
+> **Nothing sets `useLibrary` yet**, so the library search is off for every real request until this
+> entry turns it on; the field is a boolean on the generate request, not a list of ids.
 
 - **Lane:** B
 - **Needs:** BF-11f, BF-11g
