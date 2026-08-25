@@ -1151,8 +1151,37 @@ whether or not anyone draws them first.
 
 ### [nutrition][app-shell] Q-395a — phase 2: the quantity sheet and Edit Meal's collapsing rows
 
+> **✅ THE CODE SHIPPED 2026-08-25 (Lane B, v1.364.0).** `components/nutrition/quantity-sheet.tsx`
+> is new; `ingredient-row.tsx` is **deleted** and the builder's rows are the shared `FoodRow`, so a
+> food now draws one way in all five places. `QtyUnit` moved to `saved-meal-qty.ts`, beside the maths
+> that uses it. [`journal`](overview/entries/2026-08-25-quantity-sheet-collapsing-rows.md).
+>
+> **`Needs: Q-406` removed** — Q-406's own text has said *"Q-395a's `Needs: Q-406` is satisfied"*
+> since the shared row shipped on 2026-08-23, but the field it is read from still said otherwise, so
+> the tool kept this parked. Same field-vs-prose gap as Q-306's.
+>
+> **The entry's "`ingredient-row.tsx` becoming `food-row.tsx`" wording could not be followed
+> literally** — `food-row.tsx` already existed, as Q-406's shipped component. The instruction that
+> matters is the one beside it (*"the collapsed shape IS Q-406's row — not a second component"*), and
+> that is what shipped: `ingredient-row.tsx` is gone rather than renamed onto a live file.
+>
+> **48 dp floor, done as one systemic change:** `components/ui/segmented-tabs.tsx` `min-h-11` →
+> `min-h-12`, which lifts all **8** call sites at once; the batch-size stepper and its field went
+> 44 → 48 too. Measured after: segments render at exactly 48 px on `/more` and `/health`, no
+> horizontal overflow on either.
+>
+> **Verified in a browser at 412×915, in BOTH themes**, driving the real sheet: the header carries the
+> meal name over *"Makes 1 portion · 149 kcal each"*; the collapsed row reads *"Chicken pate · 1
+> serving · 48 g · 149 kcal"*; the sheet is headed *"INGREDIENT 1 OF 2 · <meal>"*; the `2 srv` preset
+> gave 298 kcal, srv→g gave 96, +5 g gave 101, and Done wrote back *"101 g · 313 kcal"*; Remove
+> emptied the list and closed the sheet. The tapped row's highlight was checked as
+> **false → true → false** across open and Done. Colours invert properly (light `oklch(1 0 0)` on
+> `oklch(0.145 0 0)`, dark `oklch(0.05 0 0)` on `oklch(0.985 0 0)`), zero page errors in either.
+- **Keep:** the **device smoke run in both themes** this entry names, which a browser cannot stand in
+  for — the bottom sheet's safe-area inset renders as 0 in the sandbox, and this change puts a
+  destructive control on that action row. `Gate: device`.
+
 - **Lane:** B
-- **Needs:** Q-406
 - **Spec:** Q-395, findings 9, 12, 13 and the 2026-08-19 owner decision. **Drawings (committed
   2026-08-24):** [`docs/design/2026-08-18-nutrition-rework-mockups.html`](design/2026-08-18-nutrition-rework-mockups.html)
   — the expanded row is the **`srv/g — A`** artboard, the collapsed row is the `Full Cream Milk` row
@@ -1182,7 +1211,9 @@ whether or not anyone draws them first.
 ### [nutrition][app-shell] Q-395b — phase 3: the day screen, against the 11-section coverage list
 
 - **Lane:** B
-- **Needs:** Q-395a
+- **`Needs: Q-395a` cleared 2026-08-25.** What this phase depends on is the components existing, and
+  they do — the quantity sheet and the collapsed row shipped. Q-395a stays queued only for its device
+  smoke run, and a device check on the builder does not gate the day screen.
 - **Spec:** Q-395, findings 14 and 16.
 - **Scope.** `nutrition-content.tsx` and its cards. Grouped sections with full-bleed dividers
   replace gapped cards — that is most of the vertical space this screen spends on nothing. Extend

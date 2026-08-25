@@ -11,6 +11,9 @@ interface Props {
    *  rows keeps one ragged-right edge even when a row has no figure. */
   calories?: number | null
   showChevron?: boolean
+  /** Keeps the tapped row visible under a sheet's scrim, so the sheet reads as belonging to it
+   *  rather than as an unrelated screen (Q-395a). */
+  highlighted?: boolean
   onPress?: () => void
   /** Row is `<button>` when pressable and a plain `<div>` otherwise — never a div with a click
    *  handler, which the WebView treats as untappable for accessibility purposes. */
@@ -38,7 +41,7 @@ interface Props {
  * with a fixed width is what makes a column of numbers scannable.
  */
 export const FoodRow = memo(function FoodRow({
-  name, secondary, calories, showChevron, onPress, disabled,
+  name, secondary, calories, showChevron, highlighted, onPress, disabled,
 }: Props) {
   const body = (
     <>
@@ -56,7 +59,7 @@ export const FoodRow = memo(function FoodRow({
     </>
   )
 
-  const className = 'flex w-full items-center gap-3 px-4 py-3 text-left min-h-12'
+  const className = `flex w-full items-center gap-3 px-4 py-3 text-left min-h-12${highlighted ? ' bg-brand/10' : ''}`
 
   return onPress ? (
     <button type="button" onClick={onPress} disabled={disabled} className={`${className} transition-colors active:bg-muted/40 disabled:opacity-50`}>

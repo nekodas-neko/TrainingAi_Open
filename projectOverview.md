@@ -27,28 +27,28 @@
 **Version:** v1.318.10 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-08-24.
 
+**A food draws one way everywhere now, and its amount is edited on its own screen (Q-395a).** The
+builder's rows became Q-406's shared `FoodRow`; `ingredient-row.tsx` is deleted and the stepper,
+number field and srv/g toggle live in a new quantity sheet headed *"Ingredient 1 of 2 · <meal>"*.
+Segmented tabs went 44 → 48 px in the shared primitive, lifting all 8 call sites. `Gate: device`.
+
 **Build a Meal's ingredient picker is its own component now (BF-11a).** `saved-meals-sheet.tsx`
-774 → 590 lines — 26 under the CI ceiling with four BF-11 features due to land in it. No behaviour
-change; `openBuild`'s three reset setters became a keyed remount, driven to confirm it clears them.
+774 → 590 lines, 26 under the CI ceiling. `openBuild`'s reset setters became a keyed remount.
 
 **Q-319's water bug was unreachable, and the half its entry called fine was the broken one.** The
-tile already routes water to the right sheet; the generic sheet's branch wrote an ABSOLUTE total
-(discarding the day's water, reintroducing SYNC-P7) and queues `waterMlDelta` now.
+generic sheet wrote an ABSOLUTE water total — reintroducing SYNC-P7 — and queues `waterMlDelta` now.
 
 **The workout write path can be driven past set 1 (Q-461).** The Start Set bounce never gave
-Playwright a stable frame, so `Start Set 2` hung — 85 ms vs 8,009 ms with and without the new
-`prefers-reduced-motion` rule. A spec drives three logged sets and fails if the rule is removed.
+Playwright a stable frame — 85 ms vs 8,009 ms with and without the new reduced-motion rule.
 
 **Disk maintenance works from a desktop again (Q-544).** The DB-footprint and device-metrics cards
-touch no plugin but sat after `OuraBleDebug`'s native early-return — so reclaiming disk needed the
-APK, the one client `VACUUM FULL`'s lock blocks. Both moved above it. `Gate: device`.
+touch no plugin but sat after `OuraBleDebug`'s native early-return. Both moved above it.
 
 **The frame packer has a button (Q-316).** In the DB-footprint card, with the packable count beside
 it. Its confirm copy deliberately does not read like the lossless VACUUM one — this is the only
 control that DELETEs archival frames — and a refusal is listed with its reason. `Gate: device`.
 
-**Declaring a ring re-key has a button (Q-317).** On `/admin/oura-ble`, outside `OuraBleDebug` —
-which renders nothing without the plugin, exactly the laptop doing the re-key. `Gate: device`.
+**Declaring a ring re-key has a button (Q-317).** On `/admin/oura-ble`, outside `OuraBleDebug`, which renders nothing without the plugin — exactly the laptop doing the re-key. `Gate: device`.
 
 **The two BLE consoles poll the redecode job instead of guessing (Q-318).** A completed run reported
 `failed: 502`; the backfill said "Done" at the gateway timeout. Both wait for the real status now.
