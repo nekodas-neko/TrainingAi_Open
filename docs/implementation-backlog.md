@@ -1638,6 +1638,48 @@ Do not implement it; the labels alone fix what the owner asked about.
 - **Surface: UI strings only, web-reproducible.**
 
 
+### [devices][platform] BF-18 — `oura-autopack-ingest` asserts phase 3 of the packer after polling only for phase 1, so it goes red at random on any PR
+
+- **Branch:** _unassigned_
+- **Added:** 2026-08-25 · observed failing CI on PR #438, a **docs-only** change touching nothing in this path
+- **Lane: A** — `lib/data/postgres/__tests__/oura-autopack-ingest.test.ts`. Test-only; the packer is correct.
+
+`Tests` failed with `AssertionError: expected 8 to be +0` at `oura-autopack-ingest.test.ts:82` on a
+branch whose entire diff is markdown. The file passes locally 3/3 in 9.6 s.
+
+**Root cause — the packer is three sequential phases, deliberately not one transaction.**
+`lib/data/postgres/slices/oura-raw-pack.ts` inserts into `oura_raw_packed`, reads it back and
+verifies, then deletes the hot rows by primary key. The comment above phase 3 explains why the split
+exists (a bucket-range delete could remove a frame that arrived mid-select), and that design must not
+change. The test waits for phase 1 and asserts phase 3 with no wait:
+
+```js
+expect(await until(async () => (await packedRows()) === 1)).toBe(true)   // polls for phase 1
+expect(await coldHotRows()).toBe(0)                                      // asserts phase 3, unpolled
+```
+
+`8` is the cold frames still in the hot tier because phase 3 had not committed. Line 81 passing is
+what proves it: the packed row existed, so packing had started.
+
+**Why it survives:** the file is **not** in `ROLLUP_TESTS` (`vitest.config.ts:24`), so it runs in the
+`unit` project, and its own `until()` budgets 5,000 ms. Under CI contention against ~380 files on one
+Postgres, the phase-1→phase-3 gap exceeds the zero milliseconds the assertion allows.
+
+**Fix — poll for the end state, not the first phase:**
+
+```js
+expect(await until(async () => (await packedRows()) === 1 && (await coldHotRows()) === 0)).toBe(true)
+```
+
+**Do not** widen the rollup glob to cover it, raise the `until()` budget, skip, or retry the test —
+the assertion checks the wrong moment and the timeout is only the symptom.
+
+- **What would count as fixed:** the test asserts the packer's completed state, with a comment noting
+  the three phases commit separately so the next assertion added here polls too.
+- **Sibling sweep:** the other tests in this file, and any sibling polling one phase of a multi-phase
+  write, will have the same shape.
+- **Surface: server, web-reproducible.** Passes locally; the failure needs a loaded runner.
+
 ### [nutrition][platform] BF-12 — logging a saved meal takes ~20s and the owner couldn't find it after navigating away; traced to the slow fallback firing, not a lost write
 
 - **Lane: A** — the fix is in `logMealItems`/local-store availability, not the UI. No schema.
