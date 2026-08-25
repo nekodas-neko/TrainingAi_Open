@@ -63,11 +63,13 @@ builder's rows became the shared `FoodRow`; `ingredient-row.tsx` is deleted and 
 
 **The Devices card stops calling the ring healthy with no key (LB-5).** Checks `hasKey()` and links to `/admin/oura-ble` when false. `Gate: device`.
 
-**The colour-only score subset was ONE site, not a sweep (Q-281).** Nine `scoreBand()` call sites
-read rather than counted: only `readiness-breakdown`'s "Final readiness" row coloured without the
-word. `contributor-chart` has no `.label` at all and is correct — it renders the legend. **The Q-491
-lesson again: a zero-label grep is not a violator list.** Also laned Q-289/Q-290/Q-291 to A — the
-tool serves an unlaned entry to both lanes, and all three are `packages/shared` scoring work.
+**The queue says which rows it has not classified (LB-12).** After correcting four entries' lanes
+one at a time and hitting two more, it was measured: **77 of 193 entries state no lane**, and **53 of
+Lane B's 55 READY rows** — so two are rows the queue knows are Lane B's. Showing them to both lanes
+is right; being silent about it was not. They print `⟨lane unstated⟩` now. **The sweep is the
+Orchestrator's** and is filed, not done.
+
+**The colour-only score subset was ONE site, not a sweep (Q-281).** Nine `scoreBand()` call sites read rather than counted: only `readiness-breakdown`'s "Final readiness" row coloured without the word. `contributor-chart` has no `.label` at all and is correct — it renders the legend. **The Q-491 lesson again: a zero-label grep is not a violator list.** Also laned Q-289/Q-290/Q-291 to A.
 
 **The volume card stops guessing, and the surface was WRONG rather than absent (Q-305, half).** It
 already drew a band — a hardcoded generic **10–20** — while `packages/shared` computed real per-muscle MEV/MAV/MRV beside it. The goal multiplier is what makes that material: Q-305's own first pass read the unscaled row and called lats *below MEV*; against the app's own table it is **in range** and three muscles are over MRV. The band's **word** ships with its colour — two of the four are red and mean opposite things. Push:pull stays open: it needs a taxonomy belonging in `packages/shared`, which is Lane A's. `Gate: device`.
@@ -75,8 +77,7 @@ already drew a band — a hardcoded generic **10–20** — while `packages/shar
 **The raw-store console says what its numbers mean (Q-538, half).** It printed **209,326 rows, 0
 rolled up, 31.2 MB** and it took a source trace to know `0 rolled up` was the fault — the prune's predicate matches nothing, so the 14-day window can delete no row at all. It now says unbounded, unbacked (past the 25 MB Auto Backup quota) and shedding, in words. **The bound stays blocked** on an unbuilt rollup consumer that is Lane A's and has no queue entry. `Gate: device`.
 
-**The queue tooling learns `OR-` (PS-6).** The Orchestrator prefix was never in the ID alternation,
-and the failure was **silent deletion**: `next-item.js` counted **194 entries with and without** a scratch `OR-99`, printed it nowhere, and `check-backlog-pointers` neither caught a duplicate nor resolved `Needs: OR-n`. One shared `scripts/lib/entry-id.js` now, not four regexes — four copies is what let it drift. PS-6 named three sites; there were four.
+**The queue tooling learns `OR-` (PS-6).** The Orchestrator prefix was never in the ID alternation, and the failure was **silent deletion**: `next-item.js` counted **194 entries with and without** a scratch `OR-99` and printed it nowhere. One shared `scripts/lib/entry-id.js` now, not four regexes. PS-6 named three sites; there were four.
 
 **The vacuum button can reach the table that needs it (Q-315).** `error_events` holds **4 live rows
 in 49 MB** in production and the generalised `/api/admin/vacuum` had **no caller** — the one control still posted to the `oura_raw_samples`-only route. A table picker fed by that route's own `GET` fixes it; the press itself is the owner's, from a desktop. `Gate: owner`.
