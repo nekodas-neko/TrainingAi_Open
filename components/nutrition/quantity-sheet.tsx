@@ -1,11 +1,10 @@
 'use client'
 
-import { Minus, Plus, Trash2 } from 'lucide-react'
+import { Trash2 } from 'lucide-react'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { Button } from '@/components/ui/button'
-import { SegmentedTabs } from '@/components/ui/segmented-tabs'
-import { cn } from '@trainingai/shared/utils'
 import type { FoodItem } from '@trainingai/shared/types/nutrition'
+import { QuantityEditor } from './quantity-editor'
 import type { QtyUnit } from './saved-meal-qty'
 
 interface Props {
@@ -44,21 +43,6 @@ export function QuantitySheet({
   item, qty, unit, index, total, mealName,
   onUnitChange, onQtyChange, onStep, onRemove, onClose,
 }: Props) {
-  const servingG = item?.servingSizeG ?? 0
-  const displayed = unit === 'g'
-    ? Math.round((servingG || 100) * qty)
-    : Math.round(qty * 100) / 100
-
-  // The drawing's row of shortcuts. Grams is offered only when there is a serving size to divide
-  // by — `qtyFromInput` returns null for grams without one, so a chip that cannot apply is worse
-  // than a chip that is not there.
-  const presets: { label: string; raw: string; unit: QtyUnit }[] = [
-    { label: '1 srv', raw: '1', unit: 'serving' },
-    { label: '2 srv', raw: '2', unit: 'serving' },
-    { label: '3 srv', raw: '3', unit: 'serving' },
-    ...(servingG > 0 ? [{ label: '100 g', raw: '100', unit: 'g' as QtyUnit }] : []),
-  ]
-
   return (
     <Sheet open={item != null} onOpenChange={o => { if (!o) onClose() }}>
       <SheetContent side="bottom">
@@ -71,82 +55,25 @@ export function QuantitySheet({
 
         {item && (
           <div className="space-y-4 px-4 pb-4">
-            {servingG > 0 && (
-              <p className="text-xs tabular-nums text-muted-foreground">
-                {/* "1 serving of THIS FOOD", not a portion of the meal — the meal's own batch size
-                    is a separate control and the two were reading as the same word. */}
-                1 serving of {item.name} = {Math.round(servingG)} g
-              </p>
-            )}
-
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => onStep(-1)}
-                aria-label={`Less ${item.name}`}
-                className="flex-none w-12 h-12 rounded-xl bg-muted flex items-center justify-center"
-              >
-                <Minus className="h-5 w-5" />
-              </button>
-              <input
-                type="number"
-                inputMode="decimal"
-                min={0}
-                step={unit === 'g' ? 5 : 0.5}
-                value={displayed}
-                onChange={e => onQtyChange(e.target.value)}
-                autoFocus
-                aria-label={unit === 'g' ? `Grams of ${item.name}` : `Servings of ${item.name}`}
-                className="min-w-0 flex-1 h-14 rounded-xl bg-muted px-3 text-2xl font-bold tabular-nums text-center outline-none focus:ring-2 focus:ring-brand [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none"
-              />
-              <button
-                onClick={() => onStep(1)}
-                aria-label={`More ${item.name}`}
-                className="flex-none w-12 h-12 rounded-xl bg-muted flex items-center justify-center"
-              >
-                <Plus className="h-5 w-5" />
-              </button>
-            </div>
-
-            {/* An item with no serving size has no gram equivalent, so it only ever offers servings. */}
-            {servingG > 0 && (
-              <SegmentedTabs
-                tabs={[{ value: 'serving' as QtyUnit, label: 'srv' }, { value: 'g' as QtyUnit, label: 'g' }]}
-                value={unit}
-                onValueChange={onUnitChange}
-                size="xs"
-              />
-            )}
-
-            <div className="flex flex-wrap gap-2">
-              {presets.map(p => (
-                <button
-                  key={p.label}
-                  onClick={() => { onUnitChange(p.unit); onQtyChange(p.raw) }}
-                  className={cn(
-                    'min-h-12 rounded-xl bg-muted px-4 text-sm font-semibold transition-colors active:bg-muted/60',
-                  )}
-                >
-                  {p.label}
-                </button>
-              ))}
-            </div>
-
-            <p className="text-sm tabular-nums text-muted-foreground">
-              {Math.round((item.calories ?? 0) * qty)} kcal ·{' '}
-              {Math.round((item.proteinG ?? 0) * qty * 10) / 10}P ·{' '}
-              {Math.round((item.carbsG ?? 0) * qty * 10) / 10}C ·{' '}
-              {Math.round((item.fatG ?? 0) * qty * 10) / 10}F
-            </p>
+            <QuantityEditor
+              item={item}
+              qty={qty}
+              unit={unit}
+              onUnitChange={onUnitChange}
+              onQtyChange={onQtyChange}
+              onStep={onStep}
+              autoFocus
+            />
 
             <div className="flex gap-2">
               <button
                 onClick={onRemove}
                 aria-label={`Remove ${item.name}`}
-                className="flex-none min-h-12 w-12 rounded-xl bg-destructive/10 flex items-center justify-center"
+                className="flex min-h-12 w-12 flex-none items-center justify-center rounded-xl bg-destructive/10"
               >
                 <Trash2 className="h-5 w-5 text-destructive" />
               </button>
-              <Button className="flex-1 h-12 font-semibold" onClick={onClose}>Done</Button>
+              <Button className="h-12 flex-1 font-semibold" onClick={onClose}>Done</Button>
             </div>
           </div>
         )}

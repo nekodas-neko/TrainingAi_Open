@@ -439,48 +439,31 @@ P/C/F chips gone. Journal:
   artboard is 812 px and stops at the fold. Decided, not outstanding.
 - **The device check**, and the owner's provisional ④ watching brief on grouped-section backgrounds.
 
-### [nutrition] BF-26 — two quantity sheets: the builder's matches artboard 6, the diary's does not
+### [nutrition] BF-26 — the two quantity sheets converged; the phone has not seen it
 
-- **Lane:** B
+- **Branch:** `fix/quantity-sheet-convergence` (merged 2026-08-25)
+- **Lane: B**
+- **Gate: device**
 - **Spec:** BF-28.
-- **Added:** 2026-08-25, device smoke run ⑧ — *"the UI could use some work; everything looks the
-  same"*. **Screenshot received**, and it names the wrong sheet as the culprit in a useful way: the
-  one the owner photographed is not the one Q-395a built.
 
-**There are two.** `quantity-sheet.tsx` (Q-395a, opened from the meal builder) and
-`quick-edit-log-sheet.tsx` (Q-406/v1.367.0, opened by tapping a logged row on the day screen). They
-do the same job and look nothing alike, and the diary one — the one reached far more often — is the
-one that does not match the drawing.
+**Shipped.** Both sheets render one `components/nutrition/quantity-editor.tsx`, so the diary sheet
+gained artboard 6's `srv`/`g` toggle, its absolute presets (`1 srv · 2 srv · 3 srv · 100 g`) and the
+inline macro line — and both now use `MACRO_COLORS`, matching the row that opened them. Cancel is
+gone: the drawing has none and the sheet already had two ways out (the X, and the back gesture from
+BF-27), so a third beside a bin was the ambiguous control. `qtyFromInput`/`steppedQty` are shared
+rather than re-derived, which was the entry's actual point. Journal:
+[`2026-08-25-quantity-sheet-convergence`](overview/entries/2026-08-25-quantity-sheet-convergence.md).
 
-| | artboard 6 · `quantity-sheet.tsx` | `quick-edit-log-sheet.tsx` (the screenshot) |
-|---|---|---|
-| unit | `srv` / `g` toggle, `SegmentedTabs` at 48 dp | **none** — servings only |
-| presets | `1 srv · 2 srv · 3 srv · 100 g`, absolute | `×0.5 ×1 ×1.5 ×2 ×3`, multipliers |
-| macros | `230 kcal · P 52.8 · C 2 · F 0.6`, inline and labelled | four equal uncoloured columns, words spelled out |
-| actions | trash · **Save** | trash · **Cancel** · Save |
+**The finding worth keeping:** `globals.css` sets `input { font-size: 16px !important }` under
+`max-width:640px` (the iOS-zoom guard), so **a `text-*` size class on an input is inert at every
+phone width** — the value needed `!text-2xl` to be bigger than its steppers at all. Measured across
+the app: only two other inputs carry a size class and both want ≤16 px, which is what the guard is
+for. So this is narrow, not systemic — but it is silent, and the next person wanting a large input
+will hit it.
 
-**Why "everything looks the same" is literally true of the screenshot.** The `−`, the value and the
-`+` are the same rounded square, the same fill, the same border and near-identical height, so the
-number the sheet exists to set has no more weight than the buttons that nudge it. Below it the macro
-strip is four identical monochrome columns — while the food row **directly behind the sheet** renders
-`P 26g` green, `C 1g` blue, `F 0g` orange from `MACRO_COLORS`. The sheet does not import it.
-`kcal` sits in that same strip at the same weight, so the headline number is not a headline.
-
-**Three things to fix, in order of what the owner is looking at:**
-
-1. **Bring the diary sheet onto the artboard-6 shape** — the `srv`/`g` toggle, the absolute presets,
-   the inline labelled macro strip. `quantity-sheet.tsx` already implements all of it, including the
-   `qtyFromInput` grams handling and the "an item with no serving size only ever offers servings"
-   guard. **Reuse it, do not re-derive it** — the two sheets existing separately is the defect.
-2. **`MACRO_COLORS` in the sheet**, so P/C/F read the same inside it as on the row that opened it.
-3. **Give the value hierarchy** — the amount larger and visually distinct from its steppers.
-- **Decide the two-vs-three-button action row explicitly.** The drawing has no Cancel; the sheet has
-  an X and a back-gesture dismiss already. Removing Cancel is probably right, but it is a
-  destructive-adjacent control sitting next to a trash can, so say which you chose and why.
-- **Not a rewrite.** Q-395a shipped its sheet days ago and it passed on the device. This is
-  convergence onto the one that is already correct.
-- **Verification.** Both sheets open side by side against artboard 6 at 412 dp; then the device run —
-  the safe-area inset under the action row renders 0 in the sandbox, and Remove sits in that row.
+- **Keep:** the device pass. The action row's safe-area inset renders 0 in the sandbox and Remove
+  sits in that row; and whether the sheet now reads as one thing is the owner's call, not a
+  measurement.
 
 ### [nutrition] BF-29 — artboard 3 parity: My meals, and the slot cards that share its row
 
