@@ -108,22 +108,22 @@ Earlier sessions' PRs are in the journal entries; this list stays to the current
   `--name-only` against `origin/main` before every push. Commit, push, *then* switch branches. Never
   slice a generated file by string index. A count moving further than your change explains is the bug.
 
-## The database reclaim — one press left
+## The database reclaim — DONE, and the last item was a false premise
 
-`VACUUM FULL error_events` (**Q-315**, ~49 MB, **27% of the database** at 28 live rows). **It now
-has a button** — Lane B shipped it 2026-08-25 — at **More → Settings → Developer → "Oura BLE debug"
-→ Table = `error_events` → "Reclaim disk"**. The previous baton said it needed a `curl`; that was
-already stale when written. **Do not add a bearer path to `/api/admin/vacuum` without an explicit
-yes — it is an auth change.**
+**Q-315 is closed.** The owner pressed the button; it correctly reclaimed **0 B**, because
+`error_events` was never bloated. It holds **6,168 real rows** (45 MB of stacks), 5,928 of them one
+already-fixed burst (Q-214's `oura_heartrate` cardinality violation, fixed 2026-08-13) that ages out
+of the 30-day prune by ~2026-09-12. **The "4 live rows in 49 MB" figure was `n_live_tup`** — the
+stale estimate this baton warns about two sections down, read 24 against 6,168 and repeated through
+five documents including this file. **When a size and a row count disagree, run `count(*)`.**
 
-Discoverability, not capability, is what is actually missing: a general database control sits behind
-a row labelled for Oura, and `/admin` has no maintenance tab. That is **Q-531**, already filed,
-already owner-gated, and **Lane B's** by the path rule.
+Still true: **no bearer path on `/api/admin/vacuum` without an explicit yes — it is an auth change.**
+Discoverability is the real gap: a general DB control behind a row labelled for Oura, and `/admin`
+has no maintenance tab. **Q-531**, filed, owner-gated, Lane B's.
 
 ## Waiting on the owner
 
 - **One photo scan in the app** — unblocks BF-4 entirely (the nutrition scan-latency question).
-- **The `error_events` reclaim button-press** above — the last piece of Q-315.
 - **Q-403** — the Coach's already-applied-swap wording. A product decision with two candidates.
 - **Q-422** and **TN-9 / Q-289 / Q-290** — Tuning-originated; owner signs off, then Lane A implements.
 - **Q-388 SpO₂** — the missing datum is one night *without* the measurement sequence: a Kotlin change

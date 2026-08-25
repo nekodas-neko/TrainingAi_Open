@@ -351,6 +351,33 @@ below threshold and left in place for next time.
 > BF-29 (My meals), BF-30 (Meal detail), BF-31 (Edit meal) and BF-26 (Quantity). Two artboards need
 > no entry — `Tap targets` and the `srv/g` studies both shipped in Q-395a.
 
+### [nutrition] LA-30 — a zero-calorie food can never be logged, and the button says nothing
+
+- **Lane:** B
+- **Added:** 2026-08-25, from the owner hitting it live — a ZMA supplement scan, correctly read by
+  the AI as *"It is calorie-free"*, with **Next** greyed out and no message explaining why.
+- **The gate:** `components/nutrition/review-step.tsx:159`
+
+  ```ts
+  const canSave = value.name.trim().length > 0 && value.calories > 0
+  ```
+
+  Every genuinely zero-calorie item is refused: supplements, water, black coffee, plain tea, diet
+  soft drink, sugar-free gum, zero-cal sweetener, most spices and herbs.
+- **The server already disagrees with it.** `packages/shared/src/validation/food-item.ts:19` is
+  `z.number().min(0).max(10000)` — zero is explicitly allowed, so the API would have accepted this
+  log. There is **no engine half to this fix**; it is one client-side predicate, which is what puts
+  it in Lane B.
+- **Sibling surface, same PR:** `components/nutrition/ingredient-picker.tsx:154` does
+  `if (!scan || scan.error || !(scan.calories > 0))` — a zero-calorie scan is classified as a
+  *failed* scan there. Same rule, different consequence.
+- **Suggested shape:** drop `calories > 0` from `canSave`; a name is the only field that must be
+  present. If a guard against an empty/failed AI response is still wanted, test that the scan
+  *returned* — not that its calories are nonzero, which is a legitimate value.
+- **The silent-disable is half the bug.** A disabled primary button with no reason given is
+  indistinguishable from a broken app; the owner's report was *"it wouldn't let me log it"*, not
+  *"it told me why"*. Whatever replaces the gate should say what it wants.
+
 ### [nutrition][app-shell] BF-28 — mockup parity: the artboards are the spec, and this is the map
 
 - **Lane:** B
@@ -465,16 +492,74 @@ will hit it.
   sits in that row; and whether the sheet now reads as one thing is the owner's call, not a
   measurement.
 
+### [nutrition] BF-32 — the meal photo is stored, pickable, and displayed nowhere; the placeholder is the missing piece
+
+- **Lane:** B
+- **Spec:** BF-28.
+- **Added:** 2026-08-25, owner, reviewing the artboards: *"Some are similar but not the same (i.e no
+  spot for an image) it should show the default one in the mockup if no image is attached."*
+- **⚑ The owner's sentence is the specification, and it is stronger than "add a thumbnail".** The
+  glyph tile is the **always-present** state of the row, not a fallback bolted on afterwards. A row
+  with no photo shows the placeholder; a row with one shows the photo in the same box. There is never
+  a row without the box — which is what makes a list read as one thing rather than ragged.
+
+**What already exists, and what is missing.** The storage half shipped twice over:
+
+| Piece | State |
+|---|---|
+| `saved_meals.image_data_uri` column | ✅ Q-396 — round-trips both routes, the outbox replay and the local mirror |
+| `MealPhotoTile` — pick, downscale to 128 px WebP, preview | ✅ Q-327, wired into Edit Meal |
+| **Anything that renders a stored photo** | ✗ **nothing** — grep `imageDataUri` and every hit is a route, an adapter or the picker |
+| **The placeholder** | ✗ does not exist |
+
+So a photo picked today is written, synced, and never seen again. That is the finding: **the feature
+is write-only**, and it has been since the picker landed.
+
+**`FoodRow` has no thumbnail slot at all.** Its own comment says so — *"The optional thumbnail Q-406
+lists is deliberately not here yet. No call site passes one."* **That deferral is now superseded by
+the owner's instruction** and Q-406 has been amended to say so. The thumbnail lands in `FoodRow`,
+once, and every parity entry gets it for free.
+
+**The placeholder, read off the artboards:** a 40 px tile, `border-radius: 9px`, filled with
+`linear-gradient(140deg, …)` carrying a utensils glyph at 45% white. It appears **nine times** in the
+drawings with identical values and once in a lighter variant, so it is one shared thing, not
+per-screen markup. Meal detail (artboard 4) uses the same idea at hero scale — a full-width band with
+a large glyph and a `Photo` button on it.
+
+- **⚠ The gradient in the artboards is `oklch(...)` literals, and BF-28 rule 3 applies.** Take the
+  structure; source the colours from tokens. `check-hex-literals.js` ratchets per file, so a pasted
+  literal fails the Custom Rules job.
+- **Sizes to settle in the PR, not guess:** the row tile at 40 px against the day screen's existing
+  row height, and whether the hero band is a fixed height or an aspect ratio. Say which you chose.
+- **The photo is a data URI, not a URL** — `<img src>` on a data URI needs no `no-img-element`
+  exemption for a remote host, which is the objection `food-row.tsx` recorded against building this
+  early. That objection no longer applies to saved meals; it may still apply to any future
+  food-item image from an external source, so do not widen the prop to accept a URL without saying
+  why.
+- **Scope, explicitly:** this is the shared tile plus its call sites — the day screen rows, My meals
+  rows, Meal detail's hero, the ingredient lists. It is **not** a new capture flow; picking already
+  works.
+- **Verification.** Both states on every surface — a meal with a photo and a meal without — against
+  the artboards at 412 dp per BF-28. Then the device run: a data-URI image inside a scrolling list is
+  exactly the shape Samsung's WebView compositor has mishandled before.
+
 ### [nutrition] BF-30 — artboard 4 parity: Meal detail, the one screen with no clear counterpart
 
 - **Lane:** B
 - **Spec:** BF-28.
 - **Added:** 2026-08-25, owner: the nutrition screens match their drawings.
-- **⚑ Start by answering whether this screen exists.** Artboards 1, 2, 3, 5 and 6 each map onto a
-  shipped surface. This one maps onto `saved-meal-card.tsx`'s expanded state and `my-meals-picker.tsx`
-  — neither of which is a screen. **The first task is to decide whether Meal detail is a new route, a
-  full-height sheet, or an expansion of the card**, and that decision belongs in the PR before any
-  markup. Every other parity entry is "change what is there"; this one may be "build what is drawn".
+- **Needs:** BF-32
+- **✅ THE OPEN QUESTION IS ANSWERED — the owner wants this screen.** 2026-08-25, looking at artboard
+  4: *"I dont see this screen yet"*. The entry previously allowed "it stays a card, here's why" as an
+  outcome; **that is no longer available.** Artboards 1, 2, 3, 5 and 6 each map onto a shipped
+  surface and this one does not, so unlike every other parity entry this is *build what is drawn*
+  rather than *change what is there*.
+- **Still to decide, in the PR before any markup:** route vs full-height sheet vs expanded card. The
+  owner asked for the screen, not for where it lives. A sheet reached from a My-meals row is the
+  cheapest shape that matches the drawing and keeps the back gesture working (BF-27); say what you
+  chose and why.
+- **The hero band is BF-32's placeholder at hero scale** — same gradient, same utensils glyph, a
+  `Photo` button on it, and it shows whether or not a photo is stored. Do not draw a second one here.
 - **What artboard 4 draws:** a hero band with `[back]`, an overflow action and a **`Photo`** button;
   the meal name with `Makes 2 portions · 5 ingredients`; a **`278 / per portion`** figure; three macro
   columns with **percentage, grams and label** (`48% · 33 g · Protein`); an `Ingredients` section
@@ -556,6 +641,13 @@ will hit it.
   [`Journal`](overview/entries/2026-08-23-shared-food-row.md).
 - **✅ THE DIARY ROW SHIPPED 2026-08-25 (v1.367.0)** — with the delete this entry required moved into
   `QuickEditLogSheet` first, so no capability was dropped.
+- **⚑ THE THUMBNAIL DEFERRAL IS SUPERSEDED, 2026-08-25.** `food-row.tsx` records that the optional
+  thumbnail is *"deliberately not here yet — no call site passes one"*. The owner has now specified
+  it: *"it should show the default one in the mockup if no image is attached."* The tile is the
+  **always-present** state of the row, so the slot is no longer optional-in-practice. **BF-32 owns
+  the tile and the placeholder**; this entry owns the `FoodRow` prop it lands on. Do them in one PR
+  unless there is a reason not to, and delete that comment when you do — a stale "deliberately not
+  yet" reads as a decision rather than a superseded one.
 - **Keep:** ONE call site, the external food-database row (`ingredient-search.tsx:132`), which
   carries a macro-mismatch warning and an in-flight spinner. The agreed row has nowhere to put
   either, and adding a slot makes it a wrapper rather than a unification. **It needs a design answer
@@ -2453,7 +2545,8 @@ show it:
    rate limit and Zod schema at creation (per the AI & Security defaults).
 3. **Report:** p50/p95 per route over N days, split **cold vs warm cache** — without that split the
    deploy churn swamps everything and the number means nothing.
-4. **Retention:** cap it. `error_events` reached 49 MB for 4 live rows (Q-315); a per-navigation row
+4. **Retention:** cap it. `error_events` reached 52 MB (Q-315 — genuinely live rows, not bloat: one
+   already-fixed burst wrote 5,771 of them); a per-navigation row
    is far higher volume, so it needs a prune from day one, not later.
 
 **Two limits, stated:** the ~460 ms round trip above includes a sandbox proxy and unknown
@@ -4518,30 +4611,6 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 - **Verification:** the route is already proven end to end on `pnpm dev` (251 frames → 10 blobs, API
   dump hashing identically before and after). This item is the affordance only.
 
-### [platform] Q-315 — `error_events` holds 4 live rows in 49 MB: Q-539 stopped the bleeding but never reclaimed the space
-
-> **✅ THE BUTTON SHIPPED 2026-08-25 (Lane B).** `db-footprint-card.tsx` posts to the generalised
-> `/api/admin/vacuum` with a table picker fed by that route's own `GET`, so the allowlist cannot
-> drift from the client. The result line reports `liveRows` beside `beforeBytes` — the pair that
-> tells pure bloat from a genuinely large table, which is why this is a one-off reclaim and not a
-> chore. Confirm copy is per-table now (the old text promised "body_hex and all rows are preserved",
-> true of `oura_raw_samples` and meaningless here).
-> [`journal`](overview/entries/2026-08-25-vacuum-table-picker.md).
->
-> **Driven end to end locally: 200, `{"table":"error_events","liveRows":3,...,"reclaimedBytes":0}`.
-> Zero is correct there and proves the path, not the reclaim** — the local table is 48 KB with no
-> bloat; production's is 49 MB against 4 rows, and that cannot be reproduced here.
->
-> **✅ `app/api/oura-ble/samples/vacuum/route.ts` DELETED 2026-08-25 (Lane A)** — no caller; verified
-> `VACUUM_FULL_TABLES` still carries both tables first. **Nothing owed here**; the reclaim is a press.
-
-- **Branch:** `feat/vacuum-table-picker`
-- **Lane:** B
-- **Keep:** the press itself, on production. `/admin/oura-ble` from a **desktop** (Q-544 moved the
-  card above the native-gated `OuraBleDebug` for exactly this), signed in as admin → Table →
-  `error_events` → Reclaim disk. Expect ~49 MB back against 4 live rows. Also unexercised: a
-  `VACUUM FULL` long enough to need the slice's lifted timeouts, and the `<select>` at phone width.
-  `Gate: owner`
 ### [app-shell][platform] Q-544 — server-side disk maintenance is trapped behind a native-plugin gate, so it cannot be run from a desktop
 
 > **✅ SHIPPED 2026-08-24 (Lane B, v1.363.4).** `DbFootprintCard` **and** `DeviceMetricsPanel` moved
@@ -9688,7 +9757,7 @@ tick re-posts."* **Read from source, not reproduced:** `readJsonLimited` streams
 backgrounded mid-post is the obvious cause. Nothing catches it, so it reaches `onRequestError`,
 which reports to **both** `error_events` and Sentry. The helper is shared, so every route using it
 has this shape. It matters only because `error_events` is the table every session reads to orient,
-it prunes at 30 days, and it is already the subject of Q-315's 49 MB of bloat — a client hanging up
+it prunes at 30 days, and Q-315 measured it at 52 MB of genuinely live rows (not bloat) — a client hanging up
 is not our fault and each one spends an alert plus a row of that record. **Fix shape:** return
 `{ ok: false, reason: 'aborted' }` from the helper so the route answers 400 without reporting, or
 filter aborts in `recordRequestError` (wider — it covers routes not using the helper); either way
