@@ -7451,24 +7451,48 @@ ehr     0     0     0     0   648   208   128   556     0
   own recommendation: **trend is the missing dimension, not contributors** (contributors are
   genuinely inapplicable to a chip or a timeline row; a 7-day sparkline is not).
 
-### [platform][app-shell] Q-282 — no automated accessibility check exists anywhere in CI
+### [platform][app-shell] Q-282 — the accessibility checks CI cannot make: touch targets and contrast
 
 - **Branch:** `feat/ci-accessibility-scan`
 - **Plan:** none yet
 - **Added:** 2026-08-15 · from the comprehensive review §5
+- **Lane: B.** `eslint.config.mjs` + CI; no schema, no route.
+- **⚠️ THE ORIGINAL HEADLINE WAS FALSE, corrected 2026-08-25 — a check DOES exist.**
+  `eslint-plugin-jsx-a11y` rides in through `next/core-web-vitals` and has been running in the Lint
+  job all along. Verified by probe, not by reading: an unlabelled `<img>` reports
+  `jsx-a11y/alt-text`. **What was true is that it could not fail anything** — it reported at
+  *warning*, so `pnpm lint` exited 0 with violations present and a new one would land silently.
+  That is exactly how the hex-literal count grew by 41 in five days unnoticed.
+  - **✅ FIXED 2026-08-25 (Lane B).** Seven statically-decidable rules promoted to `error`:
+    `alt-text`, `anchor-has-content`, `aria-props`, `aria-proptypes`, `aria-unsupported-elements`,
+    `role-has-required-aria-props`, `role-supports-aria-props`. **The whole app measured at zero**
+    across `app/`, `components/` and `lib/`, so this cost nothing and froze the ground — a
+    shrink-only baseline whose baseline is empty. `pnpm lint`: **0 errors, 124 pre-existing
+    warnings**, and a probe file with three violations now fails.
+    [`journal`](overview/entries/2026-08-25-a11y-rules-can-fail.md).
+- **What is left is the half a linter cannot do, and it is the half this entry actually named.**
+  **Touch-target size** and **contrast** need a rendered page; no static rule can measure either.
+  That is still unbuilt.
 - **The gap, stated precisely.** The owner-directed testing cluster (Q-249 E2E · Q-250 emulator ·
   Q-251 staging · Q-252 error tracking · Q-253 device farm · Q-254 unverified-row sweep) is
   well-scoped and correctly prioritised, and this entry does **not** re-raise any of it. Standard
-  Android QA practice covers one thing none of the six touches: **automated accessibility scanning.**
+  Android QA practice covers one thing none of the six touches: **automated accessibility scanning
+  of a running app.**
 - **Why it is the right gap to close next.** It targets exactly the class this project keeps
   rediscovering by hand and cannot currently measure. The 2026-08-08 mobile-UI sweep found 7×7 px
   tap targets by manual inspection, and its **contrast finding could not be measured at all** — it
   is recorded in `projectOverview.md` as "contrast that could NOT be measured". Accessibility
   Scanner / Espresso accessibility checks catch missing labels, undersized touch targets and
   insufficient contrast automatically.
-- **Dependency, and why this is not a duplicate of Q-250.** A scanner needs a running app, so this
-  rides on the emulator job Q-250 introduces — it is one extra step in that job, not a second
-  harness. File it after Q-250 in any implementation ordering.
+- **⚠️ THE Q-250 DEPENDENCY HAS EXPIRED, and whoever takes this should not wait for it.** This was
+  written 2026-08-15, before the Playwright E2E harness grew into a real running app in CI. A
+  scanner needs a rendered page, not an emulator — `@axe-core/playwright` against the existing E2E
+  job would measure touch targets and contrast on the same DOM the WebView renders, with no
+  emulator and no second harness. **Not done here deliberately:** it adds a dependency and a new
+  failing-check surface, a flaky a11y gate would block every PR, and re-scoping an entry's approach
+  *and* implementing it in one pass is a decision that wants the owner or the Orchestrator, not an
+  implementer at the end of a session. The Espresso route below stays valid if the emulator lands
+  first.
 - **Scope:** Espresso accessibility checks enabled in the emulator run, failing on the touch-target
   and contrast rules only at first (the label rules will produce a large initial backlog). Use the
   **shrink-only baseline** pattern the repo already uses for `check-component-size.js` and
