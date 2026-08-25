@@ -18,6 +18,25 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
+## 2026-08-25 — Q-112 re-planned into five phases (`docs/implementation-backlog.md` raise withdrawn)
+
+Q-112 — the unified day review — was a single spec-sized entry that said of itself *"whoever picks
+this up should write a proper implementation plan first"*. The plan is now written
+([`2026-08-25-unified-day-review.md`](superpowers/plans/2026-08-25-unified-day-review.md)) and the
+entry became an umbrella plus **Q-112a–e**, each one PR with its own lane, branch and `Needs:`.
+
+**A +19 raise was prepared and then withdrawn**: the original entry carried 28 lines of direction
+and the umbrella replacing it carries 9, because the reasoning went to the plan rather than the
+queue — and by the time the branch was cut, `main` had shrunk the file enough that the growth fitted
+inside the existing headroom. Recorded because "no raise needed" is worth knowing was checked, and
+because without moving that reasoning out it would have been a ~60-line raise.
+
+**Why the re-plan was needed, recorded because this is how a queue entry goes stale silently:**
+Task 27's central premise — that no per-day read-through screen exists — stopped being true on
+2026-08-08, two days after it was written, when Q-110 shipped `/health/day`. An implementer taking
+the entry at face value would have built a third day surface and re-implemented seven working
+sections.
+
 ## 2026-08-25 — PS-6 filed (`docs/implementation-backlog.md` raise withdrawn, again)
 
 **PS-6**: the queue tooling has never known the `OR-` prefix, in three regexes across two scripts.

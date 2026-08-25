@@ -19,6 +19,11 @@ fallback) are what every offline-first domain should copy. See CLAUDE.md, "Offli
 
 ## Reference docs
 
+- [`docs/superpowers/plans/2026-08-25-unified-day-review.md`](../../superpowers/plans/2026-08-25-unified-day-review.md)
+  — **Q-112, the unified day review** (Q-112a–e). Read it instead of Task 27 of the 2026-08-05 batch,
+  whose central premise — that no per-day read-through screen exists — stopped being true when Q-110
+  shipped `/health/day`. Covers the evening flow's three steps, the skip rule, and why the
+  banner-vs-notification question was already answered by what shipped.
 - [`docs/design/2026-08-18-nutrition-rework-mockups.html`](../../design/2026-08-18-nutrition-rework-mockups.html)
   — **the nutrition rework's twelve reference drawings**, at true S25 size in the app's own tokens.
   Open this before building **Q-395 / Q-395a / Q-395b / Q-395c** or **Q-406**; it is what they cite.
