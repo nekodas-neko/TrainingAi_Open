@@ -15,11 +15,16 @@
 //   node scripts/next-item.js --lane A        one lane
 //   node scripts/next-item.js --all           do not truncate READY
 //
+// READY is work nobody has started. An entry that shipped and still owes an owner sign-off or a
+// device run states so with `- **Keep:**` and is listed under KEEP instead — see lib/keep.js for
+// why that separation is the whole point of the tool.
+//
 'use strict';
 const fs = require('fs');
 const path = require('path');
 
 const { laneFromLines } = require('./lib/lane');
+const { keepFromLines } = require('./lib/keep');
 
 const ROOT = path.resolve(__dirname, '..');
 const BACKLOG = path.join(ROOT, 'docs/implementation-backlog.md');
@@ -49,7 +54,7 @@ for (const line of lines.slice(queueStart)) {
     const id = line.match(/\b((?:LA|LB|BF|RV|TN|PS|Q)-\d+[a-z]?)\b/);
     const title = line.replace(/^###\s*/, '');
     current = id
-      ? { id: id[1], title, tags: [...line.matchAll(/\[([a-z-]+)\]/g)].map((m) => m[1]), lane: null, laneLines: [], needs: [], gates: [], batch: null, legacyBlocked: null, schemaRisk: false }
+      ? { id: id[1], title, tags: [...line.matchAll(/\[([a-z-]+)\]/g)].map((m) => m[1]), lane: null, laneLines: [], needs: [], gates: [], batch: null, legacyBlocked: null, schemaRisk: false, keep: null }
       : null;
     if (current) entries.push(current);
     continue;
@@ -90,7 +95,10 @@ for (const line of lines.slice(queueStart)) {
   }
 }
 
-for (const e of entries) e.lane = laneFromLines(e.laneLines);
+for (const e of entries) {
+  e.lane = laneFromLines(e.laneLines);
+  e.keep = keepFromLines(e.laneLines);
+}
 
 const inQueue = new Set(entries.map((e) => e.id));
 // An absent target means shipped — the protocol removes a completed entry from the queue.
@@ -105,6 +113,7 @@ const wantLane = (e) => {
 };
 
 const ready = [];
+const keeps = [];
 const parked = [];
 const unclassified = [];
 
@@ -120,8 +129,12 @@ for (const e of entries) {
     reasons.push(`unmigrated marker — ${e.legacyBlocked}`);
   }
 
+  // A Keep's own `Gate:` blocks as hard as a top-level one — the residue IS the gate there.
+  if (e.keep?.gate && !e.gates.includes(e.keep.gate)) reasons.push(`Gate: ${e.keep.gate}`);
+
   if (reasons.length) parked.push({ e, reasons });
   else if (e.lane === '?') unclassified.push(e);
+  else if (e.keep) keeps.push(e);
   else ready.push(e);
 }
 
@@ -159,6 +172,11 @@ for (const e of ready) {
 }
 const shown = ready.filter((e) => !e.batch || shownBatches.has(e.batch)).length;
 if (ready.length > shown) console.log(`      … and ${ready.length - shown} more (--all)`);
+
+if (keeps.length) {
+  console.log(`\nKEEP (${keeps.length}) — shipped; only the stated residue is owed. Not new work.`);
+  keeps.forEach((e) => console.log(`      ${fmt(e)}\n        Keep: ${e.keep.text.slice(0, 110)}`));
+}
 
 if (unclassified.length) {
   console.log(`\nUNCLASSIFIED (${unclassified.length}) — Lane: ? — decide the lane and edit the entry`);
