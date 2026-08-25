@@ -18,10 +18,13 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
-## 2026-08-25 — BF-4 re-measured (`docs/implementation-backlog.md` 12005 → 12024)
+## 2026-08-25 — BF-4 re-measured (`docs/implementation-backlog.md` 12005 → 12021)
 
-**+19, and this is the THIRD raise of this file in one session (11948 → 11989 → 12005 → 12024, +76
-total). That is a real cost and is recorded as one rather than absorbed.** All three are the same
+**+16, and this is the THIRD raise of this file in one session (11948 → 11989 → 12005 → 12021, +73
+total). That is a real cost and is recorded as one rather than absorbed.** The number is 16 rather
+than the 19 first written because LA-26 merged in between and its LA-26 → LA-28 swap freed 3 lines;
+the baseline was set to the file's real length instead of keeping the slack, which is the whole
+point of a shrink-only ratchet. All three are the same
 shape: a queue entry whose premise production contradicted, where the measurement tables are what
 stop the next session re-running the same queries.
 
