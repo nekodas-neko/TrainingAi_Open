@@ -63,11 +63,13 @@ builder's rows became the shared `FoodRow`; `ingredient-row.tsx` is deleted and 
 
 **The Devices card stops calling the ring healthy with no key (LB-5).** Checks `hasKey()` and links to `/admin/oura-ble` when false. `Gate: device`.
 
+**The vacuum button can reach the table that needs it (Q-315).** `error_events` holds **4 live rows
+in 49 MB** in production and the generalised `/api/admin/vacuum` had **no caller** — the one control
+still posted to the `oura_raw_samples`-only route. A table picker fed by that route's own `GET` fixes
+it; the press itself is the owner's, from a desktop. `Gate: owner`.
+
 **The Coach's undo has a button (Q-467).** A whole undo subsystem — route, five domain handlers, a
-`captureBefore()` in each, the `undone_at` column, even the struck-through styling — had no caller.
-**The route's `invalidateProgramStructure()` runs server-side and clears nothing**, so wiring the
-button at face value would have restored the programme in Postgres while every screen painted the
-changed one for a full TTL; the client clears the superset. `Gate: device`.
+`captureBefore()` in each, the `undone_at` column, even the struck-through styling — had no caller. **The route's `invalidateProgramStructure()` runs server-side and clears nothing**, so wiring the button at face value would have restored the programme in Postgres while every screen painted the changed one for a full TTL; the client clears the superset. `Gate: device`.
 
 **E2E is green again, and the cause was a modal, not a missing button (OR-1).** Home's first-open
 Morning Check-in `aria-hidden`s `<main>` while it is open, so every `getByRole` on Home reported the
@@ -112,9 +114,7 @@ call stays because offline it is the only one that fires. Six `components/**` si
 **Three route-hardening guards, none of them a fix for an observed symptom (Q-454, Q-455, Q-465).**
 Three GET routes answered a parameter or configuration question before establishing the caller was
 anyone — no data leaked, but `GET /api/push/subscribe` disclosed whether the deployment has push
-configured to anybody who asked. `GET /api/oura-ble/decoder-constants` answered a failed constants
-read with an **empty** 500, so a client doing `res.json()` got a parse exception on top of the real
-fault. And `POST /api/day-checkin` accepted a body of `{}` with a 201, writing a row indistinguishable from a check-in in which the user answered nothing — guarded now on **both** write paths, since the outbox reaches the same table ([`journal`](docs/overview/entries/2026-08-23-route-hardening-batch.md)).
+configured to anybody who asked. `GET /api/oura-ble/decoder-constants` answered a failed constants read with an **empty** 500, so a client doing `res.json()` got a parse exception on top of the real fault. And `POST /api/day-checkin` accepted a body of `{}` with a 201, writing a row indistinguishable from a check-in in which the user answered nothing — guarded now on **both** write paths, since the outbox reaches the same table ([`journal`](docs/overview/entries/2026-08-23-route-hardening-batch.md)).
 
 **Three ring-service fixes, none verified on the ring (Q-537, Q-533, Q-388 item 2).** Key backup
 (`/admin/oura-ble` → **Show key for backup**), a re-sync completion notification, and a connect sequence that resets the live-HR levers a killed session left on. **All native — inert until a new APK is installed, and until then the ring key has one copy.** `Gate: device`. **Item (3) needed no work:** 6,346 battery polls measure the drain the entry called unmeasurable (−22/−24/−22/−38/−15 overnight), confirming the owner's report; the SpO₂ A/B is wear, not code.
