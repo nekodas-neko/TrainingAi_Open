@@ -29,15 +29,19 @@
 
 **Five exercises now record the muscles their sibling movement already had (BF-16a).** A cable chest dip left out the shoulders, a dumbbell shoulder press the traps, a cable pulldown the upper back, a barbell shrug the upper back and forearms, and a barbell hip thrust the quads, lower back and adductors. That is the real defect behind *"hip thrusts and dumbbell shoulder press should be able to be a secondary"* — the role rule reads muscle counts and BF-15's anchor rule wants ≥ 3, so a row seeded with two was barred whatever the thresholds said. **The entry's premise was wrong in one way that mattered:** it called this production drift, and it is a defective *seed* — all 140 seeded rows fingerprint identically in the dev DB and production, so it reproduces locally and was proved through the live `/api/weekly-muscle-sets` route rather than reasoned about. Migration **216**, idempotent and case-insensitive. **The scan found eight more rows with the same shape; they are LA-24**, split into the five that a family member already answers and the three families where BF-16a's own additions have no precedent to propagate.
 
+**Lane B's 2026-08-25 run — 19 PRs — is written up in
+[`docs/handoff-2026-08-25-platform-lane-b-nineteen-prs.md`](docs/handoff-2026-08-25-platform-lane-b-nineteen-prs.md).**
+Read it with the baton at `docs/agents/state/implementation-lane-b.md` before taking a Lane B item:
+the entire Lane B surface was traversed and every remaining candidate is gated, declined, parked,
+needs hardware, or wants a plan first. **Nothing that run shipped is device-verified.**
+
 **The queue tool stopped calling shipped work "ready" (LB-11).** `next-item.js` had never learned to read a `- **Keep:**`, so an entry that shipped kept its pre-shipping priority — **17 of Lane B's top 21 were finished**, and the first startable item sat below the tool's ten-row window. A KEEP bucket prints them with what they owe; READY went 86 → 65.
 
 **Three more cards say so when their fetch fails, and the sweep was three, not ~18 (Q-499).** The
 Oura section is the one that mattered: its `return null` means *no ring connected*, so a 429 made a connected user's whole ring section vanish. `.catch()` was never the guard — `cachedFetch` resolves on a non-ok response, so only `onError` fires there. Ten other candidates were judged legitimate.
 
 **The offline tab tap is not silent, and Q-555 closes unfixed.** Driven with the worker blocked so
-`controller` is `false` throughout: offline the tap **navigates** and `app/error.tsx` says *"You're
-offline"* — in a settled tab route and on the loading fallback alike. The one failing window is
-*before hydration*, where `handleNavClick` cannot run, the anchor navigates natively and Chrome's error page appears — visible, not silent, and inherent: neither our JS nor the worker exists yet. The parked fix would be inert there and a false alarm everywhere else, so nothing merged.
+`controller` is `false` throughout: offline the tap **navigates** and `app/error.tsx` says *"You're offline"*. The one failing window is *before hydration*, where `handleNavClick` cannot run, the anchor navigates natively and Chrome's error page appears — visible, not silent, and inherent: neither our JS nor the worker exists yet. The parked fix would be inert there and a false alarm everywhere else, so nothing merged.
 
 **The diary row is the shared row now, and its sheet can delete (Q-406).** The pencil and bin came
 off every food row. **It turned up LB-10, now fixed:** `use-sheet-back-dismiss` was not double-invoke
@@ -65,29 +69,26 @@ builder's rows became the shared `FoodRow`; `ingredient-row.tsx` is deleted and 
 
 **The Devices card stops calling the ring healthy with no key (LB-5).** Checks `hasKey()` and links to `/admin/oura-ble` when false. `Gate: device`.
 
-**A ratchet row kept an already-fixed file exempt (Q-138).** `health-content.tsx` sat in
-`check-component-size.js` at a **915** baseline while being **651** lines — 115 lines of room it no longer merited. The script's header has said *"shrinking one below the limit? delete its row"* since it was written and nothing enforced it; **missed three times**. Enforced now, and two of Q-138's six rows turned out already done with line numbers pointing at nothing.
+**A ratchet row kept an already-fixed file exempt (Q-138).** `health-content.tsx` sat in `check-component-size.js` at a **915** baseline while being **651** lines — 115 lines of room it no longer merited. The script's header has said *"shrinking one below the limit? delete its row"* since it was written and nothing enforced it; **missed three times**. Enforced now, and two of Q-138's six rows turned out already done, with line numbers pointing at nothing.
 
-**The accessibility rules ran and could not fail (Q-282, headline corrected).** *"No automated
-accessibility check exists in CI"* was false — `jsx-a11y` rides in via `next/core-web-vitals` and has run all along, at **warning**, so `pnpm lint` exited 0 with violations present. The app measured at **zero**, so seven decidable rules are `error` now: an empty shrink-only baseline. **It does not close the entry** — a linter cannot measure touch targets or contrast, and that half is unbuilt.
+**The accessibility rules ran and could not fail (Q-282, headline corrected).** *"No automated accessibility check exists in CI"* was false — `jsx-a11y` rides in via `next/core-web-vitals` and has run all along, at **warning**, so `pnpm lint` exited 0 with violations present. The app measured at **zero**, so seven decidable rules are `error` now. **It does not close the entry** — a linter cannot measure touch targets or contrast, and that half is unbuilt.
 
-**The queue says which rows it has not classified (LB-12).** After correcting four entries' lanes one at a time and hitting two more, it was measured: **77 of 193 entries state no lane**, and **53 of Lane B's 55 READY rows** — so two are rows the queue knows are Lane B's. Showing them to both lanes is right; being silent about it was not. They print `⟨lane unstated⟩` now. **The sweep is the Orchestrator's** and is filed, not done.
+**A Coach swap leaves every program-structure cache key stale (LB-13, filed not fixed).** `app/api/coach/apply/route.ts:71` calls `invalidateProgramStructure()` **on the server**, where `lib/cache-groups` reaches localStorage and on-device SQLite — nothing. No client caller covers it, so `workout-data`/`next-session`/`workout-card:` keep pre-swap values, and `workout-card:` is `freshWithinTtl`: the Q-262 condition where stale **survives** rather than flashes. **Read from source, not reproduced.** Lane A's.
 
-**The colour-only score subset was ONE site, not a sweep (Q-281).** Nine `scoreBand()` call sites read rather than counted: only `readiness-breakdown`'s "Final readiness" row coloured without the word. `contributor-chart` has no `.label` at all and is correct — it renders the legend. **The Q-491 lesson again: a zero-label grep is not a violator list.** Also laned Q-289/Q-290/Q-291 to A.
+**The queue says which rows it has not classified (LB-12).** Measured: **77 of 193 entries state no lane**, and **53 of Lane B's 55 READY rows** — so two are rows the queue knows are Lane B's. Showing them to both lanes is right; being silent about it was not. They print `⟨lane unstated⟩` now. **The sweep is the Orchestrator's** and is filed, not done.
+
+**The colour-only score subset was ONE site, not a sweep (Q-281).** Nine `scoreBand()` call sites read rather than counted: only `readiness-breakdown`'s "Final readiness" row coloured without the word. `contributor-chart` has no `.label` at all and is correct — it renders the legend. **A zero-label grep is not a violator list**, the Q-491 lesson again.
 
 **The volume card stops guessing, and the surface was WRONG rather than absent (Q-305, half).** It
 already drew a band — a hardcoded generic **10–20** — while `packages/shared` computed real per-muscle MEV/MAV/MRV beside it. The goal multiplier is what makes that material: Q-305's own first pass read the unscaled row and called lats *below MEV*; against the app's own table it is **in range** and three muscles are over MRV. The band's **word** ships with its colour — two of the four are red and mean opposite things. Push:pull stays open: it needs a taxonomy belonging in `packages/shared`, which is Lane A's. `Gate: device`.
 
-**The raw-store console says what its numbers mean (Q-538, half).** It printed **209,326 rows, 0
-rolled up, 31.2 MB** and it took a source trace to know `0 rolled up` was the fault — the prune's predicate matches nothing, so the 14-day window can delete no row at all. It now says unbounded, unbacked (past the 25 MB Auto Backup quota) and shedding, in words. **The bound stays blocked** on an unbuilt rollup consumer that is Lane A's and has no queue entry. `Gate: device`.
+**The raw-store console says what its numbers mean (Q-538, half).** It printed **209,326 rows, 0 rolled up, 31.2 MB**, and it took a source trace to know `0 rolled up` was the fault — the prune's predicate matches nothing, so the 14-day window can delete no row at all. It says unbounded, unbacked (past the 25 MB Auto Backup quota) and shedding now, in words. **The bound stays blocked** on an unbuilt rollup consumer that is Lane A's. `Gate: device`.
 
 **The queue tooling learns `OR-` (PS-6).** The Orchestrator prefix was never in the ID alternation, and the failure was **silent deletion**: `next-item.js` counted **194 entries with and without** a scratch `OR-99` and printed it nowhere. One shared `scripts/lib/entry-id.js` now, not four regexes. PS-6 named three sites; there were four.
 
-**The vacuum button can reach the table that needs it (Q-315).** `error_events` holds **4 live rows
-in 49 MB** in production and the generalised `/api/admin/vacuum` had **no caller** — the one control still posted to the `oura_raw_samples`-only route. A table picker fed by that route's own `GET` fixes it; the press itself is the owner's, from a desktop. `Gate: owner`.
+**The vacuum button can reach the table that needs it (Q-315).** `error_events` holds **4 live rows in 49 MB** in production and the generalised `/api/admin/vacuum` had **no caller** — the one control still posted to the `oura_raw_samples`-only route. A table picker fed by that route's own `GET` fixes it; the press is the owner's, from a desktop. `Gate: owner`.
 
-**The Coach's undo has a button (Q-467).** A whole undo subsystem — route, five domain handlers, a
-`captureBefore()` in each, the `undone_at` column, even the struck-through styling — had no caller. **The route's `invalidateProgramStructure()` runs server-side and clears nothing**, so wiring the button at face value would have restored the programme in Postgres while every screen painted the changed one for a full TTL; the client clears the superset. `Gate: device`.
+**The Coach's undo has a button (Q-467).** A whole undo subsystem — route, five domain handlers, a `captureBefore()` in each, the `undone_at` column, even the struck-through styling — had no caller. Its route's `invalidateProgramStructure()` runs server-side and clears nothing, so the client clears the superset instead (that trail led to **LB-13**). `Gate: device`.
 
 **E2E is green again, and the cause was a modal, not a missing button (OR-1).** Home's first-open
 Morning Check-in `aria-hidden`s `<main>` while it is open, so every `getByRole` on Home reported the
