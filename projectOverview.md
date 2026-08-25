@@ -27,6 +27,8 @@
 **Version:** v1.371.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-08-25.
 
+**Five exercises now record the muscles their sibling movement already had (BF-16a).** A cable chest dip left out the shoulders, a dumbbell shoulder press the traps, a cable pulldown the upper back, a barbell shrug the upper back and forearms, and a barbell hip thrust the quads, lower back and adductors. That is the real defect behind *"hip thrusts and dumbbell shoulder press should be able to be a secondary"* — the role rule reads muscle counts and BF-15's anchor rule wants ≥ 3, so a row seeded with two was barred whatever the thresholds said. **The entry's premise was wrong in one way that mattered:** it called this production drift, and it is a defective *seed* — all 140 seeded rows fingerprint identically in the dev DB and production, so it reproduces locally and was proved through the live `/api/weekly-muscle-sets` route rather than reasoned about. Migration **216**, idempotent and case-insensitive. **The scan found eight more rows with the same shape; they are LA-24**, split into the five that a family member already answers and the three families where BF-16a's own additions have no precedent to propagate.
+
 **Lane B's 2026-08-25 run — 19 PRs — is written up in
 [`docs/handoff-2026-08-25-platform-lane-b-nineteen-prs.md`](docs/handoff-2026-08-25-platform-lane-b-nineteen-prs.md).**
 Read it with the baton at `docs/agents/state/implementation-lane-b.md` before taking a Lane B item:
@@ -35,7 +37,7 @@ needs hardware, or wants a plan first. **Nothing that run shipped is device-veri
 
 **The timeline's workout card had somewhere to land for seventeen days (Q-93-followup).** It was left unwired in August because no screen showed a past session; `/health/day` shipped 2026-08-08 and nothing tracked the dependency clearing. Workout and walk now open it; `bedtime` and `tag` stay inert, having no detail view to reach. Two more of the entry's premises were stale — the second renderer it names is deleted, and the `ev.date` it needs is stamped centrally, so no `app/api/**` change was involved. Guarded by a mutation-checked e2e spec, because a row wired to nothing renders identically to a wired one ([`journal`](docs/overview/entries/2026-08-25-timeline-workout-day-detail.md)).
 
-**The queue tool stopped calling shipped work "ready" (LB-11).** `next-item.js` had never learned to read a `- **Keep:**`, so an entry that shipped kept its pre-shipping priority — **17 of Lane B's top 21 were finished**, and the first startable item sat below the tool's ten-row window. A KEEP bucket prints them with what they owe; READY went 86 → 65.
+**The queue tool stopped calling shipped work "ready" (LB-11), and then read the two entries it was still missing (LA-23).** `next-item.js` had never learned to read a `- **Keep:**`, so an entry that shipped kept its pre-shipping priority — **17 of Lane B's top 21 were finished**, and the first startable item sat below the tool's ten-row window. A KEEP bucket prints them with what they owe; READY went 86 → 65. **LB-11 closed by recording that Lane A was unaffected; it was not.** The parser required a literal colon, and TN-3a and TN-4 write `- **Keep — what is NOT done:**`, so both read as unstarted and sat at **#1 and #2 of Lane A's READY** — each owing something no sandbox can do. `Keep` now takes a colon **or** a dash, checked against all 196 entries: ten lines begin with the word, two are those Keeps and eight are prose, so the rule covers the whole population rather than a guessed one. Lane A's READY 90 → 88, and its top row is startable.
 
 **Three more cards say so when their fetch fails, and the sweep was three, not ~18 (Q-499).** The
 Oura section is the one that mattered: its `return null` means *no ring connected*, so a 429 made a connected user's whole ring section vanish. `.catch()` was never the guard — `cachedFetch` resolves on a non-ok response, so only `onError` fires there. Ten other candidates were judged legitimate.
@@ -316,6 +318,10 @@ order.
 > An entry only leaves when **nothing is still owed**: no open work, no pending owner or device
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
+
+### [workouts][devices] ⚠️ The corrected exercise catalogue has not been seen on the device (BF-16a, 2026-08-25)
+
+**Shipped and verified on the web surface; the device path is reasoned from source, not observed.** Migration 216 corrects five `exercise_library.muscles` rows. **No APK is needed** — the device's local mirror is hydrated from `/api/workout-data` in `workout-screen.tsx:421` and upserted with `muscles=excluded.muscles`, so a corrected catalogue should reach it on the next workout-screen load through the normal path. *Should*: that chain was read, not run, and `getLocalStore` returns null in the sandbox so it cannot be run here. **What to check on the S25:** open the workout screen once, then confirm the muscle heatmap and Muscle Volume This Week attribute a logged `Barbell Hip Thrust` to quads, lower back and adductors at half weight. **Also unverified: the migration has not run against production** — the five prod rows were read this session, not written. Low risk (idempotent append, no schema change, trivially reversible by another UPDATE), and the correction is retroactive by design: `weekly-muscle-sets` reads the catalogue in a live subquery, so past weeks re-derive rather than staying on the old numbers. [`journal`](docs/overview/entries/2026-08-25-exercise-catalogue-missing-muscles.md)
 
 ### [platform] 🟡 The database is growing ~4x faster than `CLAUDE.md` predicts — measured, not yet a problem (Orchestrator, 2026-08-25)
 
