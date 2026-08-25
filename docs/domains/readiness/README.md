@@ -221,6 +221,7 @@ Live at the time of writing (2026-07-30):
 
 ## History
 
+- [`docs/handoff-2026-08-25-readiness-baseline-seed-and-lane-a-sweep.md`](../../handoff-2026-08-25-readiness-baseline-seed-and-lane-a-sweep.md) — **the baseline EMA seeded at zero, 2026-08-25** (BF-13/Q-506/TN-8 + TN-6a). `updateBaseline` annealed from `meanX8 = 0`, so night 2 read 17.905 °C against a 35.81 °C sample and the baseline was still 0.363 °C low at night 50 — one intermediate failing four consumers. Fixed in a wrapper; **the stored baselines are NOT re-derived** and need one Redecode run on production.
 - [`docs/handoff-2026-08-24-readiness-scores-owner-batch.md`](../../handoff-2026-08-24-readiness-scores-owner-batch.md)
   — **the owner's readiness/battery batch, 2026-08-24.** Four owner questions in one session
   (daytime stress, Body Battery flooring, score volatility, the temperature deload trigger) →
