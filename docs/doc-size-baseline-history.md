@@ -18,17 +18,22 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
-## 2026-08-25 — OR-1 and PS-6 filed (`docs/implementation-backlog.md` raise withdrawn, again)
+## 2026-08-25 — PS-6 filed (`docs/implementation-backlog.md` raise withdrawn, again)
 
-Two queue entries, both found from one CI failure on a docs PR. **OR-1**: Q-402's only E2E guard is
-dead — `e2e/home-card-invalidation-refetch.spec.ts` waits on a `Log Body Weight` button that exists
-nowhere outside two specs, and it is red on `main`, not on one branch. **PS-6**: the queue tooling
-has never known the `OR-` prefix, in three regexes across two scripts.
+**PS-6**: the queue tooling has never known the `OR-` prefix, in three regexes across two scripts.
+Its length is mostly the one fact that makes it urgent rather than cosmetic: `next-item.js` **drops**
+an entry whose heading matches no known prefix (`current = id ? {…} : null`), so an `OR-` entry is
+not mislabelled, it is absent, with nothing printed to say so.
 
-Both entries are long because both are traces rather than symptoms, and PS-6's length is mostly the
-one fact that makes it urgent rather than cosmetic: `next-item.js` **drops** an entry whose heading
-matches no known prefix (`current = id ? {…} : null`), so an `OR-` entry is not mislabelled, it is
-absent, with nothing printed to say so.
+**A second entry, OR-1, was withdrawn from this PR before merge.** It reported the red E2E on
+`main`, and another session filed the same failure as **BF-23** while this branch sat in CI — with a
+better diagnosis. OR-1 concluded the `Log Body Weight` button had been deleted, because the string
+greps to nothing outside two specs; BF-23 establishes it is **composed at runtime**
+(`metric-tiles-card.tsx:96`, `` aria-label={`Log ${def.label}`} ``) and that the failure is a
+**regression from one of tonight's six merges**, not a stale test. BF-23 anticipates the exact wrong
+inference OR-1 drew — *"a future session searching for the string will find nothing and conclude it
+was deleted; it was not."* Keeping both would have put a refuted diagnosis in the queue beside a
+correct one.
 
 **PS-6 is filed under `PS-`, not `OR-`, on purpose** — an `OR-` entry describing this bug could not
 appear in the tool that reports it. That is recorded in the entry so the letter does not read as a

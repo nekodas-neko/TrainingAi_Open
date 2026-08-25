@@ -334,8 +334,9 @@ signed off by the owner in that conversation. Review:
 ### [platform] PS-6 — the queue tooling has never known the `OR-` prefix, so every Orchestrator entry is mislabelled or invisible
 
 - **Branch:** `fix/queue-tools-or-prefix`
-- **Added:** 2026-08-25 · Orchestrator, hit while filing OR-1 — the **first `OR-` entry ever written**,
-  which is why five days of the prefix existing never surfaced this.
+- **Added:** 2026-08-25 · Orchestrator, hit while filing the **first `OR-` entry ever written**,
+  which is why five days of the prefix existing never surfaced this. (That entry was withdrawn as a
+  duplicate of BF-23; the tooling bug it exposed is real and unrelated.)
 - **Lane: B.** Two scripts, three regexes, no schema. **Filed under `PS-` deliberately and not
   under `OR-`: an `OR-` entry describing this bug would be invisible to the tool that reports it.**
 - **The bug.** `OR` is missing from the ID alternation in all three places:
@@ -351,49 +352,18 @@ signed off by the owner in that conversation. Review:
 - **Consequences on `check-backlog-pointers.js`:** duplicate `OR-` IDs are **not** detected, and a
   `Needs: OR-n` is not resolved as a real target. Both guarantees the file claims to give simply do
   not hold for this prefix.
-- **⚠️ Do NOT "tidy" OR-1's heading until this ships.** It reads *"OR-1 — Q-402's E2E guard is
-  dead…"*, and that `Q-402` is the **only** reason the entry appears in `next-item.js` at all.
-  Removing it makes the entry vanish rather than merely display the wrong id.
+- **How it was found, and why there is no live example to look at.** It surfaced while filing an
+  `OR-1` entry that displayed in `next-item.js` as `Q-402` — the id had been picked out of the
+  *title text*, not the entry's own prefix. That entry was withdrawn as a duplicate before it
+  merged, so reproduce this from the source above or from a scratch heading; do not go looking for
+  an `OR-` entry in the queue, there is not one yet.
 - **`docs/agents/README.md` §3 lists `OR-` as a valid prefix**, and the Orchestrator role was created
   2026-08-20 (PR #263). The tooling was never taught the letter.
-- **Verification:** after the change, `node scripts/next-item.js --lane B` prints OR-1 with id
-  `OR-1`; add a fixture with an `OR-` heading carrying no other id and confirm it is listed rather
-  than dropped; and confirm `check-backlog-pointers.js` fails on a duplicated `OR-` id.
-
-### [platform][app-shell] OR-1 — Q-402's E2E guard is dead and E2E has been red on `main` since 2026-08-25
-
-- **Branch:** `fix/home-card-refetch-guard-selectors`
-- **Added:** 2026-08-25 · Orchestrator, from a CI failure on an unrelated docs PR (#448)
-- **Lane: B** — e2e specs plus, if the affordance is genuinely gone, a Home/Health surface question.
-- **`e2e/home-card-invalidation-refetch.spec.ts:59` fails on every run, both retries**, waiting 45 s
-  for `getByRole('button', { name: 'Log Body Weight' })`. **Red on `main`, not on one branch:** #449
-  merged carrying this same failure (its run had 2 failed / 59 passed — this spec plus
-  `score-band-not-colour-only.spec.ts:20`); #448's run had 1 failed / 60 passed, the same spec, with
-  `score-band` passing. So this one is deterministic and `score-band` is flaky.
-- **Traced, not guessed.** `Log Body Weight` **exists nowhere under `app/`, `components/` or
-  `lib/`** — only in this spec and `e2e/metric-bounds-at-keyboard.spec.ts:83`. The spec's
-  `getByPlaceholder('Enter kg')` (line 62) is **also absent** from the app. `MetricLogSheet` builds
-  its heading as `Log {logState.label}` (`components/health/metric-log-sheet.tsx:165`), so a
-  *heading* can still read "Log Body Weight" while no *button* carries that accessible name.
-- **The likely cause is a surface move, which is why this is not just a selector fix.**
-  `MetricLogSheet` is rendered only from `app/health/health-content.tsx`; Home's "Body Weight" is
-  the `weightSparkline` card (`components/home/home-card-widget.tsx:107`), a `role="button"` div
-  whose action is `navigateWithTransition(… '/health?tab=body')`. **The spec's whole premise is that
-  the write happens from a sheet on Home so Home never unmounts** — *"a refetch cannot come from a
-  remount, which is the whole distinction Q-402 is about"*. If weight logging now lives on Health,
-  re-pointing the selector would make the test pass while testing nothing.
-- **⚠️ What is actually at risk.** This spec is the *only* guard on Q-402 — its own docstring says
-  *"That fix shipped unguarded, and this is the guard."* Q-402 was the owner-reported
-  *"requires a restart of the app"* bug, and **Q-359 still holds 36 more fetch-once sites of the
-  same class, 19 of them permanently mounted**. A dead guard here is a dead guard on the whole class.
-- **First step:** find whether any Home surface still opens a body-metric sheet without navigating.
-  If one does, fix the selector. If none does, the guard needs a different write that keeps Home
-  mounted — say the water widget, which `e2e/water-log-write-path.spec.ts` already drives green —
-  and the entry should say so rather than quietly weakening the assertion.
-- **Also check `e2e/metric-bounds-at-keyboard.spec.ts:83`**, which matches the same string via a
-  dialog rather than a button. It is not currently failing, so it is either still valid or vacuous.
-- **Not urgent enough to block merges:** E2E is **not** a required check (Lint, Tests, Build, Custom
-  Rules, Migration Check are), which is how #449 merged red and why #448 merged after it.
+- **Verification:** add a scratch entry headed `### [platform] OR-99 — …` and confirm three things.
+  With no other id in the heading it is **listed** by `node scripts/next-item.js` rather than
+  silently dropped, and its id column reads `OR-99`. With a second id in the heading (say a `Q-`
+  reference) the column still reads `OR-99` and not the other one. And a duplicated `OR-99` makes
+  `check-backlog-pointers.js` **fail**. All three fail today.
 
 ### [readiness][devices] TN-8 — the chronic-stress fever mask is a FOURTH consumer of the broken temperature baseline
 

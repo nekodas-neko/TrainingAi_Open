@@ -4,7 +4,7 @@
 > successor is a lost thread even with a perfect baton.
 
 **Updated:** 2026-08-24 · **By:** the session that ran sweeps 1–2 and the first owner walkthrough ·
-**Next ID:** `OR-2` (`OR-1` = the dead Q-402 E2E guard, filed 2026-08-25)
+**Next ID:** `OR-1` (still free — the first `OR-1` was withdrawn as a duplicate of BF-23, unmerged)
 
 ## Now
 
