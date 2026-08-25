@@ -27,9 +27,9 @@
 **Version:** v1.318.10 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-08-24.
 
-**The calorie ring is split by macro, and the meals are one list (Q-395b, part).** Measured: the
-day screen's gaps were **420 px of 2,649 — 16%**, not the *"most of the vertical space"* the entry
-claims; this reclaims 100. Eight sections still draw gapped cards. `Gate: device`.
+**The Nutrition day screen is grouped sections now, and the ring is split by macro (Q-395b).**
+Measured across both PRs: gaps **420 px → 280 px (16% → 11%)**, 111 px shorter — not the *"most of
+the vertical space"* the entry claimed. Both themes, 11 of 11 sections. `Gate: device`.
 
 **A food draws one way everywhere now, and its amount is edited on its own screen (Q-395a).** The
 builder's rows became the shared `FoodRow`; `ingredient-row.tsx` is deleted and the quantity control

@@ -551,22 +551,28 @@ export default function NutritionContent({ userId }: { userId?: string }) {
             transition={{ duration: 0.18 }}
             className="space-y-5"
           >
-            {/* Guarded on the payload's own date: the swipe re-renders before the new date's
-                fetch resolves, and showing the previous day's balance is worse than a skeleton. */}
-            <CalorieBalanceBar
-              data={energyBalance?.date === selectedDate ? energyBalance : null}
-              isToday={selectedDate === todayStr}
-              loading={loading}
-            />
+            {/* Q-395b: today's energy is ONE section — the balance bar and the ring are two views of
+                the same number, and a gap between them read as two unrelated cards. */}
+            <div className="divide-y divide-border/50 overflow-hidden rounded-2xl border border-border">
+              {/* Guarded on the payload's own date: the swipe re-renders before the new date's
+                  fetch resolves, and showing the previous day's balance is worse than a skeleton. */}
+              <CalorieBalanceBar
+                data={energyBalance?.date === selectedDate ? energyBalance : null}
+                isToday={selectedDate === todayStr}
+                loading={loading}
+                grouped
+              />
 
-            <MacroRing
-              calories={totals.calories}
-              proteinG={totals.proteinG}
-              carbsG={totals.carbsG}
-              fatG={totals.fatG}
-              targets={effectiveTargets}
-              earnedKcal={earnedForSelectedDate}
-            />
+              <MacroRing
+                calories={totals.calories}
+                proteinG={totals.proteinG}
+                carbsG={totals.carbsG}
+                fatG={totals.fatG}
+                targets={effectiveTargets}
+                earnedKcal={earnedForSelectedDate}
+                grouped
+              />
+            </div>
 
             {/* Actions sit here, directly under the ring, rather than being reached by scroll depth
                 (Q-237). Saved Meals is a library, not an action, and it used to be reachable only

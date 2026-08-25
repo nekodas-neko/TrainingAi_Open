@@ -10,6 +10,10 @@ interface Props {
   /** False for a past date — the zone reads as a verdict rather than a running total. */
   isToday: boolean
   loading?: boolean
+  /** Drawn as one row of a grouped section rather than as its own card (Q-395b): the section owns
+   *  the border and the divider, so a card that also draws its own puts a second hairline against
+   *  the first and re-opens the gap the grouping closes. */
+  grouped?: boolean
 }
 
 /**
@@ -20,7 +24,8 @@ interface Props {
  * "so far" on the current day: at 8am everybody is legitimately "well under", and presenting
  * that as a verdict would train the user to ignore the bar.
  */
-export const CalorieBalanceBar = memo(function CalorieBalanceBar({ data, isToday, loading }: Props) {
+export const CalorieBalanceBar = memo(function CalorieBalanceBar({ data, isToday, loading, grouped }: Props) {
+  const cardClass = grouped ? 'bg-muted/60 p-4' : 'rounded-2xl border border-border bg-muted/60 p-4'
   const [showInfo, setShowInfo] = useState(false)
 
   if (loading && data == null) {
@@ -30,7 +35,7 @@ export const CalorieBalanceBar = memo(function CalorieBalanceBar({ data, isToday
 
   if (data.balance == null) {
     return (
-      <div className="rounded-2xl border border-border bg-muted/60 p-4">
+      <div className={cardClass}>
         <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-1.5">Energy Balance</p>
         <p className="text-sm text-muted-foreground">
           Add your {data.missingProfileFields.join(', ')} in Profile to see calories in vs out.
@@ -44,7 +49,7 @@ export const CalorieBalanceBar = memo(function CalorieBalanceBar({ data, isToday
   const overTarget = b.remainingKcal < 0
 
   return (
-    <div className="rounded-2xl border border-border bg-muted/60 p-4">
+    <div className={cardClass}>
       <div className="flex items-start justify-between mb-3">
         <div>
           <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Energy Balance</p>

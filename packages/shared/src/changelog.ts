@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.366.0",
+    date: "2026-08-25",
+    changes: [
+      "The rest of the Nutrition day screen is grouped the same way the meals are \u2014 today\u2019s energy is one block, and the week\u2019s chart sits with supplements. Across the whole change the page lost 140 px of empty gaps and is 111 px shorter.",
+    ],
+  },
+  {
     version: "1.365.0",
     date: "2026-08-25",
     changes: [
