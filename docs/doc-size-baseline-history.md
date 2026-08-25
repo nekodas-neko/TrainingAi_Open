@@ -2666,3 +2666,23 @@ Q-327 — and grep proves nothing renders either one. So the entry states plainl
 **write-only**, which is a different and smaller job than "build meal photos", and names the two
 places the deferral was recorded so a reader does not trip over a stale *"deliberately not here
 yet"* comment and treat it as a live decision.
+
+## 2026-08-26 — three raised for the pillar review: backlog 11775 → 11890, `projectOverview.md` 7977 → 7987, `docs/agents/state/tuning.md` 182 → 217
+
+**Four entries, from six owner questions.** TN-13 (the HR tile averages away 84% of the movement in
+the best predictor of felt state), TN-14 (2026-08-19's 3.50 h night still feeds every baseline),
+TN-15 (Body Battery has no recharge at all and drain that ignores exercise — owner-signed-off), and
+TN-16, which is filed **parked**. Plus a long amendment to Q-507.
+
+The length is carrying the thing a short entry cannot: **a refuted hypothesis.** Stress correlating
+*positively* with readiness invited an obvious explanation — better sleep, denser HRV, more buckets
+scored — and it was measured and refuted at r = −0.128. Q-507 now says so, so the next session does
+not spend itself rediscovering it, and TN-16 says why the warning the owner asked for is parked
+rather than built. TN-15 is long for the opposite reason: it **supersedes** a standing "do not
+propose overnight charging or an anchor redesign" instruction, and a supersession that does not
+explain itself gets reverted by the next reader.
+
+**The baton was compacted in the same pass** (221 → 216 before the raise) so the 35 lines it grows by
+are the four new entries and two corrections, not accretion. One of those corrections retracts this
+baton's own claim that the check-in "adds little independent information" — measured, ~75% of it is
+information nothing else has.

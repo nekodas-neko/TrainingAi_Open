@@ -3,7 +3,7 @@
 > **Successor sessions are titled `🎶 Tuning Agent 🟢`** — exactly, both emoji. Leading emoji = role,
 > trailing = this session's status, set by the session itself. See `docs/agents/README.md` §4.
 
-**Updated:** 2026-08-24 · **By:** `session_01VVfZtbCftbwaUHtBLJoxVr` · **Next ID:** `TN-8`.
+**Updated:** 2026-08-26 · **By:** `session_01VVfZtbCftbwaUHtBLJoxVr` · **Next ID:** `TN-17`.
 Find next free: `grep -rhoE '\bTN-[0-9]+\b' docs/ | sort -t- -k2 -n | tail -1`. Legacy `Q-` numbers
 stay valid. **Rewritten in full, never appended** — narrative lives in the linked reviews.
 
@@ -11,9 +11,14 @@ stay valid. **Rewritten in full, never appended** — narrative lives in the lin
 
 ## Now
 
-**Nothing is blocked on the owner, and nothing is blocked on you.** Every decision this batch needed
-was asked plainly and answered on 2026-08-24 — see the block under the table. TN-2's offset is the
-only thing still open, and it is a fit Lane A must run, not a decision.
+**Nothing is blocked on the owner, and nothing is blocked on you.** Every decision these batches
+needed was asked plainly and answered — 2026-08-24 for TN-5/TN-6/TN-6a and the history policy,
+2026-08-26 for TN-9's intent and **TN-15's redesign**. TN-2's offset is the only thing still open,
+and it is a fit Lane A must run, not a decision.
+
+**The owner's standing verdict, 2026-08-26:** *"Overall the pillars are not working great and not
+very useful. Requires tuning."* Read that as the frame for everything below — the queue is long
+because the pillars were measured, not because they are fine.
 
 Filed this session, all propose-only, all in the queue:
 
@@ -31,6 +36,10 @@ Filed this session, all propose-only, all in the queue:
 | **TN-10** | `TOTAL_SLEEP`'s comment and curve disagree by ~15 pts on the heaviest contributor | `Gate: owner`; sequence after TN-5 |
 | **TN-11** | "moved this hour" = one reading over a resting boundary → **99.8%** of waking hours qualify | answers Q-522's open half; **TN-2 does not fix it** |
 | **TN-12** | no hourly-movement surface worth having; the one that exists is pinned at full | Lane B, `Needs: TN-11` |
+| **TN-13** | the HR tile shows a 7-day average and discards 84% of the movement in the best predictor there is | Lane B, one field |
+| **TN-14** | 2026-08-19's 3.50 h night still stored, still feeding every baseline | `Needs: Q-520`; decode the frames first |
+| **TN-15** | Body Battery: drain ignores exercise, no recharge at all | **signed off**; `Needs: TN-2`; supersedes the old "do not redesign" line |
+| **TN-16** | prolonged-stress warning + calm-down prompt | **parked** `Needs: Q-507` — the metric points the wrong way |
 
 **Owner decisions, 2026-08-24 — all recorded on the entries, nothing left gated on them.** TN-5 and
 TN-6 signed off; **TN-6a** added (suspend the temperature penalty on a self-clearing condition, ships
@@ -40,12 +49,11 @@ On **BF-13** (BugFix's entry, whose root cause supersedes TN-6's): re-derive the
 seed for all six, re-derive only what is measurably wrong. **Measured: only `temp` is** (gap +2.80 sd,
 100% of nights above; the other five are ≤0.28 sd).
 
-**BF-14 refuted 2026-08-24** — the breathing baseline is fed `rpm × 10` deliberately
-(`daily-summary.ts:110-112`, comment says so), so rpm = `meanX8 / 80`, not `/8`. Corrected it reads
-9.250 against a true 9.400, **+0.27 sd — clean**. Its own table is evidence *for* BF-13's zero seed,
-not against it. Kept in the queue with the reasoning, per Q-504's precedent.
+**BF-14 refuted 2026-08-24** — the breathing baseline is fed `rpm × 10` deliberately, so rpm =
+`meanX8 / 80`, not `/8`; corrected it reads 9.250 against 9.400, **+0.27 sd, clean**. Reasoning is on
+the entry.
 
-Reviews: [battery](../../reviews/2026-08-24-body-battery-charge-window-collapse.md) ·
+Reviews: [pillar review](../../reviews/2026-08-26-pillar-review.md) · [check-in lookback](../../reviews/2026-08-26-checkin-lookback.md) · [threshold sweep](../../reviews/2026-08-25-threshold-sweep.md) · [battery](../../reviews/2026-08-24-body-battery-charge-window-collapse.md) ·
 [sleep](../../reviews/2026-08-24-sleep-score-volatility.md) ·
 [temperature](../../reviews/2026-08-24-readiness-temperature-penalty.md) ·
 [handoff](../../handoff-2026-08-24-readiness-scores-owner-batch.md).
@@ -92,17 +100,31 @@ sleep ✅ · readiness ✅ · activity ✅ · body ✅ · devices ✅ · workout
   temperature penalty lands directly on the number the owner reads at 7 am. Measured 2026-08-26 over
   35 days: removing that penalty moves the mean morning anchor **64.8 → 76.8** and mornings waking
   "Charged" (≥75) from **7/35 to 21/35** (conservative — the 6 clamped days count as unchanged).
-  **Do not propose overnight charging or an anchor redesign to fix "it starts low"** — it is a large
-  change to a value Q-511 shows is load-bearing, aimed at a symptom TN-6 already removes. Re-measure
-  after TN-6 lands; only then is the design question real.
-- **The Activity Score at 7 am is a PARTIAL DAY, not a low day.** Its daily-movement lane (steps 18 +
-  activeEnergy 15 + zoneMinutes 10 + moveHours 12 = **55** of 100) is near-empty first thing, while
-  the strength lane (freq 25 + volume 20 = **45**) already carries yesterday's session. So a 63 at
-  7 am with a rest of the day ahead is the score working. **Do not file "activity reads low in the
-  morning"** — it is Q-505's daily-vs-weekly split, already queued.
+  **⚑ Amended 2026-08-26: the old "do not propose overnight charging or an anchor redesign" line is
+  RETIRED.** The owner asked for that redesign directly and signed it off — **TN-15**. What survives
+  is the *sequencing*, and it still binds: **TN-6, then TN-2, then TN-15.** A recharge model landed on
+  a boundary that calls 98% of waking time "draining" cannot be evaluated, and TN-6 alone lifts the
+  anchor 12 points, so measuring before it lands attributes its gain to the wrong change.
+- **The Activity Score at 7 am is a PARTIAL DAY, not a low day.** Its daily-movement lane (55 of 100)
+  is near-empty first thing while the strength lane (45) already carries yesterday's session, so a 63
+  at 7 am is the score working. **Do not file "activity reads low in the morning"** — Q-505.
 - **Removing a 10% contributor normally moves a score; `checkin` does not** (TN-9) — mean 69.9 → 70.4,
-  no day moving ≥5, because the logged check-in tracks the objective contributors closely enough to
-  add little independent information. Measure before assuming a weight is load-bearing.
+  no day moving ≥5. Measure before assuming a weight is load-bearing.
+  **⚑ But the REASON given for that was wrong, and the correction matters.** This baton used to say
+  the check-in "adds little independent information". Measured at n = 33: it correlates r ≈ 0.5 with
+  the objective contributors, which is ~25% shared variance — **so ~75% of the check-in is
+  information nothing else in the app has.** Dropping it from readiness is still right (its weight is
+  10% and the score must settle at first open), but it should be used **more** elsewhere, not less.
+  [`lookback`](../../reviews/2026-08-26-checkin-lookback.md).
+- **⛔ Imputing the check-in on unlogged days is REFUTED, not untried.** The full eight-contributor
+  model reaches in-sample R² 0.541 and **LOO R² 0.047**. Every predictor past the second raises
+  in-sample fit and lowers out-of-sample. The honest model is **two predictors at LOO R² 0.293**
+  (resting HR + previous night). On ~33 rows, quoting plain R² sells the worst model as the best.
+- **Readiness has a SECOND thing that unsettles it, and it is worse than the check-in.**
+  `READINESS_WEIGHTS.activityBalance = 0.06` and the composite's own comment says it is *"our own
+  0-100 activity score for **today**"* — a partial day. So readiness drifts ~1 point **continuously,
+  with no user action at all**, where the check-in moves once on a button press. TN-9's pass test now
+  demands two byte-identical reads twelve hours apart, which the check-in half alone cannot deliver.
 - **HR alone cannot answer "did you move" — MET can, and the app already decodes it.** The owner
   raised this and was right. `getOuraDaytimeSignals` (`adapter.ts:4959`) decodes MET from raw frames
   (**tag `0x50`**) and `MET_ACTIVE_THRESHOLD = 1.8` is Oura's own constant (`daily-medians.ts:51`).
@@ -117,10 +139,9 @@ sleep ✅ · readiness ✅ · activity ✅ · body ✅ · devices ✅ · workout
   move-hours still qualifies **97.6%** of waking hours against 99.8% today. **Do not close TN-11 as a
   side effect of TN-2**, and do not raise the shared constant to fix move-hours — that breaks the
   charge window the other way.
-- **"Does move-hours count sleep?" — no**, and by two independent guards: a hardcoded `[7, 22)` clock
-  window, and overnight HR (~50–55) sitting below the 57.8 bpm bar. But the window is **hardcoded** —
-  `readiness-payload.ts:324` never passes the `wakeHour`/`sleepHour` the function accepts — so a 6 am
-  wake loses an hour of real waking time at both ends of the ratio.
+- **"Does move-hours count sleep?" — no**, by two guards: a hardcoded `[7, 22)` window and overnight
+  HR below the bar. But that window is **hardcoded** — `readiness-payload.ts:324` never passes the
+  `wakeHour`/`sleepHour` the function accepts — so a 6 am wake loses real waking time at both ends.
 - **A distribution screen is BLIND to "always fires" and "never crosses".** Run against the two known
   failures it catches neither — `temp_dev_c` has a healthy range, `illness_score` looks merely sparse.
   It finds stuck and dead scores only. Pair every threshold with its input, or the screen reads clean
@@ -138,22 +159,36 @@ sleep ✅ · readiness ✅ · activity ✅ · body ✅ · devices ✅ · workout
   reconstructing the pre-calibration blend first; if its |Δ| is unchanged, no curve change helps.
 - **Any coverage/percentile measurement on the BLE HR series must be TIME-weighted.** The ring
   power-gates its PPG, so a per-sample percentile read ~20% where the time-weighted answer was 1.6%.
-- **+18 bpm overshoots Body Battery** into a permanently-full tank (mean 90.8, a third of days at
-  100). "It floors too often" invites exactly that; a full tank carries no information (Q-57).
+- **+18 bpm overshoots Body Battery** into a permanently-full tank (mean 90.8, a third of days at 100)
+  — a full tank carries no information (Q-57).
 - **Get a fixed-point factor from the CALL SITE, never by inference.** Inferring each baseline's
   scale as the best-fitting power of ten is right for temp (×100) and wrong for sleep (**×60**), and
   produced a phantom "sleep baseline 4.768 h against a true 8.010" that would have caused an
   unnecessary production data change. `daily-summary.ts:102-112` has all six, four lines apart.
-- **To ask whether a baseline is centred, use `% of nights above it`, not the raw gap.** 100% for
-  temperature, near 50 when healthy. Pair it with gap/nightly-sd: hrv reads 87.8% above on a gap of
-  0.04 sd, which is an EMA lagging a rising metric, not a defect.
-- **⛔ `pg_stat_user_tables` row counters are planner ESTIMATES** — `last_analyze` is NULL on every
-  table here. Its **size** columns are exact. To ask whether a table is empty, run `count(*)`. A
-  predecessor filed a data-loss incident (Q-528) off `n_live_tup` that had never happened.
+- **To ask whether a baseline is centred, use `% of nights above it`, not the raw gap** (100% for
+  temperature, near 50 when healthy), paired with gap/nightly-sd — hrv reads 87.8% above on a 0.04 sd
+  gap, an EMA lagging a rising metric, not a defect.
+- **⛔ `pg_stat_user_tables` row counters are planner ESTIMATES** (`last_analyze` NULL on every table);
+  its size columns are exact. To ask whether a table is empty, run `count(*)` — a predecessor filed a
+  data-loss incident (Q-528) off `n_live_tup` that had never happened.
 - **`claude_ro` views are row-scoped to ONE user** and `error_events` prunes at 30 days. Write every
   count as "the owner's, recently", never "the system's".
 - **A hardening fix can delete the evidence another open investigation needs** (TN-7). When a fix
   turns a 500 into a fallback, check what was waiting on that 500.
+- **A refuted hypothesis is a result — record it, do not replace it.** Stress pointing the wrong way
+  invited an obvious explanation (better sleep → denser HRV → more buckets scored). Measured:
+  **r = −0.128** against HR sample count. Q-507 now carries the refutation, so the next session does
+  not spend itself there. **Nothing replaced it**, and TN-16 is parked rather than built on a guess.
+- **Q-507 REPLICATES at n = 33 and gets stronger.** Stress-high minutes vs readiness **+0.386**; vs
+  the **sleep score +0.477** — stronger than the readiness one and untested in the original entry.
+  Also unresolved: vs overnight HRV **−0.258**, weakly the *right* way. **Do not build the overlay
+  (TN-3b), the warning or the ritual (TN-16) until the sign is explained.**
+- **A "7-day average" tile can be the least informative form of the most informative signal.** Nightly
+  resting HR moves 2.11 bpm; its 7-day average moves 0.33. Before proposing a *different metric* for a
+  tile, check whether the metric is fine and the **smoothing** is the defect (TN-13).
+- **Activity's 100 is not reachable by behaviour, and saying "train harder" would be wrong.**
+  `zoneMinutes` floored on 53/59 days (Q-523), `activeEnergy` present on 8/51, `moveHours` meaningless
+  (TN-11). Three of six contributors are structurally broken; the ceiling is a data problem.
 - **The threshold is usually right and the input usually wrong** — Q-506, Q-512, Q-514, now TN-6.
   Check the input's distribution before touching any constant.
 - **Do NOT lift the sleep scale toward its old mean** — sleep/readiness agreeing is load-bearing for
