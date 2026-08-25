@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.371.0",
+    date: "2026-08-25",
+    changes: [
+      "Today\u2019s Timeline on Home: tapping a workout or a walk now opens that day\u2019s detail screen, the same one the training calendar opens \u2014 the session with its exercises, sets, duration and calories, or the activity\u2019s own detail.",
+    ],
+  },
+  {
     version: "1.370.2",
     date: "2026-08-25",
     changes: [

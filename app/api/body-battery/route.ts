@@ -271,7 +271,14 @@ async function buildBodyBattery(userId: string, tz: string) {
       //    the WHOLE card 500'd when only the stress strip was unavailable. Falling through leaves
       //    `stressSeries` empty, which the walk already handles: `stressAt` returns null and the
       //    STRESS_DRAIN_RATE term is simply not applied.
+      //    TN-7: report it as well as logging it. `console.error` reaches no table, so from TN-4's
+      //    deploy onward a recurrence of `daytime-stress: constants not set` — the fault that fired
+      //    31 times on 2026-08-23 — produced no row anywhere, and LA-20's open verification is
+      //    waiting on exactly that count. A hardening change that turns a loud failure into a quiet
+      //    degradation also removes the evidence a separate investigation was relying on; the card
+      //    must still degrade, what changes is that the degradation leaves a trace.
       console.error('[body-battery] daytime stress series failed, continuing without it:', err)
+      reportServerError(err, { userId, url: '/api/body-battery#stress' })
     }
   }
   // Step lookup: stressLevel (∈[−1,1]) of the most recent bucket at/under a time (30-min, held forward).

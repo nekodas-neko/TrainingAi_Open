@@ -3,7 +3,7 @@
 import { Fragment, memo } from "react";
 import {
   Sunrise, Moon, Dumbbell, Footprints, Utensils,
-  BedDouble, Flame, Clock, MapPin, Zap, Tag,
+  BedDouble, Flame, Clock, Zap, Tag,
   type LucideIcon,
 } from "lucide-react";
 import { useCachedValue } from "@/lib/hooks/use-cached-value";
@@ -179,13 +179,18 @@ function EventRow({ ev, isLast }: { ev: TimelineEvent; isLast: boolean; isFirst?
   // "Fell asleep" jump to the Health tab's Sleep detail sheet pre-opened to that night, reusing
   // its existing per-night detail view (HealthMetricSheet's SleepDetailView) rather than building
   // a new screen — the sheet already renders full per-night detail for any of the last 14 nights,
-  // it just needed a way to be told which one to open with. The workout card still has no
-  // historical HR-chart/exercise-detail screen to land on — filed as its own backlog follow-up.
+  // it just needed a way to be told which one to open with. The workout and walk cards land on
+  // `/health/day`, which Q-110 built after this entry was written: its Training section renders
+  // each session's exercises, sets, duration, volume and kcal, and its Activity section opens
+  // ActivityDetailSheet. `bedtime` is a projection and `tag` a marker — neither has a detail view
+  // to reach, so both stay inert.
   let onTap: (() => void) | undefined;
   if (ev.date && ev.type === "meal") {
     onTap = () => router.push(`/nutrition?date=${ev.date}`);
   } else if (ev.date && (ev.type === "wakeup" || ev.type === "sleep")) {
     onTap = () => router.push(`/health?tab=body&openSleepDate=${ev.date}`);
+  } else if (ev.date && (ev.type === "workout" || ev.type === "walk")) {
+    onTap = () => router.push(`/health/day?date=${ev.date}`);
   }
 
   return (
@@ -248,8 +253,11 @@ function HomeDayTimelineComponent() {
   const firstYesterdayIdx = events.findIndex(e => e.day === "yesterday");
 
   return (
-    <div className="mx-4 mb-3">
-      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
+    // A named region, so the timeline is addressable rather than positional: the workout card's
+    // title is the session name, which Home also renders as a session chip further up the page —
+    // a locator that only knows the text finds both.
+    <section aria-labelledby="day-timeline-heading" className="mx-4 mb-3">
+      <p id="day-timeline-heading" className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
         Today&apos;s Timeline
       </p>
       <div>
@@ -265,7 +273,7 @@ function HomeDayTimelineComponent() {
           </Fragment>
         ))}
       </div>
-    </div>
+    </section>
   );
 }
 

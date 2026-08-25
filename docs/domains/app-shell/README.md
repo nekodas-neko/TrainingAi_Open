@@ -19,6 +19,10 @@ split is "does it feel slow" vs "is it actually slow at the source".
 
 ## Reference docs
 
+- [`docs/superpowers/plans/2026-08-25-unified-day-review.md`](../../superpowers/plans/2026-08-25-unified-day-review.md)
+  — **Q-112, the unified day review.** Relevant here for the entry points: Home's day-review banner,
+  the two local reminders in `lib/day-review-reminders.ts` (which deep-link to `/`, not to the
+  review), and the argument for `/health/day` being the read-through rather than a third day surface.
 - [`docs/app-responsiveness-investigation.md`](../../app-responsiveness-investigation.md) —
   **start here.** Why the app doesn't feel native; the investigation brief behind the current
   performance push.
@@ -138,15 +142,21 @@ Live at the time of writing (2026-07-30):
   side is exhausted; remaining wins come from device Performance profiles, which only the owner can
   capture. Phase 3 (bundled shell) is the stated architecture and is owner-gated.
 - **Home-day-timeline reads server-only** — a documented, sanctioned exception to offline-first.
-- **Today's Timeline: meal and sleep cards are tappable, workout is not.** Meal jumps to
-  `/nutrition?date=`; "Woke up"/"Fell asleep" jump to `/health?tab=body&openSleepDate=`, which
-  pre-selects that night in `HealthMetricSheet`'s sleep sheet (not `/health/sleep`, which has no
-  date-selection UI). Workout stays non-interactive — no historical HR-chart/exercise-detail screen
-  exists yet — tracked as the remainder of backlog item Q-93-followup. See
-  [`docs/overview/history-2026-08-04.md`](../../overview/history-2026-08-04.md)
-  and [`docs/overview/history-2026-08-07.md`](../../overview/history-2026-08-07.md).
 
 ## Decided
+
+- **Today's Timeline: five of seven card types navigate; `bedtime` and `tag` deliberately do not
+  (Q-93-followup, closed 2026-08-25).** Meal jumps to `/nutrition?date=`; "Woke up"/"Fell asleep"
+  jump to `/health?tab=body&openSleepDate=`, which pre-selects that night in `HealthMetricSheet`'s
+  sleep sheet (not `/health/sleep`, which has no date-selection UI); workout and walk jump to
+  `/health/day?date=`. A bedtime is a projection and a tag is a marker — neither has a detail view
+  to reach, so both stay inert rather than being given a destination that would only repeat the
+  card. The workout card was the last one wired: it waited on a screen to land on, which Q-110
+  shipped on 2026-08-08, and then sat inert for another seventeen days because nothing tracked the
+  dependency clearing. Guarded by
+  [`e2e/timeline-card-navigation.spec.ts`](../../../e2e/timeline-card-navigation.spec.ts), which
+  asserts the destination URL — a row wired to nothing renders identically to a wired one. See
+  [`docs/overview/entries/2026-08-25-timeline-workout-day-detail.md`](../../overview/entries/2026-08-25-timeline-workout-day-detail.md).
 
 - **The Coach KEEPS its write capability — but undo gets wired before anything drives adoption
   (owner, 2026-08-24 — Q-472, removed from the queue).** Production measured **0 applied Coach

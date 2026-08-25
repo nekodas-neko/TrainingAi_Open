@@ -1879,50 +1879,6 @@ same 41 nights within ±2 of 87.0 and **not above it**; `LOW_SLEEP_SCORE` firing
 
 Review: [`docs/reviews/2026-08-24-sleep-score-volatility.md`](reviews/2026-08-24-sleep-score-volatility.md).
 
-### [readiness][platform] TN-7 — TN-4's guard swallows the one signal LA-20's open verification depends on
-
-- **Branch:** _unassigned_
-- **Added:** 2026-08-24 · found while reconciling TN-4 against LA-20's Known-Issues row
-- **Lane: A** — `app/api/body-battery/route.ts`, one line
-- **Needs: TN-4** — this is a follow-up to what TN-4 shipped, not a criticism of it.
-
-TN-4's fix (#415, merged 2026-08-24 12:51 UTC) is correct and should stay. Its catch, though, ends at
-
-```ts
-console.error('[body-battery] daytime stress series failed, continuing without it:', err)
-```
-
-**`console.error` does not reach `error_events`** — the route imports `reportServerError` and uses it
-in the outer catch, but not here. So from that deploy onward a recurrence of
-`daytime-stress: constants not set` produces **no row anywhere**.
-
-**That is exactly the signal LA-20's Known-Issues row is waiting on.** Its `Keep:` reads *"the check
-is `error_events` after this deploys … the count must be zero across a window where
-`/api/body-battery` was actually called."* After TN-4 the count is zero **whether or not the root
-cause is fixed**, so the condition can no longer fail and no longer distinguishes anything.
-
-**What the observable window did establish, before the guard landed.** The fault ran
-2026-08-23 10:37 → **20:59** UTC (**31 occurrences** — LA-20's row records 19 and a 12:27 latest,
-read while it was still firing; both figures are superseded). It then went silent, and at
-**2026-08-24 11:20:38 UTC** `/api/body-battery` completed a full run and wrote a
-`body_battery_daily` snapshot with no fault — a genuine successful call ~14 h after the last error
-and ~1.5 h *before* TN-4's guard deployed. That is **one confirmed clean run in an observable
-window**, which is real evidence and is weaker than the "window" LA-20 asked for. Everything after
-~13:00 UTC on 2026-08-24 is uninformative.
-
-**Fix:** report from the catch as well as logging — `reportServerError(err, { userId, url: '/api/body-battery#stress' })`
-or an equivalent non-fatal severity. The card must still degrade rather than 500; what has to change
-is that the degradation leaves a trace.
-
-**Pass test:** force the constants unset in a test and assert both that the route returns 200 **and**
-that a report was emitted. Then LA-20's `Keep:` becomes checkable again and can be struck on a clean
-window; until then it must not be struck on silence.
-
-**The general shape, worth naming:** a hardening change that converts a loud failure into a quiet
-degradation also removes the evidence a *separate* open investigation was relying on. When a fix
-turns a 500 into a fallback, check whether anything is waiting on that 500 — and carry the signal
-across.
-
 ### [readiness][platform] TN-4 — /api/body-battery threw 31 × 500 for ten hours, then stopped on its own
 
 - **Branch:** _unassigned_
@@ -9779,33 +9735,52 @@ per-field merge where an AI write has no honest source rank to claim.
   visual duration — shortening it trades away retry margin for slower-than-typical connections, so
   reconcile + shorten carefully and re-verify on-device, not just visually.
 
-### [nutrition][app-shell] Q-112 — merge "Day in Review" + "End of Day" into one richer daily-review experience; extend to the weekly recap
+### [nutrition][app-shell] Q-112 — the unified day review: the read-through already exists, so this is a flow
 
-- **Branch:** `feat/unified-day-review`
-- **Plan:** [`docs/superpowers/plans/2026-08-05-owner-ui-bug-batch.md`](../docs/superpowers/plans/2026-08-05-owner-ui-bug-batch.md) Task 27
-- **Added:** 2026-08-06 · owner wants Home's "Your Day in Review" (AI digest + HR chart + workout-load
-  chart) merged with Nutrition's "End of Day" (meal backfill + wellness scales + journal), using
-  nutrition's UI as the visual base, with richer data (HR min/max, body composition, calories
-  burned/expended, session volume, body temp, steps, a day-timeline treatment), a nicer
-  banner/notification entry point, a read-through → missed-meals → wrap-up flow, ~7-day rolling
-  lookback, and possibly the same treatment for the weekly recap at a longer lookback. **Explicit
-  ask: primarily a UI/design uplift.**
-- **⚑ Spec-sized, not batch-task-sized — every other entry in this queue is one PR; this one isn't.**
-  Whoever picks this up should write a proper implementation plan first (per the writing-plans
-  convention) rather than execute the batch entry as a checklist — several product decisions
-  (banner vs. notification, exact section-skip logic, which stats get trend treatment) are
-  deliberately left open in the plan-doc entry, not resolved.
-- **Both source components already exist and are more different than the owner may realize**: Day
-  in Review is a thin AI-text + 2-chart Home banner sheet; End of Day is a reasonably rich but
-  visually plain nutrition/wellness/journal sheet triggered from a Nutrition-tab button, not a
-  banner. They share no component today. The weekly analog (`weekly-recap-banner.tsx`/
-  `weekly-digest`) already exists too and is the natural target for the "monthly scale" ask.
-- **No new domain math needed** — every requested stat (HR min/max, body composition, calories
-  burned, session volume, body temp, steps, scores) already has exactly one correct source elsewhere
-  in the app (several catalogued in this same session's Q-105/Q-96/Q-110 investigations); this is an
-  assembly + design problem, not a new-formula problem.
-- **Cross-reference**: shares its swipe-between-days interaction question with Q-110 (same plan doc)
-  — check both before implementing either so the app doesn't end up with divergent swipe patterns.
+- **Branch:** _umbrella_ · **Lane: B** · **Plan:** [`2026-08-25-unified-day-review.md`](superpowers/plans/2026-08-25-unified-day-review.md)
+- **Needs: Q-112e**
+- **Added:** 2026-08-06 · **re-planned 2026-08-25 — Task 27 is now stale in its central premise.** It
+  asked for a new merged day screen; `/health/day` shipped two days later and already draws body
+  composition, energy in/out, per-session volume, steps, scores, sleep and a day HR trace from
+  reusable components. What is missing is one entry point instead of two, three stats, a 7-day
+  comparison, and the wrap-up continuing from the read-through. Reasoning and alternatives: the plan.
+
+### [nutrition][app-shell] Q-112a — one evening flow, one door
+
+- **Branch:** `feat/day-review-one-door` · **Lane: B** · **Plan:** the above, §4
+- Home's banner, Nutrition's End of Day button and **both local reminders' `extra.route`** reach one
+  destination; today the reminders land on `/` and ask the user to find the banner.
+  `day-review-sheet.tsx` is deleted, its digest moving in with the error state it never had.
+
+### [nutrition][app-shell] Q-112b — the read-through becomes step 1, plus the three missing stats
+
+- **Branch:** `feat/day-review-read-through` · **Lane: B** · **Plan:** the above, §4
+- **Needs: Q-112a**
+- `day-sections` render inside the flow off the shared `day-log:<date>` key — no second fetch, no
+  second implementation. Adds HR min/max, body temp (Q-105's derived-first precedence, never the
+  frozen Cloud column) and the AI digest; the same three land on `/health/day` itself.
+
+### [readiness][nutrition] Q-112c — the 7-day comparison window
+
+- **Branch:** `feat/day-review-week-window` · **Lane: A** — `app/api/**`
+- **Needs: Q-112b**
+- The prior-7-day series for the stats that get a trend. Reuse `computeActiveEnergy()`,
+  `/api/workout-load-history`, `body_metrics`, `buildDayAudit`. Anchor at `todayMidnightUtc(tz)`.
+
+### [nutrition][app-shell] Q-112d — draw the trends, on four stats not fourteen
+
+- **Branch:** `feat/day-review-trends` · **Lane: B** · **Plan:** the above, §4
+- **Needs: Q-112c**
+- Resting HR, steps, session volume, weight. Composition percentages move too slowly to read as
+  anything but noise; scores already carry `scoreBand()`'s word. **Check Q-154 first** — without the
+  primitive's missing props, ship a delta chip rather than a fourth inline polyline.
+
+### [nutrition][app-shell] Q-112e — the weekly recap gets the same treatment
+
+- **Branch:** `feat/weekly-recap-uplift` · **Lane: B** · **Plan:** the above, §4
+- **Needs: Q-112d**
+- `weekly-recap-banner.tsx` + `/api/weekly-digest` at the owner's "monthly scale" lookback.
+  Deliberately last, so the daily version settles the layout first.
 
 ### [devices][app-shell] Q-111 — Home header device-battery chips (ring/strap/scale); question whether the manual refresh button is still needed
 
@@ -9887,35 +9862,35 @@ per-field merge where an AI write has no honest source rank to claim.
   existing scale-toast Known-Issues entry in `projectOverview.md` rather than adding a duplicate
   when this ships.
 
-### [app-shell] Q-93-followup — wire the workout Today's Timeline card to a detail screen
+### [platform][devices] LB-14 — a client that hangs up mid-request is written to `error_events` as a server fault
 
-- **Added:** 2026-08-06 · split off from Q-93 after the meal-card half shipped
-  (see `docs/overview/entries/2026-08-06-timeline-meal-tap-navigation.md`).
-- **Why split:** Q-93's plan claimed the sleep-card wiring was "straightforward... once
-  ids/dates [are] threaded through" alongside the meal card. That premise didn't hold up under
-  inspection at the `/health/sleep` route (`SleepContent` has no date-selection UI, always renders
-  the latest night) — but a *different* existing surface did have per-night date selection built
-  in: `HealthMetricSheet`'s sleep detail view already lists and renders any of the last 14 nights.
-  That gap was closed 2026-08-07 (see
-  `docs/overview/entries/2026-08-07-sleep-timeline-detail-deeplink.md`) by deep-linking to it
-  instead of building new screen work. The workout card remains genuinely unscoped: no historical
-  per-session HR-chart + exercise-detail screen exists at all (the only HR chart component renders
-  live, in-progress data only).
-- **What shipped:** the meal card navigates to `/nutrition?date=YYYY-MM-DD`; the "Woke up"/"Fell
-  asleep" cards navigate to `/health?tab=body&openSleepDate=YYYY-MM-DD`, which pre-selects that
-  night in `HealthMetricSheet`'s sleep sheet instead of showing the list. Both wired on both
-  timeline renderers (`components/home-day-timeline.tsx` and `app/health/timeline/page.tsx`).
-  `TimelineEvent`'s `date` field is reused for all of this — don't re-derive from `timeMs`
-  client-side.
-- **Remaining scope:** workout card → needs a screen to navigate to. **⚑ Corrected 2026-08-08:**
-  the claim above that a historical per-session HR chart "doesn't exist yet at all" and that "the
-  only HR chart component renders live, in-progress data only" is **wrong**.
-  `components/health/day-overlay-sheet.tsx:186-190` already renders `HrRecoveryChart` per session,
-  for an arbitrary historical date, with per-exercise markers — visible in the owner's 2026-08-07
-  screenshots. The *capability* is built; what's missing is a screen to host it properly. That makes
-  Q-110 the destination for this card, not a separate build — see the design mockups at
-  `docs/design/2026-08-08-day-detail-screen-mockups.html`.
-- **JS-only — no APK needed** once scoped.
+- **Branch:** _unassigned_ · **Added:** 2026-08-25, on the Lane B session-start `error_events` read · **Lane: A** — `packages/shared/src/http/request-guards.ts` and/or `instrumentation.ts`.
+
+`POST /api/oura-ble/battery-poll` and `POST /api/oura-ble/samples` log bare `aborted` rows — **nine
+in the 30-day window** (six 08-13, two 08-17, one 08-25), sporadic, self-healing, no user-visible
+effect: the battery-poll route's own comment says *"a dropped poll is inconsequential — the next
+tick re-posts."* **Read from source, not reproduced:** `readJsonLimited` streams the body through
+`reader.read()`, which rejects when the request stream is cancelled — the native BLE service being
+backgrounded mid-post is the obvious cause. Nothing catches it, so it reaches `onRequestError`,
+which reports to **both** `error_events` and Sentry. The helper is shared, so every route using it
+has this shape. It matters only because `error_events` is the table every session reads to orient,
+it prunes at 30 days, and it is already the subject of Q-315's 49 MB of bloat — a client hanging up
+is not our fault and each one spends an alert plus a row of that record. **Fix shape:** return
+`{ ok: false, reason: 'aborted' }` from the helper so the route answers 400 without reporting, or
+filter aborts in `recordRequestError` (wider — it covers routes not using the helper); either way
+filter on the abort *signal*, never on message text. Counts are the owner's rows only.
+
+### [app-shell] Q-93-followup — the timeline's workout and walk taps have not been pressed on the phone
+
+- **Branch:** `feat/timeline-workout-day-detail` (merged 2026-08-25, v1.371.0) · **Lane: B**
+- **Gate: device**
+- Built and guarded: `workout` and `walk` cards navigate to `/health/day?date=`, proved by the
+  mutation-checked `e2e/timeline-card-navigation.spec.ts`; `bedtime`/`tag` stay inert on purpose
+  ([`journal`](overview/entries/2026-08-25-timeline-workout-day-detail.md)).
+- **Keep:** the press itself, on the S25 — whether the row competes with `PullToSync`'s vertical
+  gesture under a real finger, and whether `/health/day`'s back control returns to Home rather than
+  stranding the user on a navless route. Both already ship for the meal and sleep cards, so this is
+  confirmation, not discovery. Strike once pressed.
 
 ### [sleep] Q-91-followup — decide whether the BLE ingest rollup should emit its own invalidation signal
 

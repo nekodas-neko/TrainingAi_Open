@@ -86,6 +86,7 @@ describe.skipIf(!canRun)('body-battery — a stress-model failure must not 500 t
     )
     await pool.query(`DELETE FROM oura_daily_derived WHERE user_id = $1`, [TEST_USER_ID])
     await pool.query(`DELETE FROM body_battery_daily WHERE user_id = $1`, [TEST_USER_ID])
+    await pool.query(`DELETE FROM error_events WHERE user_id = $1`, [TEST_USER_ID])
 
     await pool.query(
       `INSERT INTO sleep_sessions (user_id, date, sleep_start, sleep_end, duration_hours, efficiency, onset_latency_sec)
@@ -143,5 +144,36 @@ describe.skipIf(!canRun)('body-battery — a stress-model failure must not 500 t
     // The stress strip degrades rather than the card failing: with no series the STRESS_DRAIN_RATE
     // term is simply never applied, which is what `stressAt` returning null already meant.
     expect(body.stressDrained ?? 0).toBe(0)
+  })
+
+  // TN-7. The guard above is right and stays, but its catch only called `console.error`, which
+  // reaches no table — so from TN-4's deploy onward a recurrence of the fault that fired 31 times
+  // produced no row anywhere. LA-20's Known-Issues row is waiting on an `error_events` count over a
+  // window where this route was called; with the guard and without the report that count is zero
+  // whether or not the root cause is fixed, so the condition could no longer fail and no longer
+  // distinguished anything. This asserts the trace, not just the 200.
+  it('leaves a row in error_events, so a recurrence is still visible', async () => {
+    const { GET } = await import('../route')
+    expect((await GET()).status).toBe(200)
+
+    // `reportServerError` is fire-and-forget by design — it must never delay or mask the response —
+    // so the row lands after GET resolves and the assertion has to poll for it rather than read once.
+    // (BF-18 is the same lesson from the other direction: asserting an async phase with no wait
+    // passes on an idle machine and fails on a loaded runner.)
+    const deadline = Date.now() + 5_000
+    let rows: { url: string; message: string }[] = []
+    while (Date.now() < deadline) {
+      rows = (await pool.query(
+        `SELECT url, message FROM error_events WHERE user_id = $1 AND source = 'server'`,
+        [TEST_USER_ID])).rows
+      if (rows.length) break
+      await new Promise(r => setTimeout(r, 50))
+    }
+
+    expect(rows).toHaveLength(1)
+    // The fragment is what makes the row attributable to the stress strip rather than to the outer
+    // catch, which reports the same route without it.
+    expect(rows[0].url).toBe('/api/body-battery#stress')
+    expect(rows[0].message).toContain('daytime-stress: constants not set')
   })
 })

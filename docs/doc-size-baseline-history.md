@@ -18,6 +18,25 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
+## 2026-08-25 — Q-112 re-planned into five phases (`docs/implementation-backlog.md` raise withdrawn)
+
+Q-112 — the unified day review — was a single spec-sized entry that said of itself *"whoever picks
+this up should write a proper implementation plan first"*. The plan is now written
+([`2026-08-25-unified-day-review.md`](superpowers/plans/2026-08-25-unified-day-review.md)) and the
+entry became an umbrella plus **Q-112a–e**, each one PR with its own lane, branch and `Needs:`.
+
+**A +19 raise was prepared and then withdrawn**: the original entry carried 28 lines of direction
+and the umbrella replacing it carries 9, because the reasoning went to the plan rather than the
+queue — and by the time the branch was cut, `main` had shrunk the file enough that the growth fitted
+inside the existing headroom. Recorded because "no raise needed" is worth knowing was checked, and
+because without moving that reasoning out it would have been a ~60-line raise.
+
+**Why the re-plan was needed, recorded because this is how a queue entry goes stale silently:**
+Task 27's central premise — that no per-day read-through screen exists — stopped being true on
+2026-08-08, two days after it was written, when Q-110 shipped `/health/day`. An implementer taking
+the entry at face value would have built a third day surface and re-implemented seven working
+sections.
+
 ## 2026-08-25 — PS-6 filed (`docs/implementation-backlog.md` raise withdrawn, again)
 
 **PS-6**: the queue tooling has never known the `OR-` prefix, in three regexes across two scripts.
@@ -2308,6 +2327,22 @@ between and had already raised the number to 7947, so `doc-size-baseline.json` w
 `origin/main` and this raise re-derived on top of it rather than the hunk being spliced. Two
 same-session PRs both raising the same baseline is the ordinary case here, not an unusual one — the
 second one's number is only ever correct against the merged first.
+
+## 2026-08-25 — `projectOverview.md` raised, 7949 → 7957 (TN-7)
+
+Eight lines in two places, and the second is the one that earns it. Two are the Current Status
+paragraph the wrap-up asks for. **Six extend LA-20's existing Known-Issues row**, because TN-7
+changes what that row's `Keep:` means: its check is an `error_events` count, the count was
+unfalsifiable while the guard only logged, and it is falsifiable again now — but only from this
+deploy forward. A reader who takes a zero from the intervening day as evidence strikes a row on
+silence. That correction has to sit on the row itself; anywhere else and the next person to read the
+row will not see it.
+
+**Written first as 7947 → 7955, then re-derived on 7949 when BF-18's PR (#476) landed first.** Third
+same-day raise of this baseline, and the third to be superseded before merging — which is the
+ordinary case when several PRs run in one session, not a sign anything is wrong. Each time the fix
+was to rebuild `doc-size-baseline.json` from `origin/main` and re-derive, never to splice the hunk:
+the raise is only ever correct against the merged predecessor.
 ## 2026-08-25 — `docs/implementation-backlog.md` raised, 11862 → 12000 (mockup parity)
 
 The owner set the acceptance test for the nutrition arc: *"I want the design to match the mockup
