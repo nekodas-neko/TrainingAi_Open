@@ -2,7 +2,7 @@ import { convertToModelMessages, stepCountIs, type UIMessage } from 'ai'
 import { google } from '@ai-sdk/google'
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
-import { coachModel, loggedStreamText } from '@/lib/ai/instrument'
+import { COACH_MODEL_ID, coachModel, loggedStreamText } from '@/lib/ai/instrument'
 import { auth } from '@/auth'
 import { getRepositoryAsync } from '@/lib/data'
 import { rateLimit } from '@/lib/rate-limit'
@@ -166,7 +166,7 @@ export async function POST(req: Request) {
     )
 
     const result = loggedStreamText(
-      { section: 'coach', userId },
+      { section: 'coach', userId, model: COACH_MODEL_ID },
       {
         model: coachModel(),
         system: SYSTEM.replace('TODAY_ISO', todayIso),

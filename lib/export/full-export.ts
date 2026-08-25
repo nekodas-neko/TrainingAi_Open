@@ -1,103 +1,112 @@
 import { getPool } from "@/lib/data/postgres/client"
 import { getRepositoryAsync } from "@/lib/data"
+import { getPrimaryKeyColumns, quoteIdent } from "@/lib/export/db-snapshot"
+import { EXPORTED, EXCLUDED, SOFT_DELETED, WITHHELD_COLUMNS, type ExportScope } from "@/lib/export/export-map"
 
-// One row per line, streamed as { domain, row }. Covers every domain named in
-// the export plan: programs/styles/schedules, workout sessions + exercise/set
-// logs, personal records, body metrics, sleep, mood, day check-ins, food logs
-// + items + meal types, supplements + logs, injuries, activity logs,
-// oura_daily/tags, goals. Deliberately excludes tokens/credentials tables
-// (oura_tokens, push_subscriptions) and internal ops data (error_events,
-// feedback_submissions) — this is a takeout of the user's own content, not
-// app-internal bookkeeping.
-const DIRECT_DOMAINS: { domain: string; table: string }[] = [
-  { domain: "programs", table: "programs" },
-  { domain: "progression_styles", table: "progression_styles" },
-  { domain: "phase_sets", table: "phase_sets" },
-  { domain: "personal_records", table: "personal_records" },
-  { domain: "body_metrics", table: "body_metrics" },
-  { domain: "sleep_sessions", table: "sleep_sessions" },
-  { domain: "mood_logs", table: "mood_logs" },
-  { domain: "day_checkins", table: "day_checkins" },
-  { domain: "food_logs", table: "food_logs" },
-  { domain: "food_items", table: "food_items" },
-  { domain: "meal_types", table: "meal_types" },
-  { domain: "supplements", table: "supplements" },
-  { domain: "supplement_logs", table: "supplement_logs" },
-  { domain: "injuries", table: "injuries" },
-  { domain: "activity_logs", table: "activity_logs" },
-  { domain: "oura_daily", table: "oura_daily" },
-  { domain: "oura_tags", table: "oura_tags" },
-]
+/**
+ * Full-data takeout: one NDJSON line per row, `{ domain, row }`.
+ *
+ * Coverage is driven entirely by `EXPORTED` in `./export-map.ts`, which is exhaustive over
+ * `schema.ts` and enforced by `scripts/check-export-coverage.js` (Q-288). The two hand-maintained
+ * arrays that used to live here are gone: they were the reason 56 tables were missing.
+ */
 
-const JOINED_DOMAINS: { domain: string; sql: string }[] = [
-  {
-    domain: "program_sessions",
-    sql: `SELECT s.* FROM program_sessions s JOIN programs p ON s.program_id = p.id WHERE p.user_id = $1`,
-  },
-  {
-    domain: "session_exercises",
-    sql: `SELECT se.* FROM session_exercises se
-          JOIN program_sessions ps ON se.session_id = ps.id
-          JOIN programs p ON ps.program_id = p.id
-          WHERE p.user_id = $1`,
-  },
-  {
-    domain: "schedules",
-    sql: `SELECT sc.* FROM schedules sc JOIN programs p ON sc.program_id = p.id WHERE p.user_id = $1`,
-  },
-  {
-    domain: "schedule_days",
-    sql: `SELECT sd.* FROM schedule_days sd
-          JOIN schedules sc ON sd.schedule_id = sc.id
-          JOIN programs p ON sc.program_id = p.id
-          WHERE p.user_id = $1`,
-  },
-  {
-    domain: "style_sets",
-    sql: `SELECT ss.* FROM style_sets ss
-          JOIN progression_styles pst ON ss.style_id = pst.id
-          WHERE pst.user_id = $1`,
-  },
-  {
-    domain: "program_phases",
-    sql: `SELECT pp.* FROM program_phases pp
-          LEFT JOIN phase_sets ps ON pp.phase_set_id = ps.id
-          LEFT JOIN programs p ON pp.program_id = p.id
-          WHERE ps.user_id = $1 OR p.user_id = $1`,
-  },
-  {
-    domain: "workout_sessions",
-    sql: `SELECT * FROM workout_sessions WHERE user_id = $1 AND deleted_at IS NULL`,
-  },
-  {
-    domain: "exercise_logs",
-    sql: `SELECT el.* FROM exercise_logs el
-          JOIN workout_sessions ws ON el.workout_session_id = ws.id
-          WHERE ws.user_id = $1 AND el.deleted_at IS NULL AND ws.deleted_at IS NULL`,
-  },
-  {
-    domain: "set_logs",
-    sql: `SELECT sl.* FROM set_logs sl
-          JOIN exercise_logs el ON sl.exercise_log_id = el.id
-          JOIN workout_sessions ws ON el.workout_session_id = ws.id
-          WHERE ws.user_id = $1 AND sl.deleted_at IS NULL AND el.deleted_at IS NULL AND ws.deleted_at IS NULL`,
-  },
-]
+/** Rows per query. Small enough that no single table's chunk is a memory event, large enough that a
+ *  60k-row table is ~12 round trips rather than 600. */
+const CHUNK = 5_000
 
-export async function* exportUserData(userId: string): AsyncGenerator<{ domain: string; row: unknown }> {
+function whereFor(scope: ExportScope, table: string): { predicate: string } {
+  const soft = SOFT_DELETED[table]
+  const softClause = soft ? ` AND t.${quoteIdent(soft)} IS NULL` : ''
+  switch (scope.kind) {
+    case 'user_id': return { predicate: `t.user_id = $1${softClause}` }
+    case 'own_row': return { predicate: `t.id = $1${softClause}` }
+    case 'via': return { predicate: `(${scope.predicate})${softClause}` }
+  }
+}
+
+function strip(table: string, row: Record<string, unknown>): Record<string, unknown> {
+  const withheld = WITHHELD_COLUMNS[table]
+  if (!withheld) return row
+  const out = { ...row }
+  for (const col of withheld) delete out[col]
+  return out
+}
+
+/**
+ * One table's rows, by keyset pagination on its primary key.
+ *
+ * The previous implementation was `pool.query('SELECT * FROM …')` per table, which **buffers the
+ * whole result set** — while the route's comment claimed it streamed "rather than buffering the
+ * whole export in memory". Only the per-table `ReadableStream` enqueue was ever true. That was
+ * harmless across 26 small tables and an OOM the moment a bulk one was added, so it had to be fixed
+ * BEFORE coverage, not after: adding `oura_heartrate` on top of the old read would have been
+ * strictly worse than the bug it fixed.
+ */
+async function* streamTable(
+  pool: ReturnType<typeof getPool>, table: string, scope: ExportScope, userId: string,
+): AsyncGenerator<Record<string, unknown>> {
+  const pkCols = await getPrimaryKeyColumns(pool, table)
+  if (pkCols.length === 0) {
+    // Every production table has one (verified in the Q-530 plan §3.3). Refuse rather than fall
+    // back to an unpaginated read, which is the defect this replaces.
+    throw new Error(`export: "${table}" has no primary key, so it cannot be paginated safely`)
+  }
+  const cols = pkCols.map(quoteIdent).map(c => `t.${c}`).join(', ')
+  const { predicate } = whereFor(scope, table)
+  let cursor: unknown[] | null = null
+  for (;;) {
+    const params: unknown[] = [userId]
+    let keyset = ''
+    if (cursor) {
+      const placeholders = cursor.map((_, i) => `$${params.length + i + 1}`).join(', ')
+      params.push(...cursor)
+      keyset = ` AND (${cols}) > (${placeholders})`
+    }
+    const { rows } = await pool.query(
+      `SELECT t.* FROM public.${quoteIdent(table)} t WHERE ${predicate}${keyset} ORDER BY ${cols} LIMIT ${CHUNK}`,
+      params,
+    )
+    for (const row of rows) yield strip(table, row)
+    if (rows.length < CHUNK) return
+    cursor = pkCols.map(c => rows[rows.length - 1][c])
+  }
+}
+
+export interface ExportLine { domain: string; row: unknown }
+
+/**
+ * The manifest is emitted FIRST, before any row. An incomplete export is worse than none because
+ * nothing signals the omission (Q-288) — so the file now says outright what it does not contain and
+ * why, instead of leaving the reader to infer completeness from its size.
+ */
+export function buildManifest(): ExportLine {
+  return {
+    domain: '_manifest',
+    row: {
+      exportedTables: Object.keys(EXPORTED).sort(),
+      excluded: Object.entries(EXCLUDED)
+        .map(([table, x]) => ({ table, category: x.category, reason: x.reason }))
+        .sort((a, b) => a.table.localeCompare(b.table)),
+      withheldColumns: WITHHELD_COLUMNS,
+      note: 'Rows soft-deleted in the app are omitted. Excluded tables are listed above with the reason for each.',
+    },
+  }
+}
+
+export async function* exportUserData(userId: string): AsyncGenerator<ExportLine> {
   const pool = getPool()
 
-  for (const { domain, table } of DIRECT_DOMAINS) {
-    const result = await pool.query(`SELECT * FROM ${table} WHERE user_id = $1`, [userId])
-    for (const row of result.rows) yield { domain, row }
+  yield buildManifest()
+
+  for (const table of Object.keys(EXPORTED).sort()) {
+    for await (const row of streamTable(pool, table, EXPORTED[table], userId)) {
+      yield { domain: table, row }
+    }
   }
 
-  for (const { domain, sql } of JOINED_DOMAINS) {
-    const result = await pool.query(sql, [userId])
-    for (const row of result.rows) yield { domain, row }
-  }
-
+  // Not a table — a repository call that assembles the user's goals. Kept because it was in the
+  // export before this change and removing it would be a silent regression in the other direction.
   const repo = await getRepositoryAsync()
-  const goals = await repo.getUserGoals(userId)
-  yield { domain: "goals", row: goals }
+  yield { domain: "goals", row: await repo.getUserGoals(userId) }
 }

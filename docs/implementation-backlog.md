@@ -331,6 +331,56 @@ days/hours cause most stress". Measured against production the same day; the bou
 signed off by the owner in that conversation. Review:
 [`docs/reviews/2026-08-24-body-battery-charge-window-collapse.md`](reviews/2026-08-24-body-battery-charge-window-collapse.md).*
 
+### [readiness][devices] TN-8 — the chronic-stress fever mask is a FOURTH consumer of the broken temperature baseline
+
+- **Branch:** _unassigned_
+- **Added:** 2026-08-25 · found by the threshold sweep the owner asked for
+- **Lane: A** — `packages/shared/src/health/chronic-stress-assembly.ts`
+- **Batch:** temperature-baseline — the fourth consumer of the object BF-13 fixes. Same PR.
+- **Related: TN-1 / Q-525** (chronic stress has never produced a value) — a plausible contributor,
+  **not a proven cause**. See the margin note below before treating it as the answer.
+
+`chronic-stress-assembly.ts:72` sets the per-night fever baseline to `TEMP_DEV_FEVER_LIMIT_C = 1.0`,
+and the vendored model masks a night when `highestTemp > 38 || tempDev > tempDevBaseline`. The
+constant's comment states its design intent outright:
+
+> *"this secondary deviation limit is set high enough that a healthy night is never masked
+> (over-masking would starve the 21-night gate → permanent NaN)"*
+
+**Measured 2026-08-25: `temp_dev_c > 1.0` on 6 of 34 nights (17.6%).** The owner has said they have
+not been sick in 50+ days, so those are healthy nights masked as fever. The cause is the same
+**0.363 °C baseline offset** behind TN-6 and BF-13 — the deviation is positive on 34 of 34 nights, so
+its whole distribution is shifted into the limit.
+
+**⚠️ It is NOT currently starving the 21-night gate. Do not file it as TN-1's cause.** In the
+trailing 30-night window only **3 of 29** nights are masked, leaving **26 against a gate of 21**. The
+margin is thinner than intended, not gone. If TN-1's instrumentation later shows the granular layer
+refusing on night count, this is the first place to look; until then it is a correctness bug in its
+own right.
+
+**Why it is worth fixing even so:** BF-13 counts three consumers of the broken baseline (the
+readiness ladder, `tempZ`/the illness radar, the deload card). This is the **fourth**, and it is the
+only one that leaves **no trace** — a masked night simply does not contribute, so nothing on any
+surface and nothing in any column says it happened. It would survive the other three being fixed if
+the fix were aimed at consumers rather than at the baseline.
+
+**Fix:** none of its own. **BF-13's seed fix plus the temperature re-derivation resolves it**, because
+the limit is defensible once the deviation is centred: against a true nightly sd of 0.140 °C, 1.0 °C
+is 7.1 sd, which will essentially never fire on a healthy night — exactly what the comment intends.
+**Do not raise `TEMP_DEV_FEVER_LIMIT_C`** — that is the same "hide a broken input behind a plausible
+firing rate" mistake TN-6 and Q-506 both refuse.
+
+**Pass test:** after the baseline is re-derived, `temp_dev_c > 1.0` on **0 nights** of the owner's
+stored history, and the comment's premise ("a healthy night is never masked") is true as written.
+Assert it in the same test that covers BF-13's re-derivation, so the premise stops being a comment
+and becomes a check.
+
+**Verification note:** the mask was read from source and its *input* measured in production. The model
+was **not executed**, so the claim is that 6 nights cross the limit — not that a masked night was
+observed changing the model's output.
+
+Review: [`docs/reviews/2026-08-25-threshold-sweep.md`](reviews/2026-08-25-threshold-sweep.md).
+
 ### [readiness] TN-6a — suspend the temperature penalty until its baseline is centred
 
 - **Branch:** _unassigned_
@@ -5326,6 +5376,30 @@ ehr     0     0     0     0   648   208   128   556     0
   on its own day's value regardless.) Working in [`docs/reviews/2026-08-16-deferred-measurements.md`](reviews/2026-08-16-deferred-measurements.md) §5.
 - **Scope note:** 8 of 117 insights were read closely. A systematic pass over the rest is the
   natural companion and would size the problem properly.
+- ✅ **THE FORWARD FIX SHIPPED 2026-08-24** (`fix/ai-model-attribution-and-prose-guards`). `PROSE_GUARDS`
+  (`lib/ai/prompt-guards.ts`) is **one string interpolated by all five prose routes** —
+  health-insight's builder, daily-digest, weekly-digest, recap, session-explain. It states metric
+  units outright, forbids converting to imperial, requires numbers to be quoted rather than
+  recomputed, and **names the superlatives that were actually fabricated** ("perfect", "record",
+  "best", "all-time") rather than gesturing at the category.
+- **One string, not five,** because the wording drifting into five versions is exactly how `sleep`
+  ends up without the units clause again. `lib/ai/__tests__/prose-guards.test.ts` fails on a prose
+  route that does not import it, so a sixth route cannot be added without it.
+- ✅ **The rule amendment landed too.** CLAUDE.md's *no LLM self-reported number* rule now covers
+  numbers **shown to the user as fact**, not only numbers that gate an action — which is the gap
+  that let this through in the first place.
+- **⚠ Keep — and this is the honest part: the fix is PROMPT TEXT, so it is not proven.** No
+  before/after generation was compared, because that needs live model calls against the owner's real
+  data. The tests prove the instruction reaches every route and says the right things; they cannot
+  prove the model obeys it. **Re-run the 117-insight audit after a few weeks of new insights** — if
+  superlatives or Fahrenheit survive, the answer is to stop asking and start post-checking the
+  output deterministically.
+- **Keep:** the **12 stored superlatives and 7 Fahrenheit lines are not rewritten.** They are
+  historical text the user has already read; editing them would be fabricating a past that did not
+  happen. The unit system is also **hardcoded metric** — there is no `users.units` column, and
+  adding one is the trigger to make the guard dynamic.
+- **Keep:** the quasi-medical inference (2026-07-19) is untouched — the guard says nothing about
+  inferring illness from a temperature reading.
 
 ### [platform] Q-293 — `ai_health_insights.context_hash` is NULL on 109 of 117 rows
 
@@ -5467,6 +5541,39 @@ ehr     0     0     0     0   648   208   128   556     0
     **fixing coverage without fixing this is strictly worse than the bug.** Use keyset pagination by
     primary key (every prod table has one, verified) per
     [`plans/2026-08-17-admin-db-snapshot-endpoint.md`](superpowers/plans/2026-08-17-admin-db-snapshot-endpoint.md) §3.3.
+- ✅ **SHIPPED 2026-08-25** (`fix/export-completeness`). **Pagination first, coverage second**, in that
+  order and for the reason the entry gives. `lib/export/export-map.ts` is now the single authority:
+  **84 tables — 61 exported with a scope, 26 excluded with a written reason, 16 soft-delete
+  filtered** (three of the excluded are migration-created and absent from `schema.ts`).
+- **The list is exhaustive BY CONSTRUCTION, not by care.** `scripts/check-export-coverage.js` (Custom
+  Rules step 56 of 56) fails on a `pgTable` in neither record, on one in both, and on a stale entry
+  naming no table. **A new table cannot be forgotten, only classified** — which is the actual fix;
+  hand-extending the arrays would have reproduced the drift.
+- **Deliberately NOT driven from `generate-claude-ro-views.js`,** the entry's first suggestion. Its
+  views are scoped to ONE fixed owner via `app.claude_ro_owner`; this export is scoped to whoever is
+  asking. Coupling a per-request user export to the security-critical read-only view surface would
+  put both on one blast radius for no shared behaviour. The FK predicates are copied from its `VIA`
+  map with its reasoning, which is the part worth reusing.
+- **The exclusions are written down rather than absent.** Credentials (2), shipped catalogue (6),
+  app-internal ops (13), **raw BLE frames (3 — `oura_raw_samples` alone is 58 MB of hex, and
+  everything it encodes reaches the user through the decoded tables, which ARE exported)**, and 2
+  jointly about another account. **`oura_heartrate` and `rr_intervals` ARE exported** despite their
+  size: they are readings taken from the user's body, the least omittable thing in a health takeout,
+  and safe only because the read paginates now.
+- **The file also says what it is missing.** A `_manifest` line leads the NDJSON with every excluded
+  table and its reason — the entry's *"nothing signals the omission"* is the defect, and a bigger
+  file does not fix it.
+- **⚠ Two things the tests caught that review had not.** (a) The hand-written `SOFT_DELETED` list was
+  wrong in BOTH directions — two tables invented, thirteen missed — and a missed one means a takeout
+  that **resurrects content the user deleted**; the check now derives it from `schema.ts`. (b) The
+  sync-domain scanner (`mutation-schema.test.ts`) flags any `domain: '…'` literal, and the export's
+  NDJSON line label shares the field name. It is now excluded by prefix — worth knowing that the
+  pre-existing `domain: "goals"` had been sliding past **on quote style alone**.
+- **Keep:** the **large-download path is unverified**. `oura_heartrate` + `rr_intervals` are 46 MB of
+  table in production and inflate as NDJSON; memory is now bounded but **no full export has been run
+  against production**, so a request timeout is untested. Run one before any portability claim rests
+  on it. **Keep:** `goals` remains a repository call rather than a table and sits outside the map,
+  so the check cannot see it.
 
 ### [platform] Q-295 — Coach is 8% of AI calls, 52% of tokens, and the slowest surface in the app
 
@@ -5513,6 +5620,28 @@ ehr     0     0     0     0   648   208   128   556     0
   `AI_MODEL_ID === 'gemini-3.1-flash-lite'`; find whether `COACH_MODEL_ID` exists at all, and
   whether the coach route passes it through the logged wrapper or around it.
 - **Cheap to settle, and it invalidates measurements while it stands.**
+- ✅ **SETTLED AND FIXED 2026-08-24** (`fix/ai-model-attribution-and-prose-guards`). **The docs were right and the
+  logging was wrong** — the second branch, the one that invalidates measurements. `COACH_MODEL_ID =
+  'gemini-3.6-flash'` does exist, `app/api/coach/route.ts` calls `coachModel()`, and the grounding
+  tool is live. What was wrong is that `logAiCall` wrote **`model: AI_MODEL_ID`, a constant**, so
+  the column recorded an assumption and could not disagree with it. Re-measured 2026-08-24: **22
+  Coach calls, first 2026-08-09** — after `COACH_MODEL_ID` shipped on 08-08 — every one filed under
+  flash-lite.
+- **It now logs what the PROVIDER says it served** (`response.modelId`), falling back to a new
+  `AiCallMeta.model` and only then to the default. Reading the response rather than the request is
+  the stronger choice: a provider may route a request elsewhere, and that substitution is exactly
+  what a model column exists to make visible. Coach passes `COACH_MODEL_ID` so its **failures**
+  attribute correctly too — a failed call has no response to read, and a Coach failure filed against
+  a model Coach does not run was the least defensible case.
+- ✅ **The binary-file oddity the entry flagged is also gone**: `instrument.ts` held a **raw NUL byte**
+  inside a template literal, which is why it grepped as binary. It is now `\0` — the same byte. A
+  pinned-hash test proves the equivalence rather than asserting it, because fingerprints are
+  **stored**, so a changed separator would silently orphan every existing one.
+- **Keep:** the **historical rows are not corrected**. Every `ai_call_log.model` value written before
+  this is an assumption, and the 22 Coach rows since 2026-08-09 were in fact `gemini-3.6-flash`. That
+  is an inference from a single deploy and a single code path, not per-row evidence, so it is
+  recorded here rather than written into the table. **Any cost or latency analysis split by model
+  must treat rows before 2026-08-24 as unattributed.**
 
 ### [platform][app-shell] Q-294 — the failure cells whose intended behaviour is undefined
 
@@ -6572,7 +6701,9 @@ ehr     0     0     0     0   648   208   128   556     0
 - **Plan:** none — **this needs an owner decision first** (which number wins), then a one-line change.
   Evidence: [`docs/reviews/2026-08-19-activity-contributor-audit.md`](reviews/2026-08-19-activity-contributor-audit.md) §3.
 - **Added:** 2026-08-19 · Tuning agent, found while auditing the Activity Score's `steps` contributor.
-- **The app shows the owner's step progress against two targets at once.** `users.steps_goal` is
+- - **A THIRD value exists and is dormant (Tuning, 2026-08-25 threshold sweep).** `DEFAULT_STEP_GOAL = 8000` (`daily-goals.ts:15`) is reached only when `activityLevel` is null (`daily-goals.ts:84`). The owner has one set, so 8,000 is not live for them — but it is for any user who has not, which makes this three numbers in the codebase rather than two. Whichever value wins the owner decision below, the fallback should agree with it.
+
+**The app shows the owner's step progress against two targets at once.** `users.steps_goal` is
   **7,000** (the owner set it); `getDailyGoals()` ignores that column and derives **10,000** from
   `activity_level = 'moderate'` via `STEP_GOAL_BY_ACTIVITY`.
 

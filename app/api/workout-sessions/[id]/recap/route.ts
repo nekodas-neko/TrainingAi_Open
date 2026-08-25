@@ -10,6 +10,7 @@ import { errorLog } from '@trainingai/shared/logger'
 import { reportServerError } from '@/lib/observability'
 import { invalidUuidResponse } from '@/lib/api/route-errors'
 import { hashInsightContext, readFreshInsight } from '@/lib/ai/insight-cache'
+import { PROSE_GUARDS } from '@/lib/ai/prompt-guards'
 
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -75,7 +76,11 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
       facts.sessionRpe != null ? `Session RPE (self-reported effort): ${facts.sessionRpe}/10` : null,
     ].filter(Boolean).join('\n')
 
-    const prompt = `You are a concise personal training assistant reviewing a just-completed workout. Facts:
+    const prompt = `You are a concise personal training assistant reviewing a just-completed workout.
+
+${PROSE_GUARDS}
+
+Facts:
 
 ${lines}
 
