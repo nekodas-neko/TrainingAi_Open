@@ -1092,8 +1092,18 @@ and this is the sixth.
 **14 — The other structural changes, in the order they pay off.**
 - **The macro summary becomes a donut with each macro as a share of calories**, next to grams.
   `components/nutrition/macro-ring.tsx` already exists — extend it rather than adding a second one.
-- **Grouped sections with full-bleed dividers** replace gapped cards, which is most of the vertical
-  space the day screen currently spends on nothing.
+- **Grouped sections with full-bleed dividers** replace gapped cards. ~~which is most of the vertical
+  space the day screen currently spends on nothing~~ — **⚠️ MEASURED AND WRONG, corrected 2026-08-25
+  after the owner reported not seeing a difference.** Gaps were **16%** of the screen, not "most" of
+  it. Shipped (v1.365.0 + v1.366.0) they are **11%**: 140 px of gap removed, the screen **111 px
+  shorter out of 2,649** — about 4%. Lane B measured this at the time and said so in both the
+  journal and a comment in `nutrition-content.tsx`; **the overclaim was never struck here, so the
+  owner was still expecting "a big difference".** Do not restate the original claim at the Q-395
+  checkpoint. **Six sections stay ungrouped on purpose** — `MealPlanReviewCard`, `MealPlanSection`,
+  `TdeeAdaptationCard`, `FoodLoggingComplete`, the action row, the End of Day button — because each
+  is conditional and a fixed group container would draw an empty bordered box on the days it is
+  absent. That is sound, and it also means the continuous grouped screen in the mockups is **not**
+  what ships; closing that gap is a separate decision, not remaining work on this entry.
 - **Source tabs on the food picker** (Recent · Frequent · My meals · Recipes) replace separate
   sheets, so a repeat log is one tap from the top of the list.
 - **The meal name becomes the screen title**, not a labelled input box, and the three-line batch
