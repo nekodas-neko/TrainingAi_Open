@@ -2273,3 +2273,26 @@ sheets handle the Android back gesture). Each carries the measurement it was fil
 length: BF-24 enumerates seven divergences read off the shipped source against the artboard's inline
 styles, and an entry that says only *"doesn't match the mockup"* would send its implementer back to
 do that reading again.
+
+## 2026-08-25 — `projectOverview.md` 7941 → 7947 and `docs/implementation-backlog.md` 11803 → 11862 (BF-16a)
+
+**projectOverview, +6.** Both additions are required by a standing rule to live in this file and
+nowhere else. One is the Current Status paragraph the session wrap-up asks for. The other is a
+Known-Issues row, because the Canonical Runtime gate gives exactly two options for a change whose
+device path has not been run — the on-device smoke run, or a row here saying so. Migration 216's
+correction reaches the S25 through `/api/workout-data` hydration, which was read in source and not
+executed; `getLocalStore` returns null in the sandbox, so it cannot be executed here. The row names
+what to check on the device, and that the migration has not yet run against production.
+
+**Backlog, +59, of which only 20 are this branch's.** BF-16a's entry (~31 lines) was removed on
+shipping and LA-24 (~51 lines) filed in its place — the eight further catalogue rows the sweep found,
+with the family precedent for each, split into the five that propagate an answer the catalogue
+already gives and the three that would mean originating anatomy nobody has been asked about. An entry
+saying only *"more rows have this too"* would send its implementer back to redo the scan.
+
+**The other 39 lines were already on `main` without a raise.** `main` sat at 11841 against an 11803
+baseline when this branch merged it; the check has an escape hatch for growth the base branch already
+carries, so it reported OK there and failed here the moment 20 more arrived. Worth knowing: a raise
+can inherit someone else's overshoot, and the number recorded is the whole of it, not the part the
+raising branch wrote.
+
