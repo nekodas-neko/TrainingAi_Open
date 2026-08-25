@@ -28,8 +28,11 @@
 **Last updated:** 2026-08-24.
 
 **The diary row is the shared row now, and its sheet can delete (Q-406).** The pencil and bin came
-off every food row. **It turned up LB-10:** `use-sheet-back-dismiss` is not double-invoke safe, so
-five sheets cannot be opened in `pnpm dev` at all — production is fine, the pre-merge surface is not.
+off every food row. **It turned up LB-10, now fixed:** `use-sheet-back-dismiss` was not double-invoke
+safe, so the quick-edit sheet could not be opened in `pnpm dev` at all — production was never
+affected, the pre-merge surface was. **The entry said five sheets; one.** The other four mount with
+`open` false, so their double-invoked run bails before pushing. `e2e/sheet-back-dismiss.spec.ts`
+guards it, and fails on the unfixed hook.
 
 **The Nutrition day screen is grouped sections now, and the ring is split by macro (Q-395b).**
 Gaps **420 px → 280 px (16% → 11%)**, 111 px shorter — not the *"most of the vertical space"* the
@@ -62,15 +65,12 @@ DELETEs archival frames — and a refusal is listed with its reason. `Gate: devi
 **Q-477 is DONE for every client component** (4 slices, 78/38 → **3 calls in 1 file**). Left is
 `workout-store.ts` — a Zustand store with no hook, where a wrong-zone stamp makes `rolloverDay()` clear the day's completed sets. A design call, analysed on the entry.
 
-**"Nine collapsibles missing `aria-expanded`" was actually two (Q-491)** — one retired, four already
-Radix, two a back chevron. `weights-summary.tsx`/`added-weight-toggle.tsx` were real, now fixed.
+**"Nine collapsibles missing `aria-expanded`" was actually two (Q-491)** — one retired, four already Radix, two a back chevron. `weights-summary.tsx`/`added-weight-toggle.tsx` were real, now fixed.
 
-**The end-of-workout "How hard was that session?" prompt is gone (Q-420).** 25.6% fill rate;
-`sessionEffort()` already derives it from set RPEs at read time, so nothing downstream changed.
+**The end-of-workout "How hard was that session?" prompt is gone (Q-420).** 25.6% fill rate; `sessionEffort()` already derives it from set RPEs at read time, so nothing downstream changed.
 
-**Two Health cards stop vanishing on a failed fetch, and the fix needed a second one (Q-499).**
-They now show "Couldn't load…" on a 429/500. `onError` alone didn't work: `cachedFetchCore`'s dedup
-relayed a failure only to the torn-down owner, never to a joined caller — fixed in `lib/sqlite/cache.ts`.
+**Two Health cards stop vanishing on a failed fetch, and the fix needed a second one (Q-499).** They
+show "Couldn't load…" on a 429/500 now. `onError` alone didn't work: `cachedFetchCore`'s dedup relayed a failure only to the torn-down owner, never to a joined caller — fixed in `lib/sqlite/cache.ts`.
 
 **The database reclaim is three-quarters done, and the last quarter is one press.** The owner's
 `oura_raw_samples` vacuum reclaimed **36 MB** (93 → **57 MB**) and the automatic packer is now
