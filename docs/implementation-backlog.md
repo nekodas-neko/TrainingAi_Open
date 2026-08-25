@@ -1539,6 +1539,11 @@ budget-aware rule and wire it into those creation paths.
   1 Accessory and at 60 minutes 1 / 2 / 2; a single exercise added to a session that already has an
   anchor never silently becomes Primary; a test asserts the two schema defaults agree; and the plan's
   §4 fixture passes at ≥ 90%.
+- **Ordering and role must stay independent.** The generator orders a new session Primary →
+  Secondary → Accessory by default, but **reordering an exercise must never change its role** — the
+  owner's Legs day deliberately opens with a hip thrust as Secondary before the squat. Verified
+  2026-08-24: nothing derives `exercise_role` from `position` today, so this holds by construction.
+  An implementation that re-derives on reorder would silently overwrite that preference.
 - **Do NOT sweep existing rows in this PR** — that is BF-16, and it is owner-gated.
 - **Related, not blocking: BF-7** covers the *runtime* duration picker. This entry reads the
   session's *configured* budget, which BF-7's owner decision confirms is the anchor.

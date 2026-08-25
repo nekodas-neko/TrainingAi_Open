@@ -74,6 +74,20 @@ and scored 83%; correcting it to 2 took the same rule to 90%. Do not re-tune wit
 - **Non-anchors:** rank by muscle count descending; the top `secondary` of them are Secondary;
   anything with ≤ 1 muscle is Accessory regardless; the rest are Accessory.
 
+### Ordering is separate from role, and must stay that way
+
+**The generator orders a new session Primary → Secondary → Accessory by default.** That is the
+sensible default and the owner asked for it.
+
+**Reordering must never change a role.** The owner's active Legs day opens with a hip thrust as
+Secondary before the squat — a deliberate glute-activation choice — and dragging an exercise up the
+list must not promote it. Verified 2026-08-24: **nothing in the codebase derives `exercise_role` from
+`position`**, so this property holds today by construction. Keep it that way — an implementation that
+re-derives roles on reorder would silently overwrite exactly this preference.
+
+The two are orthogonal on purpose: `position` is the order you perform them in, `exercise_role` is
+how they are loaded.
+
 ### Drift check
 
 The same shape is the after-the-fact check — a session holding 3 Primary, or none, shows a nudge
