@@ -266,18 +266,16 @@ production shows no row that was ever mis-linked — though `claude_ro` is row-s
 that is *no evidence*, not *has not happened*
 ([journal](docs/overview/entries/2026-08-20-program-write-fk-ownership.md)).
 
-**RV-33 closed alongside it** — `POST /api/progression-styles` and
-`PATCH /api/nutrition/food-logs/[id]` answered a *correct* ownership refusal with an empty-bodied 500
-and filed it as a server fault, because the `NotFoundError` escaped an unguarded handler. Both are
-404s with a body now, and `updateMealType` — the only repository writer that passed its argument into
-`.set()` wholesale — is whitelisted column by column
+**RV-33 closed alongside it** — two routes answered a *correct* ownership refusal with an
+empty-bodied 500, because the `NotFoundError` escaped an unguarded handler. Both are 404s with a body
+now, and `updateMealType` — the only repository writer passing its argument into `.set()` wholesale
+— is whitelisted column by column
 ([journal](docs/overview/entries/2026-08-20-ownership-refusal-status.md)).
 
 **Q-362a closed (2026-08-20)** — `/api/day-log` keyed workout durations by session **name**, so two
-`Push` sessions in one day left a single window and the earlier one vanished. Now keyed by
-`workout_sessions.id`, and shipped **additively**: the colliding name-keyed record is still emitted
-so the three Lane B surfaces that read it keep working until Q-362b moves them, with LA-15 to remove
-it afterwards ([journal](docs/overview/entries/2026-08-20-day-log-duration-session-identity.md)).
+`Push` sessions in one day left one window and the earlier vanished. Now keyed by id, **additively**:
+the name-keyed record still ships until Q-362b moves the three Lane B readers, LA-15 removes it after
+([journal](docs/overview/entries/2026-08-20-day-log-duration-session-identity.md)).
 
 **Q-424 closed (2026-08-20)** — the doc-size ratchet compared the tree against a committed number, so
 two independently-green PRs could merge into a red `main`, failing on an unrelated branch over an
