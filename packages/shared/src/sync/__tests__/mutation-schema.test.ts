@@ -41,6 +41,11 @@ describe('MutationSchema', () => {
 describe('queueMutation domain coverage', () => {
   const ROOTS = ['lib', 'components', 'app']
   const domainLiteral = /domain:\s*'([a-z_]+)'/g
+  // `lib/export/` uses `{ domain, row }` as the NDJSON line label of a data takeout — a different
+  // concept that happens to share the field name, and nothing there queues a mutation. It only
+  // surfaced when Q-288 added a single-quoted literal; the pre-existing `domain: "goals"` had been
+  // sliding past on quote style alone, which is worth knowing about this scanner.
+  const NOT_SYNC = ['lib/export/']
 
   function walk(dir: string, acc: string[]): string[] {
     for (const entry of readdirSync(dir)) {
@@ -58,6 +63,8 @@ describe('queueMutation domain coverage', () => {
     const offenders: string[] = []
     for (const root of ROOTS) {
       for (const file of walk(join(cwd, root), [])) {
+        const rel = file.replace(cwd + '/', '')
+        if (NOT_SYNC.some(prefix => rel.startsWith(prefix))) continue
         const src = readFileSync(file, 'utf8')
         for (const m of src.matchAll(domainLiteral)) {
           if (!allowed.has(m[1])) offenders.push(`${file.replace(cwd + '/', '')}: '${m[1]}'`)

@@ -300,6 +300,12 @@ jobs:
       - name: An admin check that cannot run is not a refusal
         run: node scripts/check-admin-guard-catch.js
 
+      # Q-288: /api/export covered 26 of 82 tables and presented as complete, because coverage lived
+      # in two hand-maintained arrays nothing compared to the schema. Every table added since the
+      # export was written was absent by accident.
+      - name: Every table is exported or excluded with a written reason
+        run: node scripts/check-export-coverage.js
+
       - name: A route that reads a request body parses it
         run: node scripts/check-json-body-parsed.js
 

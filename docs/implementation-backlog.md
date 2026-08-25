@@ -5460,6 +5460,39 @@ ehr     0     0     0     0   648   208   128   556     0
     **fixing coverage without fixing this is strictly worse than the bug.** Use keyset pagination by
     primary key (every prod table has one, verified) per
     [`plans/2026-08-17-admin-db-snapshot-endpoint.md`](superpowers/plans/2026-08-17-admin-db-snapshot-endpoint.md) §3.3.
+- ✅ **SHIPPED 2026-08-25** (`fix/export-completeness`). **Pagination first, coverage second**, in that
+  order and for the reason the entry gives. `lib/export/export-map.ts` is now the single authority:
+  **84 tables — 61 exported with a scope, 26 excluded with a written reason, 16 soft-delete
+  filtered** (three of the excluded are migration-created and absent from `schema.ts`).
+- **The list is exhaustive BY CONSTRUCTION, not by care.** `scripts/check-export-coverage.js` (Custom
+  Rules step 56 of 56) fails on a `pgTable` in neither record, on one in both, and on a stale entry
+  naming no table. **A new table cannot be forgotten, only classified** — which is the actual fix;
+  hand-extending the arrays would have reproduced the drift.
+- **Deliberately NOT driven from `generate-claude-ro-views.js`,** the entry's first suggestion. Its
+  views are scoped to ONE fixed owner via `app.claude_ro_owner`; this export is scoped to whoever is
+  asking. Coupling a per-request user export to the security-critical read-only view surface would
+  put both on one blast radius for no shared behaviour. The FK predicates are copied from its `VIA`
+  map with its reasoning, which is the part worth reusing.
+- **The exclusions are written down rather than absent.** Credentials (2), shipped catalogue (6),
+  app-internal ops (13), **raw BLE frames (3 — `oura_raw_samples` alone is 58 MB of hex, and
+  everything it encodes reaches the user through the decoded tables, which ARE exported)**, and 2
+  jointly about another account. **`oura_heartrate` and `rr_intervals` ARE exported** despite their
+  size: they are readings taken from the user's body, the least omittable thing in a health takeout,
+  and safe only because the read paginates now.
+- **The file also says what it is missing.** A `_manifest` line leads the NDJSON with every excluded
+  table and its reason — the entry's *"nothing signals the omission"* is the defect, and a bigger
+  file does not fix it.
+- **⚠ Two things the tests caught that review had not.** (a) The hand-written `SOFT_DELETED` list was
+  wrong in BOTH directions — two tables invented, thirteen missed — and a missed one means a takeout
+  that **resurrects content the user deleted**; the check now derives it from `schema.ts`. (b) The
+  sync-domain scanner (`mutation-schema.test.ts`) flags any `domain: '…'` literal, and the export's
+  NDJSON line label shares the field name. It is now excluded by prefix — worth knowing that the
+  pre-existing `domain: "goals"` had been sliding past **on quote style alone**.
+- **Keep:** the **large-download path is unverified**. `oura_heartrate` + `rr_intervals` are 46 MB of
+  table in production and inflate as NDJSON; memory is now bounded but **no full export has been run
+  against production**, so a request timeout is untested. Run one before any portability claim rests
+  on it. **Keep:** `goals` remains a repository call rather than a table and sits outside the map,
+  so the check cannot see it.
 
 ### [platform] Q-295 — Coach is 8% of AI calls, 52% of tokens, and the slowest surface in the app
 
