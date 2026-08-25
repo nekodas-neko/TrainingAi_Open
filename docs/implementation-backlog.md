@@ -2702,234 +2702,28 @@ design decision. See the correction at the top of that entry.
 - **Keep:** the on-device check, against `/admin/oura-ble` in the APK with real ring data spanning
   less than a full day (SpO₂/temp night-only windows are the common case). `Gate: device`.
 
-### [nutrition][platform] 🟠 BF-4 — the photo scan feels much slower, and the only dated change is the structured-output conversion
+### [nutrition][platform] 🟠 BF-4 — the photo scan feels slower; every hypothesis is measured, one scan settles it
 
-- **Gate:** owner — set 2026-08-25; see the re-measurement below. One photo scan unblocks it.
-- Lane: A — **the Lane B half SHIPPED 2026-08-23 (v1.331.0)**: `capture-step.tsx` bounds the photo to
-  1024 px, a **-86.6%** payload cut
-  ([`journal`](overview/entries/2026-08-23-bounded-scan-photo-payload.md)). **It was NOT shown to be the
-  owner's slowdown** — #112 and the cold-start check are the open half, and both are Lane A's, which
-  is why this entry's lane is now A. Nothing here is startable by Lane B.
-
-
-> ### ⚠️ RE-MEASURED 2026-08-25: nothing here is startable — it is waiting on ONE photo scan
->
-> **The two hypotheses left "on the table" below were already measured** — migration `208`'s header
-> records it, 2026-08-24, against the real model: `maxOutputTokens` changes nothing (never hitting a
-> cap) and `generateObject` costs ~10%, not a regression.
->
-> **But its conclusion — *"latency tracks OUTPUT tokens almost exactly"* — does not hold for the case
-> this entry is about.** Over all **30** production scans: r(latency, `input_tokens`) = **+0.958**,
-> r(latency, `output_tokens`) = **−0.122**. Both readings can be honest — a probe holding input fixed
-> will see output matter, while in production output barely moves (197→482) and the image swings
-> input 6× (206→1,298). **So the lever is the image payload, not the schema or an output cap.**
->
-> **Which is what the Lane B half already did — and it has never once run.** The 1024 px bound
-> shipped **2026-08-23**; the newest image-shaped scan is **2026-08-21**. Its **−86.6%** claim is
-> unverified against a real call, and `input_tokens` sat at a near-constant **1,275–1,298** across
-> all 17 image scans — that is the number that should drop.
->
-> **`payload_bytes` has never captured a value, anywhere.** Not a wiring defect: the route passes
-> `payloadBytes` on the image branch and migration 208 added the column ~08-24; there has simply been
-> no image scan since. Do not read the all-NULL column as broken instrumentation.
->
-> **➡️ `Gate: owner`, not work.** Everything actionable has shipped. One photo scan answers three
-> questions at once: whether `input_tokens` falls from ~1,280, whether `latency_ms` falls with it,
-> and what the upload leg costs (`payload_bytes` beside `latency_ms` is the subtraction this entry
-> was built for).
-
-**Owner report, 2026-08-23 (verbatim):** *"Ive noticed the nutrition scan for images is alot slower
-than it used to be; can we investigate why - from taking the photo to getting the result is much
-longer than before."*
-
-**🔁 AMENDED 2026-08-23, after the pre-cut history became available.** The owner pointed at the
-archived repo (`nekodas-neko/TrainingAI_Old`, 3,225 commits). It **corrects two claims below** — read
-this before the original analysis, which is kept so the reasoning is auditable rather than quietly
-rewritten.
-
-**Correction 1 — the measurement window is far narrower than it looked.** AI instrumentation landed
-in **#741 on 2026-07-22**; the earliest `ai_call_log` row is 2026-07-26. So "the AI call has always
-been ~4.2 s" is only true **since 2026-07-22**, and *nothing measured it before that*. The original
-wording ("NOT the regression, and that is measured") overstated what the data can support. If the
-owner's "used to be" predates late July, `ai_call_log` structurally cannot see it.
-
-**Correction 2 — the unbounded image payload is NOT the regression.** It is real and still worth
-fixing, but it cannot be what changed: `Camera.getPhoto({ resultType: Base64, source: Prompt,
-quality: 80 })` is **byte-identical since 2026-06-12**, never carried `width`/`height`, and
-`@capacitor/camera` is pinned at exactly **8.2.0 with an unchanged integrity hash** for the whole
-history. Demoted from "prime suspect" to a standing inefficiency — worth taking, but it will not
-explain a slowdown on its own.
-
-**✅ The one dated change to the scan's AI call: #112, `3219a475`, 2026-07-03** — *"AI usage batch:
-structured output, response caching, chat tools, prompt hygiene, stream robustness"*. It rewrote the
-route from **`generateText` + `JSON.parse(cleaned)`** to **`generateObject` + the Zod `ScanSchema`**,
-and added the one-shot retry (`lib/ai/retry.ts`) in the same PR. That is **19 days before
-instrumentation existed**, which is exactly why the latency table cannot see it.
-
-**The mechanism was plausible and is now retired.** `generateObject` constrains decoding to a
-schema, and CLAUDE.md *requires* structured output, so a revert was never on the table — but the
-2026-08-24 probe measured the cost at **~10%**, not a regression. `maxOutputTokens`, `temperature`
-and provider config are all still SDK defaults, and per the probe that is fine: the model was never
-hitting a cap. **The provider uses native JSON mode** (`responseMimeType` + `responseSchema`, not
-tool-calling) — checked in `@ai-sdk/google`, so the schema-strategy question is answered too.
-
-**Retries ruled out.** `withAiLogging` starts its clock **before** `withAiRetry`, so a retry and its
-1–1.5 s backoff would land in one row at roughly 9.7 s; the observed maximum is **5,013 ms**.
-
-**Everything else, checked and unchanged:** model (`gemini-3.1-flash-lite` throughout),
-`@ai-sdk/google` / `ai` (last moved 2026-05-23), and the route's later commits (#741 observability,
-#1298 surfaced previously-swallowed failures). **`ScanSchema` is no longer byte-identical since
-#112** — BF-11b reshaped it to `{identified, candidates[]}` on 2026-08-25; no image scan has run
-since, so its effect is unmeasured along with everything else in point 3 below.
-
-**How to reach the history, since this is the second entry to need it:** the archived repo is
-attachable in-session via `add_repo` (`nekodas-neko/TrainingAI_Old`), then
-`git fetch --unshallow` — a `--depth 1` clone cannot answer a "when did this change" question.
-
----
-
-**⚠️ The model call is NOT the regression, and that is measured.** All 30 production scans:
-image (~1,275 input tokens) **n=18, avg 4,168 ms** (3,498–5,013, 07-26 → 08-21); text (~215 tokens)
-**n=12, avg 1,667 ms** (1,319–2,135). The earliest image scan on record (07-26) took 4,545 ms —
-*above* the 18-call average — and the model is `gemini-3.1-flash-lite` on every row. **⚠️ Per
-Correction 1 this window opens 2026-07-22 and says nothing before it**: the AI call is stable *now*,
-not proven always to have been.
-
-**Also ruled out by reading the path, all cheap or absent:**
-- `rateLimit` is an in-memory `Map` (`lib/rate-limit.ts:97`) — no I/O on the request path.
-- Exactly one network call per scan. `callScan` (`capture-step.tsx:68`) does a single
-  `fetch('/api/nutrition/scan')`, and the route makes one `loggedGenerateObject` call.
-- Nothing happens after the response. `handleScanResult`
-  (`components/nutrition/food-logger-sheet.tsx:115`) is pure synchronous state, then `pushStep`.
-
-**Standing inefficiency (demoted from prime suspect by Correction 2 — worth fixing, not the regression): the image payload is unbounded.**
-`Camera.getPhoto({ resultType: Base64, source: Prompt, quality: 80 })` at `capture-step.tsx:113`
-passes **no `width`/`height`**, so it returns the S25's full-resolution JPEG; base64 adds ~33% on top.
-The gallery path is equally unbounded — `handlePhoto` runs `FileReader` over the raw `File` with no
-resize. The server accepts up to **5 MB of base64** (`MAX_BASE64_BYTES`, `scan/route.ts:86`) under an
-8 MB body cap, so multi-megabyte uploads are not rejected, just slow.
-
-**The argument that makes a downscale free rather than a trade-off:** every image scan in the table
-above reports **~1,275 input tokens**, within a 1,275–1,298 band across a month of real photos.
-Gemini normalises an image to a fixed tile budget before the model sees it, so a 4 MB photo and a
-400 KB photo produce the same token count and the same model work. **Bytes above that budget buy no
-accuracy — they are pure upload latency.** That also explains the owner's phrasing: "taking the photo
-to getting the result" is dominated by a leg that nothing in the app times.
-
-**Field-name trap — verified against the pinned plugin source, not from memory** (per CLAUDE.md's
-external-field-names rule, and this one would fail silently):
-- The app calls `getPhoto(options: ImageOptions)`, and `ImageOptions` names the fields **`width`** and
-  **`height`**.
-- The sibling `takePhoto(options: TakePhotoOptions)` names them **`targetWidth`** / **`targetHeight`**.
-- Writing the wrong pair is accepted by TypeScript's optional fields and ignored at runtime — a
-  downscale that silently never happens, which looks exactly like "the fix did not help".
-- Noted separately: `getPhoto` carries `@deprecated` in this pinned version, pointing at
-  `takePhoto` / `chooseFromGallery`. Not urgent, but a migration would move which field names apply.
-
-**Reuse rather than invent:** the saved-meal thumbnail entry above already prescribes an on-device
-canvas downscale before upload, for the same reason on a different surface. Take that technique; the
-target size here is larger (the model still has to read a plate of food), so pick it from the token
-budget rather than copying 128 × 128.
-
-**🔴 The gap that stops this being closed from data, and should be fixed alongside it:** nothing
-times the client half. `ai_call_log.latency_ms` covers the model call only, so "photo → result" — the
-thing the owner actually reported — has **no measurement anywhere**. Log the base64 payload size and
-the client-side elapsed time as part of this work, or the next report of the same shape starts from
-zero again.
-
-**A second candidate that could not be tested from a sandbox session:** Railway container cold start.
-`/api/nutrition/scan` is a low-traffic route, and a first request after an idle period pays
-container spin-up ahead of everything above. Worth checking against deploy times before assuming
-payload size is the whole story.
-
-**✅ The commit is now named** — see the amendment at the top. The earlier version of this entry said
-none could be, because the public repo holds a fresh history; the archived repo answers it.
-
-**What would confirm it, in one pass — run the same photo three ways and compare.** (a) Current
-`generateObject` path. (b) The same call with a flattened schema, or an explicit `maxOutputTokens`.
-(c) Downscaled versus full-resolution upload, with the payload bytes logged. If (b) moves the number,
-#112 is the regression and the schema is the lever. If only (c) moves it, the upload dominates after
-all. If neither moves and wall-clock stays high, look at Railway cold start on this low-traffic
-route — the one candidate that could not be tested from a sandbox session.
-
-**Done looks like:** a photo scan uploads a bounded payload sized to what the model actually consumes;
-the identification stays as accurate as it is today; and the client-side elapsed time is recorded
-somewhere, so the next "it feels slow" starts from a number.
-
----
-
-**✅ THE PAYLOAD BOUND SHIPPED 2026-08-23 (v1.333.4, Lane B). The rest of this entry is open and it
-is all Lane A's.** [Journal](overview/entries/2026-08-23-bounded-scan-photo-payload.md).
-
-Both client paths bounded to a 1024 px longest edge — `getPhoto` gains `width`/`height` (the
-`ImageOptions` pair, verified against pinned `@capacitor/camera` 8.2.0, **not** `takePhoto`'s
-`targetWidth`/`targetHeight`), gallery via the new `lib/media/downscale-image.ts`. **Measured:
-4000 × 3000 → 1024 × 768, base64 2,266,776 → 302,944 chars, −86.6%.**
-
-**⚠️ Not closed, and NOT shown to be the owner's regression** — Correction 2 above already demoted
-the payload to a standing inefficiency.
-
-**✅ THE EXPERIMENT RAN 2026-08-24, against the real model, and it retires #112.** The entry asked
-for exactly this — *"run the same photo three ways and compare"* — and a
-`GOOGLE_GENERATIVE_AI_API_KEY` is present in a session sandbox, so it was run rather than reasoned
-about. Same image, same system prompt, one variable at a time:
-
-| arm | median | output tokens |
-|---|---:|---:|
-| (a) today's `generateObject` + `ScanSchema` | **1,700 ms** | ~485 |
-| (b) same, plus `maxOutputTokens: 700` | 1,672–3,530 ms, no trend | ~500 |
-| (c) same, schema **flattened** (no nested `ingredients` array) | **1,029 ms** | ~146 |
-| (d) `generateText` + `JSON.parse` — the pre-#112 shape | **1,529 ms** | ~450 |
-
-- **`maxOutputTokens` is ruled out.** Output tokens were unchanged (~500 either way) because the model
-  was never hitting a cap. Capping something that is not binding does nothing, and (b) came out
-  *slower* than (a) on the mean.
-- **#112 is essentially exonerated.** `generateObject` costs about **10%** over the `generateText` +
-  `JSON.parse` it replaced (1,700 vs 1,529 median, n=5 each, overlapping ranges) — not the 2× the
-  entry's central hypothesis needs. **The structured-output conversion is not the regression**, so
-  CLAUDE.md's no-`JSON.parse` rule costs nothing here and there is nothing to trade away.
-- **Latency tracks OUTPUT tokens almost exactly**, and the nested `ingredients` array is ~70% of them:
-  ~485 tokens → ~1.7 s, ~146 tokens → ~1.0 s. **(c) is not a proposal** — `sumIngredients`/`perServing`
-  need the array — it isolates where the time goes.
-- **Input tokens are constant at 1,093–1,275 regardless of image bytes**, confirming the entry's
-  claim that bytes above Gemini's tile budget buy nothing.
-
-**✅ THE PAYLOAD IS NOW MEASURED SERVER-SIDE (migrations 208 + 209).** `ai_call_log.payload_bytes`
-records the decoded image size beside the model's own `latency_ms`, so a wall-clock complaint can be
-answered by subtraction rather than re-argued. Verified through the real route on `pnpm dev`: a
-17,591-byte photo logged `payload_bytes 17591`, `input_tokens 1275` — **exactly the production band**
-— and a sibling `weekly-digest` row kept a NULL, which is the point of it being nullable.
-
-**✅ BF-11b's schema change was checked against this entry's own finding, and it is NOT a regression
-(measured 2026-08-25).** BF-11b (#480) replaced the flat `ScanSchema` with
-`{ identified, candidates: [...] }` so a scan can return one meal per dish. Since the experiment
-above established that **latency tracks output tokens almost exactly**, a deeper schema was a
-plausible way to have made this entry's complaint worse — so it was measured rather than assumed.
-Same prompt, same model, one variable, n=5 each:
-
-| schema | median | output tokens (median) |
-|---|---:|---:|
-| flat, pre-BF-11b | 1,761 ms | 391 |
-| `candidates[]`, shipped | **1,698 ms** | 409 |
-
-The array wrapper costs **~18 output tokens (+4.6%)**, and the latency difference is *negative* and
-far inside the run-to-run spread (flat 1,464–2,051; candidates 1,436–2,387). **The common
-single-dish scan is unaffected.** A genuinely multi-dish scan does cost proportionally more output
-tokens — but it is returning proportionally more meals, which is the feature rather than a
-regression.
-
-**What is left, and it is smaller than it was:**
-- **The client leg still has no number** — `payload_bytes` prices the upload's *size*, not its
-  *duration*, and "photo → result" starts on the device. That half is Lane B's (`components/**`); it
-  can now send its elapsed time to a column that already exists.
-- **Railway cold start on this low-traffic route** is the one candidate never tested, and after the
-  above it is the leading one. It cannot be tested from a sandbox session.
-- **Trimming the ingredients array** is the only measured latency lever left (~700 ms). Whether fewer
-  ingredients or fewer per-ingredient fields is acceptable is a product question, not an engineering
-  one.
-- **Railway cold start** — still untestable from a sandbox.
-- **Not device-verified:** only the gallery path ran here. A wrong field pair downscales silently
-  never, which looks exactly like "the fix did not help".
+- **Lane:** A
+- **Gate:** owner — **one photo scan** (Nutrition → add food → camera, not barcode).
+- **Branch:** `perf/scan-latency` · **Added:** 2026-08-23 from an owner report · re-measured 2026-08-25.
+- **📄 The full investigation is
+  [`docs/reviews/2026-08-25-nutrition-scan-latency.md`](reviews/2026-08-25-nutrition-scan-latency.md)** —
+  extracted 2026-08-25 because it is *answered*, not because it is long. Read it before proposing
+  anything here; it retires four hypotheses by measurement and one of them twice.
+- **What is settled.** The model call is not the regression (measured). `maxOutputTokens` changes
+  nothing — the model was never hitting a cap. `generateObject` costs ~10% over the `generateText` +
+  `JSON.parse` it replaced, not a regression, and reverting is barred by CLAUDE.md anyway. Retries
+  are ruled out. The provider uses native JSON mode, so the schema-strategy question is answered too.
+- **What the numbers actually say.** Across all 30 production scans, latency tracks **input** tokens
+  (r = **+0.958**) and not output (r = **−0.122**). So the lever is the image payload — which is
+  exactly what the Lane B 1024 px bound targets, and **that bound has never run**: it shipped
+  2026-08-23 and the newest image-shaped scan is 2026-08-21.
+- **➡️ One photo scan answers three questions at once:** whether `input_tokens` falls from its
+  near-constant ~1,280, whether `latency_ms` falls with it, and what the upload leg costs
+  (`payload_bytes` beside `latency_ms` is the subtraction this entry exists for). `payload_bytes` is
+  NULL everywhere for the same reason — no image scan since the column shipped — and is **not** a
+  wiring defect.
 
 ### [workouts][platform] LA-21 — ✅ SHIPPED 2026-08-24: implausible session durations are culled from statistics
 
@@ -5021,170 +4815,29 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   test hook is present. Keep the affordance on device; make the control automatable. A spec covering
   log-set → complete-workout is the follow-on this unblocks.
 
-### [devices][heart-rate] Q-388 — the ring runs SpO₂ and daytime-HR recording permanently, nobody chose it, and it is ~3.5× stock drain
+### [devices][heart-rate] Q-388 — the ring runs SpO₂ permanently at ~3.5× stock drain; the decision is binary
 
 - **Lane:** A
-- **Gate:** owner — added 2026-08-25. Not a new judgement: this entry's own text already says
-  *"What still remains here is the SpO₂ decision itself (item 1) and the cadence knobs (item 4),
-  both owner-gated"*, and items 2 and 3 are done. The field just makes that machine-readable, so
-  `next-item.js` stops offering it as startable work.
-- **✅ Item (2) shipped 2026-08-23** in `feat/ring-service-device-pass` (native — **needs an APK**):
-  `enableMeasurementSequence()` now ends with `EXERCISE_HR → AUTOMATIC` and `reqBleFastHrMode(false)`,
-  so the fast-HR trap closes on every connect. Recorded as **R8** in
-  [`docs/oura-ble-operations.md`](oura-ble-operations.md) §1.
-- **⚠ Item (3) was already done before this entry was written, and the entry's central claim is
-  therefore false.** *"the keepalive already polls it every 5 min and `parseBattery` decodes it,
-  but it is never stored, so drain cannot be measured at all today"* — it **is** stored:
-  `OuraRingService.postBatteryPoll` fires on every keepalive tick into
-  `POST /api/oura-ble/battery-poll` → `oura_ble_battery_poll` (migration 133). Production holds
-  **6,346 polls from 2026-07-19 onward**, still arriving. So the evidence this entry says is
-  missing has existed the whole time, and **the A/B in (b) is runnable now** rather than blocked on
-  a native change.
-- **The drain is measured, not argued (2026-08-23).** Overnight, 22:00→08:00 Brisbane, nights with
-  no charging in the window: **−22, −24, −22, −38, −15 percentage points** over ~9.8 h. That
-  confirms the owner's ~20%/night report with the ring's own telemetry, and it means an SpO₂ A/B
-  needs only two nights of wear and this same query — no code, no APK.
-- **What still remains here** is the SpO₂ decision itself (item 1) and the cadence knobs (item 4),
-  both owner-gated. The batch no longer holds anything for this entry.
-- **2026-08-24 — owner asked whether gating SpO₂ + temp to a night-only window would help, and for
-  real numbers. It would not touch SpO₂, and would touch temp only marginally — this is a genuinely
-  new fix direction from items 1–4 above, and it is now resolved rather than open.** Full 24-hour
-  breakdown, owner's rows, 7 days (`claude_ro.oura_raw_samples`, `measured_at` bucketed to
-  Australia/Brisbane):
-
-  ```
-  hr   temp  spo2  green   ibi        hr   temp  spo2  green   ibi
-  00    571  5704     52  3874        12    469     0    719   287
-  01    429  4859      0  3236        13    390     0    815    40
-  02    551  5115      0  3288        14    385     0    866   289
-  03    439  3826      0  2411        15    454     0   1025   148
-  04    482  4715    392  3179        16    484    43   1305    79
-  05    854  9532    101  6098        17    476     0   1331   450
-  06    597  5885    308  4146        18    376   292    956   620
-  07    590  4179    586  3088        19    297    21    745    15
-  08    410  1173    639  1154        20    497     0   1616   317
-  09    465   144   1103   737        21    373     0    927   425
-  10    431    56   1436   153        22    462  1535    801  1406
-  11    351     0    670    47        23    450  3121    696  2291
-  ```
-
-  **SpO₂ (`spo2_r_pi_event`, tag 139) is 98.9% inside 22:00–09:00 already** (49,644 of 50,200/week) —
-  the ring's own AUTOMATIC-mode firmware already gates it to sleep, not the app. A night-only window
-  in our code would be a no-op restating what the firmware already does; it buys nothing beyond
-  item 1 (turn the feature off) and does not substitute for it. The real remaining lever for SpO₂ is
-  its *density* inside that window — hour 5 alone averaged ~23 events/min across the 7 nights — which
-  is the cadence question item 4 already names as unresolved, and item 4's own text is explicit that
-  the *radio*-side knobs it lists (`DRAIN_INTERVAL_MS`, connection priority) cannot touch a PPG/SpO₂
-  sensor duty cycle — no code in this repo currently exposes a sensor-side density control, so this
-  stays a fix direction, not a number.
-  **Temp (`temp_event`/`temp_period`, tags 70/105, DAYTIME_HR-bundled per `OuraProtocol.kt:114-122`)
-  is flat across all 24 hours — no night concentration to find.** It is also small: 10,171 of the
-  week's 166,233 raw events (6.1%), against SpO₂'s 30.2% and `ibi_and_amplitude`'s 22.7%. And per
-  `lib/oura-ble/rollup/run.ts:503-513`, the daytime stream (0x46/0x69) is **already dropped** from
-  the readiness temperature-deviation score — a documented quantisation defect (98.3% of 30k rows sit
-  on an exact 0.5°C grid) leaves it "no discriminative power," so only `sleep_temp_event` (tag 117,
-  1,112/week, fires only while asleep by the ring's own logic) feeds the score. The daytime stream's
-  one remaining consumer is `markWorn()` (`run.ts:865-867`, a coarse ≥31°C wear heuristic) — cutting
-  it to night-only would save at most ~3% of total event volume (half of 6.1%) and costs the daytime
-  half of that wear signal, which the other six event types feeding `markWorn` may or may not cover
-  as well; untested. **Not worth a PR on its own.**
-- **What this changes for items 1 and 4:** SpO₂ is confirmed the dominant, already-night-concentrated
-  cost — the open decision is still binary off-by-default (item 1) plus, if kept on, a real sensor
-  density/duty-cycle control that does not exist in the protocol layer today (item 4, now known to
-  need new ground rather than a config tweak). Temp is not a meaningful lever either way and needs no
-  further owner decision. Event counts are a volume proxy (each event costs one BLE frame + one flash
-  write + one decode), not measured mAh — no code changed by this note.
-- **⚑ This is the same investigation as Q-116, filed 11 days earlier, and neither entry knew.**
-  Q-116 (2026-08-06) reports a live HR reading on the Health tab with nobody having tapped
-  *Measure now*, and suspects it explains ~15%/night of drain; this entry (2026-08-17) reports
-  ~20% overnight. **The "separate latent defect" traced above is Q-116's own leak vector**: a
-  live-HR session that never reaches `stopLiveHr()` leaves fast-HR sampling on permanently, healed
-  by no reconnect or restart. Item (2) closes that vector outright, and item (3) is the
-  observability Q-116 needs before its ~15% claim can be tested at all.
-
-- **Branch:** `fix/ring-measurement-power-budget`
-- **Added:** 2026-08-17 · owner: *"the battery life drains too fast. Stock it lasts 7 days; but with
-  our build it loses about 20% over night I'm seeing. Well too much. It requires a long charge every
-  2 days. Needs to be reviewed to see whats chewing so much of its battery."*
-- **The arithmetic:** stock 7 days ≈ 14%/day. A charge every 2 days ≈ 50%/day, with 20% of that
-  overnight alone. Roughly **3.5× stock drain**.
-
-**What we turn on, and where.** `OuraRingService.onReady()` runs
-`OuraProtocol.enableMeasurementSequence()` on **every connect**
-(`android/app/src/main/java/com/trainingai/app/oura/OuraProtocol.kt:123-127`):
-
-```kotlin
-reqSetFeatureMode(FeatureId.DAYTIME_HR, FeatureMode.AUTOMATIC),
-reqSetFeatureMode(FeatureId.SPO2,       FeatureMode.AUTOMATIC),
-reqSetFeatureMode(FeatureId.REAL_STEPS, FeatureMode.AUTOMATIC),
-```
-
-Unconditional, idempotent, **no user toggle anywhere in the app**, and re-asserted on every
-reconnect so the ring can never drift back. On stock Oura, blood-oxygen sensing is an opt-in the
-vendor itself warns costs battery life. We enable it for everyone, permanently, and the only
-in-repo note on its cost is the REAL_STEPS comment observing that steps are *"passive (no sensor
-power cost, unlike the DHR burst)"* — so the DHR burst's cost was known and never budgeted.
-
-**Measured against production** (`claude_ro.oura_raw_samples`, 7 days, owner's rows only — this view
-is row-scoped to one user and prunes at 30 days, so these are the owner's counts, recently):
-
-```
-tag  event_name                rows(7d)
-139  spo2_r_pi_event             53,412   <- largest single source
- 96  ibi_and_amplitude_event     40,898
-128  green_ibi_quality_event     14,098
-115  ehr_trace_event              3,859
-```
-
-**SpO₂ is both the biggest source and concentrated exactly where the owner sees the loss** — events
-by hour, Brisbane:
-
-```
-hour   00    03    05    08    11    14    16    20    23
-spo2 5942  4946  7319  1465     0    11  2149    54  5216
-green  45   125     0   587   706   750  1174  1126  1068
-ehr     0     0     0     0   648   208   128   556     0
-```
-
-~75% of SpO₂ events fall between 22:00 and 09:00 — the overnight window the owner reports losing
-20% in. Green-PPG (DAYTIME_HR) carries a steady daytime load on top.
-
-- **A step change on 2026-08-04 that nothing explains — resolve this first.** Daily totals go
-  5,378 → 23,874 and hold (SpO₂ 586 → ~8,000/day). **Open question, not a cause:** this counts
-  *ingested* events, so better draining looks identical to more sensing. SPO2 has been in
-  `enableMeasurementSequence` since 2026-07-07 (#320, v1.117.2), and
-  `docs/overview/history-2026-08-04.md` shows no ring-side change that would account for it. It
-  decides whether the fix is "sense less" or "we always sensed this much and only now noticed".
-- **A separate latent defect, found while tracing — NOT today's cause.** `reqBleFastHrMode(false)`
-  and `EXERCISE_HR → AUTOMATIC` appear **only** in `liveHrStopSequence()` (`OuraProtocol.kt:256-259`);
-  the connect-time sequence resets DAYTIME_HR, SPO2 and REAL_STEPS but **neither of these**. Any
-  live-HR session that never reaches `stopLiveHr()` — app killed mid-workout, Samsung battery
-  management killing the service (failure L9 in
-  [`docs/oura-ble-operations.md`](oura-ble-operations.md)), or the `/admin/oura-ble` tester's
-  **Live HR** button without **Stop HR** — leaves continuous fast-HR sampling on **permanently**,
-  healed by no reconnect, app restart or service restart. Production says it is not firing now
-  (`ehr_trace_event` is zero 21:00–08:00), so it is a trap waiting, not the current drain. Fix
-  regardless: add both resets to the connect-time sequence, the one path guaranteed to run.
-- **Evidence that would settle it:** (a) ~~persist the ring's battery telemetry~~ — **done since
-  2026-07-19**, see the correction above; (b) A/B two nights, SPO2 `OFF` vs unchanged, same wear
-  pattern, compare overnight % — that prices the feature directly, **and (a) means this is now a
-  wear-pattern question rather than an engineering one**;
-  (c) confirm whether the owner had blood-oxygen sensing enabled in the stock Oura app before the
-  re-key. If it was off there and on here, that alone is most of the gap.
-- **Fix directions (undecided — measurement first):** (1) make SpO₂ a user setting defaulting off,
-  rather than an unconditional connect-time write; (2) reset EXERCISE_HR and fast-HR mode in
-  `enableMeasurementSequence()` — cheap, independent of the measurement, do it regardless;
-  (3) persist the battery poll so this is observable rather than argued; (4) *only then* the cadence
-  knobs ([`docs/oura-ble-operations.md`](oura-ble-operations.md) §2: raise `DRAIN_INTERVAL_MS`, drop
-  idle priority to `CONNECTION_PRIORITY_LOW_POWER`) — **these are radio-side, not sensor-side**, so
-  they cannot touch a PPG/SpO₂ duty cycle and are the wrong lever if sensing is the cause. That
-  doc's rule against touching the 5-min keepalive still stands: it is the drop detector.
-- **What would count as fixed:** overnight drop back near stock (~14%/day), proven by (a) rather
-  than a subjective "feels better", and nothing power-hungry enabled that the owner did not choose.
-- **Surface: device required for a fix, not for the measurement.** The sandbox cannot run BLE and
-  Kotlin only compile-checks in Android CI, so any *change* needs an APK and a wear cycle. But the
-  power draw **is** recorded and readable from here — the line above that said otherwise was wrong
-  for a month.
+- **Gate:** owner — see the decision below.
+- **Branch:** `fix/ring-measurement-power-budget` · **Added:** 2026-08-17 from an owner report
+  (*"it loses about 20% over night… requires a long charge every 2 days"*).
+- **📄 The full investigation is
+  [`docs/reviews/2026-08-25-ring-power-budget.md`](reviews/2026-08-25-ring-power-budget.md)** —
+  extracted 2026-08-25 because it is *answered*. It carries the 24-hour event breakdown, the drain
+  telemetry, the Q-116 duplication note and the two shipped items.
+- **Shipped:** item 2 (the fast-HR trap closes on every connect, `feat/ring-service-device-pass`,
+  needs an APK) and item 3 (battery polls were already stored — the entry's claim that drain could
+  not be measured was false; production holds 6,346 polls from 2026-07-19).
+- **Measured, so it is not re-argued:** overnight drain is **−15 to −38 points** over ~9.8 h on
+  nights with no charging, against stock's ~14%/day. **SpO₂ is already 98.9% inside 22:00–09:00**
+  (49,644 of 50,200/week) because the ring's own firmware gates it to sleep — so *"only run it at
+  night"* is a **no-op**, not a fix. Temperature is flat across 24 h and only 6.1% of events; the
+  daytime stream is already dropped from the readiness score, so it is not a lever either.
+- **➡️ The decision is binary: does SpO₂ stay on?** Off is the only lever that exists today — it is
+  the largest single event source. The alternative, reducing sampling *density* inside the night
+  window (hour 5 averages ~23 events/min), needs a sensor duty-cycle control that **no code in this
+  repo exposes**; the radio-side knobs cannot reach a PPG duty cycle. That is new protocol work, not
+  a config change.
 
 ### [body][app-shell] Q-319 — the Water widget's web fallback posts to a route that has no water field, and the value is discarded behind a 200
 
