@@ -5224,44 +5224,85 @@ ehr     0     0     0     0   648   208   128   556     0
   sequence has a `deload` phase at position 4 (Accumulation 4 → Intensification 3 → Peak 2 →
   Testing 1), so ~10 cycles between deloads. Long-ish, but a program-design choice.
 
-### [workouts] Q-304b — recompute (or leave) the 30 `personal_records` rows written before the AMRAP correction
+### [workouts] Q-304b — the PR recompute cannot be done as specified, and the real blast radius is 8× larger
 
 - **Lane:** A
-- **Added:** 2026-08-24 · split off Q-304 when its forward fix shipped · **owner answered the same
-  day: recompute** (the `Gate: owner` is cleared — see the decision below)
-- **Q-304's forward fix shipped** (`packages/shared/src/1rm.ts` — an unprescribed set now gets the
-  same `amrapScaleFactor` band discount an explicit AMRAP set already got via `calcAmrap1RM`, so a
-  13+ rep set with no progression style no longer feeds the 1RM estimate un-discounted). Verified:
-  measured against production first (1 of 29 flagged sets carried a style, so the qualifier that
-  would have closed the entry did not), 3 new tests at 13/20/21 reps plus the no-double-correction
-  case, full suite green.
-- **✅ DECIDED 2026-08-24 — RECOMPUTE. Gate cleared; this is now work, not a question.**
-  - **Lane: A** — it writes `personal_records`.
-  - **The framing that decided it: `personal_records` is a derived CACHE, not a primary record.**
-    `set_logs` holds what was actually lifted and is **not touched** — it stays the source of truth.
-    The stored `estimated1rm` is that data run through the 1RM formula, and the formula had a bug, so
-    the corrected value is **derivable and verifiable rather than a guess**. That is why this is not
-    the "silently rewriting your training history" hazard it first reads as, and why it differs from
-    a case where the raw record itself was wrong.
-  - **The prescription impact is real but NARROWER than this entry implied — do not over-state it in
-    the PR.** `resolveWorkingBasis` (`packages/shared/src/1rm.ts:398`) takes `lastNonDeload1rm`
-    **first**; `allTimePr1rm` is reached only when there is no real logged session at all, and even
-    then competes with `seedEstimate` via `Math.max`. So an inflated PR drives the prescribed weight
-    only for an exercise carrying a PR but **no recent log** — where it prescribes too heavy. The
-    everyday cost is the PR badge (`exercise-summary-screen.tsx`, `prBar`) and the AI chat's
-    `getPersonalRecords` tool reporting numbers never actually hit.
-- **How to do it.** Recompute the affected rows from `set_logs` through the corrected formula — the
-  same `amrapScaleFactor` path the forward fix now uses, imported, never re-derived (One Formula,
-  One Place). **Idempotent and unconditional**, per the Postgres-migration rules: running it twice
-  must not move a row twice, and it must not depend on a seed that may not exist.
-- **⚠ This is a data-changing migration — the destructive carve-out applies.** The owner has
-  authorised the *recompute* (2026-08-24); that is not a blanket approval of the migration's shape.
-  **Report the before/after per exercise in the PR**, and expect to show it before merging.
-- **Verification.** Measure against production first — 29 flagged sets, 30 PR rows, and only 1 of 29
-  carried a progression style. State how many rows actually moved and by how much; a recompute that
-  moves zero rows is a finding (the formula path was not what wrote them) and not a success.
+- **Gate:** owner — **re-gated 2026-08-25.** The owner authorised a recompute of 30 `personal_records`
+  rows on 2026-08-24. What the data actually asks for is a rewrite of **277 `exercise_logs`**, a
+  third of which cannot currently be explained. That is a different decision from the one that was
+  authorised, so it goes back rather than proceeding under the old yes.
+- **Branch:** `fix/pr-amrap-recompute` · **Added:** 2026-08-24 · re-measured 2026-08-25
+
+> ### ⚠️ MEASURED AGAINST PRODUCTION 2026-08-25 — three findings, any one of which blocks it
+>
+> **1. The specified method moves zero rows, by construction.** The entry says *"recompute from
+> `set_logs`"*, but `personal_records` derives from **`exercise_logs.estimated_1rm`** — a stored
+> column that `reconcilePersonalRecord` reads. The chain is
+> `set_logs → exercise_logs.estimated_1rm → personal_records`, so recomputing the PR layer alone
+> re-reads pre-fix estimates. The entry's own *"zero rows is a finding, not a success"* rule is
+> reached here by construction rather than discovery.
+>
+> **2. The blast radius is ~8× what the entry states.** It describes *"29 flagged sets"* and a
+> *"13+ rep set"*, but `amrapScaleFactor` discounts from **6 reps up** (`≤5 → 1.0`, `≤8 → 0.97`,
+> `≤12 → 0.93`, `≤20 → 0.88`, else `0.82`) — every unprescribed set above 5 reps, not just 13+:
+>
+> | | count |
+> |---|---|
+> | logs with an unprescribed set above 5 reps | **242** (680 sets, 6–25 reps) |
+> | eligible logs (non-bodyweight, non-baseline, non-deload) | 357 |
+> | **logs whose estimate would move** | **277** |
+> | average drop | **−2.14 kg** (max −15.00 kg) |
+>
+> **3. A third of the logs cannot be reproduced by EITHER formula, and it is time-localised.**
+> Replicating `calculate1RM` in SQL against current `set_logs` reproduces the stored value for only
+> 202 of 357. 40 more are explained by sets edited after logging; **115 are unexplained.** By month:
+>
+> | month | logs | reproduces | |
+> |---|---|---|---|
+> | 2026-05 | 108 | 77 | 71% |
+> | 2026-06 | 73 | 46 | 63% |
+> | **2026-07** | **102** | **9** | **9%** |
+> | **2026-08** | **68** | **68** | **100%** |
+>
+> **August reproducing 68/68 is what makes this trustworthy**: the SQL replication is correct, so
+> July's 9% is real divergence, not a broken measurement. Whatever changed in July is **not** the
+> Q-304 fix (shipped 2026-08-24). Filed as **LA-27**.
+>
+> **Recommendation: recompute nothing yet.** Rewriting 277 rows of a derived column on the user's
+> training history while a third of that population is unexplained is the *"a count that moves
+> further than your change explains is the bug"* case. Explain July first (LA-27), then bring the
+> owner the real proposal — 277 historical estimates, not 30 cached PR values.
+>
+> **Still correct and unchanged:** Q-304's forward fix; the derived-cache framing; and the narrow
+> prescription impact (`resolveWorkingBasis` takes `lastNonDeload1rm` first, so an inflated PR drives
+> a prescription only for an exercise with a PR but no recent log).
+
 - **Related, and deliberately still separate:** Q-298's 10 historical zero-1RM rows are the same
   shape and are **not** covered by this decision.
+
+### [workouts][platform] LA-27 — a third of `exercise_logs.estimated_1rm` cannot be re-derived, and July is 9%
+
+- **Lane:** A
+- **Added:** 2026-08-25, from the Q-304b re-measurement.
+- **The measurement.** Replicating `calculate1RM` against current `set_logs` reproduces the stored
+  `exercise_logs.estimated_1rm` for **202 of 357** eligible logs (non-bodyweight, non-baseline,
+  non-deload). A further 40 are explained by sets edited after logging. **115 are unexplained**, and
+  they are not spread evenly: **2026-08 reproduces 68/68 (100%) while 2026-07 reproduces 9/102 (9%)**,
+  with May at 71% and June at 63%.
+- **Why the August number is the important one.** It says the replication is CORRECT. A broken
+  replication would fail everywhere; one that reproduces a whole recent month exactly and then
+  collapses for July is measuring a real change in the data.
+- **What it is not.** Not the Q-304 AMRAP fix — that shipped 2026-08-24, after every row in this
+  window. Not deleted sets (the query excludes them) and not deloads (excluded by the same gates the
+  PR path uses).
+- **Why it matters.** `estimated_1rm` feeds `personal_records`, the PR badge, the AI chat's
+  `getPersonalRecords`, and `resolveWorkingBasis`'s no-recent-log fallback. If a third cannot be
+  re-derived, none of those can be audited — and **Q-304b is blocked behind it**.
+- **How to start.** Diff stored against replicated **per set, not per log**, on a handful of July
+  rows — that localises it to the weights, the reps, the `planned_pct`/`planned_reps` persistence, or
+  `use_for_1rm` subset selection. The formula is the least likely culprit, given August.
+- **Do not "fix" it by recomputing.** Overwriting the column removes the evidence of whatever caused
+  this. Explain it first.
 
 ### [workouts] Q-305 — the volume landmarks are computed and never shown to anyone
 
