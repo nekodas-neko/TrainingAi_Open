@@ -1860,8 +1860,12 @@ slow-load question on a clean `pg_stat_statements` read.
 - **Branch:** _unassigned_
 - **Added:** 2026-08-25 · found when PR #445, a **docs-only** change, failed E2E
 - **Lane: B** — Home card rendering. Test-or-app, see below; the implementer decides which.
-- **⚠ This blocks every open PR.** E2E is a required check and the failure is on `main`, so nobody
-  can merge until it is resolved. Same shape as BF-20's Lint break earlier the same night.
+- **⚠ It does NOT block merges, and that is the reason it needs picking up rather than a reason to
+  relax.** The first version of this entry said E2E was a required check and nothing could merge.
+  **Wrong** — branch protection requires Lint, Tests, Build, Custom Rules and Migration Check
+  (`CLAUDE.md` line 5); **E2E is not among them.** #454 merged at 04:19 with this same E2E failure.
+  So a red E2E stops nobody, which means it will sit red indefinitely and every later agent will
+  read a failing E2E as normal. That is worse than a blocking break, not better.
 
 **The failure**, `e2e/home-card-invalidation-refetch.spec.ts:59`, twice (original **and** retry, so
 not a flake):
