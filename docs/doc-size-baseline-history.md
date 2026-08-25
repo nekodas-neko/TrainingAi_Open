@@ -2150,3 +2150,13 @@ table is what makes the finding diagnostic rather than suspected — a **static 
 as a dynamic route, which rules out the app, the auth check and the database in one comparison. The
 negative result (Home's fetch count is flat across every commit since 2026-08-19) is what stops the
 next session hunting a regression that is not there.
+
+## 2026-08-25 — `docs/implementation-backlog.md` 11638 → 11678 (+40)
+
+**BF-21**, exposing `pg_stat_statements` to `claude_ro` once the owner enables it. Filed rather than
+done because it needs a migration number, which only Lane A may take — the entry exists to carry the
+handover, the owner's Railway steps, and the security argument for why this one view is *not*
+row-scoped (normalised query text carries shapes, never parameter values).
+
+It also carries a deliberate expectation-damper: BF-19 already measured the database at 3 ms with a
+99.90% cache hit, so a clean read here must not be treated as closing the slow-load question.

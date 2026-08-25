@@ -1812,6 +1812,45 @@ there. What changed is how often the device pays the *uncached* path — see BF-
 - **Surface: production only.** Every figure here is from a sandbox, not the S25 — the owner's
   absolute numbers will differ, but the static-vs-dynamic *comparison* is what carries the argument.
 
+### [platform] BF-21 — expose `pg_stat_statements` to `claude_ro` once the owner enables it
+
+- **Branch:** _unassigned_
+- **Added:** 2026-08-25 · owner approved enabling it after BF-19's investigation
+- **Lane: A** — **this entry exists because it needs a migration number, which BugFix may not take.**
+  One `claude_ro` view + grant, at the next free number.
+- **Gate: owner** — the extension must be enabled on Railway first (owner action, needs a Postgres
+  restart). Clears when `SELECT count(*) FROM pg_extension WHERE extname='pg_stat_statements'`
+  returns 1 in production.
+
+**The owner's half, in order.** `shared_preload_libraries` must include `pg_stat_statements` before
+the extension can work; it is a start-time parameter, so it needs a Postgres **restart**, not a
+reload. Then, as a superuser: `CREATE EXTENSION pg_stat_statements;`. Verified 2026-08-25 that it is
+**available and not installed** — `pg_available_extensions` lists `default_version` 1.12 with
+`installed_version` null, on PostgreSQL 18.6.
+
+**This entry's half.** The read-only role cannot see it without a view: `current_user` is
+`claude_readonly` and `search_path` is `claude_ro` alone, and that schema is **default-deny**, so
+`pg_stat_statements` is unreachable until a view exists. Add one and grant SELECT, at the next free
+migration number, in a NEW migration file (never edit an applied one — `ensureSchema` tracks by
+filename and would skip it forever).
+
+**Safe to expose, and why it is worth stating.** Every other `claude_ro` view is row-scoped to one
+user because production holds other people's health data. This one is not user-scoped and does not
+need to be: `pg_stat_statements` stores **normalised** query text — literals are replaced with `$n`
+placeholders — so it carries query *shapes* and timings, never parameter values or row content.
+Expose `query`, `calls`, `total_exec_time`, `mean_exec_time`, `rows`; there is no reason to expose
+anything else.
+
+**Temper the expectation.** BF-19 measured the database and it is not where the reported slowness
+is: `SELECT 1` returns in **3 ms**, cache hit is **99.90%**, and nothing sits idle in transaction.
+This is worth having as a baseline and it will catch a future regression, but it is unlikely to
+explain the load times — BF-19's client-side reporter is where that answer lives. Do not close the
+slow-load question on a clean `pg_stat_statements` read.
+
+- **What would count as fixed:** a session can run
+  `SELECT query, calls, mean_exec_time FROM claude_ro.pg_stat_statements ORDER BY total_exec_time DESC LIMIT 20`
+  and get rows.
+- **Surface: production only.** Nothing to verify locally beyond the migration applying.
 ### [nutrition][platform] BF-12 — logging a saved meal takes ~20s and the owner couldn't find it after navigating away; traced to the slow fallback firing, not a lost write
 
 - **Lane: A** — the fix is in `logMealItems`/local-store availability, not the UI. No schema.
