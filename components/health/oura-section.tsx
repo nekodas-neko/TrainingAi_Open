@@ -2,7 +2,7 @@
 
 import { memo, useEffect, useLayoutEffect, useState } from 'react'
 import { useTransitionRouter } from "@/lib/view-transition";
-import { BatteryMediumIcon, BatteryFullIcon, BatteryLowIcon, BatteryChargingIcon } from 'lucide-react'
+import { BatteryMediumIcon, BatteryFullIcon, BatteryLowIcon, BatteryChargingIcon, TriangleAlert } from 'lucide-react'
 import { secondsSinceLocalMidnight } from '@trainingai/shared/date-utils'
 import { cachedFetchToday, readTodayCacheSync } from '@/lib/sqlite/cache'
 import { TTL_MEDIUM, HEALTH_TRENDS_SUMMARY_TTL } from '@trainingai/shared/cache-ttl'
@@ -46,6 +46,7 @@ export const OuraSection = memo(function OuraSection({ trends: trendsProp }: Pro
   useEffect(() => { router.prefetch('/health/readiness'); router.prefetch('/health/sleep'); }, [router])
   const [data, setData] = useState<OuraStatsResponse | null>(null)
   const [loading, setLoading] = useState(true)
+  const [failed, setFailed] = useState(false)
   const [trends, setTrends] = useState<HealthTrendsResponse['trends']>([])
   const [liveBattery, setLiveBattery] = useState<{ percent: number; charging: boolean | null; ageMinutes: number } | null>(null)
 
@@ -65,8 +66,13 @@ export const OuraSection = memo(function OuraSection({ trends: trendsProp }: Pro
   }, [])
 
   useEffect(() => {
-    cachedFetchToday<OuraStatsResponse>('oura-stats', '/api/oura/stats', TTL_MEDIUM, d => setData(d))
-      .catch(() => {})
+    // Q-499: `.catch()` only sees a network throw — `cachedFetchToday` swallows a non-ok response
+    // unless the caller passes `onError`, so without it a 429 or a 500 is indistinguishable from a
+    // ring that was never connected, and this whole section silently disappears.
+    cachedFetchToday<OuraStatsResponse>('oura-stats', '/api/oura/stats', TTL_MEDIUM, d => setData(d), {
+      onError: () => setFailed(true),
+    })
+      .catch(() => setFailed(true))
       .finally(() => setLoading(false))
     // Live BLE battery poll — preferred over the frozen Cloud value when it's fresh.
     cachedFetchToday<{ latest: { percent: number; charging: boolean | null; ageMinutes: number } | null }>(
@@ -88,6 +94,19 @@ export const OuraSection = memo(function OuraSection({ trends: trendsProp }: Pro
   // Skeleton only when there's no cached data to paint — seeded data renders immediately
   if (loading && !data) {
     return <div className="rounded-2xl h-32 animate-pulse bg-muted/40" />
+  }
+
+  // A failed load is not the same as no ring, and the difference is the whole of Q-499: one is
+  // worth saying out loud, the other is correctly silent.
+  if (failed && !data) {
+    return (
+      <div className="rounded-2xl border border-border bg-muted/20 p-4">
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <TriangleAlert className="h-4 w-4 flex-none" aria-hidden />
+          Couldn&rsquo;t load your ring data — pull to refresh.
+        </div>
+      </div>
+    )
   }
 
   if (!data?.connected) return null

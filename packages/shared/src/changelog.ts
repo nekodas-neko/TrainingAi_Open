@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.367.1",
+    date: "2026-08-25",
+    changes: [
+      "Three cards that used to disappear when their data failed to load now say so instead \u2014 most importantly the Oura ring section, which vanishing made look like the ring had never been connected.",
+    ],
+  },
+  {
     version: "1.367.0",
     date: "2026-08-25",
     changes: [

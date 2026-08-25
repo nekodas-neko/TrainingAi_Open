@@ -3245,98 +3245,6 @@ this fits without an extraction.
   short-circuits and the enqueue never runs. That `queueMutation` throws on a dead local DB is read
   from source, not observed, and that is still true after the fix. `Gate: device`.
 
-### [app-shell][platform] Q-555 — offline, a tab tap is a silent no-op until the service worker claims the page
-
-- **Branch:** `fix/offline-first-load-navigation`
-- **Added:** 2026-08-18 · review sweep (offline read surfaces, driven for real) ·
-  [`docs/reviews/2026-08-18-offline-read-surfaces.md`](reviews/2026-08-18-offline-read-surfaces.md)
-- **Placement:** low. Narrow by construction — needs a first-ever load (or a cleared worker) plus
-  connection loss inside that window, and it self-heals on the next load.
-- **⚠️ Lead with the good news, because three of four results here are positive.** Both offline paths
-  **work** once the worker is in control: a full reload serves the precached `/offline` page verbatim,
-  and an offline tab tap navigates and paints **2515 chars against 2486 online (~101%)** with no
-  offline page and no skeleton. The offline-first design delivers.
-- **The defect is the uncontrolled window.** Measured:
-  | State | Offline tab tap |
-  |---|---|
-  | `controller: true` | navigates, paints ~101% of cached content |
-  | `controller: false` | **URL unchanged, no navigation, no offline page, no feedback at all** |
-- **The uncontrolled state is the first-ever page load** — the worker registers *during* that
-  navigation and claims only afterwards. So a genuine first session that loses connection inside that
-  window gets a tab bar where taps do nothing and nothing explains why.
-- **Why file something this narrow:** the symptom (*a tap that does nothing, silently*) is
-  indistinguishable from a frozen app, and on the APK the service worker **is** the offline cold-start
-  mechanism — so install day is exactly when a new user is most likely to be moving between networks.
-> **⚠️ DIAGNOSED 2026-08-23 (Lane A). The open question is answered and this is Lane B's to fix.**
-> ([`journal`](overview/entries/2026-08-23-q555-diagnosis.md))
->
-> **It is both, and the click handler is what makes it silent.** Read from source, no probe needed —
-> the entry guessed this would need the router's internals; it needed the call sites.
->
-> 1. `components/shell/tab-loading.tsx` — the `loading.tsx` fallback for every tab route, so **it is
->    what is on screen during the first-ever load**, which is precisely the uncontrolled window —
->    renders `<BottomNav />` **with no `onTabChange`**.
-> 2. Inside `TabShell` a tap is pure in-app state (`onTabChange={show}`) and never routes, which is
->    why the controlled case works. Outside it there is no such handler.
-> 3. `handleNavClick` (`bottom-nav.tsx:77`) calls **`e.preventDefault()` unconditionally**, then
->    `navigateWithTransition` → `router.push(href)`.
->
-> So the `<Link>`'s native navigation is suppressed on every tap, and the only remaining path is
-> `router.push`, whose RSC fetch cannot be served offline with no worker in control. **The
-> `preventDefault()` is what removes the fallback:** without it a failed navigation is a real browser
-> navigation, and the browser shows *something* — its own offline error, or the precached `/offline`
-> page once the worker controls.
->
-> **Measured vs inferred, kept apart.** Measured (the original review): controller `false` → the tap
-> does nothing. Code fact (verifiable now): the three points above. **Inferred:** that the App Router
-> aborts the failed RSC fetch without surfacing anything. Confirm that half with Playwright —
-> `context.setOffline(true)`, service worker unregistered, watch the RSC request fail — rather than
-> taking it on trust.
->
-> **No Lane A fix is hiding in the service worker.** It already does `skipWaiting()` on install and
-> `clients.claim()` on activate, so it claims as early as it can; the uncontrolled window is inherent
-> to a first-ever load. The fix is in the click handler.
->
-> **⚠️ THE RECOMMENDED FIX SHAPE DOES NOT WORK, and three more things were measured 2026-08-24
-> (Lane B). Read this before starting — an attempt got as far as a working predicate and could not
-> verify it, and the branch `fix/offline-tab-tap-native-fallback` is pushed unmerged as the record.**
->
-> 1. **"Stop suppressing the native navigation" is not available.** These are `next/link` anchors, so
->    Next's own click handler intercepts and calls `router.push` regardless — removing our
->    `preventDefault()` hands the click to the same failing path. There is no native navigation to
->    restore.
-> 2. **Forcing one is possible but worse.** Measured: a plain `<a>` click offline with no controller
->    lands on `chrome-error://chromewebdata/`. That is "something", but it throws away the cached
->    screen the user is looking at — the one thing that still works offline.
-> 3. **They already know they are offline.** `components/shell/offline-indicator.tsx` renders a
->    persistent *"Offline — showing saved data"* pill from `useOnlineStatus()` whenever offline, and
->    it is in the root layout. So the missing feedback is specifically **a response to the tap**, not
->    a statement that the connection is down. Do not add a second offline notice.
-> 4. **The predicate is the easy half and it is written.** `components/shell/nav-offline.ts` on that
->    branch, with `components/shell/__tests__/nav-offline.test.ts` pinning all four states (only
->    `offline && !controller` is the bug; offline WITH a controller is the path the review measured
->    working at ~101% of online content, so warning there would be a false alarm).
->
-> **What blocked it, and it is the whole remaining task: nobody has reproduced the failing tap.**
-> Three Playwright attempts, each failing for a different and instructive reason:
-> - Tapping from a settled `/health` measures **`TabShell`'s in-app tab switch** (`onTabChange={show}`),
->   not this defect. The URL does not change there either, which is exactly what makes the two look
->   identical — the first probe was misread as a reproduction because of it.
-> - Holding a tab route open with `page.route` does put `tab-loading.tsx`'s `<BottomNav />` (the one
->   with no `onTabChange`) on screen — `[aria-busy="true"]` confirms it — but a tap on an
->   already-visited tab then succeeds straight from the client router cache and proves nothing.
-> - Tapping a never-visited tab from that fallback still produced no toast. **Not diagnosed.** Next
->   step: log inside `handleNavClick` to establish whether the handler runs at all in that window,
->   before changing any more product code.
->
-> **Do not ship this without that reproduction.** The fix is three lines and unverifiable by reading;
-> the defect is a silent no-op, so a fix that does nothing looks exactly like a fix that works.
-- **Lane: B** — `components/shell/bottom-nav.tsx`.
-- **Not exercised — and this limit is load-bearing:** web build only. On web `cachedFetch` falls back
-  to `localStorage`, so what was verified is the **seed** path, **not** the native SQLite local store
-  that is the real source of truth on the APK. Re-check the first-load window **on device**, where the
-  worker's install timing and the WebView lifecycle differ.
-
 > **Swept 2026-08-19 — Q-552, Q-553 and Q-554 removed as complete.** All three were review findings
 > that were *fixed in the PR that filed them*, and each left behind a CI check that now enforces it:
 > `check-backlog-pointers.js`, `check-known-issue-duplication.js` and `check-index-doc-paths.js`
@@ -3371,11 +3279,21 @@ this fits without an extraction.
 
 - **Branch:** `fix/card-fetch-error-states`
 - **Lane:** B
-- **Keep:** the other ~10–18 candidate cards from the 2026-08-18 sweep remain an unenumerated
-  worklist (the review's own file list wasn't retrievable when this shipped; a fresh grep for
-  `cachedFetch`/`useCachedValue` + `return null` + no `onError`/error wording turns up ~18 today,
-  most needing per-file judgement to tell a real gap from a legitimate empty state). Not device or
-  offline verified — `cachedFetch` cannot revalidate at all offline.
+- **✅ THE REST OF THE SWEEP SHIPPED 2026-08-25 — enumerated, and it was three, not ~18.** The
+  estimate counted every self-fetching component with a bare `return null`; the shape is narrower
+  than that. Real: `health/oura-section.tsx` (its `null` means *no ring connected*, so a 429 made a
+  connected user's whole ring section vanish), `health/ai-periodization-status-card.tsx` and
+  `workout/exercise-hr-trend-card.tsx`. Judged legitimate and left alone: five *supporting* values
+  where a failure degrades a chart rather than removing a surface (`hr-profile` ×3,
+  `muscle-recovery`, `more-user-profile`), and five documented empty states
+  (`home-nutrition-zone-bar`, `food-logging-complete`, `training-stress-line`,
+  `training-stress-badge`, `exercise-detected-card` — permanently empty since the Cloud removal).
+  **`.catch()` is not the guard:** `oura-section` had one on every fetch and still vanished, because
+  `cachedFetch` resolves on a non-ok response. `e2e/card-429-error-state.spec.ts` covers all four
+  cards now, each new case confirmed red with the fix stashed.
+  [`journal`](overview/entries/2026-08-25-card-error-states-enumerated.md).
+- **Keep:** not device or offline verified — `cachedFetch` cannot revalidate at all offline, so what
+  these states do on a genuinely offline first load is untested. `Gate: device`.
 
 ### [app-shell] Q-359 — 36 other fetch-once effects have Q-402's latent bug; only the shell ones can bite
 
@@ -3736,10 +3654,17 @@ this fits without an extraction.
 
 ### [platform] Q-549 — Postgres holds 0.79 GB to serve 171 MB, at 0.002 vCPU
 
-- **Gate: owner** — the measurement above leaves nothing for code to change: `shared_buffers` is at
-  the default with a 99.87% hit ratio, and the one visible over-provision (`max_connections = 500`)
-  is a Railway console setting. The 0.79 GB figure also needs re-confirming over a full day, which
-  only the owner can read.
+- **Gate: owner** — narrowed 2026-08-25 (see the reading below). The 0.79 GB premise is **gone**;
+  all that is left of this entry is `max_connections = 500`, a Railway console setting worth tens of
+  MB. **The recommendation is to close this entry** — that call is one line and it is the owner's.
+
+> **⚠️⚠️ THE PREMISE IS FALSIFIED — owner pulled the Railway charts 2026-08-25.** `prod_DB` reads
+> **423 MB flat** across the 3-hour window (limit 8 GB) at **0.0 vCPU**, not 0.79 GB. This entry
+> predicted from a climbing post-restart reading that *"0.79 GB is the warmed steady state and will
+> return"*; seven days on a warm container, it has not. The 0.79 GB average spanned the 2026-08-17
+> `disk_full` outage. `shared_buffers` 128 MB / `max_connections` 500 confirmed unchanged.
+> **Full readings, caveats and the recommendation to close:**
+> [`2026-08-25-railway-and-db-readings.md`](reviews/2026-08-25-railway-and-db-readings.md) §2.
 
 > **⚠️ MEASURED against production 2026-08-19 — both named candidates are falsified. Read this before
 > starting; the entry below sends you at two dead ends.**
@@ -3809,6 +3734,12 @@ this fits without an extraction.
   offline and Railway's own tooling recovered it.
 - **One hard input either way:** Railway **cannot shrink a volume** and bills on storage *used*, so the
   5 GB provisioning is free and is not a reason to move.
+- **⚑ One input moved 2026-08-25.** Q-549's premise is falsified — `prod_DB` reads **423 MB flat**,
+  not the 0.79 GB this entry's ~$8/month floor was partly built on, so that slice was **never real
+  spend** rather than spend awaiting a fix. **Do not re-cost on it alone:** the app half is the
+  larger one and is still unmeasured at rest (Q-547's quiet-window read is still owed). Wait for
+  both halves read quiet, after Q-545.
+  [`readings`](reviews/2026-08-25-railway-and-db-readings.md) §4.
 
 ### [devices][platform] Q-545 — OWNER-DIRECTED FOCUS: move the Oura rollup onto the device (D2 Task 5) — the D-track's missing middle
 
@@ -3954,9 +3885,16 @@ this fits without an extraction.
 
 ### [platform] Q-547 — ANSWERED 2026-08-18: the app CPU is spiky (so Q-545 fixes it), and much of it is deploy churn
 
-- **Gate: owner** — the remaining work is an owner measurement, not code: confirm the dashed markers
-  on the Railway charts are deploys, then take the CPU/RAM baseline during a quiet window (a sandbox
-  cannot read Railway metrics). Everything else on this entry is answered.
+- **Gate: owner** — **halved 2026-08-25.** The deploy-marker half is corroborated (below). What is
+  still owed is only the second half: **the CPU/RAM baseline during a genuinely quiet window** — a
+  sandbox cannot read Railway metrics, and every reading taken so far has been on a shipping day.
+
+> **Deploy-marker half corroborated 2026-08-25.** The owner's `TrainingAI` chart carries the ~10-12
+> dashed markers, CPU spiking to **2.5 vCPU** and memory to ~1.2 GB off a 400 MB baseline, 649
+> requests in 3 h — and that window is independently known to hold **five merges** (#405, #406,
+> #407, #410, #408), with the largest spikes when #408 and #410 landed. **⚠️ So it is the opposite
+> of a quiet window and must NOT be used as the baseline or in any before/after comparison.**
+> [`2026-08-25-railway-and-db-readings.md`](reviews/2026-08-25-railway-and-db-readings.md) §3.
 
 - **Plan:** [`docs/superpowers/plans/2026-08-18-device-primary-compute.md`](superpowers/plans/2026-08-18-device-primary-compute.md) section 1, Task 0
 - **Branch:** *(none — an owner measurement, then a finding)*

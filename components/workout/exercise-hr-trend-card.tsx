@@ -1,7 +1,7 @@
 "use client";
 
 import { memo, useEffect, useState } from "react";
-import { HeartPulse, Info } from "lucide-react";
+import { HeartPulse, Info, TriangleAlert } from "lucide-react";
 import { Sparkline } from "@/components/ui/sparkline";
 import { cachedFetch, readCacheSync } from "@/lib/sqlite/cache";
 import { EXERCISE_HR_TREND_TTL } from "@trainingai/shared/cache-ttl";
@@ -22,19 +22,35 @@ interface Props {
 
 function ExerciseHrTrendCardInner({ exerciseName }: Props) {
   const [trend, setTrend] = useState<ExerciseHrTrend | null>(null);
+  const [failed, setFailed] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
+    setFailed(false);
     setTrend(readCacheSync<ExerciseHrTrend>(`exercise-hr-trend:${exerciseName}`));
     cachedFetch<ExerciseHrTrend>(
       `exercise-hr-trend:${exerciseName}`,
       `/api/workout/exercise-hr-trend?exerciseName=${encodeURIComponent(exerciseName)}`,
       EXERCISE_HR_TREND_TTL,
       d => { if (!cancelled) setTrend(d ?? null); },
+      // Q-499: without `onError` a non-ok response leaves `trend` null, which this card already
+      // uses to mean "no HR recorded for this exercise yet" — so a rate limit reads as an honest
+      // absence and the card just is not there.
+      { onError: () => { if (!cancelled) setFailed(true); } },
     );
     return () => { cancelled = true; };
   }, [exerciseName]);
 
+  if (failed && !trend) {
+    return (
+      <div className="rounded-xl border border-border bg-muted/20 p-4">
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <TriangleAlert className="h-4 w-4 flex-none" aria-hidden />
+          Couldn&rsquo;t load heart-rate history — pull to refresh.
+        </div>
+      </div>
+    );
+  }
   if (!trend || trend.coveredSets === 0) return null;
 
   const peakSeries = trend.sessions.map(s => s.avgPeakBpm).filter((v): v is number => v != null);

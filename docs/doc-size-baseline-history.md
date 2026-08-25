@@ -18,6 +18,31 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
+## 2026-08-25 — `projectOverview.md` 7937 → 7941 (`docs/implementation-backlog.md` raise withdrawn)
+
+The owner supplied the Railway charts three queue entries had been parked on, and the readings
+falsify **Q-549**'s premise: `prod_DB` holds **423 MB flat**, not 0.79 GB.
+
+**The first draft of this cost +8 and +50, and the ratchet was right to refuse it.** Most of those
+lines were *measurement*, not queue state — the settings dump, the arithmetic, the caveats, the
+reasoning about where 0.79 GB came from. That belongs in a reference doc, and it now lives in
+[`docs/reviews/2026-08-25-railway-and-db-readings.md`](reviews/2026-08-25-railway-and-db-readings.md)
+(new, unratcheted), linked from the platform index. What is left in the backlog is three short
+pointer blocks — the finding, the consequence for that entry, and a link — which is entry content.
+
+**The backlog raise to 11658 was withdrawn on the rebase and the number stands at 11638.** #444,
+#447 and #449 landed while this branch was in CI and removed enough completed entries to take the
+file to **11572** — under the original baseline even carrying this branch's +20. Ratcheting it down
+to 11572 here was considered and rejected: that shrink is those PRs' to claim, and banking it in
+this one would fail the next agent to add an entry (BF-11's plan is imminent) for a saving this
+branch did not make.
+
+The `projectOverview.md` +4 is one new Known-Issues row: the database is growing **~1.6 MB/day
+against `CLAUDE.md`'s stated ~0.4**, almost all of it `oura_raw_samples` doing its job.
+`CLAUDE.md` mandates a row for exactly this, and it is filed as a *measurement awaiting a third
+reading* rather than a defect — two points off a baseline taken immediately after a repack is not
+a trend, and the honest next step is another reading, not a fix.
+
 ## 2026-08-24 — `CLAUDE.md` 1154 → 1155
 
 One line on the backlog-conflict rule, because the class recurred a third time and the rule now has a

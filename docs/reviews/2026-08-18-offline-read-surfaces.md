@@ -55,6 +55,15 @@ exactly when a new user is most likely to be moving between networks.
 **Not diagnosed:** whether the no-op is Next's router aborting a failed RSC fetch, or the click
 handler swallowing it. Establishing that needs the router's internals, not another probe.
 
+> **⚠️ RETRACTED 2026-08-25 — the table above does not reproduce, and this is a fourth retraction to
+> add to the three below.** Driven again with `**/sw.js` aborted so `controller` is `false` for the
+> whole run: offline, the tab tap **navigates** and `app/error.tsx` renders an explicit *"You're
+> offline"* screen — both in a settled tab route and on the loading fallback. The one window that
+> does fail is *before hydration*, where `handleNavClick` cannot run and the anchor makes a native
+> navigation to the browser's error page; that is visible rather than silent, and inherent, since
+> neither our JavaScript nor the worker exists yet. Q-555 is closed unfixed —
+> [`journal`](../overview/entries/2026-08-25-q555-offline-tap-not-reproducible.md).
+
 ## Method — three retractions, and the second is the useful one
 
 This took five probe iterations. **Three produced plausible, specific, wrong answers**, and every one
