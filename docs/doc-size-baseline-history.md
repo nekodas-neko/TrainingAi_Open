@@ -2184,3 +2184,14 @@ The entry grew because the owner then reported a force restart fixed it, which r
 question to in-memory client state — and because the rewrite carries a six-row **ruled-out** table.
 That table is the point: six suspects with the measurement that killed each, so the next session
 does not re-run the same greps and reach the same dead ends.
+
+## 2026-08-25 — `CLAUDE.md` 1155 → 1159 (+4)
+
+The ring-key block told every session to confirm the owner holds `key.hex` before proposing an
+uninstall, and nothing recorded that they do. A session reaching that block had to either stall on
+the question or proceed without an answer — which is what cost a live session on 2026-08-17.
+
+Four lines in the most-read file in the repo, deliberately: the confirmation belongs beside the
+warning rather than in a backlog entry nobody opens at that moment. Written as dated and perishable
+rather than settled — one file on one machine goes stale silently — so the instruction to ask still
+stands, now with the current answer attached.
