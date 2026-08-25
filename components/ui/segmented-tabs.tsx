@@ -26,7 +26,9 @@ export function SegmentedTabs<T extends string>({
           aria-selected={value === t.value}
           onClick={() => onValueChange(t.value)}
           className={cn(
-            "flex-1 rounded-xl py-2 font-semibold transition-colors min-h-11",
+            // Q-395a finding 7: 48 dp is the floor for a tap target (CLAUDE.md), and these segments were
+            // the app's smallest at 44. One change here rather than eight at the call sites.
+            "flex-1 rounded-xl py-2 font-semibold transition-colors min-h-12",
             size === "sm" ? "text-sm" : "text-xs",
             value === t.value
               ? "bg-foreground text-background"

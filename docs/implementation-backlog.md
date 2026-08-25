@@ -1202,37 +1202,24 @@ whether or not anyone draws them first.
 ### [nutrition][app-shell] Q-395a — phase 2: the quantity sheet and Edit Meal's collapsing rows
 
 - **Lane:** B
-- **Needs:** Q-406
-- **Spec:** Q-395, findings 9, 12, 13 and the 2026-08-19 owner decision. **Drawings (committed
-  2026-08-24):** [`docs/design/2026-08-18-nutrition-rework-mockups.html`](design/2026-08-18-nutrition-rework-mockups.html)
-  — the expanded row is the **`srv/g — A`** artboard, the collapsed row is the `Full Cream Milk` row
-  in **`EditMeal.dc.html`**, and the sheet itself is **`Quantity.dc.html`**. Three artboards, not
-  one: the old wording (`unit-options.png` column A "and its Full Cream Milk row") named a file that
-  never existed and implied a single drawing carried both rows.
-- **Split out of Q-395 on 2026-08-23.** **Read Q-395 first** — it holds the decisions and this
-  entry does not repeat them.
-- **Scope.** The quantity sheet (new), and `ingredient-row.tsx` becoming `food-row.tsx` plus an
-  expanded state. Option A is decided: the unit rides on the number as a chip, `60 g` ⇄ `2 srv` on
-  one tap, built from `components/ui/segmented-tabs`. B and C are dead. Rows collapse when not
-  edited, one at a time, and the collapsed shape *is* Q-406's row — not a second component.
-- **⚠ A diary row never expands.** Finding 12 retired the list-row editor outright: a diary or
-  search row carries no editor at all. This entry governs the quantity control *where it does
-  appear* — the sheet, and the builder. Building an expanding diary row misreads both.
-- **The sheet must say where it came from:** the tapped row stays lit under the scrim, and the sheet
-  is headed `Ingredient 1 of 5 · <meal>`. Without that it reads as an unrelated screen.
-- **Edit Meal rides along:** the meal name becomes the screen title, the batch explainer becomes
-  the subtitle *"Makes 2 portions · 278 kcal each"*, and the servings control stays real at 48 px —
-  it was demoted to a subtitle in an early draw and the owner corrected that.
-- **48 dp floor applies here first** (finding 7): srv/g segments are the app's smallest targets at
-  40 px, stepper gap 6 px against 8 dp. One systemic change, not eight.
-- **Verification.** `check-hex-literals` lower per file · `check-component-size` clean, no new
-  BASELINE rows · `pnpm check:rules` · **device smoke run in both themes** — pure UI on the
-  canonical runtime, so a green `pnpm dev` is not sufficient.
+- **✅ THE CODE SHIPPED 2026-08-25 (v1.364.0)** — `quantity-sheet.tsx` new, `ingredient-row.tsx`
+  deleted, the builder's rows are the shared `FoodRow`, `QtyUnit` moved to `saved-meal-qty.ts`, and
+  48 dp done once in `ui/segmented-tabs.tsx` for all 8 call sites. `Needs: Q-406` removed — Q-406 has
+  said it was satisfied since 2026-08-23 while the field the tool reads said otherwise, the same
+  field-vs-prose gap as Q-306's. Verified in a browser at 412×915 in **both themes**, build and edit
+  paths, row highlight false → true → false.
+  [`journal`](overview/entries/2026-08-25-quantity-sheet-collapsing-rows.md) — it holds the design,
+  and the three things this entry got wrong (including that `food-row.tsx` already existed, so
+  *"`ingredient-row.tsx` becoming `food-row.tsx`"* could not be done literally).
+- **Keep:** the **device smoke run in both themes**, which a browser cannot stand in for — the
+  sheet's safe-area inset renders as 0 in the sandbox and the action row now carries Remove.
+  `Gate: device`.
 
 ### [nutrition][app-shell] Q-395b — phase 3: the day screen, against the 11-section coverage list
 
 - **Lane:** B
-- **Needs:** Q-395a
+- **`Needs: Q-395a` cleared 2026-08-25** — its components shipped; Q-395a stays queued only for a
+  device check on the builder, which does not gate this screen.
 - **Spec:** Q-395, findings 14 and 16.
 - **Scope.** `nutrition-content.tsx` and its cards. Grouped sections with full-bleed dividers
   replace gapped cards — that is most of the vertical space this screen spends on nothing. Extend
