@@ -25,6 +25,7 @@ const path = require('path');
 
 const { laneFromLines } = require('./lib/lane');
 const { keepFromLines } = require('./lib/keep');
+const { idPattern } = require('./lib/entry-id');
 
 const ROOT = path.resolve(__dirname, '..');
 const BACKLOG = path.join(ROOT, 'docs/implementation-backlog.md');
@@ -51,7 +52,7 @@ const entries = [];
 let current = null;
 for (const line of lines.slice(queueStart)) {
   if (line.startsWith('### ')) {
-    const id = line.match(/\b((?:LA|LB|BF|RV|TN|PS|Q)-\d+[a-z]?)\b/);
+    const id = line.match(idPattern());
     const title = line.replace(/^###\s*/, '');
     current = id
       ? { id: id[1], title, tags: [...line.matchAll(/\[([a-z-]+)\]/g)].map((m) => m[1]), lane: null, laneLines: [], needs: [], gates: [], batch: null, legacyBlocked: null, schemaRisk: false, keep: null }
@@ -67,7 +68,7 @@ for (const line of lines.slice(queueStart)) {
   if (!current) continue;
 
   const needs = line.match(/^\s*[-*]\s*\*{0,2}Needs:\*{0,2}\s*(.+)$/i);
-  if (needs) for (const m of needs[1].matchAll(/\b((?:LA|LB|BF|RV|TN|PS|Q)-\d+[a-z]?)\b/g)) current.needs.push(m[1]);
+  if (needs) for (const m of needs[1].matchAll(idPattern('g'))) current.needs.push(m[1]);
 
   const gate = line.match(/^\s*[-*]\s*\*{0,2}Gate:\*{0,2}\s*([a-z]+)/i);
   if (gate) current.gates.push(gate[1].toLowerCase());
