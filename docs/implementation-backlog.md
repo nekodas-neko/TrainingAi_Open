@@ -4671,9 +4671,66 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 - **Branch:** `perf/oura-raw-row-narrowing`
 - **Lane A.** Migration + `lib/data/**`.
 - **Added:** 2026-08-17
+- **Gate:** owner
 - ✅ **UNBLOCKED 2026-08-17.** The owner kept D4 as the destination **but with no deadline**, which
   lapses master-plan decision **O1** (*"do not do both"* — it vetoed `bytea` on the grounds the table
   was about to be dropped; a drop that is years out cannot veto a cheap reversible win today).
+> ### ⚠️ RE-MEASURED 2026-08-25 against production: neither half is worth doing now
+>
+> Everything below was sized before **Q-541's packing** shipped. Packing now runs automatically from
+> the ingest path, and the effect on this entry is not "the numbers moved" — it is that the table
+> this entry narrows **stopped growing**.
+>
+> **`oura_raw_samples` is now a bounded ~7-day rolling window.** Eight dates are present
+> (2026-08-18 → 08-25) at ~25k rows/day, 173,017 rows total; everything older has been sealed into
+> `oura_raw_packed`, which is already `bytea` and already omits `event_name` and `decoded`. So a
+> row-narrowing here buys a **one-time** saving that never compounds — which is the opposite of the
+> premise the entry was costed on (1.1M rows and climbing).
+>
+> | | when filed (2026-08-17) | re-measure 2026-08-23 | now (2026-08-25) |
+> |---|---|---|---|
+> | rows | ~1.1 M | 315k | **173,017** |
+> | table total | 666 MB | 87 MB | **58 MB** |
+> | dedup index | 78 MB | 22 MB | **15 MB** |
+> | `event_name` | 20 MB | — | **3.3 MB** |
+> | `body_hex` | — | 7.3 MB | **4.3 MB** |
+>
+> **What each half is actually worth, measured per column:**
+>
+> - **`event_name` drop — 3.3 MB, heap only.** It is in no index (the dedup key is
+>   `(user_id, ring_timestamp_ds, tag, body_hex)`), so there is no index win to add to it. And it is
+>   **irreversible**. The entry says take this half "regardless"; 3.3 MB does not buy a data-dropping
+>   migration, and the column is still the cheapest cross-check on the `tag` mapping the parity test
+>   pins.
+> - **`body_hex` `text` → `bytea` — ~4.3 MB.** ~2.1 MB in the heap (hex text is 2:1 against binary)
+>   plus ~2.2 MB off the 15 MB dedup index, which contains the column. **Lossless**, and needs no
+>   owner confirmation. Nominally the larger of the two — but by ~1 MB, and only once the index is
+>   counted; in the heap alone `event_name` is the bigger one.
+>
+> **Neither is worth a table rewrite of 173k rows plus the reader/writer changes across the ingest,
+> decode, pack and redecode paths and the `claude_ro` views.** Together they are ~7.6 MB of a 171 MB
+> database on a 5 GB volume at $0.15/GB/month, and reclaiming any of it needs a `VACUUM FULL` that
+> Q-315 shows there is still no working path for.
+>
+> **The table's size is not its columns, and that is what made the original sizing misleading.** The
+> 58 MB is **16.7 MB of column data + ~12 MB of heap overhead, dead tuples (10,256 at the reading)
+> and free space + 30 MB of indexes**. Column narrowing aims at the smallest third. If this table is
+> ever worth attention again it is for the index half — `oura_raw_samples_user_tag_ts` is 10 MB at
+> **1,960 scans** against the dedup index's 176,205 — or for the churn bloat, not for column width.
+>
+> **`decoded` is NULL on 173,017 of 173,017 rows.** Dead by design, not a decoder failure:
+> `lib/data/postgres/slices/oura-raw-frames.ts` documents it as *"the legacy `decoded` JSONB … `null`
+> for every hot row written since Lever 1a"*, with callers coalescing to an in-memory decode of
+> `bodyHex`. Dropping it is lossless because there is no data in it — but it saves ~0 bytes (a NULL
+> costs a null-bitmap bit), so it is schema hygiene, not a size win.
+>
+> **Recommendation: do neither half now, and do not treat this entry as startable.** If
+> `oura_raw_samples` is ever rewritten for some *other* reason, take the `bytea` conversion and the
+> `decoded` drop in that same pass — both are lossless and free once the rewrite is already
+> happening. Leave `event_name` alone unless the owner asks for it: a data-dropping migration is the
+> standing confirm-first carve-out, and 3.3 MB is not a reason to spend one. Revisit only if packing
+> stops bounding the hot tier.
+
 - **Take the `event_name` half regardless. Take the `bytea` half only if Q-541 is NOT imminent** — a
   packed blob is already `bytea`, so doing both is the same migration twice over 1.1M rows.
 - **Gives up nothing.** `event_name` is 20 MB owner-scoped across **30 distinct values, fully derivable
