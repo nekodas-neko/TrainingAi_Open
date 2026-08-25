@@ -11,17 +11,25 @@ tag table).
 
 ## Now
 
-**One PR in flight: `chore/drop-running-baselines` (Q-301b)** — migrations 220 + 221, suite green.
-Drive it to green if it has not merged; otherwise nothing is in flight. Then
-`node scripts/next-item.js --lane A`.
+**Two PRs in flight, and the second is STACKED ON THE FIRST.**
+- **#499 `chore/drop-running-baselines` (Q-301b)** — migrations 220 + 221, all required checks green.
+  **Waiting on the owner**: a data-dropping migration is CLAUDE.md's confirm-first carve-out. The
+  table has never held a row (`n_tup_ins` 0 for its whole life), so the risk is nominal — but ask.
+- **#501 `feat/ai-call-log-cached-tokens` (Q-295)** — DRAFT, migrations 222 + 223. **Must not merge
+  before #499**: its 223 is a claude_ro regen generated after 220's drop, so it carries no
+  `running_baselines` view and would strip that view while the table still existed. After #499
+  lands: rebase, regenerate 223, re-run gates, undraft.
 
-**Q-540 and Q-388 were parked today** after re-measuring their premises against production rather
-than reading them — both had sat in READY looking startable, and both are now `Gate: owner`. Detail:
-`docs/overview/entries/2026-08-25-drop-running-baselines.md` and PR #496. Only 1 of Lane A's top 15
-had owner-gating prose with no field, so that was a one-entry fix, **not** a sweep — don't make it one.
+Then `node scripts/next-item.js --lane A`.
 
-**Lesson worth carrying:** three entries in a row had premises production contradicted (BF-16a,
-Q-403, Q-540). Re-verify before implementing.
+**Q-540 and Q-388 were parked today**, both now `Gate: owner`, after re-measuring their premises
+rather than reading them. Only 1 of Lane A's top 15 had owner-gating prose with no field, so that was
+a one-entry fix, **not** a sweep — don't make it one.
+
+**Lesson worth carrying: FOUR entries in a row had premises production contradicted** (BF-16a's seed
+drift, Q-403's tier, Q-540's sizing, Q-295's latency). Re-verify before implementing. Q-295 is the
+one to remember — a review doc had carried the corrected number for a week while claiming it
+*"corroborates Q-295 exactly"*, and nobody propagated it.
 
 ## Read this before you trust the queue tool
 
@@ -31,13 +39,9 @@ by its tests, which passed throughout. Do that before taking its top row.
 
 ## The habit that has now paid on fourteen consecutive entries
 
-**Re-verify an entry's premise against current `main` before building it, and write down what you
-checked.** Two of four this session:
-
-| entry | what it said | what was true |
-|---|---|---|
-| **BF-16a** | *"Surface: production data. Not reproducible against the local seed."* | Reproduces exactly. All 140 seeded rows fingerprint identically in the dev DB and production — it is a defective **seed** (008/032), not drift, so the fix could be proved through the live route instead of argued |
-| **TN-7** | `console.error` does not reach `error_events` | True — `reportServerError` → `repo.insertErrorEvent` is the only writer, nothing bridges the console. Checked rather than taken on faith, and it is the whole basis of the entry |
+**Re-verify an entry's premise against current `main` (or production) before building it, and write
+down what you checked** — see the lesson in *Now*. The two shapes are "the entry's evidence is stale"
+and "the entry's evidence was never true"; worked examples are in this session's journal entries.
 
 ## Shipped
 
@@ -48,22 +52,18 @@ reports) · #480 BF-11b (scan returns one candidate per meal, v1.372.0) · #481 
 sweep) · #486 BF-11b follow-up · #487 BF-11g (library-first meal plan) · #489 LA-24 Kind 1
 (migration **219**) · #490 BF-20 (repo-root guard).
 
-**LA-24 is now a question, not work.** Its Kind 1 shipped; what is left is `Gate: owner` — BF-16a's
-additions to `Barbell Shrug` and `Barbell Hip Thrust` had no in-catalogue precedent, so extending
-them to the shrug and glute-bridge families is the same anatomical call made five more times unasked.
-The entry is written for an answer rather than an implementer.
+**LA-24 is now a question, not work.** Kind 1 shipped; what is left is `Gate: owner` — extending
+BF-16a's `Barbell Shrug`/`Barbell Hip Thrust` additions to their families is the same anatomical call
+made five more times unasked. Written for an answer, not an implementer.
 
-**BF-19 is the top READY item and was deliberately NOT taken.** It is a four-part telemetry feature
-(client reporter, ingest route, aggregate route, retention) whose own entry says the numbers only
-mean something once the reporter has run on the S25 — so it produces data nobody can read until a
-device run. BF-20 was taken instead because it fails *every open PR*, not just its own. Not a
-judgement that BF-19 is unimportant; it needs the device, and this session had none.
+**BF-19 is the top READY item and was deliberately NOT taken.** Four-part telemetry whose own entry
+says the numbers only mean something once the reporter has run on the S25 — it produces data nobody
+can read until a device run. Not a judgement that it is unimportant; it needs the device.
 
-**Three timing-dependent test defects shipped and were fixed in one day, all mine.** BF-18 allowed an
-async write zero milliseconds; TN-7's test counted rows written by two racing fire-and-forget calls;
-BF-11b's test paid a **4.3 s module import inside a 5 s budget**. One root, narrower than "async":
-**something in the test is timed that is not the behaviour being asserted.** Ask that before writing
-an assertion — a module import, a background write and a second writer are all answers to it.
+**Three timing-dependent test defects shipped and were fixed in one day, all mine** — an async write
+allowed zero ms, rows counted from two racing fire-and-forget calls, a 4.3 s module import inside a
+5 s budget. One root, narrower than "async": **something in the test is timed that is not the
+behaviour being asserted.** Ask that before writing an assertion.
 
 ## Standing constraints
 
@@ -118,11 +118,11 @@ before honouring it.
 
 ## The database reclaim — one press left
 
-`VACUUM FULL error_events` (**Q-315**, ~49 MB, **27% of the whole database** at 28 live rows) is the
-only piece outstanding, and **there is no button for it** — the admin UI's vacuum control covers
-`oura_raw_samples`. It needs `POST /api/admin/vacuum {"table":"error_events"}` with an admin session
-cookie, which a sandbox cannot produce. **Do not add a bearer path to that route without an explicit
-yes — it is an auth change.** Runbook: [`docs/handoff-2026-08-18-platform-database-reclaim.md`](../../handoff-2026-08-18-platform-database-reclaim.md).
+`VACUUM FULL error_events` (**Q-315**, ~49 MB, **27% of the database** at 28 live rows) is the only
+piece outstanding and **has no button** — it needs `POST /api/admin/vacuum {"table":"error_events"}`
+with an admin session cookie, which a sandbox cannot produce. **Do not add a bearer path to that
+route without an explicit yes — it is an auth change.** Runbook:
+[`docs/handoff-2026-08-18-platform-database-reclaim.md`](../../handoff-2026-08-18-platform-database-reclaim.md).
 
 ## Waiting on the owner
 
