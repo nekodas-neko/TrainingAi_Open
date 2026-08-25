@@ -2260,3 +2260,16 @@ leaves a temperature penalty switched off permanently.
 
 **Superseded on merge:** `main` had already moved the backlog past this number, so the raise carried
 no net change and `doc-size-baseline.json` was rebuilt from `origin/main` rather than spliced.
+
+## 2026-08-25 — `docs/implementation-backlog.md` raised, 11719 → 11803 (the device smoke run)
+
+Net +84, and the gross is larger: **four new entries added ~130 lines** while **Q-395a and Q-395b
+were removed** on the owner's device run passing. So the raise is smaller than the intake, which is
+the direction this file is meant to move.
+
+The four are BF-24 (the shipped day screen and artboard 1 are different layouts), BF-25 (the light
+theme has no switch), BF-26 (the quantity sheet's controls are undifferentiated) and BF-27 (5 of 45
+sheets handle the Android back gesture). Each carries the measurement it was filed on, which is the
+length: BF-24 enumerates seven divergences read off the shipped source against the artboard's inline
+styles, and an entry that says only *"doesn't match the mockup"* would send its implementer back to
+do that reading again.

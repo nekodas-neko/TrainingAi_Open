@@ -331,10 +331,92 @@ below threshold and left in place for next time.
 > out of order: the creator/planner block was titled *"pushed to the top"* while sitting 1,000
 > lines below the phases it follows.
 >
-> **Shipped already, so nothing below repeats it:** Q-395a (quantity sheet, v1.364.0), Q-395b's
-> layout half (day screen, v1.365.0 + v1.366.0), BF-11a (ingredient picker extract), and two of
-> Q-406's four call sites. **Untouched:** Q-395c and the whole BF-11b…h creator/planner chain —
-> which is exactly what the owner reported still looks unchanged on the device.
+> **Shipped and closed, so nothing below repeats it:** Q-395a (quantity sheet, v1.364.0) and Q-395b
+> (day screen, v1.365.0 + v1.366.0) — **both removed from this queue on 2026-08-25 when the owner's
+> device run passed**, journals
+> [`q-395a`](overview/entries/2026-08-25-quantity-sheet-collapsing-rows.md) ·
+> [`q-395b`](overview/entries/2026-08-25-nutrition-day-screen-sections.md) ·
+> [`q-395b grouping`](overview/entries/2026-08-25-nutrition-day-screen-grouping.md). Also shipped:
+> BF-11a (ingredient picker extract) and two of Q-406's four call sites. **Untouched:** Q-395c —
+> now unparked — and the whole BF-11b…h creator/planner chain, which is exactly what the owner
+> reported still looks unchanged on the device.
+>
+> **What that run added rather than closed:** BF-24 and BF-26 below, plus BF-25 and BF-27 in the
+> 2026-08-25 owner-request section further down.
+
+### [nutrition] BF-24 — the shipped day screen and artboard 1 are different layouts, not a partial one
+
+- **Lane:** B
+- **Added:** 2026-08-25, from the owner's device smoke run — *"Is that the final design? thats not
+  what the mockup looks like (Nutrition - the day)"*, with artboard 1 attached for comparison.
+- **Read first:** artboard **1 · Nutrition — the day** in
+  [`docs/design/2026-08-18-nutrition-rework-mockups.html`](design/2026-08-18-nutrition-rework-mockups.html).
+  Its fixture numbers (1,284 of 2,100 · 816 left · +412 burned · Breakfast 486 · Lunch 798) are the
+  ones in the owner's attachment — the attachment **is** the drawing, not a screenshot of the app.
+- **⚠ Q-395b did not claim to build this artboard.** It ticked an 11-section coverage list and
+  measured gap reclamation (420 px → 280 px). Nothing in it was a layout transcription, so this is
+  not a regression or a half-finished phase — it is work that was never scoped. Do not open it as a
+  bug against Q-395b.
+
+**The divergences, read off the shipped source against the artboard's inline styles:**
+
+1. **Header is two bands, drawn as one.** Artboard: 26 px `Nutrition` with the *date*
+   (`Wednesday 18 August`) as its subtitle, gear at right. Shipped
+   (`app/nutrition/nutrition-content.tsx:505–541`): `text-xl` title, a static
+   `Food diary & macros` subtitle, and a **second** row below carrying `‹ date ›`.
+2. **The energy block is stacked, not side-by-side.** Artboard: one 14 px-padded card, 104 px conic
+   donut on the **left** (82 px hole), and to its right `816 kcal left · +412 burned` above three
+   macro columns. Shipped: `CalorieBalanceBar` and `MacroRing` are two rows of a `divide-y` group
+   with a hairline between them. The drawing has no balance bar and no divider.
+3. **The action row is a different row.** Artboard: four equal 62 px tiles —
+   **Search · Scan · Photo · My meals**. Shipped `nutrition-action-row.tsx`: three wide buttons in a
+   2-column grid — **Log Food · Water · Saved Meals**. Scan and Photo have no tile at all. **Some of
+   this is Q-395c's**, which owns collapsing the capture entry points; decide the split before
+   building, and say which entry ships the tiles.
+4. **The grouping is inverted, and this is the big one.** Artboard: each meal is its **own** rounded
+   card; the meal name sits **outside and above it** as an uppercase 11 px label with the total
+   right-aligned on that same line; the card groups the *food rows*. Shipped: all meal types are
+   rows of **one** container and each meal's header is inside it. Q-395b grouped meals within the
+   screen; the drawing groups rows within a meal. Both are "grouped", which is why ② passed the
+   checklist and still looked wrong.
+5. **Meal header content.** Artboard: text label, one calorie number. Shipped: emoji, name,
+   kcal **plus** P/C/F chips, a round ⊕ and a chevron.
+6. **Food rows have no thumbnail.** Artboard draws a 40 px gradient tile per row.
+   `components/nutrition/food-row.tsx` says outright that the thumbnail is deliberately not built —
+   no call site passes one. **Q-406 owns it**; this entry only records that the drawing needs it.
+7. **The shipped screen has sections the drawing does not:** `MealPlanReviewCard`,
+   `MealPlanSection`, `TdeeAdaptationCard`, and the day-tools group (weekly chart + supplements).
+   An artboard is 812 px — one screenful — so it cannot be a total spec. **Part of this entry is
+   deciding which of those four stay and where**, not deleting them because they are absent from a
+   drawing that stops at the fold.
+
+- **Provisional, carried from the same run:** the owner's ④ (grouped-section backgrounds render
+  correctly, no Samsung compositor artifact) was answered *"This looks fine; but will keep this open
+  and let you know"*. That is the watching brief this entry carries — it is why Q-395b could be
+  closed without losing it.
+- **Verification.** Side by side against artboard 1 at 412 dp in a browser, then the device run.
+  State in the PR which of items 1–7 shipped and which were deliberately not, with the reason.
+
+### [nutrition] BF-26 — the quantity sheet's controls are all the same size, radius and fill
+
+- **Lane:** B
+- **Gate:** owner
+- **Added:** 2026-08-25, device smoke run ⑧ — the sheet **works** (edit and Remove both verified on
+  the S25), but *"the UI could use some work; everything looks the same; I can post a picture if
+  needed"*.
+- **What is owed from the owner:** the picture. Ask for it before starting — the finding below is a
+  reading of the source, and the owner is looking at something specific in it.
+- **What the source already shows.** In `components/nutrition/quantity-sheet.tsx` the amount input is
+  `h-14 rounded-xl bg-muted`, the − and + buttons are `w-12 h-12 rounded-xl bg-muted`, and Remove is
+  `min-h-12 w-12 rounded-xl bg-destructive/10`. Same radius, near-identical height, same fill family
+  — only Remove's tint differs, and it differs by opacity. So the value the sheet exists to set has
+  no more visual weight than the buttons that nudge it, which is a literal reading of *"everything
+  looks the same"*.
+- **Do not treat this as a rewrite of the sheet.** Q-395a shipped it four days ago and its behaviour
+  passed on the device. This is hierarchy — the amount reads as the subject, the steppers as chrome,
+  Remove as destructive and separated — not new structure.
+- **Verification.** Both themes in a browser (or dark only, if BF-25 lands first), then the device
+  run; the safe-area inset under the action row renders 0 in the sandbox.
 
 ### [nutrition][app-shell] Q-406 — the shared food row: two call sites converted, two waiting on their phase
 
@@ -655,39 +737,9 @@ whether or not anyone draws them first.
   in both themes, so a green `pnpm dev` is not sufficient evidence and a Known-Issues row is the
   fallback if no device is available.
 
-### [nutrition][app-shell] Q-395a — phase 2: the quantity sheet and Edit Meal's collapsing rows
-
-- **Lane:** B
-- **✅ THE CODE SHIPPED 2026-08-25 (v1.364.0)** — `quantity-sheet.tsx` new, `ingredient-row.tsx`
-  deleted, the builder's rows are the shared `FoodRow`, and 48 dp done once in `ui/segmented-tabs.tsx`
-  for all 8 call sites. Verified in a browser in both themes, build and edit paths.
-  [`journal`](overview/entries/2026-08-25-quantity-sheet-collapsing-rows.md) — it holds the design
-  and the three things this entry got wrong.
-- **Keep:** the **device smoke run in both themes** — the sheet's safe-area inset renders as 0 in the
-  sandbox and its action row carries Remove. `Gate: device`.
-
-### [nutrition][app-shell] Q-395b — phase 3: the day screen, against the 11-section coverage list
-
-> **🚧 PART SHIPPED 2026-08-25 (v1.365.0) — the entry stays open.** The meal list is one bordered
-> block with full-bleed dividers (`MealCard` gained `grouped`), `MacroRing`'s arc is split by macro,
-> and the trailing group moved to `day-tools-section.tsx`, taking `nutrition-content.tsx` off the
-> 800-line ceiling (789 → 773). All 11 sections ticked. **Measured: gaps were 420 px of 2,649
-> (16%)**, not *"most of the vertical space"*; this reclaims 100.
-> [`journal`](overview/entries/2026-08-25-nutrition-day-screen-sections.md).
-- **✅ THE LAYOUT HALF IS DONE 2026-08-25 (v1.366.0).** Two more grouped sections — energy
-  (`CalorieBalanceBar` + `MacroRing`) and reference (`WeeklyNutritionChart` + `SupplementsSection`).
-  **Gaps across the whole arc: 420 px → 280 px (16% → 11%), screen 111 px shorter.** Both themes
-  measured on a fully loaded screen, checklist 11 of 11 in each; a past date draws no empty bordered
-  box. [`journal`](overview/entries/2026-08-25-nutrition-day-screen-grouping.md). **What stays
-  ungrouped is conditional by nature** (the plan cards, `TdeeAdaptationCard`, `FoodLoggingComplete`,
-  the action row), so a fixed container would draw an empty border on the days they are absent.
-- **Keep:** the **device smoke run**, the only thing left — three `divide-y` sections over
-  `bg-muted/60` children now, the shape Samsung's compositor has caught out before. `Gate: device`.
-
 ### [nutrition][app-shell] Q-395c — phase 4: Log Food becomes one screen, and `My Foods` becomes one name
 
 - **Lane:** B
-- **Needs:** Q-395b
 - **Spec:** Q-395, findings 15 and 17.
 - **Scope.** The capture step's six scattered entry points collapse to one screen: search across
   everything · two tabs · a bottom row of capture actions.
@@ -1024,6 +1076,81 @@ whether or not anyone draws them first.
   half is not** — it needs a real Gemini turn, so run one plan end-to-end against `pnpm dev` and
   say plainly that the on-device pass (safe-area under the composer, the widget inside a scrolling
   thread) was not exercised unless it was.
+
+## Owner request, 2026-08-25 — the device smoke run on the nutrition rework
+
+*The owner ran the ten-step checklist for Q-395a and Q-395b on the S25 and answered every step.
+Both device gates passed and both entries closed. Four findings came out of the answers rather
+than the checks: two are nutrition-screen work and sit in the section above (BF-24, BF-26); these
+two are app-wide and sit here.*
+
+### [app-shell][platform] BF-25 — the light theme has no switch, and the owner wants it gone
+
+- **Lane:** B
+- **Gate:** owner
+- **Added:** 2026-08-25, device smoke run ⑤ — *"Do we have an option in the app to go between dark
+  and light mode? I vote we remove dark/ight mode and only have one real option which is the dark."*
+
+**The answer to the question, because it changes the decision: no, there is no switch.**
+`grep -rn 'setTheme('` over `app/` and `components/` returns **zero** call sites. `app/layout.tsx:140`
+mounts `<ThemeProvider attribute="class" defaultTheme="system" enableSystem>`, so the theme follows
+the **phone's** setting and nothing in the app can change it. Light mode is not an option the owner
+chose and can un-choose; it is what the app becomes if the S25 is ever put in light mode.
+
+**Recommendation: force dark, keep the light palette.** These are two separable changes and only one
+of them is worth making.
+
+- **Do:** `forcedTheme="dark"` on the provider — one line, and after it no user, no OS setting and no
+  auto-scheduled night mode can produce a light render. Reversing it is deleting the prop.
+- **Do not:** delete the light palette. The `:root` block in `app/globals.css` (the `.dark` block
+  overrides it), the scheme-conditional pairs in `resolveColor`, `HERO_GRADIENTS`,
+  `lib/background/screen-palettes.ts`, and the `resolvedTheme` reads in
+  `components/nutrition/weekly-nutrition-chart.tsx` and `components/health/detail-hero.tsx` all cost
+  **nothing while unreachable** — dead CSS custom properties are not paid for at runtime. Deleting
+  them is a wide, hand-verified sweep whose only benefit is tidiness, and it is the half that cannot
+  be undone.
+- **What it buys immediately:** every "verify in both themes" gate in this repo collapses to one
+  theme, including the ones sitting open on Q-395a and BF-26 right now. That is the real saving, and
+  the one-line change delivers all of it.
+- **Reversal cost:** removing the prop, if `forcedTheme` alone ships. Weeks of re-derivation, if the
+  palette goes too.
+- **The one thing to check before shipping even the one-liner:** the `useTheme()` mounted-gate hazard
+  in CLAUDE.md defaults to dark during SSR, so forcing dark cannot introduce a flash — but confirm
+  `next-themes` still stamps `.dark` synchronously under `forcedTheme`, since three components
+  document depending on exactly that.
+
+- **Verification.** Put the S25 in light mode and confirm the app stays dark end to end. Then grep
+  for surfaces reached outside the provider — the icon routes and any canvas paint — since a forced
+  class cannot reach those.
+
+### [app-shell] BF-27 — 5 of 45 sheets handle the Android back gesture; the other 40 navigate the page away
+
+- **Lane:** B
+- **Added:** 2026-08-25, device smoke run ⑩. The quantity sheet passed — back closed the sheet and
+  left the day screen — and the owner's reply was that this is the exception: *"there are many pages
+  that dont do this well; so we should do a review on these pages to make it all like this"*.
+- **Measured 2026-08-25.** `lib/hooks/use-sheet-back-dismiss.ts` is imported by **five** components:
+  `morning-checkin-sheet`, `nutrition/food-logger-sheet`, `nutrition/quick-edit-log-sheet`,
+  `nutrition/end-of-day/end-of-day-review`, `nutrition/food-library-sheet`. There are **45** files
+  rendering `<SheetContent>` and **6** rendering `<DialogContent>`, none of the latter using it. So
+  on ~40 sheets the back gesture is handled by the WebView, which navigates the underlying page
+  instead of dismissing the thing on top of it.
+- **The hook is the answer and it is already hard-won** — read its comment before touching anything.
+  It carries the LB-10 fix for React StrictMode's mount-time cleanup→effect pair and a per-instance
+  id so a nested sheet's cleanup does not cascade into its parent's handler. Do not re-derive it, and
+  do not write a second one.
+- **Scope this as a sweep, one PR.** `useSheetBackDismiss(open, onClose)` at each site, wired to the
+  same state the sheet's `onOpenChange` already drives. The risk is not per-site difficulty, it is
+  **nesting** — a sheet opened from inside another sheet is where the history stack goes wrong, and
+  the hook's own comment says so. Enumerate the nested pairs first and test those; the flat ones are
+  mechanical.
+- **`<DialogContent>` needs a decision, not the same treatment.** A confirm dialog dismissed by the
+  back gesture may be the right behaviour or may be a lost confirmation. State the choice in the PR
+  rather than sweeping all 6 silently.
+- **Verification.** `e2e/sheet-back-dismiss.spec.ts` already exists — extend it, do not replace it.
+  Then the device run: open each swept sheet, back-gesture, confirm the sheet closes and the page
+  behind it is unchanged. **The web sandbox cannot exercise the Android gesture** — the E2E spec
+  drives `history.back()`, which is close but not the same input.
 
 ## Owner request, 2026-08-24 — Body Battery is flooring, and stress needs an hour-of-day record
 
