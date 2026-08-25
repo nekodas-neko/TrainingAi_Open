@@ -1494,6 +1494,31 @@ samples) — it is already queued and is a plausible contributor to why the EMA 
 40% of nights negative; the −10 arm firing on under 20% of nights; and the illness radar able to
 reach its `watch` threshold on at least one historical night (the Q-506 half).
 
+**➕ Add one more pass test — the Body Battery morning anchor (measured 2026-08-26).** The owner
+reported the battery starting low on waking: *"battery starts at 57? I figured it should be much
+higher when waking up."* **The battery does not charge overnight** — `walkBodyBattery` filters to
+`tsMs >= wakeTime`, so the anchor *is* the whole overnight story, and `resolveAnchor` sets it to the
+readiness score. A readiness score carrying a −10/−20 temperature penalty therefore lands directly on
+the number the owner reads at 7 am.
+
+Measured over the 35 days where both a battery row and a temperature deviation exist:
+
+| | now | with the penalty removed |
+|---|---|---|
+| mean morning anchor | **64.8** | **76.8** |
+| mornings waking "Charged" (≥75) | **7/35 (20%)** | **21/35 (60%)** |
+
+**Conservative** — the 6 days whose deviation exceeded 1.0 °C were *clamped* to 40 rather than
+subtracted from, and a clamp cannot be reversed by adding the penalty back, so those days are counted
+as unchanged. The real improvement is larger.
+
+So **fixing the baseline is also the fix for "the battery never wakes up full"**, and the pass test
+gains a line: after the re-derivation, the mean morning anchor sits **above 75** over the trailing 30
+days. **Do not redesign the anchor or add overnight charging to chase this** — that would be a large
+change to a value Q-511 shows is load-bearing, aimed at a symptom this fix already removes.
+Re-measure after it lands; if the anchor still reads low then, *that* is when the design question is
+real.
+
 **Not established:** whether the owner was actually ill on any flagged night. The finding is that a
 permanently-positive deviation cannot tell illness from baseline error.
 

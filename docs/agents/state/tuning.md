@@ -82,6 +82,15 @@ sleep ✅ · readiness ✅ · activity ✅ · body ✅ · devices ✅ · workout
   the queue is comprehensive on that class. The four-for-four record that motivated the sweep held for
   the *investigated* thresholds and did not generalise.
   [`review`](../../reviews/2026-08-25-threshold-sweep.md).
+- **The Body Battery does NOT charge overnight — the anchor IS the whole overnight story.**
+  `walkBodyBattery` filters to `tsMs >= wakeTime`, and `resolveAnchor` sets the start to the
+  readiness score. So a morning battery value is a readiness score wearing a battery label, and the
+  temperature penalty lands directly on the number the owner reads at 7 am. Measured 2026-08-26 over
+  35 days: removing that penalty moves the mean morning anchor **64.8 → 76.8** and mornings waking
+  "Charged" (≥75) from **7/35 to 21/35** (conservative — the 6 clamped days count as unchanged).
+  **Do not propose overnight charging or an anchor redesign to fix "it starts low"** — it is a large
+  change to a value Q-511 shows is load-bearing, aimed at a symptom TN-6 already removes. Re-measure
+  after TN-6 lands; only then is the design question real.
 - **A distribution screen is BLIND to "always fires" and "never crosses".** Run against the two known
   failures it catches neither — `temp_dev_c` has a healthy range, `illness_score` looks merely sparse.
   It finds stuck and dead scores only. Pair every threshold with its input, or the screen reads clean
