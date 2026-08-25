@@ -14,7 +14,7 @@ silently misdirecting the next session. Update them in the same PR that consumes
 
 | Pointer | Value | Source of truth |
 |---|---|---|
-| Next free Postgres migration | **224** | `lib/data/postgres/migrations/` |
+| Next free Postgres migration | **225** | `lib/data/postgres/migrations/` |
 | Local SQLite schema version | **v29** | `lib/sqlite/migrations.ts`; `lib/sqlite/__tests__/migrations.test.ts` asserts the max |
 
 > **There is no third pointer any more.** Entry IDs are not allocated from a shared counter and
@@ -2388,44 +2388,6 @@ Do not implement it; the labels alone fix what the owner asked about.
   Target/Assisting; the same role renders identically on every screen.
 - **Surface: UI strings only, web-reproducible.**
 
-
-### [workouts] LA-24 — the three catalogue families where the anatomy is a judgement, not a precedent
-
-- **Branch:** _unassigned_
-- **Added:** 2026-08-25 · measured while shipping BF-16a
-- **Lane: A** — data correction, no schema. `exercise_library.muscles`.
-- **Gate: owner** — this is the whole entry now.
-
-- ✅ **KIND 1 SHIPPED 2026-08-25 — migration 219.** The five rows another family member already
-  answered: `Dumbbell Overhead Press`, `Machine Shoulder Press` and `Arnold Press` gained **traps**
-  (from `Barbell Overhead Press`), `Lat Pulldown` gained **upper back** (from `Close Grip Lat
-  Pulldown`, `Chin-Up`, `Pull-Up`), and `Decline Bench Press` gained **shoulders** (from `Decline
-  Dumbbell Press` and every other bench/chest press). All five were at 2 muscles, so BF-15's anchor
-  rule barred them; all five are at 3 now.
-  [`journal`](overview/entries/2026-08-25-catalogue-sibling-muscles.md).
-
-**Kind 2 is what is left, and it needs an answer rather than an implementer.** BF-16a took
-`Barbell Shrug` to traps + upper back + forearms and `Barbell Hip Thrust` to five muscles **from
-anatomy, with no in-catalogue precedent**. Their families were left at the old values, so that
-correction created a fresh inconsistency:
-
-| Row | Records | Its corrected sibling now records |
-|---|---|---|
-| **Dumbbell Shrug** | traps (1) | Barbell Shrug: traps, upper back, forearms |
-| **Machine Shrug** | traps (1) | Barbell Shrug: traps, upper back, forearms |
-| **Barbell Glute Bridge**, **Bodyweight Glute Bridge**, **Single Leg Hip Thrusts** | glutes(m), hamstrings(s) | Barbell Hip Thrust: + quads, lower back, adductors |
-
-**These are not a copy-paste, which is the reason to ask.** A machine shrug's handles may be
-supported where a barbell shrug's grip is not; a bodyweight glute bridge does not load the quads the
-way a loaded hip thrust does. It is the same judgement BF-16a was allowed to make once, and making it
-five more times without asking is how a catalogue drifts by assertion.
-
-- **The question for the owner, in one line:** should the shrug and glute-bridge families follow the
-  barbell version, or are they correct as recorded because the loading genuinely differs?
-- **What would count as fixed:** either an idempotent append migration in the shape of 216/219, or
-  the entry closed as "correct as recorded" with the reason written down.
-- **Surface: catalogue data.** Fully reproducible locally — the seeded rows are identical in the dev
-  DB and production (fingerprinted 2026-08-25).
 
 ### [platform][app-shell] BF-19 — nothing measures app load time, and the one measurable driver is 80 deploys in a day busting the whole offline cache
 
@@ -5456,67 +5418,32 @@ ehr     0     0     0     0   648   208   128   556     0
   sequence has a `deload` phase at position 4 (Accumulation 4 → Intensification 3 → Peak 2 →
   Testing 1), so ~10 cycles between deloads. Long-ish, but a program-design choice.
 
-### [workouts] Q-304b — the PR recompute cannot be done as specified, and the real blast radius is 8× larger
+### [workouts] Q-304b — CLOSED 2026-08-25: the historical 1RM estimates stay as they are
 
-- **Lane:** A
-- **Gate:** owner — **re-gated 2026-08-25.** The owner authorised a recompute of 30 `personal_records`
-  rows on 2026-08-24. What the data actually asks for is a rewrite of **277 `exercise_logs`**, a
-  third of which cannot currently be explained. That is a different decision from the one that was
-  authorised, so it goes back rather than proceeding under the old yes.
-- **Branch:** `fix/pr-amrap-recompute` · **Added:** 2026-08-24 · re-measured 2026-08-25
+- **Lane:** A · **Owner decision, 2026-08-25: do not recompute.** This entry is closed, not parked.
+- **What was asked and why the answer is no.** The owner authorised recomputing 30
+  `personal_records` rows on 2026-08-24, before the cost was known. Measuring it first (see
+  `docs/overview/entries/2026-08-25-drop-running-baselines.md` and the LA-27 work) found three things
+  that changed the question:
+  1. The specified method — recompute from `set_logs` — **moves zero rows by construction**, because
+     `personal_records` derives from the stored `exercise_logs.estimated_1rm`, not from `set_logs`.
+  2. The real blast radius is **277 `exercise_logs`**, not 30 cached values: `amrapScaleFactor`
+     discounts from **6 reps up**, not the 13+ the entry assumed.
+  3. **76 of those** belong to a progression style edited *after* the log was written, so
+     re-deriving would substitute today's prescription for the one actually trained under, with
+     nothing in the result showing which (LA-27).
+- **What that costs, since "leave it" is not free either.** An inflated PR shows on the badge and in
+  the AI chat's `getPersonalRecords`, and drives a too-heavy prescription **only** for an exercise
+  carrying a PR with no recent log — `resolveWorkingBasis` takes `lastNonDeload1rm` first. That is
+  the accepted cost.
+- **Q-304's forward fix is unaffected and remains correct** — unprescribed high-rep sets have been
+  discounted since 2026-08-24. This decision is only about history.
+- **Reversible if it ever matters:** `set_logs` is untouched and is the source of truth, so the
+  recompute stays possible. What would first need solving is LA-27's 76 rows — a re-derivation that
+  cannot say which prescription it used is the thing to avoid, not the arithmetic.
+- **Related and still separate:** Q-298's 10 historical zero-1RM rows are the same shape and are
+  **not** covered by this decision.
 
-> ### ⚠️ MEASURED AGAINST PRODUCTION 2026-08-25 — three findings, any one of which blocks it
->
-> **1. The specified method moves zero rows, by construction.** The entry says *"recompute from
-> `set_logs`"*, but `personal_records` derives from **`exercise_logs.estimated_1rm`** — a stored
-> column that `reconcilePersonalRecord` reads. The chain is
-> `set_logs → exercise_logs.estimated_1rm → personal_records`, so recomputing the PR layer alone
-> re-reads pre-fix estimates. The entry's own *"zero rows is a finding, not a success"* rule is
-> reached here by construction rather than discovery.
->
-> **2. The blast radius is ~8× what the entry states.** It describes *"29 flagged sets"* and a
-> *"13+ rep set"*, but `amrapScaleFactor` discounts from **6 reps up** (`≤5 → 1.0`, `≤8 → 0.97`,
-> `≤12 → 0.93`, `≤20 → 0.88`, else `0.82`) — every unprescribed set above 5 reps, not just 13+:
->
-> | | count |
-> |---|---|
-> | logs with an unprescribed set above 5 reps | **242** (680 sets, 6–25 reps) |
-> | eligible logs (non-bodyweight, non-baseline, non-deload) | 357 |
-> | **logs whose estimate would move** | **277** |
-> | average drop | **−2.14 kg** (max −15.00 kg) |
->
-> **3. A third of the logs cannot be reproduced by EITHER formula, and it is time-localised.**
-> Replicating `calculate1RM` in SQL against current `set_logs` reproduces the stored value for only
-> 202 of 357. 40 more are explained by sets edited after logging; **115 are unexplained.** By month:
->
-> | month | logs | reproduces | |
-> |---|---|---|---|
-> | 2026-05 | 108 | 77 | 71% |
-> | 2026-06 | 73 | 46 | 63% |
-> | **2026-07** | **102** | **9** | **9%** |
-> | **2026-08** | **68** | **68** | **100%** |
->
-> **August reproducing 68/68 is what makes this trustworthy**: the SQL replication is correct, so
-> July's 9% is real divergence, not a broken measurement.
->
-> **✅ LA-27 answered it the same day (mechanism there), and the answer makes the recompute WORSE
-> rather than unblocking it:** those logs predate `set_logs.planned_pct` persistence, so the
-> prescription used at log time is not in the set row. **76 of them belong to a progression style
-> edited after the log**, and styles are user-editable — re-deriving substitutes today's
-> prescription for the one actually trained under, invisibly. Worse than the inflation this entry
-> set out to fix, which is at least explainable.
->
-> **Recommendation: recompute nothing yet.** Rewriting 277 rows of a derived column on the user's
-> training history while a third of that population is unexplained is the *"a count that moves
-> further than your change explains is the bug"* case. Explain July first (LA-27), then bring the
-> owner the real proposal — 277 historical estimates, not 30 cached PR values.
->
-> **Still correct and unchanged:** Q-304's forward fix; the derived-cache framing; and the narrow
-> prescription impact (`resolveWorkingBasis` takes `lastNonDeload1rm` first, so an inflated PR drives
-> a prescription only for an exercise with a PR but no recent log).
-
-- **Related, and deliberately still separate:** Q-298's 10 historical zero-1RM rows are the same
-  shape and are **not** covered by this decision.
 
 ### [workouts][platform] LA-27 — ANSWERED: the un-re-derivable estimates predate `set_logs.planned_pct`
 

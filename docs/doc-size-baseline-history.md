@@ -18,6 +18,26 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
+## 2026-08-25 — LA-24 shipped and Q-304b closed (`docs/implementation-backlog.md` → 11948)
+
+**The file ends the day at exactly the number it started it on.** Both moves are entries leaving
+rather than prose being cut: LA-24's Kind 2 was decided by the owner and shipped as migration 224, so
+its entry went; Q-304b was decided *against* and collapsed from 62 lines of open investigation to 27
+of recorded decision.
+
+(Set from 12021 here because LA-28's own reduction to 11997 is in a PR that had not merged when this
+branch was cut. Both land at the file's real length, which is the only number that matters — this is
+exactly the case the "never splice, re-derive from the file" rule exists for.)
+
+**Worth reading with the three raises above it, because the shape of the day is the point.** The file
+went 11948 → 11989 → 12005 → 12021 → **11948**. Every raise was an entry being *corrected* — a
+premise production contradicted, where the measurement tables are what stop the next session
+re-running the same queries. Every reduction was an entry being *finished* or *answered*. Net zero,
+which is the right steady state for a queue file: it should breathe with the queue rather than
+ratchet upward with prose.
+
+The compaction chore the BF-4 record proposed is still worth doing — several answered entries belong
+in `docs/reviews/` with a pointer left behind — but it is no longer urgent on size grounds alone.
 ## 2026-08-25 — LA-28 shipped (`docs/implementation-backlog.md` 12021 → 11997, a RATCHET DOWN)
 
 **−24, and it is the first move in the other direction today.** LA-28 completed, so its entry left
