@@ -381,6 +381,20 @@ observed changing the model's output.
 
 Review: [`docs/reviews/2026-08-25-threshold-sweep.md`](reviews/2026-08-25-threshold-sweep.md).
 
+- ✅ **THE SEED IS FIXED, 2026-08-25** (`fix/baseline-zero-seed`, batch shipped as one PR). Working:
+  [`entries/2026-08-25-baseline-zero-seed.md`](overview/entries/2026-08-25-baseline-zero-seed.md).
+  `seedOrUpdateBaseline` seeds the first sample and **the vendor port is untouched** — putting the
+  seed inside `updateBaseline` broke `warm_up_then_settle`, ported verbatim from open_oura's own
+  test. This entry predicted that trap and it still caught an attempt. Both folds call the wrapper,
+  so **all six** baselines are protected. Four existing tests were pinning the bug (the breathing
+  baseline asserted `meanX8: 580` — exactly half of 1160).
+- **⛔ KEEP — THE DATA HALF IS NOT DONE, AND IT IS ONE BUTTON.** Stored baselines are still
+  zero-folded. **No new code needed:** `run.ts:917` null-seeds the fold under `fullHistory` and the
+  **Redecode** endpoint already sets it, so one Redecode run re-derives all six from the untouched
+  raw nightly values. **Could not be run from a sandbox** (needs the vendored constants Q-49
+  removed). Until it runs every pass test here is unmeasured: deviation mean within ±0.05 °C with
+  ~half the nights negative; `temp_dev_c > 1.0` on 0 nights (TN-8); biomarker table re-measured,
+  since every z moves ~19× and the radar may then fire too often (Q-506).
 ### [readiness] TN-6a — suspend the temperature penalty until its baseline is centred
 
 - **Branch:** _unassigned_
@@ -1411,6 +1425,9 @@ true mean on night 2 rather than converging for fifty.
   which is the one category of mistake the owner gate exists to prevent. The factors are four lines
   apart in `daily-summary.ts`; read them.
 
+- ✅ **SEED FIXED 2026-08-25** (`fix/baseline-zero-seed`) — see BF-13 for the full note, including
+  the ⛔ Keep: the stored baselines are still zero-folded and one **Redecode** run re-derives them,
+  which could not be done from a sandbox. This entry's pass tests stay unmeasured until it runs.
 ### [devices][readiness] BF-14 — ❌ REFUTED 2026-08-24: the breathing baseline is fed rpm×10 on purpose; it is correct
 
 > **⛔ REFUTED by measurement (Tuning, 2026-08-24). Do not implement this. It is kept, not deleted,
@@ -6143,6 +6160,9 @@ ehr     0     0     0     0   648   208   128   556     0
   recover faster because their scale is small. The ratios above say they are fine *now*, at 40 nights;
   they say nothing about night 5.
 
+- ✅ **SEED FIXED 2026-08-25** (`fix/baseline-zero-seed`) — see BF-13 for the full note, including
+  the ⛔ Keep: the stored baselines are still zero-folded and one **Redecode** run re-derives them,
+  which could not be done from a sandbox. This entry's pass tests stay unmeasured until it runs.
 ### [readiness][activity] Q-507 — the stress override fires on the best days: high-stress minutes correlate +0.40 with readiness
 
 - **Branch:** `fix/stress-override-input`
