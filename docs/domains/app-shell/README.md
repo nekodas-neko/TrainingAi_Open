@@ -19,6 +19,10 @@ split is "does it feel slow" vs "is it actually slow at the source".
 
 ## Reference docs
 
+- [`docs/superpowers/plans/2026-08-25-unified-day-review.md`](../../superpowers/plans/2026-08-25-unified-day-review.md)
+  — **Q-112, the unified day review.** Relevant here for the entry points: Home's day-review banner,
+  the two local reminders in `lib/day-review-reminders.ts` (which deep-link to `/`, not to the
+  review), and the argument for `/health/day` being the read-through rather than a third day surface.
 - [`docs/app-responsiveness-investigation.md`](../../app-responsiveness-investigation.md) —
   **start here.** Why the app doesn't feel native; the investigation brief behind the current
   performance push.

@@ -18,6 +18,25 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
+## 2026-08-25 — Q-112 re-planned into five phases (`docs/implementation-backlog.md` raise withdrawn)
+
+Q-112 — the unified day review — was a single spec-sized entry that said of itself *"whoever picks
+this up should write a proper implementation plan first"*. The plan is now written
+([`2026-08-25-unified-day-review.md`](superpowers/plans/2026-08-25-unified-day-review.md)) and the
+entry became an umbrella plus **Q-112a–e**, each one PR with its own lane, branch and `Needs:`.
+
+**A +19 raise was prepared and then withdrawn**: the original entry carried 28 lines of direction
+and the umbrella replacing it carries 9, because the reasoning went to the plan rather than the
+queue — and by the time the branch was cut, `main` had shrunk the file enough that the growth fitted
+inside the existing headroom. Recorded because "no raise needed" is worth knowing was checked, and
+because without moving that reasoning out it would have been a ~60-line raise.
+
+**Why the re-plan was needed, recorded because this is how a queue entry goes stale silently:**
+Task 27's central premise — that no per-day read-through screen exists — stopped being true on
+2026-08-08, two days after it was written, when Q-110 shipped `/health/day`. An implementer taking
+the entry at face value would have built a third day surface and re-implemented seven working
+sections.
+
 ## 2026-08-25 — PS-6 filed (`docs/implementation-backlog.md` raise withdrawn, again)
 
 **PS-6**: the queue tooling has never known the `OR-` prefix, in three regexes across two scripts.
@@ -2324,6 +2343,21 @@ same-day raise of this baseline, and the third to be superseded before merging �
 ordinary case when several PRs run in one session, not a sign anything is wrong. Each time the fix
 was to rebuild `doc-size-baseline.json` from `origin/main` and re-derive, never to splice the hunk:
 the raise is only ever correct against the merged predecessor.
+## 2026-08-25 — `docs/implementation-backlog.md` raised, 11862 → 12000 (mockup parity)
+
+The owner set the acceptance test for the nutrition arc: *"I want the design to match the mockup
+images"*. That is five new entries — **BF-28** (the map every parity entry reads), **BF-29**, **BF-30**,
+**BF-31**, and a **BF-26 rewritten** around the screenshot they sent.
+
+Most of the +138 is BF-28, and it is there so the other five are short. It holds the artboard →
+shipped-file table, and the three arguments that would otherwise be had once per entry: an artboard
+is one screenful and a section missing from it is not thereby deleted; an owner decision beats the
+drawing, and one already does (artboard 2 draws four tabs, Q-395c decided two); and the drawings'
+inline `oklch`/hex literals are structure to copy and colours to ignore, since `check-hex-literals.js`
+fails on the paste.
+
+The alternative was five entries each restating that, which is longer in total and drifts. This file
+grows when the queue is the only place a decision lives — and the parity rule now is.
 
 ## 2026-08-25 — `projectOverview.md` raised, 7957 → 7959 (BF-11b)
 
