@@ -3523,10 +3523,17 @@ this fits without an extraction.
 
 ### [platform] Q-549 — Postgres holds 0.79 GB to serve 171 MB, at 0.002 vCPU
 
-- **Gate: owner** — the measurement above leaves nothing for code to change: `shared_buffers` is at
-  the default with a 99.87% hit ratio, and the one visible over-provision (`max_connections = 500`)
-  is a Railway console setting. The 0.79 GB figure also needs re-confirming over a full day, which
-  only the owner can read.
+- **Gate: owner** — narrowed 2026-08-25 (see the reading below). The 0.79 GB premise is **gone**;
+  all that is left of this entry is `max_connections = 500`, a Railway console setting worth tens of
+  MB. **The recommendation is to close this entry** — that call is one line and it is the owner's.
+
+> **⚠️⚠️ THE PREMISE IS FALSIFIED — owner pulled the Railway charts 2026-08-25.** `prod_DB` reads
+> **423 MB flat** across the 3-hour window (limit 8 GB) at **0.0 vCPU**, not 0.79 GB. This entry
+> predicted from a climbing post-restart reading that *"0.79 GB is the warmed steady state and will
+> return"*; seven days on a warm container, it has not. The 0.79 GB average spanned the 2026-08-17
+> `disk_full` outage. `shared_buffers` 128 MB / `max_connections` 500 confirmed unchanged.
+> **Full readings, caveats and the recommendation to close:**
+> [`2026-08-25-railway-and-db-readings.md`](reviews/2026-08-25-railway-and-db-readings.md) §2.
 
 > **⚠️ MEASURED against production 2026-08-19 — both named candidates are falsified. Read this before
 > starting; the entry below sends you at two dead ends.**
@@ -3596,6 +3603,12 @@ this fits without an extraction.
   offline and Railway's own tooling recovered it.
 - **One hard input either way:** Railway **cannot shrink a volume** and bills on storage *used*, so the
   5 GB provisioning is free and is not a reason to move.
+- **⚑ One input moved 2026-08-25.** Q-549's premise is falsified — `prod_DB` reads **423 MB flat**,
+  not the 0.79 GB this entry's ~$8/month floor was partly built on, so that slice was **never real
+  spend** rather than spend awaiting a fix. **Do not re-cost on it alone:** the app half is the
+  larger one and is still unmeasured at rest (Q-547's quiet-window read is still owed). Wait for
+  both halves read quiet, after Q-545.
+  [`readings`](reviews/2026-08-25-railway-and-db-readings.md) §4.
 
 ### [devices][platform] Q-545 — OWNER-DIRECTED FOCUS: move the Oura rollup onto the device (D2 Task 5) — the D-track's missing middle
 
@@ -3741,9 +3754,16 @@ this fits without an extraction.
 
 ### [platform] Q-547 — ANSWERED 2026-08-18: the app CPU is spiky (so Q-545 fixes it), and much of it is deploy churn
 
-- **Gate: owner** — the remaining work is an owner measurement, not code: confirm the dashed markers
-  on the Railway charts are deploys, then take the CPU/RAM baseline during a quiet window (a sandbox
-  cannot read Railway metrics). Everything else on this entry is answered.
+- **Gate: owner** — **halved 2026-08-25.** The deploy-marker half is corroborated (below). What is
+  still owed is only the second half: **the CPU/RAM baseline during a genuinely quiet window** — a
+  sandbox cannot read Railway metrics, and every reading taken so far has been on a shipping day.
+
+> **Deploy-marker half corroborated 2026-08-25.** The owner's `TrainingAI` chart carries the ~10-12
+> dashed markers, CPU spiking to **2.5 vCPU** and memory to ~1.2 GB off a 400 MB baseline, 649
+> requests in 3 h — and that window is independently known to hold **five merges** (#405, #406,
+> #407, #410, #408), with the largest spikes when #408 and #410 landed. **⚠️ So it is the opposite
+> of a quiet window and must NOT be used as the baseline or in any before/after comparison.**
+> [`2026-08-25-railway-and-db-readings.md`](reviews/2026-08-25-railway-and-db-readings.md) §3.
 
 - **Plan:** [`docs/superpowers/plans/2026-08-18-device-primary-compute.md`](superpowers/plans/2026-08-18-device-primary-compute.md) section 1, Task 0
 - **Branch:** *(none — an owner measurement, then a finding)*
