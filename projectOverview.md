@@ -27,6 +27,8 @@
 **Version:** v1.370.1 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-08-25.
 
+**A required check was failing at random on PRs that could not have caused it (BF-18).** `Tests` went red on a **docs-only** PR with `expected 8 to be +0`, and the same file passed locally 3/3. The autopack test waited for the packer's second phase and asserted its third with **no wait at all** — the three phases commit separately and deliberately, so it allowed the final delete exactly zero milliseconds, which holds on an idle machine and does not on a runner sharing one Postgres with ~380 files. It now polls for the finished state. **Reproduced rather than inferred:** injecting an 800 ms lag between phases 2 and 3 reproduces CI's message *and its line number*, and the fixed assertion passes against the same lag. The sweep found no sibling with this shape — it is the only file in the repository using an `until()` poll, and the three fixed-sleep assertions nearby are all negative ones a short sleep can only make falsely *pass*.
+
 **Lane B's 2026-08-25 run — 19 PRs — is written up in
 [`docs/handoff-2026-08-25-platform-lane-b-nineteen-prs.md`](docs/handoff-2026-08-25-platform-lane-b-nineteen-prs.md).**
 Read it with the baton at `docs/agents/state/implementation-lane-b.md` before taking a Lane B item:

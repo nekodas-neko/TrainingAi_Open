@@ -2273,3 +2273,15 @@ sheets handle the Android back gesture). Each carries the measurement it was fil
 length: BF-24 enumerates seven divergences read off the shipped source against the artboard's inline
 styles, and an entry that says only *"doesn't match the mockup"* would send its implementer back to
 do that reading again.
+
+## 2026-08-25 — `projectOverview.md` raised, 7941 → 7943 (BF-18)
+
+Two lines: the Current Status paragraph the session wrap-up asks for, and its blank. It earns the
+space by carrying the thing a reader needs and the journal entry cannot give them at a glance — that
+a red `Tests` on an unrelated PR had a known cause with a known fix, so the next person to meet one
+does not spend the session re-running it. The rest, including the reproduction, is in the journal
+entry.
+
+**Note for whoever raises this next:** if BF-16a's PR (#475) lands first, this number is already
+7947 and the raise here is a no-op — rebuild `doc-size-baseline.json` from `origin/main` rather than
+splicing the hunk.
