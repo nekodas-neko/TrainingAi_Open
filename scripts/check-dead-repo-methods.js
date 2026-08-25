@@ -38,22 +38,20 @@ const INTERFACE_FILE = 'lib/data/repository.ts'
 const IMPL_FILE = 'lib/data/postgres/adapter.ts'
 
 /**
- * Dead on 2026-08-25, when this check was written. Each was verified by hand to have exactly two
- * references (the declaration and the implementation) and no dynamic-dispatch caller.
+ * EMPTY, and worth keeping that way (LA-28, 2026-08-25).
  *
- * These are NOT approved — they are recorded so the check can ship without a cleanup PR attached.
- * Removing them is follow-up work; two of them (`getWorkoutSessionOwners`, `getExerciseLogOwners`)
- * are bulk ownership lookups superseded by `ensureWorkoutSession`, and deleting a security-adjacent
- * helper deserves its own verification rather than riding along here.
+ * It shipped with six names the day before. All six were deleted once the one thing blocking them
+ * was verified: `getWorkoutSessionOwners`/`getExerciseLogOwners` are bulk ownership lookups, and the
+ * question was whether anything still depended on them for a guard. It does not — the sync-push path
+ * verifies ownership through `ensureWorkoutSession`, which is user-scoped, refuses a session id
+ * belonging to someone else, and 404s rather than 403 so it cannot become a membership oracle.
+ *
+ * An empty baseline is the point: a dead method is then a REGRESSION rather than a debt row, the
+ * same property CLAUDE.md credits `check-aest-midnight-timezone.js` for. Adding a name here is a
+ * deliberate act — do it only for a method genuinely reached by a dispatch this script cannot
+ * follow (`pushMutations` keys by domain string), and write the reason beside it.
  */
-const BASELINE = new Set([
-  'isUserActive',
-  'logExercise',
-  'getWorkoutSessionOwners',
-  'getExerciseLogOwners',
-  'getLastExerciseLog',
-  'renameExerciseRefs',
-])
+const BASELINE = new Set([])
 
 /** Interface members sit at exactly two spaces of indent: `  name(args): Promise<T>`. */
 function interfaceMethodNames(src) {
@@ -128,7 +126,9 @@ BASELINE in ${__filename.split('/').pop()} with the reason.`)
     process.exit(1)
   }
 
-  console.log(`check-dead-repo-methods: OK — ${names.length} repository methods, ${dead.length} dead (all baselined, shrink-only).`)
+  console.log(dead.length === 0
+    ? `check-dead-repo-methods: OK — ${names.length} repository methods, none dead. Baseline is EMPTY, so the next one is a regression.`
+    : `check-dead-repo-methods: OK — ${names.length} repository methods, ${dead.length} dead (all baselined, shrink-only).`)
 }
 
 if (require.main === module) main()
