@@ -2273,3 +2273,19 @@ sheets handle the Android back gesture). Each carries the measurement it was fil
 length: BF-24 enumerates seven divergences read off the shipped source against the artboard's inline
 styles, and an entry that says only *"doesn't match the mockup"* would send its implementer back to
 do that reading again.
+
+## 2026-08-25 — `docs/implementation-backlog.md` raised, 11803 → 12023 (mockup parity)
+
+The owner set the acceptance test for the nutrition arc: *"I want the design to match the mockup
+images"*. That is five new entries — **BF-28** (the map every parity entry reads), **BF-29**, **BF-30**,
+**BF-31**, and a **BF-26 rewritten** around the screenshot they sent.
+
+Most of the +220 is BF-28, and it is there so the other five are short. It holds the artboard →
+shipped-file table, and the three arguments that would otherwise be had once per entry: an artboard
+is one screenful and a section missing from it is not thereby deleted; an owner decision beats the
+drawing, and one already does (artboard 2 draws four tabs, Q-395c decided two); and the drawings'
+inline `oklch`/hex literals are structure to copy and colours to ignore, since `check-hex-literals.js`
+fails on the paste.
+
+The alternative was five entries each restating that, which is longer in total and drifts. This file
+grows when the queue is the only place a decision lives — and the parity rule now is.
