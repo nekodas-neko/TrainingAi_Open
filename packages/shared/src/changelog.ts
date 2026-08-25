@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.367.0",
+    date: "2026-08-25",
+    changes: [
+      "Food rows in your diary are tidier \u2014 name, how much, calories \u2014 and tapping one opens the serving editor, which can now delete the entry too. The little pencil and bin on every row are gone; the meal\u2019s macro split still sits under its foods.",
+    ],
+  },
+  {
     version: "1.366.0",
     date: "2026-08-25",
     changes: [
