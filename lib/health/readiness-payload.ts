@@ -32,6 +32,7 @@ import { resilienceLevelToBand } from '@/lib/health/stress-resilience'
 import { computeIllnessRadar, illnessAdvisory, illnessZScores, type IllnessFlag, type IllnessBiomarker, type IllnessBiomarkerKey } from '@trainingai/shared/health/illness-radar'
 import { isPreRekey } from '@/lib/oura/cloud-freshness'
 import { scoreAvailability, trailingBaselineZ, type ReadinessInputKey, type ScoreAvailability } from '@/lib/health/score-availability'
+import { isTemperatureBaselineCentred } from '@trainingai/shared/health/temperature-baseline-health'
 
 /**
  * Early-deload trigger: a low readiness score *and* an elevated acute:chronic load ratio.
@@ -149,10 +150,13 @@ export interface ReadinessScoreResponse {
   ownResilienceConfidence: number | null
 }
 
-function computeBlendedScore(
+/** Exported for TN-6a's pass test: the ladder's contribution has to be measured, not read. */
+export function computeBlendedScore(
   ouraScore: number,
   acwr: number | null,
   tempDev: number | null,
+  /** TN-6a: false suspends the temperature ladder entirely. See `isTemperatureBaselineCentred`. */
+  tempLadderTrusted: boolean,
 ): { score: number; source: 'oura+acwr' | 'oura' } {
   let modifier = 0
   let source: 'oura+acwr' | 'oura' = 'oura'
@@ -166,14 +170,19 @@ function computeBlendedScore(
   }
 
   const raw    = ouraScore + modifier
-  const absDev = tempDev != null ? Math.abs(tempDev) : 0
+  // TN-6a: the ladder is skipped outright while the baseline is uncentred, rather than the
+  // thresholds being widened. Widening would hide a broken input behind a plausible firing rate and
+  // permanently desensitise a real fever once the baseline converges — the same answer TN-6 and
+  // Q-506 both give. Nulling the deviation here is what makes every arm below unreachable.
+  const dev    = tempLadderTrusted ? tempDev : null
+  const absDev = dev != null ? Math.abs(dev) : 0
 
   let score: number
-  if (tempDev != null && absDev > 1.0) {
+  if (dev != null && absDev > 1.0) {
     score = Math.min(40, Math.max(0, raw))
-  } else if (tempDev != null && absDev > 0.5) {
+  } else if (dev != null && absDev > 0.5) {
     score = Math.max(0, Math.min(100, raw - 20))
-  } else if (tempDev != null && absDev > 0.3) {
+  } else if (dev != null && absDev > 0.3) {
     score = Math.max(0, Math.min(100, raw - 10))
   } else {
     score = Math.max(0, Math.min(100, raw))
@@ -371,6 +380,11 @@ export async function buildReadinessPayload(userId: string, tz: string): Promise
   // Temp deviation, BLE-first: the rollup already persists last night's deviation vs the
   // prior night's baseline (daily-summary.ts → oura_daily_summary.temp_dev_c). The Cloud
   // field froze at the re-key — it survives only as an explicitly-tagged fallback.
+  // TN-6a. The 28-day summary window is already loaded above, so the suspension condition costs
+  // one pass over it — no extra query, and it re-evaluates on every request, which is what lets it
+  // clear itself the moment a Redecode re-derivation centres the stored deviations.
+  const tempLadderTrusted = isTemperatureBaselineCentred(dailySummaries.map(d => d.tempDevC))
+
   const bleTempDevC = latestSummary?.tempDevC ?? null
   const cloudTempDevC = ouraToday?.temperatureDeviation ?? null
   const temperatureDeviation = bleTempDevC ?? cloudTempDevC
@@ -462,6 +476,7 @@ export async function buildReadinessPayload(userId: string, tz: string): Promise
       ouraToday.readinessScore,
       acwr,
       ouraToday.temperatureDeviation ?? null,
+      tempLadderTrusted,
     )
     score  = blended.score
     source = blended.source

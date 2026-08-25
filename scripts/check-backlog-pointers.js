@@ -29,6 +29,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { idPattern, idPartsPattern } = require('./lib/entry-id');
 
 const ROOT = path.resolve(__dirname, '..');
 const BACKLOG = path.join(ROOT, 'docs/implementation-backlog.md');
@@ -80,7 +81,7 @@ for (let i = 0; i < queue.length; i++) {
       if (line.trim() !== '') meta.get(currentId).body++;
       const needs = line.match(/^\s*[-*]\s*\*{0,2}Needs:\*{0,2}\s*(.+)$/i);
       if (needs) {
-        for (const m of needs[1].matchAll(/\b((?:LA|LB|BF|RV|TN|PS|Q)-\d+[a-z]?)\b/g)) {
+        for (const m of needs[1].matchAll(idPattern('g'))) {
           meta.get(currentId).needs.push(m[1]);
         }
       }
@@ -134,7 +135,7 @@ for (let i = 0; i < queue.length; i++) {
     );
   }
 
-  const q = line.match(/\b(LA|LB|BF|RV|TN|PS|Q)-(\d+)([a-z]?)\b/);
+  const q = line.match(idPartsPattern());
   if (!q) continue;
   const id = `${q[1]}-${q[2]}${q[3]}`;
   entryOrder.push(id);

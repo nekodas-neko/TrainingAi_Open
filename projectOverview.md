@@ -63,10 +63,26 @@ builder's rows became the shared `FoodRow`; `ingredient-row.tsx` is deleted and 
 
 **The Devices card stops calling the ring healthy with no key (LB-5).** Checks `hasKey()` and links to `/admin/oura-ble` when false. `Gate: device`.
 
+**A ratchet row kept an already-fixed file exempt (Q-138).** `health-content.tsx` sat in
+`check-component-size.js` at a **915** baseline while being **651** lines — 115 lines of room it no longer merited. The script's header has said *"shrinking one below the limit? delete its row"* since it was written and nothing enforced it; **missed three times**. Enforced now, and two of Q-138's six rows turned out already done with line numbers pointing at nothing.
+
+**The accessibility rules ran and could not fail (Q-282, headline corrected).** *"No automated
+accessibility check exists in CI"* was false — `jsx-a11y` rides in via `next/core-web-vitals` and has run all along, at **warning**, so `pnpm lint` exited 0 with violations present. The app measured at **zero**, so seven decidable rules are `error` now: an empty shrink-only baseline. **It does not close the entry** — a linter cannot measure touch targets or contrast, and that half is unbuilt.
+
+**The queue says which rows it has not classified (LB-12).** After correcting four entries' lanes one at a time and hitting two more, it was measured: **77 of 193 entries state no lane**, and **53 of Lane B's 55 READY rows** — so two are rows the queue knows are Lane B's. Showing them to both lanes is right; being silent about it was not. They print `⟨lane unstated⟩` now. **The sweep is the Orchestrator's** and is filed, not done.
+
+**The colour-only score subset was ONE site, not a sweep (Q-281).** Nine `scoreBand()` call sites read rather than counted: only `readiness-breakdown`'s "Final readiness" row coloured without the word. `contributor-chart` has no `.label` at all and is correct — it renders the legend. **The Q-491 lesson again: a zero-label grep is not a violator list.** Also laned Q-289/Q-290/Q-291 to A.
+
+**The volume card stops guessing, and the surface was WRONG rather than absent (Q-305, half).** It
+already drew a band — a hardcoded generic **10–20** — while `packages/shared` computed real per-muscle MEV/MAV/MRV beside it. The goal multiplier is what makes that material: Q-305's own first pass read the unscaled row and called lats *below MEV*; against the app's own table it is **in range** and three muscles are over MRV. The band's **word** ships with its colour — two of the four are red and mean opposite things. Push:pull stays open: it needs a taxonomy belonging in `packages/shared`, which is Lane A's. `Gate: device`.
+
+**The raw-store console says what its numbers mean (Q-538, half).** It printed **209,326 rows, 0
+rolled up, 31.2 MB** and it took a source trace to know `0 rolled up` was the fault — the prune's predicate matches nothing, so the 14-day window can delete no row at all. It now says unbounded, unbacked (past the 25 MB Auto Backup quota) and shedding, in words. **The bound stays blocked** on an unbuilt rollup consumer that is Lane A's and has no queue entry. `Gate: device`.
+
+**The queue tooling learns `OR-` (PS-6).** The Orchestrator prefix was never in the ID alternation, and the failure was **silent deletion**: `next-item.js` counted **194 entries with and without** a scratch `OR-99` and printed it nowhere. One shared `scripts/lib/entry-id.js` now, not four regexes. PS-6 named three sites; there were four.
+
 **The vacuum button can reach the table that needs it (Q-315).** `error_events` holds **4 live rows
-in 49 MB** in production and the generalised `/api/admin/vacuum` had **no caller** — the one control
-still posted to the `oura_raw_samples`-only route. A table picker fed by that route's own `GET` fixes
-it; the press itself is the owner's, from a desktop. `Gate: owner`.
+in 49 MB** in production and the generalised `/api/admin/vacuum` had **no caller** — the one control still posted to the `oura_raw_samples`-only route. A table picker fed by that route's own `GET` fixes it; the press itself is the owner's, from a desktop. `Gate: owner`.
 
 **The Coach's undo has a button (Q-467).** A whole undo subsystem — route, five domain handlers, a
 `captureBefore()` in each, the `undone_at` column, even the struck-through styling — had no caller. **The route's `invalidateProgramStructure()` runs server-side and clears nothing**, so wiring the button at face value would have restored the programme in Postgres while every screen painted the changed one for a full TTL; the client clears the superset. `Gate: device`.
@@ -82,7 +98,7 @@ affordance **absent** rather than covered — `getByLabel` found it and `getByRo
 
 **The end-of-workout "How hard was that session?" prompt is gone (Q-420).** 25.6% fill rate; `sessionEffort()` already derives it from set RPEs at read time, so nothing downstream changed.
 
-**Two Health cards stop vanishing on a failed fetch, and the fix needed a second one (Q-499).** They show "Couldn't load…" on a 429/500 now. `onError` alone didn't work: `cachedFetchCore`'s dedup relayed a failure only to the torn-down owner, never to a joined caller — fixed in `lib/sqlite/cache.ts`.
+**Two Health cards stop vanishing on a failed fetch, and the fix needed a second one (Q-499).** They show "Couldn't load…" on a 429/500 now. `onError` alone didn't work: `cachedFetchCore`'s dedup relayed a failure only to the torn-down owner, never a joined caller — fixed in `lib/sqlite/cache.ts`.
 
 **The database reclaim is three-quarters done, and the last quarter is one press.** The owner's
 `oura_raw_samples` vacuum reclaimed **36 MB** (93 → **57 MB**) and the automatic packer is observed in
@@ -101,9 +117,7 @@ was **0** in CI and those tests passed vacuously (**Q-312**); and `sessionEffort
 (**Q-420**). ⚠️ **None device-verified.** Detail, and the four wrong turns that produced them, in
 [the Lane A handoff](docs/handoff-2026-08-24-platform-implementation-lane-a-engine-run.md).
 
-**The raw-frame packer runs itself, and it deletes only what it verified (Q-541 complete).** A button
-does not hold a growth curve — `oura_raw_samples` regrew to 92 MB within five days of the 2026-08-18
-hand-run. Fires from the ingest path now, throttled per user, `OURA_AUTOPACK=off` kill switch. Automating it made the delete's race reachable, so phase 3 deletes by row id, not ds range ([`journal`](docs/overview/entries/2026-08-23-feat-oura-autopack.md)).
+**The raw-frame packer runs itself, and it deletes only what it verified (Q-541 complete).** A button does not hold a growth curve — `oura_raw_samples` regrew to 92 MB within five days of the 2026-08-18 hand-run. Fires from the ingest path now, throttled per user, `OURA_AUTOPACK=off` kill switch. Automating it made the delete's race reachable, so phase 3 deletes by row id, not ds range ([`journal`](docs/overview/entries/2026-08-23-feat-oura-autopack.md)).
 
 **Logging food evicted the caches before the server had the write (LB-4).** The invalidation fired
 correctly and too early: subscribers refetched a server that lacked the log and re-cached the pre-log
@@ -112,40 +126,30 @@ engine write paths now invalidate on **both** sides of the push (`pushThenRevali
 call stays because offline it is the only one that fires. Six `components/**` sites carry the same shape — filed as **LB-6**, audit done.
 
 **Three route-hardening guards, none of them a fix for an observed symptom (Q-454, Q-455, Q-465).**
-Three GET routes answered a parameter or configuration question before establishing the caller was
-anyone — no data leaked, but `GET /api/push/subscribe` disclosed whether the deployment has push
-configured to anybody who asked. `GET /api/oura-ble/decoder-constants` answered a failed constants read with an **empty** 500, so a client doing `res.json()` got a parse exception on top of the real fault. And `POST /api/day-checkin` accepted a body of `{}` with a 201, writing a row indistinguishable from a check-in in which the user answered nothing — guarded now on **both** write paths, since the outbox reaches the same table ([`journal`](docs/overview/entries/2026-08-23-route-hardening-batch.md)).
+Three GET routes answered a parameter or configuration question before establishing the caller was anyone — no data leaked, but `GET /api/push/subscribe` disclosed whether the deployment has push configured to anybody who asked. `GET /api/oura-ble/decoder-constants` answered a failed constants read with an **empty** 500, so a client doing `res.json()` got a parse exception on top of the real fault. And `POST /api/day-checkin` accepted a body of `{}` with a 201, writing a row indistinguishable from a check-in in which the user answered nothing — guarded now on **both** write paths ([`journal`](docs/overview/entries/2026-08-23-route-hardening-batch.md)).
 
 **Three ring-service fixes, none verified on the ring (Q-537, Q-533, Q-388 item 2).** Key backup
 (`/admin/oura-ble` → **Show key for backup**), a re-sync completion notification, and a connect sequence that resets the live-HR levers a killed session left on. **All native — inert until a new APK is installed, and until then the ring key has one copy.** `Gate: device`. **Item (3) needed no work:** 6,346 battery polls measure the drain the entry called unmeasurable (−22/−24/−22/−38/−15 overnight), confirming the owner's report; the SpO₂ A/B is wear, not code.
 
-**Two affordances came back and the sheet that owned them is gone (LB-3, v1.347.0).** Nothing opened
-`day-overlay-sheet.tsx` after Q-110, so tapping a logged exercise or an activity was dead a fortnight. Both on `/health/day` (the NAME is the target); `health-content.tsx` lost 167 lines.
+**Two affordances came back and the sheet that owned them is gone (LB-3, v1.347.0).** Nothing opened `day-overlay-sheet.tsx` after Q-110, so tapping a logged exercise or an activity was dead a fortnight. Both on `/health/day` (the NAME is the target); `health-content.tsx` lost 167 lines.
 
-**Deleting an activity works offline now (Q-328, v1.350.0).** The one activity-log write with no
-outbox domain — deleted by a bare `fetch` that failed with no connection. `softDeleteActivityLogPending`:
-a queued delete must stay `pending` or a pull clobbers it; `'synced'` is what lets `applyDelta` reap it.
+**Deleting an activity works offline now (Q-328, v1.350.0).** The one activity-log write with no outbox domain — deleted by a bare `fetch` that failed with no connection. `softDeleteActivityLogPending`: a queued delete must stay `pending` or a pull clobbers it; `'synced'` is what lets `applyDelta` reap it.
 
 **The memo-stability baseline is empty (Q-357, v1.349.0).** All four defeated call sites cleared, so a
 new one is a regression. The expensive one sat inside `visibleMeals.map(...)`, where a hook cannot
 live — its callbacks take the meal and hand it back, so the parent shares one per action.
 
-**Body-metric bounds are asked at the keyboard (Q-321, v1.348.0).** `validation/body-metrics.ts` held
-every threshold and nothing under `components/`/`app/` imported it, so a 5,000 kg weight was queued and dropped server-side. **Three** sheets, not the one the entry named.
+**Body-metric bounds are asked at the keyboard (Q-321, v1.348.0).** `validation/body-metrics.ts` held every threshold and nothing under `components/`/`app/` imported it, so a 5,000 kg weight was queued and dropped server-side. **Three** sheets, not the one the entry named.
 
-**Sixteen writes revalidated around their push, not after it (LB-6, v1.345.0).** The entry listed six — its finder read only *above* each call. `check-invalidate-after-push.js` holds it.
+**Sixteen writes revalidated around their push, not after it (LB-6, v1.345.0).** The entry listed six; its finder read only *above* each call. `check-invalidate-after-push.js` holds it.
 
-**The finished-logging control moved above End of Day (BF-6, v1.344.0).** **Zero presses in seven
-weeks**, and the calibration excludes an unmarked day rather than treating it as light.
+**The finished-logging control moved above End of Day (BF-6, v1.344.0).** **Zero presses in seven weeks**, and the calibration excludes an unmarked day rather than treating it as light.
 
-**A deload session says so now (BF-8, v1.343.0).** Intensity read "Full · As prescribed" while the card
-under it read "Deload session" — the owner trained one believing it was full. Both asked `isDeloadActive` (the PHASE), not today's session.
+**A deload session says so now (BF-8, v1.343.0).** Intensity read "Full · As prescribed" while the card under it read "Deload session" — the owner trained one believing it was full. Both asked `isDeloadActive` (the PHASE), not today's session.
 
-**A recipe link becomes a meal (Q-409's Lane B half, v1.342.0).** A page stating no yield hands back the
-**whole recipe** (1,956 kcal for a loaf), so the row asks how many it serves and cannot be kept until answered.
+**A recipe link becomes a meal (Q-409's Lane B half, v1.342.0).** A page stating no yield hands back the **whole recipe** (1,956 kcal for a loaf), so the row asks how many it serves and cannot be kept until answered.
 
-**Saved meals can carry a photo (Q-327, v1.341.0).** A 64 px tile in Edit Meal, downscaling to 128 px
-WebP (~6 KB); the tile prints the stored size, because nothing else fails loudly when the cap slips.
+**Saved meals can carry a photo (Q-327, v1.341.0).** A 64 px tile in Edit Meal, downscaling to 128 px WebP (~6 KB); the tile prints the stored size, because nothing else fails loudly when the cap slips.
 
 **The meal plan can be written to again, and it now produces saved meals (Q-398, v1.340.0).** Five
 write routes validated a variable nothing had assigned, so every one answered `400 Invalid input:
@@ -155,17 +159,14 @@ carries **Save to My Meals** with a **Save all**, idempotent on the existing `sa
 ([`journal`](docs/overview/entries/2026-08-24-meal-plan-to-saved-meals.md)).
 
 **Preferences have a server home; nothing reads it yet (Q-392, engine half).** `users.preferences`
-JSONB (mig 206) behind `GET`/`PATCH /api/user/preferences`, merging under a row lock — the unlocked
-version demonstrably drops the other device's key mid-merge. **Nothing the owner can see changed:**
-the read sites are `components/**`, so Q-392 was re-scoped to Lane B, not closed.
+JSONB (mig 206) behind `GET`/`PATCH /api/user/preferences`, merging under a row lock — the unlocked version demonstrably drops the other device's key mid-merge. **Nothing the owner can see changed:** the read sites are `components/**`, so Q-392 was re-scoped to Lane B, not closed.
 
 **The UTC-offset fixture sweep came back clean, and found something else (Q-394, LA-19 — both
 closed).** One *correctly written* test failed because the code under it re-derived midnight in
 Brisbane: `aestMidnight` takes a timezone and only **9 of 22** call sites passed one. All 22 do now.
 
 **`DELETE /api/activity-logs` stopped reporting success for a delete that deleted nothing (Q-556).**
-Q-328's outbox delete reconciled the race that made this unsafe; it now 404s for a nonexistent or
-not-yours id while a double-tap still matches. The web fallback treats a 404 as success.
+Q-328's outbox delete reconciled the race that made this unsafe; it now 404s for a nonexistent or not-yours id while a double-tap still matches. The web fallback treats a 404 as success.
 
 **Admin Device Metrics sparklines stopped stretching a partial day to full width (BF-10).**
 `Sparkline` takes optional `times`/`timeDomain` and projects `x` by position in the day, so a

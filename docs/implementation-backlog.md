@@ -369,39 +369,64 @@ signed off by the owner in that conversation. Review:
   Order `My Foods` most-recently-used first so the merge does not bury saved meals.
 - **Verification.** As Q-395a, plus a grep proving nothing user-facing still says *Saved meals* or
   *My Meals*.
-### [platform] PS-6 — the queue tooling has never known the `OR-` prefix, so every Orchestrator entry is mislabelled or invisible
 
-- **Branch:** `fix/queue-tools-or-prefix`
-- **Added:** 2026-08-25 · Orchestrator, hit while filing the **first `OR-` entry ever written**,
-  which is why five days of the prefix existing never surfaced this. (That entry was withdrawn as a
-  duplicate of BF-23; the tooling bug it exposed is real and unrelated.)
-- **Lane: B.** Two scripts, three regexes, no schema. **Filed under `PS-` deliberately and not
-  under `OR-`: an `OR-` entry describing this bug would be invisible to the tool that reports it.**
-- **The bug.** `OR` is missing from the ID alternation in all three places:
-  - `scripts/next-item.js:54` — `/\b((?:LA|LB|BF|RV|TN|PS|Q)-\d+[a-z]?)\b/`
-  - `scripts/check-backlog-pointers.js:83` — the same pattern, used to resolve `Needs:` targets
-  - `scripts/check-backlog-pointers.js:137` — `/\b(LA|LB|BF|RV|TN|PS|Q)-(\d+)([a-z]?)\b/`, the
-    duplicate-ID detector
-- **⚠️ The `next-item.js` failure mode is silent deletion, not a bad label.** Line 57 reads
-  `current = id ? {…} : null` and line 59 `if (current) entries.push(current)` — **an entry whose
-  heading matches no known prefix is dropped from the queue entirely.** So an `OR-` entry is either
-  mislabelled (if some other ID happens to appear in its heading) or **invisible to the implementer
-  running the tool**, with nothing printed to say so — not even UNCLASSIFIED.
-- **Consequences on `check-backlog-pointers.js`:** duplicate `OR-` IDs are **not** detected, and a
-  `Needs: OR-n` is not resolved as a real target. Both guarantees the file claims to give simply do
-  not hold for this prefix.
-- **How it was found, and why there is no live example to look at.** It surfaced while filing an
-  `OR-1` entry that displayed in `next-item.js` as `Q-402` — the id had been picked out of the
-  *title text*, not the entry's own prefix. That entry was withdrawn as a duplicate before it
-  merged, so reproduce this from the source above or from a scratch heading; do not go looking for
-  an `OR-` entry in the queue, there is not one yet.
-- **`docs/agents/README.md` §3 lists `OR-` as a valid prefix**, and the Orchestrator role was created
-  2026-08-20 (PR #263). The tooling was never taught the letter.
-- **Verification:** add a scratch entry headed `### [platform] OR-99 — …` and confirm three things.
-  With no other id in the heading it is **listed** by `node scripts/next-item.js` rather than
-  silently dropped, and its id column reads `OR-99`. With a second id in the heading (say a `Q-`
-  reference) the column still reads `OR-99` and not the other one. And a duplicated `OR-99` makes
-  `check-backlog-pointers.js` **fail**. All three fail today.
+### [platform] LA-22 — E2E is not a required check, and a PR merged with it red
+
+- **Lane: A** · **Added:** 2026-08-25
+- **Gate:** owner — a governance decision, not a fix.
+- **#454 merged with its own E2E `failure`** (run 32807689333). Branch protection permitted it, so
+  **E2E is not in the required-check set** — which also explains why a merge succeeds while E2E is
+  still in progress. Worth deciding deliberately: a guard that cannot block anything let a red main
+  reach four other branches before it was traced.
+- **The red itself was real and is already fixed** by #456 — Home's Morning Check-in modal set
+  `aria-hidden` on `<main>`, so `home-card-invalidation-refetch` could not see the button it wanted.
+  Nothing to do there.
+- **⚠️ THIS ENTRY'S FIRST DRAFT WAS WRONG, and the mistake is the point.** It claimed the test could
+  never have passed because "no such button exists" — the exact conclusion an `aria-hidden` overlay
+  invites, since `getByRole` reports a covered affordance as *absent* rather than *obscured*, and a
+  `grep` for the label then appears to confirm it. #456's own commit message names this trap.
+  **Reproducing on a local dev DB and then reasoning from a grep is not enough to call a test
+  unpassable**; the modal was in the way on both.
+### [platform] LB-12 — 77 of 193 queue entries state no lane, so both implementers are served each other's work
+
+- **Branch:** _unassigned_ · **Lane:** B filed it; **the sweep is the Orchestrator's** (it owns lane
+  resolution, `docs/agents/README.md`).
+- **Added:** 2026-08-25 · Lane B, after correcting four entries' lanes one at a time in one session
+  (Q-403, Q-289, Q-290, Q-291) and hitting a fifth and sixth immediately after.
+- **Measured on `main`, 2026-08-25:**
+
+  | | |
+  |---|---:|
+  | queue entries | 193 |
+  | lane stated | 116 |
+  | **lane UNSTATED** | **77 (40%)** |
+  | of Lane B's 55 READY rows, how many state no lane | **53** |
+
+  So **two** of the fifty-five rows the tool offers Lane B are rows the queue actually knows are
+  Lane B's. The rest are unclassified and shown to both lanes.
+- **The tool is not wrong; the data is incomplete.** `next-item.js` shows an unlaned entry to both
+  lanes deliberately — the path rule in §3 is supposed to answer it, and hiding it from the lane that
+  might own it would be worse. **What was wrong is that it was silent**, so a reader could not tell a
+  row the queue knows is theirs from one nobody has classified. Fixed 2026-08-25: those rows now
+  print `⟨lane unstated⟩` and the header counts them. That is the visibility half and it is done.
+- **What is left is the sweep**, which is not an implementer's to do: 77 entries want a `Lane:` field
+  applied from the path rule (reached by `app/api/**` or storage → A; reached only from
+  `app/**`/`components/**` → B; both → A). A large fraction are `readiness`/`platform` scoring work
+  in `packages/shared`, which is Lane A's, and **several are scoring changes that are no
+  implementer's at all** — Tuning proposes, the owner signs off, Lane A implements.
+- **Worth deciding while sweeping:** entries that are *notes rather than work* should leave READY.
+  **Q-294** says of itself *"this is a note against Q-249, not independent work"* and *"no branch of
+  its own"*, and it is currently row 2 of Lane B's queue. **Q-504** is titled *"REFUTED: readiness
+  should NOT get a range calibration"* and is row 8.
+- **The startable Lane B work exists; it is ~50 rows down.** Scanning the 77 unlaned entries for ones
+  whose body mentions only Lane-B surfaces (`components/`, `lib/hooks`, `lib/stores`, `.tsx`) and no
+  Lane-A surface gives **10**: Q-395b, Q-354, Q-254, Q-154, Q-168, Q-138, Q-112, Q-111, Q-93, Q-1b.
+  That is the shape of the problem — not that Lane B has nothing to do, but that fifty rows of
+  someone else's work sit on top of it.
+- **A field the queue does not have, found while checking those ten:** **Q-354** ends *"Recommendation:
+  do not pursue without a reason"* — understood, deliberately declined, and waiting on a named
+  trigger. That is neither `Gate: owner` nor `Gate: device`, so it reads as startable forever. Worth
+  settling during the sweep.
 
 ### [readiness][devices] TN-8 — the chronic-stress fever mask is a FOURTH consumer of the broken temperature baseline
 
@@ -497,6 +522,13 @@ test that feeds both, not by reading the condition.
 **Keep:** this is a suppression, not a fix. It must be removed by TN-6 rather than left as permanent
 behaviour, and TN-6's own pass test (deviation mean within ±0.05 °C of zero) is what retires it.
 
+- ✅ **SHIPPED 2026-08-25** (`fix/suspend-temp-penalty`). Working:
+  [`entries/2026-08-25-suspend-temp-penalty.md`](overview/entries/2026-08-25-suspend-temp-penalty.md).
+  `isTemperatureBaselineCentred` suspends the ladder while the trailing mean deviation is outside
+  **±0.15 °C** or there are **<10** nights to judge by — re-evaluated per request, so a Redecode
+  re-derivation lifts it with **no deploy**. Thresholds untouched.
+- **Keep:** a **suppression, not a fix** — TN-6 retires it (its ±0.05 °C pass test is what does), and
+  nothing was observed in production.
 ### [readiness][devices] TN-6 — the temperature baseline is 0.36 °C too low, so readiness carries a −16 pt penalty on 89% of days
 
 - **Branch:** _unassigned_
@@ -4440,12 +4472,27 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 - **It already exceeds Android Auto Backup's 25 MB per-app quota**, so the phone-side backup covers
   none of it — see the `allowBackup` note below. That was a projection when this entry was filed; at
   31.2 MB it is now a measurement.
-- **What is left here:** the bound and the visible failure state. The real prune still needs D2 Task 5
-  (the WebView rollup consumer) to set `rolled_up`, which is what this entry has always said and what
-  the device reading now proves.
+- **✅ THE VISIBLE FAILURE STATE SHIPPED 2026-08-25 (Lane B).** The console printed correct numbers
+  nobody could read — establishing that `0 rolled up` was *the fault* took a source trace.
+  `components/oura-ble/raw-store-health.ts` now turns the same `rawStats()` into findings: unbounded
+  (nothing rolled up), unbacked (past the 25 MB Auto Backup quota, manifest re-verified), shedding
+  (`lowDisk`), and a partial-rollup note with its percentage. Symbol beside colour, not colour alone.
+  7 unit cases including the 2026-08-18 device reading verbatim.
+  [`journal`](overview/entries/2026-08-25-raw-store-findings.md).
+- **⛔ THE BOUND IS STILL BLOCKED, and not by anything in this queue.** `pruneRaw` deletes only rows
+  marked `rolled_up`; the only writer of that flag is `markRolledUp`, whose sole caller would be the
+  **WebView rollup consumer — D2 Task 5, still not built** (re-verified 2026-08-25: a repo-wide grep
+  finds no caller for `markRolledUp`/`pruneRaw`/`getUnrolledRaw` outside the plugin interface).
+  Wiring the prune today deletes zero rows. That work is a rollup consumer over local storage —
+  **Lane A's** — and has no queue entry, which is why this is written out rather than expressed as a
+  `Needs:` whose absent target would read as "already shipped".
 - **Also record:** `AndroidManifest.xml:14` sets `allowBackup="true"` with no `dataExtractionRules`.
   Android Auto Backup's cloud quota is 25 MB/app and `oura_raw.db` passed that within two weeks, so
   **the device raw store has no working backup.** That is load-bearing for the D4 decision (Q-542).
+  The console says this out loud now.
+- **Keep:** the bound (blocked above), plus the on-device read — the findings have never been
+  rendered from a real `rawStats()` call, only from the numbers one produced. One press of **Read
+  stats** on `/admin/oura-ble` in the APK. `Gate: device`
 
 
 ### [devices][platform] Q-540 — narrow the `oura_raw_samples` row: drop `event_name`, `body_hex` → `bytea`
@@ -5057,15 +5104,34 @@ ehr     0     0     0     0   648   208   128   556     0
 - **Push:pull replicates.** legs 458 (34%), push 382 (29%), pull 286 (22%), other 202 (15%) over the
   same 56 days — **push:pull 1.34**, against the 1.30 recorded over 60 days. Consistent, and the
   same mild push dominance rather than anything pathological.
-- **Still open, and still the actual work:** the surface itself, plus the design question of whether
-  Q-278 / Q-302 / Q-305 share one treatment. Nothing was built — this entry gated building on the
-  re-measurement, and that is what was delivered.
+- **✅ THE LANDMARK HALF SHIPPED 2026-08-25 (Lane B) — and the surface was not absent, it was
+  WRONG.** `weekly-muscle-sets-card.tsx` already drew a band: a hardcoded generic `MIN_TARGET = 10` /
+  `MAX_TARGET = 20` with `barColor` at 15/10/6. So the app computed correct per-muscle landmarks and
+  rendered a made-up yardstick beside them, every week. It now uses
+  `volumeVerdict(goal, muscle, sets)` — `below MEV` / `in range` / `above MAV` / `above MRV`, with
+  **the word beside the colour**, because two of the four bands are red and mean opposite things. A
+  program target still wins over the reference range. No Lane A change was needed: `workout-data:meta`
+  already carries `program.trainingGoal` and Health already fetches that key.
+  [`journal`](overview/entries/2026-08-25-volume-landmarks-surfaced.md).
+- **⛔ THE PUSH:PULL HALF IS NOT DONE, deliberately.** This entry says to do it on the same surface
+  "rather than as two cards", and doing it here would mean inventing a muscle → movement-pattern
+  taxonomy inside a component. **There is no push/pull grouping anywhere in the repo** (checked). It
+  is domain math and belongs in `packages/shared` beside `normalizeMuscle`/`MUSCLE_LANDMARKS` under
+  One Formula One Place — which is **Lane A's**. A private second copy in `components/` to satisfy
+  "together" would be the wrong trade.
+- **Still open:** the push:pull half above, and the design question of whether Q-278 / Q-302 / Q-305
+  want one shared treatment for "computed and discarded" — untouched, because answering it inside one
+  card would have prejudged it.
 - **Where it likely belongs:** the same screen that already shows weekly volume, rather than a new
   destination — see the IA cluster (Q-232…Q-239) before adding a surface.
 - **A related check that came back CLEAN, recorded so it is not re-investigated:** `core` is tagged on
   exercises and absent from `MUSCLE_LANDMARKS`, which looks like a silent fall-through to
   `DEFAULT_LANDMARKS`. It is not — `muscles.ts:17` maps `core: 'abs'` and `volume-targets.ts:58`
-  applies `normalizeMuscle` before the lookup. Working correctly.
+  applies `normalizeMuscle` before the lookup. Working correctly. **Now pinned by a unit case** so it
+  stays that way.
+- **Keep:** the push:pull half (blocked above, Lane A), the shared-treatment design question, and the
+  S25 check — the band word sits beside the set count on a narrow row and has only been seen in a
+  desktop browser. `Gate: device`
 
 
 ### [workouts] Q-300 — 37% of sets are taken with materially less rest than prescribed, and the RPE model has no rest term
@@ -5175,6 +5241,12 @@ ehr     0     0     0     0   648   208   128   556     0
 
 ### [workouts] Q-289 — `expectedRpe` misses by more than the autoregulation dead band at both ends of its own range
 
+- **Lane: A — set 2026-08-25 (by Lane B, which the tool was serving it to).** `expectedRpe`,
+  `autoregulation.ts` and `RPE_DEAD_BAND` all live in `packages/shared/src/ai-periodization/`, which
+  the path rule assigns to Lane A. **And it is a SCORING change**, so the route is Tuning proposes →
+  owner signs off → Lane A implements, per CLAUDE.md — not an implementer's to take at all. The
+  proposal must state how many other days the change moves.
+
 - **Branch:** `fix/expected-rpe-calibration`
 - **Plan:** none yet — recalibration wants a written plan
 - **Added:** 2026-08-15 · from [`docs/reviews/2026-08-15-uncovered-lenses-review.md`](reviews/2026-08-15-uncovered-lenses-review.md) §1
@@ -5240,6 +5312,10 @@ ehr     0     0     0     0   648   208   128   556     0
 
 ### [workouts] Q-290 — logged RPE carries almost no information: sd 0.87, and effectively two values
 
+- **Lane: A — set 2026-08-25, same reasoning as Q-289.** The RPE signal and its consumers are in
+  `packages/shared/src/ai-periodization/`, and this is a **scoring** question: Tuning proposes, the
+  owner signs off, Lane A implements.
+
 - **Branch:** `feat/rpe-capture-quality`
 - **Plan:** none yet
 - **Added:** 2026-08-15 · from the uncovered-lenses review §1.4
@@ -5258,6 +5334,9 @@ ehr     0     0     0     0   648   208   128   556     0
 - **Do not "fix" this by widening the model.** A flat signal made wider is still flat.
 
 ### [platform][readiness] Q-291 — the AI surfaces contradict each other on the same day
+
+- **Lane: A — set 2026-08-25.** The contradiction is between AI route outputs
+  (`app/api/ai/**`, `lib/coach/**`), both of which the path rule assigns to Lane A.
 
 - **Branch:** `fix/ai-surface-shared-state`
 - **Plan:** none yet
@@ -7392,6 +7471,21 @@ ehr     0     0     0     0   648   208   128   556     0
   shows (a) contributors, (b) trend, (c) an action. Then fix the ones failing the repo's own
   colour-only-state rule as a first pass, since `scoreBand()` colour without `scoreBand()` label is
   already a `CLAUDE.md` violation and is the cheapest subset.
+- **✅ THE COLOUR-ONLY SUBSET IS DONE 2026-08-25 (Lane B) — and it was ONE site, not a sweep.** All
+  nine non-test `scoreBand()` call sites were read rather than counted:
+  `readiness-breakdown.tsx:72` — the **"Final readiness"** row — coloured the score by band with no
+  band word and no legend in that branch. Fixed: the label ships beside the colour.
+  **The rest are not violators**, and a grep would have said otherwise: `contributor-chart.tsx` has
+  no `.label` anywhere and renders `<ScoreBandLegend />`, which pairs every colour with its meaning;
+  `score-ring`, `alternatives-card`, `contributor-detail(s)`, `health-score-detail` and
+  `oura-score-chip-row` all render the word already (`oura-score-chip-row` is the Q-281-adjacent fix
+  that put it there). `health-insight` uses only `.label`, never the colour. **This is the Q-491
+  lesson again — a zero-label grep count is not a violator list.**
+  [`journal`](overview/entries/2026-08-25-score-band-colour-only.md).
+- **Keep:** the *survey* this entry is actually about — contributors / trend / action per surface —
+  is untouched. Only the colour-only subset it named as the cheapest first pass is done, and the
+  bigger presentation question (which overlaps Q-278 and Q-305's "computed and discarded" thread) is
+  still open. Plus the S25 check on the amended row. `Gate: device`
 - **Sequencing:** this is presentation over numbers that Q-500/Q-272/Q-275/Q-505 are all about to
   change. Do the **audit** now (it is cheap and its output is durable); hold the **UI work** until
   the model changes settle, or it gets done twice.
@@ -7415,24 +7509,48 @@ ehr     0     0     0     0   648   208   128   556     0
   own recommendation: **trend is the missing dimension, not contributors** (contributors are
   genuinely inapplicable to a chip or a timeline row; a 7-day sparkline is not).
 
-### [platform][app-shell] Q-282 — no automated accessibility check exists anywhere in CI
+### [platform][app-shell] Q-282 — the accessibility checks CI cannot make: touch targets and contrast
 
 - **Branch:** `feat/ci-accessibility-scan`
 - **Plan:** none yet
 - **Added:** 2026-08-15 · from the comprehensive review §5
+- **Lane: B.** `eslint.config.mjs` + CI; no schema, no route.
+- **⚠️ THE ORIGINAL HEADLINE WAS FALSE, corrected 2026-08-25 — a check DOES exist.**
+  `eslint-plugin-jsx-a11y` rides in through `next/core-web-vitals` and has been running in the Lint
+  job all along. Verified by probe, not by reading: an unlabelled `<img>` reports
+  `jsx-a11y/alt-text`. **What was true is that it could not fail anything** — it reported at
+  *warning*, so `pnpm lint` exited 0 with violations present and a new one would land silently.
+  That is exactly how the hex-literal count grew by 41 in five days unnoticed.
+  - **✅ FIXED 2026-08-25 (Lane B).** Seven statically-decidable rules promoted to `error`:
+    `alt-text`, `anchor-has-content`, `aria-props`, `aria-proptypes`, `aria-unsupported-elements`,
+    `role-has-required-aria-props`, `role-supports-aria-props`. **The whole app measured at zero**
+    across `app/`, `components/` and `lib/`, so this cost nothing and froze the ground — a
+    shrink-only baseline whose baseline is empty. `pnpm lint`: **0 errors, 124 pre-existing
+    warnings**, and a probe file with three violations now fails.
+    [`journal`](overview/entries/2026-08-25-a11y-rules-can-fail.md).
+- **What is left is the half a linter cannot do, and it is the half this entry actually named.**
+  **Touch-target size** and **contrast** need a rendered page; no static rule can measure either.
+  That is still unbuilt.
 - **The gap, stated precisely.** The owner-directed testing cluster (Q-249 E2E · Q-250 emulator ·
   Q-251 staging · Q-252 error tracking · Q-253 device farm · Q-254 unverified-row sweep) is
   well-scoped and correctly prioritised, and this entry does **not** re-raise any of it. Standard
-  Android QA practice covers one thing none of the six touches: **automated accessibility scanning.**
+  Android QA practice covers one thing none of the six touches: **automated accessibility scanning
+  of a running app.**
 - **Why it is the right gap to close next.** It targets exactly the class this project keeps
   rediscovering by hand and cannot currently measure. The 2026-08-08 mobile-UI sweep found 7×7 px
   tap targets by manual inspection, and its **contrast finding could not be measured at all** — it
   is recorded in `projectOverview.md` as "contrast that could NOT be measured". Accessibility
   Scanner / Espresso accessibility checks catch missing labels, undersized touch targets and
   insufficient contrast automatically.
-- **Dependency, and why this is not a duplicate of Q-250.** A scanner needs a running app, so this
-  rides on the emulator job Q-250 introduces — it is one extra step in that job, not a second
-  harness. File it after Q-250 in any implementation ordering.
+- **⚠️ THE Q-250 DEPENDENCY HAS EXPIRED, and whoever takes this should not wait for it.** This was
+  written 2026-08-15, before the Playwright E2E harness grew into a real running app in CI. A
+  scanner needs a rendered page, not an emulator — `@axe-core/playwright` against the existing E2E
+  job would measure touch targets and contrast on the same DOM the WebView renders, with no
+  emulator and no second harness. **Not done here deliberately:** it adds a dependency and a new
+  failing-check surface, a flaky a11y gate would block every PR, and re-scoping an entry's approach
+  *and* implementing it in one pass is a decision that wants the owner or the Orchestrator, not an
+  implementer at the end of a session. The Espresso route below stays valid if the emulator lands
+  first.
 - **Scope:** Espresso accessibility checks enabled in the emulator run, failing on the touch-target
   and contrast rules only at first (the label rules will produce a large initial backlog). Use the
   **shrink-only baseline** pattern the repo already uses for `check-component-size.js` and
@@ -8400,6 +8518,31 @@ ehr     0     0     0     0   648   208   128   556     0
   | exact min/max scaling | it pads by **±0.5**, which halves the amplitude of a 0.5 kg body-weight spread |
   | grid lines | `exercise-history-sheet` draws three |
 
+- **⚠️ RE-MEASURED 2026-08-25 against `exercise-history-sheet.tsx` — the list above is FIVE needs and
+  there are SIX, and the sixth is the one that decides the entry.** Read line by line against the
+  primitive's own geometry:
+
+  | # | difference | primitive today |
+  |---|---|---|
+  | 1 | horizontal inset `PAD = 4` (`x = PAD + …*(W-2·PAD)`) | spans `0..width`, no inset |
+  | 2 | exact min/max scaling | pads by **±0.5** |
+  | 3 | `strokeWidth` 2 | hardcoded `1.5` |
+  | 4 | three grid lines | none |
+  | 5 | last dot `r=4` opacity 1, others `r=2.5` **opacity 0.45** | all dots `r=2.5`, full opacity |
+  | 6 | **a decorative halo ring on the last point** (`r=7`, stroke at 0.28 opacity) | nothing |
+
+  **(5)'s opacity and (6) are both absent from the list above.** (6) is the problem: a `haloLastDot`
+  prop is asking the shared primitive to draw one caller's specific art, which is how a primitive
+  becomes a thin wrapper over a config object — the exact failure Q-406 named when it declined to add
+  a warning slot to `FoodRow` ("adding a slot makes it a wrapper rather than a unification").
+- **So this is a DESIGN DECISION, not a conversion, and it wants an answer before code:** either the
+  primitive absorbs six props including a decorative one, or the three callers accept small visual
+  changes (drop the halo, unify the dot treatment) and the primitive stays general. **The second is
+  the better trade and it changes how a user-facing chart looks**, which is why it is not something to
+  slip into an implementation PR unasked. `Gate: owner`
+- **Not blocked on effort or on the primitive — blocked on that call.** Everything else is mechanical
+  once it is made.
+
 - **`SparklineChart` is not the answer either, and the reason is load-bearing.** It already draws
   this exact "1RM trend" shape (and `exercise-stats-sheet` + `exercise-summary-screen` use it), but
   it is **chart.js**. `active-workout-screen.tsx` imports no chart.js today, and CLAUDE.md's own
@@ -9189,17 +9332,32 @@ per-field merge where an AI write has no honest source rank to claim.
 
 - **Branch:** `refactor/component-size-hotspots`
 - **Added:** 2026-08-07 · [review §4](reviews/2026-08-07-full-app-review.md)
+- **Lane: B.** `components/**` + `app/**` extractions only.
 - Low priority individually; the rule exists because these files absorb every new feature by default.
   Take them opportunistically when already touching the file, not as a dedicated PR.
+- **⚠️ RE-MEASURED 2026-08-25 — two of the six rows were already done, and their line numbers now
+  point at nothing.** `health-content.tsx` **991 → 651** and `profile-tab.tsx` **849 → 476**, both
+  under the 800 limit. The other four are unchanged or slightly smaller (`workout-screen` 1851 →
+  1820, `session-select-content` 1478 → 1456, `config-screen` 997, `program-editor-sheet` 963), so
+  their extractions still stand. **Following a stale row is worse than having no row**: it sends the
+  next reader to line 588-779 of a file that is 651 lines long.
+- **It also surfaced a hole in the ratchet, now closed.** `health-content.tsx` was still listed in
+  `check-component-size.js` at a **915** baseline while sitting at 651 — silently re-granting it 115
+  lines of room it was no longer entitled to. The script's own header has said *"Shrinking one below
+  the limit? Delete its row"* since it was written, and nothing enforced it; the rule has now been
+  missed three times (`health-sections` was removed correctly, `profile-tab` and `health-content`
+  were not). `check-client-today-timezone.js` has enforced the same rule for its own baseline all
+  along — that half is now in this script too, and fails on a stale row.
+  [`journal`](overview/entries/2026-08-25-component-size-stale-baseline.md).
 
   | lines | file | proposed extraction |
   |---|---|---|
   | 1851 | `components/workout-screen.tsx` | the data-loading layer — `fetchExercises` (289-444), `loadPeriodization` (445-481), `handleDurationPresetChange` (482-506), `refreshExercises` (507-…) plus their `useState`s → `components/workout/use-workout-session-data.ts`; and the two terminal states (1604-1640) → `workout-load-states.tsx`. ~350 lines. |
   | 1478 | `app/session-select/session-select-content.tsx` | the banner stack (1128-1193) → `app/session-select/components/home-banner-stack.tsx`, taking the APK-banner and day-review dismiss state with it (182, 193, 344-355). ~110 lines, 4 `useState`s. |
   | 997 | `components/config-screen.tsx` | progression-style CRUD (152-249, already a self-labelled section) → `components/config/progression-style-editor.tsx`. ~100 lines. |
-  | 991 | `app/health/health-content.tsx` | the day-overlay subsystem (588-779) → `app/health/hooks/use-day-overlay.ts`, alongside the existing `use-health-calcs.ts`. ~190 lines. |
+  | ~~991~~ **651** | ~~`app/health/health-content.tsx`~~ | **✅ DONE — under the limit, row deleted from the ratchet 2026-08-25.** The line numbers above (588-779) no longer point at the day-overlay subsystem; do not follow them. |
   | 963 | `components/config/program-editor-sheet.tsx` | exercise-row mutations (199-325) → `components/config/use-program-exercise-edits.ts`. ~130 lines. |
-  | 849 | `components/more/profile-tab.tsx` | the notification-toggle block (154-257) + its switch rows → `components/more/notification-settings-section.tsx`. ~100 lines. |
+  | ~~849~~ **476** | ~~`components/more/profile-tab.tsx`~~ | **✅ DONE 2026-08-19** — already off the ratchet, recorded in `CLAUDE.md`. Line numbers stale. |
 
 - **Related, latent — record but do not act:** `components/shell/bottom-nav.tsx:27-33` reads three
   `persist`-ed Zustand stores with no `skipHydration` anywhere in `lib/stores/`. Zustand rehydrates
