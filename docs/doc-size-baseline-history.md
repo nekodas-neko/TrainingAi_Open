@@ -2395,3 +2395,18 @@ against a ceiling of 60, which failed a migration PR for a reason unrelated to t
 unblocked the way the check intends — the two nutrition entries are now linked from that domain's
 index, which the wrap-up rule asks for anyway — but that leaves 59 and the next session hits it
 again. Filed as **LA-25** so the sweep is done deliberately rather than discovered mid-feature.
+
+## 2026-08-25 — `projectOverview.md` raised, 7961 → 7963 (LA-25, the journal sweep)
+
+Two lines, and the sixth same-day raise of this baseline by one session. The paragraph carries the
+measurement rather than the chore: the journal README's "~20 loose files" trigger was written for a
+load that no longer exists, and **17 entries landed on 2026-08-25 alone**, so a sweep clearing 25
+buys about a day and a half. A reader of the index needs to know the cadence is near-daily now,
+because the alternative is finding out when the guard fails their own PR — which is exactly how this
+sweep started.
+
+**Six raises in one session is itself worth a note for whoever reads this next.** None was avoidable
+and none was spliced — each was rebuilt from `origin/main` and re-derived, because with several PRs
+in flight the number is only ever correct against the merged predecessor. If that starts feeling like
+friction rather than bookkeeping, the thing to question is whether Current Status should hold a
+paragraph per PR at this merge rate, not whether the ratchet should be looser.
