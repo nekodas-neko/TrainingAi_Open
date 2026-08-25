@@ -343,10 +343,77 @@ below threshold and left in place for next time.
 >
 > **What that run added rather than closed:** BF-24 and BF-26 below, plus BF-25 and BF-27 in the
 > 2026-08-25 owner-request section further down.
+>
+> **Then the owner set the acceptance test for the whole arc, 2026-08-25** — *"I want the design to
+> match the mockup images ... make sure the design/ui is made to match the mockup"*. **BF-28 is the
+> map**: every artboard, its shipped counterpart, and the rules that stop six entries re-deriving the
+> same three arguments. The per-screen parity entries are BF-24 (the day), Q-395c (Add food),
+> BF-29 (My meals), BF-30 (Meal detail), BF-31 (Edit meal) and BF-26 (Quantity). Two artboards need
+> no entry — `Tap targets` and the `srv/g` studies both shipped in Q-395a.
+
+### [nutrition][app-shell] BF-28 — mockup parity: the artboards are the spec, and this is the map
+
+- **Lane:** B
+- **Added:** 2026-08-25, from the owner: *"I want the design to match the mockup images — that was my
+  main interest, can you make sure the design/ui is made to match the mockup."*
+- **⚑ Not implementable on its own.** This is the entry the per-screen parity entries read, the same
+  way Q-395 and BF-11 work. It holds the map, the rules and the things the drawings get wrong, so six
+  entries do not each re-derive them.
+
+**The standing rule, from the owner: a nutrition screen matches its artboard.** Until now the phases
+were specified as *behaviour* — a coverage checklist, gap measurements, a shared row component — and
+every one of them passed while the screens drifted from the drawings. Q-395b is the clean example:
+it ticked 11 of 11 sections and the owner's first look at the result was *"thats not what the mockup
+looks like"*. Parity is now the acceptance test, not a nice-to-have alongside it.
+
+**The map.** All twelve artboards are in
+[`docs/design/2026-08-18-nutrition-rework-mockups.html`](design/2026-08-18-nutrition-rework-mockups.html).
+
+| # | Artboard | Shipped counterpart | Entry |
+|---|---|---|---|
+| 1 | Nutrition — the day | `app/nutrition/nutrition-content.tsx` + `meal-card.tsx` | **BF-24** |
+| 2 | Add food | `food-logger-sheet.tsx` · `capture-step.tsx` | **Q-395c** (already owns it) |
+| 3 | My meals | `saved-meals-sheet.tsx` · `saved-meal-card.tsx` | **BF-29** |
+| 4 | Meal detail | `saved-meal-card.tsx` expanded · `my-meals-picker.tsx` | **BF-30** |
+| 5 | Edit meal | the builder — `assign-step` · `review-step` · `ingredient-picker` | **BF-31** |
+| 6 | Quantity | `quantity-sheet.tsx` ✅ · `quick-edit-log-sheet.tsx` ✗ | **BF-26** |
+| — | Saved Meals — today | the meal-plan slot cards | folded into BF-29 |
+| — | Tap targets | ✅ done — `ui/segmented-tabs.tsx`, 48 dp once for 8 call sites (Q-395a) | closed |
+| — | The green | the hardcoded-accent study — see below | ratcheted, not an entry |
+| — | srv/g A · B · C | ✅ done — the toggle lives in `quantity-sheet.tsx`, once, not per row | closed |
+
+**Three rules that bind every parity entry:**
+
+1. **An artboard is 812 px — one screenful, not a total spec.** The shipped day screen carries
+   `MealPlanReviewCard`, `MealPlanSection`, `TdeeAdaptationCard` and the day-tools group; none appears
+   in artboard 1 because the drawing stops at the fold. **Do not delete a section for being absent
+   from a drawing.** Where a screen has more than its artboard, the entry decides where the extra
+   goes and says so in the PR.
+2. **An owner decision beats the drawing, and one already does.** Artboard 2 draws four tabs —
+   `Recent · Frequent · My meals · Recipes`. Q-395c's owner-set decision is **two**: `Recent` and
+   `My Foods`, because *Frequent* was a second ordering of what *Recent* already shows. Build the
+   two. Any other case where a drawing and a written owner decision disagree comes back here rather
+   than being resolved by whoever notices.
+3. **Match the layout, not the literals.** The artboards are hand-written HTML with inline
+   `oklch(...)` and `#22c55e` values. Copy the **structure, hierarchy, spacing and grouping**; take
+   the colours from theme tokens. The artboard *"The green"* is that argument made by the designer
+   themselves: a literal opts out of both the accent the user picks and the darkening light mode
+   applies, and is invisible in the one combination everything was built in.
+   `scripts/check-hex-literals.js` ratchets this, so a parity PR that pastes literals fails the
+   Custom Rules job. **428 across 86 files today** — a parity entry may not raise its files' numbers.
+
+- **How to verify parity, every entry.** Open the artboard and the running screen side by side at
+  **412 dp**, and enumerate in the PR body: what matched, what was changed to match, and what was
+  deliberately left different **with the reason**. A parity PR that says only "matches the mockup" is
+  not reviewable — that claim is what BF-24 exists to correct.
+- **Device run per screen**, per the standing gate. The web sandbox renders safe-area insets as 0 and
+  will not show a Samsung compositor artifact.
 
 ### [nutrition] BF-24 — the shipped day screen and artboard 1 are different layouts, not a partial one
 
 - **Lane:** B
+- **Spec:** BF-28 — read it first for the parity rules, chiefly that an artboard is one screenful and
+  a section absent from it is not thereby deleted.
 - **Added:** 2026-08-25, from the owner's device smoke run — *"Is that the final design? thats not
   what the mockup looks like (Nutrition - the day)"*, with artboard 1 attached for comparison.
 - **Read first:** artboard **1 · Nutrition — the day** in
@@ -397,26 +464,133 @@ below threshold and left in place for next time.
 - **Verification.** Side by side against artboard 1 at 412 dp in a browser, then the device run.
   State in the PR which of items 1–7 shipped and which were deliberately not, with the reason.
 
-### [nutrition] BF-26 — the quantity sheet's controls are all the same size, radius and fill
+### [nutrition] BF-26 — two quantity sheets: the builder's matches artboard 6, the diary's does not
 
 - **Lane:** B
-- **Gate:** owner
-- **Added:** 2026-08-25, device smoke run ⑧ — the sheet **works** (edit and Remove both verified on
-  the S25), but *"the UI could use some work; everything looks the same; I can post a picture if
-  needed"*.
-- **What is owed from the owner:** the picture. Ask for it before starting — the finding below is a
-  reading of the source, and the owner is looking at something specific in it.
-- **What the source already shows.** In `components/nutrition/quantity-sheet.tsx` the amount input is
-  `h-14 rounded-xl bg-muted`, the − and + buttons are `w-12 h-12 rounded-xl bg-muted`, and Remove is
-  `min-h-12 w-12 rounded-xl bg-destructive/10`. Same radius, near-identical height, same fill family
-  — only Remove's tint differs, and it differs by opacity. So the value the sheet exists to set has
-  no more visual weight than the buttons that nudge it, which is a literal reading of *"everything
-  looks the same"*.
-- **Do not treat this as a rewrite of the sheet.** Q-395a shipped it four days ago and its behaviour
-  passed on the device. This is hierarchy — the amount reads as the subject, the steppers as chrome,
-  Remove as destructive and separated — not new structure.
-- **Verification.** Both themes in a browser (or dark only, if BF-25 lands first), then the device
-  run; the safe-area inset under the action row renders 0 in the sandbox.
+- **Spec:** BF-28.
+- **Added:** 2026-08-25, device smoke run ⑧ — *"the UI could use some work; everything looks the
+  same"*. **Screenshot received**, and it names the wrong sheet as the culprit in a useful way: the
+  one the owner photographed is not the one Q-395a built.
+
+**There are two.** `quantity-sheet.tsx` (Q-395a, opened from the meal builder) and
+`quick-edit-log-sheet.tsx` (Q-406/v1.367.0, opened by tapping a logged row on the day screen). They
+do the same job and look nothing alike, and the diary one — the one reached far more often — is the
+one that does not match the drawing.
+
+| | artboard 6 · `quantity-sheet.tsx` | `quick-edit-log-sheet.tsx` (the screenshot) |
+|---|---|---|
+| unit | `srv` / `g` toggle, `SegmentedTabs` at 48 dp | **none** — servings only |
+| presets | `1 srv · 2 srv · 3 srv · 100 g`, absolute | `×0.5 ×1 ×1.5 ×2 ×3`, multipliers |
+| macros | `230 kcal · P 52.8 · C 2 · F 0.6`, inline and labelled | four equal uncoloured columns, words spelled out |
+| actions | trash · **Save** | trash · **Cancel** · Save |
+
+**Why "everything looks the same" is literally true of the screenshot.** The `−`, the value and the
+`+` are the same rounded square, the same fill, the same border and near-identical height, so the
+number the sheet exists to set has no more weight than the buttons that nudge it. Below it the macro
+strip is four identical monochrome columns — while the food row **directly behind the sheet** renders
+`P 26g` green, `C 1g` blue, `F 0g` orange from `MACRO_COLORS`. The sheet does not import it.
+`kcal` sits in that same strip at the same weight, so the headline number is not a headline.
+
+**Three things to fix, in order of what the owner is looking at:**
+
+1. **Bring the diary sheet onto the artboard-6 shape** — the `srv`/`g` toggle, the absolute presets,
+   the inline labelled macro strip. `quantity-sheet.tsx` already implements all of it, including the
+   `qtyFromInput` grams handling and the "an item with no serving size only ever offers servings"
+   guard. **Reuse it, do not re-derive it** — the two sheets existing separately is the defect.
+2. **`MACRO_COLORS` in the sheet**, so P/C/F read the same inside it as on the row that opened it.
+3. **Give the value hierarchy** — the amount larger and visually distinct from its steppers.
+- **Decide the two-vs-three-button action row explicitly.** The drawing has no Cancel; the sheet has
+  an X and a back-gesture dismiss already. Removing Cancel is probably right, but it is a
+  destructive-adjacent control sitting next to a trash can, so say which you chose and why.
+- **Not a rewrite.** Q-395a shipped its sheet days ago and it passed on the device. This is
+  convergence onto the one that is already correct.
+- **Verification.** Both sheets open side by side against artboard 6 at 412 dp; then the device run —
+  the safe-area inset under the action row renders 0 in the sandbox, and Remove sits in that row.
+
+### [nutrition] BF-29 — artboard 3 parity: My meals, and the slot cards that share its row
+
+- **Lane:** B
+- **Spec:** BF-28.
+- **Added:** 2026-08-25, owner: the nutrition screens match their drawings.
+- **Shipped counterpart:** `saved-meals-sheet.tsx` (656 lines) and `saved-meal-card.tsx`.
+- **What artboard 3 draws:** a header `[back] My Meals [+ New]`; one search field
+  *"Search your meals"*; a count line **`3 meals`**; then rows of `thumbnail · name · "5 items ·
+  makes 2 portions" · calories · chevron`, grouped as one list; and a footnote —
+  **"Calories are per portion. Swipe a row for label, edit and delete."**
+- **The footnote is a specification, not decoration.** It states (a) that the number shown is
+  per-portion, which `saved-meal-card.tsx` already reasons about in its own comments, and (b) that
+  the row's actions are reached by **swipe**, not by buttons on the row. Check what shipped actually
+  does before building — if the actions are buttons today, changing them to swipe is a real
+  interaction change and needs `@use-gesture/react`, which this repo already uses at four sites.
+  **Do not hand-roll the swipe**; three hand-rolled gesture handlers already exist and are the ones
+  to copy away from.
+- **The row is the shared `FoodRow` shape** — thumbnail, name, grey sub-line, calories in a fixed
+  right column, optional chevron. Q-406 owns the component and its thumbnail is deliberately not
+  built yet. If this screen needs the thumbnail, it lands in Q-406, not here.
+- **Also covers the `Saved Meals — today` artboard**, the slot-card study on page 2, which is the same
+  row shape in a meal-plan context. Same list, so same entry.
+- **⚠ Overlaps Q-395c's rename.** Q-395c merges Saved meals / My Meals / My Foods into **one** list
+  under one name. If Q-395c ships first, this entry is parity work on the merged screen; if this
+  ships first, do not entrench a name Q-395c will have to sweep. **Check which landed before
+  starting**, and say in the PR which order you found.
+- **Verification.** Side by side against artboard 3 at 412 dp, enumerated in the PR per BF-28; device
+  run.
+
+### [nutrition] BF-30 — artboard 4 parity: Meal detail, the one screen with no clear counterpart
+
+- **Lane:** B
+- **Spec:** BF-28.
+- **Added:** 2026-08-25, owner: the nutrition screens match their drawings.
+- **⚑ Start by answering whether this screen exists.** Artboards 1, 2, 3, 5 and 6 each map onto a
+  shipped surface. This one maps onto `saved-meal-card.tsx`'s expanded state and `my-meals-picker.tsx`
+  — neither of which is a screen. **The first task is to decide whether Meal detail is a new route, a
+  full-height sheet, or an expansion of the card**, and that decision belongs in the PR before any
+  markup. Every other parity entry is "change what is there"; this one may be "build what is drawn".
+- **What artboard 4 draws:** a hero band with `[back]`, an overflow action and a **`Photo`** button;
+  the meal name with `Makes 2 portions · 5 ingredients`; a **`278 / per portion`** figure; three macro
+  columns with **percentage, grams and label** (`48% · 33 g · Protein`); an `Ingredients` section
+  headed `whole batch` listing `name · "60 g · 2 servings" · calories`; and a bottom action row —
+  **`Log this meal`** with two icon buttons beside it.
+- **`Log this meal` already exists** at `saved-meal-card.tsx:220`, and that file's own comment records
+  the batch-vs-portion rule the artboard's `whole batch` / `per portion` split is drawing: a batch
+  recipe shows ONE portion, which is what the button writes. **The semantics are settled; this is
+  presentation.** Do not re-litigate what a portion means.
+- **The percentage column is a number that has to come from somewhere.** `48% · 33 g · Protein` is
+  macro share of energy — the Atwater conversion. `packages/shared` owns `KCAL_PER_G` after LB-9, and
+  `components/nutrition/macro-energy.ts` is the `components/` copy. Use one of those; do not write
+  `* 4` / `* 9` in a component.
+- **Verification.** Side by side against artboard 4 at 412 dp, enumerated per BF-28; device run.
+  If the outcome is "this stays a card, not a screen", that is an acceptable result — say so with the
+  reason and close the entry rather than building a route nobody navigates to.
+
+### [nutrition] BF-31 — artboard 5 parity: Edit meal, and the batch footer that is its point
+
+- **Lane:** B
+- **Spec:** BF-28.
+- **Added:** 2026-08-25, owner: the nutrition screens match their drawings.
+- **Shipped counterpart:** the builder — `assign-step.tsx`, `review-step.tsx`, `ingredient-picker.tsx`.
+  Q-395a already converted its ingredient rows to the shared `FoodRow` and deleted `ingredient-row.tsx`,
+  so the **rows** are done and this entry is the frame around them.
+- **What artboard 5 draws:** a header carrying the meal name **inline-editable** (a pencil beside it)
+  with `Makes 2 portions · 278 kcal each` beneath; an `Ingredients` section headed `whole batch`, each
+  row `name · "60 g" · calories · [chevron]`; then **`+ Add ingredient`** and **`+ Add a photo`** as
+  two affordances at the end of the list, not floating buttons; and a **pinned footer**:
+
+  > `Batch` · `555 kcal` · `66 P` · `48 C` · `13 F` · … · `278 / portion`, with **`Save meal`** below it.
+
+- **The footer is the finding.** It keeps the batch total, the per-macro split and the per-portion
+  figure visible **while ingredients are being edited** — which is the whole reason to have this
+  screen rather than a list. Whether the shipped builder shows those numbers during editing, or only
+  at a review step afterwards, is the first thing to check; if it is the latter, this is a real
+  behaviour change and not a restyle.
+- **The pencil is a second finding.** Artboard 5 edits the meal name in place in the header. Check
+  whether renaming currently costs a separate sheet or step.
+- **`66 P · 48 C · 13 F` uses `MACRO_COLORS`**, like every other macro readout in the app, and takes
+  its kcal from `macro-energy.ts` / `KCAL_PER_G` rather than inline factors.
+- **Artboard 6 draws this same screen with the quantity sheet over it.** So BF-26 and this entry
+  share a surface — if both are open, do them in one PR and verify the sheet against the screen
+  underneath it, which is exactly what artboard 6 shows.
+- **Verification.** Side by side against artboard 5 at 412 dp, enumerated per BF-28; device run.
 
 ### [nutrition][app-shell] Q-406 — the shared food row: two call sites converted, two waiting on their phase
 
@@ -740,7 +914,14 @@ whether or not anyone draws them first.
 ### [nutrition][app-shell] Q-395c — phase 4: Log Food becomes one screen, and `My Foods` becomes one name
 
 - **Lane:** B
-- **Spec:** Q-395, findings 15 and 17.
+- **Spec:** Q-395, findings 15 and 17 — **and BF-28**, because this entry is also **artboard 2
+  parity**: `Add food` is the drawing of the screen it builds. Read that artboard alongside the
+  findings.
+- **⚠ Where the drawing and the owner disagree, the owner wins, and here they do.** Artboard 2 draws
+  **four** tabs — `Recent · Frequent · My meals · Recipes`. The decision below is **two**. Build two.
+  The artboard also draws a bottom row of `Multi-add` and `Create food`, which is the same idea as
+  the decided `Photo · Barcode · Describe or enter` action row under a different set of labels —
+  reconcile them in the PR rather than shipping both rows.
 - **Scope.** The capture step's six scattered entry points collapse to one screen: search across
   everything · two tabs · a bottom row of capture actions.
 - **The decided details, all owner-set:** tabs are **`Recent` and `My Foods`**, two not four

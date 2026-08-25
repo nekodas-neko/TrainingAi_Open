@@ -2343,3 +2343,18 @@ same-day raise of this baseline, and the third to be superseded before merging �
 ordinary case when several PRs run in one session, not a sign anything is wrong. Each time the fix
 was to rebuild `doc-size-baseline.json` from `origin/main` and re-derive, never to splice the hunk:
 the raise is only ever correct against the merged predecessor.
+## 2026-08-25 — `docs/implementation-backlog.md` raised, 11862 → 12000 (mockup parity)
+
+The owner set the acceptance test for the nutrition arc: *"I want the design to match the mockup
+images"*. That is five new entries — **BF-28** (the map every parity entry reads), **BF-29**, **BF-30**,
+**BF-31**, and a **BF-26 rewritten** around the screenshot they sent.
+
+Most of the +138 is BF-28, and it is there so the other five are short. It holds the artboard →
+shipped-file table, and the three arguments that would otherwise be had once per entry: an artboard
+is one screenful and a section missing from it is not thereby deleted; an owner decision beats the
+drawing, and one already does (artboard 2 draws four tabs, Q-395c decided two); and the drawings'
+inline `oklch`/hex literals are structure to copy and colours to ignore, since `check-hex-literals.js`
+fails on the paste.
+
+The alternative was five entries each restating that, which is longer in total and drifts. This file
+grows when the queue is the only place a decision lives — and the parity rule now is.
