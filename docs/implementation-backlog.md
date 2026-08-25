@@ -351,6 +351,33 @@ below threshold and left in place for next time.
 > BF-29 (My meals), BF-30 (Meal detail), BF-31 (Edit meal) and BF-26 (Quantity). Two artboards need
 > no entry — `Tap targets` and the `srv/g` studies both shipped in Q-395a.
 
+### [nutrition] LA-30 — a zero-calorie food can never be logged, and the button says nothing
+
+- **Lane:** B
+- **Added:** 2026-08-25, from the owner hitting it live — a ZMA supplement scan, correctly read by
+  the AI as *"It is calorie-free"*, with **Next** greyed out and no message explaining why.
+- **The gate:** `components/nutrition/review-step.tsx:159`
+
+  ```ts
+  const canSave = value.name.trim().length > 0 && value.calories > 0
+  ```
+
+  Every genuinely zero-calorie item is refused: supplements, water, black coffee, plain tea, diet
+  soft drink, sugar-free gum, zero-cal sweetener, most spices and herbs.
+- **The server already disagrees with it.** `packages/shared/src/validation/food-item.ts:19` is
+  `z.number().min(0).max(10000)` — zero is explicitly allowed, so the API would have accepted this
+  log. There is **no engine half to this fix**; it is one client-side predicate, which is what puts
+  it in Lane B.
+- **Sibling surface, same PR:** `components/nutrition/ingredient-picker.tsx:154` does
+  `if (!scan || scan.error || !(scan.calories > 0))` — a zero-calorie scan is classified as a
+  *failed* scan there. Same rule, different consequence.
+- **Suggested shape:** drop `calories > 0` from `canSave`; a name is the only field that must be
+  present. If a guard against an empty/failed AI response is still wanted, test that the scan
+  *returned* — not that its calories are nonzero, which is a legitimate value.
+- **The silent-disable is half the bug.** A disabled primary button with no reason given is
+  indistinguishable from a broken app; the owner's report was *"it wouldn't let me log it"*, not
+  *"it told me why"*. Whatever replaces the gate should say what it wants.
+
 ### [nutrition][app-shell] BF-28 — mockup parity: the artboards are the spec, and this is the map
 
 - **Lane:** B
@@ -2417,7 +2444,8 @@ show it:
    rate limit and Zod schema at creation (per the AI & Security defaults).
 3. **Report:** p50/p95 per route over N days, split **cold vs warm cache** — without that split the
    deploy churn swamps everything and the number means nothing.
-4. **Retention:** cap it. `error_events` reached 49 MB for 4 live rows (Q-315); a per-navigation row
+4. **Retention:** cap it. `error_events` reached 52 MB (Q-315 — genuinely live rows, not bloat: one
+   already-fixed burst wrote 5,771 of them); a per-navigation row
    is far higher volume, so it needs a prune from day one, not later.
 
 **Two limits, stated:** the ~460 ms round trip above includes a sandbox proxy and unknown
@@ -4482,30 +4510,6 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 - **Verification:** the route is already proven end to end on `pnpm dev` (251 frames → 10 blobs, API
   dump hashing identically before and after). This item is the affordance only.
 
-### [platform] Q-315 — `error_events` holds 4 live rows in 49 MB: Q-539 stopped the bleeding but never reclaimed the space
-
-> **✅ THE BUTTON SHIPPED 2026-08-25 (Lane B).** `db-footprint-card.tsx` posts to the generalised
-> `/api/admin/vacuum` with a table picker fed by that route's own `GET`, so the allowlist cannot
-> drift from the client. The result line reports `liveRows` beside `beforeBytes` — the pair that
-> tells pure bloat from a genuinely large table, which is why this is a one-off reclaim and not a
-> chore. Confirm copy is per-table now (the old text promised "body_hex and all rows are preserved",
-> true of `oura_raw_samples` and meaningless here).
-> [`journal`](overview/entries/2026-08-25-vacuum-table-picker.md).
->
-> **Driven end to end locally: 200, `{"table":"error_events","liveRows":3,...,"reclaimedBytes":0}`.
-> Zero is correct there and proves the path, not the reclaim** — the local table is 48 KB with no
-> bloat; production's is 49 MB against 4 rows, and that cannot be reproduced here.
->
-> **✅ `app/api/oura-ble/samples/vacuum/route.ts` DELETED 2026-08-25 (Lane A)** — no caller; verified
-> `VACUUM_FULL_TABLES` still carries both tables first. **Nothing owed here**; the reclaim is a press.
-
-- **Branch:** `feat/vacuum-table-picker`
-- **Lane:** B
-- **Keep:** the press itself, on production. `/admin/oura-ble` from a **desktop** (Q-544 moved the
-  card above the native-gated `OuraBleDebug` for exactly this), signed in as admin → Table →
-  `error_events` → Reclaim disk. Expect ~49 MB back against 4 live rows. Also unexercised: a
-  `VACUUM FULL` long enough to need the slice's lifted timeouts, and the `<select>` at phone width.
-  `Gate: owner`
 ### [app-shell][platform] Q-544 — server-side disk maintenance is trapped behind a native-plugin gate, so it cannot be run from a desktop
 
 > **✅ SHIPPED 2026-08-24 (Lane B, v1.363.4).** `DbFootprintCard` **and** `DeviceMetricsPanel` moved
@@ -9652,7 +9656,7 @@ tick re-posts."* **Read from source, not reproduced:** `readJsonLimited` streams
 backgrounded mid-post is the obvious cause. Nothing catches it, so it reaches `onRequestError`,
 which reports to **both** `error_events` and Sentry. The helper is shared, so every route using it
 has this shape. It matters only because `error_events` is the table every session reads to orient,
-it prunes at 30 days, and it is already the subject of Q-315's 49 MB of bloat — a client hanging up
+it prunes at 30 days, and Q-315 measured it at 52 MB of genuinely live rows (not bloat) — a client hanging up
 is not our fault and each one spends an alert plus a row of that record. **Fix shape:** return
 `{ ok: false, reason: 'aborted' }` from the helper so the route answers 400 without reporting, or
 filter aborts in `recordRequestError` (wider — it covers routes not using the helper); either way
