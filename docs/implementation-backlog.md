@@ -4537,8 +4537,8 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 > Zero is correct there and proves the path, not the reclaim** — the local table is 48 KB with no
 > bloat; production's is 49 MB against 4 rows, and that cannot be reproduced here.
 >
-> **`app/api/oura-ble/samples/vacuum/route.ts` now has no caller.** Deleting it is `app/api/**`,
-> Lane A's, and was not done as a side effect of wiring a button.
+> **✅ `app/api/oura-ble/samples/vacuum/route.ts` DELETED 2026-08-25 (Lane A)** — no caller; verified
+> `VACUUM_FULL_TABLES` still carries both tables first. **Nothing owed here**; the reclaim is a press.
 
 - **Branch:** `feat/vacuum-table-picker`
 - **Lane:** B
