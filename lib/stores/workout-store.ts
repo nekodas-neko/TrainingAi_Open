@@ -2,7 +2,6 @@ import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
 import type { WorkoutMode, ExerciseSummaryData, SessionLogEntry } from '@/components/workout/types'
 import { DEFAULT_SETS, DEFAULT_REPS } from '@/components/workout/utils'
-import { todayInTz } from '@trainingai/shared/date-utils'
 
 // A snapshot of everything superset alternation needs to preserve for an
 // exercise that isn't currently loaded into the flat fields below — taken
@@ -179,7 +178,11 @@ const INITIAL_STATE: WorkoutState = {
   summaryData: null,
   todayLogged: {},
   sessionLog: [],
-  storedDate: todayInTz(),
+  // Empty, not `todayInTz()`: this module is evaluated outside React, so it cannot reach the user's
+  // timezone, and DEFAULT_TZ is the wrong answer for anyone who has pressed Auto-detect (Q-477). It
+  // is stamped by `WorkoutDayRollover`, which knows the zone. Empty never equals a real date, so the
+  // first rollover check stamps it — clearing two objects that are already empty on a fresh store.
+  storedDate: '',
   revertedDeloads: {},
   newPRs: [],
   xpEarned: undefined,
@@ -190,10 +193,15 @@ const INITIAL_STATE: WorkoutState = {
 // in place (matching zustand's own onRehydrateStorage contract) and also returns it.
 export function applyRehydrateFixups(
   state: WorkoutState,
-  today: string,
+  today: string | null,
   now: number,
 ): WorkoutState {
-  const dateRolledOver = state.storedDate !== today
+  // `null` means the caller cannot know the user's timezone — which `onRehydrateStorage` cannot,
+  // running at store creation before any provider mounts. Skipping the date branch there is the
+  // whole of Q-477's remainder: guessing `DEFAULT_TZ` would compare a Kiritimati user's real today
+  // against Brisbane's, and a mismatch CLEARS `todayLogged`, dropping the day's completed-set ticks.
+  // The transient-mode and stale-anchor fixups below need no date and still run.
+  const dateRolledOver = today !== null && state.storedDate !== today
   if (dateRolledOver) {
     state.storedDate = today
     state.todayLogged = {}
@@ -302,7 +310,9 @@ export const useWorkoutStore = create<WorkoutStore>()(
         summaryData: null,
         todayLogged: s.todayLogged,
         sessionLog: s.sessionLog,
-        storedDate: todayInTz(),
+        // `storedDate` is deliberately NOT re-stamped here. It marks which day `todayLogged`
+        // belongs to, not anything about this workout, and re-stamping it in a zone the store
+        // cannot know is how a wrong zone HIDES a rollover that is due.
         revertedDeloads: s.revertedDeloads,
         newPRs: [],
         xpEarned: undefined,
@@ -425,7 +435,7 @@ export const useWorkoutStore = create<WorkoutStore>()(
       storage: createJSONStorage(() => localStorage),
       onRehydrateStorage: () => (state) => {
         if (!state) return
-        applyRehydrateFixups(state, todayInTz(), Date.now())
+        applyRehydrateFixups(state, null, Date.now())
       },
     }
   )

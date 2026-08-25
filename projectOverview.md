@@ -28,9 +28,7 @@
 **Last updated:** 2026-08-24.
 
 **The queue tool stopped calling shipped work "ready" (LB-11).** `next-item.js` had never learned to
-read a `- **Keep:**`, so an entry that shipped kept its pre-shipping priority — **17 of Lane B's top
-21 were finished**, and the first startable item sat below the tool's ten-row window. A KEEP bucket
-prints them with what they owe; READY went 86 → 65.
+read a `- **Keep:**`, so an entry that shipped kept its pre-shipping priority — **17 of Lane B's top 21 were finished**, and the first startable item sat below the tool's ten-row window. A KEEP bucket prints them with what they owe; READY went 86 → 65.
 
 **Three more cards say so when their fetch fails, and the sweep was three, not ~18 (Q-499).** The
 Oura section is the one that mattered: its `return null` means *no ring connected*, so a 429 made a
@@ -73,7 +71,11 @@ builder's rows became the shared `FoodRow`; `ingredient-row.tsx` is deleted and 
 
 **The Devices card stops calling the ring healthy with no key (LB-5).** Checks `hasKey()` and links to `/admin/oura-ble` when false. `Gate: device`.
 
-**Q-477 is DONE for every client component** (4 slices, 78/38 → **3 calls in 1 file**). Left is `workout-store.ts`, a Zustand store with no hook, where a wrong-zone stamp makes `rolloverDay()` clear the day's completed sets — a design call, analysed on the entry.
+**Q-477 is COMPLETE — the ratchet baseline is empty** (78 bare calls across 38 files → **0 across
+539 scanned**). The last slice did not thread `tz` into the Zustand store; it stopped the store
+guessing. `onRehydrateStorage` compared against Brisbane while the workout screen compared against
+the user's zone, so a non-Brisbane user could have the day rolled over twice — and a rollover clears
+the day's completed-set ticks. One shell component in the root layout answers it now. `Gate: device`.
 
 **"Nine collapsibles missing `aria-expanded`" was actually two (Q-491)** — one retired, four already Radix, two a back chevron. `weights-summary.tsx`/`added-weight-toggle.tsx` were real, now fixed.
 
