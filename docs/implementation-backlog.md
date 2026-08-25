@@ -1763,6 +1763,55 @@ new top-level `*.mjs` / `*.js` / `*.ts` that is not on a short allowlist (`next.
   `*.json` capture, or `/tmp`-writing script has the same origin.
 - **Surface: CI only, web-reproducible.**
 
+### [platform][app-shell] BF-22 — production is served from Virginia and the owner is in Brisbane: ~270 ms on every request, ~20 requests per Home open
+
+- **Branch:** _unassigned_
+- **Added:** 2026-08-25 · owner: *"everything is loading very slowly"*, with a screenshot of a fully-loaded Home
+- **Lane: A** — a Railway region change is infrastructure, not code. The request-count half is shared with BF-19.
+- **Gate: owner** — moving a region is a production migration with a database attached. Ties directly into **Q-551** (stay on Railway or leave), which is already owner-gated; decide them together.
+
+**Measured 2026-08-25 from one sandbox, one proxy, keep-alive so TLS setup is excluded:**
+
+| Request | TTFB |
+|---|---|
+| `google.com/generate_204` | **~30 ms** |
+| `…up.railway.app/manifest.webmanifest` — a **static file** | **~276 ms** |
+| `…up.railway.app/api/version` — a dynamic route | **~285 ms** |
+
+**A static file costs the same as a dynamic route**, which is what makes this diagnostic rather than
+suggestive: the application, the auth check and the database contribute under 10 ms of the total.
+The rest is the path to the origin. Response headers name it — **`x-railway-edge: iad1`**, Washington
+DC — and `users.timezone` is `Australia/Brisbane`. Brisbane to Virginia is roughly 15,000 km; ~250 ms
+round-trip is close to what fibre physics allows, so no server tuning will move it.
+
+**The multiplier is the Home screen's fan-out.** `app/session-select/session-select-content.tsx`
+holds **17 `cachedFetch`/`cachedFetchToday` sites across 17 `useEffect`s**, against ~20 distinct
+endpoints. `cachedFetchCore` paints the cached value and then **always** revalidates over the
+network, so a warm cache still costs a full set of round trips.
+
+**This is not the regression the owner suspected, and that matters.** The fan-out is **flat**: 17
+`cachedFetch`, 17 `useEffect`, 12 `readCacheSync`, ~1456 lines, unchanged across every commit
+touching the file from 2026-08-19 to 2026-08-25. Nothing was added. The distance has always been
+there. What changed is how often the device pays the *uncached* path — see BF-19: 80 deploys on
+2026-08-24, each rewriting the service-worker cache name.
+
+**Three levers, largest first:**
+1. **Region.** Serving from a region near AU instead of `iad1` cuts the constant off *every* request
+   — roughly a third of the current round trip, multiplied by ~20 requests per screen. Check
+   Railway's current region list rather than assuming which are available; the database has to move
+   with it, which is what makes this owner-gated.
+2. **Fan-out.** ~20 endpoints per Home open is a lot to spend at 270 ms each. A server-assembled
+   aggregate would trade N round trips for one.
+3. **Cache churn.** BF-19's half.
+
+- **What would count as fixed:** a static asset from the origin returns in well under 100 ms from the
+  owner's location, and Home's request count is stated rather than incidental.
+- **Do not** spend effort on server-side or query tuning off the back of this entry — BF-19 measured
+  SQL at 3 ms with a 99.90% cache hit, and this entry shows a static file is just as slow as a
+  dynamic one.
+- **Surface: production only.** Every figure here is from a sandbox, not the S25 — the owner's
+  absolute numbers will differ, but the static-vs-dynamic *comparison* is what carries the argument.
+
 ### [nutrition][platform] BF-12 — logging a saved meal takes ~20s and the owner couldn't find it after navigating away; traced to the slow fallback firing, not a lost write
 
 - **Lane: A** — the fix is in `logMealItems`/local-store availability, not the UI. No schema.

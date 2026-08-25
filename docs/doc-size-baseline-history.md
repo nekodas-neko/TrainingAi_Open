@@ -2138,3 +2138,15 @@ a short build list. A plan would have cost more lines than the entry.
 every open PR. Twenty-three lines to record a failure that cost every concurrent agent a red check
 and had already happened twice under a prose-only rule, which is the argument for the guard the
 entry asks for.
+
+## 2026-08-25 — `docs/implementation-backlog.md` raised for BF-22
+
+**BF-22** — the owner's slow-load report traced to distance, not code. Production serves from
+`iad1` (Washington DC) and the owner is in Brisbane, so every request carries ~270 ms that no server
+tuning can remove; Home spends ~20 of them per open.
+
+The lines are mostly the measurement table and the negative result, and both earn their place. The
+table is what makes the finding diagnostic rather than suspected — a **static file** costs the same
+as a dynamic route, which rules out the app, the auth check and the database in one comparison. The
+negative result (Home's fetch count is flat across every commit since 2026-08-19) is what stops the
+next session hunting a regression that is not there.
