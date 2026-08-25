@@ -4,8 +4,12 @@ import { rateLimit } from "@/lib/rate-limit"
 import { exportUserData } from "@/lib/export/full-export"
 import { todayInTz, DEFAULT_TZ } from "@trainingai/shared/date-utils"
 
-// GET — full-data takeout. Streams NDJSON (one `{domain, row}` line per record)
-// via ReadableStream rather than buffering the whole export in memory.
+// GET — full-data takeout. Streams NDJSON (one `{domain, row}` line per record), starting with a
+// `_manifest` line naming every excluded table and why.
+//
+// Q-288: this comment used to claim the export streamed "rather than buffering the whole export in
+// memory", and only the enqueue below was ever true — `exportUserData` read each table with a
+// single buffering `pool.query`. It now paginates by primary key, so the claim holds.
 export async function GET() {
   const session = await auth()
   if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
