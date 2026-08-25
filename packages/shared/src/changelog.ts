@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.373.0",
+    date: "2026-08-25",
+    changes: [
+      "The Android back gesture now closes whatever sheet or dialog is on top, instead of navigating the page underneath away. It worked on five screens before and works everywhere now \u2014 including one press at a time when a sheet was opened from inside another, and on confirmations, where back cancels rather than confirms.",
+    ],
+  },
+  {
     version: "1.372.0",
     date: "2026-08-25",
     changes: [

@@ -24,7 +24,7 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.372.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Version:** v1.373.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-08-25.
 
 **The journal sweep, and the cadence it revealed (LA-25).** `check-doc-index-size.js` failed a *migration* PR at 61 unlinked entries against a limit of 60. **25 folded into a new `history-2026-08-25.md`, unlinked 59 → 34.** The finding is worth more than the sweep: the README's "~20 loose files" trigger was written for a load that no longer exists — **seventeen entries landed on 2026-08-25 alone** across the concurrent sessions, and the count went from a post-sweep 32 on the 24th to 61 the next day, so a sweep clearing 25 buys **about a day and a half**. This is a near-daily chore now, and the practical trigger is the guard failing someone's PR. **The cheaper half is the citation habit** — cite the review or handoff doc, not the loose journal entry — and this run broke it knowingly: BF-11e cited two journal entries from the nutrition index for want of a handoff doc, which costs the linked floor **two, permanently**. A sweep can undo a fold; it cannot undo a citation.
@@ -44,6 +44,8 @@
 Read it with the baton at `docs/agents/state/implementation-lane-b.md` before taking a Lane B item:
 the entire Lane B surface was traversed and every remaining candidate is gated, declined, parked,
 needs hardware, or wants a plan first. **Nothing that run shipped is device-verified.**
+
+**The back gesture stops navigating the page away (BF-27).** `useSheetBackDismiss` was imported by 5 of 45 sheet files and 0 of 6 dialog files; everywhere else Android back reached the WebView, which took the page underneath with it. Shipped **not** as the 40-site sweep the entry scoped but as one component rendered by `SheetContent`/`DialogContent` — so it covers every sheet, every dialog and every future one, closes through Radix's own `onOpenChange` (keeping each surface's existing guards and cancel arms), and reaches the uncontrolled sheet a per-site sweep could not. Dialogs were included deliberately: back can only take a cancel arm, asserted on the database. Three mutation-checked e2e cases, including the nest ([`journal`](docs/overview/entries/2026-08-25-back-dismiss-sweep.md)).
 
 **The timeline's workout card had somewhere to land for seventeen days (Q-93-followup).** It was left unwired in August because no screen showed a past session; `/health/day` shipped 2026-08-08 and nothing tracked the dependency clearing. Workout and walk now open it; `bedtime` and `tag` stay inert, having no detail view to reach. Two more of the entry's premises were stale — the second renderer it names is deleted, and the `ev.date` it needs is stamped centrally, so no `app/api/**` change was involved. Guarded by a mutation-checked e2e spec, because a row wired to nothing renders identically to a wired one ([`journal`](docs/overview/entries/2026-08-25-timeline-workout-day-detail.md)).
 
@@ -268,18 +270,16 @@ production shows no row that was ever mis-linked — though `claude_ro` is row-s
 that is *no evidence*, not *has not happened*
 ([journal](docs/overview/entries/2026-08-20-program-write-fk-ownership.md)).
 
-**RV-33 closed alongside it** — `POST /api/progression-styles` and
-`PATCH /api/nutrition/food-logs/[id]` answered a *correct* ownership refusal with an empty-bodied 500
-and filed it as a server fault, because the `NotFoundError` escaped an unguarded handler. Both are
-404s with a body now, and `updateMealType` — the only repository writer that passed its argument into
-`.set()` wholesale — is whitelisted column by column
+**RV-33 closed alongside it** — two routes answered a *correct* ownership refusal with an
+empty-bodied 500, because the `NotFoundError` escaped an unguarded handler. Both are 404s with a body
+now, and `updateMealType` — the only repository writer passing its argument into `.set()` wholesale
+— is whitelisted column by column
 ([journal](docs/overview/entries/2026-08-20-ownership-refusal-status.md)).
 
 **Q-362a closed (2026-08-20)** — `/api/day-log` keyed workout durations by session **name**, so two
-`Push` sessions in one day left a single window and the earlier one vanished. Now keyed by
-`workout_sessions.id`, and shipped **additively**: the colliding name-keyed record is still emitted
-so the three Lane B surfaces that read it keep working until Q-362b moves them, with LA-15 to remove
-it afterwards ([journal](docs/overview/entries/2026-08-20-day-log-duration-session-identity.md)).
+`Push` sessions in one day left one window and the earlier vanished. Now keyed by id, **additively**:
+the name-keyed record still ships until Q-362b moves the three Lane B readers, LA-15 removes it after
+([journal](docs/overview/entries/2026-08-20-day-log-duration-session-identity.md)).
 
 **Q-424 closed (2026-08-20)** — the doc-size ratchet compared the tree against a committed number, so
 two independently-green PRs could merge into a red `main`, failing on an unrelated branch over an

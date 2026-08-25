@@ -1,0 +1,185 @@
+import { test, expect } from '@playwright/test'
+import { Client } from 'pg'
+import { SEED_EMAIL, settleRouteBoundary } from './fixtures'
+
+/**
+ * BF-27: the Android back gesture closes the surface on top, on sheets and dialogs that were never
+ * individually wired for it.
+ *
+ * Before this, `useSheetBackDismiss` was imported by **5 of 45** sheet files and **0 of 6** dialog
+ * files; everywhere else back was handled by the WebView, which navigated the page underneath away.
+ * The hook now lives in `SheetContent`/`DialogContent` via `components/ui/back-dismiss.tsx`, so the
+ * two surfaces here are covered by the primitive rather than by anything in their own source —
+ * which is exactly why they are the ones worth asserting on. Neither file mentions back dismissal.
+ *
+ * `sheet-back-dismiss.spec.ts` still guards the harder case the hook was written for (a sheet that
+ * MOUNTS already-open, under StrictMode) and the one-entry-per-open invariant. This file guards the
+ * sweep's reach.
+ */
+
+const SESSION_ID = '7e7e7e7e-7e7e-4e7e-8e7e-7e7e7e7e7e7e'
+const EXERCISE = 'Spec Back Sweep Press'
+// A fixed past day: nothing here is compared against the clock on either side.
+const DAY = '2026-08-14'
+
+async function withDb<T>(fn: (db: Client) => Promise<T>): Promise<T> {
+  const connectionString = process.env.DATABASE_URL
+  expect(connectionString, 'DATABASE_URL must be set — see e2e/README.md').toBeTruthy()
+  const db = new Client({ connectionString })
+  await db.connect()
+  try { return await fn(db) } finally { await db.end() }
+}
+
+async function cleanup(db: Client) {
+  await db.query(
+    `DELETE FROM set_logs WHERE exercise_log_id IN (SELECT id FROM exercise_logs WHERE workout_session_id = $1)`,
+    [SESSION_ID],
+  )
+  await db.query('DELETE FROM exercise_logs WHERE workout_session_id = $1', [SESSION_ID])
+  await db.query('DELETE FROM workout_sessions WHERE id = $1', [SESSION_ID])
+}
+
+/** Counts the row the delete dialog would remove — the dialog's own state would agree either way. */
+async function liveLogs(): Promise<number> {
+  return withDb(async db => {
+    const { rows } = await db.query<{ n: string }>(
+      `SELECT count(*) AS n FROM exercise_logs
+        WHERE workout_session_id = $1 AND exercise_name = $2 AND deleted_at IS NULL`,
+      [SESSION_ID, EXERCISE],
+    )
+    return Number(rows[0].n)
+  })
+}
+
+test.describe.configure({ mode: 'serial' })
+
+test.beforeAll(async () => {
+  await withDb(async db => {
+    const { rows } = await db.query<{ id: string }>('SELECT id FROM users WHERE email = $1', [SEED_EMAIL])
+    const userId = rows[0]?.id
+    expect(userId, `${SEED_EMAIL} is not seeded — run pnpm db:local`).toBeTruthy()
+    await cleanup(db)
+
+    await db.query(
+      `INSERT INTO workout_sessions (id, session_name, started_at, completed_at, user_id)
+       VALUES ($1, 'Spec Back Sweep Session', '2026-08-13 22:00:00+00', '2026-08-13 22:45:00+00', $2)`,
+      [SESSION_ID, userId],
+    )
+    const { rows: [log] } = await db.query<{ id: string }>(
+      `INSERT INTO exercise_logs (workout_session_id, exercise_name, logged_at, muscle_groups)
+       VALUES ($1, $2, '2026-08-13 22:20:00+00', '{chest}') RETURNING id`,
+      [SESSION_ID, EXERCISE],
+    )
+    await db.query(
+      `INSERT INTO set_logs (exercise_log_id, set_number, weight_kg, reps)
+       SELECT $1, n, 50, 8 FROM generate_series(1, 3) n`,
+      [log.id],
+    )
+  })
+})
+
+test.afterAll(async () => { await withDb(cleanup) })
+
+type Page = import('@playwright/test').Page
+
+/**
+ * A real CDP touch sequence, not `.click()` — the mouse path dispatches no `click` event on these
+ * screens (Q-354, written up on `water-log-write-path.spec.ts`). Retried because a tap fired before
+ * React has attached the handler does nothing, silently, and CI starts the dev server cold. Safe to
+ * repeat: every control here opens a surface, so a second tap re-opens rather than toggling shut.
+ */
+async function tapUntilOpen(page: Page, selector: string): Promise<void> {
+  const target = page.locator(selector)
+  await expect(target).toBeVisible({ timeout: 30_000 })
+  await expect(async () => {
+    const box = (await target.boundingBox())!
+    await page.touchscreen.tap(box.x + box.width / 2, box.y + box.height / 2)
+    await expect(page.getByRole('dialog')).toBeVisible({ timeout: 3_000 })
+  }).toPass({ timeout: 60_000 })
+}
+
+test('back closes a sheet that was never wired for it, and stays on the page', async ({ page }) => {
+  await page.goto(`/health/day?date=${DAY}`)
+  await settleRouteBoundary(page)
+
+  const before = await page.evaluate(() => history.length)
+  await tapUntilOpen(page, `button[aria-label="${EXERCISE} history"]`)
+  // One entry per open, not two: the primitive owns this now, and a sheet that also kept its own
+  // call would push twice and need two presses.
+  expect(await page.evaluate(() => history.length)).toBe(before + 1)
+
+  await page.goBack()
+  await expect(page.getByRole('dialog')).toHaveCount(0, { timeout: 10_000 })
+  expect(new URL(page.url()).pathname).toBe('/health/day')
+})
+
+test('back cancels a confirm dialog rather than confirming it', async ({ page }) => {
+  expect(await liveLogs()).toBe(1)
+
+  await page.goto(`/health/day?date=${DAY}`)
+  await settleRouteBoundary(page)
+  await tapUntilOpen(page, `button[aria-label="Delete ${EXERCISE}"]`)
+
+  await page.goBack()
+  await expect(page.getByRole('dialog')).toHaveCount(0, { timeout: 10_000 })
+  expect(new URL(page.url()).pathname).toBe('/health/day')
+
+  // The point of extending this to dialogs at all. Back reaches each dialog through Radix's
+  // `onOpenChange(false)` — the same path as Cancel and the X — so it can only ever take the cancel
+  // arm. Asserted on the DATABASE because a dialog that closed and a dialog that deleted look
+  // identical on screen.
+  expect(await liveLogs()).toBe(1)
+})
+
+/**
+ * The nesting case BF-27 names as the real risk: "a sheet opened from inside another sheet is where
+ * the history stack goes wrong". Before this change most nests had no history entry at all, so the
+ * interaction was untested in practice; now every sheet has one and the per-instance `sheetId` in
+ * `useSheetBackDismiss` is what has to keep them apart.
+ *
+ * Log Food → History is the shortest real nest: `food-logger-sheet.tsx` renders `FoodLibrarySheet`.
+ */
+test('back closes the inner sheet of a nest and leaves the outer one open', async ({ page }) => {
+  await page.goto('/nutrition')
+  await settleRouteBoundary(page)
+  const before = await page.evaluate(() => history.length)
+
+  // The tab shell mounts several panels at once, so DOM order is not screen order and
+  // `getByRole(...).first()` resolves into an off-screen panel — where a tap lands on the carousel
+  // and switches tabs instead. Pick the one whose box is actually within the viewport.
+  const clickInView = async (name: string) => {
+    const handle = await page.evaluateHandle((n) => {
+      const match = [...document.querySelectorAll('button')]
+        .filter(b => (b.getAttribute('aria-label') || b.textContent || '').trim() === n)
+      return match.find(e => {
+        const r = e.getBoundingClientRect()
+        return r.width > 0 && r.x >= 0 && r.x < window.innerWidth
+      }) ?? null
+    }, name)
+    await handle.evaluate(el => (el as HTMLElement | null)?.click())
+  }
+
+  await expect(async () => {
+    await clickInView('Add food')
+    await expect(page.getByRole('dialog')).toBeVisible({ timeout: 3_000 })
+  }).toPass({ timeout: 60_000 })
+  expect(await page.evaluate(() => history.length)).toBe(before + 1)
+
+  await expect(async () => {
+    await clickInView('History')
+    await expect(page.getByPlaceholder('Search your food library…')).toBeVisible({ timeout: 3_000 })
+  }).toPass({ timeout: 60_000 })
+  // A second entry, not a shared one — the nested sheet pushed its own.
+  expect(await page.evaluate(() => history.length)).toBe(before + 2)
+
+  // One press takes the inner sheet only. Radix aria-hides the covered sheet, so the assertion that
+  // the OUTER survived is its content coming back, not a dialog count.
+  await page.goBack()
+  await expect(page.getByPlaceholder('Search your food library…')).toHaveCount(0, { timeout: 10_000 })
+  await expect(page.getByText('How would you like to log food?')).toBeVisible({ timeout: 10_000 })
+  expect(new URL(page.url()).pathname).toBe('/nutrition')
+
+  await page.goBack()
+  await expect(page.getByRole('dialog')).toHaveCount(0, { timeout: 10_000 })
+  expect(new URL(page.url()).pathname).toBe('/nutrition')
+})

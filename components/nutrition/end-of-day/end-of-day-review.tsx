@@ -5,7 +5,6 @@ import { X, Moon, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet'
 import { toast } from 'sonner'
-import { useSheetBackDismiss } from '@/lib/hooks/use-sheet-back-dismiss'
 import { getLocalStore } from '@/lib/local-store'
 import { pushMutations } from '@/lib/local-store/sync-engine'
 import { invalidateHealthTrends } from '@/lib/cache-groups'
@@ -53,7 +52,6 @@ const DEFAULT_SCALES: Record<EveningScaleKey, number> = {
 
 export function EndOfDayReview({ open, onClose, mealTypes, logs, date, userId, targets, onLogged }: Props) {
   const tz = useUserTimezone()
-  useSheetBackDismiss(open, onClose)
   const pageGradient = usePageGradient('sleep')
   const isLight = useHeroColorScheme() === 'light'
   const [scales, setScales] = useState<Record<EveningScaleKey, number>>({ ...DEFAULT_SCALES })

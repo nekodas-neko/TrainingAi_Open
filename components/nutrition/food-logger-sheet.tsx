@@ -14,7 +14,6 @@ import { todayInTz } from '@trainingai/shared/date-utils'
 import { mealTypeForHour } from '@trainingai/shared/nutrition/log-plan-meal'
 import { logMealItems } from '@trainingai/shared/nutrition/log-meal'
 import { logFoodEntries, ingredientsToEntries, type NewFoodEntry } from '@trainingai/shared/nutrition/log-food'
-import { useSheetBackDismiss } from '@/lib/hooks/use-sheet-back-dismiss'
 import { readCacheSync } from '@/lib/sqlite/cache'
 import { getLocalStore } from '@/lib/local-store'
 import { hapticLight } from '@/lib/haptics'
@@ -77,7 +76,6 @@ interface Props {
 export function FoodLoggerSheet({ open, preselectedMealTypeId = null, onClose, onLogged, userId, logDate }: Props) {
   // Q-413: the eaten-at resolution happens in the USER's zone, not the device's.
   const tz = useUserTimezone()
-  useSheetBackDismiss(open, () => { reset(); onClose() })
   const [stepStack, setStepStack] = useState<Step[]>(['capture'])
   const step = stepStack[stepStack.length - 1]
 
