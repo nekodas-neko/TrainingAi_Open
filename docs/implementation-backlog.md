@@ -1680,6 +1680,66 @@ the assertion checks the wrong moment and the timeout is only the symptom.
   write, will have the same shape.
 - **Surface: server, web-reproducible.** Passes locally; the failure needs a loaded runner.
 
+### [platform][app-shell] BF-19 — nothing measures app load time, and the one measurable driver is 80 deploys in a day busting the whole offline cache
+
+- **Branch:** _unassigned_
+- **Added:** 2026-08-25 · owner: *"the app has been VERY slowly lately with load times... just in case there is a regression that's permanent I need a second opinion"*
+- **Lane: A** — a new `app/api/admin/` route plus a client reporter. **Do not** name it `timing-*`: `admin/timing-baseline` and `admin/time-audit` already exist and are about **workout** duration, not app load.
+
+**There is no app-load instrumentation anywhere** — the two existing timing endpoints measure how
+long sets and sessions take. Nothing records navigation timing, chunk load time or route latency, so
+the owner's report cannot be confirmed or refuted from data. That gap is the entry.
+
+**Ruled out, measured 2026-08-25 against production** — none of these is the cause: database query
+time (`SELECT 1` → **3 ms** server-side inside a ~460 ms round trip), disk I/O (**99.90%** cache hit,
+`blks_hit` 37.2 M vs `blks_read` 38.5 k), connection pinning (`idle in transaction` = **0**, 11
+connections), and migration replay on cold start (**216** rows in `schema_migrations` against **214**
+files on disk, so nothing re-runs).
+
+**The one thing that did show up.** Merged PRs: **13 on 2026-08-23, 80 on 2026-08-24, 7 so far on
+2026-08-25.** Every merge is a Railway deploy, and `app/sw.js/route.ts:12,22` stamps the service
+worker's cache name from the deploy SHA:
+
+```js
+const BUILD_ID = process.env.RAILWAY_GIT_COMMIT_SHA ?? String(Date.now())
+cacheName: `ta-${BUILD_ID.slice(0, 12)}`
+```
+
+So the APK's entire offline cache is invalidated **once per deploy** — up to 80 times in a day, on
+which cadence the device is never warm and every open re-downloads the shell. That is a consequence
+of release cadence, not a code regression; the SHA stamping is deliberate (it replaced a hand-bumped
+constant forgotten twice, sessions 55/74).
+
+**Corroborated, not just inferred:** `error_events` carries a client
+**`Loading chunk 2179 failed`** — the signature of a client holding a shell reference to a chunk a
+redeploy has already removed. That both *is* slowness and proves the invalidation is reaching the
+device.
+
+#### What to build
+
+A load-time record the owner can read, since the slowness is client-side and no server metric will
+show it:
+
+1. **Client reporter** — on each route settle, post `performance.getEntriesByType('navigation')`
+   plus chunk/resource timings: route, `responseStart`, `domContentLoaded`, total, whether the SW
+   served it from cache, and the build id.
+2. **Ingest + aggregate route** under `app/api/admin/`, admin-gated, matching its sibling routes'
+   rate limit and Zod schema at creation (per the AI & Security defaults).
+3. **Report:** p50/p95 per route over N days, split **cold vs warm cache** — without that split the
+   deploy churn swamps everything and the number means nothing.
+4. **Retention:** cap it. `error_events` reached 49 MB for 4 live rows (Q-315); a per-navigation row
+   is far higher volume, so it needs a prune from day one, not later.
+
+**Two limits, stated:** the ~460 ms round trip above includes a sandbox proxy and unknown
+geography, so it is not the owner's device latency; and `pg_stat_statements` is **available but not
+installed**, needing `shared_preload_libraries` and a Railway restart — an owner action worth doing
+separately, since it is the only route to per-query time in production.
+
+- **What would count as fixed:** the owner can answer *"is a route slower this week than last"* from
+  stored data, split cold/warm, without asking anyone.
+- **Surface: device.** Web timings will not represent the APK; the numbers only mean something once
+  the reporter has run on the S25.
+
 ### [nutrition][platform] BF-12 — logging a saved meal takes ~20s and the owner couldn't find it after navigating away; traced to the slow fallback firing, not a lost write
 
 - **Lane: A** — the fix is in `logMealItems`/local-store availability, not the UI. No schema.
