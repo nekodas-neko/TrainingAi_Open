@@ -423,6 +423,18 @@ from the tray raises the confirmation rather than deleting.
 - **Keep: not device-verified.** Every e2e run took the web fallback (`getLocalStore` is null in a browser), so the local-store mirror and the two outbox mutations per copy are verified by reading only, as are the new controls' 48dp targets.
 - **Keep: step 3 of the entry is not done and needs the owner.** It proposes deleting `meal-plan-section` and the staleness nag once meals live in My Meals; the entry gates that on confirmation and this PR did not take it.
 
+### [app-shell][platform] ⚠️ The app is pinned to dark; the device has not been switched to light to check (BF-25, v1.377.0)
+
+`forcedTheme="dark" defaultTheme="dark" enableSystem={false}` on the `ThemeProvider`. The
+one-line version BF-25 prescribed was measured and **would have shipped the bug it was meant to
+close**: `forcedTheme` alone governs only the class on `<html>`, so `/health/heart-rate` painted
+pale-pink hero art under a **white** scrim over a dark page. `e2e/forced-dark-theme.spec.ts` guards
+all of it under `colorScheme: 'light'` and was proven to fail without the fix.
+
+**On device:** put the S25 in light mode and confirm the app stays dark end to end, including the
+surfaces the provider cannot reach — the icon routes (no CSS) and any canvas paint. The sandbox
+emulates `prefers-color-scheme`; it does not run Samsung's WebView or its scheduled night mode.
+
 ### [nutrition][app-shell] ⚠️ The calorie surface: one budget, a progress bar, and one open cache-ordering bug (Q-415/Q-417/Q-323 fixed, LB-4 open, 2026-08-23)
 
 **Fixed in v1.335.0.** Home's nutrition card and the Nutrition ring both read `budgetProvenance(...).total` — the expression the provenance line under the bar already prints — instead of composing `nutrition_targets.calories` (the **rest-day floor**) plus a separately-sourced burn. Three budgets used to be on screen at once from the same data (2,180 / 2,451 / 2,001), which is how one card said "Goal reached" while the card two rows above said "166 kcal left". Macro bars now use `macroTargets.scaled`; the label says "from movement" ([`journal`](docs/overview/entries/2026-08-23-one-calorie-budget.md)).
@@ -1727,22 +1739,15 @@ the next device change.
 - **466 test files, none of which opened a browser** — until now. `playwright.config.ts`, `e2e/`,
   `pnpm e2e` and a separate `E2E` CI job. One spec: the five tabs must paint real content on a
   repeat visit, which makes the instant-paint rule executable instead of reviewed by eye.
-- **Read [`e2e/README.md`](e2e/README.md) before trusting a green run.** It records what the harness
-  proves and what it cannot, all measured: it drives the **web** build (`getLocalStore` returns null,
-  so every offline-first domain takes its web fallback and the device branch never runs); it uses
-  `pnpm dev` because the pg pool forces SSL under `NODE_ENV=production` and the local Postgres does
-  not speak it; and its skeleton check covers **only the panel in the viewport**, so a tabbed screen
-  like Health is roughly a third covered.
-- **The harness was shown to discriminate, and the first attempt to do so failed usefully.** Forcing
-  a Training-panel card to stay loading turns Health red. Forcing the Body-tile skeletons does not —
-  that panel is off-screen — which is how the viewport limitation was found rather than shipped as a
-  false guarantee. A Health "bug" found on the first run was traced, fixed, and then **reverted**
-  once the off-screen carousel panel explained it.
-- **The per-tab coverage gap is closed for Health** (2026-08-15, Q-297): `e2e/health-tabs-instant-paint.spec.ts`
-  drives `?tab=` and asserts the requested tab is *selected* before checking, so each panel is
-  actually in the viewport. Verified by the mutation Q-249's spec could not catch — pinning the
-  Body tiles' skeleton now fails, and fails only the Body case. **Every other tabbed screen still
-  has the gap.**
+- **Read [`e2e/README.md`](e2e/README.md) before trusting a green run** — it records, all measured,
+  what the harness proves and what it cannot: it drives the **web** build, so every offline-first
+  domain takes its web fallback and the device branch never runs; it uses `pnpm dev` because the pg
+  pool forces SSL under `NODE_ENV=production`; and its skeleton check covers **only the panel in the
+  viewport**. That last limitation was found by the harness failing to discriminate — forcing the
+  off-screen Body tiles' skeleton did not turn Health red — rather than shipped as a false guarantee.
+- **The per-tab gap is closed for Health only** (Q-297): `health-tabs-instant-paint.spec.ts` drives
+  `?tab=` and asserts the tab is *selected* first, so each panel is really in the viewport, and
+  pinning the Body skeleton now fails only the Body case. **Every other tabbed screen still has it.**
 - **The `E2E` job is not a required status check** and should stay that way until it has a track
   record. Remaining write-path specs and the promotion are **Q-297**.
 - Detail: [`docs/overview/history-2026-08-15.md`](docs/overview/history-2026-08-15.md).
