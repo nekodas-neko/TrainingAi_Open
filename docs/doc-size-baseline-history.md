@@ -2296,3 +2296,17 @@ carries, so it reported OK there and failed here the moment 20 more arrived. Wor
 can inherit someone else's overshoot, and the number recorded is the whole of it, not the part the
 raising branch wrote.
 
+## 2026-08-25 — `projectOverview.md` raised, 7947 → 7955 (TN-7)
+
+Eight lines in two places, and the second is the one that earns it. Two are the Current Status
+paragraph the wrap-up asks for. **Six extend LA-20's existing Known-Issues row**, because TN-7
+changes what that row's `Keep:` means: its check is an `error_events` count, the count was
+unfalsifiable while the guard only logged, and it is falsifiable again now — but only from this
+deploy forward. A reader who takes a zero from the intervening day as evidence strikes a row on
+silence. That correction has to sit on the row itself; anywhere else and the next person to read
+the row will not see it.
+
+**If this lands after `fix/autopack-test-polls-final-phase` (BF-18), the number is already 7949** —
+rebuild `doc-size-baseline.json` from `origin/main` and re-derive rather than splicing the hunk.
+That is the third same-day raise of this baseline, which is the ordinary case when several PRs run
+in one session, not a sign anything is wrong.
