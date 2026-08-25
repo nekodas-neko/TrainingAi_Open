@@ -4,24 +4,41 @@
 > is how six concurrent sessions stay tellable apart; a renamed successor is a lost thread even with a
 > perfect baton.
 
-**Updated:** 2026-08-25 · **By:** the eighth session to run as Lane A · **Next ID:** `LA-26`
+**Updated:** 2026-08-25 · **By:** the eighth session to run as Lane A · **Next ID:** `LA-27`
 (`grep -rhoE '\bLA-[0-9]+\b' docs/ | sort -t- -k2 -n | tail -1` is the authority, not this line)
-**Migrations:** through 219; next free is **220**. Local SQLite **v29** (BF-11e added the saved-meal
-tag table).
+**Migrations:** `main`'s directory head is 219, but **220–223 are CLAIMED by the two open PRs below**,
+so the next free number is **224** — claim against open PRs, not just the directory. Local SQLite
+**v29** (BF-11e added the saved-meal tag table).
 
 ## Now
 
-**Nothing is in flight.** Four PRs opened, four merged. Start with
-`node scripts/next-item.js --lane A` — and it is trustworthy again in a way it was not this morning;
-see below.
+**Two PRs are open, the second is STACKED on the first, and both are waiting.**
+- **#499 `chore/drop-running-baselines` (Q-301b)** — migrations 220 + 221. **All 6 checks green,
+  base current, waiting on the OWNER.** A data-dropping migration is CLAUDE.md's confirm-first
+  carve-out. The table has never held a row (`n_tup_ins` 0 for its whole life), so the risk is
+  nominal — but ask, do not merge it for them.
+- **#501 `feat/ai-call-log-cached-tokens` (Q-295)** — DRAFT, migrations 222 + 223. **Must not merge
+  before #499**: 223 is a claude_ro regen generated after 220's drop, so it carries no
+  `running_baselines` view and would strip that view while the table still existed. After #499
+  lands: rebase, regenerate 223, re-run gates, undraft.
+
+**Merged today:** #496 (Q-540 re-measured and parked), #500 (Q-295 re-measured and re-scoped).
+Both are premise corrections, not features — see the lesson below.
+
+Then `node scripts/next-item.js --lane A`.
 
 ## Read this before you trust the queue tool
 
-**`next-item.js` was reporting two shipped, production-gated entries as Lane A's #1 and #2 startable
-items**, and the pickup prompt for this session repeated that ranking. `keepFromLines` required a
-literal `Keep:`; TN-3a and TN-4 write `- **Keep — what is NOT done:**` with a dash. Fixed in #473,
-checked against all 196 entries (ten lines begin with the word: two are dash-form Keeps, eight are
-prose). Lane A's READY went 90 → 88.
+`next-item.js` mis-ranked shipped entries as startable twice (LB-11's KEEP bucket, then LA-23's
+dash-form `Keep —` parse, #473) — both found by reading its real output for your own lane, never by
+its tests, which passed throughout.
+
+**FOUR entries in a row had premises production contradicted** — BF-16a's seed drift, Q-403's tier,
+Q-540's sizing, Q-295's latency. **Re-verify an entry's premise before building it.** Q-295 is the
+one to remember: a review doc had carried the corrected number for a week while claiming it
+*"corroborates Q-295 exactly"*, and nobody propagated it. Q-540 and Q-388 are now `Gate: owner` as a
+result — but only 1 of Lane A's top 15 had owner-gating prose with no field, so that was a one-entry
+fix, **not** a sweep.
 
 **The lesson generalises past this bug.** LB-11 built the KEEP bucket the same morning and closed by
 recording *"Lane A is unaffected in shape and now leads with `TN-3a`"* — a claim about the other lane,
@@ -31,39 +48,29 @@ your own lane** before taking its top row.
 
 ## The habit that has now paid on fourteen consecutive entries
 
-**Re-verify an entry's premise against current `main` before building it, and write down what you
-checked.** Two of four this session:
-
-| entry | what it said | what was true |
-|---|---|---|
-| **BF-16a** | *"Surface: production data. Not reproducible against the local seed."* | Reproduces exactly. All 140 seeded rows fingerprint identically in the dev DB and production — it is a defective **seed** (008/032), not drift, so the fix could be proved through the live route instead of argued |
-| **TN-7** | `console.error` does not reach `error_events` | True — `reportServerError` → `repo.insertErrorEvent` is the only writer, nothing bridges the console. Checked rather than taken on faith, and it is the whole basis of the entry |
+**Re-verify an entry's premise against current `main` (or production) before building it, and write
+down what you checked** — see the lesson above. The two shapes are "the entry's evidence is stale"
+and "the entry's evidence was never true"; worked examples are in this session's journal entries.
 
 ## Shipped
 
-#473 LA-23 (queue tool reads a dash Keep) · #475 BF-16a (migration **216**, catalogue muscles,
-v1.370.2) · #476 BF-18 (autopack test polls the final phase) · #477 TN-7 (Body Battery stress failure
-reports) · #480 BF-11b (scan returns one candidate per meal, v1.372.0) · #481 TN-7 follow-up ·
-#482 BF-11e (migration **217/218**, local SQLite **v29**, saved-meal tags) · #484 LA-25 (journal
-sweep) · #486 BF-11b follow-up · #487 BF-11g (library-first meal plan) · #489 LA-24 Kind 1
-(migration **219**) · #490 BF-20 (repo-root guard).
+#473 LA-23 (queue tool reads a dash Keep) · #475 BF-16a (migration **216**, v1.370.2) · #476 BF-18 ·
+#477 + #481 TN-7 (Body Battery stress failure reports) · #480 + #486 BF-11b (one candidate per meal,
+v1.372.0) · #482 BF-11e (migrations **217/218**, local SQLite **v29**) · #484 LA-25 · #487 BF-11g ·
+#489 LA-24 Kind 1 (migration **219**) · #490 BF-20 · #496 Q-540 · #500 Q-295.
 
-**LA-24 is now a question, not work.** Its Kind 1 shipped; what is left is `Gate: owner` — BF-16a's
-additions to `Barbell Shrug` and `Barbell Hip Thrust` had no in-catalogue precedent, so extending
-them to the shrug and glute-bridge families is the same anatomical call made five more times unasked.
-The entry is written for an answer rather than an implementer.
+**LA-24 is now a question, not work.** Kind 1 shipped; what is left is `Gate: owner` — extending
+BF-16a's `Barbell Shrug`/`Barbell Hip Thrust` additions to their families is the same anatomical call
+made five more times unasked. Written for an answer, not an implementer.
 
-**BF-19 is the top READY item and was deliberately NOT taken.** It is a four-part telemetry feature
-(client reporter, ingest route, aggregate route, retention) whose own entry says the numbers only
-mean something once the reporter has run on the S25 — so it produces data nobody can read until a
-device run. BF-20 was taken instead because it fails *every open PR*, not just its own. Not a
-judgement that BF-19 is unimportant; it needs the device, and this session had none.
+**BF-19 is the top READY item and was deliberately NOT taken.** Four-part telemetry whose own entry
+says the numbers only mean something once the reporter has run on the S25 — it produces data nobody
+can read until a device run. Not a judgement that it is unimportant; it needs the device.
 
-**Three timing-dependent test defects shipped and were fixed in one day, all mine.** BF-18 allowed an
-async write zero milliseconds; TN-7's test counted rows written by two racing fire-and-forget calls;
-BF-11b's test paid a **4.3 s module import inside a 5 s budget**. One root, narrower than "async":
-**something in the test is timed that is not the behaviour being asserted.** Ask that before writing
-an assertion — a module import, a background write and a second writer are all answers to it.
+**Three timing-dependent test defects shipped and were fixed in one day, all mine** — an async write
+allowed zero ms, rows counted from two racing fire-and-forget calls, a 4.3 s module import inside a
+5 s budget. One root, narrower than "async": **something in the test is timed that is not the
+behaviour being asserted.** Ask that before writing an assertion.
 
 ## Standing constraints
 
@@ -87,19 +94,18 @@ an assertion — a module import, a background write and a second writer are all
 ## Traps this session walked into, so you do not
 
 - **A backlog conflict can be a deletion against an insertion, and then NEITHER side is right.**
-  CLAUDE.md warns that these are usually two deletions. This one was worse: `origin/main`'s side of
-  one hunk carried **LA-24 (shipped, keep) and BF-18 (completed here, drop) together**, so "keep
-  theirs" resurrects a finished entry and "keep mine" deletes a live one. **Read the headings inside
-  the hunk, then check the resolved diff**: `git diff --numstat origin/main -- docs/implementation-backlog.md`
-  should show `0 <n>` and one removed heading, nothing added.
+  One hunk's `origin/main` side carried **LA-24 (shipped, keep) and BF-18 (drop) together** — "keep
+  theirs" resurrects a finished entry, "keep mine" deletes a live one. Read the headings inside the
+  hunk, then check `git diff --numstat origin/main -- docs/implementation-backlog.md`: expect
+  `0 <n>` and one removed heading, nothing added.
 - **`doc-size-baseline.json` was raised three times in one session and superseded every time.** With
-  several PRs in flight the number is only correct against the merged predecessor. Always
-  `git show origin/main:docs/doc-size-baseline.json > …` and re-derive; never splice the hunk. The
-  history file beside it is append-only — there, keeping both sides *is* the resolution.
-- **`projectOverview.md` conflicts on the Current Status header every single time**, because both
-  sides add a paragraph after the `**Version:**` line. Keep both paragraphs and one header (the
-  higher version). It contains the literal text `` `<<<<<<< HEAD` `` in prose, so never assert on a
-  naive marker search — run `node scripts/check-conflict-markers.js`, which knows the difference.
+  several PRs in flight it is only correct against the merged predecessor: always
+  `git show origin/main:docs/doc-size-baseline.json > …` and re-derive, never splice. The history
+  file beside it is append-only — there, keeping both sides *is* the resolution.
+- **`projectOverview.md` conflicts on the Current Status header every time** — both sides add a
+  paragraph after `**Version:**`. Keep both paragraphs and the higher version's header. It contains
+  the literal `` `<<<<<<< HEAD` `` in prose, so never assert on a naive marker search — run
+  `node scripts/check-conflict-markers.js`.
 - **Inherited and still true:** `git reset --soft origin/main` does **not** merge — diff
   `--name-only` against `origin/main` before every push. Commit, push, *then* switch branches.
   Never slice a generated file by string index. A count that moves further than your change explains
@@ -108,29 +114,27 @@ an assertion — a module import, a background write and a second writer are all
 ## A park that was overridden, and why it may need to happen again
 
 **TN-7 was `PARKED` on `Needs: TN-4` and shipped anyway.** A `Needs:` clears when its target leaves
-the queue; TN-4 will not leave, because its residue is *why* the constants were unset for ten hours
-on a fault that stopped by itself and whose evidence prunes **2026-09-22**. TN-7 was parked behind an
-investigation it is the prerequisite for. Its own text settles it — *"a follow-up to what TN-4
-shipped"* — and TN-4's catch block is on `main`, so the dependency was satisfied in substance and
-blocked only in the tool. **The general shape: a `Needs:` pointing at an entry whose residue is an
-open question, rather than at unbuilt work, is a park with no end date.** Check which kind it is
-before honouring it.
+the queue, and TN-4 will not leave — its residue is *why* the constants were unset, an open question,
+not unbuilt work. TN-4's catch block is on `main`, so the dependency held in substance and blocked
+only in the tool. **A `Needs:` pointing at an open question rather than unbuilt work is a park with
+no end date.** Check which kind it is before honouring it.
 
 ## The database reclaim — one press left
 
-`VACUUM FULL error_events` (**Q-315**, ~49 MB, **27% of the whole database** at 28 live rows) is the
-only piece outstanding, and **there is no button for it** — the admin UI's vacuum control covers
-`oura_raw_samples`. It needs `POST /api/admin/vacuum {"table":"error_events"}` with an admin session
-cookie, which a sandbox cannot produce. **Do not add a bearer path to that route without an explicit
-yes — it is an auth change.** Runbook: [`docs/handoff-2026-08-18-platform-database-reclaim.md`](../../handoff-2026-08-18-platform-database-reclaim.md).
+`VACUUM FULL error_events` (**Q-315**, ~49 MB, **27% of the database** at 28 live rows) is the only
+piece outstanding and **has no button** — it needs `POST /api/admin/vacuum {"table":"error_events"}`
+with an admin session cookie, which a sandbox cannot produce. **Do not add a bearer path to that
+route without an explicit yes — it is an auth change.** Runbook:
+[`docs/handoff-2026-08-18-platform-database-reclaim.md`](../../handoff-2026-08-18-platform-database-reclaim.md).
 
 ## Waiting on the owner
 
-- **LA-24's second half** (`Gate: owner`) — whether the shrug and glute-bridge families follow
-  BF-16a's additions. Its first half (five rows a family member already answers) needs no gate.
+- **#499** — the drop above. Green and blocked only on a yes.
+- **LA-24's second half** (`Gate: owner`) — whether the shrug/glute-bridge families follow BF-16a's
+  additions. Its first half needs no gate.
 - **Q-422** is Tuning-originated: *Tuning proposes → owner signs off → Lane A implements*.
-- **Q-388 SpO₂ is not a code question.** The missing datum is one night *without* the automatic
-  measurement sequence, which needs a Kotlin change and a new APK.
+- **Q-388 SpO₂ is not a code question** — the missing datum is one night *without* the measurement
+  sequence, needing a Kotlin change and a new APK. Now `Gate: owner`.
 - Device checks owed and accumulating: **Q-400** (also decides Q-411), **Q-413**, **Q-412**,
   **Q-405**, **Q-310**, BF-16a's catalogue hydration, plus everything from the last three sessions.
 
@@ -140,38 +144,33 @@ yes — it is an auth change.** Runbook: [`docs/handoff-2026-08-18-platform-data
   `app/api/oura-ble/rekey/`, `lib/data/postgres/slices/oura-raw-{frames,pack}.ts`,
   `packages/shared/src/workout/derive-session-rpe.ts`,
   `packages/shared/src/health/workout-energy.ts` — Lane A's.
-- `scripts/` sits in neither lane's path list and the ownership rule does not decide it. LB-11
-  claimed it once and released on merge; #473 did the same. Claim per PR, release on merge.
+- `scripts/` sits in neither lane's path list and the rule does not decide it. Claim per PR, release
+  on merge — LB-11 and #473 both did.
 - `components/nutrition/meal-label-*` is **Lane B's**.
 
 ## Findings, so they are not re-derived
 
-*Inherited on its fifth baton. **Move the Oura half to
-[`docs/oura-ble-operations.md`](../../oura-ble-operations.md) rather than carrying it a sixth time.***
+*The raw-frame half moved to [`docs/oura-ble-operations.md`](../../oura-ble-operations.md) §5 on
+2026-08-25, per the instruction this section carried for five batons. Keep it there.*
 
 - **The exercise catalogue:** `muscles` is jsonb, order is **not** load-bearing (every consumer
   filters on `role`; none indexes the array), and the tallies read it in a **live subquery**, so a
   catalogue correction re-derives history rather than applying only forward. A few rows carry Title
   Case values, so any guard on muscle names folds case. The device's local mirror re-hydrates from
   `/api/workout-data` in `workout-screen.tsx:421` — **no APK needed for a catalogue change**.
-- **Raw frames:** read only via `slices/oura-raw-frames.ts` (a hot-only read silently returns 7 days);
-  an aggregate cannot use its dedupe — anti-join on `(epoch, tag, ds_bucket)`.
-  `oura_raw_samples.measured_at` and `event_name` are **dead columns**, owner-gated to drop. A ds
-  regression is **not** a ring-clock reset (Q-314) — a re-drain makes one. The packer's phase-3
-  delete goes by **row id**, never by bucket range, and its three phases commit **separately**: any
-  test asserting the delete must poll (BF-18).
 - **Security:** the `VACUUM FULL` allowlist is a boundary, not validation — `hasOwnProperty`, never
   `in`. **DNS rebinding is NOT closed in `fetchPublicUrl`**: the address is validated, then the
   hostname is connected to by name.
-- **`claude_ro` is row-scoped to ONE user** — every count from `/api/admin/db-query` is *the
-  owner's*. Write findings as "none of the owner's", never "nothing is failing". It needs no manual
-  step: views scope on `current_setting('app.claude_ro_owner', true)`, set by `bootstrapClaudeRoOwner()`.
+- **`claude_ro` is row-scoped to ONE user** — every count from `/api/admin/db-query` is *the owner's*.
+  Write findings as "none of the owner's", never "nothing is failing". Views scope on
+  `current_setting('app.claude_ro_owner', true)` (set by `bootstrapClaudeRoOwner()`) — no manual step.
+  **The generator reads the LIVE LOCAL SCHEMA, not `schema.ts`**, so stacked view regens are
+  order-dependent.
 - **The MODEL is reachable from this sandbox** — `GOOGLE_GENERATIVE_AI_API_KEY` is set and
-  `generateObject` works through the proxy, so an AI behaviour change can be **measured** rather than
-  reasoned about. BF-11b's split rule read 5,5,1,1,5,1 on its headline case and 30/30 after one
-  wording change; neither number was reachable any other way. There is no `tsx` — drive a probe as a
-  throwaway `*.test.ts` under vitest, which resolves the `@/` alias. Gate a shipped live test on an
-  explicit `RUN_LIVE_AI_TESTS=1`, never on the key alone, or CI starts paying for it.
+  `generateObject` works through the proxy, so AI behaviour can be **measured**: BF-11b's split rule
+  read 5,5,1,1,5,1 on its headline case and 30/30 after one wording change. No `tsx` — drive probes
+  as throwaway `*.test.ts` under vitest (it resolves `@/`). Gate any shipped live test on
+  `RUN_LIVE_AI_TESTS=1`, never on the key alone, or CI pays for it.
 - **Sandbox limits:** the rollup cannot execute here (needs the vendored constants Q-49 removed), so
   anything wanting a rollup pass is owner-only. A stale local DB looks like a code defect — drop
   `/var/lib/postgresql/local-dev`. `npx next lint` is **not** `pnpm lint`. Drizzle will not marshal a

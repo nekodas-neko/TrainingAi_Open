@@ -212,6 +212,26 @@ which we control or can detect:
 6. **This document is part of the product.** New failure signature → new row in §1, in the
    same PR that handles it. That is how the "we own it" promise stays true a year from now.
 
+## 5. Raw-frame engineering facts (moved off the Lane A baton, 2026-08-25)
+
+Carried on the Implementation Lane A baton for five handovers before landing here. These are the
+things a session re-derives if they are not written down:
+
+- **Read raw frames only through `lib/data/postgres/slices/oura-raw-frames.ts`.** A hot-only read
+  silently returns ~7 days, because packing moved everything older into `oura_raw_packed`.
+- **An aggregate cannot reuse the reader's dedupe** — anti-join on `(epoch, tag, ds_bucket)`.
+- **The packer's phase-3 delete goes by row id, never by bucket range, and its three phases commit
+  separately.** Any test asserting the delete must poll for it rather than assume it has happened
+  (BF-18 shipped a flaky test that allowed the write zero milliseconds).
+- **A ds regression is NOT a ring-clock reset** (Q-314) — a re-drain produces one.
+- **`decoded` is NULL on every hot row** (173,017 of 173,017, measured 2026-08-25) and that is by
+  design: `oura-raw-frames.ts` documents it as legacy, with callers coalescing to an in-memory
+  decode of `bodyHex`.
+- **`measured_at` and `event_name` are dead columns, and Q-540 re-measured on 2026-08-25 says do NOT
+  drop them on their own account.** Packing bounded `oura_raw_samples` to a ~7-day rolling window
+  (173k rows, 58 MB), so the drop is worth ~3 MB one-time and never compounds — not enough to spend
+  an irreversible migration on. Fold it into some other rewrite if one ever happens.
+
 ## 4. Data-integrity verification runbook (the 1:1 check)
 
 Run after any recovery, re-key, decoder change, or protocol-touching PR — and once after
