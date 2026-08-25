@@ -2099,3 +2099,25 @@ was overtaken by `nightSessions`. A reader who re-derives from either goes the w
 moved to [`entries/2026-08-25-sleep-fragment-nights.md`](overview/entries/2026-08-25-sleep-fragment-nights.md)
 and the queue kept what a queue needs — what is still owed, and what must not be trusted. Raising
 came second, once the entry was as short as it could honestly be.
+## 2026-08-25 — `docs/implementation-backlog.md` 11532 → 11590 (+58)
+
+Four new entries, and **20 of the 58 lines were already on `main` before this branch existed** —
+`main` was sitting over its own baseline when this branch merged it. That is the concurrency case
+the check cannot catch on its own: a branch measured green against the baseline, another branch
+merged, and the sum crossed the line with neither PR individually at fault. Worth knowing before
+reading a +58 as one session's sprawl.
+
+The 38 lines this branch actually added:
+
+- **BF-16 split into BF-16a / BF-16b** (exercise-role data corrections). The split was forced by a
+  sequencing bug found in review — the role rule reads catalogue muscle counts and the catalogue
+  corrections change them, so the catalogue half has to land first and ungated.
+- **BF-18** — `oura-autopack-ingest.test.ts` asserts phase 3 of a three-phase packer after polling
+  only for phase 1, so it can fail on any PR regardless of diff. Found when it went red on a
+  docs-only branch. The entry carries the root cause and the one-line fix rather than a plan doc,
+  because the fix is one line and a plan would cost more lines than the entry.
+
+The exercise-role *design* deliberately did **not** land here — it went to
+`docs/superpowers/plans/2026-08-24-exercise-roles.md`, which is what kept this raise to 58 rather
+than 165. That is the pattern to copy: an entry states the defect and the acceptance test; a design
+with rejected alternatives belongs in a plan.
