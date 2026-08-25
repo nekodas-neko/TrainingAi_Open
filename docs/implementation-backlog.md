@@ -1690,6 +1690,104 @@ like the feature works and would quietly teach the owner to ignore it.
 **Pass test:** on a day with a genuinely sedentary hour, that hour's cell reads empty on the strip and
 the day's move-hours total is below the goal.
 
+### [heart-rate] TN-13 — the HR tile shows a 7-day average of the one signal that best predicts how the owner feels
+
+- **Branch:** _unassigned_ · **Added:** 2026-08-26 · owner: *"my value is 52; what is that? what would be the more useful HR value to show?"*
+- **Lane: B** — `components/oura-score-chip-row.tsx:390`; the payload field already exists.
+
+`const hr = readiness.restingHr ?? readiness.hrCurrent`, and `restingHr` is documented as
+*"recent (7-day) average resting HR"* (`readiness-payload.ts:131`).
+
+**Measured over 50 nights:** nightly resting HR moves **2.11 bpm** night to night; the 7-day average
+moves **0.33**. **The tile discards 84% of the daily movement.** And resting HR is the **strongest
+predictor of the owner's own check-in** (r = **+0.557**, best of nine — see the
+[lookback](reviews/2026-08-26-checkin-lookback.md)). The most informative signal, shown in its least
+informative form.
+
+**Recommendation: show last night's resting HR with its delta against baseline** — "52 · −2 vs
+usual". `restingHrBaseline` is already passed to `restingHrCue`, so the comparison exists; only the
+displayed number is smoothed. **Do not simply swap in HRV** — HRV is more responsive but correlates
+less with felt state here (+0.427 vs +0.557), and it is absent from Home entirely, which is a
+separate question.
+
+**Pass test:** the tile's number changes on most days; over the stored history its night-to-night mean
+change is within 20% of 2.11 bpm rather than 0.33.
+
+### [sleep][devices] TN-14 — the 2026-08-19 partial night (3.50 h) is still stored and still feeds every baseline
+
+- **Branch:** _unassigned_ · **Added:** 2026-08-26 · owner, second time asking: *"I don't want it contributing to stats"*
+- **Lane: A**
+- **Needs: Q-520** — the partial-night flag is the mechanism this needs and is unbuilt.
+
+Verified in production 2026-08-26: `oura_daily_summary` for **2026-08-19** holds
+`sleep_duration_hours = 3.50`, efficiency 86, deep 1.00, REM 0.58 — between a 9.00 h night and a
+7.67 h night. **Nothing has removed, corrected or flagged it.** It contributes to the sleep baseline,
+to `sleepBalance` in readiness, and to any trailing sleep statistic reading that table.
+
+**Do not delete the row.** It is decoded ring data, and a hand-deletion is an unreproducible data edit
+that the next rollup may recreate. The right shape is Q-520's flag — mark the night partial and have
+consumers exclude it — which also handles the next one without another manual pass.
+
+**Establish first whether the 3.50 h is wrong or real.** The owner reports it as "decoded poorly", but
+this entry has **not** verified that against the raw frames — a genuinely short night and a
+mis-decoded one look identical in the summary table. Decode the night's frames before deciding
+whether the fix is a flag, a correction, or both.
+
+**Pass test:** a trailing sleep baseline computed with and without 2026-08-19 differs, and the shipped
+one matches the "without" version.
+
+### [readiness][body] TN-15 — Body Battery: drain that ignores exercise, and no recharge at all
+
+- **Branch:** _unassigned_ · **Added:** 2026-08-26 · owner: *"as we learn basic exercise/HR/stress through the day we should pick up a drain value — then charge it back up through sleep/rest so it's more usable"*
+- **Lane: A**
+- **Needs: TN-2** — the charge window must be fixed before a recharge model can be judged.
+- **Owner sign-off: RECEIVED 2026-08-26** for the direction. **This supersedes the standing "do not
+  propose overnight charging or an anchor redesign" guidance**, which was written against chasing a
+  symptom, not against a stated product requirement.
+
+Two halves are missing from the model the owner describes.
+
+**No recharge.** `walkBodyBattery` filters to `tsMs >= wakeTime`, so overnight is never simulated; the
+morning value is the readiness score via `resolveAnchor`. Measured 2026-08-26: mean morning anchor
+**64.8**, and mornings reading "Charged" (≥75) on **7 of 35**.
+
+**Drain does not respond to exercise.** **Q-521** measured `corr(hr_sample_count, total_drained)` =
+**+0.518** against `corr(steps, total_drained)` = **−0.153**, and a workout moving the end value by
+**0.6 points**. Drain ≈ rate × time worn.
+
+**Sequence, and it matters:** TN-6 first (it lifts the anchor 64.8 → 76.8 on its own), then TN-2 (the
+charge window), then this. Landing a recharge model on top of a boundary that already mis-classifies
+98% of waking time as "draining" cannot be evaluated — and **Q-521 is downstream of Q-515** for the
+same reason.
+
+**⛔ Do not fit a drain model on `HR_REST_THRESHOLD` as it stands**, and **do not reuse TN-11's
+answer either** — that one needs *sedentary vs moving*, this needs a graded intensity. Three
+questions, three boundaries.
+
+**Pass test:** a training day and a rest day with equal wear time differ by ≥15 end-of-day points;
+end-of-day correlates with next-morning readiness at r ≥ +0.4 (v5 alone reached +0.67, n=11 — that is
+the bar to beat, not to assume).
+
+### [readiness] TN-16 — a prolonged-stress warning and a calm-down prompt, blocked on the metric's sign
+
+- **Branch:** _unassigned_ · **Added:** 2026-08-26 · owner request
+- **Lane: B**
+- **Needs: Q-507** — deliberately. Read the next paragraph before starting.
+- **Gate: owner** — do not build until the sign question is settled.
+
+The owner asked for a warning when stress has been elevated too long, plus a calm-down ritual. **The
+metric currently rises on good days**: re-measured 2026-08-26 (n = 33), stress-high minutes correlate
+**+0.386 with readiness** and **+0.477 with the sleep score** — replicating and strengthening Q-507.
+
+**A warning built on this would fire on the owner's best days.** That is worse than no warning: it
+teaches them the app is wrong, and it is the exact failure mode Q-504 records. The HR-chart overlay
+they also asked for is **TN-3b** (`Needs: TN-3a` for per-bucket persistence) and is subject to the
+same caveat — a coloured stress line that brightens after good sleep is an anti-feature.
+
+**What has to happen first:** explain the sign. The obvious hypothesis — that stress minutes track
+data density — was **tested and refuted** (r = −0.128 vs HR sample count). No replacement mechanism is
+established. Until one is, this stays parked.
+
 ### [readiness] TN-6a — suspend the temperature penalty until its baseline is centred
 
 - **Branch:** _unassigned_
@@ -6306,6 +6404,23 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   measurable confound without removing the feature.
 - **n = 25 is small** — at that size r = +0.40 sits near the conventional significance boundary, so the
   strength is provisional. The group means are the durable part. Re-measure at n ≈ 60.
+- **⚑ Amended 2026-08-26 — re-measured at n = 33, and it replicates and strengthens.**
+  ([pillar review](reviews/2026-08-26-pillar-review.md) §4.) `corr(stress_high_minutes,
+  readiness_score)` = **+0.386**, essentially unchanged. **New:** `corr(stress_high_minutes,
+  sleep_score)` = **+0.477** — *stronger than the readiness correlation, and untested in the original
+  entry*. More "high stress" minutes on nights the owner slept **better**. `daytime_stress_scaled`
+  again carries the right sign and no magnitude (−0.086); vs activity score, nothing (−0.033).
+- **⚑ A mechanism was proposed and REFUTED, so the sign is still unexplained.** Hypothesis: better
+  sleep → denser HRV signal → more buckets scored → more minutes classified as anything. Measured:
+  `corr(stress_high_minutes, hr_sample_count)` = **−0.128**, and total scored minutes vs sample count
+  = **−0.259**. Data density does not explain it. Also noted and unresolved: stress-high minutes vs
+  **overnight HRV** = **−0.258**, weakly the *right* way, which sits oddly beside +0.477 vs the sleep
+  score. **Record this as unresolved rather than substituting a second hypothesis** — the first
+  action above ("explain the sign before touching the constant") is now the *only* open action, and
+  one candidate explanation is off the table.
+- **This entry now blocks two more.** **TN-16** (prolonged-stress warning + calm-down prompt) carries
+  `Needs: Q-507` deliberately, and **TN-3b** (the HR-chart stress overlay the owner asked for) is
+  subject to the same caveat. Both would surface a number that currently rises on good days.
 
 ### [readiness] Q-508 — resilience has emitted exactly one value in its lifetime (level 5, granular pinned at the 5.99 clamp)
 
