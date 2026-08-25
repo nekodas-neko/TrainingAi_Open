@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { settleRouteBoundary } from './fixtures'
+import { settleRouteBoundary, suppressMorningCheckin } from './fixtures'
 
 /**
  * Q-281 audit — of the twenty selectable Home score-ring styles, exactly one ("accentring") renders
@@ -21,6 +21,10 @@ test('the Home score cue renders its band word, not colour alone', async ({ page
   await page.addInitScript(() => {
     localStorage.setItem('ta_score_ring_style', 'accentring')
   })
+  // Home's first-open-of-day check-in is a MODAL, and Radix `aria-hidden`s `<main>` while it is
+  // open — so the `getByRole` below reports an empty Home rather than a covered one. It opens after
+  // an async read, which is why this spec read as *flaky* rather than broken (OR-1).
+  await suppressMorningCheckin(page)
   await page.goto('/')
   await settleRouteBoundary(page)
 

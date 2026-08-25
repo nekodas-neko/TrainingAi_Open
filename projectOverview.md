@@ -31,23 +31,16 @@
 read a `- **Keep:**`, so an entry that shipped kept its pre-shipping priority — **17 of Lane B's top 21 were finished**, and the first startable item sat below the tool's ten-row window. A KEEP bucket prints them with what they owe; READY went 86 → 65.
 
 **Three more cards say so when their fetch fails, and the sweep was three, not ~18 (Q-499).** The
-Oura section is the one that mattered: its `return null` means *no ring connected*, so a 429 made a
-connected user's whole ring section vanish. `.catch()` was never the guard — `cachedFetch` resolves
-on a non-ok response, so only `onError` fires there. Ten other candidates were judged legitimate.
+Oura section is the one that mattered: its `return null` means *no ring connected*, so a 429 made a connected user's whole ring section vanish. `.catch()` was never the guard — `cachedFetch` resolves on a non-ok response, so only `onError` fires there. Ten other candidates were judged legitimate.
 
 **The offline tab tap is not silent, and Q-555 closes unfixed.** Driven with the worker blocked so
 `controller` is `false` throughout: offline the tap **navigates** and `app/error.tsx` says *"You're
 offline"* — in a settled tab route and on the loading fallback alike. The one failing window is
-*before hydration*, where `handleNavClick` cannot run, the anchor navigates natively and Chrome's
-error page appears — visible, not silent, and inherent: neither our JS nor the worker exists yet.
-The parked fix would be inert there and a false alarm everywhere else, so nothing merged.
+*before hydration*, where `handleNavClick` cannot run, the anchor navigates natively and Chrome's error page appears — visible, not silent, and inherent: neither our JS nor the worker exists yet. The parked fix would be inert there and a false alarm everywhere else, so nothing merged.
 
 **The diary row is the shared row now, and its sheet can delete (Q-406).** The pencil and bin came
 off every food row. **It turned up LB-10, now fixed:** `use-sheet-back-dismiss` was not double-invoke
-safe, so the quick-edit sheet could not be opened in `pnpm dev` at all — production was never
-affected, the pre-merge surface was. **The entry said five sheets; one.** The other four mount with
-`open` false, so their double-invoked run bails before pushing. `e2e/sheet-back-dismiss.spec.ts`
-guards it, and fails on the unfixed hook.
+safe, so the quick-edit sheet could not be opened in `pnpm dev` at all — production was never affected, the pre-merge surface was. **The entry said five sheets; one.** The other four mount with `open` false, so their double-invoked run bails before pushing. `e2e/sheet-back-dismiss.spec.ts` guards it, and fails on the unfixed hook.
 
 **The Nutrition day screen is grouped sections now, and the ring is split by macro (Q-395b).** Gaps
 **420 px → 280 px (16% → 11%)**, 111 px shorter — not the *"most of the vertical space"* the entry claimed. Both themes, 11 of 11 sections. `Gate: device`.
@@ -70,6 +63,12 @@ builder's rows became the shared `FoodRow`; `ingredient-row.tsx` is deleted and 
 **The two BLE consoles poll the redecode job instead of guessing (Q-318).** A completed run reported `failed: 502` and the backfill said "Done" at the gateway timeout; both wait for the real status now.
 
 **The Devices card stops calling the ring healthy with no key (LB-5).** Checks `hasKey()` and links to `/admin/oura-ble` when false. `Gate: device`.
+
+**E2E is green again, and the cause was a modal, not a missing button (OR-1).** Home's first-open
+Morning Check-in `aria-hidden`s `<main>` while it is open, so every `getByRole` on Home reported the
+affordance **absent** rather than covered — `getByLabel` found it and `getByRole` did not, on correct
+markup. `suppressMorningCheckin()` is the fixture. Two wrong turns are on the journal entry, one of
+them mine: a tile refactor built on the wrong theory, reverted in full after measuring.
 
 **Q-477 is COMPLETE — the ratchet baseline is empty** (78 bare calls across 38 files → **0 across
 539 scanned**). The last slice did not thread `tz` into the Zustand store; it stopped the store
