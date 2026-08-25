@@ -2425,3 +2425,11 @@ milliseconds, one that counted rows written by two racing fire-and-forget calls,
 narrower — *something in the test is timed that is not the behaviour being asserted* — and that is
 short enough to actually ask before writing an assertion. The other two lines are the shipped list
 and the migration/SQLite pointers, which a baton is wrong without.
+
+## 2026-08-25 — `projectOverview.md` raised, 7965 → 7967 (LA-24 Kind 1)
+
+Two lines. The paragraph carries a *retraction* as much as a change: BF-16a's Known-Issues row said
+its migration had not run against production, and reading production to verify LA-24's before-values
+showed it had. A caveat that has become false is worse than no caveat — it teaches the next reader to
+discount the ones that are still true — so striking it is the point of the edit, not incidental to
+it.
