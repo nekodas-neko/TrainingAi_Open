@@ -3,7 +3,7 @@
 > **Successor sessions are titled `🚧 Implementation Agent (B) 🟢`** — exactly, emoji included. That
 > title is how six concurrent sessions stay tellable apart; a renamed successor is a lost thread.
 
-**Updated:** 2026-08-25 · **By:** the eleventh Lane B run · **Next ID:** `LB-13`
+**Updated:** 2026-08-25 · **By:** the eleventh Lane B run · **Next ID:** `LB-15`
 
 ## Now
 **Nothing open — every branch merged.** This run landed **18 PRs**: #446 (Q-406 diary row), #447
@@ -50,6 +50,15 @@ findings (**Read stats** on `/admin/oura-ble`), Q-305's band words at S25 width,
 readiness" row (never rendered at all — the local seed has no `ouraScore` row), Q-477's rollover
 across local midnight. Carried: BF-10, LB-5, Q-328/Q-321/Q-486, Q-389 print/scan/share, a TalkBack
 pass, Q-450/Q-418 (needs a Polar H10).
+
+## Filed at wrap-up, not yet worked
+- **LB-13** — `app/api/coach/apply/route.ts:71` and the undo route both call
+  `invalidateProgramStructure()` **server-side**, where `lib/cache-groups` reaches nothing. Undo is
+  covered by its client caller; **apply is not**, so a Coach `session_exercise` swap leaves
+  `workout-data`/`next-session`/`workout-card:` stale — and `workout-card:` is `freshWithinTtl`, the
+  condition where stale *survives*. **Lane A's** (`app/api/**`). Read from source, **not reproduced**.
+- **LB-14** — E2E is not a required check; the same red was filed twice, by two agents, hours apart.
+  `Gate: owner`.
 
 ## Claimed paths
 None held. `scripts/next-item.js` + `scripts/lib/{keep,entry-id}.js` were claimed for LB-11/PS-6 and

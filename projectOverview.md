@@ -71,6 +71,8 @@ builder's rows became the shared `FoodRow`; `ingredient-row.tsx` is deleted and 
 
 **The accessibility rules ran and could not fail (Q-282, headline corrected).** *"No automated accessibility check exists in CI"* was false — `jsx-a11y` rides in via `next/core-web-vitals` and has run all along, at **warning**, so `pnpm lint` exited 0 with violations present. The app measured at **zero**, so seven decidable rules are `error` now. **It does not close the entry** — a linter cannot measure touch targets or contrast, and that half is unbuilt.
 
+**A Coach swap leaves every program-structure cache key stale (LB-13, filed not fixed).** `app/api/coach/apply/route.ts:71` calls `invalidateProgramStructure()` **on the server**, where `lib/cache-groups` reaches localStorage and on-device SQLite — nothing. No client caller covers it, so `workout-data`/`next-session`/`workout-card:` keep pre-swap values, and `workout-card:` is `freshWithinTtl`: the Q-262 condition where stale **survives** rather than flashes. **Read from source, not reproduced.** Lane A's.
+
 **The queue says which rows it has not classified (LB-12).** Measured: **77 of 193 entries state no lane**, and **53 of Lane B's 55 READY rows** — so two are rows the queue knows are Lane B's. Showing them to both lanes is right; being silent about it was not. They print `⟨lane unstated⟩` now. **The sweep is the Orchestrator's** and is filed, not done.
 
 **The colour-only score subset was ONE site, not a sweep (Q-281).** Nine `scoreBand()` call sites read rather than counted: only `readiness-breakdown`'s "Final readiness" row coloured without the word. `contributor-chart` has no `.label` at all and is correct — it renders the legend. **A zero-label grep is not a violator list**, the Q-491 lesson again.
@@ -82,11 +84,9 @@ already drew a band — a hardcoded generic **10–20** — while `packages/shar
 
 **The queue tooling learns `OR-` (PS-6).** The Orchestrator prefix was never in the ID alternation, and the failure was **silent deletion**: `next-item.js` counted **194 entries with and without** a scratch `OR-99` and printed it nowhere. One shared `scripts/lib/entry-id.js` now, not four regexes. PS-6 named three sites; there were four.
 
-**The vacuum button can reach the table that needs it (Q-315).** `error_events` holds **4 live rows
-in 49 MB** in production and the generalised `/api/admin/vacuum` had **no caller** — the one control still posted to the `oura_raw_samples`-only route. A table picker fed by that route's own `GET` fixes it; the press itself is the owner's, from a desktop. `Gate: owner`.
+**The vacuum button can reach the table that needs it (Q-315).** `error_events` holds **4 live rows in 49 MB** in production and the generalised `/api/admin/vacuum` had **no caller** — the one control still posted to the `oura_raw_samples`-only route. A table picker fed by that route's own `GET` fixes it; the press is the owner's, from a desktop. `Gate: owner`.
 
-**The Coach's undo has a button (Q-467).** A whole undo subsystem — route, five domain handlers, a
-`captureBefore()` in each, the `undone_at` column, even the struck-through styling — had no caller. **The route's `invalidateProgramStructure()` runs server-side and clears nothing**, so wiring the button at face value would have restored the programme in Postgres while every screen painted the changed one for a full TTL; the client clears the superset. `Gate: device`.
+**The Coach's undo has a button (Q-467).** A whole undo subsystem — route, five domain handlers, a `captureBefore()` in each, the `undone_at` column, even the struck-through styling — had no caller. Its route's `invalidateProgramStructure()` runs server-side and clears nothing, so the client clears the superset instead (that trail led to **LB-13**). `Gate: device`.
 
 **E2E is green again, and the cause was a modal, not a missing button (OR-1).** Home's first-open
 Morning Check-in `aria-hidden`s `<main>` while it is open, so every `getByRole` on Home reported the

@@ -331,6 +331,57 @@ days/hours cause most stress". Measured against production the same day; the bou
 signed off by the owner in that conversation. Review:
 [`docs/reviews/2026-08-24-body-battery-charge-window-collapse.md`](reviews/2026-08-24-body-battery-charge-window-collapse.md).*
 
+### [platform][workouts] LB-13 — two API routes call a CLIENT cache helper, so a Coach swap leaves every program-structure key stale
+
+- **Branch:** _unassigned_ · **Lane: A** (`app/api/**` + a `scripts/` check). Filed by Lane B.
+- **Added:** 2026-08-25 · found while wiring Q-467's undo, where the same line had to be worked around.
+- **The defect, read from source (NOT observed at runtime — see Keep).** `lib/cache-groups.ts`
+  imports `lib/sqlite/cache`, which returns early on `typeof window === 'undefined'`. So on the
+  server every group helper is a no-op. Two routes call one anyway:
+  - `app/api/coach/apply/route.ts:71` — `await invalidateProgramStructure()`
+  - `app/api/coach/apply/[id]/undo/route.ts:70` — same
+- **The apply path has no other caller that covers it.** The three client apply sites
+  (`change-preview.tsx:117-119`, `number-dial.tsx:72-74`, `confirm-content.tsx`) clear
+  `invalidateGoalRecommendations()` (only when `domain === 'user_goals'`) and
+  `invalidateCoachHistory()`. **Nothing clears program structure.** So a `session_exercise` swap —
+  the Coach's commonest change, and the one in Q-403's screenshots — writes to Postgres while
+  `workout-data`, `next-session`, `workout-card:`, `phase-sets` and the prescription seeds all keep
+  their pre-swap values.
+- **`workout-card:` is `freshWithinTtl` at `TTL_LONG`**, which by CLAUDE.md's own Q-262 rule is
+  exactly the condition where a stale entry **survives as a settled value** rather than as a
+  first-paint flash. That is the half that makes this user-visible rather than cosmetic.
+- **Q-467's undo route is NOT affected** — its client caller clears the superset explicitly
+  (`feat/coach-undo-control`, 2026-08-25). Its route line is inert but harmless. **Apply is the gap.**
+- **⚠️ The CLAUDE.md rule as written is what produces this.** Line 295: *"Every mutation (**API
+  write** or local write) invalidates via a named group helper in `lib/cache-groups.ts`"* — that
+  instructs an API route to do precisely this. The rule fired; it produced the bug. **Correcting the
+  rule needs the owner** (CLAUDE.md is not an implementer's to edit) and is the durable half.
+- **Fix shape:** (1) the client apply sites clear the superset, as the undo caller already does;
+  (2) drop the inert route calls; (3) a `scripts/check-*.js` rule that fails on any
+  `lib/cache-groups` import under `app/api/**` — grep-able, so it belongs in CI rather than prose,
+  which is how the safe-area and push-mutations rules stopped recurring.
+- **Keep:** **not reproduced at runtime.** The chain is read from source and from the helper's own
+  early return; nobody has applied a Coach swap and watched the workout screen keep the old exercise.
+  Do that first — it is one apply and one look at `/workout`, and it decides the priority.
+
+### [platform] LB-14 — E2E is not a required check, so it can sit red on `main` and nobody is stopped
+
+- **Branch:** _unassigned_ · **Lane:** OWNER DECISION, then whoever holds CI.
+- **Added:** 2026-08-25 · Lane B, after the same red was filed twice by two agents hours apart.
+- **What happened.** E2E went red on `main` and stayed red. Branch protection requires Lint, Tests,
+  Build, Custom Rules and Migration Check — **not E2E** — so merges continued. **OR-1** and
+  **BF-23** were filed independently, by the Orchestrator and BugFix, for the identical failure;
+  both diagnosed it as a content regression in the preceding merges, and both were wrong (it was
+  Home's check-in modal `aria-hidden`ing `<main>`). That is two agents' sessions spent on one red.
+- **The trade is real, which is why this is a decision and not a fix.** E2E takes 8–14 minutes and
+  drives a live dev server; making it required puts that on the critical path of every merge and
+  makes any flake a hard block. The alternative — what happens today — is that a red E2E is
+  invisible until someone trips over it, and *"E2E is red on main"* becomes normal.
+- **Middle options worth costing before deciding:** required only on PRs touching `app/**`,
+  `components/**` or `e2e/**`; or not required but with a scheduled run on `main` that opens an
+  issue on red, so it is loud without being blocking.
+- **Gate: owner**
+
 ### [platform] LB-12 — 77 of 193 queue entries state no lane, so both implementers are served each other's work
 
 - **Branch:** _unassigned_ · **Lane:** B filed it; **the sweep is the Orchestrator's** (it owns lane
