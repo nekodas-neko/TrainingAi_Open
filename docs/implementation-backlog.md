@@ -1501,9 +1501,39 @@ ring recorded anything" and the ratio is ~1 by construction.
 but they ask different questions — TN-2 needs the boundary between *resting and not*, this needs the
 boundary between *sedentary and moving*. At TN-2's most generous proposed offset it is still 97.6%.
 **Do not close this as a side effect of TN-2**, and do not fix it by pushing `HR_REST_THRESHOLD`
-higher — that would break Body Battery's charge window in the other direction. It needs its own
-test: a sustained elevation (e.g. several minutes above a higher bar) or an hourly step count, not a
-single-sample touch of a resting boundary.
+higher — that would break Body Battery's charge window in the other direction.
+
+**⚑ HR ALONE IS THE WRONG INPUT — use MET, which this app already decodes.** The owner raised this
+directly (*"its just HR?? that's not enough right? it needs HR + movement like accel"*) and it is the
+better framing than the "sustained elevation" this entry first proposed. Heart rate rises for stress,
+caffeine, digestion, heat and standing up; **an hour of anxious desk work is indistinguishable from
+an hour of walking**, which is exactly the confusion a move-every-hour prompt must not make.
+
+**The accelerometer-derived signal is already available on the same pipeline:**
+- `getOuraDaytimeSignals` (`adapter.ts:4959`) decodes **MET** from raw BLE frames, **tag `0x50`**,
+  alongside skin temperature, through the two-tier `readRawFrames`.
+- `MET_ACTIVE_THRESHOLD = 1.8` already exists (`daily-medians.ts:51`) and is **Oura's own** activity
+  threshold — the same `1.8` appears as `ring_met_limit` in `stress_daytime_sensing`. So the constant
+  does not need inventing or fitting.
+- The daytime-stress model already consumes an intraday MET series, so this is a signal the app
+  decodes and discards for this purpose rather than one it lacks.
+
+**Recommended test:** an hour counts as moved when its MET series shows sustained activity — e.g. a
+run of samples above `MET_ACTIVE_THRESHOLD`, not a single touch. Keep HR only as a secondary
+confirmation if it earns its place; MET is the direct measurement and HR is a proxy for it.
+
+**⚠️ Two implementation facts, both measured:**
+1. **`readiness-payload.ts` does NOT currently fetch daytime signals** — `computeMovedHours` is called
+   at line 324 with HR only, so adding MET means either a new decode on that path or moving the
+   computation to where MET is already loaded (`/api/body-battery` fetches it today). Decide that
+   before writing the test; a per-request raw-frame decode is not free.
+2. **The hourly MET distribution could NOT be measured for this entry**, and that gap is the first
+   thing to close. Intraday MET is decoded from raw frames rather than stored in a column, and
+   `decoded` is NULL on the hot tier — so SQL cannot reach it. The daily `met_avg` (n=51, range
+   1.004–1.636, mean 1.360) is a **daily average and says nothing about hourly discrimination** —
+   a daily mean above 1.8 would mean an entire day of activity, so "0 of 51 days exceed the sample
+   threshold" is expected and is **not** evidence either way. **Measure the hourly MET distribution
+   before picking the run-length**, or the threshold is fitted to nothing.
 
 **Sleep is excluded, but by a hardcoded clock window rather than the owner's sleep.**
 `computeMovedHours` accepts `wakeHour`/`sleepHour`, and **`readiness-payload.ts:324` never passes

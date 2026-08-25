@@ -103,6 +103,14 @@ sleep ✅ · readiness ✅ · activity ✅ · body ✅ · devices ✅ · workout
 - **Removing a 10% contributor normally moves a score; `checkin` does not** (TN-9) — mean 69.9 → 70.4,
   no day moving ≥5, because the logged check-in tracks the objective contributors closely enough to
   add little independent information. Measure before assuming a weight is load-bearing.
+- **HR alone cannot answer "did you move" — MET can, and the app already decodes it.** The owner
+  raised this and was right. `getOuraDaytimeSignals` (`adapter.ts:4959`) decodes MET from raw frames
+  (**tag `0x50`**) and `MET_ACTIVE_THRESHOLD = 1.8` is Oura's own constant (`daily-medians.ts:51`).
+  HR rises for stress, caffeine, heat and standing, so an anxious hour at a desk scores the same as a
+  walk. **Before fitting any MET run-length, measure the hourly MET distribution** — it is decoded
+  from raw frames, not a column, and `decoded` is NULL on the hot tier, so SQL cannot reach it.
+  **Do not use daily `met_avg` as a stand-in**: it is an average (n=51, 1.004–1.636, mean 1.360) and
+  "0 of 51 days exceed the 1.8 sample threshold" is expected arithmetic, not evidence.
 - **`HR_REST_THRESHOLD` is read by TWO metrics asking DIFFERENT questions, and one fix cannot serve
   both.** Body Battery wants the boundary between *resting and not* (TN-2); `computeMovedHours` wants
   the boundary between *sedentary and moving* (TN-11). At TN-2's most generous proposed offset,
