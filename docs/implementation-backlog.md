@@ -2767,6 +2767,24 @@ answered by subtraction rather than re-argued. Verified through the real route o
 17,591-byte photo logged `payload_bytes 17591`, `input_tokens 1275` — **exactly the production band**
 — and a sibling `weekly-digest` row kept a NULL, which is the point of it being nullable.
 
+**✅ BF-11b's schema change was checked against this entry's own finding, and it is NOT a regression
+(measured 2026-08-25).** BF-11b (#480) replaced the flat `ScanSchema` with
+`{ identified, candidates: [...] }` so a scan can return one meal per dish. Since the experiment
+above established that **latency tracks output tokens almost exactly**, a deeper schema was a
+plausible way to have made this entry's complaint worse — so it was measured rather than assumed.
+Same prompt, same model, one variable, n=5 each:
+
+| schema | median | output tokens (median) |
+|---|---:|---:|
+| flat, pre-BF-11b | 1,761 ms | 391 |
+| `candidates[]`, shipped | **1,698 ms** | 409 |
+
+The array wrapper costs **~18 output tokens (+4.6%)**, and the latency difference is *negative* and
+far inside the run-to-run spread (flat 1,464–2,051; candidates 1,436–2,387). **The common
+single-dish scan is unaffected.** A genuinely multi-dish scan does cost proportionally more output
+tokens — but it is returning proportionally more meals, which is the feature rather than a
+regression.
+
 **What is left, and it is smaller than it was:**
 - **The client leg still has no number** — `payload_bytes` prices the upload's *size*, not its
   *duration*, and "photo → result" starts on the device. That half is Lane B's (`components/**`); it
