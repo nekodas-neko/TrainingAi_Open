@@ -4,7 +4,6 @@ import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useState } from
 import { Search, X } from 'lucide-react'
 import type { FoodItem } from '@trainingai/shared/types/nutrition'
 import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet'
-import { useSheetBackDismiss } from '@/lib/hooks/use-sheet-back-dismiss'
 import { cachedFetch, readCacheSync } from '@/lib/sqlite/cache'
 import { TTL_MEDIUM } from '@trainingai/shared/cache-ttl'
 import { getLocalStore } from '@/lib/local-store'
@@ -20,7 +19,6 @@ interface Props {
 }
 
 export function FoodLibrarySheet({ open, onClose, onSelect, userId }: Props) {
-  useSheetBackDismiss(open, onClose)
   const [query, setQuery] = useState('')
   const [items, setItems] = useState<FoodItem[]>([])
   const [loading, setLoading] = useState(false)

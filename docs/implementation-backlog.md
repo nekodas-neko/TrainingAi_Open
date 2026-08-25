@@ -1250,34 +1250,21 @@ of them is worth making.
   for surfaces reached outside the provider — the icon routes and any canvas paint — since a forced
   class cannot reach those.
 
-### [app-shell] BF-27 — 5 of 45 sheets handle the Android back gesture; the other 40 navigate the page away
+### [app-shell] BF-27 — the back gesture now closes every sheet and dialog; nobody has pressed it on the phone
 
-- **Lane:** B
-- **Added:** 2026-08-25, device smoke run ⑩. The quantity sheet passed — back closed the sheet and
-  left the day screen — and the owner's reply was that this is the exception: *"there are many pages
-  that dont do this well; so we should do a review on these pages to make it all like this"*.
-- **Measured 2026-08-25.** `lib/hooks/use-sheet-back-dismiss.ts` is imported by **five** components:
-  `morning-checkin-sheet`, `nutrition/food-logger-sheet`, `nutrition/quick-edit-log-sheet`,
-  `nutrition/end-of-day/end-of-day-review`, `nutrition/food-library-sheet`. There are **45** files
-  rendering `<SheetContent>` and **6** rendering `<DialogContent>`, none of the latter using it. So
-  on ~40 sheets the back gesture is handled by the WebView, which navigates the underlying page
-  instead of dismissing the thing on top of it.
-- **The hook is the answer and it is already hard-won** — read its comment before touching anything.
-  It carries the LB-10 fix for React StrictMode's mount-time cleanup→effect pair and a per-instance
-  id so a nested sheet's cleanup does not cascade into its parent's handler. Do not re-derive it, and
-  do not write a second one.
-- **Scope this as a sweep, one PR.** `useSheetBackDismiss(open, onClose)` at each site, wired to the
-  same state the sheet's `onOpenChange` already drives. The risk is not per-site difficulty, it is
-  **nesting** — a sheet opened from inside another sheet is where the history stack goes wrong, and
-  the hook's own comment says so. Enumerate the nested pairs first and test those; the flat ones are
-  mechanical.
-- **`<DialogContent>` needs a decision, not the same treatment.** A confirm dialog dismissed by the
-  back gesture may be the right behaviour or may be a lost confirmation. State the choice in the PR
-  rather than sweeping all 6 silently.
-- **Verification.** `e2e/sheet-back-dismiss.spec.ts` already exists — extend it, do not replace it.
-  Then the device run: open each swept sheet, back-gesture, confirm the sheet closes and the page
-  behind it is unchanged. **The web sandbox cannot exercise the Android gesture** — the E2E spec
-  drives `history.back()`, which is close but not the same input.
+- **Branch:** `fix/sheet-back-dismiss-sweep` (merged 2026-08-25, v1.372.0)
+- **Lane: B**
+- **Gate: device**
+- Shipped **not** as the 40-site sweep the entry scoped, but as one component: `SheetContent` and
+  `DialogContent` render `components/ui/back-dismiss.tsx`, so the hook covers 45 sheets and 6
+  dialogs and every future one, and the five call sites that had it lost it. Rationale, and why the
+  hook must be a *child* of `Content` rather than a call in `SheetContent`, is in the component's
+  own comment and the journal:
+  [`2026-08-25-back-dismiss-sweep`](overview/entries/2026-08-25-back-dismiss-sweep.md).
+- **Keep:** the gesture itself, on the S25. `e2e/back-dismiss-sweep.spec.ts` drives
+  `history.back()`, which is close to the Android gesture and not the same input — the entry says so
+  and it is still true. Press it on: a plain sheet, a confirm dialog (it must cancel, not confirm),
+  and a nest (Log Food → History: one press must leave Log Food open). Strike once pressed.
 
 ## Owner request, 2026-08-24 — Body Battery is flooring, and stress needs an hour-of-day record
 

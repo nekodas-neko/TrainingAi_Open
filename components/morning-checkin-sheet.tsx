@@ -5,7 +5,6 @@ import { X, Sunrise, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet'
 import { toast } from 'sonner'
-import { useSheetBackDismiss } from '@/lib/hooks/use-sheet-back-dismiss'
 import { getLocalStore } from '@/lib/local-store'
 import { pushMutations } from '@/lib/local-store/sync-engine'
 import { invalidateCheckinAffectsPrescription, invalidateHealthTrends } from '@/lib/cache-groups'
@@ -30,7 +29,6 @@ interface Props {
 }
 
 export function MorningCheckinSheet({ open, onClose, userId, readiness, onSaved }: Props) {
-  useSheetBackDismiss(open, onClose)
   const tz = useUserTimezone()
   const [scales, setScales] = useState<Record<MorningScaleKey, number>>(() => ({ ...NEUTRAL_SCALES }))
   const [touched, setTouched] = useState<Record<MorningScaleKey, boolean>>({

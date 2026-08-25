@@ -3,6 +3,7 @@
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { XIcon } from "lucide-react";
 import { cn } from "@trainingai/shared/utils";
+import { BackDismiss } from "@/components/ui/back-dismiss";
 import type { ComponentProps } from "react";
 
 export const Dialog = DialogPrimitive.Root;
@@ -39,6 +40,7 @@ export const DialogContent = ({
       )}
       {...props}
     >
+      <BackDismiss />
       {children}
       <DialogPrimitive.Close className="absolute right-4 top-4 rounded-sm opacity-70 hover:opacity-100">
         <XIcon className="size-4" />
