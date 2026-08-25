@@ -331,25 +331,23 @@ days/hours cause most stress". Measured against production the same day; the bou
 signed off by the owner in that conversation. Review:
 [`docs/reviews/2026-08-24-body-battery-charge-window-collapse.md`](reviews/2026-08-24-body-battery-charge-window-collapse.md).*
 
-### [platform][app-shell] LA-22 — a guard test merged that has never passed, and E2E is not a required check
+### [platform] LA-22 — E2E is not a required check, and a PR merged with it red
 
-- **Lane: A** · **Added:** 2026-08-25, while landing TN-6a — it blocked two PRs before being traced.
-- **`e2e/home-card-invalidation-refetch.spec.ts` fails on a bare `origin/main`.** Reproduced locally
-  on untouched main (cb5f4902), and on two unrelated branches. It clicks
-  `getByRole('button', { name: 'Log Body Weight' })` on **Home**; no such button exists anywhere —
-  `metric-log-sheet.tsx` is reached only from `app/health/health-content.tsx`, and the sibling spec
-  opens it from Health's Body tab via a button named `Log`. **Home has no body-metric write
-  affordance at all**, so the test cannot pass as written.
-- **⚠️ It was added by #454 and MERGED WITH ITS OWN E2E RED** (run 32807689333, E2E `failure`). So
-  **E2E is not in the required-check set** — which also explains why merges succeed while E2E is
-  still in progress. Worth deciding deliberately: a non-required E2E is a guard that cannot block
-  anything, and this is the first case where that let a never-passing test onto `main`.
-- **Q-402 is therefore still unguarded** — the whole point of the spec. Its fix shipped and the
-  guard does not run, which is the state #454 set out to fix.
-- **Do NOT skip or delete the test to go green** — the options are to give Home the affordance the
-  guard needs, or to drive the write the way the sibling spec does and accept that it no longer
-  proves "Home stays mounted", which is the property Q-402 is about. That is a real design call and
-  belongs with the spec's author.
+- **Lane: A** · **Added:** 2026-08-25
+- **Gate:** owner — a governance decision, not a fix.
+- **#454 merged with its own E2E `failure`** (run 32807689333). Branch protection permitted it, so
+  **E2E is not in the required-check set** — which also explains why a merge succeeds while E2E is
+  still in progress. Worth deciding deliberately: a guard that cannot block anything let a red main
+  reach four other branches before it was traced.
+- **The red itself was real and is already fixed** by #456 — Home's Morning Check-in modal set
+  `aria-hidden` on `<main>`, so `home-card-invalidation-refetch` could not see the button it wanted.
+  Nothing to do there.
+- **⚠️ THIS ENTRY'S FIRST DRAFT WAS WRONG, and the mistake is the point.** It claimed the test could
+  never have passed because "no such button exists" — the exact conclusion an `aria-hidden` overlay
+  invites, since `getByRole` reports a covered affordance as *absent* rather than *obscured*, and a
+  `grep` for the label then appears to confirm it. #456's own commit message names this trap.
+  **Reproducing on a local dev DB and then reasoning from a grep is not enough to call a test
+  unpassable**; the modal was in the way on both.
 
 ### [readiness][devices] TN-8 — the chronic-stress fever mask is a FOURTH consumer of the broken temperature baseline
 
