@@ -66,16 +66,21 @@ export function DayToolsSection({
         tz={tz}
       />
 
-      <WeeklyNutritionChart data={weeklyData} calorieTarget={calorieTarget} adherence={adherence} />
+      {/* Q-395b: the week's chart and supplements are one section. Neither is about today's meals,
+          both are reference rather than action, and separately they were two more gapped cards. */}
+      <div className="divide-y divide-border/50 overflow-hidden rounded-2xl border border-border">
+        <WeeklyNutritionChart data={weeklyData} calorieTarget={calorieTarget} adherence={adherence} grouped />
 
-      {isToday && (
-        <SupplementsSection
-          supplements={supplements}
-          loading={supplementsLoading}
-          onChanged={onSupplementsChanged}
-          userId={userId}
-        />
-      )}
+        {isToday && (
+          <SupplementsSection
+            supplements={supplements}
+            loading={supplementsLoading}
+            onChanged={onSupplementsChanged}
+            userId={userId}
+            grouped
+          />
+        )}
+      </div>
 
       {/* Last on the page, which is where a day-review action belongs — the owner asked for this
           order. The comment here used to defend the old position; it was arguing against merging

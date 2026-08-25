@@ -1201,10 +1201,15 @@ whether or not anyone draws them first.
 > 800-line ceiling (789 → 773). All 11 sections ticked. **Measured: gaps were 420 px of 2,649
 > (16%)**, not *"most of the vertical space"*; this reclaims 100.
 > [`journal`](overview/entries/2026-08-25-nutrition-day-screen-sections.md).
-- **Keep:** the other eight sections still draw gapped cards. Taking them full-bleed edits eight
-  components' chrome for a small remaining gain — the meal list was the largest share — so do it
-  with a device in hand, alongside the **device smoke run** and a dark pass on the new dividers.
-  `Gate: device`.
+- **✅ THE LAYOUT HALF IS DONE 2026-08-25 (v1.366.0).** Two more grouped sections — energy
+  (`CalorieBalanceBar` + `MacroRing`) and reference (`WeeklyNutritionChart` + `SupplementsSection`).
+  **Gaps across the whole arc: 420 px → 280 px (16% → 11%), screen 111 px shorter.** Both themes
+  measured on a fully loaded screen, checklist 11 of 11 in each; a past date draws no empty bordered
+  box. [`journal`](overview/entries/2026-08-25-nutrition-day-screen-grouping.md). **What stays
+  ungrouped is conditional by nature** (the plan cards, `TdeeAdaptationCard`, `FoodLoggingComplete`,
+  the action row), so a fixed container would draw an empty border on the days they are absent.
+- **Keep:** the **device smoke run**, the only thing left — three `divide-y` sections over
+  `bg-muted/60` children now, the shape Samsung's compositor has caught out before. `Gate: device`.
 
 ### [nutrition][platform] LB-9 — the Atwater factors have four copies, two of them Lane A's
 

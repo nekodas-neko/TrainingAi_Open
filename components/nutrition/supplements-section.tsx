@@ -18,9 +18,11 @@ interface Props {
   loading: boolean
   onChanged: (supplements: SupplementWithStatus[]) => void
   userId?: string
+  /** Drawn as one row of a grouped section rather than as its own card (Q-395b). */
+  grouped?: boolean
 }
 
-export function SupplementsSection({ supplements, loading, onChanged, userId }: Props) {
+export function SupplementsSection({ supplements, loading, onChanged, userId , grouped}: Props) {
   const tz = useUserTimezone();
   const [manageOpen, setManageOpen] = useState(false)
   const [toggling, setToggling] = useState<string | null>(null)
@@ -97,7 +99,7 @@ export function SupplementsSection({ supplements, loading, onChanged, userId }: 
           </button>
         </div>
         {active.length === 0 ? (
-          <div className="rounded-2xl bg-muted/40 border border-border px-4 py-4">
+          <div className={grouped ? 'bg-muted/40 px-4 py-4' : 'rounded-2xl bg-muted/40 border border-border px-4 py-4'}>
             <EmptyState
               title="No supplements added yet."
               className="py-0"

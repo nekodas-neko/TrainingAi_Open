@@ -30,6 +30,8 @@ interface Props {
   data: DaySummary[]
   calorieTarget?: number | null
   adherence?: NutritionAdherenceResponse | null
+  /** Drawn as one row of a grouped section rather than as its own card (Q-395b). */
+  grouped?: boolean
 }
 
 type Metric = 'calories' | 'proteinG' | 'carbsG' | 'fatG'
@@ -48,7 +50,7 @@ function fmtDayLabel(date: string) {
   return d.toLocaleDateString('en-AU', { weekday: 'short' })
 }
 
-export function WeeklyNutritionChart({ data, calorieTarget, adherence }: Props) {
+export function WeeklyNutritionChart({ data, calorieTarget, adherence , grouped}: Props) {
   const [metric, setMetric] = useState<Metric>('calories')
   const { resolvedTheme } = useTheme()
   const cfg = METRIC_CONFIG[metric]
@@ -102,7 +104,7 @@ export function WeeklyNutritionChart({ data, calorieTarget, adherence }: Props) 
   }), [cfg.unit, resolvedTheme])
 
   return (
-    <div className="rounded-2xl border border-border p-4">
+    <div className={grouped ? 'p-4' : 'rounded-2xl border border-border p-4'}>
       <div className="flex items-center justify-between gap-2 flex-wrap mb-3">
         <h3 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground whitespace-nowrap">7-day nutrition</h3>
         <div className="flex gap-1">
