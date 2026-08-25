@@ -2654,3 +2654,15 @@ a **live** bug traded for a closed one. The owner scanned a ZMA supplement, the 
 `review-step.tsx`'s `canSave` requires `calories > 0`, so **Next** greyed out with no message. The
 server's own schema is `z.number().min(0)`, so there is no engine half — it is Lane B's, and it is
 queue position 1.
+## 2026-08-25 — `docs/implementation-backlog.md` raised, 11710 → 11775 (the meal photo)
+
+One entry, **BF-32**. The owner reviewed the artboards and found the gap none of the parity entries
+had: *"no spot for an image ... it should show the default one in the mockup if no image is
+attached."*
+
+The length is the evidence, and it is what stops the entry being re-investigated. The photo half
+shipped **twice** — `saved_meals.image_data_uri` in Q-396, the picker and its 128 px downscale in
+Q-327 — and grep proves nothing renders either one. So the entry states plainly that the feature is
+**write-only**, which is a different and smaller job than "build meal photos", and names the two
+places the deferral was recorded so a reader does not trip over a stale *"deliberately not here
+yet"* comment and treat it as a live decision.
