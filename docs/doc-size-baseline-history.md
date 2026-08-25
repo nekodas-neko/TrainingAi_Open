@@ -18,6 +18,29 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
+## 2026-08-25 — the compaction chore, first pass (`docs/implementation-backlog.md` 12146 → 11799)
+
+**A RATCHET DOWN of 347 lines, and the first time this file has been made smaller on purpose rather
+than as a side effect of finishing work.** The owner approved the chore this log proposed two records
+above: an entry long because it was written as an *investigation*, and now answered, moves to
+`docs/reviews/` with a pointer left in the queue.
+
+**Two entries, chosen by a rule rather than by size.** BF-4 (229 → 21) and Q-388 (165 → 23) — both
+investigations concluded today, so the extraction could be vouched for rather than guessed at. Being
+long was explicitly *not* the criterion: the top fifteen entries are 2,863 lines, 23% of the file,
+and most are long because they specify unbuilt work, where the length is the deliverable.
+
+**The test a pointer has to pass:** someone deciding the question should not need to open the review
+doc. So each entry keeps the measured conclusions that bear on the decision — BF-4's input-token
+correlation and the never-run payload bound, Q-388's drain figures and the firmware night-gating that
+makes "run it at night" a no-op — and sheds the working.
+
+**Do not read this as licence to shrink the file generally.** The remaining thirteen of the top
+fifteen should stay until their own investigations conclude. A queue file that is short because its
+specifications were thrown away is worse than a long one.
+
+---
+
 ## 2026-08-25 — LA-24 shipped and Q-304b closed (`docs/implementation-backlog.md` → 11948)
 
 **The file ends the day at exactly the number it started it on.** Both moves are entries leaving
