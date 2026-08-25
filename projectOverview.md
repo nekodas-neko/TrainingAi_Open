@@ -24,7 +24,7 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.370.2 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Version:** v1.371.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-08-25.
 
 **The Body Battery guard stopped swallowing the signal a separate investigation was waiting on (TN-7).** TN-4's fix is right and stays — a stress-model failure costs the stress strip, not the whole card. But its catch only called `console.error`, which reaches no table, so from that deploy a recurrence of the fault that fired **31 times on 2026-08-23** wrote nothing anywhere. LA-20's Known-Issues row asks for a zero `error_events` count over a window where this route was called, and with the guard and without the report that count is zero **whether or not the cause is fixed** — a condition that can no longer fail. The catch now reports as well as logs, tagged `/api/body-battery#stress` so the row is attributable to the strip rather than the outer catch. **The window that counts starts at this deploy**; every zero before it is silence from the guard, and the row says so now. **The general shape, worth naming: a hardening change that turns a loud failure into a quiet degradation also removes the evidence a separate open investigation was relying on.**
@@ -38,6 +38,8 @@
 Read it with the baton at `docs/agents/state/implementation-lane-b.md` before taking a Lane B item:
 the entire Lane B surface was traversed and every remaining candidate is gated, declined, parked,
 needs hardware, or wants a plan first. **Nothing that run shipped is device-verified.**
+
+**The timeline's workout card had somewhere to land for seventeen days (Q-93-followup).** It was left unwired in August because no screen showed a past session; `/health/day` shipped 2026-08-08 and nothing tracked the dependency clearing. Workout and walk now open it; `bedtime` and `tag` stay inert, having no detail view to reach. Two more of the entry's premises were stale — the second renderer it names is deleted, and the `ev.date` it needs is stamped centrally, so no `app/api/**` change was involved. Guarded by a mutation-checked e2e spec, because a row wired to nothing renders identically to a wired one ([`journal`](docs/overview/entries/2026-08-25-timeline-workout-day-detail.md)).
 
 **The queue tool stopped calling shipped work "ready" (LB-11), and then read the two entries it was still missing (LA-23).** `next-item.js` had never learned to read a `- **Keep:**`, so an entry that shipped kept its pre-shipping priority — **17 of Lane B's top 21 were finished**, and the first startable item sat below the tool's ten-row window. A KEEP bucket prints them with what they owe; READY went 86 → 65. **LB-11 closed by recording that Lane A was unaffected; it was not.** The parser required a literal colon, and TN-3a and TN-4 write `- **Keep — what is NOT done:**`, so both read as unstarted and sat at **#1 and #2 of Lane A's READY** — each owing something no sandbox can do. `Keep` now takes a colon **or** a dash, checked against all 196 entries: ten lines begin with the word, two are those Keeps and eight are prose, so the rule covers the whole population rather than a guessed one. Lane A's READY 90 → 88, and its top row is startable.
 
@@ -274,10 +276,9 @@ so the three Lane B surfaces that read it keep working until Q-362b moves them, 
 it afterwards ([journal](docs/overview/entries/2026-08-20-day-log-duration-session-identity.md)).
 
 **Q-424 closed (2026-08-20)** — the doc-size ratchet compared the tree against a committed number, so
-two independently-green PRs could merge into a red `main` and the failure then landed on an unrelated
-branch as an unrelated file over an unrelated limit. It now asks whether **this branch** grew the
-file, reports an inherited overage instead of failing it, and says how many lines the branch itself
-added. Custom Rules is **51 steps** now — a base fetch was added
+two independently-green PRs could merge into a red `main`, failing on an unrelated branch over an
+unrelated file. It now asks whether **this branch** grew the file, and reports an inherited overage
+instead of failing it. Run `pnpm check:rules` for the live step count — never quote one from here
 ([journal](docs/overview/entries/2026-08-20-doc-size-ratchet-order-independence.md)).
 
 **Q-421 is Lane B's now (2026-08-20)** — route (a) shipped, route (b) is owner-rejected, and the
@@ -296,9 +297,8 @@ SQLSTATEs that are benign on an ordinary run are precisely the failure signal un
 (reasoning, not status) and [2026-08-17 agent model/device findings](docs/handoff-2026-08-17-platform-agent-model-and-device-session-findings.md)
 (**Q-536 CLOSED, confirmed on device**; its cause **Q-314** is still live and reopens on every re-pair).
 
-**Open at the time of writing:** PR #6 (session notes the public cut did not carry), PR #10 (the
-public-repo migration handoff). Check `list_pull_requests` rather than trusting this line — it is a
-snapshot, not a live view, and it was already three PRs out of date once.
+**Open PRs:** run `list_pull_requests` — any snapshot written here goes stale within the hour, and
+one already did. The two oldest, #6 and #10, are public-repo-migration handoffs open since 08-17.
 
 **What shipped recently is in the journal, not here.** Read `docs/overview/entries/` for the current
 window, then the newest `history-*.md`. The 157 dated status notes this section used to carry were
@@ -3693,9 +3693,9 @@ for the supplements case; the rest need the owner to separate "stopped logging" 
 native-STT rebuild has **not** been installed on the S25 — the JS half shipped via Railway and is
 calling a native plugin that isn't there.
 
-**Still live — re-checked 2026-08-19, and the count was three times what this row claimed:** not 4
-but **12**, latest **2026-08-18 23:41 UTC**, the day before the check. Two weeks on, the owner is
-still reaching for voice logging and still getting nothing.
+**Still live — re-read 2026-08-25 and it has not stopped:** five more from `/workout`, latest
+**2026-08-24 21:41 UTC**. Three weeks on, the owner is still reaching for voice logging and still
+getting nothing. (The 2026-08-19 read found 12, against the 4 this row first claimed.)
 
 **The message changed spelling on 2026-08-17**, which strengthens rather than weakens the diagnosis:
 10 reads `"SpeechRecognition" plugin is not implemented` (08-05 → 08-16), the last 2 read
