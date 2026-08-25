@@ -699,6 +699,17 @@ const CREATE_SAVED_MEAL_ITEMS = `CREATE TABLE IF NOT EXISTS saved_meal_items (
   quantity_multiplier REAL NOT NULL DEFAULT 1
 )`;
 
+// BF-11e — which meal types a saved meal is eligible for, mirrored locally so the tags render and
+// write offline. A NEW table, which is the one case `CREATE TABLE IF NOT EXISTS` handles correctly
+// on upgraded devices as well as fresh installs: the hazard that check-local-column-upgrade-path.js
+// exists for is a COLUMN added to an existing table's CREATE body, where the IF NOT EXISTS makes the
+// whole statement a no-op and the column never arrives.
+const CREATE_SAVED_MEAL_MEAL_TYPES = `CREATE TABLE IF NOT EXISTS saved_meal_meal_types (
+  saved_meal_id TEXT NOT NULL,
+  meal_type_id  TEXT NOT NULL,
+  PRIMARY KEY (saved_meal_id, meal_type_id)
+)`;
+
 // Local mirror of the evening/morning End of Day check-in so it renders and
 // writes offline-first — the local store is the source of truth. One row per
 // (log_date, phase). sore_muscles stored as JSON text like mood_logs.
@@ -799,7 +810,7 @@ export const RECONCILE_TABLES: string[] = [
   CREATE_DAY_CHECKINS,
   CREATE_FITNESS_TESTS,
   CREATE_PRESCRIBED_RUNS,
-  CREATE_SAVED_MEALS, CREATE_SAVED_MEAL_ITEMS,
+  CREATE_SAVED_MEALS, CREATE_SAVED_MEAL_ITEMS, CREATE_SAVED_MEAL_MEAL_TYPES,
   CREATE_MEAL_PLANS, CREATE_MEAL_PLAN_VARIANTS, CREATE_MEAL_PLAN_MEALS,
   CREATE_MEAL_PLAN_VARIANTS_IDX, CREATE_MEAL_PLAN_MEALS_IDX,
   CREATE_PLAN_MEAL_ANSWERS, CREATE_PLAN_MEAL_ANSWERS_IDX,
@@ -1144,6 +1155,7 @@ export const MIGRATIONS: UpgradeStatement[] = [
       // Offline-first saved meals (create/edit/delete offline, read local-first).
       CREATE_SAVED_MEALS,
       CREATE_SAVED_MEAL_ITEMS,
+      CREATE_SAVED_MEAL_MEAL_TYPES,
     ],
   },
   {
@@ -1268,6 +1280,16 @@ export const MIGRATIONS: UpgradeStatement[] = [
       // to the CREATE TABLE body above reaches fresh installs ONLY — this ALTER is what reaches
       // everyone else, and the RECONCILE_COLUMNS row is the authority if the upgrade half-applies.
       `ALTER TABLE saved_meals ADD COLUMN image_data_uri TEXT`,
+    ],
+  },
+  {
+    toVersion: 29,
+    statements: [
+      // BF-11e. A new TABLE, not a column — so unlike v27 and v28 above, the `CREATE TABLE IF NOT
+      // EXISTS` in the fresh-install list is not a no-op for upgraded devices, because the table is
+      // not there yet. Repeating it here is what makes an upgraded device get it; it is also
+      // idempotent, so a retried partial upgrade cannot throw the way a duplicate ADD COLUMN does.
+      CREATE_SAVED_MEAL_MEAL_TYPES,
     ],
   },
 ];

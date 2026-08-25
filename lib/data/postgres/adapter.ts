@@ -3376,8 +3376,8 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   async listLatestMealTimes(userId: string, from: string, to: string) { return n.listLatestMealTimes(this.db, userId, from, to) }
   async listRecentFoodItemsForMealType(userId: string, mealTypeId: string, limit: number) { return n.listRecentFoodItemsForMealType(this.db, userId, mealTypeId, limit) }
   async listSavedMeals(userId: string) { return n.listSavedMeals(this.db, userId) }
-  async createSavedMeal(userId: string, name: string, items: { foodItemId: string; quantityMultiplier: number }[], id?: string, servings?: number, imageDataUri?: string | null) { return n.createSavedMeal(this.db, userId, name, items, id, servings, imageDataUri) }
-  async updateSavedMeal(id: string, userId: string, name: string, items: { foodItemId: string; quantityMultiplier: number }[], servings?: number, imageDataUri?: string | null) { return n.updateSavedMeal(this.db, id, userId, name, items, servings, imageDataUri) }
+  async createSavedMeal(userId: string, name: string, items: { foodItemId: string; quantityMultiplier: number }[], id?: string, servings?: number, imageDataUri?: string | null, mealTypeIds?: string[]) { return n.createSavedMeal(this.db, userId, name, items, id, servings, imageDataUri, mealTypeIds) }
+  async updateSavedMeal(id: string, userId: string, name: string, items: { foodItemId: string; quantityMultiplier: number }[], servings?: number, imageDataUri?: string | null, mealTypeIds?: string[]) { return n.updateSavedMeal(this.db, id, userId, name, items, servings, imageDataUri, mealTypeIds) }
   async deleteSavedMeal(id: string, userId: string) { return n.deleteSavedMeal(this.db, id, userId) }
   async getNutritionTargets(userId: string) { return n.getNutritionTargets(this.db, userId) }
   async upsertNutritionTargets(userId: string, data: Omit<NutritionTargets, 'id' | 'userId' | 'updatedAt'>) { return n.upsertNutritionTargets(this.db, userId, data) }
@@ -4202,7 +4202,16 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
               }
               imageDataUri = rawImage
             }
-            await this.createSavedMeal(userId, name, items, p.id, servings, imageDataUri)
+            // BF-11e. Same `undefined` vs `[]` distinction as the web route and as `imageDataUri`
+            // above: a mutation queued by an older bundle carries no `mealTypeIds` at all, and must
+            // leave the stored tags alone rather than clearing them on replay. Non-string entries
+            // are dropped here rather than trusted — this is the offline path, and the payload sat
+            // in local SQLite since whenever the user acted.
+            const rawTags = p.mealTypeIds
+            const mealTypeIds = Array.isArray(rawTags)
+              ? rawTags.filter((t): t is string => typeof t === 'string')
+              : undefined
+            await this.createSavedMeal(userId, name, items, p.id, servings, imageDataUri, mealTypeIds)
           }
           processed++
         } else if (mut.domain === 'activity_logs') {

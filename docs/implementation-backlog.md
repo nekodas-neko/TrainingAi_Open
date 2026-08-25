@@ -14,8 +14,8 @@ silently misdirecting the next session. Update them in the same PR that consumes
 
 | Pointer | Value | Source of truth |
 |---|---|---|
-| Next free Postgres migration | **217** | `lib/data/postgres/migrations/` |
-| Local SQLite schema version | **v28** | `lib/sqlite/migrations.ts`; `lib/sqlite/__tests__/migrations.test.ts` asserts the max |
+| Next free Postgres migration | **219** | `lib/data/postgres/migrations/` |
+| Local SQLite schema version | **v29** | `lib/sqlite/migrations.ts`; `lib/sqlite/__tests__/migrations.test.ts` asserts the max |
 
 > **There is no third pointer any more.** Entry IDs are not allocated from a shared counter and
 > never were safely: a next-free pointer is a *floor*, not an authority, because it cannot see an
@@ -1022,30 +1022,16 @@ whether or not anyone draws them first.
   both reference it, so a new id orphans a label already stuck on a container.
 - May batch with BF-11c (one screen, one verification pass) if BF-11c's save path lands unchanged.
 
-### [nutrition] BF-11e — saved meals get meal-type tags, so slot matching is not macro-blind
-
-- **Lane:** A
-- **Plan:** [`plans/2026-08-24-library-first-meal-planner.md`](superpowers/plans/2026-08-24-library-first-meal-planner.md) §5.1
-- **Branch:** `feat/saved-meal-meal-type-tags`
-- **Added:** 2026-08-24 · planning session, from BF-11 (design item 8). Owner: *"we don't want
-  pancakes recommended for dinner."*
-- **Reuse `MealType` as the vocabulary** rather than a parallel "category" concept — the user already
-  names and configures their own meal types, each with a time window, and a meal can be eligible for
-  several. New join table `saved_meal_meal_types`, composite PK, `saved_meal_id` cascading.
-- **⚠ Needs a Postgres migration. Lane A claims the number against the directory AND open PRs when it
-  builds** — the tree already carries four collided pairs and `migrate.js` applies in filename order.
-  The plan names the requirement, never the number.
-- **Three constraints the trace found, none obvious:** `meal_types` **soft-deletes**, so a join row can
-  point at a deleted type — filter on read rather than deleting join rows, so restoring a type
-  restores its tags; saved meals reach the device via **`hydrateSavedMeals`, not `getSyncDelta`**, so
-  tags ride the existing `listSavedMeals` response and there is no pull-delta branch; but the **push**
-  branch does exist (`adapter.ts:4175`), so route, outbox payload, `pushMutations` and the local table
-  all take tags **in the same PR**.
-- Local SQLite: new table registered in `RECONCILE_TABLES` in the same commit, plus a version bump.
-  Every `SavedMeal` mapper gains `mealTypeIds` — a missed mapper fails silently as "tags don't save".
-- **Never batch this** — it carries a migration.
 
 ### [nutrition] BF-11f — tagging a meal from Build a Meal
+
+> **⚠ BF-11e shipped the storage and transport (migration 217, local SQLite v29). The one thing it
+> deliberately did NOT do is the last link: `saved-meals-sheet.tsx` still queues an outbox payload
+> with no `mealTypeIds`.** That is correct today — absent means *leave the stored tags alone*, and
+> sending the currently-loaded tags would revert a change made on another device between the sheet
+> loading and the save. **The moment this entry adds a picker, it must add `mealTypeIds` to BOTH
+> `store.upsertSavedMeal(...)` and `store.queueMutation(...)` in that file, in the same PR**, or tags
+> will save on the web and strand offline. There is a comment at the call site saying so.
 
 - **Lane:** B
 - **Needs:** BF-11e

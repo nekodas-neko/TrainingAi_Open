@@ -3,95 +3,106 @@
 > **Successor sessions are titled `🚧 Implementation Agent (B) 🟢`** — exactly, emoji included. That
 > title is how six concurrent sessions stay tellable apart; a renamed successor is a lost thread.
 
-**Updated:** 2026-08-25 · **By:** the eleventh Lane B run · **Next ID:** `LB-14`
+**Updated:** 2026-08-25 · **By:** the twelfth Lane B run · **Next ID:** `LB-15`
 
 ## Now
-**Nothing open — every branch merged.** This run landed **18 PRs**: #446 (Q-406 diary row), #447
-(LB-10), #449 (Q-555 closed unfixed), #451 (Q-499), #452 (LB-11), #454 (Q-477 complete), #456 (OR-1),
-#457 (Q-467), #459 (BF-23), #460 (Q-315), #462 (PS-6), #463 (Q-538 half), #464 (Q-305 half), #465
-(Q-281 subset), #466 (LB-12), #467 (Q-282 corrected), #468 (Q-154 measured), #469 (Q-138 ratchet).
-Each has a journal entry in `docs/overview/entries/` dated 2026-08-25 — read those, not this file.
+**One PR open: [#483](https://github.com/nekodas-neko/TrainingAi_Open/pull/483) (BF-27), and it is
+yours to finish.** All five required checks went green on its previous head; the docs commit on top
+restarted CI. **Do not merge it on the merge button alone** — E2E is not a required check, this
+change touches every sheet and dialog in the app, and two local full-suite runs failed a *different*
+1 and 3 specs (`meal-label`, `food-logging-complete`, `tabs-instant-paint (More)`). None reproduces
+alone or in a subset, and the `meal-label` one has a mechanism that is the spec's own (it reads
+canvas pixels gated only on `inkFraction > 0.01`, i.e. *any* ink, so a canvas caught mid-draw decodes
+to nothing). Read the E2E job, then merge or fix. The reasoning is in the PR body and in that
+branch's journal entry, `docs/overview/entries/2026-08-25-back-dismiss-sweep.md` — **both land only
+when #483 merges**, which is why neither is linked here.
+
+**Merged this run:** #478 (Q-93-followup), #479 (the Q-112 re-plan).
+
+## The finding that should change how you start
+**The previous baton said the startable Lane B surface was exhausted. It was not.** BF-27 sat at
+**#3 of READY**, ungated, owner-requested, with its hook and its e2e spec already in the repo. The
+2026-08-25 traversal that concluded otherwise was one day old.
+
+**So: run `node scripts/next-item.js --lane B` and actually read the top five**, whatever any baton
+says. A traversal is a snapshot; entries get unparked, dependencies land, and the owner files new
+work daily.
+
+**And re-verify every entry's premise before writing code — it is still the highest-value act in the
+role.** Three for three this run:
+- **Q-93-followup** — *"no historical per-session HR-chart/exercise-detail screen exists at all"*.
+  `/health/day` shipped **seventeen days earlier** and is exactly that screen. Two more of its claims
+  were stale: the second renderer it names is deleted, and the `ev.date` it needs is stamped
+  centrally at `app/api/day-timeline/route.ts:302`, so no Lane A change was involved.
+- **Q-112** — same shape, larger. Task 27 asked for a new merged day screen because no per-day
+  read-through existed; `/health/day` shipped **two days** after it was written. Building it as
+  written would have made a third day surface and re-implemented seven working sections.
+- **BF-27** — sound, but its prescribed approach (40 call-site wirings) was worse than one component,
+  and its *"the quantity sheet passed"* observation points at a file that has no hook at all.
 
 ## Next
-**⚠️ Do NOT start by hunting the queue top-down — it will waste an hour.** `node scripts/next-item.js
---lane B` now marks `⟨lane unstated⟩` rows; **52 of ~56 READY are unstated**, and applying the path
-rule to them puts almost all in Lane A. **The startable Lane B work sits ~35–40 rows down.**
-
-**The whole surface was traversed on 2026-08-25 and every candidate is accounted for:**
-- **Q-395b, Q-395a, Q-406, BF-10, Q-486, Q-499, LB-5, Q-316/317/318, Q-544, Q-461, Q-319** — shipped,
-  `Keep:` is a device check only. They print under **KEEP** now, not READY.
-- **Q-354** — *"do not pursue without a reason"*, deliberately declined. Its named trigger (a scanner
-  driving mouse input) has NOT fired: Q-282's jsx-a11y work is static.
-- **Q-154** — now `Gate: owner`. It is a design call, not a conversion: converting faithfully needs
-  **six** primitive props, one of them a decorative halo ring. See the entry.
-- **Q-138** — four real extractions left, and the entry says take them *opportunistically when
-  already in the file*. Respect that.
-- **Q-254** — PARKED, `Needs: Q-297`.
-- **Q-111** — ring half shipped; strap/scale halves need a chest strap and a scale in hand.
-- **Q-93-followup, Q-112, Q-168** — feature work with **no plan**. Per the backlog-driven protocol
-  these need a docs-only planning PR first; do not start implementing one cold.
-
-**So: the next Lane B session should either take a `Gate: device` item to the phone, or write a plan.**
-If the Orchestrator has swept LB-12 by then, re-run the tool first — the picture changes completely.
+`node scripts/next-item.js --lane B` first. Known-good candidates, in the order I would take them:
+- **Q-395c** — top of READY, nutrition phase 4. PR #458 exists to unpark it; check whether another
+  session is on it before starting.
+- **BF-24** — the shipped nutrition day screen vs artboard 1. Lane B, owner-reported, has a drawing
+  to build against.
+- **Q-112a** — a real one-PR entry now, with a plan behind it
+  ([`the day-review plan`](../../superpowers/plans/2026-08-25-unified-day-review.md)); Q-112c is Lane A and gates Q-112d.
+- **Q-168, Q-154, Q-254, Q-111** — still gated, parked, or owner-decision. Unchanged.
 
 ## Do not re-litigate
 - **`lib/coach/**`, `packages/shared/**`, `app/api/**`, `lib/data/**` are Lane A** whatever the edit
-  looks like. Q-403 said "Lane B if the fix is the system prompt in `app/api/coach/route.ts`" — wrong,
-  the rule is the **path**, not the nature of the edit. Corrected, along with Q-289/Q-290/Q-291.
+  looks like. The rule is the **path**, not the nature of the edit.
 - **Scoring changes are nobody's to implement**: Tuning proposes → owner signs off → Lane A builds.
 - **Radix `Collapsible`/`CollapsibleTrigger` supplies `aria-expanded`** — never a Q-491 violator.
 - **`weekly-stats-hub`'s `todayKey` needs `.replace(/-/g,"/")`** — `/api/weekly-stats` emits `yyyy/MM/dd`.
-- **Q-359's remaining 12 sites** — judged not worth converting; the entry is its ratchet's home.
+- **Back-dismissal is the primitive's job now** (once #483 lands). `SheetContent`/`DialogContent`
+  render `components/ui/back-dismiss.tsx`. **Never call
+  `useSheetBackDismiss` at a call site again** — it would push twice and need two presses. And it
+  must stay a *child* of `Content`: `SheetContent`'s body runs whenever a caller renders it, and
+  every tab screen renders its sheets unconditionally with a null prop.
 
 ## Owed (device / physical)
-**Everything this run shipped is APK-unverified.** Q-406's diary row + delete, Q-499's three error
-states, Q-467's Coach undo, Q-315's vacuum picker (needs a **desktop**, not the phone), Q-538's raw-store
-findings (**Read stats** on `/admin/oura-ble`), Q-305's band words at S25 width, Q-281's "Final
-readiness" row (never rendered at all — the local seed has no `ouraScore` row), Q-477's rollover
-across local midnight. Carried: BF-10, LB-5, Q-328/Q-321/Q-486, Q-389 print/scan/share, a TalkBack
-pass, Q-450/Q-418 (needs a Polar H10).
+**Nothing this run is device-verified**, and each entry keeps a `Gate: device` residue naming the
+presses:
+- **BF-27** — a plain sheet, a confirm dialog (must **cancel**, not confirm), and a nest
+  (Log Food → History: one press must leave Log Food open).
+- **Q-93-followup** — tap a workout and a walk row in Home's timeline; check the row does not fight
+  `PullToSync`'s vertical gesture, and that `/health/day`'s back returns to Home.
+- Carried from before: Q-406, Q-467, Q-499, Q-538 (Read stats), Q-305 at S25 width, Q-477 across
+  local midnight, BF-10, LB-5, Q-328/Q-321/Q-486, Q-389 print/scan/share, a TalkBack pass,
+  Q-450/Q-418 (needs a Polar H10). **Q-315 needs a DESKTOP, not the phone.**
 
-## Filed at wrap-up, not yet worked
-- **LB-13** — `app/api/coach/apply/route.ts:71` and the undo route both call
-  `invalidateProgramStructure()` **server-side**, where `lib/cache-groups` reaches nothing. Undo is
-  covered by its client caller; **apply is not**, so a Coach `session_exercise` swap leaves
-  `workout-data`/`next-session`/`workout-card:` stale — and `workout-card:` is `freshWithinTtl`, the
-  condition where stale *survives*. **Lane A's** (`app/api/**`). Read from source, **not reproduced**.
-- **LA-22** — E2E is not a required check; the same red was filed three times (LA-22, OR-1, BF-23) by three agents. Lane B's duplicate (LB-14) was folded into LA-22 on merge, so **LB-14 was never used** — the next Lane B id is still LB-14.
-  `Gate: owner`.
+## Filed this run, not worked
+- **LB-14** — `readJsonLimited` rejects when a client hangs up mid-post, nothing catches it, and
+  `onRequestError` files the client's disconnect as a server fault in **both** `error_events` and
+  Sentry. Nine rows in 30 days across two BLE ingest routes. **Lane A's**, low priority. Read from
+  source, not reproduced.
+- **Q-112a–e** — the re-planned day review, five entries with lanes and `Needs:` fields.
 
 ## Claimed paths
-None held. `scripts/next-item.js` + `scripts/lib/{keep,entry-id}.js` were claimed for LB-11/PS-6 and
-released on merge. `scripts/` remains in neither lane's path list — claim it in this file if you take it.
+None held.
 
 ## Gotchas worth carrying
+- **`get_check_runs` AND `get_workflow_job` both lag badly — 30+ minutes measured today.** Build read
+  `in_progress` long after a 3-minute job must have finished, and `get_job_logs` 404s throughout,
+  which looks like confirmation and is not. `failed_only: true` on the *run* was the freshest signal.
+- **`.click()` does nothing inside `[data-swipe-carousel]`** (Q-354) — use `page.touchscreen.tap()`.
+  **And the tab shell mounts several panels at once, so DOM order is not screen order**: an unscoped
+  `getByRole(...).first()` resolves into an off-screen panel, where a forced click switches tabs
+  instead. Pick the element whose box is inside the viewport. It looked exactly like my own change
+  breaking the app. **Run the probe against unmodified `main` before believing you broke something.**
+- **`pkill -f "next dev"` exits 144 and kills the rest of a compound command** — put it last. The
+  previous baton said this and I did it anyway.
 - **Shallow clone: `git fetch --unshallow origin` before every merge**, or `git fetch origin main`
   re-shallows and the merge dies with "refusing to merge unrelated histories."
-- **A backlog conflict is almost always TWO DELETIONS** — read headings, keep neither side.
-- **`git ls-remote origin 'refs/heads/<name>*'` before pushing** — several names are already taken.
-- **`open('f','w').write(open('f').read()…)` TRUNCATES BEFORE IT READS.** Wiped `package.json` to 0
-  bytes; every tool then failed with `ERR_INVALID_PACKAGE_CONFIG`, which looks nothing like the cause.
-- **A grep count is not a violator list.** Q-491 claimed nine `aria-expanded` violators (two were
-  real); Q-281's zero-`.label` grep would have flagged `contributor-chart`, which renders a legend and
-  is correct. **Read the files.** This cost nothing each time and removed eight false positives once.
-- **An entry's own premise is wrong often enough to always check.** This run: Q-282's headline
-  ("no a11y check in CI" — there is one), Q-305 ("never shown" — it was shown, against a made-up
-  band), Q-315 ("just needs a press" — nothing could press it), Q-138 (two rows already done),
-  Q-467's route calling a **client** cache-invalidation helper server-side, where it clears nothing.
-- **Playwright here:** `chromium.launch({ executablePath: '/opt/pw-browsers/chromium' })`; `/sign-in`'s
-  FIRST submit is "Sign in with Google" — click **"Sign in with email"**, then `press('Enter')` on the
-  password (the real submit has no accessible name). `serviceWorkers:'block'`, and
-  `waitUntil:'domcontentloaded'` on polling consoles.
-- **Home's Morning Check-in is a MODAL** — Radix `aria-hidden`s `<main>`, so every `getByRole` on Home
-  returns 0 and the failure reads as "the affordance does not exist". Use `suppressMorningCheckin()`.
-- **StrictMode's double effect-invoke is real and bites**: LB-10 made five sheets unopenable in
-  `pnpm dev` while production was fine.
-- **A scratch route needs `rm -rf .next` afterwards**, and sometimes before — "Invariant: missing
-  bootstrap script" is a stale `.next`, not your code.
-- **`projectOverview.md` sits ON its ratchet almost every PR** — re-measure with
-  `check-doc-index-size.js`, compact an older paragraph, never raise the baseline.
-- **`get_check_runs` lags 30+ min; attempting the merge is the reliable check.** E2E is NOT a required
-  check — it can be red on `main` and nothing stops merges (that is how BF-23/OR-1 happened twice).
-- **`pkill -f "next dev"` exits 144 and kills the rest of a compound command** — put it last.
-- **The local seed drifts as you probe it.** `first-run-empty-states` and `goal-invalidation` went red
-  locally from this session's own inserts and passed in CI. Check before believing a local red.
+- **`git ls-remote origin 'refs/heads/<name>*'` before pushing** — five baton names are taken.
+- **A backlog conflict is usually TWO DELETIONS** — read the headings, keep neither side.
+- **Rebuild `package.json`/`changelog.ts` from `git show origin/main:...`** and prepend; never splice
+  a conflict hunk. Expect to re-bump: another agent took 1.372.0 while #483 was in review.
+- **`projectOverview.md` sits ON its ratchet almost every PR.** Compact an older shipped-note, never
+  raise the baseline; the checker counts `wc -l + 1`. **The backlog baseline is different** — a
+  planning PR adding real entries may raise it, with a note in `doc-size-baseline-history.md`, but
+  check first whether `main` already left headroom (it had).
+- **The local seed drifts as you probe it**, and a full local E2E run under load is not trustworthy:
+  I got 66/67 then 64/67 with different failures on identical code.
