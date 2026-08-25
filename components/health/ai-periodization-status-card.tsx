@@ -2,7 +2,7 @@
 
 import { memo, useLayoutEffect, useState, useCallback } from "react";
 import { toast } from "sonner";
-import { SparklesIcon } from "lucide-react";
+import { SparklesIcon, TriangleAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { getSessionIcon } from "@/lib/session-icon";
 import { cn } from "@trainingai/shared/utils";
@@ -49,12 +49,18 @@ export const AiPeriodizationStatusCard = memo(function AiPeriodizationStatusCard
   const [sessions, setSessions] = useState<SessionOverview[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [applying, setApplying] = useState<string | null>(null);
+  const [failed, setFailed] = useState(false);
 
   const loadSessions = useCallback(() => {
+    setFailed(false);
     cachedFetch<{ sessions: SessionOverview[] }>(
       'ai-periodization-overview', '/api/ai-periodization/program-overview', TTL_MEDIUM,
       d => { if (d?.sessions) setSessions(d.sessions); },
-    ).catch(() => {}).finally(() => setLoading(false));
+      // Q-499: a success with no AI-dynamic sessions sets `sessions` to `[]`, so a still-null
+      // `sessions` after the fetch means the fetch itself failed — the one case worth saying out
+      // loud. Without `onError` the two are the same null and the card just is not there.
+      { onError: () => setFailed(true) },
+    ).catch(() => setFailed(true)).finally(() => setLoading(false));
   }, []);
 
   useLayoutEffect(() => {
@@ -89,6 +95,16 @@ export const AiPeriodizationStatusCard = memo(function AiPeriodizationStatusCard
 
   const activeSessions = sessions?.filter(s => s.state != null) ?? [];
 
+  if (failed && sessions === null) {
+    return (
+      <div className="rounded-2xl bg-muted/60 border border-border p-4">
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <TriangleAlert className="h-4 w-4 flex-none" aria-hidden />
+          Couldn&rsquo;t load AI Periodization — pull to refresh.
+        </div>
+      </div>
+    );
+  }
   if (!loading && activeSessions.length === 0) return null;
 
   return (

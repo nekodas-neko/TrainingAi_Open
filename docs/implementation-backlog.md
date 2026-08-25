@@ -3146,11 +3146,21 @@ this fits without an extraction.
 
 - **Branch:** `fix/card-fetch-error-states`
 - **Lane:** B
-- **Keep:** the other ~10–18 candidate cards from the 2026-08-18 sweep remain an unenumerated
-  worklist (the review's own file list wasn't retrievable when this shipped; a fresh grep for
-  `cachedFetch`/`useCachedValue` + `return null` + no `onError`/error wording turns up ~18 today,
-  most needing per-file judgement to tell a real gap from a legitimate empty state). Not device or
-  offline verified — `cachedFetch` cannot revalidate at all offline.
+- **✅ THE REST OF THE SWEEP SHIPPED 2026-08-25 — enumerated, and it was three, not ~18.** The
+  estimate counted every self-fetching component with a bare `return null`; the shape is narrower
+  than that. Real: `health/oura-section.tsx` (its `null` means *no ring connected*, so a 429 made a
+  connected user's whole ring section vanish), `health/ai-periodization-status-card.tsx` and
+  `workout/exercise-hr-trend-card.tsx`. Judged legitimate and left alone: five *supporting* values
+  where a failure degrades a chart rather than removing a surface (`hr-profile` ×3,
+  `muscle-recovery`, `more-user-profile`), and five documented empty states
+  (`home-nutrition-zone-bar`, `food-logging-complete`, `training-stress-line`,
+  `training-stress-badge`, `exercise-detected-card` — permanently empty since the Cloud removal).
+  **`.catch()` is not the guard:** `oura-section` had one on every fetch and still vanished, because
+  `cachedFetch` resolves on a non-ok response. `e2e/card-429-error-state.spec.ts` covers all four
+  cards now, each new case confirmed red with the fix stashed.
+  [`journal`](overview/entries/2026-08-25-card-error-states-enumerated.md).
+- **Keep:** not device or offline verified — `cachedFetch` cannot revalidate at all offline, so what
+  these states do on a genuinely offline first load is untested. `Gate: device`.
 
 ### [app-shell] Q-359 — 36 other fetch-once effects have Q-402's latent bug; only the shell ones can bite
 

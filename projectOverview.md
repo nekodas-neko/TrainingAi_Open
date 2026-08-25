@@ -27,6 +27,11 @@
 **Version:** v1.318.10 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-08-24.
 
+**Three more cards say so when their fetch fails, and the sweep was three, not ~18 (Q-499).** The
+Oura section is the one that mattered: its `return null` means *no ring connected*, so a 429 made a
+connected user's whole ring section vanish. `.catch()` was never the guard — `cachedFetch` resolves
+on a non-ok response, so only `onError` fires there. Ten other candidates were judged legitimate.
+
 **The offline tab tap is not silent, and Q-555 closes unfixed.** Driven with the worker blocked so
 `controller` is `false` throughout: offline the tap **navigates** and `app/error.tsx` says *"You're
 offline"* — in a settled tab route and on the loading fallback alike. The one failing window is
@@ -47,33 +52,29 @@ guards it, and fails on the unfixed hook.
 **A food draws one way everywhere now, and its amount is edited on its own screen (Q-395a).** The
 builder's rows became the shared `FoodRow`; `ingredient-row.tsx` is deleted and the quantity control lives in a new sheet. Segmented tabs went 44 → 48 px in the shared primitive, lifting 8 call sites.
 
-**Build a Meal's ingredient picker is its own component (BF-11a).** `saved-meals-sheet.tsx` 774 → 590 lines. `openBuild`'s reset setters became a keyed remount.
+**Build a Meal's ingredient picker is its own component (BF-11a).** `saved-meals-sheet.tsx` 774 → 590 lines; `openBuild`'s reset setters became a keyed remount.
 
 **Q-319's water bug was unreachable, and the half its entry called fine was the broken one.** The generic sheet wrote an ABSOLUTE water total — reintroducing SYNC-P7 — and queues `waterMlDelta` now.
 
-**The workout write path can be driven past set 1 (Q-461).** The Start Set bounce never gave Playwright a stable frame — 85 ms vs 8,009 ms with and without the new reduced-motion rule.
+**The workout write path can be driven past set 1 (Q-461).** The Start Set bounce never gave Playwright a stable frame — 85 ms vs 8,009 ms with and without the reduced-motion rule.
 
-**Disk maintenance works from a desktop again (Q-544).** The DB-footprint and device-metrics cards touch no plugin but sat after `OuraBleDebug`'s native early-return. Both moved above it.
+**Disk maintenance works from a desktop again (Q-544).** The DB-footprint and device-metrics cards touch no plugin but sat after `OuraBleDebug`'s native early-return; both moved above it.
 
-**The frame packer has a button (Q-316).** In the DB-footprint card, with the packable count beside it. Its confirm copy does not read like the lossless VACUUM one — this is the only control that
-DELETEs archival frames — and a refusal is listed with its reason. `Gate: device`.
+**The frame packer has a button (Q-316).** In the DB-footprint card, with the packable count beside it. Its confirm copy does not read like the lossless VACUUM one — this is the only control that DELETEs archival frames — and a refusal is listed with its reason. `Gate: device`.
 
-**Declaring a ring re-key has a button (Q-317).** On `/admin/oura-ble`, outside `OuraBleDebug`, which renders nothing without the plugin — exactly the laptop doing the re-key. `Gate: device`.
+**Declaring a ring re-key has a button (Q-317).** On `/admin/oura-ble`, outside `OuraBleDebug`, which renders nothing without the plugin — the laptop doing the re-key. `Gate: device`.
 
-**The two BLE consoles poll the redecode job instead of guessing (Q-318).** A completed run reported
-`failed: 502`; the backfill said "Done" at the gateway timeout. Both wait for the real status now.
+**The two BLE consoles poll the redecode job instead of guessing (Q-318).** A completed run reported `failed: 502` and the backfill said "Done" at the gateway timeout; both wait for the real status now.
 
-**The Devices card stops calling the ring healthy with no key (LB-5).** Checks `hasKey()`, links to `/admin/oura-ble` when false. `Gate: device`.
+**The Devices card stops calling the ring healthy with no key (LB-5).** Checks `hasKey()` and links to `/admin/oura-ble` when false. `Gate: device`.
 
-**Q-477 is DONE for every client component** (4 slices, 78/38 → **3 calls in 1 file**). Left is
-`workout-store.ts` — a Zustand store with no hook, where a wrong-zone stamp makes `rolloverDay()` clear the day's completed sets. A design call, analysed on the entry.
+**Q-477 is DONE for every client component** (4 slices, 78/38 → **3 calls in 1 file**). Left is `workout-store.ts`, a Zustand store with no hook, where a wrong-zone stamp makes `rolloverDay()` clear the day's completed sets — a design call, analysed on the entry.
 
 **"Nine collapsibles missing `aria-expanded`" was actually two (Q-491)** — one retired, four already Radix, two a back chevron. `weights-summary.tsx`/`added-weight-toggle.tsx` were real, now fixed.
 
 **The end-of-workout "How hard was that session?" prompt is gone (Q-420).** 25.6% fill rate; `sessionEffort()` already derives it from set RPEs at read time, so nothing downstream changed.
 
-**Two Health cards stop vanishing on a failed fetch, and the fix needed a second one (Q-499).** They
-show "Couldn't load…" on a 429/500 now. `onError` alone didn't work: `cachedFetchCore`'s dedup relayed a failure only to the torn-down owner, never to a joined caller — fixed in `lib/sqlite/cache.ts`.
+**Two Health cards stop vanishing on a failed fetch, and the fix needed a second one (Q-499).** They show "Couldn't load…" on a 429/500 now. `onError` alone didn't work: `cachedFetchCore`'s dedup relayed a failure only to the torn-down owner, never to a joined caller — fixed in `lib/sqlite/cache.ts`.
 
 **The database reclaim is three-quarters done, and the last quarter is one press.** The owner's
 `oura_raw_samples` vacuum reclaimed **36 MB** (93 → **57 MB**) and the automatic packer is observed in
@@ -99,11 +100,10 @@ Automating it made the delete's race reachable, so phase 3 deletes by row id, no
 ([`journal`](docs/overview/entries/2026-08-23-feat-oura-autopack.md)).
 
 **Logging food evicted the caches before the server had the write (LB-4).** The invalidation fired
-correctly and too early: subscribers refetched a server that lacked the log and re-cached the
-pre-log figures, which then stood for the key's full TTL — Home read 42 kcal high, exactly one
-entry. The engine write paths now invalidate on **both** sides of the push (`pushThenRevalidate`);
-the immediate call stays because offline it is the only one that fires. Six `components/**` sites
-carry the same shape — filed as **LB-6**, audit done.
+correctly and too early: subscribers refetched a server that lacked the log and re-cached the pre-log
+figures, which then stood for the key's full TTL — Home read 42 kcal high, exactly one entry. The
+engine write paths now invalidate on **both** sides of the push (`pushThenRevalidate`); the immediate
+call stays because offline it is the only one that fires. Six `components/**` sites carry the same shape — filed as **LB-6**, audit done.
 
 **Three route-hardening guards, none of them a fix for an observed symptom (Q-454, Q-455, Q-465).**
 Three GET routes answered a parameter or configuration question before establishing the caller was
