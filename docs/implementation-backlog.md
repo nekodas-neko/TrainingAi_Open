@@ -409,60 +409,35 @@ looks like"*. Parity is now the acceptance test, not a nice-to-have alongside it
 - **Device run per screen**, per the standing gate. The web sandbox renders safe-area insets as 0 and
   will not show a Samsung compositor artifact.
 
-### [nutrition] BF-24 — the shipped day screen and artboard 1 are different layouts, not a partial one
+### [nutrition] BF-24 — artboard 1 parity: the header and the meal grouping shipped; the energy block and the tile row did not
 
-- **Lane:** B
+- **Branch:** `feat/nutrition-day-artboard-parity` (merged 2026-08-25)
+- **Lane: B**
+- **Gate: device**
 - **Spec:** BF-28 — read it first for the parity rules, chiefly that an artboard is one screenful and
   a section absent from it is not thereby deleted.
-- **Added:** 2026-08-25, from the owner's device smoke run — *"Is that the final design? thats not
-  what the mockup looks like (Nutrition - the day)"*, with artboard 1 attached for comparison.
 - **Read first:** artboard **1 · Nutrition — the day** in
   [`docs/design/2026-08-18-nutrition-rework-mockups.html`](design/2026-08-18-nutrition-rework-mockups.html).
-  Its fixture numbers (1,284 of 2,100 · 816 left · +412 burned · Breakfast 486 · Lunch 798) are the
-  ones in the owner's attachment — the attachment **is** the drawing, not a screenshot of the app.
-- **⚠ Q-395b did not claim to build this artboard.** It ticked an 11-section coverage list and
-  measured gap reclamation (420 px → 280 px). Nothing in it was a layout transcription, so this is
-  not a regression or a half-finished phase — it is work that was never scoped. Do not open it as a
-  bug against Q-395b.
 
-**The divergences, read off the shipped source against the artboard's inline styles:**
+**Shipped — ①, ④, ⑤.** The header is one band (26 px title, the date as its subtitle, gear right);
+each meal is now its **own card with its name as a label above it**, which is the inversion the owner
+reacted to — artboard 1 groups the food ROWS within a meal, where Q-395b grouped the MEALS within one
+container; and the meal header line is the name and one calorie number, the emoji and the duplicated
+P/C/F chips gone. Journal:
+[`2026-08-25-nutrition-day-artboard-parity`](overview/entries/2026-08-25-nutrition-day-artboard-parity.md).
 
-1. **Header is two bands, drawn as one.** Artboard: 26 px `Nutrition` with the *date*
-   (`Wednesday 18 August`) as its subtitle, gear at right. Shipped
-   (`app/nutrition/nutrition-content.tsx:505–541`): `text-xl` title, a static
-   `Food diary & macros` subtitle, and a **second** row below carrying `‹ date ›`.
-2. **The energy block is stacked, not side-by-side.** Artboard: one 14 px-padded card, 104 px conic
-   donut on the **left** (82 px hole), and to its right `816 kcal left · +412 burned` above three
-   macro columns. Shipped: `CalorieBalanceBar` and `MacroRing` are two rows of a `divide-y` group
-   with a hairline between them. The drawing has no balance bar and no divider.
-3. **The action row is a different row.** Artboard: four equal 62 px tiles —
-   **Search · Scan · Photo · My meals**. Shipped `nutrition-action-row.tsx`: three wide buttons in a
-   2-column grid — **Log Food · Water · Saved Meals**. Scan and Photo have no tile at all. **Some of
-   this is Q-395c's**, which owns collapsing the capture entry points; decide the split before
-   building, and say which entry ships the tiles.
-4. **The grouping is inverted, and this is the big one.** Artboard: each meal is its **own** rounded
-   card; the meal name sits **outside and above it** as an uppercase 11 px label with the total
-   right-aligned on that same line; the card groups the *food rows*. Shipped: all meal types are
-   rows of **one** container and each meal's header is inside it. Q-395b grouped meals within the
-   screen; the drawing groups rows within a meal. Both are "grouped", which is why ② passed the
-   checklist and still looked wrong.
-5. **Meal header content.** Artboard: text label, one calorie number. Shipped: emoji, name,
-   kcal **plus** P/C/F chips, a round ⊕ and a chevron.
-6. **Food rows have no thumbnail.** Artboard draws a 40 px gradient tile per row.
-   `components/nutrition/food-row.tsx` says outright that the thumbnail is deliberately not built —
-   no call site passes one. **Q-406 owns it**; this entry only records that the drawing needs it.
-7. **The shipped screen has sections the drawing does not:** `MealPlanReviewCard`,
-   `MealPlanSection`, `TdeeAdaptationCard`, and the day-tools group (weekly chart + supplements).
-   An artboard is 812 px — one screenful — so it cannot be a total spec. **Part of this entry is
-   deciding which of those four stay and where**, not deleting them because they are absent from a
-   drawing that stops at the fold.
-
-- **Provisional, carried from the same run:** the owner's ④ (grouped-section backgrounds render
-  correctly, no Samsung compositor artifact) was answered *"This looks fine; but will keep this open
-  and let you know"*. That is the watching brief this entry carries — it is why Q-395b could be
-  closed without losing it.
-- **Verification.** Side by side against artboard 1 at 412 dp in a browser, then the device run.
-  State in the PR which of items 1–7 shipped and which were deliberately not, with the reason.
+**Keep — ②, ③, ⑥, ⑦, each for a stated reason:**
+- **② the energy block** (one card, 104 px donut left, macro columns right) is not day-screen-only:
+  `CalorieBalanceBar` also renders on `/health` (`health-sections.tsx:658`), so merging it with
+  `MacroRing` changes two screens and wants its own PR with Health verified alongside.
+- **③ the four-tile action row** (Search · Scan · Photo · My meals) overlaps **Q-395c**, which owns
+  collapsing the capture entry points. Building the tiles first would wire four destinations that
+  entry may then change. **Q-395c ships the tiles**; this entry defers.
+- **⑥ the row thumbnail** is **Q-406's**, as this entry already said.
+- **⑦ the four sections the drawing lacks** (`MealPlanReviewCard`, `MealPlanSection`,
+  `TdeeAdaptationCard`, day-tools) **stay where they are**, below the meals — BF-28's rule 1: an
+  artboard is 812 px and stops at the fold. Decided, not outstanding.
+- **The device check**, and the owner's provisional ④ watching brief on grouped-section backgrounds.
 
 ### [nutrition] BF-26 — two quantity sheets: the builder's matches artboard 6, the diary's does not
 

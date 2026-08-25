@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.374.0",
+    date: "2026-08-25",
+    changes: [
+      "The Nutrition day screen now follows its design: each meal is its own card with the meal name and its calorie total on a label above it, instead of every meal being a row inside one long box. The header is a single band \u2014 the date sits under the title where a static subtitle used to be \u2014 and the meal line is the name and one number, without the duplicated macro chips.",
+    ],
+  },
+  {
     version: "1.373.0",
     date: "2026-08-25",
     changes: [

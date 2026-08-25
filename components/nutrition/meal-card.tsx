@@ -15,11 +15,9 @@ interface Props {
   /** By id, not the log object: the row renders inside `.map()` where a hook cannot memoise an
    *  object literal, and one would defeat `FoodRow`'s `memo` silently (Q-490). */
   onQuickEdit: (logId: string) => void
-  /** Drawn as one row of a grouped list rather than as its own card (Q-395b). */
-  grouped?: boolean
 }
 
-export const MealCard = memo(function MealCard({ mealType, logs, onAdd, onQuickEdit, grouped }: Props) {
+export const MealCard = memo(function MealCard({ mealType, logs, onAdd, onQuickEdit }: Props) {
   const [expanded, setExpanded] = useState(true)
   const totals = logs.reduce(
     (acc, l) => ({ calories: acc.calories + l.calories, proteinG: acc.proteinG + l.proteinG, carbsG: acc.carbsG + l.carbsG, fatG: acc.fatG + l.fatG }),
@@ -27,45 +25,44 @@ export const MealCard = memo(function MealCard({ mealType, logs, onAdd, onQuickE
   )
 
   return (
-    // Q-395b: inside the grouped meal list the section owns the border and the dividers, so a card
-    // that also draws its own puts a second hairline against the first and re-opens the gaps the
-    // grouping closes. Standalone callers keep the card.
-    <div className={grouped ? 'bg-muted/60' : 'rounded-2xl bg-muted/60 border border-border overflow-hidden'}>
+    // BF-24 ④: the meal name is a label ABOVE the card, and the card groups the food rows — the
+    // inversion of Q-395b, which grouped meals within one container and put each name inside it.
+    // Both are "grouped", which is why ② passed its checklist and still did not look like the
+    // drawing. `grouped` now means "the parent spaces these", not "the parent owns the border".
+    <div className="space-y-1.5">
       <Collapsible open={expanded} onOpenChange={setExpanded}>
-        {/* Header row */}
+        {/* BF-24 ⑤: artboard 1's header line is the name and one calorie number, nothing else. The
+            emoji and the P/C/F chips are gone from here — the macros already have a home in the
+            totals footer, and the per-meal split at two sizes was the noisiest part of the row.
+            The ⊕ and the chevron stay: the drawing depicts a state, not the controls that reach it,
+            and per-meal add is the only way to log to a meal that is not the current hour's. */}
         <CollapsibleTrigger asChild>
           <div
             role="button"
             tabIndex={0}
-            className="w-full flex items-center gap-3 px-4 py-4 cursor-pointer active:bg-muted/20 transition-colors"
+            className="flex w-full cursor-pointer items-center gap-2 px-1 py-1 text-muted-foreground transition-colors active:opacity-70"
           >
-            <span className="text-2xl leading-none">{mealType.emoji}</span>
-            <div className="flex-1 min-w-0">
-              <p className="font-semibold text-base leading-tight">{mealType.name}</p>
-              {logs.length > 0 && (
-                <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                  <span className="text-xs text-muted-foreground tabular-nums">{Math.round(totals.calories)} kcal</span>
-                  <span className="text-[10px] font-semibold tabular-nums" style={{ color: MACRO_COLORS.protein }}>P {Math.round(totals.proteinG)}g</span>
-                  <span className="text-[10px] font-semibold tabular-nums" style={{ color: MACRO_COLORS.carbs }}>C {Math.round(totals.carbsG)}g</span>
-                  <span className="text-[10px] font-semibold tabular-nums" style={{ color: MACRO_COLORS.fat }}>F {Math.round(totals.fatG)}g</span>
-                </div>
-              )}
-            </div>
+            <span className="min-w-0 flex-1 truncate text-[11px] font-semibold uppercase tracking-[0.05em]">
+              {mealType.name}
+            </span>
+            {logs.length > 0 && (
+              <span className="text-[11px] tabular-nums">{Math.round(totals.calories)}</span>
+            )}
             <button
               onClick={e => { e.stopPropagation(); onAdd(mealType.id) }}
-              className="h-9 w-9 rounded-full border border-border/60 flex items-center justify-center text-muted-foreground hover:border-brand hover:text-brand transition-colors"
-              aria-label="Add food"
+              className="-my-2 flex h-9 w-9 items-center justify-center rounded-full transition-colors hover:text-brand"
+              aria-label={`Add food to ${mealType.name}`}
             >
-              <Plus className="w-4 h-4" />
+              <Plus className="h-4 w-4" />
             </button>
             {logs.length > 0 && (
-              <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform ${expanded ? 'rotate-180' : ''}`} />
+              <ChevronDown className={`h-4 w-4 transition-transform ${expanded ? 'rotate-180' : ''}`} />
             )}
           </div>
         </CollapsibleTrigger>
 
       <CollapsibleContent>
-        <div className="border-t border-border/30">
+        <div className="overflow-hidden rounded-2xl border border-border bg-muted/60">
           {logs.length === 0 ? (
             <button
               onClick={() => onAdd(mealType.id)}
@@ -105,7 +102,7 @@ export const MealCard = memo(function MealCard({ mealType, logs, onAdd, onQuickE
 
               {/* Totals footer — only shown when there are 2+ items */}
               {logs.length > 1 && (
-                <div className="px-4 py-3 bg-muted/20 border-t border-border/20 flex items-center justify-between">
+                <div className="flex items-center justify-between border-t border-border/20 bg-muted/20 px-4 py-3">
                   <div className="flex items-center gap-3">
                     <span className="text-xs font-semibold" style={{ color: MACRO_COLORS.protein }}>P {Math.round(totals.proteinG)}g</span>
                     <span className="text-xs font-semibold" style={{ color: MACRO_COLORS.carbs }}>C {Math.round(totals.carbsG)}g</span>
