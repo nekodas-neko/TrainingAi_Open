@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useLayoutEffect, useState } from 'react'
+import { memo, useCallback, useEffect, useLayoutEffect, useState } from 'react'
 import { useUserTimezone } from '@/components/shell/user-timezone-provider'
 import { ChevronLeft, Plus, Minus, Trash2, Search, X, Loader2, CheckSquare, Sparkles } from 'lucide-react'
 import { toast } from 'sonner'
@@ -23,8 +23,9 @@ import { MealPhotoTile } from './meal-photo-tile'
 import { usePlanSavedMealIds } from '@/lib/hooks/use-plan-saved-meal-ids'
 import { MealLabelSheet } from './meal-label-sheet'
 import { BulkDeleteConfirm } from './bulk-delete-confirm'
-import { IngredientRow, type QtyUnit } from './ingredient-row'
-import { qtyFromInput, steppedQty } from './saved-meal-qty'
+import { FoodRow } from './food-row'
+import { QuantitySheet } from './quantity-sheet'
+import { qtyFromInput, steppedQty, type QtyUnit } from './saved-meal-qty'
 import { IngredientPicker } from './ingredient-picker'
 
 type SheetTab = 'meals' | 'build'
@@ -83,6 +84,7 @@ export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate,
   const [mealServings, setMealServings] = useState(1)
   const [ingredients, setIngredients] = useState<IngredientEntry[]>([])
   const [unitById, setUnitById] = useState<Record<string, QtyUnit>>({})
+  const [editingIngredientId, setEditingIngredientId] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   // Bumped on every entry to the build form. `IngredientPicker` owns the search query, its results
   // and the add-by-hand form (BF-11a), so remounting it on a new build session is what clears them —
@@ -137,6 +139,7 @@ export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate,
     setMealImage(meal?.imageDataUri ?? null)
     setMealServings(meal?.servings ?? 1)
     setIngredients(meal ? meal.items.map(i => ({ item: i.foodItem, qty: i.quantityMultiplier })) : [])
+    setEditingIngredientId(null)
     setBuildSession(n => n + 1)
     setTab('build')
   }, [])
@@ -161,6 +164,15 @@ export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate,
    * serving multiplier either way — grams is a second view of the same number, not a second number.
    * An item with no serving size has no gram equivalent, so it only ever offers servings.
    */
+  /** The collapsed row's grey line — *how much*, in whichever unit this ingredient is set to. */
+  function amountLabel(item: FoodItem, qty: number, unit: QtyUnit): string {
+    const servingG = item.servingSizeG ?? 0
+    if (unit === 'g' && servingG > 0) return `${Math.round(servingG * qty)} g`
+    const servings = Math.round(qty * 100) / 100
+    const label = `${servings} ${servings === 1 ? 'serving' : 'servings'}`
+    return servingG > 0 ? `${label} · ${Math.round(servingG * qty)} g` : label
+  }
+
   function unitFor(item: FoodItem): QtyUnit {
     return (item.servingSizeG ?? 0) > 0 ? (unitById[item.id] ?? 'serving') : 'serving'
   }
@@ -181,6 +193,10 @@ export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate,
       })
     )
   }
+
+  const editingIndex = ingredients.findIndex(e => e.item.id === editingIngredientId)
+  // `stepQty` removes a row when a step takes it to zero, so the sheet can outlive its ingredient.
+  const editingEntry = editingIndex === -1 ? null : ingredients[editingIndex]
 
   const totalMacros = ingredients.reduce(
     (acc, { item, qty }) => ({
@@ -340,7 +356,20 @@ export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate,
               <button onClick={backToMeals} aria-label="Back" className="p-2.5 -ml-1.5 text-muted-foreground hover:text-foreground rounded-lg">
                 <ChevronLeft className="w-5 h-5" />
               </button>
-              <SheetTitle>{editingMeal ? 'Edit Meal' : 'Build a Meal'}</SheetTitle>
+              {/* Q-395a: the meal's name is the screen title once it has one, and the batch
+                  explainer is its subtitle — "Edit Meal" said nothing the screen did not already
+                  show, and the batch figure was buried below the fold. */}
+              <div className="min-w-0">
+                <SheetTitle className="truncate">
+                  {mealName.trim() || (editingMeal ? 'Edit Meal' : 'Build a Meal')}
+                </SheetTitle>
+                {ingredients.length > 0 && (
+                  <p className="truncate text-xs tabular-nums text-muted-foreground">
+                    Makes {mealServings} {mealServings === 1 ? 'portion' : 'portions'} ·{' '}
+                    {Math.round(totalMacros.kcal / mealServings)} kcal each
+                  </p>
+                )}
+              </div>
             </div>
           )}
         </SheetHeader>
@@ -480,7 +509,7 @@ export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate,
                   <button
                     onClick={() => setMealServings(v => Math.max(1, Math.round((v - 1) * 4) / 4))}
                     aria-label="Fewer servings"
-                    className="flex-none w-11 h-11 rounded-lg bg-muted flex items-center justify-center"
+                    className="flex-none w-12 h-12 rounded-lg bg-muted flex items-center justify-center"
                   >
                     <Minus className="h-4 w-4" />
                   </button>
@@ -495,12 +524,12 @@ export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate,
                       if (Number.isFinite(n) && n >= 0.25) setMealServings(Math.min(50, Math.round(n * 4) / 4))
                     }}
                     aria-label="Servings this meal makes"
-                    className="min-w-0 flex-1 min-h-[44px] rounded-lg bg-muted px-2 text-sm font-bold tabular-nums text-center outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none"
+                    className="min-w-0 flex-1 min-h-12 rounded-lg bg-muted px-2 text-sm font-bold tabular-nums text-center outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none"
                   />
                   <button
                     onClick={() => setMealServings(v => Math.min(50, Math.round((v + 1) * 4) / 4))}
                     aria-label="More servings"
-                    className="flex-none w-11 h-11 rounded-lg bg-muted flex items-center justify-center"
+                    className="flex-none w-12 h-12 rounded-lg bg-muted flex items-center justify-center"
                   >
                     <Plus className="h-4 w-4" />
                   </button>
@@ -522,18 +551,22 @@ export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate,
               {ingredients.length > 0 && (
                 <div className="space-y-2">
                   <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Ingredients</p>
-                  {ingredients.map(({ item, qty }) => (
-                    <IngredientRow
-                      key={item.id}
-                      item={item}
-                      qty={qty}
-                      unit={unitFor(item)}
-                      onUnitChange={u => setUnitById(prev => ({ ...prev, [item.id]: u }))}
-                      onQtyChange={raw => setDisplayQty(item, raw, unitFor(item))}
-                      onStep={dir => stepQty(item, unitFor(item), dir)}
-                      onRemove={() => setIngredients(prev => prev.filter(e => e.item.id !== item.id))}
-                    />
-                  ))}
+                  {/* Q-395a finding 12: the row carries no editor. It is the same `FoodRow` the
+                      diary and both search lists draw, and the quantity control lives in the sheet
+                      a tap opens — which is the only reason one row component can serve all four. */}
+                  <div className="overflow-hidden rounded-xl bg-muted/40 divide-y divide-border/40">
+                    {ingredients.map(({ item, qty }) => (
+                      <IngredientListRow
+                        key={item.id}
+                        id={item.id}
+                        name={item.name}
+                        secondary={amountLabel(item, qty, unitFor(item))}
+                        calories={(item.calories ?? 0) * qty}
+                        highlighted={item.id === editingIngredientId}
+                        onEdit={setEditingIngredientId}
+                      />
+                    ))}
+                  </div>
                   <div className="rounded-xl bg-brand/10 border border-brand/20 px-3 py-2 text-xs font-semibold">
                     {mealServings !== 1 && (
                       <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
@@ -569,6 +602,25 @@ export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate,
                 userId={userId}
                 onAdd={addIngredient}
               />
+
+              <QuantitySheet
+                item={editingEntry?.item ?? null}
+                qty={editingEntry?.qty ?? 1}
+                unit={editingEntry ? unitFor(editingEntry.item) : 'serving'}
+                index={editingIndex + 1}
+                total={ingredients.length}
+                mealName={mealName.trim()}
+                onUnitChange={u => editingEntry && setUnitById(prev => ({ ...prev, [editingEntry.item.id]: u }))}
+                onQtyChange={raw => editingEntry && setDisplayQty(editingEntry.item, raw, unitFor(editingEntry.item))}
+                onStep={dir => editingEntry && stepQty(editingEntry.item, unitFor(editingEntry.item), dir)}
+                onRemove={() => {
+                  if (!editingEntry) return
+                  const id = editingEntry.item.id
+                  setEditingIngredientId(null)
+                  setIngredients(prev => prev.filter(e => e.item.id !== id))
+                }}
+                onClose={() => setEditingIngredientId(null)}
+              />
             </div>
 
             <div className="shrink-0 pt-2">
@@ -591,3 +643,14 @@ export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate,
     </Sheet>
   )
 }
+
+/** Wrapper so the memoised row gets a stable `onPress` from inside a `.map()`, where a hook cannot
+ *  live and an inline arrow would defeat `React.memo` silently (Q-490). Props are scalars for the
+ *  same reason — an object literal would defeat it just as quietly. */
+const IngredientListRow = memo(function IngredientListRow(
+  { id, name, secondary, calories, highlighted, onEdit }:
+  { id: string; name: string; secondary: string; calories: number; highlighted: boolean; onEdit: (id: string) => void },
+) {
+  const press = useCallback(() => onEdit(id), [id, onEdit])
+  return <FoodRow name={name} secondary={secondary} calories={calories} showChevron highlighted={highlighted} onPress={press} />
+})

@@ -331,6 +331,56 @@ days/hours cause most stress". Measured against production the same day; the bou
 signed off by the owner in that conversation. Review:
 [`docs/reviews/2026-08-24-body-battery-charge-window-collapse.md`](reviews/2026-08-24-body-battery-charge-window-collapse.md).*
 
+### [readiness][devices] TN-8 — the chronic-stress fever mask is a FOURTH consumer of the broken temperature baseline
+
+- **Branch:** _unassigned_
+- **Added:** 2026-08-25 · found by the threshold sweep the owner asked for
+- **Lane: A** — `packages/shared/src/health/chronic-stress-assembly.ts`
+- **Batch:** temperature-baseline — the fourth consumer of the object BF-13 fixes. Same PR.
+- **Related: TN-1 / Q-525** (chronic stress has never produced a value) — a plausible contributor,
+  **not a proven cause**. See the margin note below before treating it as the answer.
+
+`chronic-stress-assembly.ts:72` sets the per-night fever baseline to `TEMP_DEV_FEVER_LIMIT_C = 1.0`,
+and the vendored model masks a night when `highestTemp > 38 || tempDev > tempDevBaseline`. The
+constant's comment states its design intent outright:
+
+> *"this secondary deviation limit is set high enough that a healthy night is never masked
+> (over-masking would starve the 21-night gate → permanent NaN)"*
+
+**Measured 2026-08-25: `temp_dev_c > 1.0` on 6 of 34 nights (17.6%).** The owner has said they have
+not been sick in 50+ days, so those are healthy nights masked as fever. The cause is the same
+**0.363 °C baseline offset** behind TN-6 and BF-13 — the deviation is positive on 34 of 34 nights, so
+its whole distribution is shifted into the limit.
+
+**⚠️ It is NOT currently starving the 21-night gate. Do not file it as TN-1's cause.** In the
+trailing 30-night window only **3 of 29** nights are masked, leaving **26 against a gate of 21**. The
+margin is thinner than intended, not gone. If TN-1's instrumentation later shows the granular layer
+refusing on night count, this is the first place to look; until then it is a correctness bug in its
+own right.
+
+**Why it is worth fixing even so:** BF-13 counts three consumers of the broken baseline (the
+readiness ladder, `tempZ`/the illness radar, the deload card). This is the **fourth**, and it is the
+only one that leaves **no trace** — a masked night simply does not contribute, so nothing on any
+surface and nothing in any column says it happened. It would survive the other three being fixed if
+the fix were aimed at consumers rather than at the baseline.
+
+**Fix:** none of its own. **BF-13's seed fix plus the temperature re-derivation resolves it**, because
+the limit is defensible once the deviation is centred: against a true nightly sd of 0.140 °C, 1.0 °C
+is 7.1 sd, which will essentially never fire on a healthy night — exactly what the comment intends.
+**Do not raise `TEMP_DEV_FEVER_LIMIT_C`** — that is the same "hide a broken input behind a plausible
+firing rate" mistake TN-6 and Q-506 both refuse.
+
+**Pass test:** after the baseline is re-derived, `temp_dev_c > 1.0` on **0 nights** of the owner's
+stored history, and the comment's premise ("a healthy night is never masked") is true as written.
+Assert it in the same test that covers BF-13's re-derivation, so the premise stops being a comment
+and becomes a check.
+
+**Verification note:** the mask was read from source and its *input* measured in production. The model
+was **not executed**, so the claim is that 6 nights cross the limit — not that a masked night was
+observed changing the model's output.
+
+Review: [`docs/reviews/2026-08-25-threshold-sweep.md`](reviews/2026-08-25-threshold-sweep.md).
+
 ### [readiness] TN-6a — suspend the temperature penalty until its baseline is centred
 
 - **Branch:** _unassigned_
@@ -1152,37 +1202,24 @@ whether or not anyone draws them first.
 ### [nutrition][app-shell] Q-395a — phase 2: the quantity sheet and Edit Meal's collapsing rows
 
 - **Lane:** B
-- **Needs:** Q-406
-- **Spec:** Q-395, findings 9, 12, 13 and the 2026-08-19 owner decision. **Drawings (committed
-  2026-08-24):** [`docs/design/2026-08-18-nutrition-rework-mockups.html`](design/2026-08-18-nutrition-rework-mockups.html)
-  — the expanded row is the **`srv/g — A`** artboard, the collapsed row is the `Full Cream Milk` row
-  in **`EditMeal.dc.html`**, and the sheet itself is **`Quantity.dc.html`**. Three artboards, not
-  one: the old wording (`unit-options.png` column A "and its Full Cream Milk row") named a file that
-  never existed and implied a single drawing carried both rows.
-- **Split out of Q-395 on 2026-08-23.** **Read Q-395 first** — it holds the decisions and this
-  entry does not repeat them.
-- **Scope.** The quantity sheet (new), and `ingredient-row.tsx` becoming `food-row.tsx` plus an
-  expanded state. Option A is decided: the unit rides on the number as a chip, `60 g` ⇄ `2 srv` on
-  one tap, built from `components/ui/segmented-tabs`. B and C are dead. Rows collapse when not
-  edited, one at a time, and the collapsed shape *is* Q-406's row — not a second component.
-- **⚠ A diary row never expands.** Finding 12 retired the list-row editor outright: a diary or
-  search row carries no editor at all. This entry governs the quantity control *where it does
-  appear* — the sheet, and the builder. Building an expanding diary row misreads both.
-- **The sheet must say where it came from:** the tapped row stays lit under the scrim, and the sheet
-  is headed `Ingredient 1 of 5 · <meal>`. Without that it reads as an unrelated screen.
-- **Edit Meal rides along:** the meal name becomes the screen title, the batch explainer becomes
-  the subtitle *"Makes 2 portions · 278 kcal each"*, and the servings control stays real at 48 px —
-  it was demoted to a subtitle in an early draw and the owner corrected that.
-- **48 dp floor applies here first** (finding 7): srv/g segments are the app's smallest targets at
-  40 px, stepper gap 6 px against 8 dp. One systemic change, not eight.
-- **Verification.** `check-hex-literals` lower per file · `check-component-size` clean, no new
-  BASELINE rows · `pnpm check:rules` · **device smoke run in both themes** — pure UI on the
-  canonical runtime, so a green `pnpm dev` is not sufficient.
+- **✅ THE CODE SHIPPED 2026-08-25 (v1.364.0)** — `quantity-sheet.tsx` new, `ingredient-row.tsx`
+  deleted, the builder's rows are the shared `FoodRow`, `QtyUnit` moved to `saved-meal-qty.ts`, and
+  48 dp done once in `ui/segmented-tabs.tsx` for all 8 call sites. `Needs: Q-406` removed — Q-406 has
+  said it was satisfied since 2026-08-23 while the field the tool reads said otherwise, the same
+  field-vs-prose gap as Q-306's. Verified in a browser at 412×915 in **both themes**, build and edit
+  paths, row highlight false → true → false.
+  [`journal`](overview/entries/2026-08-25-quantity-sheet-collapsing-rows.md) — it holds the design,
+  and the three things this entry got wrong (including that `food-row.tsx` already existed, so
+  *"`ingredient-row.tsx` becoming `food-row.tsx`"* could not be done literally).
+- **Keep:** the **device smoke run in both themes**, which a browser cannot stand in for — the
+  sheet's safe-area inset renders as 0 in the sandbox and the action row now carries Remove.
+  `Gate: device`.
 
 ### [nutrition][app-shell] Q-395b — phase 3: the day screen, against the 11-section coverage list
 
 - **Lane:** B
-- **Needs:** Q-395a
+- **`Needs: Q-395a` cleared 2026-08-25** — its components shipped; Q-395a stays queued only for a
+  device check on the builder, which does not gate this screen.
 - **Spec:** Q-395, findings 14 and 16.
 - **Scope.** `nutrition-content.tsx` and its cards. Grouped sections with full-bleed dividers
   replace gapped cards — that is most of the vertical space this screen spends on nothing. Extend
@@ -6639,7 +6676,9 @@ ehr     0     0     0     0   648   208   128   556     0
 - **Plan:** none — **this needs an owner decision first** (which number wins), then a one-line change.
   Evidence: [`docs/reviews/2026-08-19-activity-contributor-audit.md`](reviews/2026-08-19-activity-contributor-audit.md) §3.
 - **Added:** 2026-08-19 · Tuning agent, found while auditing the Activity Score's `steps` contributor.
-- **The app shows the owner's step progress against two targets at once.** `users.steps_goal` is
+- - **A THIRD value exists and is dormant (Tuning, 2026-08-25 threshold sweep).** `DEFAULT_STEP_GOAL = 8000` (`daily-goals.ts:15`) is reached only when `activityLevel` is null (`daily-goals.ts:84`). The owner has one set, so 8,000 is not live for them — but it is for any user who has not, which makes this three numbers in the codebase rather than two. Whichever value wins the owner decision below, the fallback should agree with it.
+
+**The app shows the owner's step progress against two targets at once.** `users.steps_goal` is
   **7,000** (the owner set it); `getDailyGoals()` ignores that column and derives **10,000** from
   `activity_level = 'moderate'` via `STEP_GOAL_BY_ACTIVITY`.
 
