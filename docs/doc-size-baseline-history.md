@@ -2274,14 +2274,37 @@ length: BF-24 enumerates seven divergences read off the shipped source against t
 styles, and an entry that says only *"doesn't match the mockup"* would send its implementer back to
 do that reading again.
 
-## 2026-08-25 — `projectOverview.md` raised, 7941 → 7943 (BF-18)
+## 2026-08-25 — `projectOverview.md` 7941 → 7947 and `docs/implementation-backlog.md` 11803 → 11862 (BF-16a)
+
+**projectOverview, +6.** Both additions are required by a standing rule to live in this file and
+nowhere else. One is the Current Status paragraph the session wrap-up asks for. The other is a
+Known-Issues row, because the Canonical Runtime gate gives exactly two options for a change whose
+device path has not been run — the on-device smoke run, or a row here saying so. Migration 216's
+correction reaches the S25 through `/api/workout-data` hydration, which was read in source and not
+executed; `getLocalStore` returns null in the sandbox, so it cannot be executed here. The row names
+what to check on the device, and that the migration has not yet run against production.
+
+**Backlog, +59, of which only 20 are this branch's.** BF-16a's entry (~31 lines) was removed on
+shipping and LA-24 (~51 lines) filed in its place — the eight further catalogue rows the sweep found,
+with the family precedent for each, split into the five that propagate an answer the catalogue
+already gives and the three that would mean originating anatomy nobody has been asked about. An entry
+saying only *"more rows have this too"* would send its implementer back to redo the scan.
+
+**The other 39 lines were already on `main` without a raise.** `main` sat at 11841 against an 11803
+baseline when this branch merged it; the check has an escape hatch for growth the base branch already
+carries, so it reported OK there and failed here the moment 20 more arrived. Worth knowing: a raise
+can inherit someone else's overshoot, and the number recorded is the whole of it, not the part the
+raising branch wrote.
+
+## 2026-08-25 — `projectOverview.md` raised, 7947 → 7949 (BF-18)
 
 Two lines: the Current Status paragraph the session wrap-up asks for, and its blank. It earns the
 space by carrying the thing a reader needs and the journal entry cannot give them at a glance — that
 a red `Tests` on an unrelated PR had a known cause with a known fix, so the next person to meet one
-does not spend the session re-running it. The rest, including the reproduction, is in the journal
-entry.
+does not spend the session re-running it. The reproduction is in the journal entry.
 
-**Note for whoever raises this next:** if BF-16a's PR (#475) lands first, this number is already
-7947 and the raise here is a no-op — rebuild `doc-size-baseline.json` from `origin/main` rather than
-splicing the hunk.
+**Written first as 7941 → 7943, and superseded before it merged.** BF-16a's PR (#475) landed in
+between and had already raised the number to 7947, so `doc-size-baseline.json` was rebuilt from
+`origin/main` and this raise re-derived on top of it rather than the hunk being spliced. Two
+same-session PRs both raising the same baseline is the ordinary case here, not an unusual one — the
+second one's number is only ever correct against the merged first.

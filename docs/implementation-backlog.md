@@ -14,7 +14,7 @@ silently misdirecting the next session. Update them in the same PR that consumes
 
 | Pointer | Value | Source of truth |
 |---|---|---|
-| Next free Postgres migration | **216** | `lib/data/postgres/migrations/` |
+| Next free Postgres migration | **217** | `lib/data/postgres/migrations/` |
 | Local SQLite schema version | **v28** | `lib/sqlite/migrations.ts`; `lib/sqlite/__tests__/migrations.test.ts` asserts the max |
 
 > **There is no third pointer any more.** Entry IDs are not allocated from a shared counter and
@@ -2091,37 +2091,6 @@ budget-aware rule and wire it into those creation paths.
 - **Surface: server/shared + local SQLite.** The local-schema half is **not** web-reproducible
   (`getLocalStore` returns null in the sandbox), so it needs the device check or a Known-Issues row.
 
-### [workouts] BF-16a — five catalogue rows record fewer muscles than their own sibling movement
-
-- **Branch:** _unassigned_
-- **Added:** 2026-08-24 · found while tracing BF-15, from production
-- **Lane: A** — data correction, no schema. `exercise_library.muscles`.
-- **Lands BEFORE BF-15.** The role rule reads muscle counts and this entry changes them, so shipping
-  it afterwards would either break BF-15's fixture or pin it to data known to be wrong. **No owner
-  gate** — adding the front delts to a dip is not a judgement call, and no role changes here.
-
-This is the real defect behind the owner's *"hip thrusts and dumbbell shoulder press should be able
-to be a secondary"*. It is a data problem, not a threshold problem — each of these records fewer
-muscles than the sibling movement it mirrors:
-
-| Exercise | Recorded | Its sibling | Missing |
-|---|---|---|---|
-| **Cable Chest Dips** | chest, triceps (2) | Barbell Bench Press (3) | shoulders |
-| **Dumbbell Shoulder Press** | shoulders, triceps (2) | Barbell Overhead Press (3) | traps |
-| **Barbell Hip Thrust** | glutes, hamstrings (2) | — | quads, lower back, adductors |
-| **Cable Pulldown** | lats, biceps (2) | Chin-Up (3) | rear delts / rhomboids |
-| **Barbell Shrug** | traps (1) | — | rhomboids, forearms |
-
-These rows also feed the muscle heatmap and every weighted-set / tonnage tally (`roleWeight`,
-`packages/shared/src/muscles.ts:29`, plus three raw-SQL copies), so the value is larger than the role
-recommendation alone.
-
-- **What would count as fixed:** each row lists the muscles its sibling movement lists, the sibling
-  comparison is recorded in the PR so the judgement is reviewable, and BF-15's fixture is measured
-  against the corrected catalogue rather than the current one.
-- **Surface: production data.** Not reproducible against the local seed — the dev database is seeded
-  correct.
-
 ### [workouts] BF-16b — the retired all-primary program, and the one live session with no Primary
 
 - **Branch:** _unassigned_
@@ -2178,6 +2147,56 @@ Do not implement it; the labels alone fix what the owner asked about.
   Target/Assisting; the same role renders identically on every screen.
 - **Surface: UI strings only, web-reproducible.**
 
+
+### [workouts] LA-24 — BF-16a's five rows are fixed; eight more carry the same defect
+
+- **Branch:** _unassigned_
+- **Added:** 2026-08-25 · measured while shipping BF-16a (migration 216)
+- **Lane: A** — data correction, no schema. `exercise_library.muscles`.
+- **Does not block BF-15.** BF-16a was its prerequisite and has landed. This is the same class on
+  rows the owner's report did not name.
+
+BF-16a fixed five rows against the movement each mirrors. Scanning the whole live catalogue (140
+seeded rows, `merged_into IS NULL`) for the same shape found **eight more**, in two kinds that want
+different handling — which is why they were filed rather than folded into that PR.
+
+**Kind 1 — five rows where another member of the same family already records the muscle.** Adding it
+is propagating the catalogue's own answer, not originating one:
+
+| Row | Records | Add | Already recorded by |
+|---|---|---|---|
+| **Dumbbell Overhead Press** | shoulders(m), triceps(s) | traps(s) | Barbell Overhead Press |
+| **Machine Shoulder Press** | shoulders(m), triceps(s) | traps(s) | Barbell Overhead Press |
+| **Arnold Press** | shoulders(m), triceps(s) | traps(s) | Barbell Overhead Press |
+| **Lat Pulldown** | lats(m), biceps(s) | upper back(s) | Close Grip Lat Pulldown, Chin-Up, Pull-Up |
+| **Decline Bench Press** | chest(m), triceps(s) | shoulders(s) | Decline Dumbbell Press, and every other bench/chest press |
+
+All five sit at 2 muscles, so BF-15's anchor rule (a catalogued exercise with ≥ 3) bars them exactly
+as it barred BF-16a's rows. `Dumbbell Overhead Press` and `Dumbbell Shoulder Press` are also a
+near-duplicate pair — same two muscles, same equipment — and may want a 164-style merge instead of
+two parallel corrections. Decide that first; it changes what this entry does.
+
+**Kind 2 — three rows where BF-16a's own additions have no in-catalogue precedent to propagate.**
+BF-16a took `Barbell Shrug` to traps + upper back + forearms and `Barbell Hip Thrust` to five
+muscles, from anatomy rather than from a sibling. Their families were left at the old values, so the
+correction created a fresh inconsistency:
+
+| Row | Records | Its corrected sibling now records |
+|---|---|---|
+| **Dumbbell Shrug** | traps (1) | Barbell Shrug: traps, upper back, forearms |
+| **Machine Shrug** | traps (1) | Barbell Shrug: traps, upper back, forearms |
+| **Barbell Glute Bridge**, **Bodyweight Glute Bridge**, **Single Leg Hip Thrusts** | glutes(m), hamstrings(s) | Barbell Hip Thrust: + quads, lower back, adductors |
+
+These are **not** a copy-paste: a machine shrug's handles may be supported where a barbell shrug's
+grip is not, and a bodyweight glute bridge does not load the quads the way a barbell hip thrust does.
+`Gate: owner` on this half — it is the same judgement BF-16a was allowed to make once, and making it
+five more times without asking is how a catalogue drifts by assertion.
+
+- **What would count as fixed:** Kind 1 shipped as an idempotent append migration in the shape of
+  216, with the family precedent named per row; Kind 2 either shipped with an owner answer or
+  explicitly closed as "correct as recorded" with the reason.
+- **Surface: catalogue data.** Fully reproducible locally — the seeded rows are identical in the dev
+  DB and production (fingerprinted 2026-08-25, all 140 match).
 
 ### [platform][app-shell] BF-19 — nothing measures app load time, and the one measurable driver is 80 deploys in a day busting the whole offline cache
 

@@ -24,10 +24,12 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.370.1 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Version:** v1.370.2 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-08-25.
 
 **A required check was failing at random on PRs that could not have caused it (BF-18).** `Tests` went red on a **docs-only** PR with `expected 8 to be +0`, and the same file passed locally 3/3. The autopack test waited for the packer's second phase and asserted its third with **no wait at all** — the three phases commit separately and deliberately, so it allowed the final delete exactly zero milliseconds, which holds on an idle machine and does not on a runner sharing one Postgres with ~380 files. It now polls for the finished state. **Reproduced rather than inferred:** injecting an 800 ms lag between phases 2 and 3 reproduces CI's message *and its line number*, and the fixed assertion passes against the same lag. The sweep found no sibling with this shape — it is the only file in the repository using an `until()` poll, and the three fixed-sleep assertions nearby are all negative ones a short sleep can only make falsely *pass*.
+
+**Five exercises now record the muscles their sibling movement already had (BF-16a).** A cable chest dip left out the shoulders, a dumbbell shoulder press the traps, a cable pulldown the upper back, a barbell shrug the upper back and forearms, and a barbell hip thrust the quads, lower back and adductors. That is the real defect behind *"hip thrusts and dumbbell shoulder press should be able to be a secondary"* — the role rule reads muscle counts and BF-15's anchor rule wants ≥ 3, so a row seeded with two was barred whatever the thresholds said. **The entry's premise was wrong in one way that mattered:** it called this production drift, and it is a defective *seed* — all 140 seeded rows fingerprint identically in the dev DB and production, so it reproduces locally and was proved through the live `/api/weekly-muscle-sets` route rather than reasoned about. Migration **216**, idempotent and case-insensitive. **The scan found eight more rows with the same shape; they are LA-24**, split into the five that a family member already answers and the three families where BF-16a's own additions have no precedent to propagate.
 
 **Lane B's 2026-08-25 run — 19 PRs — is written up in
 [`docs/handoff-2026-08-25-platform-lane-b-nineteen-prs.md`](docs/handoff-2026-08-25-platform-lane-b-nineteen-prs.md).**
@@ -318,6 +320,10 @@ order.
 > An entry only leaves when **nothing is still owed**: no open work, no pending owner or device
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
+
+### [workouts][devices] ⚠️ The corrected exercise catalogue has not been seen on the device (BF-16a, 2026-08-25)
+
+**Shipped and verified on the web surface; the device path is reasoned from source, not observed.** Migration 216 corrects five `exercise_library.muscles` rows. **No APK is needed** — the device's local mirror is hydrated from `/api/workout-data` in `workout-screen.tsx:421` and upserted with `muscles=excluded.muscles`, so a corrected catalogue should reach it on the next workout-screen load through the normal path. *Should*: that chain was read, not run, and `getLocalStore` returns null in the sandbox so it cannot be run here. **What to check on the S25:** open the workout screen once, then confirm the muscle heatmap and Muscle Volume This Week attribute a logged `Barbell Hip Thrust` to quads, lower back and adductors at half weight. **Also unverified: the migration has not run against production** — the five prod rows were read this session, not written. Low risk (idempotent append, no schema change, trivially reversible by another UPDATE), and the correction is retroactive by design: `weekly-muscle-sets` reads the catalogue in a live subquery, so past weeks re-derive rather than staying on the old numbers. [`journal`](docs/overview/entries/2026-08-25-exercise-catalogue-missing-muscles.md)
 
 ### [platform] 🟡 The database is growing ~4x faster than `CLAUDE.md` predicts — measured, not yet a problem (Orchestrator, 2026-08-25)
 
