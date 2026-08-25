@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.375.0",
+    date: "2026-08-25",
+    changes: [
+      "Editing how much of a food you logged now looks and works like the meal builder's version: you can switch between servings and grams, the shortcuts are real amounts (1 srv, 2 srv, 3 srv, 100 g) instead of multipliers, protein/carbs/fat are colour-coded to match the row you tapped, and the amount itself is the biggest thing on the sheet rather than the same size as the plus and minus buttons.",
+    ],
+  },
+  {
     version: "1.374.0",
     date: "2026-08-25",
     changes: [
