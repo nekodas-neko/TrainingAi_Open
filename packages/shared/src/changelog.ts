@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.375.1",
+    date: "2026-08-25",
+    changes: [
+      "Seven more exercises now record the muscles they actually work. A dumbbell or machine shrug counted only the traps, while the barbell version counts the traps, upper back and forearms; the glute bridges counted only glutes and hamstrings, while the barbell hip thrust also counts quads, lower back and adductors. Each row now matches the movement it mirrors, so the muscle heatmap and the weekly set tallies credit that work \u2014 on past weeks as well as new ones, because the tallies read the catalogue live rather than storing a copy.",
+    ],
+  },
+  {
     version: "1.375.0",
     date: "2026-08-25",
     changes: [
