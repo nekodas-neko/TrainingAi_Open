@@ -5256,8 +5256,14 @@ ehr     0     0     0     0   648   208   128   556     0
 > | **2026-08** | **68** | **68** | **100%** |
 >
 > **August reproducing 68/68 is what makes this trustworthy**: the SQL replication is correct, so
-> July's 9% is real divergence, not a broken measurement. Whatever changed in July is **not** the
-> Q-304 fix (shipped 2026-08-24). Filed as **LA-27**.
+> July's 9% is real divergence, not a broken measurement.
+>
+> **✅ LA-27 answered it the same day (mechanism there), and the answer makes the recompute WORSE
+> rather than unblocking it:** those logs predate `set_logs.planned_pct` persistence, so the
+> prescription used at log time is not in the set row. **76 of them belong to a progression style
+> edited after the log**, and styles are user-editable — re-deriving substitutes today's
+> prescription for the one actually trained under, invisibly. Worse than the inflation this entry
+> set out to fix, which is at least explainable.
 >
 > **Recommendation: recompute nothing yet.** Rewriting 277 rows of a derived column on the user's
 > training history while a third of that population is unexplained is the *"a count that moves
@@ -5271,29 +5277,39 @@ ehr     0     0     0     0   648   208   128   556     0
 - **Related, and deliberately still separate:** Q-298's 10 historical zero-1RM rows are the same
   shape and are **not** covered by this decision.
 
-### [workouts][platform] LA-27 — a third of `exercise_logs.estimated_1rm` cannot be re-derived, and July is 9%
+### [workouts][platform] LA-27 — ANSWERED: the un-re-derivable estimates predate `set_logs.planned_pct`
 
 - **Lane:** A
-- **Added:** 2026-08-25, from the Q-304b re-measurement.
-- **The measurement.** Replicating `calculate1RM` against current `set_logs` reproduces the stored
-  `exercise_logs.estimated_1rm` for **202 of 357** eligible logs (non-bodyweight, non-baseline,
-  non-deload). A further 40 are explained by sets edited after logging. **115 are unexplained**, and
-  they are not spread evenly: **2026-08 reproduces 68/68 (100%) while 2026-07 reproduces 9/102 (9%)**,
-  with May at 71% and June at 63%.
-- **Why the August number is the important one.** It says the replication is CORRECT. A broken
-  replication would fail everywhere; one that reproduces a whole recent month exactly and then
-  collapses for July is measuring a real change in the data.
-- **What it is not.** Not the Q-304 AMRAP fix — that shipped 2026-08-24, after every row in this
-  window. Not deleted sets (the query excludes them) and not deloads (excluded by the same gates the
-  PR path uses).
-- **Why it matters.** `estimated_1rm` feeds `personal_records`, the PR badge, the AI chat's
-  `getPersonalRecords`, and `resolveWorkingBasis`'s no-recent-log fallback. If a third cannot be
-  re-derived, none of those can be audited — and **Q-304b is blocked behind it**.
-- **How to start.** Diff stored against replicated **per set, not per log**, on a handful of July
-  rows — that localises it to the weights, the reps, the `planned_pct`/`planned_reps` persistence, or
-  `use_for_1rm` subset selection. The formula is the least likely culprit, given August.
-- **Do not "fix" it by recomputing.** Overwriting the column removes the evidence of whatever caused
-  this. Explain it first.
+- **Added:** 2026-08-25 from the Q-304b re-measurement · **answered the same day.**
+- **✅ The 115 unexplained logs are not corrupt.** They predate `set_logs.planned_pct` /
+  `planned_reps` persistence: the prescription WAS applied at log time, just never written to the set
+  row, so re-deriving today falls back to factor 1.0. Share of sets carrying `planned_pct`:
+
+  | month | sets with `planned_pct` |
+  |---|---|
+  | 2026-04 → 06 | **0%** |
+  | 2026-07 | **40%** |
+  | 2026-08 | **94%** |
+
+  July is the worst month at 9% rather than the oldest because it is the **overlap window** — styles
+  in use, per-set columns half populated. May/June reproduce *better* (71%/63%) because many of those
+  logs genuinely had no style, where factor 1.0 is right.
+- **This is the mechanism, and it also settles the recoverability question.** Of **257** pre-August
+  logs with no `planned_pct` on any set:
+  - **90** carry no `style_id` at all — unprescribed, factor 1.0 is correct, nothing is missing.
+  - **167** could be re-derived through `exercise_logs.style_id` → `style_sets`.
+  - **…but 76 of those 167 belong to a style whose `style_sets` were edited AFTER the log was
+    written.** Progression styles are user-editable, so re-deriving those applies a prescription
+    the lifter never trained under. **They are not recoverable, only guessable.**
+- **➡️ Decisive for Q-304b.** A recompute would not merely rewrite 277 estimates — for **76** it
+  would silently substitute today's prescription for the one actually used, with nothing in the
+  result showing which. Worse than the inflation Q-304b set out to correct.
+- **No code change is needed.** Nothing is broken going forward — `planned_pct` has persisted since
+  mid-July and August reproduces 68/68. This entry exists so the next session reading a 32%
+  non-reproduction rate does not read it as data loss.
+- **Keep:** the exact commit that began persisting `planned_pct` is not identified — the sandbox
+  clone is depth-1, so `git log` on `log-exercise.ts` cannot reach July. Worth pinning if anyone
+  needs the precise cutover date rather than the month. Nothing else is owed.
 
 ### [workouts] Q-305 — the volume landmarks are computed and never shown to anyone
 

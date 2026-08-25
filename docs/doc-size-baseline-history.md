@@ -18,6 +18,27 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
+## 2026-08-25 — LA-27 answered (`docs/implementation-backlog.md` 11989 → 12005)
+
+**+16, and it closes an investigation rather than opening one.** LA-27 was filed hours earlier in
+the same file asking why a third of `exercise_logs.estimated_1rm` could not be re-derived. It is
+answered: those logs predate `set_logs.planned_pct` persistence (0% of sets before July, 40% in
+July, 94% in August), so the prescription was applied at log time and never written to the set row.
+Not data loss.
+
+**The +16 is almost entirely the recoverability breakdown, and that is the part worth the lines.**
+Of 257 pre-August logs missing the column, 90 carry no style (factor 1.0 is correct), 167 could be
+re-derived via `style_id` → `style_sets`, **but 76 of those belong to a style edited after the log**.
+Progression styles are user-editable, so re-deriving those substitutes today's prescription for the
+one actually trained under. That number is what turns Q-304b from "blocked pending investigation"
+into "the recompute is worse than the defect", and losing it to a size baseline would cost the next
+session the same four production queries.
+
+**Deliberately kept out:** the mechanism is now stated once, in LA-27. Q-304b carries only the
+consequence and points at it — the first draft had both in full and was 22 over instead of 16.
+
+---
+
 ## 2026-08-25 — Q-304b re-measured and LA-27 filed (`docs/implementation-backlog.md` 11948 → 11989)
 
 **+41, and it is a new queue entry plus a rewritten one, not accreted prose.**
