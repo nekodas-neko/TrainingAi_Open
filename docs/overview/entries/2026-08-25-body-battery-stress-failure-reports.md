@@ -82,3 +82,26 @@ does, on `main`. Blocked in the tool, satisfied in substance.
 A hardening change that turns a loud failure into a quiet degradation also removes the evidence a
 *separate* open investigation was relying on. When a fix turns a 500 into a fallback, check whether
 anything is waiting on that 500 — and carry the signal across.
+
+## The session-start `error_events` read, recorded so it is not a dropped finding
+
+Eight distinct rows in 7 days, **all of the owner's** (`claude_ro` is row-scoped) and inside the
+30-day prune. Nothing unrecorded:
+
+- `/api/body-battery` · `daytime-stress: constants not set` · **31 hits, latest 2026-08-23 20:59** —
+  this entry's subject. Unchanged since TN-4 read it; nothing since.
+- `SpeechRecognition.then() is not implemented on android` · 5 rows across five workout URLs —
+  already carried in `projectOverview.md`.
+- `Loading chunk 2179 failed` · 1 row — already carried in the backlog, under BF-19.
+- `POST /api/oura-ble/battery-poll` · `aborted` · 1 row, **2026-08-25 11:26**, 45 minutes before this
+  session opened.
+
+**The last one is worth a sentence, and not a Known-Issues row.** Queried across the whole table:
+`aborted` has **24 hits on `battery-poll` since 2026-08-09** and **74 on `/api/oura-ble/samples`,
+ending 2026-08-13**. The class is already characterised in `projectOverview.md`'s 2026-08-18 review
+as *"connection-timeout/`aborted` noise mapping to the recorded pool and disk-full incidents"*, so it
+is not new. **What has quietly gone stale is that attribution** — those incidents closed on
+2026-08-17 and the trickle continues eight days later, so "maps to the pool and disk-full incidents"
+no longer covers today's occurrence. A single abort on a fire-and-forget battery poll is the expected
+shape of a phone dropping a BLE-triggered request, which is why this is a note rather than an entry;
+what would change that is a *rate*, and one row in seven days is not one.
