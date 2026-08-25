@@ -63,11 +63,11 @@ builder's rows became the shared `FoodRow`; `ingredient-row.tsx` is deleted and 
 
 **The Devices card stops calling the ring healthy with no key (LB-5).** Checks `hasKey()` and links to `/admin/oura-ble` when false. `Gate: device`.
 
+**A ratchet row kept an already-fixed file exempt (Q-138).** `health-content.tsx` sat in
+`check-component-size.js` at a **915** baseline while being **651** lines — 115 lines of room it no longer merited. The script's header has said *"shrinking one below the limit? delete its row"* since it was written and nothing enforced it; **missed three times**. Enforced now, and two of Q-138's six rows turned out already done with line numbers pointing at nothing.
+
 **The accessibility rules ran and could not fail (Q-282, headline corrected).** *"No automated
-accessibility check exists in CI"* was false — `jsx-a11y` rides in via `next/core-web-vitals` and has
-run all along, at **warning**, so `pnpm lint` exited 0 with violations present. The app measured at
-**zero**, so seven decidable rules are `error` now: an empty shrink-only baseline. **It does not
-close the entry** — a linter cannot measure touch targets or contrast, and that half is unbuilt.
+accessibility check exists in CI"* was false — `jsx-a11y` rides in via `next/core-web-vitals` and has run all along, at **warning**, so `pnpm lint` exited 0 with violations present. The app measured at **zero**, so seven decidable rules are `error` now: an empty shrink-only baseline. **It does not close the entry** — a linter cannot measure touch targets or contrast, and that half is unbuilt.
 
 **The queue says which rows it has not classified (LB-12).** After correcting four entries' lanes one at a time and hitting two more, it was measured: **77 of 193 entries state no lane**, and **53 of Lane B's 55 READY rows** — so two are rows the queue knows are Lane B's. Showing them to both lanes is right; being silent about it was not. They print `⟨lane unstated⟩` now. **The sweep is the Orchestrator's** and is filed, not done.
 
