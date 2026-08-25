@@ -2131,3 +2131,10 @@ have cut the evidence, which is the part that stops the next session re-running 
 
 Deliberately not a plan doc: there is no design with rejected alternatives here, just a finding and
 a short build list. A plan would have cost more lines than the entry.
+
+## 2026-08-25 — `docs/implementation-backlog.md` 11615 → 11638 (+23)
+
+**BF-20**, filed after a scratch script (`m.mjs`, from #442) reached `main` and turned Lint red for
+every open PR. Twenty-three lines to record a failure that cost every concurrent agent a red check
+and had already happened twice under a prose-only rule, which is the argument for the guard the
+entry asks for.
