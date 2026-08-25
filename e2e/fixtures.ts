@@ -148,3 +148,48 @@ export async function enableHomeCards(page: Page, keys: string[]): Promise<void>
     ['ta_ss_cards', JSON.stringify(keys)] as const,
   )
 }
+
+/**
+ * Suppress Home's first-open-of-day Morning Check-in prompt (OR-1).
+ *
+ * It is a **modal** Radix sheet, so while it is open Radix sets `aria-hidden="true"` on `<main>` and
+ * `pointer-events: none` on `<body>`. Everything on Home leaves the accessibility tree with it —
+ * measured: `getByLabel('Log Body Weight')` finds the button and
+ * `getByRole('button', { name: 'Log Body Weight' })` finds **nothing**, on markup that is correct
+ * and that resolves fine the moment the sheet is dismissed. So a Home spec does not fail with
+ * "a modal is in the way"; it fails claiming the affordance it wants does not exist, which is a very
+ * convincing wrong answer — it cost a trace through three components before the `<main>` attribute
+ * was read.
+ *
+ * Every fresh browser profile is exposed to it: the prompt fires whenever `ta_morning_checkin` is
+ * absent and the user has no check-in row for today, which is exactly the state CI provisions on
+ * every run. Pre-setting the marker is what a returning user's browser already has.
+ *
+ * The date must be the USER's, not the runner's — the marker is compared against `todayInTz(tz)`
+ * (`session-select-content.tsx:107`), and the seeded user's zone is not the container's.
+ *
+ * Call before `page.goto`.
+ */
+export async function suppressMorningCheckin(page: Page): Promise<void> {
+  const connectionString = process.env.DATABASE_URL
+  expect(connectionString, 'DATABASE_URL must be set — see e2e/README.md').toBeTruthy()
+  const { Client } = await import('pg')
+  const db = new Client({ connectionString })
+  await db.connect()
+  let today: string | undefined
+  try {
+    const { rows } = await db.query<{ d: string }>(
+      `SELECT to_char(now() AT TIME ZONE coalesce(timezone, 'Australia/Brisbane'), 'YYYY-MM-DD') AS d
+         FROM users WHERE email = $1`,
+      [SEED_EMAIL],
+    )
+    today = rows[0]?.d
+  } finally {
+    await db.end()
+  }
+  expect(today, `${SEED_EMAIL} is not seeded — run pnpm db:local`).toBeTruthy()
+  await page.addInitScript(
+    ([storageKey, value]) => localStorage.setItem(storageKey, value),
+    ['ta_morning_checkin', today] as const,
+  )
+}

@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { enableHomeCards, ensureEnergyBalanceProfile, settleRouteBoundary } from './fixtures'
+import { enableHomeCards, ensureEnergyBalanceProfile, settleRouteBoundary, suppressMorningCheckin } from './fixtures'
 
 /**
  * Q-402's fix, driven end to end for the first time.
@@ -31,6 +31,9 @@ test.describe('Home cards refetch when a write invalidates their key (Q-402 / Q-
 
   test('the energy-balance card refetches after a body-metric write, with no navigation', async ({ page }) => {
     await enableHomeCards(page, ['energyBalanceWidget'])
+    // Home's first-open-of-day check-in is a MODAL, and Radix `aria-hidden`s `<main>` while it is
+    // open — so without this every `getByRole` below reports that Home is empty (OR-1).
+    await suppressMorningCheckin(page)
 
     const energyCalls: string[] = []
     page.on('request', r => {
