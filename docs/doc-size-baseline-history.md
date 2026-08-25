@@ -2260,3 +2260,14 @@ leaves a temperature penalty switched off permanently.
 
 **Superseded on merge:** `main` had already moved the backlog past this number, so the raise carried
 no net change and `doc-size-baseline.json` was rebuilt from `origin/main` rather than spliced.
+
+## 2026-08-25 — `projectOverview.md` raised, 7941 → 7946 (BF-16a)
+
+Five lines, both of which the standing rules require in this file rather than anywhere else. One is
+the Current Status paragraph the session wrap-up asks for. The other is a Known-Issues row, and it is
+there because the Canonical Runtime gate gives exactly two options for a change whose device path has
+not been run — the on-device smoke run, or a row here saying so. Migration 216's correction reaches
+the S25 through `/api/workout-data` hydration, which was read in source and not executed; `getLocalStore`
+returns null in the sandbox, so it cannot be executed here. The row names what to check on the device
+and that the migration has not yet run against production.
+

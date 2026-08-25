@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.370.2",
+    date: "2026-08-25",
+    changes: [
+      "Five exercises recorded fewer muscles than the movement they mirror \u2014 a cable chest dip left out the shoulders, a dumbbell shoulder press the traps, a cable pulldown the upper back, a barbell shrug the upper back and forearms, and a barbell hip thrust the quads, lower back and adductors. They now match their siblings, so the muscle heatmap and the weekly set tallies count the work these lifts actually do, on past weeks as well as new ones.",
+    ],
+  },
+  {
     version: "1.370.1",
     date: "2026-08-25",
     changes: [
