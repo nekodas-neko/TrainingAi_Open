@@ -1,18 +1,16 @@
 /**
  * How many calories each macro contributes, and its share of the total.
  *
- * The Atwater factors were written out longhand in four places before this — `MacroRing`'s new
- * split arc would have been a fifth, and `saved-meal-card.tsx` already carried one. This is the one
- * copy `components/` uses.
+ * The Atwater factors were written out longhand in four places before this — `MacroRing`'s split
+ * arc would have been a fifth, and `saved-meal-card.tsx` already carried one.
  *
- * **The other two live in `packages/shared/` and are Lane A's to fold in:**
- * `calorie-balance.ts` has a `KCAL_PER_G` that is not exported, and `goal-recommendation.ts`
- * hardcodes `* 4` / `* 9` at three call sites. Filed as LB-9 — this module cannot reach across that
- * boundary, and adding a sixth copy to close a gap is how there came to be four.
+ * **LB-9 closed that: there is now exactly one copy**, `packages/shared/src/nutrition/atwater.ts`,
+ * which `calorie-balance.ts` and `goal-recommendation.ts` also import. This module re-exports it so
+ * existing `components/` imports keep working, and adds the two shapes only the UI needs.
  */
+import { KCAL_PER_G } from '@trainingai/shared/nutrition/atwater'
 
-/** Atwater factors: the calories in a gram of each macronutrient. */
-export const KCAL_PER_G = { protein: 4, carbs: 4, fat: 9 } as const
+export { KCAL_PER_G }
 
 export interface MacroGrams {
   proteinG: number

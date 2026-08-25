@@ -1,3 +1,4 @@
+import { KCAL_PER_G } from './atwater'
 import { ACTIVITY_LEVELS, type ActivityLevel, type FitnessGoal } from '../types/user'
 import { cunninghamBmr } from '../health/body-composition'
 import { SEDENTARY_MULTIPLIER } from '../health/energy-baseline'
@@ -51,7 +52,9 @@ export const SEX_OFFSET: Record<string, number> = { male: 5, female: -161, other
  * throughout this app.
  */
 export function carbsFromRemainder(calories: number, proteinG: number, fatG: number): number {
-  return Math.round(Math.max(0, calories - proteinG * 4 - fatG * 9) / 4)
+  return Math.round(
+    Math.max(0, calories - proteinG * KCAL_PER_G.protein - fatG * KCAL_PER_G.fat) / KCAL_PER_G.carbs,
+  )
 }
 
 /**
@@ -77,7 +80,7 @@ export const MACRO_RECONCILE_TOLERANCE_KCAL = 2
 
 /** What a macro set actually comes to, by Atwater. */
 export function caloriesFromMacros(macros: DailyMacros): number {
-  return macros.proteinG * 4 + macros.carbsG * 4 + macros.fatG * 9
+  return macros.proteinG * KCAL_PER_G.protein + macros.carbsG * KCAL_PER_G.carbs + macros.fatG * KCAL_PER_G.fat
 }
 
 export interface DailyMacros {
@@ -105,12 +108,12 @@ export function reconcileDailyMacros(
   calories: number,
   macros: DailyMacros,
 ): DailyMacros & { adjusted: boolean } {
-  const asGiven = macros.proteinG * 4 + macros.carbsG * 4 + macros.fatG * 9
+  const asGiven = caloriesFromMacros(macros)
   if (!(calories > 0) || Math.abs(asGiven - calories) <= MACRO_RECONCILE_TOLERANCE_KCAL) {
     return { ...macros, adjusted: false }
   }
 
-  const fromProteinAndFat = macros.proteinG * 4 + macros.fatG * 9
+  const fromProteinAndFat = macros.proteinG * KCAL_PER_G.protein + macros.fatG * KCAL_PER_G.fat
   if (fromProteinAndFat > calories) {
     const k = calories / fromProteinAndFat
     return {
