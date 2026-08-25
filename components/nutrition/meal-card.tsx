@@ -1,23 +1,25 @@
 'use client'
 
-import { memo, useState } from 'react'
-import { Plus, Trash2, Pencil, ChevronDown } from 'lucide-react'
+import { memo, useCallback, useState } from 'react'
+import { Plus, ChevronDown } from 'lucide-react'
 import { AnimatePresence, motion } from 'motion/react'
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/components/ui/collapsible'
 import type { MealType, FoodLogWithItem } from '@trainingai/shared/types/nutrition'
 import { MACRO_COLORS } from '@trainingai/shared/nutrition/macro-colors'
+import { FoodRow } from './food-row'
 
 interface Props {
   mealType: MealType
   logs: FoodLogWithItem[]
   onAdd: (mealTypeId: string) => void
-  onDeleteLog: (logId: string) => void
-  onQuickEdit: (log: FoodLogWithItem) => void
+  /** By id, not the log object: the row renders inside `.map()` where a hook cannot memoise an
+   *  object literal, and one would defeat `FoodRow`'s `memo` silently (Q-490). */
+  onQuickEdit: (logId: string) => void
   /** Drawn as one row of a grouped list rather than as its own card (Q-395b). */
   grouped?: boolean
 }
 
-export const MealCard = memo(function MealCard({ mealType, logs, onAdd, onDeleteLog, onQuickEdit, grouped }: Props) {
+export const MealCard = memo(function MealCard({ mealType, logs, onAdd, onQuickEdit, grouped }: Props) {
   const [expanded, setExpanded] = useState(true)
   const totals = logs.reduce(
     (acc, l) => ({ calories: acc.calories + l.calories, proteinG: acc.proteinG + l.proteinG, carbsG: acc.carbsG + l.carbsG, fatG: acc.fatG + l.fatG }),
@@ -82,38 +84,21 @@ export const MealCard = memo(function MealCard({ mealType, logs, onAdd, onDelete
                     animate={{ opacity: 1, height: "auto" }}
                     exit={{ opacity: 0, height: 0 }}
                     transition={{ duration: 0.18 }}
-                    className={`flex items-start gap-3 px-4 py-3.5 overflow-hidden ${i < logs.length - 1 ? 'border-b border-border/20' : ''}`}
+                    className={`overflow-hidden ${i < logs.length - 1 ? 'border-b border-border/20' : ''}`}
                   >
-                    <div className="flex-1 min-w-0 pt-0.5">
-                      <p className="text-sm font-medium leading-snug truncate">{log.foodItem.name}</p>
-                      {log.foodItem.brand && (
-                        <p className="text-xs text-muted-foreground truncate mt-0.5">{log.foodItem.brand}</p>
-                      )}
-                      <div className="flex items-center gap-2.5 mt-1.5">
-                        <span className="text-[11px] font-semibold" style={{ color: MACRO_COLORS.protein }}>P {Math.round(log.proteinG)}g</span>
-                        <span className="text-[11px] font-semibold" style={{ color: MACRO_COLORS.carbs }}>C {Math.round(log.carbsG)}g</span>
-                        <span className="text-[11px] font-semibold" style={{ color: MACRO_COLORS.fat }}>F {Math.round(log.fatG)}g</span>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-0.5 shrink-0 mt-0.5">
-                      <span className="text-sm font-semibold tabular-nums w-16 text-right mr-1">
-                        {Math.round(log.calories)} kcal
-                      </span>
-                      <button
-                        onClick={() => onQuickEdit(log)}
-                        aria-label="Edit log"
-                        className="p-4 text-muted-foreground hover:text-foreground rounded-lg hover:bg-muted/40 transition-colors"
-                      >
-                        <Pencil className="w-3.5 h-3.5" />
-                      </button>
-                      <button
-                        onClick={() => onDeleteLog(log.id)}
-                        aria-label="Delete log"
-                        className="p-4 text-muted-foreground hover:text-destructive rounded-lg hover:bg-destructive/10 transition-colors"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
+                    {/* Q-406: the diary row is the shared `FoodRow` — name, a grey line of what and
+                        how much, calories right-aligned, chevron. The inline pencil and bin are
+                        gone; editing and deleting both live in the sheet a tap opens, which is what
+                        lets one row component serve the diary, the library and both search lists.
+                        The per-item P/C/F moved into that sheet's live preview; the meal's totals
+                        footer still carries the macro split at rest. */}
+                    <DiaryRow
+                      id={log.id}
+                      name={log.foodItem.name}
+                      secondary={logAmountLabel(log)}
+                      calories={log.calories}
+                      onEdit={onQuickEdit}
+                    />
                   </motion.div>
                 ))}
               </AnimatePresence>
@@ -136,4 +121,22 @@ export const MealCard = memo(function MealCard({ mealType, logs, onAdd, onDelete
       </Collapsible>
     </div>
   )
+})
+
+/** The grey line under the name: *what and how much*, which is what Q-406's shape asks for there. */
+function logAmountLabel(log: FoodLogWithItem): string {
+  const servingG = log.foodItem.servingSizeG ?? 0
+  const q = Math.round(log.quantityMultiplier * 100) / 100
+  const amount = `${q} ${q === 1 ? 'serving' : 'servings'}${servingG > 0 ? ` · ${Math.round(servingG * log.quantityMultiplier)} g` : ''}`
+  return log.foodItem.brand ? `${log.foodItem.brand} · ${amount}` : amount
+}
+
+/** Wrapper so the memoised row gets a stable `onPress` from inside a `.map()`, where a hook cannot
+ *  live and an inline arrow would defeat `React.memo` silently (Q-490). Scalars only. */
+const DiaryRow = memo(function DiaryRow(
+  { id, name, secondary, calories, onEdit }:
+  { id: string; name: string; secondary: string; calories: number; onEdit: (id: string) => void },
+) {
+  const press = useCallback(() => onEdit(id), [id, onEdit])
+  return <FoodRow name={name} secondary={secondary} calories={calories} showChevron onPress={press} />
 })

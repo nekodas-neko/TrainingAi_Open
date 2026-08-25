@@ -100,6 +100,10 @@ export default function NutritionContent({ userId }: { userId?: string }) {
 
   const [mealTypes, setMealTypes] = useState<MealType[]>([]);
   const [logs, setLogs] = useState<FoodLogWithItem[]>([]);
+  // Read by `openQuickEdit`, which takes an id so the diary row can stay on scalar props (Q-490).
+  // A ref rather than a dep so the callback identity stays stable across every log change.
+  const logsRef = useRef<FoodLogWithItem[]>([]);
+  useEffect(() => { logsRef.current = logs; }, [logs]);
   // Which date `logs` currently holds data for. The anti-flicker guards in loadFoodLogs keep the
   // previous value when a fetch comes back empty, and without this they cannot tell a transient
   // empty response for the day on screen from the correct answer for a genuinely empty other day —
@@ -382,7 +386,11 @@ export default function NutritionContent({ userId }: { userId?: string }) {
   }, [logs]);
   const openLogger = useCallback((mealTypeId: string) => { setLoggerMealTypeId(mealTypeId); setLoggerOpen(true); }, []);
   const requestDeleteLog = useCallback((logId: string) => setConfirmDeleteLogId(logId), []);
-  const openQuickEdit = useCallback((log: FoodLogWithItem) => setEditingLog(log), []);
+  // By id: the diary row is the shared `FoodRow` now and passes scalars, so the lookup happens
+  // here, where the logs live (Q-406).
+  const openQuickEdit = useCallback((logId: string) => {
+    setEditingLog(logsRef.current.find(l => l.id === logId) ?? null);
+  }, []);
 
   const handleConfirmDelete = useCallback(async () => {
     if (!confirmDeleteLogId) return;
@@ -642,7 +650,6 @@ export default function NutritionContent({ userId }: { userId?: string }) {
                     mealType={mt}
                     logs={logsByMealType.get(mt.id) ?? EMPTY_LOGS}
                     onAdd={openLogger}
-                    onDeleteLog={requestDeleteLog}
                     onQuickEdit={openQuickEdit}
                     grouped
                   />
@@ -723,7 +730,7 @@ export default function NutritionContent({ userId }: { userId?: string }) {
         logDate={selectedDate}
       />
 
-      <QuickEditLogSheet key={editingLog?.id} log={editingLog} onClose={() => setEditingLog(null)} onSaved={handleQuickEditSaved} userId={userId} />
+      <QuickEditLogSheet key={editingLog?.id} log={editingLog} onClose={() => setEditingLog(null)} onSaved={handleQuickEditSaved} onDelete={requestDeleteLog} userId={userId} />
 
       <Sheet open={settingsOpen} onOpenChange={setSettingsOpen}>
         <SheetContent side="bottom" className="rounded-t-2xl max-h-[85vh] flex flex-col">

@@ -381,6 +381,20 @@ observed changing the model's output.
 
 Review: [`docs/reviews/2026-08-25-threshold-sweep.md`](reviews/2026-08-25-threshold-sweep.md).
 
+- ✅ **THE SEED IS FIXED, 2026-08-25** (`fix/baseline-zero-seed`, batch shipped as one PR). Working:
+  [`entries/2026-08-25-baseline-zero-seed.md`](overview/entries/2026-08-25-baseline-zero-seed.md).
+  `seedOrUpdateBaseline` seeds the first sample and **the vendor port is untouched** — putting the
+  seed inside `updateBaseline` broke `warm_up_then_settle`, ported verbatim from open_oura's own
+  test. This entry predicted that trap and it still caught an attempt. Both folds call the wrapper,
+  so **all six** baselines are protected. Four existing tests were pinning the bug (the breathing
+  baseline asserted `meanX8: 580` — exactly half of 1160).
+- **⛔ KEEP — THE DATA HALF IS NOT DONE, AND IT IS ONE BUTTON.** Stored baselines are still
+  zero-folded. **No new code needed:** `run.ts:917` null-seeds the fold under `fullHistory` and the
+  **Redecode** endpoint already sets it, so one Redecode run re-derives all six from the untouched
+  raw nightly values. **Could not be run from a sandbox** (needs the vendored constants Q-49
+  removed). Until it runs every pass test here is unmeasured: deviation mean within ±0.05 °C with
+  ~half the nights negative; `temp_dev_c > 1.0` on 0 nights (TN-8); biomarker table re-measured,
+  since every z moves ~19× and the radar may then fire too often (Q-506).
 ### [readiness] TN-6a — suspend the temperature penalty until its baseline is centred
 
 - **Branch:** _unassigned_
@@ -851,48 +865,34 @@ without a queue entry is a dropped finding.*
 
 ### [nutrition][app-shell] Q-406 — the shared food row: two call sites converted, two waiting on their phase
 
+> **✅ THE DIARY ROW CONVERTED 2026-08-25 (v1.367.0)** — `meal-card.tsx` draws the shared `FoodRow`
+> and `QuickEditLogSheet` **gained a delete in the same change**, which this entry required before the
+> conversion could be safe. Q-395a was meant to carry it and did not. Per-item P/C/F moved into the
+> sheet's live preview. [`journal`](overview/entries/2026-08-25-diary-row-shared-shape.md).
+>
+> **⚠ It turned up a pre-existing defect, LB-10 — fixed 2026-08-25.** The sheet would not open in
+> `pnpm dev` at all, on `main` too: `use-sheet-back-dismiss.ts` was not double-invoke safe. Verified
+> here with `reactStrictMode: false`; the hook is fixed and guarded now
+> ([`journal`](overview/entries/2026-08-25-sheet-back-dismiss-strict-mode.md)).
+
 - **Branch:** `refactor/nutrition-food-row`
 - **Lane B.** No schema, no route.
 - **✅ GATE CLEARED 2026-08-24 — the drawings are in the repository:**
-  [`docs/design/2026-08-18-nutrition-rework-mockups.html`](design/2026-08-18-nutrition-rework-mockups.html).
-  All twelve artboards, at true S25 size, openable in a browser with no build step and no canvas.
-  This gate's own clearing condition was *"clears when the drawings land under `docs/design/`"*, and
-  they have. **Q-395a/b/c are unblocked too** — they cite the same drawings.
-  - **Recovered, not redrawn.** They were a Claude Design canvas
-    (<https://claude.ai/code/artifact/936866ab-387b-44a3-9de0-de080a8d6c3b>, *"Nutrition UI Review"*)
-    that had never been committed. Every artboard's markup and inline styles are unchanged; only the
-    editor's `<x-dc>`/`<helmet>` wrappers were stripped. **These are the drawings the owner reviewed
-    twice**, not a fresh interpretation of the prose — which is the whole point, since a re-drawing
-    would need re-approving.
-  - **⚠ `unit-options.png` never existed as a file** and no session will ever find it. It was a
-    screenshot of the `srv/g — A/B/C` artboards. Cite `UnitA.dc.html` (page 2 of the committed file).
-  - **⚠ Q-395a's two references are two different artboards.** The EXPANDED row is `srv/g — A`; the
-    COLLAPSED `Full Cream Milk` row is in **`EditMeal.dc.html`** (artboard 5), not in unit-options.
-    Both entries' wording implies one drawing holds both. It does not.
-  - **Known fidelity limit, bounded and marked:** three artboards (`MealsNow`, `Targets`, `UnitA`)
-    used editor-side `sc-for` loops that were never bound to data — they drew N placeholder rows via
-    `hint-placeholder-count`. An inline shim reproduces that, and unbound values render as a muted
-    `{{token}}`, exactly as the canvas showed them. Those captions are marked TEMPLATED. **The six
-    reworked screens on page 1 use no templating and are exact.**
-  - Rendered and checked in Chromium before committing: 12 of 12 artboards draw, no JS errors.
-- **Still owed, and deliberately not a gate:** the two unconverted call sites below need a *design
-  answer* (where a per-row warning goes), not a drawing. Q-395's drawings do not settle it, so it
-  stays an open question for whoever builds the external-food row.
-- **✅ THE COMPONENT SHIPPED 2026-08-23 (v1.338.0)** — `components/nutrition/food-row.tsx`, and the
-  library sheet + the food-database search row now draw it.
-  [`Journal`](overview/entries/2026-08-23-shared-food-row.md). **Q-395a's `Needs: Q-406` is
-  satisfied.**
-- **The other two call sites are deliberately NOT converted, and this is the reason.** The agreed
-  row's only trailing element is a chevron.
-  - **The diary row** (`meal-card.tsx`) carries inline **edit and delete** buttons. Q-395a retires
-    the list-row editor and moves editing into the quantity sheet — but **that sheet does not exist
-    yet**, so converting the diary row now removes the only way to correct a logged food. That is
-    LB-1's failure exactly: a capability deleted by a UI move whose replacement had not been built.
-    **Convert it in Q-395a, in the same PR that adds the sheet.**
-  - **The external food-database row** (`ingredient-search.tsx:132`) carries a macro-mismatch warning
-    line and an in-flight spinner. The agreed row has nowhere to put either, and adding a slot for
-    them is what makes it a wrapper rather than a unification. **Needs a design answer** — where a
-    per-row warning goes — which belongs with Q-395's drawings.
+  [`docs/design/2026-08-18-nutrition-rework-mockups.html`](design/2026-08-18-nutrition-rework-mockups.html),
+  twelve artboards recovered from the owner-reviewed canvas, unchanged. That file's own preamble
+  carries the two corrections these entries need — `unit-options.png` never existed, and Q-395a's two
+  references are two different artboards — plus which three are TEMPLATED. Read it there rather than
+  duplicating it here. **Q-395a/b/c were unblocked by the same landing.**
+- **✅ THE COMPONENT SHIPPED 2026-08-23 (v1.338.0)** — `components/nutrition/food-row.tsx`, drawn by
+  the library sheet and the food-database search row.
+  [`Journal`](overview/entries/2026-08-23-shared-food-row.md).
+- **✅ THE DIARY ROW SHIPPED 2026-08-25 (v1.367.0)** — with the delete this entry required moved into
+  `QuickEditLogSheet` first, so no capability was dropped.
+- **What is left is ONE call site: the external food-database row** (`ingredient-search.tsx:132`),
+  which carries a macro-mismatch warning and an in-flight spinner. The agreed row has nowhere to put
+  either, and adding a slot makes it a wrapper rather than a unification. **Needs a design answer —
+  where a per-row warning goes.** Q-395's drawings do not settle it (checked: none of the twelve
+  artboards shows a warning treatment).
 - **✅ RESOLVED 2026-08-24 — the drawings are in the repository.** **The lesson worth keeping: a
   mockup that lives only in a chat artifact is a mockup the queue cannot use.** These were drawn
   2026-08-18, reviewed twice, decided against — then blocked four entries for six days because
@@ -1411,6 +1411,9 @@ true mean on night 2 rather than converging for fifty.
   which is the one category of mistake the owner gate exists to prevent. The factors are four lines
   apart in `daily-summary.ts`; read them.
 
+- ✅ **SEED FIXED 2026-08-25** (`fix/baseline-zero-seed`) — see BF-13 for the full note, including
+  the ⛔ Keep: the stored baselines are still zero-folded and one **Redecode** run re-derives them,
+  which could not be done from a sandbox. This entry's pass tests stay unmeasured until it runs.
 ### [devices][readiness] BF-14 — ❌ REFUTED 2026-08-24: the breathing baseline is fed rpm×10 on purpose; it is correct
 
 > **⛔ REFUTED by measurement (Tuning, 2026-08-24). Do not implement this. It is kept, not deleted,
@@ -6232,6 +6235,9 @@ ehr     0     0     0     0   648   208   128   556     0
   recover faster because their scale is small. The ratios above say they are fine *now*, at 40 nights;
   they say nothing about night 5.
 
+- ✅ **SEED FIXED 2026-08-25** (`fix/baseline-zero-seed`) — see BF-13 for the full note, including
+  the ⛔ Keep: the stored baselines are still zero-folded and one **Redecode** run re-derives them,
+  which could not be done from a sandbox. This entry's pass tests stay unmeasured until it runs.
 ### [readiness][activity] Q-507 — the stress override fires on the best days: high-stress minutes correlate +0.40 with readiness
 
 - **Branch:** `fix/stress-override-input`
