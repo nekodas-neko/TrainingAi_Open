@@ -15,6 +15,7 @@ import { computeSleepScoreSeries } from '@trainingai/shared/health/sleep-score'
 import { nightSessions } from '@trainingai/shared/health/sleep-night'
 import { describePersonalRecord } from '@trainingai/shared/1rm'
 import { readJsonLimited } from '@trainingai/shared/http/request-guards'
+import { PROSE_GUARDS } from '@/lib/ai/prompt-guards'
 
 // An optional force flag.
 const MAX_BODY_BYTES = 4 * 1024
@@ -246,7 +247,7 @@ export async function POST(req: Request) {
       { section: 'weekly-digest', userId, fingerprint: { isoWeekKey, contextHash } },
       () => generateText({
         model: aiModel(),
-        prompt: `You are a personal training coach. Write a concise recap of the user's last completed training week (Monday to Sunday, the week that just ended). 4–6 bullet points, max 180 words total. Cover training load, any PRs, recovery (HRV/readiness/sleep), and one specific recommendation for the week ahead. Be specific, encouraging, and actionable. Use the data below — quote its numbers, never invent or recompute any.\n\n${context}`,
+        prompt: `You are a personal training coach. Write a concise recap of the user's last completed training week (Monday to Sunday, the week that just ended). 4–6 bullet points, max 180 words total. Cover training load, any PRs, recovery (HRV/readiness/sleep), and one specific recommendation for the week ahead. Be specific, encouraging, and actionable. Use the data below — quote its numbers, never invent or recompute any.\n\n${PROSE_GUARDS}\n\n${context}`,
         maxRetries: 0,
       }),
     ))
