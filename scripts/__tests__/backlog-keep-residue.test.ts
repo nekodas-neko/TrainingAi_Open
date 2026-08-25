@@ -59,6 +59,35 @@ describe('backlog keep residue', () => {
     expect(k?.gate).toBeNull()
   })
 
+  // The colon requirement above was too narrow, and it was narrow in a way that hit the two
+  // highest-priority entries in Lane A's queue: TN-3a and TN-4 both write the residue as
+  // `- **Keep — what is NOT done:**`. Both read as unstarted work and sat at #1 and #2 of READY,
+  // which is the same defect this file was written to fix, one punctuation mark over.
+  it('reads the em-dash form', () => {
+    const k = keepFromLines(['- **Keep — what is NOT done:** why the constants were unset.'])
+    expect(k?.text).toBe('what is NOT done: why the constants were unset.')
+  })
+
+  it('reads the en-dash and hyphen forms', () => {
+    expect(keepFromLines(['- **Keep – three things are NOT done:** no back-fill has run.'])?.text)
+      .toBe('three things are NOT done: no back-fill has run.')
+    expect(keepFromLines(['- **Keep - the device run:** unverified on the S25.'])?.text)
+      .toBe('the device run: unverified on the S25.')
+  })
+
+  // Widening to dashes must not re-open the false-positive door the colon was closing. These are
+  // the real prose lines in the backlog that begin with the word and state no residue.
+  it('still ignores prose beginning with the word', () => {
+    for (const line of [
+      '  keep what the owner saw; the `MODEL_VERSION` bump below is what makes the eras separable.',
+      '- Keep `classifyZone`\'s three-state shape (`push` / `in` / `ease`) and swap what it reads.',
+      '  **Keep `keepSavedMealIds.max(6)`**: it equals `MEAL_COUNT_MAX`, so it is not arbitrary.',
+      '  keep only the prose cached. Recomputing is the cheaper first cut.',
+    ]) {
+      expect(keepFromLines([line]), line).toBeNull()
+    }
+  })
+
   it('strips bold markers so the residue prints as one plain line', () => {
     expect(keepFromLines(['- **Keep:** the **surfacing** itself is unbuilt.'])?.text)
       .toBe('the surfacing itself is unbuilt.')
