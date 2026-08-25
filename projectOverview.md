@@ -27,6 +27,9 @@
 **Version:** v1.318.10 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-08-24.
 
+**The queue tool stopped calling shipped work "ready" (LB-11).** `next-item.js` had never learned to
+read a `- **Keep:**`, so an entry that shipped kept its pre-shipping priority — **17 of Lane B's top 21 were finished**, and the first startable item sat below the tool's ten-row window. A KEEP bucket prints them with what they owe; READY went 86 → 65.
+
 **Three more cards say so when their fetch fails, and the sweep was three, not ~18 (Q-499).** The
 Oura section is the one that mattered: its `return null` means *no ring connected*, so a 429 made a
 connected user's whole ring section vanish. `.catch()` was never the guard — `cachedFetch` resolves
@@ -68,7 +71,11 @@ builder's rows became the shared `FoodRow`; `ingredient-row.tsx` is deleted and 
 
 **The Devices card stops calling the ring healthy with no key (LB-5).** Checks `hasKey()` and links to `/admin/oura-ble` when false. `Gate: device`.
 
-**Q-477 is DONE for every client component** (4 slices, 78/38 → **3 calls in 1 file**). Left is `workout-store.ts`, a Zustand store with no hook, where a wrong-zone stamp makes `rolloverDay()` clear the day's completed sets — a design call, analysed on the entry.
+**Q-477 is COMPLETE — the ratchet baseline is empty** (78 bare calls across 38 files → **0 across
+539 scanned**). The last slice did not thread `tz` into the Zustand store; it stopped the store
+guessing. `onRehydrateStorage` compared against Brisbane while the workout screen compared against
+the user's zone, so a non-Brisbane user could have the day rolled over twice — and a rollover clears
+the day's completed-set ticks. One shell component in the root layout answers it now. `Gate: device`.
 
 **"Nine collapsibles missing `aria-expanded`" was actually two (Q-491)** — one retired, four already Radix, two a back chevron. `weights-summary.tsx`/`added-weight-toggle.tsx` were real, now fixed.
 
@@ -95,9 +102,7 @@ was **0** in CI and those tests passed vacuously (**Q-312**); and `sessionEffort
 
 **The raw-frame packer runs itself, and it deletes only what it verified (Q-541 complete).** A button
 does not hold a growth curve — `oura_raw_samples` regrew to 92 MB within five days of the 2026-08-18
-hand-run. Fires from the ingest path now, throttled per user, `OURA_AUTOPACK=off` kill switch.
-Automating it made the delete's race reachable, so phase 3 deletes by row id, not ds range
-([`journal`](docs/overview/entries/2026-08-23-feat-oura-autopack.md)).
+hand-run. Fires from the ingest path now, throttled per user, `OURA_AUTOPACK=off` kill switch. Automating it made the delete's race reachable, so phase 3 deletes by row id, not ds range ([`journal`](docs/overview/entries/2026-08-23-feat-oura-autopack.md)).
 
 **Logging food evicted the caches before the server had the write (LB-4).** The invalidation fired
 correctly and too early: subscribers refetched a server that lacked the log and re-cached the pre-log
@@ -110,16 +115,10 @@ Three GET routes answered a parameter or configuration question before establish
 anyone — no data leaked, but `GET /api/push/subscribe` disclosed whether the deployment has push
 configured to anybody who asked. `GET /api/oura-ble/decoder-constants` answered a failed constants
 read with an **empty** 500, so a client doing `res.json()` got a parse exception on top of the real
-fault. And `POST /api/day-checkin` accepted a body of `{}` with a 201, writing a row
-indistinguishable from a check-in in which the user answered nothing — guarded now on **both** write
-paths, since the outbox reaches the same table
-([`journal`](docs/overview/entries/2026-08-23-route-hardening-batch.md)).
+fault. And `POST /api/day-checkin` accepted a body of `{}` with a 201, writing a row indistinguishable from a check-in in which the user answered nothing — guarded now on **both** write paths, since the outbox reaches the same table ([`journal`](docs/overview/entries/2026-08-23-route-hardening-batch.md)).
 
 **Three ring-service fixes, none verified on the ring (Q-537, Q-533, Q-388 item 2).** Key backup
-(`/admin/oura-ble` → **Show key for backup**), a re-sync completion notification, and a connect sequence that resets the live-HR levers a killed session left on. **All native — inert until a new
-APK is installed, and until then the ring key has one copy.** `Gate: device`. **Item (3) needed no
-work:** 6,346 battery polls measure the drain the entry called unmeasurable (−22/−24/−22/−38/−15
-overnight), confirming the owner's report; the SpO₂ A/B is wear, not code.
+(`/admin/oura-ble` → **Show key for backup**), a re-sync completion notification, and a connect sequence that resets the live-HR levers a killed session left on. **All native — inert until a new APK is installed, and until then the ring key has one copy.** `Gate: device`. **Item (3) needed no work:** 6,346 battery polls measure the drain the entry called unmeasurable (−22/−24/−22/−38/−15 overnight), confirming the owner's report; the SpO₂ A/B is wear, not code.
 
 **Two affordances came back and the sheet that owned them is gone (LB-3, v1.347.0).** Nothing opened
 `day-overlay-sheet.tsx` after Q-110, so tapping a logged exercise or an activity was dead a fortnight. Both on `/health/day` (the NAME is the target); `health-content.tsx` lost 167 lines.
