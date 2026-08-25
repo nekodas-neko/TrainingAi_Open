@@ -13,6 +13,8 @@
 // someone cutting. Bands are expressed as deviation from that target so the same thresholds
 // work for loss, gain, recomp and maintenance without branching.
 
+import { KCAL_PER_G } from './atwater'
+
 /** Intentional daily calorie offset per goal. Re-exported from the goal recommender so the
  *  deficit the bar bands against is the same one the target was built from. */
 export { CALORIE_ADJUSTMENT_BY_GOAL as GOAL_DAILY_DELTA } from './goal-recommendation'
@@ -116,8 +118,6 @@ export interface MacroTargets {
   fatG: number
 }
 
-/** kcal per gram. Not configurable — these are the Atwater factors the rest of the app uses. */
-const KCAL_PER_G = { protein: 4, carbs: 4, fat: 9 } as const
 
 /**
  * The day's macro targets once movement has grown the calorie budget (Q-323).

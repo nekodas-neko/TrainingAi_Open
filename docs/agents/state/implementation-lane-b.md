@@ -3,7 +3,7 @@
 > **Successor sessions are titled `🚧 Implementation Agent (B) 🟢`** — exactly, emoji included. That
 > title is how six concurrent sessions stay tellable apart; a renamed successor is a lost thread.
 
-**Updated:** 2026-08-25 · **By:** the eleventh Lane B run · **Next ID:** `LB-15`
+**Updated:** 2026-08-25 · **By:** the eleventh Lane B run · **Next ID:** `LB-14`
 
 ## Now
 **Nothing open — every branch merged.** This run landed **18 PRs**: #446 (Q-406 diary row), #447
@@ -57,7 +57,7 @@ pass, Q-450/Q-418 (needs a Polar H10).
   covered by its client caller; **apply is not**, so a Coach `session_exercise` swap leaves
   `workout-data`/`next-session`/`workout-card:` stale — and `workout-card:` is `freshWithinTtl`, the
   condition where stale *survives*. **Lane A's** (`app/api/**`). Read from source, **not reproduced**.
-- **LB-14** — E2E is not a required check; the same red was filed twice, by two agents, hours apart.
+- **LA-22** — E2E is not a required check; the same red was filed three times (LA-22, OR-1, BF-23) by three agents. Lane B's duplicate (LB-14) was folded into LA-22 on merge, so **LB-14 was never used** — the next Lane B id is still LB-14.
   `Gate: owner`.
 
 ## Claimed paths
