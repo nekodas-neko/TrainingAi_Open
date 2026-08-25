@@ -9554,33 +9554,52 @@ per-field merge where an AI write has no honest source rank to claim.
   visual duration — shortening it trades away retry margin for slower-than-typical connections, so
   reconcile + shorten carefully and re-verify on-device, not just visually.
 
-### [nutrition][app-shell] Q-112 — merge "Day in Review" + "End of Day" into one richer daily-review experience; extend to the weekly recap
+### [nutrition][app-shell] Q-112 — the unified day review: the read-through already exists, so this is a flow
 
-- **Branch:** `feat/unified-day-review`
-- **Plan:** [`docs/superpowers/plans/2026-08-05-owner-ui-bug-batch.md`](../docs/superpowers/plans/2026-08-05-owner-ui-bug-batch.md) Task 27
-- **Added:** 2026-08-06 · owner wants Home's "Your Day in Review" (AI digest + HR chart + workout-load
-  chart) merged with Nutrition's "End of Day" (meal backfill + wellness scales + journal), using
-  nutrition's UI as the visual base, with richer data (HR min/max, body composition, calories
-  burned/expended, session volume, body temp, steps, a day-timeline treatment), a nicer
-  banner/notification entry point, a read-through → missed-meals → wrap-up flow, ~7-day rolling
-  lookback, and possibly the same treatment for the weekly recap at a longer lookback. **Explicit
-  ask: primarily a UI/design uplift.**
-- **⚑ Spec-sized, not batch-task-sized — every other entry in this queue is one PR; this one isn't.**
-  Whoever picks this up should write a proper implementation plan first (per the writing-plans
-  convention) rather than execute the batch entry as a checklist — several product decisions
-  (banner vs. notification, exact section-skip logic, which stats get trend treatment) are
-  deliberately left open in the plan-doc entry, not resolved.
-- **Both source components already exist and are more different than the owner may realize**: Day
-  in Review is a thin AI-text + 2-chart Home banner sheet; End of Day is a reasonably rich but
-  visually plain nutrition/wellness/journal sheet triggered from a Nutrition-tab button, not a
-  banner. They share no component today. The weekly analog (`weekly-recap-banner.tsx`/
-  `weekly-digest`) already exists too and is the natural target for the "monthly scale" ask.
-- **No new domain math needed** — every requested stat (HR min/max, body composition, calories
-  burned, session volume, body temp, steps, scores) already has exactly one correct source elsewhere
-  in the app (several catalogued in this same session's Q-105/Q-96/Q-110 investigations); this is an
-  assembly + design problem, not a new-formula problem.
-- **Cross-reference**: shares its swipe-between-days interaction question with Q-110 (same plan doc)
-  — check both before implementing either so the app doesn't end up with divergent swipe patterns.
+- **Branch:** _umbrella_ · **Lane: B** · **Plan:** [`2026-08-25-unified-day-review.md`](superpowers/plans/2026-08-25-unified-day-review.md)
+- **Needs: Q-112e**
+- **Added:** 2026-08-06 · **re-planned 2026-08-25 — Task 27 is now stale in its central premise.** It
+  asked for a new merged day screen; `/health/day` shipped two days later and already draws body
+  composition, energy in/out, per-session volume, steps, scores, sleep and a day HR trace from
+  reusable components. What is missing is one entry point instead of two, three stats, a 7-day
+  comparison, and the wrap-up continuing from the read-through. Reasoning and alternatives: the plan.
+
+### [nutrition][app-shell] Q-112a — one evening flow, one door
+
+- **Branch:** `feat/day-review-one-door` · **Lane: B** · **Plan:** the above, §4
+- Home's banner, Nutrition's End of Day button and **both local reminders' `extra.route`** reach one
+  destination; today the reminders land on `/` and ask the user to find the banner.
+  `day-review-sheet.tsx` is deleted, its digest moving in with the error state it never had.
+
+### [nutrition][app-shell] Q-112b — the read-through becomes step 1, plus the three missing stats
+
+- **Branch:** `feat/day-review-read-through` · **Lane: B** · **Plan:** the above, §4
+- **Needs: Q-112a**
+- `day-sections` render inside the flow off the shared `day-log:<date>` key — no second fetch, no
+  second implementation. Adds HR min/max, body temp (Q-105's derived-first precedence, never the
+  frozen Cloud column) and the AI digest; the same three land on `/health/day` itself.
+
+### [readiness][nutrition] Q-112c — the 7-day comparison window
+
+- **Branch:** `feat/day-review-week-window` · **Lane: A** — `app/api/**`
+- **Needs: Q-112b**
+- The prior-7-day series for the stats that get a trend. Reuse `computeActiveEnergy()`,
+  `/api/workout-load-history`, `body_metrics`, `buildDayAudit`. Anchor at `todayMidnightUtc(tz)`.
+
+### [nutrition][app-shell] Q-112d — draw the trends, on four stats not fourteen
+
+- **Branch:** `feat/day-review-trends` · **Lane: B** · **Plan:** the above, §4
+- **Needs: Q-112c**
+- Resting HR, steps, session volume, weight. Composition percentages move too slowly to read as
+  anything but noise; scores already carry `scoreBand()`'s word. **Check Q-154 first** — without the
+  primitive's missing props, ship a delta chip rather than a fourth inline polyline.
+
+### [nutrition][app-shell] Q-112e — the weekly recap gets the same treatment
+
+- **Branch:** `feat/weekly-recap-uplift` · **Lane: B** · **Plan:** the above, §4
+- **Needs: Q-112d**
+- `weekly-recap-banner.tsx` + `/api/weekly-digest` at the owner's "monthly scale" lookback.
+  Deliberately last, so the daily version settles the layout first.
 
 ### [devices][app-shell] Q-111 — Home header device-battery chips (ring/strap/scale); question whether the manual refresh button is still needed
 
