@@ -5700,30 +5700,6 @@ ehr     0     0     0     0   648   208   128   556     0
   rest band) is already measured — see the ✅ above it. Surfacing is a Lane B UI change once the
   owner has seen the framing; nothing here licenses a rest term in `expectedRpe`.
 
-### [platform] LA-28 — delete the 6 dead repository methods LA-26's check baselined
-
-- **Lane:** A
-- **Added:** 2026-08-25, from LA-26 shipping `scripts/check-dead-repo-methods.js`.
-- **The check ships with 6 baselined, and a baseline is a debt row, not an approval.** Each was
-  verified by hand to have **exactly two references** — its declaration in `lib/data/repository.ts`
-  and its implementation in `lib/data/postgres/adapter.ts` — with no caller and no dynamic-dispatch
-  reach: `isUserActive`, `logExercise`, `getWorkoutSessionOwners`, `getExerciseLogOwners`,
-  `getLastExerciseLog`, `renameExerciseRefs`.
-- **Why they were not deleted in the same PR.** `getWorkoutSessionOwners` and
-  `getExerciseLogOwners` are **bulk ownership lookups**. The live ownership path is
-  `ensureWorkoutSession` (CLAUDE.md names it the reference for verifying client-supplied row ids),
-  so these read as superseded rather than as a missing guard — but "reads as" is not "was verified
-  as", and deleting a security-adjacent helper on that basis inside a PR about a CI script is how a
-  gap gets closed by accident. Confirm the sync-push path verifies ownership by another route
-  first, then delete.
-- **The prize is an empty baseline.** CLAUDE.md's own reference case is
-  `check-aest-midnight-timezone.js`, whose baseline is empty *"so an omitting call site is a
-  regression rather than a debt row"*. Six entries is close enough to reach.
-- Delete the declaration and the implementation together, and remove each name from `BASELINE` in
-  the same PR — the check fails if a baselined name stops being dead, which is what makes it
-  ratchet.
-
-
 ### [workouts] Q-289 — `expectedRpe` misses by more than the autoregulation dead band at both ends of its own range
 
 - **Lane: A — set 2026-08-25 (by Lane B, which the tool was serving it to).** `expectedRpe`,
