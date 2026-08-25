@@ -18,6 +18,25 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
+## 2026-08-25 — `projectOverview.md` 7937 → 7941, `docs/implementation-backlog.md` 11638 → 11658
+
+The owner supplied the Railway charts three queue entries had been parked on, and the readings
+falsify **Q-549**'s premise: `prod_DB` holds **423 MB flat**, not 0.79 GB.
+
+**The first draft of this cost +8 and +50, and the ratchet was right to refuse it.** Most of those
+lines were *measurement*, not queue state — the settings dump, the arithmetic, the caveats, the
+reasoning about where 0.79 GB came from. That belongs in a reference doc, and it now lives in
+[`docs/reviews/2026-08-25-railway-and-db-readings.md`](reviews/2026-08-25-railway-and-db-readings.md)
+(new, unratcheted), linked from the platform index. What is left in the backlog is three short
+pointer blocks — the finding, the consequence for that entry, and a link — which is entry content
+and is what the +20 buys.
+
+The `projectOverview.md` +4 is one new Known-Issues row: the database is growing **~1.6 MB/day
+against `CLAUDE.md`'s stated ~0.4**, almost all of it `oura_raw_samples` doing its job.
+`CLAUDE.md` mandates a row for exactly this, and it is filed as a *measurement awaiting a third
+reading* rather than a defect — two points off a baseline taken immediately after a repack is not
+a trend, and the honest next step is another reading, not a fix.
+
 ## 2026-08-24 — `CLAUDE.md` 1154 → 1155
 
 One line on the backlog-conflict rule, because the class recurred a third time and the rule now has a
