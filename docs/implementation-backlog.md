@@ -1855,6 +1855,50 @@ slow-load question on a clean `pg_stat_statements` read.
   and get rows.
 - **Surface: production only.** Nothing to verify locally beyond the migration applying.
 
+### [app-shell][platform] BF-23 — E2E is red on `main`: Home's quick-log button never appears, and it broke in tonight's six merges
+
+- **Branch:** _unassigned_
+- **Added:** 2026-08-25 · found when PR #445, a **docs-only** change, failed E2E
+- **Lane: B** — Home card rendering. Test-or-app, see below; the implementer decides which.
+- **⚠ This blocks every open PR.** E2E is a required check and the failure is on `main`, so nobody
+  can merge until it is resolved. Same shape as BF-20's Lint break earlier the same night.
+
+**The failure**, `e2e/home-card-invalidation-refetch.spec.ts:59`, twice (original **and** retry, so
+not a flake):
+
+```
+Error: locator.click: Test timeout of 45000ms exceeded.
+  - waiting for getByRole('button', { name: 'Log Body Weight' })
+```
+
+59 passed, 1 failed, 1 flaky (`one-calorie-budget.spec.ts`, an unrelated `ECONNRESET`).
+
+**It is a regression, not a stale test.** The spec landed **2026-08-20** in #275 and has passed
+since. PR #443 passed E2E at **02:26** tonight; this run failed at **03:46**. Six PRs merged in
+between — **#446, #444, #447, #449, #451, #448** — and one of them made that button unreachable.
+**#451** ("Give the last three vanishing cards an error state", Q-499) is the first place to look,
+because it changed what self-fetching cards do instead of `return null`; **#447** (sheet
+back-dismiss under StrictMode) is second, since this test drives a sheet.
+
+**Where the button comes from — there is no literal to grep.** `"Log Body Weight"` appears **nowhere**
+in `app/` or `components/`. It is built at `app/session-select/components/metric-tiles-card.tsx:96`
+as ``aria-label={`Log ${def.label}`}``, and `def.label` is `"Body Weight"` from
+`lib/home/home-prefs.ts:18`. The sheet it opens is `log-value-sheet.tsx`, titled
+``{widget ? `Log ${widget.label}` : "Log"}``. A future session searching for the string will find
+nothing and conclude it was deleted; it was not.
+
+**One thing that was checked and is NOT the cause:** `components/home/home-card-widget.tsx` was
+untouched tonight — its most recent change is #412 on 2026-08-24.
+
+- **What would count as fixed:** the spec passes on `main` without weakening what it asserts. It
+  guards Q-402 — that a Home card refetches on invalidation **without a remount** — and its own
+  commit notes it was mutation-checked, so loosening the selector to make it green would retire a
+  guard that took three attempts to build.
+- **Do not** simply add `metricTiles` to the spec's `enableHomeCards` list until it is established
+  that the card is genuinely meant to be pref-gated. The test passed for five days without it.
+- **Surface: E2E on CI, web-reproducible.** `pnpm exec playwright test e2e/home-card-invalidation-refetch.spec.ts`
+  reproduces without a device.
+
 ### [nutrition][platform] BF-12 — logging a saved meal takes ~20s and the owner couldn't find it after navigating away; traced to the slow fallback firing, not a lost write
 
 - **Lane: A** — the fix is in `logMealItems`/local-store availability, not the UI. No schema.
