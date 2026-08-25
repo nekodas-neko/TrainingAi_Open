@@ -14,7 +14,7 @@ silently misdirecting the next session. Update them in the same PR that consumes
 
 | Pointer | Value | Source of truth |
 |---|---|---|
-| Next free Postgres migration | **219** | `lib/data/postgres/migrations/` |
+| Next free Postgres migration | **220** | `lib/data/postgres/migrations/` |
 | Local SQLite schema version | **v29** | `lib/sqlite/migrations.ts`; `lib/sqlite/__tests__/migrations.test.ts` asserts the max |
 
 > **There is no third pointer any more.** Entry IDs are not allocated from a shared counter and
@@ -2193,37 +2193,24 @@ Do not implement it; the labels alone fix what the owner asked about.
 - **Surface: UI strings only, web-reproducible.**
 
 
-### [workouts] LA-24 — BF-16a's five rows are fixed; eight more carry the same defect
+### [workouts] LA-24 — the three catalogue families where the anatomy is a judgement, not a precedent
 
 - **Branch:** _unassigned_
-- **Added:** 2026-08-25 · measured while shipping BF-16a (migration 216)
+- **Added:** 2026-08-25 · measured while shipping BF-16a
 - **Lane: A** — data correction, no schema. `exercise_library.muscles`.
-- **Does not block BF-15.** BF-16a was its prerequisite and has landed. This is the same class on
-  rows the owner's report did not name.
+- **Gate: owner** — this is the whole entry now.
 
-BF-16a fixed five rows against the movement each mirrors. Scanning the whole live catalogue (140
-seeded rows, `merged_into IS NULL`) for the same shape found **eight more**, in two kinds that want
-different handling — which is why they were filed rather than folded into that PR.
+- ✅ **KIND 1 SHIPPED 2026-08-25 — migration 219.** The five rows another family member already
+  answered: `Dumbbell Overhead Press`, `Machine Shoulder Press` and `Arnold Press` gained **traps**
+  (from `Barbell Overhead Press`), `Lat Pulldown` gained **upper back** (from `Close Grip Lat
+  Pulldown`, `Chin-Up`, `Pull-Up`), and `Decline Bench Press` gained **shoulders** (from `Decline
+  Dumbbell Press` and every other bench/chest press). All five were at 2 muscles, so BF-15's anchor
+  rule barred them; all five are at 3 now.
+  [`journal`](overview/entries/2026-08-25-catalogue-sibling-muscles.md).
 
-**Kind 1 — five rows where another member of the same family already records the muscle.** Adding it
-is propagating the catalogue's own answer, not originating one:
-
-| Row | Records | Add | Already recorded by |
-|---|---|---|---|
-| **Dumbbell Overhead Press** | shoulders(m), triceps(s) | traps(s) | Barbell Overhead Press |
-| **Machine Shoulder Press** | shoulders(m), triceps(s) | traps(s) | Barbell Overhead Press |
-| **Arnold Press** | shoulders(m), triceps(s) | traps(s) | Barbell Overhead Press |
-| **Lat Pulldown** | lats(m), biceps(s) | upper back(s) | Close Grip Lat Pulldown, Chin-Up, Pull-Up |
-| **Decline Bench Press** | chest(m), triceps(s) | shoulders(s) | Decline Dumbbell Press, and every other bench/chest press |
-
-All five sit at 2 muscles, so BF-15's anchor rule (a catalogued exercise with ≥ 3) bars them exactly
-as it barred BF-16a's rows. `Dumbbell Overhead Press` and `Dumbbell Shoulder Press` are also a
-near-duplicate pair — same two muscles, same equipment — and may want a 164-style merge instead of
-two parallel corrections. Decide that first; it changes what this entry does.
-
-**Kind 2 — three rows where BF-16a's own additions have no in-catalogue precedent to propagate.**
-BF-16a took `Barbell Shrug` to traps + upper back + forearms and `Barbell Hip Thrust` to five
-muscles, from anatomy rather than from a sibling. Their families were left at the old values, so the
+**Kind 2 is what is left, and it needs an answer rather than an implementer.** BF-16a took
+`Barbell Shrug` to traps + upper back + forearms and `Barbell Hip Thrust` to five muscles **from
+anatomy, with no in-catalogue precedent**. Their families were left at the old values, so that
 correction created a fresh inconsistency:
 
 | Row | Records | Its corrected sibling now records |
@@ -2232,16 +2219,17 @@ correction created a fresh inconsistency:
 | **Machine Shrug** | traps (1) | Barbell Shrug: traps, upper back, forearms |
 | **Barbell Glute Bridge**, **Bodyweight Glute Bridge**, **Single Leg Hip Thrusts** | glutes(m), hamstrings(s) | Barbell Hip Thrust: + quads, lower back, adductors |
 
-These are **not** a copy-paste: a machine shrug's handles may be supported where a barbell shrug's
-grip is not, and a bodyweight glute bridge does not load the quads the way a barbell hip thrust does.
-`Gate: owner` on this half — it is the same judgement BF-16a was allowed to make once, and making it
+**These are not a copy-paste, which is the reason to ask.** A machine shrug's handles may be
+supported where a barbell shrug's grip is not; a bodyweight glute bridge does not load the quads the
+way a loaded hip thrust does. It is the same judgement BF-16a was allowed to make once, and making it
 five more times without asking is how a catalogue drifts by assertion.
 
-- **What would count as fixed:** Kind 1 shipped as an idempotent append migration in the shape of
-  216, with the family precedent named per row; Kind 2 either shipped with an owner answer or
-  explicitly closed as "correct as recorded" with the reason.
+- **The question for the owner, in one line:** should the shrug and glute-bridge families follow the
+  barbell version, or are they correct as recorded because the loading genuinely differs?
+- **What would count as fixed:** either an idempotent append migration in the shape of 216/219, or
+  the entry closed as "correct as recorded" with the reason written down.
 - **Surface: catalogue data.** Fully reproducible locally — the seeded rows are identical in the dev
-  DB and production (fingerprinted 2026-08-25, all 140 match).
+  DB and production (fingerprinted 2026-08-25).
 
 ### [platform][app-shell] BF-19 — nothing measures app load time, and the one measurable driver is 80 deploys in a day busting the whole offline cache
 
