@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet'
@@ -14,12 +15,16 @@ interface Props {
   log: FoodLogWithItem | null
   onClose: () => void
   onSaved: (updatedLog: FoodLogWithItem) => void
+  /** Removing the log. It lives here because Q-406's shared row carries no controls — without a
+   *  delete in the sheet, converting the diary row would take away the only way to remove a logged
+   *  food, which is LB-1's failure exactly. */
+  onDelete: (logId: string) => void
   userId?: string
 }
 
 const PRESETS = [0.5, 1, 1.5, 2, 3]
 
-export function QuickEditLogSheet({ log, onClose, onSaved, userId }: Props) {
+export function QuickEditLogSheet({ log, onClose, onSaved, onDelete, userId }: Props) {
   const [qty, setQty] = useState(() => log?.quantityMultiplier ?? 1)
   const [saving, setSaving] = useState(false)
   useSheetBackDismiss(!!log, onClose)
@@ -171,6 +176,13 @@ export function QuickEditLogSheet({ log, onClose, onSaved, userId }: Props) {
           </div>
 
           <div className="flex gap-2">
+            <button
+              onClick={() => { if (log) { onClose(); onDelete(log.id) } }}
+              aria-label={`Remove ${item?.name ?? 'this food'}`}
+              className="flex min-h-12 w-12 flex-none items-center justify-center rounded-xl bg-destructive/10 active:bg-destructive/20 transition-colors"
+            >
+              <Trash2 className="h-5 w-5 text-destructive" />
+            </button>
             <button onClick={onClose} className="flex-1 rounded-xl border px-4 py-2.5 text-sm font-medium">
               Cancel
             </button>

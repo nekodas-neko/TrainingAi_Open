@@ -851,48 +851,33 @@ without a queue entry is a dropped finding.*
 
 ### [nutrition][app-shell] Q-406 — the shared food row: two call sites converted, two waiting on their phase
 
+> **✅ THE DIARY ROW CONVERTED 2026-08-25 (v1.367.0)** — `meal-card.tsx` draws the shared `FoodRow`
+> and `QuickEditLogSheet` **gained a delete in the same change**, which this entry required before the
+> conversion could be safe. Q-395a was meant to carry it and did not. Per-item P/C/F moved into the
+> sheet's live preview. [`journal`](overview/entries/2026-08-25-diary-row-shared-shape.md).
+>
+> **⚠ It turned up a pre-existing defect — see LB-10.** The sheet does not open in `pnpm dev` at all,
+> on `main` too: `use-sheet-back-dismiss.ts` is not double-invoke safe. Production is unaffected;
+> edit and delete were verified with `reactStrictMode: false`, then reverted.
+
 - **Branch:** `refactor/nutrition-food-row`
 - **Lane B.** No schema, no route.
 - **✅ GATE CLEARED 2026-08-24 — the drawings are in the repository:**
-  [`docs/design/2026-08-18-nutrition-rework-mockups.html`](design/2026-08-18-nutrition-rework-mockups.html).
-  All twelve artboards, at true S25 size, openable in a browser with no build step and no canvas.
-  This gate's own clearing condition was *"clears when the drawings land under `docs/design/`"*, and
-  they have. **Q-395a/b/c are unblocked too** — they cite the same drawings.
-  - **Recovered, not redrawn.** They were a Claude Design canvas
-    (<https://claude.ai/code/artifact/936866ab-387b-44a3-9de0-de080a8d6c3b>, *"Nutrition UI Review"*)
-    that had never been committed. Every artboard's markup and inline styles are unchanged; only the
-    editor's `<x-dc>`/`<helmet>` wrappers were stripped. **These are the drawings the owner reviewed
-    twice**, not a fresh interpretation of the prose — which is the whole point, since a re-drawing
-    would need re-approving.
-  - **⚠ `unit-options.png` never existed as a file** and no session will ever find it. It was a
-    screenshot of the `srv/g — A/B/C` artboards. Cite `UnitA.dc.html` (page 2 of the committed file).
-  - **⚠ Q-395a's two references are two different artboards.** The EXPANDED row is `srv/g — A`; the
-    COLLAPSED `Full Cream Milk` row is in **`EditMeal.dc.html`** (artboard 5), not in unit-options.
-    Both entries' wording implies one drawing holds both. It does not.
-  - **Known fidelity limit, bounded and marked:** three artboards (`MealsNow`, `Targets`, `UnitA`)
-    used editor-side `sc-for` loops that were never bound to data — they drew N placeholder rows via
-    `hint-placeholder-count`. An inline shim reproduces that, and unbound values render as a muted
-    `{{token}}`, exactly as the canvas showed them. Those captions are marked TEMPLATED. **The six
-    reworked screens on page 1 use no templating and are exact.**
-  - Rendered and checked in Chromium before committing: 12 of 12 artboards draw, no JS errors.
-- **Still owed, and deliberately not a gate:** the two unconverted call sites below need a *design
-  answer* (where a per-row warning goes), not a drawing. Q-395's drawings do not settle it, so it
-  stays an open question for whoever builds the external-food row.
-- **✅ THE COMPONENT SHIPPED 2026-08-23 (v1.338.0)** — `components/nutrition/food-row.tsx`, and the
-  library sheet + the food-database search row now draw it.
-  [`Journal`](overview/entries/2026-08-23-shared-food-row.md). **Q-395a's `Needs: Q-406` is
-  satisfied.**
-- **The other two call sites are deliberately NOT converted, and this is the reason.** The agreed
-  row's only trailing element is a chevron.
-  - **The diary row** (`meal-card.tsx`) carries inline **edit and delete** buttons. Q-395a retires
-    the list-row editor and moves editing into the quantity sheet — but **that sheet does not exist
-    yet**, so converting the diary row now removes the only way to correct a logged food. That is
-    LB-1's failure exactly: a capability deleted by a UI move whose replacement had not been built.
-    **Convert it in Q-395a, in the same PR that adds the sheet.**
-  - **The external food-database row** (`ingredient-search.tsx:132`) carries a macro-mismatch warning
-    line and an in-flight spinner. The agreed row has nowhere to put either, and adding a slot for
-    them is what makes it a wrapper rather than a unification. **Needs a design answer** — where a
-    per-row warning goes — which belongs with Q-395's drawings.
+  [`docs/design/2026-08-18-nutrition-rework-mockups.html`](design/2026-08-18-nutrition-rework-mockups.html),
+  twelve artboards recovered from the owner-reviewed canvas, unchanged. That file's own preamble
+  carries the two corrections these entries need — `unit-options.png` never existed, and Q-395a's two
+  references are two different artboards — plus which three are TEMPLATED. Read it there rather than
+  duplicating it here. **Q-395a/b/c were unblocked by the same landing.**
+- **✅ THE COMPONENT SHIPPED 2026-08-23 (v1.338.0)** — `components/nutrition/food-row.tsx`, drawn by
+  the library sheet and the food-database search row.
+  [`Journal`](overview/entries/2026-08-23-shared-food-row.md).
+- **✅ THE DIARY ROW SHIPPED 2026-08-25 (v1.367.0)** — with the delete this entry required moved into
+  `QuickEditLogSheet` first, so no capability was dropped.
+- **What is left is ONE call site: the external food-database row** (`ingredient-search.tsx:132`),
+  which carries a macro-mismatch warning and an in-flight spinner. The agreed row has nowhere to put
+  either, and adding a slot makes it a wrapper rather than a unification. **Needs a design answer —
+  where a per-row warning goes.** Q-395's drawings do not settle it (checked: none of the twelve
+  artboards shows a warning treatment).
 - **✅ RESOLVED 2026-08-24 — the drawings are in the repository.** **The lesson worth keeping: a
   mockup that lives only in a chat artifact is a mockup the queue cannot use.** These were drawn
   2026-08-18, reviewed twice, decided against — then blocked four entries for six days because
@@ -1210,6 +1195,21 @@ whether or not anyone draws them first.
   the action row), so a fixed container would draw an empty border on the days they are absent.
 - **Keep:** the **device smoke run**, the only thing left — three `divide-y` sections over
   `bg-muted/60` children now, the shape Samsung's compositor has caught out before. `Gate: device`.
+
+### [app-shell][platform] LB-10 — five sheets cannot be opened in `pnpm dev`: the back-dismiss hook is not double-invoke safe
+
+- **Lane:** B · **Added:** 2026-08-25, while converting Q-406's diary row.
+- **`lib/hooks/use-sheet-back-dismiss.ts`** pushes a history entry on open and calls `history.back()`
+  in its cleanup. Under StrictMode's double invoke that is push → `back()` → push, and the `popstate`
+  from the `back()` lands *after* the second push carrying the pre-push state — so the handler sees a
+  `sheetId` that is not its own and fires `onClose()` on the frame the sheet opened.
+- **Measured:** the sheet renders twice with a truthy `log` then flips to null; with
+  `reactStrictMode: false` it opens. Reproduced on `main`, so it predates Q-406.
+- **Production is fine** (no double-invoke), but `pnpm dev` is this repo's pre-merge test surface and
+  **five sheets are unopenable on it**: `quick-edit-log-sheet`, `food-logger-sheet`,
+  `food-library-sheet`, `morning-checkin-sheet`, `end-of-day-review` — same family as Q-461.
+- **Fix shape:** make the handler ignore a pop it caused itself — track whether the cleanup's
+  `back()` is in flight. Prove it by opening one of the five in `pnpm dev` with StrictMode ON.
 
 ### [nutrition][platform] LB-9 — the Atwater factors have four copies, two of them Lane A's
 
