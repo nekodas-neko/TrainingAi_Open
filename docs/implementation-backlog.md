@@ -2539,11 +2539,39 @@ design decision. See the correction at the top of that entry.
 
 ### [nutrition][platform] 🟠 BF-4 — the photo scan feels much slower, and the only dated change is the structured-output conversion
 
+- **Gate:** owner — set 2026-08-25; see the re-measurement below. One photo scan unblocks it.
 - Lane: A — **the Lane B half SHIPPED 2026-08-23 (v1.331.0)**: `capture-step.tsx` bounds the photo to
   1024 px, a **-86.6%** payload cut
   ([`journal`](overview/entries/2026-08-23-bounded-scan-photo-payload.md)). **It was NOT shown to be the
   owner's slowdown** — #112 and the cold-start check are the open half, and both are Lane A's, which
   is why this entry's lane is now A. Nothing here is startable by Lane B.
+
+
+> ### ⚠️ RE-MEASURED 2026-08-25: nothing here is startable — it is waiting on ONE photo scan
+>
+> **The two hypotheses left "on the table" below were already measured** — migration `208`'s header
+> records it, 2026-08-24, against the real model: `maxOutputTokens` changes nothing (never hitting a
+> cap) and `generateObject` costs ~10%, not a regression.
+>
+> **But its conclusion — *"latency tracks OUTPUT tokens almost exactly"* — does not hold for the case
+> this entry is about.** Over all **30** production scans: r(latency, `input_tokens`) = **+0.958**,
+> r(latency, `output_tokens`) = **−0.122**. Both readings can be honest — a probe holding input fixed
+> will see output matter, while in production output barely moves (197→482) and the image swings
+> input 6× (206→1,298). **So the lever is the image payload, not the schema or an output cap.**
+>
+> **Which is what the Lane B half already did — and it has never once run.** The 1024 px bound
+> shipped **2026-08-23**; the newest image-shaped scan is **2026-08-21**. Its **−86.6%** claim is
+> unverified against a real call, and `input_tokens` sat at a near-constant **1,275–1,298** across
+> all 17 image scans — that is the number that should drop.
+>
+> **`payload_bytes` has never captured a value, anywhere.** Not a wiring defect: the route passes
+> `payloadBytes` on the image branch and migration 208 added the column ~08-24; there has simply been
+> no image scan since. Do not read the all-NULL column as broken instrumentation.
+>
+> **➡️ `Gate: owner`, not work.** Everything actionable has shipped. One photo scan answers three
+> questions at once: whether `input_tokens` falls from ~1,280, whether `latency_ms` falls with it,
+> and what the upload leg costs (`payload_bytes` beside `latency_ms` is the subtraction this entry
+> was built for).
 
 **Owner report, 2026-08-23 (verbatim):** *"Ive noticed the nutrition scan for images is alot slower
 than it used to be; can we investigate why - from taking the photo to getting the result is much
@@ -2573,23 +2601,21 @@ route from **`generateText` + `JSON.parse(cleaned)`** to **`generateObject` + th
 and added the one-shot retry (`lib/ai/retry.ts`) in the same PR. That is **19 days before
 instrumentation existed**, which is exactly why the latency table cannot see it.
 
-**This is a plausible mechanism, not a proven one, and the fix is not a revert.** `generateObject`
-constrains decoding to a schema; the schema here is not trivial (10 fields plus a nested
-`ingredients` array of 6 fields each). CLAUDE.md *requires* structured output — "never `JSON.parse` of
-free text" — so restoring the old path is not on the table. What is on the table: check which
-structured-output strategy the SDK uses for Google here, and whether a flatter schema or an explicit
-`maxOutputTokens` shortens it. There is currently **no `maxOutputTokens`, no `temperature` and no
-thinking/provider config anywhere on this call** — every one is an SDK default.
+**The mechanism was plausible and is now retired.** `generateObject` constrains decoding to a
+schema, and CLAUDE.md *requires* structured output, so a revert was never on the table — but the
+2026-08-24 probe measured the cost at **~10%**, not a regression. `maxOutputTokens`, `temperature`
+and provider config are all still SDK defaults, and per the probe that is fine: the model was never
+hitting a cap. **The provider uses native JSON mode** (`responseMimeType` + `responseSchema`, not
+tool-calling) — checked in `@ai-sdk/google`, so the schema-strategy question is answered too.
 
-**Retries are visible in the data and are not firing.** `withAiLogging` captures `started` **before**
-`withAiRetry` (`lib/ai/instrument.ts:102–105`), so `latency_ms` includes a retry *and* its 1–1.5 s
-backoff in a single row. One retry would produce roughly 9.7 s; the observed maximum is **5,013 ms**,
-so no logged scan retried. Ruled out.
+**Retries ruled out.** `withAiLogging` starts its clock **before** `withAiRetry`, so a retry and its
+1–1.5 s backoff would land in one row at roughly 9.7 s; the observed maximum is **5,013 ms**.
 
-**Everything else that could have changed, checked and unchanged:** model (`gemini-3.1-flash-lite`
-throughout), `ScanSchema` (byte-identical since #112), `@ai-sdk/google@2.0.74` / `ai@5.0.192` (last
-moved 2026-05-23), and the route's later commits — #741 added observability, #1298 (2026-08-13) only
-surfaced failures that were previously swallowed.
+**Everything else, checked and unchanged:** model (`gemini-3.1-flash-lite` throughout),
+`@ai-sdk/google` / `ai` (last moved 2026-05-23), and the route's later commits (#741 observability,
+#1298 surfaced previously-swallowed failures). **`ScanSchema` is no longer byte-identical since
+#112** — BF-11b reshaped it to `{identified, candidates[]}` on 2026-08-25; no image scan has run
+since, so its effect is unmeasured along with everything else in point 3 below.
 
 **How to reach the history, since this is the second entry to need it:** the archived repo is
 attachable in-session via `add_repo` (`nekodas-neko/TrainingAI_Old`), then
@@ -2597,19 +2623,12 @@ attachable in-session via `add_repo` (`nekodas-neko/TrainingAI_Old`), then
 
 ---
 
-**⚠️ Read this first: the model call is NOT the regression, and that is measured, not assumed.**
-`ai_call_log` records `latency_ms` per call, so the AI half is directly observable. All 30
-`nutrition-scan` calls in production, split by call shape:
-
-| shape | n | avg | min | max | span |
-|---|---|---|---|---|---|
-| image (~1,275 input tokens) | 18 | **4,168 ms** | 3,498 | 5,013 | 2026-07-26 → 08-21 |
-| text (~215 input tokens) | 12 | 1,667 ms | 1,319 | 2,135 | 2026-07-26 → 08-20 |
-
-**The earliest image scan on record (2026-07-26) took 4,545 ms — above the 18-call average.** The
-model is `gemini-3.1-flash-lite` on every row, so it did not change either. **⚠️ Per Correction 1
-above, this window opens on 2026-07-22 and says nothing before it** — it shows the AI call is stable
-*now*, not that it always was.
+**⚠️ The model call is NOT the regression, and that is measured.** All 30 production scans:
+image (~1,275 input tokens) **n=18, avg 4,168 ms** (3,498–5,013, 07-26 → 08-21); text (~215 tokens)
+**n=12, avg 1,667 ms** (1,319–2,135). The earliest image scan on record (07-26) took 4,545 ms —
+*above* the 18-call average — and the model is `gemini-3.1-flash-lite` on every row. **⚠️ Per
+Correction 1 this window opens 2026-07-22 and says nothing before it**: the AI call is stable *now*,
+not proven always to have been.
 
 **Also ruled out by reading the path, all cheap or absent:**
 - `rateLimit` is an in-memory `Map` (`lib/rate-limit.ts:97`) — no I/O on the request path.
