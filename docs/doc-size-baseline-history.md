@@ -18,6 +18,92 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
+## 2026-08-25 — LA-28 shipped (`docs/implementation-backlog.md` 12021 → 11997, a RATCHET DOWN)
+
+**−24, and it is the first move in the other direction today.** LA-28 completed, so its entry left
+the queue. The baseline follows the file down rather than banking the slack — the point of a
+shrink-only ratchet is that headroom cannot be saved up and spent later.
+
+Worth recording beside the three raises above it (11948 → 11989 → 12005 → 12021 → **11997**): the net
+for the session is **+49**, not the +73 the BF-4 record named, because completing an entry gives the
+lines back. The raises were for entries that were *corrected*; this is one that was *finished*. That
+is the distinction to watch if the trend is ever argued about — a queue file growing because work is
+being recorded is different from one growing because work is being done.
+
+---
+
+## 2026-08-25 — BF-4 re-measured (`docs/implementation-backlog.md` 12005 → 12021)
+
+**+16, and this is the THIRD raise of this file in one session (11948 → 11989 → 12005 → 12021, +73
+total). That is a real cost and is recorded as one rather than absorbed.** The number is 16 rather
+than the 19 first written because LA-26 merged in between and its LA-26 → LA-28 swap freed 3 lines;
+the baseline was set to the file's real length instead of keeping the slack, which is the whole
+point of a shrink-only ratchet. All three are the same
+shape: a queue entry whose premise production contradicted, where the measurement tables are what
+stop the next session re-running the same queries.
+
+The gross addition here was **38**; half of it was paid for by deleting prose the finding made
+stale, which is the only reason the raise is 19:
+
+- The paragraph asking which structured-output strategy the SDK uses and whether `maxOutputTokens`
+  helps — migration 208's own header answered both on 2026-08-24, and the entry never caught up.
+- The "all 30 calls by shape" table, compressed to two lines now that the correlation figure
+  (r=+0.958 on input, −0.122 on output) carries the same conclusion more sharply.
+- The retry ruling-out and the unchanged-dependencies list, both settled.
+
+**If this file needs a fourth raise, compact it instead.** The entries being corrected are long
+because they were written as investigations; several are now answered and could move to
+`docs/reviews/` with a pointer left behind. That is a compaction chore, not a per-PR fix, and it is
+the right response to this trend rather than another +19.
+
+---
+
+## 2026-08-25 — LA-27 answered (`docs/implementation-backlog.md` 11989 → 12005)
+
+**+16, and it closes an investigation rather than opening one.** LA-27 was filed hours earlier in
+the same file asking why a third of `exercise_logs.estimated_1rm` could not be re-derived. It is
+answered: those logs predate `set_logs.planned_pct` persistence (0% of sets before July, 40% in
+July, 94% in August), so the prescription was applied at log time and never written to the set row.
+Not data loss.
+
+**The +16 is almost entirely the recoverability breakdown, and that is the part worth the lines.**
+Of 257 pre-August logs missing the column, 90 carry no style (factor 1.0 is correct), 167 could be
+re-derived via `style_id` → `style_sets`, **but 76 of those belong to a style edited after the log**.
+Progression styles are user-editable, so re-deriving those substitutes today's prescription for the
+one actually trained under. That number is what turns Q-304b from "blocked pending investigation"
+into "the recompute is worse than the defect", and losing it to a size baseline would cost the next
+session the same four production queries.
+
+**Deliberately kept out:** the mechanism is now stated once, in LA-27. Q-304b carries only the
+consequence and points at it — the first draft had both in full and was 22 over instead of 16.
+
+---
+
+## 2026-08-25 — Q-304b re-measured and LA-27 filed (`docs/implementation-backlog.md` 11948 → 11989)
+
+**+41, and it is a new queue entry plus a rewritten one, not accreted prose.**
+
+Q-304b asked for a recompute of 30 `personal_records` rows, gate already cleared by the owner on
+2026-08-24. Measuring against production before building it produced three findings, each of which
+blocks the entry as written, and none of which fits in a line:
+
+1. The specified method moves **zero rows by construction** — `personal_records` derives from
+   `exercise_logs.estimated_1rm`, a stored column, not from `set_logs`.
+2. The blast radius is **277 logs, not 29 sets** — `amrapScaleFactor` discounts from 6 reps up, not
+   the 13+ the entry describes.
+3. **115 of 357 eligible logs cannot be reproduced by either formula**, and it is time-localised:
+   August reproduces 68/68, July 9/102.
+
+Finding 3 became **LA-27** rather than a bullet inside Q-304b, because it blocks Q-304b rather than
+belonging to it, and because it is the one an implementer should take first. That entry is ~28 of
+the 41 lines.
+
+**The two measurement tables are deliberately kept in the queue rather than moved to a review doc.**
+They are what stops the next session re-running the same four production queries, and the entry's
+whole failure mode was a number nobody re-checked.
+
+---
+
 ## 2026-08-25 — Q-112 re-planned into five phases (`docs/implementation-backlog.md` raise withdrawn)
 
 Q-112 — the unified day review — was a single spec-sized entry that said of itself *"whoever picks
@@ -2457,3 +2543,22 @@ no device. A successor that finds the top item untouched should be able to read 
 judged or merely missed, and those are not the same thing.
 
 **A baton that is stale on its numbers is worse than a short one.** It gets trusted.
+
+## 2026-08-25 — `CLAUDE.md` raised, 1159 → 1174 (dark only)
+
+The owner pinned the app to dark and asked for **one** UI/design. That has to live in `CLAUDE.md`
+rather than only in a backlog entry, because the thing it changes is what *every future session*
+does by default: design in one theme, verify in one theme, draw mockups in one theme, and stop
+filing light-mode bugs.
+
+Fifteen lines, and two of them are the ones that earn it. The first says **do not delete the light
+palette** — unreachable CSS custom properties cost nothing at runtime, and deleting them is the only
+irreversible half of this decision. The second draws the distinction a reader will otherwise get
+wrong: **theme is pinned, accent is not.** `data-brand` is still user-picked, so a hex literal still
+bypasses the colour the user chose and `check-hex-literals.js` still ratchets it. Without that line,
+"dark only" reads as "literals are fine now", which would quietly break the brand picker.
+
+The four existing light-mode rules below it were amended in place rather than deleted, each saying
+which half of it dark-only retires and which half still binds — a deleted rule leaves no trace of why
+it went, and two of them still guard live hazards (`var(--x)` in canvas paint; a cutout painting over
+the wallpaper layer).

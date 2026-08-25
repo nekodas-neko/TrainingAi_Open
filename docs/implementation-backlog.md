@@ -14,7 +14,7 @@ silently misdirecting the next session. Update them in the same PR that consumes
 
 | Pointer | Value | Source of truth |
 |---|---|---|
-| Next free Postgres migration | **222** | `lib/data/postgres/migrations/` |
+| Next free Postgres migration | **224** | `lib/data/postgres/migrations/` |
 | Local SQLite schema version | **v29** | `lib/sqlite/migrations.ts`; `lib/sqlite/__tests__/migrations.test.ts` asserts the max |
 
 > **There is no third pointer any more.** Entry IDs are not allocated from a shared counter and
@@ -1150,44 +1150,35 @@ Both device gates passed and both entries closed. Four findings came out of the 
 than the checks: two are nutrition-screen work and sit in the section above (BF-24, BF-26); these
 two are app-wide and sit here.*
 
-### [app-shell][platform] BF-25 — the light theme has no switch, and the owner wants it gone
+### [app-shell][platform] BF-25 — pin the app to dark: `forcedTheme="dark"`, palette kept
 
 - **Lane:** B
-- **Gate:** owner
-- **Added:** 2026-08-25, device smoke run ⑤ — *"Do we have an option in the app to go between dark
-  and light mode? I vote we remove dark/ight mode and only have one real option which is the dark."*
+- **✅ DECIDED BY THE OWNER 2026-08-25** — *"yes lets keep it as forced dark mode. then we need to
+  only make one UI/design"*. The `Gate: owner` is cleared; this is now ordinary implementation work.
+- **The standing consequence is already in `CLAUDE.md`** → *Visual consistency & theme*, the dark-only
+  rule. Read it before starting: it is what future sessions bind to, and it draws the one distinction
+  that matters — **theme is pinned, accent is not.** `data-brand` is still user-picked, so hex
+  literals are still a defect and `check-hex-literals.js` still ratchets them.
 
-**The answer to the question, because it changes the decision: no, there is no switch.**
-`grep -rn 'setTheme('` over `app/` and `components/` returns **zero** call sites. `app/layout.tsx:140`
-mounts `<ThemeProvider attribute="class" defaultTheme="system" enableSystem>`, so the theme follows
-the **phone's** setting and nothing in the app can change it. Light mode is not an option the owner
-chose and can un-choose; it is what the app becomes if the S25 is ever put in light mode.
+**The change, and its two halves — only the first ships.**
 
-**Recommendation: force dark, keep the light palette.** These are two separable changes and only one
-of them is worth making.
-
-- **Do:** `forcedTheme="dark"` on the provider — one line, and after it no user, no OS setting and no
-  auto-scheduled night mode can produce a light render. Reversing it is deleting the prop.
-- **Do not:** delete the light palette. The `:root` block in `app/globals.css` (the `.dark` block
-  overrides it), the scheme-conditional pairs in `resolveColor`, `HERO_GRADIENTS`,
-  `lib/background/screen-palettes.ts`, and the `resolvedTheme` reads in
-  `components/nutrition/weekly-nutrition-chart.tsx` and `components/health/detail-hero.tsx` all cost
-  **nothing while unreachable** — dead CSS custom properties are not paid for at runtime. Deleting
-  them is a wide, hand-verified sweep whose only benefit is tidiness, and it is the half that cannot
-  be undone.
-- **What it buys immediately:** every "verify in both themes" gate in this repo collapses to one
-  theme, including the ones sitting open on Q-395a and BF-26 right now. That is the real saving, and
-  the one-line change delivers all of it.
-- **Reversal cost:** removing the prop, if `forcedTheme` alone ships. Weeks of re-derivation, if the
-  palette goes too.
-- **The one thing to check before shipping even the one-liner:** the `useTheme()` mounted-gate hazard
-  in CLAUDE.md defaults to dark during SSR, so forcing dark cannot introduce a flash — but confirm
-  `next-themes` still stamps `.dark` synchronously under `forcedTheme`, since three components
-  document depending on exactly that.
-
-- **Verification.** Put the S25 in light mode and confirm the app stays dark end to end. Then grep
-  for surfaces reached outside the provider — the icon routes and any canvas paint — since a forced
-  class cannot reach those.
+- **DO:** `forcedTheme="dark"` on the `ThemeProvider` in `app/layout.tsx:140` (currently
+  `defaultTheme="system" enableSystem`). One line. After it, no OS setting and no auto-scheduled
+  night mode can produce a light render. Reversing it is deleting the prop.
+- **DO NOT:** delete the light palette — the `:root` block in `globals.css` (`.dark` overrides it),
+  the `resolveColor` scheme pairs, `HERO_GRADIENTS`, `lib/background/screen-palettes.ts`, and the
+  `resolvedTheme` reads in `weekly-nutrition-chart.tsx` and `detail-hero.tsx`. Dead CSS custom
+  properties are not paid for at runtime. Deleting them is a wide hand-verified sweep whose only
+  benefit is tidiness, and it is the half that cannot be undone.
+- **⚠ Check one thing before shipping even the one-liner.** Three components document depending on
+  `next-themes` stamping `.dark` on `<html>` **synchronously, before React hydrates**. Confirm that
+  still holds under `forcedTheme` rather than assuming — if it does not, a page-root surface flashes
+  on every navigation, which is the exact bug this is supposed to close.
+- **Verification.** Put the S25 in light mode and confirm the app stays dark end to end. Then check
+  the surfaces the provider cannot reach — the icon routes, which have no CSS, and any canvas paint.
+  `Gate: device`.
+- **What it buys immediately:** every "verify in both themes" gate in this repo collapses to one, and
+  every artboard and mockup from here is drawn dark only.
 
 ### [app-shell] BF-27 — the back gesture now closes every sheet and dialog; nobody has pressed it on the phone
 
@@ -1374,6 +1365,203 @@ Review: [`docs/reviews/2026-08-25-threshold-sweep.md`](reviews/2026-08-25-thresh
   removed). Until it runs every pass test here is unmeasured: deviation mean within ±0.05 °C with
   ~half the nights negative; `temp_dev_c > 1.0` on 0 nights (TN-8); biomarker table re-measured,
   since every z moves ~19× and the radar may then fire too often (Q-506).
+### [readiness] TN-9 — readiness moves when the check-in is logged; the owner wants it final on first open
+
+- **Branch:** _unassigned_
+- **Added:** 2026-08-26 · owner instruction: *"we shouldn't have readiness move the number — the numbers should be fully set on first open/load."*
+- **Lane: A** — `packages/shared/src/health/readiness-composite.ts`
+- **Owner sign-off: RECEIVED 2026-08-26** for the intent (the number must be settled at first load).
+  The mechanism below is the recommendation; confirm it before shipping if it changes.
+
+`READINESS_WEIGHTS.checkin = 0.10`, and an unlogged check-in contributes
+`NEUTRAL = { score: 50, provisional: true }` (`readiness-composite.ts:72`). So **10% of readiness is
+a frozen 50 until the owner answers the card, and the score then moves.** That is exactly the
+behaviour the instruction rules out.
+
+**It also contradicts the card's own copy.** The Log Readiness card reads *"It tunes today's session,
+not your whole plan"* — but logging also shifts the readiness score the user already read at the top
+of the same screen.
+
+**Recommendation: drop `checkin` from the composite and renormalise over the remaining eight.** The
+check-in keeps driving the session prescription, which is what its card claims and what it is
+actually good for; readiness becomes fully objective and therefore final the moment the overnight
+data is in.
+
+**Measured over the 35 days holding a stored contributor set:**
+
+| | |
+|---|---|
+| days the check-in was actually logged | **32 of 35 (91%)** |
+| readiness mean, with `checkin` | **69.9** (sd 11.59) |
+| readiness mean, without | **70.4** (sd 11.79) |
+| mean per-day change | **+0.44** |
+| largest single-day move | **3.84** |
+| days moving ≥2 pts | **4 of 35** |
+| days moving ≥5 pts | **0 of 35** |
+
+So the change is nearly free — it does not shift the level, and sd rises slightly rather than
+compressing. **This is unusual and worth stating: removing a 10% contributor normally moves a score,
+and here it does not, because the logged check-in tracks the objective contributors closely enough
+that it was adding little independent information.**
+
+**What it costs:** the composite's header comment says a great check-in is what lets a day *"reach a
+true 100"*. Dropping it lowers the practical ceiling a little. Measured, nothing reached 100 anyway.
+
+**Pass test:** readiness for a given day is byte-identical before and after a check-in is logged;
+mean over the trailing 30 days within ±1 of the current mean; the Log Readiness card's copy still
+matches what logging does.
+
+**Do not instead "exclude when unlogged and include when logged"** — that still moves the number the
+moment the owner answers, which is the thing being removed.
+
+### [sleep] TN-10 — `TOTAL_SLEEP`'s comment and its curve disagree by ~15 points, on the heaviest contributor
+
+- **Branch:** _unassigned_
+- **Added:** 2026-08-26 · found while explaining a 57 on a 7.75 h night
+- **Lane: A** — `packages/shared/src/health/sleep-score.ts:60-61`
+- **Gate: owner** — changes a score. Not signed off.
+- **Sequence after TN-5** (the calibration curve) so two sleep changes are not evaluated at once.
+
+The anchors and the line documenting them do not agree:
+
+| hours | curve gives | the comment claims |
+|---|---|---|
+| 7.6 | **71.4** | *"~86"* |
+| 8.0 | **77.0** | *"8h is excellent (~92)"* |
+| 9.0 | **92.0** | *"100 at ~9h"* |
+
+The comment reads as though written against anchors one position further along than the ones present.
+**`totalSleep` carries weight 24 of 110 — the largest of the ten** — so a ~15-point error there is
+~3.3 blend points on every night in the 7.5–8 h band, which is where most of the owner's nights land.
+
+**Which is wrong is the open question, and it is not answerable from the data.** Either the comment
+is stale and the curve is deliberate, or the anchors were shifted and the comment records the
+intent. **Read the plan the comment cites**
+(`docs/superpowers/plans/2026-07-22-core-score-cards-and-activity-overhaul.md`, W-C) before changing
+either — that plan is the only record of what the shape was meant to be.
+
+**Worked example, the owner's 2026-08-26 night:** 7.75 h scored **73.5** on this contributor against
+a comment implying ~89. Blend 73.15 → displayed **57** (reproduced exactly from the stored value).
+
+**⛔ Do not fix this by raising the curve to match the comment without reading that plan.** A duration
+curve that reaches the 90s at 8 h is a different product decision from one that needs 9 h, and the
+current shape may be the deliberate one — the file's own header says the recalibration was meant to
+make a good night *"land in the 80s"*, which the curve does and the comment does not.
+
+**Pass test:** whichever way it is resolved, the comment and the anchors state the same thing, and a
+test asserts the sub-score at 7.6 / 8.0 / 9.0 h so they cannot drift apart again.
+
+### [activity][heart-rate] TN-11 — "moved this hour" is really "the ring recorded something this hour": 99.8% of waking hours qualify
+
+- **Branch:** _unassigned_
+- **Added:** 2026-08-26 · owner asked how move hours are tracked and whether sleep is counted
+- **Lane: A** — `packages/shared/src/health/hourly-movement.ts`, `lib/health/readiness-payload.ts:324`
+- **Answers the open half of Q-522** (moveHours saturated, 100 on 48 of 59 days). Q-188 fixed the
+  *denominator*; this is why the *numerator* saturates. **Supersede Q-522's "unrelated reason" line.**
+
+**How it works.** An hour in `[wakeHour, sleepHour)` counts as *moved* when **at least one HR reading
+that hour** exceeds `HR_REST_THRESHOLD` (0.05 of HR reserve). Goal = `sleepHour − wakeHour`.
+
+**Why it is always 100.** With the owner's reserve (168 − 52) the boundary is **57.8 bpm**, and only
+**1.57% of waking time** sits below that (measured for TN-2). Requiring *one* reading in a
+**60-minute** window to clear it is the weakest possible test. Measured over 45 days / **657 waking
+hours holding data**:
+
+| "moved" boundary | hours qualifying |
+|---|---|
+| **57.8 bpm (shipped)** | **99.8%** |
+| 64 bpm (TN-2's upper bracket) | **97.6%** |
+| 70 bpm | 90.1% |
+| 80 bpm | 63.5% |
+| 95 bpm | 25.4% |
+
+657 hours over 45 days is **14.6 of the 15-hour window**, so the numerator is effectively "hours the
+ring recorded anything" and the ratio is ~1 by construction.
+
+**⛔ TN-2 does not fix this, and that is the point worth carrying.** Both read `HR_REST_THRESHOLD`,
+but they ask different questions — TN-2 needs the boundary between *resting and not*, this needs the
+boundary between *sedentary and moving*. At TN-2's most generous proposed offset it is still 97.6%.
+**Do not close this as a side effect of TN-2**, and do not fix it by pushing `HR_REST_THRESHOLD`
+higher — that would break Body Battery's charge window in the other direction.
+
+**⚑ HR ALONE IS THE WRONG INPUT — use MET, which this app already decodes.** The owner raised this
+directly (*"its just HR?? that's not enough right? it needs HR + movement like accel"*) and it is the
+better framing than the "sustained elevation" this entry first proposed. Heart rate rises for stress,
+caffeine, digestion, heat and standing up; **an hour of anxious desk work is indistinguishable from
+an hour of walking**, which is exactly the confusion a move-every-hour prompt must not make.
+
+**The accelerometer-derived signal is already available on the same pipeline:**
+- `getOuraDaytimeSignals` (`adapter.ts:4959`) decodes **MET** from raw BLE frames, **tag `0x50`**,
+  alongside skin temperature, through the two-tier `readRawFrames`.
+- `MET_ACTIVE_THRESHOLD = 1.8` already exists (`daily-medians.ts:51`) and is **Oura's own** activity
+  threshold — the same `1.8` appears as `ring_met_limit` in `stress_daytime_sensing`. So the constant
+  does not need inventing or fitting.
+- The daytime-stress model already consumes an intraday MET series, so this is a signal the app
+  decodes and discards for this purpose rather than one it lacks.
+
+**Recommended test:** an hour counts as moved when its MET series shows sustained activity — e.g. a
+run of samples above `MET_ACTIVE_THRESHOLD`, not a single touch. Keep HR only as a secondary
+confirmation if it earns its place; MET is the direct measurement and HR is a proxy for it.
+
+**⚠️ Two implementation facts, both measured:**
+1. **`readiness-payload.ts` does NOT currently fetch daytime signals** — `computeMovedHours` is called
+   at line 324 with HR only, so adding MET means either a new decode on that path or moving the
+   computation to where MET is already loaded (`/api/body-battery` fetches it today). Decide that
+   before writing the test; a per-request raw-frame decode is not free.
+2. **The hourly MET distribution could NOT be measured for this entry**, and that gap is the first
+   thing to close. Intraday MET is decoded from raw frames rather than stored in a column, and
+   `decoded` is NULL on the hot tier — so SQL cannot reach it. The daily `met_avg` (n=51, range
+   1.004–1.636, mean 1.360) is a **daily average and says nothing about hourly discrimination** —
+   a daily mean above 1.8 would mean an entire day of activity, so "0 of 51 days exceed the sample
+   threshold" is expected and is **not** evidence either way. **Measure the hourly MET distribution
+   before picking the run-length**, or the threshold is fitted to nothing.
+
+**Sleep is excluded, but by a hardcoded clock window rather than the owner's sleep.**
+`computeMovedHours` accepts `wakeHour`/`sleepHour`, and **`readiness-payload.ts:324` never passes
+them**, so every day uses `DEFAULT_WAKE_HOUR = 7` / `DEFAULT_SLEEP_HOUR = 22`. Consequences:
+- Sleep is doubly protected in practice — outside the window *and* below the boundary, since the
+  owner's overnight HR runs ~50–55 against a 57.8 bpm bar. **So "does it count sleep?" is: no.**
+- But a 06:00 wake (the owner's actual pattern) has **an hour of genuine waking time excluded** from
+  both numerator and denominator, and a sleep-in past 07:00 would count those hours as waking.
+- The sleep window is already known per night (`sleep_sessions`). Passing it is a small change and
+  makes the metric describe the owner's day rather than a generic one.
+
+**Pass test:** over the trailing 30 days the contributor is neither pinned at 100 nor at 0 — target a
+spread with a median in the 50–85 band and at least 20% of days below 70; and `computeMovedHours` is
+called with the night's real wake/sleep hours, asserted by a test.
+
+### [activity] TN-12 — there is no way to see hourly movement, and the one surface that exists is pinned at full
+
+- **Branch:** _unassigned_
+- **Added:** 2026-08-26 · owner request: *"id like to see something for it to make sure there is moment every hour"*
+- **Lane: B**
+- **Needs: TN-11** — and this dependency is the whole point, see below.
+
+The owner reported seeing nothing for move hours. **There is exactly one surface**:
+`app/health/activity/activity-content.tsx:64` renders `moveHours` against
+`moveHoursGoal ?? 15`, inside a block that only appears when zone-minutes or move-hours are non-null.
+It is on Health → Activity, not Home, and there is **no nudge, no notification and no per-hour
+breakdown** anywhere.
+
+**Why it must wait for TN-11.** The metric currently reads 15/15 on essentially every day (99.8% of
+waking hours qualify), so a nudge built on it **would never fire** and an hourly dash would show a
+full row of ticks every day regardless of what the owner did. Shipping the surface first would look
+like the feature works and would quietly teach the owner to ignore it.
+
+**What to build once TN-11 lands:**
+- **An hourly strip** — one cell per hour of the real waking window, filled when that hour met the
+  movement test, so "was there movement every hour" is answerable at a glance. The stress-strip in
+  `components/body-battery/stress-strip.tsx` is the nearest existing pattern.
+- **Home placement**, since the owner looked there first and the Health → Activity page is two taps
+  away.
+- **A nudge is a separate decision, not a given.** The app has **no cron layer** (`docs/module-map.md`
+  §0), so an hourly "you haven't moved" notification is not a small addition — it needs a scheduling
+  mechanism that does not exist. Scope the strip first; raise the nudge as its own entry with that
+  constraint stated, rather than assuming a notification is cheap.
+
+**Pass test:** on a day with a genuinely sedentary hour, that hour's cell reads empty on the strip and
+the day's move-hours total is below the goal.
+
 ### [readiness] TN-6a — suspend the temperature penalty until its baseline is centred
 
 - **Branch:** _unassigned_
@@ -1483,6 +1671,31 @@ samples) — it is already queued and is a plausible contributor to why the EMA 
 **Pass test:** stored deviation mean within ±0.05 °C of zero over the trailing 30 nights; at least
 40% of nights negative; the −10 arm firing on under 20% of nights; and the illness radar able to
 reach its `watch` threshold on at least one historical night (the Q-506 half).
+
+**➕ Add one more pass test — the Body Battery morning anchor (measured 2026-08-26).** The owner
+reported the battery starting low on waking: *"battery starts at 57? I figured it should be much
+higher when waking up."* **The battery does not charge overnight** — `walkBodyBattery` filters to
+`tsMs >= wakeTime`, so the anchor *is* the whole overnight story, and `resolveAnchor` sets it to the
+readiness score. A readiness score carrying a −10/−20 temperature penalty therefore lands directly on
+the number the owner reads at 7 am.
+
+Measured over the 35 days where both a battery row and a temperature deviation exist:
+
+| | now | with the penalty removed |
+|---|---|---|
+| mean morning anchor | **64.8** | **76.8** |
+| mornings waking "Charged" (≥75) | **7/35 (20%)** | **21/35 (60%)** |
+
+**Conservative** — the 6 days whose deviation exceeded 1.0 °C were *clamped* to 40 rather than
+subtracted from, and a clamp cannot be reversed by adding the penalty back, so those days are counted
+as unchanged. The real improvement is larger.
+
+So **fixing the baseline is also the fix for "the battery never wakes up full"**, and the pass test
+gains a line: after the re-derivation, the mean morning anchor sits **above 75** over the trailing 30
+days. **Do not redesign the anchor or add overnight charging to chase this** — that would be a large
+change to a value Q-511 shows is load-bearing, aimed at a symptom this fix already removes.
+Re-measure after it lands; if the anchor still reads low then, *that* is when the design question is
+real.
 
 **Not established:** whether the owner was actually ill on any flagged night. The finding is that a
 permanently-positive deviation cannot tell illness from baseline error.
@@ -2529,11 +2742,39 @@ design decision. See the correction at the top of that entry.
 
 ### [nutrition][platform] 🟠 BF-4 — the photo scan feels much slower, and the only dated change is the structured-output conversion
 
+- **Gate:** owner — set 2026-08-25; see the re-measurement below. One photo scan unblocks it.
 - Lane: A — **the Lane B half SHIPPED 2026-08-23 (v1.331.0)**: `capture-step.tsx` bounds the photo to
   1024 px, a **-86.6%** payload cut
   ([`journal`](overview/entries/2026-08-23-bounded-scan-photo-payload.md)). **It was NOT shown to be the
   owner's slowdown** — #112 and the cold-start check are the open half, and both are Lane A's, which
   is why this entry's lane is now A. Nothing here is startable by Lane B.
+
+
+> ### ⚠️ RE-MEASURED 2026-08-25: nothing here is startable — it is waiting on ONE photo scan
+>
+> **The two hypotheses left "on the table" below were already measured** — migration `208`'s header
+> records it, 2026-08-24, against the real model: `maxOutputTokens` changes nothing (never hitting a
+> cap) and `generateObject` costs ~10%, not a regression.
+>
+> **But its conclusion — *"latency tracks OUTPUT tokens almost exactly"* — does not hold for the case
+> this entry is about.** Over all **30** production scans: r(latency, `input_tokens`) = **+0.958**,
+> r(latency, `output_tokens`) = **−0.122**. Both readings can be honest — a probe holding input fixed
+> will see output matter, while in production output barely moves (197→482) and the image swings
+> input 6× (206→1,298). **So the lever is the image payload, not the schema or an output cap.**
+>
+> **Which is what the Lane B half already did — and it has never once run.** The 1024 px bound
+> shipped **2026-08-23**; the newest image-shaped scan is **2026-08-21**. Its **−86.6%** claim is
+> unverified against a real call, and `input_tokens` sat at a near-constant **1,275–1,298** across
+> all 17 image scans — that is the number that should drop.
+>
+> **`payload_bytes` has never captured a value, anywhere.** Not a wiring defect: the route passes
+> `payloadBytes` on the image branch and migration 208 added the column ~08-24; there has simply been
+> no image scan since. Do not read the all-NULL column as broken instrumentation.
+>
+> **➡️ `Gate: owner`, not work.** Everything actionable has shipped. One photo scan answers three
+> questions at once: whether `input_tokens` falls from ~1,280, whether `latency_ms` falls with it,
+> and what the upload leg costs (`payload_bytes` beside `latency_ms` is the subtraction this entry
+> was built for).
 
 **Owner report, 2026-08-23 (verbatim):** *"Ive noticed the nutrition scan for images is alot slower
 than it used to be; can we investigate why - from taking the photo to getting the result is much
@@ -2563,23 +2804,21 @@ route from **`generateText` + `JSON.parse(cleaned)`** to **`generateObject` + th
 and added the one-shot retry (`lib/ai/retry.ts`) in the same PR. That is **19 days before
 instrumentation existed**, which is exactly why the latency table cannot see it.
 
-**This is a plausible mechanism, not a proven one, and the fix is not a revert.** `generateObject`
-constrains decoding to a schema; the schema here is not trivial (10 fields plus a nested
-`ingredients` array of 6 fields each). CLAUDE.md *requires* structured output — "never `JSON.parse` of
-free text" — so restoring the old path is not on the table. What is on the table: check which
-structured-output strategy the SDK uses for Google here, and whether a flatter schema or an explicit
-`maxOutputTokens` shortens it. There is currently **no `maxOutputTokens`, no `temperature` and no
-thinking/provider config anywhere on this call** — every one is an SDK default.
+**The mechanism was plausible and is now retired.** `generateObject` constrains decoding to a
+schema, and CLAUDE.md *requires* structured output, so a revert was never on the table — but the
+2026-08-24 probe measured the cost at **~10%**, not a regression. `maxOutputTokens`, `temperature`
+and provider config are all still SDK defaults, and per the probe that is fine: the model was never
+hitting a cap. **The provider uses native JSON mode** (`responseMimeType` + `responseSchema`, not
+tool-calling) — checked in `@ai-sdk/google`, so the schema-strategy question is answered too.
 
-**Retries are visible in the data and are not firing.** `withAiLogging` captures `started` **before**
-`withAiRetry` (`lib/ai/instrument.ts:102–105`), so `latency_ms` includes a retry *and* its 1–1.5 s
-backoff in a single row. One retry would produce roughly 9.7 s; the observed maximum is **5,013 ms**,
-so no logged scan retried. Ruled out.
+**Retries ruled out.** `withAiLogging` starts its clock **before** `withAiRetry`, so a retry and its
+1–1.5 s backoff would land in one row at roughly 9.7 s; the observed maximum is **5,013 ms**.
 
-**Everything else that could have changed, checked and unchanged:** model (`gemini-3.1-flash-lite`
-throughout), `ScanSchema` (byte-identical since #112), `@ai-sdk/google@2.0.74` / `ai@5.0.192` (last
-moved 2026-05-23), and the route's later commits — #741 added observability, #1298 (2026-08-13) only
-surfaced failures that were previously swallowed.
+**Everything else, checked and unchanged:** model (`gemini-3.1-flash-lite` throughout),
+`@ai-sdk/google` / `ai` (last moved 2026-05-23), and the route's later commits (#741 observability,
+#1298 surfaced previously-swallowed failures). **`ScanSchema` is no longer byte-identical since
+#112** — BF-11b reshaped it to `{identified, candidates[]}` on 2026-08-25; no image scan has run
+since, so its effect is unmeasured along with everything else in point 3 below.
 
 **How to reach the history, since this is the second entry to need it:** the archived repo is
 attachable in-session via `add_repo` (`nekodas-neko/TrainingAI_Old`), then
@@ -2587,19 +2826,12 @@ attachable in-session via `add_repo` (`nekodas-neko/TrainingAI_Old`), then
 
 ---
 
-**⚠️ Read this first: the model call is NOT the regression, and that is measured, not assumed.**
-`ai_call_log` records `latency_ms` per call, so the AI half is directly observable. All 30
-`nutrition-scan` calls in production, split by call shape:
-
-| shape | n | avg | min | max | span |
-|---|---|---|---|---|---|
-| image (~1,275 input tokens) | 18 | **4,168 ms** | 3,498 | 5,013 | 2026-07-26 → 08-21 |
-| text (~215 input tokens) | 12 | 1,667 ms | 1,319 | 2,135 | 2026-07-26 → 08-20 |
-
-**The earliest image scan on record (2026-07-26) took 4,545 ms — above the 18-call average.** The
-model is `gemini-3.1-flash-lite` on every row, so it did not change either. **⚠️ Per Correction 1
-above, this window opens on 2026-07-22 and says nothing before it** — it shows the AI call is stable
-*now*, not that it always was.
+**⚠️ The model call is NOT the regression, and that is measured.** All 30 production scans:
+image (~1,275 input tokens) **n=18, avg 4,168 ms** (3,498–5,013, 07-26 → 08-21); text (~215 tokens)
+**n=12, avg 1,667 ms** (1,319–2,135). The earliest image scan on record (07-26) took 4,545 ms —
+*above* the 18-call average — and the model is `gemini-3.1-flash-lite` on every row. **⚠️ Per
+Correction 1 this window opens 2026-07-22 and says nothing before it**: the AI call is stable *now*,
+not proven always to have been.
 
 **Also ruled out by reading the path, all cheap or absent:**
 - `rateLimit` is an in-memory `Map` (`lib/rate-limit.ts:97`) — no I/O on the request path.
@@ -5205,44 +5437,101 @@ ehr     0     0     0     0   648   208   128   556     0
   sequence has a `deload` phase at position 4 (Accumulation 4 → Intensification 3 → Peak 2 →
   Testing 1), so ~10 cycles between deloads. Long-ish, but a program-design choice.
 
-### [workouts] Q-304b — recompute (or leave) the 30 `personal_records` rows written before the AMRAP correction
+### [workouts] Q-304b — the PR recompute cannot be done as specified, and the real blast radius is 8× larger
 
 - **Lane:** A
-- **Added:** 2026-08-24 · split off Q-304 when its forward fix shipped · **owner answered the same
-  day: recompute** (the `Gate: owner` is cleared — see the decision below)
-- **Q-304's forward fix shipped** (`packages/shared/src/1rm.ts` — an unprescribed set now gets the
-  same `amrapScaleFactor` band discount an explicit AMRAP set already got via `calcAmrap1RM`, so a
-  13+ rep set with no progression style no longer feeds the 1RM estimate un-discounted). Verified:
-  measured against production first (1 of 29 flagged sets carried a style, so the qualifier that
-  would have closed the entry did not), 3 new tests at 13/20/21 reps plus the no-double-correction
-  case, full suite green.
-- **✅ DECIDED 2026-08-24 — RECOMPUTE. Gate cleared; this is now work, not a question.**
-  - **Lane: A** — it writes `personal_records`.
-  - **The framing that decided it: `personal_records` is a derived CACHE, not a primary record.**
-    `set_logs` holds what was actually lifted and is **not touched** — it stays the source of truth.
-    The stored `estimated1rm` is that data run through the 1RM formula, and the formula had a bug, so
-    the corrected value is **derivable and verifiable rather than a guess**. That is why this is not
-    the "silently rewriting your training history" hazard it first reads as, and why it differs from
-    a case where the raw record itself was wrong.
-  - **The prescription impact is real but NARROWER than this entry implied — do not over-state it in
-    the PR.** `resolveWorkingBasis` (`packages/shared/src/1rm.ts:398`) takes `lastNonDeload1rm`
-    **first**; `allTimePr1rm` is reached only when there is no real logged session at all, and even
-    then competes with `seedEstimate` via `Math.max`. So an inflated PR drives the prescribed weight
-    only for an exercise carrying a PR but **no recent log** — where it prescribes too heavy. The
-    everyday cost is the PR badge (`exercise-summary-screen.tsx`, `prBar`) and the AI chat's
-    `getPersonalRecords` tool reporting numbers never actually hit.
-- **How to do it.** Recompute the affected rows from `set_logs` through the corrected formula — the
-  same `amrapScaleFactor` path the forward fix now uses, imported, never re-derived (One Formula,
-  One Place). **Idempotent and unconditional**, per the Postgres-migration rules: running it twice
-  must not move a row twice, and it must not depend on a seed that may not exist.
-- **⚠ This is a data-changing migration — the destructive carve-out applies.** The owner has
-  authorised the *recompute* (2026-08-24); that is not a blanket approval of the migration's shape.
-  **Report the before/after per exercise in the PR**, and expect to show it before merging.
-- **Verification.** Measure against production first — 29 flagged sets, 30 PR rows, and only 1 of 29
-  carried a progression style. State how many rows actually moved and by how much; a recompute that
-  moves zero rows is a finding (the formula path was not what wrote them) and not a success.
+- **Gate:** owner — **re-gated 2026-08-25.** The owner authorised a recompute of 30 `personal_records`
+  rows on 2026-08-24. What the data actually asks for is a rewrite of **277 `exercise_logs`**, a
+  third of which cannot currently be explained. That is a different decision from the one that was
+  authorised, so it goes back rather than proceeding under the old yes.
+- **Branch:** `fix/pr-amrap-recompute` · **Added:** 2026-08-24 · re-measured 2026-08-25
+
+> ### ⚠️ MEASURED AGAINST PRODUCTION 2026-08-25 — three findings, any one of which blocks it
+>
+> **1. The specified method moves zero rows, by construction.** The entry says *"recompute from
+> `set_logs`"*, but `personal_records` derives from **`exercise_logs.estimated_1rm`** — a stored
+> column that `reconcilePersonalRecord` reads. The chain is
+> `set_logs → exercise_logs.estimated_1rm → personal_records`, so recomputing the PR layer alone
+> re-reads pre-fix estimates. The entry's own *"zero rows is a finding, not a success"* rule is
+> reached here by construction rather than discovery.
+>
+> **2. The blast radius is ~8× what the entry states.** It describes *"29 flagged sets"* and a
+> *"13+ rep set"*, but `amrapScaleFactor` discounts from **6 reps up** (`≤5 → 1.0`, `≤8 → 0.97`,
+> `≤12 → 0.93`, `≤20 → 0.88`, else `0.82`) — every unprescribed set above 5 reps, not just 13+:
+>
+> | | count |
+> |---|---|
+> | logs with an unprescribed set above 5 reps | **242** (680 sets, 6–25 reps) |
+> | eligible logs (non-bodyweight, non-baseline, non-deload) | 357 |
+> | **logs whose estimate would move** | **277** |
+> | average drop | **−2.14 kg** (max −15.00 kg) |
+>
+> **3. A third of the logs cannot be reproduced by EITHER formula, and it is time-localised.**
+> Replicating `calculate1RM` in SQL against current `set_logs` reproduces the stored value for only
+> 202 of 357. 40 more are explained by sets edited after logging; **115 are unexplained.** By month:
+>
+> | month | logs | reproduces | |
+> |---|---|---|---|
+> | 2026-05 | 108 | 77 | 71% |
+> | 2026-06 | 73 | 46 | 63% |
+> | **2026-07** | **102** | **9** | **9%** |
+> | **2026-08** | **68** | **68** | **100%** |
+>
+> **August reproducing 68/68 is what makes this trustworthy**: the SQL replication is correct, so
+> July's 9% is real divergence, not a broken measurement.
+>
+> **✅ LA-27 answered it the same day (mechanism there), and the answer makes the recompute WORSE
+> rather than unblocking it:** those logs predate `set_logs.planned_pct` persistence, so the
+> prescription used at log time is not in the set row. **76 of them belong to a progression style
+> edited after the log**, and styles are user-editable — re-deriving substitutes today's
+> prescription for the one actually trained under, invisibly. Worse than the inflation this entry
+> set out to fix, which is at least explainable.
+>
+> **Recommendation: recompute nothing yet.** Rewriting 277 rows of a derived column on the user's
+> training history while a third of that population is unexplained is the *"a count that moves
+> further than your change explains is the bug"* case. Explain July first (LA-27), then bring the
+> owner the real proposal — 277 historical estimates, not 30 cached PR values.
+>
+> **Still correct and unchanged:** Q-304's forward fix; the derived-cache framing; and the narrow
+> prescription impact (`resolveWorkingBasis` takes `lastNonDeload1rm` first, so an inflated PR drives
+> a prescription only for an exercise with a PR but no recent log).
+
 - **Related, and deliberately still separate:** Q-298's 10 historical zero-1RM rows are the same
   shape and are **not** covered by this decision.
+
+### [workouts][platform] LA-27 — ANSWERED: the un-re-derivable estimates predate `set_logs.planned_pct`
+
+- **Lane:** A
+- **Added:** 2026-08-25 from the Q-304b re-measurement · **answered the same day.**
+- **✅ The 115 unexplained logs are not corrupt.** They predate `set_logs.planned_pct` /
+  `planned_reps` persistence: the prescription WAS applied at log time, just never written to the set
+  row, so re-deriving today falls back to factor 1.0. Share of sets carrying `planned_pct`:
+
+  | month | sets with `planned_pct` |
+  |---|---|
+  | 2026-04 → 06 | **0%** |
+  | 2026-07 | **40%** |
+  | 2026-08 | **94%** |
+
+  July is the worst month at 9% rather than the oldest because it is the **overlap window** — styles
+  in use, per-set columns half populated. May/June reproduce *better* (71%/63%) because many of those
+  logs genuinely had no style, where factor 1.0 is right.
+- **This is the mechanism, and it also settles the recoverability question.** Of **257** pre-August
+  logs with no `planned_pct` on any set:
+  - **90** carry no `style_id` at all — unprescribed, factor 1.0 is correct, nothing is missing.
+  - **167** could be re-derived through `exercise_logs.style_id` → `style_sets`.
+  - **…but 76 of those 167 belong to a style whose `style_sets` were edited AFTER the log was
+    written.** Progression styles are user-editable, so re-deriving those applies a prescription
+    the lifter never trained under. **They are not recoverable, only guessable.**
+- **➡️ Decisive for Q-304b.** A recompute would not merely rewrite 277 estimates — for **76** it
+  would silently substitute today's prescription for the one actually used, with nothing in the
+  result showing which. Worse than the inflation Q-304b set out to correct.
+- **No code change is needed.** Nothing is broken going forward — `planned_pct` has persisted since
+  mid-July and August reproduces 68/68. This entry exists so the next session reading a 32%
+  non-reproduction rate does not read it as data loss.
+- **Keep:** the exact commit that began persisting `planned_pct` is not identified — the sandbox
+  clone is depth-1, so `git log` on `log-exercise.ts` cannot reach July. Worth pinning if anyone
+  needs the precise cutover date rather than the month. Nothing else is owed.
 
 ### [workouts] Q-305 — the volume landmarks are computed and never shown to anyone
 
@@ -5391,33 +5680,6 @@ ehr     0     0     0     0   648   208   128   556     0
 - **Keep:** the surfacing itself is unbuilt, and the primary half (Q-289's bucket table split by
   rest band) is already measured — see the ✅ above it. Surfacing is a Lane B UI change once the
   owner has seen the framing; nothing here licenses a rest term in `expectedRpe`.
-
-### [platform] LA-26 — dead data-layer code ships repeatedly: flag a repository method with no callers outside `lib/data/`
-
-- **Lane:** A
-- **Added:** 2026-08-25, from Q-301b's closing observation while dropping `running_baselines`.
-- **Three instances, and nobody caught any of them from the code.** Each was found only when
-  somebody went looking at production row counts and asked why a table was empty:
-  - **Q-301 / Q-301b** — `saveRunningBaseline`/`getRunningBaseline` and the `running_baselines`
-    table. The writer landed in migration 146 *after* the only `running_plans` row existed, so it
-    never fired. `n_tup_ins` was 0 for its entire life.
-  - **Q-270** — `training_load_ots`: a live producer writing into a table that held zero rows.
-  - **Q-231** — the "Exercise detected" card kept its reader after losing its only writer, so it has
-    been permanently empty since ~2026-08-04 and looked like a working feature.
-- **The shape they share** is what makes it checkable: a repository method that is exported, typed,
-  tested in isolation, and called by nothing outside `lib/data/`. TypeScript cannot see it — an
-  unused *export* is not an error — and the tests pass because they call it directly.
-- **What to build.** A `scripts/check-*.js` in the Custom Rules job that walks the repository
-  interface and fails on a method whose only references are inside `lib/data/` (plus its own tests).
-  Shrink-only per-method baseline, like the other ratchets, because there will be legitimate
-  exceptions (a method reached only through the adapter, one kept for an imminent caller) and each
-  one should have to be written down rather than argued once.
-- **The known false-positive risk, and why the baseline handles it rather than cleverness:**
-  `pushMutations` dispatches by domain string, so some methods are reached only through a lookup the
-  checker cannot follow statically. Those go in the baseline with a reason; the alternative — teaching
-  the script to resolve dynamic dispatch — is how this kind of check becomes unmaintainable.
-- **Not urgent.** Nothing is broken today; this stops the *next* one costing a production
-  investigation to notice.
 
 ### [workouts] Q-289 — `expectedRpe` misses by more than the autoregulation dead band at both ends of its own range
 
@@ -5812,11 +6074,11 @@ ehr     0     0     0     0   648   208   128   556     0
   Gemini 3.x caches **implicitly by default** — so implicit caching may already be part of the 6.4×
   above and nothing in production can tell you. An explicit cache added now is an optimisation you
   cannot measure, stacked on one you cannot see.
-- **➡️ Re-scoped: do NOT implement explicit context caching.** What is left is the cheap measurement —
-  record `cachedContentTokenCount` on `ai_call_log` (additive column + the `loggedStreamText` /
-  `loggedGenerateObject` wrappers in `lib/ai/instrument.ts` + a `claude_ro` view regen), then look.
-  High hit rate → this closes as measured-and-rejected, which the entry's own text calls a fine
-  outcome. Zero → the caching work gets a number behind it instead of a hypothesis.
+- **➡️ Re-scoped: do NOT add explicit context caching. ✅ Measurement half SHIPPED 2026-08-25**
+  (migrations 222 + 223): `ai_call_log.cached_input_tokens` records the provider's own cache hits,
+  read at `readUsage`. Nullable, no backfill — **NULL = nothing reported, 0 = a reported MISS**.
+- **Keep:** nobody has LOOKED yet — the column fills only as calls are made, and Coach's last was
+  2026-08-18. Run the hit-rate query once there is traffic: high → close as measured-and-rejected.
 - **Cost was never the reason and still is not** — 255 calls / 632,639 tokens over 24 days at
   flash-lite rates is cents per month. Do not optimise this for money.
 - **Confirmed in the same read:** every Coach row reads `gemini-3.1-flash-lite` while `COACH_MODEL_ID`

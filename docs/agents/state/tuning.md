@@ -27,6 +27,10 @@ Filed this session, all propose-only, all in the queue:
 | **TN-6a** | suspend the temperature penalty until the baseline is centred | **signed off**, ships alone, outside the batch |
 | **TN-7** | TN-4's catch only `console.error`s, disarming LA-20's verification | one line, Lane A |
 | **TN-8** | chronic-stress fever mask = a **fourth** consumer of the broken temp baseline | batched with BF-13; fixed by that seed fix |
+| **TN-9** | readiness moves when the check-in is logged; owner wants it final at first open | intent signed off — drop `checkin`, renormalise |
+| **TN-10** | `TOTAL_SLEEP`'s comment and curve disagree by ~15 pts on the heaviest contributor | `Gate: owner`; sequence after TN-5 |
+| **TN-11** | "moved this hour" = one reading over a resting boundary → **99.8%** of waking hours qualify | answers Q-522's open half; **TN-2 does not fix it** |
+| **TN-12** | no hourly-movement surface worth having; the one that exists is pinned at full | Lane B, `Needs: TN-11` |
 
 **Owner decisions, 2026-08-24 — all recorded on the entries, nothing left gated on them.** TN-5 and
 TN-6 signed off; **TN-6a** added (suspend the temperature penalty on a self-clearing condition, ships
@@ -82,6 +86,41 @@ sleep ✅ · readiness ✅ · activity ✅ · body ✅ · devices ✅ · workout
   the queue is comprehensive on that class. The four-for-four record that motivated the sweep held for
   the *investigated* thresholds and did not generalise.
   [`review`](../../reviews/2026-08-25-threshold-sweep.md).
+- **The Body Battery does NOT charge overnight — the anchor IS the whole overnight story.**
+  `walkBodyBattery` filters to `tsMs >= wakeTime`, and `resolveAnchor` sets the start to the
+  readiness score. So a morning battery value is a readiness score wearing a battery label, and the
+  temperature penalty lands directly on the number the owner reads at 7 am. Measured 2026-08-26 over
+  35 days: removing that penalty moves the mean morning anchor **64.8 → 76.8** and mornings waking
+  "Charged" (≥75) from **7/35 to 21/35** (conservative — the 6 clamped days count as unchanged).
+  **Do not propose overnight charging or an anchor redesign to fix "it starts low"** — it is a large
+  change to a value Q-511 shows is load-bearing, aimed at a symptom TN-6 already removes. Re-measure
+  after TN-6 lands; only then is the design question real.
+- **The Activity Score at 7 am is a PARTIAL DAY, not a low day.** Its daily-movement lane (steps 18 +
+  activeEnergy 15 + zoneMinutes 10 + moveHours 12 = **55** of 100) is near-empty first thing, while
+  the strength lane (freq 25 + volume 20 = **45**) already carries yesterday's session. So a 63 at
+  7 am with a rest of the day ahead is the score working. **Do not file "activity reads low in the
+  morning"** — it is Q-505's daily-vs-weekly split, already queued.
+- **Removing a 10% contributor normally moves a score; `checkin` does not** (TN-9) — mean 69.9 → 70.4,
+  no day moving ≥5, because the logged check-in tracks the objective contributors closely enough to
+  add little independent information. Measure before assuming a weight is load-bearing.
+- **HR alone cannot answer "did you move" — MET can, and the app already decodes it.** The owner
+  raised this and was right. `getOuraDaytimeSignals` (`adapter.ts:4959`) decodes MET from raw frames
+  (**tag `0x50`**) and `MET_ACTIVE_THRESHOLD = 1.8` is Oura's own constant (`daily-medians.ts:51`).
+  HR rises for stress, caffeine, heat and standing, so an anxious hour at a desk scores the same as a
+  walk. **Before fitting any MET run-length, measure the hourly MET distribution** — it is decoded
+  from raw frames, not a column, and `decoded` is NULL on the hot tier, so SQL cannot reach it.
+  **Do not use daily `met_avg` as a stand-in**: it is an average (n=51, 1.004–1.636, mean 1.360) and
+  "0 of 51 days exceed the 1.8 sample threshold" is expected arithmetic, not evidence.
+- **`HR_REST_THRESHOLD` is read by TWO metrics asking DIFFERENT questions, and one fix cannot serve
+  both.** Body Battery wants the boundary between *resting and not* (TN-2); `computeMovedHours` wants
+  the boundary between *sedentary and moving* (TN-11). At TN-2's most generous proposed offset,
+  move-hours still qualifies **97.6%** of waking hours against 99.8% today. **Do not close TN-11 as a
+  side effect of TN-2**, and do not raise the shared constant to fix move-hours — that breaks the
+  charge window the other way.
+- **"Does move-hours count sleep?" — no**, and by two independent guards: a hardcoded `[7, 22)` clock
+  window, and overnight HR (~50–55) sitting below the 57.8 bpm bar. But the window is **hardcoded** —
+  `readiness-payload.ts:324` never passes the `wakeHour`/`sleepHour` the function accepts — so a 6 am
+  wake loses an hour of real waking time at both ends of the ratio.
 - **A distribution screen is BLIND to "always fires" and "never crosses".** Run against the two known
   failures it catches neither — `temp_dev_c` has a healthy range, `illness_score` looks merely sparse.
   It finds stuck and dead scores only. Pair every threshold with its input, or the screen reads clean

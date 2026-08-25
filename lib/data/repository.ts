@@ -435,7 +435,6 @@ export interface LastRealOneRm {
 export interface WorkoutRepository {
   // ── Users ──────────────────────────────────────────────────────────────────
   upsertUser(user: Omit<User, 'id' | 'createdAt' | 'isActive' | 'isAdmin'>, forceActive?: boolean): Promise<User>
-  isUserActive(userId: string): Promise<boolean>
   listUsers(limit?: number, offset?: number): Promise<User[]>
   countInactiveUsers(): Promise<number>
   activateUser(userId: string): Promise<void>
@@ -512,7 +511,6 @@ export interface WorkoutRepository {
    *  an error here (unlike `setWorkoutSessionWarmupEnd`, where zero rows means "already set"). */
   setSessionRpe(userId: string, workoutSessionId: string, rpe: number): Promise<boolean>
   setWorkoutSessionWarmupEnd(userId: string, workoutSessionId: string, warmupEndedAt: Date): Promise<void>
-  logExercise(log: Omit<ExerciseLog, 'id' | 'sets'>): Promise<ExerciseLog>
   logExerciseAndSets(
     userId: string,
     log: Omit<ExerciseLog, 'id' | 'sets'> & { exerciseLogId?: string },
@@ -634,10 +632,6 @@ export interface WorkoutRepository {
   // logged exercises (abandoned starts) via an EXISTS check, matching getDayLog's
   // existing consumer-side filter.
   getDaySessionSummaries(userId: string, date: string, timezone?: string): Promise<{ sessionId?: string; sessionName: string; startedAt: Date; completedAt?: Date }[]>
-  // Batched ownership lookups for sync-time IDOR checks — returns a map of
-  // row id -> owning userId for whichever of the given ids already exist.
-  getWorkoutSessionOwners(sessionIds: string[]): Promise<Map<string, string>>
-  getExerciseLogOwners(exerciseLogIds: string[]): Promise<Map<string, string>>
   getWorkoutSessionsFrom(userId: string, from: Date): Promise<WorkoutSession[]>
   // Lightweight alternative to getWorkoutSessionsFrom for training-load aggregates —
   // sums exercise_logs.volume in SQL instead of hydrating full exercise/set_log trees.
@@ -646,7 +640,6 @@ export interface WorkoutRepository {
   // exercises by set count, each one grouped SQL query (no full-tree hydration).
   getYearReviewTotals(userId: string, from: Date): Promise<YearReviewTotals>
   getYearReviewTopExercises(userId: string, from: Date, limit: number): Promise<YearReviewTopExercise[]>
-  getLastExerciseLog(userId: string, exerciseName: string): Promise<ExerciseLog | null>
   // programId optionally scopes to sessions belonging to that program only — used by the
   // ai_dynamic baseline auto-heal so a shared exercise name from a *different* program's
   // history can't skip a fresh cycle's AMRAP baseline week.
@@ -666,7 +659,6 @@ export interface WorkoutRepository {
   getExerciseType(exerciseName: string): Promise<ExerciseType>
   upsertExercise(entry: Omit<ExerciseLibraryEntry, 'id'> & { id?: string }): Promise<ExerciseLibraryEntry>
   deleteExercise(name: string): Promise<void>
-  renameExerciseRefs(oldName: string, newName: string): Promise<void>
   createExercise(entry: { name: string; muscles: MuscleAssignment[]; equipment: string[]; instructions?: string; createdBy: string; exerciseType?: ExerciseType }): Promise<ExerciseLibraryEntry>
   renameExercise(userId: string, id: string, newName: string): Promise<ExerciseLibraryEntry>
   // Admin-only edit that may rename the exercise (any library entry, regardless of
@@ -1275,6 +1267,9 @@ export interface AiCallLogInput {
   fingerprint?: string | null
   /** BF-4: the request payload this call carried, where the shape has one. */
   payloadBytes?: number | null
+  /** Q-295: input tokens the provider served from its own cache. NULL where it reported nothing;
+   *  0 is a reported miss and is a different fact. */
+  cachedInputTokens?: number | null
 }
 export interface AiCallSectionStat {
   section: string

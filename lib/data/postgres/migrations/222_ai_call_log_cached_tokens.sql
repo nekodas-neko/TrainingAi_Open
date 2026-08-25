@@ -1,0 +1,15 @@
+-- Q-295: record how many input tokens the provider served from ITS cache.
+--
+-- The entry proposed adding explicit context caching to the Coach prompt, on the grounds that a
+-- large static prefix is what caching is for. Re-measured 2026-08-25, the prefix claim held (the
+-- system prompt plus 24 tool declarations are most of a call) but the latency that motivated it had
+-- already fallen 6.4x on its own, and -- the reason for this migration -- nothing in production can
+-- say why. Gemini 3.x caches IMPLICITLY by default and `@ai-sdk/google` reports the hit, but
+-- `ai_call_log` had nowhere to put it, so implicit caching may already be doing this work and be
+-- invisible. Adding an explicit cache without this column would be an optimisation nobody could
+-- measure, stacked on one nobody could see.
+--
+-- Nullable with no default and no backfill, deliberately: NULL means "this call predates the
+-- column, or the provider reported nothing", which is honestly different from 0 ("the provider
+-- reported a miss"). A DEFAULT 0 would silently claim every historical call was a cache miss.
+ALTER TABLE ai_call_log ADD COLUMN IF NOT EXISTS cached_input_tokens integer;

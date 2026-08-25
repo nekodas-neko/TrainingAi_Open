@@ -605,12 +605,6 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     return returnedUser
   }
 
-  async isUserActive(userId: string): Promise<boolean> {
-    const [r] = await this.db.select({ isActive: s.users.isActive })
-      .from(s.users).where(eq(s.users.id, userId))
-    return r?.isActive ?? false
-  }
-
   async listUsers(limit = 100, offset = 0): Promise<User[]> {
     const rows = await this.db.select().from(s.users).orderBy(asc(s.users.createdAt)).limit(limit).offset(offset)
     return rows.map(r => this.rowToUser(r))
@@ -864,27 +858,6 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
         eq(s.workoutSessions.userId, userId),
         isNull(s.workoutSessions.warmupEndedAt),
       ))
-  }
-
-  async logExercise(log: Omit<ExerciseLog, 'id' | 'sets'>): Promise<ExerciseLog> {
-    const [r] = await this.db.insert(s.exerciseLogs)
-      .values({
-        workoutSessionId: log.workoutSessionId,
-        exerciseName: log.exerciseName,
-        styleId: log.styleId ?? null,
-        styleName: log.styleName ?? null,
-        estimated1rm: log.estimated1rm ?? null,
-        target80: log.target80 ?? null,
-        volume: log.volume ?? null,
-        avgReps: log.avgReps ?? null,
-        timeToComplete: log.timeToComplete ?? null,
-        muscleGroups: log.muscleGroups,
-        loggedAt: log.loggedAt,
-        interExerciseRestSec: log.interExerciseRestSec ?? null,
-        prepTimeSec: log.prepTimeSec ?? null,
-      })
-      .returning()
-    return { ...log, id: r.id, sets: [] }
   }
 
   async logExerciseWithId(log: Omit<ExerciseLog, 'sets'> & { id: string }): Promise<void> {
@@ -1280,23 +1253,6 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     return rows.map(r => ({ sessionId: r.sessionId ?? undefined, sessionName: r.sessionName, startedAt: r.startedAt, completedAt: r.completedAt ?? undefined }))
   }
 
-  async getWorkoutSessionOwners(sessionIds: string[]): Promise<Map<string, string>> {
-    if (!sessionIds.length) return new Map()
-    const rows = await this.db.select({ id: s.workoutSessions.id, userId: s.workoutSessions.userId })
-      .from(s.workoutSessions)
-      .where(and(inArray(s.workoutSessions.id, sessionIds), isNull(s.workoutSessions.deletedAt)))
-    return new Map(rows.map(r => [r.id, r.userId]))
-  }
-
-  async getExerciseLogOwners(exerciseLogIds: string[]): Promise<Map<string, string>> {
-    if (!exerciseLogIds.length) return new Map()
-    const rows = await this.db.select({ id: s.exerciseLogs.id, userId: s.workoutSessions.userId })
-      .from(s.exerciseLogs)
-      .innerJoin(s.workoutSessions, eq(s.workoutSessions.id, s.exerciseLogs.workoutSessionId))
-      .where(and(inArray(s.exerciseLogs.id, exerciseLogIds), isNull(s.exerciseLogs.deletedAt)))
-    return new Map(rows.map(r => [r.id, r.userId]))
-  }
-
   async getWorkoutSessionsFrom(userId: string, from: Date): Promise<WorkoutSession[]> {
     const wsRows = await this.db.select().from(s.workoutSessions)
       .where(and(eq(s.workoutSessions.userId, userId), gte(s.workoutSessions.startedAt, from), isNull(s.workoutSessions.deletedAt)))
@@ -1396,38 +1352,6 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       last1rm: r.last1rm != null ? Number(r.last1rm) : null,
       exerciseType: r.exerciseType ?? null,
     }))
-  }
-
-  async getLastExerciseLog(userId: string, exerciseName: string): Promise<ExerciseLog | null> {
-    const [elRow] = await this.db.select().from(s.exerciseLogs)
-      .innerJoin(s.workoutSessions, eq(s.workoutSessions.id, s.exerciseLogs.workoutSessionId))
-      .where(and(
-        eq(s.workoutSessions.userId, userId), eq(s.exerciseLogs.exerciseName, exerciseName),
-        isNull(s.exerciseLogs.deletedAt), isNull(s.workoutSessions.deletedAt),
-      ))
-      .orderBy(desc(s.exerciseLogs.loggedAt))
-      .limit(1)
-    if (!elRow) return null
-
-    const el = elRow.exercise_logs
-    const setRows = await this.db.select().from(s.setLogs)
-      .where(and(eq(s.setLogs.exerciseLogId, el.id), isNull(s.setLogs.deletedAt)))
-      .orderBy(asc(s.setLogs.setNumber))
-
-    return {
-      id: el.id, workoutSessionId: el.workoutSessionId,
-      exerciseName: el.exerciseName, styleId: el.styleId ?? undefined,
-      styleName: el.styleName ?? undefined, estimated1rm: el.estimated1rm ?? undefined,
-      target80: el.target80 ?? undefined, volume: el.volume ?? undefined,
-      avgReps: el.avgReps ?? undefined, timeToComplete: el.timeToComplete ?? undefined,
-      muscleGroups: el.muscleGroups ?? [], loggedAt: el.loggedAt,
-      sets: setRows.map(ss => ({
-        id: ss.id, exerciseLogId: ss.exerciseLogId, setNumber: ss.setNumber,
-        weightKg: ss.weightKg, reps: ss.reps,
-        setTimeSec: ss.setTimeSec ?? undefined, restTimeSec: ss.restTimeSec ?? undefined,
-        intensityPct: ss.intensityPct ?? undefined, useFor1rm: ss.useFor1rm,
-      })),
-    }
   }
 
   /**
@@ -2273,20 +2197,6 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
 
   async deleteExercise(name: string): Promise<void> {
     await this.db.delete(s.exerciseLibrary).where(eq(s.exerciseLibrary.name, name))
-  }
-
-  async renameExerciseRefs(oldName: string, newName: string): Promise<void> {
-    await this.db.transaction(async tx => {
-      await tx.update(s.sessionExercises)
-        .set({ exerciseName: newName })
-        .where(eq(s.sessionExercises.exerciseName, oldName))
-      await tx.update(s.exerciseLogs)
-        .set({ exerciseName: newName })
-        .where(eq(s.exerciseLogs.exerciseName, oldName))
-      await tx.update(s.personalRecords)
-        .set({ exerciseName: newName })
-        .where(eq(s.personalRecords.exerciseName, oldName))
-    })
   }
 
   async createExercise(entry: { name: string; muscles: MuscleAssignment[]; equipment: string[]; instructions?: string; createdBy: string; exerciseType?: ExerciseType }): Promise<ExerciseLibraryEntry> {
@@ -4685,6 +4595,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       ok: row.ok,
       fingerprint: row.fingerprint ?? null,
       payloadBytes: row.payloadBytes ?? null,
+      cachedInputTokens: row.cachedInputTokens ?? null,
     })
 
     const now = Date.now()
