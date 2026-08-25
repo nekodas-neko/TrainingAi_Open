@@ -5478,32 +5478,29 @@ ehr     0     0     0     0   648   208   128   556     0
   rest band) is already measured — see the ✅ above it. Surfacing is a Lane B UI change once the
   owner has seen the framing; nothing here licenses a rest term in `expectedRpe`.
 
-### [platform] LA-26 — dead data-layer code ships repeatedly: flag a repository method with no callers outside `lib/data/`
+### [platform] LA-28 — delete the 6 dead repository methods LA-26's check baselined
 
 - **Lane:** A
-- **Added:** 2026-08-25, from Q-301b's closing observation while dropping `running_baselines`.
-- **Three instances, and nobody caught any of them from the code.** Each was found only when
-  somebody went looking at production row counts and asked why a table was empty:
-  - **Q-301 / Q-301b** — `saveRunningBaseline`/`getRunningBaseline` and the `running_baselines`
-    table. The writer landed in migration 146 *after* the only `running_plans` row existed, so it
-    never fired. `n_tup_ins` was 0 for its entire life.
-  - **Q-270** — `training_load_ots`: a live producer writing into a table that held zero rows.
-  - **Q-231** — the "Exercise detected" card kept its reader after losing its only writer, so it has
-    been permanently empty since ~2026-08-04 and looked like a working feature.
-- **The shape they share** is what makes it checkable: a repository method that is exported, typed,
-  tested in isolation, and called by nothing outside `lib/data/`. TypeScript cannot see it — an
-  unused *export* is not an error — and the tests pass because they call it directly.
-- **What to build.** A `scripts/check-*.js` in the Custom Rules job that walks the repository
-  interface and fails on a method whose only references are inside `lib/data/` (plus its own tests).
-  Shrink-only per-method baseline, like the other ratchets, because there will be legitimate
-  exceptions (a method reached only through the adapter, one kept for an imminent caller) and each
-  one should have to be written down rather than argued once.
-- **The known false-positive risk, and why the baseline handles it rather than cleverness:**
-  `pushMutations` dispatches by domain string, so some methods are reached only through a lookup the
-  checker cannot follow statically. Those go in the baseline with a reason; the alternative — teaching
-  the script to resolve dynamic dispatch — is how this kind of check becomes unmaintainable.
-- **Not urgent.** Nothing is broken today; this stops the *next* one costing a production
-  investigation to notice.
+- **Added:** 2026-08-25, from LA-26 shipping `scripts/check-dead-repo-methods.js`.
+- **The check ships with 6 baselined, and a baseline is a debt row, not an approval.** Each was
+  verified by hand to have **exactly two references** — its declaration in `lib/data/repository.ts`
+  and its implementation in `lib/data/postgres/adapter.ts` — with no caller and no dynamic-dispatch
+  reach: `isUserActive`, `logExercise`, `getWorkoutSessionOwners`, `getExerciseLogOwners`,
+  `getLastExerciseLog`, `renameExerciseRefs`.
+- **Why they were not deleted in the same PR.** `getWorkoutSessionOwners` and
+  `getExerciseLogOwners` are **bulk ownership lookups**. The live ownership path is
+  `ensureWorkoutSession` (CLAUDE.md names it the reference for verifying client-supplied row ids),
+  so these read as superseded rather than as a missing guard — but "reads as" is not "was verified
+  as", and deleting a security-adjacent helper on that basis inside a PR about a CI script is how a
+  gap gets closed by accident. Confirm the sync-push path verifies ownership by another route
+  first, then delete.
+- **The prize is an empty baseline.** CLAUDE.md's own reference case is
+  `check-aest-midnight-timezone.js`, whose baseline is empty *"so an omitting call site is a
+  regression rather than a debt row"*. Six entries is close enough to reach.
+- Delete the declaration and the implementation together, and remove each name from `BASELINE` in
+  the same PR — the check fails if a baselined name stops being dead, which is what makes it
+  ratchet.
+
 
 ### [workouts] Q-289 — `expectedRpe` misses by more than the autoregulation dead band at both ends of its own range
 

@@ -75,7 +75,7 @@ behaviour being asserted.** Ask that before writing an assertion.
 ## Standing constraints
 
 - **The local gate is `pnpm check:rules`** — quote its `Ran N of N`, never the word "pass". It is
-  **57 of 57** now — BF-20 added the repo-root guard. Do not hardcode it; the runner reads the count
+  **58 of 58** now — LA-26 added the dead-repo-method guard. Never hardcode it; the runner reads it
   from `ci.yml`, which is the whole point of quoting the number rather than the word "pass".
 - **The clone is depth 1.** `git fetch --deepen=200 origin main` before any `git merge origin/main`,
   or it refuses as "unrelated histories". Hit twice this session; it is not optional.
