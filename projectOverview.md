@@ -268,12 +268,11 @@ mutation-verified parity test fails if either side drifts again
 ([journal](docs/overview/entries/2026-08-20-session-energy-cross-surface-parity.md)).
 
 **RV-32 and RV-34 closed (2026-08-20)** — the program-config write surface took two client-supplied
-FKs on trust. Three of four write paths accepted a `progression_styles` id belonging to another user
-(the fourth refused it), and `listPhaseSets` joined the style **name** in unscoped, so another user's
-words reached a screen and an LLM prompt. A foreign `program_sessions.id` was a raw duplicate-key 500
-with the failed SQL in `error_events`. All guarded, refusals verified live with two accounts, and
-production shows no row that was ever mis-linked — though `claude_ro` is row-scoped to the owner, so
-that is *no evidence*, not *has not happened*
+FKs on trust: three of four write paths accepted another user's `progression_styles` id, and
+`listPhaseSets` joined the style **name** in unscoped, so their words reached a screen and an LLM
+prompt. A foreign `program_sessions.id` was a raw duplicate-key 500. All guarded, refusals verified
+live with two accounts; production shows no mis-linked row, but `claude_ro` is row-scoped to the
+owner, so that is *no evidence*, not *has not happened*
 ([journal](docs/overview/entries/2026-08-20-program-write-fk-ownership.md)).
 
 **RV-33 closed alongside it** — two routes answered a *correct* ownership refusal with an
@@ -300,10 +299,9 @@ tag** — Q-529 had been served to Lane A for days while its field said B
 ([journal](docs/overview/entries/2026-08-20-energy-basis-and-lane-resolution.md)).
 
 **LA-13 closed (2026-08-20)** — `Migration Check` ran only against a **fresh** database, where a
-non-idempotent migration cannot fail; it now replays every file against the schema it just built.
-The first version was green with a migration deliberately broken, because the "already there"
-SQLSTATEs that are benign on an ordinary run are precisely the failure signal under replay
-([journal](docs/overview/entries/2026-08-20-migration-replay-check.md)).
+non-idempotent migration cannot fail; it now replays every file against the schema it just built. Its
+first version was green with a migration deliberately broken: the "already there" SQLSTATEs that are
+benign on an ordinary run are the failure signal under replay ([journal](docs/overview/entries/2026-08-20-migration-replay-check.md)).
 
 **Older session handoffs:** [2026-08-20 workouts energy/RPE intake](docs/handoff-2026-08-20-workouts-energy-accuracy-and-rpe-intake.md)
 (reasoning, not status) and [2026-08-17 agent model/device findings](docs/handoff-2026-08-17-platform-agent-model-and-device-session-findings.md)
