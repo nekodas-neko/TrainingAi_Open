@@ -6,18 +6,17 @@
 **Updated:** 2026-08-25 · **By:** the twelfth Lane B run · **Next ID:** `LB-15`
 
 ## Now
-**One PR open: [#483](https://github.com/nekodas-neko/TrainingAi_Open/pull/483) (BF-27), and it is
-yours to finish.** All five required checks went green on its previous head; the docs commit on top
-restarted CI. **Do not merge it on the merge button alone** — E2E is not a required check, this
-change touches every sheet and dialog in the app, and two local full-suite runs failed a *different*
-1 and 3 specs (`meal-label`, `food-logging-complete`, `tabs-instant-paint (More)`). None reproduces
-alone or in a subset, and the `meal-label` one has a mechanism that is the spec's own (it reads
-canvas pixels gated only on `inkFraction > 0.01`, i.e. *any* ink, so a canvas caught mid-draw decodes
-to nothing). Read the E2E job, then merge or fix. The reasoning is in the PR body and in that
-branch's journal entry, `docs/overview/entries/2026-08-25-back-dismiss-sweep.md` — **both land only
-when #483 merges**, which is why neither is linked here.
+**Nothing open — every branch merged.** This run landed **#478** (Q-93-followup), **#479** (the Q-112
+re-plan), **#483** (BF-27) and **#485** (this baton). Each has a journal entry in
+`docs/overview/entries/` dated 2026-08-25.
 
-**Merged this run:** #478 (Q-93-followup), #479 (the Q-112 re-plan).
+**The local full-suite red on #483 was load, and CI settled it.** Two local runs failed a *different*
+1 and 3 specs (`meal-label`, `food-logging-complete`, `tabs-instant-paint (More)`); none reproduced
+alone or in a subset. **CI E2E passed all of them** on a fresh database in **11m16s**, and its
+failure-artifact step was *skipped*, which only happens when nothing fails. So: **CI E2E here takes
+about eleven minutes, not the three CI usually takes** — a docs-only PR's E2E ran just as long. Budget
+for that rather than reading a long-running E2E as a hang, and distrust a local full-suite red that
+will not reproduce in isolation.
 
 ## The finding that should change how you start
 **The previous baton said the startable Lane B surface was exhausted. It was not.** BF-27 sat at
@@ -56,8 +55,8 @@ role.** Three for three this run:
 - **Scoring changes are nobody's to implement**: Tuning proposes → owner signs off → Lane A builds.
 - **Radix `Collapsible`/`CollapsibleTrigger` supplies `aria-expanded`** — never a Q-491 violator.
 - **`weekly-stats-hub`'s `todayKey` needs `.replace(/-/g,"/")`** — `/api/weekly-stats` emits `yyyy/MM/dd`.
-- **Back-dismissal is the primitive's job now** (once #483 lands). `SheetContent`/`DialogContent`
-  render `components/ui/back-dismiss.tsx`. **Never call
+- **Back-dismissal is the primitive's job now.** `SheetContent`/`DialogContent` render
+  [`components/ui/back-dismiss.tsx`](../../../components/ui/back-dismiss.tsx). **Never call
   `useSheetBackDismiss` at a call site again** — it would push twice and need two presses. And it
   must stay a *child* of `Content`: `SheetContent`'s body runs whenever a caller renders it, and
   every tab screen renders its sheets unconditionally with a null prop.
