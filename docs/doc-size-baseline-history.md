@@ -2086,7 +2086,6 @@ backlog is edited by five agents at once, so a branch that was under its baselin
 once CI merges `main` into it — the local number and the merged number are different questions. The
 fix each time is the same: merge `origin/main`, recount, raise in the same PR. Recorded here so the
 pattern is legible rather than looking like repeated carelessness.
-<<<<<<< HEAD
 
 ## 2026-08-25 — `docs/implementation-backlog.md` raised, 11532 → 11571 (Q-274)
 
@@ -2100,5 +2099,3 @@ was overtaken by `nightSessions`. A reader who re-derives from either goes the w
 moved to [`entries/2026-08-25-sleep-fragment-nights.md`](overview/entries/2026-08-25-sleep-fragment-nights.md)
 and the queue kept what a queue needs — what is still owed, and what must not be trusted. Raising
 came second, once the entry was as short as it could honestly be.
-=======
->>>>>>> origin/fix/sleep-fragment-nights
