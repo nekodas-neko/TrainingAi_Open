@@ -63,13 +63,14 @@ builder's rows became the shared `FoodRow`; `ingredient-row.tsx` is deleted and 
 
 **The Devices card stops calling the ring healthy with no key (LB-5).** Checks `hasKey()` and links to `/admin/oura-ble` when false. `Gate: device`.
 
+**The colour-only score subset was ONE site, not a sweep (Q-281).** Nine `scoreBand()` call sites
+read rather than counted: only `readiness-breakdown`'s "Final readiness" row coloured without the
+word. `contributor-chart` has no `.label` at all and is correct — it renders the legend. **The Q-491
+lesson again: a zero-label grep is not a violator list.** Also laned Q-289/Q-290/Q-291 to A — the
+tool serves an unlaned entry to both lanes, and all three are `packages/shared` scoring work.
+
 **The volume card stops guessing, and the surface was WRONG rather than absent (Q-305, half).** It
-already drew a band — a hardcoded generic **10–20** — while `packages/shared` computed real
-per-muscle MEV/MAV/MRV beside it. The goal multiplier is what makes that material: Q-305's own first
-pass read the unscaled row and called lats *below MEV*; against the app's own table it is **in
-range** and three muscles are over MRV. The band's **word** ships with its colour — two of the four
-are red and mean opposite things. Push:pull stays open: it needs a taxonomy that belongs in
-`packages/shared`, which is Lane A's. `Gate: device`.
+already drew a band — a hardcoded generic **10–20** — while `packages/shared` computed real per-muscle MEV/MAV/MRV beside it. The goal multiplier is what makes that material: Q-305's own first pass read the unscaled row and called lats *below MEV*; against the app's own table it is **in range** and three muscles are over MRV. The band's **word** ships with its colour — two of the four are red and mean opposite things. Push:pull stays open: it needs a taxonomy belonging in `packages/shared`, which is Lane A's. `Gate: device`.
 
 **The raw-store console says what its numbers mean (Q-538, half).** It printed **209,326 rows, 0
 rolled up, 31.2 MB** and it took a source trace to know `0 rolled up` was the fault — the prune's predicate matches nothing, so the 14-day window can delete no row at all. It now says unbounded, unbacked (past the 25 MB Auto Backup quota) and shedding, in words. **The bound stays blocked** on an unbuilt rollup consumer that is Lane A's and has no queue entry. `Gate: device`.
@@ -137,8 +138,7 @@ configured to anybody who asked. `GET /api/oura-ble/decoder-constants` answered 
 new one is a regression. The expensive one sat inside `visibleMeals.map(...)`, where a hook cannot
 live — its callbacks take the meal and hand it back, so the parent shares one per action.
 
-**Body-metric bounds are asked at the keyboard (Q-321, v1.348.0).** `validation/body-metrics.ts` held
-every threshold and nothing under `components/`/`app/` imported it, so a 5,000 kg weight was queued and dropped server-side. **Three** sheets, not the one the entry named.
+**Body-metric bounds are asked at the keyboard (Q-321, v1.348.0).** `validation/body-metrics.ts` held every threshold and nothing under `components/`/`app/` imported it, so a 5,000 kg weight was queued and dropped server-side. **Three** sheets, not the one the entry named.
 
 **Sixteen writes revalidated around their push, not after it (LB-6, v1.345.0).** The entry listed six; its finder read only *above* each call. `check-invalidate-after-push.js` holds it.
 
@@ -146,8 +146,7 @@ every threshold and nothing under `components/`/`app/` imported it, so a 5,000 k
 
 **A deload session says so now (BF-8, v1.343.0).** Intensity read "Full · As prescribed" while the card under it read "Deload session" — the owner trained one believing it was full. Both asked `isDeloadActive` (the PHASE), not today's session.
 
-**A recipe link becomes a meal (Q-409's Lane B half, v1.342.0).** A page stating no yield hands back the
-**whole recipe** (1,956 kcal for a loaf), so the row asks how many it serves and cannot be kept until answered.
+**A recipe link becomes a meal (Q-409's Lane B half, v1.342.0).** A page stating no yield hands back the **whole recipe** (1,956 kcal for a loaf), so the row asks how many it serves and cannot be kept until answered.
 
 **Saved meals can carry a photo (Q-327, v1.341.0).** A 64 px tile in Edit Meal, downscaling to 128 px WebP (~6 KB); the tile prints the stored size, because nothing else fails loudly when the cap slips.
 
@@ -166,8 +165,7 @@ closed).** One *correctly written* test failed because the code under it re-deri
 Brisbane: `aestMidnight` takes a timezone and only **9 of 22** call sites passed one. All 22 do now.
 
 **`DELETE /api/activity-logs` stopped reporting success for a delete that deleted nothing (Q-556).**
-Q-328's outbox delete reconciled the race that made this unsafe; it now 404s for a nonexistent or
-not-yours id while a double-tap still matches. The web fallback treats a 404 as success.
+Q-328's outbox delete reconciled the race that made this unsafe; it now 404s for a nonexistent or not-yours id while a double-tap still matches. The web fallback treats a 404 as success.
 
 **Admin Device Metrics sparklines stopped stretching a partial day to full width (BF-10).**
 `Sparkline` takes optional `times`/`timeDomain` and projects `x` by position in the day, so a
