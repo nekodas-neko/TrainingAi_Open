@@ -38,6 +38,17 @@ ratchet upward with prose.
 
 The compaction chore the BF-4 record proposed is still worth doing — several answered entries belong
 in `docs/reviews/` with a pointer left behind — but it is no longer urgent on size grounds alone.
+## 2026-08-25 — LA-28 shipped (`docs/implementation-backlog.md` 12021 → 11997, a RATCHET DOWN)
+
+**−24, and it is the first move in the other direction today.** LA-28 completed, so its entry left
+the queue. The baseline follows the file down rather than banking the slack — the point of a
+shrink-only ratchet is that headroom cannot be saved up and spent later.
+
+Worth recording beside the three raises above it (11948 → 11989 → 12005 → 12021 → **11997**): the net
+for the session is **+49**, not the +73 the BF-4 record named, because completing an entry gives the
+lines back. The raises were for entries that were *corrected*; this is one that was *finished*. That
+is the distinction to watch if the trend is ever argued about — a queue file growing because work is
+being recorded is different from one growing because work is being done.
 
 ---
 
