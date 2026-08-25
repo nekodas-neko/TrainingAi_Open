@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.368.0",
+    date: "2026-08-25",
+    changes: [
+      "You can undo a change AI Coach made to your programme. Open Coach \u2192 History and press Undo on the change; it reverts until you start your next workout, after which the app says so rather than quietly disagreeing with a session you have already done.",
+    ],
+  },
+  {
     version: "1.367.1",
     date: "2026-08-25",
     changes: [

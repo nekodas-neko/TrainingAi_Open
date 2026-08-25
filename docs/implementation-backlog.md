@@ -3926,59 +3926,32 @@ this fits without an extraction.
 
 ### [app-shell][workouts][platform] Q-467 — the Coach can change your programme and nothing in the app can undo it
 
-- **✅ UNBLOCKED — `Needs: Q-468` is satisfied** (Q-468 shipped and left the queue; an absent target
-  counts as satisfied by the protocol). Nothing gates this now.
-- **⬆ RE-PRICED UP by the owner's Q-472 decision, 2026-08-24 — this is now a PREREQUISITE, not a
-  deferred nicety.** The owner answered Q-472 *"keep the Coach's write capability, but wire undo
-  before driving adoption"*, which makes this entry the gating step for that whole plan. The
-  2026-08-18 amendment below re-priced it *down* on the grounds that `coach_changes` is empty so the
-  harm "has not yet happened" — that reasoning is now **inverted**: the exposure is absent only
-  while nothing is driving writes, and the decision is to start driving them. **Do this before any
-  work that makes the Coach propose more.**
-- **Most of it is wiring something already built** — see the undo subsystem inventory below. That is
-  what makes it a cheap prerequisite rather than an expensive one.
+> **✅ SHIPPED 2026-08-25.** `coach-history.tsx` renders an Undo on every change that is not already
+> undone; the row re-styles struck-through when it lands, and the route's 409 window ("you've trained
+> since this change") renders as a sentence on the row rather than an error, replacing the button.
+> No confirm dialog — undo *is* the safety net.
+> [`journal`](overview/entries/2026-08-25-coach-undo-control.md).
+>
+> **The route's `invalidateProgramStructure()` runs on the SERVER and clears nothing** —
+> `lib/cache-groups.ts` reaches `localStorage`/`sessionStorage`/the on-device SQLite cache. Wiring
+> the button at face value would have restored the programme in Postgres while every screen kept
+> painting the changed one for a full TTL. The client clears the superset (program structure, goal
+> recommendations, coach history), because the history payload carries no domain field and adding
+> one means editing `lib/coach/threads.ts`, which is Lane A's.
+>
+> **Verified against a real `coach_changes` row**, both ways: inside the window, `POST /undo` 200 and
+> `users.steps_goal` **12,000 → 8,000** in the database with `undone_at` set; after a workout started
+> since, **409**, the refusal on the row, the button gone, and the row **not** struck through.
 
 - **Branch:** `feat/coach-undo-control`
-- **Added:** 2026-08-18 · review sweep (the Coach write path — **the first review ever to cover it**) ·
-  [`docs/reviews/2026-08-18-coach-apply-path.md`](reviews/2026-08-18-coach-apply-path.md)
-- **Placement:** upper-mid. An AI-initiated write to the data that decides what the user is told to
-  lift, with no in-app way back.
-- **A complete undo subsystem exists and has no caller.** All of this is built:
-  `POST /api/coach/apply/[id]/undo` (auth-gated, rate-limited, ownership-scoped, with a well-reasoned
-  "until the next workout started after the change" window); `undoCoachChange()` with a double-undo
-  guard; an `undo()` handler in **all five** domains; `captureBefore()` in each, existing solely for
-  it; the `coach_changes.undone_at` column; and `components/coach/coach-history.tsx` already styling
-  undone changes with strikethrough, muted colour and a "· undone" suffix.
-- **Nothing calls it.** Every client fetch to a Coach endpoint, enumerated across `app/`,
-  `components/` and `lib/`:
-  ```
-  /api/coach   /api/coach/threads   /api/coach/preview   /api/coach/apply   /api/coach/options
-  ```
-  `/api/coach/apply/[id]/undo` appears in **no** client file, and `coach-history.tsx` renders the
-  list read-only — no Undo button anywhere.
-- **⚠️ This is NOT the known "no user-facing entry point" note** (this file, in the Coach phase-1
-  entry). That note is about phase 1 shipping the **apply** path without an entry point; phases 2–3
-  then wired apply — `change-preview.tsx`, `number-dial.tsx`, `confirm-content.tsx` and
-  `lib/coach/pending-change.ts` all POST to it and it works. **Undo was never wired with it.** The
-  asymmetry is the finding; do not close this as already-known.
-- **Why this severity:** the user approves changes per row, which implies reversibility, and the
-  history screen then styles for an undo that cannot be reached. The only way back is to ask the Coach
-  to change it again — a *new* change against current state, not a restore, and for `early_deload` or
-  `program_phase` possibly not expressible at all.
-- **Fix shape:** an Undo control in `coach-history.tsx` for changes that are not `undoneAt` and still
-  inside the window, treating the route's 409 ("you've trained since") as a first-class state rather
-  than an error. **Lane B** — the route already exists.
-- **✅ ~~Do Q-468 first, or in the same change~~ — Q-468 has SHIPPED and left the queue.** Converted
-  2026-08-24 from a prose blocker marker that was still parking this entry long after its reason
-  expired. The defect it guarded against is fixed; wiring the button no longer ships it.
-- **🔎 AMENDED 2026-08-18 from production — re-scoped, not closed.** `claude_ro.coach_changes` is
-  **empty**: no Coach change has ever been applied by this account, so **there has never been anything
-  to undo** and the harm this entry describes has not yet happened. The code path is still wrong and
-  the first real use will meet it — but the "upper-mid" placement was priced on an exposure that does
-  not exist yet. See **Q-472** and
-  [`docs/reviews/2026-08-18-production-verification.md`](reviews/2026-08-18-production-verification.md).
-  (`claude_ro` is row-scoped to one user — this says nothing about other accounts.)
-
+- **Lane:** B
+- **Keep:** only `user_goals` was driven through the UI. The other four domains
+  (`nutrition_targets`, `session_exercise`, `early_deload`, `program_phase`) share the route, the
+  shared `undoCoachChange()` and this client call, and are covered at handler level by
+  `coach-domains.test.ts` — but no UI pass touched them, and `early_deload`/`program_phase` are the
+  two whose restore is hardest to express. The `stale` 409 (a later change still in effect) renders
+  through the same path and was not driven separately. Plus the tap-target/wrap check at S25 width.
+  `Gate: device`.
 ### [platform][app-shell] Q-392 — the preference API exists; the read sites still read `localStorage`
 
 - **⚑ ABSORBS Q-393 (removed 2026-08-23). The `mealLabelStyle` row below IS that entry.** Q-393
