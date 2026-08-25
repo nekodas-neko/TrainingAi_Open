@@ -63,10 +63,14 @@ builder's rows became the shared `FoodRow`; `ingredient-row.tsx` is deleted and 
 
 **The Devices card stops calling the ring healthy with no key (LB-5).** Checks `hasKey()` and links to `/admin/oura-ble` when false. `Gate: device`.
 
+**The queue tooling learns `OR-` (PS-6).** The Orchestrator prefix was never in the ID alternation,
+and the failure was **silent deletion**: `next-item.js` counted **194 entries with and without** a
+scratch `OR-99`, printed it nowhere, and `check-backlog-pointers` neither caught a duplicate nor
+resolved `Needs: OR-n`. One shared `scripts/lib/entry-id.js` now, not four regexes — four copies is
+what let it drift. PS-6 named three sites; there were four.
+
 **The vacuum button can reach the table that needs it (Q-315).** `error_events` holds **4 live rows
-in 49 MB** in production and the generalised `/api/admin/vacuum` had **no caller** — the one control
-still posted to the `oura_raw_samples`-only route. A table picker fed by that route's own `GET` fixes
-it; the press itself is the owner's, from a desktop. `Gate: owner`.
+in 49 MB** in production and the generalised `/api/admin/vacuum` had **no caller** — the one control still posted to the `oura_raw_samples`-only route. A table picker fed by that route's own `GET` fixes it; the press itself is the owner's, from a desktop. `Gate: owner`.
 
 **The Coach's undo has a button (Q-467).** A whole undo subsystem — route, five domain handlers, a
 `captureBefore()` in each, the `undone_at` column, even the struck-through styling — had no caller. **The route's `invalidateProgramStructure()` runs server-side and clears nothing**, so wiring the button at face value would have restored the programme in Postgres while every screen painted the changed one for a full TTL; the client clears the superset. `Gate: device`.
@@ -101,9 +105,7 @@ was **0** in CI and those tests passed vacuously (**Q-312**); and `sessionEffort
 (**Q-420**). ⚠️ **None device-verified.** Detail, and the four wrong turns that produced them, in
 [the Lane A handoff](docs/handoff-2026-08-24-platform-implementation-lane-a-engine-run.md).
 
-**The raw-frame packer runs itself, and it deletes only what it verified (Q-541 complete).** A button
-does not hold a growth curve — `oura_raw_samples` regrew to 92 MB within five days of the 2026-08-18
-hand-run. Fires from the ingest path now, throttled per user, `OURA_AUTOPACK=off` kill switch. Automating it made the delete's race reachable, so phase 3 deletes by row id, not ds range ([`journal`](docs/overview/entries/2026-08-23-feat-oura-autopack.md)).
+**The raw-frame packer runs itself, and it deletes only what it verified (Q-541 complete).** A button does not hold a growth curve — `oura_raw_samples` regrew to 92 MB within five days of the 2026-08-18 hand-run. Fires from the ingest path now, throttled per user, `OURA_AUTOPACK=off` kill switch. Automating it made the delete's race reachable, so phase 3 deletes by row id, not ds range ([`journal`](docs/overview/entries/2026-08-23-feat-oura-autopack.md)).
 
 **Logging food evicted the caches before the server had the write (LB-4).** The invalidation fired
 correctly and too early: subscribers refetched a server that lacked the log and re-cached the pre-log
@@ -122,9 +124,7 @@ configured to anybody who asked. `GET /api/oura-ble/decoder-constants` answered 
 **Two affordances came back and the sheet that owned them is gone (LB-3, v1.347.0).** Nothing opened
 `day-overlay-sheet.tsx` after Q-110, so tapping a logged exercise or an activity was dead a fortnight. Both on `/health/day` (the NAME is the target); `health-content.tsx` lost 167 lines.
 
-**Deleting an activity works offline now (Q-328, v1.350.0).** The one activity-log write with no
-outbox domain — deleted by a bare `fetch` that failed with no connection. `softDeleteActivityLogPending`:
-a queued delete must stay `pending` or a pull clobbers it; `'synced'` is what lets `applyDelta` reap it.
+**Deleting an activity works offline now (Q-328, v1.350.0).** The one activity-log write with no outbox domain — deleted by a bare `fetch` that failed with no connection. `softDeleteActivityLogPending`: a queued delete must stay `pending` or a pull clobbers it; `'synced'` is what lets `applyDelta` reap it.
 
 **The memo-stability baseline is empty (Q-357, v1.349.0).** All four defeated call sites cleared, so a
 new one is a regression. The expensive one sat inside `visibleMeals.map(...)`, where a hook cannot

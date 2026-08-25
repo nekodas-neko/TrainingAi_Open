@@ -331,40 +331,6 @@ days/hours cause most stress". Measured against production the same day; the bou
 signed off by the owner in that conversation. Review:
 [`docs/reviews/2026-08-24-body-battery-charge-window-collapse.md`](reviews/2026-08-24-body-battery-charge-window-collapse.md).*
 
-### [platform] PS-6 — the queue tooling has never known the `OR-` prefix, so every Orchestrator entry is mislabelled or invisible
-
-- **Branch:** `fix/queue-tools-or-prefix`
-- **Added:** 2026-08-25 · Orchestrator, hit while filing the **first `OR-` entry ever written**,
-  which is why five days of the prefix existing never surfaced this. (That entry was withdrawn as a
-  duplicate of BF-23; the tooling bug it exposed is real and unrelated.)
-- **Lane: B.** Two scripts, three regexes, no schema. **Filed under `PS-` deliberately and not
-  under `OR-`: an `OR-` entry describing this bug would be invisible to the tool that reports it.**
-- **The bug.** `OR` is missing from the ID alternation in all three places:
-  - `scripts/next-item.js:54` — `/\b((?:LA|LB|BF|RV|TN|PS|Q)-\d+[a-z]?)\b/`
-  - `scripts/check-backlog-pointers.js:83` — the same pattern, used to resolve `Needs:` targets
-  - `scripts/check-backlog-pointers.js:137` — `/\b(LA|LB|BF|RV|TN|PS|Q)-(\d+)([a-z]?)\b/`, the
-    duplicate-ID detector
-- **⚠️ The `next-item.js` failure mode is silent deletion, not a bad label.** Line 57 reads
-  `current = id ? {…} : null` and line 59 `if (current) entries.push(current)` — **an entry whose
-  heading matches no known prefix is dropped from the queue entirely.** So an `OR-` entry is either
-  mislabelled (if some other ID happens to appear in its heading) or **invisible to the implementer
-  running the tool**, with nothing printed to say so — not even UNCLASSIFIED.
-- **Consequences on `check-backlog-pointers.js`:** duplicate `OR-` IDs are **not** detected, and a
-  `Needs: OR-n` is not resolved as a real target. Both guarantees the file claims to give simply do
-  not hold for this prefix.
-- **How it was found, and why there is no live example to look at.** It surfaced while filing an
-  `OR-1` entry that displayed in `next-item.js` as `Q-402` — the id had been picked out of the
-  *title text*, not the entry's own prefix. That entry was withdrawn as a duplicate before it
-  merged, so reproduce this from the source above or from a scratch heading; do not go looking for
-  an `OR-` entry in the queue, there is not one yet.
-- **`docs/agents/README.md` §3 lists `OR-` as a valid prefix**, and the Orchestrator role was created
-  2026-08-20 (PR #263). The tooling was never taught the letter.
-- **Verification:** add a scratch entry headed `### [platform] OR-99 — …` and confirm three things.
-  With no other id in the heading it is **listed** by `node scripts/next-item.js` rather than
-  silently dropped, and its id column reads `OR-99`. With a second id in the heading (say a `Q-`
-  reference) the column still reads `OR-99` and not the other one. And a duplicated `OR-99` makes
-  `check-backlog-pointers.js` **fail**. All three fail today.
-
 ### [readiness][devices] TN-8 — the chronic-stress fever mask is a FOURTH consumer of the broken temperature baseline
 
 - **Branch:** _unassigned_
