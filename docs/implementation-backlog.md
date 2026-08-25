@@ -923,11 +923,11 @@ without a queue entry is a dropped finding.*
   [`Journal`](overview/entries/2026-08-23-shared-food-row.md).
 - **✅ THE DIARY ROW SHIPPED 2026-08-25 (v1.367.0)** — with the delete this entry required moved into
   `QuickEditLogSheet` first, so no capability was dropped.
-- **What is left is ONE call site: the external food-database row** (`ingredient-search.tsx:132`),
-  which carries a macro-mismatch warning and an in-flight spinner. The agreed row has nowhere to put
-  either, and adding a slot makes it a wrapper rather than a unification. **Needs a design answer —
-  where a per-row warning goes.** Q-395's drawings do not settle it (checked: none of the twelve
-  artboards shows a warning treatment).
+- **Keep:** ONE call site, the external food-database row (`ingredient-search.tsx:132`), which
+  carries a macro-mismatch warning and an in-flight spinner. The agreed row has nowhere to put
+  either, and adding a slot makes it a wrapper rather than a unification. **It needs a design answer
+  — where a per-row warning goes** — and Q-395's drawings do not settle it (checked: none of the
+  twelve artboards shows a warning treatment). `Gate: owner`.
 - **✅ RESOLVED 2026-08-24 — the drawings are in the repository.** **The lesson worth keeping: a
   mockup that lives only in a chat artifact is a mockup the queue cannot use.** These were drawn
   2026-08-18, reviewed twice, decided against — then blocked four entries for six days because
@@ -3210,6 +3210,8 @@ this fits without an extraction.
 > **The entry stays queued as the home of its ratchet, not as a queue of work.** Re-judge a site only
 > if a NEW writer starts clearing its key while it is on screen.
 
+- **Keep:** nothing to build. This entry is the home of `check-fetch-once-effects.js` and its
+  per-site judgements — re-judge a site only if a NEW writer starts clearing its key on screen.
 - **Branch:** `chore/adopt-use-cached-value`
 - **Added:** 2026-08-19 · Lane B, while fixing Q-402 · [`journal`](overview/entries/2026-08-19-cache-invalidation-signal.md)
 - **Placement:** low. **Latent, not broken.** Q-402 shipped the mechanism (`subscribeToInvalidation`
