@@ -6,6 +6,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.364.0",
+    date: "2026-08-25",
+    changes: [
+      "Building a meal is quieter. Each ingredient is now a single tidy row \u2014 name, how much, calories \u2014 and tapping one opens a dedicated screen to change the amount, with 1/2/3 serving and 100 g shortcuts. The meal\u2019s own name is the title now, with \u201cMakes 2 portions \u00b7 278 kcal each\u201d under it.",
+      "Segmented buttons across the app (the srv/g toggle, the Health and More tabs) are a little taller, so they are easier to hit.",
+    ],
+  },
+  {
     version: "1.363.6",
     date: "2026-08-24",
     changes: [

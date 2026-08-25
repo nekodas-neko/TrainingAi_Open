@@ -8,7 +8,8 @@
  * testing.
  */
 
-import type { QtyUnit } from './ingredient-row'
+/** How a row's quantity is being *entered*. What gets stored is always a serving multiplier. */
+export type QtyUnit = 'serving' | 'g'
 
 /** Two decimals is enough to express any gram value against a sane serving size, and stops a long
  *  float reaching the database. 100 servings is the ceiling for one ingredient. */

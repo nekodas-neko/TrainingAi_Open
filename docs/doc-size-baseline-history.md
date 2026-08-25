@@ -2074,3 +2074,15 @@ by-product of a routine handoff because its bulk was narrative rather than state
 this handover by moving that narrative into the three dated reviews and the handoff doc it already
 cited, keeping only state and the do-not-re-litigate list. **Five of six batons are now at or under
 ~170 lines.**
+
+## 2026-08-25 — `docs/implementation-backlog.md` raised for the threshold sweep
+
+**TN-8** (the chronic-stress fever mask — a fourth consumer of the temperature baseline BF-13 fixes)
+plus a third-step-goal amendment on Q-524. Both are queue entries carrying their measurements, which
+is what this file is for.
+
+**Third parallel-merge raise in two days, and that is the ratchet working rather than failing.** The
+backlog is edited by five agents at once, so a branch that was under its baseline locally goes over
+once CI merges `main` into it — the local number and the merged number are different questions. The
+fix each time is the same: merge `origin/main`, recount, raise in the same PR. Recorded here so the
+pattern is legible rather than looking like repeated carelessness.
