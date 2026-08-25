@@ -331,6 +331,39 @@ days/hours cause most stress". Measured against production the same day; the bou
 signed off by the owner in that conversation. Review:
 [`docs/reviews/2026-08-24-body-battery-charge-window-collapse.md`](reviews/2026-08-24-body-battery-charge-window-collapse.md).*
 
+### [platform][workouts] LB-13 — two API routes call a CLIENT cache helper, so a Coach swap leaves every program-structure key stale
+
+- **Branch:** _unassigned_ · **Lane: A** (`app/api/**` + a `scripts/` check). Filed by Lane B.
+- **Added:** 2026-08-25 · found while wiring Q-467's undo, where the same line had to be worked around.
+- **The defect, read from source (NOT observed at runtime — see Keep).** `lib/cache-groups.ts`
+  imports `lib/sqlite/cache`, which returns early on `typeof window === 'undefined'`. So on the
+  server every group helper is a no-op. Two routes call one anyway:
+  - `app/api/coach/apply/route.ts:71` — `await invalidateProgramStructure()`
+  - `app/api/coach/apply/[id]/undo/route.ts:70` — same
+- **The apply path has no other caller that covers it.** The three client apply sites
+  (`change-preview.tsx:117-119`, `number-dial.tsx:72-74`, `confirm-content.tsx`) clear
+  `invalidateGoalRecommendations()` (only when `domain === 'user_goals'`) and
+  `invalidateCoachHistory()`. **Nothing clears program structure.** So a `session_exercise` swap —
+  the Coach's commonest change, and the one in Q-403's screenshots — writes to Postgres while
+  `workout-data`, `next-session`, `workout-card:`, `phase-sets` and the prescription seeds all keep
+  their pre-swap values.
+- **`workout-card:` is `freshWithinTtl` at `TTL_LONG`**, which by CLAUDE.md's own Q-262 rule is
+  exactly the condition where a stale entry **survives as a settled value** rather than as a
+  first-paint flash. That is the half that makes this user-visible rather than cosmetic.
+- **Q-467's undo route is NOT affected** — its client caller clears the superset explicitly
+  (`feat/coach-undo-control`, 2026-08-25). Its route line is inert but harmless. **Apply is the gap.**
+- **⚠️ The CLAUDE.md rule as written is what produces this.** Line 295: *"Every mutation (**API
+  write** or local write) invalidates via a named group helper in `lib/cache-groups.ts`"* — that
+  instructs an API route to do precisely this. The rule fired; it produced the bug. **Correcting the
+  rule needs the owner** (CLAUDE.md is not an implementer's to edit) and is the durable half.
+- **Fix shape:** (1) the client apply sites clear the superset, as the undo caller already does;
+  (2) drop the inert route calls; (3) a `scripts/check-*.js` rule that fails on any
+  `lib/cache-groups` import under `app/api/**` — grep-able, so it belongs in CI rather than prose,
+  which is how the safe-area and push-mutations rules stopped recurring.
+- **Keep:** **not reproduced at runtime.** The chain is read from source and from the helper's own
+  early return; nobody has applied a Coach swap and watched the workout screen keep the old exercise.
+  Do that first — it is one apply and one look at `/workout`, and it decides the priority.
+
 ### [platform] LA-22 — E2E is not a required check, and a PR merged with it red
 
 - **Lane: A** · **Added:** 2026-08-25
@@ -348,6 +381,12 @@ signed off by the owner in that conversation. Review:
   `grep` for the label then appears to confirm it. #456's own commit message names this trap.
   **Reproducing on a local dev DB and then reasoning from a grep is not enough to call a test
   unpassable**; the modal was in the way on both.
+- **Middle options worth costing before deciding:** required only on PRs touching `app/**`,
+  `components/**` or `e2e/**`; or not required but with a scheduled run on `main` that opens an
+  issue on red, so it is loud without being blocking.
+- *Lane B filed the identical finding the same day (as LB-14) after **OR-1** and **BF-23** were also
+  filed independently for the same red; folded here rather than kept as a fourth duplicate.*
+
 ### [platform] LB-12 — 77 of 193 queue entries state no lane, so both implementers are served each other's work
 
 - **Branch:** _unassigned_ · **Lane:** B filed it; **the sweep is the Orchestrator's** (it owns lane
