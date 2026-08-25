@@ -5015,15 +5015,34 @@ ehr     0     0     0     0   648   208   128   556     0
 - **Push:pull replicates.** legs 458 (34%), push 382 (29%), pull 286 (22%), other 202 (15%) over the
   same 56 days — **push:pull 1.34**, against the 1.30 recorded over 60 days. Consistent, and the
   same mild push dominance rather than anything pathological.
-- **Still open, and still the actual work:** the surface itself, plus the design question of whether
-  Q-278 / Q-302 / Q-305 share one treatment. Nothing was built — this entry gated building on the
-  re-measurement, and that is what was delivered.
+- **✅ THE LANDMARK HALF SHIPPED 2026-08-25 (Lane B) — and the surface was not absent, it was
+  WRONG.** `weekly-muscle-sets-card.tsx` already drew a band: a hardcoded generic `MIN_TARGET = 10` /
+  `MAX_TARGET = 20` with `barColor` at 15/10/6. So the app computed correct per-muscle landmarks and
+  rendered a made-up yardstick beside them, every week. It now uses
+  `volumeVerdict(goal, muscle, sets)` — `below MEV` / `in range` / `above MAV` / `above MRV`, with
+  **the word beside the colour**, because two of the four bands are red and mean opposite things. A
+  program target still wins over the reference range. No Lane A change was needed: `workout-data:meta`
+  already carries `program.trainingGoal` and Health already fetches that key.
+  [`journal`](overview/entries/2026-08-25-volume-landmarks-surfaced.md).
+- **⛔ THE PUSH:PULL HALF IS NOT DONE, deliberately.** This entry says to do it on the same surface
+  "rather than as two cards", and doing it here would mean inventing a muscle → movement-pattern
+  taxonomy inside a component. **There is no push/pull grouping anywhere in the repo** (checked). It
+  is domain math and belongs in `packages/shared` beside `normalizeMuscle`/`MUSCLE_LANDMARKS` under
+  One Formula One Place — which is **Lane A's**. A private second copy in `components/` to satisfy
+  "together" would be the wrong trade.
+- **Still open:** the push:pull half above, and the design question of whether Q-278 / Q-302 / Q-305
+  want one shared treatment for "computed and discarded" — untouched, because answering it inside one
+  card would have prejudged it.
 - **Where it likely belongs:** the same screen that already shows weekly volume, rather than a new
   destination — see the IA cluster (Q-232…Q-239) before adding a surface.
 - **A related check that came back CLEAN, recorded so it is not re-investigated:** `core` is tagged on
   exercises and absent from `MUSCLE_LANDMARKS`, which looks like a silent fall-through to
   `DEFAULT_LANDMARKS`. It is not — `muscles.ts:17` maps `core: 'abs'` and `volume-targets.ts:58`
-  applies `normalizeMuscle` before the lookup. Working correctly.
+  applies `normalizeMuscle` before the lookup. Working correctly. **Now pinned by a unit case** so it
+  stays that way.
+- **Keep:** the push:pull half (blocked above, Lane A), the shared-treatment design question, and the
+  S25 check — the band word sits beside the set count on a narrow row and has only been seen in a
+  desktop browser. `Gate: device`
 
 
 ### [workouts] Q-300 — 37% of sets are taken with materially less rest than prescribed, and the RPE model has no rest term

@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.370.0",
+    date: "2026-08-25",
+    changes: [
+      "Muscle Volume This Week now measures each muscle against its own effective and recoverable set ranges, scaled to your program\u2019s training goal, instead of one flat 10\u201320 band for everything \u2014 and says which side of the range you are on in words, not just colour.",
+    ],
+  },
+  {
     version: "1.369.1",
     date: "2026-08-25",
     changes: [
