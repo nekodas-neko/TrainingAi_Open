@@ -78,8 +78,14 @@ describe.skipIf(!canRun)('the ingest path runs the packer', () => {
     ])
     expect(n).toBe(1)
 
-    expect(await until(async () => (await packedRows()) === 1)).toBe(true)
-    expect(await coldHotRows()).toBe(0)                    // the sealed bucket left the hot tier…
+    // Poll for the packer's FINAL state, not its first phase. The three phases commit separately
+    // and deliberately (see the module docstring on `oura-raw-pack.ts`), so a packed row existing
+    // proves only that phase 2 got there — phase 3's delete can still be in flight. Waiting on
+    // phase 1 and then asserting phase 3 with no wait allowed it exactly zero milliseconds, which
+    // holds on an idle machine and fails on a loaded CI runner: `expected 8 to be +0`, on a
+    // docs-only PR (BF-18). Any assertion added here polls for the same reason.
+    expect(await until(async () =>
+      (await packedRows()) === 1 && (await coldHotRows()) === 0)).toBe(true)
     expect(Number((await pool.query(
       `SELECT frame_count FROM oura_raw_packed WHERE user_id=$1`, [TEST_USER_ID])).rows[0].frame_count),
     ).toBe(coldFrames.length)                              // …intact

@@ -2296,3 +2296,15 @@ carries, so it reported OK there and failed here the moment 20 more arrived. Wor
 can inherit someone else's overshoot, and the number recorded is the whole of it, not the part the
 raising branch wrote.
 
+## 2026-08-25 — `projectOverview.md` raised, 7947 → 7949 (BF-18)
+
+Two lines: the Current Status paragraph the session wrap-up asks for, and its blank. It earns the
+space by carrying the thing a reader needs and the journal entry cannot give them at a glance — that
+a red `Tests` on an unrelated PR had a known cause with a known fix, so the next person to meet one
+does not spend the session re-running it. The reproduction is in the journal entry.
+
+**Written first as 7941 → 7943, and superseded before it merged.** BF-16a's PR (#475) landed in
+between and had already raised the number to 7947, so `doc-size-baseline.json` was rebuilt from
+`origin/main` and this raise re-derived on top of it rather than the hunk being spliced. Two
+same-session PRs both raising the same baseline is the ordinary case here, not an unusual one — the
+second one's number is only ever correct against the merged first.
