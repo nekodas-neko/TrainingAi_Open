@@ -893,27 +893,10 @@ without a queue entry is a dropped finding.*
     line and an in-flight spinner. The agreed row has nowhere to put either, and adding a slot for
     them is what makes it a wrapper rather than a unification. **Needs a design answer** — where a
     per-row warning goes — which belongs with Q-395's drawings.
-- **✅ RESOLVED 2026-08-24 — struck, and kept only for the lesson.** ~~THE DRAWINGS ARE NOT IN THE
-  REPOSITORY~~: they are, at
-  [`docs/design/2026-08-18-nutrition-rework-mockups.html`](design/2026-08-18-nutrition-rework-mockups.html).
-  **The lesson worth keeping: a mockup that lives only in a chat artifact is a mockup the queue
-  cannot use.** These were drawn 2026-08-18, reviewed twice, decided against — and then blocked four
-  entries for six days because nobody committed them. **Commit the canvas in the same PR that files
-  the entry citing it.** The historical text follows.
-  ~~`unit-options.png`, which Q-395a names as its
-  reference for the expanded and collapsed rows, is nowhere in the tree — `docs/design/` holds
-  mockups for cardio, scores and the AI coach, none for nutrition.~~ The row above was built from
-  Q-406's **written** description ("name · grey secondary line · calories right-aligned in a fixed
-  column · optional chevron"), which is complete enough for it. **The remaining phases are not so
-  lucky**: Q-395a/b/c reference drawings no session can open. Commit them under `docs/design/`, or
-  the phases will be built from prose and the visual match cannot be checked.
-- **The optional thumbnail is deferred.** No call site passes one, and an unused `<img>` costs a
-  `no-img-element` exemption for arbitrary user photo URLs. The phase that first shows a thumbnail
-  adds it, with the loader decision made where it can be seen.
-- **Unblocks:** Q-395a, and Q-398 which wants the same row for plan meals.
-- **⏫ MOVED TO TOP OF QUEUE 2026-08-24, on the owner's explicit direction.** Priority is settled;
-  the sole remaining blocker is the missing drawings named above. Nothing else in the queue outranks
-  this chain once that gate clears.
+- **✅ RESOLVED 2026-08-24 — the drawings are in the repository.** **The lesson worth keeping: a
+  mockup that lives only in a chat artifact is a mockup the queue cannot use.** These were drawn
+  2026-08-18, reviewed twice, decided against — then blocked four entries for six days because
+  nobody committed them. **Commit the canvas in the same PR that files the entry citing it.**
 
 ### [nutrition][app-shell] Q-395 — the nutrition rework: the spec every phase reads, and the final checkpoint
 
@@ -1203,36 +1186,48 @@ whether or not anyone draws them first.
 
 - **Lane:** B
 - **✅ THE CODE SHIPPED 2026-08-25 (v1.364.0)** — `quantity-sheet.tsx` new, `ingredient-row.tsx`
-  deleted, the builder's rows are the shared `FoodRow`, `QtyUnit` moved to `saved-meal-qty.ts`, and
-  48 dp done once in `ui/segmented-tabs.tsx` for all 8 call sites. `Needs: Q-406` removed — Q-406 has
-  said it was satisfied since 2026-08-23 while the field the tool reads said otherwise, the same
-  field-vs-prose gap as Q-306's. Verified in a browser at 412×915 in **both themes**, build and edit
-  paths, row highlight false → true → false.
-  [`journal`](overview/entries/2026-08-25-quantity-sheet-collapsing-rows.md) — it holds the design,
-  and the three things this entry got wrong (including that `food-row.tsx` already existed, so
-  *"`ingredient-row.tsx` becoming `food-row.tsx`"* could not be done literally).
-- **Keep:** the **device smoke run in both themes**, which a browser cannot stand in for — the
-  sheet's safe-area inset renders as 0 in the sandbox and the action row now carries Remove.
-  `Gate: device`.
+  deleted, the builder's rows are the shared `FoodRow`, and 48 dp done once in `ui/segmented-tabs.tsx`
+  for all 8 call sites. Verified in a browser in both themes, build and edit paths.
+  [`journal`](overview/entries/2026-08-25-quantity-sheet-collapsing-rows.md) — it holds the design
+  and the three things this entry got wrong.
+- **Keep:** the **device smoke run in both themes** — the sheet's safe-area inset renders as 0 in the
+  sandbox and its action row carries Remove. `Gate: device`.
 
 ### [nutrition][app-shell] Q-395b — phase 3: the day screen, against the 11-section coverage list
+
+> **🚧 PART SHIPPED 2026-08-25 (v1.365.0) — the entry stays open.** The meal list is one bordered
+> block with full-bleed dividers (`MealCard` gained `grouped`), `MacroRing`'s arc is split by macro,
+> and the trailing group moved to `day-tools-section.tsx`, taking `nutrition-content.tsx` off the
+> 800-line ceiling (789 → 773). All 11 sections ticked. **Measured: gaps were 420 px of 2,649
+> (16%)**, not *"most of the vertical space"*; this reclaims 100.
+> [`journal`](overview/entries/2026-08-25-nutrition-day-screen-sections.md).
+- **Keep:** the other eight sections still draw gapped cards. Taking them full-bleed edits eight
+  components' chrome for a small remaining gain — the meal list was the largest share — so do it
+  with a device in hand, alongside the **device smoke run** and a dark pass on the new dividers.
+  `Gate: device`.
+
+### [nutrition][platform] LB-9 — the Atwater factors have four copies, two of them Lane A's
+
+- **Lane:** A
+- **Added:** 2026-08-25 · Lane B, while writing Q-395b's macro-split arc.
+- **`calorie-balance.ts`'s `KCAL_PER_G` is not exported** and `goal-recommendation.ts` hardcodes
+  `* 4` / `* 9` at three sites (54, 80, 108). A fourth copy in `saved-meal-card.tsx` is gone —
+  Q-395b put `components/nutrition/macro-energy.ts` in its place for `components/`.
+- **Left:** export `KCAL_PER_G`, fold `goal-recommendation.ts` onto it, then have `macro-energy.ts`
+  import rather than redeclare — all in `packages/shared/`, which Lane B cannot reach. Values agree
+  everywhere, so no behaviour change.
+
 
 - **Lane:** B
 - **`Needs: Q-395a` cleared 2026-08-25** — its components shipped; Q-395a stays queued only for a
   device check on the builder, which does not gate this screen.
 - **Spec:** Q-395, findings 14 and 16.
-- **Scope.** `nutrition-content.tsx` and its cards. Grouped sections with full-bleed dividers
-  replace gapped cards — that is most of the vertical space this screen spends on nothing. Extend
-  the shipped 96 px `MacroRing` with an arc **split by macro**; do not add a second ring.
-- **⚠ This entry carries the coverage checklist and checks it off in the PR.** The first draw showed
-  **3 of the 11 sections** this tab actually renders. In shipped order: ScreenHeader + date nav ·
-  CalorieBalanceBar · MacroRing · NutritionActionRow · MealPlanReviewCard · MealPlanSection ·
-  TdeeAdaptationCard · MealCard × meal types · End of Day · WeeklyNutritionChart ·
-  SupplementsSection. **A rework that quietly loses a section is the failure mode Q-395 exists to
-  prevent**, and this is the phase where it would happen.
-- **Headroom is not free.** Q-406's first half took `nutrition-content.tsx` 800 → 732; it is not on
-  the size baseline, so it is held to 800 hard. Extract before adding.
-- **Verification.** As Q-395a, plus the checklist above ticked off in the PR body.
+- **Scope.** `nutrition-content.tsx` and its cards: grouped sections with full-bleed dividers replace
+  gapped cards, and the 96 px `MacroRing` gains an arc split by macro (never a second ring).
+- **⚠ Every PR here ticks the coverage checklist.** The screen renders **12** sections and a rework
+  that quietly loses one is the failure mode Q-395 exists to prevent. The list is in the journal
+  linked below, corrected — this entry's own copy named 11 and mis-ordered End of Day.
+- **Verification.** As Q-395a, plus the checklist ticked in the PR body.
 
 ### [nutrition][app-shell] Q-395c — phase 4: Log Food becomes one screen, and `My Foods` becomes one name
 
@@ -5702,6 +5697,25 @@ ehr     0     0     0     0   648   208   128   556     0
   half-fix. Decide the invariant once, at the write or at `nightSessions`.
 - **First action:** re-run the rows-per-date query above over all history (not just post-re-key) to
   size the affected set before choosing between the two fixes.
+- ✅ **SIZED AND PARTLY FIXED 2026-08-25** (`fix/sleep-fragment-nights`). Working:
+  [`entries/2026-08-25-sleep-fragment-nights.md`](overview/entries/2026-08-25-sleep-fragment-nights.md).
+  All history: **17 rows under 1.5 h across 74 dates, 4 of them exactly 0.00 h**, every one starting
+  **09:32–22:14 local** — daytime detections, not short nights.
+- **⚠ TWO CLAIMS ABOVE ARE STALE — do not re-derive from them.** (a) 08-11 and 08-13 both carry
+  **2 rows** now; Q-536's clock repair (two days after filing) supplied their nights. The only
+  single-row fragment dates in all history are **2026-06-01** (1.45 h, Cloud-era) and **2026-08-22**
+  (0.00 h). (b) The readiness claim is dead: `readiness-payload`, `sleep-trend` and
+  `score-audit/sleep` **all go through `nightSessions`**, which already handles 16 of the 17.
+- **The invariant was already decided; the defect was readers bypassing it.** Both fixed:
+  `/api/day-log` took `sleepRes.value[0]` and `listSleepSessions` orders by **date only**, so on 15
+  dates it chose nap-vs-night **by coin flip**; and the sleep list rendered 2026-08-22 as a 0.00 h
+  night, because `mergeByDate`'s one-row fast path skips `primaryCluster`.
+- **⚠ NEW: there are TWO implementations of "which rows are the night"** — `sleep-night.ts`
+  (circadian band + 3 h gap) and `lib/sleep/merge-sessions.ts` (longest + 1 h contiguity). They agree
+  on this history, but *One Formula, One Place* calls that a bug by definition.
+- **Keep:** converge those two (changes the main sleep surface, wants a device check) · **nothing
+  device-verified** · the write path still stores 0.00 h rows · 2026-06-01 still classifies as a
+  1.45 h night and no decision was made about it.
 
 ### [readiness][workouts] Q-275 — readiness is structurally blind to training load, and every incumbent treats load as primary
 

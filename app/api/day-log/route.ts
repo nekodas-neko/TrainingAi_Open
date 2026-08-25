@@ -4,6 +4,7 @@ import { getRepository } from "@/lib/data";
 import { fmtAest, DEFAULT_TZ, normalizeDateParam, dateStrMidnightInTz } from "@trainingai/shared/date-utils";
 import { toZonedTime } from "date-fns-tz";
 import type { ActivityLog } from "@trainingai/shared/types";
+import { nightSessions } from '@trainingai/shared/health/sleep-night'
 
 export interface DayExercise {
   name: string;
@@ -223,7 +224,18 @@ export async function GET(req: NextRequest) {
     repo.getHrForWindow(userId, dayMid, nextMid),
   ]);
 
-  const sleepRow = sleepRes.status === "fulfilled" ? sleepRes.value[0] : undefined;
+  // Q-274: this was `sleepRes.value[0]`. `listSleepSessions` orders by DATE only, so within a date
+  // the row order is whatever Postgres returns — and 15 dates in production carry two rows, a
+  // daytime fragment plus the real night. The day log was picking between them by coin flip.
+  // `nightSessions` is the one place that answers "which rows are the night": it drops
+  // zero-duration rows, classifies naps out by circadian midpoint, and reassembles a fragmented
+  // night. Longest wins among what survives, matching `nightForDate` — but chosen from the rows
+  // this query already restricted to `pgDate`, rather than re-deriving the wake day, because
+  // production carries rows whose stored date disagrees with their local wake day.
+  const nights = sleepRes.status === "fulfilled" ? nightSessions(sleepRes.value, tz) : [];
+  const sleepRow = nights.length
+    ? nights.reduce((best, n) => ((n.durationHours ?? 0) > (best.durationHours ?? 0) ? n : best))
+    : undefined;
   const sleep: DaySleep | null = sleepRow
     ? {
         durationHours:   sleepRow.durationHours   ?? null,

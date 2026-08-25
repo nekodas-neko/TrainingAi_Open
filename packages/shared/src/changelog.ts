@@ -6,6 +6,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.365.0",
+    date: "2026-08-25",
+    changes: [
+      "The calorie ring on Nutrition is now split by macro \u2014 the arc still shows how far through your goal you are, but coloured by where those calories came from, with each share written under its name.",
+      "Your meals are one continuous list instead of six separate cards with gaps between them, so less of the screen is spent on nothing.",
+    ],
+  },
+  {
     version: "1.364.0",
     date: "2026-08-25",
     changes: [

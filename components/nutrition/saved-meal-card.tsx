@@ -5,6 +5,7 @@ import { ChevronDown, Check, Loader2, Pencil, QrCode, Trash2 } from 'lucide-reac
 import { Button } from '@/components/ui/button'
 import { cn } from '@trainingai/shared/utils'
 import { MACRO_COLORS } from '@trainingai/shared/nutrition/macro-colors'
+import { macroKcal, macroShares } from './macro-energy'
 import type { SavedMeal } from '@trainingai/shared/types/nutrition'
 import { oneServingItems } from '@trainingai/shared/nutrition/saved-meal-ingredients'
 
@@ -74,9 +75,10 @@ export const SavedMealCard = memo(function SavedMealCard({
   }), { weightG: 0, calories: 0, proteinG: 0, carbsG: 0, fatG: 0 })
 
   // Energy share per macro, which is what a split bar should show — grams would make fat look
-  // like a third of what it contributes.
-  const energy = totals.proteinG * 4 + totals.carbsG * 4 + totals.fatG * 9
-  const pct = (kcal: number) => energy > 0 ? (kcal / energy) * 100 : 0
+  // like a third of what it contributes. The Atwater factors come from `macro-energy.ts`; this
+  // wrote them out longhand and was one of the copies that module exists to end.
+  const energy = macroKcal(totals).total
+  const shares = macroShares(totals)
   const selecting = selected !== null
 
   return (
@@ -150,9 +152,9 @@ export const SavedMealCard = memo(function SavedMealCard({
         {energy > 0 && (
           <>
             <div className="mt-2 flex h-1.5 overflow-hidden rounded-full bg-muted">
-              <span style={{ width: `${pct(totals.proteinG * 4)}%`, backgroundColor: MACRO_COLORS.protein }} />
-              <span style={{ width: `${pct(totals.carbsG * 4)}%`, backgroundColor: MACRO_COLORS.carbs }} />
-              <span style={{ width: `${pct(totals.fatG * 9)}%`, backgroundColor: MACRO_COLORS.fat }} />
+              <span style={{ width: `${shares.protein * 100}%`, backgroundColor: MACRO_COLORS.protein }} />
+              <span style={{ width: `${shares.carbs * 100}%`, backgroundColor: MACRO_COLORS.carbs }} />
+              <span style={{ width: `${shares.fat * 100}%`, backgroundColor: MACRO_COLORS.fat }} />
             </div>
             <div className="mt-1.5 flex gap-3 text-[11px] font-semibold tabular-nums">
               <span style={{ color: MACRO_COLORS.protein }}>P {Math.round(totals.proteinG)}g</span>
