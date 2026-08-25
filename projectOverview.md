@@ -24,7 +24,7 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.373.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Version:** v1.374.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-08-25.
 
 **The journal sweep, and the cadence it revealed (LA-25).** `check-doc-index-size.js` failed a *migration* PR at 61 unlinked entries against a limit of 60. **25 folded into a new `history-2026-08-25.md`, unlinked 59 → 34.** The finding is worth more than the sweep: the README's "~20 loose files" trigger was written for a load that no longer exists — **seventeen entries landed on 2026-08-25 alone** across the concurrent sessions, and the count went from a post-sweep 32 on the 24th to 61 the next day, so a sweep clearing 25 buys **about a day and a half**. This is a near-daily chore now, and the practical trigger is the guard failing someone's PR. **The cheaper half is the citation habit** — cite the review or handoff doc, not the loose journal entry — and this run broke it knowingly: BF-11e cited two journal entries from the nutrition index for want of a handoff doc, which costs the linked floor **two, permanently**. A sweep can undo a fold; it cannot undo a citation.
@@ -50,6 +50,8 @@
 Read it with the baton at `docs/agents/state/implementation-lane-b.md` before taking a Lane B item:
 the entire Lane B surface was traversed and every remaining candidate is gated, declined, parked,
 needs hardware, or wants a plan first. **Nothing that run shipped is device-verified.**
+
+**The Nutrition day screen's meal grouping was inverted (BF-24, artboard 1).** The owner's *"thats not what the mockup looks like"* had a precise cause: artboard 1 groups the food ROWS within a meal — name as a label above its own card — where Q-395b grouped the MEALS within one container. Both are "grouped", which is why a coverage checklist passed while the screen still looked wrong. Header is one band now (26 px title, date as subtitle) and the meal line is a name and one number. **②③⑥⑦ deliberately not done**, each with a reason on the entry: ② touches `/health` too, ③ is Q-395c's, ⑥ is Q-406's, ⑦ is BF-28's fold rule ([`journal`](docs/overview/entries/2026-08-25-nutrition-day-artboard-parity.md)).
 
 **The back gesture stops navigating the page away (BF-27).** `useSheetBackDismiss` was imported by 5 of 45 sheet files and 0 of 6 dialog files; everywhere else Android back reached the WebView, which took the page underneath with it. Shipped **not** as the 40-site sweep the entry scoped but as one component rendered by `SheetContent`/`DialogContent` — so it covers every sheet, every dialog and every future one, closes through Radix's own `onOpenChange` (keeping each surface's existing guards and cancel arms), and reaches the uncontrolled sheet a per-site sweep could not. Dialogs were included deliberately: back can only take a cancel arm, asserted on the database. Three mutation-checked e2e cases, including the nest ([`journal`](docs/overview/entries/2026-08-25-back-dismiss-sweep.md)).
 
@@ -268,12 +270,11 @@ mutation-verified parity test fails if either side drifts again
 ([journal](docs/overview/entries/2026-08-20-session-energy-cross-surface-parity.md)).
 
 **RV-32 and RV-34 closed (2026-08-20)** — the program-config write surface took two client-supplied
-FKs on trust. Three of four write paths accepted a `progression_styles` id belonging to another user
-(the fourth refused it), and `listPhaseSets` joined the style **name** in unscoped, so another user's
-words reached a screen and an LLM prompt. A foreign `program_sessions.id` was a raw duplicate-key 500
-with the failed SQL in `error_events`. All guarded, refusals verified live with two accounts, and
-production shows no row that was ever mis-linked — though `claude_ro` is row-scoped to the owner, so
-that is *no evidence*, not *has not happened*
+FKs on trust: three of four write paths accepted another user's `progression_styles` id, and
+`listPhaseSets` joined the style **name** in unscoped, so their words reached a screen and an LLM
+prompt. A foreign `program_sessions.id` was a raw duplicate-key 500. All guarded, refusals verified
+live with two accounts; production shows no mis-linked row, but `claude_ro` is row-scoped to the
+owner, so that is *no evidence*, not *has not happened*
 ([journal](docs/overview/entries/2026-08-20-program-write-fk-ownership.md)).
 
 **RV-33 closed alongside it** — two routes answered a *correct* ownership refusal with an
@@ -300,10 +301,9 @@ tag** — Q-529 had been served to Lane A for days while its field said B
 ([journal](docs/overview/entries/2026-08-20-energy-basis-and-lane-resolution.md)).
 
 **LA-13 closed (2026-08-20)** — `Migration Check` ran only against a **fresh** database, where a
-non-idempotent migration cannot fail; it now replays every file against the schema it just built.
-The first version was green with a migration deliberately broken, because the "already there"
-SQLSTATEs that are benign on an ordinary run are precisely the failure signal under replay
-([journal](docs/overview/entries/2026-08-20-migration-replay-check.md)).
+non-idempotent migration cannot fail; it now replays every file against the schema it just built. Its
+first version was green with a migration deliberately broken: the "already there" SQLSTATEs that are
+benign on an ordinary run are the failure signal under replay ([journal](docs/overview/entries/2026-08-20-migration-replay-check.md)).
 
 **Older session handoffs:** [2026-08-20 workouts energy/RPE intake](docs/handoff-2026-08-20-workouts-energy-accuracy-and-rpe-intake.md)
 (reasoning, not status) and [2026-08-17 agent model/device findings](docs/handoff-2026-08-17-platform-agent-model-and-device-session-findings.md)

@@ -500,47 +500,50 @@ export default function NutritionContent({ userId }: { userId?: string }) {
 
   return (
     <div className="flex flex-col bg-page h-screen">
+      {/* BF-24 ①: one band, not two. Artboard 1 draws a 26 px title with the DATE as its subtitle
+          and the gear at the right; the shipped screen had a static "Food diary & macros" line that
+          said nothing and pushed the date onto a second row of its own. The day chevrons stay —
+          the drawing depicts a state, not the controls that reach it, and the swipe alone is not a
+          discoverable affordance — but they sit on the subtitle line now, so the header is one
+          band. Their hit area is 44 px with negative margins, so the row's height still comes from
+          the text: bigger than the 28 px they shipped at, not smaller. */}
       <ScreenHeader>
-        <div className="w-full">
-          <div className="flex items-start justify-between">
-            <div>
-              <h1 className="text-xl font-bold">Nutrition</h1>
-              <p className="text-sm text-muted-foreground">Food diary &amp; macros</p>
+        <div className="flex w-full items-start gap-3">
+          <div className="min-w-0 flex-1">
+            <h1 className="text-[26px] font-semibold leading-none tracking-[-0.02em]">Nutrition</h1>
+            <div className="mt-1 flex items-center gap-0.5">
+              <span className="text-[13px] text-muted-foreground">{formatDateLabel(selectedDate, todayStr)}</span>
+              <button
+                onClick={() => {
+                  dateChangeDirRef.current = -1;
+                  setSelectedDate(shiftDateStr(selectedDate, -1));
+                }}
+                aria-label="Previous day"
+                className="-my-3 ml-1 flex h-11 w-11 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </button>
+              <button
+                onClick={() => {
+                  if (selectedDate >= todayStr) return;
+                  dateChangeDirRef.current = 1;
+                  setSelectedDate(shiftDateStr(selectedDate, 1));
+                }}
+                aria-label="Next day"
+                aria-disabled={selectedDate >= todayStr}
+                className={`-my-3 flex h-11 w-11 items-center justify-center rounded-lg transition-colors ${selectedDate >= todayStr ? 'cursor-default text-muted-foreground/30' : 'text-muted-foreground hover:bg-muted hover:text-foreground'}`}
+              >
+                <ChevronRight className="h-4 w-4" />
+              </button>
             </div>
-            <button
-              onClick={() => setSettingsOpen(true)}
-              aria-label="Nutrition settings"
-              className="p-2 text-muted-foreground hover:text-foreground mt-1"
-            >
-              <Settings className="w-4 h-4" />
-            </button>
           </div>
-          {/* Date navigation */}
-          <div className="flex items-center justify-between mt-2">
-            <button
-              onClick={() => {
-                dateChangeDirRef.current = -1;
-                setSelectedDate(shiftDateStr(selectedDate, -1));
-              }}
-              aria-label="Previous day"
-              className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-            >
-              <ChevronLeft className="w-4 h-4" />
-            </button>
-            <span className="text-sm font-semibold">{formatDateLabel(selectedDate, todayStr)}</span>
-            <button
-              onClick={() => {
-                if (selectedDate >= todayStr) return;
-                dateChangeDirRef.current = 1;
-                setSelectedDate(shiftDateStr(selectedDate, 1));
-              }}
-              aria-label="Next day"
-              aria-disabled={selectedDate >= todayStr}
-              className={`p-1.5 rounded-lg transition-colors ${selectedDate >= todayStr ? 'text-muted-foreground/30 cursor-default' : 'text-muted-foreground hover:text-foreground hover:bg-muted'}`}
-            >
-              <ChevronRight className="w-4 h-4" />
-            </button>
-          </div>
+          <button
+            onClick={() => setSettingsOpen(true)}
+            aria-label="Nutrition settings"
+            className="-mr-2 flex h-11 w-11 flex-none items-center justify-center text-muted-foreground hover:text-foreground"
+          >
+            <Settings className="h-5 w-5" />
+          </button>
         </div>
       </ScreenHeader>
 
@@ -638,12 +641,12 @@ export default function NutritionContent({ userId }: { userId?: string }) {
               }}
             />
 
-            {/* Q-395b: the meals are ONE grouped section with full-bleed dividers, not six cards
-                with gaps between them. Measured on the seeded day, the gaps between siblings across
-                this whole screen came to 358 px of 2,394 — 15%, not the "most of the vertical
-                space" the entry claims, and the meal list was the largest single share of it. */}
+            {/* BF-24 ④: each meal is its own card with its name as a label above it — artboard 1
+                groups the food ROWS within a meal, where Q-395b grouped the MEALS within one
+                container. That reversal is what the owner reacted to. 14 px between meal groups is
+                the drawing's own figure. */}
             {mealTypes.length > 0 && (
-              <div className="divide-y divide-border/50 overflow-hidden rounded-2xl border border-border">
+              <div className="space-y-3.5">
                 {mealTypes.map(mt => (
                   <MealCard
                     key={mt.id}
@@ -651,7 +654,6 @@ export default function NutritionContent({ userId }: { userId?: string }) {
                     logs={logsByMealType.get(mt.id) ?? EMPTY_LOGS}
                     onAdd={openLogger}
                     onQuickEdit={openQuickEdit}
-                    grouped
                   />
                 ))}
               </div>
