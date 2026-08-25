@@ -5,7 +5,7 @@
 // cap, the drop of empty candidates, and the per-candidate serving divide. They deliberately do
 // **not** pin the splitting decision itself, which is model behaviour — that lives in
 // `splitting-decision.live.test.ts`, which needs a real API key and does not run in CI.
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest'
 
 const USER = '00000000-0000-4000-8000-0000000bf11b'
 
@@ -44,8 +44,20 @@ type ScanResponse = {
   error?: string; recipeYield?: number | null
 }
 
+// Imported ONCE, in a hook, not inside the first test.
+//
+// Measured: importing this route takes **4.3 s on an idle machine** — it reaches
+// `@/lib/observability`, which pulls in the Drizzle adapter. Paid inside a test it leaves ~700 ms of
+// a 5 s budget, so the first case in this file failed at 5012 ms under ordinary parallel load and
+// passed on a re-run: a flake this file introduced, in a suite every PR runs. `beforeAll` has its
+// own (10 s) budget and pays the cost once, which is both correct attribution and faster.
+let POST: (req: Request) => Promise<Response>
+
+beforeAll(async () => {
+  ({ POST } = await import('@/app/api/nutrition/scan/route'))
+})
+
 async function scan(body: Record<string, unknown>): Promise<ScanResponse> {
-  const { POST } = await import('@/app/api/nutrition/scan/route')
   const res = await POST(new Request('http://test/api/nutrition/scan', {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
   }))
