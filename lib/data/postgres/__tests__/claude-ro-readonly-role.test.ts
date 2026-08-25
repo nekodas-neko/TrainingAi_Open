@@ -187,8 +187,9 @@ describe.skipIf(!canRun)('claude_readonly role — the read-only guarantee', () 
     ['oura_tokens.personal_access_token',      `SELECT personal_access_token FROM oura_tokens LIMIT 1`],
     ['oura_tokens.webhook_signing_key',        `SELECT webhook_signing_key FROM oura_tokens LIMIT 1`],
     ['feedback_submissions.screenshot_data',   `SELECT screenshot_data FROM feedback_submissions LIMIT 1`],
-    ['push_subscriptions.p256dh',              `SELECT p256dh FROM push_subscriptions LIMIT 1`],
-    ['push_subscriptions.endpoint',            `SELECT endpoint FROM push_subscriptions LIMIT 1`],
+    // `push_subscriptions.p256dh` / `.endpoint` were here until Q-285 dropped the table. Their
+    // replacement is the table/view parity check below, which is what actually generalises: a
+    // withheld column can only be reached through a view, and an unclassified table has none.
   ])('withholds %s', async (_label, sql) => {
     const err = await errorFrom(sql)
     expect(err).not.toBeNull()

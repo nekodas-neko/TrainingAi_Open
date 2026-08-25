@@ -63,8 +63,9 @@ through four existing patterns. **Before adding any scheduler, pick one of these
 since this app has no cron layer."* If you think you need a real scheduler, that's a
 design decision to raise with the user first — don't add one silently.
 
-Server push (not scheduled — triggered by events): `lib/push.ts` (`sendPushToUser`),
-client subscription in `lib/push-client.ts`, VAPID-gated.
+There is no server push either, since Q-285 deleted the web-push stack (§9) — so nothing
+server-side can reach a device at all. Anything time-based has to be a local notification
+scheduled on the device.
 
 ---
 
@@ -403,10 +404,8 @@ Health Connect (Tasker ingest) sibling integration: `lib/health-connect-sync.ts`
 | Rest-complete local notification | `lib/notifications.ts` |
 | Meal / workout / supplement reminders | `lib/meal-reminders.ts`, `lib/workout-reminders.ts`, `lib/supplement-reminders.ts` (each `computeXAction` + `reconcileX`) |
 | Health anomaly alerts (illness / high-stress / low-readiness) | `lib/health-alerts.ts` → `computeHealthAlertActions(input, notifiedToday)` (pure fire/skip, illness `elevated`/`fever` only, stress `highMinutes`≥threshold else `current`≤`STRESS_HIGH_LEVEL`, readiness-low suppressed when illness/stress fires; per-type per-day dedup) + `reconcileHealthAlerts` (Capacitor, ids 9300–9302). Fired from a native-only `sync-provider.tsx` effect (open+resume) reading warmed readiness-score + body-battery; gated by `ta_pref_health_alerts`. On-device local-notification design (no cron layer, §0); delivery is APK-only. |
-| Server web-push | `lib/push.ts` → `sendPushToUser`, `getVapidPublicKey` |
-| Client push subscription | `lib/push-client.ts` → `subscribeToPush`, `unsubscribeFromPush` |
-| Routes | `app/api/push/subscribe`, `app/api/push/test` |
 | Reminder reconciliation wiring | `components/sync-provider.tsx` |
+| ~~Web push~~ | **DELIBERATE: gone, 2026-08-25 (Q-285).** Owner decision, taken with the count in hand: `push_subscriptions` held 0 rows across two measurements eight days apart, and `sendPushToUser`'s only caller was its own test route. Deleted whole — `lib/push.ts`, `lib/push-client.ts`, both `/api/push/*` routes, the settings toggle, the table, and the service worker's `push`/`notificationclick` handlers. **Do not re-add it:** every notification this app actually sends is native Android or a Capacitor local notification, neither of which goes through a service worker, and there is still no cron layer to trigger a server-side send (§0). |
 
 ---
 

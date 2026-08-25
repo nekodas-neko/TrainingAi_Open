@@ -45,6 +45,10 @@ const DELIBERATE = new Map([
    'app-shell index names it as a route that does not exist (Q-554)'],
   ['components/health/day-overlay-sheet.tsx',
    'app-shell index names it as deleted; its two live affordances moved to /health/day (LB-3)'],
+  ['lib/push.ts',
+   'module-map names it as deleted with the whole web-push stack — no senders, no subscribers (Q-285)'],
+  ['lib/push-client.ts',
+   'module-map names it as deleted with the whole web-push stack — no senders, no subscribers (Q-285)'],
 ])
 
 const TOP = /^(app|lib|components|packages|scripts|docs|android|e2e|public)\//

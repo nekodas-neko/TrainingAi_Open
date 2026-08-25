@@ -14,7 +14,7 @@ silently misdirecting the next session. Update them in the same PR that consumes
 
 | Pointer | Value | Source of truth |
 |---|---|---|
-| Next free Postgres migration | **214** | `lib/data/postgres/migrations/` |
+| Next free Postgres migration | **216** | `lib/data/postgres/migrations/` |
 | Local SQLite schema version | **v28** | `lib/sqlite/migrations.ts`; `lib/sqlite/__tests__/migrations.test.ts` asserts the max |
 
 > **There is no third pointer any more.** Entry IDs are not allocated from a shared counter and
@@ -5214,60 +5214,6 @@ ehr     0     0     0     0   648   208   128   556     0
 - **First action:** read the RPE input component and check its default value and its position in the
   logging flow. If it opens pre-set to a value, that is very likely the whole finding.
 - **Do not "fix" this by widening the model.** A flat signal made wider is still flat.
-
-### [platform][devices] Q-285 — the web-push stack has no senders and no subscribers
-
-> **✅ OWNER DECISION 2026-08-24: option (b) — DELETE the web-push stack.** Asked with the count in
-> hand (0 subscriptions, one caller of `sendPushToUser` and it is the test route) and with Q-286
-> alongside, since (a) depended on Q-286 being the stranded consumer. It is not — see below.
->
-> **⚠️ RE-LANED TO A.** The deletion is `lib/push.ts`, both `app/api/push/*` routes and the
-> `push_subscriptions` table — `app/api/**` plus storage, which is Lane A's by the ownership rule.
-> The Lane B half is small and rides with it: `lib/push-client.ts` and the toggle at
-> `components/more/settings-panel.tsx:78`. Lane A takes it, engine half first; the table drop is a
-> data-losing migration on a table holding **0 rows**, which is why it still wants the owner's nod at
-> merge time even with the decision made.
->
-> **Option (a) is off the table on its own merits, not just by preference.** Its premise was that
-> Q-286 is a shipped-and-stranded consumer waiting for a transport. Q-286 turned out to be already
-> delivered — by **local notifications**, not push (see its removal note in this PR's journal). So
-> wiring web push would be building a second transport for a job that is done.
-> [`journal`](overview/entries/2026-08-24-push-decision-and-stale-reminders.md).
->
-> **Still worth checking before the delete lands:** whether `VAPID_PUBLIC_KEY`/`VAPID_PRIVATE_KEY`/
-> `VAPID_EMAIL` are set in Railway. Not to change the decision — to know whether the stack was ever
-> live, which the delete commit should say. `sendPushToUser` returns silently when they are unset, so
-> an unconfigured deployment is indistinguishable from a working one with no subscribers.
-- **Lane:** A
-
-- **Re-measured 2026-08-23: `claude_ro.push_subscriptions` still holds 0 rows**, eight days on.
-  Nothing has subscribed in the interval, so the decision below is unchanged by waiting — which is
-  itself weak evidence for (b) or (c) over (a).
-
-- **Branch:** `chore/decide-web-push`
-- **Plan:** none needed — this is a decision, then a small change either way
-- **Added:** 2026-08-15 · from the uncovered-lenses review §3
-- **Measured and traced end to end:**
-  - `claude_ro.push_subscriptions` — **0 rows.**
-  - The subscribe path exists and is user-reachable: `components/more/settings-panel.tsx:78` →
-    `subscribeToPush()` (`lib/push-client.ts`) → `reg.pushManager.subscribe()` →
-    `POST /api/push/subscribe`.
-  - **`sendPushToUser` (`lib/push.ts:30`) has exactly one caller in the codebase:
-    `app/api/push/test/route.ts`.** No feature sends a web push.
-- **This is NOT the notification work recorded in `projectOverview.md`.** Those rows (ring/strap
-  quieting, low-battery exception, scale notification) are **native Android** —
-  `OuraRingService.kt`, `ScaleBleService.kt`, `PolarStrapService.kt`, `DeviceBatteryNotifier.kt` —
-  and that stack works. Web push is a separate, inert one. Stated explicitly because the first draft
-  of this finding conflated them.
-- **Decide, don't drift:**
-  - **(a) Wire it.** There is an obvious consumer already shipped and stranded — see **Q-286**.
-    Note this needs a scheduler, and `docs/module-map.md` §0 says there is deliberately none.
-  - **(b) Remove it.** Delete `lib/push.ts`, `lib/push-client.ts`, both `/api/push/*` routes, the
-    settings toggle and the `push_subscriptions` table. Roughly 200 lines and a table.
-  - **(c) Keep it dormant** — then say so in `module-map.md`, so the next session does not re-find it.
-- **Check before deciding:** whether `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `VAPID_EMAIL` are
-  set in Railway. `sendPushToUser` returns silently when they are not (`if (!VAPID_CONFIGURED) return`),
-  so an unconfigured deployment is indistinguishable from a working one with no subscribers.
 
 ### [platform][readiness] Q-291 — the AI surfaces contradict each other on the same day
 

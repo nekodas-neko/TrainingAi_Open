@@ -1,12 +1,9 @@
 "use client"
 
 import { useEffect, useState } from 'react'
-import { Activity, Bell, Calendar, ChevronDown, Loader2, Palette, Route, Settings, Terminal, Timer } from 'lucide-react'
-import { toast } from 'sonner'
-import { Button } from '@/components/ui/button'
+import { Activity, Bell, Calendar, ChevronDown, Palette, Route, Settings, Terminal, Timer } from 'lucide-react'
 import { Switch } from '@/components/ui/switch'
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/components/ui/collapsible'
-import { subscribeToPush, unsubscribeFromPush } from '@/lib/push-client'
 import { ThemeColorPicker } from '@/components/theme-color-picker'
 import { DynamicBackgroundSettings } from '@/components/profile/dynamic-background-settings'
 import { HomeWidgetsSection } from './home-widgets-section'
@@ -19,9 +16,6 @@ export function SettingsPanel() {
   const [appearanceExpanded, setAppearanceExpanded] = useState(false)
   const [preferencesExpanded, setPreferencesExpanded] = useState(false)
   const [calendarSync, setCalendarSync] = useState(true)
-  const [pushEnabled, setPushEnabled] = useState(false)
-  const [pushSupported, setPushSupported] = useState(false)
-  const [sendingTestPush, setSendingTestPush] = useState(false)
   const [dayReviewRemindersEnabled, setDayReviewRemindersEnabled] = useState(true)
   const [restChipEnabled, setRestChipEnabled] = useState(true)
   const [runChipEnabled, setRunChipEnabled] = useState(true)
@@ -41,11 +35,6 @@ export function SettingsPanel() {
   useEffect(() => {
     const stored = localStorage.getItem('ta_pref_calendar_sync')
     if (stored !== null) setCalendarSync(stored !== 'false')
-    // Check push support and current state
-    if (typeof window !== 'undefined' && 'PushManager' in window) {
-      setPushSupported(true)
-      setPushEnabled(localStorage.getItem('ta_pref_push_enabled') === 'true')
-    }
   }, [])
 
   const toggleCalendarSync = (val: boolean) => {
@@ -71,40 +60,6 @@ export function SettingsPanel() {
   const toggleRunChip = (val: boolean) => {
     setRunChipEnabled(val)
     localStorage.setItem('ta_pref_run_chip', String(val))
-  }
-
-  const togglePush = async (val: boolean) => {
-    if (val) {
-      const ok = await subscribeToPush()
-      if (ok) {
-        setPushEnabled(true)
-        localStorage.setItem('ta_pref_push_enabled', 'true')
-        toast.success('Push notifications enabled')
-      } else {
-        toast.error('Could not enable push notifications')
-      }
-    } else {
-      await unsubscribeFromPush()
-      setPushEnabled(false)
-      localStorage.setItem('ta_pref_push_enabled', 'false')
-    }
-  }
-
-  const sendTestPush = async () => {
-    setSendingTestPush(true)
-    try {
-      const res = await fetch('/api/push/test', { method: 'POST' })
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}))
-        toast.error(data.error ?? 'Failed to send test notification')
-        return
-      }
-      toast.success('Test notification sent')
-    } catch {
-      toast.error('Network error — try again')
-    } finally {
-      setSendingTestPush(false)
-    }
   }
 
   return (
@@ -139,33 +94,6 @@ export function SettingsPanel() {
               </div>
               <Switch checked={calendarSync} onCheckedChange={toggleCalendarSync} />
             </div>
-            {pushSupported && (
-              <div className="flex items-center justify-between px-4 py-3.5">
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-xl flex items-center justify-center bg-muted">
-                    <Bell className="h-4 w-4 text-muted-foreground" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-semibold">Push Notifications</p>
-                    <p className="text-[10px] text-muted-foreground">Workout reminders and goal nudges</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  {pushEnabled && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-8 text-xs"
-                      disabled={sendingTestPush}
-                      onClick={sendTestPush}
-                    >
-                      {sendingTestPush ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Send test'}
-                    </Button>
-                  )}
-                  <Switch checked={pushEnabled} onCheckedChange={togglePush} />
-                </div>
-              </div>
-            )}
             <div className="flex items-center justify-between px-4 py-3.5">
               <div className="flex items-center gap-3">
                 <div className="w-8 h-8 rounded-xl flex items-center justify-center bg-muted">

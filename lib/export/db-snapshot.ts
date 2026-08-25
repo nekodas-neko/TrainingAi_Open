@@ -195,8 +195,9 @@ export function resolveRequestedTables(cols: TableColumns, tablesParam: string |
     }
     toExport.push(table)
   }
-  // push_subscriptions cannot round-trip (plan §5.1: all three withheld columns are NOT NULL, so a
-  // view row can never satisfy them on restore) — included in the export for audit purposes, but
-  // the restore script skips it and says so. Nothing to do here; the streaming path is unaffected.
+  // The one table that could not round-trip was `push_subscriptions`, dropped by Q-285. The hazard
+  // it illustrated is still real for any future table with withheld NOT NULL columns: the view row
+  // cannot satisfy them on restore, so the restore script skips such a table via its SKIP_TABLES
+  // (plan §5.1). Nothing to do here either way; the streaming path is unaffected.
   return { toExport, omitted }
 }
