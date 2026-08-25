@@ -9284,17 +9284,32 @@ per-field merge where an AI write has no honest source rank to claim.
 
 - **Branch:** `refactor/component-size-hotspots`
 - **Added:** 2026-08-07 · [review §4](reviews/2026-08-07-full-app-review.md)
+- **Lane: B.** `components/**` + `app/**` extractions only.
 - Low priority individually; the rule exists because these files absorb every new feature by default.
   Take them opportunistically when already touching the file, not as a dedicated PR.
+- **⚠️ RE-MEASURED 2026-08-25 — two of the six rows were already done, and their line numbers now
+  point at nothing.** `health-content.tsx` **991 → 651** and `profile-tab.tsx` **849 → 476**, both
+  under the 800 limit. The other four are unchanged or slightly smaller (`workout-screen` 1851 →
+  1820, `session-select-content` 1478 → 1456, `config-screen` 997, `program-editor-sheet` 963), so
+  their extractions still stand. **Following a stale row is worse than having no row**: it sends the
+  next reader to line 588-779 of a file that is 651 lines long.
+- **It also surfaced a hole in the ratchet, now closed.** `health-content.tsx` was still listed in
+  `check-component-size.js` at a **915** baseline while sitting at 651 — silently re-granting it 115
+  lines of room it was no longer entitled to. The script's own header has said *"Shrinking one below
+  the limit? Delete its row"* since it was written, and nothing enforced it; the rule has now been
+  missed three times (`health-sections` was removed correctly, `profile-tab` and `health-content`
+  were not). `check-client-today-timezone.js` has enforced the same rule for its own baseline all
+  along — that half is now in this script too, and fails on a stale row.
+  [`journal`](overview/entries/2026-08-25-component-size-stale-baseline.md).
 
   | lines | file | proposed extraction |
   |---|---|---|
   | 1851 | `components/workout-screen.tsx` | the data-loading layer — `fetchExercises` (289-444), `loadPeriodization` (445-481), `handleDurationPresetChange` (482-506), `refreshExercises` (507-…) plus their `useState`s → `components/workout/use-workout-session-data.ts`; and the two terminal states (1604-1640) → `workout-load-states.tsx`. ~350 lines. |
   | 1478 | `app/session-select/session-select-content.tsx` | the banner stack (1128-1193) → `app/session-select/components/home-banner-stack.tsx`, taking the APK-banner and day-review dismiss state with it (182, 193, 344-355). ~110 lines, 4 `useState`s. |
   | 997 | `components/config-screen.tsx` | progression-style CRUD (152-249, already a self-labelled section) → `components/config/progression-style-editor.tsx`. ~100 lines. |
-  | 991 | `app/health/health-content.tsx` | the day-overlay subsystem (588-779) → `app/health/hooks/use-day-overlay.ts`, alongside the existing `use-health-calcs.ts`. ~190 lines. |
+  | ~~991~~ **651** | ~~`app/health/health-content.tsx`~~ | **✅ DONE — under the limit, row deleted from the ratchet 2026-08-25.** The line numbers above (588-779) no longer point at the day-overlay subsystem; do not follow them. |
   | 963 | `components/config/program-editor-sheet.tsx` | exercise-row mutations (199-325) → `components/config/use-program-exercise-edits.ts`. ~130 lines. |
-  | 849 | `components/more/profile-tab.tsx` | the notification-toggle block (154-257) + its switch rows → `components/more/notification-settings-section.tsx`. ~100 lines. |
+  | ~~849~~ **476** | ~~`components/more/profile-tab.tsx`~~ | **✅ DONE 2026-08-19** — already off the ratchet, recorded in `CLAUDE.md`. Line numbers stale. |
 
 - **Related, latent — record but do not act:** `components/shell/bottom-nav.tsx:27-33` reads three
   `persist`-ed Zustand stores with no `skipHydration` anywhere in `lib/stores/`. Zustand rehydrates

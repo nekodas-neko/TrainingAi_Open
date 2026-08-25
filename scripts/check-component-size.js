@@ -41,7 +41,6 @@ const BASELINE = {
   // deleted activity until the next sync; there is no zero-line shape for "also write locally".
   // The full explanation deliberately lives on `deleteActivityLog` in sqlite-backend.ts rather
   // than here, which is what kept this to three lines instead of nine.
-  'app/health/health-content.tsx': 915,
   'components/config/program-editor-sheet.tsx': 963,
 };
 
@@ -82,6 +81,32 @@ for (const top of ['app', 'components']) walk(path.join(root, top));
 if (inherited.length > 0) {
   console.log('check-component-size: inherited from the base branch, not caused here:');
   inherited.forEach((f) => console.log('  • ' + f));
+}
+
+// The header above says "Shrinking one below the limit? Delete its row" — and nothing enforced it,
+// so a hotspot that got fixed kept its exemption. Missed three times: `health-sections.tsx` was
+// removed correctly on 2026-08-09, then `profile-tab.tsx` sat listed at 476 lines and
+// `health-content.tsx` at 651 against a 915 baseline. A stale row is not harmless — it silently
+// re-grants a file up to `baseline - LIMIT` lines of room it is no longer entitled to, which for
+// `health-content` was 115. `check-client-today-timezone.js` has enforced the same rule for its own
+// baseline all along; this is that half, arriving late.
+const stale = Object.keys(BASELINE).filter((rel) => {
+  const full = path.join(root, rel);
+  if (!fs.existsSync(full)) return true;
+  const src = fs.readFileSync(full, 'utf8');
+  return src.split('\n').length - (src.endsWith('\n') ? 1 : 0) <= LIMIT;
+});
+if (stale.length > 0) {
+  console.error('BASELINE holds file(s) that are no longer over the limit — delete the row in the');
+  console.error(`same PR, so the file is held to ${LIMIT} like everything else:`);
+  for (const rel of stale) {
+    const full = path.join(root, rel);
+    const n = fs.existsSync(full)
+      ? (() => { const src = fs.readFileSync(full, 'utf8'); return src.split('\n').length - (src.endsWith('\n') ? 1 : 0); })()
+      : 'file no longer exists';
+    console.error(`  ${rel}: now ${n}, baseline ${BASELINE[rel]}`);
+  }
+  process.exit(1);
 }
 
 if (failures.length > 0) {
