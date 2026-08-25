@@ -2250,3 +2250,13 @@ Four lines in the most-read file in the repo, deliberately: the confirmation bel
 warning rather than in a backlog entry nobody opens at that moment. Written as dated and perishable
 rather than settled — one file on one machine goes stale silently — so the instruction to ask still
 stands, now with the current answer attached.
+
+## 2026-08-25 — `docs/implementation-backlog.md` raised, 11658 → 11665 (TN-6a)
+
+Seven lines, and they were eleven before being cut once. What is left is the shipped note plus the
+**Keep** — that this is a *suppression, not a fix*, and TN-6's ±0.05 °C pass test is what retires it.
+That line is the whole reason the entry stays in the queue: a reader who takes the ✅ at face value
+leaves a temperature penalty switched off permanently.
+
+**Superseded on merge:** `main` had already moved the backlog past this number, so the raise carried
+no net change and `doc-size-baseline.json` was rebuilt from `origin/main` rather than spliced.
