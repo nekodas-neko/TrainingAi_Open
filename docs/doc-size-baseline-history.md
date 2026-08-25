@@ -2138,3 +2138,15 @@ a short build list. A plan would have cost more lines than the entry.
 every open PR. Twenty-three lines to record a failure that cost every concurrent agent a red check
 and had already happened twice under a prose-only rule, which is the argument for the guard the
 entry asks for.
+
+## 2026-08-25 — `docs/implementation-backlog.md` raised, 11638 → 11658 (temperature-baseline batch)
+
+Twenty lines across BF-13, Q-506 and TN-8 — the three entries of one batch, so the note had to reach
+all three. **It was trimmed twice before this raise.** The first draft pasted the same ~19-line block
+into each entry; that became one full note on BF-13 (the root) and a two-line cross-reference on the
+other two, then the full note itself was cut roughly in half.
+
+What survives is the part a queue cannot do without: the **⛔ Keep** saying the data half is unrun.
+The seed fix ships in this PR, but the owner's stored baselines are still the zero-folded ones, and
+every pass test in all three entries measures the re-derivation rather than the code. An entry that
+looked finished here would be wrong in the way that matters most.
