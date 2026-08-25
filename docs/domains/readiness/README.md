@@ -57,6 +57,16 @@ render the band's label/icon alongside its colour (CLAUDE.md, One Formula One Pl
   measured and **both pass** — 43 summary rows against a threshold of 21, and 27 of 31 nights complete
   in the trailing window — so the refusal is inside the **granular** layer, which persists no reason
   for a null. Filed **TN-1**.
+- [`docs/reviews/2026-08-25-threshold-sweep.md`](../../reviews/2026-08-25-threshold-sweep.md)
+  — **the threshold sweep, 2026-08-25.** 246 constants → 27 that decide a user-visible branch, each
+  checked against its input's real distribution. **One new finding: TN-8**, the chronic-stress fever
+  mask (`TEMP_DEV_FEVER_LIMIT_C = 1.0`) is a **fourth** consumer of the broken temperature baseline —
+  it masks **6 of 34 healthy nights** as fever, against a comment promising it never would. **One
+  cleared:** `EARLY_DELOAD_SCORE_MAX = 45` fires on 4.9% of days, healthy, so the owner's deload
+  complaint is entirely the temperature card and not this path. **Two method rules:** a distribution
+  screen is blind to "always fires" (run against `temp_dev_c` and `illness_score` it catches
+  neither), and coverage must be measured on a **recent** window — pre-BLE rows make every score read
+  29–49% when August is 100%.
 - [`docs/reviews/2026-08-24-readiness-temperature-penalty.md`](../../reviews/2026-08-24-readiness-temperature-penalty.md)
   — **the temperature penalty fires on 91% of nights, 2026-08-24.** `computeBlendedScore`
   (`readiness-payload.ts:169`) subtracts on an **absolute °C** ladder (−10 past 0.3, −20 past 0.5,

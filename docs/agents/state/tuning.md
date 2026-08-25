@@ -26,6 +26,7 @@ Filed this session, all propose-only, all in the queue:
 | **TN-6** | temp baseline 0.363 °C low → −16 pts/day on 89% of days | **signed off**; batched with Q-506 + **BF-13** |
 | **TN-6a** | suspend the temperature penalty until the baseline is centred | **signed off**, ships alone, outside the batch |
 | **TN-7** | TN-4's catch only `console.error`s, disarming LA-20's verification | one line, Lane A |
+| **TN-8** | chronic-stress fever mask = a **fourth** consumer of the broken temp baseline | batched with BF-13; fixed by that seed fix |
 
 **Owner decisions, 2026-08-24 — all recorded on the entries, nothing left gated on them.** TN-5 and
 TN-6 signed off; **TN-6a** added (suspend the temperature penalty on a self-clearing condition, ships
@@ -52,10 +53,12 @@ Q-49 removed; `oura_raw_samples` holds ~7 of the 56 days needed; `decoded` NULL 
 ## Next
 
 1. **Re-measure after Lane A lands any of TN-2/5/6 or Q-506** — each carries its own pass test.
-2. **Activity volatility at n ≥ 20.** It read 7.2 → 12.2 day-to-day, which would be a real change of
+2. **The threshold sweep is done** — see the do-not-re-litigate list. What it left is the ~13
+   thresholds whose inputs are never persisted; those need the pipeline, not SQL.
+3. **Activity volatility at n ≥ 20.** It read 7.2 → 12.2 day-to-day, which would be a real change of
    character for the most compressed score in the app. **Six deltas cannot tell that from a run of
    unusual days** — deliberately not filed.
-3. **Earlier open findings, none built:** illness radar cannot fire (Q-506) · stress override fires
+4. **Earlier open findings, none built:** illness radar cannot fire (Q-506) · stress override fires
    on the *best* days (Q-507) · resilience has emitted one value ever (Q-508/510) · BLE input drift,
    anchor must not move (Q-509) · battery anchor flip (Q-511) · ACWR call-site windows (Q-512/513) ·
    64% of back-off cuts are a clamp artefact (Q-514) · rest/active boundary shrinks with fitness
@@ -72,6 +75,25 @@ sleep ✅ · readiness ✅ · activity ✅ · body ✅ · devices ✅ · workout
 
 ## Do not re-litigate
 
+- **The threshold sweep is DONE (2026-08-25) — do not re-run it.** 246 constants → 42 guards, 8
+  maturity gates, 196 candidates → **27 decision thresholds**. Yield: **one** new finding (TN-8),
+  **one** cleared (`EARLY_DELOAD_SCORE_MAX` fires 4.9% — healthy, deliberately not filed), one
+  amendment (a dormant third step goal on Q-524). Every DEAD/STUCK column mapped to a filed entry, so
+  the queue is comprehensive on that class. The four-for-four record that motivated the sweep held for
+  the *investigated* thresholds and did not generalise.
+  [`review`](../../reviews/2026-08-25-threshold-sweep.md).
+- **A distribution screen is BLIND to "always fires" and "never crosses".** Run against the two known
+  failures it catches neither — `temp_dev_c` has a healthy range, `illness_score` looks merely sparse.
+  It finds stuck and dead scores only. Pair every threshold with its input, or the screen reads clean
+  on a score compared against the wrong number.
+- **Measure coverage on a RECENT window, never all history.** `oura_daily_derived` holds pre-BLE rows
+  back to 2026-05, so whole-history coverage reads 29–49% and looks like a defect; August is 100% for
+  readiness, sleep, activity and illness. A whole-history coverage number measures when the pipeline
+  started.
+- **~13 thresholds are not measurable from stored data** (sleep staging, `MET_ACTIVE_THRESHOLD`,
+  `APNEA_THRESHOLD`, `NIGHT_BAND_*`, `RANGE_THRESHOLD`, `CONSISTENCY_*`) — their inputs are
+  per-sample intermediates nothing persists, the same shape as TN-3a. They need a session that can
+  run the pipeline, not more SQL.
 - **A calibration curve cannot reduce displayed volatility — its total rise is conserved.** Uniform
   gain moved night-to-night |Δ| 13.53 → **13.75**. Diagnose "the score jumps around" by
   reconstructing the pre-calibration blend first; if its |Δ| is unchanged, no curve change helps.
