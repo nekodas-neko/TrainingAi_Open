@@ -2433,3 +2433,12 @@ its migration had not run against production, and reading production to verify L
 showed it had. A caveat that has become false is worse than no caveat — it teaches the next reader to
 discount the ones that are still true — so striking it is the point of the edit, not incidental to
 it.
+
+## 2026-08-25 — `projectOverview.md` raised, 7967 → 7969 (BF-20)
+
+Two lines. The paragraph spends most of its length on the two places the backlog entry's own
+prescription was wrong — an allowlist that would have failed on nine correct files, and a
+`.gitignore` rule that applied literally to `*.ts` would have silently untracked a legitimate root
+config. Both are the kind of thing a future reader would otherwise re-derive by breaking the guard,
+and the guard is the sort that gets deleted the first time it fires wrongly. The mechanics are in the
+journal entry; what belongs in the index is why the shipped version differs from the filed one.

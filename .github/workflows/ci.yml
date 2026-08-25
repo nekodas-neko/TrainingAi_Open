@@ -381,6 +381,9 @@ jobs:
         # which is the same "failure that is not the branch author's" this whole class is about. It
         # bit locally the first time it was flaky.
         run: git fetch --depth=1 origin main || true
+      - name: No stray module at the repo root
+        run: node scripts/check-repo-root.js
+
       - name: Orientation docs stay within their baselines
         run: node scripts/check-doc-index-size.js
 
