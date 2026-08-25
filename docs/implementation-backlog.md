@@ -5152,6 +5152,12 @@ ehr     0     0     0     0   648   208   128   556     0
 
 ### [workouts] Q-289 — `expectedRpe` misses by more than the autoregulation dead band at both ends of its own range
 
+- **Lane: A — set 2026-08-25 (by Lane B, which the tool was serving it to).** `expectedRpe`,
+  `autoregulation.ts` and `RPE_DEAD_BAND` all live in `packages/shared/src/ai-periodization/`, which
+  the path rule assigns to Lane A. **And it is a SCORING change**, so the route is Tuning proposes →
+  owner signs off → Lane A implements, per CLAUDE.md — not an implementer's to take at all. The
+  proposal must state how many other days the change moves.
+
 - **Branch:** `fix/expected-rpe-calibration`
 - **Plan:** none yet — recalibration wants a written plan
 - **Added:** 2026-08-15 · from [`docs/reviews/2026-08-15-uncovered-lenses-review.md`](reviews/2026-08-15-uncovered-lenses-review.md) §1
@@ -5217,6 +5223,10 @@ ehr     0     0     0     0   648   208   128   556     0
 
 ### [workouts] Q-290 — logged RPE carries almost no information: sd 0.87, and effectively two values
 
+- **Lane: A — set 2026-08-25, same reasoning as Q-289.** The RPE signal and its consumers are in
+  `packages/shared/src/ai-periodization/`, and this is a **scoring** question: Tuning proposes, the
+  owner signs off, Lane A implements.
+
 - **Branch:** `feat/rpe-capture-quality`
 - **Plan:** none yet
 - **Added:** 2026-08-15 · from the uncovered-lenses review §1.4
@@ -5235,6 +5245,9 @@ ehr     0     0     0     0   648   208   128   556     0
 - **Do not "fix" this by widening the model.** A flat signal made wider is still flat.
 
 ### [platform][readiness] Q-291 — the AI surfaces contradict each other on the same day
+
+- **Lane: A — set 2026-08-25.** The contradiction is between AI route outputs
+  (`app/api/ai/**`, `lib/coach/**`), both of which the path rule assigns to Lane A.
 
 - **Branch:** `fix/ai-surface-shared-state`
 - **Plan:** none yet
@@ -7369,6 +7382,21 @@ ehr     0     0     0     0   648   208   128   556     0
   shows (a) contributors, (b) trend, (c) an action. Then fix the ones failing the repo's own
   colour-only-state rule as a first pass, since `scoreBand()` colour without `scoreBand()` label is
   already a `CLAUDE.md` violation and is the cheapest subset.
+- **✅ THE COLOUR-ONLY SUBSET IS DONE 2026-08-25 (Lane B) — and it was ONE site, not a sweep.** All
+  nine non-test `scoreBand()` call sites were read rather than counted:
+  `readiness-breakdown.tsx:72` — the **"Final readiness"** row — coloured the score by band with no
+  band word and no legend in that branch. Fixed: the label ships beside the colour.
+  **The rest are not violators**, and a grep would have said otherwise: `contributor-chart.tsx` has
+  no `.label` anywhere and renders `<ScoreBandLegend />`, which pairs every colour with its meaning;
+  `score-ring`, `alternatives-card`, `contributor-detail(s)`, `health-score-detail` and
+  `oura-score-chip-row` all render the word already (`oura-score-chip-row` is the Q-281-adjacent fix
+  that put it there). `health-insight` uses only `.label`, never the colour. **This is the Q-491
+  lesson again — a zero-label grep count is not a violator list.**
+  [`journal`](overview/entries/2026-08-25-score-band-colour-only.md).
+- **Keep:** the *survey* this entry is actually about — contributors / trend / action per surface —
+  is untouched. Only the colour-only subset it named as the cheapest first pass is done, and the
+  bigger presentation question (which overlaps Q-278 and Q-305's "computed and discarded" thread) is
+  still open. Plus the S25 check on the amended row. `Gate: device`
 - **Sequencing:** this is presentation over numbers that Q-500/Q-272/Q-275/Q-505 are all about to
   change. Do the **audit** now (it is cheap and its output is durable); hold the **UI work** until
   the model changes settle, or it gets done twice.

@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.370.1",
+    date: "2026-08-25",
+    changes: [
+      "The \u201cFinal readiness\u201d figure now says which band it is in \u2014 High, Moderate or Low \u2014 instead of relying on its colour alone.",
+    ],
+  },
+  {
     version: "1.370.0",
     date: "2026-08-25",
     changes: [
