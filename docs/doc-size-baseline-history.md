@@ -18,6 +18,31 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
+## 2026-08-25 — Q-304b re-measured and LA-27 filed (`docs/implementation-backlog.md` 11948 → 11989)
+
+**+41, and it is a new queue entry plus a rewritten one, not accreted prose.**
+
+Q-304b asked for a recompute of 30 `personal_records` rows, gate already cleared by the owner on
+2026-08-24. Measuring against production before building it produced three findings, each of which
+blocks the entry as written, and none of which fits in a line:
+
+1. The specified method moves **zero rows by construction** — `personal_records` derives from
+   `exercise_logs.estimated_1rm`, a stored column, not from `set_logs`.
+2. The blast radius is **277 logs, not 29 sets** — `amrapScaleFactor` discounts from 6 reps up, not
+   the 13+ the entry describes.
+3. **115 of 357 eligible logs cannot be reproduced by either formula**, and it is time-localised:
+   August reproduces 68/68, July 9/102.
+
+Finding 3 became **LA-27** rather than a bullet inside Q-304b, because it blocks Q-304b rather than
+belonging to it, and because it is the one an implementer should take first. That entry is ~28 of
+the 41 lines.
+
+**The two measurement tables are deliberately kept in the queue rather than moved to a review doc.**
+They are what stops the next session re-running the same four production queries, and the entry's
+whole failure mode was a number nobody re-checked.
+
+---
+
 ## 2026-08-25 — Q-112 re-planned into five phases (`docs/implementation-backlog.md` raise withdrawn)
 
 Q-112 — the unified day review — was a single spec-sized entry that said of itself *"whoever picks
