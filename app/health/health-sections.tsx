@@ -128,6 +128,8 @@ export interface HealthSectionsCtx {
   handleDayClick: (date: string) => void;
   weeklyStats: WeeklyStatsResponse | null;
   activeSessions: ProgramSession[];
+  /** The active program's training goal — scales the volume landmarks (Q-305). */
+  trainingGoal?: string;
   muscleSets: MuscleSetsEntry[] | null;
   strengthTrend: StrengthTrendEntry[] | null;
   weekToDate: WeekToDate | null;
@@ -147,7 +149,7 @@ export function getHealthSections(ctx: HealthSectionsCtx) {
     todayWaterMl, waterGoalMl, activeEnergyKcalToday, bmi, bmiLabel, bmiUsesBf,
     weightTrendKgPerWeek, energyBalanceKcal, energyBalance, trainingLoad, sleepCorr, injuries,
     setInjuries, userId, recoveryMuscles, handleDayClick, weeklyStats,
-    activeSessions, muscleSets, strengthTrend, weekToDate, userGoals,
+    activeSessions, trainingGoal, muscleSets, strengthTrend, weekToDate, userGoals,
     progressSummary, bodyBaseline, healthTrends,
   } = ctx;
 
@@ -695,7 +697,7 @@ export function getHealthSections(ctx: HealthSectionsCtx) {
       case "timeInZone":      return <TimeInZoneCard key="timeInZone" />;
       case "aiPeriodization": return <AiPeriodizationStatusCard key="aiPeriodization" />;
       case "aiVolume":        return <AiWeeklyVolumeCard key="aiVolume" />;
-      case "muscleSets":      return <WeeklyMuscleSetsCard key="muscleSets" muscles={muscleSets ?? []} loading={muscleSets === null} title="Muscle Volume This Week" />;
+      case "muscleSets":      return <WeeklyMuscleSetsCard key="muscleSets" muscles={muscleSets ?? []} loading={muscleSets === null} title="Muscle Volume This Week" trainingGoal={trainingGoal} />;
       case "muscleMap":       return <BodyMuscleCard key="muscleMap" muscleSets={muscleSets} recoveryMuscles={recoveryMuscles} />;
       case "baselineTests":   return <LatestBaselineCard key="baselineTests" userId={userId} />;
       case "activityHistory": return <ActivityHistoryCard key="activityHistory" userId={userId} />;

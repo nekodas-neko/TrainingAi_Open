@@ -148,3 +148,58 @@ export async function enableHomeCards(page: Page, keys: string[]): Promise<void>
     ['ta_ss_cards', JSON.stringify(keys)] as const,
   )
 }
+
+/**
+ * Suppress Home's first-open-of-day Morning Check-in prompt (OR-1).
+ *
+ * It is a **modal** Radix sheet, so while it is open Radix sets `aria-hidden="true"` on `<main>` and
+ * `pointer-events: none` on `<body>`. Everything on Home leaves the accessibility tree with it —
+ * measured: `getByLabel('Log Body Weight')` finds the button and
+ * `getByRole('button', { name: 'Log Body Weight' })` finds **nothing**, on markup that is correct
+ * and that resolves fine the moment the sheet is dismissed. So a Home spec does not fail with
+ * "a modal is in the way"; it fails claiming the affordance it wants does not exist, which is a very
+ * convincing wrong answer — it cost a trace through three components before the `<main>` attribute
+ * was read.
+ *
+ * Every fresh browser profile is exposed: the prompt fires whenever `ta_morning_checkin` is absent
+ * and the user has no `morning` check-in row for today, which is what CI provisions on every run.
+ * Pre-setting the marker is what a returning user's browser already has.
+ *
+ * **But exposure is not the same as failing, and that distinction is why this sat unnoticed.** The
+ * sheet opens after an async read (the local store on device, `/api/day-checkin` on web), so whether
+ * it lands before or after a spec's first interaction is a **race**. That is why
+ * `home-card-invalidation-refetch` passed for weeks and then did not (BF-23 dated the turn to
+ * 2026-08-25 and read it as a content regression in one of six merges — it is not), and why
+ * `score-band-not-colour-only` read as *flaky* rather than broken. **What made the race start
+ * landing the other way was not established** — adding spec files shifts worker distribution and so
+ * what runs before what, which is a plausible mechanism and was not proven. This fixture removes the
+ * race rather than explaining it.
+ *
+ * The date must be the USER's, not the runner's — the marker is compared against `todayInTz(tz)`
+ * (`session-select-content.tsx:107`), and the seeded user's zone is not the container's.
+ *
+ * Call before `page.goto`.
+ */
+export async function suppressMorningCheckin(page: Page): Promise<void> {
+  const connectionString = process.env.DATABASE_URL
+  expect(connectionString, 'DATABASE_URL must be set — see e2e/README.md').toBeTruthy()
+  const { Client } = await import('pg')
+  const db = new Client({ connectionString })
+  await db.connect()
+  let today: string | undefined
+  try {
+    const { rows } = await db.query<{ d: string }>(
+      `SELECT to_char(now() AT TIME ZONE coalesce(timezone, 'Australia/Brisbane'), 'YYYY-MM-DD') AS d
+         FROM users WHERE email = $1`,
+      [SEED_EMAIL],
+    )
+    today = rows[0]?.d
+  } finally {
+    await db.end()
+  }
+  expect(today, `${SEED_EMAIL} is not seeded — run pnpm db:local`).toBeTruthy()
+  await page.addInitScript(
+    ([storageKey, value]) => localStorage.setItem(storageKey, value),
+    ['ta_morning_checkin', today] as const,
+  )
+}

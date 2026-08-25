@@ -18,6 +18,36 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
+## 2026-08-25 — PS-6 filed (`docs/implementation-backlog.md` raise withdrawn, again)
+
+**PS-6**: the queue tooling has never known the `OR-` prefix, in three regexes across two scripts.
+Its length is mostly the one fact that makes it urgent rather than cosmetic: `next-item.js` **drops**
+an entry whose heading matches no known prefix (`current = id ? {…} : null`), so an `OR-` entry is
+not mislabelled, it is absent, with nothing printed to say so.
+
+**A second entry, OR-1, was withdrawn from this PR before merge.** It reported the red E2E on
+`main`, and another session filed the same failure as **BF-23** while this branch sat in CI — with a
+better diagnosis. OR-1 concluded the `Log Body Weight` button had been deleted, because the string
+greps to nothing outside two specs; BF-23 establishes it is **composed at runtime**
+(`metric-tiles-card.tsx:96`, `` aria-label={`Log ${def.label}`} ``) and that the failure is a
+**regression from one of tonight's six merges**, not a stale test. BF-23 anticipates the exact wrong
+inference OR-1 drew — *"a future session searching for the string will find nothing and conclude it
+was deleted; it was not."* Keeping both would have put a refuted diagnosis in the queue beside a
+correct one.
+
+**PS-6 is filed under `PS-`, not `OR-`, on purpose** — an `OR-` entry describing this bug could not
+appear in the tool that reports it. That is recorded in the entry so the letter does not read as a
+mistake later.
+
+**The raise to 11648 was withdrawn on the rebase and the number stands at 11638** — the second time
+in one session. #454 landed while this branch was in CI and removed enough completed entries to take
+the file to **11534**, under the original baseline even carrying these two entries' +64. Ratcheting
+down to 11534 was again declined for the same reason as the earlier withdrawal: the shrink belongs
+to the PRs that made it, and banking it here would fail the next agent to add an entry. **Worth
+noticing as a pattern rather than a coincidence** — on a queue this active, a raise taken at the
+start of a CI cycle is often unnecessary by the end of it, so check the real count after the rebase
+before keeping one.
+
 ## 2026-08-25 — `projectOverview.md` 7937 → 7941 (`docs/implementation-backlog.md` raise withdrawn)
 
 The owner supplied the Railway charts three queue entries had been parked on, and the readings
@@ -2175,3 +2205,48 @@ What survives is the part a queue cannot do without: the **⛔ Keep** saying the
 The seed fix ships in this PR, but the owner's stored baselines are still the zero-folded ones, and
 every pass test in all three entries measures the re-derivation rather than the code. An entry that
 looked finished here would be wrong in the way that matters most.
+## 2026-08-25 — `docs/implementation-backlog.md` raised for BF-22
+
+**BF-22** — the owner's slow-load report traced to distance, not code. Production serves from
+`iad1` (Washington DC) and the owner is in Brisbane, so every request carries ~270 ms that no server
+tuning can remove; Home spends ~20 of them per open.
+
+The lines are mostly the measurement table and the negative result, and both earn their place. The
+table is what makes the finding diagnostic rather than suspected — a **static file** costs the same
+as a dynamic route, which rules out the app, the auth check and the database in one comparison. The
+negative result (Home's fetch count is flat across every commit since 2026-08-19) is what stops the
+next session hunting a regression that is not there.
+
+## 2026-08-25 — `docs/implementation-backlog.md` 11638 → 11678 (+40)
+
+**BF-21**, exposing `pg_stat_statements` to `claude_ro` once the owner enables it. Filed rather than
+done because it needs a migration number, which only Lane A may take — the entry exists to carry the
+handover, the owner's Railway steps, and the security argument for why this one view is *not*
+row-scoped (normalised query text carries shapes, never parameter values).
+
+It also carries a deliberate expectation-damper: BF-19 already measured the database at 3 ms with a
+99.90% cache hit, so a clean read here must not be treated as closing the slow-load question.
+
+## 2026-08-25 — `docs/implementation-backlog.md` raised again, BF-22 rewritten
+
+BF-22's first version concluded the app was slow because production ran in Virginia while the owner
+is in Brisbane. **That was wrong.** `x-railway-edge` names the edge PoP the *caller* reaches, not
+where the container runs, and the ~276 ms was a US-adjacent sandbox measuring its own distance. The
+service is deployed in Singapore. The rewrite says so at the top, because a wrong finding left in a
+queue is worse than no finding.
+
+The entry grew because the owner then reported a force restart fixed it, which relocates the whole
+question to in-memory client state — and because the rewrite carries a six-row **ruled-out** table.
+That table is the point: six suspects with the measurement that killed each, so the next session
+does not re-run the same greps and reach the same dead ends.
+
+## 2026-08-25 — `CLAUDE.md` 1155 → 1159 (+4)
+
+The ring-key block told every session to confirm the owner holds `key.hex` before proposing an
+uninstall, and nothing recorded that they do. A session reaching that block had to either stall on
+the question or proceed without an answer — which is what cost a live session on 2026-08-17.
+
+Four lines in the most-read file in the repo, deliberately: the confirmation belongs beside the
+warning rather than in a backlog entry nobody opens at that moment. Written as dated and perishable
+rather than settled — one file on one machine goes stale silently — so the instruction to ask still
+stands, now with the current answer attached.

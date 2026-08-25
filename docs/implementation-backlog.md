@@ -331,6 +331,47 @@ days/hours cause most stress". Measured against production the same day; the bou
 signed off by the owner in that conversation. Review:
 [`docs/reviews/2026-08-24-body-battery-charge-window-collapse.md`](reviews/2026-08-24-body-battery-charge-window-collapse.md).*
 
+### [platform] LB-12 — 77 of 193 queue entries state no lane, so both implementers are served each other's work
+
+- **Branch:** _unassigned_ · **Lane:** B filed it; **the sweep is the Orchestrator's** (it owns lane
+  resolution, `docs/agents/README.md`).
+- **Added:** 2026-08-25 · Lane B, after correcting four entries' lanes one at a time in one session
+  (Q-403, Q-289, Q-290, Q-291) and hitting a fifth and sixth immediately after.
+- **Measured on `main`, 2026-08-25:**
+
+  | | |
+  |---|---:|
+  | queue entries | 193 |
+  | lane stated | 116 |
+  | **lane UNSTATED** | **77 (40%)** |
+  | of Lane B's 55 READY rows, how many state no lane | **53** |
+
+  So **two** of the fifty-five rows the tool offers Lane B are rows the queue actually knows are
+  Lane B's. The rest are unclassified and shown to both lanes.
+- **The tool is not wrong; the data is incomplete.** `next-item.js` shows an unlaned entry to both
+  lanes deliberately — the path rule in §3 is supposed to answer it, and hiding it from the lane that
+  might own it would be worse. **What was wrong is that it was silent**, so a reader could not tell a
+  row the queue knows is theirs from one nobody has classified. Fixed 2026-08-25: those rows now
+  print `⟨lane unstated⟩` and the header counts them. That is the visibility half and it is done.
+- **What is left is the sweep**, which is not an implementer's to do: 77 entries want a `Lane:` field
+  applied from the path rule (reached by `app/api/**` or storage → A; reached only from
+  `app/**`/`components/**` → B; both → A). A large fraction are `readiness`/`platform` scoring work
+  in `packages/shared`, which is Lane A's, and **several are scoring changes that are no
+  implementer's at all** — Tuning proposes, the owner signs off, Lane A implements.
+- **Worth deciding while sweeping:** entries that are *notes rather than work* should leave READY.
+  **Q-294** says of itself *"this is a note against Q-249, not independent work"* and *"no branch of
+  its own"*, and it is currently row 2 of Lane B's queue. **Q-504** is titled *"REFUTED: readiness
+  should NOT get a range calibration"* and is row 8.
+- **The startable Lane B work exists; it is ~50 rows down.** Scanning the 77 unlaned entries for ones
+  whose body mentions only Lane-B surfaces (`components/`, `lib/hooks`, `lib/stores`, `.tsx`) and no
+  Lane-A surface gives **10**: Q-395b, Q-354, Q-254, Q-154, Q-168, Q-138, Q-112, Q-111, Q-93, Q-1b.
+  That is the shape of the problem — not that Lane B has nothing to do, but that fifty rows of
+  someone else's work sit on top of it.
+- **A field the queue does not have, found while checking those ten:** **Q-354** ends *"Recommendation:
+  do not pursue without a reason"* — understood, deliberately declined, and waiting on a named
+  trigger. That is neither `Gate: owner` nor `Gate: device`, so it reads as startable forever. Worth
+  settling during the sweep.
+
 ### [readiness][devices] TN-8 — the chronic-stress fever mask is a FOURTH consumer of the broken temperature baseline
 
 - **Branch:** _unassigned_
@@ -1742,6 +1783,95 @@ new top-level `*.mjs` / `*.js` / `*.ts` that is not on a short allowlist (`next.
 - **Sibling sweep:** check for other scratch files already committed — a root-level `*.png`,
   `*.json` capture, or `/tmp`-writing script has the same origin.
 - **Surface: CI only, web-reproducible.**
+
+### [platform][app-shell] BF-22 — the slow loads clear on a force restart, so they are in-memory client state; the server-distance theory was measured wrong
+
+- **Branch:** _unassigned_
+- **Added:** 2026-08-25 · owner: *"everything is loading very slowly"*, then *"actually its running a lot better after a force restart"*
+- **Lane: B** — client shell. Not a server or database entry; see the ruled-out list.
+
+**⚠ A correction to the first version of this entry, which was wrong.** It concluded that production
+was served from Virginia while the owner is in Brisbane, from `x-railway-edge: iad1` in the response
+headers plus a ~276 ms measurement. **`x-railway-edge` names the edge PoP the *caller* reaches, not
+where the container runs.** The measurement was taken from a US-adjacent sandbox, so it recorded the
+sandbox's own distance to the origin. The owner states the service is deployed in **Singapore**,
+which is the closest region Railway offered, and the numbers agree with that: a static file taking
+~276 ms *from a caller near `iad1`* means the origin is far from `iad1`, which is the opposite of
+the conclusion drawn. From Brisbane to Singapore the constant is roughly 100 ms, not 270 ms.
+**Do not re-derive a region finding from `x-railway-edge` — it describes the caller.**
+
+**The datapoint that actually locates it: a force restart fixed it.** That rules out everything
+persistent — the local SQLite store, the service-worker cache, `localStorage` and the server all
+survive a restart — and points at **in-memory state in a shell that never unmounts**.
+`components/shell/tab-shell.tsx` keeps **all five tab panels mounted** once visited (`invisible` +
+`content-visibility`, deliberately, for scroll position and state). The app is therefore one
+long-lived JS context between force-quits, and the same file already records a measured instance of
+this class: hidden panels' CSS animations once consumed **21.3% of main-thread time**, fixed with
+`tab-panel-idle`.
+
+**Ruled out by inspection 2026-08-25 — do not re-investigate these without new evidence:**
+
+| Suspect | Finding |
+|---|---|
+| Database | `SELECT 1` 3 ms, 99.90% cache hit, 0 idle-in-transaction (BF-19) |
+| Server app work | A **static file** and a dynamic route cost the same from one caller — under 10 ms of app time |
+| Home fan-out growth | **Flat**: 17 `cachedFetch`, 17 `useEffect`, 12 `readCacheSync`, ~1456 lines, unchanged across every commit touching `session-select-content.tsx` since 2026-08-19 |
+| Timers in tab panels | The five tab contents contain **zero** `setInterval`/`requestAnimationFrame`, and four of five consume `useTabVisibility` |
+| `useInvalidationRefetch` | Returns `unsubscribe()` and clears its timeout; the `addEventListener` a grep finds is in its docstring |
+| BLE/live-HR services | `battery-soak`, `continuous-capture` and `live-hr/manager` all clear their timers in `stop()`; `manager.start()` is guarded twice against double-start |
+
+**What is still worth suspecting**, in the absence of a device profile: JS heap growth across five
+permanently-mounted panels; DOM accumulation in long lists; and the interaction with BF-19's deploy
+churn, where a rewritten service-worker cache forces the shell to be re-fetched into an already-long-
+lived context.
+
+- **Needs:** BF-19 — the client reporter is what produces the device measurement this entry cannot
+  get any other way.
+- **This cannot be root-caused from a sandbox** and should not be attempted again from one. It wants
+  a heap and main-thread profile from the S25 across a long-running session.
+- **What would count as fixed:** the owner can go a normal week without a force restart changing how
+  the app feels, and there is a measurement showing why rather than an inference.
+- **Surface: device only.** Every negative above is from source inspection, not from a running S25.
+
+### [platform] BF-21 — expose `pg_stat_statements` to `claude_ro` once the owner enables it
+
+- **Branch:** _unassigned_
+- **Added:** 2026-08-25 · owner approved enabling it after BF-19's investigation
+- **Lane: A** — **this entry exists because it needs a migration number, which BugFix may not take.**
+  One `claude_ro` view + grant, at the next free number.
+- **Gate: owner** — the extension must be enabled on Railway first (owner action, needs a Postgres
+  restart). Clears when `SELECT count(*) FROM pg_extension WHERE extname='pg_stat_statements'`
+  returns 1 in production.
+
+**The owner's half, in order.** `shared_preload_libraries` must include `pg_stat_statements` before
+the extension can work; it is a start-time parameter, so it needs a Postgres **restart**, not a
+reload. Then, as a superuser: `CREATE EXTENSION pg_stat_statements;`. Verified 2026-08-25 that it is
+**available and not installed** — `pg_available_extensions` lists `default_version` 1.12 with
+`installed_version` null, on PostgreSQL 18.6.
+
+**This entry's half.** The read-only role cannot see it without a view: `current_user` is
+`claude_readonly` and `search_path` is `claude_ro` alone, and that schema is **default-deny**, so
+`pg_stat_statements` is unreachable until a view exists. Add one and grant SELECT, at the next free
+migration number, in a NEW migration file (never edit an applied one — `ensureSchema` tracks by
+filename and would skip it forever).
+
+**Safe to expose, and why it is worth stating.** Every other `claude_ro` view is row-scoped to one
+user because production holds other people's health data. This one is not user-scoped and does not
+need to be: `pg_stat_statements` stores **normalised** query text — literals are replaced with `$n`
+placeholders — so it carries query *shapes* and timings, never parameter values or row content.
+Expose `query`, `calls`, `total_exec_time`, `mean_exec_time`, `rows`; there is no reason to expose
+anything else.
+
+**Temper the expectation.** BF-19 measured the database and it is not where the reported slowness
+is: `SELECT 1` returns in **3 ms**, cache hit is **99.90%**, and nothing sits idle in transaction.
+This is worth having as a baseline and it will catch a future regression, but it is unlikely to
+explain the load times — BF-19's client-side reporter is where that answer lives. Do not close the
+slow-load question on a clean `pg_stat_statements` read.
+
+- **What would count as fixed:** a session can run
+  `SELECT query, calls, mean_exec_time FROM claude_ro.pg_stat_statements ORDER BY total_exec_time DESC LIMIT 20`
+  and get rows.
+- **Surface: production only.** Nothing to verify locally beyond the migration applying.
 
 ### [nutrition][platform] BF-12 — logging a saved meal takes ~20s and the owner couldn't find it after navigating away; traced to the slow fallback firing, not a lost write
 
@@ -3766,59 +3896,32 @@ this fits without an extraction.
 
 ### [app-shell][workouts][platform] Q-467 — the Coach can change your programme and nothing in the app can undo it
 
-- **✅ UNBLOCKED — `Needs: Q-468` is satisfied** (Q-468 shipped and left the queue; an absent target
-  counts as satisfied by the protocol). Nothing gates this now.
-- **⬆ RE-PRICED UP by the owner's Q-472 decision, 2026-08-24 — this is now a PREREQUISITE, not a
-  deferred nicety.** The owner answered Q-472 *"keep the Coach's write capability, but wire undo
-  before driving adoption"*, which makes this entry the gating step for that whole plan. The
-  2026-08-18 amendment below re-priced it *down* on the grounds that `coach_changes` is empty so the
-  harm "has not yet happened" — that reasoning is now **inverted**: the exposure is absent only
-  while nothing is driving writes, and the decision is to start driving them. **Do this before any
-  work that makes the Coach propose more.**
-- **Most of it is wiring something already built** — see the undo subsystem inventory below. That is
-  what makes it a cheap prerequisite rather than an expensive one.
+> **✅ SHIPPED 2026-08-25.** `coach-history.tsx` renders an Undo on every change that is not already
+> undone; the row re-styles struck-through when it lands, and the route's 409 window ("you've trained
+> since this change") renders as a sentence on the row rather than an error, replacing the button.
+> No confirm dialog — undo *is* the safety net.
+> [`journal`](overview/entries/2026-08-25-coach-undo-control.md).
+>
+> **The route's `invalidateProgramStructure()` runs on the SERVER and clears nothing** —
+> `lib/cache-groups.ts` reaches `localStorage`/`sessionStorage`/the on-device SQLite cache. Wiring
+> the button at face value would have restored the programme in Postgres while every screen kept
+> painting the changed one for a full TTL. The client clears the superset (program structure, goal
+> recommendations, coach history), because the history payload carries no domain field and adding
+> one means editing `lib/coach/threads.ts`, which is Lane A's.
+>
+> **Verified against a real `coach_changes` row**, both ways: inside the window, `POST /undo` 200 and
+> `users.steps_goal` **12,000 → 8,000** in the database with `undone_at` set; after a workout started
+> since, **409**, the refusal on the row, the button gone, and the row **not** struck through.
 
 - **Branch:** `feat/coach-undo-control`
-- **Added:** 2026-08-18 · review sweep (the Coach write path — **the first review ever to cover it**) ·
-  [`docs/reviews/2026-08-18-coach-apply-path.md`](reviews/2026-08-18-coach-apply-path.md)
-- **Placement:** upper-mid. An AI-initiated write to the data that decides what the user is told to
-  lift, with no in-app way back.
-- **A complete undo subsystem exists and has no caller.** All of this is built:
-  `POST /api/coach/apply/[id]/undo` (auth-gated, rate-limited, ownership-scoped, with a well-reasoned
-  "until the next workout started after the change" window); `undoCoachChange()` with a double-undo
-  guard; an `undo()` handler in **all five** domains; `captureBefore()` in each, existing solely for
-  it; the `coach_changes.undone_at` column; and `components/coach/coach-history.tsx` already styling
-  undone changes with strikethrough, muted colour and a "· undone" suffix.
-- **Nothing calls it.** Every client fetch to a Coach endpoint, enumerated across `app/`,
-  `components/` and `lib/`:
-  ```
-  /api/coach   /api/coach/threads   /api/coach/preview   /api/coach/apply   /api/coach/options
-  ```
-  `/api/coach/apply/[id]/undo` appears in **no** client file, and `coach-history.tsx` renders the
-  list read-only — no Undo button anywhere.
-- **⚠️ This is NOT the known "no user-facing entry point" note** (this file, in the Coach phase-1
-  entry). That note is about phase 1 shipping the **apply** path without an entry point; phases 2–3
-  then wired apply — `change-preview.tsx`, `number-dial.tsx`, `confirm-content.tsx` and
-  `lib/coach/pending-change.ts` all POST to it and it works. **Undo was never wired with it.** The
-  asymmetry is the finding; do not close this as already-known.
-- **Why this severity:** the user approves changes per row, which implies reversibility, and the
-  history screen then styles for an undo that cannot be reached. The only way back is to ask the Coach
-  to change it again — a *new* change against current state, not a restore, and for `early_deload` or
-  `program_phase` possibly not expressible at all.
-- **Fix shape:** an Undo control in `coach-history.tsx` for changes that are not `undoneAt` and still
-  inside the window, treating the route's 409 ("you've trained since") as a first-class state rather
-  than an error. **Lane B** — the route already exists.
-- **✅ ~~Do Q-468 first, or in the same change~~ — Q-468 has SHIPPED and left the queue.** Converted
-  2026-08-24 from a prose blocker marker that was still parking this entry long after its reason
-  expired. The defect it guarded against is fixed; wiring the button no longer ships it.
-- **🔎 AMENDED 2026-08-18 from production — re-scoped, not closed.** `claude_ro.coach_changes` is
-  **empty**: no Coach change has ever been applied by this account, so **there has never been anything
-  to undo** and the harm this entry describes has not yet happened. The code path is still wrong and
-  the first real use will meet it — but the "upper-mid" placement was priced on an exposure that does
-  not exist yet. See **Q-472** and
-  [`docs/reviews/2026-08-18-production-verification.md`](reviews/2026-08-18-production-verification.md).
-  (`claude_ro` is row-scoped to one user — this says nothing about other accounts.)
-
+- **Lane:** B
+- **Keep:** only `user_goals` was driven through the UI. The other four domains
+  (`nutrition_targets`, `session_exercise`, `early_deload`, `program_phase`) share the route, the
+  shared `undoCoachChange()` and this client call, and are covered at handler level by
+  `coach-domains.test.ts` — but no UI pass touched them, and `early_deload`/`program_phase` are the
+  two whose restore is hardest to express. The `stale` 409 (a later change still in effect) renders
+  through the same path and was not driven separately. Plus the tap-target/wrap check at S25 width.
+  `Gate: device`.
 ### [platform][app-shell] Q-392 — the preference API exists; the read sites still read `localStorage`
 
 - **⚑ ABSORBS Q-393 (removed 2026-08-23). The `mealLabelStyle` row below IS that entry.** Q-393
@@ -3905,8 +4008,13 @@ cross-session against the local DB. Nothing user-visible changed — **no read s
 - **Branch:** `fix/coach-applied-change-copy`
 - **Added:** 2026-08-18, from owner screenshots of a working swap. **The swap itself is fine** — this
   is the sentence around it.
-- **Lane B** if the fix is the system prompt in `app/api/coach/route.ts` (it is). No schema, no route
-  logic.
+- **Lane: A — corrected 2026-08-25 (by Lane B, which this was being served to).** The entry reasoned
+  from the *nature* of the edit ("it is only the system prompt, so Lane B"), and the ownership rule
+  is deliberately not that: **reached by `app/api/**` → Lane A**, whatever the edit looks like. The
+  rule is path-based precisely so this judgement is not re-made per entry, and `app/api/coach/route.ts`
+  is squarely Lane A's. The investigation the entry asks for first — whether the model wrote the
+  sentence after the tool call, or the UI renders tool results ahead of streamed text — also lands in
+  that file, so splitting it across lanes would help nobody.
 
 **What the screen showed, in this order:**
 1. Green result card — *"Swapped Barbell Romanian Deadlift → Barbell Jefferson Curl in Legs"*
@@ -4182,66 +4290,29 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   dump hashing identically before and after). This item is the affordance only.
 
 ### [platform] Q-315 — `error_events` holds 4 live rows in 49 MB: Q-539 stopped the bleeding but never reclaimed the space
-- **🔁 RE-SCOPED 2026-08-24 — this was never an owner DECISION, and the `Gate: owner` was hiding a
-  missing button. `Lane: B` now.** *"What is left is a press"* was true and incomplete: **nothing in
-  the app can make that press.** `app/api/admin/vacuum/route.ts` shipped, generalised, with
-  `error_events` in `VACUUM_FULL_TABLES` — and **has no caller**. The one vacuum control that exists
-  (`components/oura-ble/db-footprint-card.tsx:108`) still posts to the *old*
-  `/api/oura-ble/samples/vacuum`, which only ever touches `oura_raw_samples`. The route is
-  session-only (no bearer path, unlike `ADMIN_EXPORT_SECRET`/`ADMIN_SNAPSHOT_SECRET`), so there is
-  no way to reach `error_events` from anywhere.
-  - **The work is small and is Lane B's:** point that control at the generalised route with a table
-    selector, driven by the `GET` the route already serves (it returns
-    `VACUUM_FULL_TABLES` as `{table, what}[]` for exactly this). **Then** the owner presses it —
-    which is an action, not a decision, and needs no gate.
-  - **It is reachable once wired.** Q-544 moved `DbFootprintCard` **above** the native-gated
-    `OuraBleDebug` on `/admin/oura-ble` precisely so it renders on a desktop — which is the client
-    that can actually hold the `ACCESS EXCLUSIVE` lock.
-  - **Third instance of this repo's "built it, never wired it" class**, alongside Q-467's undo
-    subsystem with no caller and LB-3's sheet nothing opened.
-- **↻ NUMBERS REFRESHED 2026-08-24 — the case got STRONGER, not weaker.** The headline and the
-  measurements below are from 2026-08-18, when the database was 819 MB. Packing has since taken it
-  to **181 MB**, so `error_events` at **49 MB is now ~27% of the whole database**, not 6%. Live rows
-  have drifted 4 → **33** (`n_tup_ins` 37) and the size has not moved — consistent with the entry's
-  own diagnosis that this is dead tuples and TOAST, not data. Q-534's 500 MB deadline is met, so the
-  urgency framing below is spent; the waste is not.
-- **Added:** 2026-08-18 (found while measuring production for Q-541)
-- **Lane:** B — see the re-scope above; the remaining work is wiring the existing control to the generalised route, which is `components/**`.
-- **Measured production, 2026-08-18:** `error_events` is **49 MB total against `n_live_tup = 4`** —
-  12 MB heap, 1.1 MB indexes, and the remaining ~36 MB in TOAST. That is **6% of the whole 819 MB
-  database** held by four rows.
-- **This is dead weight, not data.** Q-539 diagnosed the cause: one fault wrote **5,771 rows** because
-  the dedupe key varied with a generated `VALUES` list, each stored message truncated to exactly
-  2,000 chars of `(default, $N, $N),` boilerplate. Q-539 fixed the key and cut the cap to 1,000, and
-  the rows themselves have since been pruned — but Postgres MVCC leaves the dead tuples in place, so
-  the file never shrank. **Nothing here re-grows**: the write path is already fixed, so this is a
-  one-off reclaim, not a recurring chore.
-- **Why it is worth a queue entry rather than a footnote:** it is the cheapest MB in the database
-  against the owner's end-of-week 500 MB deadline (Q-534). Q-541's packing is worth ~680 MB and is
-  several sessions of careful work; this is ~49 MB for a single statement over a four-row table, with
-  no data at risk and no read path to reason about.
-- **Shape:** the existing `app/api/oura-ble/samples/vacuum/route.ts` already runs
-  `VACUUM (FULL) oura_raw_samples` behind an admin gate — generalise it to take a table name from a
-  small allowlist, or add a sibling. `VACUUM FULL` takes an ACCESS EXCLUSIVE lock and rewrites the
-  table; on four live rows that is milliseconds, but it still needs free disk equal to the current
-  file (49 MB against a 5 GB volume — not a constraint today, and worth re-checking if the volume is
-  cut back to 500 MB before this runs).
-- **Verification:** `pg_total_relation_size` before and after via `/api/admin/db-query`, and
-  `SELECT count(*) FROM error_events` unchanged either side. Do not assume the count is 4 by the time
-  it runs — read it first.
-- 🚧 **The ROUTE shipped 2026-08-18 (Lane A); the PRESS has not happened.** `POST /api/admin/vacuum`
-  with `{"table":"error_events"}`, admin-gated, 4/min, allowlisted to `error_events` and
-  `oura_raw_samples`; `GET` lists what may be vacuumed. The table name is interpolated into
-  `VACUUM (FULL) <table>` because VACUUM accepts no bind parameter, so **the allowlist is the safety
-  boundary, not validation** — checked with `hasOwnProperty` (an `in` check accepts `toString`, and
-  there is a mutation-checked test for exactly that) in both the route and the slice. Verified live
-  on `pnpm dev`: a disallowed name and a missing body both 400, and a real run on the local
-  `oura_raw_samples` reclaimed **5.7 MB of 6 MB**.
-  **Still outstanding: someone has to press it against production.** No button — that is Q-316's
-  territory (`components/**`, Lane B) — so until then it is a curl with an admin session cookie.
-  The same route is what reclaims the space after Q-541's backfill and after migration 193's index
-  drop, which is why it was generalised rather than copied.
 
+> **✅ THE BUTTON SHIPPED 2026-08-25 (Lane B).** `db-footprint-card.tsx` posts to the generalised
+> `/api/admin/vacuum` with a table picker fed by that route's own `GET`, so the allowlist cannot
+> drift from the client. The result line reports `liveRows` beside `beforeBytes` — the pair that
+> tells pure bloat from a genuinely large table, which is why this is a one-off reclaim and not a
+> chore. Confirm copy is per-table now (the old text promised "body_hex and all rows are preserved",
+> true of `oura_raw_samples` and meaningless here).
+> [`journal`](overview/entries/2026-08-25-vacuum-table-picker.md).
+>
+> **Driven end to end locally: 200, `{"table":"error_events","liveRows":3,...,"reclaimedBytes":0}`.
+> Zero is correct there and proves the path, not the reclaim** — the local table is 48 KB with no
+> bloat; production's is 49 MB against 4 rows, and that cannot be reproduced here.
+>
+> **`app/api/oura-ble/samples/vacuum/route.ts` now has no caller.** Deleting it is `app/api/**`,
+> Lane A's, and was not done as a side effect of wiring a button.
+
+- **Branch:** `feat/vacuum-table-picker`
+- **Lane:** B
+- **Keep:** the press itself, on production. `/admin/oura-ble` from a **desktop** (Q-544 moved the
+  card above the native-gated `OuraBleDebug` for exactly this), signed in as admin → Table →
+  `error_events` → Reclaim disk. Expect ~49 MB back against 4 live rows. Also unexercised: a
+  `VACUUM FULL` long enough to need the slice's lifted timeouts, and the `<select>` at phone width.
+  `Gate: owner`
 ### [app-shell][platform] Q-544 — server-side disk maintenance is trapped behind a native-plugin gate, so it cannot be run from a desktop
 
 > **✅ SHIPPED 2026-08-24 (Lane B, v1.363.4).** `DbFootprintCard` **and** `DeviceMetricsPanel` moved
@@ -4330,12 +4401,27 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 - **It already exceeds Android Auto Backup's 25 MB per-app quota**, so the phone-side backup covers
   none of it — see the `allowBackup` note below. That was a projection when this entry was filed; at
   31.2 MB it is now a measurement.
-- **What is left here:** the bound and the visible failure state. The real prune still needs D2 Task 5
-  (the WebView rollup consumer) to set `rolled_up`, which is what this entry has always said and what
-  the device reading now proves.
+- **✅ THE VISIBLE FAILURE STATE SHIPPED 2026-08-25 (Lane B).** The console printed correct numbers
+  nobody could read — establishing that `0 rolled up` was *the fault* took a source trace.
+  `components/oura-ble/raw-store-health.ts` now turns the same `rawStats()` into findings: unbounded
+  (nothing rolled up), unbacked (past the 25 MB Auto Backup quota, manifest re-verified), shedding
+  (`lowDisk`), and a partial-rollup note with its percentage. Symbol beside colour, not colour alone.
+  7 unit cases including the 2026-08-18 device reading verbatim.
+  [`journal`](overview/entries/2026-08-25-raw-store-findings.md).
+- **⛔ THE BOUND IS STILL BLOCKED, and not by anything in this queue.** `pruneRaw` deletes only rows
+  marked `rolled_up`; the only writer of that flag is `markRolledUp`, whose sole caller would be the
+  **WebView rollup consumer — D2 Task 5, still not built** (re-verified 2026-08-25: a repo-wide grep
+  finds no caller for `markRolledUp`/`pruneRaw`/`getUnrolledRaw` outside the plugin interface).
+  Wiring the prune today deletes zero rows. That work is a rollup consumer over local storage —
+  **Lane A's** — and has no queue entry, which is why this is written out rather than expressed as a
+  `Needs:` whose absent target would read as "already shipped".
 - **Also record:** `AndroidManifest.xml:14` sets `allowBackup="true"` with no `dataExtractionRules`.
   Android Auto Backup's cloud quota is 25 MB/app and `oura_raw.db` passed that within two weeks, so
   **the device raw store has no working backup.** That is load-bearing for the D4 decision (Q-542).
+  The console says this out loud now.
+- **Keep:** the bound (blocked above), plus the on-device read — the findings have never been
+  rendered from a real `rawStats()` call, only from the numbers one produced. One press of **Read
+  stats** on `/admin/oura-ble` in the APK. `Gate: device`
 
 
 ### [devices][platform] Q-540 — narrow the `oura_raw_samples` row: drop `event_name`, `body_hex` → `bytea`
@@ -4947,15 +5033,34 @@ ehr     0     0     0     0   648   208   128   556     0
 - **Push:pull replicates.** legs 458 (34%), push 382 (29%), pull 286 (22%), other 202 (15%) over the
   same 56 days — **push:pull 1.34**, against the 1.30 recorded over 60 days. Consistent, and the
   same mild push dominance rather than anything pathological.
-- **Still open, and still the actual work:** the surface itself, plus the design question of whether
-  Q-278 / Q-302 / Q-305 share one treatment. Nothing was built — this entry gated building on the
-  re-measurement, and that is what was delivered.
+- **✅ THE LANDMARK HALF SHIPPED 2026-08-25 (Lane B) — and the surface was not absent, it was
+  WRONG.** `weekly-muscle-sets-card.tsx` already drew a band: a hardcoded generic `MIN_TARGET = 10` /
+  `MAX_TARGET = 20` with `barColor` at 15/10/6. So the app computed correct per-muscle landmarks and
+  rendered a made-up yardstick beside them, every week. It now uses
+  `volumeVerdict(goal, muscle, sets)` — `below MEV` / `in range` / `above MAV` / `above MRV`, with
+  **the word beside the colour**, because two of the four bands are red and mean opposite things. A
+  program target still wins over the reference range. No Lane A change was needed: `workout-data:meta`
+  already carries `program.trainingGoal` and Health already fetches that key.
+  [`journal`](overview/entries/2026-08-25-volume-landmarks-surfaced.md).
+- **⛔ THE PUSH:PULL HALF IS NOT DONE, deliberately.** This entry says to do it on the same surface
+  "rather than as two cards", and doing it here would mean inventing a muscle → movement-pattern
+  taxonomy inside a component. **There is no push/pull grouping anywhere in the repo** (checked). It
+  is domain math and belongs in `packages/shared` beside `normalizeMuscle`/`MUSCLE_LANDMARKS` under
+  One Formula One Place — which is **Lane A's**. A private second copy in `components/` to satisfy
+  "together" would be the wrong trade.
+- **Still open:** the push:pull half above, and the design question of whether Q-278 / Q-302 / Q-305
+  want one shared treatment for "computed and discarded" — untouched, because answering it inside one
+  card would have prejudged it.
 - **Where it likely belongs:** the same screen that already shows weekly volume, rather than a new
   destination — see the IA cluster (Q-232…Q-239) before adding a surface.
 - **A related check that came back CLEAN, recorded so it is not re-investigated:** `core` is tagged on
   exercises and absent from `MUSCLE_LANDMARKS`, which looks like a silent fall-through to
   `DEFAULT_LANDMARKS`. It is not — `muscles.ts:17` maps `core: 'abs'` and `volume-targets.ts:58`
-  applies `normalizeMuscle` before the lookup. Working correctly.
+  applies `normalizeMuscle` before the lookup. Working correctly. **Now pinned by a unit case** so it
+  stays that way.
+- **Keep:** the push:pull half (blocked above, Lane A), the shared-treatment design question, and the
+  S25 check — the band word sits beside the set count on a narrow row and has only been seen in a
+  desktop browser. `Gate: device`
 
 
 ### [workouts] Q-300 — 37% of sets are taken with materially less rest than prescribed, and the RPE model has no rest term
@@ -5065,6 +5170,12 @@ ehr     0     0     0     0   648   208   128   556     0
 
 ### [workouts] Q-289 — `expectedRpe` misses by more than the autoregulation dead band at both ends of its own range
 
+- **Lane: A — set 2026-08-25 (by Lane B, which the tool was serving it to).** `expectedRpe`,
+  `autoregulation.ts` and `RPE_DEAD_BAND` all live in `packages/shared/src/ai-periodization/`, which
+  the path rule assigns to Lane A. **And it is a SCORING change**, so the route is Tuning proposes →
+  owner signs off → Lane A implements, per CLAUDE.md — not an implementer's to take at all. The
+  proposal must state how many other days the change moves.
+
 - **Branch:** `fix/expected-rpe-calibration`
 - **Plan:** none yet — recalibration wants a written plan
 - **Added:** 2026-08-15 · from [`docs/reviews/2026-08-15-uncovered-lenses-review.md`](reviews/2026-08-15-uncovered-lenses-review.md) §1
@@ -5130,6 +5241,10 @@ ehr     0     0     0     0   648   208   128   556     0
 
 ### [workouts] Q-290 — logged RPE carries almost no information: sd 0.87, and effectively two values
 
+- **Lane: A — set 2026-08-25, same reasoning as Q-289.** The RPE signal and its consumers are in
+  `packages/shared/src/ai-periodization/`, and this is a **scoring** question: Tuning proposes, the
+  owner signs off, Lane A implements.
+
 - **Branch:** `feat/rpe-capture-quality`
 - **Plan:** none yet
 - **Added:** 2026-08-15 · from the uncovered-lenses review §1.4
@@ -5148,6 +5263,9 @@ ehr     0     0     0     0   648   208   128   556     0
 - **Do not "fix" this by widening the model.** A flat signal made wider is still flat.
 
 ### [platform][readiness] Q-291 — the AI surfaces contradict each other on the same day
+
+- **Lane: A — set 2026-08-25.** The contradiction is between AI route outputs
+  (`app/api/ai/**`, `lib/coach/**`), both of which the path rule assigns to Lane A.
 
 - **Branch:** `fix/ai-surface-shared-state`
 - **Plan:** none yet
@@ -7282,6 +7400,21 @@ ehr     0     0     0     0   648   208   128   556     0
   shows (a) contributors, (b) trend, (c) an action. Then fix the ones failing the repo's own
   colour-only-state rule as a first pass, since `scoreBand()` colour without `scoreBand()` label is
   already a `CLAUDE.md` violation and is the cheapest subset.
+- **✅ THE COLOUR-ONLY SUBSET IS DONE 2026-08-25 (Lane B) — and it was ONE site, not a sweep.** All
+  nine non-test `scoreBand()` call sites were read rather than counted:
+  `readiness-breakdown.tsx:72` — the **"Final readiness"** row — coloured the score by band with no
+  band word and no legend in that branch. Fixed: the label ships beside the colour.
+  **The rest are not violators**, and a grep would have said otherwise: `contributor-chart.tsx` has
+  no `.label` anywhere and renders `<ScoreBandLegend />`, which pairs every colour with its meaning;
+  `score-ring`, `alternatives-card`, `contributor-detail(s)`, `health-score-detail` and
+  `oura-score-chip-row` all render the word already (`oura-score-chip-row` is the Q-281-adjacent fix
+  that put it there). `health-insight` uses only `.label`, never the colour. **This is the Q-491
+  lesson again — a zero-label grep count is not a violator list.**
+  [`journal`](overview/entries/2026-08-25-score-band-colour-only.md).
+- **Keep:** the *survey* this entry is actually about — contributors / trend / action per surface —
+  is untouched. Only the colour-only subset it named as the cheapest first pass is done, and the
+  bigger presentation question (which overlaps Q-278 and Q-305's "computed and discarded" thread) is
+  still open. Plus the S25 check on the amended row. `Gate: device`
 - **Sequencing:** this is presentation over numbers that Q-500/Q-272/Q-275/Q-505 are all about to
   change. Do the **audit** now (it is cheap and its output is durable); hold the **UI work** until
   the model changes settle, or it gets done twice.
@@ -7305,24 +7438,48 @@ ehr     0     0     0     0   648   208   128   556     0
   own recommendation: **trend is the missing dimension, not contributors** (contributors are
   genuinely inapplicable to a chip or a timeline row; a 7-day sparkline is not).
 
-### [platform][app-shell] Q-282 — no automated accessibility check exists anywhere in CI
+### [platform][app-shell] Q-282 — the accessibility checks CI cannot make: touch targets and contrast
 
 - **Branch:** `feat/ci-accessibility-scan`
 - **Plan:** none yet
 - **Added:** 2026-08-15 · from the comprehensive review §5
+- **Lane: B.** `eslint.config.mjs` + CI; no schema, no route.
+- **⚠️ THE ORIGINAL HEADLINE WAS FALSE, corrected 2026-08-25 — a check DOES exist.**
+  `eslint-plugin-jsx-a11y` rides in through `next/core-web-vitals` and has been running in the Lint
+  job all along. Verified by probe, not by reading: an unlabelled `<img>` reports
+  `jsx-a11y/alt-text`. **What was true is that it could not fail anything** — it reported at
+  *warning*, so `pnpm lint` exited 0 with violations present and a new one would land silently.
+  That is exactly how the hex-literal count grew by 41 in five days unnoticed.
+  - **✅ FIXED 2026-08-25 (Lane B).** Seven statically-decidable rules promoted to `error`:
+    `alt-text`, `anchor-has-content`, `aria-props`, `aria-proptypes`, `aria-unsupported-elements`,
+    `role-has-required-aria-props`, `role-supports-aria-props`. **The whole app measured at zero**
+    across `app/`, `components/` and `lib/`, so this cost nothing and froze the ground — a
+    shrink-only baseline whose baseline is empty. `pnpm lint`: **0 errors, 124 pre-existing
+    warnings**, and a probe file with three violations now fails.
+    [`journal`](overview/entries/2026-08-25-a11y-rules-can-fail.md).
+- **What is left is the half a linter cannot do, and it is the half this entry actually named.**
+  **Touch-target size** and **contrast** need a rendered page; no static rule can measure either.
+  That is still unbuilt.
 - **The gap, stated precisely.** The owner-directed testing cluster (Q-249 E2E · Q-250 emulator ·
   Q-251 staging · Q-252 error tracking · Q-253 device farm · Q-254 unverified-row sweep) is
   well-scoped and correctly prioritised, and this entry does **not** re-raise any of it. Standard
-  Android QA practice covers one thing none of the six touches: **automated accessibility scanning.**
+  Android QA practice covers one thing none of the six touches: **automated accessibility scanning
+  of a running app.**
 - **Why it is the right gap to close next.** It targets exactly the class this project keeps
   rediscovering by hand and cannot currently measure. The 2026-08-08 mobile-UI sweep found 7×7 px
   tap targets by manual inspection, and its **contrast finding could not be measured at all** — it
   is recorded in `projectOverview.md` as "contrast that could NOT be measured". Accessibility
   Scanner / Espresso accessibility checks catch missing labels, undersized touch targets and
   insufficient contrast automatically.
-- **Dependency, and why this is not a duplicate of Q-250.** A scanner needs a running app, so this
-  rides on the emulator job Q-250 introduces — it is one extra step in that job, not a second
-  harness. File it after Q-250 in any implementation ordering.
+- **⚠️ THE Q-250 DEPENDENCY HAS EXPIRED, and whoever takes this should not wait for it.** This was
+  written 2026-08-15, before the Playwright E2E harness grew into a real running app in CI. A
+  scanner needs a rendered page, not an emulator — `@axe-core/playwright` against the existing E2E
+  job would measure touch targets and contrast on the same DOM the WebView renders, with no
+  emulator and no second harness. **Not done here deliberately:** it adds a dependency and a new
+  failing-check surface, a flaky a11y gate would block every PR, and re-scoping an entry's approach
+  *and* implementing it in one pass is a decision that wants the owner or the Orchestrator, not an
+  implementer at the end of a session. The Espresso route below stays valid if the emulator lands
+  first.
 - **Scope:** Espresso accessibility checks enabled in the emulator run, failing on the touch-target
   and contrast rules only at first (the label rules will produce a large initial backlog). Use the
   **shrink-only baseline** pattern the repo already uses for `check-component-size.js` and
@@ -8290,6 +8447,31 @@ ehr     0     0     0     0   648   208   128   556     0
   | exact min/max scaling | it pads by **±0.5**, which halves the amplitude of a 0.5 kg body-weight spread |
   | grid lines | `exercise-history-sheet` draws three |
 
+- **⚠️ RE-MEASURED 2026-08-25 against `exercise-history-sheet.tsx` — the list above is FIVE needs and
+  there are SIX, and the sixth is the one that decides the entry.** Read line by line against the
+  primitive's own geometry:
+
+  | # | difference | primitive today |
+  |---|---|---|
+  | 1 | horizontal inset `PAD = 4` (`x = PAD + …*(W-2·PAD)`) | spans `0..width`, no inset |
+  | 2 | exact min/max scaling | pads by **±0.5** |
+  | 3 | `strokeWidth` 2 | hardcoded `1.5` |
+  | 4 | three grid lines | none |
+  | 5 | last dot `r=4` opacity 1, others `r=2.5` **opacity 0.45** | all dots `r=2.5`, full opacity |
+  | 6 | **a decorative halo ring on the last point** (`r=7`, stroke at 0.28 opacity) | nothing |
+
+  **(5)'s opacity and (6) are both absent from the list above.** (6) is the problem: a `haloLastDot`
+  prop is asking the shared primitive to draw one caller's specific art, which is how a primitive
+  becomes a thin wrapper over a config object — the exact failure Q-406 named when it declined to add
+  a warning slot to `FoodRow` ("adding a slot makes it a wrapper rather than a unification").
+- **So this is a DESIGN DECISION, not a conversion, and it wants an answer before code:** either the
+  primitive absorbs six props including a decorative one, or the three callers accept small visual
+  changes (drop the halo, unify the dot treatment) and the primitive stays general. **The second is
+  the better trade and it changes how a user-facing chart looks**, which is why it is not something to
+  slip into an implementation PR unasked. `Gate: owner`
+- **Not blocked on effort or on the primitive — blocked on that call.** Everything else is mechanical
+  once it is made.
+
 - **`SparklineChart` is not the answer either, and the reason is load-bearing.** It already draws
   this exact "1RM trend" shape (and `exercise-stats-sheet` + `exercise-summary-screen` use it), but
   it is **chart.js**. `active-workout-screen.tsx` imports no chart.js today, and CLAUDE.md's own
@@ -9079,17 +9261,32 @@ per-field merge where an AI write has no honest source rank to claim.
 
 - **Branch:** `refactor/component-size-hotspots`
 - **Added:** 2026-08-07 · [review §4](reviews/2026-08-07-full-app-review.md)
+- **Lane: B.** `components/**` + `app/**` extractions only.
 - Low priority individually; the rule exists because these files absorb every new feature by default.
   Take them opportunistically when already touching the file, not as a dedicated PR.
+- **⚠️ RE-MEASURED 2026-08-25 — two of the six rows were already done, and their line numbers now
+  point at nothing.** `health-content.tsx` **991 → 651** and `profile-tab.tsx` **849 → 476**, both
+  under the 800 limit. The other four are unchanged or slightly smaller (`workout-screen` 1851 →
+  1820, `session-select-content` 1478 → 1456, `config-screen` 997, `program-editor-sheet` 963), so
+  their extractions still stand. **Following a stale row is worse than having no row**: it sends the
+  next reader to line 588-779 of a file that is 651 lines long.
+- **It also surfaced a hole in the ratchet, now closed.** `health-content.tsx` was still listed in
+  `check-component-size.js` at a **915** baseline while sitting at 651 — silently re-granting it 115
+  lines of room it was no longer entitled to. The script's own header has said *"Shrinking one below
+  the limit? Delete its row"* since it was written, and nothing enforced it; the rule has now been
+  missed three times (`health-sections` was removed correctly, `profile-tab` and `health-content`
+  were not). `check-client-today-timezone.js` has enforced the same rule for its own baseline all
+  along — that half is now in this script too, and fails on a stale row.
+  [`journal`](overview/entries/2026-08-25-component-size-stale-baseline.md).
 
   | lines | file | proposed extraction |
   |---|---|---|
   | 1851 | `components/workout-screen.tsx` | the data-loading layer — `fetchExercises` (289-444), `loadPeriodization` (445-481), `handleDurationPresetChange` (482-506), `refreshExercises` (507-…) plus their `useState`s → `components/workout/use-workout-session-data.ts`; and the two terminal states (1604-1640) → `workout-load-states.tsx`. ~350 lines. |
   | 1478 | `app/session-select/session-select-content.tsx` | the banner stack (1128-1193) → `app/session-select/components/home-banner-stack.tsx`, taking the APK-banner and day-review dismiss state with it (182, 193, 344-355). ~110 lines, 4 `useState`s. |
   | 997 | `components/config-screen.tsx` | progression-style CRUD (152-249, already a self-labelled section) → `components/config/progression-style-editor.tsx`. ~100 lines. |
-  | 991 | `app/health/health-content.tsx` | the day-overlay subsystem (588-779) → `app/health/hooks/use-day-overlay.ts`, alongside the existing `use-health-calcs.ts`. ~190 lines. |
+  | ~~991~~ **651** | ~~`app/health/health-content.tsx`~~ | **✅ DONE — under the limit, row deleted from the ratchet 2026-08-25.** The line numbers above (588-779) no longer point at the day-overlay subsystem; do not follow them. |
   | 963 | `components/config/program-editor-sheet.tsx` | exercise-row mutations (199-325) → `components/config/use-program-exercise-edits.ts`. ~130 lines. |
-  | 849 | `components/more/profile-tab.tsx` | the notification-toggle block (154-257) + its switch rows → `components/more/notification-settings-section.tsx`. ~100 lines. |
+  | ~~849~~ **476** | ~~`components/more/profile-tab.tsx`~~ | **✅ DONE 2026-08-19** — already off the ratchet, recorded in `CLAUDE.md`. Line numbers stale. |
 
 - **Related, latent — record but do not act:** `components/shell/bottom-nav.tsx:27-33` reads three
   `persist`-ed Zustand stores with no `skipHydration` anywhere in `lib/stores/`. Zustand rehydrates

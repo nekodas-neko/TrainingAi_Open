@@ -25,6 +25,7 @@ const path = require('path');
 
 const { laneFromLines } = require('./lib/lane');
 const { keepFromLines } = require('./lib/keep');
+const { idPattern } = require('./lib/entry-id');
 
 const ROOT = path.resolve(__dirname, '..');
 const BACKLOG = path.join(ROOT, 'docs/implementation-backlog.md');
@@ -51,7 +52,7 @@ const entries = [];
 let current = null;
 for (const line of lines.slice(queueStart)) {
   if (line.startsWith('### ')) {
-    const id = line.match(/\b((?:LA|LB|BF|RV|TN|PS|Q)-\d+[a-z]?)\b/);
+    const id = line.match(idPattern());
     const title = line.replace(/^###\s*/, '');
     current = id
       ? { id: id[1], title, tags: [...line.matchAll(/\[([a-z-]+)\]/g)].map((m) => m[1]), lane: null, laneLines: [], needs: [], gates: [], batch: null, legacyBlocked: null, schemaRisk: false, keep: null }
@@ -67,7 +68,7 @@ for (const line of lines.slice(queueStart)) {
   if (!current) continue;
 
   const needs = line.match(/^\s*[-*]\s*\*{0,2}Needs:\*{0,2}\s*(.+)$/i);
-  if (needs) for (const m of needs[1].matchAll(/\b((?:LA|LB|BF|RV|TN|PS|Q)-\d+[a-z]?)\b/g)) current.needs.push(m[1]);
+  if (needs) for (const m of needs[1].matchAll(idPattern('g'))) current.needs.push(m[1]);
 
   const gate = line.match(/^\s*[-*]\s*\*{0,2}Gate:\*{0,2}\s*([a-z]+)/i);
   if (gate) current.gates.push(gate[1].toLowerCase());
@@ -138,15 +139,26 @@ for (const e of entries) {
   else ready.push(e);
 }
 
+// An entry that states no lane is shown to BOTH lanes on the understanding that the path rule in
+// docs/agents/README.md §3 answers it. That is the right default and it was silent: 77 of 193
+// entries state no lane (measured 2026-08-25), so an implementer reading this list could not tell a
+// row the queue KNOWS is theirs from one nobody has classified. Three sessions in a row started on
+// an entry that turned out to be the other lane's. Marking them changes no bucket — it says which
+// rows still owe a path-rule check before you start.
 const fmt = (e) => {
   const tags = e.tags.length ? `[${e.tags.join('][')}] ` : '';
   const title = e.title.replace(/^(\[[^\]]*\]\s*)+/, '').replace(/^[^\w]*/, '');
-  return `${e.id.padEnd(7)} ${(tags + title).slice(0, 100)}`;
+  const unlaned = e.lane === null ? '  ⟨lane unstated⟩' : '';
+  return `${e.id.padEnd(7)} ${(tags + title).slice(0, 100)}${unlaned}`;
 };
 
 console.log(`\nQueue: ${entries.length} entries${laneArg ? ` · lane ${laneArg}` : ''}\n`);
 
-console.log(`READY (${ready.length}) — top of the list is next`);
+const unlanedReady = ready.filter((e) => e.lane === null).length;
+console.log(
+  `READY (${ready.length}) — top of the list is next` +
+  (unlanedReady ? ` · ${unlanedReady} state no lane (⟨lane unstated⟩) — apply the path rule before starting one` : ''),
+);
 if (!ready.length) console.log('  nothing startable — everything is parked or unclassified');
 
 // Entries sharing a Batch: ship as one PR, so the first member to appear pulls its siblings up with

@@ -135,6 +135,9 @@ export default function HealthContent({ userId, sex: sexProp, heightCm: heightCm
   const [muscleSets, setMuscleSets] = useState<MuscleSetsEntry[] | null>(null);
   const [strengthTrend, setStrengthTrend] = useState<StrengthTrendEntry[] | null>(null);
   const [activeSessions, setActiveSessions] = useState<ProgramSession[]>([]);
+  // Q-305: the goal SCALES the volume landmark table, so a card measuring a week against MEV/MRV
+  // without it reads the wrong row — which is how Q-305's own first pass inverted its finding.
+  const [trainingGoal, setTrainingGoal] = useState<string | undefined>(undefined);
 
   // ONLY the first-paint seed (Q-241): `userGoals` below supersedes them the moment it loads. See
   // the hook for why it re-reads on tabEpoch rather than on mount alone (Q-260).
@@ -184,8 +187,9 @@ export default function HealthContent({ userId, sex: sexProp, heightCm: heightCm
     if (goals) setUserGoals(goals);
     // Seed active sessions synchronously so Training Load bars render with correct
     // palette colors on first paint instead of falling back to the hash function.
-    const workoutMeta = readCacheSync<{ program?: { sessions?: ProgramSession[] } }>('workout-data:meta');
+    const workoutMeta = readCacheSync<{ program?: { sessions?: ProgramSession[]; trainingGoal?: string } }>('workout-data:meta');
     if (workoutMeta?.program?.sessions?.length) setActiveSessions(workoutMeta.program.sessions);
+    if (workoutMeta?.program?.trainingGoal) setTrainingGoal(workoutMeta.program.trainingGoal);
     // Seed training load so the card renders immediately without a skeleton.
     const trainingLoadCached = readTodayCacheSync<import('@/app/api/training-load/route').TrainingLoadResponse>('training-load');
     if (trainingLoadCached && trainingLoadCached.interpretation !== 'insufficient_data') setTrainingLoad(trainingLoadCached);
@@ -374,9 +378,12 @@ export default function HealthContent({ userId, sex: sexProp, heightCm: heightCm
         'weekly-muscle-sets', '/api/weekly-muscle-sets', TTL_MEDIUM,
         d => { if (d) setMuscleSets(d.muscles) },
       ),
-      () => cachedFetch<{ program?: { sessions?: ProgramSession[] } }>(
+      () => cachedFetch<{ program?: { sessions?: ProgramSession[]; trainingGoal?: string } }>(
         'workout-data:meta', '/api/workout-data?tab=meta', TTL_LONG,
-        d => { if (d?.program?.sessions?.length) setActiveSessions(d.program.sessions) },
+        d => {
+          if (d?.program?.sessions?.length) setActiveSessions(d.program.sessions)
+          if (d?.program?.trainingGoal) setTrainingGoal(d.program.trainingGoal)
+        },
       ),
     ], 4);
   }, []);
@@ -520,7 +527,7 @@ export default function HealthContent({ userId, sex: sexProp, heightCm: heightCm
     todayWaterMl, waterGoalMl, activeEnergyKcalToday, bmi, bmiLabel, bmiUsesBf,
     weightTrendKgPerWeek, energyBalanceKcal, energyBalance, trainingLoad, sleepCorr, injuries,
     setInjuries, userId, recoveryMuscles, handleDayClick, weeklyStats,
-    activeSessions, muscleSets, strengthTrend, weekToDate, userGoals,
+    activeSessions, trainingGoal, muscleSets, strengthTrend, weekToDate, userGoals,
     progressSummary, bodyBaseline, healthTrends,
   });
 
