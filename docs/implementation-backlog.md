@@ -5792,30 +5792,54 @@ ehr     0     0     0     0   648   208   128   556     0
   on it. **Keep:** `goals` remains a repository call rather than a table and sits outside the map,
   so the check cannot see it.
 
-### [platform] Q-295 — Coach is 8% of AI calls, 52% of tokens, and the slowest surface in the app
+### [platform] Q-295 — Coach's prompt is mostly a static prefix; the latency that motivated caching it is already gone
 
 - **Branch:** `perf/coach-prompt-caching`
 - **Plan:** none needed
 - **Added:** 2026-08-15 · from the uncovered-lenses review §5
-- **Cost is explicitly NOT the reason for this entry.** Measured: 255 calls / 632,639 tokens over 24
-  days ≈ **26,360 tokens/day**, which at flash-lite rates is cents per month and ~$6/month at 100×
-  the users. **Do not optimise this for money.**
-- **Latency is the reason.** Measured by section:
+- **⚠️ RE-MEASURED 2026-08-25 — the headline numbers this entry was filed on are stale.** It was
+  filed as *"8% of AI calls, 52% of tokens, and the slowest surface in the app"* at 5,840 ms and
+  ~19,400 input tokens per call. Coach's **full lifetime history** (`claude_ro.ai_call_log`, 22 calls,
+  all the owner's — which is all there are for this surface):
 
-  | section | calls | tokens | input | output | avg latency |
-  |---|---|---|---|---|---|
-  | **coach** | 17 | **330,221 (52%)** | 316,687 | 13,534 | **5,840 ms** |
-  | prescription | 43 | 151,783 | 127,831 | 23,952 | 2,455 ms |
-  | ai-chat | 4 | 61,015 | 60,346 | 669 | 2,966 ms |
+  | date | calls | avg input | avg output | avg latency |
+  |---|---|---|---|---|
+  | 2026-08-09 | 8 | 29,012 | 1,503 | **9,557 ms** |
+  | 2026-08-10 | 4 | 12,612 | 355 | 2,823 ms |
+  | 2026-08-13 | 5 | 9,352 | 90 | 2,307 ms |
+  | 2026-08-18 | 5 | 7,976 | 54 | **1,489 ms** |
 
-  Coach + ai-chat: **21 of 255 calls (8%) for 62% of tokens**, at a **23:1 input:output ratio** —
-  ~19,400 input tokens per coach call. 5.8 s is the slowest user-facing surface in the app.
-- **A large static prompt prefix is what context caching is for.** Check how much of those 19,400
-  tokens is stable across calls before assuming it helps — if the prompt is mostly per-call user
-  data, caching buys nothing and this entry closes as measured-and-rejected, which is a fine outcome.
-- **Related history:** Q-170 already cut Coach latency 10.0 s → 3.5 s by addressing reasoning
-  tokens. The 5,840 ms measured here is the current state after that fix, so this is the next
-  increment, not a regression.
+  **5,840 ms was a blend across a falling curve, not a steady state** — latency is down 6.4× and
+  input tokens 3.6×, monotonically, and output tokens collapsed 1,503 → 54 (Q-170's reasoning-token
+  behaviour settling). Coach's last call was **2026-08-18**.
+- **It is no longer the slowest surface.** Over 14 days `nutrition-scan` is **3,057 ms across 30
+  calls and still running today**; `prescription` is 2,435 ms. The latency attention has moved to
+  **BF-4** (the photo scan feeling slower) — and scan latency is dominated by image handling, not a
+  prompt prefix, so this entry's fix would not help it.
+- **This was already in the tree and nobody propagated it.**
+  [`docs/reviews/2026-08-18-ai-double-trips.md`](reviews/2026-08-18-ai-double-trips.md) records a
+  7-day Coach average of **2,307 ms** while saying it *"corroborates Q-295 exactly"* — it
+  corroborated the shape and contradicted the number.
+- **The entry's own test was run, and its hypothesis was right.** The system prompt is 5,752 chars
+  (≈1,438 tokens), constant bar a `TODAY_ISO` substitution; the 24 tool declarations (16
+  `buildChatTools` + 8 `buildWidgetTools`) serialise to ≈34,128 chars, of which the **8 widget tools
+  are 71%**. A cache would cover most of a call, not a sliver. It is the *problem* that shrank, not
+  the mechanism that failed.
+- **What actually blocks answering this — and it is not the caching work.** `ai_call_log` has **no
+  cached-token column** (`input_tokens`, `output_tokens`, `total_tokens`, `latency_ms`,
+  `payload_bytes`, and no more). `@ai-sdk/google` 3.0.86 surfaces `cachedContentTokenCount`, and
+  Gemini 3.x caches **implicitly by default** — so implicit caching may already be part of the 6.4×
+  above and nothing in production can tell you. An explicit cache added now is an optimisation you
+  cannot measure, stacked on one you cannot see.
+- **➡️ Re-scoped: do NOT implement explicit context caching.** What is left is the cheap measurement —
+  record `cachedContentTokenCount` on `ai_call_log` (additive column + the `loggedStreamText` /
+  `loggedGenerateObject` wrappers in `lib/ai/instrument.ts` + a `claude_ro` view regen), then look.
+  High hit rate → this closes as measured-and-rejected, which the entry's own text calls a fine
+  outcome. Zero → the caching work gets a number behind it instead of a hypothesis.
+- **Cost was never the reason and still is not** — 255 calls / 632,639 tokens over 24 days at
+  flash-lite rates is cents per month. Do not optimise this for money.
+- **Confirmed in the same read:** every Coach row reads `gemini-3.1-flash-lite` while `COACH_MODEL_ID`
+  is `gemini-3.6-flash`. That is **Q-296**, still live.
 
 ### [platform] Q-296 — the docs say Coach runs `gemini-3.6-flash`; production says otherwise
 
