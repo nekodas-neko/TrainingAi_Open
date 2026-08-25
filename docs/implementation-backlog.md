@@ -5071,33 +5071,6 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   sequence has a `deload` phase at position 4 (Accumulation 4 → Intensification 3 → Peak 2 →
   Testing 1), so ~10 cycles between deloads. Long-ish, but a program-design choice.
 
-### [workouts] Q-304b — CLOSED 2026-08-25: the historical 1RM estimates stay as they are
-
-- **Lane:** A · **Owner decision, 2026-08-25: do not recompute.** This entry is closed, not parked.
-- **What was asked and why the answer is no.** The owner authorised recomputing 30
-  `personal_records` rows on 2026-08-24, before the cost was known. Measuring it first (see
-  `docs/overview/entries/2026-08-25-drop-running-baselines.md` and the LA-27 work) found three things
-  that changed the question:
-  1. The specified method — recompute from `set_logs` — **moves zero rows by construction**, because
-     `personal_records` derives from the stored `exercise_logs.estimated_1rm`, not from `set_logs`.
-  2. The real blast radius is **277 `exercise_logs`**, not 30 cached values: `amrapScaleFactor`
-     discounts from **6 reps up**, not the 13+ the entry assumed.
-  3. **76 of those** belong to a progression style edited *after* the log was written, so
-     re-deriving would substitute today's prescription for the one actually trained under, with
-     nothing in the result showing which (LA-27).
-- **What that costs, since "leave it" is not free either.** An inflated PR shows on the badge and in
-  the AI chat's `getPersonalRecords`, and drives a too-heavy prescription **only** for an exercise
-  carrying a PR with no recent log — `resolveWorkingBasis` takes `lastNonDeload1rm` first. That is
-  the accepted cost.
-- **Q-304's forward fix is unaffected and remains correct** — unprescribed high-rep sets have been
-  discounted since 2026-08-24. This decision is only about history.
-- **Reversible if it ever matters:** `set_logs` is untouched and is the source of truth, so the
-  recompute stays possible. What would first need solving is LA-27's 76 rows — a re-derivation that
-  cannot say which prescription it used is the thing to avoid, not the arithmetic.
-- **Related and still separate:** Q-298's 10 historical zero-1RM rows are the same shape and are
-  **not** covered by this decision.
-
-
 ### [workouts][platform] LA-27 — ANSWERED: the un-re-derivable estimates predate `set_logs.planned_pct`
 
 - **Lane:** A
@@ -11069,53 +11042,6 @@ path and wanting a device check before merging — so this is one entangled piec
 of work, not two. Take the `return 60` fix and the offline weight-resolution
 wiring together, with a device check, rather than building a mirror table nobody
 reads.
-
-### [cross] 🟢 Q-27 — finish the per-domain documentation migration — **CLOSED, not doing either item**
-
-> **⚑ Owner delegated the call 2026-08-04 (*"your decision. I don't read docs — so if it's better for
-> you then go for it"*). Having looked: neither item is worth doing.**
->
-> **Item (a), move the ~25 loose root docs into pillar folders — NO.** The problem it solves is
-> already solved. `docs/domains/*/README.md` carries **55 links** to those exact files, which is the
-> subject-based view the migration was meant to create. Moving them breaks all 55 links plus every
-> reference in `CLAUDE.md`, `projectOverview.md` and the backlog, to achieve physical colocation
-> that nothing navigates by. Churn with a real breakage surface and no reader.
->
-> **Item (b), split `projectOverview.md`'s Known Issues per pillar — NO.** That file is what a fresh
-> session reads first to orient; splitting it means rewriting the orientation convention in
-> `CLAUDE.md` at the same time. Not a side effect of a docs tidy.
->
-> Reopen only if the domain indexes stop being maintained — the indexes are the mechanism, and they
-> are working.
-
-Added 2026-07-30, alongside the PR that shipped the domain structure. **Plan:**
-[`docs/superpowers/plans/2026-07-30-domain-docs-deep-migration.md`](superpowers/plans/2026-07-30-domain-docs-deep-migration.md).
-
-Already shipped: the eleven-pillar taxonomy and indexes under [`docs/domains/`](domains/README.md),
-`[domain]` tags on every `projectOverview.md` Known-Issues heading **and** every heading in this
-file, and the domain segment in handoff filenames (`docs/handoff-YYYY-MM-DD-<domain>-<title>.md`).
-
-**Item 1 (docs link check in CI) — DONE 2026-07-30.** `scripts/check-doc-links.js` walks every
-`.md` under `docs/` and the three repo-root docs, strips fenced/inline code first (a regex literal
-or a quoted markdown example in backticks reads exactly like `[text](path)` otherwise — both
-occurred in this repo's review docs and produced false positives before the strip was added), and
-fails on any relative link that doesn't resolve. Wired into the Custom Rules CI job. Running it
-found 42 broken links beyond the 16 the ad hoc pre-check caught — 36 in `docs/overview/uplift-archive.md`
-missing a `../` (linking from `docs/overview/` as if it were `docs/`) plus 12 of those additionally
-needing `archive/` (their target plans had moved to `docs/superpowers/plans/archive/` since the
-links were written), and one in `docs/handoff-phase-3-bundled-shell.md` with one `docs/` too many.
-All fixed in the same PR.
-
-What's left — both **explicit go/no-go decisions, not assumed work** (the indexes already make
-everything findable, and each move is a large link-rewriting diff — `oura-ble-operations.md` alone
-is referenced from `CLAUDE.md`, several plans, a skill and multiple journal entries):
-
-2. **Optionally** move the ~25 loose `docs/` root reference docs into their pillar folders
-   (`sleep-system.md` → `domains/sleep/`, the six `oura-ble-*.md` → `domains/devices/`, etc.).
-3. **Optionally** split the `projectOverview.md` Known Issues into per-pillar files.
-
-Record the decision either way rather than silently skipping it — now safe to attempt either move
-since the CI link check (item 1) catches a botched rewrite immediately.
 
 ### [platform] 🟡 J1 residual — CI-enforced cache/fetch hygiene gates
 
