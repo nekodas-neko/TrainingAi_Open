@@ -425,6 +425,13 @@ test that feeds both, not by reading the condition.
 **Keep:** this is a suppression, not a fix. It must be removed by TN-6 rather than left as permanent
 behaviour, and TN-6's own pass test (deviation mean within ±0.05 °C of zero) is what retires it.
 
+- ✅ **SHIPPED 2026-08-25** (`fix/suspend-temp-penalty`). Working:
+  [`entries/2026-08-25-suspend-temp-penalty.md`](overview/entries/2026-08-25-suspend-temp-penalty.md).
+  `isTemperatureBaselineCentred` suspends the ladder while the trailing mean deviation is outside
+  **±0.15 °C** or there are **<10** nights to judge by — re-evaluated per request, so a Redecode
+  re-derivation lifts it with **no deploy**. Thresholds untouched.
+- **Keep:** a **suppression, not a fix** — TN-6 retires it (its ±0.05 °C pass test is what does), and
+  nothing was observed in production.
 ### [readiness][devices] TN-6 — the temperature baseline is 0.36 °C too low, so readiness carries a −16 pt penalty on 89% of days
 
 - **Branch:** _unassigned_

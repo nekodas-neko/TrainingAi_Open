@@ -2150,3 +2150,10 @@ What survives is the part a queue cannot do without: the **⛔ Keep** saying the
 The seed fix ships in this PR, but the owner's stored baselines are still the zero-folded ones, and
 every pass test in all three entries measures the re-derivation rather than the code. An entry that
 looked finished here would be wrong in the way that matters most.
+
+## 2026-08-25 — `docs/implementation-backlog.md` raised, 11658 → 11665 (TN-6a)
+
+Seven lines, and they were eleven before being cut once. What is left is the shipped note plus the
+**Keep** — that this is a *suppression, not a fix*, and TN-6's ±0.05 °C pass test is what retires it.
+That line is the whole reason the entry stays in the queue: a reader who takes the ✅ at face value
+leaves a temperature penalty switched off permanently.
