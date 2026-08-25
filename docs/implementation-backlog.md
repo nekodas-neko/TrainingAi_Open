@@ -4211,6 +4211,44 @@ cross-session against the local DB. Nothing user-visible changed — **no read s
 That third line is the finding. The user could not tell from the screen whether anything had happened,
 on a change that had already been written.
 
+> ### ⚠️ INVESTIGATED 2026-08-25 (Lane A). The entry asks for the transcript check *before* any
+> prompt change — it was done, and **it retires one of the two defects and reverses the proposed
+> fix.** Read this before implementing.
+>
+> **1. The ordering question is answered: it is the MODEL, not the UI.** `coach-message.tsx` maps
+> `parts` in array order with no sort, and production `coach_messages.parts` shows the same order
+> stored. Of **8 assistant messages in production, 3 carry a `text` part at all — and in all 3 it is
+> the LAST part**, after every tool call. The other 5 have no text at all, so "omit it entirely" is
+> already the common behaviour. The instruction *"Write your one sentence BEFORE calling a widget
+> tool"* is being violated **3 of 3 times** despite being explicit.
+>
+> **2. "Proposal" is the RIGHT word, and the entry's premise is wrong.** The entry says *"a
+> `session_exercise` swap applies immediately, which is why the card is past tense"*. It does not.
+> `DOMAIN_TIER` (`lib/coach/patch.ts:43`) puts `session_exercise` at **tier 2**, and
+> `widget-registry.tsx:78` routes **tier 1–2 to `ChangePreview`** — an inline confirmation with
+> per-row toggles and an **Apply button** (`change-preview.tsx:92 handleApply`). Only **tier 3**
+> (`program_phase`, the sole member) pushes a screen. **Nothing applies without the user accepting**,
+> inline or otherwise, so the swap genuinely IS a proposal at the moment the model writes the word.
+>
+> **3. So the proposed guard would make it worse.** Feeding the tier in "so *proposal* is only ever
+> available for tier 3" would stop the model correctly describing a tier-2 proposal as one. Do not
+> build it.
+>
+> **What is actually wrong is only the ordering, and it is one defect rather than two.** The sentence
+> is accurate when generated and *stale by the time it is read*: the user has already tapped Apply
+> and seen the green "Swapped" card, so a correct "Here is the proposal to…" arrives describing a
+> decision they have already made. That is exactly what produced the owner's *"Is this complete?"*
+>
+> **And prompting has already failed at it** — the rule exists and is ignored 3/3. **Hypothesis, not
+> established:** the AI SDK's multi-step loop (`stopWhen: stepCountIs(6)`) makes a final text step
+> the natural shape, so the instruction fights the mechanism rather than the model's judgement.
+> Whoever takes this should test that before writing more prompt.
+>
+> **Two candidate fixes, and the choice is a product decision:** make the sentence correct *where it
+> actually lands* (past tense, additive, or omitted — which the entry already offers and which 5 of 8
+> messages already do), **or** render text above widgets in the thread — a UI change, Lane B, and one
+> that would undo the deliberate "text on screen while the widget composes" intent.
+
 **Two defects, both against rules the prompt already states.**
 - **"Proposal" is the wrong word for this domain.** `program_phase` is **the only tier-3 domain**
   (`lib/coach/domains/program-phase.ts:8`) — the only one that routes through a confirmation screen.
@@ -4616,9 +4654,66 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 - **Branch:** `perf/oura-raw-row-narrowing`
 - **Lane A.** Migration + `lib/data/**`.
 - **Added:** 2026-08-17
+- **Gate:** owner
 - ✅ **UNBLOCKED 2026-08-17.** The owner kept D4 as the destination **but with no deadline**, which
   lapses master-plan decision **O1** (*"do not do both"* — it vetoed `bytea` on the grounds the table
   was about to be dropped; a drop that is years out cannot veto a cheap reversible win today).
+> ### ⚠️ RE-MEASURED 2026-08-25 against production: neither half is worth doing now
+>
+> Everything below was sized before **Q-541's packing** shipped. Packing now runs automatically from
+> the ingest path, and the effect on this entry is not "the numbers moved" — it is that the table
+> this entry narrows **stopped growing**.
+>
+> **`oura_raw_samples` is now a bounded ~7-day rolling window.** Eight dates are present
+> (2026-08-18 → 08-25) at ~25k rows/day, 173,017 rows total; everything older has been sealed into
+> `oura_raw_packed`, which is already `bytea` and already omits `event_name` and `decoded`. So a
+> row-narrowing here buys a **one-time** saving that never compounds — which is the opposite of the
+> premise the entry was costed on (1.1M rows and climbing).
+>
+> | | when filed (2026-08-17) | re-measure 2026-08-23 | now (2026-08-25) |
+> |---|---|---|---|
+> | rows | ~1.1 M | 315k | **173,017** |
+> | table total | 666 MB | 87 MB | **58 MB** |
+> | dedup index | 78 MB | 22 MB | **15 MB** |
+> | `event_name` | 20 MB | — | **3.3 MB** |
+> | `body_hex` | — | 7.3 MB | **4.3 MB** |
+>
+> **What each half is actually worth, measured per column:**
+>
+> - **`event_name` drop — 3.3 MB, heap only.** It is in no index (the dedup key is
+>   `(user_id, ring_timestamp_ds, tag, body_hex)`), so there is no index win to add to it. And it is
+>   **irreversible**. The entry says take this half "regardless"; 3.3 MB does not buy a data-dropping
+>   migration, and the column is still the cheapest cross-check on the `tag` mapping the parity test
+>   pins.
+> - **`body_hex` `text` → `bytea` — ~4.3 MB.** ~2.1 MB in the heap (hex text is 2:1 against binary)
+>   plus ~2.2 MB off the 15 MB dedup index, which contains the column. **Lossless**, and needs no
+>   owner confirmation. Nominally the larger of the two — but by ~1 MB, and only once the index is
+>   counted; in the heap alone `event_name` is the bigger one.
+>
+> **Neither is worth a table rewrite of 173k rows plus the reader/writer changes across the ingest,
+> decode, pack and redecode paths and the `claude_ro` views.** Together they are ~7.6 MB of a 171 MB
+> database on a 5 GB volume at $0.15/GB/month, and reclaiming any of it needs a `VACUUM FULL` that
+> Q-315 shows there is still no working path for.
+>
+> **The table's size is not its columns, and that is what made the original sizing misleading.** The
+> 58 MB is **16.7 MB of column data + ~12 MB of heap overhead, dead tuples (10,256 at the reading)
+> and free space + 30 MB of indexes**. Column narrowing aims at the smallest third. If this table is
+> ever worth attention again it is for the index half — `oura_raw_samples_user_tag_ts` is 10 MB at
+> **1,960 scans** against the dedup index's 176,205 — or for the churn bloat, not for column width.
+>
+> **`decoded` is NULL on 173,017 of 173,017 rows.** Dead by design, not a decoder failure:
+> `lib/data/postgres/slices/oura-raw-frames.ts` documents it as *"the legacy `decoded` JSONB … `null`
+> for every hot row written since Lever 1a"*, with callers coalescing to an in-memory decode of
+> `bodyHex`. Dropping it is lossless because there is no data in it — but it saves ~0 bytes (a NULL
+> costs a null-bitmap bit), so it is schema hygiene, not a size win.
+>
+> **Recommendation: do neither half now, and do not treat this entry as startable.** If
+> `oura_raw_samples` is ever rewritten for some *other* reason, take the `bytea` conversion and the
+> `decoded` drop in that same pass — both are lossless and free once the rewrite is already
+> happening. Leave `event_name` alone unless the owner asks for it: a data-dropping migration is the
+> standing confirm-first carve-out, and 3.3 MB is not a reason to spend one. Revisit only if packing
+> stops bounding the hot tier.
+
 - **Take the `event_name` half regardless. Take the `bytea` half only if Q-541 is NOT imminent** — a
   packed blob is already `bytea`, so doing both is the same migration twice over 1.1M rows.
 - **Gives up nothing.** `event_name` is 20 MB owner-scoped across **30 distinct values, fully derivable
