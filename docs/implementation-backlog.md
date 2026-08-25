@@ -1498,32 +1498,31 @@ breath_avg_rpm:   9.1     9.7    10.0     9.8      9.8     <- the value it is co
 - **Surface: server/shared, web-reproducible.** Same as BF-13.
 
 
-### [workouts] BF-15 — the exercise-role default is `primary`, so an unclassified isolation movement gets prescribed like a main lift
+### [workouts] BF-15 — the exercise-role fallback is `primary`, so unclassified work is prescribed like a main lift
 
 - **Branch:** _unassigned_
-- **Added:** 2026-08-24 · owner report — *"my concern here is that some 'isolation' type work will increase to a main level when it should be accessory sort of — like bicep curls... but what about cable dips?"*
-- **Lane: A** — `lib/data/postgres/schema.ts`, one Postgres migration, `lib/sqlite/migrations.ts` (local schema version), plus the `?? 'primary'` read fallbacks listed below.
-- **Ships alone.** BF-16 depends on it but is owner-gated, and BF-17 is a pure rename that must stay separately revertable — batching either makes the revert non-separable.
+- **Added:** 2026-08-24 · owner report — *"some 'isolation' type work will increase to a main level when it should be accessory sort of — like bicep curls... but what about cable dips?"*
+- **Lane: A** — `lib/data/postgres/schema.ts`, one Postgres migration, `lib/sqlite/migrations.ts` (local schema version), `packages/shared/src/workout/exercise-role.ts`, and the read fallbacks below.
+- **Ships alone.** BF-16 depends on it but is owner-gated; BF-17 is a label change that must stay separately revertable.
+- **⚑ The design is settled and written up — read [`docs/superpowers/plans/2026-08-24-exercise-roles.md`](superpowers/plans/2026-08-24-exercise-roles.md) before touching any of it.** It carries the budget-scaled session shape with its calibration, the anchor rule, the measured 90% fixture, and **four shapes that were proposed and rejected with reasons** (position-based roles, isolation→accessory, never-auto-Primary, remembered per-exercise preference). Re-proposing one costs a session.
 
 **The role decides the prescription, not a badge.** `resolveStyleForExercise`
-(`packages/shared/src/phase-engine.ts:147`) selects the progression style from `exercise_role`, and
-the style carries the per-set percentages and reps. `primary` takes the phase's *primary* style —
-the heavy one that climbs across the block. So a movement that lands on `primary` by omission is
-prescribed at main-lift percentages and escalates with the phase, which is exactly the owner's
-report.
+(`packages/shared/src/phase-engine.ts:147`) selects the progression style from `exercise_role`, so an
+exercise that lands on `primary` by omission is prescribed at **90% × 3** in a Peak phase where
+`accessory` would have given a flat 60% × 12. `session-data.ts:299` also reads it for
+`lastSetMode`, so the same exercise takes an **AMRAP last set** — a set to failure at a percentage
+chosen for a compound.
 
-**Two places default it to `primary`, and both are wrong way round:**
+**Two schema defaults say `primary` and must flip together** — a local default disagreeing with the
+server writes divergent rows on the offline path:
 
 | Site | Current |
 |---|---|
-| `lib/data/postgres/schema.ts:138` | `text('exercise_role').notNull().default('primary')` |
-| `lib/sqlite/migrations.ts:178` | `exercise_role TEXT NOT NULL DEFAULT 'primary'` |
+| `lib/data/postgres/schema.ts:138` | `.default('primary')` |
+| `lib/sqlite/migrations.ts:178` | `DEFAULT 'primary'` |
 
-Both must flip in the same PR — a local default that disagrees with the server default writes
-divergent rows on the offline path.
-
-**Ten read sites also hard-code the same fallback** and must flip with it, or a null read
-re-manufactures the defect downstream of the column: `lib/coach/domains/session-exercise.ts:311`,
+**Ten read sites hard-code the same fallback** and must flip with them, or a null read
+re-manufactures the defect downstream: `lib/coach/domains/session-exercise.ts:311`,
 `lib/local-store/sync-engine.ts:422`, `lib/local-store/sqlite-backend.ts:1010`,
 `lib/data/postgres/slices/programs.ts:118,289`, `app/api/admin/program-export/route.ts:63`,
 `components/config/program-editor-sheet.tsx:854`, `components/config-screen.tsx:398,450`,
@@ -1531,129 +1530,86 @@ re-manufactures the defect downstream of the column: `lib/coach/domains/session-
 `packages/shared/src/ai-periodization/generate-prescription.ts:389,464`,
 `components/workout/ai-prescription-card.tsx:278`.
 
-**`session-data.ts:299` is the one that shows the blast radius is not only load:**
-`lastSetMode = (ex.exerciseRole ?? 'primary') === 'primary' ? 'amrap' : 'plus1'` — so an
-unclassified exercise also gets an **AMRAP** last set. On an isolation movement that is a set taken
-to failure at a percentage chosen for a compound.
+**Second half — the classifier is wired to exactly one path.** `recommendExerciseRole` is called only
+from `lib/coach/domains/session-exercise.ts:183,273` (the Coach swap). The program editor, the AI
+generator and the local assembler all take the column default instead. Replace it with the plan's
+budget-aware rule and wire it into those creation paths.
 
-**`accessory` is the correct floor, and the codebase already says so.**
-`UNCLASSIFIED_EXERCISE_ROLE` (`packages/shared/src/workout/exercise-role.ts:80`) is already
-`'accessory'`, with the reasoning written out: being wrong at `accessory` under-loads, being wrong
-at `primary` puts a heavy percentage on a movement nobody has classified. The Coach swap path
-honours that constant; the schema default contradicts it. This entry makes the schema agree with
-the code that was written to be careful.
+- **What would count as fixed:** a session built at 30 minutes produces 1 Primary / 1 Secondary /
+  1 Accessory and at 60 minutes 1 / 2 / 2; a single exercise added to a session that already has an
+  anchor never silently becomes Primary; a test asserts the two schema defaults agree; and the plan's
+  §4 fixture passes at ≥ 90%.
+- **Do NOT sweep existing rows in this PR** — that is BF-16, and it is owner-gated.
+- **Related, not blocking: BF-7** covers the *runtime* duration picker. This entry reads the
+  session's *configured* budget, which BF-7's owner decision confirms is the anchor.
+- **Surface: server/shared + local SQLite.** The local-schema half is **not** web-reproducible
+  (`getLocalStore` returns null in the sandbox), so it needs the device check or a Known-Issues row.
 
-**Second half — the classifier exists and is wired to exactly one path.**
-`recommendExerciseRole` is called only from `lib/coach/domains/session-exercise.ts:183,273` (the
-Coach swap). Every other way a `session_exercises` row is created — the program editor, the
-AI program generator, the local program assembler — takes the column default instead. Wire the
-classifier into those insert paths so a *new* slot arrives with a recommendation rather than a
-default. It returns `null` when the catalogue entry has no muscles, which means *ask* and must not
-be collapsed into a default at the call site (the function's own contract).
-
-- **What would count as fixed:** a new session exercise created from the program editor for
-  Dumbbell Bicep Curl arrives as `accessory` without anyone touching the role control, and a test
-  asserts the two schema defaults agree.
-- **Do NOT sweep existing rows in this PR.** Correcting the rows the owner already has is BF-16 and
-  is gated on their approval — a silent re-role changes the prescription of a program mid-block.
-- **Surface: server/shared + local SQLite.** The local-schema half is **not** web-reproducible —
-  `getLocalStore` returns null in the sandbox — so the migration path needs the device check, or a
-  Known-Issues row saying it did not get one.
-
-### [workouts] BF-16 — 14 exercises hold two or three different roles across the owner's own program
+### [workouts] BF-16 — the retired all-primary program, and the catalogue rows recorded thinner than their own siblings
 
 - **Branch:** _unassigned_
 - **Added:** 2026-08-24 · found while tracing BF-15, from production
-- **Lane: A** — data correction, no schema. `session_exercises.exercise_role`.
+- **Lane: A** — data correction, no schema.
 - **Needs:** BF-15
-- **Gate: owner** — every changed row changes a prescribed percentage. The deliverable is an
-  **advisory list the owner approves row by row**, never a silent sweep.
+- **Gate: owner** — any role change alters a prescribed percentage. The deliverable is an advisory
+  list approved row by row, never a silent sweep.
 
-Measured against production (`claude_ro.session_exercises`, 87 slots: 31 primary / 31 secondary /
-25 accessory). Fourteen exercise names carry more than one role:
+**The owner's ACTIVE program needs no role corrections** — Shikai carries 1 Primary in four of its
+five sessions. An earlier count of "11 isolation movements at `primary`" was real but unsplit:
+almost all of it sits inside the retired `Strength + Hypertrophy`, where **every** exercise is
+`primary` — the old column default doing exactly what BF-15 describes. Correcting a program nobody
+trains on may not be worth doing at all; present it and let the owner decide.
 
-| Exercise | Roles held | Slots |
-|---|---|---|
-| Cable Chest Dips | primary + secondary | 5 |
-| Bent-Over Barbell Row | primary + secondary | 4 |
-| Dumbbell Bulgarian Split Squat | primary + secondary | 4 |
-| **Dumbbell Lateral Raise** | accessory + primary + secondary | 4 |
-| Barbell Hip Thrust | primary + secondary | 3 |
-| Barbell Romanian Deadlift | primary + secondary | 3 |
-| Cable Pulldown | primary + secondary | 3 |
-| Landmine Press | primary + secondary | 3 |
-| Single Leg Hip Thrusts | primary + secondary | 3 |
-| Cable Crunch Abs | accessory + primary | 3 |
-| Dumbbell Preacher Curl | accessory + primary | 3 |
-| Tricep Cable Combo | accessory + primary | 3 |
-| Barbell Shrug | accessory + secondary | 2 |
-| Pull-Up | accessory + secondary | 2 |
+Two things that are worth doing, both detailed in
+[`docs/superpowers/plans/2026-08-24-exercise-roles.md`](superpowers/plans/2026-08-24-exercise-roles.md) §6:
 
-**Not all of these are defects, and the distinction is the whole entry.** A row can legitimately be
-primary on one day and secondary on another — Bent-Over Barbell Row leading a pull session and
-supporting a deadlift session is correct, and role is a property of the *slot*, not the exercise.
-What is not defensible is a **lateral raise** appearing at `primary`, or a **preacher curl** and a
-**cable crunch** at `primary`: those are isolation movements taking a main-lift style, and they are
-the owner's reported symptom.
+1. **`Shikai / Lower` has no Primary at all** — three Secondary and two Accessory, the only
+   live-program anomaly.
+2. **Five catalogue rows record fewer muscles than their own sibling movement** — Cable Chest Dips
+   (2) against Barbell Bench Press (3), Dumbbell Shoulder Press (2) against Barbell Overhead Press
+   (3), plus Barbell Hip Thrust, Cable Pulldown and Barbell Shrug. This is the real defect behind the
+   owner's *"hip thrusts and dumbbell shoulder press should be able to be a secondary"*, and it is a
+   data problem rather than a threshold one. These rows also feed the muscle heatmap and every
+   weighted-set / tonnage tally, so fixing them is worth more than the role recommendation alone.
 
-**The split to apply:** for each of the 14, present the current role per slot alongside
-`recommendExerciseRole`'s recommendation and the catalogue's muscle count + equipment, and let the
-owner accept or reject each. Movements the classifier calls `accessory` (fewer than 3 muscles) that
-are currently sitting at `primary` are the high-confidence corrections; the barbell compounds
-holding two roles are probably deliberate and should default to *keep*.
+- **What would count as fixed:** each corrected row is one the owner approved, with the sibling
+  comparison recorded in the PR so the judgement is reviewable.
+- **Surface: production data.** Not reproducible against the local seed — the dev database is seeded
+  correct.
 
-- **What would count as fixed:** no isolation movement (catalogue muscle count < 3) holds
-  `exercise_role = 'primary'` anywhere in the owner's program, and each change is one the owner
-  approved.
-- **Surface: production data.** Not reproducible against the local seed — the dev database's nine
-  slots are seeded correct.
-
-### [workouts][platform] BF-17 — `main` and `primary` are two different axes wearing the same word, and `secondary` means both
+### [workouts][platform] BF-17 — `main` and `primary` are two axes wearing the same word, and the UI labels them backwards
 
 - **Branch:** _unassigned_
 - **Added:** 2026-08-24 · owner: *"can we have consistent names? I know we use main as well somewhere?"*
-- **Lane: A** — one idempotent data migration over `exercise_library.muscles`, plus ~25 mechanical
-  code sites. No behaviour change.
+- **Lane: A** — user-visible label strings only. No stored value changes, no migration.
 - **Needs:** BF-15
 
-Two unrelated axes share near-synonymous vocabulary, and collide outright on `secondary`:
+`components/config/program-editor-sheet.tsx` renders both axes twenty lines apart and labels them
+backwards from each other: line 846 labels the *exercise* value `primary` as **"Main Compound"**,
+line 872 labels the *muscle* value `main` as **"PRIMARY"**. The same exercise value also renders
+differently per screen — `components/workout-builder/builder-review.tsx:33` maps `primary → 'Main'`
+and **`secondary → 'Compound'`**.
 
-| Axis | Stored in | Values |
-|---|---|---|
-| **Muscle** role — how hard this exercise works this muscle | `exercise_library.muscles` JSONB (`{"muscle":"biceps","role":"main"}`) | `main` \| `secondary` |
-| **Exercise** role — what the exercise is *for* in the session | `session_exercises.exercise_role` (`ExerciseRole`) | `primary` \| `secondary` \| `accessory` |
+**The agreed vocabulary** — one word per concept, matching the stored value:
+**Primary / Secondary / Accessory** for the exercise role, **Target / Assisting** for the muscle
+role. `"Main"`, `"Main Compound"`, `"Secondary Compound"` and `"Compound"` are all retired;
+"Compound" is actively wrong for `secondary`, since an accessory can be compound too.
 
-So `secondary` is an assisting muscle in one context and a second-tier lift in the other, and
-`main`/`primary` are the same word on different axes.
+**Five files carry a visible label:** `program-editor-sheet.tsx` (both axes), `builder-review.tsx`,
+`add-exercise-sheet.tsx` (`title=` tooltips), `exercise-history-sheet.tsx:269`,
+`admin/exercise-manager.tsx`.
 
-**This is not cosmetic — it has already misled the code that reads it.**
-`packages/shared/src/workout/exercise-role.ts` carries a whole paragraph of docstring explaining
-that a "2+ `main` muscles = compound" rule calls Barbell Bench Press an isolation, because 117 of
-142 catalogue rows carry exactly one `main` muscle. That warning exists only because the naming
-invites the mistake. `roleWeight` (`packages/shared/src/muscles.ts:29`) and six
-`ai-periodization` sites all branch on `role === 'main'` for muscle weighting, adjacent to code
-branching on `exerciseRole === 'primary'` for style selection.
+**The data rename (`main` → `target` in storage) is DECLINED** — 85 non-test sites across 44 files,
+149 catalogue rows, and **three hand-written raw-SQL copies** of `muscle_entry->>'role' = 'main'`
+where missing one silently halves every muscle-volume number in the app. Full scope and reasoning in
+[`docs/superpowers/plans/2026-08-24-exercise-roles.md`](superpowers/plans/2026-08-24-exercise-roles.md) §5.
+Do not implement it; the labels alone fix what the owner asked about.
 
-**Rename the MUSCLE axis, not the exercise axis:** `main` → `target`, `secondary` → `assisting`.
-The exercise axis is a real column, drives the progression engine, and is shown in the UI; the
-muscle axis lives inside a JSONB blob and in-memory types, so it is the cheaper half to move.
+- **What would count as fixed:** no user-visible string reads "Main", "Main Compound", "Secondary
+  Compound" or "Compound"; the program editor's two axes read Primary/Secondary/Accessory and
+  Target/Assisting; the same role renders identically on every screen.
+- **Surface: UI strings only, web-reproducible.**
 
-Scope: one idempotent `UPDATE … jsonb` migration over the catalogue rows; the `'main' | 'secondary'`
-literal type in `packages/shared/src/types/program.ts:3` and its ~25 call sites (`muscles.ts`,
-`ai-periodization/*`, `injury-substitution.ts`, `session-data.ts`, `program-assembler.ts`,
-`coach/tools.ts`, `exercise-image-gen.ts`); the `mainMuscles` field name in
-`packages/shared/src/types/builder.ts` and its validator; and the AI prompt string at
-`app/api/exercises/generate/route.ts:30`, which instructs the model to emit `"main"`.
-
-**Alternative considered — document the two axes and leave the words.** Genuinely better at zero
-risk, and nothing is broken today. It loses because the confusion is already load-bearing in a
-docstring, and every future change to the classifier re-pays the tax.
-
-- **Must not batch with BF-15.** A rename with no behaviour change riding alongside a change that
-  alters prescriptions makes the revert non-separable.
-- **What would count as fixed:** `grep -rn "'main'" --include=*.ts packages/ lib/ app/ components/`
-  returns no muscle-role hits, and the catalogue holds no `"role":"main"`.
-- **Surface: server/shared, web-reproducible.** The migration is idempotent and reversible.
 
 ### [nutrition][platform] BF-12 — logging a saved meal takes ~20s and the owner couldn't find it after navigating away; traced to the slow fallback firing, not a lost write
 
