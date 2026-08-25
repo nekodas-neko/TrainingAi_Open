@@ -63,11 +63,13 @@ builder's rows became the shared `FoodRow`; `ingredient-row.tsx` is deleted and 
 
 **The Devices card stops calling the ring healthy with no key (LB-5).** Checks `hasKey()` and links to `/admin/oura-ble` when false. `Gate: device`.
 
-**The queue says which rows it has not classified (LB-12).** After correcting four entries' lanes
-one at a time and hitting two more, it was measured: **77 of 193 entries state no lane**, and **53 of
-Lane B's 55 READY rows** — so two are rows the queue knows are Lane B's. Showing them to both lanes
-is right; being silent about it was not. They print `⟨lane unstated⟩` now. **The sweep is the
-Orchestrator's** and is filed, not done.
+**The accessibility rules ran and could not fail (Q-282, headline corrected).** *"No automated
+accessibility check exists in CI"* was false — `jsx-a11y` rides in via `next/core-web-vitals` and has
+run all along, at **warning**, so `pnpm lint` exited 0 with violations present. The app measured at
+**zero**, so seven decidable rules are `error` now: an empty shrink-only baseline. **It does not
+close the entry** — a linter cannot measure touch targets or contrast, and that half is unbuilt.
+
+**The queue says which rows it has not classified (LB-12).** After correcting four entries' lanes one at a time and hitting two more, it was measured: **77 of 193 entries state no lane**, and **53 of Lane B's 55 READY rows** — so two are rows the queue knows are Lane B's. Showing them to both lanes is right; being silent about it was not. They print `⟨lane unstated⟩` now. **The sweep is the Orchestrator's** and is filed, not done.
 
 **The colour-only score subset was ONE site, not a sweep (Q-281).** Nine `scoreBand()` call sites read rather than counted: only `readiness-breakdown`'s "Final readiness" row coloured without the word. `contributor-chart` has no `.label` at all and is correct — it renders the legend. **The Q-491 lesson again: a zero-label grep is not a violator list.** Also laned Q-289/Q-290/Q-291 to A.
 
@@ -124,9 +126,7 @@ engine write paths now invalidate on **both** sides of the push (`pushThenRevali
 call stays because offline it is the only one that fires. Six `components/**` sites carry the same shape — filed as **LB-6**, audit done.
 
 **Three route-hardening guards, none of them a fix for an observed symptom (Q-454, Q-455, Q-465).**
-Three GET routes answered a parameter or configuration question before establishing the caller was
-anyone — no data leaked, but `GET /api/push/subscribe` disclosed whether the deployment has push
-configured to anybody who asked. `GET /api/oura-ble/decoder-constants` answered a failed constants read with an **empty** 500, so a client doing `res.json()` got a parse exception on top of the real fault. And `POST /api/day-checkin` accepted a body of `{}` with a 201, writing a row indistinguishable from a check-in in which the user answered nothing — guarded now on **both** write paths, since the outbox reaches the same table ([`journal`](docs/overview/entries/2026-08-23-route-hardening-batch.md)).
+Three GET routes answered a parameter or configuration question before establishing the caller was anyone — no data leaked, but `GET /api/push/subscribe` disclosed whether the deployment has push configured to anybody who asked. `GET /api/oura-ble/decoder-constants` answered a failed constants read with an **empty** 500, so a client doing `res.json()` got a parse exception on top of the real fault. And `POST /api/day-checkin` accepted a body of `{}` with a 201, writing a row indistinguishable from a check-in in which the user answered nothing — guarded now on **both** write paths ([`journal`](docs/overview/entries/2026-08-23-route-hardening-batch.md)).
 
 **Three ring-service fixes, none verified on the ring (Q-537, Q-533, Q-388 item 2).** Key backup
 (`/admin/oura-ble` → **Show key for backup**), a re-sync completion notification, and a connect sequence that resets the live-HR levers a killed session left on. **All native — inert until a new APK is installed, and until then the ring key has one copy.** `Gate: device`. **Item (3) needed no work:** 6,346 battery polls measure the drain the entry called unmeasurable (−22/−24/−22/−38/−15 overnight), confirming the owner's report; the SpO₂ A/B is wear, not code.
