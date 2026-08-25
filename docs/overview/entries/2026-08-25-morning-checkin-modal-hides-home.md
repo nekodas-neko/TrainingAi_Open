@@ -22,9 +22,19 @@ So a Home spec does not fail saying a modal is in the way. It fails claiming the
 **does not exist** — a very convincing wrong answer, on markup that is entirely correct.
 
 Every fresh browser profile is exposed: the prompt fires whenever `ta_morning_checkin` is absent and
-the user has no check-in row for today, which is exactly what CI provisions on every run. It opens
-after an async local-store/API read, which is why one spec read as *deterministic* and the other as
-*flaky* — same cause, different race.
+the user has no `morning` check-in row for today, which is what CI provisions on every run.
+
+**Exposure is not the same as failing, and the difference matters.** The sheet opens after an async
+read (the local store on device, `/api/day-checkin` on web), so whether it lands before or after a
+spec's first interaction is a **race** — which is why one spec read as *deterministic* and the other
+as *flaky*, and why `home-card-invalidation-refetch` passed for weeks before it did not.
+
+**What was NOT established: why the race began landing the other way on 2026-08-25.** BF-23 dated
+the turn precisely (green at 02:26, red at 03:46, six merges between) and read it as a content
+regression in one of them; that reading is wrong — none of the six touched Home's tiles, the sheet,
+or the check-in prompt. Adding spec files shifts Playwright's worker distribution and so what runs
+before what, which is a plausible mechanism and is **not proven**. This fixture removes the race
+rather than explaining it, which is the right fix either way but is worth not overstating.
 
 `e2e/fixtures.ts` gains `suppressMorningCheckin(page)`, pre-setting the marker a returning user's
 browser would already have. The date comes from the **user's** timezone, not the runner's: the
@@ -65,6 +75,15 @@ hot screen.
 `getByText`, which reads the DOM rather than the accessibility tree and is unaffected. They pass. They
 are one line from being exposed the moment either starts clicking, and the fixture is there when they
 do — but changing green specs that have no defect is not this PR's business.
+
+## BF-23 struck with it
+
+The BugFix agent filed **BF-23** independently for the same failure — same spec, same line, same
+selector — while OR-1 was open, and it is removed from the queue here. Its diagnosis was wrong in
+the same direction as OR-1's (a content regression in one of six merges, "#451 is the first place to
+look") and its timing evidence is the best thing about it: it is what forced the correction above
+about what was and was not established. Two agents filing the same red independently, hours apart,
+is the cost of a check that does not block.
 
 ## Not exercised
 

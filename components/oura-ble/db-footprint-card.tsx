@@ -20,6 +20,12 @@ interface PackRunResult {
   ms: number
 }
 
+/** What `GET /api/admin/vacuum` answers — the allowlist, so the picker cannot drift from it. */
+interface VacuumTable {
+  table: string
+  what: string
+}
+
 interface Stats {
   tables: { table: string; rows: number; bytes: number }[]
   rawSamples: { totalRows: number; decodedRows: number; decodedBytes: number; bodyHexBytes: number }
@@ -49,6 +55,8 @@ export function DbFootprintCard() {
   const [backfillMsg, setBackfillMsg] = useState<string | null>(null)
   const [vacuuming, setVacuuming] = useState(false)
   const [vacuumMsg, setVacuumMsg] = useState<string | null>(null)
+  const [vacuumTables, setVacuumTables] = useState<VacuumTable[]>([])
+  const [vacuumTable, setVacuumTable] = useState('oura_raw_samples')
   const [confirm, setConfirm] = useState<'backfill' | 'vacuum' | 'pack' | null>(null)
   const [packable, setPackable] = useState<PackableCount | null>(null)
   const [packing, setPacking] = useState(false)
@@ -64,6 +72,13 @@ export function DbFootprintCard() {
       setStats(await res.json())
       const packRes = await fetch('/api/oura-ble/samples/pack')
       if (packRes.ok) setPackable(await packRes.json())
+      // The allowlist comes from the route rather than a local copy, so adding a table server-side
+      // puts it in the picker with no client change — which is the point of the route's GET.
+      const vacRes = await fetch('/api/admin/vacuum')
+      if (vacRes.ok) {
+        const { tables } = await vacRes.json() as { tables: VacuumTable[] }
+        setVacuumTables(tables ?? [])
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
     } finally {
@@ -105,17 +120,33 @@ export function DbFootprintCard() {
     setVacuuming(true)
     setVacuumMsg(null)
     try {
-      const res = await fetch('/api/oura-ble/samples/vacuum', { method: 'POST' })
-      if (!res.ok) { setVacuumMsg(`vacuum failed: ${res.status}`); return }
-      const j = await res.json() as { beforeBytes: number; afterBytes: number; reclaimedBytes: number; ms: number }
-      setVacuumMsg(`reclaimed ${fmtBytes(j.reclaimedBytes)} (${fmtBytes(j.beforeBytes)} → ${fmtBytes(j.afterBytes)}) in ${(j.ms / 1000).toFixed(1)}s`)
+      // Q-315: the generalised route, not `/api/oura-ble/samples/vacuum`, which only ever touched
+      // `oura_raw_samples`. `error_events` has been in the allowlist since the route shipped and had
+      // **no caller anywhere in the app** — 4 live rows in 49 MB with nothing able to press it.
+      const res = await fetch('/api/admin/vacuum', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ table: vacuumTable }),
+      })
+      const j = await res.json().catch(() => ({})) as {
+        table?: string; liveRows?: number; beforeBytes?: number; afterBytes?: number
+        reclaimedBytes?: number; ms?: number; error?: string
+      }
+      if (!res.ok) { setVacuumMsg(j.error ?? `vacuum failed: ${res.status}`); return }
+      // `liveRows` against `beforeBytes` is what distinguishes pure bloat from a genuinely large
+      // table, which is the whole reason Q-315 is a one-off reclaim and not a recurring chore.
+      setVacuumMsg(
+        `${j.table}: reclaimed ${fmtBytes(j.reclaimedBytes ?? 0)} ` +
+        `(${fmtBytes(j.beforeBytes ?? 0)} → ${fmtBytes(j.afterBytes ?? 0)}, ` +
+        `${fmtNum(j.liveRows ?? 0)} live rows) in ${((j.ms ?? 0) / 1000).toFixed(1)}s`,
+      )
       await load()
     } catch (err) {
       setVacuumMsg(err instanceof Error ? err.message : String(err))
     } finally {
       setVacuuming(false)
     }
-  }, [load])
+  }, [load, vacuumTable])
 
   // Q-541 Task 4 / Q-316 — move sealed buckets of raw frames into compact blobs. This is the one
   // control in the app that issues a DELETE against archival frames, so its refusals are surfaced
@@ -186,7 +217,24 @@ export function DbFootprintCard() {
                 {backfillMsg && <span className="text-muted-foreground">{backfillMsg}</span>}
               </div>
             )}
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <label className="flex items-center gap-1.5 text-muted-foreground">
+                <span>Table</span>
+                <select
+                  value={vacuumTable}
+                  onChange={e => setVacuumTable(e.target.value)}
+                  disabled={vacuuming || vacuumTables.length === 0}
+                  className="min-h-11 rounded-lg border border-border bg-background px-2"
+                >
+                  {vacuumTables.length === 0 ? (
+                    <option value={vacuumTable}>{vacuumTable}</option>
+                  ) : (
+                    vacuumTables.map(t => (
+                      <option key={t.table} value={t.table}>{t.table} — {t.what}</option>
+                    ))
+                  )}
+                </select>
+              </label>
               <Button size="sm" variant="outline" disabled={vacuuming} onClick={() => setConfirm('vacuum')}>
                 {vacuuming ? 'Vacuuming…' : 'Reclaim disk — VACUUM FULL (Lever 1c)'}
               </Button>
@@ -259,7 +307,7 @@ export function DbFootprintCard() {
         open={confirm === 'vacuum'}
         onOpenChange={o => !o && setConfirm(null)}
         title="Run VACUUM FULL?"
-        message='Run VACUUM FULL on oura_raw_samples to physically reclaim disk freed by nulling "decoded"? This rewrites the table and briefly locks it (usually seconds). No data is lost — body_hex and all rows are preserved.'
+        message={`Run VACUUM FULL on ${vacuumTable} to physically reclaim disk that dead tuples hold? This rewrites the table and takes an ACCESS EXCLUSIVE lock on it for the duration (usually seconds). No data is lost — every row is preserved.`}
         confirmLabel="Run VACUUM"
         variant="default"
         onConfirm={() => void runVacuum()}

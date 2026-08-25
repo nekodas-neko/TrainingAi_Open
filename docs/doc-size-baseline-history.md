@@ -18,6 +18,36 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
+## 2026-08-25 — PS-6 filed (`docs/implementation-backlog.md` raise withdrawn, again)
+
+**PS-6**: the queue tooling has never known the `OR-` prefix, in three regexes across two scripts.
+Its length is mostly the one fact that makes it urgent rather than cosmetic: `next-item.js` **drops**
+an entry whose heading matches no known prefix (`current = id ? {…} : null`), so an `OR-` entry is
+not mislabelled, it is absent, with nothing printed to say so.
+
+**A second entry, OR-1, was withdrawn from this PR before merge.** It reported the red E2E on
+`main`, and another session filed the same failure as **BF-23** while this branch sat in CI — with a
+better diagnosis. OR-1 concluded the `Log Body Weight` button had been deleted, because the string
+greps to nothing outside two specs; BF-23 establishes it is **composed at runtime**
+(`metric-tiles-card.tsx:96`, `` aria-label={`Log ${def.label}`} ``) and that the failure is a
+**regression from one of tonight's six merges**, not a stale test. BF-23 anticipates the exact wrong
+inference OR-1 drew — *"a future session searching for the string will find nothing and conclude it
+was deleted; it was not."* Keeping both would have put a refuted diagnosis in the queue beside a
+correct one.
+
+**PS-6 is filed under `PS-`, not `OR-`, on purpose** — an `OR-` entry describing this bug could not
+appear in the tool that reports it. That is recorded in the entry so the letter does not read as a
+mistake later.
+
+**The raise to 11648 was withdrawn on the rebase and the number stands at 11638** — the second time
+in one session. #454 landed while this branch was in CI and removed enough completed entries to take
+the file to **11534**, under the original baseline even carrying these two entries' +64. Ratcheting
+down to 11534 was again declined for the same reason as the earlier withdrawal: the shrink belongs
+to the PRs that made it, and banking it here would fail the next agent to add an entry. **Worth
+noticing as a pattern rather than a coincidence** — on a queue this active, a raise taken at the
+start of a CI cycle is often unnecessary by the end of it, so check the real count after the rebase
+before keeping one.
+
 ## 2026-08-25 — `projectOverview.md` 7937 → 7941 (`docs/implementation-backlog.md` raise withdrawn)
 
 The owner supplied the Railway charts three queue entries had been parked on, and the readings

@@ -369,6 +369,39 @@ signed off by the owner in that conversation. Review:
   Order `My Foods` most-recently-used first so the merge does not bury saved meals.
 - **Verification.** As Q-395a, plus a grep proving nothing user-facing still says *Saved meals* or
   *My Meals*.
+### [platform] PS-6 — the queue tooling has never known the `OR-` prefix, so every Orchestrator entry is mislabelled or invisible
+
+- **Branch:** `fix/queue-tools-or-prefix`
+- **Added:** 2026-08-25 · Orchestrator, hit while filing the **first `OR-` entry ever written**,
+  which is why five days of the prefix existing never surfaced this. (That entry was withdrawn as a
+  duplicate of BF-23; the tooling bug it exposed is real and unrelated.)
+- **Lane: B.** Two scripts, three regexes, no schema. **Filed under `PS-` deliberately and not
+  under `OR-`: an `OR-` entry describing this bug would be invisible to the tool that reports it.**
+- **The bug.** `OR` is missing from the ID alternation in all three places:
+  - `scripts/next-item.js:54` — `/\b((?:LA|LB|BF|RV|TN|PS|Q)-\d+[a-z]?)\b/`
+  - `scripts/check-backlog-pointers.js:83` — the same pattern, used to resolve `Needs:` targets
+  - `scripts/check-backlog-pointers.js:137` — `/\b(LA|LB|BF|RV|TN|PS|Q)-(\d+)([a-z]?)\b/`, the
+    duplicate-ID detector
+- **⚠️ The `next-item.js` failure mode is silent deletion, not a bad label.** Line 57 reads
+  `current = id ? {…} : null` and line 59 `if (current) entries.push(current)` — **an entry whose
+  heading matches no known prefix is dropped from the queue entirely.** So an `OR-` entry is either
+  mislabelled (if some other ID happens to appear in its heading) or **invisible to the implementer
+  running the tool**, with nothing printed to say so — not even UNCLASSIFIED.
+- **Consequences on `check-backlog-pointers.js`:** duplicate `OR-` IDs are **not** detected, and a
+  `Needs: OR-n` is not resolved as a real target. Both guarantees the file claims to give simply do
+  not hold for this prefix.
+- **How it was found, and why there is no live example to look at.** It surfaced while filing an
+  `OR-1` entry that displayed in `next-item.js` as `Q-402` — the id had been picked out of the
+  *title text*, not the entry's own prefix. That entry was withdrawn as a duplicate before it
+  merged, so reproduce this from the source above or from a scratch heading; do not go looking for
+  an `OR-` entry in the queue, there is not one yet.
+- **`docs/agents/README.md` §3 lists `OR-` as a valid prefix**, and the Orchestrator role was created
+  2026-08-20 (PR #263). The tooling was never taught the letter.
+- **Verification:** add a scratch entry headed `### [platform] OR-99 — …` and confirm three things.
+  With no other id in the heading it is **listed** by `node scripts/next-item.js` rather than
+  silently dropped, and its id column reads `OR-99`. With a second id in the heading (say a `Q-`
+  reference) the column still reads `OR-99` and not the other one. And a duplicated `OR-99` makes
+  `check-backlog-pointers.js` **fail**. All three fail today.
 
 ### [readiness][devices] TN-8 — the chronic-stress fever mask is a FOURTH consumer of the broken temperature baseline
 
@@ -1878,54 +1911,6 @@ slow-load question on a clean `pg_stat_statements` read.
   `SELECT query, calls, mean_exec_time FROM claude_ro.pg_stat_statements ORDER BY total_exec_time DESC LIMIT 20`
   and get rows.
 - **Surface: production only.** Nothing to verify locally beyond the migration applying.
-
-### [app-shell][platform] BF-23 — E2E is red on `main`: Home's quick-log button never appears, and it broke in tonight's six merges
-
-- **Branch:** _unassigned_
-- **Added:** 2026-08-25 · found when PR #445, a **docs-only** change, failed E2E
-- **Lane: B** — Home card rendering. Test-or-app, see below; the implementer decides which.
-- **⚠ It does NOT block merges, and that is the reason it needs picking up rather than a reason to
-  relax.** The first version of this entry said E2E was a required check and nothing could merge.
-  **Wrong** — branch protection requires Lint, Tests, Build, Custom Rules and Migration Check
-  (`CLAUDE.md` line 5); **E2E is not among them.** #454 merged at 04:19 with this same E2E failure.
-  So a red E2E stops nobody, which means it will sit red indefinitely and every later agent will
-  read a failing E2E as normal. That is worse than a blocking break, not better.
-
-**The failure**, `e2e/home-card-invalidation-refetch.spec.ts:59`, twice (original **and** retry, so
-not a flake):
-
-```
-Error: locator.click: Test timeout of 45000ms exceeded.
-  - waiting for getByRole('button', { name: 'Log Body Weight' })
-```
-
-59 passed, 1 failed, 1 flaky (`one-calorie-budget.spec.ts`, an unrelated `ECONNRESET`).
-
-**It is a regression, not a stale test.** The spec landed **2026-08-20** in #275 and has passed
-since. PR #443 passed E2E at **02:26** tonight; this run failed at **03:46**. Six PRs merged in
-between — **#446, #444, #447, #449, #451, #448** — and one of them made that button unreachable.
-**#451** ("Give the last three vanishing cards an error state", Q-499) is the first place to look,
-because it changed what self-fetching cards do instead of `return null`; **#447** (sheet
-back-dismiss under StrictMode) is second, since this test drives a sheet.
-
-**Where the button comes from — there is no literal to grep.** `"Log Body Weight"` appears **nowhere**
-in `app/` or `components/`. It is built at `app/session-select/components/metric-tiles-card.tsx:96`
-as ``aria-label={`Log ${def.label}`}``, and `def.label` is `"Body Weight"` from
-`lib/home/home-prefs.ts:18`. The sheet it opens is `log-value-sheet.tsx`, titled
-``{widget ? `Log ${widget.label}` : "Log"}``. A future session searching for the string will find
-nothing and conclude it was deleted; it was not.
-
-**One thing that was checked and is NOT the cause:** `components/home/home-card-widget.tsx` was
-untouched tonight — its most recent change is #412 on 2026-08-24.
-
-- **What would count as fixed:** the spec passes on `main` without weakening what it asserts. It
-  guards Q-402 — that a Home card refetches on invalidation **without a remount** — and its own
-  commit notes it was mutation-checked, so loosening the selector to make it green would retire a
-  guard that took three attempts to build.
-- **Do not** simply add `metricTiles` to the spec's `enableHomeCards` list until it is established
-  that the card is genuinely meant to be pref-gated. The test passed for five days without it.
-- **Surface: E2E on CI, web-reproducible.** `pnpm exec playwright test e2e/home-card-invalidation-refetch.spec.ts`
-  reproduces without a device.
 
 ### [nutrition][platform] BF-12 — logging a saved meal takes ~20s and the owner couldn't find it after navigating away; traced to the slow fallback firing, not a lost write
 
@@ -3950,59 +3935,32 @@ this fits without an extraction.
 
 ### [app-shell][workouts][platform] Q-467 — the Coach can change your programme and nothing in the app can undo it
 
-- **✅ UNBLOCKED — `Needs: Q-468` is satisfied** (Q-468 shipped and left the queue; an absent target
-  counts as satisfied by the protocol). Nothing gates this now.
-- **⬆ RE-PRICED UP by the owner's Q-472 decision, 2026-08-24 — this is now a PREREQUISITE, not a
-  deferred nicety.** The owner answered Q-472 *"keep the Coach's write capability, but wire undo
-  before driving adoption"*, which makes this entry the gating step for that whole plan. The
-  2026-08-18 amendment below re-priced it *down* on the grounds that `coach_changes` is empty so the
-  harm "has not yet happened" — that reasoning is now **inverted**: the exposure is absent only
-  while nothing is driving writes, and the decision is to start driving them. **Do this before any
-  work that makes the Coach propose more.**
-- **Most of it is wiring something already built** — see the undo subsystem inventory below. That is
-  what makes it a cheap prerequisite rather than an expensive one.
+> **✅ SHIPPED 2026-08-25.** `coach-history.tsx` renders an Undo on every change that is not already
+> undone; the row re-styles struck-through when it lands, and the route's 409 window ("you've trained
+> since this change") renders as a sentence on the row rather than an error, replacing the button.
+> No confirm dialog — undo *is* the safety net.
+> [`journal`](overview/entries/2026-08-25-coach-undo-control.md).
+>
+> **The route's `invalidateProgramStructure()` runs on the SERVER and clears nothing** —
+> `lib/cache-groups.ts` reaches `localStorage`/`sessionStorage`/the on-device SQLite cache. Wiring
+> the button at face value would have restored the programme in Postgres while every screen kept
+> painting the changed one for a full TTL. The client clears the superset (program structure, goal
+> recommendations, coach history), because the history payload carries no domain field and adding
+> one means editing `lib/coach/threads.ts`, which is Lane A's.
+>
+> **Verified against a real `coach_changes` row**, both ways: inside the window, `POST /undo` 200 and
+> `users.steps_goal` **12,000 → 8,000** in the database with `undone_at` set; after a workout started
+> since, **409**, the refusal on the row, the button gone, and the row **not** struck through.
 
 - **Branch:** `feat/coach-undo-control`
-- **Added:** 2026-08-18 · review sweep (the Coach write path — **the first review ever to cover it**) ·
-  [`docs/reviews/2026-08-18-coach-apply-path.md`](reviews/2026-08-18-coach-apply-path.md)
-- **Placement:** upper-mid. An AI-initiated write to the data that decides what the user is told to
-  lift, with no in-app way back.
-- **A complete undo subsystem exists and has no caller.** All of this is built:
-  `POST /api/coach/apply/[id]/undo` (auth-gated, rate-limited, ownership-scoped, with a well-reasoned
-  "until the next workout started after the change" window); `undoCoachChange()` with a double-undo
-  guard; an `undo()` handler in **all five** domains; `captureBefore()` in each, existing solely for
-  it; the `coach_changes.undone_at` column; and `components/coach/coach-history.tsx` already styling
-  undone changes with strikethrough, muted colour and a "· undone" suffix.
-- **Nothing calls it.** Every client fetch to a Coach endpoint, enumerated across `app/`,
-  `components/` and `lib/`:
-  ```
-  /api/coach   /api/coach/threads   /api/coach/preview   /api/coach/apply   /api/coach/options
-  ```
-  `/api/coach/apply/[id]/undo` appears in **no** client file, and `coach-history.tsx` renders the
-  list read-only — no Undo button anywhere.
-- **⚠️ This is NOT the known "no user-facing entry point" note** (this file, in the Coach phase-1
-  entry). That note is about phase 1 shipping the **apply** path without an entry point; phases 2–3
-  then wired apply — `change-preview.tsx`, `number-dial.tsx`, `confirm-content.tsx` and
-  `lib/coach/pending-change.ts` all POST to it and it works. **Undo was never wired with it.** The
-  asymmetry is the finding; do not close this as already-known.
-- **Why this severity:** the user approves changes per row, which implies reversibility, and the
-  history screen then styles for an undo that cannot be reached. The only way back is to ask the Coach
-  to change it again — a *new* change against current state, not a restore, and for `early_deload` or
-  `program_phase` possibly not expressible at all.
-- **Fix shape:** an Undo control in `coach-history.tsx` for changes that are not `undoneAt` and still
-  inside the window, treating the route's 409 ("you've trained since") as a first-class state rather
-  than an error. **Lane B** — the route already exists.
-- **✅ ~~Do Q-468 first, or in the same change~~ — Q-468 has SHIPPED and left the queue.** Converted
-  2026-08-24 from a prose blocker marker that was still parking this entry long after its reason
-  expired. The defect it guarded against is fixed; wiring the button no longer ships it.
-- **🔎 AMENDED 2026-08-18 from production — re-scoped, not closed.** `claude_ro.coach_changes` is
-  **empty**: no Coach change has ever been applied by this account, so **there has never been anything
-  to undo** and the harm this entry describes has not yet happened. The code path is still wrong and
-  the first real use will meet it — but the "upper-mid" placement was priced on an exposure that does
-  not exist yet. See **Q-472** and
-  [`docs/reviews/2026-08-18-production-verification.md`](reviews/2026-08-18-production-verification.md).
-  (`claude_ro` is row-scoped to one user — this says nothing about other accounts.)
-
+- **Lane:** B
+- **Keep:** only `user_goals` was driven through the UI. The other four domains
+  (`nutrition_targets`, `session_exercise`, `early_deload`, `program_phase`) share the route, the
+  shared `undoCoachChange()` and this client call, and are covered at handler level by
+  `coach-domains.test.ts` — but no UI pass touched them, and `early_deload`/`program_phase` are the
+  two whose restore is hardest to express. The `stale` 409 (a later change still in effect) renders
+  through the same path and was not driven separately. Plus the tap-target/wrap check at S25 width.
+  `Gate: device`.
 ### [platform][app-shell] Q-392 — the preference API exists; the read sites still read `localStorage`
 
 - **⚑ ABSORBS Q-393 (removed 2026-08-23). The `mealLabelStyle` row below IS that entry.** Q-393
@@ -4089,8 +4047,13 @@ cross-session against the local DB. Nothing user-visible changed — **no read s
 - **Branch:** `fix/coach-applied-change-copy`
 - **Added:** 2026-08-18, from owner screenshots of a working swap. **The swap itself is fine** — this
   is the sentence around it.
-- **Lane B** if the fix is the system prompt in `app/api/coach/route.ts` (it is). No schema, no route
-  logic.
+- **Lane: A — corrected 2026-08-25 (by Lane B, which this was being served to).** The entry reasoned
+  from the *nature* of the edit ("it is only the system prompt, so Lane B"), and the ownership rule
+  is deliberately not that: **reached by `app/api/**` → Lane A**, whatever the edit looks like. The
+  rule is path-based precisely so this judgement is not re-made per entry, and `app/api/coach/route.ts`
+  is squarely Lane A's. The investigation the entry asks for first — whether the model wrote the
+  sentence after the tool call, or the UI renders tool results ahead of streamed text — also lands in
+  that file, so splitting it across lanes would help nobody.
 
 **What the screen showed, in this order:**
 1. Green result card — *"Swapped Barbell Romanian Deadlift → Barbell Jefferson Curl in Legs"*
@@ -4366,66 +4329,29 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   dump hashing identically before and after). This item is the affordance only.
 
 ### [platform] Q-315 — `error_events` holds 4 live rows in 49 MB: Q-539 stopped the bleeding but never reclaimed the space
-- **🔁 RE-SCOPED 2026-08-24 — this was never an owner DECISION, and the `Gate: owner` was hiding a
-  missing button. `Lane: B` now.** *"What is left is a press"* was true and incomplete: **nothing in
-  the app can make that press.** `app/api/admin/vacuum/route.ts` shipped, generalised, with
-  `error_events` in `VACUUM_FULL_TABLES` — and **has no caller**. The one vacuum control that exists
-  (`components/oura-ble/db-footprint-card.tsx:108`) still posts to the *old*
-  `/api/oura-ble/samples/vacuum`, which only ever touches `oura_raw_samples`. The route is
-  session-only (no bearer path, unlike `ADMIN_EXPORT_SECRET`/`ADMIN_SNAPSHOT_SECRET`), so there is
-  no way to reach `error_events` from anywhere.
-  - **The work is small and is Lane B's:** point that control at the generalised route with a table
-    selector, driven by the `GET` the route already serves (it returns
-    `VACUUM_FULL_TABLES` as `{table, what}[]` for exactly this). **Then** the owner presses it —
-    which is an action, not a decision, and needs no gate.
-  - **It is reachable once wired.** Q-544 moved `DbFootprintCard` **above** the native-gated
-    `OuraBleDebug` on `/admin/oura-ble` precisely so it renders on a desktop — which is the client
-    that can actually hold the `ACCESS EXCLUSIVE` lock.
-  - **Third instance of this repo's "built it, never wired it" class**, alongside Q-467's undo
-    subsystem with no caller and LB-3's sheet nothing opened.
-- **↻ NUMBERS REFRESHED 2026-08-24 — the case got STRONGER, not weaker.** The headline and the
-  measurements below are from 2026-08-18, when the database was 819 MB. Packing has since taken it
-  to **181 MB**, so `error_events` at **49 MB is now ~27% of the whole database**, not 6%. Live rows
-  have drifted 4 → **33** (`n_tup_ins` 37) and the size has not moved — consistent with the entry's
-  own diagnosis that this is dead tuples and TOAST, not data. Q-534's 500 MB deadline is met, so the
-  urgency framing below is spent; the waste is not.
-- **Added:** 2026-08-18 (found while measuring production for Q-541)
-- **Lane:** B — see the re-scope above; the remaining work is wiring the existing control to the generalised route, which is `components/**`.
-- **Measured production, 2026-08-18:** `error_events` is **49 MB total against `n_live_tup = 4`** —
-  12 MB heap, 1.1 MB indexes, and the remaining ~36 MB in TOAST. That is **6% of the whole 819 MB
-  database** held by four rows.
-- **This is dead weight, not data.** Q-539 diagnosed the cause: one fault wrote **5,771 rows** because
-  the dedupe key varied with a generated `VALUES` list, each stored message truncated to exactly
-  2,000 chars of `(default, $N, $N),` boilerplate. Q-539 fixed the key and cut the cap to 1,000, and
-  the rows themselves have since been pruned — but Postgres MVCC leaves the dead tuples in place, so
-  the file never shrank. **Nothing here re-grows**: the write path is already fixed, so this is a
-  one-off reclaim, not a recurring chore.
-- **Why it is worth a queue entry rather than a footnote:** it is the cheapest MB in the database
-  against the owner's end-of-week 500 MB deadline (Q-534). Q-541's packing is worth ~680 MB and is
-  several sessions of careful work; this is ~49 MB for a single statement over a four-row table, with
-  no data at risk and no read path to reason about.
-- **Shape:** the existing `app/api/oura-ble/samples/vacuum/route.ts` already runs
-  `VACUUM (FULL) oura_raw_samples` behind an admin gate — generalise it to take a table name from a
-  small allowlist, or add a sibling. `VACUUM FULL` takes an ACCESS EXCLUSIVE lock and rewrites the
-  table; on four live rows that is milliseconds, but it still needs free disk equal to the current
-  file (49 MB against a 5 GB volume — not a constraint today, and worth re-checking if the volume is
-  cut back to 500 MB before this runs).
-- **Verification:** `pg_total_relation_size` before and after via `/api/admin/db-query`, and
-  `SELECT count(*) FROM error_events` unchanged either side. Do not assume the count is 4 by the time
-  it runs — read it first.
-- 🚧 **The ROUTE shipped 2026-08-18 (Lane A); the PRESS has not happened.** `POST /api/admin/vacuum`
-  with `{"table":"error_events"}`, admin-gated, 4/min, allowlisted to `error_events` and
-  `oura_raw_samples`; `GET` lists what may be vacuumed. The table name is interpolated into
-  `VACUUM (FULL) <table>` because VACUUM accepts no bind parameter, so **the allowlist is the safety
-  boundary, not validation** — checked with `hasOwnProperty` (an `in` check accepts `toString`, and
-  there is a mutation-checked test for exactly that) in both the route and the slice. Verified live
-  on `pnpm dev`: a disallowed name and a missing body both 400, and a real run on the local
-  `oura_raw_samples` reclaimed **5.7 MB of 6 MB**.
-  **Still outstanding: someone has to press it against production.** No button — that is Q-316's
-  territory (`components/**`, Lane B) — so until then it is a curl with an admin session cookie.
-  The same route is what reclaims the space after Q-541's backfill and after migration 193's index
-  drop, which is why it was generalised rather than copied.
 
+> **✅ THE BUTTON SHIPPED 2026-08-25 (Lane B).** `db-footprint-card.tsx` posts to the generalised
+> `/api/admin/vacuum` with a table picker fed by that route's own `GET`, so the allowlist cannot
+> drift from the client. The result line reports `liveRows` beside `beforeBytes` — the pair that
+> tells pure bloat from a genuinely large table, which is why this is a one-off reclaim and not a
+> chore. Confirm copy is per-table now (the old text promised "body_hex and all rows are preserved",
+> true of `oura_raw_samples` and meaningless here).
+> [`journal`](overview/entries/2026-08-25-vacuum-table-picker.md).
+>
+> **Driven end to end locally: 200, `{"table":"error_events","liveRows":3,...,"reclaimedBytes":0}`.
+> Zero is correct there and proves the path, not the reclaim** — the local table is 48 KB with no
+> bloat; production's is 49 MB against 4 rows, and that cannot be reproduced here.
+>
+> **`app/api/oura-ble/samples/vacuum/route.ts` now has no caller.** Deleting it is `app/api/**`,
+> Lane A's, and was not done as a side effect of wiring a button.
+
+- **Branch:** `feat/vacuum-table-picker`
+- **Lane:** B
+- **Keep:** the press itself, on production. `/admin/oura-ble` from a **desktop** (Q-544 moved the
+  card above the native-gated `OuraBleDebug` for exactly this), signed in as admin → Table →
+  `error_events` → Reclaim disk. Expect ~49 MB back against 4 live rows. Also unexercised: a
+  `VACUUM FULL` long enough to need the slice's lifted timeouts, and the `<select>` at phone width.
+  `Gate: owner`
 ### [app-shell][platform] Q-544 — server-side disk maintenance is trapped behind a native-plugin gate, so it cannot be run from a desktop
 
 > **✅ SHIPPED 2026-08-24 (Lane B, v1.363.4).** `DbFootprintCard` **and** `DeviceMetricsPanel` moved
