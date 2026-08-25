@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.376.0",
+    date: "2026-08-25",
+    changes: [
+      "My Meals now reads as a list rather than a stack of cards: one grouped panel where each meal is a single line \u2014 its name, what is in it, and its calories lined up in a column down the right \u2014 with a count above and the search box always there. Label, edit and delete have moved onto a left swipe of the row; tapping a meal still opens it for the ingredients, the macro split and Log this meal. The calorie figure is one portion, which the list now says outright for batch recipes.",
+    ],
+  },
+  {
     version: "1.375.0",
     date: "2026-08-25",
     changes: [

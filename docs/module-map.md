@@ -436,6 +436,7 @@ check `components/ui/` first** (`CLAUDE.md` visual-consistency rules).
 | Tabs / segmented | `segmented-tabs.tsx`, `tab-panels.tsx` |
 | Sparkline | `sparkline.tsx`, `sparkline-chart.tsx` (six inline polyline copies are being retired — use these) |
 | Swipe carousel | `swipe-carousel.tsx` (+ `swipe-carousel-math.ts`) — prefer over hand-rolled swipe |
+| Swipe-to-reveal row actions | `swipe-actions.tsx` (+ `swipe-actions-math.ts`) — `useDrag`, x-locked, `touch-action: pan-y`; tray is `aria-hidden` when closed, so every action it holds must also be reachable without the gesture |
 | Carousel dot indicators | `carousel-dots.tsx` — the dots under a swipe carousel. Owns the touch area (`tap-target-dot`) and the 24 px pitch that keeps neighbouring hit areas disjoint; never hand-roll the row (2026-08-09, Q-160) |
 | Small-control touch areas | `.tap-target-dot` (24×44, dot rows) and `.tap-target-44` (44×44, isolated controls) in `app/globals.css`, next to the `.tap-dense` floor opt-out. **Which one — or neither — depends on the clearance to the nearest interactive neighbour**: a hit area wider than that gap steals the neighbour's taps (Q-160, Q-176) |
 | Weight dial | `weight-dial.tsx`, `weight-dial-modal.tsx` |

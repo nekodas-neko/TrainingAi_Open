@@ -465,35 +465,6 @@ will hit it.
   sits in that row; and whether the sheet now reads as one thing is the owner's call, not a
   measurement.
 
-### [nutrition] BF-29 — artboard 3 parity: My meals, and the slot cards that share its row
-
-- **Lane:** B
-- **Spec:** BF-28.
-- **Added:** 2026-08-25, owner: the nutrition screens match their drawings.
-- **Shipped counterpart:** `saved-meals-sheet.tsx` (656 lines) and `saved-meal-card.tsx`.
-- **What artboard 3 draws:** a header `[back] My Meals [+ New]`; one search field
-  *"Search your meals"*; a count line **`3 meals`**; then rows of `thumbnail · name · "5 items ·
-  makes 2 portions" · calories · chevron`, grouped as one list; and a footnote —
-  **"Calories are per portion. Swipe a row for label, edit and delete."**
-- **The footnote is a specification, not decoration.** It states (a) that the number shown is
-  per-portion, which `saved-meal-card.tsx` already reasons about in its own comments, and (b) that
-  the row's actions are reached by **swipe**, not by buttons on the row. Check what shipped actually
-  does before building — if the actions are buttons today, changing them to swipe is a real
-  interaction change and needs `@use-gesture/react`, which this repo already uses at four sites.
-  **Do not hand-roll the swipe**; three hand-rolled gesture handlers already exist and are the ones
-  to copy away from.
-- **The row is the shared `FoodRow` shape** — thumbnail, name, grey sub-line, calories in a fixed
-  right column, optional chevron. Q-406 owns the component and its thumbnail is deliberately not
-  built yet. If this screen needs the thumbnail, it lands in Q-406, not here.
-- **Also covers the `Saved Meals — today` artboard**, the slot-card study on page 2, which is the same
-  row shape in a meal-plan context. Same list, so same entry.
-- **⚠ Overlaps Q-395c's rename.** Q-395c merges Saved meals / My Meals / My Foods into **one** list
-  under one name. If Q-395c ships first, this entry is parity work on the merged screen; if this
-  ships first, do not entrench a name Q-395c will have to sweep. **Check which landed before
-  starting**, and say in the PR which order you found.
-- **Verification.** Side by side against artboard 3 at 412 dp, enumerated in the PR per BF-28; device
-  run.
-
 ### [nutrition] BF-30 — artboard 4 parity: Meal detail, the one screen with no clear counterpart
 
 - **Lane:** B
@@ -517,6 +488,16 @@ will hit it.
   macro share of energy — the Atwater conversion. `packages/shared` owns `KCAL_PER_G` after LB-9, and
   `components/nutrition/macro-energy.ts` is the `components/` copy. Use one of those; do not write
   `* 4` / `* 9` in a component.
+- **BF-29 shipped and left this question exactly where it found it, but narrowed the stakes.** The
+  list row is now artboard 3's compact shape and **tapping it expands in place** — which is one of
+  the three candidate answers above, chosen because it was already the shipped behaviour and
+  because deleting the expansion before a detail surface existed would have taken `Log this meal`,
+  the ingredient breakdown and the macro split off the screen entirely. Two consequences to inherit:
+  the chevron is the rotating `ChevronDown` rather than artboard 3's `ChevronRight`, deliberately,
+  because the glyph has to describe what the tap does — **decide the destination here and the glyph
+  follows**; and the label/edit/delete trio now lives in *two* places (the swipe tray, and the
+  expanded panel that keeps them reachable without the gesture). If this becomes a screen, that
+  duplication resolves into artboard 4's bottom action row and should not be carried across.
 - **Verification.** Side by side against artboard 4 at 412 dp, enumerated per BF-28; device run.
   If the outcome is "this stays a card, not a screen", that is an acceptable result — say so with the
   reason and close the entry rather than building a route nobody navigates to.

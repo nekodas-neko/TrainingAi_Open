@@ -1,8 +1,9 @@
 'use client'
 
-import { memo, useState } from 'react'
+import { memo, useMemo, useState } from 'react'
 import { ChevronDown, Check, Loader2, Pencil, QrCode, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { SwipeActions, type SwipeAction } from '@/components/ui/swipe-actions'
 import { cn } from '@trainingai/shared/utils'
 import { MACRO_COLORS } from '@trainingai/shared/nutrition/macro-colors'
 import { macroKcal, macroShares } from './macro-energy'
@@ -32,16 +33,21 @@ interface Props {
 }
 
 /**
- * One saved meal, with its ingredients broken down.
+ * One saved meal: a scannable row that opens to its ingredients (BF-29, artboard 3).
  *
- * The old row showed a name, a totals line, and ingredient names with a bare "×1" multiplier — the
- * multiplier being the only number, and the least useful one, since it says nothing about how much
- * food that actually is. Every ingredient now carries its weight and its own macros, because the
- * library is what meal plans get built from and "is this the 30 g or the 60 g scoop" is the
- * question people actually have.
+ * The collapsed row is `name · "5 items · makes 2 portions" · calories · chevron` — the shape
+ * `food-row.tsx` settled on, so a list of meals lines up down its right edge the way a list of
+ * foods does. It is not the literal `FoodRow`: that takes scalar props by design (Q-490), and the
+ * two things this row has beyond it — the "From plan" badge and an expanded/collapsed state —
+ * would have to arrive as a `ReactNode` and defeat its `memo()` for every other caller.
  *
- * Delete is confirmed inline. It used to fire on the first tap of a small icon sitting between two
- * other small icons, and the only feedback was a toast after the fact.
+ * **Every number shown collapsed is per portion**, which is what "Log this meal" writes; the
+ * footnote on the list says so, because a row reading 208 for a tub that holds 416 is otherwise a
+ * lie the list cannot correct.
+ *
+ * Label, edit and delete are reached by swiping the row left. That gesture is an accelerator, not
+ * the only route — the same three sit in the expanded panel, because a touch-only product cannot
+ * put delete behind a drag and nothing else.
  */
 export const SavedMealCard = memo(function SavedMealCard({
   meal, logging, selected, onToggleSelected, onLog, onEdit, onDelete, onLabel, fromPlan,
@@ -81,96 +87,100 @@ export const SavedMealCard = memo(function SavedMealCard({
   const shares = macroShares(totals)
   const selecting = selected !== null
 
-  return (
-    <div className={cn(
-      'rounded-2xl border bg-card overflow-hidden transition-colors',
-      selected ? 'border-brand/60 bg-brand/5' : 'border-border/50',
-    )}>
-      {/* A card containing other controls is a div with role=button, never a nested <button> —
-          Samsung's WebView strips the inner one. */}
-      <div
-        role="button"
-        tabIndex={0}
-        aria-expanded={selecting ? undefined : expanded}
-        aria-pressed={selecting ? selected : undefined}
-        onClick={() => selecting ? onToggleSelected(meal) : setExpanded(v => !v)}
-        onKeyDown={e => {
-          if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault()
-            selecting ? onToggleSelected(meal) : setExpanded(v => !v)
-          }
-        }}
-        className="w-full px-4 py-3 text-left active:bg-muted/20 transition-colors"
-      >
-        <div className="flex items-start gap-3">
-          {selecting && (
-            <span className={cn(
-              'mt-0.5 flex-none w-5 h-5 grid place-items-center rounded-md border',
-              selected ? 'border-brand bg-brand' : 'border-border',
-            )}>
-              {selected && <Check className="w-3.5 h-3.5 text-black" />}
+  // Artboard 3's grey line: how many things are in it, then either the batch size or the weight.
+  const itemCount = `${rows.length} item${rows.length !== 1 ? 's' : ''}`
+  const secondary = servings !== 1
+    ? `${itemCount} · makes ${servings} portions`
+    : totals.weightG > 0 ? `${itemCount} · ${Math.round(totals.weightG)} g` : itemCount
+
+  // The tray is remade only when an action's identity changes, so a drag is not fighting a fresh
+  // array on every parent render.
+  const swipeActions = useMemo<SwipeAction[]>(() => [
+    { key: 'label', label: 'Label', icon: <QrCode className="h-4 w-4" />, onPress: () => onLabel(meal) },
+    { key: 'edit', label: 'Edit', icon: <Pencil className="h-4 w-4" />, onPress: () => onEdit(meal) },
+    { key: 'delete', label: 'Delete', icon: <Trash2 className="h-4 w-4" />, onPress: () => setConfirmingDelete(true), destructive: true },
+  ], [meal, onLabel, onEdit])
+
+  const toggle = () => selecting ? onToggleSelected(meal) : setExpanded(v => !v)
+
+  const row = (
+    /* A card containing other controls is a div with role=button, never a nested <button> —
+       Samsung's WebView strips the inner one. The collapsed row holds no controls of its own, but
+       selection mode puts a checkbox in it, so the shape stays constant. */
+    <div
+      role="button"
+      tabIndex={0}
+      aria-expanded={selecting ? undefined : expanded}
+      aria-pressed={selecting ? selected : undefined}
+      onClick={toggle}
+      onKeyDown={e => {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle() }
+      }}
+      className="flex w-full items-center gap-3 px-4 py-3 text-left min-h-12 transition-colors active:bg-muted/20"
+    >
+      {selecting && (
+        <span className={cn(
+          'flex-none w-5 h-5 grid place-items-center rounded-md border',
+          selected ? 'border-brand bg-brand' : 'border-border',
+        )}>
+          {selected && <Check className="w-3.5 h-3.5 text-black" />}
+        </span>
+      )}
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-sm font-medium leading-snug">
+          {meal.name}
+          {/* A word, not a coloured dot: provenance has to survive the colour-only-state rule
+              and a monochrome screenshot alike. */}
+          {fromPlan && (
+            <span className="ml-1.5 align-middle rounded-full bg-muted px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-muted-foreground">
+              From plan
             </span>
           )}
-          <div className="min-w-0 flex-1">
-            <p className="text-sm font-semibold">
-              {meal.name}
-              {/* A word, not a coloured dot: provenance has to survive the colour-only-state rule
-                  and a monochrome screenshot alike. */}
-              {fromPlan && (
-                <span className="ml-1.5 align-middle rounded-full bg-muted px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-muted-foreground">
-                  From plan
-                </span>
-              )}
-            </p>
-            {servings !== 1 && (
-              <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                Makes {servings} portions
-              </p>
-            )}
-            <div className="mt-1 flex items-center gap-2">
-              {/* The calorie figure is the one number people scan this list for, so it gets to look
-                  like a value rather than another item in a dot-separated run-on. */}
-              <span className="rounded-full bg-foreground px-2.5 py-1 text-xs font-bold tabular-nums text-background">
-                {Math.round(totals.calories).toLocaleString()} kcal
-              </span>
-              <span className="text-[11px] tabular-nums text-muted-foreground">
-                {totals.weightG > 0 && `${Math.round(totals.weightG)} g · `}
-                {rows.length} item{rows.length !== 1 ? 's' : ''}
-                {servings !== 1 && ' · per portion'}
-              </span>
-            </div>
-          </div>
-          {!selecting && (
-            <ChevronDown className={cn(
-              'w-4 h-4 flex-none mt-0.5 text-muted-foreground transition-transform',
-              expanded && 'rotate-180',
-            )} />
-          )}
-        </div>
+        </span>
+        <span className="mt-0.5 block truncate text-xs text-muted-foreground">{secondary}</span>
+      </span>
+      <span className="w-16 flex-none text-right text-sm font-semibold tabular-nums">
+        {Math.round(totals.calories).toLocaleString()}
+        <i className="ml-0.5 text-[10px] font-normal not-italic text-muted-foreground">kcal</i>
+      </span>
+      {!selecting && (
+        <ChevronDown className={cn(
+          'w-4 h-4 flex-none text-muted-foreground transition-transform',
+          expanded && 'rotate-180',
+        )} />
+      )}
+    </div>
+  )
 
-        {/* Macro split, with the numbers beside it — the bar alone would be colour-only state. */}
-        {energy > 0 && (
-          <>
-            <div className="mt-2 flex h-1.5 overflow-hidden rounded-full bg-muted">
-              <span style={{ width: `${shares.protein * 100}%`, backgroundColor: MACRO_COLORS.protein }} />
-              <span style={{ width: `${shares.carbs * 100}%`, backgroundColor: MACRO_COLORS.carbs }} />
-              <span style={{ width: `${shares.fat * 100}%`, backgroundColor: MACRO_COLORS.fat }} />
-            </div>
-            <div className="mt-1.5 flex gap-3 text-[11px] font-semibold tabular-nums">
-              <span style={{ color: MACRO_COLORS.protein }}>P {Math.round(totals.proteinG)}g</span>
-              <span style={{ color: MACRO_COLORS.carbs }}>C {Math.round(totals.carbsG)}g</span>
-              <span style={{ color: MACRO_COLORS.fat }}>F {Math.round(totals.fatG)}g</span>
-            </div>
-          </>
-        )}
-      </div>
+  return (
+    <div className="bg-card">
+      {/* Selection mode owns the horizontal axis for nothing, but a row being ticked should not
+          also slide away under the thumb — so the tray is not mounted at all while selecting. */}
+      {selecting ? row : (
+        <SwipeActions actions={swipeActions} itemLabel={meal.name}>{row}</SwipeActions>
+      )}
 
       {expanded && !selecting && (
         <div className="border-t border-border/30 px-4 py-2">
+          {/* Macro split, with the numbers beside it — the bar alone would be colour-only state. */}
+          {energy > 0 && (
+            <>
+              <div className="mt-1 flex h-1.5 overflow-hidden rounded-full bg-muted">
+                <span style={{ width: `${shares.protein * 100}%`, backgroundColor: MACRO_COLORS.protein }} />
+                <span style={{ width: `${shares.carbs * 100}%`, backgroundColor: MACRO_COLORS.carbs }} />
+                <span style={{ width: `${shares.fat * 100}%`, backgroundColor: MACRO_COLORS.fat }} />
+              </div>
+              <div className="mt-1.5 flex gap-3 text-[11px] font-semibold tabular-nums">
+                <span style={{ color: MACRO_COLORS.protein }}>P {Math.round(totals.proteinG)}g</span>
+                <span style={{ color: MACRO_COLORS.carbs }}>C {Math.round(totals.carbsG)}g</span>
+                <span style={{ color: MACRO_COLORS.fat }}>F {Math.round(totals.fatG)}g</span>
+              </div>
+            </>
+          )}
           {rows.length === 0 ? (
             <p className="py-1 text-[11px] text-muted-foreground">This meal has no ingredients saved.</p>
           ) : (
-            <ul className="divide-y divide-border/20">
+            <ul className="mt-1 divide-y divide-border/20">
               {rows.map(r => (
                 <li key={r.id} className="py-2">
                   <div className="flex items-baseline justify-between gap-2">
@@ -191,54 +201,57 @@ export const SavedMealCard = memo(function SavedMealCard({
         </div>
       )}
 
-      {!selecting && (
-        confirmingDelete ? (
-          <div className="border-t border-destructive/30 bg-destructive/5 px-4 py-3">
-            <p className="text-xs font-medium">Delete “{meal.name}”?</p>
-            <p className="mt-0.5 text-[11px] leading-snug text-muted-foreground">
-              Meals you have already logged keep their food. Any meal plan built from this one keeps
-              its own copy.
-            </p>
-            <div className="mt-2 flex gap-2">
-              <Button variant="secondary" size="sm" className="flex-1 min-h-[44px]" onClick={() => setConfirmingDelete(false)}>
-                Cancel
-              </Button>
-              <Button variant="destructive" size="sm" className="flex-1 min-h-[44px]" onClick={() => onDelete(meal)}>
-                Delete
-              </Button>
-            </div>
-          </div>
-        ) : (
-          <div className="flex items-center gap-2 border-t border-border/30 px-3 py-2">
-            <Button
-              onClick={() => onLog(meal)}
-              disabled={logging}
-              size="sm"
-              className="flex-1 min-h-[44px] gap-1.5"
-            >
-              {logging && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-              Log this meal
+      {/* Delete is confirmed inline. It used to fire on the first tap of a small icon sitting
+          between two other small icons, and the only feedback was a toast after the fact. The
+          swipe tray raises the same confirmation rather than deleting outright. */}
+      {!selecting && confirmingDelete && (
+        <div className="border-t border-destructive/30 bg-destructive/5 px-4 py-3">
+          <p className="text-xs font-medium">Delete “{meal.name}”?</p>
+          <p className="mt-0.5 text-[11px] leading-snug text-muted-foreground">
+            Meals you have already logged keep their food. Any meal plan built from this one keeps
+            its own copy.
+          </p>
+          <div className="mt-2 flex gap-2">
+            <Button variant="secondary" size="sm" className="flex-1 min-h-[44px]" onClick={() => setConfirmingDelete(false)}>
+              Cancel
             </Button>
-            <Button
-              variant="secondary" size="sm" className="min-h-[44px] min-w-[44px] px-3"
-              onClick={() => onLabel(meal)} aria-label={`Print a label for ${meal.name}`}
-            >
-              <QrCode className="w-3.5 h-3.5" />
-            </Button>
-            <Button
-              variant="secondary" size="sm" className="min-h-[44px] min-w-[44px] px-3"
-              onClick={() => onEdit(meal)} aria-label={`Edit ${meal.name}`}
-            >
-              <Pencil className="w-3.5 h-3.5" />
-            </Button>
-            <Button
-              variant="secondary" size="sm" className="min-h-[44px] min-w-[44px] px-3"
-              onClick={() => setConfirmingDelete(true)} aria-label={`Delete ${meal.name}`}
-            >
-              <Trash2 className="w-3.5 h-3.5 text-destructive" />
+            <Button variant="destructive" size="sm" className="flex-1 min-h-[44px]" onClick={() => onDelete(meal)}>
+              Delete
             </Button>
           </div>
-        )
+        </div>
+      )}
+
+      {expanded && !selecting && !confirmingDelete && (
+        <div className="flex items-center gap-2 border-t border-border/30 px-3 py-2">
+          <Button
+            onClick={() => onLog(meal)}
+            disabled={logging}
+            size="sm"
+            className="flex-1 min-h-[44px] gap-1.5"
+          >
+            {logging && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+            Log this meal
+          </Button>
+          <Button
+            variant="secondary" size="sm" className="min-h-[44px] min-w-[44px] px-3"
+            onClick={() => onLabel(meal)} aria-label={`Print a label for ${meal.name}`}
+          >
+            <QrCode className="w-3.5 h-3.5" />
+          </Button>
+          <Button
+            variant="secondary" size="sm" className="min-h-[44px] min-w-[44px] px-3"
+            onClick={() => onEdit(meal)} aria-label={`Edit ${meal.name}`}
+          >
+            <Pencil className="w-3.5 h-3.5" />
+          </Button>
+          <Button
+            variant="secondary" size="sm" className="min-h-[44px] min-w-[44px] px-3"
+            onClick={() => setConfirmingDelete(true)} aria-label={`Delete ${meal.name}`}
+          >
+            <Trash2 className="w-3.5 h-3.5 text-destructive" />
+          </Button>
+        </div>
       )}
     </div>
   )

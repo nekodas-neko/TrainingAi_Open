@@ -393,6 +393,21 @@ order.
 **Fixed.** Both the pre-workout Intensity control and the in-workout header asked `isDeloadActive` — *"is the current PHASE a deload week"* — rather than whether today's session is a deload, which is what `prescription.deload` holds. So an auto-applied, readiness-driven deload read as a full session from the pre-workout screen to the last set, and the owner trained one that way. `sessionContextLabel` resolves the header's line in one place; `useDeloadChoice` adopts the prescription until the user chooses otherwise; "As prescribed" now sits under whichever half the engine picked, with the other labelled **Override** ([`journal`](docs/overview/entries/2026-08-24-deload-visible-on-both-surfaces.md)).
 - **Keep: not device-verified, and the active header has no end-to-end guard.** `e2e/deload-visible.spec.ts` covers the toggle against a real auto-applied prescription and is mutation-checked; the header's label is pinned by unit tests only — no spec starts a workout and reads it.
 
+### [nutrition] ⚠️ My Meals took artboard 3's shape, and its row actions moved to a swipe (BF-29, v1.376.0) — NOT verified on device · needs: hardware
+
+The meal library's rows collapsed to `name · what is in it · calories · chevron` inside one grouped
+card, and **label / edit / delete are now reached by dragging a row left** — a gesture this app did
+not previously have anywhere. Built on `@use-gesture/react`, axis-locked to x with
+`touch-action: pan-y`, and the e2e harness drives it with real CDP touch events, so the handler is
+proven to fire. **What the sandbox cannot prove is that it coexists with the Samsung WebView's own
+scroll physics** — whether a diagonal thumb-flick down a long list opens a tray it did not mean to,
+and whether the row springs back cleanly when it does. The three actions also sit in the expanded
+row, so nothing is unreachable if the gesture proves awkward.
+
+On device, check: scrolling the meal library vertically never reveals a tray; a deliberate
+left-drag opens one and a right-drag closes it; opening a second row closes the first; `Delete`
+from the tray raises the confirmation rather than deleting.
+
 ### [nutrition] ⚠️ The meal photo can be picked; the camera branch has not run (Q-327, v1.341.0)
 
 **Shipped.** `MealPhotoTile` beside the meal-name field in Edit Meal — picker and preview in one tile, so the image rides the save that was already there. `downscaleToDataUrl` gained a `mimeType`, and **requests** WebP rather than assuming it: `toDataURL` answers an unsupported type with a PNG and no error, several times the bytes the 16 KB cap was sized against, so it checks what came back. Guarded by `e2e/meal-photo-picker.spec.ts`, which asserts the **stored** row is a WebP under the cap after feeding it a photo four times past it ([`journal`](docs/overview/entries/2026-08-24-saved-meal-photo-picker.md)).
@@ -1681,28 +1696,6 @@ the next device change.
   fires when logging gets consistent enough to switch tuning on — on success, not failure.
 - **Q-387** holds the trace and an assessment of the owner's two proposed controls (the "% below
   expected" one is circular — do not ship as specified). No device or prod data needed. **Not started.**
-
-### [platform] ✅ PR #1390's red E2E job — cause found, fixed (Q-297/Q-309, closed 2026-08-17)
-
-- **The cause was not environmental and not the specs.** `components/weekly-recap-banner.tsx` POSTs
-  `/api/weekly-digest` on every Home mount; that route returns **502 by design** when the model call
-  fails, which it always does in CI because the E2E job sets no `GOOGLE_GENERATIVE_AI_API_KEY`.
-  `tabs-instant-paint.spec.ts` counts any `/api/` 5xx as a page-load failure, and whether the POST
-  returns before the assertion is a race — so the Home tab was one lost race from red on every run.
-  Two runs eleven minutes apart on identical code went one each way.
-- **Fixed** in `TrainingAi_Open` #5 with a *named* exclusion (`EXPECTED_5XX = ['/api/weekly-digest']`),
-  not a blanket "ignore 502" — a 502 from any other route is still a finding, and so is a 500 from
-  this one.
-- **Correcting the old entry's suggested next step:** downloading the `playwright-report` artifact
-  cannot work. `playwright.config.ts` uses the `github`/`list` reporters, which never write that
-  directory, so the `if: failure()` upload always produces an empty artifact.
-  **What does work:** `actions_get` → `get_workflow_run_logs_url` and download the zip.
-  `get_job_logs` genuinely cannot reach the Playwright output — it caps at 5,000 lines and the
-  Postgres container dump consumes all of them.
-- **The `FATAL: role "root" does not exist` lead was not the cause** and was not pursued further. It
-  is present while the suite passes, so it is noise for this purpose rather than a finding — but
-  nobody has explained it, and it should not be re-chased as an E2E failure cause.
-- Context: [`docs/handoff-2026-08-16-platform-e2e-harness-and-backlog-run.md`](docs/handoff-2026-08-16-platform-e2e-harness-and-backlog-run.md).
 
 ### [workouts][readiness] 🔴 An ai_dynamic deload phase reached via the generic fallback branch runs at full weight and can mint a wrong PR (Q-310, 2026-08-17)
 

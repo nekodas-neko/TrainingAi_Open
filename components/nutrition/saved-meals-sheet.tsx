@@ -355,9 +355,7 @@ export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate,
         <SheetHeader className="px-1 pb-0 shrink-0">
           {tab === 'meals' ? (
             <SheetTitle>
-              {selectedIds
-                ? `${selectedIds.size} selected`
-                : `Saved Meals${meals.length > 0 ? ` · ${meals.length}` : ''}`}
+              {selectedIds ? `${selectedIds.size} selected` : 'Saved Meals'}
             </SheetTitle>
           ) : (
             <div className="flex items-center gap-2">
@@ -405,18 +403,23 @@ export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate,
               </>
             ) : (
               <>
+                {/* Artboard 3 puts a single `+ New` pill in the header band, not a pair of
+                    full-width bars. It cannot literally sit beside the title here — the sheet's
+                    close ✕ is `absolute top-4 right-4` and owns that corner — so the pills keep
+                    their own row and take the drawing's weight instead of its position. */}
+                <span className="flex-1" />
                 {meals.length > 1 && (
                   <Button
-                    variant="secondary" className="flex-1 min-h-[44px] gap-1.5"
+                    variant="secondary" size="sm" className="min-h-[44px] rounded-full px-4 gap-1.5"
                     onClick={() => setSelectedIds(new Set())}
                   >
                     <CheckSquare className="w-4 h-4" />
                     Select
                   </Button>
                 )}
-                <Button onClick={() => openBuild()} className="flex-1 min-h-[44px] gap-1.5">
+                <Button onClick={() => openBuild()} size="sm" className="min-h-[44px] rounded-full px-4 gap-1.5">
                   <Plus className="w-4 h-4" />
-                  New Meal
+                  New
                 </Button>
               </>
             )}
@@ -434,15 +437,17 @@ export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate,
               />
             )}
             {/* Search earns its place once the library grows — generated plan meals land here too,
-                so this list gets long faster than a hand-built one would. */}
-            {meals.length > 4 && (
-              <div className="flex items-center gap-2 rounded-xl border border-border bg-muted/50 px-3 py-2.5">
+                so this list gets long faster than a hand-built one would. Artboard 3 draws it over
+                a three-meal list, so the old "more than four" gate is gone: a search box that
+                appears partway down a growing library is a control you have to notice twice. */}
+            {meals.length > 0 && (
+              <div className="flex min-h-[44px] items-center gap-2 rounded-xl border border-border bg-muted/50 px-3 py-2.5">
                 <Search className="w-3.5 h-3.5 text-muted-foreground flex-none" />
                 <input
                   value={mealQuery}
                   onChange={e => setMealQuery(e.target.value)}
-                  placeholder="Search saved meals"
-                  aria-label="Search saved meals"
+                  placeholder="Search your meals"
+                  aria-label="Search your meals"
                   className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
                 />
                 {mealQuery && (
@@ -471,20 +476,34 @@ export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate,
                 <Button variant="secondary" size="sm" onClick={() => setMealQuery('')}>Clear search</Button>
               </div>
             ) : (
-              visibleMeals.map(meal => (
-                <SavedMealCard
-                  key={meal.id}
-                  meal={meal}
-                  logging={logging === meal.id}
-                  selected={selectedIds ? selectedIds.has(meal.id) : null}
-                  onToggleSelected={toggleSelected}
-                  onLog={quickLog}
-                  onEdit={openBuild}
-                  onDelete={deleteMeal}
-                  onLabel={setLabelMeal}
-                  fromPlan={planSavedMealIds.has(meal.id)}
-                />
-              ))
+              <>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.05em] text-muted-foreground">
+                  {visibleMeals.length} meal{visibleMeals.length === 1 ? '' : 's'}
+                </p>
+                {/* One grouped card, not a stack of them (artboard 3). Separate cards gave every
+                    meal its own border and the list stopped reading as a list. */}
+                <div className="divide-y divide-border/50 overflow-hidden rounded-2xl border border-border">
+                  {visibleMeals.map(meal => (
+                    <SavedMealCard
+                      key={meal.id}
+                      meal={meal}
+                      logging={logging === meal.id}
+                      selected={selectedIds ? selectedIds.has(meal.id) : null}
+                      onToggleSelected={toggleSelected}
+                      onLog={quickLog}
+                      onEdit={openBuild}
+                      onDelete={deleteMeal}
+                      onLabel={setLabelMeal}
+                      fromPlan={planSavedMealIds.has(meal.id)}
+                    />
+                  ))}
+                </div>
+                {/* Both halves are load-bearing: the figure on a row is one portion of what may be
+                    a batch, and label/edit/delete now have a gesture that nothing else announces. */}
+                <p className="px-1 text-[11px] leading-relaxed text-muted-foreground">
+                  Calories are per portion. Swipe a row for label, edit and delete.
+                </p>
+              </>
             )}
           </div>
         ) : (
