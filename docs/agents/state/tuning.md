@@ -29,6 +29,8 @@ Filed this session, all propose-only, all in the queue:
 | **TN-8** | chronic-stress fever mask = a **fourth** consumer of the broken temp baseline | batched with BF-13; fixed by that seed fix |
 | **TN-9** | readiness moves when the check-in is logged; owner wants it final at first open | intent signed off — drop `checkin`, renormalise |
 | **TN-10** | `TOTAL_SLEEP`'s comment and curve disagree by ~15 pts on the heaviest contributor | `Gate: owner`; sequence after TN-5 |
+| **TN-11** | "moved this hour" = one reading over a resting boundary → **99.8%** of waking hours qualify | answers Q-522's open half; **TN-2 does not fix it** |
+| **TN-12** | no hourly-movement surface worth having; the one that exists is pinned at full | Lane B, `Needs: TN-11` |
 
 **Owner decisions, 2026-08-24 — all recorded on the entries, nothing left gated on them.** TN-5 and
 TN-6 signed off; **TN-6a** added (suspend the temperature penalty on a self-clearing condition, ships
@@ -101,6 +103,16 @@ sleep ✅ · readiness ✅ · activity ✅ · body ✅ · devices ✅ · workout
 - **Removing a 10% contributor normally moves a score; `checkin` does not** (TN-9) — mean 69.9 → 70.4,
   no day moving ≥5, because the logged check-in tracks the objective contributors closely enough to
   add little independent information. Measure before assuming a weight is load-bearing.
+- **`HR_REST_THRESHOLD` is read by TWO metrics asking DIFFERENT questions, and one fix cannot serve
+  both.** Body Battery wants the boundary between *resting and not* (TN-2); `computeMovedHours` wants
+  the boundary between *sedentary and moving* (TN-11). At TN-2's most generous proposed offset,
+  move-hours still qualifies **97.6%** of waking hours against 99.8% today. **Do not close TN-11 as a
+  side effect of TN-2**, and do not raise the shared constant to fix move-hours — that breaks the
+  charge window the other way.
+- **"Does move-hours count sleep?" — no**, and by two independent guards: a hardcoded `[7, 22)` clock
+  window, and overnight HR (~50–55) sitting below the 57.8 bpm bar. But the window is **hardcoded** —
+  `readiness-payload.ts:324` never passes the `wakeHour`/`sleepHour` the function accepts — so a 6 am
+  wake loses an hour of real waking time at both ends of the ratio.
 - **A distribution screen is BLIND to "always fires" and "never crosses".** Run against the two known
   failures it catches neither — `temp_dev_c` has a healthy range, `illness_score` looks merely sparse.
   It finds stuck and dead scores only. Pair every threshold with its input, or the screen reads clean

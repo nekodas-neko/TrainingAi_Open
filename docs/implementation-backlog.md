@@ -1470,6 +1470,87 @@ make a good night *"land in the 80s"*, which the curve does and the comment does
 **Pass test:** whichever way it is resolved, the comment and the anchors state the same thing, and a
 test asserts the sub-score at 7.6 / 8.0 / 9.0 h so they cannot drift apart again.
 
+### [activity][heart-rate] TN-11 — "moved this hour" is really "the ring recorded something this hour": 99.8% of waking hours qualify
+
+- **Branch:** _unassigned_
+- **Added:** 2026-08-26 · owner asked how move hours are tracked and whether sleep is counted
+- **Lane: A** — `packages/shared/src/health/hourly-movement.ts`, `lib/health/readiness-payload.ts:324`
+- **Answers the open half of Q-522** (moveHours saturated, 100 on 48 of 59 days). Q-188 fixed the
+  *denominator*; this is why the *numerator* saturates. **Supersede Q-522's "unrelated reason" line.**
+
+**How it works.** An hour in `[wakeHour, sleepHour)` counts as *moved* when **at least one HR reading
+that hour** exceeds `HR_REST_THRESHOLD` (0.05 of HR reserve). Goal = `sleepHour − wakeHour`.
+
+**Why it is always 100.** With the owner's reserve (168 − 52) the boundary is **57.8 bpm**, and only
+**1.57% of waking time** sits below that (measured for TN-2). Requiring *one* reading in a
+**60-minute** window to clear it is the weakest possible test. Measured over 45 days / **657 waking
+hours holding data**:
+
+| "moved" boundary | hours qualifying |
+|---|---|
+| **57.8 bpm (shipped)** | **99.8%** |
+| 64 bpm (TN-2's upper bracket) | **97.6%** |
+| 70 bpm | 90.1% |
+| 80 bpm | 63.5% |
+| 95 bpm | 25.4% |
+
+657 hours over 45 days is **14.6 of the 15-hour window**, so the numerator is effectively "hours the
+ring recorded anything" and the ratio is ~1 by construction.
+
+**⛔ TN-2 does not fix this, and that is the point worth carrying.** Both read `HR_REST_THRESHOLD`,
+but they ask different questions — TN-2 needs the boundary between *resting and not*, this needs the
+boundary between *sedentary and moving*. At TN-2's most generous proposed offset it is still 97.6%.
+**Do not close this as a side effect of TN-2**, and do not fix it by pushing `HR_REST_THRESHOLD`
+higher — that would break Body Battery's charge window in the other direction. It needs its own
+test: a sustained elevation (e.g. several minutes above a higher bar) or an hourly step count, not a
+single-sample touch of a resting boundary.
+
+**Sleep is excluded, but by a hardcoded clock window rather than the owner's sleep.**
+`computeMovedHours` accepts `wakeHour`/`sleepHour`, and **`readiness-payload.ts:324` never passes
+them**, so every day uses `DEFAULT_WAKE_HOUR = 7` / `DEFAULT_SLEEP_HOUR = 22`. Consequences:
+- Sleep is doubly protected in practice — outside the window *and* below the boundary, since the
+  owner's overnight HR runs ~50–55 against a 57.8 bpm bar. **So "does it count sleep?" is: no.**
+- But a 06:00 wake (the owner's actual pattern) has **an hour of genuine waking time excluded** from
+  both numerator and denominator, and a sleep-in past 07:00 would count those hours as waking.
+- The sleep window is already known per night (`sleep_sessions`). Passing it is a small change and
+  makes the metric describe the owner's day rather than a generic one.
+
+**Pass test:** over the trailing 30 days the contributor is neither pinned at 100 nor at 0 — target a
+spread with a median in the 50–85 band and at least 20% of days below 70; and `computeMovedHours` is
+called with the night's real wake/sleep hours, asserted by a test.
+
+### [activity] TN-12 — there is no way to see hourly movement, and the one surface that exists is pinned at full
+
+- **Branch:** _unassigned_
+- **Added:** 2026-08-26 · owner request: *"id like to see something for it to make sure there is moment every hour"*
+- **Lane: B**
+- **Needs: TN-11** — and this dependency is the whole point, see below.
+
+The owner reported seeing nothing for move hours. **There is exactly one surface**:
+`app/health/activity/activity-content.tsx:64` renders `moveHours` against
+`moveHoursGoal ?? 15`, inside a block that only appears when zone-minutes or move-hours are non-null.
+It is on Health → Activity, not Home, and there is **no nudge, no notification and no per-hour
+breakdown** anywhere.
+
+**Why it must wait for TN-11.** The metric currently reads 15/15 on essentially every day (99.8% of
+waking hours qualify), so a nudge built on it **would never fire** and an hourly dash would show a
+full row of ticks every day regardless of what the owner did. Shipping the surface first would look
+like the feature works and would quietly teach the owner to ignore it.
+
+**What to build once TN-11 lands:**
+- **An hourly strip** — one cell per hour of the real waking window, filled when that hour met the
+  movement test, so "was there movement every hour" is answerable at a glance. The stress-strip in
+  `components/body-battery/stress-strip.tsx` is the nearest existing pattern.
+- **Home placement**, since the owner looked there first and the Health → Activity page is two taps
+  away.
+- **A nudge is a separate decision, not a given.** The app has **no cron layer** (`docs/module-map.md`
+  §0), so an hourly "you haven't moved" notification is not a small addition — it needs a scheduling
+  mechanism that does not exist. Scope the strip first; raise the nudge as its own entry with that
+  constraint stated, rather than assuming a notification is cheap.
+
+**Pass test:** on a day with a genuinely sedentary hour, that hour's cell reads empty on the strip and
+the day's move-hours total is below the goal.
+
 ### [readiness] TN-6a — suspend the temperature penalty until its baseline is centred
 
 - **Branch:** _unassigned_
