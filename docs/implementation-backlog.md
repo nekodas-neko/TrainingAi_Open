@@ -1763,54 +1763,54 @@ new top-level `*.mjs` / `*.js` / `*.ts` that is not on a short allowlist (`next.
   `*.json` capture, or `/tmp`-writing script has the same origin.
 - **Surface: CI only, web-reproducible.**
 
-### [platform][app-shell] BF-22 — production is served from Virginia and the owner is in Brisbane: ~270 ms on every request, ~20 requests per Home open
+### [platform][app-shell] BF-22 — the slow loads clear on a force restart, so they are in-memory client state; the server-distance theory was measured wrong
 
 - **Branch:** _unassigned_
-- **Added:** 2026-08-25 · owner: *"everything is loading very slowly"*, with a screenshot of a fully-loaded Home
-- **Lane: A** — a Railway region change is infrastructure, not code. The request-count half is shared with BF-19.
-- **Gate: owner** — moving a region is a production migration with a database attached. Ties directly into **Q-551** (stay on Railway or leave), which is already owner-gated; decide them together.
+- **Added:** 2026-08-25 · owner: *"everything is loading very slowly"*, then *"actually its running a lot better after a force restart"*
+- **Lane: B** — client shell. Not a server or database entry; see the ruled-out list.
 
-**Measured 2026-08-25 from one sandbox, one proxy, keep-alive so TLS setup is excluded:**
+**⚠ A correction to the first version of this entry, which was wrong.** It concluded that production
+was served from Virginia while the owner is in Brisbane, from `x-railway-edge: iad1` in the response
+headers plus a ~276 ms measurement. **`x-railway-edge` names the edge PoP the *caller* reaches, not
+where the container runs.** The measurement was taken from a US-adjacent sandbox, so it recorded the
+sandbox's own distance to the origin. The owner states the service is deployed in **Singapore**,
+which is the closest region Railway offered, and the numbers agree with that: a static file taking
+~276 ms *from a caller near `iad1`* means the origin is far from `iad1`, which is the opposite of
+the conclusion drawn. From Brisbane to Singapore the constant is roughly 100 ms, not 270 ms.
+**Do not re-derive a region finding from `x-railway-edge` — it describes the caller.**
 
-| Request | TTFB |
+**The datapoint that actually locates it: a force restart fixed it.** That rules out everything
+persistent — the local SQLite store, the service-worker cache, `localStorage` and the server all
+survive a restart — and points at **in-memory state in a shell that never unmounts**.
+`components/shell/tab-shell.tsx` keeps **all five tab panels mounted** once visited (`invisible` +
+`content-visibility`, deliberately, for scroll position and state). The app is therefore one
+long-lived JS context between force-quits, and the same file already records a measured instance of
+this class: hidden panels' CSS animations once consumed **21.3% of main-thread time**, fixed with
+`tab-panel-idle`.
+
+**Ruled out by inspection 2026-08-25 — do not re-investigate these without new evidence:**
+
+| Suspect | Finding |
 |---|---|
-| `google.com/generate_204` | **~30 ms** |
-| `…up.railway.app/manifest.webmanifest` — a **static file** | **~276 ms** |
-| `…up.railway.app/api/version` — a dynamic route | **~285 ms** |
+| Database | `SELECT 1` 3 ms, 99.90% cache hit, 0 idle-in-transaction (BF-19) |
+| Server app work | A **static file** and a dynamic route cost the same from one caller — under 10 ms of app time |
+| Home fan-out growth | **Flat**: 17 `cachedFetch`, 17 `useEffect`, 12 `readCacheSync`, ~1456 lines, unchanged across every commit touching `session-select-content.tsx` since 2026-08-19 |
+| Timers in tab panels | The five tab contents contain **zero** `setInterval`/`requestAnimationFrame`, and four of five consume `useTabVisibility` |
+| `useInvalidationRefetch` | Returns `unsubscribe()` and clears its timeout; the `addEventListener` a grep finds is in its docstring |
+| BLE/live-HR services | `battery-soak`, `continuous-capture` and `live-hr/manager` all clear their timers in `stop()`; `manager.start()` is guarded twice against double-start |
 
-**A static file costs the same as a dynamic route**, which is what makes this diagnostic rather than
-suggestive: the application, the auth check and the database contribute under 10 ms of the total.
-The rest is the path to the origin. Response headers name it — **`x-railway-edge: iad1`**, Washington
-DC — and `users.timezone` is `Australia/Brisbane`. Brisbane to Virginia is roughly 15,000 km; ~250 ms
-round-trip is close to what fibre physics allows, so no server tuning will move it.
+**What is still worth suspecting**, in the absence of a device profile: JS heap growth across five
+permanently-mounted panels; DOM accumulation in long lists; and the interaction with BF-19's deploy
+churn, where a rewritten service-worker cache forces the shell to be re-fetched into an already-long-
+lived context.
 
-**The multiplier is the Home screen's fan-out.** `app/session-select/session-select-content.tsx`
-holds **17 `cachedFetch`/`cachedFetchToday` sites across 17 `useEffect`s**, against ~20 distinct
-endpoints. `cachedFetchCore` paints the cached value and then **always** revalidates over the
-network, so a warm cache still costs a full set of round trips.
-
-**This is not the regression the owner suspected, and that matters.** The fan-out is **flat**: 17
-`cachedFetch`, 17 `useEffect`, 12 `readCacheSync`, ~1456 lines, unchanged across every commit
-touching the file from 2026-08-19 to 2026-08-25. Nothing was added. The distance has always been
-there. What changed is how often the device pays the *uncached* path — see BF-19: 80 deploys on
-2026-08-24, each rewriting the service-worker cache name.
-
-**Three levers, largest first:**
-1. **Region.** Serving from a region near AU instead of `iad1` cuts the constant off *every* request
-   — roughly a third of the current round trip, multiplied by ~20 requests per screen. Check
-   Railway's current region list rather than assuming which are available; the database has to move
-   with it, which is what makes this owner-gated.
-2. **Fan-out.** ~20 endpoints per Home open is a lot to spend at 270 ms each. A server-assembled
-   aggregate would trade N round trips for one.
-3. **Cache churn.** BF-19's half.
-
-- **What would count as fixed:** a static asset from the origin returns in well under 100 ms from the
-  owner's location, and Home's request count is stated rather than incidental.
-- **Do not** spend effort on server-side or query tuning off the back of this entry — BF-19 measured
-  SQL at 3 ms with a 99.90% cache hit, and this entry shows a static file is just as slow as a
-  dynamic one.
-- **Surface: production only.** Every figure here is from a sandbox, not the S25 — the owner's
-  absolute numbers will differ, but the static-vs-dynamic *comparison* is what carries the argument.
+- **Needs:** BF-19 — the client reporter is what produces the device measurement this entry cannot
+  get any other way.
+- **This cannot be root-caused from a sandbox** and should not be attempted again from one. It wants
+  a heap and main-thread profile from the S25 across a long-running session.
+- **What would count as fixed:** the owner can go a normal week without a force restart changing how
+  the app feels, and there is a measurement showing why rather than an inference.
+- **Surface: device only.** Every negative above is from source inspection, not from a running S25.
 
 ### [platform] BF-21 — expose `pg_stat_statements` to `claude_ro` once the owner enables it
 

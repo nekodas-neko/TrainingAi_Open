@@ -2160,3 +2160,16 @@ row-scoped (normalised query text carries shapes, never parameter values).
 
 It also carries a deliberate expectation-damper: BF-19 already measured the database at 3 ms with a
 99.90% cache hit, so a clean read here must not be treated as closing the slow-load question.
+
+## 2026-08-25 — `docs/implementation-backlog.md` raised again, BF-22 rewritten
+
+BF-22's first version concluded the app was slow because production ran in Virginia while the owner
+is in Brisbane. **That was wrong.** `x-railway-edge` names the edge PoP the *caller* reaches, not
+where the container runs, and the ~276 ms was a US-adjacent sandbox measuring its own distance. The
+service is deployed in Singapore. The rewrite says so at the top, because a wrong finding left in a
+queue is worse than no finding.
+
+The entry grew because the owner then reported a force restart fixed it, which relocates the whole
+question to in-memory client state — and because the rewrite carries a six-row **ruled-out** table.
+That table is the point: six suspects with the measurement that killed each, so the next session
+does not re-run the same greps and reach the same dead ends.
