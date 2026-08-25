@@ -132,7 +132,12 @@ const BASELINE = {
   'app/api/nutrition-goals/recommend/route.ts': 1,
   'app/api/nutrition/meal-plans/generate/meal/route.ts': 2,
   'app/api/nutrition/meal-plans/generate/route.ts': 2,
-  'app/api/nutrition/scan/route.ts': 2,
+  // BF-11b split the single-meal fields out into `CandidateSchema` so the route can return one
+  // entry per meal. All three here are `generateObject` RESPONSE schemas — the model's output, not
+  // a client's input — which is the exemption class this file's header describes and the reason the
+  // number was 2 rather than 0. The route parses no request schema at all; it reads `body.text`,
+  // `body.url` and `body.image` by hand with explicit type and size guards.
+  'app/api/nutrition/scan/route.ts': 3,
   'app/api/oura-ble/accel-chunks/route.ts': 1,
   'app/api/oura-ble/live-steps/route.ts': 2,
   'app/api/oura-ble/samples/route.ts': 1,

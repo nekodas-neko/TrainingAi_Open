@@ -2324,3 +2324,15 @@ same-day raise of this baseline, and the third to be superseded before merging �
 ordinary case when several PRs run in one session, not a sign anything is wrong. Each time the fix
 was to rebuild `doc-size-baseline.json` from `origin/main` and re-derive, never to splice the hunk:
 the raise is only ever correct against the merged predecessor.
+
+## 2026-08-25 — `projectOverview.md` raised, 7957 → 7959 (BF-11b)
+
+Two lines: the Current Status paragraph the wrap-up asks for, and its blank. Fourth same-day raise of
+this baseline, by the same session — see the three above for why that is ordinary rather than a
+symptom, and always rebuild from `origin/main` rather than splicing.
+
+The paragraph is longer than most because it carries a number no journal entry will be read for: the
+split rule's first version returned **5, 5, 1, 1, 5, 1** on five identical containers, and its second
+returned 30 of 30 across six cases. A reader of the index needs to know the splitting was measured
+rather than assumed, because the obvious next question — *"can I trust the candidate count?"* — has a
+different answer before and after that change.

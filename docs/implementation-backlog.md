@@ -798,26 +798,6 @@ whether or not anyone draws them first.
   reference drawings were never committed). Part 1 §8 has the file-by-file collision table and the
   carry-across rule. **Do not plan around that chain landing, and do not wait for it.**
 
-### [nutrition] BF-11b — the scan route returns N candidate meals instead of one
-
-- **Lane:** A
-- **Plan:** [`plans/2026-08-24-meal-creator.md`](superpowers/plans/2026-08-24-meal-creator.md) §4
-- **Branch:** `feat/scan-multi-candidate`
-- **Added:** 2026-08-24 · planning session, from BF-11 (design item 2).
-- **Lane A by the §3 rule, not by BF-11's old `Lane: B` line** — `app/api/nutrition/scan/route.ts` is
-  reached by `app/api/**`. The engine half lands before the UI that consumes it.
-- **`ScanSchema` returns exactly one `name` + one `ingredients[]` for every input mode today.** A
-  week of meal-prep containers, or a "5 lunches" roundup page, is forced into one merged estimate.
-- **Additive, not breaking.** Four call sites read the current shape (`capture-step.tsx`,
-  `review-step.tsx`, `meal-backfill-section.tsx`, `saved-meals-sheet.tsx`); three of them are
-  single-dish by nature. Keep the top level as-is (= `candidates[0]`) and add `candidates` alongside.
-  **Do not flip the top level to an array.**
-- **The risk is the splitting decision, not the macros:** one plated curry-rice-naan is **one** meal;
-  five labelled tubs are five. Pin it with fixture tests asserting candidate **counts and names**,
-  never calories, or the test becomes a model snapshot that fails on every prompt tweak.
-- Cap candidates at 8; `identified: false` still returns none; the URL branch's `recipeYield` divide
-  is **per candidate**.
-
 ### [nutrition] BF-11c — Build a Meal gains the recipe URL, the candidate picker and History quick-add
 
 - **Lane:** B

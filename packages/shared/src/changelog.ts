@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.372.0",
+    date: "2026-08-25",
+    changes: [
+      "Scanning a photo or description that contains several meals \u2014 a week of meal-prep containers, a page with four recipes, or just \u201clunch was X, dinner was Y\u201d \u2014 now works out each meal separately instead of merging them all into one estimate. A single plated meal is still one meal however many things are on the plate. The app logs the first for now; the rest come through when Build a Meal gains the picker for them.",
+    ],
+  },
+  {
     version: "1.371.0",
     date: "2026-08-25",
     changes: [
