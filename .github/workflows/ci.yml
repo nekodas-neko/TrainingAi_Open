@@ -369,6 +369,12 @@ jobs:
       - name: Backlog pointers and Q numbers are accurate
         run: node scripts/check-backlog-pointers.js
 
+      # LA-26. A repository method nothing calls is invisible to tsc (an unused export is not an
+      # error), to lint, and to the tests. It has shipped three times (Q-301, Q-270, Q-231) and was
+      # only ever caught by someone asking why a production table was empty.
+      - name: No dead repository methods
+        run: node scripts/check-dead-repo-methods.js
+
       # Q-424: the size ratchet asks whether THIS BRANCH grew a file, which needs the base branch's
       # copy to compare against. `actions/checkout` is shallow (depth 1), so `main` is not present —
       # one depth-1 fetch of that ref is all it takes, and the script degrades to baseline-only if it
