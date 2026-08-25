@@ -1384,6 +1384,203 @@ Review: [`docs/reviews/2026-08-25-threshold-sweep.md`](reviews/2026-08-25-thresh
   removed). Until it runs every pass test here is unmeasured: deviation mean within ±0.05 °C with
   ~half the nights negative; `temp_dev_c > 1.0` on 0 nights (TN-8); biomarker table re-measured,
   since every z moves ~19× and the radar may then fire too often (Q-506).
+### [readiness] TN-9 — readiness moves when the check-in is logged; the owner wants it final on first open
+
+- **Branch:** _unassigned_
+- **Added:** 2026-08-26 · owner instruction: *"we shouldn't have readiness move the number — the numbers should be fully set on first open/load."*
+- **Lane: A** — `packages/shared/src/health/readiness-composite.ts`
+- **Owner sign-off: RECEIVED 2026-08-26** for the intent (the number must be settled at first load).
+  The mechanism below is the recommendation; confirm it before shipping if it changes.
+
+`READINESS_WEIGHTS.checkin = 0.10`, and an unlogged check-in contributes
+`NEUTRAL = { score: 50, provisional: true }` (`readiness-composite.ts:72`). So **10% of readiness is
+a frozen 50 until the owner answers the card, and the score then moves.** That is exactly the
+behaviour the instruction rules out.
+
+**It also contradicts the card's own copy.** The Log Readiness card reads *"It tunes today's session,
+not your whole plan"* — but logging also shifts the readiness score the user already read at the top
+of the same screen.
+
+**Recommendation: drop `checkin` from the composite and renormalise over the remaining eight.** The
+check-in keeps driving the session prescription, which is what its card claims and what it is
+actually good for; readiness becomes fully objective and therefore final the moment the overnight
+data is in.
+
+**Measured over the 35 days holding a stored contributor set:**
+
+| | |
+|---|---|
+| days the check-in was actually logged | **32 of 35 (91%)** |
+| readiness mean, with `checkin` | **69.9** (sd 11.59) |
+| readiness mean, without | **70.4** (sd 11.79) |
+| mean per-day change | **+0.44** |
+| largest single-day move | **3.84** |
+| days moving ≥2 pts | **4 of 35** |
+| days moving ≥5 pts | **0 of 35** |
+
+So the change is nearly free — it does not shift the level, and sd rises slightly rather than
+compressing. **This is unusual and worth stating: removing a 10% contributor normally moves a score,
+and here it does not, because the logged check-in tracks the objective contributors closely enough
+that it was adding little independent information.**
+
+**What it costs:** the composite's header comment says a great check-in is what lets a day *"reach a
+true 100"*. Dropping it lowers the practical ceiling a little. Measured, nothing reached 100 anyway.
+
+**Pass test:** readiness for a given day is byte-identical before and after a check-in is logged;
+mean over the trailing 30 days within ±1 of the current mean; the Log Readiness card's copy still
+matches what logging does.
+
+**Do not instead "exclude when unlogged and include when logged"** — that still moves the number the
+moment the owner answers, which is the thing being removed.
+
+### [sleep] TN-10 — `TOTAL_SLEEP`'s comment and its curve disagree by ~15 points, on the heaviest contributor
+
+- **Branch:** _unassigned_
+- **Added:** 2026-08-26 · found while explaining a 57 on a 7.75 h night
+- **Lane: A** — `packages/shared/src/health/sleep-score.ts:60-61`
+- **Gate: owner** — changes a score. Not signed off.
+- **Sequence after TN-5** (the calibration curve) so two sleep changes are not evaluated at once.
+
+The anchors and the line documenting them do not agree:
+
+| hours | curve gives | the comment claims |
+|---|---|---|
+| 7.6 | **71.4** | *"~86"* |
+| 8.0 | **77.0** | *"8h is excellent (~92)"* |
+| 9.0 | **92.0** | *"100 at ~9h"* |
+
+The comment reads as though written against anchors one position further along than the ones present.
+**`totalSleep` carries weight 24 of 110 — the largest of the ten** — so a ~15-point error there is
+~3.3 blend points on every night in the 7.5–8 h band, which is where most of the owner's nights land.
+
+**Which is wrong is the open question, and it is not answerable from the data.** Either the comment
+is stale and the curve is deliberate, or the anchors were shifted and the comment records the
+intent. **Read the plan the comment cites**
+(`docs/superpowers/plans/2026-07-22-core-score-cards-and-activity-overhaul.md`, W-C) before changing
+either — that plan is the only record of what the shape was meant to be.
+
+**Worked example, the owner's 2026-08-26 night:** 7.75 h scored **73.5** on this contributor against
+a comment implying ~89. Blend 73.15 → displayed **57** (reproduced exactly from the stored value).
+
+**⛔ Do not fix this by raising the curve to match the comment without reading that plan.** A duration
+curve that reaches the 90s at 8 h is a different product decision from one that needs 9 h, and the
+current shape may be the deliberate one — the file's own header says the recalibration was meant to
+make a good night *"land in the 80s"*, which the curve does and the comment does not.
+
+**Pass test:** whichever way it is resolved, the comment and the anchors state the same thing, and a
+test asserts the sub-score at 7.6 / 8.0 / 9.0 h so they cannot drift apart again.
+
+### [activity][heart-rate] TN-11 — "moved this hour" is really "the ring recorded something this hour": 99.8% of waking hours qualify
+
+- **Branch:** _unassigned_
+- **Added:** 2026-08-26 · owner asked how move hours are tracked and whether sleep is counted
+- **Lane: A** — `packages/shared/src/health/hourly-movement.ts`, `lib/health/readiness-payload.ts:324`
+- **Answers the open half of Q-522** (moveHours saturated, 100 on 48 of 59 days). Q-188 fixed the
+  *denominator*; this is why the *numerator* saturates. **Supersede Q-522's "unrelated reason" line.**
+
+**How it works.** An hour in `[wakeHour, sleepHour)` counts as *moved* when **at least one HR reading
+that hour** exceeds `HR_REST_THRESHOLD` (0.05 of HR reserve). Goal = `sleepHour − wakeHour`.
+
+**Why it is always 100.** With the owner's reserve (168 − 52) the boundary is **57.8 bpm**, and only
+**1.57% of waking time** sits below that (measured for TN-2). Requiring *one* reading in a
+**60-minute** window to clear it is the weakest possible test. Measured over 45 days / **657 waking
+hours holding data**:
+
+| "moved" boundary | hours qualifying |
+|---|---|
+| **57.8 bpm (shipped)** | **99.8%** |
+| 64 bpm (TN-2's upper bracket) | **97.6%** |
+| 70 bpm | 90.1% |
+| 80 bpm | 63.5% |
+| 95 bpm | 25.4% |
+
+657 hours over 45 days is **14.6 of the 15-hour window**, so the numerator is effectively "hours the
+ring recorded anything" and the ratio is ~1 by construction.
+
+**⛔ TN-2 does not fix this, and that is the point worth carrying.** Both read `HR_REST_THRESHOLD`,
+but they ask different questions — TN-2 needs the boundary between *resting and not*, this needs the
+boundary between *sedentary and moving*. At TN-2's most generous proposed offset it is still 97.6%.
+**Do not close this as a side effect of TN-2**, and do not fix it by pushing `HR_REST_THRESHOLD`
+higher — that would break Body Battery's charge window in the other direction.
+
+**⚑ HR ALONE IS THE WRONG INPUT — use MET, which this app already decodes.** The owner raised this
+directly (*"its just HR?? that's not enough right? it needs HR + movement like accel"*) and it is the
+better framing than the "sustained elevation" this entry first proposed. Heart rate rises for stress,
+caffeine, digestion, heat and standing up; **an hour of anxious desk work is indistinguishable from
+an hour of walking**, which is exactly the confusion a move-every-hour prompt must not make.
+
+**The accelerometer-derived signal is already available on the same pipeline:**
+- `getOuraDaytimeSignals` (`adapter.ts:4959`) decodes **MET** from raw BLE frames, **tag `0x50`**,
+  alongside skin temperature, through the two-tier `readRawFrames`.
+- `MET_ACTIVE_THRESHOLD = 1.8` already exists (`daily-medians.ts:51`) and is **Oura's own** activity
+  threshold — the same `1.8` appears as `ring_met_limit` in `stress_daytime_sensing`. So the constant
+  does not need inventing or fitting.
+- The daytime-stress model already consumes an intraday MET series, so this is a signal the app
+  decodes and discards for this purpose rather than one it lacks.
+
+**Recommended test:** an hour counts as moved when its MET series shows sustained activity — e.g. a
+run of samples above `MET_ACTIVE_THRESHOLD`, not a single touch. Keep HR only as a secondary
+confirmation if it earns its place; MET is the direct measurement and HR is a proxy for it.
+
+**⚠️ Two implementation facts, both measured:**
+1. **`readiness-payload.ts` does NOT currently fetch daytime signals** — `computeMovedHours` is called
+   at line 324 with HR only, so adding MET means either a new decode on that path or moving the
+   computation to where MET is already loaded (`/api/body-battery` fetches it today). Decide that
+   before writing the test; a per-request raw-frame decode is not free.
+2. **The hourly MET distribution could NOT be measured for this entry**, and that gap is the first
+   thing to close. Intraday MET is decoded from raw frames rather than stored in a column, and
+   `decoded` is NULL on the hot tier — so SQL cannot reach it. The daily `met_avg` (n=51, range
+   1.004–1.636, mean 1.360) is a **daily average and says nothing about hourly discrimination** —
+   a daily mean above 1.8 would mean an entire day of activity, so "0 of 51 days exceed the sample
+   threshold" is expected and is **not** evidence either way. **Measure the hourly MET distribution
+   before picking the run-length**, or the threshold is fitted to nothing.
+
+**Sleep is excluded, but by a hardcoded clock window rather than the owner's sleep.**
+`computeMovedHours` accepts `wakeHour`/`sleepHour`, and **`readiness-payload.ts:324` never passes
+them**, so every day uses `DEFAULT_WAKE_HOUR = 7` / `DEFAULT_SLEEP_HOUR = 22`. Consequences:
+- Sleep is doubly protected in practice — outside the window *and* below the boundary, since the
+  owner's overnight HR runs ~50–55 against a 57.8 bpm bar. **So "does it count sleep?" is: no.**
+- But a 06:00 wake (the owner's actual pattern) has **an hour of genuine waking time excluded** from
+  both numerator and denominator, and a sleep-in past 07:00 would count those hours as waking.
+- The sleep window is already known per night (`sleep_sessions`). Passing it is a small change and
+  makes the metric describe the owner's day rather than a generic one.
+
+**Pass test:** over the trailing 30 days the contributor is neither pinned at 100 nor at 0 — target a
+spread with a median in the 50–85 band and at least 20% of days below 70; and `computeMovedHours` is
+called with the night's real wake/sleep hours, asserted by a test.
+
+### [activity] TN-12 — there is no way to see hourly movement, and the one surface that exists is pinned at full
+
+- **Branch:** _unassigned_
+- **Added:** 2026-08-26 · owner request: *"id like to see something for it to make sure there is moment every hour"*
+- **Lane: B**
+- **Needs: TN-11** — and this dependency is the whole point, see below.
+
+The owner reported seeing nothing for move hours. **There is exactly one surface**:
+`app/health/activity/activity-content.tsx:64` renders `moveHours` against
+`moveHoursGoal ?? 15`, inside a block that only appears when zone-minutes or move-hours are non-null.
+It is on Health → Activity, not Home, and there is **no nudge, no notification and no per-hour
+breakdown** anywhere.
+
+**Why it must wait for TN-11.** The metric currently reads 15/15 on essentially every day (99.8% of
+waking hours qualify), so a nudge built on it **would never fire** and an hourly dash would show a
+full row of ticks every day regardless of what the owner did. Shipping the surface first would look
+like the feature works and would quietly teach the owner to ignore it.
+
+**What to build once TN-11 lands:**
+- **An hourly strip** — one cell per hour of the real waking window, filled when that hour met the
+  movement test, so "was there movement every hour" is answerable at a glance. The stress-strip in
+  `components/body-battery/stress-strip.tsx` is the nearest existing pattern.
+- **Home placement**, since the owner looked there first and the Health → Activity page is two taps
+  away.
+- **A nudge is a separate decision, not a given.** The app has **no cron layer** (`docs/module-map.md`
+  §0), so an hourly "you haven't moved" notification is not a small addition — it needs a scheduling
+  mechanism that does not exist. Scope the strip first; raise the nudge as its own entry with that
+  constraint stated, rather than assuming a notification is cheap.
+
+**Pass test:** on a day with a genuinely sedentary hour, that hour's cell reads empty on the strip and
+the day's move-hours total is below the goal.
+
 ### [readiness] TN-6a — suspend the temperature penalty until its baseline is centred
 
 - **Branch:** _unassigned_
@@ -1493,6 +1690,31 @@ samples) — it is already queued and is a plausible contributor to why the EMA 
 **Pass test:** stored deviation mean within ±0.05 °C of zero over the trailing 30 nights; at least
 40% of nights negative; the −10 arm firing on under 20% of nights; and the illness radar able to
 reach its `watch` threshold on at least one historical night (the Q-506 half).
+
+**➕ Add one more pass test — the Body Battery morning anchor (measured 2026-08-26).** The owner
+reported the battery starting low on waking: *"battery starts at 57? I figured it should be much
+higher when waking up."* **The battery does not charge overnight** — `walkBodyBattery` filters to
+`tsMs >= wakeTime`, so the anchor *is* the whole overnight story, and `resolveAnchor` sets it to the
+readiness score. A readiness score carrying a −10/−20 temperature penalty therefore lands directly on
+the number the owner reads at 7 am.
+
+Measured over the 35 days where both a battery row and a temperature deviation exist:
+
+| | now | with the penalty removed |
+|---|---|---|
+| mean morning anchor | **64.8** | **76.8** |
+| mornings waking "Charged" (≥75) | **7/35 (20%)** | **21/35 (60%)** |
+
+**Conservative** — the 6 days whose deviation exceeded 1.0 °C were *clamped* to 40 rather than
+subtracted from, and a clamp cannot be reversed by adding the penalty back, so those days are counted
+as unchanged. The real improvement is larger.
+
+So **fixing the baseline is also the fix for "the battery never wakes up full"**, and the pass test
+gains a line: after the re-derivation, the mean morning anchor sits **above 75** over the trailing 30
+days. **Do not redesign the anchor or add overnight charging to chase this** — that would be a large
+change to a value Q-511 shows is load-bearing, aimed at a symptom this fix already removes.
+Re-measure after it lands; if the anchor still reads low then, *that* is when the design question is
+real.
 
 **Not established:** whether the owner was actually ill on any flagged night. The finding is that a
 permanently-positive deviation cannot tell illness from baseline error.
