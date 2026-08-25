@@ -4685,6 +4685,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       ok: row.ok,
       fingerprint: row.fingerprint ?? null,
       payloadBytes: row.payloadBytes ?? null,
+      cachedInputTokens: row.cachedInputTokens ?? null,
     })
 
     const now = Date.now()

@@ -14,7 +14,7 @@ silently misdirecting the next session. Update them in the same PR that consumes
 
 | Pointer | Value | Source of truth |
 |---|---|---|
-| Next free Postgres migration | **220** | `lib/data/postgres/migrations/` |
+| Next free Postgres migration | **224** | `lib/data/postgres/migrations/` |
 | Local SQLite schema version | **v29** | `lib/sqlite/migrations.ts`; `lib/sqlite/__tests__/migrations.test.ts` asserts the max |
 
 > **There is no third pointer any more.** Entry IDs are not allocated from a shared counter and
@@ -5842,11 +5842,18 @@ ehr     0     0     0     0   648   208   128   556     0
   Gemini 3.x caches **implicitly by default** — so implicit caching may already be part of the 6.4×
   above and nothing in production can tell you. An explicit cache added now is an optimisation you
   cannot measure, stacked on one you cannot see.
-- **➡️ Re-scoped: do NOT implement explicit context caching.** What is left is the cheap measurement —
-  record `cachedContentTokenCount` on `ai_call_log` (additive column + the `loggedStreamText` /
-  `loggedGenerateObject` wrappers in `lib/ai/instrument.ts` + a `claude_ro` view regen), then look.
-  High hit rate → this closes as measured-and-rejected, which the entry's own text calls a fine
-  outcome. Zero → the caching work gets a number behind it instead of a hypothesis.
+- **➡️ Re-scoped: do NOT implement explicit context caching.**
+- **✅ The measurement half SHIPPED 2026-08-25** (`feat/ai-call-log-cached-tokens`, migrations 222 +
+  223): `ai_call_log.cached_input_tokens` records what the provider served from its own cache, read
+  at the single `readUsage` chokepoint in `lib/ai/instrument.ts` from
+  `inputTokenDetails.cacheReadTokens` with the SDK's deprecated `cachedInputTokens` as a fallback.
+  Nullable with no backfill on purpose — **NULL means the provider said nothing, 0 means it reported
+  a MISS**, and a `DEFAULT 0` would have claimed every historical call was a measured miss.
+- **Keep:** nobody has LOOKED yet. The column starts empty and only fills as calls are made, and
+  Coach's last call was 2026-08-18 — so this needs real traffic before it can answer anything. Once
+  there are calls, run the hit-rate query: high → close this as measured-and-rejected, which the
+  entry's own text calls a fine outcome; zero → the caching work finally has a number behind it
+  instead of a hypothesis. Nothing else here is owed.
 - **Cost was never the reason and still is not** — 255 calls / 632,639 tokens over 24 days at
   flash-lite rates is cents per month. Do not optimise this for money.
 - **Confirmed in the same read:** every Coach row reads `gemini-3.1-flash-lite` while `COACH_MODEL_ID`
