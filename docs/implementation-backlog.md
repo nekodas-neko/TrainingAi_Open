@@ -323,6 +323,835 @@ below threshold and left in place for next time.
      entries below are ordered by dependency, not by Q number. Do not re-sort them into numeric
      order; the sequence is the point. -->
 
+## Nutrition screens — owner priority, confirmed against the drawings 2026-08-25
+
+> **The owner reviewed [`docs/design/2026-08-18-nutrition-rework-mockups.html`](design/2026-08-18-nutrition-rework-mockups.html) on 2026-08-25 and confirmed these are the
+> screens they want.** Two previously separate blocks — the Q-395 rework phases and the BF-11
+> meal creator/planner — are one section here because they are one arc and were being worked
+> out of order: the creator/planner block was titled *"pushed to the top"* while sitting 1,000
+> lines below the phases it follows.
+>
+> **Shipped and closed, so nothing below repeats it:** Q-395a (quantity sheet, v1.364.0) and Q-395b
+> (day screen, v1.365.0 + v1.366.0) — **both removed from this queue on 2026-08-25 when the owner's
+> device run passed**, journals
+> [`q-395a`](overview/entries/2026-08-25-quantity-sheet-collapsing-rows.md) ·
+> [`q-395b`](overview/entries/2026-08-25-nutrition-day-screen-sections.md) ·
+> [`q-395b grouping`](overview/entries/2026-08-25-nutrition-day-screen-grouping.md). Also shipped:
+> BF-11a (ingredient picker extract) and two of Q-406's four call sites. **Untouched:** Q-395c —
+> now unparked — and the whole BF-11b…h creator/planner chain, which is exactly what the owner
+> reported still looks unchanged on the device.
+>
+> **What that run added rather than closed:** BF-24 and BF-26 below, plus BF-25 and BF-27 in the
+> 2026-08-25 owner-request section further down.
+
+### [nutrition] BF-24 — the shipped day screen and artboard 1 are different layouts, not a partial one
+
+- **Lane:** B
+- **Added:** 2026-08-25, from the owner's device smoke run — *"Is that the final design? thats not
+  what the mockup looks like (Nutrition - the day)"*, with artboard 1 attached for comparison.
+- **Read first:** artboard **1 · Nutrition — the day** in
+  [`docs/design/2026-08-18-nutrition-rework-mockups.html`](design/2026-08-18-nutrition-rework-mockups.html).
+  Its fixture numbers (1,284 of 2,100 · 816 left · +412 burned · Breakfast 486 · Lunch 798) are the
+  ones in the owner's attachment — the attachment **is** the drawing, not a screenshot of the app.
+- **⚠ Q-395b did not claim to build this artboard.** It ticked an 11-section coverage list and
+  measured gap reclamation (420 px → 280 px). Nothing in it was a layout transcription, so this is
+  not a regression or a half-finished phase — it is work that was never scoped. Do not open it as a
+  bug against Q-395b.
+
+**The divergences, read off the shipped source against the artboard's inline styles:**
+
+1. **Header is two bands, drawn as one.** Artboard: 26 px `Nutrition` with the *date*
+   (`Wednesday 18 August`) as its subtitle, gear at right. Shipped
+   (`app/nutrition/nutrition-content.tsx:505–541`): `text-xl` title, a static
+   `Food diary & macros` subtitle, and a **second** row below carrying `‹ date ›`.
+2. **The energy block is stacked, not side-by-side.** Artboard: one 14 px-padded card, 104 px conic
+   donut on the **left** (82 px hole), and to its right `816 kcal left · +412 burned` above three
+   macro columns. Shipped: `CalorieBalanceBar` and `MacroRing` are two rows of a `divide-y` group
+   with a hairline between them. The drawing has no balance bar and no divider.
+3. **The action row is a different row.** Artboard: four equal 62 px tiles —
+   **Search · Scan · Photo · My meals**. Shipped `nutrition-action-row.tsx`: three wide buttons in a
+   2-column grid — **Log Food · Water · Saved Meals**. Scan and Photo have no tile at all. **Some of
+   this is Q-395c's**, which owns collapsing the capture entry points; decide the split before
+   building, and say which entry ships the tiles.
+4. **The grouping is inverted, and this is the big one.** Artboard: each meal is its **own** rounded
+   card; the meal name sits **outside and above it** as an uppercase 11 px label with the total
+   right-aligned on that same line; the card groups the *food rows*. Shipped: all meal types are
+   rows of **one** container and each meal's header is inside it. Q-395b grouped meals within the
+   screen; the drawing groups rows within a meal. Both are "grouped", which is why ② passed the
+   checklist and still looked wrong.
+5. **Meal header content.** Artboard: text label, one calorie number. Shipped: emoji, name,
+   kcal **plus** P/C/F chips, a round ⊕ and a chevron.
+6. **Food rows have no thumbnail.** Artboard draws a 40 px gradient tile per row.
+   `components/nutrition/food-row.tsx` says outright that the thumbnail is deliberately not built —
+   no call site passes one. **Q-406 owns it**; this entry only records that the drawing needs it.
+7. **The shipped screen has sections the drawing does not:** `MealPlanReviewCard`,
+   `MealPlanSection`, `TdeeAdaptationCard`, and the day-tools group (weekly chart + supplements).
+   An artboard is 812 px — one screenful — so it cannot be a total spec. **Part of this entry is
+   deciding which of those four stay and where**, not deleting them because they are absent from a
+   drawing that stops at the fold.
+
+- **Provisional, carried from the same run:** the owner's ④ (grouped-section backgrounds render
+  correctly, no Samsung compositor artifact) was answered *"This looks fine; but will keep this open
+  and let you know"*. That is the watching brief this entry carries — it is why Q-395b could be
+  closed without losing it.
+- **Verification.** Side by side against artboard 1 at 412 dp in a browser, then the device run.
+  State in the PR which of items 1–7 shipped and which were deliberately not, with the reason.
+
+### [nutrition] BF-26 — the quantity sheet's controls are all the same size, radius and fill
+
+- **Lane:** B
+- **Gate:** owner
+- **Added:** 2026-08-25, device smoke run ⑧ — the sheet **works** (edit and Remove both verified on
+  the S25), but *"the UI could use some work; everything looks the same; I can post a picture if
+  needed"*.
+- **What is owed from the owner:** the picture. Ask for it before starting — the finding below is a
+  reading of the source, and the owner is looking at something specific in it.
+- **What the source already shows.** In `components/nutrition/quantity-sheet.tsx` the amount input is
+  `h-14 rounded-xl bg-muted`, the − and + buttons are `w-12 h-12 rounded-xl bg-muted`, and Remove is
+  `min-h-12 w-12 rounded-xl bg-destructive/10`. Same radius, near-identical height, same fill family
+  — only Remove's tint differs, and it differs by opacity. So the value the sheet exists to set has
+  no more visual weight than the buttons that nudge it, which is a literal reading of *"everything
+  looks the same"*.
+- **Do not treat this as a rewrite of the sheet.** Q-395a shipped it four days ago and its behaviour
+  passed on the device. This is hierarchy — the amount reads as the subject, the steppers as chrome,
+  Remove as destructive and separated — not new structure.
+- **Verification.** Both themes in a browser (or dark only, if BF-25 lands first), then the device
+  run; the safe-area inset under the action row renders 0 in the sandbox.
+
+### [nutrition][app-shell] Q-406 — the shared food row: two call sites converted, two waiting on their phase
+
+> **✅ THE DIARY ROW CONVERTED 2026-08-25 (v1.367.0)** — `meal-card.tsx` draws the shared `FoodRow`
+> and `QuickEditLogSheet` **gained a delete in the same change**, which this entry required before the
+> conversion could be safe. Q-395a was meant to carry it and did not. Per-item P/C/F moved into the
+> sheet's live preview. [`journal`](overview/entries/2026-08-25-diary-row-shared-shape.md).
+>
+> **⚠ It turned up a pre-existing defect, LB-10 — fixed 2026-08-25.** The sheet would not open in
+> `pnpm dev` at all, on `main` too: `use-sheet-back-dismiss.ts` was not double-invoke safe. Verified
+> here with `reactStrictMode: false`; the hook is fixed and guarded now
+> ([`journal`](overview/entries/2026-08-25-sheet-back-dismiss-strict-mode.md)).
+
+- **Branch:** `refactor/nutrition-food-row`
+- **Lane B.** No schema, no route.
+- **✅ GATE CLEARED 2026-08-24 — the drawings are in the repository:**
+  [`docs/design/2026-08-18-nutrition-rework-mockups.html`](design/2026-08-18-nutrition-rework-mockups.html),
+  twelve artboards recovered from the owner-reviewed canvas, unchanged. That file's own preamble
+  carries the two corrections these entries need — `unit-options.png` never existed, and Q-395a's two
+  references are two different artboards — plus which three are TEMPLATED. Read it there rather than
+  duplicating it here. **Q-395a/b/c were unblocked by the same landing.**
+- **✅ THE COMPONENT SHIPPED 2026-08-23 (v1.338.0)** — `components/nutrition/food-row.tsx`, drawn by
+  the library sheet and the food-database search row.
+  [`Journal`](overview/entries/2026-08-23-shared-food-row.md).
+- **✅ THE DIARY ROW SHIPPED 2026-08-25 (v1.367.0)** — with the delete this entry required moved into
+  `QuickEditLogSheet` first, so no capability was dropped.
+- **Keep:** ONE call site, the external food-database row (`ingredient-search.tsx:132`), which
+  carries a macro-mismatch warning and an in-flight spinner. The agreed row has nowhere to put
+  either, and adding a slot makes it a wrapper rather than a unification. **It needs a design answer
+  — where a per-row warning goes** — and Q-395's drawings do not settle it (checked: none of the
+  twelve artboards shows a warning treatment). `Gate: owner`.
+- **✅ RESOLVED 2026-08-24 — the drawings are in the repository.** **The lesson worth keeping: a
+  mockup that lives only in a chat artifact is a mockup the queue cannot use.** These were drawn
+  2026-08-18, reviewed twice, decided against — then blocked four entries for six days because
+  nobody committed them. **Commit the canvas in the same PR that files the entry citing it.**
+
+### [nutrition][app-shell] Q-395 — the nutrition rework: the spec every phase reads, and the final checkpoint
+
+- **Lane:** B
+- **Needs:** Q-395c
+- **⚑ SPLIT INTO PHASES 2026-08-23 — this entry is now the specification, not the work.** It was a
+  269-line item describing sixteen screens, listed as one thing an implementer could pick up. The
+  work is **Q-406** (the shared row) → **Q-395a** (quantity sheet + Edit Meal) → **Q-395b** (the day
+  screen) → **Q-395c** (Log Food + the `My Foods` rename). Each phase points back here rather than
+  copying the decisions, so they still live in exactly one place. **Read this before any phase.**
+- **Why it parks behind its own last phase.** It is the completion checkpoint: when Q-395c lands,
+  this confirms the drawn screens match what shipped, sweeps the ~11 sheets finding 18 lists as
+  never drawn, and leaves the queue. Never pick it up as a work item.
+
+- **Branch:** `feat/nutrition-visual-uplift`
+- **Added:** 2026-08-18 · owner: *"can we backlog a UI uplift for the nutrition side. I think it
+- **Lane:** B
+  could have a bit of a design uplift"*, with screenshots of **Saved Meals** and **Edit Meal**.
+- **What this entry is for.** A taste request cannot be implemented from as written, so this
+  separates the part that is objectively wrong (findings 1–3, each with a CI check that already
+  measures it) from the part that is genuinely a design decision (findings 4–5, which need
+  mockups before code). Do the first half regardless of what is decided about the second.
+- **Scope.** `app/nutrition/nutrition-content.tsx` and `components/nutrition/**` — the Nutrition
+  tab, the Saved Meals sheet, the Edit Meal builder, and the meal-plan sheets that share their
+  visual language. Nothing server-side: no route, no schema, no migration.
+
+**1 — 48 hardcoded hex literals, and `#22c55e` is the one that actually breaks.**
+`--brand` is **user-selectable at runtime**: `components/theme-color-picker.tsx:38` writes
+`--brand`/`--color-brand` from a hue the user picks, and `app/globals.css:59-65` *darkens* the
+light-mode value on purpose (the comment there says why — the vivid dark-mode green is unreadable
+as light-mode text). Every `#22c55e` in nutrition opts out of both. Change the accent to blue and
+nutrition's selected chips and checkboxes stay green; switch to light mode and they stay at the
+value the CSS deliberately avoids. Sites: `saved-meal-card.tsx:75,97` · `my-meals-picker.tsx:226,270,276` ·
+`restrictions-picker.tsx:183` · `meal-plan-edit-sheet.tsx:220` · `meal-plan-manage-sheet.tsx:173` ·
+`meal-plan-setup-sheet.tsx:206,433` · `meal-plan-review-step.tsx:114,158` · `meal-plan-section.tsx:30`.
+Same story for `#ef4444` where `text-destructive` already exists — `ingredient-row.tsx:52` uses the
+token correctly, `saved-meal-card.tsx` and `meal-plan-manage-sheet.tsx:248,263` use the literal.
+
+**2 — CI is already pointed at this, which is what makes it cheap.**
+`scripts/check-hex-literals.js:91-103` carries **14 nutrition files** as shrink-only baselines
+totalling 48 literals. Lowering those numbers *is* the deliverable for finding 1, the check proves
+it, and the ratchet means a redesign structurally cannot make it worse. Do not sweep the whole repo
+(471 literals) — that is a separate, much larger job.
+
+**3 — ⚠ Both landing files are at the 800-line ceiling, and this bites on line one.**
+`app/nutrition/nutrition-content.tsx` is **exactly 800** and `components/nutrition/saved-meals-sheet.tsx`
+is **793**. Neither is in `scripts/check-component-size.js`'s BASELINE, so both are held to
+`LIMIT = 800` hard — verified by the script's own counting, not `wc`. **Adding a single line to
+`nutrition-content.tsx` fails Custom Rules.** Extraction into `components/nutrition/` children is
+the first commit, not the cleanup at the end. Note the BASELINE is shrink-only: do not add these
+files to it to buy room.
+
+- **✅ FINDINGS 1 AND 2 SHIPPED 2026-08-18 (v1.324.4, Lane B).** Every `#22c55e` and `#ef4444` in
+  the nutrition surface is now `brand` / `destructive`, so selected chips, checkboxes and the plan
+  card follow the user's chosen accent and light mode's deliberately-darkened value. **Repo total
+  471 → 428**, and **eight nutrition files came off the hex baseline entirely**, which holds them at
+  zero from here — the ratchet now makes this class structurally unable to come back in those files.
+  One site needed more than a swap: `meal-plan-section.tsx` passed its literal to `accentCardStyle()`,
+  which needs real colour channels and **returns an accent-less card for anything that is not a hex**,
+  so handing it a `var()` would have silently dropped the tint. Its gradient is now built locally with
+  `color-mix` on `var(--color-brand)`, mirroring that helper's output including the `willChange` layer
+  promotion.
+- **Finding 3 did not bite and is still true.** Replacing literals with tokens is line-for-line, so
+  nothing was added to either 800-line file — but `nutrition-content.tsx` is still exactly at the
+  limit, so **the extraction is still the first commit of any change that adds a line.**
+
+**4 — Edit Meal is three times taller than it needs to be (the design half).**
+Each `IngredientRow` (`components/nutrition/ingredient-row.tsx`) stacks four bands: name + macro
+line, a 44 px delete button, a 44 px −/qty/+ stepper row, and a serving-conversion hint. Two
+ingredients fill the S25 screen — which is exactly what the owner's screenshot shows, with the
+whole-batch total already off-screen. A five-ingredient recipe is a blind scroll. **This needs a
+decision, not a fix.** Two shapes worth drawing: a compact row that reveals its stepper on tap, or
+the stepper inline with the name. Do not pick one in code first.
+
+**5 — Card metadata has an uneven rhythm.** `saved-meal-card.tsx:102,118` gate "Makes N portions"
+and "· per portion" on `servings !== 1`, so the first card in the owner's screenshot carries two
+lines the other two do not. The behaviour is right; the ragged card heights are the cost. A
+redesign should either reserve the slot or move it into the expanded view.
+
+
+**6 — MOCKUPS AND A DESIGN-SYSTEM REVIEW EXIST (2026-08-18).** The owner asked for drawn options
+before code, so both screens were recreated at true S25 size from the real tokens and reviewed
+against the `ui-ux-pro-max` rule set. **Canvas:**
+<https://claude.ai/code/artifact/936866ab-387b-44a3-9de0-de080a8d6c3b> — nine artboards: Edit Meal
+today vs proposed, Saved Meals today vs proposed, three srv/g options, a tap-target audit and the
+theme finding drawn out. The three findings below came out of that review and are additional to 1–5.
+
+**7 — Every control on both screens is 44 px. Rule 15 says 48 dp with 8 dp between.**
+44 is the iOS floor, not this repo's. Measured: srv/g segments **40 px** (`ingredient-row.tsx:86`,
+the smallest targets on either screen); quantity steppers, row delete and all four card actions
+**44 px** (`ingredient-row.tsx:50,59,75` · `saved-meal-card.tsx:194-217` ·
+`saved-meals-sheet.tsx:628,650`); stepper gap **6 px** against the 8 dp minimum
+(`ingredient-row.tsx:55`). The only compliant control on either screen is `Update Meal`
+(`saved-meals-sheet.tsx:774`, `h-12`). Treat this as **one systemic change**, not eight fixes.
+
+**8 — The srv/g toggle is a hand-rolled segmented control, and `components/ui/segmented-tabs`
+exists (rule 24).** `ingredient-row.tsx:81-95` rebuilds the pill-tab markup inline — the exact
+pattern that was copy-pasted ~17× with drifting font sizes before the primitive was extracted.
+Whichever option below wins, the control that survives comes from the primitive.
+
+**9 — What the toggle actually is, and the three ways out.** It selects an *input mode* for a value
+the row already prints both ways: `ingredient-row.tsx:100-107` always renders
+`1 serving of X = 250 g · using 300 g`. It is also per-row (`unitById` in `saved-meals-sheet.tsx`),
+so two rows can sit in different modes at once and `1.2` beside `60` means different things.
+- **A — the unit rides on the number** (`[−] [ 60 g ▾ ] [+]`), one tap inside the field swaps it.
+  **Recommended.** It removes a control rather than relocating one, the number is never bare, and
+  the freed width is what pays for 48 px steppers.
+- **B — grams only**, the stepper stepping by one serving. No mode at all, but you can no longer
+  *type* "2 scoops" — the exact case `ingredient-row.tsx`'s own comment says both units exist for.
+- **C — the toggle moves below the value row** at full size. No behaviour change, safest, and the
+  tallest of the three, which works against the density complaint that started this.
+
+**10 — ⚠ `#22c55e` is ALSO the literal value of `MACRO_COLORS.protein`.** A find-and-replace of that
+string onto `var(--brand)` would repaint the protein macro with whatever accent the user picked.
+The selection-state literals and the macro palette are the same eight characters and must not share
+a fate — finding 1 is the former only.
+
+
+**19 — Owner answers, 2026-08-18 (asked as four blocking questions).**
+- **Scope of the design pass:** *"the full work through; the nutrition tab; and all features from
+  logging food - to creating a meal to editing a meal."* Sixteen screens are now drawn end to end.
+- **Targets stay in Profile, with a shortcut.** `components/profile/macro-targets-pane.tsx` keeps
+  ownership; Nutrition Settings gets a row that jumps to it. They are profile-level facts like
+  weight, and moving them is churn — but editing them two tabs from where they are judged is the
+  friction the shortcut removes.
+- ~~**"Complete Today's Logging" is a button at the foot of the day's log**~~ — **shipped** (Q-387,
+  Lane A half v1.319.x, Lane B half #330). It is **no longer at the foot**: BF-6 moved it directly
+  under the meals in v1.344.0 because at the foot it took zero presses in seven weeks.
+- **The meal plan becomes a generator of saved meals** — see **Q-398**.
+
+**11 — THE DIRECTION IS SETTLED, AND IT IS BIGGER THAN A VISUAL PASS (2026-08-18).** The owner sent
+MyFitnessPal screenshots and asked for a rework that reads as naturally. Six screens are drawn at
+true S25 size in our own tokens — **canvas page "Reworked screens"**,
+<https://claude.ai/code/artifact/936866ab-387b-44a3-9de0-de080a8d6c3b>: the day, add food, my meals,
+meal detail, edit meal, and the quantity sheet. What was borrowed is **structural, not visual** —
+none of the chrome, colour or type is copied.
+
+**12 — The root cause of "bulky" is that a list row carries an editor.** Findings 7–9 treated the
+srv/g control as the problem; it is a symptom. Mainstream food loggers put **no controls on a list
+row at all** — row is name, a grey line of what and how much, calories right-aligned — and every
+quantity edit happens on a separate surface. Our `IngredientRow` instead replicates a delete
+button, a stepper, a value field, a unit toggle and a conversion hint onto *every* ingredient. Two
+ingredients fill the S25 screen; the drawn version fits five with room left over.
+**This supersedes srv/g options A, B and C** as a fork: the toggle now appears once, in the quantity
+sheet, at 56 px. Option A's shape (unit chip on the number) is what that sheet uses.
+
+**13 — One row component, six call sites.** Today a food reads one way in the diary, another in
+search, another in a saved meal, another in the builder — four shapes for one thing. The drawings
+use exactly one: optional thumbnail · name · grey secondary line · calories right-aligned in a fixed
+column · optional chevron. Build it as `components/nutrition/food-row.tsx` and use it on all six
+screens; per the repo's own reuse rule a pattern at ≥2 sites gets extracted before the third copy,
+and this is the sixth.
+
+**14 — The other structural changes, in the order they pay off.**
+- **The macro summary becomes a donut with each macro as a share of calories**, next to grams.
+  `components/nutrition/macro-ring.tsx` already exists — extend it rather than adding a second one.
+- **Grouped sections with full-bleed dividers** replace gapped cards, which is most of the vertical
+  space the day screen currently spends on nothing.
+- **Source tabs on the food picker** (Recent · Frequent · My meals · Recipes) replace separate
+  sheets, so a repeat log is one tap from the top of the list.
+- **The meal name becomes the screen title**, not a labelled input box, and the three-line batch
+  explainer becomes a subtitle: *"Makes 2 portions · 278 kcal each"*.
+- **Destructive actions leave the summary row** — delete lives in the quantity sheet and behind a
+  swipe on a saved meal, not beside the button pressed daily.
+
+- **⚠ Sequencing.** This is a rework, not a repaint, and it lands in the two files that are already
+  at the 800-line ceiling (finding 3). Order: extract `food-row.tsx` first, then the quantity sheet,
+  then convert screens one at a time behind the existing behaviour. **Do not start by editing
+  `nutrition-content.tsx`** — one added line fails Custom Rules.
+- **The known cost, stated so it is not discovered late:** changing a quantity now takes a tap. For
+  a saved meal built once and logged for months that is cheap; for someone tweaking amounts while
+  assembling, inline steppers were faster. The owner has seen this trade drawn and chose the rework
+  anyway.
+- **Related:** meal thumbnails are **Q-396**, filed separately because they need a migration and a
+  sync-payload change (Lane A) while everything above is Lane B.
+
+
+**15 — OWNER REVIEW OF THE MOCKUPS, 2026-08-18. Six notes, all folded in; one caught a real gap.**
+- **Ring:** use the shipped `MacroRing` (96 px masked conic + value/target bars), not a new donut —
+  with the filled arc **split by macro** instead of a single `var(--brand)` sweep. Do not add a
+  second ring component.
+- **Log Food is one screen.** The current capture step's six scattered entry points collapse to:
+  search across everything · tabs · a bottom row of capture actions. **Both were revised by the
+  owner on 2026-08-19 and the revision wins over this line** — the tabs are **Recent · My Foods**
+  (see note 17), and the action row is ordered **Photo · Barcode · Describe or enter**, in that
+  order, not the Barcode-first order originally drawn. The order is the owner's; it is also the
+  right default, since photo is the fastest path for a plated meal and barcode only works on
+  packaged food.
+- **Describe and manual entry become one sheet.** Type what you ate and the fields fill in; skip the
+  box and type them yourself. The fields are always visible, so neither path is a hidden mode.
+- **My Meals rows carry their macro split** (P/C/F beside the calorie column) so the list can be
+  chosen from. The label/QR and the full breakdown stay **inside** the meal on the detail screen.
+- **Edit Meal keeps a real servings control** — "This recipe makes [− 2 portions +]" at 48 px, in a
+  band that also states the per-portion cost. It had been demoted to a subtitle; that was wrong.
+- **The quantity sheet must show where it came from:** the tapped ingredient row stays lit under the
+  scrim and the sheet is headed "Ingredient 1 of 5 · <meal>". Without that the sheet reads as an
+  unrelated screen.
+
+**16 — ⚠ THE COVERAGE AUDIT THE OWNER ASKED FOR, AND WHAT IT FOUND.** *"Make sure you compare each
+page/section to what's in prod right now — we don't want to silently lose any sections."* The first
+draw showed **3 of the 11 sections** the Nutrition tab actually renders. In shipped order
+(`app/nutrition/nutrition-content.tsx`): ScreenHeader + date nav · **CalorieBalanceBar** ·
+MacroRing · **NutritionActionRow (three buttons — Saved Meals had been dropped)** ·
+**MealPlanReviewCard** · **MealPlanSection** · **TdeeAdaptationCard** · MealCard × meal types ·
+**End of Day** · **WeeklyNutritionChart** · **SupplementsSection**. The eight in bold were missing
+and are now drawn. **Any implementation PR carries this list and checks it off** — a rework that
+quietly loses a section is the failure mode this entry exists to prevent.
+
+**17 — DECIDED 2026-08-19, and it went further than the question asked. The tabs are `Recent` and
+`My Foods`. Two, not four.** The question here was where to put `My Foods`; the owner answered by
+collapsing the row: ***"I Think recent tab is fine; dont think we need frequent - saved and myfoods
+I dont think need to be seperated. Saved could contain foods made or saved. Maybe we just have 'my
+foods'"***.
+- **`Frequent` is dropped.** It was a second ordering of the same list Recent already shows.
+- **`Saved meals` and `My Foods` merge into one `My Foods` list** holding anything the user made or
+  saved. This is the right call for a reason worth writing down: a saved meal and a food you built
+  were always the same kind of row wearing two labels, which is exactly what finding 13's single
+  row component says. Two lists that render identically and differ only in provenance are one list
+  with a subtitle.
+- **Nothing is lost, and check that before building.** `FoodLibrarySheet` and `SavedMealsSheet` are
+  separate components today; merging the tabs must not silently drop a capability that only one of
+  them has (bulk delete, meal-plan linkage, the label path). Diff them first and carry every action
+  across, or say in the PR which was intentionally dropped.
+- Ordering within `My Foods`: most recently used first, so the merge does not bury saved meals under
+  one-off foods.
+- **⚠ The merge is a RENAME as well as a merge, and the rename has to be swept.** The owner spotted
+  the half-done version immediately — *"So im picking up a discrepancy between My Meals and My
+  foods? Whats the difference"* — against a prototype that still had a `My Meals` screen beside a
+  `My Foods` tab. There is no difference, and that is the point: **two names for one list is the
+  defect**. Grep for every user-facing occurrence of *Saved meals*, *My Meals* and *My Foods* —
+  sheet titles, tab labels, empty states, toasts, the `+ Add food` destinations, the nav copy — and
+  land on the single name in one pass. A surface left on the old name reads as a second list that
+  is missing rows.
+
+**18 — Sheets not yet drawn, listed so they are not assumed done.** `FoodLoggerSheet` review and
+assign steps (only capture is drawn) · `QuickEditLogSheet` · `WaterLogSheet` · `FoodLibrarySheet` ·
+`MealTypeManager` and the Nutrition Settings sheet · `MealPlanSetupSheet`/`EditSheet`/`ManageSheet` ·
+`ManageSupplementsSheet` · `EndOfDayReview` and its seven children · the barcode overlay · the
+delete-log dialog. Roughly eleven more surfaces. They inherit the row language and the 48 dp floor
+whether or not anyone draws them first.
+
+**What NOT to change — all three exist because a CLAUDE.md rule required them:**
+- `MACRO_COLORS` (`@trainingai/shared/nutrition/macro-colors`) is the shared semantic palette,
+  correctly imported at every site. It is **not** finding 1 and must not be tokenised away.
+- `saved-meal-card.tsx` is well built: `role="button"` + `aria-expanded` (`:80-82`) for the
+  nested-control WebView rule, macro colour always paired with its P/C/F label (`:130-142`) for the
+  colour-only-state rule, and an inline delete confirmation (`:172+`). A visual pass keeps all three.
+- No new dependencies — `motion` v12, `@use-gesture/react` and shadcn primitives are installed.
+
+- **DECIDED BY THE OWNER, 2026-08-19 — the ingredient row is unblocked.** Both open questions were
+  answered in one reply: ***"go with A, and yes collapse the row when not editing"***.
+  1. **Option A wins** — the unit rides on the number as a chip inside the field, `60 g` ⇄ `2 srv`
+     on one tap. B and C are dead; do not revisit them. The control comes from
+     `components/ui/segmented-tabs`, not a fourth hand-rolled segmented control (finding 8).
+  2. **Rows collapse when not being edited**, one expanded at a time. The collapsed shape is
+     finding 13's single row component — name · grey secondary line · calories right-aligned ·
+     chevron — so this is not a second component, it is `food-row.tsx` with an expanded state.
+  **Read this together with finding 12, which is not contradicted by it.** Finding 12 retired A/B/C
+  *as a fork over what sits on a list row*, because the answer there is **nothing** — a diary or
+  search row carries no editor and never expands. What the owner has now chosen is the shape of the
+  quantity control **wherever it does appear**: the quantity sheet, and the expanded row in Edit
+  Meal, which is a builder rather than a list. Finding 12 already anticipated this
+  (*"Option A's shape (unit chip on the number) is what that sheet uses"*), so the decision confirms
+  it rather than reopening it. **A row in the diary that expands to edit would be a
+  misreading of both.**
+- **The drawings exist, and since 2026-08-24 they are IN THE REPO** —
+  [`docs/design/2026-08-18-nutrition-rework-mockups.html`](design/2026-08-18-nutrition-rework-mockups.html)
+  (finding 6's canvas, committed). The expanded row is the **`srv/g — A`** artboard
+  (`UnitA.dc.html`); the collapsed `Full Cream Milk` row is in **`EditMeal.dc.html`** — two different
+  artboards, which this line previously implied were one. Findings 1, 2,
+  3, 7 and 8 never depended on this answer and can still go first — but nothing is blocked now.
+- **Still open, and deliberately not blocking: where `My Foods` lives** (note 17). Recommendation
+  stands — a **fourth tab** beside Recent, Frequent and Saved meals, because it is a list of foods
+  like the other three and a tab is where someone looks for it. Build it that way unless the owner
+  says otherwise; it is one line to move later.
+- **Lane B** — `components/nutrition/**` and `app/nutrition/**` are both Lane B's under §3, and
+  nothing here touches an engine path.
+- **Read first:** [`docs/domains/nutrition/README.md`](domains/nutrition/README.md), then the
+  `ui-ux-pro-max` skill — it is this repo's own design system and the authority for this item.
+- **Verification.** `node scripts/check-hex-literals.js` must report a **lower** number for every
+  file touched; `node scripts/check-component-size.js` clean without new BASELINE rows;
+  `pnpm check:rules`. Then the **on-device smoke run** — this is pure UI on the canonical runtime,
+  in both themes, so a green `pnpm dev` is not sufficient evidence and a Known-Issues row is the
+  fallback if no device is available.
+
+### [nutrition][app-shell] Q-395c — phase 4: Log Food becomes one screen, and `My Foods` becomes one name
+
+- **Lane:** B
+- **Spec:** Q-395, findings 15 and 17.
+- **Scope.** The capture step's six scattered entry points collapse to one screen: search across
+  everything · two tabs · a bottom row of capture actions.
+- **The decided details, all owner-set:** tabs are **`Recent` and `My Foods`**, two not four
+  (`Frequent` was a second ordering of what `Recent` already shows). Action row ordered **Photo ·
+  Barcode · Describe or enter**. Describe and manual entry are one sheet with the fields always
+  visible, so neither is a hidden mode. `My Foods` rows carry their P/C/F split beside the calorie
+  column; the label/QR and full breakdown stay inside the meal.
+- **⚠ The merge is a RENAME as well as a merge, and the rename must be swept in one pass.** Saved
+  meals and My Foods become one list. The owner caught the half-done version immediately — *"So im
+  picking up a discrepancy between My Meals and My foods? Whats the difference"* — and there is no
+  difference, which is the point. **Two names for one list is the defect.** Grep every user-facing
+  occurrence of *Saved meals*, *My Meals* and *My Foods* — sheet titles, tab labels, empty states,
+  toasts, `+ Add food` destinations, nav copy — and land on the single name together. A surface left
+  on the old name reads as a second list that is missing rows.
+- **⚠ Diff `FoodLibrarySheet` against `SavedMealsSheet` before merging them.** Carry every action
+  across — bulk delete, meal-plan linkage, the label path — or say in the PR which was dropped.
+  Order `My Foods` most-recently-used first so the merge does not bury saved meals.
+- **Verification.** As Q-395a, plus a grep proving nothing user-facing still says *Saved meals* or
+  *My Meals*.
+
+### [nutrition] BF-11 — the meal creator/planner redesign: the spec every phase reads, and the final checkpoint
+
+- **Needs:** BF-11h
+- **Not a work item.** Split into eight phases 2026-08-24 (BF-11a…BF-11h below), the way Q-395 was.
+  This entry is the spec pointer and the closing checkpoint: strike it when every phase has shipped
+  *and* the whole flow has been walked once on the S25 — creating a meal from a recipe URL, from a
+  multi-dish photo, and generating a plan that draws on the library.
+- **Added:** 2026-08-24 · owner: *"the meal scan by url — this was added to the meal planner — but I
+  think this needs to be moved 'create a meal' then the meal builder can reference previously made
+  meals."* Grew across three more owner messages, same session, into a full design for both halves.
+- **The design (decisions, owner's words, file/line trace):**
+  [`docs/superpowers/specs/2026-08-24-meal-creator-and-planner-design.md`](superpowers/specs/2026-08-24-meal-creator-and-planner-design.md).
+- **The plans (build order, resolved open calls, verification):**
+  - Part 1 — [`plans/2026-08-24-meal-creator.md`](superpowers/plans/2026-08-24-meal-creator.md)
+  - Part 2 — [`plans/2026-08-24-library-first-meal-planner.md`](superpowers/plans/2026-08-24-library-first-meal-planner.md)
+- **Owner's sequencing is binding:** the Meal Creator (BF-11a…d) ships first and on its own merits;
+  the Planner integration (BF-11e…h) comes after and depends on it.
+- **The three open calls the design left to planning are RESOLVED** — reasoning in Part 2 §3, so
+  nobody re-litigates them. In short: the no-match fallback is **AI generation, labelled** (not
+  prompt-to-create, which would strand a half-built wizard); the meal-count prompt fires **only when
+  a pin would be dropped**, and there is **nothing to "transfer"** because the split derives from the
+  day's totals rather than the sum of the slots; and "select all" is **`useLibrary: boolean`**, not a
+  list, because the route already reads the library server-side. **None needed the owner.**
+- **⚠ Two live defects found while planning, in the path BF-11h rewrites.** Lower the meal count
+  after picking meals (the picker's `maxKeepable` guard only holds going forward) and
+  `generate/route.ts` puts a **negative number in the prompt** (`Meals: exactly -1`) and **silently
+  discards** every pinned meal past the slot count — `names[i]` is never read beyond `slots.length`.
+  Part 2 §2 has the trace. It is the mechanism behind the owner's *"it's gotta prompt you
+  somewhere"*, and it is a silent drop, not just a missing prompt.
+- **Overlap with Q-407 (below), not a duplicate.** Q-407 reworks the whole wizard into a coach
+  conversation and touches neither scanning location nor planner matching. The engine phases
+  (BF-11e, BF-11g) are untouched by it either way, which is why they lead. Part 2 §6 has the
+  either-order rule.
+- **Collision with the parked Q-406 → Q-395a/b/c chain** (that chain is `Gate: owner` — its
+  reference drawings were never committed). Part 1 §8 has the file-by-file collision table and the
+  carry-across rule. **Do not plan around that chain landing, and do not wait for it.**
+
+### [nutrition] BF-11b — the scan route returns N candidate meals instead of one
+
+- **Lane:** A
+- **Plan:** [`plans/2026-08-24-meal-creator.md`](superpowers/plans/2026-08-24-meal-creator.md) §4
+- **Branch:** `feat/scan-multi-candidate`
+- **Added:** 2026-08-24 · planning session, from BF-11 (design item 2).
+- **Lane A by the §3 rule, not by BF-11's old `Lane: B` line** — `app/api/nutrition/scan/route.ts` is
+  reached by `app/api/**`. The engine half lands before the UI that consumes it.
+- **`ScanSchema` returns exactly one `name` + one `ingredients[]` for every input mode today.** A
+  week of meal-prep containers, or a "5 lunches" roundup page, is forced into one merged estimate.
+- **Additive, not breaking.** Four call sites read the current shape (`capture-step.tsx`,
+  `review-step.tsx`, `meal-backfill-section.tsx`, `saved-meals-sheet.tsx`); three of them are
+  single-dish by nature. Keep the top level as-is (= `candidates[0]`) and add `candidates` alongside.
+  **Do not flip the top level to an array.**
+- **The risk is the splitting decision, not the macros:** one plated curry-rice-naan is **one** meal;
+  five labelled tubs are five. Pin it with fixture tests asserting candidate **counts and names**,
+  never calories, or the test becomes a model snapshot that fails on every prompt tweak.
+- Cap candidates at 8; `identified: false` still returns none; the URL branch's `recipeYield` divide
+  is **per candidate**.
+
+### [nutrition] BF-11c — Build a Meal gains the recipe URL, the candidate picker and History quick-add
+
+- **Lane:** B
+- **Needs:** BF-11a, BF-11b
+- **Plan:** [`plans/2026-08-24-meal-creator.md`](superpowers/plans/2026-08-24-meal-creator.md) §5
+- **Branch:** `feat/build-a-meal-add-methods`
+- **Added:** 2026-08-24 · planning session, from BF-11 (design items 1, 2, 3). **This is BF-11's
+  original ask** — the recipe-URL scan reachable without starting the whole plan wizard.
+- **Three add-methods beside the existing search; none replaces anything.** (a) an `https:` URL →
+  whole recipe; (b) a multi-candidate list when a scan returns several dishes, each kept one becoming
+  **its own** saved meal; (c) the food-item **History** list Log Food already has
+  (`capture-step.tsx:245`) as the default state before you type — **reuse that source, do not build a
+  second one.**
+- **⚠ The unstated-yield case is not cosmetic.** `recipeYield: null` means the payload is the WHOLE
+  recipe — a banana-bread page measured **1,956 kcal for the loaf**. Reuse `my-meals-picker.tsx`'s
+  handling and the shared `perServing`, so the two divides cannot drift.
+- **One real difference from the wizard's version:** a "makes 12" recipe lands as `servings: 12` with
+  the whole recipe's items, **not** pre-divided — `SavedMeal.totals` is the whole recipe by contract
+  and `oneServingItems()` is the one place that divides. Pre-dividing here double-divides on log.
+- **Check before reusing `food-row.tsx`**: its only trailing element is a chevron, and a candidate row
+  needs keep/discard. Q-406 records that adding slots for per-row controls is what turns that row into
+  a wrapper rather than a unification — extend it deliberately or draw the candidate list separately
+  and say which.
+
+### [nutrition] BF-11d — a scan that duplicates an existing meal asks instead of silently adding one
+
+- **Lane:** B
+- **Needs:** BF-11c
+- **Plan:** [`plans/2026-08-24-meal-creator.md`](superpowers/plans/2026-08-24-meal-creator.md) §6
+- **Branch:** `feat/saved-meal-duplicate-detection`
+- **Added:** 2026-08-24 · planning session, from BF-11 (design item 5). Owner: *"happy to have this
+  workflow for now"* — build as designed, refine on use.
+- **"Close" already has a definition worth reusing rather than inventing:** `fitDistance`
+  (`packages/shared/src/nutrition/meal-macro-fit.ts`) reduces a macro comparison to one comparable
+  number and exists so two versions of the same meal can be compared without a second opinion about
+  "better". Pair it with a normalised name match and **require both** — macros alone match every
+  protein shake against every other one.
+- **It asks, never merges.** "Save as new" is one tap and is the safe default on dismissal. It runs on
+  save, not per keystroke.
+- **"Update it" must keep the existing id** — `meal_plan_meals.saved_meal_id` and the printed QR label
+  both reference it, so a new id orphans a label already stuck on a container.
+- May batch with BF-11c (one screen, one verification pass) if BF-11c's save path lands unchanged.
+
+### [nutrition] BF-11e — saved meals get meal-type tags, so slot matching is not macro-blind
+
+- **Lane:** A
+- **Plan:** [`plans/2026-08-24-library-first-meal-planner.md`](superpowers/plans/2026-08-24-library-first-meal-planner.md) §5.1
+- **Branch:** `feat/saved-meal-meal-type-tags`
+- **Added:** 2026-08-24 · planning session, from BF-11 (design item 8). Owner: *"we don't want
+  pancakes recommended for dinner."*
+- **Reuse `MealType` as the vocabulary** rather than a parallel "category" concept — the user already
+  names and configures their own meal types, each with a time window, and a meal can be eligible for
+  several. New join table `saved_meal_meal_types`, composite PK, `saved_meal_id` cascading.
+- **⚠ Needs a Postgres migration. Lane A claims the number against the directory AND open PRs when it
+  builds** — the tree already carries four collided pairs and `migrate.js` applies in filename order.
+  The plan names the requirement, never the number.
+- **Three constraints the trace found, none obvious:** `meal_types` **soft-deletes**, so a join row can
+  point at a deleted type — filter on read rather than deleting join rows, so restoring a type
+  restores its tags; saved meals reach the device via **`hydrateSavedMeals`, not `getSyncDelta`**, so
+  tags ride the existing `listSavedMeals` response and there is no pull-delta branch; but the **push**
+  branch does exist (`adapter.ts:4175`), so route, outbox payload, `pushMutations` and the local table
+  all take tags **in the same PR**.
+- Local SQLite: new table registered in `RECONCILE_TABLES` in the same commit, plus a version bump.
+  Every `SavedMeal` mapper gains `mealTypeIds` — a missed mapper fails silently as "tags don't save".
+- **Never batch this** — it carries a migration.
+
+### [nutrition] BF-11f — tagging a meal from Build a Meal
+
+- **Lane:** B
+- **Needs:** BF-11e
+- **Plan:** [`plans/2026-08-24-library-first-meal-planner.md`](superpowers/plans/2026-08-24-library-first-meal-planner.md) §5.2
+- **Branch:** `feat/saved-meal-tag-ui`
+- **Added:** 2026-08-24 · planning session, from BF-11 (design item 8, UI half).
+- Multi-select chips of the user's live meal types in the build/edit form; reuse the wizard's existing
+  `ChipGroup` rather than drawing a fourth chip.
+- **An untagged meal is eligible for EVERY slot, not none** — the other way round silently shrinks
+  everyone's library to zero on the day it ships.
+- Independent of BF-11g; the two may run in parallel in different lanes.
+
+### [nutrition] BF-11g — the planner searches your saved meals before asking the AI
+
+- **Lane:** A
+- **Needs:** BF-11e
+- **Plan:** [`plans/2026-08-24-library-first-meal-planner.md`](superpowers/plans/2026-08-24-library-first-meal-planner.md) §5.3
+- **Branch:** `feat/library-first-meal-plan`
+- **Added:** 2026-08-24 · planning session, from BF-11 (design items 6, 7, 9, 10). **The core of Part
+  2.** Owner: *"it prefers meals already in the planner and adds other meals around it."*
+- **Today every non-pinned slot is a fresh AI recipe** — nothing reads the library. New order per
+  unpinned slot: filter by the slot's meal type (plus untagged) → rank by **`fitDistance`** → take the
+  best if `mealFit` says it is close enough → otherwise fall through to AI → either way through
+  `scaleWithTopUp`, unchanged.
+- **Do not write a second ranking function.** `fitDistance`/`mealFit`
+  (`packages/shared/src/nutrition/meal-macro-fit.ts`) is already the One-Formula-One-Place for "how
+  far is this meal from its target", relative rather than absolute, calories deliberately excluded.
+- **`useLibrary: boolean`, not a list of ids** — the route already calls `listSavedMeals(userId)`
+  server-side, so "use all my saved meals" costs zero payload and cannot name another user's meal.
+  **Keep `keepSavedMealIds.max(6)`**: it equals `MEAL_COUNT_MAX`, so it is not arbitrary. But
+  `listSavedMeals` is currently fetched only when pins exist — it must be fetched when either is set.
+- **⚠ New failure mode this change creates: a meal used twice in one day.** The "genuinely DIFFERENT
+  food" instruction constrains the *model*, and a library search never reaches the model. Track what
+  each slot consumed.
+- **Also fixes the §2 server half:** cap honoured pins at the slot count and **report the drop**,
+  so a client that skips BF-11h's prompt still gets a coherent plan instead of a silent discard.
+- `matchReason` on the response is not decoration — BF-11h's swap and the existing AI edit both need it.
+
+### [nutrition] BF-11h — the wizard surfaces the library, the reasons, and the meal-count prompt
+
+- **Lane:** B
+- **Needs:** BF-11f, BF-11g
+- **Plan:** [`plans/2026-08-24-library-first-meal-planner.md`](superpowers/plans/2026-08-24-library-first-meal-planner.md) §5.5
+- **Branch:** `feat/meal-plan-library-surface`
+- **Added:** 2026-08-24 · planning session, from BF-11 (design items 10, 11, 12).
+- Four things, one screen pair, one verification pass: a **"use all my saved meals"** toggle in the
+  *Yours* step (the existing checkboxes stay and keep meaning *pin* — the copy must distinguish
+  them); **"why this meal"** from `matchReason`, and its inverse on a fallback slot, which is the
+  useful half of the rejected prompt-to-create option; **reroll offers a library swap first**, AI
+  second; and the **meal-count reduction prompt**.
+- **⚠ The reduction prompt is fixing a live silent drop, not adding a nicety** — see BF-11 above and
+  Part 2 §2. It fires **only when `K > M − 1`** (pins exceed the slots left after the planner's
+  reserved one). Below that, re-run the split and say nothing: **there is nothing to "transfer"**,
+  because the split derives from the day's totals, so removing a slot redistributes automatically.
+  What the user loses is a meal *choice*, and that is what the prompt is about.
+- **Verify the regression, don't inspect it:** pick the maximum meals, go back, lower the count,
+  confirm the prompt fires and nothing is dropped. The failure is invisible from the UI.
+- Read Q-407 first (Part 2 §6) — it edits the same two files, and its instruction *"do not delete the
+  stepper in this PR"* holds here too.
+
+### [nutrition][platform] Q-407 — the meal-plan wizard is seven screens for six answers, and the one piece the Coach lacks is multi-select
+
+- **Branch:** `feat/nutrition-coach-meal-plan`
+- **Added:** 2026-08-19 · BugFix Intake, from the owner · mockup rendered in-session
+- **Lane:** ?
+- **Placement:** in the nutrition cluster, after Q-398 — **which shipped 2026-08-24**, so the
+  dependency is cleared. The plan's exit route in this design is "Save all as meals", and plan meals
+  can now become ordinary saved meals; before that, a conversational plan had nowhere to land and
+  was only a nicer-looking dead end.
+- **Owner's words:** *"lets get the meal plan setup wizard mocked up too -> This could use some
+  work - its too step by step - Could we try implement this into an AI coach/meal builder type
+  thing? Where it feels like a chat with a UI? Also there should be options for 'select all' as I
+  keep clicking each grocery store."* and, on the mockup, *"This looks really good - I'd like to
+  see that in prod"*.
+
+- **What it is today.** `components/nutrition/meal-plan-setup-sheet.tsx` (445 lines) is a linear
+  stepper: `const STEPS = ['Stores', 'Avoid', 'Skip', 'Meals', 'Yours', 'Training', 'Review']`
+  (line 28), seven screens holding thirteen `useState` fields, with a fixed footer per step. It
+  works, and the docstring's reason for the stepped shape is sound (a fixed action row that never
+  scrolls away, and `SheetFooter` owning the bottom inset — this repo's most repeated on-device
+  regression). **Keep that property.** The problem is not the footer, it is that six of the seven
+  screens ask a question the app can mostly answer itself, and none of them can be skipped.
+
+- **Three of the four pieces already exist, which is why this is smaller than it sounds.**
+  - `lib/coach/widgets.ts` is a **union of client-side tool schemas**, explicitly documented as the
+    extension point: *"Adding a widget means adding a member here and a row in
+    `components/coach/widget-registry.tsx`. The union is the extension point; the protocol does not
+    change."*
+  - `CHOICE_SOURCES` (`['sessions','exercises','swap_candidates']`) is the **server-fills-the-list**
+    mechanism, and its docstring is already the token argument the owner is asking for: a
+    nine-option picker the model typed out cost **~554 output tokens**, and *"having a language
+    model re-type it is paying to transcribe your own database"*. `app/api/coach/options/route.ts`
+    is where a source is resolved.
+  - `HandoffSchema` routes to real screens (`destination: 'program_builder' | 'log_activity' |
+    'profile' | 'nutrition'`), so a conversation that must hand off to a full screen has a route.
+
+- **The one genuine gap: `choice_list` is single-select, and that is exactly the owner's complaint.**
+  `ChoiceListSchema` (lib/coach/widgets.ts) has `prompt`, `source`, `sourceId`, `options[]` — **no
+  multi flag** — and `ChoiceList`'s callback is `onChoose?: (option: { id, label }) => void`, one
+  option, singular. There is no configuration that makes it multi-select. So "I keep clicking each
+  grocery store" is not a missing convenience on top of a multi-select; the widget has never had
+  one. **Extend the schema rather than adding a second widget:**
+  - add `multi?: boolean` and `selectAll?: boolean` to `ChoiceListSchema`, defaulting false so
+    every existing call site is unchanged;
+  - `ChoiceList` gains checkbox rows, a "Select all" row (with an `n of m` count) and a Continue
+    button, resolving to a **list** of options;
+  - **flat, not a discriminated union** — the schema's own comment says why: *"Gemini's
+    function-declaration schema is fussy about unions, and this feature has already lost a day to
+    one (`z.literal(false)`)."* Do not model this as a union of single/multi variants.
+  - `MAX_VISIBLE_ROWS = 6` already scrolls the list; six stores fit, so no change needed there, but
+    check the Continue button is inside the widget and not below the scroll region.
+
+- **The stores list is the reference case for the token saving.** `STORES` is a hardcoded curated
+  six-item AU list in the component (line 21) with a docstring saying it is deliberate. The coach
+  must **never type those six names** — add a `grocery_stores` source to `CHOICE_SOURCES` and serve
+  it from `app/api/coach/options/route.ts` alongside the existing three. Same for the ingredient
+  lists (`PROTEINS`, `CARBS`, `FATS`, `VEG` — 32 more strings) and the dietary-restriction
+  catalogue, which is already an API (`/api/nutrition/dietary-restrictions`). **Every one of those
+  is a string the model would otherwise generate and the app already holds.**
+
+- **The conversation shape (from the mockup).** Three things, in order:
+  1. **Answers are widgets.** Stores as the new multi-select with Select all; restrictions as chips.
+     The coach **states what it already knows instead of asking** — *"I already know you log dairy
+     most days, so I have left it in"* — which is both the token saving and the better manner. The
+     seven steps become at most three exchanges, and any of them can be typed past instead of
+     tapped.
+  2. **The plan arrives as a widget, not prose.** A card listing each meal with its calories and
+     item count, plus **Save all as meals** (Q-398) and Redo. The plan is then disposable, because
+     the meals outlive it.
+  3. Entering from the Nutrition tab starts you **inside the nutrition scope**. **Scope it by giving
+     the coach a tool subset, not by instructing it** — a prompt that says "do not read workout
+     data" is a request the model will occasionally ignore, while a tool it never receives is a
+     boundary it cannot cross. **Make that subset a named record** (prompt section + tool subset +
+     patch domains + widget sources) rather than an inline filter, so a second coach can have one
+     without a refactor. That one line is all that survives of Q-408 — see the note below.
+
+- **Q-408 was descoped into the line above, 2026-08-19, on the owner's call.** It proposed the full
+  architecture from the owner's original message: Home as an "AI Coach" routing to scoped Nutrition,
+  Workout and Goal specialists. **Removed rather than deferred, for three reasons worth keeping so
+  nobody re-files it unexamined:**
+  1. **It is a router for one destination.** There is one coach. Routing has value when it picks
+     between coaches, and every decision in that design would have been made against imagined
+     requirements until a real second coach exists.
+  2. **Its hardest problem argues against it.** The owner's own example — *"what should I eat before
+     tomorrow's legs session?"* — is nutrition **and** workout. A strict boundary breaks it, so the
+     architecture's central question was never how to separate the coaches but how to let them talk
+     anyway, which is a harder problem than the one that motivated it.
+  3. **The token argument does not survive contact with Q-170's measurement.** Latency is almost
+     entirely *output* tokens; a shorter per-scope system prompt saves *input* tokens, which are not
+     the bottleneck. And inlining more prompt context was measured **twice** and made things worse.
+     The real saving — naming a `source` and letting the server fill the list — already exists as
+     `CHOICE_SOURCES` and is already in this entry.
+  **Reversal cost is nil.** If a second coach earns its place, write the architecture then, against
+  real requirements. The named-record shape above is what keeps that cheap.
+
+- **OWNER REVIEW OF THE PROTOTYPE, 2026-08-19 — the plan must end by writing meals, and that is not
+  optional polish.** ***"Meal plan coach needs more work - I want it to make the meal plan; then add
+  each item to the saved meals/my foods"***. The conversation is not finished when it prints a plan;
+  it is finished when **every meal in the plan exists as a row in `My Foods`**, indistinguishable
+  from one built by hand — loggable, editable, and with its own printable label.
+  - **This makes Q-398 a hard prerequisite rather than a related item.** Q-398 is the write path
+    (plan meal → saved meal, keyed on `(plan id, plan item id)` so a repeat save is a no-op). Without
+    it there is nothing for the widget's button to call, and a coach that produces an un-saveable
+    plan is the same dead end the stepper already is.
+  - **The plan is disposable once its meals are saved**, and the copy should say so. That is the
+    whole reason this beats a plan document: the user keeps meals, not a plan.
+  - The prototype demonstrates the loop end-to-end (tap *Save all to My Foods*, then find the four
+    meals under `My Foods` tagged *from your plan*) —
+    <https://claude.ai/code/artifact/4fc7f99e-71f3-442c-b88b-1bb83b5fa9d6>.
+
+- **Do not delete the stepper in this PR.** The wizard is a working flow the owner uses; ship the
+  conversation as the path behind the same entry point and keep the stepped sheet reachable until
+  the conversation has been used on-device for a plan the owner actually keeps. A conversational
+  flow that stalls mid-plan with no fallback is strictly worse than seven screens that finish.
+
+- **Lane.** Split, and **`lib/coach/**` is Lane A** — six `app/api/coach/**` routes import it
+  (nine imports; `apply.ts` and `patch.ts` also write storage), and the rule in
+  [`docs/agents/README.md`](agents/README.md) §3 sends anything reached by `app/api/**` to Lane A.
+  **No baton claim is needed**, and an earlier draft of this paragraph saying otherwise was wrong.
+  `lib/coach/widgets.ts` + `app/api/coach/options/route.ts` + `app/api/coach/route.ts` (the SYSTEM
+  prompt's widget rules, lines 27–59) are **Lane A**; `components/coach/choice-list.tsx`,
+  `components/coach/widget-registry.tsx` and `components/nutrition/meal-plan-setup-sheet.tsx` are
+  **Lane B**. The schema change lands first — the component cannot render a flag the schema does
+  not carry.
+
+- **Verification.** The multi-select half is testable in the sandbox: a widget rendered with
+  `multi: true` returns every checked id, Select all toggles all six, and an existing single-select
+  call site still resolves to one option (that regression is the actual risk). The **conversation
+  half is not** — it needs a real Gemini turn, so run one plan end-to-end against `pnpm dev` and
+  say plainly that the on-device pass (safe-area under the composer, the widget inside a scrolling
+  thread) was not exercised unless it was.
+
+## Owner request, 2026-08-25 — the device smoke run on the nutrition rework
+
+*The owner ran the ten-step checklist for Q-395a and Q-395b on the S25 and answered every step.
+Both device gates passed and both entries closed. Four findings came out of the answers rather
+than the checks: two are nutrition-screen work and sit in the section above (BF-24, BF-26); these
+two are app-wide and sit here.*
+
+### [app-shell][platform] BF-25 — the light theme has no switch, and the owner wants it gone
+
+- **Lane:** B
+- **Gate:** owner
+- **Added:** 2026-08-25, device smoke run ⑤ — *"Do we have an option in the app to go between dark
+  and light mode? I vote we remove dark/ight mode and only have one real option which is the dark."*
+
+**The answer to the question, because it changes the decision: no, there is no switch.**
+`grep -rn 'setTheme('` over `app/` and `components/` returns **zero** call sites. `app/layout.tsx:140`
+mounts `<ThemeProvider attribute="class" defaultTheme="system" enableSystem>`, so the theme follows
+the **phone's** setting and nothing in the app can change it. Light mode is not an option the owner
+chose and can un-choose; it is what the app becomes if the S25 is ever put in light mode.
+
+**Recommendation: force dark, keep the light palette.** These are two separable changes and only one
+of them is worth making.
+
+- **Do:** `forcedTheme="dark"` on the provider — one line, and after it no user, no OS setting and no
+  auto-scheduled night mode can produce a light render. Reversing it is deleting the prop.
+- **Do not:** delete the light palette. The `:root` block in `app/globals.css` (the `.dark` block
+  overrides it), the scheme-conditional pairs in `resolveColor`, `HERO_GRADIENTS`,
+  `lib/background/screen-palettes.ts`, and the `resolvedTheme` reads in
+  `components/nutrition/weekly-nutrition-chart.tsx` and `components/health/detail-hero.tsx` all cost
+  **nothing while unreachable** — dead CSS custom properties are not paid for at runtime. Deleting
+  them is a wide, hand-verified sweep whose only benefit is tidiness, and it is the half that cannot
+  be undone.
+- **What it buys immediately:** every "verify in both themes" gate in this repo collapses to one
+  theme, including the ones sitting open on Q-395a and BF-26 right now. That is the real saving, and
+  the one-line change delivers all of it.
+- **Reversal cost:** removing the prop, if `forcedTheme` alone ships. Weeks of re-derivation, if the
+  palette goes too.
+- **The one thing to check before shipping even the one-liner:** the `useTheme()` mounted-gate hazard
+  in CLAUDE.md defaults to dark during SSR, so forcing dark cannot introduce a flash — but confirm
+  `next-themes` still stamps `.dark` synchronously under `forcedTheme`, since three components
+  document depending on exactly that.
+
+- **Verification.** Put the S25 in light mode and confirm the app stays dark end to end. Then grep
+  for surfaces reached outside the provider — the icon routes and any canvas paint — since a forced
+  class cannot reach those.
+
+### [app-shell] BF-27 — 5 of 45 sheets handle the Android back gesture; the other 40 navigate the page away
+
+- **Lane:** B
+- **Added:** 2026-08-25, device smoke run ⑩. The quantity sheet passed — back closed the sheet and
+  left the day screen — and the owner's reply was that this is the exception: *"there are many pages
+  that dont do this well; so we should do a review on these pages to make it all like this"*.
+- **Measured 2026-08-25.** `lib/hooks/use-sheet-back-dismiss.ts` is imported by **five** components:
+  `morning-checkin-sheet`, `nutrition/food-logger-sheet`, `nutrition/quick-edit-log-sheet`,
+  `nutrition/end-of-day/end-of-day-review`, `nutrition/food-library-sheet`. There are **45** files
+  rendering `<SheetContent>` and **6** rendering `<DialogContent>`, none of the latter using it. So
+  on ~40 sheets the back gesture is handled by the WebView, which navigates the underlying page
+  instead of dismissing the thing on top of it.
+- **The hook is the answer and it is already hard-won** — read its comment before touching anything.
+  It carries the LB-10 fix for React StrictMode's mount-time cleanup→effect pair and a per-instance
+  id so a nested sheet's cleanup does not cascade into its parent's handler. Do not re-derive it, and
+  do not write a second one.
+- **Scope this as a sweep, one PR.** `useSheetBackDismiss(open, onClose)` at each site, wired to the
+  same state the sheet's `onOpenChange` already drives. The risk is not per-site difficulty, it is
+  **nesting** — a sheet opened from inside another sheet is where the history stack goes wrong, and
+  the hook's own comment says so. Enumerate the nested pairs first and test those; the flat ones are
+  mechanical.
+- **`<DialogContent>` needs a decision, not the same treatment.** A confirm dialog dismissed by the
+  back gesture may be the right behaviour or may be a lost confirmation. State the choice in the PR
+  rather than sweeping all 6 silently.
+- **Verification.** `e2e/sheet-back-dismiss.spec.ts` already exists — extend it, do not replace it.
+  Then the device run: open each swept sheet, back-gesture, confirm the sheet closes and the page
+  behind it is unchanged. **The web sandbox cannot exercise the Android gesture** — the E2E spec
+  drives `history.back()`, which is close but not the same input.
+
 ## Owner request, 2026-08-24 — Body Battery is flooring, and stress needs an hour-of-day record
 
 *Reported in session: "its 9:19pm here and its already at looks like its been 0 for awhile", plus
@@ -967,378 +1796,6 @@ exactly that guard and comments saying why.
 because none of them is the change that review was for, and per **No orphaned findings** a finding
 without a queue entry is a dropped finding.*
 
-### [nutrition][app-shell] Q-406 — the shared food row: two call sites converted, two waiting on their phase
-
-> **✅ THE DIARY ROW CONVERTED 2026-08-25 (v1.367.0)** — `meal-card.tsx` draws the shared `FoodRow`
-> and `QuickEditLogSheet` **gained a delete in the same change**, which this entry required before the
-> conversion could be safe. Q-395a was meant to carry it and did not. Per-item P/C/F moved into the
-> sheet's live preview. [`journal`](overview/entries/2026-08-25-diary-row-shared-shape.md).
->
-> **⚠ It turned up a pre-existing defect, LB-10 — fixed 2026-08-25.** The sheet would not open in
-> `pnpm dev` at all, on `main` too: `use-sheet-back-dismiss.ts` was not double-invoke safe. Verified
-> here with `reactStrictMode: false`; the hook is fixed and guarded now
-> ([`journal`](overview/entries/2026-08-25-sheet-back-dismiss-strict-mode.md)).
-
-- **Branch:** `refactor/nutrition-food-row`
-- **Lane B.** No schema, no route.
-- **✅ GATE CLEARED 2026-08-24 — the drawings are in the repository:**
-  [`docs/design/2026-08-18-nutrition-rework-mockups.html`](design/2026-08-18-nutrition-rework-mockups.html),
-  twelve artboards recovered from the owner-reviewed canvas, unchanged. That file's own preamble
-  carries the two corrections these entries need — `unit-options.png` never existed, and Q-395a's two
-  references are two different artboards — plus which three are TEMPLATED. Read it there rather than
-  duplicating it here. **Q-395a/b/c were unblocked by the same landing.**
-- **✅ THE COMPONENT SHIPPED 2026-08-23 (v1.338.0)** — `components/nutrition/food-row.tsx`, drawn by
-  the library sheet and the food-database search row.
-  [`Journal`](overview/entries/2026-08-23-shared-food-row.md).
-- **✅ THE DIARY ROW SHIPPED 2026-08-25 (v1.367.0)** — with the delete this entry required moved into
-  `QuickEditLogSheet` first, so no capability was dropped.
-- **Keep:** ONE call site, the external food-database row (`ingredient-search.tsx:132`), which
-  carries a macro-mismatch warning and an in-flight spinner. The agreed row has nowhere to put
-  either, and adding a slot makes it a wrapper rather than a unification. **It needs a design answer
-  — where a per-row warning goes** — and Q-395's drawings do not settle it (checked: none of the
-  twelve artboards shows a warning treatment). `Gate: owner`.
-- **✅ RESOLVED 2026-08-24 — the drawings are in the repository.** **The lesson worth keeping: a
-  mockup that lives only in a chat artifact is a mockup the queue cannot use.** These were drawn
-  2026-08-18, reviewed twice, decided against — then blocked four entries for six days because
-  nobody committed them. **Commit the canvas in the same PR that files the entry citing it.**
-
-### [nutrition][app-shell] Q-395 — the nutrition rework: the spec every phase reads, and the final checkpoint
-
-- **Lane:** B
-- **Needs:** Q-395c
-- **⚑ SPLIT INTO PHASES 2026-08-23 — this entry is now the specification, not the work.** It was a
-  269-line item describing sixteen screens, listed as one thing an implementer could pick up. The
-  work is **Q-406** (the shared row) → **Q-395a** (quantity sheet + Edit Meal) → **Q-395b** (the day
-  screen) → **Q-395c** (Log Food + the `My Foods` rename). Each phase points back here rather than
-  copying the decisions, so they still live in exactly one place. **Read this before any phase.**
-- **Why it parks behind its own last phase.** It is the completion checkpoint: when Q-395c lands,
-  this confirms the drawn screens match what shipped, sweeps the ~11 sheets finding 18 lists as
-  never drawn, and leaves the queue. Never pick it up as a work item.
-
-- **Branch:** `feat/nutrition-visual-uplift`
-- **Added:** 2026-08-18 · owner: *"can we backlog a UI uplift for the nutrition side. I think it
-- **Lane:** B
-  could have a bit of a design uplift"*, with screenshots of **Saved Meals** and **Edit Meal**.
-- **What this entry is for.** A taste request cannot be implemented from as written, so this
-  separates the part that is objectively wrong (findings 1–3, each with a CI check that already
-  measures it) from the part that is genuinely a design decision (findings 4–5, which need
-  mockups before code). Do the first half regardless of what is decided about the second.
-- **Scope.** `app/nutrition/nutrition-content.tsx` and `components/nutrition/**` — the Nutrition
-  tab, the Saved Meals sheet, the Edit Meal builder, and the meal-plan sheets that share their
-  visual language. Nothing server-side: no route, no schema, no migration.
-
-**1 — 48 hardcoded hex literals, and `#22c55e` is the one that actually breaks.**
-`--brand` is **user-selectable at runtime**: `components/theme-color-picker.tsx:38` writes
-`--brand`/`--color-brand` from a hue the user picks, and `app/globals.css:59-65` *darkens* the
-light-mode value on purpose (the comment there says why — the vivid dark-mode green is unreadable
-as light-mode text). Every `#22c55e` in nutrition opts out of both. Change the accent to blue and
-nutrition's selected chips and checkboxes stay green; switch to light mode and they stay at the
-value the CSS deliberately avoids. Sites: `saved-meal-card.tsx:75,97` · `my-meals-picker.tsx:226,270,276` ·
-`restrictions-picker.tsx:183` · `meal-plan-edit-sheet.tsx:220` · `meal-plan-manage-sheet.tsx:173` ·
-`meal-plan-setup-sheet.tsx:206,433` · `meal-plan-review-step.tsx:114,158` · `meal-plan-section.tsx:30`.
-Same story for `#ef4444` where `text-destructive` already exists — `ingredient-row.tsx:52` uses the
-token correctly, `saved-meal-card.tsx` and `meal-plan-manage-sheet.tsx:248,263` use the literal.
-
-**2 — CI is already pointed at this, which is what makes it cheap.**
-`scripts/check-hex-literals.js:91-103` carries **14 nutrition files** as shrink-only baselines
-totalling 48 literals. Lowering those numbers *is* the deliverable for finding 1, the check proves
-it, and the ratchet means a redesign structurally cannot make it worse. Do not sweep the whole repo
-(471 literals) — that is a separate, much larger job.
-
-**3 — ⚠ Both landing files are at the 800-line ceiling, and this bites on line one.**
-`app/nutrition/nutrition-content.tsx` is **exactly 800** and `components/nutrition/saved-meals-sheet.tsx`
-is **793**. Neither is in `scripts/check-component-size.js`'s BASELINE, so both are held to
-`LIMIT = 800` hard — verified by the script's own counting, not `wc`. **Adding a single line to
-`nutrition-content.tsx` fails Custom Rules.** Extraction into `components/nutrition/` children is
-the first commit, not the cleanup at the end. Note the BASELINE is shrink-only: do not add these
-files to it to buy room.
-
-- **✅ FINDINGS 1 AND 2 SHIPPED 2026-08-18 (v1.324.4, Lane B).** Every `#22c55e` and `#ef4444` in
-  the nutrition surface is now `brand` / `destructive`, so selected chips, checkboxes and the plan
-  card follow the user's chosen accent and light mode's deliberately-darkened value. **Repo total
-  471 → 428**, and **eight nutrition files came off the hex baseline entirely**, which holds them at
-  zero from here — the ratchet now makes this class structurally unable to come back in those files.
-  One site needed more than a swap: `meal-plan-section.tsx` passed its literal to `accentCardStyle()`,
-  which needs real colour channels and **returns an accent-less card for anything that is not a hex**,
-  so handing it a `var()` would have silently dropped the tint. Its gradient is now built locally with
-  `color-mix` on `var(--color-brand)`, mirroring that helper's output including the `willChange` layer
-  promotion.
-- **Finding 3 did not bite and is still true.** Replacing literals with tokens is line-for-line, so
-  nothing was added to either 800-line file — but `nutrition-content.tsx` is still exactly at the
-  limit, so **the extraction is still the first commit of any change that adds a line.**
-
-**4 — Edit Meal is three times taller than it needs to be (the design half).**
-Each `IngredientRow` (`components/nutrition/ingredient-row.tsx`) stacks four bands: name + macro
-line, a 44 px delete button, a 44 px −/qty/+ stepper row, and a serving-conversion hint. Two
-ingredients fill the S25 screen — which is exactly what the owner's screenshot shows, with the
-whole-batch total already off-screen. A five-ingredient recipe is a blind scroll. **This needs a
-decision, not a fix.** Two shapes worth drawing: a compact row that reveals its stepper on tap, or
-the stepper inline with the name. Do not pick one in code first.
-
-**5 — Card metadata has an uneven rhythm.** `saved-meal-card.tsx:102,118` gate "Makes N portions"
-and "· per portion" on `servings !== 1`, so the first card in the owner's screenshot carries two
-lines the other two do not. The behaviour is right; the ragged card heights are the cost. A
-redesign should either reserve the slot or move it into the expanded view.
-
-
-**6 — MOCKUPS AND A DESIGN-SYSTEM REVIEW EXIST (2026-08-18).** The owner asked for drawn options
-before code, so both screens were recreated at true S25 size from the real tokens and reviewed
-against the `ui-ux-pro-max` rule set. **Canvas:**
-<https://claude.ai/code/artifact/936866ab-387b-44a3-9de0-de080a8d6c3b> — nine artboards: Edit Meal
-today vs proposed, Saved Meals today vs proposed, three srv/g options, a tap-target audit and the
-theme finding drawn out. The three findings below came out of that review and are additional to 1–5.
-
-**7 — Every control on both screens is 44 px. Rule 15 says 48 dp with 8 dp between.**
-44 is the iOS floor, not this repo's. Measured: srv/g segments **40 px** (`ingredient-row.tsx:86`,
-the smallest targets on either screen); quantity steppers, row delete and all four card actions
-**44 px** (`ingredient-row.tsx:50,59,75` · `saved-meal-card.tsx:194-217` ·
-`saved-meals-sheet.tsx:628,650`); stepper gap **6 px** against the 8 dp minimum
-(`ingredient-row.tsx:55`). The only compliant control on either screen is `Update Meal`
-(`saved-meals-sheet.tsx:774`, `h-12`). Treat this as **one systemic change**, not eight fixes.
-
-**8 — The srv/g toggle is a hand-rolled segmented control, and `components/ui/segmented-tabs`
-exists (rule 24).** `ingredient-row.tsx:81-95` rebuilds the pill-tab markup inline — the exact
-pattern that was copy-pasted ~17× with drifting font sizes before the primitive was extracted.
-Whichever option below wins, the control that survives comes from the primitive.
-
-**9 — What the toggle actually is, and the three ways out.** It selects an *input mode* for a value
-the row already prints both ways: `ingredient-row.tsx:100-107` always renders
-`1 serving of X = 250 g · using 300 g`. It is also per-row (`unitById` in `saved-meals-sheet.tsx`),
-so two rows can sit in different modes at once and `1.2` beside `60` means different things.
-- **A — the unit rides on the number** (`[−] [ 60 g ▾ ] [+]`), one tap inside the field swaps it.
-  **Recommended.** It removes a control rather than relocating one, the number is never bare, and
-  the freed width is what pays for 48 px steppers.
-- **B — grams only**, the stepper stepping by one serving. No mode at all, but you can no longer
-  *type* "2 scoops" — the exact case `ingredient-row.tsx`'s own comment says both units exist for.
-- **C — the toggle moves below the value row** at full size. No behaviour change, safest, and the
-  tallest of the three, which works against the density complaint that started this.
-
-**10 — ⚠ `#22c55e` is ALSO the literal value of `MACRO_COLORS.protein`.** A find-and-replace of that
-string onto `var(--brand)` would repaint the protein macro with whatever accent the user picked.
-The selection-state literals and the macro palette are the same eight characters and must not share
-a fate — finding 1 is the former only.
-
-
-**19 — Owner answers, 2026-08-18 (asked as four blocking questions).**
-- **Scope of the design pass:** *"the full work through; the nutrition tab; and all features from
-  logging food - to creating a meal to editing a meal."* Sixteen screens are now drawn end to end.
-- **Targets stay in Profile, with a shortcut.** `components/profile/macro-targets-pane.tsx` keeps
-  ownership; Nutrition Settings gets a row that jumps to it. They are profile-level facts like
-  weight, and moving them is churn — but editing them two tabs from where they are judged is the
-  friction the shortcut removes.
-- ~~**"Complete Today's Logging" is a button at the foot of the day's log**~~ — **shipped** (Q-387,
-  Lane A half v1.319.x, Lane B half #330). It is **no longer at the foot**: BF-6 moved it directly
-  under the meals in v1.344.0 because at the foot it took zero presses in seven weeks.
-- **The meal plan becomes a generator of saved meals** — see **Q-398**.
-
-**11 — THE DIRECTION IS SETTLED, AND IT IS BIGGER THAN A VISUAL PASS (2026-08-18).** The owner sent
-MyFitnessPal screenshots and asked for a rework that reads as naturally. Six screens are drawn at
-true S25 size in our own tokens — **canvas page "Reworked screens"**,
-<https://claude.ai/code/artifact/936866ab-387b-44a3-9de0-de080a8d6c3b>: the day, add food, my meals,
-meal detail, edit meal, and the quantity sheet. What was borrowed is **structural, not visual** —
-none of the chrome, colour or type is copied.
-
-**12 — The root cause of "bulky" is that a list row carries an editor.** Findings 7–9 treated the
-srv/g control as the problem; it is a symptom. Mainstream food loggers put **no controls on a list
-row at all** — row is name, a grey line of what and how much, calories right-aligned — and every
-quantity edit happens on a separate surface. Our `IngredientRow` instead replicates a delete
-button, a stepper, a value field, a unit toggle and a conversion hint onto *every* ingredient. Two
-ingredients fill the S25 screen; the drawn version fits five with room left over.
-**This supersedes srv/g options A, B and C** as a fork: the toggle now appears once, in the quantity
-sheet, at 56 px. Option A's shape (unit chip on the number) is what that sheet uses.
-
-**13 — One row component, six call sites.** Today a food reads one way in the diary, another in
-search, another in a saved meal, another in the builder — four shapes for one thing. The drawings
-use exactly one: optional thumbnail · name · grey secondary line · calories right-aligned in a fixed
-column · optional chevron. Build it as `components/nutrition/food-row.tsx` and use it on all six
-screens; per the repo's own reuse rule a pattern at ≥2 sites gets extracted before the third copy,
-and this is the sixth.
-
-**14 — The other structural changes, in the order they pay off.**
-- **The macro summary becomes a donut with each macro as a share of calories**, next to grams.
-  `components/nutrition/macro-ring.tsx` already exists — extend it rather than adding a second one.
-- **Grouped sections with full-bleed dividers** replace gapped cards, which is most of the vertical
-  space the day screen currently spends on nothing.
-- **Source tabs on the food picker** (Recent · Frequent · My meals · Recipes) replace separate
-  sheets, so a repeat log is one tap from the top of the list.
-- **The meal name becomes the screen title**, not a labelled input box, and the three-line batch
-  explainer becomes a subtitle: *"Makes 2 portions · 278 kcal each"*.
-- **Destructive actions leave the summary row** — delete lives in the quantity sheet and behind a
-  swipe on a saved meal, not beside the button pressed daily.
-
-- **⚠ Sequencing.** This is a rework, not a repaint, and it lands in the two files that are already
-  at the 800-line ceiling (finding 3). Order: extract `food-row.tsx` first, then the quantity sheet,
-  then convert screens one at a time behind the existing behaviour. **Do not start by editing
-  `nutrition-content.tsx`** — one added line fails Custom Rules.
-- **The known cost, stated so it is not discovered late:** changing a quantity now takes a tap. For
-  a saved meal built once and logged for months that is cheap; for someone tweaking amounts while
-  assembling, inline steppers were faster. The owner has seen this trade drawn and chose the rework
-  anyway.
-- **Related:** meal thumbnails are **Q-396**, filed separately because they need a migration and a
-  sync-payload change (Lane A) while everything above is Lane B.
-
-
-**15 — OWNER REVIEW OF THE MOCKUPS, 2026-08-18. Six notes, all folded in; one caught a real gap.**
-- **Ring:** use the shipped `MacroRing` (96 px masked conic + value/target bars), not a new donut —
-  with the filled arc **split by macro** instead of a single `var(--brand)` sweep. Do not add a
-  second ring component.
-- **Log Food is one screen.** The current capture step's six scattered entry points collapse to:
-  search across everything · tabs · a bottom row of capture actions. **Both were revised by the
-  owner on 2026-08-19 and the revision wins over this line** — the tabs are **Recent · My Foods**
-  (see note 17), and the action row is ordered **Photo · Barcode · Describe or enter**, in that
-  order, not the Barcode-first order originally drawn. The order is the owner's; it is also the
-  right default, since photo is the fastest path for a plated meal and barcode only works on
-  packaged food.
-- **Describe and manual entry become one sheet.** Type what you ate and the fields fill in; skip the
-  box and type them yourself. The fields are always visible, so neither path is a hidden mode.
-- **My Meals rows carry their macro split** (P/C/F beside the calorie column) so the list can be
-  chosen from. The label/QR and the full breakdown stay **inside** the meal on the detail screen.
-- **Edit Meal keeps a real servings control** — "This recipe makes [− 2 portions +]" at 48 px, in a
-  band that also states the per-portion cost. It had been demoted to a subtitle; that was wrong.
-- **The quantity sheet must show where it came from:** the tapped ingredient row stays lit under the
-  scrim and the sheet is headed "Ingredient 1 of 5 · <meal>". Without that the sheet reads as an
-  unrelated screen.
-
-**16 — ⚠ THE COVERAGE AUDIT THE OWNER ASKED FOR, AND WHAT IT FOUND.** *"Make sure you compare each
-page/section to what's in prod right now — we don't want to silently lose any sections."* The first
-draw showed **3 of the 11 sections** the Nutrition tab actually renders. In shipped order
-(`app/nutrition/nutrition-content.tsx`): ScreenHeader + date nav · **CalorieBalanceBar** ·
-MacroRing · **NutritionActionRow (three buttons — Saved Meals had been dropped)** ·
-**MealPlanReviewCard** · **MealPlanSection** · **TdeeAdaptationCard** · MealCard × meal types ·
-**End of Day** · **WeeklyNutritionChart** · **SupplementsSection**. The eight in bold were missing
-and are now drawn. **Any implementation PR carries this list and checks it off** — a rework that
-quietly loses a section is the failure mode this entry exists to prevent.
-
-**17 — DECIDED 2026-08-19, and it went further than the question asked. The tabs are `Recent` and
-`My Foods`. Two, not four.** The question here was where to put `My Foods`; the owner answered by
-collapsing the row: ***"I Think recent tab is fine; dont think we need frequent - saved and myfoods
-I dont think need to be seperated. Saved could contain foods made or saved. Maybe we just have 'my
-foods'"***.
-- **`Frequent` is dropped.** It was a second ordering of the same list Recent already shows.
-- **`Saved meals` and `My Foods` merge into one `My Foods` list** holding anything the user made or
-  saved. This is the right call for a reason worth writing down: a saved meal and a food you built
-  were always the same kind of row wearing two labels, which is exactly what finding 13's single
-  row component says. Two lists that render identically and differ only in provenance are one list
-  with a subtitle.
-- **Nothing is lost, and check that before building.** `FoodLibrarySheet` and `SavedMealsSheet` are
-  separate components today; merging the tabs must not silently drop a capability that only one of
-  them has (bulk delete, meal-plan linkage, the label path). Diff them first and carry every action
-  across, or say in the PR which was intentionally dropped.
-- Ordering within `My Foods`: most recently used first, so the merge does not bury saved meals under
-  one-off foods.
-- **⚠ The merge is a RENAME as well as a merge, and the rename has to be swept.** The owner spotted
-  the half-done version immediately — *"So im picking up a discrepancy between My Meals and My
-  foods? Whats the difference"* — against a prototype that still had a `My Meals` screen beside a
-  `My Foods` tab. There is no difference, and that is the point: **two names for one list is the
-  defect**. Grep for every user-facing occurrence of *Saved meals*, *My Meals* and *My Foods* —
-  sheet titles, tab labels, empty states, toasts, the `+ Add food` destinations, the nav copy — and
-  land on the single name in one pass. A surface left on the old name reads as a second list that
-  is missing rows.
-
-**18 — Sheets not yet drawn, listed so they are not assumed done.** `FoodLoggerSheet` review and
-assign steps (only capture is drawn) · `QuickEditLogSheet` · `WaterLogSheet` · `FoodLibrarySheet` ·
-`MealTypeManager` and the Nutrition Settings sheet · `MealPlanSetupSheet`/`EditSheet`/`ManageSheet` ·
-`ManageSupplementsSheet` · `EndOfDayReview` and its seven children · the barcode overlay · the
-delete-log dialog. Roughly eleven more surfaces. They inherit the row language and the 48 dp floor
-whether or not anyone draws them first.
-
-**What NOT to change — all three exist because a CLAUDE.md rule required them:**
-- `MACRO_COLORS` (`@trainingai/shared/nutrition/macro-colors`) is the shared semantic palette,
-  correctly imported at every site. It is **not** finding 1 and must not be tokenised away.
-- `saved-meal-card.tsx` is well built: `role="button"` + `aria-expanded` (`:80-82`) for the
-  nested-control WebView rule, macro colour always paired with its P/C/F label (`:130-142`) for the
-  colour-only-state rule, and an inline delete confirmation (`:172+`). A visual pass keeps all three.
-- No new dependencies — `motion` v12, `@use-gesture/react` and shadcn primitives are installed.
-
-- **DECIDED BY THE OWNER, 2026-08-19 — the ingredient row is unblocked.** Both open questions were
-  answered in one reply: ***"go with A, and yes collapse the row when not editing"***.
-  1. **Option A wins** — the unit rides on the number as a chip inside the field, `60 g` ⇄ `2 srv`
-     on one tap. B and C are dead; do not revisit them. The control comes from
-     `components/ui/segmented-tabs`, not a fourth hand-rolled segmented control (finding 8).
-  2. **Rows collapse when not being edited**, one expanded at a time. The collapsed shape is
-     finding 13's single row component — name · grey secondary line · calories right-aligned ·
-     chevron — so this is not a second component, it is `food-row.tsx` with an expanded state.
-  **Read this together with finding 12, which is not contradicted by it.** Finding 12 retired A/B/C
-  *as a fork over what sits on a list row*, because the answer there is **nothing** — a diary or
-  search row carries no editor and never expands. What the owner has now chosen is the shape of the
-  quantity control **wherever it does appear**: the quantity sheet, and the expanded row in Edit
-  Meal, which is a builder rather than a list. Finding 12 already anticipated this
-  (*"Option A's shape (unit chip on the number) is what that sheet uses"*), so the decision confirms
-  it rather than reopening it. **A row in the diary that expands to edit would be a
-  misreading of both.**
-- **The drawings exist, and since 2026-08-24 they are IN THE REPO** —
-  [`docs/design/2026-08-18-nutrition-rework-mockups.html`](design/2026-08-18-nutrition-rework-mockups.html)
-  (finding 6's canvas, committed). The expanded row is the **`srv/g — A`** artboard
-  (`UnitA.dc.html`); the collapsed `Full Cream Milk` row is in **`EditMeal.dc.html`** — two different
-  artboards, which this line previously implied were one. Findings 1, 2,
-  3, 7 and 8 never depended on this answer and can still go first — but nothing is blocked now.
-- **Still open, and deliberately not blocking: where `My Foods` lives** (note 17). Recommendation
-  stands — a **fourth tab** beside Recent, Frequent and Saved meals, because it is a list of foods
-  like the other three and a tab is where someone looks for it. Build it that way unless the owner
-  says otherwise; it is one line to move later.
-- **Lane B** — `components/nutrition/**` and `app/nutrition/**` are both Lane B's under §3, and
-  nothing here touches an engine path.
-- **Read first:** [`docs/domains/nutrition/README.md`](domains/nutrition/README.md), then the
-  `ui-ux-pro-max` skill — it is this repo's own design system and the authority for this item.
-- **Verification.** `node scripts/check-hex-literals.js` must report a **lower** number for every
-  file touched; `node scripts/check-component-size.js` clean without new BASELINE rows;
-  `pnpm check:rules`. Then the **on-device smoke run** — this is pure UI on the canonical runtime,
-  in both themes, so a green `pnpm dev` is not sufficient evidence and a Known-Issues row is the
-  fallback if no device is available.
-
-### [nutrition][app-shell] Q-395a — phase 2: the quantity sheet and Edit Meal's collapsing rows
-
-- **Lane:** B
-- **✅ THE CODE SHIPPED 2026-08-25 (v1.364.0)** — `quantity-sheet.tsx` new, `ingredient-row.tsx`
-  deleted, the builder's rows are the shared `FoodRow`, and 48 dp done once in `ui/segmented-tabs.tsx`
-  for all 8 call sites. Verified in a browser in both themes, build and edit paths.
-  [`journal`](overview/entries/2026-08-25-quantity-sheet-collapsing-rows.md) — it holds the design
-  and the three things this entry got wrong.
-- **Keep:** the **device smoke run in both themes** — the sheet's safe-area inset renders as 0 in the
-  sandbox and its action row carries Remove. `Gate: device`.
-
-### [nutrition][app-shell] Q-395b — phase 3: the day screen, against the 11-section coverage list
-
-> **🚧 PART SHIPPED 2026-08-25 (v1.365.0) — the entry stays open.** The meal list is one bordered
-> block with full-bleed dividers (`MealCard` gained `grouped`), `MacroRing`'s arc is split by macro,
-> and the trailing group moved to `day-tools-section.tsx`, taking `nutrition-content.tsx` off the
-> 800-line ceiling (789 → 773). All 11 sections ticked. **Measured: gaps were 420 px of 2,649
-> (16%)**, not *"most of the vertical space"*; this reclaims 100.
-> [`journal`](overview/entries/2026-08-25-nutrition-day-screen-sections.md).
-- **✅ THE LAYOUT HALF IS DONE 2026-08-25 (v1.366.0).** Two more grouped sections — energy
-  (`CalorieBalanceBar` + `MacroRing`) and reference (`WeeklyNutritionChart` + `SupplementsSection`).
-  **Gaps across the whole arc: 420 px → 280 px (16% → 11%), screen 111 px shorter.** Both themes
-  measured on a fully loaded screen, checklist 11 of 11 in each; a past date draws no empty bordered
-  box. [`journal`](overview/entries/2026-08-25-nutrition-day-screen-grouping.md). **What stays
-  ungrouped is conditional by nature** (the plan cards, `TdeeAdaptationCard`, `FoodLoggingComplete`,
-  the action row), so a fixed container would draw an empty border on the days they are absent.
-- **Keep:** the **device smoke run**, the only thing left — three `divide-y` sections over
-  `bg-muted/60` children now, the shape Samsung's compositor has caught out before. `Gate: device`.
-
-### [nutrition][app-shell] Q-395c — phase 4: Log Food becomes one screen, and `My Foods` becomes one name
-
-- **Lane:** B
-- **Needs:** Q-395b
-- **Spec:** Q-395, findings 15 and 17.
-- **Scope.** The capture step's six scattered entry points collapse to one screen: search across
-  everything · two tabs · a bottom row of capture actions.
-- **The decided details, all owner-set:** tabs are **`Recent` and `My Foods`**, two not four
-  (`Frequent` was a second ordering of what `Recent` already shows). Action row ordered **Photo ·
-  Barcode · Describe or enter**. Describe and manual entry are one sheet with the fields always
-  visible, so neither is a hidden mode. `My Foods` rows carry their P/C/F split beside the calorie
-  column; the label/QR and full breakdown stay inside the meal.
-- **⚠ The merge is a RENAME as well as a merge, and the rename must be swept in one pass.** Saved
-  meals and My Foods become one list. The owner caught the half-done version immediately — *"So im
-  picking up a discrepancy between My Meals and My foods? Whats the difference"* — and there is no
-  difference, which is the point. **Two names for one list is the defect.** Grep every user-facing
-  occurrence of *Saved meals*, *My Meals* and *My Foods* — sheet titles, tab labels, empty states,
-  toasts, `+ Add food` destinations, nav copy — and land on the single name together. A surface left
-  on the old name reads as a second list that is missing rows.
-- **⚠ Diff `FoodLibrarySheet` against `SavedMealsSheet` before merging them.** Carry every action
-  across — bulk delete, meal-plan linkage, the label path — or say in the PR which was dropped.
-  Order `My Foods` most-recently-used first so the merge does not bury saved meals.
-- **Verification.** As Q-395a, plus a grep proving nothing user-facing still says *Saved meals* or
-  *My Meals*.
 
 ### [platform] PS-4 — the batons are the cross-lane coordination mechanism and none of them fits on a screen
 
@@ -2012,328 +2469,6 @@ slow-load question on a clean `pg_stat_statements` read.
   `pnpm dev` could not be run in the sandbox (missing `@sentry/nextjs` in `node_modules`).
 - **Keep:** the on-device check this entry already asks for — whether `LocalStoreDeadBanner` is
   showing during a reproduction — now also tells you whether the ~20s is gone or merely shorter.
-
-## Nutrition — pushed to the top, 2026-08-24 (owner request)
-
-*"push the nutrition work closer to the top"* — BF-11 and Q-407 moved up from their prior position
-(below BF-10/BF-4/LA-21/Q-420/Q-422/Q-406/Q-395abc) to sit right after the standing coordination
-entry. Queue position is priority; nothing else about either entry changed in this move.
-
-### [nutrition] BF-11 — the meal creator/planner redesign: the spec every phase reads, and the final checkpoint
-
-- **Needs:** BF-11h
-- **Not a work item.** Split into eight phases 2026-08-24 (BF-11a…BF-11h below), the way Q-395 was.
-  This entry is the spec pointer and the closing checkpoint: strike it when every phase has shipped
-  *and* the whole flow has been walked once on the S25 — creating a meal from a recipe URL, from a
-  multi-dish photo, and generating a plan that draws on the library.
-- **Added:** 2026-08-24 · owner: *"the meal scan by url — this was added to the meal planner — but I
-  think this needs to be moved 'create a meal' then the meal builder can reference previously made
-  meals."* Grew across three more owner messages, same session, into a full design for both halves.
-- **The design (decisions, owner's words, file/line trace):**
-  [`docs/superpowers/specs/2026-08-24-meal-creator-and-planner-design.md`](superpowers/specs/2026-08-24-meal-creator-and-planner-design.md).
-- **The plans (build order, resolved open calls, verification):**
-  - Part 1 — [`plans/2026-08-24-meal-creator.md`](superpowers/plans/2026-08-24-meal-creator.md)
-  - Part 2 — [`plans/2026-08-24-library-first-meal-planner.md`](superpowers/plans/2026-08-24-library-first-meal-planner.md)
-- **Owner's sequencing is binding:** the Meal Creator (BF-11a…d) ships first and on its own merits;
-  the Planner integration (BF-11e…h) comes after and depends on it.
-- **The three open calls the design left to planning are RESOLVED** — reasoning in Part 2 §3, so
-  nobody re-litigates them. In short: the no-match fallback is **AI generation, labelled** (not
-  prompt-to-create, which would strand a half-built wizard); the meal-count prompt fires **only when
-  a pin would be dropped**, and there is **nothing to "transfer"** because the split derives from the
-  day's totals rather than the sum of the slots; and "select all" is **`useLibrary: boolean`**, not a
-  list, because the route already reads the library server-side. **None needed the owner.**
-- **⚠ Two live defects found while planning, in the path BF-11h rewrites.** Lower the meal count
-  after picking meals (the picker's `maxKeepable` guard only holds going forward) and
-  `generate/route.ts` puts a **negative number in the prompt** (`Meals: exactly -1`) and **silently
-  discards** every pinned meal past the slot count — `names[i]` is never read beyond `slots.length`.
-  Part 2 §2 has the trace. It is the mechanism behind the owner's *"it's gotta prompt you
-  somewhere"*, and it is a silent drop, not just a missing prompt.
-- **Overlap with Q-407 (below), not a duplicate.** Q-407 reworks the whole wizard into a coach
-  conversation and touches neither scanning location nor planner matching. The engine phases
-  (BF-11e, BF-11g) are untouched by it either way, which is why they lead. Part 2 §6 has the
-  either-order rule.
-- **Collision with the parked Q-406 → Q-395a/b/c chain** (that chain is `Gate: owner` — its
-  reference drawings were never committed). Part 1 §8 has the file-by-file collision table and the
-  carry-across rule. **Do not plan around that chain landing, and do not wait for it.**
-
-### [nutrition] BF-11b — the scan route returns N candidate meals instead of one
-
-- **Lane:** A
-- **Plan:** [`plans/2026-08-24-meal-creator.md`](superpowers/plans/2026-08-24-meal-creator.md) §4
-- **Branch:** `feat/scan-multi-candidate`
-- **Added:** 2026-08-24 · planning session, from BF-11 (design item 2).
-- **Lane A by the §3 rule, not by BF-11's old `Lane: B` line** — `app/api/nutrition/scan/route.ts` is
-  reached by `app/api/**`. The engine half lands before the UI that consumes it.
-- **`ScanSchema` returns exactly one `name` + one `ingredients[]` for every input mode today.** A
-  week of meal-prep containers, or a "5 lunches" roundup page, is forced into one merged estimate.
-- **Additive, not breaking.** Four call sites read the current shape (`capture-step.tsx`,
-  `review-step.tsx`, `meal-backfill-section.tsx`, `saved-meals-sheet.tsx`); three of them are
-  single-dish by nature. Keep the top level as-is (= `candidates[0]`) and add `candidates` alongside.
-  **Do not flip the top level to an array.**
-- **The risk is the splitting decision, not the macros:** one plated curry-rice-naan is **one** meal;
-  five labelled tubs are five. Pin it with fixture tests asserting candidate **counts and names**,
-  never calories, or the test becomes a model snapshot that fails on every prompt tweak.
-- Cap candidates at 8; `identified: false` still returns none; the URL branch's `recipeYield` divide
-  is **per candidate**.
-
-### [nutrition] BF-11c — Build a Meal gains the recipe URL, the candidate picker and History quick-add
-
-- **Lane:** B
-- **Needs:** BF-11a, BF-11b
-- **Plan:** [`plans/2026-08-24-meal-creator.md`](superpowers/plans/2026-08-24-meal-creator.md) §5
-- **Branch:** `feat/build-a-meal-add-methods`
-- **Added:** 2026-08-24 · planning session, from BF-11 (design items 1, 2, 3). **This is BF-11's
-  original ask** — the recipe-URL scan reachable without starting the whole plan wizard.
-- **Three add-methods beside the existing search; none replaces anything.** (a) an `https:` URL →
-  whole recipe; (b) a multi-candidate list when a scan returns several dishes, each kept one becoming
-  **its own** saved meal; (c) the food-item **History** list Log Food already has
-  (`capture-step.tsx:245`) as the default state before you type — **reuse that source, do not build a
-  second one.**
-- **⚠ The unstated-yield case is not cosmetic.** `recipeYield: null` means the payload is the WHOLE
-  recipe — a banana-bread page measured **1,956 kcal for the loaf**. Reuse `my-meals-picker.tsx`'s
-  handling and the shared `perServing`, so the two divides cannot drift.
-- **One real difference from the wizard's version:** a "makes 12" recipe lands as `servings: 12` with
-  the whole recipe's items, **not** pre-divided — `SavedMeal.totals` is the whole recipe by contract
-  and `oneServingItems()` is the one place that divides. Pre-dividing here double-divides on log.
-- **Check before reusing `food-row.tsx`**: its only trailing element is a chevron, and a candidate row
-  needs keep/discard. Q-406 records that adding slots for per-row controls is what turns that row into
-  a wrapper rather than a unification — extend it deliberately or draw the candidate list separately
-  and say which.
-
-### [nutrition] BF-11d — a scan that duplicates an existing meal asks instead of silently adding one
-
-- **Lane:** B
-- **Needs:** BF-11c
-- **Plan:** [`plans/2026-08-24-meal-creator.md`](superpowers/plans/2026-08-24-meal-creator.md) §6
-- **Branch:** `feat/saved-meal-duplicate-detection`
-- **Added:** 2026-08-24 · planning session, from BF-11 (design item 5). Owner: *"happy to have this
-  workflow for now"* — build as designed, refine on use.
-- **"Close" already has a definition worth reusing rather than inventing:** `fitDistance`
-  (`packages/shared/src/nutrition/meal-macro-fit.ts`) reduces a macro comparison to one comparable
-  number and exists so two versions of the same meal can be compared without a second opinion about
-  "better". Pair it with a normalised name match and **require both** — macros alone match every
-  protein shake against every other one.
-- **It asks, never merges.** "Save as new" is one tap and is the safe default on dismissal. It runs on
-  save, not per keystroke.
-- **"Update it" must keep the existing id** — `meal_plan_meals.saved_meal_id` and the printed QR label
-  both reference it, so a new id orphans a label already stuck on a container.
-- May batch with BF-11c (one screen, one verification pass) if BF-11c's save path lands unchanged.
-
-### [nutrition] BF-11e — saved meals get meal-type tags, so slot matching is not macro-blind
-
-- **Lane:** A
-- **Plan:** [`plans/2026-08-24-library-first-meal-planner.md`](superpowers/plans/2026-08-24-library-first-meal-planner.md) §5.1
-- **Branch:** `feat/saved-meal-meal-type-tags`
-- **Added:** 2026-08-24 · planning session, from BF-11 (design item 8). Owner: *"we don't want
-  pancakes recommended for dinner."*
-- **Reuse `MealType` as the vocabulary** rather than a parallel "category" concept — the user already
-  names and configures their own meal types, each with a time window, and a meal can be eligible for
-  several. New join table `saved_meal_meal_types`, composite PK, `saved_meal_id` cascading.
-- **⚠ Needs a Postgres migration. Lane A claims the number against the directory AND open PRs when it
-  builds** — the tree already carries four collided pairs and `migrate.js` applies in filename order.
-  The plan names the requirement, never the number.
-- **Three constraints the trace found, none obvious:** `meal_types` **soft-deletes**, so a join row can
-  point at a deleted type — filter on read rather than deleting join rows, so restoring a type
-  restores its tags; saved meals reach the device via **`hydrateSavedMeals`, not `getSyncDelta`**, so
-  tags ride the existing `listSavedMeals` response and there is no pull-delta branch; but the **push**
-  branch does exist (`adapter.ts:4175`), so route, outbox payload, `pushMutations` and the local table
-  all take tags **in the same PR**.
-- Local SQLite: new table registered in `RECONCILE_TABLES` in the same commit, plus a version bump.
-  Every `SavedMeal` mapper gains `mealTypeIds` — a missed mapper fails silently as "tags don't save".
-- **Never batch this** — it carries a migration.
-
-### [nutrition] BF-11f — tagging a meal from Build a Meal
-
-- **Lane:** B
-- **Needs:** BF-11e
-- **Plan:** [`plans/2026-08-24-library-first-meal-planner.md`](superpowers/plans/2026-08-24-library-first-meal-planner.md) §5.2
-- **Branch:** `feat/saved-meal-tag-ui`
-- **Added:** 2026-08-24 · planning session, from BF-11 (design item 8, UI half).
-- Multi-select chips of the user's live meal types in the build/edit form; reuse the wizard's existing
-  `ChipGroup` rather than drawing a fourth chip.
-- **An untagged meal is eligible for EVERY slot, not none** — the other way round silently shrinks
-  everyone's library to zero on the day it ships.
-- Independent of BF-11g; the two may run in parallel in different lanes.
-
-### [nutrition] BF-11g — the planner searches your saved meals before asking the AI
-
-- **Lane:** A
-- **Needs:** BF-11e
-- **Plan:** [`plans/2026-08-24-library-first-meal-planner.md`](superpowers/plans/2026-08-24-library-first-meal-planner.md) §5.3
-- **Branch:** `feat/library-first-meal-plan`
-- **Added:** 2026-08-24 · planning session, from BF-11 (design items 6, 7, 9, 10). **The core of Part
-  2.** Owner: *"it prefers meals already in the planner and adds other meals around it."*
-- **Today every non-pinned slot is a fresh AI recipe** — nothing reads the library. New order per
-  unpinned slot: filter by the slot's meal type (plus untagged) → rank by **`fitDistance`** → take the
-  best if `mealFit` says it is close enough → otherwise fall through to AI → either way through
-  `scaleWithTopUp`, unchanged.
-- **Do not write a second ranking function.** `fitDistance`/`mealFit`
-  (`packages/shared/src/nutrition/meal-macro-fit.ts`) is already the One-Formula-One-Place for "how
-  far is this meal from its target", relative rather than absolute, calories deliberately excluded.
-- **`useLibrary: boolean`, not a list of ids** — the route already calls `listSavedMeals(userId)`
-  server-side, so "use all my saved meals" costs zero payload and cannot name another user's meal.
-  **Keep `keepSavedMealIds.max(6)`**: it equals `MEAL_COUNT_MAX`, so it is not arbitrary. But
-  `listSavedMeals` is currently fetched only when pins exist — it must be fetched when either is set.
-- **⚠ New failure mode this change creates: a meal used twice in one day.** The "genuinely DIFFERENT
-  food" instruction constrains the *model*, and a library search never reaches the model. Track what
-  each slot consumed.
-- **Also fixes the §2 server half:** cap honoured pins at the slot count and **report the drop**,
-  so a client that skips BF-11h's prompt still gets a coherent plan instead of a silent discard.
-- `matchReason` on the response is not decoration — BF-11h's swap and the existing AI edit both need it.
-
-### [nutrition] BF-11h — the wizard surfaces the library, the reasons, and the meal-count prompt
-
-- **Lane:** B
-- **Needs:** BF-11f, BF-11g
-- **Plan:** [`plans/2026-08-24-library-first-meal-planner.md`](superpowers/plans/2026-08-24-library-first-meal-planner.md) §5.5
-- **Branch:** `feat/meal-plan-library-surface`
-- **Added:** 2026-08-24 · planning session, from BF-11 (design items 10, 11, 12).
-- Four things, one screen pair, one verification pass: a **"use all my saved meals"** toggle in the
-  *Yours* step (the existing checkboxes stay and keep meaning *pin* — the copy must distinguish
-  them); **"why this meal"** from `matchReason`, and its inverse on a fallback slot, which is the
-  useful half of the rejected prompt-to-create option; **reroll offers a library swap first**, AI
-  second; and the **meal-count reduction prompt**.
-- **⚠ The reduction prompt is fixing a live silent drop, not adding a nicety** — see BF-11 above and
-  Part 2 §2. It fires **only when `K > M − 1`** (pins exceed the slots left after the planner's
-  reserved one). Below that, re-run the split and say nothing: **there is nothing to "transfer"**,
-  because the split derives from the day's totals, so removing a slot redistributes automatically.
-  What the user loses is a meal *choice*, and that is what the prompt is about.
-- **Verify the regression, don't inspect it:** pick the maximum meals, go back, lower the count,
-  confirm the prompt fires and nothing is dropped. The failure is invisible from the UI.
-- Read Q-407 first (Part 2 §6) — it edits the same two files, and its instruction *"do not delete the
-  stepper in this PR"* holds here too.
-
-### [nutrition][platform] Q-407 — the meal-plan wizard is seven screens for six answers, and the one piece the Coach lacks is multi-select
-
-- **Branch:** `feat/nutrition-coach-meal-plan`
-- **Added:** 2026-08-19 · BugFix Intake, from the owner · mockup rendered in-session
-- **Lane:** ?
-- **Placement:** in the nutrition cluster, after Q-398 — **which shipped 2026-08-24**, so the
-  dependency is cleared. The plan's exit route in this design is "Save all as meals", and plan meals
-  can now become ordinary saved meals; before that, a conversational plan had nowhere to land and
-  was only a nicer-looking dead end.
-- **Owner's words:** *"lets get the meal plan setup wizard mocked up too -> This could use some
-  work - its too step by step - Could we try implement this into an AI coach/meal builder type
-  thing? Where it feels like a chat with a UI? Also there should be options for 'select all' as I
-  keep clicking each grocery store."* and, on the mockup, *"This looks really good - I'd like to
-  see that in prod"*.
-
-- **What it is today.** `components/nutrition/meal-plan-setup-sheet.tsx` (445 lines) is a linear
-  stepper: `const STEPS = ['Stores', 'Avoid', 'Skip', 'Meals', 'Yours', 'Training', 'Review']`
-  (line 28), seven screens holding thirteen `useState` fields, with a fixed footer per step. It
-  works, and the docstring's reason for the stepped shape is sound (a fixed action row that never
-  scrolls away, and `SheetFooter` owning the bottom inset — this repo's most repeated on-device
-  regression). **Keep that property.** The problem is not the footer, it is that six of the seven
-  screens ask a question the app can mostly answer itself, and none of them can be skipped.
-
-- **Three of the four pieces already exist, which is why this is smaller than it sounds.**
-  - `lib/coach/widgets.ts` is a **union of client-side tool schemas**, explicitly documented as the
-    extension point: *"Adding a widget means adding a member here and a row in
-    `components/coach/widget-registry.tsx`. The union is the extension point; the protocol does not
-    change."*
-  - `CHOICE_SOURCES` (`['sessions','exercises','swap_candidates']`) is the **server-fills-the-list**
-    mechanism, and its docstring is already the token argument the owner is asking for: a
-    nine-option picker the model typed out cost **~554 output tokens**, and *"having a language
-    model re-type it is paying to transcribe your own database"*. `app/api/coach/options/route.ts`
-    is where a source is resolved.
-  - `HandoffSchema` routes to real screens (`destination: 'program_builder' | 'log_activity' |
-    'profile' | 'nutrition'`), so a conversation that must hand off to a full screen has a route.
-
-- **The one genuine gap: `choice_list` is single-select, and that is exactly the owner's complaint.**
-  `ChoiceListSchema` (lib/coach/widgets.ts) has `prompt`, `source`, `sourceId`, `options[]` — **no
-  multi flag** — and `ChoiceList`'s callback is `onChoose?: (option: { id, label }) => void`, one
-  option, singular. There is no configuration that makes it multi-select. So "I keep clicking each
-  grocery store" is not a missing convenience on top of a multi-select; the widget has never had
-  one. **Extend the schema rather than adding a second widget:**
-  - add `multi?: boolean` and `selectAll?: boolean` to `ChoiceListSchema`, defaulting false so
-    every existing call site is unchanged;
-  - `ChoiceList` gains checkbox rows, a "Select all" row (with an `n of m` count) and a Continue
-    button, resolving to a **list** of options;
-  - **flat, not a discriminated union** — the schema's own comment says why: *"Gemini's
-    function-declaration schema is fussy about unions, and this feature has already lost a day to
-    one (`z.literal(false)`)."* Do not model this as a union of single/multi variants.
-  - `MAX_VISIBLE_ROWS = 6` already scrolls the list; six stores fit, so no change needed there, but
-    check the Continue button is inside the widget and not below the scroll region.
-
-- **The stores list is the reference case for the token saving.** `STORES` is a hardcoded curated
-  six-item AU list in the component (line 21) with a docstring saying it is deliberate. The coach
-  must **never type those six names** — add a `grocery_stores` source to `CHOICE_SOURCES` and serve
-  it from `app/api/coach/options/route.ts` alongside the existing three. Same for the ingredient
-  lists (`PROTEINS`, `CARBS`, `FATS`, `VEG` — 32 more strings) and the dietary-restriction
-  catalogue, which is already an API (`/api/nutrition/dietary-restrictions`). **Every one of those
-  is a string the model would otherwise generate and the app already holds.**
-
-- **The conversation shape (from the mockup).** Three things, in order:
-  1. **Answers are widgets.** Stores as the new multi-select with Select all; restrictions as chips.
-     The coach **states what it already knows instead of asking** — *"I already know you log dairy
-     most days, so I have left it in"* — which is both the token saving and the better manner. The
-     seven steps become at most three exchanges, and any of them can be typed past instead of
-     tapped.
-  2. **The plan arrives as a widget, not prose.** A card listing each meal with its calories and
-     item count, plus **Save all as meals** (Q-398) and Redo. The plan is then disposable, because
-     the meals outlive it.
-  3. Entering from the Nutrition tab starts you **inside the nutrition scope**. **Scope it by giving
-     the coach a tool subset, not by instructing it** — a prompt that says "do not read workout
-     data" is a request the model will occasionally ignore, while a tool it never receives is a
-     boundary it cannot cross. **Make that subset a named record** (prompt section + tool subset +
-     patch domains + widget sources) rather than an inline filter, so a second coach can have one
-     without a refactor. That one line is all that survives of Q-408 — see the note below.
-
-- **Q-408 was descoped into the line above, 2026-08-19, on the owner's call.** It proposed the full
-  architecture from the owner's original message: Home as an "AI Coach" routing to scoped Nutrition,
-  Workout and Goal specialists. **Removed rather than deferred, for three reasons worth keeping so
-  nobody re-files it unexamined:**
-  1. **It is a router for one destination.** There is one coach. Routing has value when it picks
-     between coaches, and every decision in that design would have been made against imagined
-     requirements until a real second coach exists.
-  2. **Its hardest problem argues against it.** The owner's own example — *"what should I eat before
-     tomorrow's legs session?"* — is nutrition **and** workout. A strict boundary breaks it, so the
-     architecture's central question was never how to separate the coaches but how to let them talk
-     anyway, which is a harder problem than the one that motivated it.
-  3. **The token argument does not survive contact with Q-170's measurement.** Latency is almost
-     entirely *output* tokens; a shorter per-scope system prompt saves *input* tokens, which are not
-     the bottleneck. And inlining more prompt context was measured **twice** and made things worse.
-     The real saving — naming a `source` and letting the server fill the list — already exists as
-     `CHOICE_SOURCES` and is already in this entry.
-  **Reversal cost is nil.** If a second coach earns its place, write the architecture then, against
-  real requirements. The named-record shape above is what keeps that cheap.
-
-- **OWNER REVIEW OF THE PROTOTYPE, 2026-08-19 — the plan must end by writing meals, and that is not
-  optional polish.** ***"Meal plan coach needs more work - I want it to make the meal plan; then add
-  each item to the saved meals/my foods"***. The conversation is not finished when it prints a plan;
-  it is finished when **every meal in the plan exists as a row in `My Foods`**, indistinguishable
-  from one built by hand — loggable, editable, and with its own printable label.
-  - **This makes Q-398 a hard prerequisite rather than a related item.** Q-398 is the write path
-    (plan meal → saved meal, keyed on `(plan id, plan item id)` so a repeat save is a no-op). Without
-    it there is nothing for the widget's button to call, and a coach that produces an un-saveable
-    plan is the same dead end the stepper already is.
-  - **The plan is disposable once its meals are saved**, and the copy should say so. That is the
-    whole reason this beats a plan document: the user keeps meals, not a plan.
-  - The prototype demonstrates the loop end-to-end (tap *Save all to My Foods*, then find the four
-    meals under `My Foods` tagged *from your plan*) —
-    <https://claude.ai/code/artifact/4fc7f99e-71f3-442c-b88b-1bb83b5fa9d6>.
-
-- **Do not delete the stepper in this PR.** The wizard is a working flow the owner uses; ship the
-  conversation as the path behind the same entry point and keep the stepped sheet reachable until
-  the conversation has been used on-device for a plan the owner actually keeps. A conversational
-  flow that stalls mid-plan with no fallback is strictly worse than seven screens that finish.
-
-- **Lane.** Split, and **`lib/coach/**` is Lane A** — six `app/api/coach/**` routes import it
-  (nine imports; `apply.ts` and `patch.ts` also write storage), and the rule in
-  [`docs/agents/README.md`](agents/README.md) §3 sends anything reached by `app/api/**` to Lane A.
-  **No baton claim is needed**, and an earlier draft of this paragraph saying otherwise was wrong.
-  `lib/coach/widgets.ts` + `app/api/coach/options/route.ts` + `app/api/coach/route.ts` (the SYSTEM
-  prompt's widget rules, lines 27–59) are **Lane A**; `components/coach/choice-list.tsx`,
-  `components/coach/widget-registry.tsx` and `components/nutrition/meal-plan-setup-sheet.tsx` are
-  **Lane B**. The schema change lands first — the component cannot render a flag the schema does
-  not carry.
-
-- **Verification.** The multi-select half is testable in the sandbox: a widget rendered with
-  `multi: true` returns every checked id, Select all toggles all six, and an existing single-select
-  call site still resolves to one option (that regression is the actual risk). The **conversation
-  half is not** — it needs a real Gemini turn, so run one plan end-to-end against `pnpm dev` and
-  say plainly that the on-device pass (safe-area under the composer, the widget inside a scrolling
-  thread) was not exercised unless it was.
 
 ## Nutrition focus — the owner's priority, 2026-08-18
 
