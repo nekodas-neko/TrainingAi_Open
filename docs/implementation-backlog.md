@@ -331,6 +331,23 @@ days/hours cause most stress". Measured against production the same day; the bou
 signed off by the owner in that conversation. Review:
 [`docs/reviews/2026-08-24-body-battery-charge-window-collapse.md`](reviews/2026-08-24-body-battery-charge-window-collapse.md).*
 
+### [platform] LA-22 — E2E is not a required check, and a PR merged with it red
+
+- **Lane: A** · **Added:** 2026-08-25
+- **Gate:** owner — a governance decision, not a fix.
+- **#454 merged with its own E2E `failure`** (run 32807689333). Branch protection permitted it, so
+  **E2E is not in the required-check set** — which also explains why a merge succeeds while E2E is
+  still in progress. Worth deciding deliberately: a guard that cannot block anything let a red main
+  reach four other branches before it was traced.
+- **The red itself was real and is already fixed** by #456 — Home's Morning Check-in modal set
+  `aria-hidden` on `<main>`, so `home-card-invalidation-refetch` could not see the button it wanted.
+  Nothing to do there.
+- **⚠️ THIS ENTRY'S FIRST DRAFT WAS WRONG, and the mistake is the point.** It claimed the test could
+  never have passed because "no such button exists" — the exact conclusion an `aria-hidden` overlay
+  invites, since `getByRole` reports a covered affordance as *absent* rather than *obscured*, and a
+  `grep` for the label then appears to confirm it. #456's own commit message names this trap.
+  **Reproducing on a local dev DB and then reasoning from a grep is not enough to call a test
+  unpassable**; the modal was in the way on both.
 ### [platform] LB-12 — 77 of 193 queue entries state no lane, so both implementers are served each other's work
 
 - **Branch:** _unassigned_ · **Lane:** B filed it; **the sweep is the Orchestrator's** (it owns lane
@@ -466,6 +483,13 @@ test that feeds both, not by reading the condition.
 **Keep:** this is a suppression, not a fix. It must be removed by TN-6 rather than left as permanent
 behaviour, and TN-6's own pass test (deviation mean within ±0.05 °C of zero) is what retires it.
 
+- ✅ **SHIPPED 2026-08-25** (`fix/suspend-temp-penalty`). Working:
+  [`entries/2026-08-25-suspend-temp-penalty.md`](overview/entries/2026-08-25-suspend-temp-penalty.md).
+  `isTemperatureBaselineCentred` suspends the ladder while the trailing mean deviation is outside
+  **±0.15 °C** or there are **<10** nights to judge by — re-evaluated per request, so a Redecode
+  re-derivation lifts it with **no deploy**. Thresholds untouched.
+- **Keep:** a **suppression, not a fix** — TN-6 retires it (its ±0.05 °C pass test is what does), and
+  nothing was observed in production.
 ### [readiness][devices] TN-6 — the temperature baseline is 0.36 °C too low, so readiness carries a −16 pt penalty on 89% of days
 
 - **Branch:** _unassigned_
