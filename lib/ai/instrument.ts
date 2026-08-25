@@ -90,16 +90,27 @@ function stableStringify(v: unknown): string {
 // ── Best-effort logging (fire-and-forget) ───────────────────────────────────────
 // NEVER awaited on the hot path, NEVER throws — a logging failure must not fail or
 // slow the AI call. Metadata only (tokens + fingerprint hash), no prompt bodies.
-function readUsage(usage: unknown): { input: number | null; output: number | null; total: number | null } {
-  const u = usage as { inputTokens?: number; outputTokens?: number; totalTokens?: number } | null | undefined
+function readUsage(usage: unknown): { input: number | null; output: number | null; total: number | null; cached: number | null } {
+  const u = usage as {
+    inputTokens?: number
+    outputTokens?: number
+    totalTokens?: number
+    inputTokenDetails?: { cacheReadTokens?: number }
+    cachedInputTokens?: number
+  } | null | undefined
   const input = u?.inputTokens ?? null
   const output = u?.outputTokens ?? null
   const total = u?.totalTokens ?? (input != null && output != null ? input + output : null)
-  return { input, output, total }
+  // Q-295. `inputTokenDetails.cacheReadTokens` is the current field; `cachedInputTokens` is the
+  // SDK's own deprecated alias, read as a fallback so this keeps working whichever of the two a
+  // given provider version populates. `??` and not `||` — a reported 0 is a cache MISS and must
+  // survive as 0, where null means the provider said nothing at all.
+  const cached = u?.inputTokenDetails?.cacheReadTokens ?? u?.cachedInputTokens ?? null
+  return { input, output, total, cached }
 }
 
 function logAiCall(meta: AiCallMeta, opts: { usage?: unknown; latencyMs: number; ok: boolean; modelId?: string | null }): void {
-  const { input, output, total } = readUsage(opts.usage)
+  const { input, output, total, cached } = readUsage(opts.usage)
   const fingerprint = meta.fingerprint === undefined ? null : aiFingerprint(meta.section, meta.fingerprint)
   void (async () => {
     try {
@@ -122,6 +133,7 @@ function logAiCall(meta: AiCallMeta, opts: { usage?: unknown; latencyMs: number;
         ok: opts.ok,
         fingerprint,
         payloadBytes: meta.payloadBytes ?? null,
+        cachedInputTokens: cached,
       })
     } catch {
       // best-effort only — never surface a logging failure

@@ -794,6 +794,11 @@ export const aiCallLog = pgTable('ai_call_log', {
    *  `latency_ms` is the MODEL's time, and the leg the owner reported as slow is the one before it.
    *  Null, not 0, where a shape has no payload. */
   payloadBytes: integer('payload_bytes'),
+  /** Q-295 (migration 222). Input tokens the PROVIDER served from its own cache. Gemini 3.x caches
+   *  implicitly by default, so this is how you tell whether prompt caching is already happening
+   *  before adding an explicit cache on top. NULL (not 0) where the call predates the column or the
+   *  provider reported nothing — a miss is 0 and is a different fact. */
+  cachedInputTokens: integer('cached_input_tokens'),
   createdAt:    timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 })
 

@@ -14,7 +14,7 @@ silently misdirecting the next session. Update them in the same PR that consumes
 
 | Pointer | Value | Source of truth |
 |---|---|---|
-| Next free Postgres migration | **222** | `lib/data/postgres/migrations/` |
+| Next free Postgres migration | **224** | `lib/data/postgres/migrations/` |
 | Local SQLite schema version | **v29** | `lib/sqlite/migrations.ts`; `lib/sqlite/__tests__/migrations.test.ts` asserts the max |
 
 > **There is no third pointer any more.** Entry IDs are not allocated from a shared counter and
@@ -5863,11 +5863,11 @@ ehr     0     0     0     0   648   208   128   556     0
   Gemini 3.x caches **implicitly by default** — so implicit caching may already be part of the 6.4×
   above and nothing in production can tell you. An explicit cache added now is an optimisation you
   cannot measure, stacked on one you cannot see.
-- **➡️ Re-scoped: do NOT implement explicit context caching.** What is left is the cheap measurement —
-  record `cachedContentTokenCount` on `ai_call_log` (additive column + the `loggedStreamText` /
-  `loggedGenerateObject` wrappers in `lib/ai/instrument.ts` + a `claude_ro` view regen), then look.
-  High hit rate → this closes as measured-and-rejected, which the entry's own text calls a fine
-  outcome. Zero → the caching work gets a number behind it instead of a hypothesis.
+- **➡️ Re-scoped: do NOT add explicit context caching. ✅ Measurement half SHIPPED 2026-08-25**
+  (migrations 222 + 223): `ai_call_log.cached_input_tokens` records the provider's own cache hits,
+  read at `readUsage`. Nullable, no backfill — **NULL = nothing reported, 0 = a reported MISS**.
+- **Keep:** nobody has LOOKED yet — the column fills only as calls are made, and Coach's last was
+  2026-08-18. Run the hit-rate query once there is traffic: high → close as measured-and-rejected.
 - **Cost was never the reason and still is not** — 255 calls / 632,639 tokens over 24 days at
   flash-lite rates is cents per month. Do not optimise this for money.
 - **Confirmed in the same read:** every Coach row reads `gemini-3.1-flash-lite` while `COACH_MODEL_ID`

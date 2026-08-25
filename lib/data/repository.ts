@@ -1275,6 +1275,9 @@ export interface AiCallLogInput {
   fingerprint?: string | null
   /** BF-4: the request payload this call carried, where the shape has one. */
   payloadBytes?: number | null
+  /** Q-295: input tokens the provider served from its own cache. NULL where it reported nothing;
+   *  0 is a reported miss and is a different fact. */
+  cachedInputTokens?: number | null
 }
 export interface AiCallSectionStat {
   section: string
