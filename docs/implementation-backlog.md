@@ -1414,6 +1414,42 @@ matches what logging does.
 **Do not instead "exclude when unlogged and include when logged"** — that still moves the number the
 moment the owner answers, which is the thing being removed.
 
+**⚑ THE CHECK-IN IS NOT THE ONLY THING THAT UNSETTLES READINESS — `activityBalance` is worse.**
+`READINESS_WEIGHTS.activityBalance = 0.06`, and the composite's own doc-comment says it is
+*"Our own 0-100 activity score for **today**"* (`readiness-composite.ts:49`). Today's activity score
+is a **partial day** — its 55-weight daily-movement lane is near-empty at 7 am and fills through the
+day (measured 2026-08-26: 63 at 07:03, against 78 and 82 on the two preceding completed days).
+
+So readiness drifts **continuously, with no user action at all**, at roughly `0.06 × ~15 = ~1 point`
+across a day. Smaller than the check-in's ±3.84, and **worse in kind**: the check-in moves once when
+the owner presses a button, this moves invisibly all day. `prevDayActivity` (weight 0.09) already
+uses the previous, completed day and is settled — so the fix is to point `activityBalance` at a
+completed day too, or drop it.
+
+**The owner's requirement is one thing — "the numbers should be fully set on first open/load" — and
+it needs both changes.** Shipping only the check-in half leaves the score still drifting, and the
+owner will reasonably read that as the fix not working.
+
+**Pass test (extended):** readiness for a given day is byte-identical across two reads twelve hours
+apart with no new overnight data — which the check-in half alone does not achieve.
+
+**📏 The lookback the owner asked for is DONE (2026-08-26) — do not re-run it.**
+[`review`](reviews/2026-08-26-checkin-lookback.md), n = 33 logged days.
+- **The check-in correlates with the objective signals**: restingHeartRate **+0.557**, previousNight
+  **+0.520**, sleepBalance **+0.470**, temperature **+0.463**, hrvBalance +0.427. Yesterday's
+  training predicts it essentially not at all (**+0.028**).
+- **Best honest model: resting HR + last night's sleep, LOO R² = 0.293.** Adding predictors raises
+  in-sample R² and *lowers* out-of-sample: all eight contributors reach R² 0.541 with **LOO R²
+  0.047**.
+- **⛔ Do NOT impute the check-in on unlogged days.** That is the obvious next idea and the numbers
+  refuse it — a model explaining 5% of out-of-sample variance is a fabricated value with a model's
+  authority. Keep the neutral/exclusion path.
+- **This CORRECTS this entry's original reasoning.** It said the check-in "tracks the objective
+  contributors closely enough to add little independent information". r ≈ 0.5 is **~25% shared
+  variance**, so ~75% of the check-in is information nothing else has. Dropping it from readiness is
+  still right — because its weight is 10% and the score must be settled — but **not** because it is
+  redundant. It is worth keeping and using elsewhere.
+
 ### [sleep] TN-10 — `TOTAL_SLEEP`'s comment and its curve disagree by ~15 points, on the heaviest contributor
 
 - **Branch:** _unassigned_
