@@ -1276,29 +1276,6 @@ whether or not anyone draws them first.
 - **Keep:** the **device smoke run**, the only thing left — three `divide-y` sections over
   `bg-muted/60` children now, the shape Samsung's compositor has caught out before. `Gate: device`.
 
-### [nutrition][platform] LB-9 — the Atwater factors have four copies, two of them Lane A's
-
-- **Lane:** A
-- **Added:** 2026-08-25 · Lane B, while writing Q-395b's macro-split arc.
-- **`calorie-balance.ts`'s `KCAL_PER_G` is not exported** and `goal-recommendation.ts` hardcodes
-  `* 4` / `* 9` at three sites (54, 80, 108). A fourth copy in `saved-meal-card.tsx` is gone —
-  Q-395b put `components/nutrition/macro-energy.ts` in its place for `components/`.
-- **Left:** export `KCAL_PER_G`, fold `goal-recommendation.ts` onto it, then have `macro-energy.ts`
-  import rather than redeclare — all in `packages/shared/`, which Lane B cannot reach. Values agree
-  everywhere, so no behaviour change.
-
-
-- **Lane:** B
-- **`Needs: Q-395a` cleared 2026-08-25** — its components shipped; Q-395a stays queued only for a
-  device check on the builder, which does not gate this screen.
-- **Spec:** Q-395, findings 14 and 16.
-- **Scope.** `nutrition-content.tsx` and its cards: grouped sections with full-bleed dividers replace
-  gapped cards, and the 96 px `MacroRing` gains an arc split by macro (never a second ring).
-- **⚠ Every PR here ticks the coverage checklist.** The screen renders **12** sections and a rework
-  that quietly loses one is the failure mode Q-395 exists to prevent. The list is in the journal
-  linked below, corrected — this entry's own copy named 11 and mis-ordered End of Day.
-- **Verification.** As Q-395a, plus the checklist ticked in the PR body.
-
 ### [nutrition][app-shell] Q-395c — phase 4: Log Food becomes one screen, and `My Foods` becomes one name
 
 - **Lane:** B
