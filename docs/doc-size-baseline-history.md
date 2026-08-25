@@ -2138,3 +2138,13 @@ a short build list. A plan would have cost more lines than the entry.
 every open PR. Twenty-three lines to record a failure that cost every concurrent agent a red check
 and had already happened twice under a prose-only rule, which is the argument for the guard the
 entry asks for.
+
+## 2026-08-25 — `docs/implementation-backlog.md` 11638 → 11678 (+40)
+
+**BF-21**, exposing `pg_stat_statements` to `claude_ro` once the owner enables it. Filed rather than
+done because it needs a migration number, which only Lane A may take — the entry exists to carry the
+handover, the owner's Railway steps, and the security argument for why this one view is *not*
+row-scoped (normalised query text carries shapes, never parameter values).
+
+It also carries a deliberate expectation-damper: BF-19 already measured the database at 3 ms with a
+99.90% cache hit, so a clean read here must not be treated as closing the slow-load question.
