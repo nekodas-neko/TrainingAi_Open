@@ -2343,3 +2343,44 @@ same-day raise of this baseline, and the third to be superseded before merging �
 ordinary case when several PRs run in one session, not a sign anything is wrong. Each time the fix
 was to rebuild `doc-size-baseline.json` from `origin/main` and re-derive, never to splice the hunk:
 the raise is only ever correct against the merged predecessor.
+## 2026-08-25 — `docs/implementation-backlog.md` raised, 11862 → 12000 (mockup parity)
+
+The owner set the acceptance test for the nutrition arc: *"I want the design to match the mockup
+images"*. That is five new entries — **BF-28** (the map every parity entry reads), **BF-29**, **BF-30**,
+**BF-31**, and a **BF-26 rewritten** around the screenshot they sent.
+
+Most of the +138 is BF-28, and it is there so the other five are short. It holds the artboard →
+shipped-file table, and the three arguments that would otherwise be had once per entry: an artboard
+is one screenful and a section missing from it is not thereby deleted; an owner decision beats the
+drawing, and one already does (artboard 2 draws four tabs, Q-395c decided two); and the drawings'
+inline `oklch`/hex literals are structure to copy and colours to ignore, since `check-hex-literals.js`
+fails on the paste.
+
+The alternative was five entries each restating that, which is longer in total and drifts. This file
+grows when the queue is the only place a decision lives — and the parity rule now is.
+
+## 2026-08-25 — `projectOverview.md` raised, 7957 → 7959 (BF-11b)
+
+Two lines: the Current Status paragraph the wrap-up asks for, and its blank. Fourth same-day raise of
+this baseline, by the same session — see the three above for why that is ordinary rather than a
+symptom, and always rebuild from `origin/main` rather than splicing.
+
+The paragraph is longer than most because it carries a number no journal entry will be read for: the
+split rule's first version returned **5, 5, 1, 1, 5, 1** on five identical containers, and its second
+returned 30 of 30 across six cases. A reader of the index needs to know the splitting was measured
+rather than assumed, because the obvious next question — *"can I trust the candidate count?"* — has a
+different answer before and after that change.
+
+## 2026-08-25 — `docs/agents/state/implementation-lane-a.md` raised, 152 → 158 (BF-11b)
+
+Six lines, all one finding: **the Gemini model is reachable from an agent sandbox.** No baton had
+recorded it, and every Lane A session before this one worked as though an AI behaviour change could
+only be reasoned about. It cannot: BF-11b's split rule returned 5, 5, 1, 1, 5, 1 on its headline case
+and 30 of 30 after one wording change, and neither number was reachable by reading the prompt, by the
+type checker, or by any mocked test.
+
+The lines that come with it are the ones that would otherwise be rediscovered — there is no `tsx`, so
+a probe runs as a throwaway `*.test.ts` under vitest for the `@/` alias, and a shipped live test gates
+on an explicit `RUN_LIVE_AI_TESTS=1` rather than on the key, or CI quietly starts paying for
+non-deterministic runs. A baton is the right home precisely because this changes what a session
+believes is *possible*, which is not something you look up when you already think the answer is no.
