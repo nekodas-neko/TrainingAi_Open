@@ -2291,29 +2291,6 @@ separately, since it is the only route to per-query time in production.
 - **Surface: device.** Web timings will not represent the APK; the numbers only mean something once
   the reporter has run on the S25.
 
-### [platform] BF-20 — a scratch script reached `main` and turned Lint red for every open PR; nothing guards the repo root
-
-- **Branch:** _unassigned_
-- **Added:** 2026-08-25 · found when PR #443, a docs-only change, failed Lint
-- **Lane: A** — a Custom Rules check plus a `.gitignore` line.
-
-`m.mjs` — a 39-line Playwright screenshot-measurement scratch script, unreferenced by anything —
-was committed at the repo root in **#442** and merged. Its three `console.log` calls fail the
-`no-console` rule, so **`main` itself went red and every open PR inherited it**. Removed in #443
-because that was the only way to unblock any of them, not because the file belonged to that PR.
-
-**This is the `git add -A` hazard CLAUDE.md already documents**, which bit twice on 2026-08-08 and
-has now bitten again. Prose has not held it. The cheap guard is a Custom Rules step failing on any
-new top-level `*.mjs` / `*.js` / `*.ts` that is not on a short allowlist (`next.config`, `sentry.*`,
-`vitest.config`, `eslint.config`, `tailwind.config`, `postcss.config`), plus the same patterns in
-`.gitignore` so the file is never staged in the first place.
-
-- **What would count as fixed:** a stray root-level script cannot be committed, and if one is, CI
-  names it rather than failing on a `no-console` error three files away from the cause.
-- **Sibling sweep:** check for other scratch files already committed — a root-level `*.png`,
-  `*.json` capture, or `/tmp`-writing script has the same origin.
-- **Surface: CI only, web-reproducible.**
-
 ### [platform][app-shell] BF-22 — the slow loads clear on a force restart, so they are in-memory client state; the server-distance theory was measured wrong
 
 - **Branch:** _unassigned_

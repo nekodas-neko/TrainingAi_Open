@@ -2433,3 +2433,27 @@ its migration had not run against production, and reading production to verify L
 showed it had. A caveat that has become false is worse than no caveat — it teaches the next reader to
 discount the ones that are still true — so striking it is the point of the edit, not incidental to
 it.
+
+## 2026-08-25 — `projectOverview.md` raised, 7967 → 7969 (BF-20)
+
+Two lines. The paragraph spends most of its length on the two places the backlog entry's own
+prescription was wrong — an allowlist that would have failed on nine correct files, and a
+`.gitignore` rule that applied literally to `*.ts` would have silently untracked a legitimate root
+config. Both are the kind of thing a future reader would otherwise re-derive by breaking the guard,
+and the guard is the sort that gets deleted the first time it fires wrongly. The mechanics are in the
+journal entry; what belongs in the index is why the shipped version differs from the filed one.
+
+## 2026-08-25 — the Lane A baton raised, 167 → 179 (session-state refresh)
+
+Twelve lines, and the two that matter most are single tokens: **next free migration 219 → 220** and
+**`pnpm check:rules` 56 → 57**. Both had gone stale within the same session that wrote them, and both
+are facts a successor acts on without re-deriving — a wrong migration number is how the tree got its
+two collided pairs, and a stale check count defeats the reason CLAUDE.md says to quote `Ran N of N`
+rather than the word "pass".
+
+The rest records why **BF-19 was skipped while sitting at #1**: it is four parts of telemetry whose
+own entry says the numbers mean nothing until the reporter has run on the S25, and this session had
+no device. A successor that finds the top item untouched should be able to read whether it was
+judged or merely missed, and those are not the same thing.
+
+**A baton that is stale on its numbers is worse than a short one.** It gets trusted.

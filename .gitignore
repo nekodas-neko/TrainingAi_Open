@@ -80,3 +80,22 @@ docs/superpowers/plans/2026-07-09-oura-ble-accurate-sleep-staging.md
 docs/oura-models-bundle.md
 docs/oura-models-inventory.md
 .agents/skills/oura-native-ble/
+
+# BF-20 — a scratch script at the repo root fails Lint for EVERY open PR, not just the one that
+# added it (`m.mjs`, #442). `git add -A` is how it happens, so the cheapest guard is not staging it.
+#
+# Root-level only (the leading slash), and only the extensions whose legitimate root set is two
+# files and stable. `*.ts` is deliberately NOT ignored here: fourteen legitimate root `.ts` files
+# exist and a new one would be silently untracked, which is a worse failure than the one being
+# prevented — a missing file that nobody staged is harder to diagnose than a red check that names
+# it. `scripts/check-repo-root.js` covers `.ts` instead, loudly and by name.
+/*.js
+/*.mjs
+/*.cjs
+# Anything named `*.config.*` is a tool's own file and is never the hazard — negating the SHAPE
+# rather than listing today's two names is what stops a legitimate `next.config.mjs` or
+# `tailwind.config.js` from being silently untracked if one is ever added.
+!/*.config.js
+!/*.config.mjs
+!/*.config.cjs
+

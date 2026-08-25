@@ -6,7 +6,7 @@
 
 **Updated:** 2026-08-25 · **By:** the eighth session to run as Lane A · **Next ID:** `LA-26`
 (`grep -rhoE '\bLA-[0-9]+\b' docs/ | sort -t- -k2 -n | tail -1` is the authority, not this line)
-**Migrations:** through 218; next free is **219**. Local SQLite **v29** (BF-11e added the saved-meal
+**Migrations:** through 219; next free is **220**. Local SQLite **v29** (BF-11e added the saved-meal
 tag table).
 
 ## Now
@@ -45,8 +45,19 @@ checked.** Two of four this session:
 v1.370.2) · #476 BF-18 (autopack test polls the final phase) · #477 TN-7 (Body Battery stress failure
 reports) · #480 BF-11b (scan returns one candidate per meal, v1.372.0) · #481 TN-7 follow-up ·
 #482 BF-11e (migration **217/218**, local SQLite **v29**, saved-meal tags) · #484 LA-25 (journal
-sweep) · #486 BF-11b follow-up · BF-11g (library-first meal plan). **LA-24 filed** — eight more
-catalogue rows with BF-16a's defect, with the family precedent for each.
+sweep) · #486 BF-11b follow-up · #487 BF-11g (library-first meal plan) · #489 LA-24 Kind 1
+(migration **219**) · #490 BF-20 (repo-root guard).
+
+**LA-24 is now a question, not work.** Its Kind 1 shipped; what is left is `Gate: owner` — BF-16a's
+additions to `Barbell Shrug` and `Barbell Hip Thrust` had no in-catalogue precedent, so extending
+them to the shrug and glute-bridge families is the same anatomical call made five more times unasked.
+The entry is written for an answer rather than an implementer.
+
+**BF-19 is the top READY item and was deliberately NOT taken.** It is a four-part telemetry feature
+(client reporter, ingest route, aggregate route, retention) whose own entry says the numbers only
+mean something once the reporter has run on the S25 — so it produces data nobody can read until a
+device run. BF-20 was taken instead because it fails *every open PR*, not just its own. Not a
+judgement that BF-19 is unimportant; it needs the device, and this session had none.
 
 **Three timing-dependent test defects shipped and were fixed in one day, all mine.** BF-18 allowed an
 async write zero milliseconds; TN-7's test counted rows written by two racing fire-and-forget calls;
@@ -57,7 +68,8 @@ an assertion — a module import, a background write and a second writer are all
 ## Standing constraints
 
 - **The local gate is `pnpm check:rules`** — quote its `Ran N of N`, never the word "pass". It is
-  **56 of 56** now. Do not hardcode it; the runner reads the count from `ci.yml`.
+  **57 of 57** now — BF-20 added the repo-root guard. Do not hardcode it; the runner reads the count
+  from `ci.yml`, which is the whole point of quoting the number rather than the word "pass".
 - **The clone is depth 1.** `git fetch --deepen=200 origin main` before any `git merge origin/main`,
   or it refuses as "unrelated histories". Hit twice this session; it is not optional.
 - **`get_check_runs` returning `total_count: 0`** right after a push is **registration lag**, not a
