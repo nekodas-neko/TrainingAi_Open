@@ -870,9 +870,10 @@ without a queue entry is a dropped finding.*
 > conversion could be safe. Q-395a was meant to carry it and did not. Per-item P/C/F moved into the
 > sheet's live preview. [`journal`](overview/entries/2026-08-25-diary-row-shared-shape.md).
 >
-> **⚠ It turned up a pre-existing defect — see LB-10.** The sheet does not open in `pnpm dev` at all,
-> on `main` too: `use-sheet-back-dismiss.ts` is not double-invoke safe. Production is unaffected;
-> edit and delete were verified with `reactStrictMode: false`, then reverted.
+> **⚠ It turned up a pre-existing defect, LB-10 — fixed 2026-08-25.** The sheet would not open in
+> `pnpm dev` at all, on `main` too: `use-sheet-back-dismiss.ts` was not double-invoke safe. Verified
+> here with `reactStrictMode: false`; the hook is fixed and guarded now
+> ([`journal`](overview/entries/2026-08-25-sheet-back-dismiss-strict-mode.md)).
 
 - **Branch:** `refactor/nutrition-food-row`
 - **Lane B.** No schema, no route.
@@ -1209,21 +1210,6 @@ whether or not anyone draws them first.
   the action row), so a fixed container would draw an empty border on the days they are absent.
 - **Keep:** the **device smoke run**, the only thing left — three `divide-y` sections over
   `bg-muted/60` children now, the shape Samsung's compositor has caught out before. `Gate: device`.
-
-### [app-shell][platform] LB-10 — five sheets cannot be opened in `pnpm dev`: the back-dismiss hook is not double-invoke safe
-
-- **Lane:** B · **Added:** 2026-08-25, while converting Q-406's diary row.
-- **`lib/hooks/use-sheet-back-dismiss.ts`** pushes a history entry on open and calls `history.back()`
-  in its cleanup. Under StrictMode's double invoke that is push → `back()` → push, and the `popstate`
-  from the `back()` lands *after* the second push carrying the pre-push state — so the handler sees a
-  `sheetId` that is not its own and fires `onClose()` on the frame the sheet opened.
-- **Measured:** the sheet renders twice with a truthy `log` then flips to null; with
-  `reactStrictMode: false` it opens. Reproduced on `main`, so it predates Q-406.
-- **Production is fine** (no double-invoke), but `pnpm dev` is this repo's pre-merge test surface and
-  **five sheets are unopenable on it**: `quick-edit-log-sheet`, `food-logger-sheet`,
-  `food-library-sheet`, `morning-checkin-sheet`, `end-of-day-review` — same family as Q-461.
-- **Fix shape:** make the handler ignore a pop it caused itself — track whether the cleanup's
-  `back()` is in flight. Prove it by opening one of the five in `pnpm dev` with StrictMode ON.
 
 ### [nutrition][platform] LB-9 — the Atwater factors have four copies, two of them Lane A's
 
