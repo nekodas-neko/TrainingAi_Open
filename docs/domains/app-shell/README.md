@@ -171,6 +171,16 @@ Live at the time of writing (2026-07-30):
 
 ## History
 
+- **[`docs/handoff-2026-08-25-platform-lane-b-nineteen-prs.md`](../../handoff-2026-08-25-platform-lane-b-nineteen-prs.md)**
+  — Lane B, 2026-08-25. The shell-relevant half: **LB-10**, `use-sheet-back-dismiss` was not
+  StrictMode-safe, so a sheet mounted already-open closed itself on the frame it opened and five
+  sheets looked unopenable in `pnpm dev` while production was fine. **Q-477 completed** — the
+  client-timezone ratchet is at zero, and the workout day-rollover moved to
+  [`components/shell/workout-day-rollover.tsx`](../../../components/shell/workout-day-rollover.tsx)
+  in the root layout, because the rehydrate check it replaced ran on every app open. And the trap
+  worth knowing before writing any Home spec: **Home's Morning Check-in is a modal**, so Radix
+  `aria-hidden`s `<main>` and every `getByRole` on Home returns 0 — the failure reads as *"the
+  affordance does not exist"* on correct markup.
 - **[`docs/overview/entries/2026-08-17-radiogroup-keyboard-nav.md`](../../overview/entries/2026-08-17-radiogroup-keyboard-nav.md)**
   — 🆕 Q-350: all eight `role="radiogroup"`s now share
   [`lib/hooks/use-roving-radio-group.ts`](../../../lib/hooks/use-roving-radio-group.ts) for arrow keys
