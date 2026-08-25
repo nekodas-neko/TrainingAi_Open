@@ -710,6 +710,10 @@ workflow artifact (`app-debug-apk`) on that PR's Android run, kept 14 days.
 > (harmless — the server holds the archive) and any unsynced outbox mutation (**not** harmless —
 > flush it first with pull-to-refresh on More, which pushes; the "Sync now" button in Data & Sync
 > only pulls and will not flush anything).
+>
+> **Owner confirmed holding `key.hex` on 2026-08-25** — so the ring is recoverable, and an uninstall
+> is a decision rather than a gamble. Still ask: one file on one machine goes stale silently, and
+> this line would never know.
 
 **These APKs upgrade in place only while the `ANDROID_DEBUG_KEYSTORE_B64` repository secret is
 set.** Gradle's fallback debug keystore is generated per machine, and a GitHub runner is a fresh
