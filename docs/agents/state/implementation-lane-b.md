@@ -7,16 +7,14 @@
 
 ## Now
 **Nothing open — every branch merged.** This run landed **#478** (Q-93-followup), **#479** (the Q-112
-re-plan), **#483** (BF-27) and **#485** (this baton). Each has a journal entry in
-`docs/overview/entries/` dated 2026-08-25.
+re-plan), **#483** (BF-27), **#485**/**#488** (this baton) and **#491** (BF-24). Each has a journal
+entry in `docs/overview/entries/` dated 2026-08-25.
 
-**The local full-suite red on #483 was load, and CI settled it.** Two local runs failed a *different*
-1 and 3 specs (`meal-label`, `food-logging-complete`, `tabs-instant-paint (More)`); none reproduced
-alone or in a subset. **CI E2E passed all of them** on a fresh database in **11m16s**, and its
-failure-artifact step was *skipped*, which only happens when nothing fails. So: **CI E2E here takes
-about eleven minutes, not the three CI usually takes** — a docs-only PR's E2E ran just as long. Budget
-for that rather than reading a long-running E2E as a hang, and distrust a local full-suite red that
-will not reproduce in isolation.
+**CI E2E here takes about ELEVEN minutes, not the three `CLAUDE.md` quotes** — measured twice, and a
+docs-only PR's E2E ran just as long, so it is the job's cost, not your change. Do not read a
+long-running E2E as a hang. Corollary, from #483: two local full-suite runs failed a *different* 1
+and 3 specs that CI then passed on a fresh database, so **distrust a local full-suite red that will
+not reproduce alone or in a subset.**
 
 ## The finding that should change how you start
 **The previous baton said the startable Lane B surface was exhausted. It was not.** BF-27 sat at
@@ -30,21 +28,24 @@ work daily.
 **And re-verify every entry's premise before writing code — it is still the highest-value act in the
 role.** Three for three this run:
 - **Q-93-followup** — *"no historical per-session HR-chart/exercise-detail screen exists at all"*.
-  `/health/day` shipped **seventeen days earlier** and is exactly that screen. Two more of its claims
-  were stale: the second renderer it names is deleted, and the `ev.date` it needs is stamped
-  centrally at `app/api/day-timeline/route.ts:302`, so no Lane A change was involved.
-- **Q-112** — same shape, larger. Task 27 asked for a new merged day screen because no per-day
-  read-through existed; `/health/day` shipped **two days** after it was written. Building it as
-  written would have made a third day surface and re-implemented seven working sections.
+  `/health/day` shipped **seventeen days earlier** and is that screen. Two more claims were stale:
+  the second renderer it names is deleted, and its `ev.date` is stamped centrally (route line 302).
+- **Q-112** — same shape, larger. Task 27 wanted a new merged day screen because no per-day
+  read-through existed; `/health/day` shipped **two days** later. Building it as written would have
+  made a third day surface and re-implemented seven working sections.
 - **BF-27** — sound, but its prescribed approach (40 call-site wirings) was worse than one component,
   and its *"the quantity sheet passed"* observation points at a file that has no hook at all.
+- **BF-24** — accurate, and worth carrying: Q-395b and artboard 1 are *both* "grouped". The drawing
+  groups the food ROWS within a meal; Q-395b grouped the MEALS within one box — which is why a
+  coverage checklist passed while the owner said it did not look like the mockup.
 
 ## Next
 `node scripts/next-item.js --lane B` first. Known-good candidates, in the order I would take them:
-- **Q-395c** — top of READY, nutrition phase 4. PR #458 exists to unpark it; check whether another
-  session is on it before starting.
-- **BF-24** — the shipped nutrition day screen vs artboard 1. Lane B, owner-reported, has a drawing
-  to build against.
+- **Q-395c** — nutrition phase 4, and it owns BF-24's ③ tiles. Check nobody else is on it.
+- **BF-29 · BF-30 · BF-31 · BF-26** — the remaining artboard-parity entries. **Read BF-28 first**: an
+  artboard is one screenful, and a section absent from it is not thereby deleted.
+- **BF-24 is PART done — do not re-take it whole.** #491 shipped ①④⑤; ②③⑥⑦ are kept on the entry
+  with reasons (② also renders on `/health`, ③ is **Q-395c's**, ⑥ is Q-406's, ⑦ is decided).
 - **Q-112a** — a real one-PR entry now, with a plan behind it
   ([`the day-review plan`](../../superpowers/plans/2026-08-25-unified-day-review.md)); Q-112c is Lane A and gates Q-112d.
 - **Q-168, Q-154, Q-254, Q-111** — still gated, parked, or owner-decision. Unchanged.
