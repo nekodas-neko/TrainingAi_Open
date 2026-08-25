@@ -13,9 +13,13 @@ interface Props {
   /** Kcal earned from today's movement, from `budgetProvenance(...)` — the same addend the zone
    *  bar names, so the ring and the bar cannot disagree about it (Q-417). */
   earnedKcal?: number | null
+  /** Drawn as one row of a grouped section rather than as its own card (Q-395b): the section owns
+   *  the border and the divider, so a card that also draws its own puts a second hairline against
+   *  the first and re-opens the gap the grouping closes. */
+  grouped?: boolean
 }
 
-export function MacroRing({ calories, proteinG, carbsG, fatG, targets, earnedKcal }: Props) {
+export function MacroRing({ calories, proteinG, carbsG, fatG, targets, earnedKcal, grouped }: Props) {
   const calTarget = targets?.calories ?? 2000
   const remaining = Math.max(0, calTarget - calories)
   const pct = Math.min(100, Math.round((calories / calTarget) * 100))
@@ -46,7 +50,7 @@ export function MacroRing({ calories, proteinG, carbsG, fatG, targets, earnedKca
       : 'transparent'
 
   return (
-    <div className="rounded-2xl bg-muted/60 border border-border px-4 py-4">
+    <div className={grouped ? 'bg-muted/60 px-4 py-4' : 'rounded-2xl bg-muted/60 border border-border px-4 py-4'}>
       <div className="flex items-center gap-5">
         {/* Ring — conic-gradient + mask instead of an animated SVG stroke-dashoffset,
             which is unreliable on the Samsung WebView compositor. */}

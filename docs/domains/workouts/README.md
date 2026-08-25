@@ -92,6 +92,14 @@ Mode flow and the orchestrator pattern are documented in [`CLAUDE.md`](../../../
   temporary). Records why real per-exercise phase state was rejected (transition signals, the
   multiplied transition flow, and no single phase left to render), and why the offset cannot go
   forwards (`capLoadToAnchor`).
+- [`docs/superpowers/plans/2026-08-24-exercise-roles.md`](../../superpowers/plans/2026-08-24-exercise-roles.md)
+  — **planned, BF-15/16/17.** The settled design for how `exercise_role` is recommended at session
+  creation: one anchor picked as Primary, the rest filled to a shape scaled from
+  `program_sessions.time_budget_minutes` (1 P / 2 S / 2 A at 60 min, calibrated against 9 of 9 real
+  sessions and measured at 90% over 70 slots). Also carries the agreed vocabulary
+  (Primary/Secondary/Accessory for the exercise, Target/Assisting for the muscle) and **four
+  designs that were proposed and rejected with reasons** — position-based roles, isolation→accessory,
+  never-auto-Primary, and a remembered per-exercise preference. Read it before re-opening any of them.
 - [`docs/superpowers/plans/2026-08-05-measured-warmup-scale-with-preset.md`](../../superpowers/plans/2026-08-05-measured-warmup-scale-with-preset.md)
   — **planned, Q-83.** Once a per-lifter warmup median is learned, it's a fixed absolute minute
   count subtracted from every Quick/Normal/Long preset budget with no scaling — so Quick loses
