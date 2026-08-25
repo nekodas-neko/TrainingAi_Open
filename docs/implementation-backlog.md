@@ -1169,44 +1169,35 @@ Both device gates passed and both entries closed. Four findings came out of the 
 than the checks: two are nutrition-screen work and sit in the section above (BF-24, BF-26); these
 two are app-wide and sit here.*
 
-### [app-shell][platform] BF-25 — the light theme has no switch, and the owner wants it gone
+### [app-shell][platform] BF-25 — pin the app to dark: `forcedTheme="dark"`, palette kept
 
 - **Lane:** B
-- **Gate:** owner
-- **Added:** 2026-08-25, device smoke run ⑤ — *"Do we have an option in the app to go between dark
-  and light mode? I vote we remove dark/ight mode and only have one real option which is the dark."*
+- **✅ DECIDED BY THE OWNER 2026-08-25** — *"yes lets keep it as forced dark mode. then we need to
+  only make one UI/design"*. The `Gate: owner` is cleared; this is now ordinary implementation work.
+- **The standing consequence is already in `CLAUDE.md`** → *Visual consistency & theme*, the dark-only
+  rule. Read it before starting: it is what future sessions bind to, and it draws the one distinction
+  that matters — **theme is pinned, accent is not.** `data-brand` is still user-picked, so hex
+  literals are still a defect and `check-hex-literals.js` still ratchets them.
 
-**The answer to the question, because it changes the decision: no, there is no switch.**
-`grep -rn 'setTheme('` over `app/` and `components/` returns **zero** call sites. `app/layout.tsx:140`
-mounts `<ThemeProvider attribute="class" defaultTheme="system" enableSystem>`, so the theme follows
-the **phone's** setting and nothing in the app can change it. Light mode is not an option the owner
-chose and can un-choose; it is what the app becomes if the S25 is ever put in light mode.
+**The change, and its two halves — only the first ships.**
 
-**Recommendation: force dark, keep the light palette.** These are two separable changes and only one
-of them is worth making.
-
-- **Do:** `forcedTheme="dark"` on the provider — one line, and after it no user, no OS setting and no
-  auto-scheduled night mode can produce a light render. Reversing it is deleting the prop.
-- **Do not:** delete the light palette. The `:root` block in `app/globals.css` (the `.dark` block
-  overrides it), the scheme-conditional pairs in `resolveColor`, `HERO_GRADIENTS`,
-  `lib/background/screen-palettes.ts`, and the `resolvedTheme` reads in
-  `components/nutrition/weekly-nutrition-chart.tsx` and `components/health/detail-hero.tsx` all cost
-  **nothing while unreachable** — dead CSS custom properties are not paid for at runtime. Deleting
-  them is a wide, hand-verified sweep whose only benefit is tidiness, and it is the half that cannot
-  be undone.
-- **What it buys immediately:** every "verify in both themes" gate in this repo collapses to one
-  theme, including the ones sitting open on Q-395a and BF-26 right now. That is the real saving, and
-  the one-line change delivers all of it.
-- **Reversal cost:** removing the prop, if `forcedTheme` alone ships. Weeks of re-derivation, if the
-  palette goes too.
-- **The one thing to check before shipping even the one-liner:** the `useTheme()` mounted-gate hazard
-  in CLAUDE.md defaults to dark during SSR, so forcing dark cannot introduce a flash — but confirm
-  `next-themes` still stamps `.dark` synchronously under `forcedTheme`, since three components
-  document depending on exactly that.
-
-- **Verification.** Put the S25 in light mode and confirm the app stays dark end to end. Then grep
-  for surfaces reached outside the provider — the icon routes and any canvas paint — since a forced
-  class cannot reach those.
+- **DO:** `forcedTheme="dark"` on the `ThemeProvider` in `app/layout.tsx:140` (currently
+  `defaultTheme="system" enableSystem`). One line. After it, no OS setting and no auto-scheduled
+  night mode can produce a light render. Reversing it is deleting the prop.
+- **DO NOT:** delete the light palette — the `:root` block in `globals.css` (`.dark` overrides it),
+  the `resolveColor` scheme pairs, `HERO_GRADIENTS`, `lib/background/screen-palettes.ts`, and the
+  `resolvedTheme` reads in `weekly-nutrition-chart.tsx` and `detail-hero.tsx`. Dead CSS custom
+  properties are not paid for at runtime. Deleting them is a wide hand-verified sweep whose only
+  benefit is tidiness, and it is the half that cannot be undone.
+- **⚠ Check one thing before shipping even the one-liner.** Three components document depending on
+  `next-themes` stamping `.dark` on `<html>` **synchronously, before React hydrates**. Confirm that
+  still holds under `forcedTheme` rather than assuming — if it does not, a page-root surface flashes
+  on every navigation, which is the exact bug this is supposed to close.
+- **Verification.** Put the S25 in light mode and confirm the app stays dark end to end. Then check
+  the surfaces the provider cannot reach — the icon routes, which have no CSS, and any canvas paint.
+  `Gate: device`.
+- **What it buys immediately:** every "verify in both themes" gate in this repo collapses to one, and
+  every artboard and mockup from here is drawn dark only.
 
 ### [app-shell] BF-27 — the back gesture now closes every sheet and dialog; nobody has pressed it on the phone
 
