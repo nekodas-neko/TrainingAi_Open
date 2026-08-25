@@ -61,6 +61,12 @@ deleted look identical once it is gone.
      closes the inner sheet and leaves Log Food open, a second closes Log Food, and the page never
      moves. Before this, most nests pushed no entry at all, so the per-instance `sheetId` that keeps
      them apart had never been exercised in the product.
+- **The three `hideCloseButton` sheets were checked individually**, because they are the ones with no
+  X at all — back is their only dismissal besides Save, so they depend entirely on this hidden
+  `Close` being its own element rather than the visible one. `food-logger-sheet` is covered by the
+  nest case above; `morning-checkin-sheet` and `end-of-day-review` were driven in a browser: each
+  pushes an entry on open, one back press closes it, and the page stays put. That the three sheets
+  that most need this are exactly the three that already had the hook is not a coincidence.
 - `sheet-back-dismiss.spec.ts` still passes — the StrictMode mount-already-open case (LB-10) and its
   one-entry-per-open invariant survive the move into the primitive.
 - `tsc --noEmit` clean · `next lint` clean on the new file · `pnpm check:rules` **Ran 56 of 56**.
