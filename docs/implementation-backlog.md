@@ -1023,35 +1023,6 @@ whether or not anyone draws them first.
 - May batch with BF-11c (one screen, one verification pass) if BF-11c's save path lands unchanged.
 
 
-### [platform] LA-25 — the journal is one entry from blocking every PR, and this is the second time
-
-- **Branch:** _unassigned_
-- **Added:** 2026-08-25 · hit while shipping BF-11e, whose own entry crossed the limit
-- **Lane: A** — docs only. `docs/overview/entries/` → `docs/overview/history-*.md`.
-- **Not batchable with a feature PR, which is the point of filing it.**
-
-`check-doc-index-size.js` fails when `docs/overview/entries/` holds more than **60 unlinked**
-entries. It hit **61** on 2026-08-25 and blocked a migration PR mid-flight. **Seventeen entries were
-added that day alone**, across the concurrent sessions, so the limit is reached in days, not weeks.
-
-BF-11e unblocked itself the way the check intends — by linking its two nutrition entries from
-`docs/domains/nutrition/README.md`, which the wrap-up rule prescribes anyway and which makes them
-non-foldable. That is a legitimate move and **not a fix**: it left **59**, so the next session to add
-two entries is blocked again, mid-feature, on a chore that has nothing to do with its change.
-
-**Do the sweep deliberately, per [`docs/overview/entries/README.md`](overview/entries/README.md):**
-fold the unlinked entries oldest-first into a batched `docs/overview/history-*.md`, rewrite
-`](../../` to `](../` in each body, then `git rm` the folded files. The oldest unlinked are the three
-from 2026-08-19.
-
-- **⚠ The trap that has already bitten this chore, from the last sweep:** a **concurrent PR can link
-  an entry you have already folded**, and git surfaces only the one it also modified — three became
-  cited mid-sweep and two would have gone unnoticed (60 → 57 folded). Re-check the linked set
-  immediately before pushing, not only at the start.
-- **What would count as fixed:** unlinked entries back under ~45, so the limit is weeks away rather
-  than days; and a note in the README saying what the sweep cadence actually needs to be at the
-  current rate of ~17 entries/day across the running sessions.
-
 ### [nutrition] BF-11f — tagging a meal from Build a Meal
 
 > **⚠ BF-11e shipped the storage and transport (migration 217, local SQLite v29). The one thing it

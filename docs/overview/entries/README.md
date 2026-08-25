@@ -137,6 +137,24 @@ the sweep rewriting citations into the history file, or durable docs citing the 
 citation habit above is cheaper than either and needs no retrofit, so that is the answer unless the
 floor starts rising again from a source other than journal citations.
 
+### What the cadence actually needs to be (measured 2026-08-25, LA-25)
+
+The trigger above says ~20 loose files, which was written when a session produced one or two entries
+a week. It no longer describes the load. **Seventeen entries landed on 2026-08-25 alone**, across the
+concurrent sessions, and the unlinked count went from a post-sweep 32 on 2026-08-24 to **61 the next
+day** — a hard CI failure, on a migration PR, for a reason unrelated to the migration.
+
+So the honest number: at **~17 entries/day** and a limit of 60 unlinked, a sweep that clears 25
+buys **about a day and a half**. Treat it as a near-daily chore while this many sessions run in
+parallel, not a periodic one — and expect the trigger to be *the guard failing someone's PR* unless
+somebody sweeps ahead of it.
+
+**The cheaper half is still the citation habit above**: cite the review or handoff document, not the
+loose journal entry, and the linked floor stops rising. The 2026-08-25 sweep itself cost the floor
+**two** — a nutrition PR cited its own two journal entries from that domain index, because there was
+no handoff doc to cite instead. That is a legitimate trade and worth naming: an entry linked for a
+good reason is permanent weight, and a sweep cannot take it back.
+
 This is a standing chore in the same spirit as Dependabot remediation: it lives here permanently and
 is worked on a threshold, not every session. Below threshold, leave the entries; above it, compact.
 
