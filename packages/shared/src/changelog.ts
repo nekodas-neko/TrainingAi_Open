@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.369.0",
+    date: "2026-08-25",
+    changes: [
+      "The disk-reclaim button on the admin database card can now pick which table to compact, instead of only ever touching the ring\u2019s raw frames. It also reports how many live rows the table actually holds, so a big number next to a tiny row count reads as wasted space rather than real data.",
+    ],
+  },
+  {
     version: "1.368.0",
     date: "2026-08-25",
     changes: [

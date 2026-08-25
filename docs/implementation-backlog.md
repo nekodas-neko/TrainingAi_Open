@@ -4024,8 +4024,13 @@ cross-session against the local DB. Nothing user-visible changed — **no read s
 - **Branch:** `fix/coach-applied-change-copy`
 - **Added:** 2026-08-18, from owner screenshots of a working swap. **The swap itself is fine** — this
   is the sentence around it.
-- **Lane B** if the fix is the system prompt in `app/api/coach/route.ts` (it is). No schema, no route
-  logic.
+- **Lane: A — corrected 2026-08-25 (by Lane B, which this was being served to).** The entry reasoned
+  from the *nature* of the edit ("it is only the system prompt, so Lane B"), and the ownership rule
+  is deliberately not that: **reached by `app/api/**` → Lane A**, whatever the edit looks like. The
+  rule is path-based precisely so this judgement is not re-made per entry, and `app/api/coach/route.ts`
+  is squarely Lane A's. The investigation the entry asks for first — whether the model wrote the
+  sentence after the tool call, or the UI renders tool results ahead of streamed text — also lands in
+  that file, so splitting it across lanes would help nobody.
 
 **What the screen showed, in this order:**
 1. Green result card — *"Swapped Barbell Romanian Deadlift → Barbell Jefferson Curl in Legs"*
@@ -4301,66 +4306,29 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   dump hashing identically before and after). This item is the affordance only.
 
 ### [platform] Q-315 — `error_events` holds 4 live rows in 49 MB: Q-539 stopped the bleeding but never reclaimed the space
-- **🔁 RE-SCOPED 2026-08-24 — this was never an owner DECISION, and the `Gate: owner` was hiding a
-  missing button. `Lane: B` now.** *"What is left is a press"* was true and incomplete: **nothing in
-  the app can make that press.** `app/api/admin/vacuum/route.ts` shipped, generalised, with
-  `error_events` in `VACUUM_FULL_TABLES` — and **has no caller**. The one vacuum control that exists
-  (`components/oura-ble/db-footprint-card.tsx:108`) still posts to the *old*
-  `/api/oura-ble/samples/vacuum`, which only ever touches `oura_raw_samples`. The route is
-  session-only (no bearer path, unlike `ADMIN_EXPORT_SECRET`/`ADMIN_SNAPSHOT_SECRET`), so there is
-  no way to reach `error_events` from anywhere.
-  - **The work is small and is Lane B's:** point that control at the generalised route with a table
-    selector, driven by the `GET` the route already serves (it returns
-    `VACUUM_FULL_TABLES` as `{table, what}[]` for exactly this). **Then** the owner presses it —
-    which is an action, not a decision, and needs no gate.
-  - **It is reachable once wired.** Q-544 moved `DbFootprintCard` **above** the native-gated
-    `OuraBleDebug` on `/admin/oura-ble` precisely so it renders on a desktop — which is the client
-    that can actually hold the `ACCESS EXCLUSIVE` lock.
-  - **Third instance of this repo's "built it, never wired it" class**, alongside Q-467's undo
-    subsystem with no caller and LB-3's sheet nothing opened.
-- **↻ NUMBERS REFRESHED 2026-08-24 — the case got STRONGER, not weaker.** The headline and the
-  measurements below are from 2026-08-18, when the database was 819 MB. Packing has since taken it
-  to **181 MB**, so `error_events` at **49 MB is now ~27% of the whole database**, not 6%. Live rows
-  have drifted 4 → **33** (`n_tup_ins` 37) and the size has not moved — consistent with the entry's
-  own diagnosis that this is dead tuples and TOAST, not data. Q-534's 500 MB deadline is met, so the
-  urgency framing below is spent; the waste is not.
-- **Added:** 2026-08-18 (found while measuring production for Q-541)
-- **Lane:** B — see the re-scope above; the remaining work is wiring the existing control to the generalised route, which is `components/**`.
-- **Measured production, 2026-08-18:** `error_events` is **49 MB total against `n_live_tup = 4`** —
-  12 MB heap, 1.1 MB indexes, and the remaining ~36 MB in TOAST. That is **6% of the whole 819 MB
-  database** held by four rows.
-- **This is dead weight, not data.** Q-539 diagnosed the cause: one fault wrote **5,771 rows** because
-  the dedupe key varied with a generated `VALUES` list, each stored message truncated to exactly
-  2,000 chars of `(default, $N, $N),` boilerplate. Q-539 fixed the key and cut the cap to 1,000, and
-  the rows themselves have since been pruned — but Postgres MVCC leaves the dead tuples in place, so
-  the file never shrank. **Nothing here re-grows**: the write path is already fixed, so this is a
-  one-off reclaim, not a recurring chore.
-- **Why it is worth a queue entry rather than a footnote:** it is the cheapest MB in the database
-  against the owner's end-of-week 500 MB deadline (Q-534). Q-541's packing is worth ~680 MB and is
-  several sessions of careful work; this is ~49 MB for a single statement over a four-row table, with
-  no data at risk and no read path to reason about.
-- **Shape:** the existing `app/api/oura-ble/samples/vacuum/route.ts` already runs
-  `VACUUM (FULL) oura_raw_samples` behind an admin gate — generalise it to take a table name from a
-  small allowlist, or add a sibling. `VACUUM FULL` takes an ACCESS EXCLUSIVE lock and rewrites the
-  table; on four live rows that is milliseconds, but it still needs free disk equal to the current
-  file (49 MB against a 5 GB volume — not a constraint today, and worth re-checking if the volume is
-  cut back to 500 MB before this runs).
-- **Verification:** `pg_total_relation_size` before and after via `/api/admin/db-query`, and
-  `SELECT count(*) FROM error_events` unchanged either side. Do not assume the count is 4 by the time
-  it runs — read it first.
-- 🚧 **The ROUTE shipped 2026-08-18 (Lane A); the PRESS has not happened.** `POST /api/admin/vacuum`
-  with `{"table":"error_events"}`, admin-gated, 4/min, allowlisted to `error_events` and
-  `oura_raw_samples`; `GET` lists what may be vacuumed. The table name is interpolated into
-  `VACUUM (FULL) <table>` because VACUUM accepts no bind parameter, so **the allowlist is the safety
-  boundary, not validation** — checked with `hasOwnProperty` (an `in` check accepts `toString`, and
-  there is a mutation-checked test for exactly that) in both the route and the slice. Verified live
-  on `pnpm dev`: a disallowed name and a missing body both 400, and a real run on the local
-  `oura_raw_samples` reclaimed **5.7 MB of 6 MB**.
-  **Still outstanding: someone has to press it against production.** No button — that is Q-316's
-  territory (`components/**`, Lane B) — so until then it is a curl with an admin session cookie.
-  The same route is what reclaims the space after Q-541's backfill and after migration 193's index
-  drop, which is why it was generalised rather than copied.
 
+> **✅ THE BUTTON SHIPPED 2026-08-25 (Lane B).** `db-footprint-card.tsx` posts to the generalised
+> `/api/admin/vacuum` with a table picker fed by that route's own `GET`, so the allowlist cannot
+> drift from the client. The result line reports `liveRows` beside `beforeBytes` — the pair that
+> tells pure bloat from a genuinely large table, which is why this is a one-off reclaim and not a
+> chore. Confirm copy is per-table now (the old text promised "body_hex and all rows are preserved",
+> true of `oura_raw_samples` and meaningless here).
+> [`journal`](overview/entries/2026-08-25-vacuum-table-picker.md).
+>
+> **Driven end to end locally: 200, `{"table":"error_events","liveRows":3,...,"reclaimedBytes":0}`.
+> Zero is correct there and proves the path, not the reclaim** — the local table is 48 KB with no
+> bloat; production's is 49 MB against 4 rows, and that cannot be reproduced here.
+>
+> **`app/api/oura-ble/samples/vacuum/route.ts` now has no caller.** Deleting it is `app/api/**`,
+> Lane A's, and was not done as a side effect of wiring a button.
+
+- **Branch:** `feat/vacuum-table-picker`
+- **Lane:** B
+- **Keep:** the press itself, on production. `/admin/oura-ble` from a **desktop** (Q-544 moved the
+  card above the native-gated `OuraBleDebug` for exactly this), signed in as admin → Table →
+  `error_events` → Reclaim disk. Expect ~49 MB back against 4 live rows. Also unexercised: a
+  `VACUUM FULL` long enough to need the slice's lifted timeouts, and the `<select>` at phone width.
+  `Gate: owner`
 ### [app-shell][platform] Q-544 — server-side disk maintenance is trapped behind a native-plugin gate, so it cannot be run from a desktop
 
 > **✅ SHIPPED 2026-08-24 (Lane B, v1.363.4).** `DbFootprintCard` **and** `DeviceMetricsPanel` moved
