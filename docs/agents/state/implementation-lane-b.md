@@ -3,7 +3,7 @@
 > **Successor sessions are titled `🚧 Implementation Agent (B) 🟢`** — exactly, emoji included. That
 > title is how six concurrent sessions stay tellable apart; a renamed successor is a lost thread.
 
-**Updated:** 2026-08-24 · **By:** the tenth Lane B run · **Next ID:** `LB-8`
+**Updated:** 2026-08-25 · **By:** the eleventh Lane B run · **Next ID:** `LB-12`
 
 ## Now
 **Nothing open.** This run merged #406/#410/#412 (Q-477 slices 2–4), #416 (Q-318), #418 (Q-317),
@@ -16,9 +16,11 @@ gave the re-key declaration a button, Q-316 gave the frame packer one, and Q-544
 they render on a desktop at all.
 
 ## Next
-`node scripts/next-item.js --lane B`, and **re-verify the premise first.** The top ten READY entries
-are almost all shipped-with-a-`Keep:`-line; the genuinely startable work now begins around **Q-538**
-(device raw-store pruning) and **Q-461**, **Q-319**, **Q-306**.
+`node scripts/next-item.js --lane B`, and **re-verify the premise first** — that check is still the
+highest-value thing this role does. **The tool no longer buries the startable work** (LB-11): a
+shipped-with-a-`Keep:` entry now prints under KEEP rather than at the top of READY, so row 1 is a
+real item. It leads with **Q-477's remainder** (`lib/stores/workout-store.ts`, a design call — see
+below), then **Q-467**, **Q-403**.
 
 - **BF-11 is NOT startable by Lane B.** Its own text says it is "not an implementation plan" and that
   a planning session must turn it into one first; no plan exists under `docs/superpowers/plans/` and
@@ -28,7 +30,9 @@ are almost all shipped-with-a-`Keep:`-line; the genuinely startable work now beg
   design decision, not a conversion.** A Zustand store has no hook, and `onRehydrateStorage` runs
   before any provider mounts; a wrong-zone stamp makes `rolloverDay()` clear the day's completed
   sets. Full analysis is on the Q-477 entry. Do not convert it mechanically.
-- **⛔ Q-395's drawings still aren't in the repo.** Do not take Q-395a/b/c or Q-406's last two sites.
+- **✅ Q-395's drawings ARE in the repo now** — `docs/design/2026-08-18-nutrition-rework-mockups.html`,
+  landed by #428. Q-395a/b and Q-406's diary row all shipped this run; Q-406's last call site is
+  `Gate: owner` on a design answer the twelve artboards do not contain.
 
 ## Do not re-litigate
 - **Q-359's remaining 12 sites, Q-555's `next/link`-can't-work fix shape, `lib/coach/**` = Lane A,
@@ -46,7 +50,10 @@ in sandbox), the Q-389 print/scan/share checks, a TalkBack pass (incl. the two Q
 "Accent ring" style, Q-450/Q-418 (needs a Polar H10).
 
 ## Claimed paths
-None held.
+**`scripts/next-item.js` + `scripts/lib/keep.js`** — claimed for LB-11, released when that PR merges.
+`scripts/` is in neither lane's path list in `docs/agents/README.md` §3 and the ownership rule does
+not decide it, so this is the ambiguous-path claim the rule asks for. It does not reserve `scripts/`
+for Lane B generally.
 
 ## Gotchas worth carrying
 - **Shallow clone: `git fetch --unshallow origin` before every merge**, or `git fetch origin main`
