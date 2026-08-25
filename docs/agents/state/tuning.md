@@ -109,22 +109,23 @@ sleep ✅ · readiness ✅ · activity ✅ · body ✅ · devices ✅ · workout
   is near-empty first thing while the strength lane (45) already carries yesterday's session, so a 63
   at 7 am is the score working. **Do not file "activity reads low in the morning"** — Q-505.
 - **Removing a 10% contributor normally moves a score; `checkin` does not** (TN-9) — mean 69.9 → 70.4,
-  no day moving ≥5. Measure before assuming a weight is load-bearing.
-  **⚑ But the REASON given for that was wrong, and the correction matters.** This baton used to say
-  the check-in "adds little independent information". Measured at n = 33: it correlates r ≈ 0.5 with
-  the objective contributors, which is ~25% shared variance — **so ~75% of the check-in is
-  information nothing else in the app has.** Dropping it from readiness is still right (its weight is
-  10% and the score must settle at first open), but it should be used **more** elsewhere, not less.
-  [`lookback`](../../reviews/2026-08-26-checkin-lookback.md).
-- **⛔ Imputing the check-in on unlogged days is REFUTED, not untried.** The full eight-contributor
-  model reaches in-sample R² 0.541 and **LOO R² 0.047**. Every predictor past the second raises
-  in-sample fit and lowers out-of-sample. The honest model is **two predictors at LOO R² 0.293**
-  (resting HR + previous night). On ~33 rows, quoting plain R² sells the worst model as the best.
-- **Readiness has a SECOND thing that unsettles it, and it is worse than the check-in.**
-  `READINESS_WEIGHTS.activityBalance = 0.06` and the composite's own comment says it is *"our own
-  0-100 activity score for **today**"* — a partial day. So readiness drifts ~1 point **continuously,
-  with no user action at all**, where the check-in moves once on a button press. TN-9's pass test now
-  demands two byte-identical reads twelve hours apart, which the check-in half alone cannot deliver.
+  no day moving ≥5. **The reason first given here was wrong and is corrected**: it is because the
+  weight is 10% *and* it correlates with the rest, not because it is redundant.
+- **The check-in lookback is DONE (2026-08-26, n=33) — do not re-run it.**
+  [`review`](../../reviews/2026-08-26-checkin-lookback.md). Correlates restingHeartRate **+0.557**,
+  previousNight **+0.520**, sleepBalance +0.470, temperature +0.463; yesterday's training **+0.028**.
+  **Best honest model is 2 predictors, LOO R² 0.293**; all eight reach R² 0.541 with **LOO 0.047**.
+  **⛔ Do NOT impute the check-in on unlogged days** — 5% out-of-sample is a fabricated number with a
+  model's authority. **r ≈ 0.5 is ~25% shared variance, so ~75% of the check-in is information
+  nothing else has** — it is worth using more elsewhere, not less.
+- **On n≈30, always report LEAVE-ONE-OUT R², never plain R².** Here R² rose monotonically to 0.541
+  with eight predictors while LOO collapsed to 0.047 — the in-sample number would have sold a model
+  with no predictive power at all.
+- **"Final at first open" needs TWO fixes, not one.** Besides the check-in, `activityBalance`
+  (weight 0.06) is **today's** activity score (`readiness-composite.ts:49`), which is a partial day
+  that fills all day — so readiness drifts ~1 point continuously with no user action.
+  `prevDayActivity` already uses a completed day and is settled. Ship only the check-in half and the
+  owner will read the fix as not working.
 - **HR alone cannot answer "did you move" — MET can, and the app already decodes it.** The owner
   raised this and was right. `getOuraDaytimeSignals` (`adapter.ts:4959`) decodes MET from raw frames
   (**tag `0x50`**) and `MET_ACTIVE_THRESHOLD = 1.8` is Oura's own constant (`daily-medians.ts:51`).

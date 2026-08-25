@@ -2667,7 +2667,19 @@ Q-327 — and grep proves nothing renders either one. So the entry states plainl
 places the deferral was recorded so a reader does not trip over a stale *"deliberately not here
 yet"* comment and treat it as a live decision.
 
-## 2026-08-26 — three raised for the pillar review: backlog 11775 → 11890, `projectOverview.md` 7977 → 7987, `docs/agents/state/tuning.md` 182 → 217
+## 2026-08-25 — `docs/implementation-backlog.md` raised, 11775 → 11811 (the check-in lookback)
+
+Two entries' worth of measurement, no new entry. **TN-9** gains its second cause — readiness carries
+`activityBalance` at weight 0.06 and the composite's own comment says it is *"our own 0-100 activity
+score for **today**"*, a partial day — so the score drifts ~1 point with no user action at all, which
+the check-in half alone does not fix. Its pass test is extended to demand two byte-identical reads
+twelve hours apart.
+
+The length is doing the work the entry cannot do without it: it records that the obvious follow-up,
+**imputing the check-in on unlogged days, is refuted** — LOO R² 0.047 — so the next session does not
+spend itself rediscovering that a model explaining 5% of out-of-sample variance is a fabricated
+number wearing a regression's authority.
+## 2026-08-26 — three raised for the pillar review: backlog 11775 → 11926, `projectOverview.md` 7977 → 7987, `docs/agents/state/tuning.md` 182 → 218
 
 **Four entries, from six owner questions.** TN-13 (the HR tile averages away 84% of the movement in
 the best predictor of felt state), TN-14 (2026-08-19's 3.50 h night still feeds every baseline),
@@ -2682,7 +2694,11 @@ rather than built. TN-15 is long for the opposite reason: it **supersedes** a st
 propose overnight charging or an anchor redesign" instruction, and a supersession that does not
 explain itself gets reverted by the next reader.
 
-**The baton was compacted in the same pass** (221 → 216 before the raise) so the 35 lines it grows by
+*(Final figures after the check-in lookback PR landed on `main` in between and was merged in — both
+raises are in this branch's diff, which is why the backlog number is higher than the 11890 the branch
+alone reached.)*
+
+**The baton was compacted in the same pass** (221 → 216 before the raise) so the lines it grows by
 are the four new entries and two corrections, not accretion. One of those corrections retracts this
 baton's own claim that the check-in "adds little independent information" — measured, ~75% of it is
 information nothing else has.
