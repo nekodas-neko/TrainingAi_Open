@@ -6,7 +6,6 @@ import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet'
 import type { FoodLogWithItem } from '@trainingai/shared/types/nutrition'
-import { useSheetBackDismiss } from '@/lib/hooks/use-sheet-back-dismiss'
 import { getLocalStore } from '@/lib/local-store'
 import { pushThenRevalidate } from '@/lib/local-store/push-then-revalidate'
 import { invalidateNutritionWrite } from '@/lib/cache-groups'
@@ -27,7 +26,6 @@ const PRESETS = [0.5, 1, 1.5, 2, 3]
 export function QuickEditLogSheet({ log, onClose, onSaved, onDelete, userId }: Props) {
   const [qty, setQty] = useState(() => log?.quantityMultiplier ?? 1)
   const [saving, setSaving] = useState(false)
-  useSheetBackDismiss(!!log, onClose)
 
   const item = log?.foodItem
   const r1 = (n: number) => Math.round(n * 10) / 10

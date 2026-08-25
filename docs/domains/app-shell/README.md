@@ -181,6 +181,17 @@ Live at the time of writing (2026-07-30):
 
 ## History
 
+- **[`docs/overview/entries/2026-08-25-back-dismiss-sweep.md`](../../overview/entries/2026-08-25-back-dismiss-sweep.md)**
+  — 🆕 **BF-27**: the Android back gesture now closes the sheet or dialog on top rather than
+  navigating the page underneath away. It reached 5 of 45 sheet files and 0 of 6 dialog files
+  before. The hook is no longer wired per call site — `SheetContent` and `DialogContent` render
+  [`components/ui/back-dismiss.tsx`](../../../components/ui/back-dismiss.tsx), which closes through
+  Radix's own `onOpenChange` so every existing guard and cancel arm still runs. **The one thing to
+  know before touching it:** the hook must be a *child* of `Content`, never a call in
+  `SheetContent` — that body runs whenever a caller renders it, and every tab screen renders its
+  sheets unconditionally with a null prop, so a hook one level up pushes a history entry for every
+  closed sheet on the page.
+
 - **[`docs/handoff-2026-08-25-platform-lane-b-nineteen-prs.md`](../../handoff-2026-08-25-platform-lane-b-nineteen-prs.md)**
   — Lane B, 2026-08-25. The shell-relevant half: **LB-10**, `use-sheet-back-dismiss` was not
   StrictMode-safe, so a sheet mounted already-open closed itself on the frame it opened and five

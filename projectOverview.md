@@ -24,7 +24,7 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.371.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Version:** v1.372.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-08-25.
 
 **The Body Battery guard stopped swallowing the signal a separate investigation was waiting on (TN-7).** TN-4's fix is right and stays — a stress-model failure costs the stress strip, not the whole card. But its catch only called `console.error`, which reaches no table, so from that deploy a recurrence of the fault that fired **31 times on 2026-08-23** wrote nothing anywhere. LA-20's Known-Issues row asks for a zero `error_events` count over a window where this route was called, and with the guard and without the report that count is zero **whether or not the cause is fixed** — a condition that can no longer fail. The catch now reports as well as logs, tagged `/api/body-battery#stress` so the row is attributable to the strip rather than the outer catch. **The window that counts starts at this deploy**; every zero before it is silence from the guard, and the row says so now. **The general shape, worth naming: a hardening change that turns a loud failure into a quiet degradation also removes the evidence a separate open investigation was relying on.**
@@ -38,6 +38,8 @@
 Read it with the baton at `docs/agents/state/implementation-lane-b.md` before taking a Lane B item:
 the entire Lane B surface was traversed and every remaining candidate is gated, declined, parked,
 needs hardware, or wants a plan first. **Nothing that run shipped is device-verified.**
+
+**The back gesture stops navigating the page away (BF-27).** `useSheetBackDismiss` was imported by 5 of 45 sheet files and 0 of 6 dialog files; everywhere else Android back reached the WebView, which took the page underneath with it. Shipped **not** as the 40-site sweep the entry scoped but as one component rendered by `SheetContent`/`DialogContent` — so it covers every sheet, every dialog and every future one, closes through Radix's own `onOpenChange` (keeping each surface's existing guards and cancel arms), and reaches the uncontrolled sheet a per-site sweep could not. Dialogs were included deliberately: back can only take a cancel arm, asserted on the database. Three mutation-checked e2e cases, including the nest ([`journal`](docs/overview/entries/2026-08-25-back-dismiss-sweep.md)).
 
 **The timeline's workout card had somewhere to land for seventeen days (Q-93-followup).** It was left unwired in August because no screen showed a past session; `/health/day` shipped 2026-08-08 and nothing tracked the dependency clearing. Workout and walk now open it; `bedtime` and `tag` stay inert, having no detail view to reach. Two more of the entry's premises were stale — the second renderer it names is deleted, and the `ev.date` it needs is stamped centrally, so no `app/api/**` change was involved. Guarded by a mutation-checked e2e spec, because a row wired to nothing renders identically to a wired one ([`journal`](docs/overview/entries/2026-08-25-timeline-workout-day-detail.md)).
 
