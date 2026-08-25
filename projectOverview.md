@@ -63,11 +63,16 @@ builder's rows became the shared `FoodRow`; `ingredient-row.tsx` is deleted and 
 
 **The Devices card stops calling the ring healthy with no key (LB-5).** Checks `hasKey()` and links to `/admin/oura-ble` when false. `Gate: device`.
 
+**The volume card stops guessing, and the surface was WRONG rather than absent (Q-305, half).** It
+already drew a band — a hardcoded generic **10–20** — while `packages/shared` computed real
+per-muscle MEV/MAV/MRV beside it. The goal multiplier is what makes that material: Q-305's own first
+pass read the unscaled row and called lats *below MEV*; against the app's own table it is **in
+range** and three muscles are over MRV. The band's **word** ships with its colour — two of the four
+are red and mean opposite things. Push:pull stays open: it needs a taxonomy that belongs in
+`packages/shared`, which is Lane A's. `Gate: device`.
+
 **The raw-store console says what its numbers mean (Q-538, half).** It printed **209,326 rows, 0
-rolled up, 31.2 MB** and it took a source trace to know `0 rolled up` was the fault — the prune's
-predicate matches nothing, so the 14-day window can delete no row at all. It now says unbounded,
-unbacked (past the 25 MB Auto Backup quota) and shedding, in words. **The bound stays blocked** on an
-unbuilt rollup consumer that is Lane A's and has no queue entry. `Gate: device`.
+rolled up, 31.2 MB** and it took a source trace to know `0 rolled up` was the fault — the prune's predicate matches nothing, so the 14-day window can delete no row at all. It now says unbounded, unbacked (past the 25 MB Auto Backup quota) and shedding, in words. **The bound stays blocked** on an unbuilt rollup consumer that is Lane A's and has no queue entry. `Gate: device`.
 
 **The queue tooling learns `OR-` (PS-6).** The Orchestrator prefix was never in the ID alternation,
 and the failure was **silent deletion**: `next-item.js` counted **194 entries with and without** a scratch `OR-99`, printed it nowhere, and `check-backlog-pointers` neither caught a duplicate nor resolved `Needs: OR-n`. One shared `scripts/lib/entry-id.js` now, not four regexes — four copies is what let it drift. PS-6 named three sites; there were four.
@@ -89,7 +94,7 @@ affordance **absent** rather than covered — `getByLabel` found it and `getByRo
 
 **The end-of-workout "How hard was that session?" prompt is gone (Q-420).** 25.6% fill rate; `sessionEffort()` already derives it from set RPEs at read time, so nothing downstream changed.
 
-**Two Health cards stop vanishing on a failed fetch, and the fix needed a second one (Q-499).** They show "Couldn't load…" on a 429/500 now. `onError` alone didn't work: `cachedFetchCore`'s dedup relayed a failure only to the torn-down owner, never to a joined caller — fixed in `lib/sqlite/cache.ts`.
+**Two Health cards stop vanishing on a failed fetch, and the fix needed a second one (Q-499).** They show "Couldn't load…" on a 429/500 now. `onError` alone didn't work: `cachedFetchCore`'s dedup relayed a failure only to the torn-down owner, never a joined caller — fixed in `lib/sqlite/cache.ts`.
 
 **The database reclaim is three-quarters done, and the last quarter is one press.** The owner's
 `oura_raw_samples` vacuum reclaimed **36 MB** (93 → **57 MB**) and the automatic packer is observed in
@@ -139,14 +144,12 @@ every threshold and nothing under `components/`/`app/` imported it, so a 5,000 k
 
 **The finished-logging control moved above End of Day (BF-6, v1.344.0).** **Zero presses in seven weeks**, and the calibration excludes an unmarked day rather than treating it as light.
 
-**A deload session says so now (BF-8, v1.343.0).** Intensity read "Full · As prescribed" while the card
-under it read "Deload session" — the owner trained one believing it was full. Both asked `isDeloadActive` (the PHASE), not today's session.
+**A deload session says so now (BF-8, v1.343.0).** Intensity read "Full · As prescribed" while the card under it read "Deload session" — the owner trained one believing it was full. Both asked `isDeloadActive` (the PHASE), not today's session.
 
 **A recipe link becomes a meal (Q-409's Lane B half, v1.342.0).** A page stating no yield hands back the
 **whole recipe** (1,956 kcal for a loaf), so the row asks how many it serves and cannot be kept until answered.
 
-**Saved meals can carry a photo (Q-327, v1.341.0).** A 64 px tile in Edit Meal, downscaling to 128 px
-WebP (~6 KB); the tile prints the stored size, because nothing else fails loudly when the cap slips.
+**Saved meals can carry a photo (Q-327, v1.341.0).** A 64 px tile in Edit Meal, downscaling to 128 px WebP (~6 KB); the tile prints the stored size, because nothing else fails loudly when the cap slips.
 
 **The meal plan can be written to again, and it now produces saved meals (Q-398, v1.340.0).** Five
 write routes validated a variable nothing had assigned, so every one answered `400 Invalid input:
@@ -156,9 +159,7 @@ carries **Save to My Meals** with a **Save all**, idempotent on the existing `sa
 ([`journal`](docs/overview/entries/2026-08-24-meal-plan-to-saved-meals.md)).
 
 **Preferences have a server home; nothing reads it yet (Q-392, engine half).** `users.preferences`
-JSONB (mig 206) behind `GET`/`PATCH /api/user/preferences`, merging under a row lock — the unlocked
-version demonstrably drops the other device's key mid-merge. **Nothing the owner can see changed:**
-the read sites are `components/**`, so Q-392 was re-scoped to Lane B, not closed.
+JSONB (mig 206) behind `GET`/`PATCH /api/user/preferences`, merging under a row lock — the unlocked version demonstrably drops the other device's key mid-merge. **Nothing the owner can see changed:** the read sites are `components/**`, so Q-392 was re-scoped to Lane B, not closed.
 
 **The UTC-offset fixture sweep came back clean, and found something else (Q-394, LA-19 — both
 closed).** One *correctly written* test failed because the code under it re-derived midnight in
