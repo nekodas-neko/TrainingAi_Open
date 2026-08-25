@@ -52,13 +52,13 @@ const BARE = /\b(todayInTz|localDateString)\s*\(\s*\)/g;
 const EXEMPT = new Map([
 ]);
 
-const BASELINE = {
-  // Q-477 slice 4 emptied every COMPONENT file. What is left is the one place a hook cannot
-  // reach: a Zustand store. Threading `tz` into it is a design decision with real risk —
-  // `rolloverDay` clears `todayLogged`, so a wrong reconcile drops the day's completed sets —
-  // and the rehydrate path runs outside React entirely, before any provider mounts.
-  'lib/stores/workout-store.ts': 3,
-};
+// Empty, and Q-477 is closed. The last three calls were `lib/stores/workout-store.ts`'s, and the
+// answer was not to thread `tz` into a Zustand store: the store stopped fabricating a date at all.
+// `storedDate` is now written only by a caller that knows the user's zone, and `onRehydrateStorage`
+// — which runs outside React, before any provider mounts — passes `null` and skips the date branch
+// rather than guessing DEFAULT_TZ, because a wrong guess there CLEARS the day's completed-set ticks.
+// A bare call anywhere under the scanned roots is a regression now, not a debt row.
+const BASELINE = {};
 
 function walk(dir, out) {
   if (!fs.existsSync(dir)) return out;

@@ -145,6 +145,57 @@ describe('rolloverDay (WK-13: day rollover while the app stays foregrounded)', (
   })
 })
 
+// Q-477's last slice. `onRehydrateStorage` runs at store creation, outside React and before any
+// provider mounts, so it cannot reach the user's timezone. It used to guess Brisbane and compare the
+// stored day against it — and a mismatch CLEARS `todayLogged`, which is the day's completed-set
+// ticks. For a user who has pressed Auto-detect that guess is a different date from the one the
+// rest of the app uses, so the app could drop a morning's work on open.
+describe('applyRehydrateFixups with an unknown timezone (Q-477)', () => {
+  function stateOn(day: string): WorkoutStore {
+    return { ...useWorkoutStore.getState(), mode: 'pre', storedDate: day, todayLogged: { s: ['Bench'] } }
+  }
+
+  it('does not roll the day over when the caller cannot know the zone', () => {
+    const state = stateOn('2026-07-12')
+    applyRehydrateFixups(state, null, Date.now())
+    expect(state.storedDate).toBe('2026-07-12')
+    expect(state.todayLogged).toEqual({ s: ['Bench'] })
+  })
+
+  // The date branch is skipped; everything that needs no date still has to run, or a stale
+  // `summaryData` crashes ExerciseSummaryScreen and the done screen re-fires its confetti.
+  it('still applies the transient-mode fixups with a null date', () => {
+    const state = { ...stateOn('2026-07-12'), mode: 'done' as const }
+    applyRehydrateFixups(state, null, Date.now())
+    expect(state.mode).toBe('pre')
+    expect(state.summaryData).toBeNull()
+  })
+
+  it('still rolls over when the caller DOES know the zone', () => {
+    const state = stateOn('2026-07-12')
+    applyRehydrateFixups(state, '2026-07-13', Date.now())
+    expect(state.storedDate).toBe('2026-07-13')
+    expect(state.todayLogged).toEqual({})
+  })
+
+  // The store no longer stamps a date it cannot compute. Empty never equals a real day, so the
+  // first check by a caller that knows the zone stamps it — clearing objects already empty.
+  it('starts unstamped rather than guessing Brisbane', () => {
+    localStorage.clear()
+    useWorkoutStore.getState().resetSession()
+    expect(useWorkoutStore.getState().storedDate).toBe('')
+  })
+
+  // Re-stamping here would let a workout started after midnight mask a rollover that is due.
+  it('startWorkout does not re-stamp the day', () => {
+    localStorage.clear()
+    useWorkoutStore.getState().resetSession()
+    useWorkoutStore.getState().rolloverDay('2026-07-12')
+    useWorkoutStore.getState().startWorkout('session-a')
+    expect(useWorkoutStore.getState().storedDate).toBe('2026-07-12')
+  })
+})
+
 describe('effectiveRestSec (TMR-1/TMR-5)', () => {
   it('uses lastSetRestSec when configured', () => {
     expect(effectiveRestSec(120)).toBe(120)

@@ -3373,154 +3373,40 @@ this fits without an extraction.
   collapse chevron from a navigation chevron, neither of which a text grep can do reliably. Also
   not done: screen-reader/TalkBack verification on either fixed component, and no device check.
 
-### [app-shell][platform] Q-477 — the Profile "Auto-detect timezone" button is what breaks the app's dates: the server honours the new zone, 100 of 125 client call sites do not
+### [app-shell][platform] Q-477 — the Profile "Auto-detect timezone" button is what breaks the app's dates: the server honours the new zone, the client did not
 
-> **⚠️ Step 1 (the CI ratchet) is DONE — 2026-08-19, Lane A. What is left is step 2, the sweep, which
-> is Lane B's.** `scripts/check-client-today-timezone.js` is step 50 of 50 in Custom Rules, with a
-> shrink-only per-file baseline. A new bare call in any client file now fails CI, and a file that
-> improves must lower its baseline in the same PR.
+> **✅ COMPLETE 2026-08-25.** The ratchet baseline in `scripts/check-client-today-timezone.js` is
+> **empty**: 0 bare calls across 539 client files, from a measured start of 78 across 38. A bare
+> `todayInTz()`/`localDateString()` anywhere under `app/**` (ex-`app/api`), `components/**`,
+> `lib/hooks/**` or `lib/stores/**` is a regression now, not a debt row.
 >
-> **Re-measured, and the headline count does not reproduce.** The script finds **78 bare calls across
-> 38 files** over **522 client files** (`app/**` ex-`app/api`, `components/**`, `lib/hooks/**`,
-> `lib/stores/**`), not 100 of 125. The difference is the file set, not a fix — which is the entry's
-> own argument for a script: **do not hand-count this, run
-> `node scripts/check-client-today-timezone.js --print`**, which is the maintained list.
+> **The last slice did not thread `tz` into the Zustand store — it stopped the store guessing.**
+> Both shapes this entry proposed hand the store a timezone it cannot legitimately have. But
+> `storedDate` exists only to be compared against a "today" so a rollover can clear `todayLogged`,
+> so it is now written only by a caller that knows the zone: `INITIAL_STATE` starts `''`,
+> `applyRehydrateFixups` takes `string | null` and skips the date branch on `null`, and
+> `startWorkout` no longer re-stamps. `components/shell/workout-day-rollover.tsx` — in the **root
+> layout**, so it runs on every app open rather than only those landing on the workout screen —
+> supplies the date from `useUserTimezone()`.
+> [`journal`](overview/entries/2026-08-25-workout-store-user-timezone.md).
 >
-> The sweep order in the entry still stands (calendar today-marker → write paths → display), and so
-> does the warning not to make `todayInTz()`'s default throw or read a global.
+> **The defect underneath was two answers, not one wrong one.** `onRehydrateStorage` compared
+> against Brisbane while `workout-screen.tsx`'s visibilitychange effect compared against the user's
+> zone, so a non-Brisbane user could have the day rolled over twice — and a rollover CLEARS the
+> day's completed-set ticks.
 >
-> **First slice shipped 2026-08-24 (Lane B): the calendar today-marker, the one named live symptom.**
-> `calendar-widget.tsx`'s `todayStr` now reads `todayInTz(useUserTimezone())` instead of the
-> device-local `localDateString()` — the exact site and exact bug the entry measured (Training
-> Calendar highlighting the 18th for a `Pacific/Kiritimati` user on their own 19th). Verified live,
-> the same way: set a seeded user to `Pacific/Midway` (UTC−11, currently a day behind this
-> container's UTC clock), re-logged in, and the calendar now bolds the *previous* day — the user's
-> actual today — not the container's. Ratchet down to **76 calls across 37 files** (was 78/38).
-> [`journal`](overview/entries/2026-08-24-calendar-today-marker-timezone.md). **37 files remain**,
-> ordered write paths next, then display, per the sweep order above.
->
-> **Second slice shipped 2026-08-24 (Lane B): the four check-in / log sheets — the write paths the
-> order calls for next.** `mood-checkin-sheet`, `morning-checkin-sheet`, `profile/water-log-sheet`
-> and `health/metric-log-sheet` all take `useUserTimezone()` now; all four dropped to **zero** and
-> are off the baseline. Ratchet down to **70 calls across 33 files** (was 76/37).
-> `metric-log-sheet` carried **both** bugs in one function — its local branch used `todayInTz()`
-> (Brisbane) while its web fallback POSTed `localDateString()` (device zone), two different answers
-> for the same save; the `localDateString` import is now gone from that file.
-> [`journal`](overview/entries/2026-08-24-checkin-sheets-user-timezone.md).
->
-> **Third slice shipped 2026-08-24 (Lane B): `session-select-content` (16 calls — the single
-> largest file) and the four workout surfaces.** Ratchet down to **47 calls across 28 files** (was
-> 70/33). Two of the sixteen were in *module-scope* helpers (`isMorningCheckinPromptDone`,
-> `markMorningCheckinPromptDone`), which cannot call a hook — they take `tz` as a parameter now,
-> the shape `getGreeting(name, tz)` in the same file already used.
->
-> **It also turned up a blind spot in the ratchet itself, worth knowing before the next slice.**
-> `session-select-content` declared two local `const tz = Intl.DateTimeFormat().resolvedOptions().timeZone`
-> — the *device's* zone — used for the early-deload dismiss key and the "is it evening yet" hour
-> check. Same Q-477 bug class, but **the ratchet cannot see it**: `BARE` only matches
-> `todayInTz()`/`localDateString()` with empty parens. One of them shadowed the component's own
-> `tz` in the same block, which is what surfaced it (a TS use-before-declaration error) rather than
-> any check. Both now use the component's `tz`. **The counted number is a floor, not the whole
-> class** — an `Intl.DateTimeFormat()` sweep is separate, unmeasured work.
-> [`journal`](overview/entries/2026-08-24-session-select-workout-user-timezone.md).
->
-> **Fourth slice shipped 2026-08-24 (Lane B) — the sweep is DONE for every component.** 27 files,
-> 44 call sites, ratchet **47/28 → 3 calls in 1 file**. The baseline now holds exactly one entry.
->
-> **Two more of `metric-log-sheet`'s class, found by reading rather than by the count:**
-> `log-value-sheet.tsx` POSTed `localDate: localDateString()` (device zone) while its own local
-> branch used `todayInTz(tz)` — two answers for one save. And `weekly-stats-hub.tsx`'s `todayKey`
-> needed `todayInTz(tz).replace(/-/g,"/")`, **not** a plain swap: `/api/weekly-stats` emits
-> `dateKey` as `yyyy/MM/dd`, so a dash-formatted key would have silently stopped matching and
-> killed the today-highlight. **A blind find-and-replace across this sweep would have shipped that.**
->
-> Also threaded through three module-scope helpers that cannot call a hook (`linkPrescribedRun`,
-> `readSeed`, and `warmCache` in `sync-provider` — that last writes the `{date, data}` envelope
-> `cachedFetchToday` reads, so a zone mismatch makes every warmed today-key a permanent miss).
-> Zero lint warnings introduced across all 27 files.
-> [`journal`](overview/entries/2026-08-24-client-timezone-sweep-components-complete.md).
->
-> **`lib/stores/workout-store.ts` is all that remains, and it is a DESIGN decision, not a
-> conversion.** It is a Zustand store, so no hook is available. **The risk is real:** `storedDate`
-> exists only to detect a day rollover, and a mismatch makes `rolloverDay()` clear `todayLogged` —
-> dropping the day's completed-set ticks. A wrong-zone stamp can both *miss* a rollover and *fire a
-> spurious one*.
->
-> **The pure functions are already parameterised** — `applyRehydrateFixups(state, today, now)` and
-> `rolloverDay(today)` both take the date, and `workout-screen.tsx`'s visibilitychange effect
-> already passes `todayInTz(tz)`. What has no answer is the three places that *supply* the stamp:
-> the initial-state object, one reducer, and `onRehydrateStorage`, which runs at store creation
-> **outside React, before any provider mounts**.
->
-> Two shapes, neither free: **(a)** reconcile on mount — let the store stamp `DEFAULT_TZ` and have
-> the component correct it, which adds a `rolloverDay` call whose clearing behaviour must be proven
-> not to eat a legitimate day's ticks; or **(b)** a module-level "current user tz" the store reads,
-> which is the global this entry's own header warns against. **Pick deliberately and verify the
-> clear path** — do not convert it mechanically.
->
-> **What that slice actually proved, and what it did not.** With a seeded user on
-> `Pacific/Kiritimati` (UTC+14, currently a day *ahead* of this container's UTC clock — so the
-> user's day, Brisbane's day and the device's day are three distinguishable values):
-> `metric-log-sheet` POSTed `localDate: 2026-08-25` and `morning-checkin-sheet` POSTed
-> `date: 2026-08-25`, both landing rows on **08-25** — the user's day, where before they would have
-> sent the device's/Brisbane's 08-24. Those two are proven end-to-end.
-> **The other two are not, and the reason is structural:** `water-log-sheet`'s date feeds only the
-> **local-store** write (`/api/water-log` derives its own date server-side from the session tz), and
-> `getLocalStore` is null in the web sandbox — so its fix only bites on device, where the local row
-> would otherwise be filed a day off the server's. `mood-checkin-sheet`'s date likewise feeds the
-> local write and the outbox mutation, **plus the `mood:${date}` cache key**, which *is*
-> web-reachable but was not driven here.
+> **Two blind spots this entry leaves behind, both real and neither counted by the ratchet:**
+> **(1)** a local `const tz = Intl.DateTimeFormat().resolvedOptions().timeZone` is the same bug class
+> and `BARE` cannot see it — two were found in `session-select-content` by a TypeScript error, not by
+> the check. An `Intl.DateTimeFormat()` sweep is separate, unmeasured work. **(2)** nothing here was
+> exercised against a user actually on a non-Brisbane zone in production, because there is none.
 
-- **Branch:** `fix/client-today-uses-user-timezone`
-- **Added:** 2026-08-18 · review sweep (non-default-timezone lens) ·
+- **Branch:** `fix/workout-store-day-rollover-tz`
 - **Lane:** B
-  [`docs/reviews/2026-08-18-timezone-non-default-user.md`](reviews/2026-08-18-timezone-non-default-user.md)
-- **Placement:** upper-mid. **Latent today** — every user row is `Australia/Brisbane`, so nothing is
-  broken in production — but the app ships the button that triggers it, and the fix wants a ratchet
-  before the count grows further.
-- **The inversion worth reading first.** While a user is on `Australia/Brisbane`, client and server
-  both compute Brisbane and agree; nothing is wrong. **Setting the timezone is what introduces the
-  bug** — the server moves immediately, the client does not.
-  `components/profile/edit-profile-sheet.tsx:190` exposes an **"Auto-detect timezone"** button, so the
-  intended one-tap action for anyone not in Brisbane is exactly the action that desynchronises them.
-- **Measured** with a user set to `Pacific/Kiritimati` (UTC+14) and re-logged-in so the JWT carried it,
-  at a moment when three calendar dates were live (Midway 08-17, UTC/Brisbane 08-18, Kiritimati 08-19):
-
-  | Layer | Expression | Value | |
-  |---|---|---|---|
-  | Server routes | `todayInTz(tz)` | 2026-08-19 | ✅ |
-  | Client, **25** sites | `todayInTz(tz)` via `useUserTimezone()` | 2026-08-19 | ✅ |
-  | Client, **91** sites | `todayInTz()` → `DEFAULT_TZ` | 2026-08-18 | ❌ |
-  | Client, **9** sites | `localDateString()` → the *device's* zone | 2026-08-18 (here) | ❌ |
-
-  Live: `POST /api/day-checkin` (no date) → `"logDate":"2026-08-19"`; `GET /api/workout-data?tab=<id>`
-  → `"dataDate":"2026-08-19"`.
-- **Observed on screen**, Health → Training as that user: the **Training Calendar highlights 18** and
-  Training Load highlights **"Tue"**, on a day that was Wednesday the 19th for them. Source:
-  `components/calendar-widget.tsx:110`, `const todayStr = localDateString()` — the *device's* zone, a
-  third answer that follows neither the user's setting nor the server. `CLAUDE.md` already warns
-  *"Client code has two 'today' sources … Pick one per feature"*; there are three.
-- **Nothing is missing except the argument.** `useUserTimezone()`
-  (`components/shell/user-timezone-provider.tsx:40`) is a context available anywhere in the tree, and
-  `components/profile/goals-section.tsx:114` already calls `todayInTz(user?.timezone)` correctly.
-- **Fix shape — ratchet first, then sweep by surface:**
-  1. **A Custom Rules step rejecting a bare `todayInTz()` / `localDateString()` in client code**, with
-     a shrink-only per-file baseline — same shape as `check-hex-literals.js` and
-     `check-cache-ttl-divergence.js`, both of which exist because prose alone did not hold a count.
-     That freezes the number at 100 and puts every future addition in a diff.
-  2. Sweep highest-visibility first: the calendar today-marker, then write paths, then display.
-     **Q-478 is done** (2026-08-18) — the two cache today-guards now take a `tz`, and
-     `scripts/check-tz-aware-cache-guards.js` keeps every call site passing one. Its ratchet is a
-     narrower shape than step 1 asks for: it guards two named helpers, not bare `todayInTz()`.
-     Step 1 is still owed.
-  **Do NOT** make `todayInTz`'s default throw or read a global — the function is shared with server
-  code that passes `tz` explicitly, and a global reintroduces the ambiguity somewhere harder to see.
-- **Lane B owns the sweep** (`app/**` ex-`app/api`, `components/**`, `lib/hooks/**`); the CI ratchet is
-  a `scripts/` addition either lane can carry, but it should land **first** and on its own.
-- **Not verified on:** the APK — and note the 9 `localDateString()` sites read the *phone's* zone
-  there, a third value this harness cannot reproduce. Not against production, where every user is
-  Brisbane and the symptom does not arise.
-
+- **Keep:** the device check. The rollover hangs off `visibilitychange`, which behaves differently in
+  a WebView than a desktop tab, and a real backgrounding across local midnight is the case that
+  matters. Start from Profile → **Auto-detect timezone**, the button that triggers the whole class.
+  `Gate: device`.
 ### [platform] Q-549 — Postgres holds 0.79 GB to serve 171 MB, at 0.002 vCPU
 
 - **Gate: owner** — narrowed 2026-08-25 (see the reading below). The 0.79 GB premise is **gone**;

@@ -747,22 +747,8 @@ export default function WorkoutScreen({ sessionType, userId, aiDeload, wasOverri
     return () => { cancelled = true; handle?.remove(); };
   }, []);
 
-  // ── Day rollover while foregrounded (WK-13) ───────────────────────────────
-  // onRehydrateStorage resets todayLogged/revertedDeloads only at app rehydrate.
-  // An app left open across local midnight would otherwise keep yesterday's "done"
-  // ticks (and the Complete-Workout button) until a restart. Re-check on resume —
-  // leaf-cheap, no interval timer (render-discipline rule), reads fresh state.
-  useEffect(() => {
-    const check = () => {
-      if (document.visibilityState !== "visible") return;
-      const today = todayInTz(tz);
-      if (useWorkoutStore.getState().storedDate !== today) {
-        useWorkoutStore.getState().rolloverDay(today);
-      }
-    };
-    document.addEventListener("visibilitychange", check);
-    return () => document.removeEventListener("visibilitychange", check);
-  }, [tz]);
+  // The day-rollover check (WK-13) moved to `components/shell/workout-day-rollover.tsx`, in the root
+  // layout — it has to run on every app open, not only the ones that land on this screen (Q-477).
 
   // Live HR runs while the workout is physically underway (active → the
   // per-exercise summary), and stops on pre/done and unmount to spare the ring.
