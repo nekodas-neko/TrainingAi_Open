@@ -381,6 +381,25 @@ observed changing the model's output.
 
 Review: [`docs/reviews/2026-08-25-threshold-sweep.md`](reviews/2026-08-25-threshold-sweep.md).
 
+- ✅ **THE SEED IS FIXED, 2026-08-25** (`fix/baseline-zero-seed`, batch shipped as one PR). Working:
+  [`entries/2026-08-25-baseline-zero-seed.md`](overview/entries/2026-08-25-baseline-zero-seed.md).
+  `seedOrUpdateBaseline` seeds the first-ever sample; **the vendor port is untouched** — putting the
+  seed inside `updateBaseline` broke `warm_up_then_settle`, which is ported verbatim from
+  open_oura's own test and pins `updateBaseline(null, 100, 0) === 400`. This entry predicted that
+  trap and it still caught one attempt. Both folds (`daily-summary`, `score-availability`) call the
+  wrapper, so **all six** baselines are protected.
+- **⚠ Four existing tests were pinning the bug**, each checked rather than adjusted to fit: the
+  breathing baseline asserted `meanX8: 580`, which is exactly half of 1160; `trailingBaselineZ`'s
+  overconfident-z case *demonstrated* the hazard (`> 5`) and now asserts `null`, with the maturity
+  floor kept as defence in depth.
+- **⛔ KEEP — THE DATA HALF IS NOT DONE, AND IT IS ONE BUTTON.** The stored baselines are still the
+  zero-folded ones. **No new code is needed:** `run.ts:917` null-seeds the fold under `fullHistory`,
+  and the **Redecode** admin endpoint already sets it — so one Redecode run on production re-derives
+  all six from the untouched raw nightly values. **It could not be run from a sandbox** (the rollup
+  needs the vendored constants Q-49 removed). Until it runs, every pass test in this batch is
+  unmeasured: deviation mean within ±0.05 °C and ~half the nights negative; `temp_dev_c > 1.0` on 0
+  nights (TN-8); and the biomarker table re-measured, since every z moves ~19× and the radar may
+  then fire too often (Q-506).
 ### [readiness] TN-6a — suspend the temperature penalty until its baseline is centred
 
 - **Branch:** _unassigned_
@@ -1406,6 +1425,25 @@ true mean on night 2 rather than converging for fifty.
   which is the one category of mistake the owner gate exists to prevent. The factors are four lines
   apart in `daily-summary.ts`; read them.
 
+- ✅ **THE SEED IS FIXED, 2026-08-25** (`fix/baseline-zero-seed`, batch shipped as one PR). Working:
+  [`entries/2026-08-25-baseline-zero-seed.md`](overview/entries/2026-08-25-baseline-zero-seed.md).
+  `seedOrUpdateBaseline` seeds the first-ever sample; **the vendor port is untouched** — putting the
+  seed inside `updateBaseline` broke `warm_up_then_settle`, which is ported verbatim from
+  open_oura's own test and pins `updateBaseline(null, 100, 0) === 400`. This entry predicted that
+  trap and it still caught one attempt. Both folds (`daily-summary`, `score-availability`) call the
+  wrapper, so **all six** baselines are protected.
+- **⚠ Four existing tests were pinning the bug**, each checked rather than adjusted to fit: the
+  breathing baseline asserted `meanX8: 580`, which is exactly half of 1160; `trailingBaselineZ`'s
+  overconfident-z case *demonstrated* the hazard (`> 5`) and now asserts `null`, with the maturity
+  floor kept as defence in depth.
+- **⛔ KEEP — THE DATA HALF IS NOT DONE, AND IT IS ONE BUTTON.** The stored baselines are still the
+  zero-folded ones. **No new code is needed:** `run.ts:917` null-seeds the fold under `fullHistory`,
+  and the **Redecode** admin endpoint already sets it — so one Redecode run on production re-derives
+  all six from the untouched raw nightly values. **It could not be run from a sandbox** (the rollup
+  needs the vendored constants Q-49 removed). Until it runs, every pass test in this batch is
+  unmeasured: deviation mean within ±0.05 °C and ~half the nights negative; `temp_dev_c > 1.0` on 0
+  nights (TN-8); and the biomarker table re-measured, since every z moves ~19× and the radar may
+  then fire too often (Q-506).
 ### [devices][readiness] BF-14 — ❌ REFUTED 2026-08-24: the breathing baseline is fed rpm×10 on purpose; it is correct
 
 > **⛔ REFUTED by measurement (Tuning, 2026-08-24). Do not implement this. It is kept, not deleted,
@@ -6017,6 +6055,25 @@ ehr     0     0     0     0   648   208   128   556     0
   recover faster because their scale is small. The ratios above say they are fine *now*, at 40 nights;
   they say nothing about night 5.
 
+- ✅ **THE SEED IS FIXED, 2026-08-25** (`fix/baseline-zero-seed`, batch shipped as one PR). Working:
+  [`entries/2026-08-25-baseline-zero-seed.md`](overview/entries/2026-08-25-baseline-zero-seed.md).
+  `seedOrUpdateBaseline` seeds the first-ever sample; **the vendor port is untouched** — putting the
+  seed inside `updateBaseline` broke `warm_up_then_settle`, which is ported verbatim from
+  open_oura's own test and pins `updateBaseline(null, 100, 0) === 400`. This entry predicted that
+  trap and it still caught one attempt. Both folds (`daily-summary`, `score-availability`) call the
+  wrapper, so **all six** baselines are protected.
+- **⚠ Four existing tests were pinning the bug**, each checked rather than adjusted to fit: the
+  breathing baseline asserted `meanX8: 580`, which is exactly half of 1160; `trailingBaselineZ`'s
+  overconfident-z case *demonstrated* the hazard (`> 5`) and now asserts `null`, with the maturity
+  floor kept as defence in depth.
+- **⛔ KEEP — THE DATA HALF IS NOT DONE, AND IT IS ONE BUTTON.** The stored baselines are still the
+  zero-folded ones. **No new code is needed:** `run.ts:917` null-seeds the fold under `fullHistory`,
+  and the **Redecode** admin endpoint already sets it — so one Redecode run on production re-derives
+  all six from the untouched raw nightly values. **It could not be run from a sandbox** (the rollup
+  needs the vendored constants Q-49 removed). Until it runs, every pass test in this batch is
+  unmeasured: deviation mean within ±0.05 °C and ~half the nights negative; `temp_dev_c > 1.0` on 0
+  nights (TN-8); and the biomarker table re-measured, since every z moves ~19× and the radar may
+  then fire too often (Q-506).
 ### [readiness][activity] Q-507 — the stress override fires on the best days: high-stress minutes correlate +0.40 with readiness
 
 - **Branch:** `fix/stress-override-input`
