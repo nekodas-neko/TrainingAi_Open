@@ -6,6 +6,41 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.370.1",
+    date: "2026-08-25",
+    changes: [
+      "The \u201cFinal readiness\u201d figure now says which band it is in \u2014 High, Moderate or Low \u2014 instead of relying on its colour alone.",
+    ],
+  },
+  {
+    version: "1.370.0",
+    date: "2026-08-25",
+    changes: [
+      "Muscle Volume This Week now measures each muscle against its own effective and recoverable set ranges, scaled to your program\u2019s training goal, instead of one flat 10\u201320 band for everything \u2014 and says which side of the range you are on in words, not just colour.",
+    ],
+  },
+  {
+    version: "1.369.1",
+    date: "2026-08-25",
+    changes: [
+      "The ring\u2019s on-device storage readout now says what its numbers mean \u2014 whether the store can actually be trimmed, whether it has outgrown the phone\u2019s backup limit, and whether the service is dropping data to save space \u2014 instead of leaving you to work it out from row counts.",
+    ],
+  },
+  {
+    version: "1.369.0",
+    date: "2026-08-25",
+    changes: [
+      "The disk-reclaim button on the admin database card can now pick which table to compact, instead of only ever touching the ring\u2019s raw frames. It also reports how many live rows the table actually holds, so a big number next to a tiny row count reads as wasted space rather than real data.",
+    ],
+  },
+  {
+    version: "1.368.0",
+    date: "2026-08-25",
+    changes: [
+      "You can undo a change AI Coach made to your programme. Open Coach \u2192 History and press Undo on the change; it reverts until you start your next workout, after which the app says so rather than quietly disagreeing with a session you have already done.",
+    ],
+  },
+  {
     version: "1.367.1",
     date: "2026-08-25",
     changes: [

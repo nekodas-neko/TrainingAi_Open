@@ -161,9 +161,19 @@ export async function enableHomeCards(page: Page, keys: string[]): Promise<void>
  * convincing wrong answer — it cost a trace through three components before the `<main>` attribute
  * was read.
  *
- * Every fresh browser profile is exposed to it: the prompt fires whenever `ta_morning_checkin` is
- * absent and the user has no check-in row for today, which is exactly the state CI provisions on
- * every run. Pre-setting the marker is what a returning user's browser already has.
+ * Every fresh browser profile is exposed: the prompt fires whenever `ta_morning_checkin` is absent
+ * and the user has no `morning` check-in row for today, which is what CI provisions on every run.
+ * Pre-setting the marker is what a returning user's browser already has.
+ *
+ * **But exposure is not the same as failing, and that distinction is why this sat unnoticed.** The
+ * sheet opens after an async read (the local store on device, `/api/day-checkin` on web), so whether
+ * it lands before or after a spec's first interaction is a **race**. That is why
+ * `home-card-invalidation-refetch` passed for weeks and then did not (BF-23 dated the turn to
+ * 2026-08-25 and read it as a content regression in one of six merges — it is not), and why
+ * `score-band-not-colour-only` read as *flaky* rather than broken. **What made the race start
+ * landing the other way was not established** — adding spec files shifts worker distribution and so
+ * what runs before what, which is a plausible mechanism and was not proven. This fixture removes the
+ * race rather than explaining it.
  *
  * The date must be the USER's, not the runner's — the marker is compared against `todayInTz(tz)`
  * (`session-select-content.tsx:107`), and the seeded user's zone is not the container's.

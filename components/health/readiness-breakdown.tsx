@@ -32,7 +32,10 @@ const WEIGHT_LABELS: Record<keyof typeof READINESS_WEIGHTS, string> = {
 export function ReadinessBreakdown({ readiness }: { readiness: ReadinessScoreResponse }) {
   const displayScore = readiness.readinessDisplayScore
   if (displayScore == null) return null
-  const color = scoreBand(displayScore).color
+  // Q-281: the band's WORD ships with its colour. `scoreBand()` colour without `scoreBand()`'s
+  // label is a CLAUDE.md violation outright, and this row is the one place the composite branch
+  // does not cover with a legend — a bare amber 62 says nothing to anyone who cannot see amber.
+  const { color, label: bandLabel } = scoreBand(displayScore)
 
   if (readiness.ouraScore != null) {
     const adj = displayScore - readiness.ouraScore
@@ -69,7 +72,10 @@ export function ReadinessBreakdown({ readiness }: { readiness: ReadinessScoreRes
           )}
           <div className="flex items-center justify-between text-sm border-t border-border/50 pt-1.5 mt-1">
             <span className="text-muted-foreground font-medium">Final readiness</span>
-            <span className="font-bold tabular-nums" style={{ color }}>{displayScore}</span>
+            <span className="flex items-baseline gap-1.5">
+              <span className="text-[11px] text-muted-foreground">{bandLabel}</span>
+              <span className="font-bold tabular-nums" style={{ color }}>{displayScore}</span>
+            </span>
           </div>
         </div>
       </div>

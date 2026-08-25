@@ -34,6 +34,26 @@ const eslintConfig = [
   },
   {
     rules: {
+      // Q-282: an accessibility check DOES exist in CI — `eslint-plugin-jsx-a11y` rides in via
+      // `next/core-web-vitals` and runs in the Lint job. It was reporting at **warning**, so
+      // `pnpm lint` exited 0 with violations present and a new one would land silently. That is
+      // exactly how this repo's other counts drifted while nobody was looking: the hex-literal
+      // total grew by 41 in five days precisely because it was prose rather than a gate.
+      //
+      // **The whole app is at zero today** (measured across `app/`, `components/` and `lib/`), so
+      // promoting these costs nothing now and freezes the ground — a shrink-only baseline whose
+      // baseline is empty, which is the strongest form of the pattern this repo already uses.
+      //
+      // Scoped to the rules that are unambiguous and statically decidable. This does NOT close
+      // Q-282: a linter cannot measure **touch-target size** or **contrast**, which are the two
+      // things that entry actually names, and both need a rendered page.
+      "jsx-a11y/alt-text": "error",
+      "jsx-a11y/anchor-has-content": "error",
+      "jsx-a11y/aria-props": "error",
+      "jsx-a11y/aria-proptypes": "error",
+      "jsx-a11y/aria-unsupported-elements": "error",
+      "jsx-a11y/role-has-required-aria-props": "error",
+      "jsx-a11y/role-supports-aria-props": "error",
       "no-console": ["error", { allow: ["warn", "error", "info"] }],
       "@typescript-eslint/no-explicit-any": "warn",
       "no-restricted-syntax": [
