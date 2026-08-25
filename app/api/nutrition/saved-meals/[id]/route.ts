@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { getRepository } from '@/lib/data'
 import { SavedMealSchema } from '@trainingai/shared/validators/saved-meal'
-import { invalidUuidResponse } from '@/lib/api/route-errors'
+import { invalidUuidResponse, withRouteErrors } from '@/lib/api/route-errors'
 import { readJsonLimited } from '@trainingai/shared/http/request-guards'
 
 // Same shape as the create route.
@@ -28,10 +28,14 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.issues[0]?.message ?? 'Invalid body' }, { status: 400 })
   }
-  const { name, items, servings, imageDataUri } = parsed.data
+  const { name, items, servings, imageDataUri, mealTypeIds } = parsed.data
   const repo = await getRepository()
-  const updated = await repo.updateSavedMeal(id, userId, name, items, servings, imageDataUri)
-  return NextResponse.json(updated)
+  // Same reasoning as the POST route: a refused write answers 400 with a message, not 500 — which
+  // also keeps the offline outbox quarantining it instead of retrying it forever.
+  return withRouteErrors(async () => {
+    const updated = await repo.updateSavedMeal(id, userId, name, items, servings, imageDataUri, mealTypeIds)
+    return NextResponse.json(updated)
+  })
 }
 
 export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {

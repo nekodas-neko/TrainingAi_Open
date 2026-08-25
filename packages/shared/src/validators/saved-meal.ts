@@ -24,4 +24,15 @@ export const SavedMealSchema = z.object({
     const reject = rejectMealImage(v)
     if (reject) ctx.addIssue({ code: 'custom', message: mealImageRejectionMessage(reject) })
   }),
+  // BF-11e — which meal types this meal suits, so a planner does not put pancakes at dinner.
+  //
+  // `.optional()` with NO `.default([])`, unlike `items` above, and the difference is the whole
+  // point: a default would turn "the caller did not mention tags" into "clear the tags", and until
+  // BF-11f ships a picker every save from the saved-meals sheet omits them. Same `undefined` vs
+  // explicit-`[]` distinction as `imageDataUri`, carried all the way to the upsert.
+  //
+  // Bounded because it is a client-supplied array reaching a write. Twenty is far past any real
+  // configuration — the owner has a handful of meal types — while still refusing a payload built to
+  // make the ownership check do work.
+  mealTypeIds: z.array(z.string().uuid()).max(20).optional(),
 })

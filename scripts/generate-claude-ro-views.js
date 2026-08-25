@@ -116,6 +116,10 @@ const VIA = {
   session_exercises:      t => `EXISTS (SELECT 1 FROM public.program_sessions ps JOIN public.programs p ON p.id = ps.program_id WHERE ps.id = ${t}.session_id AND p.user_id = $OWNER)`,
   style_sets:             t => `EXISTS (SELECT 1 FROM public.progression_styles ps WHERE ps.id = ${t}.style_id AND ps.user_id = $OWNER)`,
   saved_meal_items:       t => `EXISTS (SELECT 1 FROM public.saved_meals sm WHERE sm.id = ${t}.saved_meal_id AND sm.user_id = $OWNER)`,
+  // BF-11e. Scoped through the MEAL, not the meal type — both FKs lead to a user and either would
+  // scope correctly, but a row is a fact about the meal, and matching `saved_meal_items` above keeps
+  // one rule for the two tables that hang off `saved_meals`.
+  saved_meal_meal_types:  t => `EXISTS (SELECT 1 FROM public.saved_meals sm WHERE sm.id = ${t}.saved_meal_id AND sm.user_id = $OWNER)`,
   // Meal Plan (Q-186). Variants hang off the plan, and meals off the variant — so the meal
   // predicate is two joins deep. That extra level is exactly where a scoping check gets skipped,
   // which is why it is written out here rather than left to the reader.

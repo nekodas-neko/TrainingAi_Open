@@ -185,6 +185,20 @@ Live at the time of writing (2026-07-30):
 
 ## History
 
+- **[`docs/overview/entries/2026-08-25-saved-meal-meal-type-tags.md`](../../overview/entries/2026-08-25-saved-meal-meal-type-tags.md)**
+  — BF-11e: saved meals carry meal-type tags (migration 217, local SQLite v29). **Storage and
+  transport only — no picker yet (BF-11f), so nothing is user-visible.** Read it before touching the
+  saved-meal write path: `undefined` leaves stored tags alone and `[]` clears them, soft-deleted meal
+  types are filtered on read rather than by deleting join rows, and the sheet's outbox payload
+  deliberately does **not** carry tags yet — BF-11f must add it there and to `upsertSavedMeal` in the
+  same PR or tags will save on the web and strand offline.
+- **[`docs/overview/entries/2026-08-25-scan-multi-candidate.md`](../../overview/entries/2026-08-25-scan-multi-candidate.md)**
+  — BF-11b: `/api/nutrition/scan` returns one candidate per meal instead of merging several into one
+  estimate. The top level stays the first dish because five call sites read it and two gate on it.
+  Its measurement is worth knowing before touching that prompt: the first split rule was a **coin
+  flip** on identical meal-prep containers (5, 5, 1, 1, 5, 1) and the shipped one is 30 of 30.
+
+
 - **[`docs/handoff-2026-08-13-nutrition-meal-plan-build-out.md`](../../handoff-2026-08-13-nutrition-meal-plan-build-out.md)**
   — 🆕 the Meal Plan build-out, Phase 1 through one-tap "I ate this" (v1.282.0 → v1.299.0, fifteen
   merged PRs, migrations 177–183, local SQLite v23–v25). **Start here for anything meal-plan.**

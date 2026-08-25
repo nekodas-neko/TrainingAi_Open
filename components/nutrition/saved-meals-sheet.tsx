@@ -230,6 +230,14 @@ export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate,
           { id: mealId, name, servings: mealServings, imageDataUri: mealImage, createdAt, updatedAt: now, deletedAt: null, syncStatus: 'pending' },
           items.map(it => ({ id: crypto.randomUUID(), savedMealId: mealId, foodItemId: it.foodItemId, quantityMultiplier: it.quantityMultiplier })),
         )
+        // BF-11e added `mealTypeIds` to the route, the outbox branch and the local table. This
+        // payload deliberately does NOT send it yet, and that is the correct no-op rather than an
+        // omission: absent means "leave the stored tags alone" on both the local upsert above and
+        // the server replay, while sending the currently-loaded tags would REVERT a change made on
+        // another device between this sheet loading and this save. There is no asymmetry for the
+        // sync rule to catch either — no surface can set a tag today, web or native.
+        // **BF-11f adds the picker: it must add `mealTypeIds` HERE and to `upsertSavedMeal` above,
+        // in the same PR**, or tags will save on the web and strand offline.
         await store.queueMutation({ userId: userId!, domain: 'saved_meals', date: todayInTz(tz), payload: { id: mealId, name, items, servings: mealServings, imageDataUri: mealImage } })
         await invalidateSavedMeals()
         setMeals(await store.getSavedMeals())

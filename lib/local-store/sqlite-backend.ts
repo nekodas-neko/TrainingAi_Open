@@ -2394,6 +2394,19 @@ export class SQLiteLocalStore implements LocalStore {
         ORDER BY smi.id`,
       [],
     );
+    // BF-11e. No join to a local `meal_types` mirror: there isn't one, and the soft-delete filter
+    // that the server read applies has already been applied by the time these rows were hydrated.
+    // Storing what the server resolved keeps one definition of "which tags are live".
+    const tagRows = await querySQL<Record<string, unknown>>(
+      `SELECT saved_meal_id, meal_type_id FROM saved_meal_meal_types`, [],
+    );
+    const tagsByMeal = new Map<string, string[]>();
+    for (const t of tagRows) {
+      const mealId = String(t.saved_meal_id);
+      const list = tagsByMeal.get(mealId) ?? [];
+      list.push(String(t.meal_type_id));
+      tagsByMeal.set(mealId, list);
+    }
     const r1 = (n: number) => Math.round(n * 10) / 10;
     const itemsByMeal = new Map<string, SavedMealItem[]>();
     for (const r of rows) {
@@ -2434,6 +2447,7 @@ export class SQLiteLocalStore implements LocalStore {
         servings: Number(m.servings) > 0 ? Number(m.servings) : 1,
         imageDataUri: m.image_data_uri ? String(m.image_data_uri) : null,
         createdAt: new Date(String(m.created_at)),
+        mealTypeIds: tagsByMeal.get(id) ?? [],
         items,
         totals: { calories: totals.calories, proteinG: r1(totals.proteinG), carbsG: r1(totals.carbsG), fatG: r1(totals.fatG) },
       } satisfies SavedMeal;
@@ -2442,7 +2456,7 @@ export class SQLiteLocalStore implements LocalStore {
 
   // Write a meal + replace its items in one shot (offline create/edit). The caller sets
   // syncStatus: 'pending' for a local edit or 'synced' when hydrating from the server.
-  async upsertSavedMeal(meal: LocalSavedMeal, items: LocalSavedMealItem[]): Promise<void> {
+  async upsertSavedMeal(meal: LocalSavedMeal, items: LocalSavedMealItem[], mealTypeIds?: string[]): Promise<void> {
     // `imageDataUri` omitted means "this write is not about the image" and must NOT clear a stored
     // one — the standing rule that a local upsert overwrites every column by default is exactly how
     // a name edit would silently delete the photo. An explicit `null` still removes it, so the two
@@ -2464,6 +2478,19 @@ export class SQLiteLocalStore implements LocalStore {
         `INSERT INTO saved_meal_items (id, saved_meal_id, food_item_id, quantity_multiplier) VALUES (?,?,?,?)`,
         [it.id, it.savedMealId, it.foodItemId, it.quantityMultiplier],
       );
+    }
+    // BF-11e. Omitted means "this write is not about the tags" and must NOT clear them — the same
+    // reasoning as `keepImage` above, and the same standing rule it exists for: a local upsert
+    // overwrites every column by default, which is exactly how a name edit silently deletes
+    // something the caller never mentioned. An explicit `[]` still clears.
+    if (mealTypeIds !== undefined) {
+      await runSQL(`DELETE FROM saved_meal_meal_types WHERE saved_meal_id=?`, [meal.id]);
+      for (const typeId of [...new Set(mealTypeIds)]) {
+        await runSQL(
+          `INSERT INTO saved_meal_meal_types (saved_meal_id, meal_type_id) VALUES (?,?)`,
+          [meal.id, typeId],
+        );
+      }
     }
   }
 
@@ -2496,6 +2523,9 @@ export class SQLiteLocalStore implements LocalStore {
         // removed on another device must lose it locally too (Q-396).
         { id: m.id, name: m.name, servings: m.servings ?? 1, imageDataUri: m.imageDataUri ?? null, createdAt: (m.createdAt instanceof Date ? m.createdAt.toISOString() : String(m.createdAt)), updatedAt: now, deletedAt: null, syncStatus: 'synced' },
         m.items.map(it => ({ id: it.id, savedMealId: m.id, foodItemId: it.foodItemId, quantityMultiplier: it.quantityMultiplier })),
+        // `?? []`, not omitted: the server list IS authoritative here, so a meal whose tags were
+        // cleared on another device must lose them locally too — the same call the image makes.
+        m.mealTypeIds ?? [],
       );
     }
     // Prune synced local rows the server dropped (cross-device deletes).
@@ -2505,6 +2535,7 @@ export class SQLiteLocalStore implements LocalStore {
     for (const row of localRows) {
       if (!serverIds.has(row.id)) {
         await runSQL(`DELETE FROM saved_meal_items WHERE saved_meal_id=?`, [row.id]);
+        await runSQL(`DELETE FROM saved_meal_meal_types WHERE saved_meal_id=?`, [row.id]);
         await runSQL(`DELETE FROM saved_meals WHERE id=?`, [row.id]);
       }
     }
