@@ -63,11 +63,14 @@ builder's rows became the shared `FoodRow`; `ingredient-row.tsx` is deleted and 
 
 **The Devices card stops calling the ring healthy with no key (LB-5).** Checks `hasKey()` and links to `/admin/oura-ble` when false. `Gate: device`.
 
+**The raw-store console says what its numbers mean (Q-538, half).** It printed **209,326 rows, 0
+rolled up, 31.2 MB** and it took a source trace to know `0 rolled up` was the fault — the prune's
+predicate matches nothing, so the 14-day window can delete no row at all. It now says unbounded,
+unbacked (past the 25 MB Auto Backup quota) and shedding, in words. **The bound stays blocked** on an
+unbuilt rollup consumer that is Lane A's and has no queue entry. `Gate: device`.
+
 **The queue tooling learns `OR-` (PS-6).** The Orchestrator prefix was never in the ID alternation,
-and the failure was **silent deletion**: `next-item.js` counted **194 entries with and without** a
-scratch `OR-99`, printed it nowhere, and `check-backlog-pointers` neither caught a duplicate nor
-resolved `Needs: OR-n`. One shared `scripts/lib/entry-id.js` now, not four regexes — four copies is
-what let it drift. PS-6 named three sites; there were four.
+and the failure was **silent deletion**: `next-item.js` counted **194 entries with and without** a scratch `OR-99`, printed it nowhere, and `check-backlog-pointers` neither caught a duplicate nor resolved `Needs: OR-n`. One shared `scripts/lib/entry-id.js` now, not four regexes — four copies is what let it drift. PS-6 named three sites; there were four.
 
 **The vacuum button can reach the table that needs it (Q-315).** `error_events` holds **4 live rows
 in 49 MB** in production and the generalised `/api/admin/vacuum` had **no caller** — the one control still posted to the `oura_raw_samples`-only route. A table picker fed by that route's own `GET` fixes it; the press itself is the owner's, from a desktop. `Gate: owner`.
@@ -121,8 +124,7 @@ configured to anybody who asked. `GET /api/oura-ble/decoder-constants` answered 
 **Three ring-service fixes, none verified on the ring (Q-537, Q-533, Q-388 item 2).** Key backup
 (`/admin/oura-ble` → **Show key for backup**), a re-sync completion notification, and a connect sequence that resets the live-HR levers a killed session left on. **All native — inert until a new APK is installed, and until then the ring key has one copy.** `Gate: device`. **Item (3) needed no work:** 6,346 battery polls measure the drain the entry called unmeasurable (−22/−24/−22/−38/−15 overnight), confirming the owner's report; the SpO₂ A/B is wear, not code.
 
-**Two affordances came back and the sheet that owned them is gone (LB-3, v1.347.0).** Nothing opened
-`day-overlay-sheet.tsx` after Q-110, so tapping a logged exercise or an activity was dead a fortnight. Both on `/health/day` (the NAME is the target); `health-content.tsx` lost 167 lines.
+**Two affordances came back and the sheet that owned them is gone (LB-3, v1.347.0).** Nothing opened `day-overlay-sheet.tsx` after Q-110, so tapping a logged exercise or an activity was dead a fortnight. Both on `/health/day` (the NAME is the target); `health-content.tsx` lost 167 lines.
 
 **Deleting an activity works offline now (Q-328, v1.350.0).** The one activity-log write with no outbox domain — deleted by a bare `fetch` that failed with no connection. `softDeleteActivityLogPending`: a queued delete must stay `pending` or a pull clobbers it; `'synced'` is what lets `applyDelta` reap it.
 
@@ -133,10 +135,9 @@ live — its callbacks take the meal and hand it back, so the parent shares one 
 **Body-metric bounds are asked at the keyboard (Q-321, v1.348.0).** `validation/body-metrics.ts` held
 every threshold and nothing under `components/`/`app/` imported it, so a 5,000 kg weight was queued and dropped server-side. **Three** sheets, not the one the entry named.
 
-**Sixteen writes revalidated around their push, not after it (LB-6, v1.345.0).** The entry listed six — its finder read only *above* each call. `check-invalidate-after-push.js` holds it.
+**Sixteen writes revalidated around their push, not after it (LB-6, v1.345.0).** The entry listed six; its finder read only *above* each call. `check-invalidate-after-push.js` holds it.
 
-**The finished-logging control moved above End of Day (BF-6, v1.344.0).** **Zero presses in seven
-weeks**, and the calibration excludes an unmarked day rather than treating it as light.
+**The finished-logging control moved above End of Day (BF-6, v1.344.0).** **Zero presses in seven weeks**, and the calibration excludes an unmarked day rather than treating it as light.
 
 **A deload session says so now (BF-8, v1.343.0).** Intensity read "Full · As prescribed" while the card
 under it read "Deload session" — the owner trained one believing it was full. Both asked `isDeloadActive` (the PHASE), not today's session.

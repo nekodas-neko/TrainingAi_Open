@@ -4383,12 +4383,27 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 - **It already exceeds Android Auto Backup's 25 MB per-app quota**, so the phone-side backup covers
   none of it — see the `allowBackup` note below. That was a projection when this entry was filed; at
   31.2 MB it is now a measurement.
-- **What is left here:** the bound and the visible failure state. The real prune still needs D2 Task 5
-  (the WebView rollup consumer) to set `rolled_up`, which is what this entry has always said and what
-  the device reading now proves.
+- **✅ THE VISIBLE FAILURE STATE SHIPPED 2026-08-25 (Lane B).** The console printed correct numbers
+  nobody could read — establishing that `0 rolled up` was *the fault* took a source trace.
+  `components/oura-ble/raw-store-health.ts` now turns the same `rawStats()` into findings: unbounded
+  (nothing rolled up), unbacked (past the 25 MB Auto Backup quota, manifest re-verified), shedding
+  (`lowDisk`), and a partial-rollup note with its percentage. Symbol beside colour, not colour alone.
+  7 unit cases including the 2026-08-18 device reading verbatim.
+  [`journal`](overview/entries/2026-08-25-raw-store-findings.md).
+- **⛔ THE BOUND IS STILL BLOCKED, and not by anything in this queue.** `pruneRaw` deletes only rows
+  marked `rolled_up`; the only writer of that flag is `markRolledUp`, whose sole caller would be the
+  **WebView rollup consumer — D2 Task 5, still not built** (re-verified 2026-08-25: a repo-wide grep
+  finds no caller for `markRolledUp`/`pruneRaw`/`getUnrolledRaw` outside the plugin interface).
+  Wiring the prune today deletes zero rows. That work is a rollup consumer over local storage —
+  **Lane A's** — and has no queue entry, which is why this is written out rather than expressed as a
+  `Needs:` whose absent target would read as "already shipped".
 - **Also record:** `AndroidManifest.xml:14` sets `allowBackup="true"` with no `dataExtractionRules`.
   Android Auto Backup's cloud quota is 25 MB/app and `oura_raw.db` passed that within two weeks, so
   **the device raw store has no working backup.** That is load-bearing for the D4 decision (Q-542).
+  The console says this out loud now.
+- **Keep:** the bound (blocked above), plus the on-device read — the findings have never been
+  rendered from a real `rawStats()` call, only from the numbers one produced. One press of **Read
+  stats** on `/admin/oura-ble` in the APK. `Gate: device`
 
 
 ### [devices][platform] Q-540 — narrow the `oura_raw_samples` row: drop `event_name`, `body_hex` → `bytea`
