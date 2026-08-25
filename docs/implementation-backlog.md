@@ -9729,35 +9729,35 @@ per-field merge where an AI write has no honest source rank to claim.
   existing scale-toast Known-Issues entry in `projectOverview.md` rather than adding a duplicate
   when this ships.
 
-### [app-shell] Q-93-followup — wire the workout Today's Timeline card to a detail screen
+### [platform][devices] LB-14 — a client that hangs up mid-request is written to `error_events` as a server fault
 
-- **Added:** 2026-08-06 · split off from Q-93 after the meal-card half shipped
-  (see `docs/overview/entries/2026-08-06-timeline-meal-tap-navigation.md`).
-- **Why split:** Q-93's plan claimed the sleep-card wiring was "straightforward... once
-  ids/dates [are] threaded through" alongside the meal card. That premise didn't hold up under
-  inspection at the `/health/sleep` route (`SleepContent` has no date-selection UI, always renders
-  the latest night) — but a *different* existing surface did have per-night date selection built
-  in: `HealthMetricSheet`'s sleep detail view already lists and renders any of the last 14 nights.
-  That gap was closed 2026-08-07 (see
-  `docs/overview/entries/2026-08-07-sleep-timeline-detail-deeplink.md`) by deep-linking to it
-  instead of building new screen work. The workout card remains genuinely unscoped: no historical
-  per-session HR-chart + exercise-detail screen exists at all (the only HR chart component renders
-  live, in-progress data only).
-- **What shipped:** the meal card navigates to `/nutrition?date=YYYY-MM-DD`; the "Woke up"/"Fell
-  asleep" cards navigate to `/health?tab=body&openSleepDate=YYYY-MM-DD`, which pre-selects that
-  night in `HealthMetricSheet`'s sleep sheet instead of showing the list. Both wired on both
-  timeline renderers (`components/home-day-timeline.tsx` and `app/health/timeline/page.tsx`).
-  `TimelineEvent`'s `date` field is reused for all of this — don't re-derive from `timeMs`
-  client-side.
-- **Remaining scope:** workout card → needs a screen to navigate to. **⚑ Corrected 2026-08-08:**
-  the claim above that a historical per-session HR chart "doesn't exist yet at all" and that "the
-  only HR chart component renders live, in-progress data only" is **wrong**.
-  `components/health/day-overlay-sheet.tsx:186-190` already renders `HrRecoveryChart` per session,
-  for an arbitrary historical date, with per-exercise markers — visible in the owner's 2026-08-07
-  screenshots. The *capability* is built; what's missing is a screen to host it properly. That makes
-  Q-110 the destination for this card, not a separate build — see the design mockups at
-  `docs/design/2026-08-08-day-detail-screen-mockups.html`.
-- **JS-only — no APK needed** once scoped.
+- **Branch:** _unassigned_ · **Added:** 2026-08-25, on the Lane B session-start `error_events` read · **Lane: A** — `packages/shared/src/http/request-guards.ts` and/or `instrumentation.ts`.
+
+`POST /api/oura-ble/battery-poll` and `POST /api/oura-ble/samples` log bare `aborted` rows — **nine
+in the 30-day window** (six 08-13, two 08-17, one 08-25), sporadic, self-healing, no user-visible
+effect: the battery-poll route's own comment says *"a dropped poll is inconsequential — the next
+tick re-posts."* **Read from source, not reproduced:** `readJsonLimited` streams the body through
+`reader.read()`, which rejects when the request stream is cancelled — the native BLE service being
+backgrounded mid-post is the obvious cause. Nothing catches it, so it reaches `onRequestError`,
+which reports to **both** `error_events` and Sentry. The helper is shared, so every route using it
+has this shape. It matters only because `error_events` is the table every session reads to orient,
+it prunes at 30 days, and it is already the subject of Q-315's 49 MB of bloat — a client hanging up
+is not our fault and each one spends an alert plus a row of that record. **Fix shape:** return
+`{ ok: false, reason: 'aborted' }` from the helper so the route answers 400 without reporting, or
+filter aborts in `recordRequestError` (wider — it covers routes not using the helper); either way
+filter on the abort *signal*, never on message text. Counts are the owner's rows only.
+
+### [app-shell] Q-93-followup — the timeline's workout and walk taps have not been pressed on the phone
+
+- **Branch:** `feat/timeline-workout-day-detail` (merged 2026-08-25, v1.371.0) · **Lane: B**
+- **Gate: device**
+- Built and guarded: `workout` and `walk` cards navigate to `/health/day?date=`, proved by the
+  mutation-checked `e2e/timeline-card-navigation.spec.ts`; `bedtime`/`tag` stay inert on purpose
+  ([`journal`](overview/entries/2026-08-25-timeline-workout-day-detail.md)).
+- **Keep:** the press itself, on the S25 — whether the row competes with `PullToSync`'s vertical
+  gesture under a real finger, and whether `/health/day`'s back control returns to Home rather than
+  stranding the user on a navless route. Both already ship for the meal and sleep cards, so this is
+  confirmation, not discovery. Strike once pressed.
 
 ### [sleep] Q-91-followup — decide whether the BLE ingest rollup should emit its own invalidation signal
 
