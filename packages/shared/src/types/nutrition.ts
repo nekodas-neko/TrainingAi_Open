@@ -75,6 +75,16 @@ export interface SavedMeal {
   /** A small WebP thumbnail as a base64 data URI, or null. Capped — see `nutrition/meal-image.ts`. */
   imageDataUri: string | null
   createdAt: Date
+  /**
+   * Meal types this meal is eligible for (BF-11e), so a planner does not put pancakes at dinner.
+   *
+   * Soft-deleted meal types are filtered out on read, not deleted from the join table — restoring a
+   * type restores its tags. An empty array therefore means "no tags", never "tags we could not
+   * resolve". On a WRITE, `undefined` means "not mentioned, leave the stored tags alone" and `[]`
+   * means "clear them" — the same distinction `imageDataUri` draws, and load-bearing for the same
+   * reason: a save from a surface that has no tag picker must not wipe tags set elsewhere.
+   */
+  mealTypeIds: string[]
   items: SavedMealItem[]
   totals: { calories: number; proteinG: number; carbsG: number; fatG: number }
 }

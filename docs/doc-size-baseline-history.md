@@ -2384,3 +2384,14 @@ a probe runs as a throwaway `*.test.ts` under vitest for the `@/` alias, and a s
 on an explicit `RUN_LIVE_AI_TESTS=1` rather than on the key, or CI quietly starts paying for
 non-deterministic runs. A baton is the right home precisely because this changes what a session
 believes is *possible*, which is not something you look up when you already think the answer is no.
+
+## 2026-08-25 — `projectOverview.md` raised, 7959 → 7961 (BF-11e)
+
+Two lines: the Current Status paragraph, and its blank. Fifth same-day raise of this baseline by this
+session — rebuilt from `origin/main` each time, never spliced.
+
+**Worth recording alongside it: the same run tripped the journal-entry runaway limit**, at 61 unlinked
+against a ceiling of 60, which failed a migration PR for a reason unrelated to the migration. It was
+unblocked the way the check intends — the two nutrition entries are now linked from that domain's
+index, which the wrap-up rule asks for anyway — but that leaves 59 and the next session hits it
+again. Filed as **LA-25** so the sweep is done deliberately rather than discovered mid-feature.

@@ -122,6 +122,9 @@ export const EXPORTED: Record<string, ExportScope> = {
   style_sets: { kind: 'via', predicate: 'EXISTS (SELECT 1 FROM public.progression_styles ps WHERE ps.id = t.style_id AND ps.user_id = $1)' },
   program_volume_targets: { kind: 'via', predicate: 'EXISTS (SELECT 1 FROM public.programs p WHERE p.id = t.program_id AND p.user_id = $1)' },
   saved_meal_items: { kind: 'via', predicate: 'EXISTS (SELECT 1 FROM public.saved_meals sm WHERE sm.id = t.saved_meal_id AND sm.user_id = $1)' },
+  // BF-11e. Scoped through the meal, matching `saved_meal_items` — both FKs lead to a user, and
+  // taking the same path keeps one rule for the two tables hanging off `saved_meals`.
+  saved_meal_meal_types: { kind: 'via', predicate: 'EXISTS (SELECT 1 FROM public.saved_meals sm WHERE sm.id = t.saved_meal_id AND sm.user_id = $1)' },
   meal_plan_variants: { kind: 'via', predicate: 'EXISTS (SELECT 1 FROM public.meal_plans mp WHERE mp.id = t.meal_plan_id AND mp.user_id = $1)' },
   meal_plan_meals: { kind: 'via', predicate: 'EXISTS (SELECT 1 FROM public.meal_plan_variants v JOIN public.meal_plans mp ON mp.id = v.meal_plan_id WHERE v.id = t.variant_id AND mp.user_id = $1)' },
   // Both arms, for the reason the generator documents at length: `program_id` is nullable and the

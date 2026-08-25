@@ -606,6 +606,18 @@ export const savedMeals = pgTable('saved_meals', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 })
 
+// BF-11e — which meal types a saved meal is eligible for, so a plan does not put pancakes at dinner.
+// `MealType` is reused as the vocabulary rather than a parallel "category": the user already names
+// and configures their own types with time windows, and a meal can suit several (a protein shake is
+// plausibly Breakfast and Post-Workout).
+//
+// `meal_types` SOFT-deletes (see its own comment), so a row here can point at a deleted type. That
+// is deliberate and handled on READ, not by deleting join rows — restoring a type restores its tags.
+export const savedMealMealTypes = pgTable('saved_meal_meal_types', {
+  savedMealId: uuid('saved_meal_id').notNull().references(() => savedMeals.id, { onDelete: 'cascade' }),
+  mealTypeId:  uuid('meal_type_id').notNull().references(() => mealTypes.id, { onDelete: 'cascade' }),
+}, t => [primaryKey({ columns: [t.savedMealId, t.mealTypeId] })])
+
 export const savedMealItems = pgTable('saved_meal_items', {
   id:                 uuid('id').primaryKey().defaultRandom(),
   savedMealId:        uuid('saved_meal_id').notNull().references(() => savedMeals.id, { onDelete: 'cascade' }),

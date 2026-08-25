@@ -3,6 +3,7 @@ import { auth } from '@/auth'
 import { getRepository } from '@/lib/data'
 import { SavedMealSchema } from '@trainingai/shared/validators/saved-meal'
 import { readJsonLimited } from '@trainingai/shared/http/request-guards'
+import { withRouteErrors } from '@/lib/api/route-errors'
 
 // 100 items of a uuid and a multiplier plus a 120-char name is well under 10 KB.
 // 64 KB, raised from 32 KB with Q-396. A capped thumbnail is 16 KB DECODED, which is ~21.3 KB of
@@ -32,8 +33,13 @@ export async function POST(req: Request) {
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.issues[0]?.message ?? 'Invalid body' }, { status: 400 })
   }
-  const { id, name, items, servings, imageDataUri } = parsed.data
+  const { id, name, items, servings, imageDataUri, mealTypeIds } = parsed.data
   const repo = await getRepository()
-  const meal = await repo.createSavedMeal(userId, name, items, id, servings, imageDataUri)
-  return NextResponse.json(meal, { status: 201 })
+  // A refused write — an unknown food item, or a meal type that is not this user's (BF-11e) — is a
+  // 400 with a message, not a bare 500. It also matters offline: the outbox treats 5xx as "retry"
+  // and 4xx as "quarantine", and a mutation that can never succeed must not be retried forever.
+  return withRouteErrors(async () => {
+    const meal = await repo.createSavedMeal(userId, name, items, id, servings, imageDataUri, mealTypeIds)
+    return NextResponse.json(meal, { status: 201 })
+  })
 }

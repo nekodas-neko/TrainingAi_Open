@@ -483,6 +483,18 @@ export async function listSavedMeals(db: Db, userId: string): Promise<SavedMeal[
     .where(inArray(s.savedMealItems.savedMealId, mealIds))
     .orderBy(asc(s.savedMealItems.id))
 
+  // BF-11e. The inner join to `meal_types` is what filters SOFT-DELETED types: a join row may point
+  // at one, deliberately, because deleting the join rows instead would mean restoring a type could
+  // not restore its tags. So the filter belongs here, on read, and nowhere else.
+  const tagRows = await db.select({
+    mealId: s.savedMealMealTypes.savedMealId,
+    typeId: s.savedMealMealTypes.mealTypeId,
+  })
+    .from(s.savedMealMealTypes)
+    .innerJoin(s.mealTypes, eq(s.savedMealMealTypes.mealTypeId, s.mealTypes.id))
+    .where(and(inArray(s.savedMealMealTypes.savedMealId, mealIds), isNull(s.mealTypes.deletedAt)))
+    .orderBy(asc(s.mealTypes.sortOrder))
+
   return meals.map(m => {
     const items: SavedMealItem[] = itemRows
       .filter(r => r.smiMealId === m.id)
@@ -505,7 +517,12 @@ export async function listSavedMeals(db: Db, userId: string): Promise<SavedMeal[
     )
     // `totals` stays the WHOLE recipe — dividing here would make every existing caller
     // silently change meaning. Callers that want one portion divide by `servings` themselves.
-    return { id: m.id, userId: m.userId, name: m.name, servings: m.servings, imageDataUri: m.imageDataUri ?? null, createdAt: m.createdAt, items, totals }
+    return {
+      id: m.id, userId: m.userId, name: m.name, servings: m.servings,
+      imageDataUri: m.imageDataUri ?? null, createdAt: m.createdAt,
+      mealTypeIds: tagRows.filter(r => r.mealId === m.id).map(r => r.typeId),
+      items, totals,
+    }
   })
 }
 
@@ -514,7 +531,7 @@ export async function listSavedMeals(db: Db, userId: string): Promise<SavedMeal[
 // offline create that replays — or a create+edit that replays out of order — lands
 // in place instead of duplicating or throwing. The meal id is client-minted (offline)
 // or generated here (online without one), and the junction rows are replaced wholesale.
-async function writeSavedMeal(db: Db, userId: string, id: string, name: string, items: { foodItemId: string; quantityMultiplier: number }[], servings: number, imageDataUri?: string | null): Promise<SavedMeal> {
+async function writeSavedMeal(db: Db, userId: string, id: string, name: string, items: { foodItemId: string; quantityMultiplier: number }[], servings: number, imageDataUri?: string | null, mealTypeIds?: string[]): Promise<SavedMeal> {
   await db.transaction(async tx => {
     const [meal] = await tx.insert(s.savedMeals)
       // `undefined` means "the caller did not mention the image", which must not clear a stored one
@@ -536,24 +553,47 @@ async function writeSavedMeal(db: Db, userId: string, id: string, name: string, 
       const ids = [...new Set(items.map(i => i.foodItemId))]
       const owned = await tx.select({ id: s.foodItems.id }).from(s.foodItems)
         .where(and(eq(s.foodItems.userId, userId), inArray(s.foodItems.id, ids)))
-      if (owned.length !== ids.length) throw new Error('Unknown food item')
+      // `UserFacingError`, not `Error`: this is a refused request, and its twin below (the meal-type
+      // check BF-11e added) is one — leaving them different would answer 500 here and 400 there for
+      // the same class of client mistake, in the same function.
+      if (owned.length !== ids.length) throw new UserFacingError('Unknown food item')
     }
 
     await tx.delete(s.savedMealItems).where(eq(s.savedMealItems.savedMealId, id))
     if (items.length > 0) {
       await tx.insert(s.savedMealItems).values(items.map(i => ({ savedMealId: id, ...i })))
     }
+
+    // BF-11e. `undefined` means the caller did not mention tags, which must NOT clear stored ones —
+    // the same distinction `imageDataUri` draws above, and load-bearing here for a concrete reason:
+    // until BF-11f ships a tag picker, every save from the saved-meals sheet omits them, and
+    // treating that as "clear" would make tags impossible to keep. An explicit `[]` clears.
+    if (mealTypeIds !== undefined) {
+      // Ownership-verified even though this table has no `user_id`: the ids are client-supplied and
+      // reach a table whose FK only proves the type EXISTS, not whose it is. Same check, and the
+      // same reason, as the food-item one above (CLAUDE.md, write-path ownership discipline (c)).
+      const wanted = [...new Set(mealTypeIds)]
+      if (wanted.length > 0) {
+        const owned = await tx.select({ id: s.mealTypes.id }).from(s.mealTypes)
+          .where(and(eq(s.mealTypes.userId, userId), inArray(s.mealTypes.id, wanted), isNull(s.mealTypes.deletedAt)))
+        if (owned.length !== wanted.length) throw new UserFacingError('Unknown meal type')
+      }
+      await tx.delete(s.savedMealMealTypes).where(eq(s.savedMealMealTypes.savedMealId, id))
+      if (wanted.length > 0) {
+        await tx.insert(s.savedMealMealTypes).values(wanted.map(mealTypeId => ({ savedMealId: id, mealTypeId })))
+      }
+    }
   })
   const all = await listSavedMeals(db, userId)
   return all.find(m => m.id === id)!
 }
 
-export async function createSavedMeal(db: Db, userId: string, name: string, items: { foodItemId: string; quantityMultiplier: number }[], id?: string, servings = 1, imageDataUri?: string | null): Promise<SavedMeal> {
-  return writeSavedMeal(db, userId, id ?? randomUUID(), name, items, servings, imageDataUri)
+export async function createSavedMeal(db: Db, userId: string, name: string, items: { foodItemId: string; quantityMultiplier: number }[], id?: string, servings = 1, imageDataUri?: string | null, mealTypeIds?: string[]): Promise<SavedMeal> {
+  return writeSavedMeal(db, userId, id ?? randomUUID(), name, items, servings, imageDataUri, mealTypeIds)
 }
 
-export async function updateSavedMeal(db: Db, id: string, userId: string, name: string, items: { foodItemId: string; quantityMultiplier: number }[], servings = 1, imageDataUri?: string | null): Promise<SavedMeal> {
-  return writeSavedMeal(db, userId, id, name, items, servings, imageDataUri)
+export async function updateSavedMeal(db: Db, id: string, userId: string, name: string, items: { foodItemId: string; quantityMultiplier: number }[], servings = 1, imageDataUri?: string | null, mealTypeIds?: string[]): Promise<SavedMeal> {
+  return writeSavedMeal(db, userId, id, name, items, servings, imageDataUri, mealTypeIds)
 }
 
 export async function deleteSavedMeal(db: Db, id: string, userId: string): Promise<void> {

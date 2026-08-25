@@ -41,7 +41,8 @@ export interface LocalStore {
   getRecentFoodItemsForMeal(mealTypeId: string, limit: number): Promise<FoodItem[]>;
   // Saved meals (offline-first: create/edit/delete offline, read local-first).
   getSavedMeals(): Promise<SavedMeal[]>;
-  upsertSavedMeal(meal: LocalSavedMeal, items: LocalSavedMealItem[]): Promise<void>;
+  /** `mealTypeIds` omitted = leave stored tags alone; `[]` = clear them (BF-11e). */
+  upsertSavedMeal(meal: LocalSavedMeal, items: LocalSavedMealItem[], mealTypeIds?: string[]): Promise<void>;
   /** The active plan assembled from local rows, so the Nutrition section renders with no network. */
   getActiveMealPlan(): Promise<MealPlan | null>;
   /** Planned meals declined on a day (Q-187 phase 2). Local-first: the UI reads this, not the API. */
