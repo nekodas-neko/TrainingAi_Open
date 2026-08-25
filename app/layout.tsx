@@ -18,6 +18,7 @@ import { ErrorReporter } from "@/components/error-reporter";
 import { NavTimingProbe } from "@/components/perf/nav-timing-probe";
 import { BRAND_THEME_STORAGE_KEY, CUSTOM_HUE_STORAGE_KEY } from "@trainingai/shared/brand-themes";
 import { UserTimezoneProvider } from "@/components/shell/user-timezone-provider";
+import { WorkoutDayRollover } from "@/components/shell/workout-day-rollover";
 import { auth } from "@/auth";
 import "./globals.css";
 
@@ -151,6 +152,7 @@ export default async function RootLayout({
             <MobileAuthHandler hasSession={!!userId} />
             <SyncProvider userId={userId} />
             <TabSwipeNavigator />
+            <WorkoutDayRollover />
             <CapacitorNativeInit />
             <AutoDetectionProvider />
             <LiveHrAmbientProvider />
