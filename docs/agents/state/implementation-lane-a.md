@@ -145,6 +145,12 @@ yes — it is an auth change.** Runbook: [`docs/handoff-2026-08-18-platform-data
 - **`claude_ro` is row-scoped to ONE user** — every count from `/api/admin/db-query` is *the
   owner's*. Write findings as "none of the owner's", never "nothing is failing". It needs no manual
   step: views scope on `current_setting('app.claude_ro_owner', true)`, set by `bootstrapClaudeRoOwner()`.
+- **The MODEL is reachable from this sandbox** — `GOOGLE_GENERATIVE_AI_API_KEY` is set and
+  `generateObject` works through the proxy, so an AI behaviour change can be **measured** rather than
+  reasoned about. BF-11b's split rule read 5,5,1,1,5,1 on its headline case and 30/30 after one
+  wording change; neither number was reachable any other way. There is no `tsx` — drive a probe as a
+  throwaway `*.test.ts` under vitest, which resolves the `@/` alias. Gate a shipped live test on an
+  explicit `RUN_LIVE_AI_TESTS=1`, never on the key alone, or CI starts paying for it.
 - **Sandbox limits:** the rollup cannot execute here (needs the vendored constants Q-49 removed), so
   anything wanting a rollup pass is owner-only. A stale local DB looks like a code defect — drop
   `/var/lib/postgresql/local-dev`. `npx next lint` is **not** `pnpm lint`. Drizzle will not marshal a

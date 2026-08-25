@@ -2358,3 +2358,29 @@ fails on the paste.
 
 The alternative was five entries each restating that, which is longer in total and drifts. This file
 grows when the queue is the only place a decision lives — and the parity rule now is.
+
+## 2026-08-25 — `projectOverview.md` raised, 7957 → 7959 (BF-11b)
+
+Two lines: the Current Status paragraph the wrap-up asks for, and its blank. Fourth same-day raise of
+this baseline, by the same session — see the three above for why that is ordinary rather than a
+symptom, and always rebuild from `origin/main` rather than splicing.
+
+The paragraph is longer than most because it carries a number no journal entry will be read for: the
+split rule's first version returned **5, 5, 1, 1, 5, 1** on five identical containers, and its second
+returned 30 of 30 across six cases. A reader of the index needs to know the splitting was measured
+rather than assumed, because the obvious next question — *"can I trust the candidate count?"* — has a
+different answer before and after that change.
+
+## 2026-08-25 — `docs/agents/state/implementation-lane-a.md` raised, 152 → 158 (BF-11b)
+
+Six lines, all one finding: **the Gemini model is reachable from an agent sandbox.** No baton had
+recorded it, and every Lane A session before this one worked as though an AI behaviour change could
+only be reasoned about. It cannot: BF-11b's split rule returned 5, 5, 1, 1, 5, 1 on its headline case
+and 30 of 30 after one wording change, and neither number was reachable by reading the prompt, by the
+type checker, or by any mocked test.
+
+The lines that come with it are the ones that would otherwise be rediscovered — there is no `tsx`, so
+a probe runs as a throwaway `*.test.ts` under vitest for the `@/` alias, and a shipped live test gates
+on an explicit `RUN_LIVE_AI_TESTS=1` rather than on the key, or CI quietly starts paying for
+non-deterministic runs. A baton is the right home precisely because this changes what a session
+believes is *possible*, which is not something you look up when you already think the answer is no.

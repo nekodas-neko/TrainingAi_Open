@@ -101,9 +101,16 @@ without a second extraction mid-flight.
 
 ### 4.1 The change
 
-`ScanSchema` gains a candidates array. **Additively** — four call sites
-(`capture-step.tsx`, `review-step.tsx`, `meal-backfill-section.tsx`, `saved-meals-sheet.tsx`) read
-the current single-meal shape today and must not break.
+`ScanSchema` gains a candidates array. **Additively** — the call sites read the current single-meal
+shape today and must not break.
+
+> **⚠ Corrected 2026-08-25 while implementing.** This said *four* call sites and named
+> `saved-meals-sheet.tsx`, which **does not call this route** (its `fetch` goes to
+> `/api/nutrition/saved-meals`). There are **five**, and the two it missed are the ones that matter
+> most to the no-breaking-change rule: `my-meals-picker.tsx` reads `body.ingredients` and
+> `ingredient-picker.tsx` gates on `scan.calories > 0`, so both fail silently if the top level ever
+> becomes an array. The real list is `my-meals-picker.tsx`, `capture-step.tsx`, `review-step.tsx`,
+> `ingredient-picker.tsx`, `meal-backfill-section.tsx`.
 
 The shape that keeps them working is a response whose **top level is unchanged** and which carries
 the extra candidates alongside:
