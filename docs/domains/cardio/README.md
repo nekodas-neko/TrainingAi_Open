@@ -36,9 +36,13 @@ prescription coach, the cardio hub/trends/picker surfaces, and guided walk.
   duration and distance**. Read from the column, never derived, written as an explicit null at save —
   same shape as Q-230, likely one fix for pace/steps/calories together (Q-307).
 - [`docs/reviews/2026-08-15-pillar-model-soundness-review.md`](../../reviews/2026-08-15-pillar-model-soundness-review.md)
-  — §2: `running_baselines` is written at plan creation, holds **0 rows**, and `getRunningBaseline`
-  has no callers outside the repository layer, so 12 prescribed runs never consulted a baseline
-  (Q-301). The pace/HR model across 47 activity logs is **still unreviewed**.
+  — §2: `running_baselines` was written at plan creation, held **0 rows**, and `getRunningBaseline`
+  had no callers outside the repository layer, so 12 prescribed runs never consulted a baseline
+  (Q-301). **Closed:** the code went 2026-08-24 (Q-301) and the table itself was dropped
+  2026-08-25 in migrations 220/221 (Q-301b) — `n_tup_ins` was 0 for the table's entire life, and
+  `resolveSnapshot()` recomputes from `fitness_tests` + `body_metrics` on every request instead.
+  See [`docs/overview/entries/2026-08-25-drop-running-baselines.md`](../../overview/entries/2026-08-25-drop-running-baselines.md).
+  The pace/HR model across 47 activity logs is **still unreviewed**.
 - [`docs/gait-movement-domain.md`](../../gait-movement-domain.md) — **start here** for cadence and
   gait: the domain map and what each signal can and cannot tell us.
 - Plans: `ls docs/superpowers/plans/*cardio*` (13 today), plus

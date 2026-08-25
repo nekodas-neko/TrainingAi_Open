@@ -4,30 +4,30 @@
 > is how six concurrent sessions stay tellable apart; a renamed successor is a lost thread even with a
 > perfect baton.
 
-**Updated:** 2026-08-25 · **By:** the eighth session to run as Lane A · **Next ID:** `LA-26`
+**Updated:** 2026-08-25 · **By:** the eighth session to run as Lane A · **Next ID:** `LA-27`
 (`grep -rhoE '\bLA-[0-9]+\b' docs/ | sort -t- -k2 -n | tail -1` is the authority, not this line)
-**Migrations:** through 219; next free is **220**. Local SQLite **v29** (BF-11e added the saved-meal
+**Migrations:** through 221; next free is **222**. Local SQLite **v29** (BF-11e added the saved-meal
 tag table).
 
 ## Now
 
-**Nothing is in flight.** Four PRs opened, four merged. Start with
-`node scripts/next-item.js --lane A` — and it is trustworthy again in a way it was not this morning;
-see below.
+**One PR in flight: `chore/drop-running-baselines` (Q-301b)** — migrations 220 + 221, suite green.
+Drive it to green if it has not merged; otherwise nothing is in flight. Then
+`node scripts/next-item.js --lane A`.
+
+**Q-540 and Q-388 were parked today** after re-measuring their premises against production rather
+than reading them — both had sat in READY looking startable, and both are now `Gate: owner`. Detail:
+`docs/overview/entries/2026-08-25-drop-running-baselines.md` and PR #496. Only 1 of Lane A's top 15
+had owner-gating prose with no field, so that was a one-entry fix, **not** a sweep — don't make it one.
+
+**Lesson worth carrying:** three entries in a row had premises production contradicted (BF-16a,
+Q-403, Q-540). Re-verify before implementing.
 
 ## Read this before you trust the queue tool
 
-**`next-item.js` was reporting two shipped, production-gated entries as Lane A's #1 and #2 startable
-items**, and the pickup prompt for this session repeated that ranking. `keepFromLines` required a
-literal `Keep:`; TN-3a and TN-4 write `- **Keep — what is NOT done:**` with a dash. Fixed in #473,
-checked against all 196 entries (ten lines begin with the word: two are dash-form Keeps, eight are
-prose). Lane A's READY went 90 → 88.
-
-**The lesson generalises past this bug.** LB-11 built the KEEP bucket the same morning and closed by
-recording *"Lane A is unaffected in shape and now leads with `TN-3a`"* — a claim about the other lane,
-made without running the other lane's query. Both defects in that parser were found by reading its
-real output, never by its tests, which passed throughout. **Run the tool and read what it says about
-your own lane** before taking its top row.
+`next-item.js` mis-ranked shipped entries as startable twice (LB-11's KEEP bucket, then LA-23's
+dash-form `Keep —` parse, #473) — both found by **reading its real output for your own lane**, never
+by its tests, which passed throughout. Do that before taking its top row.
 
 ## The habit that has now paid on fourteen consecutive entries
 
