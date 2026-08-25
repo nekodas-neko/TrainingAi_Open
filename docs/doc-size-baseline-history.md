@@ -2308,3 +2308,19 @@ between and had already raised the number to 7947, so `doc-size-baseline.json` w
 `origin/main` and this raise re-derived on top of it rather than the hunk being spliced. Two
 same-session PRs both raising the same baseline is the ordinary case here, not an unusual one — the
 second one's number is only ever correct against the merged first.
+
+## 2026-08-25 — `projectOverview.md` raised, 7949 → 7957 (TN-7)
+
+Eight lines in two places, and the second is the one that earns it. Two are the Current Status
+paragraph the wrap-up asks for. **Six extend LA-20's existing Known-Issues row**, because TN-7
+changes what that row's `Keep:` means: its check is an `error_events` count, the count was
+unfalsifiable while the guard only logged, and it is falsifiable again now — but only from this
+deploy forward. A reader who takes a zero from the intervening day as evidence strikes a row on
+silence. That correction has to sit on the row itself; anywhere else and the next person to read the
+row will not see it.
+
+**Written first as 7947 → 7955, then re-derived on 7949 when BF-18's PR (#476) landed first.** Third
+same-day raise of this baseline, and the third to be superseded before merging — which is the
+ordinary case when several PRs run in one session, not a sign anything is wrong. Each time the fix
+was to rebuild `doc-size-baseline.json` from `origin/main` and re-derive, never to splice the hunk:
+the raise is only ever correct against the merged predecessor.

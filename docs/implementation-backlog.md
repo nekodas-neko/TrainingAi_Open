@@ -1698,50 +1698,6 @@ same 41 nights within ±2 of 87.0 and **not above it**; `LOW_SLEEP_SCORE` firing
 
 Review: [`docs/reviews/2026-08-24-sleep-score-volatility.md`](reviews/2026-08-24-sleep-score-volatility.md).
 
-### [readiness][platform] TN-7 — TN-4's guard swallows the one signal LA-20's open verification depends on
-
-- **Branch:** _unassigned_
-- **Added:** 2026-08-24 · found while reconciling TN-4 against LA-20's Known-Issues row
-- **Lane: A** — `app/api/body-battery/route.ts`, one line
-- **Needs: TN-4** — this is a follow-up to what TN-4 shipped, not a criticism of it.
-
-TN-4's fix (#415, merged 2026-08-24 12:51 UTC) is correct and should stay. Its catch, though, ends at
-
-```ts
-console.error('[body-battery] daytime stress series failed, continuing without it:', err)
-```
-
-**`console.error` does not reach `error_events`** — the route imports `reportServerError` and uses it
-in the outer catch, but not here. So from that deploy onward a recurrence of
-`daytime-stress: constants not set` produces **no row anywhere**.
-
-**That is exactly the signal LA-20's Known-Issues row is waiting on.** Its `Keep:` reads *"the check
-is `error_events` after this deploys … the count must be zero across a window where
-`/api/body-battery` was actually called."* After TN-4 the count is zero **whether or not the root
-cause is fixed**, so the condition can no longer fail and no longer distinguishes anything.
-
-**What the observable window did establish, before the guard landed.** The fault ran
-2026-08-23 10:37 → **20:59** UTC (**31 occurrences** — LA-20's row records 19 and a 12:27 latest,
-read while it was still firing; both figures are superseded). It then went silent, and at
-**2026-08-24 11:20:38 UTC** `/api/body-battery` completed a full run and wrote a
-`body_battery_daily` snapshot with no fault — a genuine successful call ~14 h after the last error
-and ~1.5 h *before* TN-4's guard deployed. That is **one confirmed clean run in an observable
-window**, which is real evidence and is weaker than the "window" LA-20 asked for. Everything after
-~13:00 UTC on 2026-08-24 is uninformative.
-
-**Fix:** report from the catch as well as logging — `reportServerError(err, { userId, url: '/api/body-battery#stress' })`
-or an equivalent non-fatal severity. The card must still degrade rather than 500; what has to change
-is that the degradation leaves a trace.
-
-**Pass test:** force the constants unset in a test and assert both that the route returns 200 **and**
-that a report was emitted. Then LA-20's `Keep:` becomes checkable again and can be struck on a clean
-window; until then it must not be struck on silence.
-
-**The general shape, worth naming:** a hardening change that converts a loud failure into a quiet
-degradation also removes the evidence a *separate* open investigation was relying on. When a fix
-turns a 500 into a fallback, check whether anything is waiting on that 500 — and carry the signal
-across.
-
 ### [readiness][platform] TN-4 — /api/body-battery threw 31 × 500 for ten hours, then stopped on its own
 
 - **Branch:** _unassigned_
