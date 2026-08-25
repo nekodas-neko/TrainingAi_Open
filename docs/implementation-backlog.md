@@ -5627,6 +5627,40 @@ ehr     0     0     0     0   648   208   128   556     0
   half-fix. Decide the invariant once, at the write or at `nightSessions`.
 - **First action:** re-run the rows-per-date query above over all history (not just post-re-key) to
   size the affected set before choosing between the two fixes.
+- ✅ **SIZED AND PARTLY FIXED 2026-08-25** (`fix/sleep-fragment-nights`). All-history sizing:
+  **17 rows under 1.5 h across 74 dates — 4 of them exactly 0.00 h.** Every one starts between
+  **09:32 and 22:14 local**, so they are daytime detections, not short nights.
+- **⚠ TWO OF THIS ENTRY'S CLAIMS ARE NOW STALE — do not re-derive from them.**
+  (a) **2026-08-11 and 2026-08-13 are NOT single-row dates any more; both carry 2 rows.** Q-536's
+  clock repair (2026-08-17, after this was filed) supplied their real nights. The only genuinely
+  single-row fragment dates in all history are **2026-06-01** (1.45 h, 22:14–23:41, Cloud-era, no
+  `oura_id` — plausibly a real short night) and **2026-08-22** (0.00 h, 17:44–18:39).
+  (b) **The readiness claim no longer holds either.** `previousNight` and `sleepBalance` reach these
+  rows through `readiness-payload.ts`, `sleep-trend.ts` and `score-audit/sleep.ts` — **all three go
+  through `nightSessions` now**, which drops zero-duration rows and classifies naps out by circadian
+  midpoint. 16 of the 17 fragments are already handled; only 2026-06-01 classifies as a night, and
+  arguably correctly.
+- **So the invariant was already decided — the defect was readers that bypassed it.** Two found:
+  - ✅ **`/api/day-log` picked `sleepRes.value[0]`.** `listSleepSessions` orders by **date only**, so
+    within a date the order is whatever Postgres returns — the day log chose between the nap and the
+    night **by coin flip** on 15 dates. It now aggregates through `nightSessions` and takes the
+    longest night.
+  - ✅ **The sleep list rendered a 0.00 h night.** `mergeByDate`'s `primaryCluster` picks the longest
+    row, so nap-plus-night dates were already right; a date whose ONLY row is zero-duration returns
+    early from the one-row fast path. 2026-08-22 reached the list as a night of zero hours. The
+    zero-duration predicate is now imported from `sleep-night.ts` (`recordsSleep`) rather than
+    copied.
+- **⚠ NEW FINDING — there are TWO implementations of "which rows are the night", and this PR did not
+  merge them.** `packages/shared/src/health/sleep-night.ts` classifies by circadian midpoint then
+  merges within a 3 h gap; `lib/sleep/merge-sessions.ts` takes the longest row plus anything within
+  1 h. They agree on the production history, which is why nothing has surfaced — but *One Formula,
+  One Place* says two implementations of the same metric is a bug by definition. Converging them
+  changes the owner's main sleep surface and needs a device check, so it is **not** done here.
+- **Keep:** (1) converge the two night-selection implementations, above. (2) **Nothing was verified
+  on device** — both fixes are read-path changes to surfaces the owner looks at daily. (3) The write
+  path still stores 0.00 h rows; that is now filtered at both read paths, and whether the rollup
+  should refuse to write them at all is untouched. (4) `2026-06-01` still classifies as a 1.45 h
+  night, and no decision was made about it.
 
 ### [readiness][workouts] Q-275 — readiness is structurally blind to training load, and every incumbent treats load as primary
 

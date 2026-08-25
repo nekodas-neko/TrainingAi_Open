@@ -58,7 +58,9 @@ export interface SleepWindow {
 }
 
 /**
- * True when a row records any sleep at all.
+ * True when a row records any sleep at all. Exported because the sleep list's own merge
+ * (`lib/sleep/merge-sessions.ts`) needs the same answer, and a second copy there is how the two
+ * drift — this module is where "does this row record sleep" is decided.
  *
  * Production carries rows with `duration_hours = 0.00` — a bed period the recorder never resolved
  * into sleep. They are not short nights; they are non-nights, and `computeSleepScore` returns null
@@ -72,8 +74,13 @@ export interface SleepWindow {
  * which is correct). Only a window with NO duration is meaningless, and it is the only one that can
  * produce the null this fixes.
  */
+export function recordsSleep(durationHours: number | null | undefined): boolean {
+  return durationHours != null && durationHours > 0
+}
+
+/** {@link recordsSleep} for a whole window. */
 function hasSleep(w: SleepWindow): boolean {
-  return w.durationHours != null && w.durationHours > 0
+  return recordsSleep(w.durationHours)
 }
 
 /** Local hour-of-day (0–24, fractional) of an instant. */

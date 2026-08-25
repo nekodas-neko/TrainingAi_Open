@@ -1,3 +1,5 @@
+import { recordsSleep } from '@trainingai/shared/health/sleep-night';
+
 export type SleepRow = {
   date: string;
   ouraId: string | null;
@@ -61,7 +63,16 @@ function primaryCluster(list: SleepRow[]): SleepRow[] {
 // Samsung row only contributes the earliest start / latest end timestamps.
 export function mergeByDate(rows: SleepRow[]) {
   const byDate = new Map<string, SleepRow[]>();
-  for (const r of rows) {
+  // Q-274: `primaryCluster` picks the LONGEST row, so on a date carrying a nap plus the night the
+  // night already wins. What it cannot fix is a date whose ONLY row is a fragment: with one row it
+  // returns early, and production has a date (2026-08-22) whose sole row is 0.00 h — which the
+  // sleep list rendered as a night of zero hours. A zero-duration row is a bed period the recorder
+  // never resolved into sleep, not a short night, and `computeSleepScore` already returns null for
+  // it. Showing nothing for that date is honest; showing 0.00 h reads as "you slept none".
+  //
+  // The predicate is imported rather than rewritten: `sleep-night.ts` is where "does this row
+  // record any sleep" is decided, and a second copy here is how the two drift.
+  for (const r of rows.filter(r => recordsSleep(r.durationHours))) {
     const list = byDate.get(r.date) ?? [];
     list.push(r);
     byDate.set(r.date, list);
