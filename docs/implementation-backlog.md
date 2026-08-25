@@ -14,7 +14,7 @@ silently misdirecting the next session. Update them in the same PR that consumes
 
 | Pointer | Value | Source of truth |
 |---|---|---|
-| Next free Postgres migration | **220** | `lib/data/postgres/migrations/` |
+| Next free Postgres migration | **222** | `lib/data/postgres/migrations/` |
 | Local SQLite schema version | **v29** | `lib/sqlite/migrations.ts`; `lib/sqlite/__tests__/migrations.test.ts` asserts the max |
 
 > **There is no third pointer any more.** Entry IDs are not allocated from a shared counter and
@@ -4849,6 +4849,10 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 ### [devices][heart-rate] Q-388 — the ring runs SpO₂ and daytime-HR recording permanently, nobody chose it, and it is ~3.5× stock drain
 
 - **Lane:** A
+- **Gate:** owner — added 2026-08-25. Not a new judgement: this entry's own text already says
+  *"What still remains here is the SpO₂ decision itself (item 1) and the cadence knobs (item 4),
+  both owner-gated"*, and items 2 and 3 are done. The field just makes that machine-readable, so
+  `next-item.js` stops offering it as startable work.
 - **✅ Item (2) shipped 2026-08-23** in `feat/ring-service-device-pass` (native — **needs an APK**):
   `enableMeasurementSequence()` now ends with `EXERCISE_HR → AUTOMATIC` and `reqBleFastHrMode(false)`,
   so the fast-HR trap closes on every connect. Recorded as **R8** in
@@ -5407,47 +5411,32 @@ ehr     0     0     0     0   648   208   128   556     0
   rest band) is already measured — see the ✅ above it. Surfacing is a Lane B UI change once the
   owner has seen the framing; nothing here licenses a rest term in `expectedRpe`.
 
-### [cardio] Q-301b — drop the `running_baselines` table itself (code already removed)
+### [platform] LA-26 — dead data-layer code ships repeatedly: flag a repository method with no callers outside `lib/data/`
 
-- **Lane:** A — it takes a migration number.
-- **Added:** 2026-08-24 · Q-301's code half shipped · **owner authorised the DROP the same day**
-  (`Gate: owner` cleared).
-- **✅ DECIDED 2026-08-24 — DROP IT, and the emptiness is evidenced three ways, not assumed.**
-  - **`n_tup_ins = 0`** — a **lifetime** insert counter maintained on every write. Unlike
-    `n_live_tup` it is **not a planner estimate** (this database has `last_analyze` NULL on every
-    table, so `n_live_tup` alone would prove nothing — that trap filed a data-loss incident, Q-528,
-    that had never happened), and unlike a `claude_ro` `count(*)` it is **not row-scoped to one
-    user**. No row has ever been inserted by anyone.
-  - **16 kB total**, consistent with an empty heap plus index pages and no bloat.
-  - **The code trace explains why it is empty** rather than leaving it a mystery: the writer landed
-    in migration 146 *after* the only `running_plans` row was created (2026-07-21), and no plan has
-    been created since. Not a silent write failure.
-  - **Nothing can reach it:** the Drizzle `schema.ts` entry is gone, so no query in the app can name
-    the table.
-- **How to do it.** A migration whose only statement is the drop. `DROP TABLE IF EXISTS` so a re-run
-  is a no-op, and **verify `n_tup_ins` is still 0 immediately before merging** — the authorisation
-  rests on the table never having been written, so a non-zero counter at merge time invalidates the
-  decision rather than being a detail to work around.
-- **Investigation completed, in the entry's own order:**
-  1. **What the 12 `prescribed_runs` actually derive from:** `resolveSnapshot()`
-     (`packages/shared/src/running/assemble-plan-context.ts`), called **fresh on every request** from
-     `fitness_tests` and `body_metrics` — live data, not the stale plan-creation-time snapshot
-     `running_baselines` would have held. Sensible inputs by another (better) route — dead code to
-     delete, not a broken feature to wire, per the entry's own decision tree.
-  2. **Why the table was empty:** the one `running_plans` row was created 2026-07-21; the writer
-     (migration 146) landed after that plan already existed. No plan has been created since — not a
-     silent write failure.
-  3. **Decision: delete.** `saveRunningBaseline`/`getRunningBaseline`, the `RunningBaseline` interface,
-     the dead write call in `app/api/running-plan/route.ts`, and the `runningBaselines` Drizzle table
-     definition are all removed. `tsc --noEmit` clean, `pnpm check:rules` 55 of 55, full suite green.
-- **What's left, gated on the owner:** the physical `running_baselines` Postgres table itself.
-  Dropping it is a schema-changing migration and CLAUDE.md's data-dropping rule applies regardless of
-  the table currently holding zero rows — the code no longer references it (Drizzle's schema.ts entry
-  is gone, so no query can reach it), so the physical table is a harmless, disconnected leftover until
-  a small follow-up migration drops it.
-- **Third instance of a recurring class** — Q-270 (`training_load_ots`: live producer, zero rows)
-  and Q-231 (the "Exercise detected" card losing its only writer). Worth proposing a CI check that
-  flags a repository read method with no callers outside the data layer.
+- **Lane:** A
+- **Added:** 2026-08-25, from Q-301b's closing observation while dropping `running_baselines`.
+- **Three instances, and nobody caught any of them from the code.** Each was found only when
+  somebody went looking at production row counts and asked why a table was empty:
+  - **Q-301 / Q-301b** — `saveRunningBaseline`/`getRunningBaseline` and the `running_baselines`
+    table. The writer landed in migration 146 *after* the only `running_plans` row existed, so it
+    never fired. `n_tup_ins` was 0 for its entire life.
+  - **Q-270** — `training_load_ots`: a live producer writing into a table that held zero rows.
+  - **Q-231** — the "Exercise detected" card kept its reader after losing its only writer, so it has
+    been permanently empty since ~2026-08-04 and looked like a working feature.
+- **The shape they share** is what makes it checkable: a repository method that is exported, typed,
+  tested in isolation, and called by nothing outside `lib/data/`. TypeScript cannot see it — an
+  unused *export* is not an error — and the tests pass because they call it directly.
+- **What to build.** A `scripts/check-*.js` in the Custom Rules job that walks the repository
+  interface and fails on a method whose only references are inside `lib/data/` (plus its own tests).
+  Shrink-only per-method baseline, like the other ratchets, because there will be legitimate
+  exceptions (a method reached only through the adapter, one kept for an imminent caller) and each
+  one should have to be written down rather than argued once.
+- **The known false-positive risk, and why the baseline handles it rather than cleverness:**
+  `pushMutations` dispatches by domain string, so some methods are reached only through a lookup the
+  checker cannot follow statically. Those go in the baseline with a reason; the alternative — teaching
+  the script to resolve dynamic dispatch — is how this kind of check becomes unmaintainable.
+- **Not urgent.** Nothing is broken today; this stops the *next* one costing a production
+  investigation to notice.
 
 ### [workouts] Q-289 — `expectedRpe` misses by more than the autoregulation dead band at both ends of its own range
 
