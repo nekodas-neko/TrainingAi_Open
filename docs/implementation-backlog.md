@@ -385,7 +385,23 @@ tuple makes a shared-table write a *compile error*, which is stronger than anyth
   claims it. If the round trip fails, the unit is not in that protocol family and Phases 1+ are void.
   QRing is the fallback only if the ring will not advertise after a full charge — **decline any
   firmware update it offers**, then uninstall it.
-- **🔎 ROOT CAUSE, 2026-08-26 — every write was ASCII, never bytes (§11e).** The nRF Connect log shows
+- **✅ PHASE 0 COMPLETE and ✅ PHASE 1 SHIPPED, 2026-08-26.** The owner ran Start Monitoring on the
+  Web Bluetooth client with the ring worn and it returned live HR — the command round trip, which
+  was the last unmeasured thing (§11h). Caveat: that proves the ring and the transport via a
+  *third-party* client, not our code; ours is proven when Phase 3 drives it.
+  **Phase 1 is `lib/colmi-ble/protocol.ts` + `decode.ts`, 32 tests**, covering the full command
+  surface — battery, set-time, find-device, real-time HR, and the HR / activity / stress / HRV /
+  sleep / temperature / SpO2 syncs — at the owner's direction (*"a lot of features the oura ring
+  doesn't have … get full use out of it"*). Two decisions not to re-litigate: decoders return
+  **relative** time (`daysAgo`, `minuteOfDay`, BCD) and never build a Date, because the reference
+  client resolves in the *device's* zone; and decoders are **infallible**, held by a 300-case fuzz
+  test. Anchor test is the real captured packet `73-0C-64-00-…-E3`.
+- **Next: Phase 2 (storage, Lane A migration) then Phase 3 (sync + pairing card).** Pairing filters
+  by `namePrefix: 'R09_'`, never a stored device id (§11a). The sync path must treat a silent ring
+  as distinguishable from no-data, and must handle **"held by another app"** — a peripheral takes one
+  connection and stops advertising while held, so it presents as *device not found* (§11g).
+- **Historical, kept for the trail — ROOT CAUSE of the evening's silence (§11e): every write was
+  ASCII, never bytes.** The nRF Connect log shows
   `Data written to 6e400002…, value: (0x) 30-33-30-30-…-33` — that is the 32-character *string*
   `"0300…03"` sent as 32 ASCII bytes, not the 16 binary bytes. **And it was not a missed setting (§11e-d):** the ring reuses
   **Nordic UART Service's exact characteristic UUIDs** (`6e400002`/`6e400003`) under its own service

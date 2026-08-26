@@ -308,7 +308,34 @@ command bytes**.
 > summing to `0x1FE` is `0` under mod 255 and `254` under mod 256. Every published client says 255.
 > A decoder that assumes 256 passes Phase 0 and then fails on roughly half of all real commands.
 
-### Phase 1 — the pure protocol module · no device needed
+### Phase 1 — the pure protocol module · ✅ SHIPPED 2026-08-26
+
+`lib/colmi-ble/protocol.ts` (203 lines) and `lib/colmi-ble/decode.ts` (295 lines), with 32 tests.
+Pure functions, no I/O, no clock — so the module runs in the WebView and is fully testable without
+a ring.
+
+- **Framing:** 16-byte V1 packets, **mod-256** checksum, CRC16-Modbus and the 6-byte header for V2
+  big data, BCD date parts.
+- **Commands:** battery, set-time, phone-name, find-device, real-time HR, and the HR / activity /
+  stress / HRV / sleep / temperature / SpO2 syncs.
+- **Decoders:** battery (push and direct), real-time HR, activity buckets, the 30-minute HRV and
+  stress series, the multi-packet HR log, and the V2 sleep, temperature and SpO2 histories.
+
+Two design decisions worth not re-litigating:
+
+1. **Decoders return RELATIVE time — `daysAgo`, `minuteOfDay`, BCD parts — and never build a Date.**
+   Gadgetbridge resolves these with `Calendar.getInstance()`, the device's own zone, which is the
+   pattern `CLAUDE.md` bans: a phone in another zone would key a night's sleep to the wrong day. The
+   caller anchors them in the *user's* timezone. It also leaves the module with no clock, so its
+   tests have no hour-dependence and no rolling-window expiry.
+2. **Decoders are infallible.** An unrecognised or truncated frame returns `{ kind: 'unknown' }`,
+   never a throw — the Oura pipeline's rule, and a 300-case fuzz test holds it.
+
+**The anchor test is the packet captured from the owner's ring** — `73-0C-64-00-…-E3` decoding to
+battery 100% / not charging, and the `-01-…-E4` variant to charging. Everything else is pinned to a
+reference implementation; that one is pinned to hardware.
+
+### Phase 1 (original scope) — no device needed
 
 `lib/colmi-ble/protocol.ts`: build a command, verify a checksum, parse an HR-log packet chain, parse
 a step record. **Pure functions, no I/O**, mirroring the `PolarProtocol.kt` / `ScaleProtocol.kt`
@@ -440,7 +467,7 @@ Read in nRF Connect on a factory-fresh ring. **No vendor app was ever installed.
 | `6E40FFF0-…` service present? | **yes** |
 | RX `6E400002-…` | **present** — WRITE, WRITE NO RESPONSE |
 | TX `6E400003-…` | **present** — NOTIFY, with CCCD `0x2902` |
-| `0x03` round trip | never validly sent from nRF (§11e-d); **Web Bluetooth connects — §11g** |
+| Command round trip | **CONFIRMED** — real-time HR via Web Bluetooth, owner, 2026-08-26 (§11h) |
 | Firmware Revision, trial end | _not yet read_ |
 
 **What this settles:** the R09 exposes the R02 family's transport exactly — same service UUID, same
@@ -790,6 +817,27 @@ not advertising at all.
 packet framing and the mod-256 checksum (against a decoded battery push whose charging byte tracked
 the charger); and Web Bluetooth connectivity from the S25. **Unmeasured: exactly one thing — the
 write direction.**
+
+### 11h. Command round trip CONFIRMED — Phase 0 complete (2026-08-26)
+
+The owner ran the Web Bluetooth client's **Start Monitoring** with the ring worn and reported it
+*"worked well"*, with more capability on show than the Oura provides. That is the write direction —
+a command issued, the ring acting on it, data returned — and it was the single thing still
+unmeasured after §11g.
+
+**Phase 0 is complete.** Measured on the owner's own R09: services and characteristics; the notify
+path; packet framing and the mod-256 checksum against a real decoded battery push; Web Bluetooth
+connectivity from the S25; and now a command→response round trip.
+
+**Caveat kept deliberately:** this was the *third-party* client's code path, not ours. It proves the
+ring and the transport, not `lib/colmi-ble/`. Ours is proven when Phase 3 drives the same commands
+from the app.
+
+**Scope note from the owner:** *"had a lot of features the oura ring doesn't have so it would be
+good for you to get full use out of it."* Taken as direction for Phase 1's breadth — the module
+covers the full command surface (SpO2, HRV, stress, skin temperature and sleep included) rather than
+the HR-and-steps minimum the plan originally scoped, since in a pure module breadth is cheap and the
+layouts were all available from one source.
 
 ### 11d. Gadgetbridge is the reference implementation, and it should be installed next
 

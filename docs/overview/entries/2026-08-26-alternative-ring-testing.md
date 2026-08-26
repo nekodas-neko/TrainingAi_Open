@@ -242,6 +242,45 @@ theory ran against a Value field that was hiding the outgoing bug and the incomi
 time, and every genuine result in them came from reading other people's source rather than from the
 device.
 
+## Command round trip confirmed — Phase 0 complete
+
+The owner ran the web client's Start Monitoring with the ring worn and it returned live heart rate.
+That is the write direction, the one thing still unmeasured, so Phase 0 is done: services and
+characteristics, the notify path, framing and the mod-256 checksum against a real decoded push, Web
+Bluetooth connectivity from the S25, and now a command reaching the ring and being acted on.
+
+The caveat is kept deliberately — that was the third-party client's code path. It proves the ring
+and the transport, not ours. Ours is proven when Phase 3 drives the same commands from the app.
+
+## Phase 1 shipped: the protocol module
+
+`lib/colmi-ble/protocol.ts` and `lib/colmi-ble/decode.ts`, 32 tests, all green. Pure functions, no
+I/O and no clock, so the module runs in the WebView and is testable without a ring.
+
+Framing, commands and decoders cover the full surface rather than the HR-and-steps minimum the plan
+originally scoped — the owner asked for full use of the ring, and in a pure module breadth is cheap
+once the layouts are in hand. That includes SpO2, HRV, stress, sleep and **skin temperature**, none
+of which the Oura pipeline provides.
+
+Two decisions worth not re-litigating later:
+
+**Decoders return relative time and never construct a Date.** `daysAgo`, `minuteOfDay`, BCD parts.
+Gadgetbridge resolves these with `Calendar.getInstance()` — the device's own zone — which is exactly
+the pattern this repo bans: a phone in another zone keys a night's sleep to the wrong day. The caller
+anchors them in the user's timezone instead. The side benefit is that a clockless module cannot grow
+an hour-dependent or rolling-window test, which this repo has been bitten by twice.
+
+**Decoders are infallible.** An unrecognised or truncated frame returns `{ kind: 'unknown' }` rather
+than throwing — the Oura pipeline's rule, since one bad frame must never take down ingest. A
+300-case fuzz test holds it.
+
+The anchor test is the packet captured from the owner's ring, `73-0C-64-00-…-E3` decoding to battery
+100% / not charging with the `-01-…-E4` variant charging. Every other vector comes from a reference
+implementation; that one comes from hardware.
+
+The isolation guard was re-probed against the real directory rather than a stand-in: naming a
+scoring table inside `lib/colmi-ble/` fails, and importing it from `readiness-payload.ts` fails.
+
 ## Deployment shape
 
 No APK. `lib/live-hr/chest-strap-source.ts` already does the full BLE cycle in TypeScript in the
