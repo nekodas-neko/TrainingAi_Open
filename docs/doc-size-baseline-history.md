@@ -2917,6 +2917,35 @@ The lines also keep the half that is genuinely open: the entry's *"then re-measu
 and mean-0.150 figures were measured against the OLD window and nobody has re-run them, so they may
 already be zero. That replay is Tuning's, which is why the entry is now `Gate: owner` rather than
 deleted — deleting it would lose a live question, and leaving it READY would invite the no-op.
+## 2026-08-26 — backlog → 12164, `projectOverview.md` → 8050, `docs/agents/state/tuning.md` 218 → 235 (the HR-tile and pacing follow-ups)
+
+*(Absolute figures are from the final rebase; other PRs raised the same two lines while this branch was open, so the deltas this branch is responsible for are **+83** on the backlog and **+9** on `projectOverview.md`.)*
+
+One new entry (**TN-17**, Activity as a pace-to-goal score) and two amendments that are longer than
+the entry.
+
+**TN-13's amendment carries a reconciliation, and that is what the lines buy.** The pillar review
+quoted resting HR at **+0.557** against the check-in; measured raw, it is **+0.129**. Both are right
+— one is the baseline-relative contributor score, one is bare bpm — and without the amendment saying
+so, the next session finds a contradiction between two of its own documents and re-runs the whole
+lookback to resolve it. It also records that **4 `provisional: true` rows** (score pinned at the
+placeholder 50) drag that correlation from −0.553 to −0.395, which is a trap for any future query
+against `readiness_contributors`.
+
+**TN-17 is long because the mechanic is fine and the reason not to ship it yet is arithmetic.** The
+owner's median day is 4,649 steps against a 7,000 goal reached on 32% of days, so a paced score reads
+red from mid-morning most days. An entry that said only "build pacing" would ship a tile that tells
+the owner they are failing — and the entry has to carry the numbers, or that gets rediscovered on
+the device.
+
+**TN-3a gains a shipped-notice** rather than being deleted: the table is live, the back-fill is not,
+so it keeps a `Keep:` line instead of leaving the queue looking finished.
+
+**The baton was compacted in the same pass** (241 → 234 before the raise). Its 16 net lines are three
+traps a successor would otherwise walk into — `perceived_recovery` runs 1 = best … 5 = worst,
+`readiness_contributors` carries `provisional: true` rows pinned at 50, and `step_live_windows` is
+empty — plus the note that TN-3a's queue entry lagged the database by two days, which is the general
+lesson: check production before trusting an entry's state.
 
 ## 2026-08-26 — `docs/implementation-backlog.md` raised, 12081 → 12131 (BF-35, filling the food tile)
 
