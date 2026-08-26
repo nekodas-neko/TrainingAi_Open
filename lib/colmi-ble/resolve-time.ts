@@ -75,3 +75,16 @@ export function resolveActivityBucket(
   const at = fromZonedTime(`${dayStr}T${hh}:${mm}:00`, tz)
   return Number.isNaN(at.getTime()) ? null : at
 }
+
+/**
+ * A day's local midnight expressed as seconds, as though that wall-clock were UTC.
+ *
+ * This is what the ring's heart-rate log request wants — not a real epoch. Gadgetbridge builds the
+ * same number as `millis + ZONE_OFFSET + DST_OFFSET`; `Date.UTC` on the date parts gets there
+ * directly and without reading a clock or a zone, because the value is deliberately zone-free.
+ */
+export function localDayStartSeconds(dayStr: string): number {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dayStr)
+  if (!m) return 0
+  return Math.floor(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3])) / 1000)
+}

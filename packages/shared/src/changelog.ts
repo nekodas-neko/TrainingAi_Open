@@ -6,10 +6,10 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: "1.386.1",
+    version: "1.386.2",
     date: "2026-08-26",
     changes: [
-      "The Colmi ring card now shows how many frames the ring actually sent, under \u201cSync detail\u201d. The first real sync came back with a battery reading and nothing else, and there was no way to tell a ring that had recorded nothing from one whose data we failed to read \u2014 both look like an empty sync. The ring is also given longer to answer, because its history arrives in bursts and cutting the wait short looks identical to having no history.",
+      "Heart rate now syncs from the Colmi ring \u2014 the request was missing the day it was asking for, and the ring answered silence rather than an error, which is why every other measurement appeared and heart rate never did. The card also shows how many frames the ring actually sent, under \u201cSync detail\u201d. The first real sync came back with a battery reading and nothing else, and there was no way to tell a ring that had recorded nothing from one whose data we failed to read \u2014 both look like an empty sync. The ring is also given longer to answer, because its history arrives in bursts and cutting the wait short looks identical to having no history.",
     ],
   },
   {

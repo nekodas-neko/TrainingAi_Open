@@ -9,7 +9,7 @@
 // the Oura's continuous capture. That is why the WebView path's suspension while backgrounded does
 // not matter here.
 import { decodeV1, decodeBigData, bigDataPayloadLength, type ColmiFrame } from '@/lib/colmi-ble/decode'
-import { resolveRelative, resolveSleepWindow, resolveActivityBucket } from '@/lib/colmi-ble/resolve-time'
+import { resolveRelative, resolveSleepWindow, resolveActivityBucket, localDayStartSeconds } from '@/lib/colmi-ble/resolve-time'
 import {
   V1_SERVICE, V1_WRITE, V1_NOTIFY, V2_SERVICE, V2_WRITE, V2_NOTIFY, NAME_PREFIX,
   cmdBattery, cmdSetDateTime, cmdPhoneName, cmdSyncActivity, cmdSyncHeartRate,
@@ -206,8 +206,15 @@ export async function syncColmiRing(opts: SyncOptions): Promise<ColmiSyncOutcome
       }
     }
     for (const metric of AUTO_METRICS) await v1(cmdReadAutoPref(metric))
-    for (let d = 0; d < (opts.activityDays ?? 3); d++) await v1(cmdSyncActivity(d))
-    await v1(cmdSyncHeartRate())
+    const days = opts.activityDays ?? 3
+    for (let d = 0; d < days; d++) await v1(cmdSyncActivity(d))
+    // One request per day: the heart-rate log is addressed BY day, unlike HRV and stress which
+    // return the current day unasked. Walk back from today so a sync after midnight still collects
+    // the night that has just ended.
+    for (let d = 0; d < days; d++) {
+      const dayStr = shiftDay(opts.todayStr, -d)
+      await v1(cmdSyncHeartRate(localDayStartSeconds(dayStr)))
+    }
     await v1(cmdSyncHrv())
     await v1(cmdSyncStress())
     await v2(cmdSyncSleep())
@@ -340,6 +347,14 @@ export function framesToPayload(frames: ColmiFrame[], opts: Pick<SyncOptions, 't
 }
 
 const sleep = (ms: number) => new Promise<void>(r => setTimeout(r, ms))
+
+/** Shift a 'YYYY-MM-DD' key by whole days. Pure date-key arithmetic, no zone involved. */
+function shiftDay(dayStr: string, days: number): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dayStr)
+  if (!m) return dayStr
+  const d = new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]) + days))
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`
+}
 const describe = (e: unknown) => e instanceof Error ? e.message : 'Unknown error'
 
 function connectHint(e: unknown): string {

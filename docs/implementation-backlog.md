@@ -386,7 +386,24 @@ If a history command's tag is absent, the ring never answered it — a different
 answering and failing to map. Also raised the drain window 12s → 30s, since the heart-rate log alone
 can be 24 packets and a drain that ends early looks exactly like a ring with no history.
 
-**Next sync is the discriminator.** Read "Sync detail" first.
+**SECOND SYNC, 21:02 — cause (A) confirmed, plus one real bug found.** Stored HRV 47, stress 31,
+**temperature 36.4 °C** and battery. All plausible, and the timing settles it: the switches were
+enabled at 20:48 and the first samples are stamped **21:00** — the ring's first 30-minute slot after
+being switched on. So there was genuinely nothing before, and it is recording now. `local_date`
+also resolved to 2026-08-27 for a 21:00 UTC sample, which is the right Brisbane day.
+
+**The bug: the heart-rate log request was a bare `0x15` and the ring ignored it.** Gadgetbridge
+sends `[0x15, <int32 LE>]` where the int is the day's LOCAL midnight expressed as though it were UTC
+(`millis + ZONE_OFFSET + DST_OFFSET`). HRV, stress and temperature take no argument and worked; this
+one does and returned silence rather than an error — which is exactly why HR was the only enabled
+metric with nothing to show. Fixed with `localDayStartSeconds()` and one request per day walking
+back from today, so a sync after midnight still collects the night that just ended.
+
+**Still outstanding after this fix, and expected rather than broken:** sleep and SpO2 need a night
+with the switches on (there has not been one yet); steps/calories/distance need the ring to have
+been worn and moving, and it has mostly sat on a desk or charger.
+
+**Next sync is the discriminator for HR.** Read "Sync detail" first.
 
 **Do this, in order, and record the result in §11 of the plan:**
 
