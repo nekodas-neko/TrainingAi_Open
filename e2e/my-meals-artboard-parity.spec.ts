@@ -67,7 +67,7 @@ test.afterAll(async () => {
 async function openLibrary(page: Page): Promise<void> {
   await page.goto('/nutrition')
   await settleRouteBoundary(page)
-  const button = page.getByRole('button', { name: 'My Foods', exact: true })
+  const button = page.getByRole('button', { name: 'My Meals', exact: true })
   await expect(button).toBeVisible({ timeout: 60_000 })
   await expect(async () => {
     // Tap only while the sheet is still CLOSED. Since Q-395c this button opens Log Food, which then
@@ -112,12 +112,13 @@ async function swipeRowLeft(page: Page, row: ReturnType<Page['getByRole']>, dist
 test('the meal library is artboard 3: a count line, one grouped list, and per-portion calories', async ({ page }) => {
   await openLibrary(page)
 
-  // The search field no longer waits for a fifth meal to appear.
-  await expect(page.getByPlaceholder('Search your foods')).toBeVisible()
+  // The search field no longer waits for a fifth meal to appear. It says which list it searches
+  // since BF-37 split them back apart.
+  await expect(page.getByPlaceholder('Search your meals')).toBeVisible()
 
-  // The count line, which replaced the `· N` that used to ride on the sheet's title. It counts
-  // ITEMS rather than meals since Q-395c merged the two lists — foods share the list now, so a
-  // "meals" count would be describing part of what is on screen.
+  // The count line, which replaced the `· N` that used to ride on the sheet's title. Still "items"
+  // rather than "meals": the word survived the split because the row count is what it describes,
+  // and a tab that shows only meals already says so in its own label.
   await expect(page.getByText(/^\d+ items?$/)).toBeVisible()
 
   const row = page.getByRole('button', { name: new RegExp(`^${MEAL_NAME}`) }).first()

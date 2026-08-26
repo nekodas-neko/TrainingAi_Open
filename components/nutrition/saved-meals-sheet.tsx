@@ -1,15 +1,14 @@
 'use client'
 
-import { memo, useCallback, useEffect, useLayoutEffect, useState } from 'react'
+import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useState } from 'react'
 import { useUserTimezone } from '@/components/shell/user-timezone-provider'
 import { ChevronLeft, Plus, Minus, Trash2, Loader2, CheckSquare, Pencil, Camera } from 'lucide-react'
 import { toast } from 'sonner'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import type { FoodItem, SavedMeal, MealType, FoodLogWithItem } from '@trainingai/shared/types/nutrition'
+import type { FoodItem, SavedMeal, MealType, FoodLogWithItem, NutritionScanResult } from '@trainingai/shared/types/nutrition'
 import { todayInTz } from '@trainingai/shared/date-utils'
-import { cancelMealReminder } from '@/lib/meal-reminders'
 import { logMealItems } from '@trainingai/shared/nutrition/log-meal'
 import { mealTypeForHour } from '@trainingai/shared/nutrition/log-plan-meal'
 import { MACRO_COLORS } from '@trainingai/shared/nutrition/macro-colors'
@@ -19,6 +18,9 @@ import { TTL_MEDIUM, TTL_LONG } from '@trainingai/shared/cache-ttl'
 import { getLocalStore } from '@/lib/local-store'
 import { pushThenRevalidate } from '@/lib/local-store/push-then-revalidate'
 import { FoodList } from './food-list'
+import { CaptureActions } from './capture-actions'
+import { RecentFoodsPanel } from './recent-foods-panel'
+import { SegmentedTabs } from '@/components/ui/segmented-tabs'
 import { MealDetailSheet } from './meal-detail-sheet'
 import { MealPhotoTile } from './meal-photo-tile'
 import { usePlanSavedMealIds } from '@/lib/hooks/use-plan-saved-meal-ids'
@@ -29,7 +31,30 @@ import { QuantitySheet } from './quantity-sheet'
 import { qtyFromInput, steppedQty, type QtyUnit } from './saved-meal-qty'
 import { IngredientPicker } from './ingredient-picker'
 
+/** Which SCREEN is showing. The tab strip within the list screen is `listTab` below. */
 type SheetTab = 'meals' | 'build'
+
+/**
+ * The tabs of the list screen (LB-16, then BF-37).
+ *
+ * **Three, not the two LB-16 decided.** That decision was made while saved meals and single foods
+ * were one list; the owner's report that they are *"2 seperate things"* un-merges them, and the
+ * strip is where that split lands — two tabs side by side make the difference visible in a way two
+ * separately-reached sheets never did. `Frequent` is still cut: it was a second ordering of
+ * `Recent`.
+ *
+ * **The tab labels drop the possessive deliberately.** `My Foods` against `My Meals` is the pair the
+ * owner could not tell apart, and two labels that differ only in their last word are hard to tell
+ * apart wherever they appear. `Meals` against `Single foods` names the actual distinction — a
+ * composition against one thing. (`My Meals` survives on the page's own button, where it names one
+ * list rather than one of two lookalikes.)
+ */
+const LIST_TABS = [
+  { value: 'recent' as const, label: 'Recent' },
+  { value: 'meals' as const, label: 'Meals' },
+  { value: 'foods' as const, label: 'Single foods' },
+]
+type ListTab = (typeof LIST_TABS)[number]['value']
 
 interface IngredientEntry {
   item: FoodItem
@@ -51,13 +76,22 @@ interface Props {
    * it (Q-395c).
    */
   onSelectFood: (item: FoodItem) => void
+  /** A scan came back — the parent pushes its review step. */
+  onScanResult: (result: NutritionScanResult) => void
+  /** Straight to the manual form, skipping the scan. */
+  onManual: () => void
+  /** A scanned saved-meal label (Q-389); the parent owns the logging. */
+  onScannedSavedMeal?: (mealId: string) => void
+  /** Open on `Meals` rather than `Recent` — set when the entry point was the page's My Meals button. */
+  openOnMeals?: boolean
 }
 
-export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate, preselectedMealTypeId, onSelectFood }: Props) {
+export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate, preselectedMealTypeId, onSelectFood, onScanResult, onManual, onScannedSavedMeal, openOnMeals }: Props) {
   const planSavedMealIds = usePlanSavedMealIds()
   // Q-413: the eaten-at resolution happens in the USER's zone, not the device's.
   const tz = useUserTimezone()
   const [tab, setTab] = useState<SheetTab>('meals')
+  const [listTab, setListTab] = useState<ListTab>('recent')
   const [meals, setMeals] = useState<SavedMeal[]>([])
   const [mealTypes, setMealTypes] = useState<MealType[]>([])
   const [loading, setLoading] = useState(true)
@@ -109,6 +143,7 @@ export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate,
   useEffect(() => {
     if (!open) return
     setTab('meals')
+    setListTab(openOnMeals ? 'meals' : 'recent')
     fetchMeals()
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open])
@@ -150,6 +185,16 @@ export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate,
     setPickerOpen(!meal || meal.items.length === 0)
     setTab('build')
   }, [])
+
+  /**
+   * Selection mode belongs to the meal list, and only that list draws its Cancel/Delete row — so
+   * leaving the tab with a selection live strands the header on "3 selected" with no way to clear
+   * it. Dropping the selection on the way out is the only exit that cannot get stuck.
+   */
+  function changeListTab(next: ListTab) {
+    if (next !== 'meals') { setSelectedIds(null); setConfirmBulkDelete(false) }
+    setListTab(next)
+  }
 
   function backToMeals() {
     setTab('meals')
@@ -364,6 +409,16 @@ export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate,
     }
   }, [userId, tz])
 
+  /**
+   * Which bucket `Recent` reads. Pinned for the life of the sheet rather than recomputed per render:
+   * the hour ticking over mid-session is not a reason to swap the list under a thumb, and a value
+   * that changes every render would be an unstable prop.
+   */
+  const recentMealTypeId = useMemo(
+    () => preselectedMealTypeId ?? mealTypeForHour(mealTypes, new Date().getHours()) ?? null,
+    [preselectedMealTypeId, mealTypes],
+  )
+
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="bottom" className="h-[90vh] flex flex-col">
@@ -373,7 +428,7 @@ export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate,
         <SheetHeader className="px-1 pb-0 shrink-0">
           {tab === 'meals' ? (
             <SheetTitle>
-              {selectedIds ? `${selectedIds.size} selected` : 'My Foods'}
+              {selectedIds ? `${selectedIds.size} selected` : 'Log Food'}
             </SheetTitle>
           ) : (
             <div className="flex items-center gap-2">
@@ -421,79 +476,89 @@ export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate,
           )}
         </SheetHeader>
 
-        {tab === 'meals' && (
-          <div className="flex shrink-0 gap-2 px-1">
-            {selectedIds ? (
-              <>
-                <Button
-                  variant="secondary" className="flex-1 min-h-[44px]"
-                  onClick={() => { setSelectedIds(null); setConfirmBulkDelete(false) }}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  variant="destructive" className="flex-1 min-h-[44px] gap-1.5"
-                  disabled={selectedIds.size === 0 || bulkDeleting}
-                  onClick={() => setConfirmBulkDelete(true)}
-                >
-                  {bulkDeleting
-                    ? <Loader2 className="w-4 h-4 animate-spin" />
-                    : <Trash2 className="w-4 h-4" />}
-                  Delete
-                </Button>
-              </>
-            ) : (
-              <>
-                {/* Artboard 3 puts a single `+ New` pill in the header band, not a pair of
-                    full-width bars. It cannot literally sit beside the title here — the sheet's
-                    close ✕ is `absolute top-4 right-4` and owns that corner — so the pills keep
-                    their own row and take the drawing's weight instead of its position. */}
-                <span className="flex-1" />
-                {meals.length > 1 && (
-                  <Button
-                    variant="secondary" size="sm" className="min-h-[44px] rounded-full px-4 gap-1.5"
-                    onClick={() => setSelectedIds(new Set())}
-                  >
-                    <CheckSquare className="w-4 h-4" />
-                    Select
-                  </Button>
-                )}
-                <Button onClick={() => openBuild()} size="sm" className="min-h-[44px] rounded-full px-4 gap-1.5">
-                  <Plus className="w-4 h-4" />
-                  New
-                </Button>
-              </>
-            )}
-          </div>
-        )}
-
         {tab === 'meals' ? (
-          <div className="flex-1 overflow-y-auto px-1 space-y-3">
-            {confirmBulkDelete && selectedIds && (
-              <BulkDeleteConfirm
-                count={selectedIds.size}
-                deleting={bulkDeleting}
-                onCancel={() => setConfirmBulkDelete(false)}
-                onConfirm={() => void deleteSelected()}
-              />
+          // LB-16: this IS the Log Food screen now, not a list stacked on one. `CaptureActions`
+          // renders these children while idle and takes the whole screen once a capture starts, so
+          // the tabs cannot be left showing behind a half-open camera.
+          <CaptureActions onScanResult={onScanResult} onManual={onManual} onScannedSavedMeal={onScannedSavedMeal}>
+            <SegmentedTabs tabs={LIST_TABS} value={listTab} onValueChange={changeListTab} size="xs" className="shrink-0 px-1" />
+            {listTab === 'meals' && (
+              <div className="flex shrink-0 gap-2 px-1">
+                {selectedIds ? (
+                  <>
+                    <Button
+                      variant="secondary" className="flex-1 min-h-[44px]"
+                      onClick={() => { setSelectedIds(null); setConfirmBulkDelete(false) }}
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      variant="destructive" className="flex-1 min-h-[44px] gap-1.5"
+                      disabled={selectedIds.size === 0 || bulkDeleting}
+                      onClick={() => setConfirmBulkDelete(true)}
+                    >
+                      {bulkDeleting
+                        ? <Loader2 className="w-4 h-4 animate-spin" />
+                        : <Trash2 className="w-4 h-4" />}
+                      Delete
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    {/* Artboard 3 puts a single `+ New` pill in the header band, not a pair of
+                        full-width bars. It cannot literally sit beside the title here — the sheet's
+                        close ✕ is `absolute top-4 right-4` and owns that corner — so the pills keep
+                        their own row and take the drawing's weight instead of its position. */}
+                    <span className="flex-1" />
+                    {meals.length > 1 && (
+                      <Button
+                        variant="secondary" size="sm" className="min-h-[44px] rounded-full px-4 gap-1.5"
+                        onClick={() => setSelectedIds(new Set())}
+                      >
+                        <CheckSquare className="w-4 h-4" />
+                        Select
+                      </Button>
+                    )}
+                    <Button onClick={() => openBuild()} size="sm" className="min-h-[44px] rounded-full px-4 gap-1.5">
+                      <Plus className="w-4 h-4" />
+                      New
+                    </Button>
+                  </>
+                )}
+              </div>
             )}
-            <FoodList
-              meals={meals}
-              loadingMeals={loading}
-              query={mealQuery}
-              onQueryChange={setMealQuery}
-              selectedIds={selectedIds}
-              onToggleSelected={toggleSelected}
-              onOpenMeal={openDetail}
-              onEditMeal={openBuild}
-              onRequestDeleteMeal={requestDelete}
-              onLabelMeal={setLabelMeal}
-              planSavedMealIds={planSavedMealIds}
-              onBuildFirst={openBuild}
-              onSelectFood={onSelectFood}
-              userId={userId}
-            />
-          </div>
+            <div className="flex-1 overflow-y-auto px-1 space-y-3">
+              {confirmBulkDelete && selectedIds && (
+                <BulkDeleteConfirm
+                  count={selectedIds.size}
+                  deleting={bulkDeleting}
+                  onCancel={() => setConfirmBulkDelete(false)}
+                  onConfirm={() => void deleteSelected()}
+                />
+              )}
+              {listTab === 'recent' ? (
+                <RecentFoodsPanel mealTypeId={recentMealTypeId} userId={userId} onSelectFood={onSelectFood} />
+              ) : (
+                <FoodList
+                  show={listTab}
+                  meals={meals}
+                  loadingMeals={loading}
+                  query={mealQuery}
+                  onQueryChange={setMealQuery}
+                  selectedIds={selectedIds}
+                  onToggleSelected={toggleSelected}
+                  onOpenMeal={openDetail}
+                  onEditMeal={openBuild}
+                  onRequestDeleteMeal={requestDelete}
+                  onLabelMeal={setLabelMeal}
+                  planSavedMealIds={planSavedMealIds}
+                  onBuildFirst={openBuild}
+                  onSelectFood={onSelectFood}
+                  userId={userId}
+                />
+              )}
+            </div>
+          </CaptureActions>
         ) : (
           <>
             <div className="flex-1 overflow-y-auto px-1 space-y-4 pb-2">

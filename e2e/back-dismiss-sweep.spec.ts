@@ -155,14 +155,20 @@ test('back cancels a confirm dialog rather than confirming it', async ({ page })
 })
 
 /**
- * The nesting case BF-27 names as the real risk: "a sheet opened from inside another sheet is where
- * the history stack goes wrong". Before this change most nests had no history entry at all, so the
- * interaction was untested in practice; now every sheet has one and the per-instance `sheetId` in
- * `useSheetBackDismiss` is what has to keep them apart.
+ * The nest, as LB-16 left it: Log Food IS the list, and a meal opens on top of it.
  *
- * Log Food → My Foods is the shortest real nest: `food-logger-sheet.tsx` renders `SavedMealsSheet`.
+ * **This used to be three layers and is now two**, which is the change rather than a loss of cover.
+ * `Add food` opened a logger whose capture step was a grid of tiles, one of which opened the list as
+ * a SECOND sheet; the list is the capture screen now, so that middle layer is gone. The three-deep
+ * case `useSheetBackDismiss` was wrong at is asserted directly, without a browser, in
+ * `lib/hooks/__tests__/sheet-back-stack.test.ts` — seven cases including the sibling swap and the
+ * StrictMode double-mount, none of which a coordinate tap could reach reliably.
+ *
+ * Asserted press-by-press rather than by counting dialogs: Radix aria-hides every covered layer, so
+ * `getByRole('dialog')` sees exactly one whatever the depth is, and a collapse looks identical to a
+ * correct unwind until you ask what is on screen.
  */
-test('back closes the inner sheet of a nest and leaves the outer one open', async ({ page }) => {
+test('back closes the meal on top of the list and leaves the list open', async ({ page }) => {
   await page.goto('/nutrition')
   await settleRouteBoundary(page)
   const before = await page.evaluate(() => history.length)
@@ -171,11 +177,9 @@ test('back closes the inner sheet of a nest and leaves the outer one open', asyn
   // `getByRole(...).first()` resolves into an off-screen panel — where a tap lands on the carousel
   // and switches tabs instead. Pick the one whose box is actually within the viewport.
   //
-  // The aria-hidden filter matters as much as the box does now that both labels appear twice: the
-  // page's own action row carries a "My Foods" button and so does the tile inside the open sheet,
-  // and the page comes FIRST in DOM order because Radix portals append to `<body>`. Radix marks
-  // everything outside the open dialog `aria-hidden`, which is exactly the "not on screen" the box
-  // test cannot see.
+  // The aria-hidden filter matters as much as the box does: Radix marks everything outside the open
+  // dialog `aria-hidden`, and portals append to `<body>`, so the page's own controls come FIRST in
+  // DOM order while being exactly the "not on screen" the box test cannot see.
   const clickInView = async (name: string) => {
     const handle = await page.evaluateHandle((n) => {
       const match = [...document.querySelectorAll('button')]
@@ -195,70 +199,18 @@ test('back closes the inner sheet of a nest and leaves the outer one open', asyn
   }).toPass({ timeout: 60_000 })
   expect(await page.evaluate(() => history.length)).toBe(before + 1)
 
+  // A tab switch is not a navigation. Worth asserting rather than assuming: if the tabs ever pushed
+  // an entry, back would spend presses on them and the unwind below would silently stop matching
+  // what the user sees.
   await expect(async () => {
-    await clickInView('My Foods')
-    await expect(page.getByPlaceholder('Search your foods')).toBeVisible({ timeout: 3_000 })
+    await clickInView('Meals')
+    await expect(page.getByPlaceholder('Search your meals')).toBeVisible({ timeout: 3_000 })
   }).toPass({ timeout: 60_000 })
-  // A second entry, not a shared one — the nested sheet pushed its own.
-  expect(await page.evaluate(() => history.length)).toBe(before + 2)
+  expect(await page.evaluate(() => history.length)).toBe(before + 1)
 
-  // One press takes the inner sheet only. Radix aria-hides the covered sheet, so the assertion that
-  // the OUTER survived is its content coming back, not a dialog count.
-  await page.goBack()
-  await expect(page.getByPlaceholder('Search your foods')).toHaveCount(0, { timeout: 10_000 })
-  await expect(page.getByText('How would you like to log food?')).toBeVisible({ timeout: 10_000 })
-  expect(new URL(page.url()).pathname).toBe('/nutrition')
-
-  await page.goBack()
-  await expect(page.getByRole('dialog')).toHaveCount(0, { timeout: 10_000 })
-  expect(new URL(page.url()).pathname).toBe('/nutrition')
-})
-
-/**
- * LB-16: three layers, which is the depth Q-395c introduced (Log Food → My Foods → a meal) and the
- * depth the hook was silently wrong at.
- *
- * `useSheetBackDismiss` used to decide "my entry is gone" by comparing the arriving state's
- * `sheetId` against its own — so every sheet that was not the one we landed on closed itself. At two
- * layers that is right by accident: back from the top lands on the only other sheet's entry and
- * nothing is stacked underneath to be wrong about. At three, back from the top lands on the MIDDLE
- * sheet's entry, and the BOTTOM sheet reads a foreign id and closes — taking the middle one down
- * with it, because it renders inside it. One press, two layers gone.
- *
- * Asserted press-by-press rather than by counting dialogs: Radix aria-hides every covered layer, so
- * `getByRole('dialog')` sees exactly one whatever the depth is, and a collapse looks identical to a
- * correct unwind until you ask what is on screen.
- */
-test('back unwinds a three-layer nest one press at a time', async ({ page }) => {
-  await page.goto('/nutrition')
-  await settleRouteBoundary(page)
-
-  const clickInView = async (name: string) => {
-    const handle = await page.evaluateHandle((n) => {
-      const match = [...document.querySelectorAll('button')]
-        .filter(b => (b.getAttribute('aria-label') || b.textContent || '').trim() === n)
-        .filter(b => !b.closest('[aria-hidden="true"]'))
-      return match.find(e => {
-        const r = e.getBoundingClientRect()
-        return r.width > 0 && r.x >= 0 && r.x < window.innerWidth
-      }) ?? null
-    }, name)
-    await handle.evaluate(el => (el as HTMLElement | null)?.click())
-  }
-
-  await expect(async () => {
-    await clickInView('Add food')
-    await expect(page.getByText('How would you like to log food?')).toBeVisible({ timeout: 3_000 })
-  }).toPass({ timeout: 60_000 })
-
-  await expect(async () => {
-    await clickInView('My Foods')
-    await expect(page.getByPlaceholder('Search your foods')).toBeVisible({ timeout: 3_000 })
-  }).toPass({ timeout: 60_000 })
-
-  // Layer three: a meal opens its own screen. `.click()` never lands on this screen (Q-354), so the
-  // row is tapped by coordinate — and its box is re-measured inside the retry, because the food half
-  // of the list arrives asynchronously and re-sorts what is under the finger.
+  // Layer two: a meal opens its own screen. `.click()` never lands on this screen (Q-354), so the
+  // row is tapped by coordinate — and its box is re-measured inside the retry, because the list
+  // paints from cache first and re-sorts what is under the finger when the fetch lands.
   const opened = page.getByRole('button', { name: 'Log this meal' })
   await expect(async () => {
     const row = page.getByRole('button', { name: new RegExp(`^${MEAL_NAME}`) }).first()
@@ -268,18 +220,16 @@ test('back unwinds a three-layer nest one press at a time', async ({ page }) => 
     await expect(opened).toBeVisible({ timeout: 3_000 })
   }).toPass({ timeout: 60_000 })
   await expect(opened).toBeInViewport()
+  expect(await page.evaluate(() => history.length)).toBe(before + 2)
 
-  // One press: the meal goes, the list stays.
+  // One press: the meal goes, the list stays. Radix aria-hides the covered sheet, so the assertion
+  // that the list SURVIVED is its content coming back, not a dialog count.
   await page.goBack()
   await expect(opened).toHaveCount(0, { timeout: 10_000 })
-  await expect(page.getByPlaceholder('Search your foods')).toBeVisible({ timeout: 10_000 })
+  await expect(page.getByPlaceholder('Search your meals')).toBeVisible({ timeout: 10_000 })
+  expect(new URL(page.url()).pathname).toBe('/nutrition')
 
-  // Two: the list goes, the logger's capture tiles come back.
-  await page.goBack()
-  await expect(page.getByPlaceholder('Search your foods')).toHaveCount(0, { timeout: 10_000 })
-  await expect(page.getByText('How would you like to log food?')).toBeVisible({ timeout: 10_000 })
-
-  // Three: the logger goes, and only now does the page underneath still hold.
+  // Two: the screen goes, and only now does the page underneath give way to nothing.
   await page.goBack()
   await expect(page.getByRole('dialog')).toHaveCount(0, { timeout: 10_000 })
   expect(new URL(page.url()).pathname).toBe('/nutrition')

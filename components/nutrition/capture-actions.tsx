@@ -1,13 +1,10 @@
 'use client'
 
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { Camera as CameraIcon, Hash, MessageSquare, PenLine, Loader2, Bookmark } from 'lucide-react'
+import { useRef, useState } from 'react'
+import { Camera as CameraIcon, Hash, PenLine, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { BarcodeScanner } from './barcode-scanner'
-import type { NutritionScanResult, FoodItem } from '@trainingai/shared/types/nutrition'
-import { cachedFetch, readCacheSync } from '@/lib/sqlite/cache'
-import { TTL_MEDIUM } from '@trainingai/shared/cache-ttl'
-import { getLocalStore } from '@/lib/local-store'
+import type { NutritionScanResult } from '@trainingai/shared/types/nutrition'
 import { decodeMealLabelToken } from '@trainingai/shared/nutrition/label-payload'
 import { downscaleToJpegDataUrl, base64FromDataUrl } from '@/lib/media/downscale-image'
 
@@ -26,16 +23,33 @@ const SCAN_IMAGE_MAX_DIM = 1024
 interface Props {
   onScanResult: (result: NutritionScanResult) => void
   onManual: () => void
-  onMyFoods: () => void
-  preselectedMealTypeId?: string | null
-  onLibrarySelect?: (item: FoodItem) => void
-  userId?: string
   /** A scanned saved-meal label (Q-389). The parent owns the logging, since it already holds the
    *  date, the meal-type bucket and the onLogged callback. */
   onScannedSavedMeal?: (mealId: string) => void
+  /**
+   * What the screen shows when no capture is in progress — the search, the tabs and the list.
+   *
+   * Composed as children rather than coordinated through a `busy` callback because there is then
+   * exactly one source of truth for "am I mid-capture". A boolean lifted to the parent would be a
+   * second copy of the state below, and the failure it invites is the tabs still showing behind a
+   * half-open camera.
+   */
+  children: React.ReactNode
 }
 
-export function CaptureStep({ onScanResult, onManual, onMyFoods, preselectedMealTypeId, onLibrarySelect, userId, onScannedSavedMeal }: Props) {
+/**
+ * The three ways to capture a food, and every mode one of them opens (LB-16).
+ *
+ * **This replaced a five-tile grid** — `Scan Photo` · `Barcode` · `Describe it` · `Manual Entry` ·
+ * `My Foods` — which asked "how would you like to log food?" before showing any food. The list is
+ * now the screen and these are the alternates, which is the shape artboard 2 draws.
+ *
+ * **Describe and manual entry are one panel, both fields visible.** They were two tiles leading to
+ * two screens, and the difference between them — whether you type a sentence or type the macros —
+ * is not a decision anyone can make before seeing the fields. The owner's decided action row calls
+ * the pair `Describe or enter` for the same reason.
+ */
+export function CaptureActions({ onScanResult, onManual, onScannedSavedMeal, children }: Props) {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [describeText, setDescribeText] = useState('')
   const [showDescribe, setShowDescribe] = useState(false)
@@ -46,36 +60,8 @@ export function CaptureStep({ onScanResult, onManual, onMyFoods, preselectedMeal
   // this product; 'unavailable' means OFF did not answer. Telling the user their food is unknown
   // when the database is down sends them off to type it in by hand for no reason.
   const [barcodeOutcome, setBarcodeOutcome] = useState<null | 'missing' | 'unavailable'>(null)
-  const [recentItems, setRecentItems] = useState<FoodItem[]>([])
   const [pendingPhoto, setPendingPhoto] = useState<{ base64: string; mimeType: string; previewUrl: string } | null>(null)
   const [photoNote, setPhotoNote] = useState('')
-
-  useLayoutEffect(() => {
-    if (!preselectedMealTypeId) return
-    const seeded = readCacheSync<FoodItem[]>(`nutrition-recent-for-meal:${preselectedMealTypeId}`)
-    if (seeded) setRecentItems(Array.isArray(seeded) ? seeded.slice(0, 3) : [])
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-
-  useEffect(() => {
-    if (!preselectedMealTypeId || !onLibrarySelect) return
-    let cancelled = false
-    // Local-first: recent foods for this meal from previously-logged entries (offline).
-    const store = userId ? getLocalStore(userId) : null
-    if (store) {
-      store.getRecentFoodItemsForMeal(preselectedMealTypeId, 3)
-        .then(items => { if (!cancelled && items.length > 0) setRecentItems(items) })
-        .catch(() => {})
-    }
-    // Revalidate from the server when online; keep local results on failure/offline.
-    cachedFetch<FoodItem[]>(
-      `nutrition-recent-for-meal:${preselectedMealTypeId}`,
-      `/api/nutrition/recent-for-meal?mealTypeId=${preselectedMealTypeId}`,
-      TTL_MEDIUM,
-      (items) => { if (!cancelled && Array.isArray(items)) setRecentItems(items.slice(0, 3)) },
-    ).catch(() => {})
-    return () => { cancelled = true }
-  }, [preselectedMealTypeId, onLibrarySelect, userId])
 
   async function callScan(body: object) {
     setLoading(true)
@@ -190,6 +176,10 @@ export function CaptureStep({ onScanResult, onManual, onMyFoods, preselectedMeal
     }
   }
 
+  const photoInput = (
+    <input ref={fileInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handlePhoto} />
+  )
+
   if (showBarcode) {
     return <BarcodeScanner onResult={handleBarcode} onClose={() => setShowBarcode(false)} />
   }
@@ -204,7 +194,7 @@ export function CaptureStep({ onScanResult, onManual, onMyFoods, preselectedMeal
           <p className="text-sm text-muted-foreground">
             {barcodeOutcome === 'unavailable'
               ? 'Open Food Facts is not responding right now, so we could not check this barcode. Scanning a photo still works, and so does entering it manually.'
-              : 'This product isn\u2019t in the database. Try scanning a photo of the item to let AI identify it.'}
+              : 'This product isn’t in the database. Try scanning a photo of the item to let AI identify it.'}
           </p>
         </div>
         <div className="flex flex-col gap-2">
@@ -218,127 +208,106 @@ export function CaptureStep({ onScanResult, onManual, onMyFoods, preselectedMeal
             Back
           </Button>
         </div>
-        <input ref={fileInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handlePhoto} />
+        {photoInput}
       </div>
     )
   }
 
-  const tiles = [
-    {
-      icon: <CameraIcon className="w-6 h-6" />, label: 'Scan Photo',
-      action: handleCapturePhoto,
-    },
-    {
-      icon: <Hash className="w-6 h-6" />, label: 'Barcode',
-      action: () => setShowBarcode(true),
-    },
-    {
-      icon: <MessageSquare className="w-6 h-6" />, label: 'Describe it',
-      action: () => setShowDescribe(true),
-    },
-    {
-      icon: <PenLine className="w-6 h-6" />, label: 'Manual Entry',
-      action: onManual,
-    },
-    {
-      // One tile, because it is now one list (Q-395c). Two tiles for two lists is what made the
-      // owner ask what the difference was, and there was none.
-      icon: <Bookmark className="w-6 h-6" />, label: 'My Foods',
-      action: onMyFoods,
-    },
-  ]
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center gap-3 py-8">
+        <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+        <p className="text-sm text-muted-foreground">Analysing…</p>
+      </div>
+    )
+  }
 
-  return (
-    <div className="flex flex-col gap-3 p-4">
-      <p className="text-base font-semibold">How would you like to log food?</p>
-
-      {recentItems.length > 0 && onLibrarySelect && !loading && !showDescribe && !pendingPhoto && (
-        <div className="flex flex-col gap-1.5">
-          <p className="text-xs text-muted-foreground">Recently logged here</p>
-          <div className="flex flex-col rounded-xl border border-border/50 overflow-hidden">
-            {recentItems.map(item => (
-              <button
-                key={item.id}
-                onClick={() => onLibrarySelect(item)}
-                className="flex items-center gap-3 px-4 min-h-[48px] hover:bg-muted/50 transition-colors text-left border-b border-border/30 last:border-0"
-              >
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm truncate">{item.name}</p>
-                  {item.brand && <p className="text-[10px] text-muted-foreground truncate">{item.brand}</p>}
-                </div>
-                <span className="text-xs text-muted-foreground tabular-nums shrink-0">{item.calories} kcal</span>
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {loading ? (
-        <div className="flex flex-col items-center gap-3 py-8">
-          <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
-          <p className="text-sm text-muted-foreground">Analysing…</p>
-        </div>
-      ) : showDescribe ? (
-        <div className="flex flex-col gap-3">
-          <p className="text-sm text-muted-foreground">Describe the food and portion size</p>
+  if (pendingPhoto) {
+    return (
+      <div className="flex flex-col gap-3 p-4">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={pendingPhoto.previewUrl} alt="Food photo" className="w-full rounded-xl object-cover max-h-52" />
+        <div className="flex flex-col gap-1">
+          <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Add context (optional)</label>
           <textarea
+            className="w-full rounded-xl border bg-background px-4 py-3 text-sm resize-none min-h-[72px]"
+            placeholder="e.g. it's protein pasta, 200g portion"
+            value={photoNote}
+            onChange={e => setPhotoNote(e.target.value)}
+            autoFocus
+          />
+        </div>
+        {error && <p className="text-xs text-destructive text-center">{error}</p>}
+        <div className="flex gap-2">
+          <Button variant="outline" className="flex-1" onClick={() => { setPendingPhoto(null); setPhotoNote(''); setError(null) }}>Retake</Button>
+          <Button className="flex-1" onClick={handlePhotoSubmit}>Analyse</Button>
+        </div>
+        {photoInput}
+      </div>
+    )
+  }
+
+  if (showDescribe) {
+    return (
+      <div className="flex flex-col gap-3 p-4">
+        <div className="flex flex-col gap-1">
+          <label htmlFor="capture-describe" className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            Describe it
+          </label>
+          <textarea
+            id="capture-describe"
             className="w-full rounded-xl border bg-background px-4 py-3 text-sm resize-none min-h-[80px]"
             placeholder="e.g. 200g chicken breast with white rice and broccoli"
             value={describeText}
             onChange={e => setDescribeText(e.target.value)}
             autoFocus
           />
-          <div className="flex gap-2">
-            <Button variant="outline" className="flex-1" onClick={() => setShowDescribe(false)}>Back</Button>
-            <Button className="flex-1" onClick={handleDescribe} disabled={!describeText.trim()}>Analyse</Button>
-          </div>
+          <p className="text-xs text-muted-foreground">Include the portion size — it is what the estimate hangs on.</p>
         </div>
-      ) : pendingPhoto ? (
-        <div className="flex flex-col gap-3">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={pendingPhoto.previewUrl} alt="Food photo" className="w-full rounded-xl object-cover max-h-52" />
-          <div className="flex flex-col gap-1">
-            <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Add context (optional)</label>
-            <textarea
-              className="w-full rounded-xl border bg-background px-4 py-3 text-sm resize-none min-h-[72px]"
-              placeholder="e.g. it's protein pasta, 200g portion"
-              value={photoNote}
-              onChange={e => setPhotoNote(e.target.value)}
-              autoFocus
-            />
-          </div>
-          {error && <p className="text-xs text-destructive text-center">{error}</p>}
-          <div className="flex gap-2">
-            <Button variant="outline" className="flex-1" onClick={() => { setPendingPhoto(null); setPhotoNote(''); setError(null) }}>Retake</Button>
-            <Button className="flex-1" onClick={handlePhotoSubmit}>Analyse</Button>
-          </div>
+        {error && <p className="text-xs text-destructive text-center">{error}</p>}
+        <div className="flex gap-2">
+          <Button variant="outline" className="flex-1" onClick={() => { setShowDescribe(false); setError(null) }}>Back</Button>
+          <Button className="flex-1" onClick={handleDescribe} disabled={!describeText.trim()}>Analyse</Button>
         </div>
-      ) : (
-        <>
-          <div className="grid grid-cols-2 gap-2.5">
-            {tiles.map(tile => (
-              <button
-                key={tile.label}
-                onClick={tile.action}
-                className="flex flex-col items-center gap-2 rounded-2xl border border-border/60 bg-background/50 hover:bg-background/30 transition-colors p-4"
-              >
-                <span className="text-muted-foreground">{tile.icon}</span>
-                <span className="text-sm font-medium">{tile.label}</span>
-              </button>
-            ))}
-          </div>
-          {error && <p className="text-xs text-destructive text-center">{error}</p>}
-        </>
-      )}
+        {/* The manual form, offered here rather than behind a fifth tile. It is the same destination
+            the description reaches once analysed, so it belongs beside it — and knowing the macros
+            already is not a different intent, just a shorter road. */}
+        <button
+          type="button"
+          onClick={onManual}
+          className="min-h-12 rounded-xl border border-border/60 px-4 text-sm text-muted-foreground transition-colors active:bg-muted/40"
+        >
+          Know the numbers? Enter them yourself
+        </button>
+        {photoInput}
+      </div>
+    )
+  }
 
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept="image/*"
-        capture="environment"
-        className="hidden"
-        onChange={handlePhoto}
-      />
-    </div>
+  const actions = [
+    { icon: <CameraIcon className="h-5 w-5" />, label: 'Photo', action: handleCapturePhoto },
+    { icon: <Hash className="h-5 w-5" />, label: 'Barcode', action: () => setShowBarcode(true) },
+    { icon: <PenLine className="h-5 w-5" />, label: 'Describe or enter', action: () => setShowDescribe(true) },
+  ]
+
+  return (
+    <>
+      <div className="flex shrink-0 gap-2 px-1">
+        {actions.map(a => (
+          <button
+            key={a.label}
+            type="button"
+            onClick={a.action}
+            className="flex min-h-12 flex-1 flex-col items-center justify-center gap-1 rounded-2xl border border-border/60 bg-background/50 py-2.5 transition-colors active:bg-muted/40"
+          >
+            <span className="text-muted-foreground">{a.icon}</span>
+            <span className="text-center text-[11px] font-medium leading-tight">{a.label}</span>
+          </button>
+        ))}
+      </div>
+      {error && <p className="shrink-0 px-1 text-xs text-destructive text-center">{error}</p>}
+      {children}
+      {photoInput}
+    </>
   )
 }

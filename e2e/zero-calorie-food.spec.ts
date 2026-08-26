@@ -47,12 +47,13 @@ async function openDescribe(page: Page): Promise<void> {
     await tap(page, /^Log Food$/)
     await expect(page.getByRole('dialog')).toBeVisible({ timeout: 3_000 })
   }).toPass({ timeout: 60_000 })
-  // The capture tiles sit in a grid; a coordinate tap that misses opens a neighbour (History opens
-  // the Food Library, which has its own textbox and looks plausibly like the describe field). Wait
-  // for the describe pane's own copy before touching anything in it.
+  // LB-16 collapsed the capture tiles into a three-button action row, and merged `Describe it` with
+  // `Manual Entry` — the panel now offers both, so its label says both. The old warning still
+  // applies: a coordinate tap that misses lands on a neighbour, and the list behind has its own
+  // textbox, so wait for the panel's own copy before touching anything in it.
   await expect(async () => {
-    await tap(page, /^Describe it$/)
-    await expect(page.getByText('Describe the food and portion size')).toBeVisible({ timeout: 3_000 })
+    await tap(page, /^Describe or enter$/)
+    await expect(page.getByLabel('Describe it')).toBeVisible({ timeout: 3_000 })
   }).toPass({ timeout: 45_000 })
 }
 

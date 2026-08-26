@@ -55,9 +55,11 @@ test('the library sheet lists foods in the shared row, calories in their own col
   await settleRouteBoundary(page)
 
   await tap(page, page.getByRole('button', { name: 'Log Food' }))
-  // Q-395c merged the two lists and landed on one name. What matters here is the row's shape once
-  // the list is open, not how it is reached.
-  await tap(page, page.getByRole('button', { name: 'My Foods' }).first())
+  // LB-16 made the lists TABS rather than tiles, and BF-37 split them back into two, so a single
+  // food lives under `Single foods`. `role: tab`, not `role: button` — `SegmentedTabs` sets the ARIA
+  // role and a `button` query silently finds nothing. What matters here is the row's shape once the
+  // list is open, not how it is reached.
+  await tap(page, page.getByRole('tab', { name: 'Single foods' }))
 
   const row = page.getByRole('button', { name: new RegExp(NAME) }).first()
   await expect(row).toBeVisible({ timeout: 30_000 })
@@ -99,7 +101,9 @@ test('the external food-database row is the shared row, and keeps its mismatch w
   await page.goto('/nutrition')
   await settleRouteBoundary(page)
   await tap(page, page.getByRole('button', { name: 'Log Food' }))
-  await tap(page, page.getByRole('button', { name: 'My Foods' }).first())
+  // The builder is reached from the meal library, so this one goes to `Meals` rather than to the
+  // single-food tab above.
+  await tap(page, page.getByRole('tab', { name: 'Meals' }))
 
   // Into the builder, where the ingredient picker's search lives.
   await tap(page, page.getByRole('button', { name: /^(New|Build your first meal)$/ }).first())

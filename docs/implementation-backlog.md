@@ -661,61 +661,6 @@ permanently).
 
 **Do not flash the circulating `…FasterRawValuesMOD.bin`.** Only step in the arc that can brick the
 device, and it would be taken before knowing the sensor is worth streaming from.
-### [nutrition] BF-37 — My Foods merged saved meals with the food library; they are two different kinds of thing
-
-- **Lane:** B
-- **Added:** 2026-08-26 · owner, on v1.382.0: *"my foods combined saved meals + history thats not
-  right they are 2 seperate things."*
-- **This reverses the merge Q-395c shipped**, not the rename. Read
-  [`2026-08-26-one-food-list`](overview/entries/2026-08-26-one-food-list.md) before starting — it
-  deleted `food-library-sheet.tsx`, built `components/nutrition/food-list.tsx` over two sources, and
-  swept the naming across 8 files.
-
-**⚠ The original complaint was about NAMES, and the merge answered it by deleting one of the two
-things.** Q-395c was specified from the owner's own earlier question — *"So im picking up a
-discrepancy between My Meals and My foods? Whats the difference"* — and read it as *these are one
-list wearing two names*. Re-read against today's report, it says something narrower: **two lists with
-confusingly similar names, and no way to tell which held what.** The fix was to name them so the
-difference is obvious. It was not to merge them.
-
-That distinction is the whole entry, and it is worth stating rather than recording this as the owner
-changing their mind. **They are genuinely different kinds of thing:**
-
-| | Saved meal | Food item |
-|---|---|---|
-| What it is | a composition you built — ingredients, a batch, a per-portion figure | one ingredient with a serving size |
-| Where it comes from | you assembled and saved it deliberately | it appeared because you logged it once |
-| Logging it means | log the whole thing | pick a quantity of one thing |
-
-**A composed recipe and a raw ingredient sitting in one list makes "log this" ambiguous** — which is
-what the merged list now asks the owner to disambiguate on every tap.
-
-**Evidence in the owner's own screenshot, unreported:** `LOADED MAC & CHEESE / CORE POWERFOODS /
-350 g` appears **twice** in a 24-item list. That is **BF-38** (`food_items` duplicates on re-log,
-19 of 209 rows) rather than a merge artefact — but the merged list is where it becomes visible and
-annoying, and the two should be looked at together.
-
-**Keep what Q-395c got right — do not revert the PR wholesale:**
-- **The naming sweep.** One name per list, and the two names must be tellable apart at a glance.
-  *My Foods* and *My Meals* were the confusing pair; pick names that say composition vs ingredient.
-- **`food-list.tsx`'s two-source design.** Its own journal says it is *"one list over two sources,
-  not one shape over a merged type — a food row opens the assign step, a meal row opens its own
-  screen"*. The separation already exists inside the component; what changed is that both render in
-  one scroll. Splitting the presentation should not mean rewriting it.
-- **LB-17, the three-deep back-dismiss fix.** Unrelated to the merge and hard-won — see the journal.
-  Do not lose it.
-
-- **Decide the shape and say which you chose:** two tabs in one sheet, two tiles on the Log Food
-  screen (which is what `capture-step.tsx` had before Q-395c collapsed them), or two sheets. **Two
-  tiles is the cheapest and is what the owner was using before**; artboard 2 draws four tabs and
-  BF-28's rule 2 says an owner decision beats the drawing.
-- **⚠ Check the `MRU` note before changing ordering.** `food_logs` carries no `saved_meal_id`, so a
-  saved meal has **no last-used timestamp at all** and `createdAt DESC` is the only shared signal.
-  True most-recently-used needs a column that does not exist — Lane A's, and out of scope here.
-- **Verification.** Both lists reachable, each showing only its own kind, names distinguishable
-  without reading the rows. Then the three-deep back gesture again, since that path changes.
-  `Gate: device`.
-
 ### [nutrition] BF-38 — logging the same food twice creates a second `food_items` row: 19 of 209 are redundant
 
 - **Lane:** A — the matching happens at creation, in the route and the shared create path.
@@ -859,7 +804,7 @@ delivers without a second row shape.
   select, pull mapping, local upsert, outbox payload, both write paths), and the barcode route
   fetching the Open Food Facts thumbnail. **Three things are still owed:**
   1. **The render (Lane B)** — nothing displays the column yet, so the images are stored and unseen.
-  2. **Route 2's client half (Lane B)** — `capture-step.tsx` must emit a second 128 px downscale
+  2. **Route 2's client half (Lane B)** — `capture-actions.tsx` must emit a second 128 px downscale
      beside the 1024 px scan image. The server accepts and stores one already; it is inert until
      that lands. See constraint (b) above for why the scan image itself cannot be kept as-is.
   3. **Route 3, the AI generation (Lane A)** — the owner chose it and it is unbuilt. Cached by food
@@ -940,12 +885,12 @@ governed by its reasoning, not by disk.** Nothing fails loudly if it slips — t
 sync timing out on a bad connection.
 
 **(b) "The scan photo is already in the request" is true; "so keeping it is free" is not.** The
-client sends **1024 px** (`SCAN_IMAGE_MAX_DIM`, `components/nutrition/capture-step.tsx:24`) because
+client sends **1024 px** (`SCAN_IMAGE_MAX_DIM`, `components/nutrition/capture-actions.tsx`) because
 the model has to read the label. A thumbnail is **128 px** (`THUMB_MAX_DIM`,
 `meal-photo-tile.tsx:26`) — roughly **64× fewer pixels**. Storing what arrives would blow the sync
 budget by a large factor, so route 2 needs the client to emit a *second*, small downscale beside the
 scan image. That is cheap (one more canvas pass, no network, `downscaleToDataUrl` already exists and
-already handles the WebP-fallback trap) but it is **a change in `capture-step.tsx`, which is Lane
+already handles the WebP-fallback trap) but it is **a change in `capture-actions.tsx`, which is Lane
 B** — so route 2 is split across lanes and the server half is useless until the client half lands.
 **Lane A's half is: accept and validate a thumbnail field, and store it.** Do not attempt a
 server-side downscale to avoid the split: `downscaleToDataUrl` is canvas-based and browser-only, and
@@ -1050,7 +995,7 @@ looks like"*. Parity is now the acceptance test, not a nice-to-have alongside it
 | # | Artboard | Shipped counterpart | Entry |
 |---|---|---|---|
 | 1 | Nutrition — the day | `app/nutrition/nutrition-content.tsx` + `meal-card.tsx` | **BF-24** |
-| 2 | Add food | `food-logger-sheet.tsx` · `capture-step.tsx` | **LB-16** (split out of Q-395c) |
+| 2 | Add food | `food-logger-sheet.tsx` · `capture-actions.tsx` · `saved-meals-sheet.tsx` | **LB-16** ✅ shipped 2026-08-26 |
 | 3 | My meals | `saved-meals-sheet.tsx` · `saved-meal-card.tsx` | **BF-29** |
 | 4 | Meal detail | `saved-meal-card.tsx` expanded · `my-meals-picker.tsx` | **BF-30** |
 | 5 | Edit meal | the builder — `assign-step` · `review-step` · `ingredient-picker` | **BF-31** |
@@ -1067,11 +1012,14 @@ looks like"*. Parity is now the acceptance test, not a nice-to-have alongside it
    in artboard 1 because the drawing stops at the fold. **Do not delete a section for being absent
    from a drawing.** Where a screen has more than its artboard, the entry decides where the extra
    goes and says so in the PR.
-2. **An owner decision beats the drawing, and one already does.** Artboard 2 draws four tabs —
-   `Recent · Frequent · My meals · Recipes`. The owner-set decision, inherited by LB-16, is **two**:
-   `Recent` and `My Foods`, because *Frequent* was a second ordering of what *Recent* already shows. Build the
-   two. Any other case where a drawing and a written owner decision disagree comes back here rather
-   than being resolved by whoever notices.
+2. **An owner decision beats the drawing, and one already did — then a later one moved it.**
+   Artboard 2 draws four tabs, `Recent · Frequent · My meals · Recipes`. The owner-set decision
+   LB-16 inherited was **two** — `Recent` and `My Foods` — because *Frequent* was a second ordering
+   of what *Recent* already shows. **What shipped is three**: BF-37's report un-merged meals from
+   single foods, so `Recent · Meals · Single foods`. *Frequent* is still cut. The rule held both
+   times, which is the point of it: the drawing never won, a **later owner decision** beat an
+   earlier one. Any other case where a drawing and a written owner decision disagree comes back
+   here rather than being resolved by whoever notices.
 3. **Match the layout, not the literals.** The artboards are hand-written HTML with inline
    `oklch(...)` and `#22c55e` values. Copy the **structure, hierarchy, spacing and grouping**; take
    the colours from theme tokens. The artboard *"The green"* is that argument made by the designer
@@ -1108,10 +1056,11 @@ P/C/F chips gone. Journal:
 - **② the energy block** (one card, 104 px donut left, macro columns right) is not day-screen-only:
   `CalorieBalanceBar` also renders on `/health` (`health-sections.tsx:658`), so merging it with
   `MacroRing` changes two screens and wants its own PR with Health verified alongside.
-- **③ the four-tile action row** (Search · Scan · Photo · My meals) overlaps **LB-16**, which owns
-  collapsing the capture entry points. Building the tiles first would wire four destinations that
-  entry may then change. **LB-16 ships the tiles**; this entry defers. (Q-395c held this before the
-  capture screen was split out of it; Q-395c shipped 2026-08-26 and the tiles were not its half.)
+- **③ the four-tile action row** (Search · Scan · Photo · My meals) was deferred to **LB-16**, which
+  owned collapsing the capture entry points — building tiles first would have wired four destinations
+  that entry then changed. **LB-16 shipped 2026-08-26** and what it built is not four tiles: search
+  belongs to each tab's own list, `My meals` is a tab, and the row is
+  `Photo · Barcode · Describe or enter`. ✅ Nothing is owed here.
 - **⑥ the row thumbnail** is **Q-406's**, as this entry already said.
 - **⑦ the four sections the drawing lacks** (`MealPlanReviewCard`, `MealPlanSection`,
   `TdeeAdaptationCard`, day-tools) **stay where they are**, below the meals — BF-28's rule 1: an
@@ -1249,16 +1198,18 @@ That number is more valuable than either input on its own.
 ### [nutrition][app-shell] Q-395 — the nutrition rework: the spec every phase reads, and the final checkpoint
 
 - **Lane:** B
-- **Needs:** LB-16
 - **⚑ SPLIT INTO PHASES 2026-08-23 — this entry is now the specification, not the work.** It was a
   269-line item describing sixteen screens, listed as one thing an implementer could pick up. The
   work is **Q-406** (the shared row) → **Q-395a** (quantity sheet + Edit Meal) → **Q-395b** (the day
   screen) → **Q-395c** (the merged list + the `My Foods` rename, shipped 2026-08-26) → **LB-16**
-  (the capture screen, split out of Q-395c). Each phase points back here rather than
-  copying the decisions, so they still live in exactly one place. **Read this before any phase.**
-- **Why it parks behind its own last phase.** It is the completion checkpoint: when LB-16 lands,
-  this confirms the drawn screens match what shipped, sweeps the ~11 sheets finding 18 lists as
-  never drawn, and leaves the queue. Never pick it up as a work item.
+  (the capture screen, shipped 2026-08-26, carrying **BF-37**'s split of that merged list). Each
+  phase points back here rather than copying the decisions, so they still live in exactly one place.
+  **Read this before any phase.**
+- **Every phase has now shipped, so this is startable.** It is the completion checkpoint: confirm the
+  drawn screens match what shipped, sweep the ~11 sheets finding 18 lists as never drawn, then leave
+  the queue. **⚠ Wait for the LB-16/BF-37 device pass before confirming parity** — the screen those
+  two rebuilt has never been seen on the S25, so a parity sweep run now would be signing off a
+  drawing against a screenshot nobody has taken.
 
 - **Branch:** `feat/nutrition-visual-uplift`
 - **Added:** 2026-08-18 · owner: *"can we backlog a UI uplift for the nutrition side. I think it
@@ -1542,44 +1493,46 @@ whether or not anyone draws them first.
   in both themes, so a green `pnpm dev` is not sufficient evidence and a Known-Issues row is the
   fallback if no device is available.
 
-### [nutrition][app-shell] LB-16 — the capture screen: six entry points become one
+### [platform] LB-19 — two e2e specs fail on `main` in-session, and the cause is a time budget rather than a defect
 
 - **Lane:** B
-- **Added:** 2026-08-26, split out of Q-395c. **Plan:** [`2026-08-26-log-food-one-screen.md`](superpowers/plans/2026-08-26-log-food-one-screen.md).
-  Also **artboard 2 parity** (BF-28): `Add food` is the drawing of the screen this builds.
-- **⚠ Re-scope before writing code — Q-395c moved the ground under this.** It shipped 2026-08-26 and
-  the `My Foods` tab **is** its merged list, already reachable from a tile: build the tabs around
-  that component, never the list again. `capture-step.tsx` is down to **five** tiles, not six —
-  `History` and `Saved Meals` became one `My Foods`, and `food-library-sheet.tsx` is deleted, so its
-  describe-field lookalike is gone with it and the LA-30 warning below no longer applies to that
-  dialog. The coordinate-tap hazard itself stands: wait for the destination's own copy.
-- **Scope.** The remaining tiles collapse to one screen — search across everything, two
-  tabs (`Recent`, `My Foods`), an action row **`Photo · Barcode · Describe or enter`**. **⚠ Where the
-  drawing and the owner disagree the owner wins**: the artboard draws four tabs, build two, and its
-  `Multi-add` / `Create food` row is the decided action row under other labels. Describe and manual
-  entry are one sheet with the fields always visible, so neither is hidden.
-- **⚠ MEASURED 2026-08-26, AND IT IS BIGGER THAN THIS ENTRY SAYS — read before starting.** "The
-  `My Foods` tab is the merged list" is true and still understates the work. `FoodList` takes **13
-  props**, every one backed by state `saved-meals-sheet.tsx` owns: the meal fetch, selection mode,
-  the detail sheet, the builder, the label sheet, the plan ids, delete. It holds **24 `useState`
-  calls** and renders **four nested sheets** around that list. Making it a *tab* moves that whole
-  ownership layer out of a **696-line** file. This is not five tiles collapsing into one screen; it
-  is a restructure of two components, and the blast radius includes the ~8 e2e specs that reach the
-  list through the `My Foods` tile.
-- **The structuring decision, with a recommendation, so it is not re-derived.** Three ways to give
-  the tab a list, none of which the plan settles:
-  1. **Extract a `MyFoodsPanel`** owning the meals and the four sheets; `SavedMealsSheet` and the
-     capture screen both render it. Correct and the most movement.
-  2. **Reduce the list for this tab** — no selection, no bulk delete, no label. Rejected on sight:
-     `FoodList`'s swipe tray would still be there with dead actions, which is worse than today.
-  3. **Invert — put the capture screen INTO `SavedMealsSheet`.** ⭐ **Recommended.** That file
-     already owns the list, the builder and all four sheets, so a `Recent` tab and the action row are
-     additions rather than an extraction, and nothing has to move. It also matches what already
-     happens: `/nutrition`'s `My Foods` button opens the logger, which opens this sheet. The cost is
-     that the file grows against the 800-line ceiling, so the capture half lands as a child
-     component — which the repo wants anyway.
-  **Reversal cost is low either way** (moving one component and one call site), which is why this is
-  an implementer's call and not the owner's — but it should be *made* before code, not during.
+- **Added:** 2026-08-26, found while verifying LB-16. **Attributed before filing**: both fail
+  identically on a detached `origin/main` checkout with none of that branch's code, so they are not
+  the change that found them.
+- **The two:**
+  - `meal-label.spec.ts:111` *a saved meal renders a printable label in every style* — **exceeds its
+    own 180 s timeout**, having already reached the label sheet with the QR drawn and the style
+    selected (screenshot confirms). It then switches style **ten times**, each behind a 20 s
+    `poll`, and for four of them pulls the whole canvas into Node and runs a zxing decode.
+  - `goal-invalidation.spec.ts:57` *a steps-goal edit reaches Health without a reload* — four
+    navigations and two 60 s waits.
+- **Read them as marginal-by-construction, the shape CLAUDE.md already documents for the Oura rollup
+  tests**: work that fits comfortably on CI's runner and does not fit here. The rollup tests were
+  fixed by giving them their own vitest project with a 60 s timeout rather than by changing what they
+  assert; the same move exists here (`playwright.config.ts` takes per-file `test.setTimeout`).
+- **Do not weaken what they check.** `meal-label`'s decode loop is the closest the sandbox gets to
+  the print test that is still owed — it proves the symbol is unobstructed at every layout, which is
+  exactly the thing a layout change breaks silently.
+- **First step is to find out whether CI agrees.** E2E is path-gated since #556, so a run that
+  touches these paths is the evidence; if CI is green on both, this is a sandbox-budget entry and
+  the fix is a timeout. If CI is red, it is a real defect and this entry is mis-titled.
+
+### [nutrition] LB-18 — `Recent` on Log Food is scoped to a meal bucket; it may want to be global
+
+- **Lane:** A (the source), B (the swap)
+- **Added:** 2026-08-26, from LB-16. **Not a defect** — it is the only thing the data supports today,
+  recorded so it is a decision rather than a comment nobody re-reads.
+- **The limit.** There is no unfiltered recent-food-items query on either side: the route is
+  `app/api/nutrition/recent-for-meal?mealTypeId=…` and the local store is
+  `getRecentFoodItemsForMeal`. So `RecentFoodsPanel` resolves a bucket — the preselected one, else
+  `mealTypeForHour` — and reads that. Adding a global source touches `app/api/**` and
+  `lib/local-store/**`, which is **Lane A's**; the swap on the panel is one fetch, which is B's.
+- **Do not build it on a hunch.** Bucket-scoped is arguably the better default: opening Log Food at
+  7 pm and being shown what you usually eat at dinner beats a global list topped by breakfast
+  coffee. What settles it is use, and the device pass is where that shows up — so this stays parked
+  behind the LB-16/BF-37 device run rather than being scheduled on its own.
+- **Gate:** owner
+
 ### [nutrition] BF-11 — the meal creator/planner redesign: the spec every phase reads, and the final checkpoint
 
 - **Needs:** BF-11h
@@ -1628,8 +1581,8 @@ whether or not anyone draws them first.
 - **Three add-methods beside the existing search; none replaces anything.** (a) an `https:` URL →
   whole recipe; (b) a multi-candidate list when a scan returns several dishes, each kept one becoming
   **its own** saved meal; (c) the food-item **History** list Log Food already has
-  (`capture-step.tsx:245`) as the default state before you type — **reuse that source, do not build a
-  second one.**
+  (`recent-foods-panel.tsx`, which LB-16 promoted from a three-row strip into the `Recent` tab) as the
+  default state before you type — **reuse that source, do not build a second one.**
 - **⚠ The unstated-yield case is not cosmetic.** `recipeYield: null` means the payload is the WHOLE
   recipe — a banana-bread page measured **1,956 kcal for the loaf**. Reuse `my-meals-picker.tsx`'s
   handling and the shared `perServing`, so the two divides cannot drift.
@@ -12238,7 +12191,7 @@ transmission one.** Two things are true and they point in opposite directions:
    the server, defeating the whole decision), or accept only images and let the owner photograph or
    screenshot the report. **Recommended: images only for v1.** `@capacitor/camera` with
    `CameraSource.Prompt` already gives camera-or-gallery in one call
-   (`components/nutrition/capture-step.tsx:113`), so photographing a printed report or picking a
+   (`components/nutrition/capture-actions.tsx`, `handleCapturePhoto`), so photographing a printed report or picking a
    screenshot works today with no new plumbing.
 2. **No crop UI exists anywhere in the app** — grepped `components/`, `app/` and `lib/`; the only
    hits are unrelated (voice logging, meal-label rendering, the GIF creator). So the crop is new

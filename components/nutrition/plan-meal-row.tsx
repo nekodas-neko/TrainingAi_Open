@@ -24,7 +24,7 @@ interface Props {
   declined: boolean
   onLog?: (meal: MealPlanMeal) => void
   onSetDeclined?: (meal: MealPlanMeal, declined: boolean) => void
-  /** Copy this meal into My Foods (Q-398). Absent while the plan is still loading. */
+  /** Copy this meal into My Meals (Q-398). Absent while the plan is still loading. */
   onSave?: (meal: MealPlanMeal) => void
   saving: boolean
 }
@@ -110,25 +110,25 @@ export const PlanMealRow = memo(function PlanMealRow({
         )
       )}
 
-      {/* Q-398. Saved, this meal is an ordinary My Foods row — it logs in one tap, prints a label
+      {/* Q-398. Saved, this meal is an ordinary My Meals row — it logs in one tap, prints a label
           with a QR, and can be edited ingredient by ingredient — so the plan itself becomes
           disposable. Already-saved reads as a state rather than a disabled button, because what it
           answers is "have I kept this one", not "why can't I press this". */}
       {onSave && hasIngredients && (
         saved ? (
           <p className="mt-1.5 flex items-center justify-center gap-1.5 text-[11px] font-semibold text-muted-foreground">
-            <Bookmark className="w-3.5 h-3.5" style={{ color: accent }} /> In My Foods
+            <Bookmark className="w-3.5 h-3.5" style={{ color: accent }} /> In My Meals
           </p>
         ) : (
           <button
             onClick={() => onSave(meal)}
             disabled={saving}
-            aria-label={`Save ${meal.name} to My Foods`}
+            aria-label={`Save ${meal.name} to My Meals`}
             className="mt-1.5 w-full min-h-[44px] flex items-center justify-center gap-1.5 rounded-xl bg-transparent text-xs font-semibold text-muted-foreground active:bg-muted/30 transition-colors disabled:opacity-60"
           >
             {saving
               ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Saving…</>
-              : <><BookmarkPlus className="w-3.5 h-3.5" /> Save to My Foods</>}
+              : <><BookmarkPlus className="w-3.5 h-3.5" /> Save to My Meals</>}
           </button>
         )
       )}

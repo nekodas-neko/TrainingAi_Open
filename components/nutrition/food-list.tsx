@@ -13,6 +13,13 @@ import type { FoodItem, SavedMeal } from '@trainingai/shared/types/nutrition'
 const ALL_ITEMS_KEY = 'nutrition-food-items-all'
 
 interface Props {
+  /**
+   * Which kind this instance draws (BF-37). One component, two tabs — the split is presentational,
+   * because the separation the owner asked for already existed *inside* here: a food row and a meal
+   * row have never shared a shape or a tap destination. What changed is that they no longer share a
+   * scroll.
+   */
+  show: 'meals' | 'foods'
   meals: SavedMeal[]
   loadingMeals: boolean
   query: string
@@ -36,13 +43,17 @@ interface Props {
 }
 
 /**
- * One list, over two sources (Q-395c).
+ * One component, two lists (Q-395c, then BF-37).
  *
- * The owner asked the question this answers — *"So im picking up a discrepancy between My Meals and
- * My foods? Whats the difference"* — and the answer is that there should not be one to hold. But the
- * two are not the same row: a **food** is a `food_items` row that opens the assign step, and a
- * **meal** is a `saved_meals` recipe that opens its own screen (BF-30). So this is one list with two
- * row shapes and two tap behaviours, not one shape over a merged type.
+ * A **food** is a `food_items` row that opens the assign step; a **meal** is a `saved_meals` recipe
+ * that opens its own screen (BF-30). Two row shapes, two tap behaviours — that much never changed.
+ *
+ * **What changed twice is whether they share a scroll.** Q-395c merged them, reading the owner's
+ * *"whats the difference"* as *one list wearing two names*. The report that followed
+ * (*"my foods combined saved meals + history thats not right they are 2 seperate things"*) says the
+ * complaint was narrower: two lists that could not be told apart. So they are two lists again — as
+ * sibling tabs, where the strip does the telling-apart that two separately-reached sheets could not,
+ * and `show` picks which one this instance is.
  *
  * **Ordered `createdAt DESC`, which is not most-recently-used.** `food_logs` carries no
  * `saved_meal_id`, so logging a saved meal leaves no record of which meal produced the rows and a
@@ -55,7 +66,7 @@ interface Props {
  * of growing.
  */
 export function FoodList({
-  meals, loadingMeals, query, onQueryChange, selectedIds, onToggleSelected,
+  show, meals, loadingMeals, query, onQueryChange, selectedIds, onToggleSelected,
   onOpenMeal, onEditMeal, onRequestDeleteMeal, onLabelMeal, planSavedMealIds,
   onBuildFirst, onSelectFood, userId,
 }: Props) {
@@ -68,6 +79,10 @@ export function FoodList({
   }, [])
 
   useEffect(() => {
+    // Only the foods tab needs them. `show` is a dep rather than a remount guard because the two
+    // tabs render this component at the same position, so React reuses the instance and an effect
+    // keyed on anything else would never re-run on the switch.
+    if (show !== 'foods') return
     let cancelled = false
     const t = setTimeout(async () => {
       // Local-first: instant matches from previously-logged foods, which works offline.
@@ -90,7 +105,7 @@ export function FoodList({
       } catch {}
     }, 250)
     return () => { cancelled = true; clearTimeout(t) }
-  }, [query, userId])
+  }, [show, query, userId])
 
   // Matches the meal name and its ingredients, so "oats" finds a breakfast that contains oats even
   // when the meal is called something else. Foods are filtered by the route/store, not here.
@@ -102,14 +117,19 @@ export function FoodList({
   }, [meals, query])
 
   const rows = useMemo(() => {
-    const mealRows = visibleMeals.map(m => ({ kind: 'meal' as const, at: +new Date(m.createdAt), meal: m }))
-    const foodRows = foods.map(f => ({ kind: 'food' as const, at: +new Date(f.createdAt ?? 0), food: f }))
-    return [...mealRows, ...foodRows].sort((a, b) => b.at - a.at)
-  }, [visibleMeals, foods])
+    if (show === 'meals') {
+      return visibleMeals
+        .map(m => ({ kind: 'meal' as const, at: +new Date(m.createdAt), meal: m }))
+        .sort((a, b) => b.at - a.at)
+    }
+    return foods
+      .map(f => ({ kind: 'food' as const, at: +new Date(f.createdAt ?? 0), food: f }))
+      .sort((a, b) => b.at - a.at)
+  }, [show, visibleMeals, foods])
 
-  const empty = meals.length === 0 && foods.length === 0
+  const empty = show === 'meals' ? meals.length === 0 : foods.length === 0
 
-  if (loadingMeals && empty) {
+  if (show === 'meals' && loadingMeals && empty) {
     return (
       <div className="flex justify-center py-8">
         <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
@@ -127,8 +147,8 @@ export function FoodList({
           <input
             value={query}
             onChange={e => onQueryChange(e.target.value)}
-            placeholder="Search your foods"
-            aria-label="Search your foods"
+            placeholder={show === 'meals' ? 'Search your meals' : 'Search your foods'}
+            aria-label={show === 'meals' ? 'Search your meals' : 'Search your foods'}
             className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
           />
           {query && (
@@ -141,8 +161,19 @@ export function FoodList({
 
       {empty ? (
         <div className="flex flex-col items-center gap-3 py-12 text-center">
-          <p className="text-sm text-muted-foreground">Nothing saved yet.</p>
-          <Button onClick={onBuildFirst}>Build your first meal</Button>
+          {show === 'meals' ? (
+            <>
+              <p className="text-sm text-muted-foreground">No meals saved yet.</p>
+              <Button onClick={onBuildFirst}>Build your first meal</Button>
+            </>
+          ) : (
+            // No action offered: this list fills itself. Every food you log is added to it, so the
+            // useful instruction is "go log something", not a button that would only reach the
+            // meal builder — a different thing entirely, which is the confusion BF-37 is undoing.
+            <p className="text-sm text-muted-foreground">
+              Single foods land here once you have logged them.
+            </p>
+          )}
         </div>
       ) : rows.length === 0 ? (
         // Non-empty above, so this is a search that matched nothing — say so rather than rendering
@@ -176,10 +207,13 @@ export function FoodList({
             ))}
           </div>
           {/* Both halves are load-bearing: a meal's figure is one portion of what may be a batch,
-              and label/edit/delete have a gesture that nothing else announces. */}
-          <p className="px-1 text-[11px] leading-relaxed text-muted-foreground">
-            Meal calories are per portion. Swipe a meal for label, edit and delete.
-          </p>
+              and label/edit/delete have a gesture that nothing else announces. Neither is true of a
+              food row, which is why this does not follow the list into the other tab. */}
+          {show === 'meals' && (
+            <p className="px-1 text-[11px] leading-relaxed text-muted-foreground">
+              Meal calories are per portion. Swipe a meal for label, edit and delete.
+            </p>
+          )}
         </>
       )}
     </>

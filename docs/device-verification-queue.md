@@ -15,9 +15,13 @@ in the PR that acts on the answer.
 **Build to test against:** the current `apk-latest` release, or a Railway deploy if the item is
 marked **JS** — those need no new APK, just a fresh app open.
 
-**Coverage.** Every `Gate: device` entry in the Lane B queue is represented below (26 on
+**Coverage.** Every `Gate: device` entry in the Lane B queue is represented below (27 on
 2026-08-26). Three of them are **not** presses and are listed at the end so nobody hunts for a
 button that does not exist.
+
+**Start with N4.** The Log Food screen was rebuilt on 2026-08-26 and has never been seen on the
+phone; several other items in this section are reached *through* it, so if it is wrong they are all
+blocked behind it.
 
 ---
 
@@ -34,14 +38,17 @@ Everything in this section is **JS**. Open the app fresh after a deploy; no APK 
 *Why:* the sheet closed and the dialog opened in the same tick, and the dialog mistook the sheet's
 exit for a back press. Fixed against a state machine and e2e, never on a real gesture bar.
 
-## N2. Back unwinds the nest one layer per press — LB-17 / BF-30
-1. Nutrition → **Log Food** → **My Foods** → tap a **meal**.
-2. Press back three times.
-3. **Pass:** meal → the My Foods list → Log Food → the page. One layer per press, nothing skipping two.
-4. **Fail:** any press closes two layers at once.
+## N2. Back unwinds the nest one layer per press — LB-17 / BF-30 / LB-16
+1. Nutrition → **Log Food** → the **Meals** tab → tap a **meal**.
+2. Press back **twice** — not three times. LB-16 removed a layer: Log Food *is* the list now, so the
+   old middle step is gone. If you find yourself pressing a third time, something regressed.
+3. **Pass:** meal → the Log Food screen → the page. One layer per press, nothing skipping two.
+4. **Fail:** any press closes two layers at once, or the first press leaves the page entirely.
+5. Also: **switch tabs a few times first, then press back.** It must still take exactly two presses —
+   a tab is not a navigation and must not consume one.
 
-## N3. The swipe tray on the My Foods list — BF-29
-1. In **My Foods**, scroll the list vertically, including a diagonal thumb-flick.
+## N3. The swipe tray on the meal list — BF-29
+1. On the **Meals** tab, scroll the list vertically, including a diagonal thumb-flick.
 2. **Pass:** no action tray opens by accident.
 3. Drag one row **left**. **Pass:** the tray opens; a right-drag closes it; opening a second row
    closes the first; tray **Delete** raises a confirmation rather than deleting.
@@ -49,14 +56,29 @@ exit for a back press. Fixed against a state machine and e2e, never on a real ge
 *Why:* a gesture this app has nowhere else, and the sandbox cannot prove it coexists with Samsung's
 own scroll physics.
 
-## N4. The merged list itself — Q-395c
-1. **My Foods** should be **one** list containing both saved meals and single foods, newest first.
-2. **Pass:** tapping a meal opens its own screen; tapping a food goes to the portion step.
-3. Also look at: a meal row's photo tile rendering in a long scroller (data-URI images in a list are
+## N4. The Log Food screen, rebuilt — LB-16 / BF-37 · **the big one in this section**
+1. Nutrition → **Log Food**. There should be **no tile grid** and no "How would you like to log
+   food?" — the screen opens on a list, with **Recent · Meals · Single foods** as tabs and
+   **Photo · Barcode · Describe or enter** as a row above them.
+2. **Pass:** three tabs readable at this width without wrapping; the action row's three buttons all
+   comfortably tappable.
+3. **Meals** holds only saved meals; **Single foods** holds only single foods. Tapping a meal opens
+   its own screen; tapping a food goes to the portion step.
+4. **Recent** shows what you last logged. ⚠ It is scoped to the *current meal bucket*, so at 7 pm it
+   shows dinner foods, not everything (LB-18). **Tell us whether that reads right or wrong** — that
+   is the open question, not a defect.
+5. Tap **Describe or enter**: the description box and the "enter them yourself" way out must both be
+   visible at once, without hunting.
+6. Tap **Photo**, then **Barcode**: each should take the whole screen — the tabs must not still be
+   showing behind a half-open camera.
+7. Also look at: a meal row's photo tile rendering in a long scroller (data-URI images in a list are
    a shape Samsung's compositor has mishandled before).
 
+*Why this one matters:* it is a new tab strip, a rebuilt action row and one fewer sheet in the back
+stack, and the sandbox renders none of those the way the phone does.
+
 ## N5. The meal builder's pinned footer — BF-31 / BF-26
-1. Open a meal → **Edit** → scroll the ingredients to the end.
+1. **Meals** tab → open a meal → **Edit** → scroll the ingredients to the end.
 2. **Pass:** the batch figures stay pinned above **Save**, and the action row clears the gesture bar.
 3. Tap the inline **name** field. **Pass:** the keyboard does not push the footer over the input or
    off screen.
@@ -70,8 +92,8 @@ own scroll physics.
 3. Owner's watching brief: do the grouped-section backgrounds read well at this size?
 
 ## N7. The food-database row's mismatch warning — Q-406 · **JS**
-1. Nutrition → **Log Food** → **My Foods** → **New** → search the food database for something whose
-   macros and calories disagree (many branded products do).
+1. Nutrition → **Log Food** → the **Meals** tab → **New** → search the food database for something
+   whose macros and calories disagree (many branded products do).
 2. **Pass:** the row shows the amber line *"Its macros and calories disagree — check before using"*,
    with its macros still readable beside it, and a tap still adds the food.
 3. **Fail:** the sentence is missing (an icon alone has no hover on a phone), or the tap no longer
