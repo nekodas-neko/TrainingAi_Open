@@ -7,6 +7,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetFooter } from '@/com
 import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
 import { cn } from '@trainingai/shared/utils'
+import { ChipGroup } from '@/components/ui/chip-group'
 import { invalidateMealPlans } from '@/lib/cache-groups'
 import { savePlanMealsToLibrary } from '@trainingai/shared/nutrition/save-plan-meal'
 import { RestrictionsPicker, type RestrictionSelection } from './restrictions-picker'
@@ -363,39 +364,3 @@ const STEP_TITLES = [
   'Check this over',
 ]
 
-function ChipGroup({ heading, hint, options, selected, onToggle }: {
-  heading: string
-  hint?: string
-  options: string[]
-  selected: string[]
-  onToggle: (value: string) => void
-}) {
-  return (
-    <div>
-      <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-2">
-        {heading}
-      </p>
-      <div className="flex flex-wrap gap-2">
-        {options.map(o => {
-          const on = selected.includes(o)
-          return (
-            <button
-              key={o}
-              onClick={() => onToggle(o)}
-              aria-pressed={on}
-              className={cn(
-                'min-h-[36px] rounded-full border px-3 text-xs font-medium transition-colors',
-                on
-                  ? 'border-brand/50 bg-brand/15 text-brand'
-                  : 'border-border bg-muted/50 active:bg-muted/30',
-              )}
-            >
-              {o}
-            </button>
-          )
-        })}
-      </div>
-      {hint && <p className="mt-2 text-[11px] leading-snug text-muted-foreground">{hint}</p>}
-    </div>
-  )
-}

@@ -11,6 +11,16 @@ export interface SaveMealInput {
   items: { foodItemId: string; quantityMultiplier: number }[]
   servings: number
   imageDataUri: string | null
+  /**
+   * Which meal slots a plan may use this meal in (BF-11f).
+   *
+   * `[]` means "clear them" and `undefined` means "leave the stored tags alone" — the distinction
+   * that BF-11e built into the route, the outbox replay and the local table, and it is load-bearing
+   * here. Send the array whenever the builder actually **showed** this meal's tags, so an untick is
+   * saveable. Send `undefined` when it did not: overwriting a meal found by duplicate detection
+   * writes over a meal the user never opened, and `[]` there would silently wipe its tags.
+   */
+  mealTypeIds: string[] | undefined
   /** The meal's own creation date when re-saving over one; now for a new meal. */
   createdAt: string
   /** True when `mealId` names a meal that already exists — decides PUT vs POST on the web path. */
@@ -34,8 +44,8 @@ export interface SaveMealInput {
  * server rather than into an error toast — without it, one SQLite failure loses the save entirely.
  */
 export async function saveMealToLibrary(input: SaveMealInput): Promise<SavedMeal[] | null> {
-  const { mealId, name, items, servings, imageDataUri, createdAt, isUpdate, userId, tz } = input
-  const body = { id: mealId, name, items, servings, imageDataUri }
+  const { mealId, name, items, servings, imageDataUri, mealTypeIds, createdAt, isUpdate, userId, tz } = input
+  const body = { id: mealId, name, items, servings, imageDataUri, mealTypeIds }
   const store = userId ? getLocalStore(userId) : null
   const now = new Date().toISOString()
 
@@ -46,15 +56,14 @@ export async function saveMealToLibrary(input: SaveMealInput): Promise<SavedMeal
       await store.upsertSavedMeal(
         { id: mealId, name, servings, imageDataUri, createdAt, updatedAt: now, deletedAt: null, syncStatus: 'pending' },
         items.map(it => ({ id: crypto.randomUUID(), savedMealId: mealId, foodItemId: it.foodItemId, quantityMultiplier: it.quantityMultiplier })),
+        mealTypeIds,
       )
-      // BF-11e added `mealTypeIds` to the route, the outbox branch and the local table. This payload
-      // deliberately does NOT send it yet, and that is the correct no-op rather than an omission:
-      // absent means "leave the stored tags alone" on both the local upsert above and the server
-      // replay, while sending the currently-loaded tags would REVERT a change made on another device
-      // between this sheet loading and this save. There is no asymmetry for the sync rule to catch
-      // either — no surface can set a tag today, web or native.
-      // **BF-11f adds the picker: it must add `mealTypeIds` HERE and to `upsertSavedMeal` above, in
-      // the same PR**, or tags will save on the web and strand offline.
+      // BF-11e shipped the storage and transport and deliberately stopped short of sending tags;
+      // BF-11f is the picker, so the payload and the local upsert above now both carry them. They
+      // travel TOGETHER by construction — the same `mealTypeIds` reaches `upsertSavedMeal` and the
+      // outbox body from one destructure, which is what stops tags saving on the web and stranding
+      // offline. The route, the outbox replay and the local table all read absent as "leave the
+      // stored tags alone"; this path is never absent, because the builder always knows the answer.
       await store.queueMutation({ userId: userId!, domain: 'saved_meals', date: todayInTz(tz), payload: body })
       await invalidateSavedMeals()
       const fresh = await store.getSavedMeals()

@@ -24,8 +24,21 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.383.6 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Version:** v1.388.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-08-26.
+
+**A saved meal can say which meals of the day it suits (BF-11f) — and the save button was eating
+its own argument.** BF-11e built the column, the join table, the route field and the outbox replay and
+deliberately shipped no way to set any of it; this is the picker. **Untagged means EVERY slot, not
+none**, so the hint under the chips changes with the selection — nothing ticked otherwise reads as
+"excluded from everything". Writing the round-trip test caught a live defect underneath it:
+`onClick={onSave}` handed React's click event to `handleSave(overwrite?)`, so every save from the
+footer looked like an overwrite — which meant **BF-11d's duplicate prompt, shipped the day before,
+had never fired once**, and the new tags arrived as `undefined`. Neither TypeScript nor the memo check
+can see that shape. A sweep found one sibling (`food-list.tsx`'s empty-state button, which reads
+`.items` off the event); it is fixed **by inspection, not reproduced** — no spec has an empty meal
+library, which is **LB-20**. ⚠️ Not device-verified.
+[Journal](docs/overview/entries/2026-08-26-feat-saved-meal-tag-ui.md).
 
 **A remembered bedtime, in its own column (Q-519, engine half).** A night the ring only caught from
 4 am reads as a 4 am bedtime and moves the 14-day estimate ~23 minutes for a fortnight. The entry
@@ -437,21 +450,6 @@ now, and `updateMealType` — the only repository writer passing its argument in
 `Push` sessions in one day left one window and the earlier vanished. Now keyed by id, **additively**:
 the name-keyed record still ships until Q-362b moves the three Lane B readers, LA-15 removes it after
 ([journal](docs/overview/entries/2026-08-20-day-log-duration-session-identity.md)).
-
-**Q-424 closed (2026-08-20)** — the doc-size ratchet compared the tree against a committed number, so
-two independently-green PRs could merge into a red `main`, failing on an unrelated branch over an
-unrelated file. It now asks whether **this branch** grew the file, and reports an inherited overage
-instead of failing it. Run `pnpm check:rules` for the live step count — never quote one from here
-([journal](docs/overview/entries/2026-08-20-doc-size-ratchet-order-independence.md)).
-
-**Q-421 is Lane B's now (2026-08-20)** — route (a) shipped, (b) is owner-rejected, the estimator
-basis is stored on both surfaces, only the label remains. Retagging it exposed that **`next-item.js`
-let an entry's prose outrank its own lane tag** ([journal](docs/overview/entries/2026-08-20-energy-basis-and-lane-resolution.md)).
-
-**LA-13 closed (2026-08-20)** — `Migration Check` ran only against a **fresh** database, where a
-non-idempotent migration cannot fail; it now replays every file against the schema it just built. Its
-first version was green with a migration deliberately broken: the "already there" SQLSTATEs that are
-benign on an ordinary run are the failure signal under replay ([journal](docs/overview/entries/2026-08-20-migration-replay-check.md)).
 
 **Older session handoffs:** [2026-08-20 workouts energy/RPE intake](docs/handoff-2026-08-20-workouts-energy-accuracy-and-rpe-intake.md)
 (reasoning, not status) and [2026-08-17 agent model/device findings](docs/handoff-2026-08-17-platform-agent-model-and-device-session-findings.md)

@@ -217,6 +217,13 @@ shrink everyone's library to zero on the day it ships.
 
 Reuse the existing `ChipGroup` the wizard already uses rather than drawing a fourth chip.
 
+> **Shipped v1.388.0.** `ChipGroup` moved out of `meal-plan-setup-sheet.tsx` to
+> `components/ui/chip-group.tsx` on the way, generalised so an option can be `{ value, label }` —
+> the wizard's options are strings that are their own labels, but a tag's value is a meal-type **id**
+> the user must never see, and the string form would have keyed the chips by name. The picker itself
+> is `components/nutrition/meal-type-tags.tsx`. **BF-11h reads the same component**: if it needs a
+> chip row anywhere in the wizard, that is the one.
+
 ### 5.3 BF-11g — library-first generation (Lane A)
 
 The core of Part 2. `generate/route.ts` today: split macros into slots → pin kept meals to the first

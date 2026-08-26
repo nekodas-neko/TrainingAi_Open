@@ -62,7 +62,12 @@ export const MealBuilderFooter = memo(function MealBuilderFooter({
       )}
       <Button
         className="w-full h-12 font-semibold"
-        onClick={onSave}
+        // `onClick={onSave}` would hand React's click event to `onSave`'s first parameter. That is
+        // invisible to TypeScript — `() => void` accepts a handler with more parameters, and
+        // `onClick` accepts a nullary one — and it broke `handleSave(overwrite?)` silently: every
+        // save from this button looked like an "overwrite this existing meal" save, which skipped
+        // BF-11d's duplicate check entirely and sent `undefined` where BF-11f's tags should be.
+        onClick={() => onSave()}
         disabled={saving || !canSave}
       >
         {saving ? (editing ? 'Updating…' : 'Saving…') : (editing ? 'Update Meal' : 'Save Meal')}
