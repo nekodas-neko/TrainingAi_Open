@@ -11773,6 +11773,50 @@ twice on disk (see the migration-number note at the top of this file).
 
 ---
 
+### [workouts][devices] 🔵 PS-7 — camera form capture, Phase 0 only: can the S25 WebView run a pose landmarker at all?
+
+- Plan: [`docs/superpowers/plans/2026-08-26-camera-form-capture.md`](superpowers/plans/2026-08-26-camera-form-capture.md)
+- Branch: `spike/camera-pose-feasibility`
+- Added: 2026-08-26
+- Lane: ? — a spike touching only a throwaway route and the CSP. The lane that takes it decides.
+- Gate: device — every question in it is a measurement the sandbox cannot make.
+
+**Placed at the tail deliberately.** The owner framed it as *"a good future move"*, not as next-up,
+and nothing is broken today. It sits with the other owner feature notes.
+
+**Owner request, 2026-08-26 (in effect):** point the phone at yourself from a tripod during a set,
+get a stick-figure animation of the movement plus the bar path, review the last 7–14 days of them,
+and have the AI coach use it — **without any camera data leaving the device**. Storage cheap,
+security concerns minimal.
+
+**The design is settled and written up — read the plan before touching any of it.** It carries the
+storage split (landmarks device-local on a 14-day window, a ~1 KB-per-set numeric summary the only
+thing that reaches Postgres, ~5 MB/year against a DB growing 0.4 MB/day), the hands-free capture
+state machine that removes the run-back-to-the-phone problem, the bar-path-from-wrist-midpoint trick,
+and **four things proposed and rejected with reasons** — a native Kotlin capture layer first, a pose
+model on `onnxruntime-web`, storing GIFs instead of the landmark series, and a Wear OS remote.
+Re-proposing one costs a session.
+
+**This entry is the Phase 0 spike and nothing else.** Stand up `getUserMedia` plus a **self-hosted**
+`@mediapipe/tasks-vision` landmarker on a throwaway route, run it on the S25 APK, and report:
+sustained fps at 720p and 1080p, whether the CSP admits the WASM session and any blob-URL worker it
+spawns (`worker-src` is absent and falls back to `default-src 'self'` — likely needs
+`worker-src 'self' blob:`), whether the ~9 MB `.task` model loads from the service-worker cache with
+the network off, and the thermal behaviour over ~10 minutes of continuous inference. The CDN path
+MediaPipe documents is CSP-blocked by `connect-src 'self'`, so self-hosting is part of the spike,
+not a later optimisation.
+
+**Phases 1–5 are in the plan and deliberately NOT queued.** Filing them before Phase 0 returns a
+number would queue work gated on an unknown. The spike's result decides whether they get filed, and
+whether the capture layer stays in the WebView or moves to a Kotlin plugin.
+
+**Open for the owner before Phase 1** (all four are in §10 of the plan): is there actually a Wear OS
+watch to build against, or is §9 moot; 7 or 14 days for the local window (recommend 14); which lifts
+first (recommend the barbell four, side-on); and whether the feature is off-by-default for the other
+accounts (recommend yes).
+
+---
+
 ## [cardio] ▶ Cardio training system — remaining
 
 - **Plateau handling + block-end review (D-7, D-8)** — deferred deliberately, needs
