@@ -135,5 +135,8 @@ const DiaryRow = memo(function DiaryRow(
   { id: string; name: string; secondary: string; calories: number; onEdit: (id: string) => void },
 ) {
   const press = useCallback(() => onEdit(id), [id, onEdit])
-  return <FoodRow name={name} secondary={secondary} calories={calories} showChevron onPress={press} />
+  // Artboard 1 draws the tile on every diary row. `food_items` carries no image column, so today
+  // this is always the placeholder — which is the state the drawing shows, and the box is what stops
+  // the list reading as ragged once any row does have a photo.
+  return <FoodRow name={name} secondary={secondary} calories={calories} showChevron showThumb thumbSrc={null} onPress={press} />
 })

@@ -6,10 +6,17 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: "1.379.1",
+    version: "1.381.0",
     date: "2026-08-26",
     changes: [
       "Fixed a record-keeping bug behind the health scores: each score is stamped with which version of its model produced it, and one part of the app was overwriting the whole stamp instead of just its own entry \u2014 so a readiness stamp was erased whenever the body-composition figures were rebuilt for that day. Nothing you see changed, but comparisons across a model change are trustworthy again, which is what the stamp is for.",
+    ],
+  },
+  {
+    version: "1.380.0",
+    date: "2026-08-26",
+    changes: [
+      "Meal photos are finally visible. You could take one and it was saved and synced, but nothing anywhere displayed it \u2014 it has been that way since the picker was added. Every meal now shows a small tile: your photo if it has one, and a food icon if it does not, so the list lines up either way instead of some rows having a picture and others nothing.",
     ],
   },
   {

@@ -2735,7 +2735,7 @@ invalidate each other indefinitely, and model output is not deterministic, so it
 That is not visible from either route's source — it is a property of the pair — which is exactly the
 kind of thing an orientation doc exists to carry.
 
-## 2026-08-26 — `CLAUDE.md` 1174 → 1198, backlog 11860 → 11910, `projectOverview.md` → 8004 (Q-273)
+## 2026-08-26 — `CLAUDE.md` 1174 → 1198, backlog 11860 → 11858, `projectOverview.md` 7992 → 8003 (Q-273)
 
 **The only `CLAUDE.md` raise of the session, and it is Q-273's own scope item 3**: *"a rule, alongside
 One Formula One Place: a correlation computed across a model change is not evidence."*
@@ -2750,7 +2750,8 @@ It also records two things that are properties of a *pair* of files and so are i
 one: `model_versions` merges with `||` and must never regain a JS read-merge, and `updated_at` does
 not identify the writing model.
 
-The backlog’s 50 are **LA-32** (36) plus Q-273's own `Keep:` block (15), which says what the entry
+The backlog ends **two lines DOWN** despite adding fifty, because Lane B's merges shrank it
+underneath this branch in between. The fifty are **LA-32** (36) plus Q-273's own `Keep:` block (15), which says what the entry
 still owes now that its scope item 1 is *safe* but not *complete* — the stamp can no longer be
 clobbered, three pillars still do not write one, and the backfill half is deliberately untouched. An
 entry that shipped half its work states the half it did not, rather than looking finished.
