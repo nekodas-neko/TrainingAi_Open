@@ -440,7 +440,7 @@ Read in nRF Connect on a factory-fresh ring. **No vendor app was ever installed.
 | `6E40FFF0-…` service present? | **yes** |
 | RX `6E400002-…` | **present** — WRITE, WRITE NO RESPONSE |
 | TX `6E400003-…` | **present** — NOTIFY, with CCCD `0x2902` |
-| `0x03` round trip | **not yet validly sent** — every write was ASCII, see §11e |
+| `0x03` round trip | never validly sent from nRF (§11e-d); **Web Bluetooth connects — §11g** |
 | Firmware Revision, trial end | _not yet read_ |
 
 **What this settles:** the R09 exposes the R02 family's transport exactly — same service UUID, same
@@ -737,6 +737,59 @@ resend on V1 write `6e400002`, notifications enabled on `6e400003`:
 Expect a reply beginning `0x03` for #1 (`[1]` = level, `[2]` = charging), a visible blink for #2,
 and multi-packet responses for #3/#4. **Capture every notification's hex from the log** — those are
 the test vectors Phase 1's decoders get pinned to.
+
+### 11f. The Web Bluetooth R09 client the owner found
+
+[`KpG782/colmi-ring-webapp`](https://github.com/KpG782/colmi-ring-webapp) — names **R02/R09**,
+written in **TypeScript over Web Bluetooth**, deployed at
+<https://colmi-ring-webapp.vercel.app>. Same language and same transport family as §5, so a working
+version is a porting source rather than a translation. (Provenance caveat: unvetted third-party
+repo, README reads generated — which is why running it mattered more than reading it.)
+
+**What it confirms:** the checksum is **mod 256** (`validatePacket` does `(checksum & 255) ===
+packet[15]`) — a second independent working implementation agreeing with Gadgetbridge's `& 0xff`
+against the Python clients' prose; the write is a **Write Request** (`writeValue`); and it uses the
+V1 UUIDs only, never touching `de5bf728`.
+
+**What it contradicts:** *"No initialization commands are automatically sent after connecting."* Its
+sequence is connect → get service → get both characteristics → `startNotifications()` → send. **No
+phone-name, no set-time, no delay, no retry.** That withdrew §11c-resolved's handshake theory.
+
+**Incidental, and useful:** it filters with `namePrefix: 'R02_'` / `'R09_'` rather than a stored
+device id — which sidesteps §11a's rotating-address problem entirely, the same shape the Oura path
+already uses here. Worth copying regardless of how the address test resolves.
+
+### 11g. Web Bluetooth CONNECTS to the R09 on the S25 — 2026-08-26, 20:38
+
+The client above opened in Chrome on the S25 and reached **`Connected`**, with a live dashboard.
+**This is the result the plan actually needed.** Being precise about its scope:
+
+**Established.** Web Bluetooth — `requestDevice` with a name-prefix filter, `gatt.connect()`,
+`getPrimaryService`, `getCharacteristic`, `startNotifications()` — works against this ring, on this
+phone, in a browser. That is the **same API family as `@capacitor-community/bluetooth-le`**, so §5's
+central claim (the spike is TypeScript in the WebView, **no APK, ships via Railway**) is now
+demonstrated rather than argued from the chest-strap precedent.
+
+**Not yet established.** A command→response round trip. The dashboard shows *Connected* with heart
+rate `Stopped / No data available` and SpO2 `No reading available` — nothing has been asked of the
+ring. Pressing **Start Monitoring with the ring worn** issues the real-time HR command
+(`0x69` / `0x1e`) and is what proves the write direction.
+
+**Why the picker was empty on the first attempt — and it constrains our own design.** nRF Connect
+still held the connection. **A BLE peripheral accepts exactly one connection, and while it is held
+it stops advertising** — so the ring was invisible to every other scanner, not merely busy.
+Disconnecting and force-stopping nRF Connect made it appear at once.
+
+That is not just a debugging note. Our pairing and sync paths must expect the ring to be
+**unreachable because something else holds it** — Gadgetbridge, the vendor app, a stale GATT
+explorer — and that condition presents as *"device not found"*, indistinguishable from out-of-range
+or a flat battery unless we say so explicitly. §11a's scan-by-name does not rescue it: the ring is
+not advertising at all.
+
+**Measured on the owner's ring so far:** transport, services and characteristics; the notify path;
+packet framing and the mod-256 checksum (against a decoded battery push whose charging byte tracked
+the charger); and Web Bluetooth connectivity from the S25. **Unmeasured: exactly one thing — the
+write direction.**
 
 ### 11d. Gadgetbridge is the reference implementation, and it should be installed next
 
