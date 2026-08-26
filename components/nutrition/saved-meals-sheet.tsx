@@ -11,7 +11,6 @@ import type { FoodItem, SavedMeal, MealType, FoodLogWithItem, NutritionScanResul
 import { todayInTz } from '@trainingai/shared/date-utils'
 import { logMealItems } from '@trainingai/shared/nutrition/log-meal'
 import { mealTypeForHour } from '@trainingai/shared/nutrition/log-plan-meal'
-import { MACRO_COLORS } from '@trainingai/shared/nutrition/macro-colors'
 import { cachedFetch, readCacheSync } from '@/lib/sqlite/cache'
 import { invalidateSavedMeals } from '@/lib/cache-groups'
 import { TTL_MEDIUM, TTL_LONG } from '@trainingai/shared/cache-ttl'
@@ -31,7 +30,10 @@ import { QuantitySheet } from './quantity-sheet'
 import { qtyFromInput, steppedQty, type QtyUnit } from './saved-meal-qty'
 import { IngredientPicker } from './ingredient-picker'
 import { MealBatchSize } from './meal-batch-size'
+import { MealBuilderFooter } from './meal-builder-footer'
 import { recipeBuilderPatch } from './recipe-import'
+import { RecipeCandidates, type RecipeCandidate } from './recipe-candidates'
+import { savePlanMealToLibrary } from '@trainingai/shared/nutrition/save-plan-meal'
 
 /** Which SCREEN is showing. The tab strip within the list screen is `listTab` below. */
 type SheetTab = 'meals' | 'build'
@@ -144,6 +146,10 @@ export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate,
   // An imported recipe whose page never stated a yield: the figures below are the whole batch until
   // the user says otherwise, and nothing else on screen would reveal that.
   const [unstatedYield, setUnstatedYield] = useState(false)
+  // A recipe page that held several dishes (BF-11c). Non-null replaces the build form with the
+  // picker: the choice is which dishes to save, not what to put in the meal on screen.
+  const [candidates, setCandidates] = useState<RecipeCandidate[] | null>(null)
+  const [savingCandidates, setSavingCandidates] = useState(false)
 
   useEffect(() => {
     if (!open) return
@@ -189,6 +195,7 @@ export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate,
     setRenamingMeal(!meal)
     setPickerOpen(!meal || meal.items.length === 0)
     setUnstatedYield(false)
+    setCandidates(null)
     setTab('build')
   }, [])
 
@@ -232,6 +239,38 @@ export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate,
     setMealServings(patch.servings)
     setUnstatedYield(patch.unstatedYield)
     setRenamingMeal(false)
+  }
+
+  /**
+   * Every dish the user kept from a multi-recipe page becomes its own saved meal (BF-11c §5.2).
+   *
+   * `savePlanMealToLibrary` is reused rather than re-implemented: its contract is exactly
+   * `{ name, ingredients }`, and it already mints the food items through `ingredientToEntry`, writes
+   * the meal local-first, queues the outbox mutation and invalidates. Its `servings: 1` is right
+   * here for the same reason it is right for an import — `/api/nutrition/scan` has already divided
+   * by any stated yield, so each candidate arrives as one serving.
+   *
+   * Serial, matching that function's own reasoning: each meal writes several rows to the same local
+   * tables and queues its own mutations, and four of them is not worth racing.
+   */
+  async function keepCandidates(kept: RecipeCandidate[]) {
+    setSavingCandidates(true)
+    let failed = 0
+    for (const c of kept) {
+      try {
+        await savePlanMealToLibrary({ name: c.name, ingredients: c.ingredients }, userId)
+      } catch {
+        failed++
+      }
+    }
+    setSavingCandidates(false)
+    setCandidates(null)
+    const saved = kept.length - failed
+    if (saved > 0) toast.success(saved === 1 ? `"${kept[0].name}" saved` : `${saved} meals saved`)
+    // Reported separately rather than folded in: a partial save is exactly when the user needs to
+    // know which half happened.
+    if (failed > 0) toast.error(failed === 1 ? 'One dish could not be saved' : `${failed} dishes could not be saved`)
+    if (saved > 0) { await invalidateSavedMeals(); backToMeals(); fetchMeals() }
   }
 
   // `[]` is stable by React's guarantee — a setter, not a value. Hoisted rather than inline because
@@ -598,6 +637,19 @@ export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate,
           </CaptureActions>
         ) : (
           <>
+            {candidates ? (
+              // Replaces the body AND the footer: while this is up the choice is which dishes to
+              // save, so the build form's own Save button would be answering a different question.
+              <div className="flex-1 overflow-y-auto px-1 pb-2">
+                <RecipeCandidates
+                  candidates={candidates}
+                  saving={savingCandidates}
+                  onCancel={() => setCandidates(null)}
+                  onKeep={kept => void keepCandidates(kept)}
+                />
+              </div>
+            ) : (
+            <>
             <div className="flex-1 overflow-y-auto px-1 space-y-4 pb-2">
               <MealBatchSize
                 servings={mealServings}
@@ -640,6 +692,7 @@ export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate,
                   userId={userId}
                   onAdd={addIngredient}
                   onImportRecipe={importRecipe}
+                  onRecipeCandidates={setCandidates}
                 />
               ) : (
                 <button
@@ -682,45 +735,20 @@ export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate,
               />
             </div>
 
-            {/* **The footer is the point of this screen.** It keeps the batch total, the macro split
-                and the per-portion figure on screen *while ingredients are being edited* — which is
-                the whole reason to have a screen here rather than a list. The same numbers were
-                already computed live, but sat in a card partway down the scroll, so the moment you
-                were editing the thing that changed them they were gone. Artboard 5 pins them. */}
-            <div className="flex shrink-0 flex-col gap-2.5 border-t border-border pt-2.5">
-              {ingredients.length > 0 && (
-                <div className="flex items-baseline gap-2.5 px-1">
-                  <span className="text-[10px] font-semibold uppercase tracking-[0.04em] text-muted-foreground">
-                    Batch
-                  </span>
-                  <span className="text-sm font-bold tabular-nums">{Math.round(totalMacros.kcal)} kcal</span>
-                  {/* `MACRO_COLORS`, like every other macro readout — the artboard's own hex values
-                      are this palette, so parity and the token rule agree here. */}
-                  <span className="text-xs font-semibold tabular-nums" style={{ color: MACRO_COLORS.protein }}>
-                    {Math.round(totalMacros.protein)} P
-                  </span>
-                  <span className="text-xs font-semibold tabular-nums" style={{ color: MACRO_COLORS.carbs }}>
-                    {Math.round(totalMacros.carbs)} C
-                  </span>
-                  <span className="text-xs font-semibold tabular-nums" style={{ color: MACRO_COLORS.fat }}>
-                    {Math.round(totalMacros.fat)} F
-                  </span>
-                  <span className="flex-1" />
-                  {mealServings !== 1 && (
-                    <span className="flex-none text-[11px] tabular-nums text-muted-foreground">
-                      {Math.round(totalMacros.kcal / mealServings)} / portion
-                    </span>
-                  )}
-                </div>
-              )}
-              <Button
-                className="w-full h-12 font-semibold"
-                onClick={handleSave}
-                disabled={saving || !mealName.trim() || ingredients.length === 0}
-              >
-                {saving ? (editingMeal ? 'Updating…' : 'Saving…') : (editingMeal ? 'Update Meal' : 'Save Meal')}
-              </Button>
-            </div>
+            <MealBuilderFooter
+              hasIngredients={ingredients.length > 0}
+              batchKcal={totalMacros.kcal}
+              protein={totalMacros.protein}
+              carbs={totalMacros.carbs}
+              fat={totalMacros.fat}
+              servings={mealServings}
+              saving={saving}
+              editing={editingMeal != null}
+              canSave={!!mealName.trim() && ingredients.length > 0}
+              onSave={handleSave}
+            />
+            </>
+            )}
           </>
         )}
       </SheetContent>

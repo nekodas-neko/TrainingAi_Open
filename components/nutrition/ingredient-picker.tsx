@@ -9,6 +9,7 @@ import { getLocalStore } from '@/lib/local-store'
 import { AddFoodByHandForm, type AddFoodByHandValues } from './add-food-by-hand-form'
 import { IngredientSearch, type ExternalFood } from './ingredient-search'
 import { hostOf } from './recipe-url'
+import type { RecipeCandidate } from './recipe-candidates'
 import type { FoodSearchResponse } from '@/app/api/nutrition/food-search/route'
 
 interface Props {
@@ -25,6 +26,12 @@ interface Props {
    * `recipeYield` is `null` when the page never stated one — see `importRecipe` below.
    */
   onImportRecipe: (recipe: { name: string; entries: { item: FoodItem; qty: number }[]; recipeYield: number | null }) => void
+  /**
+   * A page that held several dishes (BF-11c §5.2). Handed up UNCONVERTED — no food items are minted
+   * until the user says which dishes to keep, or a four-recipe page would add four meals' worth of
+   * foods to the library for one press.
+   */
+  onRecipeCandidates: (candidates: RecipeCandidate[]) => void
 }
 
 /**
@@ -38,7 +45,7 @@ interface Props {
  * owns no state, this one owns the searches, the debounce clocks and the three add paths. Neither
  * is useful without the other and neither repeats the other's job.
  */
-export function IngredientPicker({ active, userId, onAdd, onImportRecipe }: Props) {
+export function IngredientPicker({ active, userId, onAdd, onImportRecipe, onRecipeCandidates }: Props) {
   const [query, setQuery] = useState('')
   const [searchResults, setSearchResults] = useState<FoodItem[]>([])
   const [dbResults, setDbResults] = useState<ExternalFood[]>([])
@@ -177,6 +184,17 @@ export function IngredientPicker({ active, userId, onAdd, onImportRecipe }: Prop
       const ingredients: NutritionIngredient[] = Array.isArray(body?.ingredients) ? body.ingredients : []
       if (ingredients.length === 0) {
         toast.error(offlineHint() ?? 'No recipe could be read from that page')
+        return
+      }
+      // Several dishes: ask which, before minting anything. The top level is `candidates[0]`, so
+      // taking it and stopping would silently drop the rest of the page.
+      const candidates: RecipeCandidate[] = Array.isArray(body.candidates)
+        ? body.candidates.filter((c: RecipeCandidate) => Array.isArray(c?.ingredients) && c.ingredients.length > 0)
+        : []
+      if (candidates.length > 1) {
+        onRecipeCandidates(candidates)
+        setQuery('')
+        setSearchResults([])
         return
       }
       // Serial, not `Promise.all`: each one writes the same local table and queues its own outbox
