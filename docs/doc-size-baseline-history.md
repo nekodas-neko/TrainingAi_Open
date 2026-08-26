@@ -18,6 +18,22 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
+## 2026-08-26 — `docs/implementation-backlog.md` 11882 → 11903 (Q-406 blocked at `Gate: owner`)
+
+Q-406's warning-row decision was taken to be built and turned out not to be buildable. Option A moves
+the mismatch sentence *"to the food's detail"*, and **this surface has no food detail**: the external
+food-database row's tap is `onAddExternal` → `createFoodItem` + `accept()`, so it adds the food to the
+meal with no inspect step, no confirmation and no quantity sheet in between. Building A as decided
+would have deleted the only visible explanation and left an amber icon on a row that adds on tap.
+
+**Why the finding is in the queue rather than a journal entry.** It re-opens a `Gate: owner` and names
+the three ways out; whoever takes Q-406 next has to read it *before* writing code, and the backlog is
+the file they read. A journal entry is where a shipped change is explained — this is a change that was
+deliberately not shipped, and the reason has to sit on the entry it blocks.
+
+Trimmed from 24 lines to 21 before raising: the three options became one bullet rather than a numbered
+list, and the conversion note lost its restatement of what `FoodRow` is.
+
 ## 2026-08-25 — the compaction chore, first pass (`docs/implementation-backlog.md` 12146 → 11799)
 
 **A RATCHET DOWN of 347 lines, and the first time this file has been made smaller on purpose rather

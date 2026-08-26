@@ -640,6 +640,27 @@ That number is more valuable than either input on its own.
     entry is for.
   - **A → C stays open if the sentence later has to be visible in the list** — it is additive.
     Starting at C and pulling the slot out means touching every call site again. Do not pre-build it.
+
+- **⚑ BLOCKED 2026-08-26 — option A moves the sentence somewhere that does not exist.** Checked
+  before building, not after. **This surface has no food detail.** `ingredient-search.tsx:124` is
+  `onClick={() => onAddExternal(food)}` → `ingredient-picker.tsx`'s `addExternalFood`, which calls
+  `createFoodItem` and `accept()` immediately: the tap **adds the food to the meal**. There is no
+  inspect step, no confirmation, and no quantity sheet before the commit. So *"the sentence moves to
+  the food's detail"* has no destination on the one call site the decision is about, and building A
+  as written **deletes the only visible explanation** — leaving an amber icon on a row that adds on
+  tap. That is a net loss on a warning whose whole job is to be read before use, so it was not built.
+- **What it needs to become buildable**, cheapest first: **(1)** keep the sentence in the row — that
+  is option B, but the reason B lost (it *replaced* the serving line) does not apply to keeping it
+  *alongside*, which is what ships today; **(2)** give the row an inspect step, tap to open and add
+  as a second action — a real interaction change on a path whose speed is the point; **(3)** ship A
+  with the sentence as the icon's accessible name, which loses nothing to a screen reader and
+  everything to a sighted thumb, since a phone has no hover.
+- **The conversion is blocked by the same question.** The external row is **not** `FoodRow` today —
+  it is a bespoke `<button>` (`ingredient-search.tsx:122`), while `SearchResultRow` beside it *is*.
+  Converting it is this entry's goal and needs to know where the warning goes: A's *"immediately
+  before the calorie column"* requires the shared row to draw it, which is the slot this entry rules
+  out. **`Gate: owner`** — pick 1, 2 or 3 and the conversion follows.
+
 - **The in-flight spinner needs no decision** and never did: it swaps the green `+` inside the same
   16 px box, so it is a state of an existing element rather than a new slot. It works under any of
   the three treatments.
