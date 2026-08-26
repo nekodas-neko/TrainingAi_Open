@@ -469,7 +469,8 @@ template says to keep it under a screen. Measured 2026-08-19: BugFix 135 lines, 
 412 (its `Now` section alone is 200), Tuning 562, Review 1,280. Nobody reliably reads a 412-line
 file before starting an item, which means the coordination mechanism is not working as one.
 
-All five are now in `docs/doc-size-baseline.json` at their current sizes, shrink-only. They can only
+All five are now baselined at their current sizes, shrink-only, one file each under
+`docs/doc-size/` (`docs/doc-size/docs/agents/state/<agent>.md.size`). They can only
 come down, and every handoff is an opportunity — the baton is rewritten in full anyway, and anything
 that reads as narrative belongs in a dated handoff doc instead. The target is a screen; the ratchet
 just stops the drift going the other way.
