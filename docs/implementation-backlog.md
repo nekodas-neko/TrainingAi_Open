@@ -377,6 +377,179 @@ below threshold and left in place for next time.
   must **stay** open and be tappable; Cancel must cancel. Then the nest from LB-17 (Log Food →
   My Foods → a meal) must still unwind one layer per press.
 
+### [platform] BF-36 — the entries runaway limit fails whichever PR is open when it trips, not the one that caused it
+
+- **Lane:** B — `scripts/check-doc-index-size.js` and the README beside it; no schema, no route.
+- **Added:** 2026-08-26 · BugFix, after it blocked **PR #527**, a docs-only intake PR whose one new
+  journal file took the count from 60 to 61.
+- **The finding is the targeting, not the limit.** `check-doc-index-size.js:97` fails the Custom Rules
+  job when `docs/overview/entries/` holds more than **60 foldable** (unlinked) entries. The threshold
+  is right and the chore is real. What is wrong is **who pays**: the failure lands on whichever PR
+  happens to be open at the moment the count crosses, which is unrelated to whoever grew the
+  directory. Every session writes a journal entry, so the cost falls at random.
+- **What it costs, measured on the day.** #527's diff was four docs files and the failure named none
+  of them. The resolution was not the sweep — **merging `main` fixed it**, because another session
+  had run a sweep concurrently. So the blocked PR paid a CI cycle and a diagnosis for a condition it
+  neither caused nor fixed.
+- **The headroom is small enough that this recurs.** The README's own arithmetic: limit 60, linked
+  floor ~41, so **~19 files of slack**, which it measures at *"roughly twenty minutes on the busiest
+  stretch of the day and about half a day at the average rate."* At the current merge rate this will
+  block an unrelated PR again within days.
+
+**Recommended fix, and it is small: fail only a PR that adds an entry.** The check already knows how
+to attribute — the doc-size ratchet a few lines above prints *"N of which this branch added"*. Apply
+the same idea here: over the limit **and** this branch adds a file to `entries/` → fail, because that
+PR is the growth and its author is the right person to sweep. Over the limit and the branch adds
+none → the existing `console.log` note, which is already the mechanism for "sweep it when
+convenient".
+
+- **Why not just raise the limit.** It defers the same collision by about a week and makes the eventual
+  sweep bigger. The README records that sweeps have already failed the link checker in **five**
+  separate ways; a larger fold is a worse fold.
+- **Why not make it warn-only.** A warning nobody is obliged to act on is how the directory reached
+  198 files in the first place. The obligation should stay — it should just land on someone who is
+  already touching the directory.
+- **⚠ Do not "fix" this by skipping the journal entry.** The entry riding in the same PR is what stops
+  a stale "done" claim outliving an abandoned branch (see `entries/README.md`). The chore is the cost
+  of that guarantee and is worth paying; this entry is about *who* pays it.
+- **Verification.** A branch adding one entry while the count is over the limit fails; a branch adding
+  none, at the same count, passes with the note. Both against a fixture directory rather than the
+  live one, so the test does not move with the repo's real count.
+
+### [nutrition] BF-35 — fill the food placeholder: two of the three sources are already free
+
+- **Lane:** A for the storage + the OFF field; B for the render.
+- **Added:** 2026-08-26 · owner, after BF-32 put a placeholder tile on every row: *"When the AI does a
+  food match; does it come with a picture/image of the food that could be added to our photo as the
+  default? ... ONly if it doesnt add more time/expense."*
+
+**The cost question is the whole entry, and the answer differs per source. Two are free; the third is
+not and should not be built.**
+
+| Source | Covers | What an image costs |
+|---|---|---|
+| **Open Food Facts** (barcode + food search) | packaged foods — the BARILLA, the WPI, the Chobani | **Zero extra requests.** OFF already serves `image_front_small_url`/`image_front_thumb_url` on the *same* product object; `OFF_FIELDS` in `packages/shared/src/nutrition/open-food-facts.ts:80` is `'code,product_name,brands,serving_size,nutriments'` and simply does not ask for it. Adding a field to a call already being made costs a few hundred bytes. |
+| **The photo scan** (`app/api/nutrition/scan/route.ts`) | anything photographed | **Zero API cost.** The user's own photo is already in the request — `body.image`, base64, sent to `generateObject` at line 188 — and is **thrown away** once the nutrition JSON comes back. Keeping a downscaled copy adds no call and no model spend. |
+| **AI image generation** | text-typed foods with no barcode and no photo | **Real money, per image.** `lib/exercise-image-gen.ts` is the precedent. **The owner decided on 2026-08-26 to build it** — see the routing below. |
+
+**✅ THE OWNER SET THE ROUTING, 2026-08-26 — all three sources, one per entry path:**
+
+1. **Barcode scan → the product image from the lookup.** Add the image field to `OFF_FIELDS`; it
+   rides the call already being made.
+2. **Photo scan → the user's own photo.** Stop discarding it; downscale and keep it.
+3. **Text / AI describe → generate a "super small" image and attach it.**
+
+**Route 3 was recommended against on cost and the owner chose it anyway; that is their call and it is
+the scope.** One fact the implementer needs, because it changes *how* rather than *whether*:
+**image models bill per image, not per pixel — "super small" does not reduce the spend.** The levers
+that do:
+
+- **Cache by food name, not per log.** `exercise_gif_cache` is the existing pattern: one generation
+  serves every future occurrence of the same food, for every user. Most of the catalogue is
+  supermarket staples, so the hit rate should be high.
+- **Generate asynchronously, never in the save path.** Route 3's food is being *typed*, and the save
+  must stay instant per the repo's feedback-first rule. Write the row, return, fill the image after.
+  The placeholder is what shows until it lands — which is exactly what BF-32 built it for.
+- **~~Only for items that survive~~ — WITHDRAWN 2026-08-26, the owner is right.** The suggestion was
+  to generate on the *second* log, skipping four in five. Owner: *"I think that means the first
+  person wouldnt get an image right? We always want an image?"* — and yes: the first log is exactly
+  the moment the row is being looked at, so the saving buys a placeholder at the only time it is
+  noticed. With effectively one user, "the first person" is always the owner, so the rule would mean
+  *never* seeing an image on a new food. **Generate on first log.**
+- **⚠ `source` CANNOT tell route 2 from route 3, so the routing must happen at creation.**
+  `food-logger-sheet.tsx:165` writes `source: scanResult?.confidence ? 'ai' : 'manual'`, and
+  `ingredient-picker.tsx:169` writes `'ai'` for a text estimate. **A photo scan and a typed
+  description both land as `'ai'`** — the column records *that a model was involved*, not *what the
+  user gave it*. So the 203 `ai` items cannot be split into "already has a photo" and "needs one
+  generated" after the fact. **Decide the route where the code still knows whether an image was in
+  hand** — at the call site, not by reading the column back. If a durable split is wanted later, that
+  is a new value on `source` (or a separate column) and a Lane A migration; say so rather than
+  inferring.
+- **Volume, so the spend is a number rather than a worry.** 203 `ai` items over 87 days
+  (2026-05-31 → 2026-08-26) is **~2.3 new food items per day**. Worst case — every one of them a
+  typed description with no photo — that is **~70 generations a month**, and route 2 removes however
+  many were photographed. Check the model's current per-image price against that rate rather than
+  assuming; at any plausible figure this is a small monthly number, which is what makes "always
+  generate" affordable.
+- **Rate-limit it like every other AI route**, per CLAUDE.md, and give it the standard try/catch
+  returning a JSON error. A generation failure must leave the placeholder, never an error state on a
+  food row.
+
+**The scan photo is the best default of the three, and it is the one currently being discarded.** It
+is the user's actual meal rather than a stock shot of a similar product. Whoever builds this should
+take it first: it needs no new external dependency, and the downscale is already written —
+`components/nutrition/meal-photo-tile.tsx` does 128 px WebP at ~6 KB against a server-side
+`SAVED_MEAL_IMAGE_MAX_BYTES` cap, sized for exactly this.
+
+**📏 MEASURED AGAINST PRODUCTION 2026-08-26, because the owner asked whether a 7/14-day image
+expiry would save space. It would not, and the reason is structural rather than a judgement call.**
+
+| Measure | Value |
+|---|---|
+| Whole production database | **187 MB** |
+| `food_items` + `food_logs`, both, total | **288 kB** — **0.15%** of it |
+| Cost per text row | ~400 bytes |
+| The owner's food items | **209** |
+| …logged **exactly once** | **170 (81%)** |
+| …unused for 14 days | **114 (55%)** |
+| …never logged at all | 26 |
+
+**The reuse instinct is right — 81% of items are logged once and never again — but it does not
+translate into a deletion rule, because `food_logs.food_item_id` is `ON DELETE RESTRICT`.** An item
+referenced by any log cannot be deleted while that log exists, so "expire items unused for 14 days"
+is really "delete 14 days of history first", which nobody wants. **The only rows a retention sweep
+could actually remove are the 26 never-logged orphans — about 10 kB.**
+
+**So the lever is acquisition, not expiry**, and this entry already pulls it: take an image only
+where one arrives free (an OFF field on a call already being made; the scan photo already in hand),
+and never generate one. An image that is never fetched costs nothing and needs no rule to clean up.
+Even the pessimistic case is small — 209 items × 6 KB ≈ **1.2 MB**, and pruning 55% of that would
+recover 700 kB against a 187 MB database at $0.15/GB/month.
+
+**If storage ever does bite, the lever is history, not the catalogue.** `food_logs` is the larger and
+faster-growing of the two, and expiring it is a product decision about how far back the diary goes —
+a different and bigger conversation than images. **Do not solve it by half here.**
+
+- **Re-measure rather than trust this table.** These are the numbers on 2026-08-26; the session-start
+  database read is where a change would show. If `food_items` ever passes ~1% of the database, reopen
+  the question with fresh counts.
+
+**⚠ Correcting a premise, and it holds on the device too.** The owner expected *"we save foods for x
+amount of days in history so only a small repertoire will have its food image saved"*, and asked
+*"do all the details stay on the phone/app?"* — **yes, on both sides, and nothing prunes either.**
+The server has no cleanup job. The phone mirrors what `getSyncDelta` sends (`foodItemsReferenced` +
+`foodItemsCreated`, so items arrive as the logs that reference them arrive) and the local store has
+no `DELETE FROM food_items` at all. The 14-day window the owner is thinking of is the *local Oura
+raw* store, which is a different table and a different decision.
+
+**Two decisions to make and write down, not settle by accident:**
+1. **Store the bytes, or store the OFF URL?** A URL is free and always current but breaks offline —
+   and the row it decorates is read local-first. A stored data URI matches how `saved_meals` already
+   does it and works on a plane. **Recommended: store bytes**, for consistency with the meal photo
+   and because offline-first is the app's premise; note the licence line below.
+2. **`food_items` is shared, not per-user** — decide whether the image lives on the item (one copy,
+   everyone benefits) or per log. Item-level is right for OFF product shots; a scan photo is the
+   user's own and belongs to the log or to a user-scoped column.
+
+- **Licence, and it is a real constraint rather than a formality.** Open Food Facts product images
+  are **CC-BY-SA**. Displaying them in-app is fine; the obligation is attribution. Decide where that
+  line goes before shipping — a single credit in Settings is the cheap answer.
+- **No new render work — BF-32 already shipped it.** `FoodRow` carries `showThumb` + `thumbSrc` and
+  `components/nutrition/meal-thumb.tsx` draws the placeholder when `thumbSrc` is null. **The prop is
+  waiting and nothing fills it**, which is precisely the gap this entry closes: pass a `data:` URI
+  and the tile stops being a placeholder.
+- **Verification.** One sitting, one of each route: a barcode scan shows the product image, a photo
+  scan shows the user's own photo, and a typed food shows the placeholder **and then fills in** once
+  generation lands. Kill the network mid-generation and confirm the row keeps the placeholder rather
+  than showing an error. Then confirm offline still renders whatever was already stored.
+  `Gate: device`.
+- **Ship it in that order — 1, 2, 3 — but do NOT expect routes 1 and 2 to carry it.** An earlier note
+  here said the free routes would "fill most rows". **Measured 2026-08-26, that is wrong and the
+  correction matters for scoping:** of the owner's 209 food items, **`barcode` is 3 and `text` (the
+  OFF name search) is 3 — six items, 3%.** The other **203 are `source: 'ai'`**. Route 1 is a
+  rounding error on today's data; whether route 2 or route 3 carries the rest is the real question,
+  and it is the one the next bullet says cannot be answered from the column.
+
 ### [nutrition] LB-15 — a zero-calorie barcode product is reported as "not found"
 
 - **Lane:** A — `packages/shared/**`, whatever the edit looks like.
@@ -2055,12 +2228,17 @@ shipped TypeScript with the stress term included, not against this table.
 **Pass test:** over the same 56 days, end-of-day mean **55–65**, sd **≥ 28**, **≤ 3 days at 0** and
 **≤ 6 days at 100**, with the stress-drain term active.
 
-**History policy (owner, 2026-08-24): leave stored history alone and stamp the new model.** Old days
-keep what the owner saw; the `MODEL_VERSION` bump below is what makes the two eras separable.
-**⚠️ That policy leans on the stamp surviving, and Q-518 says it does not** — a sibling writer erases
-`model_versions` within hours. Body Battery writes its own `model_version` column and is fine; a
-readiness-side stamp is not, so **Q-518 is now load-bearing for this decision** rather than a tidy-up. Bump `MODEL_VERSION` to `v6` in the same PR
-so v5 and v6 days are never pooled — `docs/body-battery-tuning.md` depends on that stamp.
+**History policy — REVERSED by the owner on 2026-08-26. Recompute history; do not freeze it.** The
+2026-08-24 policy was *leave stored history alone and stamp the new model*. Asked again with the cost
+stated plainly (a night remembered as 71 may re-read as 78), the owner chose recomputation: *"Our
+history is still not accurate so I dont mind losing it till its something real to us."* So a
+recalibration in this cluster **re-scores the stored days** rather than applying only going forward,
+and each PR states how many past days moved and by how much before it merges.
+Still bump `MODEL_VERSION` to `v6` — the stamp is what stops a v5 day and a v6 day being pooled in a
+correlation, which is a separate guarantee from whether history was rewritten, and
+`docs/body-battery-tuning.md` depends on it. **The stamp now survives:** the sibling-writer clobber
+(Q-518/Q-273) was fixed in #525 — `model_versions` merges with `||` inside the shared upsert, so no
+pillar can erase another's key.
 
 **Not to be done here:** do not fit the boundary to a percentile of the owner's own waking HR. It is
 stable by construction, so charge goes near-constant and a genuinely restful day stops reading as
@@ -4462,6 +4640,41 @@ cross-session against the local DB. Nothing user-visible changed — **no read s
 - **Branch:** `fix/coach-applied-change-copy`
 - **Added:** 2026-08-18, from owner screenshots of a working swap. **The swap itself is fine** — this
   is the sentence around it.
+
+> ### 🔴 OWNER DECISION 2026-08-26 — the scope changed. Read this before implementing.
+>
+> Told that a Coach swap writes `session_exercises` — the **program** row, so it applies to every
+> future run of that session and not just today — the owner did not want the capability as it
+> stands: *"You dont want to be changing excercises during a program or you will lose progress for
+> it — plus for some people it would be hard to learn a new movement. Only useful if you use the
+> chat function to try change something because you got injured. So would be during a 'program'
+> creation/editing realistically."*
+>
+> **That is a behaviour change, not a copy change, and it lands first.** Two things follow:
+> 1. **The mid-program swap should not be offered as general advice.** The owner named exactly one
+>    case worth keeping — an injury forcing a substitution.
+> 2. **The copy defect mostly evaporates with it.** The stale *"Here is the proposal to…"* sentence
+>    was only ever reachable on the surface being restricted, so fixing the wording first would be
+>    building the sentence for a flow that is about to be gated.
+>
+> **Recommendation (Lane A): gate the swap on an open injury, rather than removing it.** Allow the
+> Coach's `session_exercise` swap only when the user has an open row in the `injury` domain that the
+> current exercise loads and the replacement avoids — `muscleDelta` in
+> `lib/coach/domains/session-exercise.ts` already computes exactly that coverage delta, so the
+> evidence is in hand. Outside that case the Coach explains the trade-off in the owner's own terms
+> (progress on the lift resets; a new movement has to be learned) and points at Config, which is
+> where a deliberate program edit belongs. **Why this over removing the tool:** removal also removes
+> the injury case, which is the one the owner called useful, and an injured user reaching for chat
+> is the moment they least want to be sent to a settings screen. **Reversal cost: low** — it is a
+> guard in one handler plus a prompt clause; deleting the guard restores today's behaviour exactly.
+> **Alternative worth naming:** make a chat swap *today-only* instead of program-wide. It answers
+> the progress-loss objection directly and is better if the owner wants ad-hoc substitutions at all,
+> but there is no per-day override table today, so it is a schema change rather than a guard — a
+> much larger job for a case the owner has not asked for.
+>
+> **Still open for the owner:** whether the injury gate is the right line, or whether the Coach
+> should lose the swap outright. Everything below the investigation note is the pre-decision copy
+> analysis and stays only as evidence.
 - **Lane: A — corrected 2026-08-25 (by Lane B, which this was being served to).** The entry reasoned
   from the *nature* of the edit ("it is only the system prompt, so Lane B"), and the ownership rule
   is deliberately not that: **reached by `app/api/**` → Lane A**, whatever the edit looks like. The
@@ -6915,59 +7128,6 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   its tests and by a comment in `TdeeAdaptationCard` explaining it was replaced. Same trap as
   `amrapScaleFactor` (Q-514); do not calibrate it.
 
-### [platform][readiness] Q-518 — the readiness model stamp survived 5h40m, then a sibling writer erased it
-
-- **Branch:** `fix/model-versions-jsonb-merge`
-- **Plan:** none — one conflict-arm expression. **Lane A implements; Tuning proposes only.**
-- **Added:** 2026-08-18 · Tuning agent ·
-  [`docs/reviews/2026-08-18-model-version-clobber.md`](reviews/2026-08-18-model-version-clobber.md)
-- **⚠️ This INVALIDATES a claim published today.** PR #85 reported the shared `model_versions` merge
-  *"held in production"*. It held for the readiness write and **does not survive the next
-  body-composition backfill**.
-- **Observed, same row (`oura_daily_derived`, day 2026-08-18), twice in one session:**
-
-  | read at | `model_versions` | `readiness_score` |
-  |---|---|---|
-  | **04:38:27** | `{"bodyComp": "atlas_2_1_0", "readiness": "v3:ri5:2026-08-18"}` | 76 |
-  | **10:18:40** | `{"bodyComp": "atlas_2_1_0"}` | 77 |
-
-  Rows 08-16/17/18 all carry `updated_at = 10:18:40`, so one job rewrote all three. Stamped rows across
-  the table went **1 → 0** (they had gone 0 → 1 earlier the same session, which is how it was noticed).
-- **Mechanism — `COALESCE` does not merge JSON.** `upsertOuraDailyDerived` sets every column as
-  `COALESCE(excluded.col, oura_daily_derived.col)`. Correct for scalars; for a `jsonb` column it picks
-  the first non-null **document whole**, so a non-null incoming value replaces the stored one entirely.
-  The merge is therefore left to each caller, and **only one of two callers does it**:
-
-  | writer | passes | merges? |
-  |---|---|---|
-  | `lib/health/readiness-payload.ts:544` | `{ ...existingVersions, readiness: … }` (reads the row first) | **yes** |
-  | `lib/data/postgres/slices/oura.ts:1664` | `{ bodyComp: BODY_COMP_MODEL_VERSION }` (flat literal) | **no** |
-
-  **The readiness code did nothing wrong** — it is the only participant honouring a convention the
-  shared writer does not enforce.
-- **Cost.** (1) **Q-501's purpose is defeated** — the stamp was the fix for "did this score move because
-  the inputs changed or the model did", and it does not survive a backfill. (2) Readiness was supposed
-  to be the pillar that *had* a stamp where sleep does not; in stored data it now does not either.
-  (3) Every future pillar that stamps has the same exposure — the next agent will copy readiness's
-  correct merge and still be clobbered.
-- **First action: move the merge into `upsertOuraDailyDerived`**, not into the bodyComp caller. For
-  `model_versions` the conflict arm should be
-  `COALESCE(existing.model_versions,'{}'::jsonb) || COALESCE(excluded.model_versions,'{}'::jsonb)` —
-  keeping every existing key and letting an incoming key win on collision, which is what both callers
-  already assume. **This is the pattern the codebase already chose one column over**:
-  `upsertOuraHeartrate`'s comment — *"this makes the guarantee the function's own, so every caller gets
-  it rather than each one remembering"* — and **Q-280 exists because two of its siblings missed it**.
-  Identical shape; fix it the same way.
-- **Do NOT patch the bodyComp caller alone** — that restores today's stamp and leaves the next writer to
-  rediscover the rule, which is how this happened.
-- **Re-verify by observation, not reasoning:** stamp a row via the readiness route, run the
-  body-composition backfill, re-read. Reasoning about this is what produced the wrong claim.
-- **Caveats.** The `||` expression above was **written, not run** — no test, no local DB. **The job that
-  ran at 10:18:40 was not identified directly**: the bodyComp backfill is the only `model_versions`
-  writer passing a flat object and its payload matches the surviving document exactly, but no
-  scheduler/trigger was traced, so **its cadence is unknown** and "short half-life" is an inference from
-  one observation. `readiness_score` also moved 76 → 77 between reads and **that is not explained here**.
-
 ### [sleep] Q-519 — manual bedtime entry for a night the ring missed, writing exactly one column
 
 - **Branch:** `feat/manual-bedtime-entry`
@@ -7387,8 +7547,12 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   `met_minutes` and `motion_mad`. **MET and motion do not drift with fitness**: they measure the
   effort rather than the body's response to it, so a MET of 3.0 is 3.0 at any training age. That is
   the principled answer to the difficulty below. **It has 0 rows system-wide** (as does
-  `step_live_windows`), so it is unavailable — see Q-528 §4. Until that sync path delivers, this fix
-  must come from heart rate or steps, and will inherit the drift.
+  `step_live_windows`), so it is unavailable — see Q-528 §4. **Mechanism found 2026-08-26 (Q-280
+  sweep): the server-side `upsertOuraBucket` has NO caller.** Its only references in the repo are the
+  separate local-store implementation, its tests, and the slice itself — so the table is empty
+  because nothing on the server ever writes it, not because the device stopped sending. The write
+  function is finished and correct; what is missing is the ingest route that calls it. Until that
+  sync path delivers, this fix must come from heart rate or steps, and will inherit the drift.
 - **Open question for the fix — this is the whole difficulty.** A boundary that is a fixed fraction
   of reserve re-saturates as soon as the owner's resting HR drops again (which is exactly what Q-515
   measured happening). Candidates, none yet fitted: a **personal EMA of waking HR** rather than
@@ -7637,38 +7801,6 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   owner decided the *question* each score answers, which does not depend on where the correlation
   settles. The labelling work can proceed now; Q-272 and Q-521 change Body Battery's behaviour
   underneath it without changing what it is for.
-
-### [platform][devices] Q-280 — Q-214's duplicate-collapse fix reached one of three same-shaped batch upserts
-
-- **Branch:** `fix/batch-upsert-duplicate-collapse`
-- **Plan:** none needed — this is a contained change with a clear reference implementation
-- **Added:** 2026-08-15 · from the comprehensive review §3.1
-- **Background, confirmed from production.** `error_events` holds **5,771 hits** of `[pg 21000]`
-  (cardinality violation) on `POST /api/hr-ingest` — an `ON CONFLICT DO UPDATE` whose VALUES list
-  hit the same conflict row twice, which Postgres rejects **for the whole statement**, discarding
-  chunks of up to 5,000 HR points. **Last occurrence 2026-08-13T00:17; Q-214's fix landed the same
-  day and it has stopped.** Not a regression — this entry is the sibling sweep.
-- **`upsertOuraHeartrate`'s own comment states the intent:** *"this makes the guarantee the
-  function's own, so every caller gets it rather than each one remembering."* Two siblings in the
-  same file have the identical shape and did not get it:
-
-  | function (`lib/data/postgres/slices/oura.ts`) | conflict target | collapses duplicates first? |
-  |---|---|---|
-  | `upsertOuraHeartrate` (L258) | `(user_id, timestamp)` | ✅ fixed by Q-214 |
-  | **`upsertOuraBucket` (L321)** | `(user_id, tier, bucket_start_ms)` | ❌ no — 2,000-row chunks |
-  | **`upsertSetHrStats` (L818)** | `set_log_id` | ❌ no |
-  | `insertRrIntervals` (L636) | — | n/a — `onConflictDoNothing` is exempt from 21000 |
-  | `upsertOuraDailySummary` (L1107) | `(user_id, date)` | n/a — one row per statement |
-- **`upsertOuraBucket` is the one that matters.** It is fed by the same BLE rollup that produced the
-  duplicates on `oura_heartrate`, and it writes 2,000-row chunks — so one duplicated
-  `(tier, bucket_start_ms)` discards 2,000 buckets. `upsertSetHrStats` is lower risk (a repeated
-  `set_log_id` in one batch needs a caller bug) but is the same class and the fix is three lines.
-- **Fix:** lift the `Map`-keyed-on-conflict-target collapse out of `upsertOuraHeartrate` into a small
-  shared helper and use it in all three, so the next batch upsert added to this file inherits it
-  rather than remembering it. Last-value-wins, matching the `excluded.*` semantics the ON CONFLICT
-  arms already use.
-- **Test:** the existing `hr-ingest-poison-pill.test.ts` is the pattern — a batch containing a
-  deliberate duplicate must persist, not 500.
 
 ### [platform][readiness] Q-278 — a score that could not be computed is rendered identically to a score of 76
 

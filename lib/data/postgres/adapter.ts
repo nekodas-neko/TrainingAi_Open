@@ -9,6 +9,7 @@ import { ouraIdForActivityType } from '@trainingai/shared/health/daily-energy'
 import { ageFromDob } from '@trainingai/shared/date-utils'
 import { mergePreferences, type UserPreferences } from '@trainingai/shared/user/preferences'
 import * as s from './schema'
+import { collapseOnConflict, keepLatestNonNull } from './collapse-conflicts'
 import { invitedEmails } from './schema'
 import { resolveSyncCursor } from '@trainingai/shared/sync/cursor'
 import { isRetryableWriteError } from '@trainingai/shared/sync/retryable-error'
@@ -883,8 +884,13 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
 
   async logSets(exerciseLogId: string, sets: Omit<SetLog, 'id' | 'exerciseLogId'>[]): Promise<SetLog[]> {
     if (sets.length === 0) return []
+    // A payload naming one set_number twice rejects the whole INSERT (21000) and loses every set in
+    // the exercise, not just the repeat. Bare EXCLUDED arm → last wins. See `collapse-conflicts.ts`.
+    // Collapsed once and reused: the `.returning()` rows are zipped against this array by index
+    // below, so collapsing inline would misalign every set after the first duplicate.
+    const deduped = collapseOnConflict(sets, set => set.setNumber)
     const rows = await this.db.insert(s.setLogs)
-      .values(sets.map(set => ({
+      .values(deduped.map(set => ({
         exerciseLogId, setNumber: set.setNumber, weightKg: set.weightKg,
         reps: set.reps, setTimeSec: set.setTimeSec ?? null,
         restTimeSec: set.restTimeSec ?? null, intensityPct: set.intensityPct ?? null,
@@ -904,7 +910,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
         },
       })
       .returning()
-    return rows.map((r, i) => ({ ...sets[i], id: r.id, exerciseLogId }))
+    return rows.map((r, i) => ({ ...deduped[i], id: r.id, exerciseLogId }))
   }
 
   async logExerciseAndSets(
@@ -991,9 +997,16 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       const exerciseLogId = r.id
       const exerciseLog: ExerciseLog = { ...log, id: exerciseLogId, sets: [] }
       if (sets.length === 0) return { exerciseLog, setLogs: [] }
+      // Collapsed once and reused: `.returning()` is zipped against this array by index below, and
+      // `total_sets` is counted from it — collapsing inline would misalign the first and inflate
+      // the second whenever a payload repeats a set id.
+      const deduped = collapseOnConflict(
+        sets.map(set => ({ ...set, id: set.id ?? crypto.randomUUID() })),
+        set => set.id,
+      )
       const setRows = await tx.insert(s.setLogs)
-        .values(sets.map(set => ({
-          id: set.id ?? crypto.randomUUID(),
+        .values(deduped.map(set => ({
+          id: set.id,
           exerciseLogId, setNumber: set.setNumber, weightKg: set.weightKg,
           reps: set.reps, setTimeSec: set.setTimeSec ?? null,
           restTimeSec: set.restTimeSec ?? null, intensityPct: set.intensityPct ?? null,
@@ -1025,7 +1038,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
           },
         })
         .returning()
-      const setLogs: SetLog[] = setRows.map((sr, i) => ({ ...sets[i], id: sr.id, exerciseLogId }))
+      const setLogs: SetLog[] = setRows.map((sr, i) => ({ ...deduped[i], id: sr.id, exerciseLogId }))
 
       // Maintain running totals — count exercise_logs for this session before our insert
       // to detect first exercise (increments total_sessions once per session).
@@ -1043,7 +1056,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       if (ws && !isReplay) {
         const sessionDelta = Number(prevExCount) === 0 ? 1 : 0
         const volumeDelta = log.volume ?? 0
-        const setsDelta = sets.length
+        const setsDelta = deduped.length
         await tx.execute(sql`
           INSERT INTO user_stats (user_id, total_sessions, total_volume_kg, total_sets, updated_at)
           VALUES (${ws.userId}::uuid, ${sessionDelta}, ${volumeDelta}, ${setsDelta}, NOW())
@@ -1822,7 +1835,10 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   async upsertBodyMetrics(userId: string, metrics: Omit<BodyMetrics, 'id' | 'userId' | 'createdAt'>[], source: HealthSource): Promise<void> {
     if (metrics.length === 0) return
     await this.db.insert(s.bodyMetrics)
-      .values(metrics.map(m => {
+      // Health Connect ingest and the sync push both send batches keyed only by `date`; one repeat
+      // rejects every metric in the batch (21000). The rank arm keeps a stored value when the
+      // incoming one is NULL and every row here shares `source`, so `keepLatestNonNull` is that arm.
+      .values(collapseOnConflict(metrics, m => m.date, keepLatestNonNull).map(m => {
         const v = {
           userId, date: m.date,
           weightKg: m.weightKg ?? null, bodyFatPct: m.bodyFatPct ?? null,
