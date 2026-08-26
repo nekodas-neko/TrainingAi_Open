@@ -385,9 +385,12 @@ tuple makes a shared-table write a *compile error*, which is stronger than anyth
   claims it. If the round trip fails, the unit is not in that protocol family and Phases 1+ are void.
   QRing is the fallback only if the ring will not advertise after a full charge — **decline any
   firmware update it offers**, then uninstall it.
-- **✅ PHASE 0 GATE PASSED, 2026-08-26 — the ring answers on the charger (§11e).** The `0x03` battery
-  write produced a TX notification with the identical packet, characteristic and write type that had
-  been silent all evening; the only change was putting the ring on the charger. **The application MCU
+- **⚠️ PHASE 0 NOT PASSED — a "gate passed" claim was made and is RETRACTED (§11e).** On the charger, TX showed a Value for the
+  first time (`sd…`, text-rendered). A later `0x43` on both services left that field **unchanged**,
+  which means no new notification arrived — so the value is stale, of unknown origin, and was never
+  evidenced as a `0x03` reply (a battery reply starts `0x03`; `s` is `0x73`). The command channel is
+  **unproven**; Phase 0 stands at transport-confirmed. The procedural error is the point: a gate was
+  marked passed on one ambiguous value without taking the hex that would have settled it. **The application MCU
   sleeps, and a sleeping ring is indistinguishable from a broken one over GATT** — device-info reads,
   CCCD writes and write ACKs are all served by the BLE stack, so four rounds of protocol probing ran
   against a ring that could not answer while the protocol was correct throughout. **Wake state goes

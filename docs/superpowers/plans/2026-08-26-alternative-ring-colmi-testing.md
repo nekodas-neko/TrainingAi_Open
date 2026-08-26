@@ -439,7 +439,7 @@ Read in nRF Connect on a factory-fresh ring. **No vendor app was ever installed.
 | `6E40FFF0-…` service present? | **yes** |
 | RX `6E400002-…` | **present** — WRITE, WRITE NO RESPONSE |
 | TX `6E400003-…` | **present** — NOTIFY, with CCCD `0x2902` |
-| `0x03` round trip | **REPLY RECEIVED on the charger** — see §11e |
+| `0x03` round trip | **UNRESOLVED** — one unverified value seen, see §11e |
 | Firmware Revision, trial end | _not yet read_ |
 
 **What this settles:** the R09 exposes the R02 family's transport exactly — same service UUID, same
@@ -603,45 +603,42 @@ connection parameters, MTU negotiation, transaction sequencing and retry — pre
 device-support class exists to get right and a manual GATT explorer does not attempt. Continuing to
 poke by hand is now the expensive path to an answer §11d gets for free.
 
-### 11e. GATE PASSED — the ring answers, but only with its application MCU awake (2026-08-26)
+### 11e. A value appeared on TX once, and the gate is NOT passed — corrected 2026-08-26
 
-**On the charger, the `0x03` battery write produced a notification on TX `6e400003` for the first
-time.** Same packet, same characteristic, same write type that had been silent all evening. The only
-variable changed was the charger.
+**This section previously read "GATE PASSED". That was wrong and is retracted.** It was written on a
+single observation: after putting the ring on the charger and writing `0x03`, TX `6e400003` showed a
+Value for the first time, rendered by nRF as the text `sd…`.
 
-**This is the Phase 0 gate, passed.** Transport, framing and the command channel are now confirmed
-on the owner's own unit rather than inherited from a client that does not list the model.
+**What came next disproves the reading.** A subsequent `0x43` (sync activity) write on both V1 and V2
+left TX showing **the identical `sd…`** — unchanged. A characteristic's Value field updates when a
+notification arrives, so an unchanged field across a new command means **no new notification
+arrived**. The `sd…` is a stale single value of unknown origin, and there is no evidence it was a
+response to `0x03` at all: the battery reply must begin `0x03`, and `s` is `0x73`.
 
-**The finding that matters more than the gate: the ring's application processor sleeps, and a
-sleeping ring is indistinguishable from a broken one over GATT.** Everything that worked during the
-silent period — device info reads, CCCD writes, and the write ACKs themselves — is served by the
-**BLE stack**. Executing a command needs the **application MCU**, which these rings power-gate hard.
-Four rounds of protocol probing were run against a ring that was never going to answer, and the
-protocol was correct the whole time.
+**The error worth recording is procedural, not technical.** `CLAUDE.md` says never to mark something
+fixed from intent, and to confirm it was *observed working*. A gate was marked passed on one
+ambiguous value, in a rendering known to mangle non-printable bytes, without ever obtaining the hex
+that would have settled it — while the hex was one tap away in the log the whole time. The charger
+hypothesis may still be right; it is simply **not evidenced**, and the two claims got merged.
 
-`CLAUDE.md` already documents the identical behaviour for the Oura — *"the ring radio/PPG sleeps
-when worn-idle — wakes on charger, worn+moving, or during sleep"* — and this plan cited it as a
-low-ranked candidate rather than checking it first. **Wake state belongs at the top of the
-diagnostic order for any ring, before any protocol hypothesis**, because it is free to test and it
-invalidates every result taken while it holds.
+**Status: Phase 0 remains at transport-confirmed.** The command channel is unproven.
 
-**Design consequence for Phase 3, and it is not cosmetic.** A sync that assumes the ring answers on
-demand will silently return nothing whenever the ring has been still. In normal use the ring is worn
-and moving, which should keep it awake — but "should" is doing work there, and the failure mode is
-*silence*, not an error. The sync path therefore needs:
+**The one measurement that would settle it, and has still not been taken:** the raw bytes, from the
+**nRF Connect log** — the maroon floating button, bottom right. It prints, per event:
 
-- a **timeout with a distinguishable outcome** — "ring asleep / did not answer" must not surface as
-  "no data", which is what would otherwise be recorded;
-- a **retry** rather than a single attempt, since wake is a race against the user's own movement;
-- **no cursor advance and no "synced" state** on a silent attempt. The Oura pipeline's rule applies
-  unchanged: only advance past what was durably received.
+```
+Notification received from 6e400003-…, value: (0x) XX-XX-XX-…
+```
 
-**Still to capture:** nRF renders the reply as text (`sd…`) rather than hex, so the actual bytes are
-not yet recorded. Read them from the **nRF Connect log** (floating button), which prints
-`Notification received from 6e400003…, value: (0x) …`. Expected layout per Gadgetbridge:
-`[0] = 0x03`, `[1] = battery %`, `[2] = charging flag (1 while on the charger)`. **Do not decode the
-text rendering** — it drops and mangles non-printable bytes, and guessing from it is how the last
-few hours went.
+The Value field shows a *decoded rendering* of the last thing that arrived. The log shows *what
+arrived, when, in hex, and whether anything arrived at all* — including ATT errors on the writes.
+Every conclusion in this section and the last two would have been decidable from it.
+
+**Recommendation, now unambiguous: stop hand-driving and install Gadgetbridge (§11d).** Five rounds
+of manual GATT probing have produced one unexplained value and no decoded data. The remaining
+differences between a GATT explorer and a device-support class — connection parameters, MTU,
+transaction sequencing, retry, and the connect handshake's timing — are exactly what is not being
+replicated by hand, and Gadgetbridge implements all of them for `R09_.*` specifically.
 
 ### 11d. Gadgetbridge is the reference implementation, and it should be installed next
 

@@ -198,29 +198,35 @@ Also noted for next time: nRF Connect's Value field shows what was *sent*, not w
 accepted. The log behind the floating button carries the ATT results and errors, and not reading it
 earlier left a gap that three rounds of probing could not close.
 
-## The ring answers on the charger — gate passed, and the lesson is the interesting part
+## A "gate passed" claim, retracted the same evening
 
-The same `0x03` battery packet, the same characteristic, the same write type that had been silent
-all evening produced a notification the moment the ring was on the charger. Phase 0 is passed:
-transport, framing and the command channel are confirmed on this unit rather than inherited from a
-client that does not list the model.
+A value appeared on TX for the first time after the ring went on the charger, rendered as the text
+`sd…`, and this entry recorded the Phase 0 gate as passed. **That was wrong.** A following `0x43`
+write on both services left the field showing the identical `sd…`. The Value field updates when a
+notification arrives, so unchanged across a new command means nothing new arrived — the value is
+stale and of unknown origin, and was never evidenced as a `0x03` reply in the first place, since a
+battery reply begins `0x03` and `s` is `0x73`.
 
-**The application processor sleeps, and a sleeping ring is indistinguishable from a broken one over
-GATT.** Every read that succeeded during the silent period — device info, the CCCD, the write ACKs
-themselves — is served by the BLE stack. Running a command needs the application MCU, which these
-rings power-gate hard. So four rounds of protocol probing were spent on a ring that was never going
-to answer, while the protocol was right the whole way through.
+Phase 0 stands at transport-confirmed. The command channel is unproven.
 
-`CLAUDE.md` already carries this for the Oura, in almost these words: the ring wakes on charger,
-worn and moving, or during sleep. The plan cited it as a low-ranked candidate instead of testing it
-first, which is backwards — wake state is free to check and it invalidates every measurement taken
-while it holds. It belongs above every protocol hypothesis in the diagnostic order for any ring.
+The failure is procedural and this repo already has the rule for it: never mark something fixed from
+intent, confirm it was observed working. A gate was called on one ambiguous value, in a rendering
+that is documented to mangle non-printable bytes, without ever taking the hex — which was one tap
+away in the nRF Connect log for the entire evening. The charger hypothesis might still be correct.
+It is simply not evidenced, and the two got merged into a claim.
 
-**It also changes Phase 3.** A sync that assumes the ring answers on demand returns nothing whenever
-the ring has been still, and returns it *as silence rather than as an error*. In normal wear the
-ring should stay awake, but the sync path still needs a timeout whose outcome is distinguishable
-from "no data", a retry rather than a single attempt, and no cursor advance or synced-state write on
-a silent attempt — the Oura durability rule, unchanged.
+The wake-state lesson from the previous section survives as a *hypothesis worth testing first*, not
+as a measured result, and the Phase 3 sync consequences it implies are held until something confirms
+it.
+
+## Five rounds of manual probing, and the tool was available throughout
+
+The honest summary of the evening: manual GATT probing eliminated write type, checksum, service,
+opcode, bonding and device-match — all real results, all obtained by reading the working client's
+source rather than from the ring — and produced no decoded byte from the device itself.
+Gadgetbridge implements `R09_.*` specifically, including the connection parameters, MTU, transaction
+sequencing and handshake timing that a GATT explorer does not attempt. It was the recommendation
+three rounds before it was taken.
 
 ## Deployment shape
 
