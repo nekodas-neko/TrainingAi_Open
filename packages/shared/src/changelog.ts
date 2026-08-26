@@ -6,6 +6,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.384.0",
+    date: "2026-08-26",
+    changes: [
+      "Log Food is one screen now. It used to ask \"how would you like to log food?\" and show five tiles before showing any food at all; it opens on your food instead, with Recent, Meals and Single foods as tabs, and Photo, Barcode and Describe-or-enter as a row above them. Describe and manual entry were two separate tiles leading to two separate screens \u2014 they are one panel with both visible, because which one you want is not something you can decide before seeing the fields.",
+      "Saved meals and single foods are two lists again, side by side as tabs. Merging them put a recipe you built and a single ingredient in the same list, which made \"log this\" mean two different things depending on the row. The names say which is which now rather than both starting with \"My\", and the button on the Nutrition screen is My Meals, which is where it takes you.",
+      "One fewer screen to back out of: opening a meal from Log Food is two layers deep rather than three, so the back gesture gets you out in two presses.",
+    ],
+  },
+  {
     version: "1.383.6",
     date: "2026-08-26",
     changes: [

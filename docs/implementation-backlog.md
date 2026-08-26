@@ -1183,6 +1183,30 @@ whether or not anyone draws them first.
   in both themes, so a green `pnpm dev` is not sufficient evidence and a Known-Issues row is the
   fallback if no device is available.
 
+### [platform] LB-19 — two e2e specs fail on `main` in-session, and the cause is a time budget rather than a defect
+
+- **Lane:** B
+- **Added:** 2026-08-26, found while verifying LB-16. **Attributed before filing**: both fail
+  identically on a detached `origin/main` checkout with none of that branch's code, so they are not
+  the change that found them.
+- **The two:**
+  - `meal-label.spec.ts:111` *a saved meal renders a printable label in every style* — **exceeds its
+    own 180 s timeout**, having already reached the label sheet with the QR drawn and the style
+    selected (screenshot confirms). It then switches style **ten times**, each behind a 20 s
+    `poll`, and for four of them pulls the whole canvas into Node and runs a zxing decode.
+  - `goal-invalidation.spec.ts:57` *a steps-goal edit reaches Health without a reload* — four
+    navigations and two 60 s waits.
+- **Read them as marginal-by-construction, the shape CLAUDE.md already documents for the Oura rollup
+  tests**: work that fits comfortably on CI's runner and does not fit here. The rollup tests were
+  fixed by giving them their own vitest project with a 60 s timeout rather than by changing what they
+  assert; the same move exists here (`playwright.config.ts` takes per-file `test.setTimeout`).
+- **Do not weaken what they check.** `meal-label`'s decode loop is the closest the sandbox gets to
+  the print test that is still owed — it proves the symbol is unobstructed at every layout, which is
+  exactly the thing a layout change breaks silently.
+- **First step is to find out whether CI agrees.** E2E is path-gated since #556, so a run that
+  touches these paths is the evidence; if CI is green on both, this is a sandbox-budget entry and
+  the fix is a timeout. If CI is red, it is a real defect and this entry is mis-titled.
+
 ### [nutrition] LB-18 — `Recent` on Log Food is scoped to a meal bucket; it may want to be global
 
 - **Lane:** A (the source), B (the swap)
