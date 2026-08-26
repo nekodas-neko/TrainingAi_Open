@@ -556,6 +556,8 @@ That number is more valuable than either input on its own.
 
 ### [nutrition][app-shell] Q-406 — the shared food row: two call sites converted, two waiting on their phase
 
+- **Gate:** owner — option A is not buildable as decided; see the blocked note below.
+
 > **✅ THE DIARY ROW CONVERTED 2026-08-25 (v1.367.0)** — `meal-card.tsx` draws the shared `FoodRow`
 > and `QuickEditLogSheet` **gained a delete in the same change**, which this entry required before the
 > conversion could be safe. Q-395a was meant to carry it and did not. Per-item P/C/F moved into the
@@ -604,6 +606,25 @@ That number is more valuable than either input on its own.
     entry is for.
   - **A → C stays open if the sentence later has to be visible in the list** — it is additive.
     Starting at C and pulling the slot out means touching every call site again. Do not pre-build it.
+
+- **⚑ BLOCKED 2026-08-26 — option A moves the sentence somewhere that does not exist.** **This
+  surface has no food detail:** `ingredient-search.tsx:124`'s tap runs `addExternalFood` →
+  `createFoodItem` + `accept()`, which **adds the food to the meal** with no inspect step,
+  confirmation or quantity sheet in between. So *"the sentence moves to the food's detail"* has no
+  destination here, and building A **deletes the only visible explanation** — a net loss on a
+  warning meant to be read before use. Not built.
+- **What it needs to become buildable**, cheapest first: **(1)** keep the sentence in the row — that
+  is option B, but the reason B lost (it *replaced* the serving line) does not apply to keeping it
+  *alongside*, which is what ships today; **(2)** give the row an inspect step, tap to open and add
+  as a second action — a real interaction change on a path whose speed is the point; **(3)** ship A
+  with the sentence as the icon's accessible name, which loses nothing to a screen reader and
+  everything to a sighted thumb, since a phone has no hover.
+- **The conversion is blocked by the same question.** The external row is **not** `FoodRow` today —
+  it is a bespoke `<button>` (`ingredient-search.tsx:122`), while `SearchResultRow` beside it *is*.
+  Converting it is this entry's goal and needs to know where the warning goes: A's *"immediately
+  before the calorie column"* requires the shared row to draw it, which is the slot this entry rules
+  out. Pick 1, 2 or 3 and the conversion follows.
+
 - **The in-flight spinner needs no decision** and never did: it swaps the green `+` inside the same
   16 px box, so it is a state of an existing element rather than a new slot. It works under any of
   the three treatments.
