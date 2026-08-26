@@ -83,3 +83,31 @@ only where one arrives free, never generate one. An image never fetched needs no
 That is worth writing down rather than answering in chat, because the next person to have this idea
 will have it for the same good reason, and the foreign key is not visible from the feature
 description.
+
+## The owner routed all three
+
+*"1. IF bardcode scan = show display image from item lookup / 2. if picture scan; use the picture as
+the food / 3. if text AI describe; then generate a super small image and attach."*
+
+Routes 1 and 2 are what the entry already recommended. **Route 3 was recommended against on cost and
+chosen anyway** — that is the owner's call and it is now the scope. The entry records the
+recommendation, the decision, and stops arguing.
+
+What it adds instead is the part that changes: **image models bill per image, not per pixel, so
+"super small" does not reduce the spend.** The mitigation the owner reached for does not do what it
+looks like it does, and saying so is more useful than repeating the objection. Four levers that do
+work, all written into the entry:
+
+- **Cache by food name, not per log** — `exercise_gif_cache` is the existing pattern, and most of a
+  personal catalogue is supermarket staples.
+- **Generate off the save path.** Route 3's food is being *typed*; the save must stay instant per the
+  feedback-first rule. The placeholder is what shows until the image lands, which is what BF-32 built
+  it for.
+- **Generate on the second log, not the first.** 81% of items are logged exactly once, so this skips
+  four in five generations for no visible loss.
+- **Rate-limit and fail soft.** A generation failure leaves the placeholder; it never becomes an
+  error state on a food row.
+
+And a sequencing note: ship 1, 2, 3 in that order and consider stopping to look after 2. The free
+routes cover the packaged and photographed foods between them, and whether route 3 is worth paying
+for is much easier to judge once the remaining placeholders are visible on screen.

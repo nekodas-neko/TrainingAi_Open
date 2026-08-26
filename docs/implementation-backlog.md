@@ -458,7 +458,32 @@ not and should not be built.**
 |---|---|---|
 | **Open Food Facts** (barcode + food search) | packaged foods — the BARILLA, the WPI, the Chobani | **Zero extra requests.** OFF already serves `image_front_small_url`/`image_front_thumb_url` on the *same* product object; `OFF_FIELDS` in `packages/shared/src/nutrition/open-food-facts.ts:80` is `'code,product_name,brands,serving_size,nutriments'` and simply does not ask for it. Adding a field to a call already being made costs a few hundred bytes. |
 | **The photo scan** (`app/api/nutrition/scan/route.ts`) | anything photographed | **Zero API cost.** The user's own photo is already in the request — `body.image`, base64, sent to `generateObject` at line 188 — and is **thrown away** once the nutrition JSON comes back. Keeping a downscaled copy adds no call and no model spend. |
-| **AI image generation** | text-typed foods with no barcode and no photo | **Real money, per image.** `lib/exercise-image-gen.ts` is the precedent, so it is buildable — **and this entry recommends against it.** It is the only source that fails the owner's "no more time/expense" condition, and the placeholder is a perfectly good answer for a food nobody photographed. |
+| **AI image generation** | text-typed foods with no barcode and no photo | **Real money, per image.** `lib/exercise-image-gen.ts` is the precedent. **The owner decided on 2026-08-26 to build it** — see the routing below. |
+
+**✅ THE OWNER SET THE ROUTING, 2026-08-26 — all three sources, one per entry path:**
+
+1. **Barcode scan → the product image from the lookup.** Add the image field to `OFF_FIELDS`; it
+   rides the call already being made.
+2. **Photo scan → the user's own photo.** Stop discarding it; downscale and keep it.
+3. **Text / AI describe → generate a "super small" image and attach it.**
+
+**Route 3 was recommended against on cost and the owner chose it anyway; that is their call and it is
+the scope.** One fact the implementer needs, because it changes *how* rather than *whether*:
+**image models bill per image, not per pixel — "super small" does not reduce the spend.** The levers
+that do:
+
+- **Cache by food name, not per log.** `exercise_gif_cache` is the existing pattern: one generation
+  serves every future occurrence of the same food, for every user. Most of the catalogue is
+  supermarket staples, so the hit rate should be high.
+- **Generate asynchronously, never in the save path.** Route 3's food is being *typed*, and the save
+  must stay instant per the repo's feedback-first rule. Write the row, return, fill the image after.
+  The placeholder is what shows until it lands — which is exactly what BF-32 built it for.
+- **Only for items that survive.** 81% of items are logged exactly once (see the measurement below).
+  Generating on the *second* log rather than the first would skip four in five generations for no
+  visible loss. **Recommended, and cheap to change later if it feels wrong.**
+- **Rate-limit it like every other AI route**, per CLAUDE.md, and give it the standard try/catch
+  returning a JSON error. A generation failure must leave the placeholder, never an error state on a
+  food row.
 
 **The scan photo is the best default of the three, and it is the one currently being discarded.** It
 is the user's actual meal rather than a stock shot of a similar product. Whoever builds this should
@@ -523,9 +548,15 @@ raw* store, which is a different table and a different decision.
   `components/nutrition/meal-thumb.tsx` draws the placeholder when `thumbSrc` is null. **The prop is
   waiting and nothing fills it**, which is precisely the gap this entry closes: pass a `data:` URI
   and the tile stops being a placeholder.
-- **Verification.** A barcode scan, a photo scan and a hand-typed food, in one sitting: the first two
-  show a real picture on the diary row, the third shows the placeholder and no error. Then confirm
-  offline still renders whatever was stored. `Gate: device`.
+- **Verification.** One sitting, one of each route: a barcode scan shows the product image, a photo
+  scan shows the user's own photo, and a typed food shows the placeholder **and then fills in** once
+  generation lands. Kill the network mid-generation and confirm the row keeps the placeholder rather
+  than showing an error. Then confirm offline still renders whatever was already stored.
+  `Gate: device`.
+- **Ship it in that order — 1, 2, 3 — and consider stopping to look after 2.** Routes 1 and 2 are
+  free, cover the packaged and photographed foods, and between them will fill most rows. Route 3 is
+  the only one that spends money, and it is much easier to judge whether it is worth it once the
+  other two are on screen and the remaining placeholders are visible.
 
 ### [nutrition] LB-15 — a zero-calorie barcode product is reported as "not found"
 

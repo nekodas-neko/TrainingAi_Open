@@ -2944,3 +2944,14 @@ that references it. A retention sweep could only ever remove the 26 never-logged
 
 Written out because the next person to have this idea will have it for the same good reason, and the
 FK is not visible from the feature description.
+
+## 2026-08-26 — `docs/implementation-backlog.md` raised, 12164 → 12195 (BF-35 routing decided)
+
+The owner routed all three image sources — barcode → product image, photo scan → the user's own
+photo, text → generate one. **Route 3 was recommended against on cost and chosen anyway**, so the
+entry records the decision and moves on to how rather than whether.
+
+The added lines are the four cost levers that actually work, because the owner's own mitigation
+does not: **image models bill per image, not per pixel, so "super small" does not reduce spend.**
+Cache by food name, generate off the save path, generate on the second log rather than the first
+(81% of items are logged once), and rate-limit it like every other AI route.
