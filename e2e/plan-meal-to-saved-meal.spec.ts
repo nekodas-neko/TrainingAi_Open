@@ -148,9 +148,9 @@ async function openPlanMeals(page: Page) {
   }).toPass({ timeout: 60_000 })
 }
 
-test('saving one planned meal copies it into My Meals at the planned weight', async ({ page }) => {
+test('saving one planned meal copies it into My Foods at the planned weight', async ({ page }) => {
   await openPlanMeals(page)
-  await tap(page, `Save ${NAME_A} to My Meals`)
+  await tap(page, `Save ${NAME_A} to My Foods`)
 
   await expect.poll(() => savedCopies(NAME_A), { timeout: 20_000 }).toHaveLength(1)
   const [item] = await savedCopies(NAME_A)
@@ -170,23 +170,23 @@ test('saving one planned meal copies it into My Meals at the planned weight', as
 test('a saved meal reads as kept, and saving the rest never duplicates it', async ({ page }) => {
   await openPlanMeals(page)
   // Kept meals show a state, not a disabled button — and the offer is gone.
-  await expect(page.getByText('In My Meals')).toBeVisible({ timeout: 30_000 })
-  await expect(page.getByRole('button', { name: `Save ${NAME_A} to My Meals` })).toHaveCount(0)
+  await expect(page.getByText('In My Foods')).toBeVisible({ timeout: 30_000 })
+  await expect(page.getByRole('button', { name: `Save ${NAME_A} to My Foods` })).toHaveCount(0)
 
   // "Save all" counts only what is left, which is the property that stops a second press
   // re-copying the first meal.
-  await tap(page, /^Save all 1 to My Meals$/)
+  await tap(page, /^Save all 1 to My Foods$/)
 
   await expect.poll(() => savedCopies(NAME_B), { timeout: 20_000 }).toHaveLength(1)
   expect(await savedCopies(NAME_A), 'the already-saved meal must not be copied again').toHaveLength(1)
   await expect.poll(() => stampOf(MEAL_B), { timeout: 20_000 }).not.toBeNull()
 })
 
-test('the copy is tagged in My Meals as coming from the plan', async ({ page }) => {
+test('the copy is tagged in My Foods as coming from the plan', async ({ page }) => {
   await page.goto('/nutrition')
   await settleRouteBoundary(page)
   await expect(async () => {
-    await tap(page, /^Saved Meals$/)
+    await tap(page, /^My Foods$/)
     await expect(page.getByText(NAME_A)).toBeVisible({ timeout: 3_000 })
   }).toPass({ timeout: 60_000 })
 

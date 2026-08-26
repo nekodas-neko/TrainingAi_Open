@@ -167,7 +167,7 @@ export function MyMealsPicker({
           </div>
         ) : meals.length === 0 ? (
           <p className="text-[11px] leading-snug text-muted-foreground">
-            You have no saved meals yet. Anything you save from a food scan or from a plan shows up
+            Nothing in My Foods yet. Anything you save from a food scan or from a plan shows up
             here next time.
           </p>
         ) : (

@@ -52,7 +52,7 @@ export function NutritionActionRow({
         className="min-h-[48px] flex items-center gap-2.5 rounded-2xl border border-border bg-muted/60 px-3 py-3 active:bg-muted/20 transition-colors"
       >
         <UtensilsCrossed className="w-4 h-4 text-muted-foreground flex-none" />
-        <span className="text-sm font-semibold flex-1 text-left">Saved Meals</span>
+        <span className="text-sm font-semibold flex-1 text-left">My Foods</span>
       </button>
     </div>
   )

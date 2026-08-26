@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useUserTimezone } from '@/components/shell/user-timezone-provider'
 import { X } from 'lucide-react'
 import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet'
@@ -8,7 +8,6 @@ import { CaptureStep } from './capture-step'
 import { ReviewStep, type EditableNutrition } from './review-step'
 import { AssignStep } from './assign-step'
 import { SavedMealsSheet } from './saved-meals-sheet'
-import { FoodLibrarySheet } from './food-library-sheet'
 import type { NutritionScanResult, NutritionIngredient, FoodItem, FoodLogWithItem, SavedMeal, MealType } from '@trainingai/shared/types/nutrition'
 import { todayInTz } from '@trainingai/shared/date-utils'
 import { mealTypeForHour } from '@trainingai/shared/nutrition/log-plan-meal'
@@ -71,9 +70,17 @@ interface Props {
   onLogged: (newLog?: FoodLogWithItem) => void
   userId?: string
   logDate?: string
+  /**
+   * Open straight onto My Foods rather than the capture tiles (Q-395c).
+   *
+   * `/nutrition`'s My Foods button used to open `SavedMealsSheet` directly. It cannot any more: the
+   * list shows foods as well as meals, and a food's tap needs the **assign** step, which lives
+   * here. So the button opens the logger onto the list instead of opening the list alone.
+   */
+  openMyFoods?: boolean
 }
 
-export function FoodLoggerSheet({ open, preselectedMealTypeId = null, onClose, onLogged, userId, logDate }: Props) {
+export function FoodLoggerSheet({ open, preselectedMealTypeId = null, onClose, onLogged, userId, logDate, openMyFoods }: Props) {
   // Q-413: the eaten-at resolution happens in the USER's zone, not the device's.
   const tz = useUserTimezone()
   const [stepStack, setStepStack] = useState<Step[]>(['capture'])
@@ -87,7 +94,12 @@ export function FoodLoggerSheet({ open, preselectedMealTypeId = null, onClose, o
   const [ingredients, setIngredients] = useState<NutritionIngredient[]>([])
   const [form, setForm] = useState<EditableNutrition>(BLANK)
   const [showSavedMeals, setShowSavedMeals] = useState(false)
-  const [showLibrary, setShowLibrary] = useState(false)
+
+  // Keyed on `open` so re-opening the logger honours the flag again; a mount-only effect would run
+  // once and leave every later open on the capture tiles.
+  useEffect(() => {
+    if (open && openMyFoods) setShowSavedMeals(true)
+  }, [open, openMyFoods])
   // When logging from the food library we already have the food item — skip creation
   const [libraryItemId, setLibraryItemId] = useState<string | null>(null)
 
@@ -97,7 +109,6 @@ export function FoodLoggerSheet({ open, preselectedMealTypeId = null, onClose, o
     setIngredients([])
     setForm(BLANK)
     setShowSavedMeals(false)
-    setShowLibrary(false)
     setLibraryItemId(null)
   }
 
@@ -133,6 +144,9 @@ export function FoodLoggerSheet({ open, preselectedMealTypeId = null, onClose, o
   }
 
   function handleLibrarySelect(item: FoodItem) {
+    // The list is a sheet stacked ON this one, so the assign step it pushes would render behind it.
+    // Close the list first, or picking a food looks like nothing happening.
+    setShowSavedMeals(false)
     setLibraryItemId(item.id)
     setIngredients([])
     setForm(itemToEditable(item))
@@ -258,8 +272,7 @@ export function FoodLoggerSheet({ open, preselectedMealTypeId = null, onClose, o
               <CaptureStep
                 onScanResult={handleScanResult}
                 onManual={handleManual}
-                onMyFoods={() => setShowLibrary(true)}
-                onSavedMeals={() => setShowSavedMeals(true)}
+                onMyFoods={() => setShowSavedMeals(true)}
                 preselectedMealTypeId={preselectedMealTypeId}
                 onLibrarySelect={handleLibrarySelect}
                 userId={userId}
@@ -298,13 +311,7 @@ export function FoodLoggerSheet({ open, preselectedMealTypeId = null, onClose, o
         userId={userId}
         logDate={logDate}
         preselectedMealTypeId={preselectedMealTypeId ?? undefined}
-      />
-
-      <FoodLibrarySheet
-        open={showLibrary}
-        onClose={() => setShowLibrary(false)}
-        onSelect={handleLibrarySelect}
-        userId={userId}
+        onSelectFood={handleLibrarySelect}
       />
     </>
   )

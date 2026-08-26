@@ -55,9 +55,9 @@ test('the library sheet lists foods in the shared row, calories in their own col
   await settleRouteBoundary(page)
 
   await tap(page, page.getByRole('button', { name: 'Log Food' }))
-  // Labelled "History" today; Q-395c renames it to "My Foods". What matters here is the row's shape
-  // once the sheet is open, not how it is reached.
-  await tap(page, page.getByRole('button', { name: 'History' }).first())
+  // Q-395c merged the two lists and landed on one name. What matters here is the row's shape once
+  // the list is open, not how it is reached.
+  await tap(page, page.getByRole('button', { name: 'My Foods' }).first())
 
   const row = page.getByRole('button', { name: new RegExp(NAME) }).first()
   await expect(row).toBeVisible({ timeout: 30_000 })

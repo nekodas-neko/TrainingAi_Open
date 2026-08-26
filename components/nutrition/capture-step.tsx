@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { Camera as CameraIcon, Hash, MessageSquare, PenLine, Loader2, Clock, Bookmark } from 'lucide-react'
+import { Camera as CameraIcon, Hash, MessageSquare, PenLine, Loader2, Bookmark } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { BarcodeScanner } from './barcode-scanner'
 import type { NutritionScanResult, FoodItem } from '@trainingai/shared/types/nutrition'
@@ -27,7 +27,6 @@ interface Props {
   onScanResult: (result: NutritionScanResult) => void
   onManual: () => void
   onMyFoods: () => void
-  onSavedMeals: () => void
   preselectedMealTypeId?: string | null
   onLibrarySelect?: (item: FoodItem) => void
   userId?: string
@@ -36,7 +35,7 @@ interface Props {
   onScannedSavedMeal?: (mealId: string) => void
 }
 
-export function CaptureStep({ onScanResult, onManual, onMyFoods, onSavedMeals, preselectedMealTypeId, onLibrarySelect, userId, onScannedSavedMeal }: Props) {
+export function CaptureStep({ onScanResult, onManual, onMyFoods, preselectedMealTypeId, onLibrarySelect, userId, onScannedSavedMeal }: Props) {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [describeText, setDescribeText] = useState('')
   const [showDescribe, setShowDescribe] = useState(false)
@@ -242,12 +241,10 @@ export function CaptureStep({ onScanResult, onManual, onMyFoods, onSavedMeals, p
       action: onManual,
     },
     {
-      icon: <Clock className="w-6 h-6" />, label: 'History',
+      // One tile, because it is now one list (Q-395c). Two tiles for two lists is what made the
+      // owner ask what the difference was, and there was none.
+      icon: <Bookmark className="w-6 h-6" />, label: 'My Foods',
       action: onMyFoods,
-    },
-    {
-      icon: <Bookmark className="w-6 h-6" />, label: 'Saved Meals',
-      action: onSavedMeals,
     },
   ]
 
