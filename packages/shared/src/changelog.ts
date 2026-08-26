@@ -6,10 +6,17 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: "1.383.1",
+    version: "1.383.2",
     date: "2026-08-26",
     changes: [
       "Scanning the barcode of something with no calories \u2014 sparkling water, a diet drink, sugar-free gum, most supplements \u2014 said the product was not found. It was found; the scanner had no way to tell \"this product has zero calories\" apart from \"this product has no calorie information\", so it treated the first as the second. Those are now different things, and a calorie-free product scans and logs like any other. A barcode with genuinely no nutrition data still reports as not found.",
+    ],
+  },
+  {
+    version: "1.383.1",
+    date: "2026-08-26",
+    changes: [
+      "Deleting a food from your day works again. Tapping the bin brought up the \u201cDelete food log?\u201d confirmation and then closed it in the same instant, so there was nothing left to tap and the food stayed put. The cause was in how the app handles the Android back gesture: closing one screen while opening another made the new one mistake the old one\u2019s exit for a back press and shut itself. That affected every place in the app where one screen closes as another opens, not just this delete.",
     ],
   },
   {

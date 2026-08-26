@@ -196,6 +196,14 @@ Live at the time of writing (2026-07-30):
   two layers by accident, wrong from three, where back lands on the *middle* sheet's entry and the
   *bottom* one reads a foreign id and closes. Each entry carries the depth it was pushed at now.
   [`2026-08-26-one-food-list.md`](../../overview/entries/2026-08-26-one-food-list.md) has the trace.
+  **And the third — BF-34 (v1.383.1):** the decision logic no longer lives in this hook at all. It is
+  [`lib/hooks/sheet-back-stack.ts`](../../../lib/hooks/sheet-back-stack.ts), with the hook reduced to
+  React wiring, because all three failures were in *when to close* and none was reachable from a test
+  while it sat inside an effect. The flag marking one of our own `history.back()` calls is
+  **module-level** now: a sheet closing and a dialog opening in the same tick are different
+  instances, so a per-instance flag was invisible to the one that received the pop and the dialog
+  closed on the frame it opened.
+  [`2026-08-26-sibling-sheet-back-dismiss.md`](../../overview/entries/2026-08-26-sibling-sheet-back-dismiss.md).
 
 - **[`docs/handoff-2026-08-25-platform-lane-b-nineteen-prs.md`](../../handoff-2026-08-25-platform-lane-b-nineteen-prs.md)**
   — Lane B, 2026-08-25. The shell-relevant half: **LB-10**, `use-sheet-back-dismiss` was not
