@@ -29,6 +29,32 @@ documentation cluster in the repo (~45 known issues, ~38 plans, 300+ model files
   blocked by `connect-src 'self'`), with a native CameraX + MediaPipe Kotlin plugin as the
   fallback if the WASM path cannot hold ~15 fps. Phase 0 is a device-gated feasibility spike;
   §9 costs a Wear OS module and recommends against it.
+- [`docs/multi-device-comparison.md`](../../multi-device-comparison.md)
+  — **how to match the Polar H10, the Oura ring and the Colmi R09 against each other (2026-08-26).**
+  Read before drawing any conclusion from the comparison endpoint. The load-bearing points: **only
+  the strap is ground truth** (electrical vs optical), so ring-vs-ring says they differ and only
+  ring-vs-strap says which is wrong; **bucket to the coarsest cadence** — both rings sample every
+  5 minutes at best, and a 1-minute grid makes them look like they never agreed when they were never
+  compared; HRV magnitudes across devices are **not** comparable (trend only); steps need a hand
+  swap mid-trial before a difference is attributable to the device; sleep compares as bed/wake time
+  and duration before stages. Also records that the 15-minute activity rollup has **no MET field** —
+  calories is the MET-analogue — and that we keep all four quarter-hour buckets where the reference
+  client collapses them onto the hour.
+- [`docs/superpowers/plans/2026-08-26-alternative-ring-colmi-testing.md`](../../superpowers/plans/2026-08-26-alternative-ring-colmi-testing.md)
+  — **the Colmi R09 in learning mode; design only, no Colmi ring has connected to this app (PS-8,
+  2026-08-26).** The load-bearing finding: **ranking a second ring low does not isolate it.** The
+  per-field merge governs writes; every scoring *read* is source-blind — `getHrForWindow` has no
+  source predicate and `preferStrapBuckets` is an allowlist of one (`chest_strap`) — so a row in
+  `oura_heartrate` / `body_metrics` / `sleep_sessions` / `oura_daily` / `oura_daily_derived` is a
+  scored row however it is stamped. Isolation is four layers: separate tables; **`colmi_ble` kept
+  OUT of `HEALTH_SOURCES`, so a shared write is a compile error** (every writer takes
+  `source: HealthSource`); `scripts/check-learning-mode-isolation.js` in Custom Rules, empty
+  baseline, landed before the integration; and no sync/outbox/local-store domain. Deployment needs
+  **no APK** (in-WebView `@capacitor-community/bluetooth-le`, and the ring logs internally so it
+  syncs on open like the scale). **The R09 is not on the reference client's compatibility list** —
+  Phase 0 is one `0x03` round trip proving transport, framing and mod-255 checksum, and it is a
+  gate. Sleep is in no client (Gadgetbridge has it, from a separate dissection). **Do not flash the
+  circulating raw-streaming mod firmware** — §8.
 1. **[`docs/oura-ble-operations.md`](../../oura-ble-operations.md)** — the operations manual:
    failure-point matrix, sync-cadence policy, protocol-maintenance playbook, data-integrity
    runbook. **Read this before touching the pipeline**, and add a §1 matrix row for any new failure

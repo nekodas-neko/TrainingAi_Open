@@ -109,6 +109,10 @@ export const EXPORTED: Record<string, ExportScope> = {
   // The user's own heart-rate measurements. Large (33 MB + 13 MB in production) and included
   // anyway: these are readings taken from their body, which is the least omittable thing in a
   // health takeout. Safe to include only because the reads below are now paginated.
+  // Colmi R09 ring, learning mode (PS-8). The user's own health data, so it exports like any
+  // other — being quarantined from SCORING says nothing about whether it is theirs to take.
+  colmi_readings: { kind: 'user_id' },
+  colmi_sleep_segments: { kind: 'user_id' },
   oura_heartrate: { kind: 'user_id' },
   rr_intervals: { kind: 'user_id' },
 

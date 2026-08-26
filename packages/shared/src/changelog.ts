@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.384.0",
+    date: "2026-08-26",
+    changes: [
+      "You can now pair a Colmi smart ring under More \u2192 Devices, alongside your Oura ring and chest strap. It records heart rate, steps, sleep stages, blood oxygen, HRV, stress and skin temperature \u2014 several of which no other device you own reports. The app switches on each of those measurements when it syncs and shows you which are recording, because a ring with one switched off collects nothing and looks exactly like a ring you forgot to wear. Everything it collects is kept separately and compared against your other devices: it does not change your readiness, sleep or any other score. Syncing is manual for now \u2014 open Devices and tap Sync now. If the ring has been sitting still it puts its sensors to sleep and will not answer, so wear it or put it on the charger first.",
+    ],
+  },
+  {
     version: "1.383.6",
     date: "2026-08-26",
     changes: [
