@@ -351,6 +351,114 @@ below threshold and left in place for next time.
 > BF-29 (My meals), BF-30 (Meal detail), BF-31 (Edit meal) and BF-26 (Quantity). Two artboards need
 > no entry — `Tap targets` and the `srv/g` studies both shipped in Q-395a.
 
+### [nutrition] BF-37 — My Foods merged saved meals with the food library; they are two different kinds of thing
+
+- **Lane:** B
+- **Added:** 2026-08-26 · owner, on v1.382.0: *"my foods combined saved meals + history thats not
+  right they are 2 seperate things."*
+- **This reverses the merge Q-395c shipped**, not the rename. Read
+  [`2026-08-26-one-food-list`](overview/entries/2026-08-26-one-food-list.md) before starting — it
+  deleted `food-library-sheet.tsx`, built `components/nutrition/food-list.tsx` over two sources, and
+  swept the naming across 8 files.
+
+**⚠ The original complaint was about NAMES, and the merge answered it by deleting one of the two
+things.** Q-395c was specified from the owner's own earlier question — *"So im picking up a
+discrepancy between My Meals and My foods? Whats the difference"* — and read it as *these are one
+list wearing two names*. Re-read against today's report, it says something narrower: **two lists with
+confusingly similar names, and no way to tell which held what.** The fix was to name them so the
+difference is obvious. It was not to merge them.
+
+That distinction is the whole entry, and it is worth stating rather than recording this as the owner
+changing their mind. **They are genuinely different kinds of thing:**
+
+| | Saved meal | Food item |
+|---|---|---|
+| What it is | a composition you built — ingredients, a batch, a per-portion figure | one ingredient with a serving size |
+| Where it comes from | you assembled and saved it deliberately | it appeared because you logged it once |
+| Logging it means | log the whole thing | pick a quantity of one thing |
+
+**A composed recipe and a raw ingredient sitting in one list makes "log this" ambiguous** — which is
+what the merged list now asks the owner to disambiguate on every tap.
+
+**Evidence in the owner's own screenshot, unreported:** `LOADED MAC & CHEESE / CORE POWERFOODS /
+350 g` appears **twice** in a 24-item list. That is **BF-38** (`food_items` duplicates on re-log,
+19 of 209 rows) rather than a merge artefact — but the merged list is where it becomes visible and
+annoying, and the two should be looked at together.
+
+**Keep what Q-395c got right — do not revert the PR wholesale:**
+- **The naming sweep.** One name per list, and the two names must be tellable apart at a glance.
+  *My Foods* and *My Meals* were the confusing pair; pick names that say composition vs ingredient.
+- **`food-list.tsx`'s two-source design.** Its own journal says it is *"one list over two sources,
+  not one shape over a merged type — a food row opens the assign step, a meal row opens its own
+  screen"*. The separation already exists inside the component; what changed is that both render in
+  one scroll. Splitting the presentation should not mean rewriting it.
+- **LB-17, the three-deep back-dismiss fix.** Unrelated to the merge and hard-won — see the journal.
+  Do not lose it.
+
+- **Decide the shape and say which you chose:** two tabs in one sheet, two tiles on the Log Food
+  screen (which is what `capture-step.tsx` had before Q-395c collapsed them), or two sheets. **Two
+  tiles is the cheapest and is what the owner was using before**; artboard 2 draws four tabs and
+  BF-28's rule 2 says an owner decision beats the drawing.
+- **⚠ Check the `MRU` note before changing ordering.** `food_logs` carries no `saved_meal_id`, so a
+  saved meal has **no last-used timestamp at all** and `createdAt DESC` is the only shared signal.
+  True most-recently-used needs a column that does not exist — Lane A's, and out of scope here.
+- **Verification.** Both lists reachable, each showing only its own kind, names distinguishable
+  without reading the rows. Then the three-deep back gesture again, since that path changes.
+  `Gate: device`.
+
+### [nutrition] BF-38 — logging the same food twice creates a second `food_items` row: 19 of 209 are redundant
+
+- **Lane:** A — the matching happens at creation, in the route and the shared create path.
+- **Added:** 2026-08-26 · BugFix, from the owner's My Foods screenshot. **Not reported** — it was
+  visible in the picture sent about something else: `LOADED MAC & CHEESE / CORE POWERFOODS / 350 g /
+  672 kcal` appears **twice in a 24-item list**.
+
+**Measured against production 2026-08-26:**
+
+| Measure | Value |
+|---|---|
+| `food_items` rows (owner's) | **209** |
+| Distinct `name` + `brand` | **190** |
+| **Redundant rows** | **19 — 9% of the catalogue** |
+| Worst offenders | `Mandarin` ×4 · `Mini Pretzels BBQ Pizza Aussie Animal` (Parker's) ×3 · `LOADED MAC & CHEESE` (CORE POWERFOODS) ×3 |
+
+**By source, which is where the fix is:**
+
+| `source` | Names with duplicates | Rows involved |
+|---|---|---|
+| `ai` | **14** | 32 |
+| `barcode` | 1 | 2 |
+| `text` (OFF name search) | 0 | — |
+
+**The `barcode` case is the unambiguous one and the place to start.** A barcode is an exact product
+identity and `food_items` carries the column — so re-scanning a product the catalogue already holds
+should reuse the row, and does not. One pair today, but it is the case with a definitively correct
+answer, and fixing it needs no judgement about what "the same food" means.
+
+**The `ai` case needs a matching rule, and that rule is the actual design work.** A model naming the
+same food twice will not produce byte-identical strings, so exact match is too strict and fuzzy match
+risks collapsing *Greek Yogurt Plain* into *Greek Yogurt Vanilla* — which silently corrupts the
+macros of every past log pointing at the survivor. **Prefer under-merging to over-merging**, and say
+in the PR which rule was chosen and what it deliberately does not catch.
+
+**Why it is worth fixing rather than tolerating at 9%:**
+- **It is the visible defect in a list the owner is already unhappy with** (BF-37) — a 24-item list
+  showing the same product twice reads as broken regardless of how the list is organised.
+- **It multiplies BF-35's spend.** That entry generates an image per food item; three rows for one
+  mac and cheese is three generations, three stored images, and three different-looking pictures of
+  the same product in one list.
+- **It quietly inflated this session's own retention measurement.** The "209 food items" behind the
+  BF-35 storage estimate is really **190 foods and 19 accidents**.
+
+- **⚠ Do NOT clean up history with a merge migration in this entry.** `food_logs.food_item_id` is
+  `ON DELETE RESTRICT`, so collapsing duplicates means re-pointing every log at the survivor first —
+  and if the matching rule is wrong, that rewrites what the owner ate. **Stop the creation first,
+  live with the existing 19, and make de-duplicating history a separate decision** once the rule has
+  been shown correct on new writes.
+- **Verification.** Scan the same barcode twice → one row. Log the same food by AI description twice
+  → one row, and a deliberately similar-but-different food → two. Then confirm past logs still
+  resolve to the right item.
+
 ### [app-shell][nutrition] BF-34 — the dialog that closed on the frame it opened (shipped v1.383.1)
 
 - **Lane:** B
