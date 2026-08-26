@@ -1,7 +1,7 @@
 'use client'
 
 import { useRef } from 'react'
-import { ChevronLeft, ImageIcon, Loader2, Pencil, QrCode, Trash2 } from 'lucide-react'
+import { ChevronLeft, Loader2, Pencil, QrCode, Trash2, Utensils } from 'lucide-react'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { Button } from '@/components/ui/button'
 import { MACRO_COLORS } from '@trainingai/shared/nutrition/macro-colors'
@@ -102,12 +102,18 @@ export function MealDetailSheet({
             // eslint-disable-next-line @next/next/no-img-element
             <img src={shown.imageDataUri} alt="" className="mb-4 h-40 w-full rounded-2xl object-cover" />
           ) : (
+            // The same tile the rows use, at hero scale — artboard 4's band is the row's placeholder
+            // grown, not a second design. It is a button because it is also where a photo is added.
             <button
               onClick={() => onEdit(shown)}
-              className="mb-4 flex h-24 w-full items-center justify-center gap-2 rounded-2xl border border-dashed border-border text-xs font-semibold text-muted-foreground"
+              className="mb-4 flex w-full flex-col items-center gap-2 rounded-2xl py-5"
+              style={{ backgroundImage: 'linear-gradient(140deg, var(--meal-tile-from), var(--meal-tile-to))' }}
+              aria-label={`Add a photo to ${shown.name}`}
             >
-              <ImageIcon className="h-4 w-4" />
-              Add a photo
+              {/* The glyph directly, not a nested `MealThumb` — the band already carries the
+                  gradient, and the tile's own is an inline style a class cannot strip. */}
+              <Utensils className="h-8 w-8 text-white/45" strokeWidth={1.6} />
+              <span className="text-xs font-semibold text-white/70">Add a photo</span>
             </button>
           )}
 
