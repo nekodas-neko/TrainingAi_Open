@@ -26,7 +26,8 @@ import { MealLabelSheet } from './meal-label-sheet'
 import { BulkDeleteConfirm } from './bulk-delete-confirm'
 import { FoodRow } from './food-row'
 import { QuantitySheet } from './quantity-sheet'
-import { qtyFromInput, steppedQty, type QtyUnit } from './saved-meal-qty'
+import { useIngredientQuantities } from './use-ingredient-quantities'
+import { MealTypeTags } from './meal-type-tags'
 import { IngredientPicker } from './ingredient-picker'
 import { MealBatchSize } from './meal-batch-size'
 import { MealBuilderFooter } from './meal-builder-footer'
@@ -63,11 +64,6 @@ const LIST_TABS = [
   { value: 'foods' as const, label: 'Single foods' },
 ]
 type ListTab = (typeof LIST_TABS)[number]['value']
-
-interface IngredientEntry {
-  item: FoodItem
-  qty: number
-}
 
 interface Props {
   open: boolean
@@ -135,8 +131,13 @@ export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate,
   // save with one more state to get wrong.
   const [mealImage, setMealImage] = useState<string | null>(null)
   const [mealServings, setMealServings] = useState(1)
-  const [ingredients, setIngredients] = useState<IngredientEntry[]>([])
-  const [unitById, setUnitById] = useState<Record<string, QtyUnit>>({})
+  const {
+    ingredients, setIngredients, addIngredient, removeIngredient,
+    unitFor, setUnit, amountLabel, setDisplayQty, stepQty,
+  } = useIngredientQuantities()
+  // Which meal slots a plan may use this meal in (BF-11f). Empty = every slot, which is what
+  // `mealFitsSlot` already means by an untagged meal — never "no slot".
+  const [mealTypeIds, setMealTypeIds] = useState<string[]>([])
   const [editingIngredientId, setEditingIngredientId] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   // Bumped on every entry to the build form. `IngredientPicker` owns the search query, its results
@@ -191,12 +192,14 @@ export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate,
 
   // Q-357: `useCallback` on the five handlers the card takes, so `SavedMealCard`'s `memo()` is not
   // defeated by a fresh identity every render. `openBuild` and `toggleSelected` touch only state
-  // setters, so `[]` is stable by React's guarantee rather than by hope.
+  // setters, so the deps are stable by React's guarantee rather than by hope — `setIngredients` is
+  // listed only because it now reaches here through a hook, where the linter cannot see that.
   const openBuild = useCallback((meal?: SavedMeal) => {
     setEditingMeal(meal ?? null)
     setMealName(meal?.name ?? '')
     setMealImage(meal?.imageDataUri ?? null)
     setMealServings(meal?.servings ?? 1)
+    setMealTypeIds(meal?.mealTypeIds ?? [])
     setIngredients(meal ? meal.items.map(i => ({ item: i.foodItem, qty: i.quantityMultiplier })) : [])
     setEditingIngredientId(null)
     setBuildSession(n => n + 1)
@@ -207,7 +210,7 @@ export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate,
     setDuplicateOf(null)
     setDuplicateAnswered(false)
     setTab('build')
-  }, [])
+  }, [setIngredients])
 
   /**
    * Selection mode belongs to the meal list, and only that list draws its Cancel/Delete row — so
@@ -287,50 +290,9 @@ export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate,
   // `MealBatchSize` is memoised and one inline arrow would defeat it silently (Q-490).
   const clearUnstatedYield = useCallback(() => setUnstatedYield(false), [])
 
-  function addIngredient(item: FoodItem) {
-    setIngredients(prev => {
-      const existing = prev.find(e => e.item.id === item.id)
-      if (existing) return prev.map(e => e.item.id === item.id ? { ...e, qty: e.qty + 1 } : e)
-      return [...prev, { item, qty: 1 }]
-    })
-  }
-
-  /**
-   * Quantity is entered in servings or in grams, per ingredient, the way MyFitnessPal does it.
-   *
-   * Servings is the default because that is what "a scoop of whey" means, and the app stores a
-   * serving multiplier either way — grams is a second view of the same number, not a second number.
-   * An item with no serving size has no gram equivalent, so it only ever offers servings.
-   */
-  /** The collapsed row's grey line — *how much*, in whichever unit this ingredient is set to. */
-  function amountLabel(item: FoodItem, qty: number, unit: QtyUnit): string {
-    const servingG = item.servingSizeG ?? 0
-    if (unit === 'g' && servingG > 0) return `${Math.round(servingG * qty)} g`
-    const servings = Math.round(qty * 100) / 100
-    const label = `${servings} ${servings === 1 ? 'serving' : 'servings'}`
-    return servingG > 0 ? `${label} · ${Math.round(servingG * qty)} g` : label
-  }
-
-  function unitFor(item: FoodItem): QtyUnit {
-    return (item.servingSizeG ?? 0) > 0 ? (unitById[item.id] ?? 'serving') : 'serving'
-  }
-
-  function setDisplayQty(item: FoodItem, raw: string, unit: QtyUnit) {
-    const next = qtyFromInput(raw, unit, item.servingSizeG)
-    if (next == null) return
-    setIngredients(prev => prev.map(e => e.item.id === item.id ? { ...e, qty: next } : e))
-  }
-
-  /** ± moves by half a serving, or by 5 g — whichever unit the row is currently showing. */
-  function stepQty(item: FoodItem, unit: QtyUnit, direction: 1 | -1) {
-    setIngredients(prev =>
-      prev.flatMap(e => {
-        if (e.item.id !== item.id) return [e]
-        const next = steppedQty(e.qty, unit, direction, item.servingSizeG)
-        return next == null ? [] : [{ ...e, qty: next }]
-      })
-    )
-  }
+  const toggleMealType = useCallback((id: string) => {
+    setMealTypeIds(prev => prev.includes(id) ? prev.filter(t => t !== id) : [...prev, id])
+  }, [])
 
   const editingIndex = ingredients.findIndex(e => e.item.id === editingIngredientId)
   // `stepQty` removes a row when a step takes it to zero, so the sheet can outlive its ingredient.
@@ -397,6 +359,11 @@ export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate,
         items: ingredients.map(e => ({ foodItemId: e.item.id, quantityMultiplier: e.qty })),
         servings: mealServings,
         imageDataUri: mealImage,
+        // `overwrite` is always a meal OTHER than the one on screen — duplicate detection excludes
+        // `editingMeal` — so the builder never loaded or showed its tags, and sending the builder's
+        // (empty, for a new meal) would wipe them. Undefined leaves them alone, which is the only
+        // honest answer to a question the user was never asked.
+        mealTypeIds: overwrite ? undefined : mealTypeIds,
         createdAt: target
           ? (target.createdAt instanceof Date ? target.createdAt.toISOString() : String(target.createdAt))
           : new Date().toISOString(),
@@ -647,6 +614,12 @@ export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate,
                 batchKcal={totalMacros.kcal}
               />
 
+              <MealTypeTags
+                mealTypes={mealTypes}
+                selected={mealTypeIds}
+                onToggle={toggleMealType}
+              />
+
               {/* Ingredient list above search so existing items are visible first */}
               {ingredients.length > 0 && (
                 <div className="space-y-2">
@@ -710,14 +683,14 @@ export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate,
                 index={editingIndex + 1}
                 total={ingredients.length}
                 mealName={mealName.trim()}
-                onUnitChange={u => editingEntry && setUnitById(prev => ({ ...prev, [editingEntry.item.id]: u }))}
+                onUnitChange={u => editingEntry && setUnit(editingEntry.item.id, u)}
                 onQtyChange={raw => editingEntry && setDisplayQty(editingEntry.item, raw, unitFor(editingEntry.item))}
                 onStep={dir => editingEntry && stepQty(editingEntry.item, unitFor(editingEntry.item), dir)}
                 onRemove={() => {
                   if (!editingEntry) return
                   const id = editingEntry.item.id
                   setEditingIngredientId(null)
-                  setIngredients(prev => prev.filter(e => e.item.id !== id))
+                  removeIngredient(id)
                 }}
                 onClose={() => setEditingIngredientId(null)}
               />

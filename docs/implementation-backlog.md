@@ -1583,6 +1583,30 @@ whether or not anyone draws them first.
   test takes longer to fail. **Do not weaken what they check** either way: `meal-label`'s decode
   loop is the closest the sandbox gets to the print test that is still owed.
 
+### [nutrition] LB-20 — the meal library's empty state is untested, and it is where the click-event bug hid
+
+- **Lane:** B
+- **Branch:** `test/empty-meal-library-e2e`
+- **Added:** 2026-08-26 · Lane B, found by sweep while shipping BF-11f.
+- **What happened.** `handleSave(overwrite?)` was wired as `onClick={onSave}`, so React's click event
+  arrived as `overwrite` on every save from the footer — which skipped BF-11d's duplicate check
+  entirely and, once BF-11f added tags, sent `undefined` where the tags should be. A network trace on
+  the new tag round-trip is what caught it; nothing else could, because both symptoms are silent.
+  **Fixed in the same PR**, along with the one sibling the sweep found: `food-list.tsx`'s
+  `onClick={onBuildFirst}`, wired to `openBuild(meal?)`, which reads `meal.items` off the event.
+- **What is still owed.** That second site was fixed **by inspection, not reproduced** — it is only
+  reachable with an empty meal library, and no spec has one. `food-row-shared.spec.ts:109` matches
+  `/^(New|Build your first meal)$/` and always lands on `New`, because the seed has meals.
+- **The awkward part, and why this is an entry rather than a line in that PR:** emptying
+  `saved_meals` for the seed user in a `beforeAll` mutates state five other specs read. Either give
+  the empty-library spec its own user, or drive the empty state from a route mock — decide before
+  writing it, because the wrong choice makes the whole nutrition suite flaky rather than this one
+  spec.
+- Neither TypeScript nor `check-memo-prop-stability.js` can see this class: `() => void` accepts a
+  handler with *more* parameters, and `onClick` accepts a nullary one. The sweep that found both
+  sites is two greps and is written out in the journal entry for v1.388.0 — a check is plausible if
+  it recurs, but two instances in one file pair is not yet a pattern worth a script.
+
 ### [nutrition] LB-18 — `Recent` on Log Food is scoped to a meal bucket; it may want to be global
 
 - **Lane:** A (the source), B (the swap)
@@ -1635,27 +1659,6 @@ whether or not anyone draws them first.
 - **Collision with the parked Q-406 → Q-395a/b/c chain** (that chain is `Gate: owner` — its
   reference drawings were never committed). Part 1 §8 has the file-by-file collision table and the
   carry-across rule. **Do not plan around that chain landing, and do not wait for it.**
-
-### [nutrition] BF-11f — tagging a meal from Build a Meal
-
-> **⚠ BF-11e shipped the storage and transport (migration 217, local SQLite v29). The one thing it
-> deliberately did NOT do is the last link: `saved-meals-sheet.tsx` still queues an outbox payload
-> with no `mealTypeIds`.** That is correct today — absent means *leave the stored tags alone*, and
-> sending the currently-loaded tags would revert a change made on another device between the sheet
-> loading and the save. **The moment this entry adds a picker, it must add `mealTypeIds` to BOTH
-> `store.upsertSavedMeal(...)` and `store.queueMutation(...)` in that file, in the same PR**, or tags
-> will save on the web and strand offline. There is a comment at the call site saying so.
-
-- **Lane:** B
-- **Needs:** BF-11e
-- **Plan:** [`plans/2026-08-24-library-first-meal-planner.md`](superpowers/plans/2026-08-24-library-first-meal-planner.md) §5.2
-- **Branch:** `feat/saved-meal-tag-ui`
-- **Added:** 2026-08-24 · planning session, from BF-11 (design item 8, UI half).
-- Multi-select chips of the user's live meal types in the build/edit form; reuse the wizard's existing
-  `ChipGroup` rather than drawing a fourth chip.
-- **An untagged meal is eligible for EVERY slot, not none** — the other way round silently shrinks
-  everyone's library to zero on the day it ships.
-- Independent of BF-11g; the two may run in parallel in different lanes.
 
 ### [nutrition] BF-11h — the wizard surfaces the library, the reasons, and the meal-count prompt
 

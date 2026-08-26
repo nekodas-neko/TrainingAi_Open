@@ -6,10 +6,18 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: "1.387.1",
+    version: "1.388.1",
     date: "2026-08-26",
     changes: [
       "Heart rate now syncs from the Colmi ring. The request was missing the day it was asking for, and the ring answers a command it does not understand with silence rather than an error \u2014 so every other measurement appeared and heart rate never did. The ring card also shows how many frames the ring actually sent, under \u201cSync detail\u201d, and the ring is given longer to answer, because its history arrives in bursts and cutting the wait short looks identical to having no history.",
+    ],
+  },
+  {
+    version: "1.388.0",
+    date: "2026-08-26",
+    changes: [
+      "A saved meal can say which meals of the day it suits. Tap Breakfast, Lunch, Dinner or any meal type you have set up, in the meal builder, and a meal plan will only put it in those slots. Leave them all untapped and it stays usable at any meal \u2014 that is the default, so nothing you already have changes.",
+      "Fixed: saving from the meal builder skipped the \"you already have this meal\" check entirely. The button was handing the save the click itself instead of your answer, so every save looked like an overwrite of a meal you had already chosen \u2014 which meant the question from the last release was never actually asked.",
     ],
   },
   {
