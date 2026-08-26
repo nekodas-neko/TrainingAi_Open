@@ -92,11 +92,12 @@ intact. **The lesson is the one in the README's own trap list**: a fold is drive
 unlinked* computation, never by a filename glob, and a fold target is appended to, never written
 over.
 
-The sweep is Orchestrator's chore and was not re-attempted here after that. Instead this entry is
-**cited from [`docs/domains/readiness/README.md`](../../domains/readiness/README.md)**, which takes
-it out of the foldable set (61 → 60) and is honest rather than a dodge: the `CLAUDE.md` rule this PR
-adds states the constraint, and this entry is the evidence behind it. It does cost the linked floor
-one, permanently — `projectOverview.md` already flags that as the real price of the citation habit.
+The sweep was not re-attempted after that — it is Orchestrator's chore, and #528 did it properly
+within the hour, folding 52 entries and amending the rule. The stopgap used in between was to cite
+this entry from the readiness domain index, which took it out of the foldable set; **that citation
+has been removed again** now the pressure is off, because `projectOverview.md` is right that a sweep
+can undo a fold and cannot undo a citation, and a workaround kept past its reason becomes a
+permanent cost.
 
 ## Not exercised
 
