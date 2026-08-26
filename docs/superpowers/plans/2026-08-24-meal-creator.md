@@ -246,6 +246,13 @@ the same meal can be compared without a second opinion about what 'better' means
 this question. Pair it with a normalised name comparison; **require both** to be close, since macros
 alone will match every protein shake against every other one.
 
+**SHIPPED 2026-08-26.** `components/nutrition/meal-duplicate.ts` → `findDuplicateMeal`, with tests.
+Two things the plan did not know: BF-11c added a **second save path** (`keepCandidates`, N meals at
+once), and four dialogs for four dishes is not asking — so on that path the ask is the tick that is
+already there, with duplicates unticked and labelled *already in your meals*. The name test is
+**equality after normalisation, not fuzzy**, following BF-38's *prefer under-merging*: a duplicate is
+deletable, an offer to overwrite the wrong meal is not.
+
 Three rules that keep this from being annoying:
 
 - It **asks**, never merges. "Save as new" must always be one tap and must be the safe default if

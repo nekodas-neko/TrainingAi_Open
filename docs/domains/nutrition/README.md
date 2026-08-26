@@ -187,6 +187,15 @@ Live at the time of writing (2026-07-30):
 
 ## History
 
+- **[`docs/overview/entries/2026-08-26-saved-meal-duplicate-detection.md`](../../overview/entries/2026-08-26-saved-meal-duplicate-detection.md)**
+  — 🆕 **BF-11d**: saving a meal you already have **asks** instead of adding it again
+  ([`meal-duplicate.ts`](../../../components/nutrition/meal-duplicate.ts)). *Close* is two
+  independent tests and both must pass — `fitDistance` on the macros, and **equality of the
+  normalised name, not a fuzzy match** (BF-38's *prefer under-merging*: a duplicate is deletable, an
+  offer to overwrite the wrong meal is not). Both save paths check; **Update keeps the existing id**,
+  because a printed QR label points at it. The write moved to
+  [`save-meal.ts`](../../../components/nutrition/save-meal.ts) and Q-216's source-text guard followed
+  it there.
 - **[`docs/overview/entries/2026-08-26-build-a-meal-add-methods.md`](../../overview/entries/2026-08-26-build-a-meal-add-methods.md)**
   — 🆕 **BF-11c**: Build a Meal takes a pasted **recipe link**, and a page holding several dishes
   asks which to keep (each becomes its own saved meal). **⚠ Read this before touching any recipe
