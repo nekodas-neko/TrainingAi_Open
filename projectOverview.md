@@ -524,25 +524,25 @@ meal row now carries a 40 px tile: the photo if there is one, a gradient-and-gly
 mishandled before — check a long day for artefacts and jank. The day screen's tile is always the
 placeholder today; `food_items` has no image column, so only saved meals can carry a photo.
 
-### [nutrition][app-shell] ⚠️ A saved meal opens onto its own screen, and the nest that reaches it is now four deep (BF-30 v1.378.0 · LB-17 v1.382.0)
+### [nutrition][app-shell] ⚠️ One back-dismiss primitive, three failures, and a device pass none has had (BF-30 v1.378.0 · LB-17 v1.382.0 · BF-34 v1.382.2)
 
-Artboard 4 shipped as a **nested sheet** over the meal library, not a route and not the row
-expansion BF-29 left in place. **This row said the unwind "rests on BF-27's one-press-per-layer
-guarantee", and that guarantee did not hold** — `useSheetBackDismiss` compared the arriving
-`sheetId` against its own, so every sheet but the one landed on closed itself. Correct at two
-layers by accident, wrong from three, which is exactly what Q-395c built by reaching the list
-through Log Food. Fixed in v1.382.0 (each entry carries its depth) and pinned by an e2e case that
-fails on the old comparison — **but a real back gesture on a real gesture bar is still unproven.**
-**BF-29's swipe is folded in here** (v1.376.0) — same screen, same single device pass, and its
-heading still said *My Meals*. Row actions are reached by **dragging a row left**, a gesture this app
-had nowhere else; e2e drives it with real CDP touch events so the handler is proven to fire, but
-**no sandbox can prove it coexists with the Samsung WebView's own scroll physics.**
+Artboard 4 shipped as a **nested sheet**, and this row said its unwind "rests on BF-27's
+one-press-per-layer guarantee". **That guarantee has now failed twice.** LB-17: an id comparison read
+every entry that was not a sheet's own as "mine is gone" — right at two layers by accident, wrong
+from three, which is what Q-395c built by reaching the list through Log Food. BF-34: the flag marking
+one of our own `history.back()` calls was per-instance, so a sheet closing and a dialog opening in
+the same tick could not see each other's and **the confirm dialog closed on the frame it opened** —
+the owner's *"the delete feature doesnt work"*. Both fixed, both pinned by tests that fail on the old
+logic. **Neither has been felt on a real gesture bar, which is the only place either lived.**
+**BF-29's swipe folds in here** (v1.376.0) — same screen, one device pass. Row actions come from
+**dragging a row left**, a gesture this app had nowhere else; e2e drives it with real CDP touch
+events so the handler fires, but **no sandbox proves it coexists with Samsung's scroll physics.**
 
-On the S25: press back from an open meal and watch it unwind **one layer per press** — meal → the
-My Foods list → Log Food → the page — with nothing skipping two. Scrolling the list vertically must
-never reveal a tray; a deliberate left-drag opens one and a right-drag closes it; opening a second
-row closes the first; tray `Delete` raises the confirmation rather than deleting. Also check that a
-92vh sheet's action row clears the gesture bar, and that a photo plus ten ingredients still scrolls.
+On the S25: tap a diary row, tap the bin — the confirm dialog must **stay** open and be tappable, and
+Cancel must cancel. Press back from an open meal and watch it unwind **one layer per press** — meal →
+My Foods → Log Food → the page — nothing skipping two. Scrolling the list must never reveal a tray; a
+left-drag opens one and a right-drag closes it; opening a second row closes the first. And a 92vh
+sheet's action row must clear the gesture bar.
 
 ### [nutrition][app-shell] ⚠️ The calorie surface: one budget, a progress bar, and one open cache-ordering bug (Q-415/Q-417/Q-323 fixed, LB-4 open, 2026-08-23)
 
