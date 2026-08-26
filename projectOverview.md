@@ -29,6 +29,20 @@
 
 **Two food lists became one, and the back gesture turned out to be wrong at three layers (Q-395c).** The owner asked what the difference between *My Meals* and *My foods* was; there wasn't one a user could hold — one listed `saved_meals`, the other `food_items`, and which list a thing was in came down to how it had been added. They are **one list called My Foods** now, newest-first across both sources, with two row shapes because a food's tap opens the assign step and a meal's opens its own screen. `food-library-sheet.tsx` is deleted. **MRU was asked for and is unavailable:** `food_logs` carries no `saved_meal_id`, so a saved meal has **no last-used timestamp at all** — `createdAt DESC` is the only recency signal the two share, and true MRU needs a Lane A column. **Routing the list through the logger made the app's first three-deep sheet nest, and one back press closed two layers.** `useSheetBackDismiss` decided "my entry is gone" by comparing the arriving `sheetId` against its own, so every sheet that was not the one landed on closed itself — right by accident at two layers, wrong at three, where back lands on the *middle* sheet's entry and the *bottom* one reads a foreign id. "Gone" is a **depth** now. The symptom in Playwright was `element was detached from the DOM` on a button just asserted visible, which reads as animation timing and is not; instrumenting `pushState`/`back`/`popstate` is what settled it ([`journal`](docs/overview/entries/2026-08-26-one-food-list.md)).
 
+**A measured RMR has somewhere to go, and a rule for how it ages (BF-33, engine half).** The owner has
+a DEXA + RMR test booked and every resting rate the app used was *predicted*. Migrations **225** (a
+`measured_rmr` table) + **226** (claude_ro regen) store it; `personalRmr` decides what happens as the
+body changes. **The entry left that open — validity window or re-scale by lean mass — and re-scaling
+wins for a reason, not a preference:** a window gives full trust the day before expiry and total
+discard the day after, while what actually invalidates a measurement is a change in body composition,
+which has no fixed relationship to elapsed time. Cunningham is linear in fat-free mass, so a
+measurement carries exactly one thing the prediction does not — **this person's residual from it** —
+and re-applying that at today's FFM ages it by body change instead of by the calendar. **Its own table,
+not a `body_metrics` column,** because a second test must sit *beside* the first: two measurements at
+different compositions are how you learn whether the first still describes this person. **⚠ NOT usable
+yet** — there is no way to enter a number; the typed field and the AI results-sheet path are scope
+item 3, the 2×2 panel is item 4 and Lane B's.
+
 **A shared test-user UUID, and a check that would have been deleted (LA-32).** Three times in two
 days, adding an unrelated test file turned the suite red in a file the PR never touched: two files
 hardcoded the same user id and one deleted it, and vitest's parallel workers share one local

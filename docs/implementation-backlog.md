@@ -14,7 +14,7 @@ silently misdirecting the next session. Update them in the same PR that consumes
 
 | Pointer | Value | Source of truth |
 |---|---|---|
-| Next free Postgres migration | **225** | `lib/data/postgres/migrations/` |
+| Next free Postgres migration | **227** | `lib/data/postgres/migrations/` |
 | Local SQLite schema version | **v29** | `lib/sqlite/migrations.ts`; `lib/sqlite/__tests__/migrations.test.ts` asserts the max |
 
 > **There is no third pointer any more.** Entry IDs are not allocated from a shared counter and
@@ -590,6 +590,14 @@ will hit it.
 
 - **Lane:** A — new column(s) plus a precedence rule in `packages/shared/`; the panel is B and can
   follow.
+- **Keep:** the ENGINE half shipped 2026-08-26 (migrations 225 + 226) — a `measured_rmr` table, the
+  `personalRmr` re-scaling rule, `POST/GET /api/measured-rmr`, and both `calculateBaseline` call
+  sites reading it. **Scope items 3 and 4 are NOT done, and item 3 is what makes it usable:** there
+  is still no way to enter a number. The typed field and the AI results-sheet photo path are next
+  (`generateObject` with a schema, never `JSON.parse` of model text, and no parsed number shown as
+  fact until the owner confirms it); the 2×2 panel is item 4 and **Lane B's**. The ageing question
+  the entry left open is answered — re-scale by lean mass, not a validity window; the reasoning is in
+  [`the journal entry`](overview/entries/2026-08-26-measured-rmr.md).
 - **Added:** 2026-08-26 · owner, who has a **DEXA + RMR test booked**: *"its a plug and play image or
   number (AI path)"*, and a panel of values *"for the energy consumption value, estimated RMR from
   general predictions, the app TUNED one ... then the Scan RMR from the scancompany"*.
