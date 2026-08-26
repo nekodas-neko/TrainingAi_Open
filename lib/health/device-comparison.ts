@@ -4,7 +4,16 @@
 // single pairing. This is the N-device view the owner asked for — three devices side by side in one
 // table — which that harness cannot express, since a `ComparisonPoint` holds exactly two values.
 //
-// PURE: no I/O, no clock. The caller buckets and supplies the series.
+// PURE: no I/O, no clock.
+//
+// **Bucket width is the whole game and the default is wrong for rings.** These three devices sample
+// at wildly different cadences: the Polar H10 emits ~1 Hz, the Oura ring's rollup bins at 5 minutes,
+// and the Colmi's heart-rate log runs at whatever interval its switch is set to (5 minutes at the
+// finest). Align two 5-minute devices on a 1-minute grid and they land in the same bucket only when
+// their phases happen to coincide — so `overlap` reads 0, every statistic returns null, and the
+// output looks like two devices that never agreed rather than two that were never compared.
+//
+// Bucket to the COARSEST cadence among the devices being compared, not the finest.
 export interface NamedSeries {
   device: string
   points: { bucketStart: string; value: number }[]
@@ -27,6 +36,31 @@ export interface PairSummary {
   /** Mean signed `a - b`. Separated from `meanAbsDelta` on purpose: a device reading 5 high all day
    *  and one alternating ±5 have the same mean absolute error and are different problems. */
   meanBias: number | null
+}
+
+/**
+ * Bucket raw `(timestamp, value)` samples into means over `minutes`-wide windows, keyed by the
+ * window's ISO start. Windows are anchored to the epoch, so every device lands on the same grid
+ * regardless of when it happened to sample — which is what makes two devices comparable at all.
+ */
+export function bucketSeries(
+  rows: { timestamp: Date; value: number }[],
+  minutes: number,
+): { bucketStart: string; value: number }[] {
+  const width = Math.max(1, Math.round(minutes)) * 60_000
+  const sums = new Map<number, { total: number; count: number }>()
+  for (const r of rows) {
+    const t = r.timestamp.getTime()
+    if (!Number.isFinite(t)) continue
+    const start = Math.floor(t / width) * width
+    const entry = sums.get(start) ?? { total: 0, count: 0 }
+    entry.total += r.value
+    entry.count += 1
+    sums.set(start, entry)
+  }
+  return [...sums.entries()]
+    .map(([start, { total, count }]) => ({ bucketStart: new Date(start).toISOString(), value: total / count }))
+    .sort((a, b) => a.bucketStart.localeCompare(b.bucketStart))
 }
 
 /** Merge N series onto the union of their bucket starts, sorted. */

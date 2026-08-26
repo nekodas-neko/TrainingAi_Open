@@ -351,6 +351,87 @@ below threshold and left in place for next time.
 > BF-29 (My meals), BF-30 (Meal detail), BF-31 (Edit meal) and BF-26 (Quantity). Two artboards need
 > no entry — `Tap targets` and the `srv/g` studies both shipped in Q-395a.
 
+### [devices] PS-11 — FIRST OVERNIGHT SYNC: prove every metric actually landed ⭐ TOMORROW'S JOB
+
+- **Lane:** A
+- **Gate:** device — needs the ring worn overnight 2026-08-26 and the app on the phone
+- **Plan:** [`2026-08-26-alternative-ring-colmi-testing.md`](superpowers/plans/2026-08-26-alternative-ring-colmi-testing.md)
+  · matching reference: [`multi-device-comparison.md`](multi-device-comparison.md)
+- **Added:** 2026-08-26 · owner is wearing the ring tonight; this is the acceptance test for the
+  connector shipped the same evening.
+
+**Nothing in the connector has run against the physical ring.** The BLE layer is I/O against
+hardware and has no test coverage by nature; everything under it is pure and covered. So this entry
+is the first real evidence either way, and it is a *measurement* task, not a build task.
+
+**Do this, in order, and record the result in §11 of the plan:**
+
+1. **More → Devices → Pair ring**, then **Sync now**. Ring on the charger or worn — a still ring
+   sleeps its processor and answers nothing, and the card will say so (`reason: 'silent'`).
+2. **Read the "Recording automatically" row first.** Five switches: heart rate (with its interval),
+   HRV, blood oxygen, stress, temperature. The sync enables all five and then reads them back.
+   **A switch that reads OFF means that metric recorded nothing overnight** — and an empty history
+   from a disabled switch is indistinguishable from a ring that was not worn. If any is off after a
+   sync, that is the bug, and it is the highest-value thing this entry can find.
+3. **Check every metric has rows**, per kind:
+   `SELECT kind, count(*), min(measured_at), max(measured_at) FROM colmi_readings GROUP BY 1;`
+   Expect: `heart_rate`, `steps`, `calories`, `distance`, `hrv`, `stress`, `spo2`, `temperature`,
+   `battery`. **A kind with zero rows is a finding** — either its switch was off, its decoder is
+   wrong, or the ring does not populate it. Say which.
+4. **Check sleep**: `SELECT local_date, count(*), sum(minutes) FROM colmi_sleep_segments GROUP BY 1;`
+   Stages are 2 light / 3 deep / 4 REM / 5 awake. Sum of minutes should be close to the night's
+   length; a wild mismatch means the stage-span walk is drifting.
+5. **Sync a second time and confirm it stores 0.** Dedup is unit-tested and DB-tested, but not
+   against real ring output, where the timestamps come from `resolveRelative` rather than a fixture.
+6. **Check the day boundary.** A session that started before midnight must be keyed to the day it
+   *started* in. This is the most likely place for an off-by-one and the hardest to notice later.
+
+**Known gaps to confirm rather than rediscover:** the heart-rate log's continuation packets are
+dropped (only the timestamped packet carries an anchor — see `framesToPayload`), so HR coverage may
+be sparser than the ring's own history; and activity is requested for 3 days by default.
+
+### [devices] PS-12 — baseline the three-device comparison, and write down what "agreement" was
+
+- **Lane:** A
+- **Gate:** device
+- **Needs:** PS-11
+- **Plan:** [`multi-device-comparison.md`](multi-device-comparison.md) — read it before running this;
+  most of the ways to get a wrong number here are listed in it.
+- **Added:** 2026-08-26
+
+Once PS-11 shows data landing, run `GET /api/admin/device-comparison?from=&to=&bucket=5` and record
+the first real numbers.
+
+- **Read `coverage` first.** It is the denominator for everything else, and a device with near-zero
+  coverage was not compared, whatever its pair statistics say.
+- **Bucket at 5 minutes, not 1.** Both rings sample every 5 at their finest; a 1-minute grid makes
+  two 5-minute devices look like they never agreed when they were never compared. The endpoint
+  defaults to 5 and reports `bucketMinutes` back.
+- **Ring vs ring says they differ; only ring vs strap says which is wrong.** Wear the H10 for at
+  least one workout inside the window or the comparison has no ground truth in it at all.
+- **Record `meanBias` separately from `meanAbsDelta`.** A ring reading 5 bpm high all day is
+  calibration and correctable; one alternating ±5 is noise and is not. They have identical mean
+  absolute error.
+- **Do not conclude anything from one day.** 14 nights, and split on any hand swap or firmware
+  change inside the window.
+
+### [devices] PS-13 — the heart-rate log drops its continuation packets
+
+- **Lane:** A (code plus a captured vector; no device gate of its own)
+- **Needs:** PS-11
+- **Added:** 2026-08-26 · known at write time, filed rather than left implicit
+
+`framesToPayload` keeps only sub-type 1 of the `0x15` heart-rate log — the packet carrying the
+little-endian unix anchor — and drops sub-types 2+, which hold 13 samples each and are a
+*continuation* of that anchor rather than self-describing. Dropping them was the honest choice
+without a real multi-packet capture: placing them means assuming the sample spacing, and a wrong
+assumption smears a day's heart rate across the wrong hours, which is worse than missing it.
+
+PS-11's capture is what settles the spacing. The header packet (sub-type 0) reports
+`intervalMinutes`; confirm the continuation samples step by exactly that, then extend the mapping
+and pin a multi-packet fixture. Until then, expect Colmi HR coverage to be thinner than the ring's
+own history and do not read that as the ring failing to record.
+
 ### [devices][cardio] PS-9 — the R09 streams raw accelerometer on stock firmware, which makes it a tier-1 source
 
 - **Lane:** A (a decoder + an ingest path; `lib/colmi-ble/**` is engine)

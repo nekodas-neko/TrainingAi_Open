@@ -166,3 +166,34 @@ describe('decoders are infallible', () => {
     }
   })
 })
+
+describe('automatic-measurement preference responses', () => {
+  it('reads each switch back', () => {
+    expect(decodeV1(buildPacket([CMD.AUTO_SPO2_PREF, 0x01, 0x01])))
+      .toEqual({ kind: 'autoPref', metric: 'spo2', enabled: true, intervalMinutes: null })
+    expect(decodeV1(buildPacket([CMD.AUTO_STRESS_PREF, 0x01, 0x00])))
+      .toEqual({ kind: 'autoPref', metric: 'stress', enabled: false, intervalMinutes: null })
+    expect(decodeV1(buildPacket([CMD.AUTO_HRV_PREF, 0x01, 0x01])))
+      .toEqual({ kind: 'autoPref', metric: 'hrv', enabled: true, intervalMinutes: null })
+  })
+
+  it('reads heart rate\'s interval alongside its switch', () => {
+    expect(decodeV1(buildPacket([CMD.AUTO_HR_PREF, 0x01, 0x01, 5])))
+      .toEqual({ kind: 'autoPref', metric: 'heart_rate', enabled: true, intervalMinutes: 5 })
+  })
+
+  it('does NOT read state out of a write acknowledgement', () => {
+    // A write is echoed with an empty body; decoding it as state would report whatever byte
+    // happened to be there as the switch's value.
+    expect(decodeV1(buildPacket([CMD.AUTO_HR_PREF, 0x02]))).toMatchObject({ kind: 'unknown' })
+  })
+
+  it('takes temperature\'s enabled flag from byte 3, past its 0x03 sub-command', () => {
+    expect(decodeV1(buildPacket([CMD.AUTO_TEMP_PREF, 0x03, 0x01, 0x01])))
+      .toEqual({ kind: 'autoPref', metric: 'temperature', enabled: true, intervalMinutes: null })
+    expect(decodeV1(buildPacket([CMD.AUTO_TEMP_PREF, 0x03, 0x01, 0x00])))
+      .toEqual({ kind: 'autoPref', metric: 'temperature', enabled: false, intervalMinutes: null })
+    // Reading byte 2 instead — the shape the other four use — would report this one as enabled.
+    expect(decodeV1(buildPacket([CMD.AUTO_TEMP_PREF, 0x99, 0x01, 0x01]))).toMatchObject({ kind: 'unknown' })
+  })
+})

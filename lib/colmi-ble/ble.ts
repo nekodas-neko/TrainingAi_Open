@@ -14,6 +14,7 @@ import {
   V1_SERVICE, V1_WRITE, V1_NOTIFY, V2_SERVICE, V2_WRITE, V2_NOTIFY, NAME_PREFIX,
   cmdBattery, cmdSetDateTime, cmdPhoneName, cmdSyncActivity, cmdSyncHeartRate,
   cmdSyncHrv, cmdSyncStress, cmdSyncSleep, cmdSyncTemperature, cmdSyncSpo2,
+  cmdReadAutoPref, cmdWriteAutoPref, AUTO_METRICS, type AutoMetric,
 } from '@/lib/colmi-ble/protocol'
 import { getPairedRing, setPairedRing, type PairedRing } from '@/lib/colmi-ble/paired-ring'
 
@@ -34,6 +35,10 @@ export interface ColmiSyncOutcome {
   sleepSegments: number
   stored?: { readings: number; sleep: number }
   battery?: { percent: number; charging: boolean }
+  /** Which automatic measurements the ring reports as ON, read back AFTER we tried to enable them.
+   *  A metric missing here recorded nothing, which is why an empty history is not proof of a
+   *  ring that was not worn. */
+  autoPrefs?: Partial<Record<AutoMetric, { enabled: boolean; intervalMinutes: number | null }>>
   message?: string
 }
 
@@ -71,6 +76,18 @@ interface SyncOptions {
   now: { year: number; month: number; day: number; hour: number; minute: number; second: number }
   /** How many days of activity history to request. */
   activityDays?: number
+  /**
+   * Switch on every automatic measurement before draining. Default true, and it is the reason a
+   * night of wear produces anything: each metric has its own switch on the ring, a ring whose
+   * switches are off records nothing, and it syncs perfectly cleanly while doing so.
+   *
+   * Idempotent — writing "on" to a switch already on is free — so this runs every sync rather than
+   * once at pairing, because a factory reset or the vendor app could turn them back off and nothing
+   * would tell us.
+   */
+  enableAutoMetrics?: boolean
+  /** Heart-rate sampling interval in minutes. The ring rounds to 5 and caps at 60. */
+  hrIntervalMinutes?: number
 }
 
 /**
@@ -93,10 +110,13 @@ export async function syncColmiRing(opts: SyncOptions): Promise<ColmiSyncOutcome
   // V2 payloads arrive split across notifications and must be reassembled before they mean anything.
   let bigDataBuffer: number[] = []
 
+  const autoPrefs: NonNullable<ColmiSyncOutcome['autoPrefs']> = {}
+
   const onV1 = (view: DataView) => {
     framesSeen++
     const f = decodeV1(new Uint8Array(view.buffer))
     if (f.kind === 'battery') battery = { percent: f.percent, charging: f.charging }
+    if (f.kind === 'autoPref') autoPrefs[f.metric] = { enabled: f.enabled, intervalMinutes: f.intervalMinutes }
     frames.push(f)
   }
 
@@ -134,6 +154,16 @@ export async function syncColmiRing(opts: SyncOptions): Promise<ColmiSyncOutcome
     await v1(cmdPhoneName('TA'))
     await v1(cmdSetDateTime(opts.now))
     await v1(cmdBattery())
+
+    // Switch the recording on BEFORE draining, then read the switches back. Enabling first means
+    // tonight is covered even if this is the first sync; reading back after means the outcome
+    // reports what the ring actually has on rather than what we asked for.
+    if (opts.enableAutoMetrics !== false) {
+      for (const metric of AUTO_METRICS) {
+        await v1(cmdWriteAutoPref(metric, true, opts.hrIntervalMinutes ?? 5))
+      }
+    }
+    for (const metric of AUTO_METRICS) await v1(cmdReadAutoPref(metric))
     for (let d = 0; d < (opts.activityDays ?? 3); d++) await v1(cmdSyncActivity(d))
     await v1(cmdSyncHeartRate())
     await v1(cmdSyncHrv())
@@ -168,15 +198,15 @@ export async function syncColmiRing(opts: SyncOptions): Promise<ColmiSyncOutcome
       cache: 'no-store',
     })
     if (!res.ok) {
-      return { ok: false, framesSeen, reason: 'post-failed', battery,
+      return { ok: false, framesSeen, reason: 'post-failed', battery, autoPrefs,
                readings: payload.readings.length, sleepSegments: payload.sleep.length,
                message: `Upload failed (${res.status}).` }
     }
     const body = await res.json() as { stored?: { readings: number; sleep: number } }
-    return { ok: true, framesSeen, battery,
+    return { ok: true, framesSeen, battery, autoPrefs,
              readings: payload.readings.length, sleepSegments: payload.sleep.length, stored: body.stored }
   } catch (e) {
-    return { ok: false, framesSeen, reason: 'post-failed', battery,
+    return { ok: false, framesSeen, reason: 'post-failed', battery, autoPrefs,
              readings: payload.readings.length, sleepSegments: payload.sleep.length, message: describe(e) }
   }
 }
@@ -197,6 +227,9 @@ export function framesToPayload(frames: ColmiFrame[], opts: Pick<SyncOptions, 't
       case 'battery':
         readings.push({ kind: 'battery', at: Date.now(), value: f.percent })
         break
+
+      case 'autoPref':
+        break   // configuration state, surfaced on the outcome — not a sample
 
       case 'realtimeHeartRate':
         if (f.bpm > 0) readings.push({ kind: 'heart_rate', at: Date.now(), value: f.bpm })

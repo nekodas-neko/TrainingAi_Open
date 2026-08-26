@@ -3,13 +3,23 @@
 // is read by nothing that produces a score — see docs/superpowers/plans/2026-08-26-alternative-ring-colmi-testing.md.
 'use client'
 import { useCallback, useEffect, useState } from 'react'
-import { CircleDot, Loader2 } from 'lucide-react'
+import { CircleDot, Loader2, Check, X } from 'lucide-react'
 import { formatInTimeZone } from 'date-fns-tz'
 import { Button } from '@/components/ui/button'
 import { useUserTimezone } from '@/components/shell/user-timezone-provider'
 import { formatTimeOfDay } from '@trainingai/shared/date-utils'
 import { pairColmiRing, forgetColmiRing, syncColmiRing, type ColmiSyncOutcome } from '@/lib/colmi-ble/ble'
 import { getPairedRing, type PairedRing } from '@/lib/colmi-ble/paired-ring'
+import type { AutoMetric } from '@/lib/colmi-ble/protocol'
+
+/** Ordered so the readout reads the same way every sync. */
+const AUTO_METRIC_LABELS: [AutoMetric, string][] = [
+  ['heart_rate', 'Heart rate'],
+  ['hrv', 'HRV'],
+  ['spo2', 'Blood oxygen'],
+  ['stress', 'Stress'],
+  ['temperature', 'Temperature'],
+]
 
 /** Wall-clock parts in the USER's zone — the ring's clock is set from these, never from the
  *  device's own locale, so a phone in another zone cannot mis-stamp the ring's history. */
@@ -110,6 +120,36 @@ export function ColmiPairing() {
             </Button>
             <Button variant="outline" onClick={forget} disabled={syncing}>Forget</Button>
           </div>
+
+          {outcome?.autoPrefs && Object.keys(outcome.autoPrefs).length > 0 && (
+            <div>
+              <div className="text-xs font-medium text-muted-foreground">Recording automatically</div>
+              <ul className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-sm">
+                {AUTO_METRIC_LABELS.map(([metric, label]) => {
+                  const pref = outcome.autoPrefs?.[metric]
+                  if (!pref) return null
+                  return (
+                    <li key={metric} className="flex items-center gap-1">
+                      {/* Never colour alone — the icon carries the state too. */}
+                      {pref.enabled
+                        ? <Check className="h-3.5 w-3.5 text-accent" aria-hidden />
+                        : <X className="h-3.5 w-3.5 text-destructive" aria-hidden />}
+                      <span className={pref.enabled ? '' : 'text-muted-foreground'}>{label}</span>
+                      {pref.intervalMinutes ? (
+                        <span className="text-muted-foreground">· {pref.intervalMinutes}m</span>
+                      ) : null}
+                    </li>
+                  )
+                })}
+              </ul>
+              {Object.values(outcome.autoPrefs).some(p => !p.enabled) && (
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Anything switched off records nothing until it is on — which looks the same as not
+                  wearing the ring. Sync again to retry.
+                </p>
+              )}
+            </div>
+          )}
 
           {outcome?.ok && (
             <p className="text-sm text-muted-foreground">

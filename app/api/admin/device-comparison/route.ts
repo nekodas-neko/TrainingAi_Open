@@ -11,8 +11,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { getRepository } from '@/lib/data'
 import { requireAdmin, adminErrorResponse } from '@/lib/admin'
-import { bucketHrToMinuteMeans } from '@/lib/oura-comparison-harness-adapters'
-import { alignSeries, allPairSummaries, coverage, type NamedSeries } from '@/lib/health/device-comparison'
+import { alignSeries, allPairSummaries, coverage, bucketSeries, type NamedSeries } from '@/lib/health/device-comparison'
 import { normalizeDateParamIso, DEFAULT_TZ } from '@trainingai/shared/date-utils'
 import { formatInTimeZone } from 'date-fns-tz'
 
@@ -21,6 +20,17 @@ const OURA = 'oura_ring'
 const STRAP = 'chest_strap'
 const COLMI = 'colmi_ring'
 const DEVICES = [OURA, STRAP, COLMI]
+
+/**
+ * Default bucket width. **Five minutes, not one.**
+ *
+ * The strap emits ~1 Hz, but both rings sample every 5 minutes at their finest. On a 1-minute grid
+ * two 5-minute devices coincide only by luck, so every ring-to-ring pair would report `overlap: 0`
+ * — which reads as "they never agreed" when it means "they were never compared". Bucket to the
+ * coarsest cadence present, and let the caller widen it further for a whole-day view.
+ */
+const DEFAULT_BUCKET_MINUTES = 5
+const MAX_BUCKET_MINUTES = 60
 
 const MAX_DAYS = 30
 /** Rows are capped so a month-long window cannot return a 40k-row body. The cap is REPORTED, never
@@ -59,6 +69,11 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: `Range too wide — ${MAX_DAYS} days maximum` }, { status: 400 })
   }
 
+  const bucketRaw = Number(params.get('bucket') ?? DEFAULT_BUCKET_MINUTES)
+  const bucketMinutes = Number.isFinite(bucketRaw)
+    ? Math.min(MAX_BUCKET_MINUTES, Math.max(1, Math.round(bucketRaw)))
+    : DEFAULT_BUCKET_MINUTES
+
   const repo = await getRepository()
   const [ouraRows, strapRows, colmiRows] = await Promise.all([
     // 'ble' is the Oura ring's own source tag on oura_heartrate; 'chest_strap' is the H10's.
@@ -68,9 +83,9 @@ export async function GET(req: NextRequest) {
   ])
 
   const series: NamedSeries[] = [
-    { device: OURA,  points: bucketHrToMinuteMeans(ouraRows) },
-    { device: STRAP, points: bucketHrToMinuteMeans(strapRows) },
-    { device: COLMI, points: bucketHrToMinuteMeans(colmiRows.map(r => ({ timestamp: r.measuredAt, bpm: r.value }))) },
+    { device: OURA,  points: bucketSeries(ouraRows.map(r => ({ timestamp: r.timestamp, value: r.bpm })), bucketMinutes) },
+    { device: STRAP, points: bucketSeries(strapRows.map(r => ({ timestamp: r.timestamp, value: r.bpm })), bucketMinutes) },
+    { device: COLMI, points: bucketSeries(colmiRows.map(r => ({ timestamp: r.measuredAt, value: r.value })), bucketMinutes) },
   ]
 
   const rows = alignSeries(series)
@@ -80,6 +95,9 @@ export async function GET(req: NextRequest) {
     metric: 'heart_rate',
     unit: 'bpm',
     range: { from: fromStr, to: toStr, timezone: tz },
+    // Reported, because every `overlap` below is a function of it — a reader who does not know the
+    // bucket width cannot tell a real disagreement from a grid that was too fine.
+    bucketMinutes,
     devices: DEVICES,
     // Computed over the FULL set, then the table is truncated — so the statistics describe the
     // window asked for rather than whatever fitted in the response.

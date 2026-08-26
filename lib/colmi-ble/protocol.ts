@@ -46,6 +46,7 @@ export const CMD = {
   PREFERENCES:        0x0a,
   SYNC_HEART_RATE:    0x15,
   REALTIME_HEART_RATE:0x1e,
+  AUTO_HR_PREF:       0x16,
   AUTO_SPO2_PREF:     0x2c,
   AUTO_STRESS_PREF:   0x36,
   SYNC_STRESS:        0x37,
@@ -79,6 +80,21 @@ export const BIG_DATA_TYPE = {
 } as const
 
 export const SLEEP_STAGE = { LIGHT: 0x02, DEEP: 0x03, REM: 0x04, AWAKE: 0x05 } as const
+
+/** Operation byte on a preference command. */
+export const PREF = { READ: 0x01, WRITE: 0x02, DELETE: 0x03 } as const
+
+/** The five metrics the ring records automatically, each behind its own switch. */
+export const AUTO_METRICS = ['heart_rate', 'spo2', 'stress', 'hrv', 'temperature'] as const
+export type AutoMetric = (typeof AUTO_METRICS)[number]
+
+const AUTO_CMD: Record<AutoMetric, number> = {
+  heart_rate:  CMD.AUTO_HR_PREF,
+  spo2:        CMD.AUTO_SPO2_PREF,
+  stress:      CMD.AUTO_STRESS_PREF,
+  hrv:         CMD.AUTO_HRV_PREF,
+  temperature: CMD.AUTO_TEMP_PREF,
+}
 
 // ── Framing ────────────────────────────────────────────────────────────────────────────────
 
@@ -212,6 +228,45 @@ export function cmdPhoneName(name = 'TA'): Uint8Array {
  * Streaming is battery-costly on a ring this size and must be bounded to an activity, never left
  * on. No decoder for its payload ships yet — see the backlog entry before building one.
  */
+// ── Automatic-measurement preferences ──────────────────────────────────────────────────────
+//
+// **This is the difference between a night of data and an empty sync.** Each metric has its own
+// switch on the ring, and a ring whose switches are off records nothing while you sleep — it will
+// still connect, still answer, still report a battery level, and still hand back an empty history.
+// That failure is indistinguishable from "you didn't wear it" unless the switches are read.
+//
+// Two shapes, not one, and the difference is not decoration:
+//   • temperature carries an extra `0x03` sub-byte before the operation, so its payload is shifted
+//     one place and its response reads `enabled` from byte 3 rather than byte 2;
+//   • heart rate encodes "off" as **0x02**, not 0x00, and carries an interval in minutes.
+
+/** Read one metric's switch. The response comes back on the same command byte. */
+export function cmdReadAutoPref(metric: AutoMetric): Uint8Array {
+  return metric === 'temperature'
+    ? buildPacket([AUTO_CMD.temperature, 0x03, PREF.READ])
+    : buildPacket([AUTO_CMD[metric], PREF.READ])
+}
+
+/**
+ * Turn one metric's automatic recording on or off.
+ *
+ * `intervalMinutes` applies to heart rate only. The ring rounds to 5 and caps at 60, so 5 is the
+ * finest it will do — and finer is what makes a ring/ring comparison possible at all, since the
+ * other ring bins at 5 minutes too.
+ */
+export function cmdWriteAutoPref(metric: AutoMetric, enabled: boolean, intervalMinutes = 5): Uint8Array {
+  if (metric === 'temperature') {
+    return buildPacket([AUTO_CMD.temperature, 0x03, PREF.WRITE, enabled ? 0x01 : 0x00])
+  }
+  if (metric === 'heart_rate') {
+    const mins = Math.min(60, Math.max(5, Math.round(intervalMinutes / 5) * 5))
+    // Off is 0x02 here, NOT 0x00 — writing 0x00 does not disable it, it is simply not a value the
+    // ring recognises for this field.
+    return buildPacket([AUTO_CMD.heart_rate, PREF.WRITE, enabled ? 0x01 : 0x02, mins])
+  }
+  return buildPacket([AUTO_CMD[metric], PREF.WRITE, enabled ? 0x01 : 0x00])
+}
+
 export const cmdRawSensorEnable  = () => buildPacket([CMD.RAW_SENSOR, 0x04, 0x04])
 export const cmdRawSensorDisable = () => buildPacket([CMD.RAW_SENSOR, 0x02])
 

@@ -13,7 +13,7 @@
 // Layouts from Gadgetbridge `YawellRingPacketHandler.java`; see protocol.ts for the source order.
 // ⚠️ LEARNING MODE — nothing here may reach a scoring input (plan §2).
 
-import { CMD, PUSH, BIG_DATA_TYPE, PACKET_SIZE, u16, fromBcd, isValidPacket } from '@/lib/colmi-ble/protocol'
+import { CMD, PUSH, PREF, BIG_DATA_TYPE, PACKET_SIZE, u16, fromBcd, isValidPacket, type AutoMetric } from '@/lib/colmi-ble/protocol'
 
 export interface BatteryReading { kind: 'battery'; percent: number; charging: boolean }
 export interface RealtimeHeartRate { kind: 'realtimeHeartRate'; bpm: number }
@@ -75,11 +75,23 @@ export interface Spo2History {
   readings: { daysAgo: number; hour: number; min: number; max: number }[]
 }
 
+/**
+ * The state of one automatic-measurement switch. A ring with these off records nothing overnight
+ * and still syncs cleanly, so reading them is how "no data" is told apart from "not enabled".
+ */
+export interface AutoPrefState {
+  kind: 'autoPref'
+  metric: AutoMetric
+  enabled: boolean
+  /** Heart rate only: how often the ring samples, in minutes. Null for the others. */
+  intervalMinutes: number | null
+}
+
 export interface UnknownFrame { kind: 'unknown'; command: number | null; reason: string }
 
 export type ColmiFrame =
   | BatteryReading | RealtimeHeartRate | ActivityBucket | HalfHourSeries
-  | HeartRateLog | SleepHistory | TemperatureHistory | Spo2History | UnknownFrame
+  | HeartRateLog | SleepHistory | TemperatureHistory | Spo2History | AutoPrefState | UnknownFrame
 
 const unknown = (command: number | null, reason: string): UnknownFrame => ({ kind: 'unknown', command, reason })
 
@@ -130,6 +142,22 @@ export function decodeV1(value: ArrayLike<number> | null | undefined, validateCh
 
     case CMD.SYNC_HEART_RATE:
       return decodeHeartRateLog(v)
+
+    // Preference responses. A WRITE is echoed with an empty body — decoding that as state would
+    // report whatever byte happened to be there as the switch's value.
+    case CMD.AUTO_HR_PREF:
+      if (v[1] === PREF.WRITE) return unknown(v[0], 'write ack, carries no state')
+      return { kind: 'autoPref', metric: 'heart_rate', enabled: v[2] === 0x01, intervalMinutes: v[3] }
+    case CMD.AUTO_SPO2_PREF:
+      return { kind: 'autoPref', metric: 'spo2', enabled: v[2] === 0x01, intervalMinutes: null }
+    case CMD.AUTO_STRESS_PREF:
+      return { kind: 'autoPref', metric: 'stress', enabled: v[2] === 0x01, intervalMinutes: null }
+    case CMD.AUTO_HRV_PREF:
+      return { kind: 'autoPref', metric: 'hrv', enabled: v[2] === 0x01, intervalMinutes: null }
+    case CMD.AUTO_TEMP_PREF:
+      // Temperature's payload is shifted one byte by its 0x03 sub-command, so `enabled` is byte 3.
+      if (v[1] !== 0x03) return unknown(v[0], 'unexpected temperature pref sub-command')
+      return { kind: 'autoPref', metric: 'temperature', enabled: v[3] === 0x01, intervalMinutes: null }
 
     default:
       return unknown(v[0], 'unrecognised command byte')
