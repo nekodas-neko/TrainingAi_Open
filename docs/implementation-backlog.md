@@ -1577,30 +1577,6 @@ whether or not anyone draws them first.
   reference drawings were never committed). Part 1 §8 has the file-by-file collision table and the
   carry-across rule. **Do not plan around that chain landing, and do not wait for it.**
 
-### [nutrition] BF-11d — a scan that duplicates an existing meal asks instead of silently adding one
-
-- **Lane:** B
-- **Plan:** [`plans/2026-08-24-meal-creator.md`](superpowers/plans/2026-08-24-meal-creator.md) §6
-- **Branch:** `feat/saved-meal-duplicate-detection`
-- **⚠ BF-11c shipped 2026-08-26, and it added a SECOND save path this must cover.** A pasted recipe
-  link now saves meals two ways: the builder's own Save (one meal), and `keepCandidates` in
-  `saved-meals-sheet.tsx` (N meals at once, via `savePlanMealToLibrary`). Duplicate detection that
-  only guards the first lets a re-imported four-dish page add four duplicates in one press — which
-  is the likeliest way anyone hits this, since a link is easy to paste twice.
-- **Added:** 2026-08-24 · planning session, from BF-11 (design item 5). Owner: *"happy to have this
-  workflow for now"* — build as designed, refine on use.
-- **"Close" already has a definition worth reusing rather than inventing:** `fitDistance`
-  (`packages/shared/src/nutrition/meal-macro-fit.ts`) reduces a macro comparison to one comparable
-  number and exists so two versions of the same meal can be compared without a second opinion about
-  "better". Pair it with a normalised name match and **require both** — macros alone match every
-  protein shake against every other one.
-- **It asks, never merges.** "Save as new" is one tap and is the safe default on dismissal. It runs on
-  save, not per keystroke.
-- **"Update it" must keep the existing id** — `meal_plan_meals.saved_meal_id` and the printed QR label
-  both reference it, so a new id orphans a label already stuck on a container.
-- May batch with BF-11f (one screen, one verification pass) — both land in the same builder.
-
-
 ### [nutrition] BF-11f — tagging a meal from Build a Meal
 
 > **⚠ BF-11e shipped the storage and transport (migration 217, local SQLite v29). The one thing it

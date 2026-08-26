@@ -6,6 +6,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.387.0",
+    date: "2026-08-26",
+    changes: [
+      "Saving a meal you already have now asks instead of quietly adding a second copy. Same name and matching macros is what it looks for \u2014 both, so a protein shake is not mistaken for a different one, and a slice is not mistaken for the loaf. You choose: update the one you have, or keep both. Updating keeps the meal\u2019s identity, so a label you have already printed and stuck on a container still scans.",
+      "Importing a multi-dish recipe page twice no longer adds every dish again. Dishes you already have come back unticked and say so, and you can tick one to keep a copy anyway.",
+    ],
+  },
+  {
     version: "1.386.0",
     date: "2026-08-26",
     changes: [
