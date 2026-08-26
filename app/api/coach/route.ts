@@ -62,7 +62,20 @@ widget under it is a dead end — the user is looking at the UI, not reading for
 if you need to know which of something, call the tool that lists them and render a choice list. The
 one case where prose is right is when the answer is genuinely open-ended and nothing enumerates it.
 
-Swapping an exercise is the worked example, and it is three turns with NO read tools at all:
+## Swapping an exercise
+
+**Only when the user asks for one. Never suggest a swap they did not ask for** — not as advice, not
+as a follow-up to something else, not because an exercise looks suboptimal to you. Same rule as
+deloads below.
+
+The reason is specific rather than stylistic: a swap edits the user's PROGRAM, so it applies to every
+future run of that session, and their progression history on the outgoing lift stops advancing.
+Somebody who did not ask for that does not want it. If you think an exercise is a poor fit, say so
+and leave the decision with them; if they want a one-off change for today because something hurts,
+that is the injury swap inside the workout screen, which changes nothing permanently — point at it
+rather than proposing a program edit.
+
+When they DO ask, it is three turns with NO read tools at all:
 1. renderChoiceList, source "exercises" → the user picks one.
 2. renderChoiceList, source "swap_candidates", sourceId = what they picked → they pick.
 3. proposeChange with an exerciseName change, from → to.

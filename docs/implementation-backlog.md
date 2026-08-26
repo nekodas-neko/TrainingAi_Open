@@ -4684,6 +4684,13 @@ cross-session against the local DB. Nothing user-visible changed — **no read s
 - **Branch:** `fix/coach-applied-change-copy`
 - **Added:** 2026-08-18, from owner screenshots of a working swap. **The swap itself is fine** — this
   is the sentence around it.
+- **Keep:** the owner's decision shipped 2026-08-26 (unprompted swaps forbidden; the card now states
+  the permanence). What is owed is **the sentence ordering** — the model writes its text after the
+  widget 3 of 3 times despite an explicit instruction, so a correct "here is the proposal" arrives
+  describing a decision the user has already made. Prompting has failed at it once; the untested
+  hypothesis is that the AI SDK's `stopWhen: stepCountIs(6)` loop makes a trailing text step the
+  natural shape, and whoever takes it should test that before writing more prompt. The alternative
+  is rendering text above widgets in the thread, which is Lane B and undoes a deliberate choice.
 
 > ### 🔴 OWNER DECISION 2026-08-26 — the scope changed. Read this before implementing.
 >
@@ -4701,78 +4708,35 @@ cross-session against the local DB. Nothing user-visible changed — **no read s
 >    was only ever reachable on the surface being restricted, so fixing the wording first would be
 >    building the sentence for a flow that is about to be gated.
 >
-> **Recommendation (Lane A): gate the swap on an open injury, rather than removing it.** Allow the
-> Coach's `session_exercise` swap only when the user has an open row in the `injury` domain that the
-> current exercise loads and the replacement avoids — `muscleDelta` in
-> `lib/coach/domains/session-exercise.ts` already computes exactly that coverage delta, so the
-> evidence is in hand. Outside that case the Coach explains the trade-off in the owner's own terms
-> (progress on the lift resets; a new movement has to be learned) and points at Config, which is
-> where a deliberate program edit belongs. **Why this over removing the tool:** removal also removes
-> the injury case, which is the one the owner called useful, and an injured user reaching for chat
-> is the moment they least want to be sent to a settings screen. **Reversal cost: low** — it is a
-> guard in one handler plus a prompt clause; deleting the guard restores today's behaviour exactly.
-> **Alternative worth naming:** make a chat swap *today-only* instead of program-wide. It answers
-> the progress-loss objection directly and is better if the owner wants ad-hoc substitutions at all,
-> but there is no per-day override table today, so it is a schema change rather than a guard — a
-> much larger job for a case the owner has not asked for.
+> ### ✅ OWNER DECIDED 2026-08-26, AND IT IS NEITHER OPTION THAT WAS OFFERED. Shipped.
 >
-> **Still open for the owner:** whether the injury gate is the right line, or whether the Coach
-> should lose the swap outright. Everything below the investigation note is the pre-decision copy
-> analysis and stays only as evidence.
-- **Lane: A — corrected 2026-08-25 (by Lane B, which this was being served to).** The entry reasoned
-  from the *nature* of the edit ("it is only the system prompt, so Lane B"), and the ownership rule
-  is deliberately not that: **reached by `app/api/**` → Lane A**, whatever the edit looks like. The
-  rule is path-based precisely so this judgement is not re-made per entry, and `app/api/coach/route.ts`
-  is squarely Lane A's. The investigation the entry asks for first — whether the model wrote the
-  sentence after the tool call, or the UI renders tool results ahead of streamed text — also lands in
-  that file, so splitting it across lanes would help nobody.
-
-**What the screen showed, in this order:**
-1. Green result card — *"Swapped Barbell Romanian Deadlift → Barbell Jefferson Curl in Legs"*
-2. Then the assistant's line — *"Here is the proposal to swap Barbell Romanian Deadlift for Barbell
-   Jefferson Curl."*
-3. Then the owner, unprompted — ***"Is this complete?"***
-
-That third line is the finding. The user could not tell from the screen whether anything had happened,
-on a change that had already been written.
-
-> ### ⚠️ INVESTIGATED 2026-08-25 (Lane A). The entry asks for the transcript check *before* any
-> prompt change — it was done, and **it retires one of the two defects and reverses the proposed
-> fix.** Read this before implementing.
+> Presented with remove / keep-and-warn / gate-on-injury, the owner answered:
+> ***"id only like the coach exercise swap to be done from the AI chat when the user requests it"***
+> — keep the capability, but the Coach must never volunteer one.
 >
-> **1. The ordering question is answered: it is the MODEL, not the UI.** `coach-message.tsx` maps
-> `parts` in array order with no sort, and production `coach_messages.parts` shows the same order
-> stored. Of **8 assistant messages in production, 3 carry a `text` part at all — and in all 3 it is
-> the LAST part**, after every tool call. The other 5 have no text at all, so "omit it entirely" is
-> already the common behaviour. The instruction *"Write your one sentence BEFORE calling a widget
-> tool"* is being violated **3 of 3 times** despite being explicit.
+> **Shipped:**
+> 1. **The system prompt now forbids an unprompted swap**, mirroring the idiom the Deloads section
+>    already uses (*"Propose it only when they ask for it… never open a conversation with it"*)
+>    rather than inventing a second phrasing for the same rule.
+> 2. **The confirmation card states the permanence** — that it changes the session itself and applies
+>    from now on, that progression history on the outgoing lift stops advancing, and that a one-off
+>    change for today is the in-workout swap instead. **On the card, not in the prompt**, because
+>    this entry's own investigation measured the prompt's existing ordering instruction being ignored
+>    **3 times out of 3**; a consequence rendered from the patch cannot be ignored or reworded.
 >
-> **2. "Proposal" is the RIGHT word, and the entry's premise is wrong.** The entry says *"a
-> `session_exercise` swap applies immediately, which is why the card is past tense"*. It does not.
-> `DOMAIN_TIER` (`lib/coach/patch.ts:43`) puts `session_exercise` at **tier 2**, and
-> `widget-registry.tsx:78` routes **tier 1–2 to `ChangePreview`** — an inline confirmation with
-> per-row toggles and an **Apply button** (`change-preview.tsx:92 handleApply`). Only **tier 3**
-> (`program_phase`, the sole member) pushes a screen. **Nothing applies without the user accepting**,
-> inline or otherwise, so the swap genuinely IS a proposal at the moment the model writes the word.
+> **The finding that killed the earlier recommendation, kept because it is load-bearing:** the injury
+> case is already handled and does not touch the program. `injury-swap-sheet.tsx` offers
+> `injurySafeAlternatives` mid-workout and its handler (`workout-screen.tsx:961`) mutates **local
+> React state only** — it never writes `session_exercises`. So gating the Coach's *permanent* swap on
+> injury would have made it do a program edit for the one case that already had a non-destructive
+> answer. That is why the card points at the in-workout swap rather than at nothing.
 >
-> **3. So the proposed guard would make it worse.** Feeding the tier in "so *proposal* is only ever
-> available for tier 3" would stop the model correctly describing a tier-2 proposal as one. Do not
-> build it.
->
-> **What is actually wrong is only the ordering, and it is one defect rather than two.** The sentence
-> is accurate when generated and *stale by the time it is read*: the user has already tapped Apply
-> and seen the green "Swapped" card, so a correct "Here is the proposal to…" arrives describing a
-> decision they have already made. That is exactly what produced the owner's *"Is this complete?"*
->
-> **And prompting has already failed at it** — the rule exists and is ignored 3/3. **Hypothesis, not
-> established:** the AI SDK's multi-step loop (`stopWhen: stepCountIs(6)`) makes a final text step
-> the natural shape, so the instruction fights the mechanism rather than the model's judgement.
-> Whoever takes this should test that before writing more prompt.
->
-> **Two candidate fixes, and the choice is a product decision:** make the sentence correct *where it
-> actually lands* (past tense, additive, or omitted — which the entry already offers and which 5 of 8
-> messages already do), **or** render text above widgets in the thread — a UI change, Lane B, and one
-> that would undo the deliberate "text on screen while the widget composes" intent.
+> **Still open, and deliberately not built:** the stale-sentence ordering. The model writes its text
+> after the widget 3 of 3 times despite an explicit instruction not to, and the investigation's
+> hypothesis — that the AI SDK's multi-step loop makes a trailing text step the natural shape — was
+> never tested. Fixing it by prompt has already failed once; the alternative is a UI change (Lane B).
+> With swaps now only happening on request, the user knows what they asked for, so the sentence is
+> less misleading than it was, which is why this is a residual rather than a blocker.
 
 **Two defects, both against rules the prompt already states.**
 - **"Proposal" is the wrong word for this domain.** `program_phase` is **the only tier-3 domain**
