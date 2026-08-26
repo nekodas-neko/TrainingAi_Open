@@ -1,6 +1,6 @@
 import { KCAL_PER_G } from './atwater'
 import { ACTIVITY_LEVELS, type ActivityLevel, type FitnessGoal } from '../types/user'
-import { cunninghamBmr } from '../health/body-composition'
+import { cunninghamBmr, personalRmr, type MeasuredRmr } from '../health/body-composition'
 import { SEDENTARY_MULTIPLIER } from '../health/energy-baseline'
 
 // Q-401: `ACTIVITY_MULTIPLIERS` used to live here — sedentary 1.2 through extra_active 1.9 — and
@@ -146,6 +146,9 @@ export interface BaselineInput {
   activityLevel: ActivityLevel
   fitnessGoal: FitnessGoal
   bodyFatPct?: number  // when present, uses Katch-McArdle BMR + lean-mass protein dosing
+  /** BF-33: a clinically measured resting rate, which outranks the prediction below. Re-scaled to
+   *  today's lean mass rather than trusted-then-expired — see `personalRmr`. */
+  measuredRmr?: MeasuredRmr | null
 }
 
 export interface BaselineResult {
@@ -165,10 +168,16 @@ export function calculateBaseline(input: BaselineInput): BaselineResult {
     ? Math.round(input.weightKg * (1 - input.bodyFatPct / 100) * 10) / 10
     : undefined
 
-  // Katch-McArdle (Cunningham) when lean mass is known; Mifflin-St Jeor otherwise
-  const bmr = leanMassKg != null
-    ? Math.round(cunninghamBmr(leanMassKg))
-    : Math.round(mifflinStJeorBmr(input.weightKg, input.heightCm, input.ageYears, input.sex))
+  // A measurement outranks both predictions (BF-33). It is re-scaled to today's lean mass, so it
+  // ages by how much the body changed rather than by the calendar; `personalRmr` returns null when
+  // there is no measurement, which is the ONLY case that falls through to a prediction.
+  // Katch-McArdle (Cunningham) when lean mass is known; Mifflin-St Jeor otherwise.
+  const measured = personalRmr(input.measuredRmr, leanMassKg)
+  const bmr = measured != null
+    ? Math.round(measured)
+    : leanMassKg != null
+      ? Math.round(cunninghamBmr(leanMassKg))
+      : Math.round(mifflinStJeorBmr(input.weightKg, input.heightCm, input.ageYears, input.sex))
 
   // The rest-day floor, not "what you burn on an average day". Today's measured movement is added
   // on top of this by `computeCalorieBalance`; folding an activity multiplier in here as well is

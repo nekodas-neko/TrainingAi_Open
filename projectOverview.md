@@ -27,6 +27,20 @@
 **Version:** v1.381.2 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-08-26.
 
+**A measured RMR has somewhere to go, and a rule for how it ages (BF-33, engine half).** The owner has
+a DEXA + RMR test booked and every resting rate the app used was *predicted*. Migrations **225** (a
+`measured_rmr` table) + **226** (claude_ro regen) store it; `personalRmr` decides what happens as the
+body changes. **The entry left that open — validity window or re-scale by lean mass — and re-scaling
+wins for a reason, not a preference:** a window gives full trust the day before expiry and total
+discard the day after, while what actually invalidates a measurement is a change in body composition,
+which has no fixed relationship to elapsed time. Cunningham is linear in fat-free mass, so a
+measurement carries exactly one thing the prediction does not — **this person's residual from it** —
+and re-applying that at today's FFM ages it by body change instead of by the calendar. **Its own table,
+not a `body_metrics` column,** because a second test must sit *beside* the first: two measurements at
+different compositions are how you learn whether the first still describes this person. **⚠ NOT usable
+yet** — there is no way to enter a number; the typed field and the AI results-sheet path are scope
+item 3, the 2×2 panel is item 4 and Lane B's.
+
 **A shared test-user UUID, and a check that would have been deleted (LA-32).** Three times in two
 days, adding an unrelated test file turned the suite red in a file the PR never touched: two files
 hardcoded the same user id and one deleted it, and vitest's parallel workers share one local

@@ -345,6 +345,7 @@ The display analogue of One-Formula-One-Place (review 2026-07-16 §4). Any new c
 
 | Concern | Where |
 |---|---|
+| Personal RMR from a clinical measurement | `packages/shared/src/health/body-composition.ts` → `personalRmr`, `MeasuredRmr` — re-scales a measured RMR to today's fat-free mass by keeping the person's residual from Cunningham, so it ages by body change rather than expiring on a date (BF-33) |
 | Retry wrapper for AI calls | `lib/ai/retry.ts` → `withAiRetry`, `isRetryableAiError` |
 | Streaming text response + error marker | `lib/ai/stream.ts` → `textStreamResponse`, `splitStreamError`, `AI_STREAM_ERROR_MARKER` |
 | Cached-AI-insight freshness (hash the prompt, serve only on match) | `lib/ai/insight-cache.ts` → `hashInsightContext`, `readFreshInsight` — every `ai_health_insights` read goes through this; there is deliberately no hash-less read (Q-293) |

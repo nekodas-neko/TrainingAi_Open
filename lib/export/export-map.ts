@@ -75,6 +75,7 @@ export const EXPORTED: Record<string, ExportScope> = {
   injuries: { kind: 'user_id' },
   meal_plans: { kind: 'user_id' },
   meal_types: { kind: 'user_id' },
+  measured_rmr: { kind: 'user_id' },
   mood_logs: { kind: 'user_id' },
   nutrition_targets: { kind: 'user_id' },
   oura_daily: { kind: 'user_id' },

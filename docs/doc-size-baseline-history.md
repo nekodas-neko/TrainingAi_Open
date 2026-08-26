@@ -2871,3 +2871,20 @@ That 83% noise rate is the durable part, because it decided the shape of the fix
 wolf is one the first person it stops will baseline into uselessness, so the detection got a script
 with seven tests — five of them false-positive cases — rather than a grep. Without the ratio written
 down, the next person to read "six collisions" re-derives the noisy rule and ships it.
+
+## 2026-08-26 — `projectOverview.md` and backlog raised (BF-33, the measured RMR)
+
+The index gains a paragraph and the backlog gains a `Keep:` block. Both carry the same two things,
+because both are load-bearing and neither is visible from the code.
+
+**The ageing rule and why it is not a validity window.** BF-33 named two candidates and left the
+choice open. A window fails at both ends — full trust the day before expiry, total discard the day
+after — while what actually invalidates a measurement is a change in body composition, which has no
+fixed relationship to elapsed time. Cunningham being linear in fat-free mass is what makes the
+alternative work: the measurement carries the person's *residual* from the prediction, and that
+re-applies at any later FFM. Someone re-reading `personalRmr` can see what it computes; only this
+says why the obvious rule was rejected.
+
+**That the feature is not usable yet.** The engine half stores it and the goal moves, but nothing can
+enter a number. An index that said "shipped" without that would be the "fixed from intent" failure
+CLAUDE.md names, one step removed.

@@ -23,6 +23,48 @@ export interface BodyComposition {
  */
 export const cunninghamBmr = (ffmKg: number): number => ffmKg * 21.6 + 370
 
+/** A resting metabolic rate measured clinically (indirect calorimetry), with the body it was
+ *  measured on. The fat-free mass is what makes it re-usable later — see `personalRmr`. */
+export interface MeasuredRmr {
+  rmrKcal: number
+  /** Fat-free mass on the day of the test, kg. Null when the provider reported no composition. */
+  ffmKgAtTest: number | null
+}
+
+/**
+ * The person's RMR at their CURRENT fat-free mass, given a clinical measurement taken at some
+ * earlier one. Returns `null` when there is nothing better than the prediction.
+ *
+ * ## Why re-scaling and not an expiry date
+ *
+ * A measurement has to age somehow: an RMR measured at 71 kg is not the RMR at 78 kg, and a stale
+ * number silently outranking a live estimate is worse than having no measurement. The obvious rule
+ * is a validity window — trust it for N months, then discard. That fails at both ends: it keeps a
+ * measurement at full weight the day before it expires and throws away all of its information the
+ * day after, and the thing that actually invalidates it is a change in body composition, which has
+ * no fixed relationship to elapsed time. Someone weight-stable for two years has a better
+ * measurement than someone who gained 8 kg in three months.
+ *
+ * Cunningham is linear in fat-free mass (`ffm·21.6 + 370`), so a measurement carries exactly one
+ * piece of information the prediction does not: **this person's residual from it.** Keep that and
+ * re-apply it at today's fat-free mass. The measurement then ages by how much the body changed
+ * rather than by the calendar, degrades smoothly instead of falling off a cliff, and a second test
+ * later simply supplies a better residual.
+ *
+ * Without a fat-free mass from the test there is no residual to compute, so the raw measurement is
+ * returned unchanged — it is still better than a prediction, and pretending to re-scale it would be
+ * inventing precision that was never measured.
+ */
+export function personalRmr(measured: MeasuredRmr | null | undefined, currentFfmKg: number | null | undefined): number | null {
+  if (measured == null) return null
+  if (!Number.isFinite(measured.rmrKcal) || measured.rmrKcal <= 0) return null
+  if (measured.ffmKgAtTest == null || currentFfmKg == null) return measured.rmrKcal
+  if (!Number.isFinite(measured.ffmKgAtTest) || !Number.isFinite(currentFfmKg)) return measured.rmrKcal
+  if (measured.ffmKgAtTest <= 0 || currentFfmKg <= 0) return measured.rmrKcal
+  const residual = measured.rmrKcal - cunninghamBmr(measured.ffmKgAtTest)
+  return cunninghamBmr(currentFfmKg) + residual
+}
+
 /**
  * Derive the body-composition panel from a weight (kg) and body-fat percentage (0–100).
  * Returns `null` for missing/implausible inputs (never fabricates) — callers render "needs a
