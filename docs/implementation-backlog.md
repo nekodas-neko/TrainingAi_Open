@@ -1554,9 +1554,16 @@ whether or not anyone draws them first.
 - **Do not weaken what they check.** `meal-label`'s decode loop is the closest the sandbox gets to
   the print test that is still owed — it proves the symbol is unobstructed at every layout, which is
   exactly the thing a layout change breaks silently.
-- **First step is to find out whether CI agrees.** E2E is path-gated since #556, so a run that
-  touches these paths is the evidence; if CI is green on both, this is a sandbox-budget entry and
-  the fix is a timeout. If CI is red, it is a real defect and this entry is mis-titled.
+- **✅ CI answered, 2026-08-26: both pass there.** PR #564's E2E job went green in **16m 15s**
+  (14:16:39 → 14:32:54Z) with these two among them, on the same commit that failed them locally. So
+  this is a sandbox time budget and nothing else — the entry's title is right and there is no defect
+  behind it.
+- **What is left is a one-line fix, if it is worth doing at all.** `test.setTimeout` on the two
+  files, sized from a local run. It is deliberately unscheduled: the specs pass on the runner that
+  gates merges, so the cost of leaving them is a session occasionally re-diagnosing them — which is
+  what this entry exists to prevent — and the cost of raising a timeout is that a genuinely hung
+  test takes longer to fail. **Do not weaken what they check** either way: `meal-label`'s decode
+  loop is the closest the sandbox gets to the print test that is still owed.
 
 ### [nutrition] LB-18 — `Recent` on Log Food is scoped to a meal bucket; it may want to be global
 
@@ -1610,50 +1617,6 @@ whether or not anyone draws them first.
 - **Collision with the parked Q-406 → Q-395a/b/c chain** (that chain is `Gate: owner` — its
   reference drawings were never committed). Part 1 §8 has the file-by-file collision table and the
   carry-across rule. **Do not plan around that chain landing, and do not wait for it.**
-
-### [nutrition] BF-11c — Build a Meal gains the recipe URL, the candidate picker and History quick-add
-
-- **Lane:** B
-- **Needs:** BF-11a, BF-11b
-- **Plan:** [`plans/2026-08-24-meal-creator.md`](superpowers/plans/2026-08-24-meal-creator.md) §5
-- **Branch:** `feat/build-a-meal-add-methods`
-- **Added:** 2026-08-24 · planning session, from BF-11 (design items 1, 2, 3). **This is BF-11's
-  original ask** — the recipe-URL scan reachable without starting the whole plan wizard.
-- **Three add-methods beside the existing search; none replaces anything.** (a) an `https:` URL →
-  whole recipe; (b) a multi-candidate list when a scan returns several dishes, each kept one becoming
-  **its own** saved meal; (c) the food-item **History** list Log Food already has
-  (`recent-foods-panel.tsx`, which LB-16 promoted from a three-row strip into the `Recent` tab) as the
-  default state before you type — **reuse that source, do not build a second one.**
-- **⚠ The unstated-yield case is not cosmetic.** `recipeYield: null` means the payload is the WHOLE
-  recipe — a banana-bread page measured **1,956 kcal for the loaf**. Reuse `my-meals-picker.tsx`'s
-  handling and the shared `perServing`, so the two divides cannot drift.
-- **One real difference from the wizard's version:** a "makes 12" recipe lands as `servings: 12` with
-  the whole recipe's items, **not** pre-divided — `SavedMeal.totals` is the whole recipe by contract
-  and `oneServingItems()` is the one place that divides. Pre-dividing here double-divides on log.
-- **Check before reusing `food-row.tsx`**: its only trailing element is a chevron, and a candidate row
-  needs keep/discard. Q-406 records that adding slots for per-row controls is what turns that row into
-  a wrapper rather than a unification — extend it deliberately or draw the candidate list separately
-  and say which.
-
-### [nutrition] BF-11d — a scan that duplicates an existing meal asks instead of silently adding one
-
-- **Lane:** B
-- **Needs:** BF-11c
-- **Plan:** [`plans/2026-08-24-meal-creator.md`](superpowers/plans/2026-08-24-meal-creator.md) §6
-- **Branch:** `feat/saved-meal-duplicate-detection`
-- **Added:** 2026-08-24 · planning session, from BF-11 (design item 5). Owner: *"happy to have this
-  workflow for now"* — build as designed, refine on use.
-- **"Close" already has a definition worth reusing rather than inventing:** `fitDistance`
-  (`packages/shared/src/nutrition/meal-macro-fit.ts`) reduces a macro comparison to one comparable
-  number and exists so two versions of the same meal can be compared without a second opinion about
-  "better". Pair it with a normalised name match and **require both** — macros alone match every
-  protein shake against every other one.
-- **It asks, never merges.** "Save as new" is one tap and is the safe default on dismissal. It runs on
-  save, not per keystroke.
-- **"Update it" must keep the existing id** — `meal_plan_meals.saved_meal_id` and the printed QR label
-  both reference it, so a new id orphans a label already stuck on a container.
-- May batch with BF-11c (one screen, one verification pass) if BF-11c's save path lands unchanged.
-
 
 ### [nutrition] BF-11f — tagging a meal from Build a Meal
 

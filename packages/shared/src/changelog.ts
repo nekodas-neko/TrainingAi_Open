@@ -6,10 +6,28 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: "1.386.2",
+    version: "1.387.1",
     date: "2026-08-26",
     changes: [
-      "Heart rate now syncs from the Colmi ring \u2014 the request was missing the day it was asking for, and the ring answered silence rather than an error, which is why every other measurement appeared and heart rate never did. The card also shows how many frames the ring actually sent, under \u201cSync detail\u201d. The first real sync came back with a battery reading and nothing else, and there was no way to tell a ring that had recorded nothing from one whose data we failed to read \u2014 both look like an empty sync. The ring is also given longer to answer, because its history arrives in bursts and cutting the wait short looks identical to having no history.",
+      "Heart rate now syncs from the Colmi ring. The request was missing the day it was asking for, and the ring answers a command it does not understand with silence rather than an error \u2014 so every other measurement appeared and heart rate never did. The ring card also shows how many frames the ring actually sent, under \u201cSync detail\u201d, and the ring is given longer to answer, because its history arrives in bursts and cutting the wait short looks identical to having no history.",
+    ],
+  },
+  {
+    version: "1.387.0",
+    date: "2026-08-26",
+    changes: [
+      "Saving a meal you already have now asks instead of quietly adding a second copy. Same name and matching macros is what it looks for \u2014 both, so a protein shake is not mistaken for a different one, and a slice is not mistaken for the loaf. You choose: update the one you have, or keep both. Updating keeps the meal\u2019s identity, so a label you have already printed and stuck on a container still scans.",
+      "Importing a multi-dish recipe page twice no longer adds every dish again. Dishes you already have come back unticked and say so, and you can tick one to keep a copy anyway.",
+    ],
+  },
+  {
+    version: "1.386.0",
+    date: "2026-08-26",
+    changes: [
+      "Build a Meal takes a recipe link. Paste an https address into the ingredient search and the whole recipe is imported \u2014 every ingredient at its own weight, each one saved to your foods so you can use it again. This was already possible inside the meal-plan wizard; it is now reachable without starting a plan.",
+      "A link to a page with several dishes asks which ones you want. Each dish you keep becomes its own saved meal, so a \"five weeknight dinners\" page gives you five meals you can log separately rather than one that nobody eats. Nothing is added to your foods until you choose.",
+      "A recipe page that never says how many it serves now says so, in the builder, next to the field that sets it \u2014 those ingredients are the whole batch, and saving them as one portion would have quietly multiplied everything you logged from it.",
+      "The ingredient search says what its first list is: Recently used before you type, Your foods after. The list was always there; nothing named it.",
     ],
   },
   {

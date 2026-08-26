@@ -23,7 +23,9 @@ const read = (p: string) => readFileSync(join(process.cwd(), p), 'utf8')
 const SITES: Array<{ file: string; what: string }> = [
   { file: 'components/guided-walk/walk-summary.tsx', what: 'a completed guided walk' },
   { file: 'components/nutrition/end-of-day/end-of-day-review.tsx', what: 'the end-of-day check-in' },
-  { file: 'components/nutrition/saved-meals-sheet.tsx', what: 'a saved meal' },
+  // BF-11d moved this write out of the sheet and into its own module; the invariant travelled with
+  // the code, so the test follows it rather than being relaxed.
+  { file: 'components/nutrition/save-meal.ts', what: 'a saved meal' },
   { file: 'app/nutrition/nutrition-content.tsx', what: 'a food-log delete' },
   { file: 'components/fitness-tests/test-result.tsx', what: 'a fitness-test result' },
 ]
@@ -53,15 +55,24 @@ describe('a failed local write falls through to the server, never to an error to
 
   // The three that were `if (store) {…} else {…API}` now gate the API on the local result, so the
   // fallback is reachable when the branch was entered and threw — not only when there is no store.
-  for (const file of [
-    'components/nutrition/end-of-day/end-of-day-review.tsx',
-    'components/nutrition/saved-meals-sheet.tsx',
-    'components/guided-walk/walk-summary.tsx',
-  ]) {
+  //
+  // **Two shapes express that, and both are correct.** A `savedLocally` flag consulted after the
+  // try, or an early `return` from the successful local path with the API call at the function's
+  // top level. What neither may do is put the API call in an `else` of the store check, which is the
+  // arrangement Q-216 was about. `save-meal.ts` takes the second shape because it is a function with
+  // a return value rather than a handler mutating component state.
+  const GATES: Array<{ file: string; gate: RegExp }> = [
+    { file: 'components/nutrition/end-of-day/end-of-day-review.tsx', gate: /let savedLocally = false/ },
+    { file: 'components/guided-walk/walk-summary.tsx', gate: /let savedLocally = false/ },
+    { file: 'components/nutrition/save-meal.ts', gate: /\n      return fresh\n/ },
+  ]
+  for (const { file, gate } of GATES) {
     it(`${file} gates its server write on the local result, not on store presence alone`, () => {
       const src = read(file)
-      expect(src).toMatch(/let savedLocally = false/)
-      expect(src).toMatch(/if \(savedLocally\) return|if \(!savedLocally\) \{/)
+      expect(src).toMatch(gate)
+      // The API call must not be the `else` of the store check — that is the exact shape whose
+      // throw skipped the fallback entirely.
+      expect(src).not.toMatch(/\}\s*else\s*\{[^}]*fetch\(/)
     })
   }
 })

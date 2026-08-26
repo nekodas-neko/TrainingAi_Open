@@ -178,6 +178,18 @@ recipe by contract (`oneServingItems()` is the one place that divides, and both 
 plan conversion call it). Pre-dividing here would make the saved meal lie about its own batch size
 and would double-divide on log.
 
+**⚠ CORRECTED 2026-08-26 — the route ALREADY pre-divides, so this instruction inverts.**
+`/api/nutrition/scan`'s `toMeal` runs `perServing(c.ingredients, servings)` before it answers, so a
+page stating *makes 12* comes back as **one slice**, not the loaf. Setting `servings: 12` on top of
+that is the very double-divide this paragraph warns about — it logs a twelfth of a slice. The
+contract above is right and the premise underneath it was wrong. What shipped is **`servings: 1`**,
+which is exact (no divide-then-multiply round trip) and is the same encoding `savePlanMealToLibrary`
+already uses. The decision is `recipeBuilderPatch` in `components/nutrition/recipe-import.ts`, with
+tests, because both divides are correct in isolation and the failure is silent.
+
+**The unstated-yield case is unaffected and is still the one that needs asking.** `recipeYield: null`
+makes the route's own divisor 1, so nothing is divided and what arrives IS the whole batch.
+
 ### 5.2 Multi-candidate picking (design item 2)
 
 When `candidates.length > 1`, show them as a list: name, calorie figure, item count, a keep/discard
@@ -194,8 +206,14 @@ its **History** action; Build a Meal's picker is type-to-search only. Wire the s
 as a default list — what shows before you have typed anything, rather than a blank state.
 
 **Reuse the existing source.** The design's first draft called this "doesn't exist" and was wrong;
-the correction is recorded in the design doc and is the reason this item is small. Find what
-`onMyFoods` opens and read from the same place.
+the correction is recorded in the design doc and is the reason this item is small.
+
+**⚠ MEASURED 2026-08-26, while building it: the picker was never type-to-search only.**
+`searchFoodItems('')` returns the twenty most recently updated foods — its own comment calls this
+"the browse-all path" — and `IngredientPicker` already fetched with an empty query on mount and
+rendered the result unconditionally. So the default list was already there. What it lacked was a
+**heading** saying what you were looking at, beside a *Food database* heading that had one; that is
+what shipped. (`onMyFoods`, which this paragraph used to point at, was removed by LB-16.)
 
 ### 5.4 Row shape
 
@@ -203,9 +221,13 @@ the correction is recorded in the design doc and is the reason this item is smal
 it onto the candidate list without checking: its only trailing element is a chevron, and Q-406
 records that adding slots for a per-row warning or spinner is what turns it into a wrapper rather
 than a unification. A candidate row needs a keep/discard control, which is a trailing element the
-agreed row does not have. Either extend the row deliberately (and say so, since Q-406's two
-unconverted call sites are waiting on exactly that design answer) or draw the candidate list
-separately and note why.
+agreed row does not have.
+
+**RESOLVED 2026-08-26 — the candidate list is drawn separately** (`recipe-candidates.tsx`), and the
+design answer this deferred to has since arrived. Q-406 shipped: all four call sites converted, and
+the owner's concession was **one optional string** (`warning`), not a node. A keep/discard control is
+a trailing *control* rather than a value, so it is the wrapper move that concession deliberately
+avoided.
 
 ---
 
@@ -223,6 +245,13 @@ number, relative rather than absolute, and is documented as existing *"so two ca
 the same meal can be compared without a second opinion about what 'better' means."* That is exactly
 this question. Pair it with a normalised name comparison; **require both** to be close, since macros
 alone will match every protein shake against every other one.
+
+**SHIPPED 2026-08-26.** `components/nutrition/meal-duplicate.ts` → `findDuplicateMeal`, with tests.
+Two things the plan did not know: BF-11c added a **second save path** (`keepCandidates`, N meals at
+once), and four dialogs for four dishes is not asking — so on that path the ask is the tick that is
+already there, with duplicates unticked and labelled *already in your meals*. The name test is
+**equality after normalisation, not fuzzy**, following BF-38's *prefer under-merging*: a duplicate is
+deletable, an offer to overwrite the wrong meal is not.
 
 Three rules that keep this from being annoying:
 

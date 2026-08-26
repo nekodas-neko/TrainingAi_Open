@@ -2,16 +2,14 @@
 
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useState } from 'react'
 import { useUserTimezone } from '@/components/shell/user-timezone-provider'
-import { ChevronLeft, Plus, Minus, Trash2, Loader2, CheckSquare, Pencil, Camera } from 'lucide-react'
+import { Plus, Trash2, Loader2, CheckSquare, Camera } from 'lucide-react'
 import { toast } from 'sonner'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import type { FoodItem, SavedMeal, MealType, FoodLogWithItem, NutritionScanResult } from '@trainingai/shared/types/nutrition'
 import { todayInTz } from '@trainingai/shared/date-utils'
 import { logMealItems } from '@trainingai/shared/nutrition/log-meal'
 import { mealTypeForHour } from '@trainingai/shared/nutrition/log-plan-meal'
-import { MACRO_COLORS } from '@trainingai/shared/nutrition/macro-colors'
 import { cachedFetch, readCacheSync } from '@/lib/sqlite/cache'
 import { invalidateSavedMeals } from '@/lib/cache-groups'
 import { TTL_MEDIUM, TTL_LONG } from '@trainingai/shared/cache-ttl'
@@ -30,6 +28,16 @@ import { FoodRow } from './food-row'
 import { QuantitySheet } from './quantity-sheet'
 import { qtyFromInput, steppedQty, type QtyUnit } from './saved-meal-qty'
 import { IngredientPicker } from './ingredient-picker'
+import { MealBatchSize } from './meal-batch-size'
+import { MealBuilderFooter } from './meal-builder-footer'
+import { MealBuilderHeader } from './meal-builder-header'
+import { recipeBuilderPatch } from './recipe-import'
+import { findDuplicateMeal, type ComparableMeal } from './meal-duplicate'
+import { sumIngredients } from '@trainingai/shared/nutrition/scan-totals'
+import { saveMealToLibrary } from './save-meal'
+import { DuplicateMealPrompt } from './duplicate-meal-prompt'
+import { RecipeCandidates, type RecipeCandidate } from './recipe-candidates'
+import { savePlanMealToLibrary } from '@trainingai/shared/nutrition/save-plan-meal'
 
 /** Which SCREEN is showing. The tab strip within the list screen is `listTab` below. */
 type SheetTab = 'meals' | 'build'
@@ -139,6 +147,17 @@ export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate,
   // The picker starts open for a NEW meal — an empty builder with a collapsed search is a dead end —
   // and closed when editing one, which is the state artboard 5 draws.
   const [pickerOpen, setPickerOpen] = useState(true)
+  // An imported recipe whose page never stated a yield: the figures below are the whole batch until
+  // the user says otherwise, and nothing else on screen would reveal that.
+  const [unstatedYield, setUnstatedYield] = useState(false)
+  // A recipe page that held several dishes (BF-11c). Non-null replaces the build form with the
+  // picker: the choice is which dishes to save, not what to put in the meal on screen.
+  const [candidates, setCandidates] = useState<RecipeCandidate[] | null>(null)
+  const [savingCandidates, setSavingCandidates] = useState(false)
+  // BF-11d: the meal this one looks like, once a save has found one. Non-null puts the question on
+  // screen; `duplicateAnswered` is what stops it being asked again on the way through its own answer.
+  const [duplicateOf, setDuplicateOf] = useState<ComparableMeal | null>(null)
+  const [duplicateAnswered, setDuplicateAnswered] = useState(false)
 
   useEffect(() => {
     if (!open) return
@@ -183,6 +202,10 @@ export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate,
     setBuildSession(n => n + 1)
     setRenamingMeal(!meal)
     setPickerOpen(!meal || meal.items.length === 0)
+    setUnstatedYield(false)
+    setCandidates(null)
+    setDuplicateOf(null)
+    setDuplicateAnswered(false)
     setTab('build')
   }, [])
 
@@ -200,6 +223,69 @@ export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate,
     setTab('meals')
     setEditingMeal(null)
   }
+
+  /**
+   * A recipe pasted as a link becomes this meal (BF-11c).
+   *
+   * It fills fields the builder already has rather than inventing a mode. The numeric decision —
+   * what `servings` becomes, and when to prompt — is `recipeBuilderPatch`, which is a pure function
+   * with tests because getting it wrong logs a twelfth of a slice and looks plausible.
+   */
+  function importRecipe(recipe: { name: string; entries: { item: FoodItem; qty: number }[]; recipeYield: number | null }) {
+    setIngredients(prev => {
+      const next = [...prev]
+      for (const { item, qty } of recipe.entries) {
+        const at = next.findIndex(e => e.item.id === item.id)
+        if (at === -1) next.push({ item, qty })
+        else next[at] = { ...next[at], qty: next[at].qty + qty }
+      }
+      return next
+    })
+    // Read from the closure, not inside a `setMealName` updater: an updater must be pure, and React
+    // may call it twice under StrictMode. This runs from a press, so the current render's name is
+    // the right one.
+    const patch = recipeBuilderPatch(recipe, mealName)
+    setMealName(patch.name)
+    setMealServings(patch.servings)
+    setUnstatedYield(patch.unstatedYield)
+    setRenamingMeal(false)
+  }
+
+  /**
+   * Every dish the user kept from a multi-recipe page becomes its own saved meal (BF-11c §5.2).
+   *
+   * `savePlanMealToLibrary` is reused rather than re-implemented: its contract is exactly
+   * `{ name, ingredients }`, and it already mints the food items through `ingredientToEntry`, writes
+   * the meal local-first, queues the outbox mutation and invalidates. Its `servings: 1` is right
+   * here for the same reason it is right for an import — `/api/nutrition/scan` has already divided
+   * by any stated yield, so each candidate arrives as one serving.
+   *
+   * Serial, matching that function's own reasoning: each meal writes several rows to the same local
+   * tables and queues its own mutations, and four of them is not worth racing.
+   */
+  async function keepCandidates(kept: RecipeCandidate[]) {
+    setSavingCandidates(true)
+    let failed = 0
+    for (const c of kept) {
+      try {
+        await savePlanMealToLibrary({ name: c.name, ingredients: c.ingredients }, userId)
+      } catch {
+        failed++
+      }
+    }
+    setSavingCandidates(false)
+    setCandidates(null)
+    const saved = kept.length - failed
+    if (saved > 0) toast.success(saved === 1 ? `"${kept[0].name}" saved` : `${saved} meals saved`)
+    // Reported separately rather than folded in: a partial save is exactly when the user needs to
+    // know which half happened.
+    if (failed > 0) toast.error(failed === 1 ? 'One dish could not be saved' : `${failed} dishes could not be saved`)
+    if (saved > 0) { await invalidateSavedMeals(); backToMeals(); fetchMeals() }
+  }
+
+  // `[]` is stable by React's guarantee — a setter, not a value. Hoisted rather than inline because
+  // `MealBatchSize` is memoised and one inline arrow would defeat it silently (Q-490).
+  const clearUnstatedYield = useCallback(() => setUnstatedYield(false), [])
 
   function addIngredient(item: FoodItem) {
     setIngredients(prev => {
@@ -260,62 +346,70 @@ export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate,
     { kcal: 0, protein: 0, carbs: 0, fat: 0 }
   )
 
-  async function handleSave() {
+  /** The same figures in `MacroTotals` shape, which is what duplicate detection compares (BF-11d). */
+  /**
+   * Which imported dishes you already have (BF-11d), by index.
+   *
+   * Computed here rather than in the picker because the library lives here — and computed once for
+   * the whole list rather than per row, so a four-dish page is four lookups, not four per render.
+   */
+  const candidateDuplicates = useMemo(
+    () => (candidates ?? []).map(c =>
+      findDuplicateMeal({ name: c.name, totals: sumIngredients(c.ingredients) }, meals)?.name ?? null),
+    [candidates, meals],
+  )
+
+  const candidateTotals = {
+    calories: totalMacros.kcal,
+    proteinG: totalMacros.protein,
+    carbsG: totalMacros.carbs,
+    fatG: totalMacros.fat,
+  }
+
+  /**
+   * Save, unless it looks like something you already have (BF-11d).
+   *
+   * `overwrite` is the meal the user chose to update. Its **id is kept**, which is the whole reason
+   * this is not a delete-and-recreate: `meal_plan_meals.saved_meal_id` references it, and so does a
+   * printed QR label the owner may already have stuck on a container.
+   */
+  async function handleSave(overwrite?: ComparableMeal) {
     const name = mealName.trim()
     if (!name) { toast.error('Enter a meal name'); return }
     if (ingredients.length === 0) { toast.error('Add at least one ingredient'); return }
+
+    // Runs on save, never per keystroke — and never when the user has already answered, or the
+    // question would come back on the way through its own answer.
+    if (!overwrite && !duplicateAnswered) {
+      const match = findDuplicateMeal({ name, totals: candidateTotals }, meals, editingMeal?.id)
+      if (match) { setDuplicateOf(match); return }
+    }
+
     setSaving(true)
-    const items = ingredients.map(e => ({ foodItemId: e.item.id, quantityMultiplier: e.qty }))
-    const store = userId ? getLocalStore(userId) : null
-    const mealId = editingMeal?.id ?? crypto.randomUUID()
-    const now = new Date().toISOString()
+    // Keeps the meal's own creation date when re-saving over one, whether it was opened for editing
+    // or matched as a duplicate: it is the same meal either way.
+    const target = editingMeal ?? (overwrite ? meals.find(m => m.id === overwrite.id) ?? null : null)
+    const mealId = target?.id ?? crypto.randomUUID()
     try {
-      let savedLocally = false  // Q-216: the local branch owns its own failure, see the catch below
-      if (store) {
-        try {
-        // Local-first: write the meal to the on-device store + queue the outbox mutation,
-        // then update the UI synchronously — no waiting on the network (works offline).
-        const createdAt = editingMeal
-          ? (editingMeal.createdAt instanceof Date ? editingMeal.createdAt.toISOString() : String(editingMeal.createdAt))
-          : now
-        await store.upsertSavedMeal(
-          { id: mealId, name, servings: mealServings, imageDataUri: mealImage, createdAt, updatedAt: now, deletedAt: null, syncStatus: 'pending' },
-          items.map(it => ({ id: crypto.randomUUID(), savedMealId: mealId, foodItemId: it.foodItemId, quantityMultiplier: it.quantityMultiplier })),
-        )
-        // BF-11e added `mealTypeIds` to the route, the outbox branch and the local table. This
-        // payload deliberately does NOT send it yet, and that is the correct no-op rather than an
-        // omission: absent means "leave the stored tags alone" on both the local upsert above and
-        // the server replay, while sending the currently-loaded tags would REVERT a change made on
-        // another device between this sheet loading and this save. There is no asymmetry for the
-        // sync rule to catch either — no surface can set a tag today, web or native.
-        // **BF-11f adds the picker: it must add `mealTypeIds` HERE and to `upsertSavedMeal` above,
-        // in the same PR**, or tags will save on the web and strand offline.
-        await store.queueMutation({ userId: userId!, domain: 'saved_meals', date: todayInTz(tz), payload: { id: mealId, name, items, servings: mealServings, imageDataUri: mealImage } })
-        await invalidateSavedMeals()
-        setMeals(await store.getSavedMeals())
-        pushThenRevalidate(userId!, invalidateSavedMeals)
-        savedLocally = true
-        // Without this the throw reached the outer catch and reported a failed save, never trying
-        // the server write in the arm below.
-        } catch (e) { console.error('Saved-meal SQLite write failed, falling back to API:', e) }
-      }
-      if (!savedLocally) {
-        // Web fallback (no local store), and the recovery path when the local write above threw.
-        const url = editingMeal ? `/api/nutrition/saved-meals/${mealId}` : '/api/nutrition/saved-meals'
-        const method = editingMeal ? 'PUT' : 'POST'
-        const res = await fetch(url, {
-          method,
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ id: mealId, name, items, servings: mealServings, imageDataUri: mealImage }),
-        })
-        if (!res.ok) throw new Error()
-        await invalidateSavedMeals()
-        fetchMeals()
-      }
-      toast.success(editingMeal ? `"${name}" updated` : `"${name}" saved to meal library`)
+      const fresh = await saveMealToLibrary({
+        mealId,
+        name,
+        items: ingredients.map(e => ({ foodItemId: e.item.id, quantityMultiplier: e.qty })),
+        servings: mealServings,
+        imageDataUri: mealImage,
+        createdAt: target
+          ? (target.createdAt instanceof Date ? target.createdAt.toISOString() : String(target.createdAt))
+          : new Date().toISOString(),
+        isUpdate: target != null,
+        userId,
+        tz,
+      })
+      if (fresh) setMeals(fresh)
+      else fetchMeals()
+      toast.success(target ? `"${name}" updated` : `"${name}" saved to meal library`)
       backToMeals()
     } catch {
-      toast.error(editingMeal ? 'Failed to update meal' : 'Failed to save meal')
+      toast.error(target ? 'Failed to update meal' : 'Failed to save meal')
     } finally {
       setSaving(false)
     }
@@ -431,48 +525,17 @@ export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate,
               {selectedIds ? `${selectedIds.size} selected` : 'Log Food'}
             </SheetTitle>
           ) : (
-            <div className="flex items-center gap-2">
-              <button onClick={backToMeals} aria-label="Back" className="p-2.5 -ml-1.5 text-muted-foreground hover:text-foreground rounded-lg">
-                <ChevronLeft className="w-5 h-5" />
-              </button>
-              {/* Q-395a: the meal's name is the screen title once it has one, and the batch
-                  explainer is its subtitle — "Edit Meal" said nothing the screen did not already
-                  show, and the batch figure was buried below the fold. */}
-              <div className="min-w-0 flex-1">
-                {/* Artboard 5 edits the name in place, next to a pencil. It used to cost a labelled
-                    field of its own in the body — which was never a separate step, but did mean the
-                    name and the figure describing it sat a screen apart. */}
-                {renamingMeal ? (
-                  <Input
-                    autoFocus
-                    value={mealName}
-                    onChange={e => setMealName(e.target.value)}
-                    onBlur={() => setRenamingMeal(false)}
-                    onKeyDown={e => { if (e.key === 'Enter' || e.key === 'Escape') setRenamingMeal(false) }}
-                    placeholder="e.g. Post-workout shake"
-                    aria-label="Meal name"
-                    className="h-8 rounded-lg px-2 text-base font-semibold"
-                  />
-                ) : (
-                  <button
-                    onClick={() => setRenamingMeal(true)}
-                    aria-label={`Rename ${mealName.trim() || 'this meal'}`}
-                    className="flex min-w-0 items-center gap-1.5 text-left"
-                  >
-                    <SheetTitle className="truncate">
-                      {mealName.trim() || (editingMeal ? 'Edit Meal' : 'Build a Meal')}
-                    </SheetTitle>
-                    <Pencil className="h-3.5 w-3.5 flex-none text-muted-foreground" />
-                  </button>
-                )}
-                {ingredients.length > 0 && (
-                  <p className="truncate text-xs tabular-nums text-muted-foreground">
-                    Makes {mealServings} {mealServings === 1 ? 'portion' : 'portions'} ·{' '}
-                    {Math.round(totalMacros.kcal / mealServings)} kcal each
-                  </p>
-                )}
-              </div>
-            </div>
+            <MealBuilderHeader
+              onBack={backToMeals}
+              name={mealName}
+              onNameChange={setMealName}
+              renaming={renamingMeal}
+              onRenamingChange={setRenamingMeal}
+              editing={editingMeal != null}
+              hasIngredients={ingredients.length > 0}
+              servings={mealServings}
+              batchKcal={totalMacros.kcal}
+            />
           )}
         </SheetHeader>
 
@@ -561,55 +624,28 @@ export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate,
           </CaptureActions>
         ) : (
           <>
-            <div className="flex-1 overflow-y-auto px-1 space-y-4 pb-2">
-              {/* Batch size. A recipe is often not one plate — the ingredients below describe the
-                  whole batch, and this is what turns that into a portion. Without it a meal plan
-                  put a two-serving tub of ice cream into one slot as if it were one meal. */}
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                  This recipe makes
-                </label>
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => setMealServings(v => Math.max(1, Math.round((v - 1) * 4) / 4))}
-                    aria-label="Fewer servings"
-                    className="flex-none w-12 h-12 rounded-lg bg-muted flex items-center justify-center"
-                  >
-                    <Minus className="h-4 w-4" />
-                  </button>
-                  <input
-                    type="number"
-                    inputMode="decimal"
-                    min={1}
-                    step={1}
-                    value={mealServings}
-                    onChange={e => {
-                      const n = parseFloat(e.target.value)
-                      if (Number.isFinite(n) && n >= 0.25) setMealServings(Math.min(50, Math.round(n * 4) / 4))
-                    }}
-                    aria-label="Servings this meal makes"
-                    className="min-w-0 flex-1 min-h-12 rounded-lg bg-muted px-2 text-sm font-bold tabular-nums text-center outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none"
-                  />
-                  <button
-                    onClick={() => setMealServings(v => Math.min(50, Math.round((v + 1) * 4) / 4))}
-                    aria-label="More servings"
-                    className="flex-none w-12 h-12 rounded-lg bg-muted flex items-center justify-center"
-                  >
-                    <Plus className="h-4 w-4" />
-                  </button>
-                  <span className="flex-none text-xs text-muted-foreground">
-                    {mealServings === 1 ? 'portion' : 'portions'}
-                  </span>
-                </div>
-                {mealServings !== 1 && (
-                  <p className="text-[11px] leading-snug text-muted-foreground">
-                    Enter the ingredients for the <strong>whole batch</strong> below. Logging this
-                    meal, and a meal plan using it, takes one portion —{' '}
-                    {Math.round(totalMacros.kcal / mealServings)} kcal of the{' '}
-                    {Math.round(totalMacros.kcal)} below.
-                  </p>
-                )}
+            {candidates ? (
+              // Replaces the body AND the footer: while this is up the choice is which dishes to
+              // save, so the build form's own Save button would be answering a different question.
+              <div className="flex-1 overflow-y-auto px-1 pb-2">
+                <RecipeCandidates
+                  candidates={candidates}
+                  duplicateNames={candidateDuplicates}
+                  saving={savingCandidates}
+                  onCancel={() => setCandidates(null)}
+                  onKeep={kept => void keepCandidates(kept)}
+                />
               </div>
+            ) : (
+            <>
+            <div className="flex-1 overflow-y-auto px-1 space-y-4 pb-2">
+              <MealBatchSize
+                servings={mealServings}
+                onChange={setMealServings}
+                unstatedYield={unstatedYield}
+                onYieldAnswered={clearUnstatedYield}
+                batchKcal={totalMacros.kcal}
+              />
 
               {/* Ingredient list above search so existing items are visible first */}
               {ingredients.length > 0 && (
@@ -643,6 +679,8 @@ export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate,
                   active={open && tab === 'build'}
                   userId={userId}
                   onAdd={addIngredient}
+                  onImportRecipe={importRecipe}
+                  onRecipeCandidates={setCandidates}
                 />
               ) : (
                 <button
@@ -685,45 +723,30 @@ export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate,
               />
             </div>
 
-            {/* **The footer is the point of this screen.** It keeps the batch total, the macro split
-                and the per-portion figure on screen *while ingredients are being edited* — which is
-                the whole reason to have a screen here rather than a list. The same numbers were
-                already computed live, but sat in a card partway down the scroll, so the moment you
-                were editing the thing that changed them they were gone. Artboard 5 pins them. */}
-            <div className="flex shrink-0 flex-col gap-2.5 border-t border-border pt-2.5">
-              {ingredients.length > 0 && (
-                <div className="flex items-baseline gap-2.5 px-1">
-                  <span className="text-[10px] font-semibold uppercase tracking-[0.04em] text-muted-foreground">
-                    Batch
-                  </span>
-                  <span className="text-sm font-bold tabular-nums">{Math.round(totalMacros.kcal)} kcal</span>
-                  {/* `MACRO_COLORS`, like every other macro readout — the artboard's own hex values
-                      are this palette, so parity and the token rule agree here. */}
-                  <span className="text-xs font-semibold tabular-nums" style={{ color: MACRO_COLORS.protein }}>
-                    {Math.round(totalMacros.protein)} P
-                  </span>
-                  <span className="text-xs font-semibold tabular-nums" style={{ color: MACRO_COLORS.carbs }}>
-                    {Math.round(totalMacros.carbs)} C
-                  </span>
-                  <span className="text-xs font-semibold tabular-nums" style={{ color: MACRO_COLORS.fat }}>
-                    {Math.round(totalMacros.fat)} F
-                  </span>
-                  <span className="flex-1" />
-                  {mealServings !== 1 && (
-                    <span className="flex-none text-[11px] tabular-nums text-muted-foreground">
-                      {Math.round(totalMacros.kcal / mealServings)} / portion
-                    </span>
-                  )}
-                </div>
-              )}
-              <Button
-                className="w-full h-12 font-semibold"
-                onClick={handleSave}
-                disabled={saving || !mealName.trim() || ingredients.length === 0}
-              >
-                {saving ? (editingMeal ? 'Updating…' : 'Saving…') : (editingMeal ? 'Update Meal' : 'Save Meal')}
-              </Button>
-            </div>
+            {duplicateOf && (
+              <div className="shrink-0 px-1 pb-2">
+                <DuplicateMealPrompt
+                  existingName={duplicateOf.name}
+                  saving={saving}
+                  onUpdate={() => { const m = duplicateOf; setDuplicateOf(null); setDuplicateAnswered(true); void handleSave(m) }}
+                  onSaveAsNew={() => { setDuplicateOf(null); setDuplicateAnswered(true); void handleSave() }}
+                />
+              </div>
+            )}
+            <MealBuilderFooter
+              hasIngredients={ingredients.length > 0}
+              batchKcal={totalMacros.kcal}
+              protein={totalMacros.protein}
+              carbs={totalMacros.carbs}
+              fat={totalMacros.fat}
+              servings={mealServings}
+              saving={saving}
+              editing={editingMeal != null}
+              canSave={!!mealName.trim() && ingredients.length > 0}
+              onSave={handleSave}
+            />
+            </>
+            )}
           </>
         )}
       </SheetContent>
