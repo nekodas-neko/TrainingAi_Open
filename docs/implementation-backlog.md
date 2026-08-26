@@ -528,50 +528,6 @@ will hit it.
   sits in that row; and whether the sheet now reads as one thing is the owner's call, not a
   measurement.
 
-### [nutrition] BF-31 — artboard 5 parity: Edit meal, and the batch footer that is its point
-
-- **Lane:** B
-- **Spec:** BF-28.
-- **Added:** 2026-08-25, owner: the nutrition screens match their drawings.
-- **⚠ Shipped counterpart — CORRECTED 2026-08-25, the entry named the wrong files.** `assign-step.tsx`
-  and `review-step.tsx` belong to `food-logger-sheet.tsx`, the **scan / Log Food** flow; neither is
-  reachable from Edit Meal. The real counterpart is **`saved-meals-sheet.tsx`'s `tab === 'build'`**
-  (`ingredient-picker.tsx` is correct, and is rendered from there). Q-395a already converted its
-  ingredient rows to the shared `FoodRow` and deleted `ingredient-row.tsx`, so the **rows** are done
-  and this entry is the frame around them.
-- **Both "first things to check" are answered — neither is a behaviour change.** (a) The builder
-  **does** show batch kcal and the P/C/F split live while ingredients are edited: a `bg-brand/10`
-  card sits inline in the ingredient list, with a `One portion — what gets logged` block beneath it
-  when servings ≠ 1. So the footer is a **restyle** — pin that block above `Save meal` instead of
-  letting it scroll away mid-list, colour `66 P · 48 C · 13 F` with `MACRO_COLORS`, and put the
-  per-portion figure on the same line as `278 / portion`. (b) Renaming costs **no** separate sheet:
-  the name is a labelled `<Input>` in the body beside the photo tile, and the `SheetTitle` already
-  mirrors it with `Makes N portions · X kcal each` beneath (Q-395a). Artboard 5 moves that input
-  *into* the header behind a pencil and drops the standalone field.
-- **Still genuinely different:** `+ Add ingredient` / `+ Add a photo` are drawn as two affordances at
-  the **end of the list**; shipped, `IngredientPicker` is a persistent search block and the photo is a
-  tile at the top beside the name.
-- **What artboard 5 draws:** a header carrying the meal name **inline-editable** (a pencil beside it)
-  with `Makes 2 portions · 278 kcal each` beneath; an `Ingredients` section headed `whole batch`, each
-  row `name · "60 g" · calories · [chevron]`; then **`+ Add ingredient`** and **`+ Add a photo`** as
-  two affordances at the end of the list, not floating buttons; and a **pinned footer**:
-
-  > `Batch` · `555 kcal` · `66 P` · `48 C` · `13 F` · … · `278 / portion`, with **`Save meal`** below it.
-
-- **The footer is the finding.** It keeps the batch total, the per-macro split and the per-portion
-  figure visible **while ingredients are being edited** — which is the whole reason to have this
-  screen rather than a list. Whether the shipped builder shows those numbers during editing, or only
-  at a review step afterwards, is the first thing to check; if it is the latter, this is a real
-  behaviour change and not a restyle.
-- **The pencil is a second finding.** Artboard 5 edits the meal name in place in the header. Check
-  whether renaming currently costs a separate sheet or step.
-- **`66 P · 48 C · 13 F` uses `MACRO_COLORS`**, like every other macro readout in the app, and takes
-  its kcal from `macro-energy.ts` / `KCAL_PER_G` rather than inline factors.
-- **Artboard 6 draws this same screen with the quantity sheet over it.** So BF-26 and this entry
-  share a surface — if both are open, do them in one PR and verify the sheet against the screen
-  underneath it, which is exactly what artboard 6 shows.
-- **Verification.** Side by side against artboard 5 at 412 dp, enumerated per BF-28; device run.
-
 ### [nutrition][app-shell] Q-406 — the shared food row: two call sites converted, two waiting on their phase
 
 > **✅ THE DIARY ROW CONVERTED 2026-08-25 (v1.367.0)** — `meal-card.tsx` draws the shared `FoodRow`

@@ -6,10 +6,17 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: "1.381.0",
+    version: "1.381.1",
     date: "2026-08-26",
     changes: [
       "Fixed a record-keeping bug behind the health scores: each score is stamped with which version of its model produced it, and one part of the app was overwriting the whole stamp instead of just its own entry \u2014 so a readiness stamp was erased whenever the body-composition figures were rebuilt for that day. Nothing you see changed, but comparisons across a model change are trustworthy again, which is what the stamp is for.",
+    ],
+  },
+  {
+    version: "1.381.0",
+    date: "2026-08-26",
+    changes: [
+      "The meal builder now keeps the batch totals pinned above Save meal \u2014 calories, protein, carbs, fat and what one portion works out to \u2014 so they stay on screen while you are editing the ingredients that change them, instead of scrolling away exactly when you need them. The meal name is edited straight from the header with the pencil beside it rather than in a separate field, and adding an ingredient or a photo are two buttons at the end of the list.",
     ],
   },
   {

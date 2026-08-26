@@ -256,6 +256,12 @@ Live at the time of writing (2026-07-30):
   Also [`docs/overview/history-2026-08-04.md`](../../overview/history-2026-08-04.md)
   (Q-108 — the Body Battery chart's right-edge label was a hardcoded `"now"` literal, unrelated to
   the real last-sample time; now derived from it).
+  Also [`docs/overview/entries/2026-08-26-model-versions-jsonb-merge.md`](../../overview/entries/2026-08-26-model-versions-jsonb-merge.md)
+  (Q-273 — `oura_daily_derived.model_versions` is a map, and the shared upsert replaced it rather
+  than merging, so `backfillBodyComp` erased the readiness stamp on every day it touched. Cited here
+  rather than left loose because the `CLAUDE.md` rule it produced — *A Correlation Across a Model
+  Change Is Not Evidence* — depends on it: the rule states the constraint, this states the evidence
+  and the two write paths it came from).
   Also [`docs/overview/history-2026-08-07.md`](../../overview/history-2026-08-07.md)
   (Q-105 — the "Body temp elevated" explainer now shows the real deviation/threshold/baseline-nights
   numbers instead of a fixed qualitative sentence).

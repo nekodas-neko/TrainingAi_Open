@@ -74,6 +74,30 @@ days. It also records two facts that are properties of a *pair* of files and inv
 `model_versions` merges and must never regain a JS read-merge, and `updated_at` does not identify
 the writing model.
 
+## The compaction chore bit, and the recovery is the part worth recording
+
+Merging `main` tripped `check-doc-index-size` at **61 foldable journal entries against a limit of
+60** — Lane B was adding entries in parallel, so the shared count crossed on this branch. The
+documented fix is the compaction sweep, so it was attempted, and it went wrong in two ways at once:
+
+1. **It folded by DATE rather than by the unlinked list**, which is trap #1 in
+   [`entries/README.md`](README.md) — *"do not fold an entry that another doc links to"*. 45 entries
+   went in where only a subset was foldable, breaking six links immediately.
+2. **It wrote to `docs/overview/history-2026-08-24.md`, which already existed** — a 228 KB file —
+   and clobbered it.
+
+Nothing was lost: the fold was never committed, `git merge --abort` restored the pre-merge tree, and
+`history-2026-08-24.md` was verified **byte-identical to `origin/main`'s copy** rather than assumed
+intact. **The lesson is the one in the README's own trap list**: a fold is driven by the *linked/
+unlinked* computation, never by a filename glob, and a fold target is appended to, never written
+over.
+
+The sweep is Orchestrator's chore and was not re-attempted here after that. Instead this entry is
+**cited from [`docs/domains/readiness/README.md`](../../domains/readiness/README.md)**, which takes
+it out of the foldable set (61 → 60) and is honest rather than a dodge: the `CLAUDE.md` rule this PR
+adds states the constraint, and this entry is the evidence behind it. It does cost the linked floor
+one, permanently — `projectOverview.md` already flags that as the real price of the citation habit.
+
 ## Not exercised
 
 No migration (the column already existed) and **no APK** — server-side only. Nothing native,

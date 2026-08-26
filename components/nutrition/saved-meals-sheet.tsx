@@ -2,7 +2,7 @@
 
 import { memo, useCallback, useEffect, useLayoutEffect, useState } from 'react'
 import { useUserTimezone } from '@/components/shell/user-timezone-provider'
-import { ChevronLeft, Plus, Minus, Trash2, Search, X, Loader2, CheckSquare, Sparkles } from 'lucide-react'
+import { ChevronLeft, Plus, Minus, Trash2, Search, X, Loader2, CheckSquare, Pencil, Camera, Sparkles } from 'lucide-react'
 import { toast } from 'sonner'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { Button } from '@/components/ui/button'
@@ -13,6 +13,7 @@ import { cn } from '@trainingai/shared/utils'
 import { cancelMealReminder } from '@/lib/meal-reminders'
 import { logMealItems } from '@trainingai/shared/nutrition/log-meal'
 import { mealTypeForHour } from '@trainingai/shared/nutrition/log-plan-meal'
+import { MACRO_COLORS } from '@trainingai/shared/nutrition/macro-colors'
 import { cachedFetch, readCacheSync } from '@/lib/sqlite/cache'
 import { invalidateSavedMeals } from '@/lib/cache-groups'
 import { TTL_MEDIUM, TTL_LONG } from '@trainingai/shared/cache-ttl'
@@ -95,6 +96,10 @@ export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate,
   // and the add-by-hand form (BF-11a), so remounting it on a new build session is what clears them —
   // which is what the setters that used to sit in `openBuild` did.
   const [buildSession, setBuildSession] = useState(0)
+  const [renamingMeal, setRenamingMeal] = useState(false)
+  // The picker starts open for a NEW meal — an empty builder with a collapsed search is a dead end —
+  // and closed when editing one, which is the state artboard 5 draws.
+  const [pickerOpen, setPickerOpen] = useState(true)
 
   useEffect(() => {
     if (!open) return
@@ -146,6 +151,8 @@ export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate,
     setIngredients(meal ? meal.items.map(i => ({ item: i.foodItem, qty: i.quantityMultiplier })) : [])
     setEditingIngredientId(null)
     setBuildSession(n => n + 1)
+    setRenamingMeal(!meal)
+    setPickerOpen(!meal || meal.items.length === 0)
     setTab('build')
   }, [])
 
@@ -381,10 +388,33 @@ export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate,
               {/* Q-395a: the meal's name is the screen title once it has one, and the batch
                   explainer is its subtitle — "Edit Meal" said nothing the screen did not already
                   show, and the batch figure was buried below the fold. */}
-              <div className="min-w-0">
-                <SheetTitle className="truncate">
-                  {mealName.trim() || (editingMeal ? 'Edit Meal' : 'Build a Meal')}
-                </SheetTitle>
+              <div className="min-w-0 flex-1">
+                {/* Artboard 5 edits the name in place, next to a pencil. It used to cost a labelled
+                    field of its own in the body — which was never a separate step, but did mean the
+                    name and the figure describing it sat a screen apart. */}
+                {renamingMeal ? (
+                  <Input
+                    autoFocus
+                    value={mealName}
+                    onChange={e => setMealName(e.target.value)}
+                    onBlur={() => setRenamingMeal(false)}
+                    onKeyDown={e => { if (e.key === 'Enter' || e.key === 'Escape') setRenamingMeal(false) }}
+                    placeholder="e.g. Post-workout shake"
+                    aria-label="Meal name"
+                    className="h-8 rounded-lg px-2 text-base font-semibold"
+                  />
+                ) : (
+                  <button
+                    onClick={() => setRenamingMeal(true)}
+                    aria-label={`Rename ${mealName.trim() || 'this meal'}`}
+                    className="flex min-w-0 items-center gap-1.5 text-left"
+                  >
+                    <SheetTitle className="truncate">
+                      {mealName.trim() || (editingMeal ? 'Edit Meal' : 'Build a Meal')}
+                    </SheetTitle>
+                    <Pencil className="h-3.5 w-3.5 flex-none text-muted-foreground" />
+                  </button>
+                )}
                 {ingredients.length > 0 && (
                   <p className="truncate text-xs tabular-nums text-muted-foreground">
                     Makes {mealServings} {mealServings === 1 ? 'portion' : 'portions'} ·{' '}
@@ -524,22 +554,6 @@ export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate,
         ) : (
           <>
             <div className="flex-1 overflow-y-auto px-1 space-y-4 pb-2">
-              {/* Meal name, with the photo beside it. The tile is the picker AND the preview, so
-                  there is no separate "current photo" row, and the picture rides the save that is
-                  already here rather than needing a write of its own (Q-327). */}
-              <div className="flex items-start gap-3">
-                <MealPhotoTile value={mealImage} onChange={setMealImage} disabled={saving} />
-                <div className="min-w-0 flex-1 space-y-1">
-                  <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Meal name</label>
-                  <Input
-                    value={mealName}
-                    onChange={e => setMealName(e.target.value)}
-                    placeholder="e.g. Post-workout shake"
-                    className="rounded-xl"
-                  />
-                </div>
-              </div>
-
               {/* Batch size. A recipe is often not one plate — the ingredients below describe the
                   whole batch, and this is what turns that into a portion. Without it a meal plan
                   put a two-serving tub of ice cream into one slot as if it were one meal. */}
@@ -609,41 +623,39 @@ export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate,
                       />
                     ))}
                   </div>
-                  <div className="rounded-xl bg-brand/10 border border-brand/20 px-3 py-2 text-xs font-semibold">
-                    {mealServings !== 1 && (
-                      <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                        Whole batch · {mealServings} portions
-                      </p>
-                    )}
-                    <div className="flex gap-3">
-                      <span>{Math.round(totalMacros.kcal)} kcal</span>
-                      <span>{Math.round(totalMacros.protein)}g P</span>
-                      <span>{Math.round(totalMacros.carbs)}g C</span>
-                      <span>{Math.round(totalMacros.fat)}g F</span>
-                    </div>
-                    {mealServings !== 1 && (
-                      <div className="mt-1.5 border-t border-brand/20 pt-1.5">
-                        <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                          One portion — what gets logged
-                        </p>
-                        <div className="mt-0.5 flex gap-3">
-                          <span>{Math.round(totalMacros.kcal / mealServings)} kcal</span>
-                          <span>{Math.round(totalMacros.protein / mealServings)}g P</span>
-                          <span>{Math.round(totalMacros.carbs / mealServings)}g C</span>
-                          <span>{Math.round(totalMacros.fat / mealServings)}g F</span>
-                        </div>
-                      </div>
-                    )}
-                  </div>
                 </div>
               )}
 
-              <IngredientPicker
-                key={buildSession}
-                active={open && tab === 'build'}
-                userId={userId}
-                onAdd={addIngredient}
-              />
+              {/* Artboard 5 ends the list with two affordances rather than a permanently-open search
+                  and a tile at the top. The picker still expands in place — a sheet on top of a
+                  sheet to add one ingredient would be a third layer over the library. */}
+              {pickerOpen ? (
+                <IngredientPicker
+                  key={buildSession}
+                  active={open && tab === 'build'}
+                  userId={userId}
+                  onAdd={addIngredient}
+                />
+              ) : (
+                <button
+                  onClick={() => setPickerOpen(true)}
+                  className="flex h-12 w-full items-center justify-center gap-2 rounded-2xl border border-dashed border-border text-sm text-muted-foreground"
+                >
+                  <Plus className="h-4 w-4" />
+                  Add ingredient
+                </button>
+              )}
+
+              {/* The tile is the picker AND the preview, so there is no separate "current photo"
+                  row, and the picture rides the save that is already here rather than needing a
+                  write of its own (Q-327). */}
+              <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
+                <MealPhotoTile value={mealImage} onChange={setMealImage} disabled={saving} />
+                <span className="inline-flex items-center gap-1.5">
+                  <Camera className="h-4 w-4" />
+                  {mealImage ? 'Change the photo' : 'Add a photo'}
+                </span>
+              </div>
 
               <QuantitySheet
                 item={editingEntry?.item ?? null}
@@ -665,7 +677,37 @@ export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate,
               />
             </div>
 
-            <div className="shrink-0 pt-2">
+            {/* **The footer is the point of this screen.** It keeps the batch total, the macro split
+                and the per-portion figure on screen *while ingredients are being edited* — which is
+                the whole reason to have a screen here rather than a list. The same numbers were
+                already computed live, but sat in a card partway down the scroll, so the moment you
+                were editing the thing that changed them they were gone. Artboard 5 pins them. */}
+            <div className="flex shrink-0 flex-col gap-2.5 border-t border-border pt-2.5">
+              {ingredients.length > 0 && (
+                <div className="flex items-baseline gap-2.5 px-1">
+                  <span className="text-[10px] font-semibold uppercase tracking-[0.04em] text-muted-foreground">
+                    Batch
+                  </span>
+                  <span className="text-sm font-bold tabular-nums">{Math.round(totalMacros.kcal)} kcal</span>
+                  {/* `MACRO_COLORS`, like every other macro readout — the artboard's own hex values
+                      are this palette, so parity and the token rule agree here. */}
+                  <span className="text-xs font-semibold tabular-nums" style={{ color: MACRO_COLORS.protein }}>
+                    {Math.round(totalMacros.protein)} P
+                  </span>
+                  <span className="text-xs font-semibold tabular-nums" style={{ color: MACRO_COLORS.carbs }}>
+                    {Math.round(totalMacros.carbs)} C
+                  </span>
+                  <span className="text-xs font-semibold tabular-nums" style={{ color: MACRO_COLORS.fat }}>
+                    {Math.round(totalMacros.fat)} F
+                  </span>
+                  <span className="flex-1" />
+                  {mealServings !== 1 && (
+                    <span className="flex-none text-[11px] tabular-nums text-muted-foreground">
+                      {Math.round(totalMacros.kcal / mealServings)} / portion
+                    </span>
+                  )}
+                </div>
+              )}
               <Button
                 className="w-full h-12 font-semibold"
                 onClick={handleSave}
