@@ -281,6 +281,49 @@ implementation; that one comes from hardware.
 The isolation guard was re-probed against the real directory rather than a stand-in: naming a
 scoring table inside `lib/colmi-ble/` fails, and importing it from `readiness-payload.ts` fails.
 
+## The connector shipped: storage, ingest, pairing card, comparison endpoint
+
+Migrations 231 and 232 (the second regenerates the `claude_ro` views — the schema is default-deny,
+so a new table is unreadable until a view exists and each views migration rebuilds the whole
+schema). A repository slice, `POST /api/colmi/samples`, `GET /api/colmi/status`, the BLE connector,
+a pairing card on More → Devices, and `GET /api/admin/device-comparison` aligning the Oura ring, the
+Polar H10 and the Colmi on one grid.
+
+Decisions worth not re-deriving. The local day is resolved **server-side** from the user's stored
+timezone and never sent by the client, because every comparison is "what did each device say on day
+X" and one writer deciding the day once is what keeps three devices aligned. A **silent ring is not
+an empty sync** — zero frames returns `reason: 'silent'` and the card says to wear it or charge it,
+since recording that as "no data" would bias the comparison in the direction that looks like the
+ring under-reports. The ingest returns `received`, `accepted` and `stored` together, because a
+repeat sync storing 0 of 400 is deduping and one number cannot distinguish that from failing.
+
+Verified against a running server rather than asserted: ingest stored 3 of 4 readings with an
+implausible 999 bpm dropped per-sample rather than the batch rejected, a second identical POST
+stored 0, an unknown key returned 400, and the admin route returned coverage plus all three pairwise
+summaries, rejected a bad date and a 30-day-plus range, and accepted both date separators. A
+DB-backed test asserts zero rows reach any of the five scoring tables. The BLE layer itself has no
+test coverage — it is I/O against hardware — and the mapping under it is pure and covered.
+
+The isolation guard was widened deliberately: "only the comparison adapters may import this" was too
+blunt once the device had a connector, since pairing and sync are app code that must reach it and
+produce no score. The rules that matter are unchanged — the module still may not name a scoring
+table, and the scoring inputs still may not mention it.
+
+## Raw accelerometer moves the ring into the other column
+
+The owner found a Raw Data Mode in the web client: `0xa1` enables ~20 Hz accelerometer streaming on
+stock firmware, no flash, and the command is in neither reference implementation. Builders ship with
+tests; no payload decoder yet.
+
+The plan had filed the Colmi as a *computed* source, beside Health Connect — a device that hands us
+finished numbers. Raw accelerometer puts it beside the Oura as a **raw-capable** one, on hardware
+costing a fraction as much with a public protocol. That is a different proposition from a cheap
+second opinion on heart rate, and it is now PS-9.
+
+The gesture idea it demonstrates is PS-10, blocked on PS-9 on purpose. The risk there is not
+recognition but false positives during resistance training: a missed gesture is an annoyance, and a
+false one that skips a set corrupts the log, which is what the app is actually for.
+
 ## Deployment shape
 
 No APK. `lib/live-hr/chest-strap-source.ts` already does the full BLE cycle in TypeScript in the

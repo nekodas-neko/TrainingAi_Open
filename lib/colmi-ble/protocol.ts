@@ -56,6 +56,7 @@ export const CMD = {
   FIND_DEVICE:        0x50,
   MANUAL_HEART_RATE:  0x69,
   NOTIFICATION:       0x73,
+  RAW_SENSOR:         0xa1,
   BIG_DATA:           0xbc,
   FACTORY_RESET:      0xff,
 } as const
@@ -197,6 +198,22 @@ export function cmdPhoneName(name = 'TA'): Uint8Array {
   const b = name.charCodeAt(1) || 0x41
   return buildPacket([CMD.PHONE_NAME, 0x02, 0x0a, a, b])
 }
+
+/**
+ * Raw accelerometer streaming, ~20 Hz on STOCK firmware.
+ *
+ * `0xa1` appears in neither Gadgetbridge's constant set nor `colmi_r02_client`; it comes from the
+ * Web Bluetooth client's `createRawDataEnablePacket`, and the owner has driven it on this ring.
+ * That matters beyond one more command: raw accelerometer makes the R09 a **raw-capable** source in
+ * `docs/device-agnostic-source-architecture.md`'s split — a device we derive metrics from — rather
+ * than a computed one that only hands us finished numbers. The circulating mod firmware is for a
+ * HIGHER rate; it is not needed to get a stream at all (plan §8 still says do not flash it).
+ *
+ * Streaming is battery-costly on a ring this size and must be bounded to an activity, never left
+ * on. No decoder for its payload ships yet — see the backlog entry before building one.
+ */
+export const cmdRawSensorEnable  = () => buildPacket([CMD.RAW_SENSOR, 0x04, 0x04])
+export const cmdRawSensorDisable = () => buildPacket([CMD.RAW_SENSOR, 0x02])
 
 export const cmdSyncSleep       = () => buildBigDataPacket(BIG_DATA_TYPE.SLEEP, [0x00])
 export const cmdSyncTemperature = () => buildBigDataPacket(BIG_DATA_TYPE.TEMPERATURE, [0x00])

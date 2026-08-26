@@ -343,7 +343,7 @@ split. Every decoder pinned to a captured packet hex as a test fixture, per the 
 pipeline already follows. This is fully unit-testable in the sandbox and is where the protocol risk
 actually gets retired.
 
-### Phase 2 — storage · **Lane A owns the migration**
+### Phase 2 — storage · ✅ SHIPPED 2026-08-26
 
 Two tables, `colmi_raw_packets` (archival hex, so a later decoder fix can re-parse without
 re-draining the ring) and `colmi_readings` (decoded HR / steps). Both `user_id`-scoped.
@@ -352,14 +352,14 @@ re-draining the ring) and `colmi_readings` (decoded HR / steps). Both `user_id`-
 > alone. This session is a one-off (`PS-`) and deliberately did not claim one. Next free is **231**
 > as of 2026-08-26, and it must be re-checked against the pointer at claim time.
 
-### Phase 3 — sync + pairing card
+### Phase 3 — sync + pairing card · ✅ SHIPPED 2026-08-26
 
 `lib/colmi-ble/sync.ts` (set time → pull HR log → pull step log → store) and a pairing card under
 `components/settings/`, copying `chest-strap-pairing.tsx`. A new route `app/api/colmi/samples`.
 **It must not reuse `app/api/hr-ingest`** — that route hardcodes `source: 'chest_strap'` and writes
 `oura_heartrate`, which is precisely the table §1 says to stay out of.
 
-### Phase 4 — the comparison report
+### Phase 4 — the comparison report · ✅ SHIPPED 2026-08-26 (admin endpoint)
 
 One adapter for `lib/oura-comparison-harness.ts`, which already merges two bucketed series and
 reports within-tolerance counts and mean absolute delta;
@@ -386,6 +386,62 @@ Needs the Gadgetbridge port. Worth doing only if Phase 5 says the HR is credible
 derived from a bad PPG will not be better than the PPG.
 
 ---
+
+## 6b. What shipped 2026-08-26 — the connector, end to end
+
+| | |
+|---|---|
+| Storage | migrations **231** (`colmi_readings`, `colmi_sleep_segments`) and **232** (regenerated `claude_ro` views — the schema is default-deny, so a new table is unreadable until a view exists) |
+| Repository | `lib/data/postgres/slices/colmi.ts`, interface + adapter |
+| Ingest | `POST /api/colmi/samples` — strict Zod, bounded body, rate limited, **per-sample** range filtering |
+| Status | `GET /api/colmi/status` |
+| Connector | `lib/colmi-ble/ble.ts` + `paired-ring.ts` + `resolve-time.ts` |
+| UI | `components/settings/colmi-pairing.tsx`, on More → Devices |
+| Comparison | `GET /api/admin/device-comparison` + `lib/health/device-comparison.ts` |
+
+**Decisions worth not re-deriving:**
+
+- **The local day is resolved server-side**, from the user's stored timezone, never sent by the
+  client. Every comparison is "what did each device say on day X"; one writer deciding the day once
+  is what keeps three devices aligned.
+- **A silent ring is not an empty sync.** `syncColmiRing` returns `reason: 'silent'` when zero
+  frames arrive and says so in the card. The ring sleeps its processor when still (§11e), and
+  recording that as "no data" would quietly corrupt the comparison in the direction that looks like
+  the ring under-reports.
+- **`received` / `accepted` / `stored` are all returned.** A repeat sync storing 0 of 400 is
+  deduping, not failing, and one number cannot tell those apart.
+- **One implausible sample is dropped, never the batch** — verified against the running server:
+  four readings in with a 999 bpm among them, three accepted.
+- **The comparison endpoint computes over the whole window and truncates the table afterwards**, and
+  reports `truncated`. Statistics that silently describe only what fitted are worse than none.
+
+**Verified against a running server** (`pnpm dev`, logged in as the seeded user): ingest stored
+3 of 4 readings and 1 sleep segment; a second identical POST stored **0** (dedup); an unknown key
+returned **400** (strict schema); the admin route returned coverage and all three pairwise summaries,
+rejected a bad date and a >30-day range, and accepted both date separators. Plus a DB-backed test
+that asserts **zero rows** land in any of the five scoring tables.
+
+**Not verified:** none of this has run against the physical ring. The BLE layer is the one part with
+no test coverage — it is I/O against hardware — and the payload mapping under it (`framesToPayload`)
+is pure and covered.
+
+## 6c. Raw accelerometer — the R09 is a tier-1 source after all
+
+The owner found a **Raw Data Mode** in the Web Bluetooth client: `0xa1` (`a1 04 04` on, `a1 02`
+off), **~20 Hz on stock firmware, no flash**. In neither Gadgetbridge's constants nor
+`colmi_r02_client`. Command builders ship in `protocol.ts`; **no payload decoder yet** — backlog
+**PS-9**.
+
+This changes where the ring sits in §8's framing. It was filed as a *computed* source beside Health
+Connect. Raw accelerometer moves it beside the Oura as a **raw-capable** one, on hardware costing a
+fraction as much with a public protocol. §8's "do not flash the mod firmware" stands and gets
+easier: the mod is for a *higher* rate, and 20 Hz stock is enough to find out whether the signal is
+worth anything.
+
+The gesture idea the client demonstrates (hands-free workout navigation) is **PS-10**, deliberately
+blocked on PS-9. The risk is not recognition, it is false positives during resistance training —
+a missed gesture is an annoyance, a false one that skips a set corrupts the log, which is the app's
+actual product.
 
 ## 7. Promotion — what it would take, and why it is not now
 

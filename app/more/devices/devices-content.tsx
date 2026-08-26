@@ -4,6 +4,7 @@ import { MoreSubScreen } from "@/components/more/sub-screen";
 import { OuraConnectionSection } from "@/components/more/oura-section";
 import { ChestStrapPairing } from "@/components/settings/chest-strap-pairing";
 import { ScalePairing } from "@/components/settings/scale-pairing";
+import { ColmiPairing } from "@/components/settings/colmi-pairing";
 import { BackgroundLocationCard } from "@/components/activity/background-location-card";
 
 export function DevicesContent() {
@@ -16,6 +17,7 @@ export function DevicesContent() {
       <OuraConnectionSection />
       <ChestStrapPairing />
       <ScalePairing />
+      <ColmiPairing />
       {/* A permission rather than a device, but it is what makes activity detection work — someone
           asking "why wasn't my walk detected" looks here. It brings its own heading. */}
       <BackgroundLocationCard />

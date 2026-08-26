@@ -1,0 +1,273 @@
+// Colmi R09 connector: pair, connect, drain, post. LEARNING MODE (PS-8).
+//
+// In-WebView BLE via `@capacitor-community/bluetooth-le`, the same path the chest strap uses. No
+// native plugin and therefore NO APK: this ships through a normal Railway deploy. Proven on the
+// owner's S25 on 2026-08-26 — a Web Bluetooth client connected to this ring and returned live HR
+// (plan §11g/§11h), and that API is this plugin's browser twin.
+//
+// The ring buffers its own history, so a sync is "open the app, drain what accumulated" rather than
+// the Oura's continuous capture. That is why the WebView path's suspension while backgrounded does
+// not matter here.
+import { decodeV1, decodeBigData, bigDataPayloadLength, type ColmiFrame } from '@/lib/colmi-ble/decode'
+import { resolveRelative, resolveSleepWindow, resolveActivityBucket } from '@/lib/colmi-ble/resolve-time'
+import {
+  V1_SERVICE, V1_WRITE, V1_NOTIFY, V2_SERVICE, V2_WRITE, V2_NOTIFY, NAME_PREFIX,
+  cmdBattery, cmdSetDateTime, cmdPhoneName, cmdSyncActivity, cmdSyncHeartRate,
+  cmdSyncHrv, cmdSyncStress, cmdSyncSleep, cmdSyncTemperature, cmdSyncSpo2,
+} from '@/lib/colmi-ble/protocol'
+import { getPairedRing, setPairedRing, type PairedRing } from '@/lib/colmi-ble/paired-ring'
+
+/** Gadgetbridge waits this long after connecting "to give the ring time to settle" before its
+ *  first command. Copied rather than reasoned about — it is the only client known to work here. */
+const SETTLE_MS = 2000
+/** How long to keep collecting notifications after the last command before giving up on stragglers. */
+const DRAIN_MS = 12_000
+const COMMAND_GAP_MS = 400
+
+export interface ColmiSyncOutcome {
+  ok: boolean
+  /** Distinguishes "the ring said nothing" from "the ring had nothing", which look identical
+   *  otherwise and must never be recorded as the same thing (plan §11e). */
+  reason?: 'unavailable' | 'not-paired' | 'connect-failed' | 'silent' | 'post-failed'
+  framesSeen: number
+  readings: number
+  sleepSegments: number
+  stored?: { readings: number; sleep: number }
+  battery?: { percent: number; charging: boolean }
+  message?: string
+}
+
+async function getBle() {
+  try {
+    const { Capacitor } = await import('@capacitor/core')
+    if (!Capacitor.isNativePlatform()) return null
+    const { BleClient } = await import('@capacitor-community/bluetooth-le')
+    return BleClient
+  } catch { return null }
+}
+
+/** OS picker filtered to the ring's advertised name prefix. */
+export async function pairColmiRing(): Promise<PairedRing | null> {
+  const Ble = await getBle()
+  if (!Ble) return null
+  await Ble.initialize()
+  const device = await Ble.requestDevice({
+    namePrefix: NAME_PREFIX,
+    optionalServices: [V1_SERVICE, V2_SERVICE],
+  })
+  const paired = { deviceId: device.deviceId, name: device.name ?? 'Colmi ring' }
+  setPairedRing(paired)
+  return paired
+}
+
+export function forgetColmiRing(): void { setPairedRing(null) }
+
+interface SyncOptions {
+  /** Today's date in the USER's timezone, 'YYYY-MM-DD'. The caller resolves it; this module never
+   *  reads a clock for calendar purposes. */
+  todayStr: string
+  timezone: string
+  /** Local wall-clock parts, user's timezone, for setting the ring's own clock. */
+  now: { year: number; month: number; day: number; hour: number; minute: number; second: number }
+  /** How many days of activity history to request. */
+  activityDays?: number
+}
+
+/**
+ * Connect, run the sync commands, decode what comes back, and post it.
+ *
+ * Collect-then-post rather than streaming: the ring answers asynchronously across both notify
+ * characteristics and a single batched write is one round trip instead of dozens.
+ */
+export async function syncColmiRing(opts: SyncOptions): Promise<ColmiSyncOutcome> {
+  const empty: ColmiSyncOutcome = { ok: false, framesSeen: 0, readings: 0, sleepSegments: 0 }
+  const Ble = await getBle()
+  if (!Ble) return { ...empty, reason: 'unavailable', message: 'Bluetooth is only available in the app.' }
+
+  const paired = getPairedRing()
+  if (!paired) return { ...empty, reason: 'not-paired', message: 'No ring paired yet.' }
+
+  const frames: ColmiFrame[] = []
+  let framesSeen = 0
+  let battery: { percent: number; charging: boolean } | undefined
+  // V2 payloads arrive split across notifications and must be reassembled before they mean anything.
+  let bigDataBuffer: number[] = []
+
+  const onV1 = (view: DataView) => {
+    framesSeen++
+    const f = decodeV1(new Uint8Array(view.buffer))
+    if (f.kind === 'battery') battery = { percent: f.percent, charging: f.charging }
+    frames.push(f)
+  }
+
+  const onV2 = (view: DataView) => {
+    framesSeen++
+    const chunk = Array.from(new Uint8Array(view.buffer))
+    bigDataBuffer = bigDataBuffer.length === 0 ? chunk : bigDataBuffer.concat(chunk)
+    const declared = bigDataPayloadLength(bigDataBuffer)
+    if (declared === null) { bigDataBuffer = []; return }          // not a frame start — drop and resync
+    if (bigDataBuffer.length < declared + 6) return                 // more to come
+    frames.push(decodeBigData(bigDataBuffer))
+    bigDataBuffer = []
+  }
+
+  try {
+    await Ble.initialize()
+    await Ble.connect(paired.deviceId, () => { /* disconnect is handled by the outcome below */ })
+  } catch (e) {
+    return { ...empty, reason: 'connect-failed', message: connectHint(e) }
+  }
+
+  try {
+    await Ble.startNotifications(paired.deviceId, V1_SERVICE, V1_NOTIFY, onV1)
+    await Ble.startNotifications(paired.deviceId, V2_SERVICE, V2_NOTIFY, onV2)
+    await sleep(SETTLE_MS)
+
+    const write = async (service: string, characteristic: string, bytes: Uint8Array) => {
+      await Ble.write(paired.deviceId, service, characteristic, new DataView(bytes.buffer as ArrayBuffer))
+      await sleep(COMMAND_GAP_MS)
+    }
+    const v1 = (b: Uint8Array) => write(V1_SERVICE, V1_WRITE, b)
+    const v2 = (b: Uint8Array) => write(V2_SERVICE, V2_WRITE, b)
+
+    // Order copied from Gadgetbridge's own connect sequence: identify, set the clock, then ask.
+    await v1(cmdPhoneName('TA'))
+    await v1(cmdSetDateTime(opts.now))
+    await v1(cmdBattery())
+    for (let d = 0; d < (opts.activityDays ?? 3); d++) await v1(cmdSyncActivity(d))
+    await v1(cmdSyncHeartRate())
+    await v1(cmdSyncHrv())
+    await v1(cmdSyncStress())
+    await v2(cmdSyncSleep())
+    await v2(cmdSyncTemperature())
+    await v2(cmdSyncSpo2())
+
+    await sleep(DRAIN_MS)
+  } catch (e) {
+    return { ...empty, framesSeen, reason: 'connect-failed', message: describe(e) }
+  } finally {
+    try { await Ble.stopNotifications(paired.deviceId, V1_SERVICE, V1_NOTIFY) } catch { /* closing */ }
+    try { await Ble.stopNotifications(paired.deviceId, V2_SERVICE, V2_NOTIFY) } catch { /* closing */ }
+    try { await Ble.disconnect(paired.deviceId) } catch { /* closing */ }
+  }
+
+  if (framesSeen === 0) {
+    // The ring's application processor sleeps when it has been still, and a sleeping ring is
+    // indistinguishable from a broken one over GATT (plan §11e). Say so rather than recording "no
+    // data" — and do NOT treat this as a successful empty sync.
+    return { ...empty, reason: 'silent',
+             message: 'The ring did not respond. Put it on or place it on the charger and try again.' }
+  }
+
+  const payload = framesToPayload(frames, opts)
+  try {
+    const res = await fetch('/api/colmi/samples', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+      cache: 'no-store',
+    })
+    if (!res.ok) {
+      return { ok: false, framesSeen, reason: 'post-failed', battery,
+               readings: payload.readings.length, sleepSegments: payload.sleep.length,
+               message: `Upload failed (${res.status}).` }
+    }
+    const body = await res.json() as { stored?: { readings: number; sleep: number } }
+    return { ok: true, framesSeen, battery,
+             readings: payload.readings.length, sleepSegments: payload.sleep.length, stored: body.stored }
+  } catch (e) {
+    return { ok: false, framesSeen, reason: 'post-failed', battery,
+             readings: payload.readings.length, sleepSegments: payload.sleep.length, message: describe(e) }
+  }
+}
+
+export interface ColmiPayload {
+  readings: { kind: string; at: number; value: number; valueHigh?: number }[]
+  sleep: { startedAt: number; endedAt: number; stage: number; minutes: number }[]
+}
+
+/** Pure: decoded frames in, ingest payload out. Split out so the mapping is testable without BLE. */
+export function framesToPayload(frames: ColmiFrame[], opts: Pick<SyncOptions, 'todayStr' | 'timezone'>): ColmiPayload {
+  const readings: ColmiPayload['readings'] = []
+  const sleepOut: ColmiPayload['sleep'] = []
+  const { todayStr, timezone: tz } = opts
+
+  for (const f of frames) {
+    switch (f.kind) {
+      case 'battery':
+        readings.push({ kind: 'battery', at: Date.now(), value: f.percent })
+        break
+
+      case 'realtimeHeartRate':
+        if (f.bpm > 0) readings.push({ kind: 'heart_rate', at: Date.now(), value: f.bpm })
+        break
+
+      case 'activity': {
+        if (f.isFinal && f.steps === 0 && f.year === 0) break     // end-of-sweep marker, not a bucket
+        const at = resolveActivityBucket(f.year, f.month, f.day, f.quarterHour, tz)
+        if (!at) break
+        const ms = at.getTime()
+        if (f.steps > 0) readings.push({ kind: 'steps', at: ms, value: f.steps })
+        if (f.calories > 0) readings.push({ kind: 'calories', at: ms, value: f.calories })
+        if (f.distanceMetres > 0) readings.push({ kind: 'distance', at: ms, value: f.distanceMetres })
+        break
+      }
+
+      case 'hrv':
+      case 'stress':
+        for (const p of f.points) {
+          readings.push({ kind: f.kind, at: resolveRelative(todayStr, 0, p.minuteOfDay, tz).getTime(), value: p.value })
+        }
+        break
+
+      case 'heartRateLog':
+        // Only the timestamped packet carries an anchor; the ring gives the rest as a continuation
+        // of it, so without the anchor we cannot place them and drop them rather than guess.
+        if (f.startedAtUnixSec !== null) {
+          f.values.forEach((bpm, i) => {
+            if (bpm > 0) readings.push({ kind: 'heart_rate', at: (f.startedAtUnixSec! + i * 300) * 1000, value: bpm })
+          })
+        }
+        break
+
+      case 'sleep':
+        for (const s of f.sessions) {
+          const win = resolveSleepWindow(todayStr, s.daysAgo, s.startMinute, s.endMinute, tz)
+          let cursor = win.startedAt.getTime()
+          for (const span of s.stages) {
+            const end = cursor + span.minutes * 60_000
+            sleepOut.push({ startedAt: cursor, endedAt: end, stage: span.stage, minutes: span.minutes })
+            cursor = end
+          }
+        }
+        break
+
+      case 'temperature':
+        for (const r of f.readings) {
+          readings.push({ kind: 'temperature', at: resolveRelative(todayStr, r.daysAgo, r.minuteOfDay, tz).getTime(), value: r.celsius })
+        }
+        break
+
+      case 'spo2':
+        for (const r of f.readings) {
+          readings.push({
+            kind: 'spo2',
+            at: resolveRelative(todayStr, r.daysAgo, r.hour * 60, tz).getTime(),
+            value: r.min, valueHigh: r.max,
+          })
+        }
+        break
+    }
+  }
+  return { readings, sleep: sleepOut }
+}
+
+const sleep = (ms: number) => new Promise<void>(r => setTimeout(r, ms))
+const describe = (e: unknown) => e instanceof Error ? e.message : 'Unknown error'
+
+function connectHint(e: unknown): string {
+  // A peripheral takes exactly ONE connection and stops advertising while it is held, so a ring
+  // held by another app is invisible rather than busy — and that presents as "not found", which
+  // reads identically to out-of-range or a flat battery unless we say so (plan §11g).
+  return `${describe(e)} — if another app (Gadgetbridge, QRing, a BLE scanner) is connected to the ring, disconnect it first.`
+}

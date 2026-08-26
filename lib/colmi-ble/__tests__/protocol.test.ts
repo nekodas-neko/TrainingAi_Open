@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   buildPacket, checksum, isValidPacket, crc16Modbus, buildBigDataPacket,
   toBcd, fromBcd, u16, cmdBattery, cmdFindDevice, cmdPhoneName, cmdSetDateTime,
-  cmdSyncHeartRate, cmdSyncSleep, BIG_DATA_TYPE, CMD,
+  cmdSyncHeartRate, cmdSyncSleep, cmdRawSensorEnable, cmdRawSensorDisable, BIG_DATA_TYPE, CMD,
 } from '@/lib/colmi-ble/protocol'
 
 const hex = (b: Uint8Array) => Buffer.from(b).toString('hex')
@@ -94,5 +94,20 @@ describe('command bytes match the reference client', () => {
     // produced nothing on the real ring.
     expect(cmdFindDevice()[0]).toBe(0x50)
     expect(CMD.BIG_DATA).toBe(0xbc)
+  })
+})
+
+describe('raw accelerometer streaming (0xa1)', () => {
+  it('builds the enable/disable packets the Web Bluetooth client uses', () => {
+    // 0xa1 + 0x04 + 0x04 = 169 = 0xa9
+    expect(hex(cmdRawSensorEnable())).toBe('a10404000000000000000000000000a9')
+    // 0xa1 + 0x02 = 163 = 0xa3
+    expect(hex(cmdRawSensorDisable())).toBe('a10200000000000000000000000000a3')
+    expect(isValidPacket(cmdRawSensorEnable())).toBe(true)
+    expect(isValidPacket(cmdRawSensorDisable())).toBe(true)
+  })
+
+  it('is a command neither Java nor Python reference client documents', () => {
+    expect(CMD.RAW_SENSOR).toBe(0xa1)
   })
 })

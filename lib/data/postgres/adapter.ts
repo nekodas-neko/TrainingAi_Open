@@ -89,6 +89,7 @@ import { nodeModelRuntime } from '@/lib/oura-models/inference/runtime-node'
 import { ensureServerOuraConstants } from '@/lib/oura-models/constants-inject'
 import { packOuraRawBuckets, countPackableBuckets, claimAutoPackSlot, AUTOPACK_MAX_BUCKETS } from './slices/oura-raw-pack'
 import * as bodyBattery from './slices/body-battery'
+import * as colmi from './slices/colmi'
 import { mergeSet, initialSourceMap, HEALTH_SOURCES, sourceRank, type HealthSource, type SourceColumn } from '@/lib/data/health-source'
 import type {
   SessionPeriodization, PeriodizationPhase, AiPrescription,
@@ -5912,6 +5913,13 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   async finishRedecodeJob(id: number, result: Record<string, unknown> | null, error: string | null) { return oura.finishRedecodeJob(this.db, id, result, error) }
   async reapStaleRedecodeJobs(userId: string) { return oura.reapStaleRedecodeJobs(this.db, userId) }
   async listOuraTags(userId: string, startDay: string, endDay: string) { return oura.listOuraTags(this.db, userId, startDay, endDay) }
+  // Colmi R09, learning mode (PS-8). Reads/writes only the colmi_* tables.
+  async insertColmiReadings(userId: string, rows: import('./slices/colmi').ColmiReadingInput[]) { return colmi.insertColmiReadings(this.db, userId, rows) }
+  async insertColmiSleepSegments(userId: string, rows: import('./slices/colmi').ColmiSleepSegmentInput[]) { return colmi.insertColmiSleepSegments(this.db, userId, rows) }
+  async getColmiReadings(userId: string, kinds: import('./slices/colmi').ColmiReadingKind[], from: Date, to: Date) { return colmi.getColmiReadings(this.db, userId, kinds, from, to) }
+  async getColmiSleepSegments(userId: string, fromDate: string, toDate: string) { return colmi.getColmiSleepSegments(this.db, userId, fromDate, toDate) }
+  async getColmiLatestReadingAt(userId: string) { return colmi.getColmiLatestReadingAt(this.db, userId) }
+
   async upsertBodyBatteryDaily(userId: string, row: import('../repository').BodyBatteryDailyRow) { return bodyBattery.upsertBodyBatteryDaily(this.db, userId, row) }
   async getBodyBatteryHistory(userId: string, startDate: string, endDate: string) { return bodyBattery.getBodyBatteryHistory(this.db, userId, startDate, endDate) }
   async upsertOuraSleep(userId: string, sessions: import('../repository').OuraSleepUpsertRow[], source: HealthSource) { return oura.upsertOuraSleep(this.db, userId, sessions, source) }

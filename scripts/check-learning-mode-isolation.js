@@ -146,14 +146,25 @@ for (const family of LEARNING_MODE) {
       }
     }
 
-    // (b) Nothing outside the device's own modules may import them — except the comparison
-    //     harness adapters, which is the ONE sanctioned reader and the point of learning mode.
-    const SANCTIONED_READER = 'lib/oura-comparison-harness-adapters.ts';
-    if (!owned(rel) && rel !== SANCTIONED_READER) {
+    // (b) Nothing outside the device's own modules may import them, except an explicit allowlist.
+    //
+    //     This started as "only the comparison adapters" and that was too blunt once the device had
+    //     a connector: pairing and sync are app code that MUST reach the module, and they produce
+    //     no score. What learning mode actually forbids is a SCORING path reading the device, which
+    //     is rule (d)'s job (it names the scoring inputs outright) and rule (a)'s (the module may
+    //     not touch a scoring table whatever calls it). Widening here does not widen those.
+    //
+    //     Keep this list short and justify every entry. An entry that computes anything a user is
+    //     shown as their own number belongs in rule (d), not here.
+    const SANCTIONED_READERS = new Set([
+      'lib/oura-comparison-harness-adapters.ts',   // the comparison harness — the point of learning mode
+      'components/settings/colmi-pairing.tsx',     // pair / sync UI: drives the device, computes nothing
+    ]);
+    if (!owned(rel) && !SANCTIONED_READERS.has(rel)) {
       for (const d of family.ownDirs) {
         const mod = d.replace(/\/$/, '');
         if (new RegExp(`from\\s+['"]@?/?${mod.replace(/\//g, '\\/')}`).test(fs.readFileSync(abs, 'utf8'))) {
-          violations.push(`${rel}: imports the learning-mode module \`${mod}\` (only ${SANCTIONED_READER} may)`);
+          violations.push(`${rel}: imports the learning-mode module \`${mod}\` (allowed only from: ${[...SANCTIONED_READERS].join(', ')})`);
         }
       }
     }

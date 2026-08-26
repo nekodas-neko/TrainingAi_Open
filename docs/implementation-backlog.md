@@ -14,7 +14,7 @@ silently misdirecting the next session. Update them in the same PR that consumes
 
 | Pointer | Value | Source of truth |
 |---|---|---|
-| Next free Postgres migration | **231** | `lib/data/postgres/migrations/` |
+| Next free Postgres migration | **233** | `lib/data/postgres/migrations/` |
 | Local SQLite schema version | **v30** | `lib/sqlite/migrations.ts`; `lib/sqlite/__tests__/migrations.test.ts` asserts the max |
 
 > **There is no third pointer any more.** Entry IDs are not allocated from a shared counter and
@@ -350,6 +350,64 @@ below threshold and left in place for next time.
 > same three arguments. The per-screen parity entries are BF-24 (the day), LB-16 (Add food),
 > BF-29 (My meals), BF-30 (Meal detail), BF-31 (Edit meal) and BF-26 (Quantity). Two artboards need
 > no entry — `Tap targets` and the `srv/g` studies both shipped in Q-395a.
+
+### [devices][cardio] PS-9 — the R09 streams raw accelerometer on stock firmware, which makes it a tier-1 source
+
+- **Lane:** A (a decoder + an ingest path; `lib/colmi-ble/**` is engine)
+- **Gate:** device
+- **Plan:** none yet — this is a finding, not a design
+- **Added:** 2026-08-26 · found by the owner in the Web Bluetooth client's UI, command confirmed in
+  its source
+
+`0xa1` enables raw accelerometer streaming (`a1 04 04`; `a1 02` disables), **~20 Hz, no firmware
+flash required**. It is in neither Gadgetbridge's constant set nor `colmi_r02_client`. The command
+builders ship in `lib/colmi-ble/protocol.ts` with tests; **there is no payload decoder**.
+
+**Why this is more than one more command.**
+[`device-agnostic-source-architecture.md`](device-agnostic-source-architecture.md) splits sources
+into **raw-capable** (we derive the metric) and **computed** (the vendor already did). The plan
+filed the Colmi in the right-hand column beside Health Connect. Raw accelerometer moves it left,
+next to the Oura — a second tier-1 device, on a ring that costs a fraction of one and whose protocol
+is public. That is a materially different proposition from "a cheap second opinion on heart rate".
+
+- **First action is a decoder + a capture, not a feature.** The client's own note says 12-bit ADC,
+  ±4 G, `-2048…+2047`, converted to G then to angles via `atan2`, based on `@atc1441`'s MIDI Ring
+  work. Port that, pin it to a captured frame, and confirm the rate on-device before anything reads it.
+- **Streaming is battery-costly and must be bounded to an activity**, never left on. The ring is
+  small and this is a continuous radio + sensor load; the Oura pipeline's `setForced`/ambient split
+  is the pattern.
+- **Do NOT flash the mod firmware for a higher rate** (plan §8). ~20 Hz stock is enough to find out
+  whether the signal is worth anything.
+
+### [app-shell][devices] PS-10 — ring gestures for hands-free workout navigation (owner idea, unproven)
+
+- **Lane:** B (the surface); depends on **PS-9** for the raw stream
+- **Needs:** PS-9
+- **Gate:** device
+- **Added:** 2026-08-26 · owner: *"the gestures one if it works well would be good for cycling
+  through the workout pages. would need a lot of testing though"* — the caveat is the entry.
+
+The problem is real: mid-set the phone is on a bench, hands are chalked or sweaty, and advancing
+the workout screen means picking it up. A wrist flick would be better than a tap.
+
+**Why this is filed rather than built, and what would have to be true first.**
+
+- **False positives are the whole risk, and resistance training is the worst case for them.** A
+  gesture recogniser trained on a still hand has to run while the same hand is doing barbell rows.
+  A missed gesture is an annoyance; a *false* one that skips a set mid-lift corrupts the log, which
+  is the app's actual product. Any design starts from a gesture that cannot occur during a lift —
+  and it needs a confirmation beat before anything destructive.
+- **It needs PS-9's stream running continuously through a workout**, which is exactly the battery
+  cost PS-9 says to bound. A workout is bounded, so this is the one place it may be affordable.
+- **The recogniser has to be ours.** The client the owner saw trains gestures in the browser and
+  keeps them there; nothing in that transfers.
+- **Cheaper alternative to weigh first:** the phone is already on a tripod for PS-7's camera work,
+  and voice is already wired for the AI chat. Neither needs a ring. Whether a gesture beats them is
+  a question worth answering before building the hardest of the three.
+
+**Recommendation: do not start this until PS-9 has produced a real capture and someone has looked at
+what a rack pull looks like in that data.** The answer to "would this false-positive constantly"
+lives in that file and nowhere else.
 
 ### [devices][platform] PS-8 — the Colmi R09 in learning mode: ingest it, compare it, score nothing with it
 
