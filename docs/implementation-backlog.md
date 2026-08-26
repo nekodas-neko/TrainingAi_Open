@@ -418,9 +418,9 @@ tuple makes a shared-table write a *compile error*, which is stronger than anyth
 - **Handshake sent, still silent — every protocol hypothesis now eliminated (§11c-exhausted).**
   Phone name and `0x50` find-device written to V1 with both notify chars subscribed: no reply, no
   blink. Bonding ruled out (`getBondingStyle()` → `BONDING_STYLE_NONE`) and device match confirmed
-  (`getSupportedDeviceName()` → `R09_.*`). What remains is **device state**: the ring may not have
-  had its >1 h first-activation charge (Colmi FAQ; enumeration started ~30 min after unboxing), and
-  its **application MCU may be asleep** — every successful read so far is served by the BLE stack,
+  (`getSupportedDeviceName()` → `R09_.*`). What remains is **device state**. First-activation is
+  **eliminated** — the owner confirms the ring reached green on the charger. So the standing
+  candidate is that its **application MCU is asleep** — every successful read so far is served by the BLE stack,
   while a command needs the app processor, and `CLAUDE.md`'s Oura section documents exactly this
   power-gating. **Retry on the charger or worn-and-moving**, and read the nRF Connect log for ATT
   errors the Value line hides.

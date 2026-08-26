@@ -585,11 +585,10 @@ eliminated from the working client's own source:**
 **When every protocol hypothesis is dead, the remaining ones are about the device's state.** Two,
 both cheap, and the second is a pattern this repo already documents for the Oura:
 
-1. **The ring may not be fully activated.** Colmi's FAQ specifies **more than an hour** on the
-   charger, until the indicator turns green, to activate a factory-fresh ring. The enumeration began
-   ~30 minutes after unboxing. A partially-activated ring can plausibly advertise and serve GATT
-   while its application firmware has never completed first boot.
-2. **The application MCU may be asleep.** Every read that has succeeded — device info, the CCCD —
+1. ~~**The ring may not be fully activated.**~~ **Eliminated — owner confirms it reached green on
+   the charger before being taken off**, which is Colmi's stated first-activation condition. The
+   ring is activated.
+2. **The application MCU may be asleep — the only candidate still standing.** Every read that has succeeded — device info, the CCCD —
    is served by the **BLE stack**. Executing a command needs the **application processor**, and
    these rings power-gate it hard. `CLAUDE.md`'s Oura section records the same behaviour: *"The ring
    radio/PPG sleeps when worn-idle — wakes on charger, worn+moving, or during sleep."* A ring lying
