@@ -6,10 +6,17 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: "1.382.2",
+    version: "1.382.3",
     date: "2026-08-26",
     changes: [
       "Deleting a food from your day works again. Tapping the bin brought up the \u201cDelete food log?\u201d confirmation and then closed it in the same instant, so there was nothing left to tap and the food stayed put. The cause was in how the app handles the Android back gesture: closing one screen while opening another made the new one mistake the old one\u2019s exit for a back press and shut itself. That affected every place in the app where one screen closes as another opens, not just this delete.",
+    ],
+  },
+  {
+    version: "1.382.2",
+    date: "2026-08-26",
+    changes: [
+      "Closed a way the app could have thrown away your whole sleep-and-recovery history. Rebuilding that history from scratch is a manual action, and if the rebuild found nothing to write \u2014 a bad decode, too narrow a range \u2014 it cleared the stored history first and then quietly did nothing, reporting success. It now leaves what is stored alone unless it has something to replace it with, and the clear-and-rewrite happens as one step, so a rebuild that fails partway can no longer leave you with an empty history. Nothing you see changes; this had not happened.",
     ],
   },
   {

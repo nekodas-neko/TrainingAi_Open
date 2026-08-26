@@ -3023,3 +3023,19 @@ mutation proof live in `docs/overview/entries/2026-08-26-fix-batch-upsert-duplic
 Also carries the two owner decisions of 2026-08-26 (readiness history recomputed rather than frozen;
 Coach mid-program swap to be restricted), which are pointers to Q-403 and the Body Battery tuning
 section rather than the decisions themselves.
+
+## 2026-08-26 — backlog → 12304 (+21), `projectOverview.md` → 8071 (+11), Q-528 + LA-33
+
+Net of two opposing changes: **−36** removing the completed Q-528 entry, **+45** filing LA-33 (the
+three shared-line ledgers that conflict on every pair of PRs), **+12** amending TN-1's sequencing
+note, which said to batch it with Q-528 and no longer applies.
+
+LA-33 is long because the argument is a measurement, not an opinion — four merge races in 35
+minutes, which three files they landed in, and the precedent that the same shape was already fixed
+once here (the session journal going one-file-per-entry). An entry that said only "the baselines
+conflict a lot" would be re-litigated by whoever picks it up.
+
+`projectOverview.md`'s eleven lines are the Current Status paragraph. It carries the two defects the
+entry did **not** name, because a session reading only the entry would fix one of three; the
+reproduction detail and the not-batched-with-TN-1 reasoning are in
+`docs/overview/entries/2026-08-26-fix-daily-summary-replace-guard.md`.

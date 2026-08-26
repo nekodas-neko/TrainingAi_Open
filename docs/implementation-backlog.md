@@ -351,7 +351,7 @@ below threshold and left in place for next time.
 > BF-29 (My meals), BF-30 (Meal detail), BF-31 (Edit meal) and BF-26 (Quantity). Two artboards need
 > no entry — `Tap targets` and the `srv/g` studies both shipped in Q-395a.
 
-### [app-shell][nutrition] BF-34 — the dialog that closed on the frame it opened (shipped v1.382.2)
+### [app-shell][nutrition] BF-34 — the dialog that closed on the frame it opened (shipped v1.382.3)
 
 - **Lane:** B
 - **Gate:** device
@@ -376,6 +376,55 @@ below threshold and left in place for next time.
   without ever opening the dialog. On device: tap a diary row, tap the bin, and the confirm dialog
   must **stay** open and be tappable; Cancel must cancel. Then the nest from LB-17 (Log Food →
   My Foods → a meal) must still unwind one layer per press.
+
+### [platform] LA-33 — three shared-line ledgers cause a merge conflict on essentially every pair of PRs
+
+- **Branch:** `chore/per-pr-doc-size-baseline` · **Lane:** A (it is a script + a JSON schema change;
+  the files belong to Orchestrator, so **`Gate: owner`** on the format choice)
+- **Gate:** owner
+- **Plan:** none yet
+- **Added:** 2026-08-26 · Lane A, measured during #544 rather than reasoned about.
+
+**Measured.** PR #544 was outrun by `main` **four times in 35 minutes** (#530, Q-395c, #543, #545).
+CI takes ~3.5 min; `main` landed every ~5–8 min. Every one of the four required a merge and a
+conflict resolution, and **every conflict was in the same three files** — never in code:
+
+| file | why every PR touches it | conflict shape |
+|---|---|---|
+| `docs/doc-size-baseline.json` | one line per tracked file; the two that move are `projectOverview.md` and the backlog | two branches edit the same two lines |
+| `docs/implementation-backlog.md` | every PR removes the entry it finished | **two deletions** — keeping both resurrects shipped entries |
+| `package.json` + `packages/shared/src/changelog.ts` | every user-visible change bumps the version | the hunk lands *inside* an entry's `changes:` array, below the shared `version:` header |
+
+**This exact shape was already solved once in this repo, and the fix worked.** The session journal
+used to be a shared `docs/overview/history-*.md` that every PR prepended to;
+[`docs/overview/entries/README.md`](overview/entries/README.md) records that it was *"the most
+frequent multi-PR merge conflict"* and that one-file-per-entry **took it to zero**. The baseline
+ledger is the same problem with the same available answer.
+
+- **First action — the baseline ledger, because it is the cheapest and the most mechanical.**
+  `scripts/check-doc-index-size.js` reads one number per file out of a shared JSON. If each tracked
+  file carried its own baseline (a sibling `<file>.size` or a `docs/doc-size/` directory of
+  one-number files), two PRs raising two different files would not touch the same line at all. The
+  check reads a directory instead of a map; nothing else changes.
+- **Do NOT extend this to the backlog in the same change.** Its conflict is real but its resolution
+  is a *judgement* (two deletions vs two additions — CLAUDE.md says to read the headings every
+  time), and splitting the backlog into per-entry files is a much larger restructuring with its own
+  costs: the queue *order* is currently expressed by position in one file, and that ordering has to
+  live somewhere.
+- **The changelog is third and may not be worth it.** A changelog-fragment scheme is the known fix
+  and CLAUDE.md already names it as a possibility (*"a future changelog-fragment change could remove
+  that too"*), but the version bump itself is one line in `package.json` and will conflict
+  regardless. Cheaper mitigation, no restructuring: **rebuild from `origin/main` rather than splicing
+  the hunks** — that is already the documented rule, and it is what makes the conflict a 30-second
+  resolution instead of a corruption. It corrupted the changelog twice before that rule existed.
+- **Why this is worth doing at all.** The cost is not the conflict, it is the *re-run*: each merge
+  invalidates a green CI result, and four rounds is ~15 minutes of compute plus four chances to
+  resolve a two-deletion conflict wrongly — which has already put shipped entries back in the queue
+  **three times** (LB-4, Q-454, Q-455, Q-465 on 2026-08-23, then LB-4 again four commits later).
+- **Owner decision needed on format only:** a directory of one-number files is ugly in a way a
+  single JSON is not. The alternative is to accept the conflict and keep resolving it by measuring.
+  **Recommendation: do it** — the measuring rule works but depends on every agent remembering it,
+  and this session already caught itself tightening two *other* agents' baselines while applying it.
 
 ### [platform] BF-36 — the entries runaway limit fails whichever PR is open when it trips, not the one that caused it
 
@@ -7373,42 +7422,6 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   read.
 - **Caveats:** one night, one athlete, `claude_ro` row-scoped.
 
-### [devices][platform] Q-528 — the daily-summary replace deletes before it checks for emptiness (latent: it has NOT fired)
-
-- **Branch:** `fix/daily-summary-replace-guard` · **Lane:** A
-- **Plan:** none needed — it is one reordering. **There is nothing to rebuild.**
-  Evidence: [`docs/reviews/2026-08-20-daily-summary-wipe-retracted.md`](reviews/2026-08-20-daily-summary-wipe-retracted.md),
-  which retracts the original [`2026-08-19-daily-summary-replace-wipe.md`](reviews/2026-08-19-daily-summary-replace-wipe.md).
-- **Added:** 2026-08-19 · Tuning agent. **Rewritten 2026-08-20 by Tuning: the wipe never happened.**
-- **⚠️ THE ORIGINAL MEASUREMENT WAS WRONG — read this before acting.** This entry said
-  `oura_daily_summary` held **1 row** and that a full-history pass had wiped the history. It holds
-  **45 rows**, of which **43 were created 2026-08-17 07:50** and have existed continuously since —
-  straddling the 2026-08-19 measurement that reported one. The count came from
-  `pg_stat_user_tables.n_live_tup`, which is a **planner estimate, not a count**; `last_analyze` and
-  `last_autovacuum` are NULL on every table here, and the same field reads **0** against
-  `oura_raw_packed`'s **764** real rows. **To ask whether a table is empty, run `count(*)`.**
-- **What is still real — the code shape.** `replaceOuraDailySummary`
-  (`lib/data/postgres/slices/oura.ts:1345`) deletes unconditionally and *then* checks for emptiness:
-
-  ```ts
-  await db.delete(s.ouraDailySummary).where(eq(s.ouraDailySummary.userId, userId))
-  if (rows.length === 0) return          // guards the INSERT, not the DELETE
-  await db.insert(...)
-  ```
-
-  A pass producing zero rows would replace the whole history and **return successfully** — no error,
-  no log. Its only production call site is `adapter.ts:6080`, reached **only** under `fullHistory`;
-  routine ingest takes `upsertOuraDailySummary` (per-day `onConflictDoUpdate`), which is safe.
-- **So this is a latent hazard on a hand-triggered path, not an incident.** Priority drops
-  accordingly, but it does not reach zero: `fullHistory` is also the **only** path that can ever
-  produce a chronic-stress score (TN-1), so this guard sits directly in front of the fix for a
-  dormant score.
-- **First action:** move the guard above the delete, or make it a transactional delete-and-insert so
-  an empty computation cannot commit a wipe. **Do not rebuild anything** — the table is intact.
-- **Pass test:** a `fullHistory` pass over a deliberately narrow input leaves prior rows intact.
-- **Caveats:** the mechanism is read from source and **not** reproduced. A dev-DB repro — populate,
-  run `fullHistory` over one night, count rows — would settle it, and is cheap.
-
 ### [devices][readiness] Q-525 — chronic stress has never produced a value, and an incremental rollup can never make it
 
 - **Branch:** `fix/chronic-stress-gate` · **Lane:** A
@@ -7476,9 +7489,17 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   there, a two-point threshold nudge would have hidden a biomarker whose baseline was 18.7× wrong.
   Once the count exists, whether to relax is a **calibration question and comes back to Tuning**, and
   any change to the scoring behaviour itself is the owner's call.
-- **Sequencing — do this with Q-528, not after it.** `fullHistory` is the **only** path that can ever
-  reach this model (a routine pass builds ~3 summary rows and returns early), and it is the same flag
-  that arms Q-528's unconditional delete. One branch should reorder that guard and add this count.
+- **Sequencing — Q-528 shipped 2026-08-26 (#544 follow-up) and they were NOT batched. This entry is
+  independently startable now.** The note here said *"one branch should reorder that guard and add
+  this count"*, on the grounds that `fullHistory` is the only path reaching this model **and** the
+  flag arming Q-528's delete. That is still true of the flag — but Q-528 offered two fixes and the
+  batching argument only holds for one of them. It was fixed **inside `replaceOuraDailySummary`**
+  (guard above the delete, delete+insert in one transaction, duplicates collapsed) rather than by
+  reordering the `fullHistory` branch in `run.ts`, which is the better fix — it protects every
+  caller, not just this one — and it touches no code this entry touches. There is no shared diff
+  left to share a branch for. What remains true: `fullHistory` is still the only path that reaches
+  the chronic-stress model, so this instrumentation still only produces a number on a hand-triggered
+  pass, and that is worth stating in whatever the count gets written to.
 - **Pass test:** a `fullHistory` pass leaves behind a number saying how many granular nights it found.
   If that number is ≥ 21 and the score is still null, the fault is inside the vendored model and this
   entry has done its job by proving it.

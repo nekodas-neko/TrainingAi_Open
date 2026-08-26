@@ -24,8 +24,19 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.382.2 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Version:** v1.382.3 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-08-26.
+
+**A full-history rebuild that computed nothing wiped the history and reported success (Q-528).**
+`replaceOuraDailySummary` deleted every one of the user's summary rows and only *then* returned
+early on an empty input. Two more of the same class were in the same seven lines and are fixed with
+it: the delete and insert were **separate statements**, so a rejected insert left the delete
+committed; and the insert had **no `ON CONFLICT` arm**, so one repeated date raised 23505 and
+rejected every row — Q-280's shape under a different SQLSTATE. It now matches
+`replaceDaytimeStressBuckets`, which already had all three right. **All three were reproduced against
+Postgres before being fixed** — the entry admitted its mechanism was read rather than measured, and
+its predecessor had already been retracted once for exactly that. Still latent: only the
+hand-triggered redecode reaches it.
 
 **One duplicate in a batch discarded the whole batch, at eight write sites (Q-280).** Postgres aborts
 an entire command whose VALUES list hits the same `ON CONFLICT` row twice — nothing lands, not just
@@ -532,7 +543,7 @@ meal row now carries a 40 px tile: the photo if there is one, a gradient-and-gly
 mishandled before — check a long day for artefacts and jank. The day screen's tile is always the
 placeholder today; `food_items` has no image column, so only saved meals can carry a photo.
 
-### [nutrition][app-shell] ⚠️ One back-dismiss primitive, three failures, and a device pass none has had (BF-30 v1.378.0 · LB-17 v1.382.0 · BF-34 v1.382.2)
+### [nutrition][app-shell] ⚠️ One back-dismiss primitive, three failures, and a device pass none has had (BF-30 v1.378.0 · LB-17 v1.382.0 · BF-34 v1.382.3)
 
 Artboard 4 shipped as a **nested sheet**, and this row said its unwind "rests on BF-27's
 one-press-per-layer guarantee". **That guarantee has now failed twice.** LB-17: an id comparison read
