@@ -2776,3 +2776,14 @@ Each surface caches on a hash of its prompt context, so two surfaces hashing eac
 invalidate each other indefinitely, and model output is not deterministic, so it would never settle.
 That is not visible from either route's source — it is a property of the pair — which is exactly the
 kind of thing an orientation doc exists to carry.
+
+## 2026-08-26 — `docs/implementation-backlog.md` raised, 11903 → 11958 (BF-34, the device-only delete)
+
+One entry, and most of it is a table of **six layers ruled out**, each with the line that rules it
+out. That is the expensive part of this bug and it is worth carrying in the queue rather than being
+re-derived: the whole delete path was driven end-to-end on web with Playwright and it **works**, so
+the failure is device-only, and an implementer who starts by re-checking the local store, the outbox
+payload or the pull-clobber gate will spend the same afternoon reaching the same dead ends.
+
+The entry ends on one question — *does the confirm dialog appear on the device at all?* — because the
+answer splits it into two different bugs with two different fixes.

@@ -351,6 +351,61 @@ below threshold and left in place for next time.
 > BF-29 (My meals), BF-30 (Meal detail), BF-31 (Edit meal) and BF-26 (Quantity). Two artboards need
 > no entry — `Tap targets` and the `srv/g` studies both shipped in Q-395a.
 
+### [nutrition][app-shell] BF-34 — deleting a diary entry does nothing on the device, and the whole path passes on web
+
+- **Lane:** B
+- **Added:** 2026-08-26 · owner, live on the APK: *"the delete feature doesnt work. so its not
+  removing from my.UI"*, with a screenshot of the converged quantity sheet open on a BARILLA
+  Spaghetti row. **Owner asked for this at the top of the queue.**
+
+**⚠ Read this before touching any code: the entire path was exercised on web and it works.** A
+Playwright run against `pnpm dev` on 2026-08-26, seeded row → tap row → tap the bin → confirm →
+`SELECT count(*) … WHERE deleted_at IS NULL` = **0**, and the row left the list. So the bug is
+**device-only**, and the layers below are already eliminated. Do not re-verify them; the value of
+this entry is the narrowing.
+
+**Eliminated by inspection, each with the line that rules it out:**
+
+| Layer | Why it is not the bug |
+|---|---|
+| The confirm dialog's wiring | Fires `handleConfirmDelete`; verified end-to-end on web |
+| `store.deleteFoodLog` | `UPDATE food_logs SET deleted_at=?, sync_status='pending'` — correct |
+| The local read | `getFoodLogsWithItems` filters `WHERE fl.deleted_at IS NULL` — correct |
+| Pull clobbering the delete | `applyDelta`'s upsert carries `WHERE food_logs.sync_status='synced'`, and the local row is `pending`, so the server copy cannot resurrect it |
+| The outbox payload | `pushMutations` strips only `syncStatus`/`updatedAt`/`deletedAt`, so `deleted: true` survives into `adapter.ts:4032` and calls `deleteFoodLog` |
+| A stale `sync_status` flip | **Nothing** flips `food_logs.sync_status` back to `'synced'` after a push; `deleteMutations` only clears the outbox rows |
+
+**The strongest remaining candidate, and the one diagnostic that splits this entry in half: does the
+"Delete food log?" dialog appear on the device at all?**
+
+`quick-edit-log-sheet.tsx:140` is `onClick={() => { if (log) { onClose(); onDelete(log.id) } }}` —
+it **closes a Radix Sheet and opens a Radix Dialog in the same tick**. Two things make that fragile
+on Samsung's WebView specifically and neither shows up on desktop Chromium:
+
+- Radix puts `pointer-events: none` on `<body>` while a modal is dismissing. If the Sheet's exit
+  animation is still running when the Dialog mounts, the Dialog is present but **untappable** — and
+  a Delete button that cannot be pressed looks exactly like a delete that does nothing.
+- `nutrition-content.tsx:735` keys the sheet `key={editingLog?.id}`, so `onClose()` changes the key
+  to `undefined` and **remounts the component** at that same moment.
+
+**If the dialog does appear and Delete does nothing**, it is a different bug and the table above is
+the wrong starting point — go to the local store, and check `getLocalStore(userId)` is non-null on
+the device (the `catch` at `handleConfirmDelete` falls through to the API path, which the owner may
+be offline for).
+
+**The fix, if it is the modal race — do not paper over it with a `setTimeout`.** Either keep the
+sheet open and let the dialog stack over it (drop the `onClose()` from that handler, and close both
+on confirm), or move the confirmation **inside** the sheet — the bin already sits beside Save and
+BF-26 deliberately removed Cancel from that row, so an inline "tap again to confirm" fits the shape
+the artboard settled on and removes the second modal entirely. **Recommended: the second** — one
+modal, no race, no timing dependency on a WebView this repo already treats as its own target.
+
+- **Not exercised, and it is the whole point:** the APK. The web sandbox returns `null` from
+  `getLocalStore`, so the local-store branch this bug lives in **cannot run there at all** — a green
+  `pnpm dev` proves nothing here and this entry is the evidence of that.
+- **Verification.** On the S25: delete a diary row, confirm it leaves the list, kill and reopen the
+  app, confirm it is still gone, then check the server no longer returns it. `Gate: device`.
+
 ### [nutrition] LB-15 — a zero-calorie barcode product is reported as "not found"
 
 - **Lane:** A — `packages/shared/**`, whatever the edit looks like.
