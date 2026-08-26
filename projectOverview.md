@@ -29,6 +29,18 @@
 
 **Two food lists became one, and the back gesture turned out to be wrong at three layers (Q-395c).** The owner asked what the difference between *My Meals* and *My foods* was; there wasn't one a user could hold — one listed `saved_meals`, the other `food_items`, and which list a thing was in came down to how it had been added. They are **one list called My Foods** now, newest-first across both sources, with two row shapes because a food's tap opens the assign step and a meal's opens its own screen. `food-library-sheet.tsx` is deleted. **MRU was asked for and is unavailable:** `food_logs` carries no `saved_meal_id`, so a saved meal has **no last-used timestamp at all** — `createdAt DESC` is the only recency signal the two share, and true MRU needs a Lane A column. **Routing the list through the logger made the app's first three-deep sheet nest, and one back press closed two layers.** `useSheetBackDismiss` decided "my entry is gone" by comparing the arriving `sheetId` against its own, so every sheet that was not the one landed on closed itself — right by accident at two layers, wrong at three, where back lands on the *middle* sheet's entry and the *bottom* one reads a foreign id. "Gone" is a **depth** now. The symptom in Playwright was `element was detached from the DOM` on a button just asserted visible, which reads as animation timing and is not; instrumenting `pushState`/`back`/`popstate` is what settled it ([`journal`](docs/overview/entries/2026-08-26-one-food-list.md)).
 
+**A window that made an ACWR impossible, and what it was really breaking (Q-512).** `health-insight`
+handed `computeVolumeAcwr` a **7-day** session list against a **21-day** span gate measured from the
+earliest session in that list — so ACWR was null on **110 of 110** replayed days, structurally rather
+than for want of history. **The entry's mechanism was right and its consequence was wrong:** the route
+never reads `.acwr`. It reads `typicalSessionVolumeKg`, the activity score's *volume-lane denominator*
+— which is **not** gated, so it always returned a number, a median over one week where every sibling
+uses four. Two heavy sessions in a quiet week set the bar. That also makes one of the entry's two
+proposed fixes unsafe: dropping the call would have removed the denominator. **And it was not the
+one-line fix it looked like** — widening the fetch silently turns `sessions7d`/`volume7dKg`, which the
+model reads as "this week", into 28-day figures, trading a visibly-absent null for a wrong number.
+They filter back explicitly. `minSpanDays` was not lowered.
+
 **A measured RMR has somewhere to go, and a rule for how it ages (BF-33, engine half).** The owner has
 a DEXA + RMR test booked and every resting rate the app used was *predicted*. Migrations **225** (a
 `measured_rmr` table) + **226** (claude_ro regen) store it; `personalRmr` decides what happens as the
