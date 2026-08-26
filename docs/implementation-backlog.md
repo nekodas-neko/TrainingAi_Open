@@ -466,13 +466,46 @@ take it first: it needs no new external dependency, and the downscale is already
 `components/nutrition/meal-photo-tile.tsx` does 128 px WebP at ~6 KB against a server-side
 `SAVED_MEAL_IMAGE_MAX_BYTES` cap, sized for exactly this.
 
-**⚠ Correcting a premise in the request, because it changes the storage estimate.** The owner
-expected *"we save foods for x amount of days in history so only a small repertoire will have its
-food image saved."* **`food_items` does not prune** — there is no cleanup job, and `food_logs`
-carries `ON DELETE RESTRICT` against it, so the catalogue grows for the life of the account. The
-14-day window is the *local Oura raw* store, a different thing. In practice this is still cheap: a
-personal catalogue is hundreds of items, and **500 × 6 KB ≈ 3 MB** against a 171 MB database at
-$0.15/GB/month. It is worth stating rather than discovering.
+**📏 MEASURED AGAINST PRODUCTION 2026-08-26, because the owner asked whether a 7/14-day image
+expiry would save space. It would not, and the reason is structural rather than a judgement call.**
+
+| Measure | Value |
+|---|---|
+| Whole production database | **187 MB** |
+| `food_items` + `food_logs`, both, total | **288 kB** — **0.15%** of it |
+| Cost per text row | ~400 bytes |
+| The owner's food items | **209** |
+| …logged **exactly once** | **170 (81%)** |
+| …unused for 14 days | **114 (55%)** |
+| …never logged at all | 26 |
+
+**The reuse instinct is right — 81% of items are logged once and never again — but it does not
+translate into a deletion rule, because `food_logs.food_item_id` is `ON DELETE RESTRICT`.** An item
+referenced by any log cannot be deleted while that log exists, so "expire items unused for 14 days"
+is really "delete 14 days of history first", which nobody wants. **The only rows a retention sweep
+could actually remove are the 26 never-logged orphans — about 10 kB.**
+
+**So the lever is acquisition, not expiry**, and this entry already pulls it: take an image only
+where one arrives free (an OFF field on a call already being made; the scan photo already in hand),
+and never generate one. An image that is never fetched costs nothing and needs no rule to clean up.
+Even the pessimistic case is small — 209 items × 6 KB ≈ **1.2 MB**, and pruning 55% of that would
+recover 700 kB against a 187 MB database at $0.15/GB/month.
+
+**If storage ever does bite, the lever is history, not the catalogue.** `food_logs` is the larger and
+faster-growing of the two, and expiring it is a product decision about how far back the diary goes —
+a different and bigger conversation than images. **Do not solve it by half here.**
+
+- **Re-measure rather than trust this table.** These are the numbers on 2026-08-26; the session-start
+  database read is where a change would show. If `food_items` ever passes ~1% of the database, reopen
+  the question with fresh counts.
+
+**⚠ Correcting a premise, and it holds on the device too.** The owner expected *"we save foods for x
+amount of days in history so only a small repertoire will have its food image saved"*, and asked
+*"do all the details stay on the phone/app?"* — **yes, on both sides, and nothing prunes either.**
+The server has no cleanup job. The phone mirrors what `getSyncDelta` sends (`foodItemsReferenced` +
+`foodItemsCreated`, so items arrive as the logs that reference them arrive) and the local store has
+no `DELETE FROM food_items` at all. The 14-day window the owner is thinking of is the *local Oura
+raw* store, which is a different table and a different decision.
 
 **Two decisions to make and write down, not settle by accident:**
 1. **Store the bytes, or store the OFF URL?** A URL is free and always current but breaks offline —

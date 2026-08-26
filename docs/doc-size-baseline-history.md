@@ -2930,3 +2930,17 @@ condition, and the entry recommends against building it.
 It also corrects a premise: `food_items` does **not** prune, so the catalogue grows for the life of
 the account rather than being a rolling window. Cheap either way (≈3 MB at 500 items) but worth
 stating rather than discovering.
+
+## 2026-08-26 — `docs/implementation-backlog.md` raised, 12131 → 12164 (the food-retention measurement)
+
+The owner asked whether images are worth keeping past 7/14 days for foods never eaten again. The
+answer needed production numbers rather than an opinion, and they are now in BF-35: **187 MB
+database, 288 kB of it food, 81% of items logged exactly once, 55% unused in 14 days.**
+
+The instinct is right and the rule is still unbuildable, which is the part worth writing down:
+`food_logs.food_item_id` is `ON DELETE RESTRICT`, so expiring an item means deleting the history
+that references it. A retention sweep could only ever remove the 26 never-logged orphans — about
+10 kB. **The lever is acquisition, not expiry**, and the entry already pulls it.
+
+Written out because the next person to have this idea will have it for the same good reason, and the
+FK is not visible from the feature description.

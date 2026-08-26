@@ -50,3 +50,36 @@ that line goes should be decided before shipping rather than after.
 **BF-34 is not fixed.** The owner re-tested on v1.381.3 after a force stop and still cannot reach the
 delete button, which is correct — the entry was filed and root-caused, and no fix has merged. Nothing
 about the diagnosis changes; it is waiting on Lane B.
+
+## The retention question, measured against production
+
+The owner pushed back on "forever": *"It stays for ever are you saying? ... do all the details stay
+on the phone/app? we need to limit as much as possible going into railway. ... Just not sure if its
+worth saving for over 7/14 days if its not being used again."*
+
+**Yes to forever, on both sides.** The server has no cleanup job; the phone mirrors what
+`getSyncDelta` sends (`foodItemsReferenced` + `foodItemsCreated`) and the local store has no
+`DELETE FROM food_items` at all.
+
+**Measured 2026-08-26:**
+
+| Measure | Value |
+|---|---|
+| Whole production database | **187 MB** |
+| `food_items` + `food_logs`, both | **288 kB** — 0.15% of it |
+| The owner's food items | **209** |
+| …logged exactly once | **170 (81%)** |
+| …unused for 14 days | **114 (55%)** |
+| …never logged at all | 26 |
+
+**The reuse instinct is right and the deletion rule is still unbuildable.** `food_logs.food_item_id`
+is `ON DELETE RESTRICT`, so an item referenced by any log cannot be removed while that log exists —
+"expire items unused for 14 days" is really "delete 14 days of history first". A retention sweep
+could only ever take the 26 never-logged orphans, about **10 kB**.
+
+**So the lever is acquisition, not expiry**, which is what BF-35 already recommends: take an image
+only where one arrives free, never generate one. An image never fetched needs no rule to clean up.
+
+That is worth writing down rather than answering in chat, because the next person to have this idea
+will have it for the same good reason, and the foreign key is not visible from the feature
+description.
