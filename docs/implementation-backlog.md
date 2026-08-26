@@ -6288,10 +6288,13 @@ statement. Reserve "proposal", and the future tense, for tier 3.
      Score already handles it)? The taper shape avoids re-normalising eight existing weights.
   2. Which load signal — session tonnage, ACWR, or a recovery-time estimate? **Note Q-279: ACWR's
      evidence base is weak**, so anchoring a second user-facing behaviour to it needs justifying.
-  3. Adding weight anywhere means every other weight moves. Settle **Q-500** first — it re-anchors
-     the Recovery Index contributor (measured cost 0.71 pts/day, not the 2.2 Q-271 claimed) and moves
-     40 of 41 days, so re-cutting the weights before it lands means doing it twice.
-- **Do not ship this and Q-500/Q-272 in the same PR.** Q-273 (model versioning) exists precisely so
+  3. Adding weight anywhere means every other weight moves. **Q-500 is settled** — it shipped the
+     Recovery Index re-anchor (5 h) on 2026-08-18 and its follow-up was answered 2026-08-26 with
+     *do not re-anchor again*; the live successor is **Q-509**, whose finding is that the BLE-era
+     input moved for measurement reasons and whose fix is an estimator/smoothing change, not a
+     weight. So this no longer waits on an anchor — but re-cutting weights before Q-509 lands still
+     means doing it twice, because a smoothing change moves the contributor.
+- **Do not ship this and Q-509/Q-272 in the same PR.** Q-273 (model versioning) exists precisely so
   changes like this stay measurable; land that first or this change is unattributable.
 
 ### [readiness][platform] Q-273 — five scoring pillars, one `model_version`, no backfill: the history is not comparable to itself
@@ -6332,8 +6335,9 @@ statement. Reserve "proposal", and the future tense, for tier 3.
     re-deriving history is the Q-304b hazard, where a recompute silently substituted a
     since-edited prescription for the one actually trained under.
   - ✅ Item 3, the `CLAUDE.md` rule, shipped: *A Correlation Across a Model Change Is Not Evidence*.
-- **Do this before the calibration items (Q-500, Q-272, Q-505).** Each of those creates another
+- **Do this before the calibration items (Q-509, Q-272, Q-505).** Each of those creates another
   incomparable segment otherwise, and the next review re-learns §1.6 the same way this one did.
+  (Q-500 was on this list and is retired — shipped 2026-08-18, follow-up answered 2026-08-26.)
 
 ### [readiness][body] Q-272 — Body Battery v5 drains 5× faster than it charges and ends at its daily low on 10 of 12 days
 
@@ -6376,47 +6380,6 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   snapshots are **partial days** (two of 14 carry under 3% of their available samples), and since rest
   is back-loaded into the evening this biases the ratio upward — treat 5.6× as an upper bound.
 
-### [readiness] Q-500 — re-derive the Recovery Index anchor on BLE-era nights (the 5 h constant is live, v1.320.0)
-
-- **The constant shipped and is verified in source** (`RECOVERY_INDEX_OPTIMAL_HOURS = 5`,
-  `READINESS_MODEL_VERSION = 'v3:ri5:2026-08-18'`, checked 2026-08-20).
-
-- **✅ THE FOLLOW-UP BELOW IS DONE, AND ITS ANSWER IS "DO NOT RE-ANCHOR" — verified 2026-08-26.**
-  It says *"re-derive the anchor once ~15 BLE-era nights exist"*. **50 exist** (`oura_daily_summary`,
-  2026-07-07 → 2026-08-26, 50 of 51 rows populated, mean **2.625 h**), and **Q-509 already ran the
-  refit** at n = 42 and landed on **3.31 h** — then argued against applying it, which is the part
-  that matters here: the anchor shrank by **0.715×** while its input shrank by **0.74×**, so an
-  anchor moved to match is absorbing a **multiplicative bias in the estimator** rather than
-  correcting a score. Q-509's own words: *"Do NOT move `RECOVERY_INDEX_OPTIMAL_HOURS`."* The real
-  work item is Q-509's smoothing experiment on the BLE HR series, not a constant. **Anyone reading
-  this entry top-down would otherwise re-derive an anchor Q-509 has already told them not to
-  apply** — the sample-size condition reads as the blocker and it is not.
-
-- **⚠️ A caution for whoever measures this, because it was walked into on 2026-08-26.**
-  `recovery_index_hours` exists on **two** tables. `oura_daily_derived.recovery_index_hours` is
-  **NULL on all 100 rows across the whole history** and is one of the known always-null columns;
-  the populated one is **`oura_daily_summary.recovery_index_hours`**. A count against the derived
-  table returns a confident **zero** and reads as "the estimator has never produced anything",
-  which was written down and nearly filed before Q-509's own n = 42 contradicted it. Same shape as
-  the `n_live_tup` retraction that rewrote Q-528: a number from the wrong source is not a smaller
-  fact than a right one, it is a different claim entirely. **Query `oura_daily_summary`.**
-
-- **Shipped 2026-08-18** after the owner approved it (*"we will go with whatever your recommendation
-  is"*). One constant in `packages/shared/src/health/readiness-composite.ts`.
-  Evidence: [`docs/reviews/2026-08-17-readiness-calibration.md`](reviews/2026-08-17-readiness-calibration.md).
-- Fitted against Oura's own `recovery_index` contributor over the 15 pre-re-key nights where both
-  exist — the only external ground truth this app has. Our estimator tracks theirs at **r = +0.712**
-  (beating every alternative tested — do **not** change the argmin) but carried a systematic
-  **−10.2-point** bias. Zero-bias anchor **4.63 h**, LOO 4.40–5.14, RMSE flat 4.5–5.25; **5** sits on
-  that floor and keeps a small negative bias so the term still errs toward under-scoring.
-- **Thresholds deliberately NOT re-anchored, and this is the nuance in the rule.** The
-  `LOW_SLEEP_SCORE` precedent says re-anchor when the *scale* changes, to preserve firing rates. This
-  is not a scale change — it is a **bias correction** on one contributor. The 3 days that move 74 → 75
-  become "recovered" because the measurement was under-reporting, which is the fix working, not a
-  side-effect to cancel out. No day crosses the early-deload, Low/Moderate or low-readiness line.
-- **`READINESS_MODEL_VERSION` bumped to `v3:ri5:2026-08-18`** so this shift stays attributable.
-- **Follow-up (not blocking):** re-derive the anchor on ~15 BLE-era nights. This fit is Cloud-era and
-  BLE overnight HR is ~2× noisier, so the anchor is conservative for current data rather than wrong.
 ### [activity] Q-505 — Activity Score: redesign as a daily effort meter with a target (decisions resolved, ready to build)
 
 - **Needs:** Q-526
@@ -6542,40 +6505,6 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   now answered by the 2026-08-19 contributor audit). Also worth
   doing regardless: **persist the contributor sub-scores** — `activity_contributors` carries only
   `base`/`trained`/`adjustment`, so the weight arithmetic above had to be derived rather than read.
-
-### [readiness] Q-504 — REFUTED: readiness should NOT get a range calibration; fix Q-500 instead
-
-- **Added:** 2026-08-18 · **Resolved the same day, by implementing it and finding it wrong.**
-  [`docs/reviews/2026-08-18-readiness-range-refuted.md`](reviews/2026-08-18-readiness-range-refuted.md)
-- **What this entry used to say:** readiness has Sleep's compression problem and the same
-  `SCORE_CALIBRATION` fix is measured and ready (mean 66.8, sd 19.1, range 15–99), held only on the
-  blast radius of five action thresholds. **Both halves of that are wrong.**
-- **Why the calibration is wrong here, not just risky.** It was implemented and the suite failed on
-  7 tests across 4 files. Three encode invariants the composite genuinely holds, and a post-hoc
-  transform on the blend breaks all three: **contributions no longer sum to the displayed score**
-  (the score-audit panel's whole job), **all-neutral input stops mapping to 50** (it gave 35), and
-  **skipping the check-in can reach 100** (a deliberate cap defeated). The first is disqualifying on
-  its own — readiness drives every training recommendation, and making its explanation panel stop
-  adding up is a worse outcome than a narrow range.
-- **Why the in-model lever fails too.** `Z_POINTS_PER_UNIT` would widen spread while preserving all
-  three invariants (z=0 → 50 at any slope). But the z-based contributors are **already wide and
-  already saturating**: `hrvBalance` sd **27.1** with a median implied |z| of **1.26** against a
-  ceiling at 1.5; `sleepBalance` sd **32.3**, both reaching the 0 and 100 rails. Raising the slope
-  pushes more days onto the rails and compresses the ends.
-- **There is no compression bug.** Contributors carry sd 17–32; the composite carries sd ~11–13.
-  Treating the weighted sds as independent predicts **7.7** — so readiness is already extracting
-  *more* spread than independence would give. Against the owner's test it is the healthiest pillar
-  (range 29–87, sd 13.0, with genuinely low days), unlike Sleep's 27-of-35 above 85.
-- **Its real weakness is the CEILING** — 1 of 34 days reaches 85 — and the term dragging it down is
-  `recoveryIndex`, **mean 35.3**, the lowest of the nine by 20 points. **That is Q-500.** This session
-  had demoted Q-500 to "lower priority since Q-504 fixes the range wholesale"; that is corrected —
-  **Q-500 is the readiness fix.**
-- **Also note:** readiness moves on its own from v1.319.0. `previousNight` is 16% of the weight and
-  the Sleep Score's mean fell ~87 → ~70, so readiness's mean drops roughly **1.8 points** with nothing
-  else changed. Re-measure before drawing conclusions from the new numbers.
-- **Shipped from this entry:** the readiness `model_version` stamp (Q-273's readiness half) — merged
-  into the shared `model_versions` JSONB rather than replacing it, so `bodyBattery`'s stamp survives.
-  Sleep shipped without one and left an unmarked step in its trend chart; readiness will not.
 
 ### [readiness][platform] Q-501 — a stored readiness score cannot be re-derived from the inputs stored beside it
 
