@@ -2946,3 +2946,56 @@ traps a successor would otherwise walk into — `perceived_recovery` runs 1 = be
 `readiness_contributors` carries `provisional: true` rows pinned at 50, and `step_live_windows` is
 empty — plus the note that TN-3a's queue entry lagged the database by two days, which is the general
 lesson: check production before trusting an entry's state.
+
+## 2026-08-26 — `docs/implementation-backlog.md` raised, 12081 → 12131 (BF-35, filling the food tile)
+
+One entry, and the length is a cost table the owner explicitly asked for: *"ONly if it doesnt add
+more time/expense."* Answering that needed the three image sources separated, because they are not
+comparable — **Open Food Facts is a field on a call already being made**, **the photo scan already
+has the user's own image and discards it**, and **AI generation costs real money per image**. A
+single "yes, add images" would have hidden that the third one is the only one that fails the
+condition, and the entry recommends against building it.
+
+It also corrects a premise: `food_items` does **not** prune, so the catalogue grows for the life of
+the account rather than being a rolling window. Cheap either way (≈3 MB at 500 items) but worth
+stating rather than discovering.
+
+## 2026-08-26 — `docs/implementation-backlog.md` raised, 12131 → 12164 (the food-retention measurement)
+
+The owner asked whether images are worth keeping past 7/14 days for foods never eaten again. The
+answer needed production numbers rather than an opinion, and they are now in BF-35: **187 MB
+database, 288 kB of it food, 81% of items logged exactly once, 55% unused in 14 days.**
+
+The instinct is right and the rule is still unbuildable, which is the part worth writing down:
+`food_logs.food_item_id` is `ON DELETE RESTRICT`, so expiring an item means deleting the history
+that references it. A retention sweep could only ever remove the 26 never-logged orphans — about
+10 kB. **The lever is acquisition, not expiry**, and the entry already pulls it.
+
+Written out because the next person to have this idea will have it for the same good reason, and the
+FK is not visible from the feature description.
+
+## 2026-08-26 — `docs/implementation-backlog.md` raised, 12164 → 12195 (BF-35 routing decided)
+
+The owner routed all three image sources — barcode → product image, photo scan → the user's own
+photo, text → generate one. **Route 3 was recommended against on cost and chosen anyway**, so the
+entry records the decision and moves on to how rather than whether.
+
+The added lines are the four cost levers that actually work, because the owner's own mitigation
+does not: **image models bill per image, not per pixel, so "super small" does not reduce spend.**
+Cache by food name, generate off the save path, generate on the second log rather than the first
+(81% of items are logged once), and rate-limit it like every other AI route.
+
+## 2026-08-26 — `docs/implementation-backlog.md` raised, 12195 → 12215 (BF-35 corrected twice)
+
+The owner rejected the generate-on-second-log lever — *"that means the first person wouldnt get an
+image right? We always want an image?"* — and is right: the first log is the moment the row is being
+looked at, and with one user "the first person" is always them. Withdrawn rather than deleted, so it
+is not re-proposed.
+
+Measuring the replacement corrected two things this entry had wrong. **`barcode` is 3 items and the
+OFF name search is 3**, so the free route covers 3% of the catalogue, not "most rows" as claimed.
+And **`source` cannot distinguish a photo scan from a typed description** — both write `'ai'` — so
+the 203 that would route to generation cannot be split after the fact, and the routing has to happen
+where the code still knows whether an image was in hand.
+
+Both are the kind of thing that reads as a detail and re-scopes the work.
