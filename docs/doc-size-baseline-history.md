@@ -2903,3 +2903,17 @@ than a dead read, and it makes one of the two fixes the entry proposed — "drop
 Also recorded: widening the fetch is **not** the one-line change it appears to be, because
 `sessions7d`/`volume7dKg` are computed from the same list and the model reads them as "this week".
 Someone re-reading the diff sees the filter; only this says what it would have broken without it.
+
+## 2026-08-26 — backlog raised 13 lines (Q-513, already fixed)
+
+Thirteen lines to say **do not implement this**, which is worth more than the entry it sits in.
+
+Q-513 asks for a 28-day ACWR window in `build-day-audit.ts`. The file already declares
+`AUDIT_HISTORY_DAYS = 28`. Without a `Keep:` saying so, the next implementer reads a READY entry with
+an explicit "first action", changes a window that is already correct, and ships a no-op PR — the
+"forcing a mismatched implementation just to clear the queue" CLAUDE.md names.
+
+The lines also keep the half that is genuinely open: the entry's *"then re-measure"*. The 38%-of-days
+and mean-0.150 figures were measured against the OLD window and nobody has re-run them, so they may
+already be zero. That replay is Tuning's, which is why the entry is now `Gate: owner` rather than
+deleted — deleting it would lose a live question, and leaving it READY would invite the no-op.

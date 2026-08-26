@@ -6647,6 +6647,18 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 
 - **Branch:** `fix/build-day-audit-acwr-window`
 - **Plan:** none — a window change. **Lane A implements; Tuning proposes only.**
+- **Keep:** ⚠️ **THE CODE HALF IS ALREADY DONE — do not re-implement it.** Verified 2026-08-26
+  against current `main`: `build-day-audit.ts` declares `AUDIT_HISTORY_DAYS = 28` and fetches
+  `getWorkoutSessionsFrom(userId, dayMid − 28d)`, so its ACWR runs on a 28-day window ending at the
+  audited day — the same 7:28 shape `readiness-payload.ts` uses (`from28dDate`), banded through the
+  same `ACWR_THRESHOLDS`. The entry's "all history / lifetime weekly average" mechanism no longer
+  describes the code. (The 28-day constant is attributed by `git log` to #137 on 2026-08-19, a day
+  after this entry was filed — but this clone is depth-limited, so trust the code reading over that
+  attribution.)
+  **What is still owed is the re-measure the entry asks for, and it is TUNING's, not Lane A's:**
+  nothing here re-ran the 88-day replay, so the 38%-of-days / mean-0.150 figures are unconfirmed
+  against the current window and may already be zero. Lane A has nothing to implement until that
+  says otherwise. `Gate: owner`
 - **Added:** 2026-08-18 · Tuning agent ·
   [`docs/reviews/2026-08-18-acwr-calibration.md`](reviews/2026-08-18-acwr-calibration.md) §3
 - **Three callers, three windows**, all feeding one `computeVolumeAcwr` and all banded with the same
