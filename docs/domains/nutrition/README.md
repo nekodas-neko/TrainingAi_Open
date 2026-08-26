@@ -185,6 +185,16 @@ Live at the time of writing (2026-07-30):
 
 ## History
 
+- **[`docs/overview/entries/2026-08-26-one-food-list.md`](../../overview/entries/2026-08-26-one-food-list.md)**
+  — 🆕 **Q-395c**: *My Meals* and the food library are **one list called My Foods**
+  ([`components/nutrition/food-list.tsx`](../../../components/nutrition/food-list.tsx));
+  `food-library-sheet.tsx` is deleted and `/nutrition`'s button opens the logger onto the list,
+  because a food's tap needs the assign step and that step is `FoodLoggerSheet`'s. **Two things to
+  know before touching it:** the list is one list over **two sources** — a food row opens the assign
+  step, a meal row opens its own screen — so it is not one shape over a merged type; and **MRU is
+  unavailable**, because `food_logs` carries no `saved_meal_id` and a saved meal therefore has no
+  last-used timestamp at all. It sorts `createdAt DESC` until a Lane A column exists.
+
 - **[`docs/overview/entries/2026-08-25-saved-meal-meal-type-tags.md`](../../overview/entries/2026-08-25-saved-meal-meal-type-tags.md)**
   — BF-11e: saved meals carry meal-type tags (migration 217, local SQLite v29). **Storage and
   transport only — no picker yet (BF-11f), so nothing is user-visible.** Read it before touching the

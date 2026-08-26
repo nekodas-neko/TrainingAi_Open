@@ -6,10 +6,18 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: "1.381.4",
+    version: "1.382.1",
     date: "2026-08-26",
     changes: [
       "Fixed a class of silent data loss when the app saves several records at once. If a single batch happened to name the same thing twice \u2014 the same heart-rate instant, the same day's weight, the same set number \u2014 the database rejected the entire batch rather than just the repeat, so everything else in it was thrown away too. This had already cost thousands of heart-rate readings. Repeats are now merged before the save at every place that writes in batches, so one duplicate can never take its neighbours down with it.",
+    ],
+  },
+  {
+    version: "1.382.0",
+    date: "2026-08-26",
+    changes: [
+      "My Meals and your food library are one list now, called My Foods. They held different things \u2014 saved recipes in one, single foods in the other \u2014 but nothing on screen said so, so which one a thing was in came down to how it had been added. One list, newest first, with both kinds in it: tap a meal to open it, tap a food to pick a portion and log it. Log Food reaches it from a single My Foods tile instead of separate History and Saved Meals tiles.",
+      "Fixed the Android back gesture closing two screens at once when three were stacked \u2014 opening a meal from My Foods inside Log Food and pressing back dropped you out of Log Food entirely instead of back to the list.",
     ],
   },
   {

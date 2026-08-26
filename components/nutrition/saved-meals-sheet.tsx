@@ -2,14 +2,13 @@
 
 import { memo, useCallback, useEffect, useLayoutEffect, useState } from 'react'
 import { useUserTimezone } from '@/components/shell/user-timezone-provider'
-import { ChevronLeft, Plus, Minus, Trash2, Search, X, Loader2, CheckSquare, Pencil, Camera, Sparkles } from 'lucide-react'
+import { ChevronLeft, Plus, Minus, Trash2, Loader2, CheckSquare, Pencil, Camera } from 'lucide-react'
 import { toast } from 'sonner'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import type { FoodItem, SavedMeal, MealType, FoodLogWithItem } from '@trainingai/shared/types/nutrition'
 import { todayInTz } from '@trainingai/shared/date-utils'
-import { cn } from '@trainingai/shared/utils'
 import { cancelMealReminder } from '@/lib/meal-reminders'
 import { logMealItems } from '@trainingai/shared/nutrition/log-meal'
 import { mealTypeForHour } from '@trainingai/shared/nutrition/log-plan-meal'
@@ -19,7 +18,7 @@ import { invalidateSavedMeals } from '@/lib/cache-groups'
 import { TTL_MEDIUM, TTL_LONG } from '@trainingai/shared/cache-ttl'
 import { getLocalStore } from '@/lib/local-store'
 import { pushThenRevalidate } from '@/lib/local-store/push-then-revalidate'
-import { SavedMealCard } from './saved-meal-card'
+import { FoodList } from './food-list'
 import { MealDetailSheet } from './meal-detail-sheet'
 import { MealPhotoTile } from './meal-photo-tile'
 import { usePlanSavedMealIds } from '@/lib/hooks/use-plan-saved-meal-ids'
@@ -46,9 +45,15 @@ interface Props {
   // The meal bucket the user opened this sheet from (e.g. "Breakfast"). When set,
   // a quick-logged saved meal goes into THIS bucket, not the current-time-of-day one.
   preselectedMealTypeId?: string
+  /**
+   * Opens the assign step for a plain food — pick a meal type, pick a quantity. That step lives in
+   * `FoodLoggerSheet`, so this sheet cannot supply it and the list cannot draw a food row without
+   * it (Q-395c).
+   */
+  onSelectFood: (item: FoodItem) => void
 }
 
-export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate, preselectedMealTypeId }: Props) {
+export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate, preselectedMealTypeId, onSelectFood }: Props) {
   const planSavedMealIds = usePlanSavedMealIds()
   // Q-413: the eaten-at resolution happens in the USER's zone, not the device's.
   const tz = useUserTimezone()
@@ -129,16 +134,6 @@ export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate,
         }
       }).finally(() => setLoading(false))
   }
-
-  // Matches the meal name and its ingredients, so "oats" finds a breakfast that contains oats
-  // even when the meal is called something else.
-  const visibleMeals = mealQuery.trim()
-    ? meals.filter(m => {
-        const q = mealQuery.trim().toLowerCase()
-        return m.name.toLowerCase().includes(q)
-          || m.items.some(i => i.foodItem?.name?.toLowerCase().includes(q))
-      })
-    : meals
 
   // Q-357: `useCallback` on the five handlers the card takes, so `SavedMealCard`'s `memo()` is not
   // defeated by a fresh identity every render. `openBuild` and `toggleSelected` touch only state
@@ -378,7 +373,7 @@ export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate,
         <SheetHeader className="px-1 pb-0 shrink-0">
           {tab === 'meals' ? (
             <SheetTitle>
-              {selectedIds ? `${selectedIds.size} selected` : 'Saved Meals'}
+              {selectedIds ? `${selectedIds.size} selected` : 'My Foods'}
             </SheetTitle>
           ) : (
             <div className="flex items-center gap-2">
@@ -482,74 +477,22 @@ export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate,
                 onConfirm={() => void deleteSelected()}
               />
             )}
-            {/* Search earns its place once the library grows — generated plan meals land here too,
-                so this list gets long faster than a hand-built one would. Artboard 3 draws it over
-                a three-meal list, so the old "more than four" gate is gone: a search box that
-                appears partway down a growing library is a control you have to notice twice. */}
-            {meals.length > 0 && (
-              <div className="flex min-h-[44px] items-center gap-2 rounded-xl border border-border bg-muted/50 px-3 py-2.5">
-                <Search className="w-3.5 h-3.5 text-muted-foreground flex-none" />
-                <input
-                  value={mealQuery}
-                  onChange={e => setMealQuery(e.target.value)}
-                  placeholder="Search your meals"
-                  aria-label="Search your meals"
-                  className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
-                />
-                {mealQuery && (
-                  <button onClick={() => setMealQuery('')} aria-label="Clear search" className="p-2 -m-2 text-muted-foreground">
-                    <X className="w-3.5 h-3.5" />
-                  </button>
-                )}
-              </div>
-            )}
-            {loading ? (
-              <div className="flex justify-center py-8">
-                <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
-              </div>
-            ) : meals.length === 0 ? (
-              <div className="flex flex-col items-center gap-3 py-12 text-center">
-                <p className="text-sm text-muted-foreground">No saved meals yet.</p>
-                <Button onClick={() => openBuild()}>
-                  Build your first meal
-                </Button>
-              </div>
-            ) : visibleMeals.length === 0 ? (
-              // meals is non-empty here, so this is a search that matched nothing — say so rather
-              // than rendering an empty panel that reads as "your meals vanished".
-              <div className="flex flex-col items-center gap-2 py-10 text-center">
-                <p className="text-sm text-muted-foreground">No meals match &ldquo;{mealQuery}&rdquo;.</p>
-                <Button variant="secondary" size="sm" onClick={() => setMealQuery('')}>Clear search</Button>
-              </div>
-            ) : (
-              <>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.05em] text-muted-foreground">
-                  {visibleMeals.length} meal{visibleMeals.length === 1 ? '' : 's'}
-                </p>
-                {/* One grouped card, not a stack of them (artboard 3). Separate cards gave every
-                    meal its own border and the list stopped reading as a list. */}
-                <div className="divide-y divide-border/50 overflow-hidden rounded-2xl border border-border">
-                  {visibleMeals.map(meal => (
-                    <SavedMealCard
-                      key={meal.id}
-                      meal={meal}
-                      selected={selectedIds ? selectedIds.has(meal.id) : null}
-                      onToggleSelected={toggleSelected}
-                      onOpen={openDetail}
-                      onEdit={openBuild}
-                      onRequestDelete={requestDelete}
-                      onLabel={setLabelMeal}
-                      fromPlan={planSavedMealIds.has(meal.id)}
-                    />
-                  ))}
-                </div>
-                {/* Both halves are load-bearing: the figure on a row is one portion of what may be
-                    a batch, and label/edit/delete now have a gesture that nothing else announces. */}
-                <p className="px-1 text-[11px] leading-relaxed text-muted-foreground">
-                  Calories are per portion. Swipe a row for label, edit and delete.
-                </p>
-              </>
-            )}
+            <FoodList
+              meals={meals}
+              loadingMeals={loading}
+              query={mealQuery}
+              onQueryChange={setMealQuery}
+              selectedIds={selectedIds}
+              onToggleSelected={toggleSelected}
+              onOpenMeal={openDetail}
+              onEditMeal={openBuild}
+              onRequestDeleteMeal={requestDelete}
+              onLabelMeal={setLabelMeal}
+              planSavedMealIds={planSavedMealIds}
+              onBuildFirst={openBuild}
+              onSelectFood={onSelectFood}
+              userId={userId}
+            />
           </div>
         ) : (
           <>

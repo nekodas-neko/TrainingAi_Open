@@ -24,7 +24,7 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.381.4 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Version:** v1.382.1 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-08-26.
 
 **One duplicate in a batch discarded the whole batch, at eight write sites (Q-280).** Postgres aborts
@@ -36,6 +36,8 @@ cosmetic: last-wins is exact only for a bare `excluded.*` arm, and three of the 
 would have turned a loud 21000 into a silent field loss. **Owner decisions the same day:** readiness
 history is **recomputed**, not frozen, when a model is recalibrated (reversing 2026-08-24); the
 Coach's mid-program exercise swap is to be **restricted** — see Q-403.
+
+**Two food lists became one, and the back gesture turned out to be wrong at three layers (Q-395c).** The owner asked what the difference between *My Meals* and *My foods* was; there wasn't one a user could hold — one listed `saved_meals`, the other `food_items`, and which list a thing was in came down to how it had been added. They are **one list called My Foods** now, newest-first across both sources, with two row shapes because a food's tap opens the assign step and a meal's opens its own screen. `food-library-sheet.tsx` is deleted. **MRU was asked for and is unavailable:** `food_logs` carries no `saved_meal_id`, so a saved meal has **no last-used timestamp at all** — `createdAt DESC` is the only recency signal the two share, and true MRU needs a Lane A column. **Routing the list through the logger made the app's first three-deep sheet nest, and one back press closed two layers.** `useSheetBackDismiss` decided "my entry is gone" by comparing the arriving `sheetId` against its own, so every sheet that was not the one landed on closed itself — right by accident at two layers, wrong at three, where back lands on the *middle* sheet's entry and the *bottom* one reads a foreign id. "Gone" is a **depth** now. The symptom in Playwright was `element was detached from the DOM` on a button just asserted visible, which reads as animation timing and is not; instrumenting `pushState`/`back`/`popstate` is what settled it ([`journal`](docs/overview/entries/2026-08-26-one-food-list.md)).
 
 **A window that made an ACWR impossible, and what it was really breaking (Q-512).** `health-insight`
 handed `computeVolumeAcwr` a **7-day** session list against a **21-day** span gate measured from the
@@ -501,21 +503,6 @@ sheet — `SheetContent side="bottom"` owns the bottom inset, so it carries no `
 but that it clears the gesture bar is unverified. Check also that the header's inline name input is
 not covered by the software keyboard.
 
-### [nutrition] ⚠️ My Meals took artboard 3's shape, and its row actions moved to a swipe (BF-29, v1.376.0) — NOT verified on device · needs: hardware
-
-The meal library's rows collapsed to `name · what is in it · calories · chevron` inside one grouped
-card, and **label / edit / delete are now reached by dragging a row left** — a gesture this app did
-not previously have anywhere. Built on `@use-gesture/react`, axis-locked to x with
-`touch-action: pan-y`, and the e2e harness drives it with real CDP touch events, so the handler is
-proven to fire. **What the sandbox cannot prove is that it coexists with the Samsung WebView's own
-scroll physics** — whether a diagonal thumb-flick down a long list opens a tray it did not mean to,
-and whether the row springs back cleanly when it does. The three actions also sit in the expanded
-row, so nothing is unreachable if the gesture proves awkward.
-
-On device, check: scrolling the meal library vertically never reveals a tray; a deliberate
-left-drag opens one and a right-drag closes it; opening a second row closes the first; `Delete`
-from the tray raises the confirmation rather than deleting.
-
 ### [nutrition] ⚠️ The meal photo can be picked; the camera branch has not run (Q-327, v1.341.0)
 
 **Shipped.** `MealPhotoTile` beside the meal-name field in Edit Meal — picker and preview in one tile, so the image rides the save that was already there. `downscaleToDataUrl` gained a `mimeType`, and **requests** WebP rather than assuming it: `toDataURL` answers an unsupported type with a PNG and no error, several times the bytes the 16 KB cap was sized against, so it checks what came back. Guarded by `e2e/meal-photo-picker.spec.ts`, which asserts the **stored** row is a WebP under the cap after feeding it a photo four times past it ([`journal`](docs/overview/entries/2026-08-24-saved-meal-photo-picker.md)).
@@ -547,12 +534,25 @@ meal row now carries a 40 px tile: the photo if there is one, a gradient-and-gly
 mishandled before — check a long day for artefacts and jank. The day screen's tile is always the
 placeholder today; `food_items` has no image column, so only saved meals can carry a photo.
 
-### [nutrition] ⚠️ A saved meal opens onto its own screen; the nested back gesture is unverified (BF-30, v1.378.0)
+### [nutrition][app-shell] ⚠️ A saved meal opens onto its own screen, and the nest that reaches it is now four deep (BF-30 v1.378.0 · LB-17 v1.382.0)
 
 Artboard 4 shipped as a **nested sheet** over the meal library, not a route and not the row
-expansion BF-29 left in place. On the S25: the back gesture now unwinds **three** layers (detail →
-library → screen), which rests on BF-27's one-press-per-layer guarantee; also check that a 92vh
-sheet's action row clears the gesture bar, and that a photo plus ten ingredients still scrolls.
+expansion BF-29 left in place. **This row said the unwind "rests on BF-27's one-press-per-layer
+guarantee", and that guarantee did not hold** — `useSheetBackDismiss` compared the arriving
+`sheetId` against its own, so every sheet but the one landed on closed itself. Correct at two
+layers by accident, wrong from three, which is exactly what Q-395c built by reaching the list
+through Log Food. Fixed in v1.382.0 (each entry carries its depth) and pinned by an e2e case that
+fails on the old comparison — **but a real back gesture on a real gesture bar is still unproven.**
+**BF-29's swipe is folded in here** (v1.376.0) — same screen, same single device pass, and its
+heading still said *My Meals*. Row actions are reached by **dragging a row left**, a gesture this app
+had nowhere else; e2e drives it with real CDP touch events so the handler is proven to fire, but
+**no sandbox can prove it coexists with the Samsung WebView's own scroll physics.**
+
+On the S25: press back from an open meal and watch it unwind **one layer per press** — meal → the
+My Foods list → Log Food → the page — with nothing skipping two. Scrolling the list vertically must
+never reveal a tray; a deliberate left-drag opens one and a right-drag closes it; opening a second
+row closes the first; tray `Delete` raises the confirmation rather than deleting. Also check that a
+92vh sheet's action row clears the gesture bar, and that a photo plus ten ingredients still scrolls.
 
 ### [nutrition][app-shell] ⚠️ The calorie surface: one budget, a progress bar, and one open cache-ordering bug (Q-415/Q-417/Q-323 fixed, LB-4 open, 2026-08-23)
 

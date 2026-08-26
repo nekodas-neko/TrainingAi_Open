@@ -22,7 +22,6 @@ const EndOfDayReview = dynamic(
   () => import("@/components/nutrition/end-of-day/end-of-day-review").then(m => m.EndOfDayReview),
   { ssr: false },
 );
-import { SavedMealsSheet } from "@/components/nutrition/saved-meals-sheet";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -586,7 +585,7 @@ export default function NutritionContent({ userId }: { userId?: string }) {
             </div>
 
             {/* Actions sit here, directly under the ring, rather than being reached by scroll depth
-                (Q-237). Saved Meals is a library, not an action, and it used to be reachable only
+                (Q-237). My Foods is a library, not an action, and it used to be reachable only
                 after scrolling past every meal card — so where it landed depended on how many meals
                 the day had. Water was mid-scroll for the same reason. */}
             {/* Q-257: the bucket comes from `mealTypeForHour`, which is not a choice made here —
@@ -694,10 +693,13 @@ export default function NutritionContent({ userId }: { userId?: string }) {
         userId={userId}
       />
 
+      {/* My Foods opens the logger onto its list rather than opening the list alone: the list now
+          shows foods as well as meals, and a food's tap needs the assign step this sheet owns. */}
       <FoodLoggerSheet
-        open={loggerOpen}
+        open={loggerOpen || savedMealsOpen}
+        openMyFoods={savedMealsOpen}
         preselectedMealTypeId={loggerMealTypeId}
-        onClose={() => { setLoggerOpen(false); setLoggerMealTypeId(null); }}
+        onClose={() => { setLoggerOpen(false); setSavedMealsOpen(false); setLoggerMealTypeId(null); }}
         onLogged={handleFoodLogged}
         userId={userId}
         logDate={selectedDate}
@@ -722,14 +724,6 @@ export default function NutritionContent({ userId }: { userId?: string }) {
         onOpenChange={setPlanSetupOpen}
         onSaved={setMealPlan}
         userId={userId}
-      />
-
-      <SavedMealsSheet
-        open={savedMealsOpen}
-        onOpenChange={setSavedMealsOpen}
-        onLogged={handleFoodLogged}
-        userId={userId}
-        logDate={selectedDate}
       />
 
       <QuickEditLogSheet key={editingLog?.id} log={editingLog} onClose={() => setEditingLog(null)} onSaved={handleQuickEditSaved} onDelete={requestDeleteLog} userId={userId} />

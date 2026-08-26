@@ -190,7 +190,12 @@ Live at the time of writing (2026-07-30):
   know before touching it:** the hook must be a *child* of `Content`, never a call in
   `SheetContent` — that body runs whenever a caller renders it, and every tab screen renders its
   sheets unconditionally with a null prop, so a hook one level up pushes a history entry for every
-  closed sheet on the page.
+  closed sheet on the page. **And the second thing — LB-17, found while shipping Q-395c (v1.382.0):** the hook decides
+  "my entry is gone" by **depth**, not by an id mismatch. It used to compare the arriving state's
+  `sheetId` against its own, so every sheet that was not the one landed on closed itself — right at
+  two layers by accident, wrong from three, where back lands on the *middle* sheet's entry and the
+  *bottom* one reads a foreign id and closes. Each entry carries the depth it was pushed at now.
+  [`2026-08-26-one-food-list.md`](../../overview/entries/2026-08-26-one-food-list.md) has the trace.
 
 - **[`docs/handoff-2026-08-25-platform-lane-b-nineteen-prs.md`](../../handoff-2026-08-25-platform-lane-b-nineteen-prs.md)**
   — Lane B, 2026-08-25. The shell-relevant half: **LB-10**, `use-sheet-back-dismiss` was not
