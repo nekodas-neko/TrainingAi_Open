@@ -7,8 +7,8 @@
 
 ## Now
 Landed: **#478** (Q-93-followup), **#479** (the Q-112 re-plan), **#483** (BF-27), **#491** (BF-24),
-**#497** (BF-26), **#512** (BF-29 — My Meals → artboard 3), and the baton PRs. **BF-25** (forced
-dark) is the open one. Each has a journal entry in `docs/overview/entries/`. **Every one owes only a
+**#497** (BF-26), **#512** (BF-29), **#515** (BF-25 — forced dark), and the baton PRs. **BF-30**
+(the meal detail sheet) is the open one. Each has a journal entry in `docs/overview/entries/`. **Every one owes only a
 device press.** Expect to re-merge `main` two or three times per PR: it landed a PR during *every*
 CI cycle tonight, and #512's first merge attempt was refused for it.
 
@@ -41,21 +41,18 @@ role.** Six for six this run, and **two entries prescribed a fix that was wrong,
 `node scripts/next-item.js --lane B` first. Known-good candidates, in the order I would take them:
 - **Q-395c** — nutrition phase 4; owns BF-24's ③ tiles. Check nobody else is on it. Also touches
   `saved-meals-sheet.tsx`, so it collides with BF-31.
-- **BF-30 · BF-31** — the rest of artboard parity. **Read BF-28 first.** Both entries now carry
-  BF-29's findings in place: BF-30's "is this a screen?" decision also owns the chevron glyph and
-  un-duplicating label/edit/delete, and **BF-31's counterpart is corrected** (it named the *scan*
-  flow; it is `saved-meals-sheet.tsx`'s build tab, and both its open questions are answered there).
-  Both touch files #512 rewrote — start from a freshly-merged `main`.
+- **BF-31 · BF-32** — the rest of artboard parity. **Read BF-28 first.** **BF-31's counterpart is
+  corrected in place** — it named the *scan* flow; it is `saved-meals-sheet.tsx`'s build tab, and
+  both its open questions are answered there (neither is a behaviour change). BF-30 answered its own
+  question as **a nested sheet**, so the detail surface now exists for BF-32's photo work to land
+  on.
 - **BF-24 is PART done — do not re-take it whole.** #491 shipped ①④⑤; ②③⑥⑦ are kept on the entry.
-- **Q-112a** — a real one-PR entry now, with a plan behind it
-  ([`the day-review plan`](../../superpowers/plans/2026-08-25-unified-day-review.md)); Q-112c is Lane A.
-- **Q-168, Q-154, Q-254, Q-111** — still gated, parked, or owner-decision. Unchanged.
+- **Q-112a** — one PR now, with [`a plan`](../../superpowers/plans/2026-08-25-unified-day-review.md) behind it; Q-112c is Lane A.
+- **Q-168, Q-154, Q-254, Q-111** — gated, parked, or owner-decision. Unchanged.
 
 ## Do not re-litigate
 - **`lib/coach/**`, `packages/shared/**`, `app/api/**`, `lib/data/**` are Lane A** whatever the edit
   looks like. The rule is the **path**, not the nature of the edit.
-- **Radix `Collapsible`/`CollapsibleTrigger` supplies `aria-expanded`** — never a Q-491 violator.
-- **`weekly-stats-hub`'s `todayKey` needs `.replace(/-/g,"/")`** — `/api/weekly-stats` emits `yyyy/MM/dd`.
 - **Back-dismissal is the primitive's job now** —
   [`components/ui/back-dismiss.tsx`](../../../components/ui/back-dismiss.tsx), rendered by
   `SheetContent`/`DialogContent`. **Never call `useSheetBackDismiss` at a call site again** (two
@@ -68,8 +65,9 @@ role.** Six for six this run, and **two entries prescribed a fix that was wrong,
   (Log Food → History: one press must leave Log Food open).
 - **Q-93-followup** — tap a workout and a walk row in Home's timeline; check the row does not fight
   `PullToSync`'s vertical gesture, and that `/health/day`'s back returns to Home.
-- **BF-29** — the swipe is a **new gesture on the canonical runtime**: scroll the meal library and
-  confirm no tray opens; drag one open and shut; open a second row and watch the first close.
+- **BF-29 · BF-30** — the swipe is a **new gesture on the canonical runtime**: scroll the library
+  and confirm no tray opens; drag one open and shut. And the meal detail is a **nested** sheet, so
+  back now unwinds three layers — detail → library → screen.
 - **BF-25** — put the S25 in **light** mode; the app must stay dark, including the icon routes (no
   CSS) and any canvas paint.
 - Carried from before: Q-406, Q-467, Q-499, Q-538 (Read stats), Q-305 at S25 width, Q-477 across
@@ -94,9 +92,11 @@ None held.
   **The tab shell mounts several panels at once, so DOM order is not screen order**: an unscoped
   `getByRole(...).first()` lands in an off-screen panel. **Probe unmodified `main` before believing
   you broke something.**
+- **Shallow clone: `git fetch --unshallow origin` before every merge** — `git fetch origin main` re-shallows it, and the merge dies with "unrelated histories". Bit again tonight.
 - **`pkill -f "next dev"` exits 144 and kills the rest of a compound command** — put it last.
-- **Shallow clone: `git fetch --unshallow origin` before every merge**, or `git fetch origin main`
-  re-shallows and the merge dies with "refusing to merge unrelated histories." Hit again tonight.
+- **`toBeVisible()` is true 500 ms before a sheet ARRIVES** (`SheetContent` slides in over
+  `duration-500`), so a `boundingBox()` right after reads a position it is still travelling through
+  — y=1127 on a 915 px viewport — and the coordinate tap hits nothing. Follow with `toBeInViewport()`.
 - **Rebuild `package.json`/`changelog.ts` from `git show origin/main:...`** and prepend; never splice
   a conflict hunk. Expect to re-bump: another agent took 1.372.0 while #483 was in review.
 - **`projectOverview.md` sits ON its ratchet almost every PR**, and **so does this baton**. Compact
@@ -104,5 +104,5 @@ None held.
   will land line-neutral** — print old vs new newline counts before writing. Merging a fresh `main`
   often supplies the headroom for free.
 - **The local seed drifts as you probe it**, and a full local E2E run under load is not trustworthy:
-  66/67 then 64/67 with different failures on identical code. `meal-label`'s first test exceeds its
-  180 s timeout here **on `main` too**, and passes in CI — six canvases, four zxing decodes.
+  66/67 then 64/67 on identical code. `meal-label`'s first test exceeds its 180 s timeout here **on
+  `main` too** and passes in CI — six canvases, four zxing decodes.

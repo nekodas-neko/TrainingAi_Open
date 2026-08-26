@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test'
 import { Client } from 'pg'
-import { SEED_EMAIL, expandSavedMeal, settleRouteBoundary } from './fixtures'
+import { SEED_EMAIL, openSavedMeal, settleRouteBoundary } from './fixtures'
 import { encodeMealLabelToken } from '@trainingai/shared/nutrition/label-payload'
 import { readPngDensity } from '@trainingai/shared/nutrition/png-density'
 import { readFileSync } from 'node:fs'
@@ -132,8 +132,8 @@ test('a saved meal renders a printable label in every style', async ({ page }) =
   await expect(async () => {
     const box = (await savedMeals.boundingBox())!
     await page.touchscreen.tap(box.x + box.width / 2, box.y + box.height / 2)
-    // The row collapsed to artboard 3's shape in BF-29, so the label button lives inside it now.
-    await expandSavedMeal(page, MEAL_NAME)
+    // BF-30 moved the row's actions onto the meal's own screen; open it first.
+    await openSavedMeal(page, MEAL_NAME)
     await expect(labelButton).toBeVisible({ timeout: 5_000 })
   }).toPass({ timeout: 90_000 })
 
@@ -260,8 +260,8 @@ test('Save to gallery hands over a PNG that declares its print size', async ({ p
   await expect(async () => {
     const box = (await savedMeals.boundingBox())!
     await page.touchscreen.tap(box.x + box.width / 2, box.y + box.height / 2)
-    // The row collapsed to artboard 3's shape in BF-29, so the label button lives inside it now.
-    await expandSavedMeal(page, MEAL_NAME)
+    // BF-30 moved the row's actions onto the meal's own screen; open it first.
+    await openSavedMeal(page, MEAL_NAME)
     await expect(labelButton).toBeVisible({ timeout: 5_000 })
   }).toPass({ timeout: 90_000 })
   await labelButton.tap()
@@ -304,8 +304,8 @@ test('the chosen label style is remembered', async ({ page }) => {
   await expect(async () => {
     const box = (await savedMeals.boundingBox())!
     await page.touchscreen.tap(box.x + box.width / 2, box.y + box.height / 2)
-    // The row collapsed to artboard 3's shape in BF-29, so the label button lives inside it now.
-    await expandSavedMeal(page, MEAL_NAME)
+    // BF-30 moved the row's actions onto the meal's own screen; open it first.
+    await openSavedMeal(page, MEAL_NAME)
     await expect(labelButton).toBeVisible({ timeout: 5_000 })
   }).toPass({ timeout: 90_000 })
   await labelButton.tap()
@@ -319,7 +319,7 @@ test('the chosen label style is remembered', async ({ page }) => {
   await expect(async () => {
     const box = (await savedMeals.boundingBox())!
     await page.touchscreen.tap(box.x + box.width / 2, box.y + box.height / 2)
-    await expandSavedMeal(page, MEAL_NAME)
+    await openSavedMeal(page, MEAL_NAME)
     await expect(labelButton).toBeVisible({ timeout: 5_000 })
   }).toPass({ timeout: 90_000 })
   await labelButton.tap()

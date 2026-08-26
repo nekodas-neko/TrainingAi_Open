@@ -19,6 +19,7 @@ import { TTL_MEDIUM, TTL_LONG } from '@trainingai/shared/cache-ttl'
 import { getLocalStore } from '@/lib/local-store'
 import { pushThenRevalidate } from '@/lib/local-store/push-then-revalidate'
 import { SavedMealCard } from './saved-meal-card'
+import { MealDetailSheet } from './meal-detail-sheet'
 import { MealPhotoTile } from './meal-photo-tile'
 import { usePlanSavedMealIds } from '@/lib/hooks/use-plan-saved-meal-ids'
 import { MealLabelSheet } from './meal-label-sheet'
@@ -75,6 +76,10 @@ export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate,
   const [editingMeal, setEditingMeal] = useState<SavedMeal | null>(null)
   // Q-389's label preview. Kept here rather than per-card so only one canvas is ever mounted.
   const [labelMeal, setLabelMeal] = useState<SavedMeal | null>(null)
+  // BF-30: the meal's own screen, one layer above this list. Held here for the same reason as the
+  // label sheet — one mounted instance, not one per row.
+  const [detailMeal, setDetailMeal] = useState<SavedMeal | null>(null)
+  const [detailConfirmDelete, setDetailConfirmDelete] = useState(false)
   const [mealName, setMealName] = useState('')
   // Always sent explicitly, never omitted. Both write paths treat `undefined` as "leave a stored
   // photo alone" and `null` as "remove it" (Q-396) — and this screen always knows which it means,
@@ -290,6 +295,17 @@ export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate,
     }
   }, [preselectedMealTypeId, mealTypes, logDate, userId, tz, onLogged])
 
+  const openDetail = useCallback((meal: SavedMeal) => {
+    setDetailConfirmDelete(false)
+    setDetailMeal(meal)
+  }, [])
+
+  /** The swipe tray's Delete lands on the meal with its confirmation already up. */
+  const requestDelete = useCallback((meal: SavedMeal) => {
+    setDetailMeal(meal)
+    setDetailConfirmDelete(true)
+  }, [])
+
   const toggleSelected = useCallback((meal: SavedMeal) => {
     setSelectedIds(prev => {
       if (!prev) return prev
@@ -487,12 +503,11 @@ export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate,
                     <SavedMealCard
                       key={meal.id}
                       meal={meal}
-                      logging={logging === meal.id}
                       selected={selectedIds ? selectedIds.has(meal.id) : null}
                       onToggleSelected={toggleSelected}
-                      onLog={quickLog}
+                      onOpen={openDetail}
                       onEdit={openBuild}
-                      onDelete={deleteMeal}
+                      onRequestDelete={requestDelete}
                       onLabel={setLabelMeal}
                       fromPlan={planSavedMealIds.has(meal.id)}
                     />
@@ -662,6 +677,19 @@ export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate,
           </>
         )}
       </SheetContent>
+      {/* Stacked over the list, not replacing it — `back-dismiss.tsx` closes one layer per press,
+          and a route would have to dismiss this sheet to navigate and re-open it on the way back. */}
+      <MealDetailSheet
+        meal={detailMeal}
+        logging={detailMeal ? logging === detailMeal.id : false}
+        confirmingDelete={detailConfirmDelete}
+        onConfirmingDeleteChange={setDetailConfirmDelete}
+        onOpenChange={o => { if (!o) { setDetailMeal(null); setDetailConfirmDelete(false) } }}
+        onLog={async m => { await quickLog(m); setDetailMeal(null) }}
+        onEdit={m => { setDetailMeal(null); openBuild(m) }}
+        onDelete={async m => { await deleteMeal(m); setDetailMeal(null) }}
+        onLabel={m => setLabelMeal(m)}
+      />
       <MealLabelSheet
         meal={labelMeal}
         open={labelMeal != null}

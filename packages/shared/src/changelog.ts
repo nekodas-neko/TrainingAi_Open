@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.378.0",
+    date: "2026-08-26",
+    changes: [
+      "Tapping a saved meal now opens the meal itself instead of unfolding the row: a full screen with its photo, the calories for one portion, protein/carbs/fat as a share and in grams, and the ingredient list at the amounts the whole batch actually contains. Log this meal, the label, edit and delete all live there. Swiping a row still gets you to label, edit and delete quickly, and delete now always asks first \u2014 it opens the meal with the confirmation showing rather than deleting straight off the swipe.",
+    ],
+  },
+  {
     version: "1.377.0",
     date: "2026-08-25",
     changes: [
