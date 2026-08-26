@@ -137,7 +137,15 @@ export default async function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} ${archivo.variable} ${instrumentSerif.variable} h-full antialiased`}
       >
         <script dangerouslySetInnerHTML={{ __html: brandThemeScript }} />
-        <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+        {/* BF-25 — the app is dark, and the OS cannot change that. Three props, not the one the
+            entry expected: `forcedTheme` alone governs the CLASS on <html> but leaves `theme` and
+            `resolvedTheme` resolving through `matchMedia`, and two components read those to pick
+            colours — `detail-hero.tsx` would paint its light gradient over a dark page on a
+            light-set phone, and `sonner.tsx` would render light toasts. `defaultTheme`/
+            `enableSystem` are what make the reported values agree with the render. Safe because
+            `setTheme` has zero call sites, so nothing has ever written `localStorage.theme` and the
+            default is what every user resolves to. Reversing this is still deleting props. */}
+        <ThemeProvider attribute="class" forcedTheme="dark" defaultTheme="dark" enableSystem={false}>
           <UserTimezoneProvider timezone={timezone}>
           <MotionConfig reducedMotion="user">
             <DynamicBackground />

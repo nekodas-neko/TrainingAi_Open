@@ -2703,10 +2703,12 @@ are the four new entries and two corrections, not accretion. One of those correc
 baton's own claim that the check-in "adds little independent information" — measured, ~75% of it is
 information nothing else has.
 
-## 2026-08-26 — `projectOverview.md` 7987 → 7989, backlog 11926 → 11898 (LA-31/Q-291)
+## 2026-08-26 — `projectOverview.md` 7987 → 7994, backlog 11926 → 11883 (LA-31/Q-291)
 
-Two lines for the Q-291 status paragraph — the day's AI surfaces can now see each other — and
-twenty-eight back from Q-291 leaving the queue. Net down.
+Seven lines for the Q-291 status paragraph — the day's AI surfaces can now see each other — and
+forty-three back from Q-291 leaving the queue and Lane B's parallel merge landing in between. Net
+down. (Re-derived twice: `origin/main` moved under this branch three times while it was open, and
+the numbers quoted here are against the base it finally merged onto.)
 
 The two lines are load-bearing rather than narrative. They record the constraint a future change
 would otherwise break: **the cross-surface read graph is one-directional and must stay acyclic.**

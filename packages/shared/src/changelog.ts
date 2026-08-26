@@ -6,10 +6,17 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: "1.377.0",
+    version: "1.378.0",
     date: "2026-08-26",
     changes: [
       "The end-of-day check-in can now see what the app already told you that morning, and is told not to reverse it without saying so. Previously each piece of coaching was written from its own slice of the day with no knowledge of the others \u2014 so on one occasion the morning advised keeping intensity low on a raised temperature, and that evening the digest cheered the two sessions that followed and said to keep the same energy tomorrow. The digest now reads the day's readiness, sleep, heart-rate and activity notes before it writes. It may still disagree with them, since by evening it knows more; what it can no longer do is disagree silently.",
+    ],
+  },
+  {
+    version: "1.377.0",
+    date: "2026-08-25",
+    changes: [
+      "The app is now dark all the time. It used to follow the phone's own light/dark setting, so switching the S25 to light — or letting it switch itself on a schedule — turned the whole app light, which nobody had asked for and which no screen was designed against. One design, one theme. The accent colour you pick is unaffected.",
     ],
   },
   {
