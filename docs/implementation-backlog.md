@@ -459,6 +459,62 @@ in the PR which rule was chosen and what it deliberately does not catch.
   → one row, and a deliberately similar-but-different food → two. Then confirm past logs still
   resolve to the right item.
 
+### [nutrition] BF-39 — a logged meal stops being a meal: `food_logs` has no `saved_meal_id`, and three symptoms trace to that
+
+- **Lane:** A — a migration plus the write path; the diary rendering is B and follows.
+- **Added:** 2026-08-26 · owner: *"the meal is a complete in 'saved meal' and it can have a picture
+  etc. but when adding it to the log; its broken down into its components so the image wont transfer
+  over. not sure what the best way around this would be. maybe it needs to stay as a whole item."*
+
+**The owner's instinct is right, and the missing piece is already documented elsewhere as a
+different problem.** Logging a saved meal writes one `food_logs` row per ingredient and **nothing
+records that they came from a meal**. `food_logs` carries `food_item_id` and no `saved_meal_id`, so
+the moment a meal is logged its identity is gone.
+
+**Three symptoms, one cause — which is what makes this worth fixing rather than patching:**
+
+| Symptom | Where it was noticed |
+|---|---|
+| The meal's photo cannot follow it into the diary | **here**, the owner's report |
+| A saved meal has **no last-used timestamp at all**, so My Foods can only order by `createdAt DESC` | Q-395c's journal, filed as a constraint rather than a defect |
+| The diary shows five ingredients where the owner ate one thing | implied by both |
+
+Q-395c's journal already says it: *"`food_logs` carries no `saved_meal_id`, so a saved meal has no
+last-used timestamp at all … True MRU needs a column that does not exist — Lane A's to add."* **That
+is this column.** Adding it for MRU alone would be under-selling it.
+
+**Two shapes, and the choice is the entry's real content:**
+
+1. **Stamp the ingredients.** Keep one row per ingredient, add a nullable `saved_meal_id` (plus a
+   per-log group id, so two servings of the same meal on one day stay distinct). The diary groups
+   rows that share it and renders the meal's name and photo over them.
+   - **Keeps** every macro total, every per-ingredient edit, and every existing query working
+     unchanged — a log row is still a log row.
+   - **Costs** grouping logic on every diary read.
+2. **Log the meal as one row.** What the owner reached for — *"maybe it needs to stay as a whole
+   item"*.
+   - **Keeps** the diary trivially correct: one thing eaten, one row, one photo.
+   - **Costs** a second shape in `food_logs`: a row that points at a meal rather than a food item,
+     which every reader, the sync delta, the local mirror and the macro sums must now handle. And
+     editing one ingredient of a logged meal stops being possible without decomposing it anyway.
+
+**Recommended: (1).** It is additive — a nullable column and a grouping pass — where (2) changes what
+a `food_logs` row *is*, and this table is read by the diary, the energy balance, the adaptive-TDEE
+window, the sync delta and the local store. **The owner's phrasing asks for the outcome, not the
+storage**: "stay as a whole item" is satisfied by the diary *showing* one grouped item, which (1)
+delivers without a second row shape.
+
+- **⚠ Sequencing against BF-35.** BF-35 fills the food tile with images; a meal's photo reaching the
+  diary needs this column first. If BF-35 lands first the meal rows simply show ingredient images —
+  correct, not broken — so this is an ordering preference, not a `Needs:`.
+- **⚠ The full offline-first chain applies**, per CLAUDE.md: local table column = server payload =
+  `getSyncDelta` output = `pullDelta` mapping = `applyDelta` upsert columns = the `pushMutations`
+  branch. A new nullable column on a synced table is exactly where that chain gets half-done.
+- **Verification.** Log a saved meal with a photo: the diary shows one grouped entry with the meal's
+  name and picture, the day's macro total is unchanged from before, and a single ingredient inside it
+  can still be edited and deleted. Then the same on a second serving of the same meal on the same
+  day — they must not merge into one.
+
 ### [app-shell][nutrition] BF-34 — the dialog that closed on the frame it opened (shipped v1.383.1)
 
 - **Lane:** B
@@ -11814,6 +11870,20 @@ maths at all, just a stored value and a precedence rule.
 `manual(5) > scale_ble(4) > oura_ble(3) > oura_cloud(2) > health_connect(1)`. A DEXA is a clinical
 measurement and outranks all of them; adding a source is a code change in that file **plus** the
 inlined SQL `CASE` at line 45 — both must move together or the SQL and TS ladders diverge.
+
+**⏰ THE SCAN IS 2026-08-27, AND ONE THING MUST HAPPEN ON THE DAY OR THE CALIBRATION CANNOT BE BUILT
+LATER.** Owner: *"Will need to get the dexa matched with the same days renpho scale measurement so we
+can calibrate our scale by the dexa scan."* Exactly right, and it is the only irreversible part:
+
+- **Take a Renpho reading the same day, as close in time to the scan as practical** — ideally both
+  fasted and before training, since BIA moves with hydration and a meal. That reading is one half of
+  the calibration pair and **cannot be reconstructed afterwards**; the DEXA figure can be typed in
+  any time, because the record is dated by when it was measured rather than when it was entered.
+- **Keep the DEXA report itself**, not just body-fat %. Fat mass, lean mass and bone mineral content
+  in kg are what let a later entry re-derive the pair if the stored percentage turns out to be
+  computed differently from the app's.
+- **The reading needs no app work.** `body_metrics` already records the scale over BLE; it is the
+  DEXA half that has nowhere to go yet, which is this entry.
 
 **Done looks like:** a DEXA reading (date, body fat %, and ideally lean/fat mass) can be entered; the
 app states the measured offset against the scale for the same period; corrected body fat feeds the

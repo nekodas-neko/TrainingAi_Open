@@ -60,3 +60,49 @@ with the 19, decide de-duplication separately once the rule is shown correct on 
 
 **BF-34 shipped** — `2026-08-26-sibling-sheet-back-dismiss.md`. The delete fix is on `main` and
 carries `Gate: device`; it needs the owner to press it.
+
+## A logged meal stops being a meal (BF-39)
+
+Owner: *"the meal is a complete in 'saved meal' and it can have a picture etc. but when adding it to
+the log; its broken down into its components so the image wont transfer over ... maybe it needs to
+stay as a whole item."*
+
+Right, and the missing piece was already written down as a *different* problem. Logging a saved meal
+writes one `food_logs` row per ingredient and **nothing records that they came from a meal** —
+`food_logs` has `food_item_id` and no `saved_meal_id`.
+
+**Three symptoms, one cause:**
+
+| Symptom | Where it surfaced |
+|---|---|
+| The meal's photo cannot follow it into the diary | this report |
+| A saved meal has **no last-used timestamp at all** | Q-395c's journal, filed as a constraint |
+| The diary shows five ingredients where one thing was eaten | implied by both |
+
+Q-395c's journal says it outright — *"True MRU needs a column that does not exist — Lane A's to
+add."* That is this column, and adding it for ordering alone would under-sell it.
+
+**Recommended: stamp the ingredients, don't change the row shape.** A nullable `saved_meal_id` plus a
+per-log group id is additive; the diary groups rows that share it and renders the meal's name and
+photo over them. The alternative the owner reached for — one row for the whole meal — makes the diary
+trivially correct and costs a **second shape** in a table read by the diary, the energy balance, the
+adaptive-TDEE window, the sync delta and the local store, and it makes editing one ingredient
+impossible without decomposing anyway.
+
+**The owner's phrasing asks for the outcome, not the storage.** "Stay as a whole item" is satisfied by
+the diary *showing* one grouped item, which the additive option delivers.
+
+## The DEXA scan is tomorrow — what is and is not ready
+
+**BF-33 shipped.** `measured_rmr` exists (`schema.ts:774`) with `POST /api/measured-rmr`, bounds
+checking, and — the load-bearing column — `ffm_kg_at_test`, so the measurement can be re-scaled to a
+future body instead of expiring on a date. **There is no UI yet**: `grep` finds no `.tsx` referencing
+it. Entry is a route call, not a screen.
+
+**BF-2 has not shipped.** No `dexa` anywhere in the tree. The DEXA half has nowhere to go.
+
+**So the operational note went into BF-2, because one part of tomorrow is irreversible.** The owner
+identified it themselves: *"Will need to get the dexa matched with the same days renpho scale
+measurement."* The scale reading is one half of the calibration pair and cannot be reconstructed
+later — while the DEXA numbers can be entered any time, since the record is dated by when it was
+measured rather than when it was typed.
