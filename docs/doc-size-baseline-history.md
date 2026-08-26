@@ -18,6 +18,22 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
+## 2026-08-26 — `docs/implementation-backlog.md` 11882 → 11903 (Q-406 blocked at `Gate: owner`)
+
+Q-406's warning-row decision was taken to be built and turned out not to be buildable. Option A moves
+the mismatch sentence *"to the food's detail"*, and **this surface has no food detail**: the external
+food-database row's tap is `onAddExternal` → `createFoodItem` + `accept()`, so it adds the food to the
+meal with no inspect step, no confirmation and no quantity sheet in between. Building A as decided
+would have deleted the only visible explanation and left an amber icon on a row that adds on tap.
+
+**Why the finding is in the queue rather than a journal entry.** It re-opens a `Gate: owner` and names
+the three ways out; whoever takes Q-406 next has to read it *before* writing code, and the backlog is
+the file they read. A journal entry is where a shipped change is explained — this is a change that was
+deliberately not shipped, and the reason has to sit on the entry it blocks.
+
+Trimmed from 24 lines to 21 before raising: the three options became one bullet rather than a numbered
+list, and the conversion note lost its restatement of what `FoodRow` is.
+
 ## 2026-08-25 — the compaction chore, first pass (`docs/implementation-backlog.md` 12146 → 11799)
 
 **A RATCHET DOWN of 347 lines, and the first time this file has been made smaller on purpose rather
@@ -2761,7 +2777,149 @@ invalidate each other indefinitely, and model output is not deterministic, so it
 That is not visible from either route's source — it is a property of the pair — which is exactly the
 kind of thing an orientation doc exists to carry.
 
-## 2026-08-26 — backlog 11882 → 11965, `projectOverview.md` 7992 → 7999, `docs/agents/state/tuning.md` 218 → 235 (the HR-tile and pacing follow-ups)
+## 2026-08-26 — backlog 11903 → 11947 (PS-7, camera form capture)
+
+Forty-four lines for one new queue entry at the tail. The entry is longer than a typical one on
+purpose: it is an owner feature request whose plan rejects four alternatives with reasons, and the
+entry names them so an implementer does not re-propose one before opening the plan. Everything else
+about the feature — the storage arithmetic, the capture state machine, the Wear OS costing — is in
+`docs/superpowers/plans/2026-08-26-camera-form-capture.md`, which is where it belongs.
+
+**Only Phase 0 is queued, and that is the reason this raise is 44 lines and not four times that.**
+The plan has five later phases. Filing them now would have added an entry each for work whose shape
+is decided by a measurement nobody has taken yet, and the queue would have carried them until
+someone read far enough to find out they were all gated on the same unknown.
+## 2026-08-26 — `docs/implementation-backlog.md` raised, 11903 → 11958 (BF-34, the device-only delete)
+
+One entry, and most of it is a table of **six layers ruled out**, each with the line that rules it
+out. That is the expensive part of this bug and it is worth carrying in the queue rather than being
+re-derived: the whole delete path was driven end-to-end on web with Playwright and it **works**, so
+the failure is device-only, and an implementer who starts by re-checking the local store, the outbox
+payload or the pull-clobber gate will spend the same afternoon reaching the same dead ends.
+
+The entry ends on one question — *does the confirm dialog appear on the device at all?* — because the
+answer splits it into two different bugs with two different fixes.
+
+## 2026-08-26 — `docs/implementation-backlog.md` raised, 12002 → 12048 (BF-34 root-caused)
+
+The owner's one-line answer — *"it opens up the confirm dialog; but then instantly minimizes"* —
+turned a device-only symptom into a traced regression in **BF-27**, which shipped the day before.
+
+The added lines are the four-step sequence and the reason the hook's existing guard cannot catch it:
+`selfPopRef` is per-instance, so a closing surface's asynchronous `history.back()` lands on the
+surface that just opened, whose flag is clear and whose `sheetId` does not match — indistinguishable
+from a real back gesture. The `sheetId` guard was written for the parent/child cascade (LB-10); this
+is the sibling case.
+
+It is written out in full because the blast radius is **every close-one-open-another transition in
+the app**, and because the obvious local fix — moving the confirm inline — would hide this instance
+and leave the cause running everywhere else.
+
+## 2026-08-26 — backlog 12048 → 12064 (PS-7 decisions, camera form capture)
+
+Sixteen lines on the existing PS-7 entry, no new entry. The owner answered all four of the plan's
+open questions the same day it was written, and one answer changed the design — the analysis is
+keyed off the exercise's logged equipment rather than a whitelist of lifts. The entry carries the
+three facts an implementer would otherwise re-derive: that `equipmentClassOf()` already exists and
+should be reused, that it collapses dumbbell into a `standard` bucket the form profile has to split,
+and that 23 of 149 production exercises carry no equipment tag at all.
+
+**This raise was missed locally and CI caught it — worth recording because the local run was not
+wrong.** `pnpm check:rules` passed on this branch at the then-current baseline of 11947. Between the
+branch being cut and the PR opening, `main` merged twice and carried the baseline to 12048 with a
+larger file underneath it. CI checks the *merge* result, so the same diff that was clean locally was
+16 over once merged. The rule already in CLAUDE.md covers it — re-merge `origin/main` immediately
+before opening each PR, not only before cutting the branch — and this is one more instance of the
+cost, not a new failure mode.
+
+## 2026-08-26 — `CLAUDE.md` 1174 → 1198, backlog 11860 → 11858, `projectOverview.md` 7992 → 8003 (Q-273)
+
+**The only `CLAUDE.md` raise of the session, and it is Q-273's own scope item 3**: *"a rule, alongside
+One Formula One Place: a correlation computed across a model change is not evidence."*
+
+Twenty-four lines, carrying a worked example rather than an instruction. `body_battery_daily` held
+**four distinct model versions over 40 days** with no recompute, and pooling them produced a
+documented false conclusion — r = −0.06 recorded as evidence the model had no outcome signal, where
+**v5 days alone give r = +0.67**. That number stood in the docs for eleven days. A rule stating the
+principle without the example is one a future session reads past; the example is what makes it stick.
+
+It also records two things that are properties of a *pair* of files and so are invisible from either
+one: `model_versions` merges with `||` and must never regain a JS read-merge, and `updated_at` does
+not identify the writing model.
+
+The backlog ends **two lines DOWN** despite adding fifty, because Lane B's merges shrank it
+underneath this branch in between. The fifty are **LA-32** (36) plus Q-273's own `Keep:` block (15), which says what the entry
+still owes now that its scope item 1 is *safe* but not *complete* — the stamp can no longer be
+clobbered, three pillars still do not write one, and the backfill half is deliberately untouched. An
+entry that shipped half its work states the half it did not, rather than looking finished.
+
+LA-32 is the survey of test files sharing a hardcoded user UUID with a file that deletes it — 233 UUIDs measured, 10 shared, 7 risky, 2 fixed, 6 remaining, with the table of
+which. Filed rather than swept because the sweep without a CI check to hold it at zero is the weaker
+half, and the entry carries the measurement so the sweep is mechanical.
+
+## 2026-08-26 — `projectOverview.md` → 8015, backlog 12078 (LA-32, the shared test-user UUID)
+
+Eleven lines up in the index, thirty-six back from LA-32 leaving the queue.
+
+The eleven earn their place by recording a **ratio, not an incident**. LA-32 was filed claiming six
+collisions remained; re-measuring found **one**, and the five false positives were each false for a
+different reason — a program id, the canonical `claude_ro` owner two files are meant to share, and
+pure-logic files that never touch `users`. The filing's rule ("shares a UUID literal, and somebody
+mentions `DELETE FROM users`") is not the claim it needed to make.
+
+That 83% noise rate is the durable part, because it decided the shape of the fix: a check that cries
+wolf is one the first person it stops will baseline into uselessness, so the detection got a script
+with seven tests — five of them false-positive cases — rather than a grep. Without the ratio written
+down, the next person to read "six collisions" re-derives the noisy rule and ships it.
+
+## 2026-08-26 — `projectOverview.md` and backlog raised (BF-33, the measured RMR)
+
+The index gains a paragraph and the backlog gains a `Keep:` block. Both carry the same two things,
+because both are load-bearing and neither is visible from the code.
+
+**The ageing rule and why it is not a validity window.** BF-33 named two candidates and left the
+choice open. A window fails at both ends — full trust the day before expiry, total discard the day
+after — while what actually invalidates a measurement is a change in body composition, which has no
+fixed relationship to elapsed time. Cunningham being linear in fat-free mass is what makes the
+alternative work: the measurement carries the person's *residual* from the prediction, and that
+re-applies at any later FFM. Someone re-reading `personalRmr` can see what it computes; only this
+says why the obvious rule was rejected.
+
+**That the feature is not usable yet.** The engine half stores it and the goal moves, but nothing can
+enter a number. An index that said "shipped" without that would be the "fixed from intent" failure
+CLAUDE.md names, one step removed.
+
+## 2026-08-26 — `projectOverview.md` raised, backlog down 17 (Q-512, the ACWR window)
+
+Twelve lines in, seventeen back as Q-512 leaves the queue. Net down.
+
+The twelve record a correction rather than a fix, which is why they are in the index and not only in
+the journal. **Q-512's stated consequence was wrong in a way that changed the work**: it said the
+route reads `.acwr` (always null, therefore inert), and the route reads `typicalSessionVolumeKg` —
+the activity score's volume-lane denominator, which is *not* gated and so always returned a number,
+just a median over one week where every sibling uses four. That makes the defect a live skew rather
+than a dead read, and it makes one of the two fixes the entry proposed — "drop the call" — unsafe.
+
+Also recorded: widening the fetch is **not** the one-line change it appears to be, because
+`sessions7d`/`volume7dKg` are computed from the same list and the model reads them as "this week".
+Someone re-reading the diff sees the filter; only this says what it would have broken without it.
+
+## 2026-08-26 — backlog raised 13 lines (Q-513, already fixed)
+
+Thirteen lines to say **do not implement this**, which is worth more than the entry it sits in.
+
+Q-513 asks for a 28-day ACWR window in `build-day-audit.ts`. The file already declares
+`AUDIT_HISTORY_DAYS = 28`. Without a `Keep:` saying so, the next implementer reads a READY entry with
+an explicit "first action", changes a window that is already correct, and ships a no-op PR — the
+"forcing a mismatched implementation just to clear the queue" CLAUDE.md names.
+
+The lines also keep the half that is genuinely open: the entry's *"then re-measure"*. The 38%-of-days
+and mean-0.150 figures were measured against the OLD window and nobody has re-run them, so they may
+already be zero. That replay is Tuning's, which is why the entry is now `Gate: owner` rather than
+deleted — deleting it would lose a live question, and leaving it READY would invite the no-op.
+## 2026-08-26 — backlog → 12164, `projectOverview.md` → 8050, `docs/agents/state/tuning.md` 218 → 235 (the HR-tile and pacing follow-ups)
+
+*(Absolute figures are from the final rebase; other PRs raised the same two lines while this branch was open, so the deltas this branch is responsible for are **+83** on the backlog and **+9** on `projectOverview.md`.)*
 
 One new entry (**TN-17**, Activity as a pace-to-goal score) and two amendments that are longer than
 the entry.

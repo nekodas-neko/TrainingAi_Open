@@ -24,8 +24,59 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.381.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Version:** v1.381.3 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-08-26.
+
+**A window that made an ACWR impossible, and what it was really breaking (Q-512).** `health-insight`
+handed `computeVolumeAcwr` a **7-day** session list against a **21-day** span gate measured from the
+earliest session in that list — so ACWR was null on **110 of 110** replayed days, structurally rather
+than for want of history. **The entry's mechanism was right and its consequence was wrong:** the route
+never reads `.acwr`. It reads `typicalSessionVolumeKg`, the activity score's *volume-lane denominator*
+— which is **not** gated, so it always returned a number, a median over one week where every sibling
+uses four. Two heavy sessions in a quiet week set the bar. That also makes one of the entry's two
+proposed fixes unsafe: dropping the call would have removed the denominator. **And it was not the
+one-line fix it looked like** — widening the fetch silently turns `sessions7d`/`volume7dKg`, which the
+model reads as "this week", into 28-day figures, trading a visibly-absent null for a wrong number.
+They filter back explicitly. `minSpanDays` was not lowered.
+
+**A measured RMR has somewhere to go, and a rule for how it ages (BF-33, engine half).** The owner has
+a DEXA + RMR test booked and every resting rate the app used was *predicted*. Migrations **225** (a
+`measured_rmr` table) + **226** (claude_ro regen) store it; `personalRmr` decides what happens as the
+body changes. **The entry left that open — validity window or re-scale by lean mass — and re-scaling
+wins for a reason, not a preference:** a window gives full trust the day before expiry and total
+discard the day after, while what actually invalidates a measurement is a change in body composition,
+which has no fixed relationship to elapsed time. Cunningham is linear in fat-free mass, so a
+measurement carries exactly one thing the prediction does not — **this person's residual from it** —
+and re-applying that at today's FFM ages it by body change instead of by the calendar. **Its own table,
+not a `body_metrics` column,** because a second test must sit *beside* the first: two measurements at
+different compositions are how you learn whether the first still describes this person. **⚠ NOT usable
+yet** — there is no way to enter a number; the typed field and the AI results-sheet path are scope
+item 3, the 2×2 panel is item 4 and Lane B's.
+
+**A shared test-user UUID, and a check that would have been deleted (LA-32).** Three times in two
+days, adding an unrelated test file turned the suite red in a file the PR never touched: two files
+hardcoded the same user id and one deleted it, and vitest's parallel workers share one local
+Postgres. **The entry's own survey said six remained; re-measuring found one.** `…d011` is a
+*program* id, `fe481797` is the canonical `claude_ro` owner two files are meant to share, and the
+rest are pure-logic files that never touch `users` — 83% noise, because "shares a UUID literal" is
+not the claim "shares a *user id* someone deletes". That ratio is why the fix is a script with
+tested detection rather than a grep: **a check that cries wolf gets baselined into uselessness by
+the first person it stops.** `check-test-user-uuid-collisions.js` is in Custom Rules (**59 of 59**,
+up from 58) with an **empty baseline**. Its first two implementations were wrong in ways the tests
+now pin — a fixed tail swallowed the next statement, and breaking on a line-ending `)` stopped
+inside the SQL, which ends lines that way constantly.
+
+**A model stamp that another pillar could erase (Q-273).** `oura_daily_derived.model_versions` is a
+map of pillar → model version, and the shared upsert `COALESCE`-replaced it — so a writer stamping
+its own key wiped every other pillar's. Live: `backfillBodyComp` wrote `{bodyComp: …}` flat and
+erased the readiness stamp on every day it touched; readiness survived only through a racy JS
+read-merge, now deleted. The upsert merges with `||` inside the statement, so stamping is additive by
+construction. **Five DB tests, and reverting the fix fails 3 of them** — including the live sequence
+— while the two that should pass either way still pass. **Q-273 is NOT complete:** sleep, activity
+and training load still carry no stamp, because only two model-version constants exist and defining
+three more is a judgement about each pillar's model, not an implementer's aside. `CLAUDE.md` gains
+the rule the entry asked for, with the worked example where pooling four model versions turned
+r = +0.67 into r = −0.06 and stood in the docs for eleven days.
 
 **The day's AI surfaces can see each other now (Q-291).** The morning readiness insight once advised keeping intensity low on a raised temperature; that evening the digest cheered the two sessions that followed and said to keep the same energy tomorrow. The digest read nine sources and **readiness was not among them** — so this was data plumbing, not a prompt tweak, which is the question the entry itself asked to settle first. It now reads the day's insights before writing, inside its context hash rather than appended after it. **The read graph is one-directional and must stay acyclic:** two surfaces hashing each other's text would invalidate each other forever, and model output is not deterministic, so it would never settle — the digest is excluded from what the digest can read, in code and in two tests. The instruction permits disagreement and forbids only *silent* disagreement, which is also pinned, so a later tightening to "never contradict" fails rather than passing quietly.
 

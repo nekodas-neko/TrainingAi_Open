@@ -766,6 +766,24 @@ export const aiHealthInsights = pgTable('ai_health_insights', {
   createdAt:   timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 }, t => [unique().on(t.userId, t.section, t.date)])
 
+// BF-33: clinically measured resting metabolic rate (indirect calorimetry). Its own table rather
+// than a `body_metrics` column because a second test must sit BESIDE the first — see migration 225.
+export const measuredRmr = pgTable('measured_rmr', {
+  id:             uuid('id').primaryKey().defaultRandom(),
+  userId:         uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  measuredOn:     date('measured_on', { mode: 'string' }).notNull(),
+  rmrKcal:        integer('rmr_kcal').notNull(),
+  // The load-bearing column: it is what lets the measurement be re-scaled to today's body instead
+  // of expiring on a date (`personalRmr`). Nullable — a provider may report a rate and no comp.
+  ffmKgAtTest:    doublePrecision('ffm_kg_at_test'),
+  weightKgAtTest: doublePrecision('weight_kg_at_test'),
+  method:         text('method'),
+  provider:       text('provider'),
+  notes:          text('notes'),
+  createdAt:      timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt:      timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+}, t => [unique().on(t.userId, t.measuredOn)])
+
 export const errorEvents = pgTable('error_events', {
   id:        uuid('id').primaryKey().defaultRandom(),
   userId:    uuid('user_id').references(() => users.id, { onDelete: 'set null' }),

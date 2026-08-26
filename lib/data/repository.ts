@@ -432,6 +432,24 @@ export interface LastRealOneRm {
   target80: number | null
 }
 
+export interface MeasuredRmrInput {
+  measuredOn: string
+  rmrKcal: number
+  ffmKgAtTest?: number | null
+  weightKgAtTest?: number | null
+  method?: string | null
+  provider?: string | null
+  notes?: string | null
+}
+
+export interface MeasuredRmrRow extends MeasuredRmrInput {
+  ffmKgAtTest: number | null
+  weightKgAtTest: number | null
+  method: string | null
+  provider: string | null
+  notes: string | null
+}
+
 export interface WorkoutRepository {
   // ── Users ──────────────────────────────────────────────────────────────────
   upsertUser(user: Omit<User, 'id' | 'createdAt' | 'isActive' | 'isAdmin'>, forceActive?: boolean): Promise<User>
@@ -785,6 +803,12 @@ export interface WorkoutRepository {
   // serve the cache when it matches — see NUT-7 (daily-digest staleness).
   getAiHealthInsightWithHash(userId: string, section: string, date: string): Promise<{ insight: string; contextHash: string | null } | null>
   listAiHealthInsightsForDate(userId: string, date: string): Promise<{ section: string; insight: string }[]>
+
+  /** BF-33: clinically measured RMR. `saveMeasuredRmr` upserts on (user, date) so re-entering a
+   *  test corrects it, while a later test is a new row beside the first. */
+  saveMeasuredRmr(userId: string, input: MeasuredRmrInput): Promise<void>
+  getLatestMeasuredRmr(userId: string): Promise<MeasuredRmrRow | null>
+  listMeasuredRmr(userId: string): Promise<MeasuredRmrRow[]>
   upsertAiHealthInsight(userId: string, section: string, date: string, insight: string, contextHash?: string): Promise<void>
   deleteAiHealthInsight(userId: string, section: string): Promise<void>
 

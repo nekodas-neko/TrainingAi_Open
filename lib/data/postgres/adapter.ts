@@ -3389,6 +3389,64 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       .orderBy(s.aiHealthInsights.section)
   }
 
+  async saveMeasuredRmr(userId: string, input: import('../repository').MeasuredRmrInput): Promise<void> {
+    await this.db.insert(s.measuredRmr)
+      .values({
+        userId,
+        measuredOn: input.measuredOn,
+        rmrKcal: input.rmrKcal,
+        ffmKgAtTest: input.ffmKgAtTest ?? null,
+        weightKgAtTest: input.weightKgAtTest ?? null,
+        method: input.method ?? null,
+        provider: input.provider ?? null,
+        notes: input.notes ?? null,
+      })
+      // Same test date = a correction, not a second test. A later date is a new row, which is what
+      // makes "a second test sits beside the first" hold (BF-33). Scoped to the user by the unique
+      // index's own columns, so the matched row is already this user's.
+      .onConflictDoUpdate({
+        target: [s.measuredRmr.userId, s.measuredRmr.measuredOn],
+        set: {
+          rmrKcal: input.rmrKcal,
+          ffmKgAtTest: input.ffmKgAtTest ?? null,
+          weightKgAtTest: input.weightKgAtTest ?? null,
+          method: input.method ?? null,
+          provider: input.provider ?? null,
+          notes: input.notes ?? null,
+          updatedAt: new Date(),
+        },
+      })
+  }
+
+  async getLatestMeasuredRmr(userId: string): Promise<import('../repository').MeasuredRmrRow | null> {
+    const [row] = await this.db.select()
+      .from(s.measuredRmr)
+      .where(eq(s.measuredRmr.userId, userId))
+      .orderBy(desc(s.measuredRmr.measuredOn))
+      .limit(1)
+    return row ? this.rowToMeasuredRmr(row) : null
+  }
+
+  async listMeasuredRmr(userId: string): Promise<import('../repository').MeasuredRmrRow[]> {
+    const rows = await this.db.select()
+      .from(s.measuredRmr)
+      .where(eq(s.measuredRmr.userId, userId))
+      .orderBy(desc(s.measuredRmr.measuredOn))
+    return rows.map(r => this.rowToMeasuredRmr(r))
+  }
+
+  private rowToMeasuredRmr(r: typeof s.measuredRmr.$inferSelect): import('../repository').MeasuredRmrRow {
+    return {
+      measuredOn: r.measuredOn,
+      rmrKcal: r.rmrKcal,
+      ffmKgAtTest: r.ffmKgAtTest,
+      weightKgAtTest: r.weightKgAtTest,
+      method: r.method,
+      provider: r.provider,
+      notes: r.notes,
+    }
+  }
+
   async upsertAiHealthInsight(userId: string, section: string, date: string, insight: string, contextHash?: string): Promise<void> {
     await this.db.insert(s.aiHealthInsights)
       .values({ userId, section, date, insight, contextHash: contextHash ?? null })

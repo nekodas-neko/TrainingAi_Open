@@ -14,7 +14,7 @@ silently misdirecting the next session. Update them in the same PR that consumes
 
 | Pointer | Value | Source of truth |
 |---|---|---|
-| Next free Postgres migration | **225** | `lib/data/postgres/migrations/` |
+| Next free Postgres migration | **227** | `lib/data/postgres/migrations/` |
 | Local SQLite schema version | **v29** | `lib/sqlite/migrations.ts`; `lib/sqlite/__tests__/migrations.test.ts` asserts the max |
 
 > **There is no third pointer any more.** Entry IDs are not allocated from a shared counter and
@@ -351,6 +351,99 @@ below threshold and left in place for next time.
 > BF-29 (My meals), BF-30 (Meal detail), BF-31 (Edit meal) and BF-26 (Quantity). Two artboards need
 > no entry — `Tap targets` and the `srv/g` studies both shipped in Q-395a.
 
+### [app-shell][nutrition] BF-34 — BF-27 dismisses any dialog opened as a sheet closes; the diary delete is the first report
+
+- **Lane:** B
+- **Added:** 2026-08-26 · owner, live on the APK: *"the delete feature doesnt work. so its not
+  removing from my.UI"*, with a screenshot of the converged quantity sheet open on a BARILLA
+  Spaghetti row. **Owner asked for this at the top of the queue.**
+
+**⚠ Read this before touching any code: the entire path was exercised on web and it works.** A
+Playwright run against `pnpm dev` on 2026-08-26, seeded row → tap row → tap the bin → confirm →
+`SELECT count(*) … WHERE deleted_at IS NULL` = **0**, and the row left the list. So the bug is
+**device-only**, and the layers below are already eliminated. Do not re-verify them; the value of
+this entry is the narrowing.
+
+**Eliminated by inspection, each with the line that rules it out:**
+
+| Layer | Why it is not the bug |
+|---|---|
+| The confirm dialog's wiring | Fires `handleConfirmDelete`; verified end-to-end on web |
+| `store.deleteFoodLog` | `UPDATE food_logs SET deleted_at=?, sync_status='pending'` — correct |
+| The local read | `getFoodLogsWithItems` filters `WHERE fl.deleted_at IS NULL` — correct |
+| Pull clobbering the delete | `applyDelta`'s upsert carries `WHERE food_logs.sync_status='synced'`, and the local row is `pending`, so the server copy cannot resurrect it |
+| The outbox payload | `pushMutations` strips only `syncStatus`/`updatedAt`/`deletedAt`, so `deleted: true` survives into `adapter.ts:4032` and calls `deleteFoodLog` |
+| A stale `sync_status` flip | **Nothing** flips `food_logs.sync_status` back to `'synced'` after a push; `deleteMutations` only clears the outbox rows |
+
+> **✅ ANSWERED AND ROOT-CAUSED, 2026-08-26.** Owner: *"when I press the delete button; it opens up
+> the confirm dialog; but then instantly minimizes so we cant click it."* The dialog **opens and is
+> then dismissed** — not the `pointer-events: none` variant, where it would sit there ignoring taps.
+> That is decisive, and it points at `useSheetBackDismiss`, not at Radix.
+>
+> **⚠ THE CAUSE IS BF-27, WHICH SHIPPED 2026-08-25 (v1.372.0), AND THE BLAST RADIUS IS THE WHOLE
+> APP — NOT THIS DELETE.** `BackDismiss` now renders inside **every** `SheetContent` and
+> `DialogContent`, so every close-one-open-another transition in the app runs the sequence below.
+> This delete is simply the first one the owner happened to press.
+>
+> **The sequence, from the hook's own source:**
+> 1. Trash tap → `onClose()` closes the sheet **and** `setConfirmDeleteLogId(id)` opens the dialog.
+> 2. The sheet's `BackDismiss` unmounts → cleanup sets **its own** `selfPopRef = true`, registers
+>    `absorb`, and calls `window.history.back()` — which is **asynchronous**.
+> 3. The dialog's `BackDismiss` mounts → **a different hook instance**, whose `selfPopRef` is
+>    `false` → it pushes `{ sheetId: dialogId }`.
+> 4. The pop from step 2 lands. The **dialog's** `handlePopState` runs: its own `selfPopRef` is
+>    false, and `e.state?.sheetId !== dialogId`, so it takes the genuine-back-gesture arm →
+>    `onClose()` → clicks the hidden `Close` → **the dialog closes on the frame it opened**.
+>
+> **The hook's guard cannot catch this, and its comment says why without realising it.** The
+> `sheetId` check exists to stop *"a nested sheet's `history.back()` cleanup from cascading into
+> parent sheet handlers"* — the parent/child case. This is the **sibling** case: one surface closing
+> while another opens. `selfPopRef` is **per-instance**, so the closing sheet's in-flight self-pop is
+> invisible to the dialog that receives it, and a state that is not mine is indistinguishable from a
+> real back gesture.
+>
+> **Fix direction, stated because it is small and the wrong fix here is a `setTimeout`:** the
+> in-flight self-pop flag has to be **shared across instances** (module-level), so whichever instance
+> receives the pop swallows it. Keep `sheetId` for the parent/child case it was written for. Verify
+> both: the nested case LB-10 fixed **and** this sibling case, or the fix trades one for the other.
+> A device build is the only place either is visible.
+>
+> **BF-27 is `Gate: device` and unstruck, and this is exactly what that gate was for.** Its Keep line
+> even names the case — *"a confirm dialog (it must cancel, not confirm)"* — and it had not been
+> pressed yet.
+
+**The original diagnostic, kept because it is what produced the answer above: does the
+"Delete food log?" dialog appear on the device at all?**
+
+`quick-edit-log-sheet.tsx:140` is `onClick={() => { if (log) { onClose(); onDelete(log.id) } }}` —
+it **closes a Radix Sheet and opens a Radix Dialog in the same tick**. Two things make that fragile
+on Samsung's WebView specifically and neither shows up on desktop Chromium:
+
+- Radix puts `pointer-events: none` on `<body>` while a modal is dismissing. If the Sheet's exit
+  animation is still running when the Dialog mounts, the Dialog is present but **untappable** — and
+  a Delete button that cannot be pressed looks exactly like a delete that does nothing.
+- `nutrition-content.tsx:735` keys the sheet `key={editingLog?.id}`, so `onClose()` changes the key
+  to `undefined` and **remounts the component** at that same moment.
+
+**If the dialog does appear and Delete does nothing**, it is a different bug and the table above is
+the wrong starting point — go to the local store, and check `getLocalStore(userId)` is non-null on
+the device (the `catch` at `handleConfirmDelete` falls through to the API path, which the owner may
+be offline for).
+
+**The earlier fix sketch, now superseded by the root cause above — kept only so nobody re-derives it.
+Moving the confirm inline would hide this instance and leave the app-wide cause in place.** Either keep the
+sheet open and let the dialog stack over it (drop the `onClose()` from that handler, and close both
+on confirm), or move the confirmation **inside** the sheet — the bin already sits beside Save and
+BF-26 deliberately removed Cancel from that row, so an inline "tap again to confirm" fits the shape
+the artboard settled on and removes the second modal entirely. **Recommended: the second** — one
+modal, no race, no timing dependency on a WebView this repo already treats as its own target.
+
+- **Not exercised, and it is the whole point:** the APK. The web sandbox returns `null` from
+  `getLocalStore`, so the local-store branch this bug lives in **cannot run there at all** — a green
+  `pnpm dev` proves nothing here and this entry is the evidence of that.
+- **Verification.** On the S25: delete a diary row, confirm it leaves the list, kill and reopen the
+  app, confirm it is still gone, then check the server no longer returns it. `Gate: device`.
+
 ### [nutrition] LB-15 — a zero-calorie barcode product is reported as "not found"
 
 - **Lane:** A — `packages/shared/**`, whatever the edit looks like.
@@ -496,6 +589,14 @@ will hit it.
 
 - **Lane:** A — new column(s) plus a precedence rule in `packages/shared/`; the panel is B and can
   follow.
+- **Keep:** the ENGINE half shipped 2026-08-26 (migrations 225 + 226) — a `measured_rmr` table, the
+  `personalRmr` re-scaling rule, `POST/GET /api/measured-rmr`, and both `calculateBaseline` call
+  sites reading it. **Scope items 3 and 4 are NOT done, and item 3 is what makes it usable:** there
+  is still no way to enter a number. The typed field and the AI results-sheet photo path are next
+  (`generateObject` with a schema, never `JSON.parse` of model text, and no parsed number shown as
+  fact until the owner confirms it); the 2×2 panel is item 4 and **Lane B's**. The ageing question
+  the entry left open is answered — re-scale by lean mass, not a validity window; the reasoning is in
+  [`the journal entry`](overview/entries/2026-08-26-measured-rmr.md).
 - **Added:** 2026-08-26 · owner, who has a **DEXA + RMR test booked**: *"its a plug and play image or
   number (AI path)"*, and a panel of values *"for the energy consumption value, estimated RMR from
   general predictions, the app TUNED one ... then the Scan RMR from the scancompany"*.
@@ -556,6 +657,8 @@ That number is more valuable than either input on its own.
 
 ### [nutrition][app-shell] Q-406 — the shared food row: two call sites converted, two waiting on their phase
 
+- **Gate:** owner — option A is not buildable as decided; see the blocked note below.
+
 > **✅ THE DIARY ROW CONVERTED 2026-08-25 (v1.367.0)** — `meal-card.tsx` draws the shared `FoodRow`
 > and `QuickEditLogSheet` **gained a delete in the same change**, which this entry required before the
 > conversion could be safe. Q-395a was meant to carry it and did not. Per-item P/C/F moved into the
@@ -604,6 +707,25 @@ That number is more valuable than either input on its own.
     entry is for.
   - **A → C stays open if the sentence later has to be visible in the list** — it is additive.
     Starting at C and pulling the slot out means touching every call site again. Do not pre-build it.
+
+- **⚑ BLOCKED 2026-08-26 — option A moves the sentence somewhere that does not exist.** **This
+  surface has no food detail:** `ingredient-search.tsx:124`'s tap runs `addExternalFood` →
+  `createFoodItem` + `accept()`, which **adds the food to the meal** with no inspect step,
+  confirmation or quantity sheet in between. So *"the sentence moves to the food's detail"* has no
+  destination here, and building A **deletes the only visible explanation** — a net loss on a
+  warning meant to be read before use. Not built.
+- **What it needs to become buildable**, cheapest first: **(1)** keep the sentence in the row — that
+  is option B, but the reason B lost (it *replaced* the serving line) does not apply to keeping it
+  *alongside*, which is what ships today; **(2)** give the row an inspect step, tap to open and add
+  as a second action — a real interaction change on a path whose speed is the point; **(3)** ship A
+  with the sentence as the icon's accessible name, which loses nothing to a screen reader and
+  everything to a sighted thumb, since a phone has no hover.
+- **The conversion is blocked by the same question.** The external row is **not** `FoodRow` today —
+  it is a bespoke `<button>` (`ingredient-search.tsx:122`), while `SearchResultRow` beside it *is*.
+  Converting it is this entry's goal and needs to know where the warning goes: A's *"immediately
+  before the calorie column"* requires the shared row to draw it, which is the slot this entry rules
+  out. Pick 1, 2 or 3 and the conversion follows.
+
 - **The in-flight spinner needs no decision** and never did: it swaps the green `+` inside the same
   16 px box, so it is a state of an existing element rather than a new slot. It works under any of
   the three treatments.
@@ -911,37 +1033,37 @@ whether or not anyone draws them first.
   in both themes, so a green `pnpm dev` is not sufficient evidence and a Known-Issues row is the
   fallback if no device is available.
 
-### [nutrition][app-shell] Q-395c — phase 4: Log Food becomes one screen, and `My Foods` becomes one name
+### [nutrition][app-shell] Q-395c — one list, one name: merge My Foods into Saved Meals
 
 - **Lane:** B
-- **Spec:** Q-395, findings 15 and 17 — **and BF-28**, because this entry is also **artboard 2
-  parity**: `Add food` is the drawing of the screen it builds. Read that artboard alongside the
-  findings.
-- **⚠ Where the drawing and the owner disagree, the owner wins, and here they do.** Artboard 2 draws
-  **four** tabs — `Recent · Frequent · My meals · Recipes`. The decision below is **two**. Build two.
-  The artboard also draws a bottom row of `Multi-add` and `Create food`, which is the same idea as
-  the decided `Photo · Barcode · Describe or enter` action row under a different set of labels —
-  reconcile them in the PR rather than shipping both rows.
-- **Scope.** The capture step's six scattered entry points collapse to one screen: search across
-  everything · two tabs · a bottom row of capture actions.
-- **The decided details, all owner-set:** tabs are **`Recent` and `My Foods`**, two not four
-  (`Frequent` was a second ordering of what `Recent` already shows). Action row ordered **Photo ·
-  Barcode · Describe or enter**. Describe and manual entry are one sheet with the fields always
-  visible, so neither is a hidden mode. `My Foods` rows carry their P/C/F split beside the calorie
-  column; the label/QR and full breakdown stay inside the meal.
-- **⚠ The merge is a RENAME as well as a merge, and the rename must be swept in one pass.** Saved
-  meals and My Foods become one list. The owner caught the half-done version immediately — *"So im
-  picking up a discrepancy between My Meals and My foods? Whats the difference"* — and there is no
-  difference, which is the point. **Two names for one list is the defect.** Grep every user-facing
-  occurrence of *Saved meals*, *My Meals* and *My Foods* — sheet titles, tab labels, empty states,
-  toasts, `+ Add food` destinations, nav copy — and land on the single name together. A surface left
-  on the old name reads as a second list that is missing rows.
-- **⚠ Diff `FoodLibrarySheet` against `SavedMealsSheet` before merging them.** Carry every action
-  across — bulk delete, meal-plan linkage, the label path — or say in the PR which was dropped.
-  Order `My Foods` most-recently-used first so the merge does not bury saved meals.
-- **Verification.** As Q-395a, plus a grep proving nothing user-facing still says *Saved meals* or
-  *My Meals*.
+- **Plan:** [`2026-08-26-log-food-one-screen.md`](superpowers/plans/2026-08-26-log-food-one-screen.md).
+  **Narrowed 2026-08-26** — the capture screen split out as **LB-16**. ID and references unchanged.
+- **The finding that forced the split:** the two lists hold **different entity types** —
+  `food_items` and `saved_meals` — so "one list" is one list over **two sources**, two row shapes and
+  two tap behaviours, not a rename over a shared shape. **The rename rides here and cannot go
+  first**: renaming both while they are still two lists gives the user two lists with one name,
+  worse than today. 15 occurrences over 8 files — the rename is small; the merge is the work.
+- **Carry every action across** — bulk delete, meal-plan linkage, the label path — or say which was dropped. **⚠ The `My Foods` P/C/F column is the question Q-406 is parked on**: a per-screen column on the shared row is the slot it rules out, so do not add the prop unilaterally.
+- **⚠ Two findings from starting it, both detailed in the plan — read it before writing code.** A
+  food's tap goes to the **assign** step inside `FoodLoggerSheet` while a meal's opens the detail
+  sheet `SavedMealsSheet` owns, so **the merged list has to live in `FoodLoggerSheet`** and
+  `/nutrition`'s button opens the logger onto it. And **MRU is unavailable**: `food_logs` has no
+  `saved_meal_id`, so a saved meal has no last-used timestamp — order by `createdAt DESC`.
+- **Verification.** A grep proving nothing user-facing says *Saved meals* or *My Meals*; e2e that one list shows both kinds, each tap does its own thing, and bulk delete and the label path survive.
 
+### [nutrition][app-shell] LB-16 — the capture screen: six entry points become one
+
+- **Lane:** B
+- **Needs:** Q-395c — the `My Foods` tab **is** the merged list, so building this first builds it twice.
+- **Added:** 2026-08-26, split out of Q-395c. **Plan:** [`2026-08-26-log-food-one-screen.md`](superpowers/plans/2026-08-26-log-food-one-screen.md).
+  Also **artboard 2 parity** (BF-28): `Add food` is the drawing of the screen this builds.
+- **Scope.** `capture-step.tsx`'s six tiles collapse to one screen — search across everything, two
+  tabs (`Recent`, `My Foods`), an action row **`Photo · Barcode · Describe or enter`**. **⚠ Where the
+  drawing and the owner disagree the owner wins**: the artboard draws four tabs, build two, and its
+  `Multi-add` / `Create food` row is the decided action row under other labels. Describe and manual
+  entry are one sheet with the fields always visible, so neither is hidden. **⚠ A coordinate tap that
+  misses a tile opens its neighbour** and `History`'s dialog has a textbox that looks like the
+  describe field — an e2e spec filled the wrong one (LA-30); wait for the destination's own copy.
 ### [nutrition] BF-11 — the meal creator/planner redesign: the spec every phase reads, and the final checkpoint
 
 - **Needs:** BF-11h
@@ -1222,6 +1344,14 @@ two are app-wide and sit here.*
   hook must be a *child* of `Content` rather than a call in `SheetContent`, is in the component's
   own comment and the journal:
   [`2026-08-25-back-dismiss-sweep`](overview/entries/2026-08-25-back-dismiss-sweep.md).
+- **⚠ IT REGRESSED SOMETHING, AND BF-34 IS THE REPORT.** The owner cannot delete a diary entry: the
+  confirm dialog opens and closes on the same frame. **Cause traced to this component.** Because a
+  closing surface's `history.back()` is asynchronous and `selfPopRef` is **per-instance**, the pop
+  lands on the *newly opened* surface, whose own flag is clear and whose `sheetId` does not match —
+  so it takes the genuine-back-gesture arm and dismisses itself. The hook's `sheetId` guard was
+  written for the parent/child cascade (LB-10) and does not cover this sibling case. **Every
+  close-one-open-another transition in the app is affected**, not just this delete. Fix and
+  verification live in **BF-34**; do not fix it here.
 - **Keep:** the gesture itself, on the S25. `e2e/back-dismiss-sweep.spec.ts` drives
   `history.back()`, which is close to the Android gesture and not the same input — the entry says so
   and it is still true. Press it on: a plain sheet, a confirm dialog (it must cancel, not confirm),
@@ -6020,6 +6150,20 @@ statement. Reserve "proposal", and the future tense, for tier 3.
      pattern is the closest existing analogue.
   3. A rule, in `CLAUDE.md` alongside *One Formula, One Place*: a correlation computed across a
      model change is not evidence.
+- **Keep:** scope item 1 is now SAFE but not COMPLETE, and item 2 is untouched.
+  - ✅ **The stamp can no longer be clobbered** (2026-08-26). `model_versions` is a map and the
+    shared upsert `COALESCE`-replaced it, so `backfillBodyComp`'s flat `{bodyComp: …}` erased the
+    readiness stamp on every day it touched; readiness survived only via a racy JS read-merge. The
+    upsert now merges with `||` and the read-merge is gone. That was the precondition for stamping
+    anything else.
+  - ❌ **Sleep, activity and training load still do not stamp.** Only two model-version constants
+    exist in the tree (`BODY_COMP_MODEL_VERSION`, `READINESS_MODEL_VERSION`); the others would have
+    to be *defined*, which is a judgement about what counts as a version for each pillar and belongs
+    with whoever owns that pillar's model — not invented by an implementer in passing.
+  - ❌ **Item 2, the backfill/recompute path, is not started** and should not be taken lightly:
+    re-deriving history is the Q-304b hazard, where a recompute silently substituted a
+    since-edited prescription for the one actually trained under.
+  - ✅ Item 3, the `CLAUDE.md` rule, shipped: *A Correlation Across a Model Change Is Not Evidence*.
 - **Do this before the calibration items (Q-500, Q-272, Q-505).** Each of those creates another
   incomparable segment otherwise, and the next review re-learns §1.6 the same way this one did.
 
@@ -6582,27 +6726,22 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   month ago, so it reads as a post-re-key coverage gap that closed on its own. *Something that stopped
   is not something that was fixed* — noted as unexplained rather than closed.
 
-### [workouts] Q-512 — `health-insight`'s ACWR is structurally null on every day (110/110)
-
-- **Branch:** `fix/health-insight-acwr-window`
-- **Plan:** none — a one-line fix either way. **Lane A implements; Tuning proposes only.**
-- **Added:** 2026-08-18 · Tuning agent ·
-  [`docs/reviews/2026-08-18-acwr-calibration.md`](reviews/2026-08-18-acwr-calibration.md) §2
-- **Mechanism.** `app/api/ai/health-insight/route.ts` calls `computeVolumeAcwr` with
-  `getWorkoutSessionsFrom(userId, subDays(new Date(), 7))` — a **7-day** list. The helper gates on
-  `spanDays >= minSpanDays` (**21**), and `spanDays` is measured from the earliest session *in the list
-  passed to it*. **A 7-day list can never span 21 days**, so the gate can never pass.
-- **Confirmed by replay over 110 days: 0 non-null.** Not a coverage problem more history would fix —
-  structural. The route computes the load object and reads `.acwr` from it every time, always `null`.
-- **First action:** either widen the fetch to **28 days** to match `signals.ts` (if the insight is meant
-  to mention training load), or drop the `computeVolumeAcwr` call and the `.acwr` read (if it is not).
-- **Do NOT lower `minSpanDays`** to rescue this caller — that degrades *every* caller's ACWR to fix one
-  that is mis-wired.
-
 ### [workouts][platform] Q-513 — the score-audit panel and the next-session engine disagree on the ACWR band on 38% of days
 
 - **Branch:** `fix/build-day-audit-acwr-window`
 - **Plan:** none — a window change. **Lane A implements; Tuning proposes only.**
+- **Keep:** ⚠️ **THE CODE HALF IS ALREADY DONE — do not re-implement it.** Verified 2026-08-26
+  against current `main`: `build-day-audit.ts` declares `AUDIT_HISTORY_DAYS = 28` and fetches
+  `getWorkoutSessionsFrom(userId, dayMid − 28d)`, so its ACWR runs on a 28-day window ending at the
+  audited day — the same 7:28 shape `readiness-payload.ts` uses (`from28dDate`), banded through the
+  same `ACWR_THRESHOLDS`. The entry's "all history / lifetime weekly average" mechanism no longer
+  describes the code. (The 28-day constant is attributed by `git log` to #137 on 2026-08-19, a day
+  after this entry was filed — but this clone is depth-limited, so trust the code reading over that
+  attribution.)
+  **What is still owed is the re-measure the entry asks for, and it is TUNING's, not Lane A's:**
+  nothing here re-ran the 88-day replay, so the 38%-of-days / mean-0.150 figures are unconfirmed
+  against the current window and may already be zero. Lane A has nothing to implement until that
+  says otherwise. `Gate: owner`
 - **Added:** 2026-08-18 · Tuning agent ·
   [`docs/reviews/2026-08-18-acwr-calibration.md`](reviews/2026-08-18-acwr-calibration.md) §3
 - **Three callers, three windows**, all feeding one `computeVolumeAcwr` and all banded with the same
@@ -11832,6 +11971,66 @@ migration + PR, sandbox-buildable.
 **Not part of this initiative, but found doing the 2026-07-29 handover and
 otherwise orphaned:** migration numbers 081, 087, 146 and 161 are each claimed
 twice on disk (see the migration-number note at the top of this file).
+
+---
+
+### [workouts][devices] 🔵 PS-7 — camera form capture, Phase 0 only: can the S25 WebView run a pose landmarker at all?
+
+- Plan: [`docs/superpowers/plans/2026-08-26-camera-form-capture.md`](superpowers/plans/2026-08-26-camera-form-capture.md)
+- Branch: `spike/camera-pose-feasibility`
+- Added: 2026-08-26
+- Lane: ? — a spike touching only a throwaway route and the CSP. The lane that takes it decides.
+- Gate: device — every question in it is a measurement the sandbox cannot make.
+
+**Placed at the tail deliberately.** The owner framed it as *"a good future move"*, not as next-up,
+and nothing is broken today. It sits with the other owner feature notes.
+
+**Owner request, 2026-08-26 (in effect):** point the phone at yourself from a tripod during a set,
+get a stick-figure animation of the movement plus the bar path, review the last 7–14 days of them,
+and have the AI coach use it — **without any camera data leaving the device**. Storage cheap,
+security concerns minimal.
+
+**The design is settled and written up — read the plan before touching any of it.** It carries the
+storage split (landmarks device-local on a 14-day window, a ~1 KB-per-set numeric summary the only
+thing that reaches Postgres, ~5 MB/year against a DB growing 0.4 MB/day), the hands-free capture
+state machine that removes the run-back-to-the-phone problem, the bar-path-from-wrist-midpoint trick,
+and **four things proposed and rejected with reasons** — a native Kotlin capture layer first, a pose
+model on `onnxruntime-web`, storing GIFs instead of the landmark series, and a Wear OS remote.
+Re-proposing one costs a session.
+
+**This entry is the Phase 0 spike and nothing else.** Stand up `getUserMedia` plus a **self-hosted**
+`@mediapipe/tasks-vision` landmarker on a throwaway route, run it on the S25 APK, and report:
+sustained fps at 720p and 1080p, whether the CSP admits the WASM session and any blob-URL worker it
+spawns (`worker-src` is absent and falls back to `default-src 'self'` — likely needs
+`worker-src 'self' blob:`), whether the ~9 MB `.task` model loads from the service-worker cache with
+the network off, and the thermal behaviour over ~10 minutes of continuous inference. The CDN path
+MediaPipe documents is CSP-blocked by `connect-src 'self'`, so self-hosting is part of the spike,
+not a later optimisation.
+
+**Phases 1–5 are in the plan and deliberately NOT queued.** Filing them before Phase 0 returns a
+number would queue work gated on an unknown. The spike's result decides whether they get filed, and
+whether the capture layer stays in the WebView or moves to a Kotlin plugin.
+
+**✅ All four open questions were answered by the owner on 2026-08-26 — §10 of the plan is now a
+decisions table, not a question list.** No owner gate remains. In short: **no Wear OS watch exists**
+(the interest is an open-source Pebble, which is a BLE peripheral rather than a second runtime — §9
+was rewritten, and its conclusion survives for a different reason); **14-day local window**;
+**off by default** for the other accounts; and — the one that changed the design — **the lift must
+not matter.**
+
+**That last answer replaced a lift whitelist with an equipment-keyed analysis profile (§5.5), and it
+is the part to read before implementing.** Verified against production the same day: `equipment` is a
+populated `text[]` with six values, and **`equipmentClassOf()` already exists** at
+`packages/shared/src/workout/time-audit.ts:183` — reuse its vocabulary, do not start a second one,
+but note it collapses dumbbell/cable/machine/kettlebell into one `standard` bucket and form capture
+needs dumbbell split out. **The request implied object detection ("find the bar length, find the
+dumbbells"); the plan explains why that is not needed** — the hands hold the load in every case, so
+wrist landmarks give the path for barbell, dumbbell and bodyweight alike, and equipment only decides
+which metrics are valid and which camera angle to ask for.
+
+**Measured prerequisite, worth a cheap data chore before Phase 3: 23 of 149 production exercises
+carry no `equipment` tag** (15%), and 16 carry more than one. The `unknown` profile is a live path
+serving about one exercise in seven, not a defensive branch.
 
 ---
 

@@ -370,6 +370,30 @@ Every stored counter in this project has drifted (`sessions_in_phase`: over-coun
 
 ---
 
+## A Correlation Across a Model Change Is Not Evidence
+
+**Stamp the model, and split on it before you believe a number.** Scores in this app are recomputed
+by models that change: `body_battery_daily.model_version` held **four distinct models** over 40
+post-re-key days, with no recompute when the model changed. Pooling them produced a documented false
+conclusion — the 2026-08-04 Known-Issues row recorded end-of-day battery vs next-day readiness at
+**r = −0.06** and used it as evidence the model had no outcome signal. Split by version, **v5 days
+alone give r = +0.67** (n = 11). The pooled figure was an artefact of mixing four models and it stood
+in the docs for eleven days.
+
+- **`oura_daily_derived.model_versions` is a MAP of pillar → version, and it MERGES.**
+  `upsertOuraDailyDerived` concatenates it with `||` rather than `COALESCE`-replacing it, so each
+  pillar writes only its own key and no writer can erase another's. Never re-introduce a read-merge
+  in JS: that is two statements, so it races, and it reads a value that may already be stale. It was
+  there because the upsert replaced the map — `backfillBodyComp` wrote `{bodyComp: …}` flat and
+  erased the readiness stamp on every day it touched (Q-273).
+- **`updated_at` is not evidence of which model wrote a row.** A bulk job bumped it on essentially
+  every `oura_daily_derived` row without rewriting a single score, so auditing "did the recalibration
+  land?" by timestamp gives the wrong answer (Q-501).
+- **A stored score and the inputs stored beside it can disagree** — summaries get recomputed and the
+  derived rows built from them are not recomputed in step. **5 of 33** recovery-index rows disagreed
+  with the summary they derive from. So before quoting a stored score, know whether you are reading
+  a value or a claim about one.
+
 ## One Formula, One Place
 
 Domain math — 1RM, ACWR, weekly cadence, expected RPE, score bands, muscle-name normalisation — lives exactly once and is imported everywhere. **Most of it is in `packages/shared/src/`, not `lib/`** — the monorepo extraction moved it and this rule kept saying `lib/` for months (Q-153). Check [`docs/module-map.md`](docs/module-map.md) for where a given formula actually is rather than guessing a directory. The weekly-cadence formula once existed in **four** copies with two different semantics; 1RM had divergent client/server/edit-path copies (wrong high-rep guard → inflated PRs). `computeVolumeAcwr` is the only ACWR implementation (the old inline flat-÷4 copy in `app/api/training-load` was retired — verified gone 2026-07-06); clients render the route's `interpretation`, never re-band raw numbers themselves. Score-band labels come from `scoreBand()` — never re-derive the 70/50 thresholds with local label strings (two divergent copies found 2026-07-06: `packages/shared/src/session-explain/group-signals.ts`, `app/api/ai/health-insight`). Time windows for stats/AI tools anchor at `todayMidnightUtc(tz)`, never `Date.now() − N×86400000` — six copies of the banned ms-offset pattern shipped in `lib/ai-chat/tools.ts` (2026-07-06 review) after the same class was fixed in session 62. Before writing any formula, grep for an existing implementation. When fixing a formula, grep for its duplicates and fix or delete them in the same PR. Two implementations of the same metric is a bug by definition. **[`docs/module-map.md`](docs/module-map.md) indexes where each formula and shared module already lives — check it before writing a new one.**
