@@ -2917,3 +2917,16 @@ The lines also keep the half that is genuinely open: the entry's *"then re-measu
 and mean-0.150 figures were measured against the OLD window and nobody has re-run them, so they may
 already be zero. That replay is Tuning's, which is why the entry is now `Gate: owner` rather than
 deleted — deleting it would lose a live question, and leaving it READY would invite the no-op.
+
+## 2026-08-26 — `docs/implementation-backlog.md` raised, 12081 → 12131 (BF-35, filling the food tile)
+
+One entry, and the length is a cost table the owner explicitly asked for: *"ONly if it doesnt add
+more time/expense."* Answering that needed the three image sources separated, because they are not
+comparable — **Open Food Facts is a field on a call already being made**, **the photo scan already
+has the user's own image and discards it**, and **AI generation costs real money per image**. A
+single "yes, add images" would have hidden that the third one is the only one that fails the
+condition, and the entry recommends against building it.
+
+It also corrects a premise: `food_items` does **not** prune, so the catalogue grows for the life of
+the account rather than being a rolling window. Cheap either way (≈3 MB at 500 items) but worth
+stating rather than discovering.

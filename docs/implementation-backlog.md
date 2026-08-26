@@ -444,6 +444,56 @@ modal, no race, no timing dependency on a WebView this repo already treats as it
 - **Verification.** On the S25: delete a diary row, confirm it leaves the list, kill and reopen the
   app, confirm it is still gone, then check the server no longer returns it. `Gate: device`.
 
+### [nutrition] BF-35 — fill the food placeholder: two of the three sources are already free
+
+- **Lane:** A for the storage + the OFF field; B for the render.
+- **Added:** 2026-08-26 · owner, after BF-32 put a placeholder tile on every row: *"When the AI does a
+  food match; does it come with a picture/image of the food that could be added to our photo as the
+  default? ... ONly if it doesnt add more time/expense."*
+
+**The cost question is the whole entry, and the answer differs per source. Two are free; the third is
+not and should not be built.**
+
+| Source | Covers | What an image costs |
+|---|---|---|
+| **Open Food Facts** (barcode + food search) | packaged foods — the BARILLA, the WPI, the Chobani | **Zero extra requests.** OFF already serves `image_front_small_url`/`image_front_thumb_url` on the *same* product object; `OFF_FIELDS` in `packages/shared/src/nutrition/open-food-facts.ts:80` is `'code,product_name,brands,serving_size,nutriments'` and simply does not ask for it. Adding a field to a call already being made costs a few hundred bytes. |
+| **The photo scan** (`app/api/nutrition/scan/route.ts`) | anything photographed | **Zero API cost.** The user's own photo is already in the request — `body.image`, base64, sent to `generateObject` at line 188 — and is **thrown away** once the nutrition JSON comes back. Keeping a downscaled copy adds no call and no model spend. |
+| **AI image generation** | text-typed foods with no barcode and no photo | **Real money, per image.** `lib/exercise-image-gen.ts` is the precedent, so it is buildable — **and this entry recommends against it.** It is the only source that fails the owner's "no more time/expense" condition, and the placeholder is a perfectly good answer for a food nobody photographed. |
+
+**The scan photo is the best default of the three, and it is the one currently being discarded.** It
+is the user's actual meal rather than a stock shot of a similar product. Whoever builds this should
+take it first: it needs no new external dependency, and the downscale is already written —
+`components/nutrition/meal-photo-tile.tsx` does 128 px WebP at ~6 KB against a server-side
+`SAVED_MEAL_IMAGE_MAX_BYTES` cap, sized for exactly this.
+
+**⚠ Correcting a premise in the request, because it changes the storage estimate.** The owner
+expected *"we save foods for x amount of days in history so only a small repertoire will have its
+food image saved."* **`food_items` does not prune** — there is no cleanup job, and `food_logs`
+carries `ON DELETE RESTRICT` against it, so the catalogue grows for the life of the account. The
+14-day window is the *local Oura raw* store, a different thing. In practice this is still cheap: a
+personal catalogue is hundreds of items, and **500 × 6 KB ≈ 3 MB** against a 171 MB database at
+$0.15/GB/month. It is worth stating rather than discovering.
+
+**Two decisions to make and write down, not settle by accident:**
+1. **Store the bytes, or store the OFF URL?** A URL is free and always current but breaks offline —
+   and the row it decorates is read local-first. A stored data URI matches how `saved_meals` already
+   does it and works on a plane. **Recommended: store bytes**, for consistency with the meal photo
+   and because offline-first is the app's premise; note the licence line below.
+2. **`food_items` is shared, not per-user** — decide whether the image lives on the item (one copy,
+   everyone benefits) or per log. Item-level is right for OFF product shots; a scan photo is the
+   user's own and belongs to the log or to a user-scoped column.
+
+- **Licence, and it is a real constraint rather than a formality.** Open Food Facts product images
+  are **CC-BY-SA**. Displaying them in-app is fine; the obligation is attribution. Decide where that
+  line goes before shipping — a single credit in Settings is the cheap answer.
+- **No new render work — BF-32 already shipped it.** `FoodRow` carries `showThumb` + `thumbSrc` and
+  `components/nutrition/meal-thumb.tsx` draws the placeholder when `thumbSrc` is null. **The prop is
+  waiting and nothing fills it**, which is precisely the gap this entry closes: pass a `data:` URI
+  and the tile stops being a placeholder.
+- **Verification.** A barcode scan, a photo scan and a hand-typed food, in one sitting: the first two
+  show a real picture on the diary row, the third shows the placeholder and no error. Then confirm
+  offline still renders whatever was stored. `Gate: device`.
+
 ### [nutrition] LB-15 — a zero-calorie barcode product is reported as "not found"
 
 - **Lane:** A — `packages/shared/**`, whatever the edit looks like.
