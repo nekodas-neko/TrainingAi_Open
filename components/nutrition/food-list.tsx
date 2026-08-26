@@ -164,7 +164,11 @@ export function FoodList({
           {show === 'meals' ? (
             <>
               <p className="text-sm text-muted-foreground">No meals saved yet.</p>
-              <Button onClick={onBuildFirst}>Build your first meal</Button>
+              {/* `onClick={onBuildFirst}` would hand React's click event to the parent's
+                  `openBuild(meal?)`, which then reads `meal.items` off it and throws. TypeScript
+                  cannot see it: `() => void` accepts a handler taking more parameters. The sibling
+                  "New" button in the sheet header already calls it this way. */}
+              <Button onClick={() => onBuildFirst()}>Build your first meal</Button>
             </>
           ) : (
             // No action offered: this list fills itself. Every food you log is added to it, so the

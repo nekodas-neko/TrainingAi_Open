@@ -6,6 +6,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.388.0",
+    date: "2026-08-26",
+    changes: [
+      "A saved meal can say which meals of the day it suits. Tap Breakfast, Lunch, Dinner or any meal type you have set up, in the meal builder, and a meal plan will only put it in those slots. Leave them all untapped and it stays usable at any meal \u2014 that is the default, so nothing you already have changes.",
+      "Fixed: saving from the meal builder skipped the \"you already have this meal\" check entirely. The button was handing the save the click itself instead of your answer, so every save looked like an overwrite of a meal you had already chosen \u2014 which meant the question from the last release was never actually asked.",
+    ],
+  },
+  {
     version: "1.387.0",
     date: "2026-08-26",
     changes: [

@@ -3,7 +3,7 @@
 > **Successor sessions are titled `🚧 Implementation Agent (B) 🟢`** — exactly. A renamed successor
 > is a lost thread.
 
-**Updated:** 2026-08-26 · **By:** the fourteenth Lane B run · **Next ID:** `LB-20`
+**Updated:** 2026-08-26 · **By:** the fourteenth Lane B run · **Next ID:** `LB-21`
 
 ## Now
 Merged this run: **#540** (Q-395c one food list + **LB-17**), **#547** (**BF-34** the sibling
@@ -96,6 +96,13 @@ None held.
 - **`e2e/fixtures.ts` `openSavedMeal` re-measures inside a retry** — lists re-sort asynchronously and
   photo tiles decode late. Any new spec tapping a row by coordinate must do the same, and must
   `scrollIntoViewIfNeeded()` first or the tap hits the overlay.
+- **A shared write path is verified with the FULL e2e suite, never hand-picked specs.** Nine chosen
+  ones passed for #567 and a failure still reached CI. ~15 minutes unattended, and it is the only
+  thing covering the specs you did not think of.
+- **For "the write did not land", read the Playwright trace, not the screenshot.** Unzip
+  `test-results/<spec>/trace.zip` → `0-trace.network` → `request.postData._sha1` into `resources/`.
+  BF-11f's PUT body had **no `mealTypeIds` key at all**; an absent key rather than a wrong value is
+  what pointed at the function's argument instead of the component's state.
 - **`meal-label.spec.ts:111` and `goal-invalidation.spec.ts:57` fail in this sandbox on `main` too** —
   verified by running them on a detached `origin/main` checkout. **LB-19** carries it. Do not spend a
   session on them; check whether CI agrees first.
