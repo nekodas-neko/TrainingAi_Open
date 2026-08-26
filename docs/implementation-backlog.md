@@ -385,6 +385,20 @@ tuple makes a shared-table write a *compile error*, which is stronger than anyth
   claims it. If the round trip fails, the unit is not in that protocol family and Phases 1+ are void.
   QRing is the fallback only if the ring will not advertise after a full charge — **decline any
   firmware update it offers**, then uninstall it.
+- **Phase 0 status, 2026-08-26 — transport PASSED, framing outstanding.** Enumerated on the owner's
+  unit in nRF Connect: `R09_C400`, firmware `RT09_3.10.22_260420`, hardware `RT09_V3.1`, service
+  `6E40FFF0-…` present with RX `6E400002` (WRITE) and TX `6E400003` (NOTIFY + CCCD). The R09 is in
+  the R02 family **at the transport layer**. The `0x03` round trip has not run, so framing and
+  checksum are still inherited assumptions. Full record: §11 of the plan.
+- **Blocker for Phase 3 design — the ring's BLE address is a rotating type (§11a).**
+  `31:37:41:30:C4:00` has the multicast bit set (not a valid public address) and random top-bits
+  `00` = non-resolvable private. But the advertised name encodes the address tail and the System ID
+  characteristic embeds the whole address, which argues stable. **Re-scan after a day and a BT
+  toggle before designing pairing:** stable → copy `lib/scale-ble/paired-scale.ts`; rotating → scan
+  by name like the Oura, because a stored `deviceId` would work all afternoon and be dead by morning.
+- **Two undocumented services found (§11b):** `de5bf728-d711-4e47-af26-65e3012a5dc7` (in no surveyed
+  client — plausible raw/big-data channel, do not write blind) and `0xFEE7` (Telink OTA — the
+  firmware-flash path; **do not write to it at all**, per the mod-firmware rule).
 - **Phase 1 — `lib/colmi-ble/protocol.ts`, pure, no device.** Build/checksum/parse for the HR log
   (`0x15`) and step log (`0x43`), each decoder pinned to a captured packet hex. This is where the
   protocol risk is actually retired, and it is fully testable in the sandbox.

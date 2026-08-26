@@ -123,9 +123,14 @@ The owner has a **Colmi R09**. This matters:
   same 16-byte framing, the same mod-255 checksum, and the same implemented feature set (real-time
   HR + SpO2, HR logs, step logs, time sync).
 
-So the R09 is *probably* in the R02 protocol family, on the evidence of one fork. That is enough to
-start and not enough to build on. **Phase 0 is more important than it was, not less** — it is now
-the step that converts "probably" into "measured".
+So the R09 is *probably* in the R02 protocol family, on the evidence of one fork. That was enough to
+start and not enough to build on.
+
+**Updated 2026-08-26 — the transport half is now measured, not inferred.** A Phase 0 enumeration on
+the owner's unit found service `6E40FFF0-…` present with RX `6E400002-…` (WRITE / WRITE NO RESPONSE)
+and TX `6E400003-…` (NOTIFY + CCCD). Firmware `RT09_3.10.22_260420`, hardware `RT09_V3.1`. Full
+record in §11. **The framing and checksum are still unverified** — that is the `0x03` round trip,
+and it is the one step of the gate still outstanding.
 
 ---
 
@@ -350,29 +355,82 @@ Only question 3 gates anything, and Phase 0 is how it gets answered.
 
 ## 10. What this plan does not claim
 
-- No Colmi ring has connected to this app. Every byte in §4 comes from someone else's repository,
-  and the R09 is not on the reference client's own compatibility list.
-- The framing, checksum and command bytes are **unverified on hardware**.
+- No Colmi ring has connected to **this app**. The Phase 0 enumeration in §11 was done in nRF
+  Connect, which proves the ring's GATT layout and nothing about our code.
+- **The transport is measured; the protocol is not.** Service and characteristic UUIDs are confirmed
+  on the owner's unit (§11). The 16-byte framing, the mod-255 checksum and every command byte in §4
+  still come from a client that does not list the R09, and remain **unverified on hardware** until
+  the `0x03` round trip runs.
+- **The pairing model is unresolved** (§11a). The address is a rotating type by its own bits and
+  looks stable by every other sign; which it is decides whether Phase 3 copies the scale or the Oura.
 - Sleep is not solved; it is known-solvable from a second codebase, which is not the same thing.
 - The isolation guarantee in §2 is **verified for the paths named there** — the five scoring tables
   and the routes that read them. It was established by reading the code, and the guard freezes it.
   It has **not** been exercised against a running device, because no device exists yet.
 
-## 11. Device record — fill this in during Phase 0
+## 11. Device record — Phase 0, run 2026-08-26
 
-Left deliberately empty. A protocol discrepancy six weeks from now is diagnosed against these
-values, and a firmware string that was never written down is a firmware string nobody has.
+Read in nRF Connect on a factory-fresh ring. **No vendor app was ever installed.**
 
-| | Value | When |
+| | Value |
+|---|---|
+| Advertised name | `R09_C400` |
+| BLE address | `31:37:41:30:C4:00` — **random, non-resolvable (see §11a)** |
+| Hardware Revision (`0x2A27`) | `RT09_V3.1` |
+| **Firmware Revision (`0x2A26`), trial start** | **`RT09_3.10.22_260420`** |
+| Serial Number (`0x2A25`) | *empty* |
+| System ID (`0x2A23`) | `00-C4-30-00-00-41-37-31` — the MAC reversed, `00-00` inserted (EUI-48→EUI-64) |
+| `6E40FFF0-…` service present? | **yes** |
+| RX `6E400002-…` | **present** — WRITE, WRITE NO RESPONSE |
+| TX `6E400003-…` | **present** — NOTIFY, with CCCD `0x2902` |
+| `0x03` round trip | **not yet run** — the remaining gate step |
+| Firmware Revision, trial end | _not yet read_ |
+
+**What this settles:** the R09 exposes the R02 family's transport exactly — same service UUID, same
+RX/TX split, same properties. §3's "probably in the family, on the evidence of one fork" is now
+measured at the transport layer. **What it does not settle:** framing, checksum convention and
+command semantics. Those need the `0x03` round trip, and until it runs every byte in §4 is still
+inherited from a different model.
+
+### 11a. The address is a rotating type — this breaks the assumed pairing pattern
+
+`31:37:41:30:C4:00` is not a valid public address: bit 0 of the first octet (`0x31` = `00110001`) is
+the multicast bit and it is **set**. As a *random* address its top two bits are `00`, which is
+**non-resolvable private** — the kind that rotates.
+
+That matters because Phase 3 assumed the scale/strap pattern. It cannot be assumed now:
+
+| device | address | how pairing persists |
 |---|---|---|
-| Model (from `0x180A`) | _not yet read_ | |
-| Firmware revision, trial start | _not yet read_ | |
-| Firmware revision, trial end | _not yet read_ | |
-| Advertised name | _not yet read_ | |
-| `6E40FFF0-…` service present? | _not yet checked_ | |
-| `0x03` round trip | _not yet run_ | |
+| Renpho scale | stable MAC | `lib/scale-ble/paired-scale.ts` stores `deviceId` in `localStorage` |
+| Polar H10 | stable public MAC | `lib/live-hr/paired-strap.ts`, same shape |
+| Oura Ring 5 | rotating RPA | **scan by name / manufacturer id, never by MAC** |
+| **Colmi R09** | **rotating by type, stable by evidence** | **undecided — see the test below** |
 
----
+The counter-evidence is strong enough not to conclude yet: the advertised name `R09_C400` encodes
+the address tail `C4:00`, and the System ID characteristic embeds the whole address. A vendor does
+not usually bake a rotating address into a static characteristic.
+
+**Free test, and it must be run before Phase 3 is designed:** re-scan tomorrow, after a
+Bluetooth toggle and after the ring has been off the phone for some hours. Same address → treat it
+as stable and copy `paired-scale.ts`. Different address → the ring is scanned by name like the Oura,
+and a stored `deviceId` would silently stop resolving after a day. **Record the result here.**
+Getting this wrong produces a pairing that works all afternoon and is dead the next morning.
+
+### 11b. Two services no client documents
+
+Beyond `6E40FFF0-…` and the standard `0x1800`/`0x1801`/`0x180A`, the ring exposes:
+
+- **`de5bf728-d711-4e47-af26-65e3012a5dc7`** — a second custom service, in none of the clients
+  surveyed in §3/§4. Worth enumerating its characteristics in nRF Connect out of curiosity; a
+  plausible candidate for the "big data"/raw-sample channel the published clients never implemented
+  (§4's missing sleep and raw-PPG paths). **Do not write to it blind.**
+- **`0xFEE7`** — Telink's OTA firmware-update service. This is the channel a firmware flash would
+  go through, including the mod firmware §8 says to stay away from. **Do not write to it at all.**
+  Noting it because knowing where the loaded gun is kept is the point of an enumeration pass.
+- `0x1812` (HID) — the ring can present as a Human Interface Device, which is how these rings do
+  camera-shutter/gesture control. Irrelevant to this plan; recorded so it is not rediscovered as a
+  mystery.
 
 ## Pickup prompt
 

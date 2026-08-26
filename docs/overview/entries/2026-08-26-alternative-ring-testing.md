@@ -90,6 +90,33 @@ half of all real commands.
 never written down is a firmware string nobody has, and re-reading it at the end of the trial is how
 a silent mid-trial update gets caught.
 
+## Phase 0 ran — transport confirmed, two surprises
+
+Enumerated on the owner's factory-fresh unit in nRF Connect, no vendor app ever installed.
+`R09_C400`, hardware `RT09_V3.1`, firmware `RT09_3.10.22_260420`. Service
+`6E40FFF0-B5A3-F393-E0A9-E50E24DCCA9E` is present with RX `6E400002` (WRITE / WRITE NO RESPONSE) and
+TX `6E400003` (NOTIFY + CCCD `0x2902`) — the R02 family's transport exactly. The biggest unknown
+about the R09 is settled at the transport layer. **The `0x03` round trip has not run**, so the
+framing and mod-255 checksum remain inherited from a client that does not list this model.
+
+**The ring's address is a rotating type, which breaks the pairing pattern the plan assumed.**
+`31:37:41:30:C4:00` has the multicast bit set in its first octet, so it is not a valid public
+address; as a random address its top two bits are `00` — non-resolvable private, the rotating kind.
+Phase 3 had assumed the scale/strap shape, where a `deviceId` is persisted to `localStorage` because
+the MAC is stable. The Oura ring is the counter-example already in the repo: rotating RPA, scanned
+by name, never by MAC.
+
+It is not conclusive either way — the advertised name encodes the address tail `C4:00` and the
+System ID characteristic embeds the whole address, and vendors do not usually bake a rotating
+address into a static characteristic. The test is free (re-scan after a day and a Bluetooth toggle)
+and it has to happen before pairing is designed, because the failure mode is a pairing that works
+all afternoon and is dead the next morning.
+
+**Two services no surveyed client documents:** `de5bf728-d711-4e47-af26-65e3012a5dc7`, a plausible
+candidate for the raw/big-data channel behind §4's missing sleep and PPG paths, and `0xFEE7` —
+Telink's OTA service, which is the firmware-flash path the mod-firmware rule says to stay away from.
+Recorded because knowing where that one lives is the point of an enumeration pass.
+
 ## Deployment shape
 
 No APK. `lib/live-hr/chest-strap-source.ts` already does the full BLE cycle in TypeScript in the
