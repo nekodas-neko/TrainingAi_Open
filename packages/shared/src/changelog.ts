@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.382.1",
+    date: "2026-08-26",
+    changes: [
+      "Fixed a class of silent data loss when the app saves several records at once. If a single batch happened to name the same thing twice \u2014 the same heart-rate instant, the same day's weight, the same set number \u2014 the database rejected the entire batch rather than just the repeat, so everything else in it was thrown away too. This had already cost thousands of heart-rate readings. Repeats are now merged before the save at every place that writes in batches, so one duplicate can never take its neighbours down with it.",
+    ],
+  },
+  {
     version: "1.382.0",
     date: "2026-08-26",
     changes: [

@@ -24,8 +24,18 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.382.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Version:** v1.382.1 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-08-26.
+
+**One duplicate in a batch discarded the whole batch, at eight write sites (Q-280).** Postgres aborts
+an entire command whose VALUES list hits the same `ON CONFLICT` row twice — nothing lands, not just
+the repeat. `error_events` recorded **5,771** hits on `POST /api/hr-ingest` (up to 5,000 HR points
+each) before Q-214 fixed `upsertOuraHeartrate` alone; a sweep found **eight** sites of that shape,
+not the two the entry named. All now use one `collapseOnConflict`. Strategy is per-site and not
+cosmetic: last-wins is exact only for a bare `excluded.*` arm, and three of the eight merge, where it
+would have turned a loud 21000 into a silent field loss. **Owner decisions the same day:** readiness
+history is **recomputed**, not frozen, when a model is recalibrated (reversing 2026-08-24); the
+Coach's mid-program exercise swap is to be **restricted** — see Q-403.
 
 **Two food lists became one, and the back gesture turned out to be wrong at three layers (Q-395c).** The owner asked what the difference between *My Meals* and *My foods* was; there wasn't one a user could hold — one listed `saved_meals`, the other `food_items`, and which list a thing was in came down to how it had been added. They are **one list called My Foods** now, newest-first across both sources, with two row shapes because a food's tap opens the assign step and a meal's opens its own screen. `food-library-sheet.tsx` is deleted. **MRU was asked for and is unavailable:** `food_logs` carries no `saved_meal_id`, so a saved meal has **no last-used timestamp at all** — `createdAt DESC` is the only recency signal the two share, and true MRU needs a Lane A column. **Routing the list through the logger made the app's first three-deep sheet nest, and one back press closed two layers.** `useSheetBackDismiss` decided "my entry is gone" by comparing the arriving `sheetId` against its own, so every sheet that was not the one landed on closed itself — right by accident at two layers, wrong at three, where back lands on the *middle* sheet's entry and the *bottom* one reads a foreign id. "Gone" is a **depth** now. The symptom in Playwright was `element was detached from the DOM` on a button just asserted visible, which reads as animation timing and is not; instrumenting `pushState`/`back`/`popstate` is what settled it ([`journal`](docs/overview/entries/2026-08-26-one-food-list.md)).
 

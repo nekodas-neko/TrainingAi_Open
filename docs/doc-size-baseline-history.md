@@ -3011,3 +3011,15 @@ an entry and merely note it for one that does not, using the attribution the doc
 lines above already performs. It also records why the two obvious alternatives are worse: raising
 the limit defers the collision and makes the eventual sweep bigger, and warn-only is how the
 directory reached 198 files.
+## 2026-08-26 — `projectOverview.md` → 8060, backlog → 12123, Q-280
+
+The Current Status paragraph for the batch-upsert duplicate-collapse sweep. **Absolute figures are
+from the final merge with `main`** — #530 raised both lines while this branch was open, so the deltas
+this branch is responsible for are **+10** on `projectOverview.md` and **−41** on the backlog (two
+completed entries removed, Q-280 and Q-518, against the amendments added). Trimmed from 16 lines to
+10 before raising: the mechanism, the eight-site count and the per-site-strategy caveat are the parts
+a session needs before touching a batch write; the full site table, the premise corrections and the
+mutation proof live in `docs/overview/entries/2026-08-26-fix-batch-upsert-duplicate-collapse.md`.
+Also carries the two owner decisions of 2026-08-26 (readiness history recomputed rather than frozen;
+Coach mid-program swap to be restricted), which are pointers to Q-403 and the Body Battery tuning
+section rather than the decisions themselves.
