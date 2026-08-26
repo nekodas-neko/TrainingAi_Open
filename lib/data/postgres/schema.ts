@@ -451,6 +451,12 @@ export const sleepSessions = pgTable('sleep_sessions', {
   respiratoryRate:  doublePrecision('respiratory_rate'),  // breaths/min (Oura average_breath)
   sleepPhase5Min:   text('sleep_phase_5_min'),            // 5-min stage codes: 1=deep 2=light 3=REM 4=awake
   timeInBedHours:   doublePrecision('time_in_bed_hours'), // migration 112
+  // Q-519 (migration 233) — a bedtime the user remembers for a night the ring did not observe.
+  // Its own column, deliberately not `sleep_start`: read ONLY by the bedtime estimate, never by
+  // anything that derives a window, a duration or an efficiency. The audit behind that split is
+  // docs/reviews/2026-08-26-manual-bedtime-write-audit.md — and it is not a stylistic preference,
+  // it is why a 23:00 bedtime over a measured 04:23-08:03 night does not become 34% efficiency.
+  manualSleepStart: timestamp('manual_sleep_start', { withTimezone: true }),
   sourceMap:        jsonb('source_map').$type<Record<string, string>>(),   // per-field provenance (migration 120)
   createdAt:        timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt:        timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),

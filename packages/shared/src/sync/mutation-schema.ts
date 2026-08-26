@@ -14,6 +14,11 @@ export const SYNCED_MUTATION_DOMAINS = [
   'injuries', 'supplements', 'activity_logs', 'fitness_tests', 'prescribed_run',
   'workout_log', 'day_checkins', 'session_rpe', 'complete_workout', 'saved_meals',
   'oura_daily_summary', 'oura_daily_derived', 'sleep_session', 'plan_meal_answers',
+  // Q-519. Distinct from `sleep_session`, which is the BLE rollup backing up a whole night it
+  // measured, keyed on `ouraId` and written at `oura_ble` rank. This one is a user answering a
+  // question about a night the ring did not observe: it targets an existing row by date and sets
+  // one column that no window, duration or efficiency is ever derived from.
+  'manual_bedtime',
 ] as const
 
 export type SyncedMutationDomain = (typeof SYNCED_MUTATION_DOMAINS)[number]

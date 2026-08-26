@@ -27,8 +27,19 @@ export async function GET() {
   // mean an hour earlier — the one thing this route exists to get right. `nightSessions` also
   // reassembles a night split by a wake-up, so its start is the real bedtime rather than the
   // 02:23 restart.
+  // Q-519 — a night the ring did not observe until 4 am reads as a 4 am bedtime, and one such night
+  // moves this 14-day mean by ~23 minutes for a fortnight. `manualSleepStart` is the bedtime the
+  // user remembers for exactly that case, and **this route is the only place it is read**: the
+  // measured window stays measured everywhere else, which is what keeps a remembered 23:00 from
+  // turning a 3-hour night into 9 hours at 34% efficiency
+  // (docs/reviews/2026-08-26-manual-bedtime-write-audit.md).
+  //
+  // Read AFTER `nightSessions` rather than before: the aggregation picks which rows are one night
+  // and which are naps, and a manual value substituted first would be attached to whatever survived
+  // that. The aggregate carries the field through from its first window, so the night it lands on is
+  // the night the user answered about.
   const { meanMinutesFromNoon } = computeSleepStartConsistency(
-    nightSessions(sleepSessions, tz).map(s => s.sleepStart.toISOString()),
+    nightSessions(sleepSessions, tz).map(s => (s.manualSleepStart ?? s.sleepStart).toISOString()),
     tz,
   )
 

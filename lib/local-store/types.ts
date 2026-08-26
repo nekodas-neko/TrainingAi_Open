@@ -67,6 +67,9 @@ export interface LocalSleepSession {
   respiratoryRate: number | null;
   sleepPhase5Min:  string | null;
   timeInBedHours:  number | null;
+  /** Q-519 — the bedtime the user remembers for a night the ring did not observe. Read only by the
+   *  bedtime estimate; never by anything deriving a window, duration or efficiency. */
+  manualSleepStart: string | null;
   syncStatus:      'pending' | 'synced';
   updatedAt:       string;
 }
