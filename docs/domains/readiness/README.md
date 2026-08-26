@@ -40,6 +40,18 @@ render the band's label/icon alongside its colour (CLAUDE.md, One Formula One Pl
   surface at all**, so "five pillars" may be three pillars and two derived values. Also:
   `scoreAvailability` has exactly one consumer, and the `score-audit/` layer has **zero** user-facing
   ones.
+- [`docs/reviews/2026-08-18-readiness-range-refuted.md`](../../reviews/2026-08-18-readiness-range-refuted.md)
+  — **read before proposing a readiness range calibration; it has been tried and it is wrong here.**
+  Sleep's `SCORE_CALIBRATION` transform was implemented on readiness and failed **7 tests across 4
+  files**, three of them invariants the composite genuinely holds: contributions stop summing to the
+  displayed score (the score-audit panel's whole job), all-neutral input stops mapping to 50 (it gave
+  35), and skipping the check-in can reach 100 (a deliberate cap defeated). The in-model lever
+  (`Z_POINTS_PER_UNIT`) fails differently — `hrvBalance` sd **27.1** and `sleepBalance` sd **32.3**
+  are already saturating their rails, so a steeper slope compresses the ends. **And there is no
+  compression bug to fix:** contributors carry sd 17–32 against a composite sd of ~11–13, where
+  independence predicts **7.7** — readiness already extracts more spread than independence would give.
+  Its real weakness is the ceiling, and the term dragging it down is `recoveryIndex`.
+
 - [`docs/reviews/2026-08-17-readiness-calibration.md`](../../reviews/2026-08-17-readiness-calibration.md)
   — **the Recovery Index contributor, calibrated against Oura's own contributor** on the 15 nights
   where both exist (2026-06-23 → 07-07, the only ground truth this metric has). Three things to carry
