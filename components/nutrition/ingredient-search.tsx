@@ -76,13 +76,22 @@ export function IngredientSearch({
       </div>
 
       {searchResults.length > 0 && (
-        <div className="rounded-xl border divide-y divide-border/30 overflow-hidden">
+        <div className="space-y-1.5">
+          {/* Headed, because the list was already here and read as unexplained (BF-11c §5.3).
+              `searchFoodItems('')` returns the twenty most recently updated foods — the browse-all
+              path — so the picker was never type-to-search only. What it lacked was a word saying
+              what you were looking at, next to a "Food database" heading that had one. */}
+          <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+            {query.trim() ? 'Your foods' : 'Recently used'}
+          </p>
           {/* Q-406: the calories move out of the secondary line into the shared right-hand column,
               which is what lets a list of foods line up. What a "serving" weighs stays, because it
               is what the quantity control counts in and "1 serving" is meaningless without it. */}
-          {searchResults.map(item => (
-            <SearchResultRow key={item.id} item={item} onAdd={onAdd} />
-          ))}
+          <div className="rounded-xl border divide-y divide-border/30 overflow-hidden">
+            {searchResults.map(item => (
+              <SearchResultRow key={item.id} item={item} onAdd={onAdd} />
+            ))}
+          </div>
         </div>
       )}
 

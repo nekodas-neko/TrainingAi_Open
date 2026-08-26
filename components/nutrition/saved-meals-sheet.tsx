@@ -31,6 +31,7 @@ import { QuantitySheet } from './quantity-sheet'
 import { qtyFromInput, steppedQty, type QtyUnit } from './saved-meal-qty'
 import { IngredientPicker } from './ingredient-picker'
 import { MealBatchSize } from './meal-batch-size'
+import { recipeBuilderPatch } from './recipe-import'
 
 /** Which SCREEN is showing. The tab strip within the list screen is `listTab` below. */
 type SheetTab = 'meals' | 'build'
@@ -209,21 +210,10 @@ export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate,
   /**
    * A recipe pasted as a link becomes this meal (BF-11c).
    *
-   * It fills three fields the builder already has rather than inventing a mode: the ingredients, the
-   * name (only when blank — a link pasted into a meal you have already named must not rename it),
-   * and the batch size.
-   *
-   * **An unstated yield is asked, never assumed.** `recipeYield: null` means the page never said how
-   * many the recipe serves, so what came back is the WHOLE batch. `SavedMeal.totals` is the whole
-   * recipe by contract and `oneServingItems()` is the one place that divides, so the honest landing
-   * is the ingredients as-is with `servings` left at 1 and a line saying so — the stepper is already
-   * on screen directly above. Guessing 1 here is the four-fold calorie error that reads as
-   * plausible; pre-dividing instead would double-divide on log.
+   * It fills fields the builder already has rather than inventing a mode. The numeric decision —
+   * what `servings` becomes, and when to prompt — is `recipeBuilderPatch`, which is a pure function
+   * with tests because getting it wrong logs a twelfth of a slice and looks plausible.
    */
-  // `[]` is stable by React's guarantee — a setter, not a value. Hoisted rather than inline because
-  // `MealBatchSize` is memoised and one inline arrow would defeat it silently (Q-490).
-  const clearUnstatedYield = useCallback(() => setUnstatedYield(false), [])
-
   function importRecipe(recipe: { name: string; entries: { item: FoodItem; qty: number }[]; recipeYield: number | null }) {
     setIngredients(prev => {
       const next = [...prev]
@@ -234,15 +224,19 @@ export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate,
       }
       return next
     })
-    setMealName(prevName => prevName.trim() ? prevName : recipe.name)
-    if (recipe.recipeYield != null && recipe.recipeYield > 1) {
-      setMealServings(recipe.recipeYield)
-      setUnstatedYield(false)
-    } else {
-      setUnstatedYield(recipe.recipeYield == null)
-    }
+    // Read from the closure, not inside a `setMealName` updater: an updater must be pure, and React
+    // may call it twice under StrictMode. This runs from a press, so the current render's name is
+    // the right one.
+    const patch = recipeBuilderPatch(recipe, mealName)
+    setMealName(patch.name)
+    setMealServings(patch.servings)
+    setUnstatedYield(patch.unstatedYield)
     setRenamingMeal(false)
   }
+
+  // `[]` is stable by React's guarantee — a setter, not a value. Hoisted rather than inline because
+  // `MealBatchSize` is memoised and one inline arrow would defeat it silently (Q-490).
+  const clearUnstatedYield = useCallback(() => setUnstatedYield(false), [])
 
   function addIngredient(item: FoodItem) {
     setIngredients(prev => {
