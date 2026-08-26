@@ -68,6 +68,11 @@ html, body {
   --brand-card-border: rgba(0, 255, 135, 0.10);
   --brand-glow: rgba(0, 255, 135, 0.12);
   /* Semantic accent colours — readable on white in light mode; overridden vivid in .dark */
+  /* BF-32 — the meal tile's gradient. Fixed rather than brand-tinted: `data-brand` is user-picked
+     and this is decoration identifying "a meal", not a brand surface. Values from the artboards. */
+  --meal-tile-from: oklch(0.30 0.06 150);
+  --meal-tile-to: oklch(0.18 0.04 70);
+
   --accent-green: oklch(0.52 0.20 145);
   --accent-cyan: oklch(0.48 0.18 210);
   --accent-amber: oklch(0.55 0.18 75);

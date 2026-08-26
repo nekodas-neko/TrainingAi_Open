@@ -492,144 +492,67 @@ will hit it.
   sits in that row; and whether the sheet now reads as one thing is the owner's call, not a
   measurement.
 
-### [nutrition] BF-32 — the meal photo is stored, pickable, and displayed nowhere; the placeholder is the missing piece
+### [body][nutrition] BF-33 — a measured RMR has nowhere to go, and the four-number panel the test sheet already draws
 
-- **Lane:** B
-- **Spec:** BF-28.
-- **Added:** 2026-08-25, owner, reviewing the artboards: *"Some are similar but not the same (i.e no
-  spot for an image) it should show the default one in the mockup if no image is attached."*
-- **⚑ The owner's sentence is the specification, and it is stronger than "add a thumbnail".** The
-  glyph tile is the **always-present** state of the row, not a fallback bolted on afterwards. A row
-  with no photo shows the placeholder; a row with one shows the photo in the same box. There is never
-  a row without the box — which is what makes a list read as one thing rather than ragged.
+- **Lane:** A — new column(s) plus a precedence rule in `packages/shared/`; the panel is B and can
+  follow.
+- **Added:** 2026-08-26 · owner, who has a **DEXA + RMR test booked**: *"its a plug and play image or
+  number (AI path)"*, and a panel of values *"for the energy consumption value, estimated RMR from
+  general predictions, the app TUNED one ... then the Scan RMR from the scancompany"*.
+- **Split out of BF-2**, which said this half *"is simpler ... it needs no calibration maths at all,
+  just a stored value and a precedence rule"*. That is still true, and it is why this is a queue item
+  while BF-2 stays a planning item: **this one does not need the scan to exist before it can be
+  built**, and should be built *before* the appointment so the numbers have somewhere to go on the day.
 
-**What already exists, and what is missing.** The storage half shipped twice over:
+**⚠ The correction that has to be made before the panel is designed: three of the owner's four values
+are not all RMR.** Energy balance can only ever see *total* expenditure — what went in against what
+the body weighed. The learned number is a **TDEE**, and turning it into an RMR means dividing by an
+activity factor, which is exactly the guess the measurement was meant to remove. So the honest panel
+is a 2×2, not a list of three RMRs:
 
-| Piece | State |
-|---|---|
-| `saved_meals.image_data_uri` column | ✅ Q-396 — round-trips both routes, the outbox replay and the local mirror |
-| `MealPhotoTile` — pick, downscale to 128 px WebP, preview | ✅ Q-327, wired into Edit Meal |
-| **Anything that renders a stored photo** | ✗ **nothing** — grep `imageDataUri` and every hit is a route, an adapter or the picker |
-| **The placeholder** | ✗ does not exist |
+| | Predicted | Measured / learned |
+|---|---|---|
+| **RMR** | Cunningham `ffm·21.6+370` (`body-composition.ts:24`), Mifflin when body fat is unknown — **exists** | **the scan — this entry** |
+| **TDEE** | RMR × activity multiplier (`energy-baseline.ts`) — **exists** | `adaptive-tdee.ts` learned maintenance — **exists and shipped** |
 
-So a photo picked today is written, synced, and never seen again. That is the finding: **the feature
-is write-only**, and it has been since the picker landed.
+**That 2×2 is what the owner's own test sheet draws** — Measured RMR beside Predicted RMR, Projected
+TDEE beside Predicted TDEE. Three of its four cells are already computed in this app today; one is
+missing, and this entry adds it.
 
-**`FoodRow` has no thumbnail slot at all.** Its own comment says so — *"The optional thumbnail Q-406
-lists is deliberately not here yet. No call site passes one."* **That deferral is now superseded by
-the owner's instruction** and Q-406 has been amended to say so. The thumbnail lands in `FoodRow`,
-once, and every parity entry gets it for free.
+**The prize, and it is worth naming so it does not get missed:** with a measured RMR *and* the learned
+TDEE, the owner's **real activity factor falls out as `learned TDEE ÷ measured RMR`** — no longer a
+picked word. The test sheet guesses `Mild` in two places and multiplies by it; the app would know.
+That number is more valuable than either input on its own.
 
-**The placeholder, read off the artboards:** a 40 px tile, `border-radius: 9px`, filled with
-`linear-gradient(140deg, …)` carrying a utensils glyph at 45% white. It appears **nine times** in the
-drawings with identical values and once in a lighter variant, so it is one shared thing, not
-per-screen markup. Meal detail (artboard 4) uses the same idea at hero scale — a full-width band with
-a large glyph and a `Photo` button on it.
+**What already exists, so nothing gets rebuilt:**
+- `adaptive-tdee.ts` is the *"app TUNED one which checks when you completed a diary entry"* the owner
+  describes, already built and already gated: `MIN_LOGGED_DAYS`, `MIN_LOGGED_FRACTION`,
+  `MIN_WEIGH_INS`, a plausibility clamp, and **Q-387's completed-day gate** — an abandoned half-log
+  reads identically to a light day and was measured pulling the estimate 514 kcal low. Do not
+  re-derive any of this.
+- `HEALTH_SOURCES` (`lib/data/health-source.ts:18`) is the precedence ladder a measured RMR slots
+  into. Adding a source is a change in that file **plus the inlined SQL `CASE` at line 45** — both
+  move together or the TS and SQL ladders diverge.
 
-- **⚠ The gradient in the artboards is `oklch(...)` literals, and BF-28 rule 3 applies.** Take the
-  structure; source the colours from tokens. `check-hex-literals.js` ratchets per file, so a pasted
-  literal fails the Custom Rules job.
-- **Sizes to settle in the PR, not guess:** the row tile at 40 px against the day screen's existing
-  row height, and whether the hero band is a fixed height or an aspect ratio. Say which you chose.
-- **The photo is a data URI, not a URL** — `<img src>` on a data URI needs no `no-img-element`
-  exemption for a remote host, which is the objection `food-row.tsx` recorded against building this
-  early. That objection no longer applies to saved meals; it may still apply to any future
-  food-item image from an external source, so do not widen the prop to accept a URL without saying
-  why.
-- **Scope, explicitly:** this is the shared tile plus its call sites — the day screen rows, My meals
-  rows, Meal detail's hero, the ingredient lists. It is **not** a new capture flow; picking already
-  works.
-- **Verification.** Both states on every surface — a meal with a photo and a meal without — against
-  the artboards at 412 dp per BF-28. Then the device run: a data-URI image inside a scrolling list is
-  exactly the shape Samsung's WebView compositor has mishandled before.
+**Scope:**
+1. **Store it.** A measured RMR with its date, the method (indirect calorimetry), and the provider.
+   It is a point-in-time clinical measurement, not a daily metric — decide whether that is a column
+   on `body_metrics` or its own small table, and say why in the PR. Prefer whatever lets a **second
+   test later** sit beside the first rather than overwrite it.
+2. **Precedence.** A measured RMR overrides the estimate at the two call sites BF-2 already traced —
+   `goal-recommendation.ts:166–169`. **⚠ It must expire or decay**: an RMR measured at 71 kg is not
+   the RMR at 78 kg, and a stale measurement silently outranking a live estimate is worse than no
+   measurement. State the rule — a validity window, or re-scaling by lean mass.
+3. **Entry.** A number the owner can type, and the AI photo path: hand the results sheet to the same
+   `generateObject` pattern the nutrition scan already uses. **Never `JSON.parse` model text**, and
+   **no model-reported number may be shown as fact** without the owner confirming it — per CLAUDE.md,
+   a model handed a score of 80 called it *"perfect"*. Show the parsed values for confirmation before
+   they are stored.
+4. **The panel**, Lane B, following the 2×2 above with each cell labelled by where it came from.
 
-### [nutrition] BF-30 — artboard 4 parity: Meal detail, the one screen with no clear counterpart
-
-- **Lane:** B
-- **Spec:** BF-28.
-- **Added:** 2026-08-25, owner: the nutrition screens match their drawings.
-- **Needs:** BF-32
-- **✅ THE OPEN QUESTION IS ANSWERED — the owner wants this screen.** 2026-08-25, looking at artboard
-  4: *"I dont see this screen yet"*. The entry previously allowed "it stays a card, here's why" as an
-  outcome; **that is no longer available.** Artboards 1, 2, 3, 5 and 6 each map onto a shipped
-  surface and this one does not, so unlike every other parity entry this is *build what is drawn*
-  rather than *change what is there*.
-- **Still to decide, in the PR before any markup:** route vs full-height sheet vs expanded card. The
-  owner asked for the screen, not for where it lives. A sheet reached from a My-meals row is the
-  cheapest shape that matches the drawing and keeps the back gesture working (BF-27); say what you
-  chose and why.
-- **The hero band is BF-32's placeholder at hero scale** — same gradient, same utensils glyph, a
-  `Photo` button on it, and it shows whether or not a photo is stored. Do not draw a second one here.
-- **What artboard 4 draws:** a hero band with `[back]`, an overflow action and a **`Photo`** button;
-  the meal name with `Makes 2 portions · 5 ingredients`; a **`278 / per portion`** figure; three macro
-  columns with **percentage, grams and label** (`48% · 33 g · Protein`); an `Ingredients` section
-  headed `whole batch` listing `name · "60 g · 2 servings" · calories`; and a bottom action row —
-  **`Log this meal`** with two icon buttons beside it.
-- **`Log this meal` already exists** at `saved-meal-card.tsx:220`, and that file's own comment records
-  the batch-vs-portion rule the artboard's `whole batch` / `per portion` split is drawing: a batch
-  recipe shows ONE portion, which is what the button writes. **The semantics are settled; this is
-  presentation.** Do not re-litigate what a portion means.
-- **The percentage column is a number that has to come from somewhere.** `48% · 33 g · Protein` is
-  macro share of energy — the Atwater conversion. `packages/shared` owns `KCAL_PER_G` after LB-9, and
-  `components/nutrition/macro-energy.ts` is the `components/` copy. Use one of those; do not write
-  `* 4` / `* 9` in a component.
-- **BF-29 shipped and left this question exactly where it found it, but narrowed the stakes.** The
-  list row is now artboard 3's compact shape and **tapping it expands in place** — which is one of
-  the three candidate answers above, chosen because it was already the shipped behaviour and
-  because deleting the expansion before a detail surface existed would have taken `Log this meal`,
-  the ingredient breakdown and the macro split off the screen entirely. Two consequences to inherit:
-  the chevron is the rotating `ChevronDown` rather than artboard 3's `ChevronRight`, deliberately,
-  because the glyph has to describe what the tap does — **decide the destination here and the glyph
-  follows**; and the label/edit/delete trio now lives in *two* places (the swipe tray, and the
-  expanded panel that keeps them reachable without the gesture). If this becomes a screen, that
-  duplication resolves into artboard 4's bottom action row and should not be carried across.
-- **Verification.** Side by side against artboard 4 at 412 dp, enumerated per BF-28; device run.
-  If the outcome is "this stays a card, not a screen", that is an acceptable result — say so with the
-  reason and close the entry rather than building a route nobody navigates to.
-
-### [nutrition] BF-31 — artboard 5 parity: Edit meal, and the batch footer that is its point
-
-- **Lane:** B
-- **Spec:** BF-28.
-- **Added:** 2026-08-25, owner: the nutrition screens match their drawings.
-- **⚠ Shipped counterpart — CORRECTED 2026-08-25, the entry named the wrong files.** `assign-step.tsx`
-  and `review-step.tsx` belong to `food-logger-sheet.tsx`, the **scan / Log Food** flow; neither is
-  reachable from Edit Meal. The real counterpart is **`saved-meals-sheet.tsx`'s `tab === 'build'`**
-  (`ingredient-picker.tsx` is correct, and is rendered from there). Q-395a already converted its
-  ingredient rows to the shared `FoodRow` and deleted `ingredient-row.tsx`, so the **rows** are done
-  and this entry is the frame around them.
-- **Both "first things to check" are answered — neither is a behaviour change.** (a) The builder
-  **does** show batch kcal and the P/C/F split live while ingredients are edited: a `bg-brand/10`
-  card sits inline in the ingredient list, with a `One portion — what gets logged` block beneath it
-  when servings ≠ 1. So the footer is a **restyle** — pin that block above `Save meal` instead of
-  letting it scroll away mid-list, colour `66 P · 48 C · 13 F` with `MACRO_COLORS`, and put the
-  per-portion figure on the same line as `278 / portion`. (b) Renaming costs **no** separate sheet:
-  the name is a labelled `<Input>` in the body beside the photo tile, and the `SheetTitle` already
-  mirrors it with `Makes N portions · X kcal each` beneath (Q-395a). Artboard 5 moves that input
-  *into* the header behind a pencil and drops the standalone field.
-- **Still genuinely different:** `+ Add ingredient` / `+ Add a photo` are drawn as two affordances at
-  the **end of the list**; shipped, `IngredientPicker` is a persistent search block and the photo is a
-  tile at the top beside the name.
-- **What artboard 5 draws:** a header carrying the meal name **inline-editable** (a pencil beside it)
-  with `Makes 2 portions · 278 kcal each` beneath; an `Ingredients` section headed `whole batch`, each
-  row `name · "60 g" · calories · [chevron]`; then **`+ Add ingredient`** and **`+ Add a photo`** as
-  two affordances at the end of the list, not floating buttons; and a **pinned footer**:
-
-  > `Batch` · `555 kcal` · `66 P` · `48 C` · `13 F` · … · `278 / portion`, with **`Save meal`** below it.
-
-- **The footer is the finding.** It keeps the batch total, the per-macro split and the per-portion
-  figure visible **while ingredients are being edited** — which is the whole reason to have this
-  screen rather than a list. Whether the shipped builder shows those numbers during editing, or only
-  at a review step afterwards, is the first thing to check; if it is the latter, this is a real
-  behaviour change and not a restyle.
-- **The pencil is a second finding.** Artboard 5 edits the meal name in place in the header. Check
-  whether renaming currently costs a separate sheet or step.
-- **`66 P · 48 C · 13 F` uses `MACRO_COLORS`**, like every other macro readout in the app, and takes
-  its kcal from `macro-energy.ts` / `KCAL_PER_G` rather than inline factors.
-- **Artboard 6 draws this same screen with the quantity sheet over it.** So BF-26 and this entry
-  share a surface — if both are open, do them in one PR and verify the sheet against the screen
-  underneath it, which is exactly what artboard 6 shows.
-- **Verification.** Side by side against artboard 5 at 412 dp, enumerated per BF-28; device run.
+- **Verification.** The real sheet's numbers (measured 1714, predicted 1513, +13%) entered by hand and
+  by photo, landing identically. Then prove the goal actually moves: `goal-recommendation.ts` must
+  return a different calorie target with the measured RMR present than without.
 
 ### [nutrition][app-shell] Q-406 — the shared food row: two call sites converted, two waiting on their phase
 
@@ -656,28 +579,38 @@ a large glyph and a `Photo` button on it.
   [`Journal`](overview/entries/2026-08-23-shared-food-row.md).
 - **✅ THE DIARY ROW SHIPPED 2026-08-25 (v1.367.0)** — with the delete this entry required moved into
   `QuickEditLogSheet` first, so no capability was dropped.
-- **⚑ THE THUMBNAIL DEFERRAL IS SUPERSEDED, 2026-08-25.** `food-row.tsx` records that the optional
-  thumbnail is *"deliberately not here yet — no call site passes one"*. The owner has now specified
-  it: *"it should show the default one in the mockup if no image is attached."* The tile is the
-  **always-present** state of the row, so the slot is no longer optional-in-practice. **BF-32 owns
-  the tile and the placeholder**; this entry owns the `FoodRow` prop it lands on. Do them in one PR
-  unless there is a reason not to, and delete that comment when you do — a stale "deliberately not
-  yet" reads as a decision rather than a superseded one.
-- **Keep:** ONE call site, the external food-database row (`ingredient-search.tsx:132`), which
-  carries a macro-mismatch warning and an in-flight spinner. The agreed row has nowhere to put
-  either, and adding a slot makes it a wrapper rather than a unification. **It needs a design answer
-  — where a per-row warning goes** — and Q-395's drawings do not settle it (checked: none of the
-  twelve artboards shows a warning treatment). `Gate: owner`.
-  - **⏸ Put to the owner 2026-08-25 and deliberately NOT answered — parked, not decided.** The reply
-    was *"I believe the other agent is working on this so maybe park this for now and check in
-    later if its been done"*. So the gate stands and the question is still open; **do not read this
-    bullet as an answer.** The recommendation that was on the table, if it helps whoever picks it up:
-    **don't put the warning in the row at all — surface it in the quantity sheet**, which now exists
-    (Q-395a, v1.364.0) and is where the user is already deciding the amount. That keeps the row one
-    shape everywhere, which is the whole point of the unification.
-  - **Whoever next touches this: check first whether the nutrition work since (BF-24, BF-26, BF-28,
-    BF-29, LA-30) has already settled it**, and if so clear the gate rather than re-asking. That
-    check is the "check in later" the owner asked for.
+- **✅ THE THUMBNAIL SHIPPED 2026-08-26 (v1.380.0), with BF-32 in one PR** as this entry asked.
+  `FoodRow` gained `showThumb`/`thumbSrc` and the stale *"deliberately not here yet"* comment is
+  gone. **The artboards narrowed the scope BF-32's prose stated:** the tile is drawn on artboards 1
+  and 3 only — meal-level rows — and never on the ingredient rows inside a meal, so
+  `ingredient-search.tsx`, `food-library-sheet.tsx` and the builder's list do **not** opt in.
+  [`journal`](overview/entries/2026-08-26-meal-photo-tile.md).
+- **✅ THE WARNING DESIGN IS DECIDED, 2026-08-26 — option A, owner's pick.** The `Gate: owner` that
+  held this entry is cleared. Three treatments were drawn at list density and put to the owner;
+  the choice was **A**.
+
+  **What to build on the last call site, the external food-database row (`ingredient-search.tsx:132`):**
+  - **An amber `AlertTriangle` immediately before the calorie column.** Nothing else changes — same
+    row height, same columns, same shape as the other three call sites. The icon is the whole
+    treatment.
+  - **The serving line stays** (`15P · 9C · 4F per 100 g`). This is the half that ruled out option B,
+    which put the warning sentence *in place of* that line: the rows carrying a mismatch are exactly
+    the rows where you want to read the numbers and judge for yourself.
+  - **The sentence moves to the food's detail**, not the row. Today's copy is *"Its macros and
+    calories disagree — check before using"* — carry the wording, not the position.
+  - **The row keeps ONE shape.** Do not add a warning slot to `FoodRow`. That was option C, and its
+    cost is not the ragged height — it is that three call sites carry a prop they never fill, which
+    turns the shared row back into a wrapper around per-screen differences. Ending that is what this
+    entry is for.
+  - **A → C stays open if the sentence later has to be visible in the list** — it is additive.
+    Starting at C and pulling the slot out means touching every call site again. Do not pre-build it.
+- **The in-flight spinner needs no decision** and never did: it swaps the green `+` inside the same
+  16 px box, so it is a state of an existing element rather than a new slot. It works under any of
+  the three treatments.
+- **Reference:** the three treatments as drawn, at 412 dp against a three-result list —
+  <https://claude.ai/code/artifact/315b8a71-5f0d-4a18-a917-a2618b882c4f>. **Q-395's twelve artboards
+  do NOT cover this**; checked, none of them shows a warning treatment, which is why it needed its
+  own drawing rather than a re-read of the mockups.
 - **✅ RESOLVED 2026-08-24 — the drawings are in the repository.** **The lesson worth keeping: a
   mockup that lives only in a chat artifact is a mockup the queue cannot use.** These were drawn
   2026-08-18, reviewed twice, decided against — then blocked four entries for six days because
@@ -5536,34 +5469,6 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 - **First action:** read the RPE input component and check its default value and its position in the
   logging flow. If it opens pre-set to a value, that is very likely the whole finding.
 - **Do not "fix" this by widening the model.** A flat signal made wider is still flat.
-
-### [platform][readiness] Q-291 — the AI surfaces contradict each other on the same day
-
-- **Lane: A — set 2026-08-25.** The contradiction is between AI route outputs
-  (`app/api/ai/**`, `lib/coach/**`), both of which the path rule assigns to Lane A.
-
-- **Branch:** `fix/ai-surface-shared-state`
-- **Plan:** none yet
-- **Added:** 2026-08-15 · from the uncovered-lenses review §2.2
-- **Observed in production, 2026-08-06, one user, one day:**
-  - **Readiness insight:** temperature 0.8 °C above baseline → *"Keep your planned exercise
-    intensity low."*
-  - **What happened:** `workout_sessions` shows **two** sessions — Legs 01:40, Upper 21:26.
-  - **Daily digest, same day:** *"Crushing three PRs… dominate today's 6754 kg leg volume session…
-    **Keep that same energy tomorrow!**"*
-- **Readiness then fell 79 → 76 → 76 → 65 across 08-05…08-08**, so the morning signal was arguably
-  correct and the evening digest encouraged a repeat of what degraded it.
-- **Distinct from Q-275/Q-276, and the fix is different.** Those are about the *scores* (readiness
-  is blind to load; the pillars disagree). This is about the *narration*: each AI surface builds its
-  own prompt from its own slice and none can see what another said today. Even with perfect scores,
-  the digest would still not know the morning advised backing off.
-- **Direction:** give the day's AI surfaces a shared context — the simplest version is that any
-  same-day generation reads the day's existing `ai_health_insights` rows and is instructed not to
-  contradict them without acknowledging the change. `ai_health_insights` already stores by
-  `(section, date)`, so the read is cheap and the table already exists.
-- **Check while in here:** whether the digest has any access to the day's readiness advisory at all,
-  or only to the outcome numbers. That determines whether this is a prompt change or a data-plumbing
-  change.
 
 ### [platform] Q-292 — the AI stated a score that is false, and gave an imperial measurement to a metric user
 
@@ -11561,6 +11466,35 @@ with the recap week visibly compared against the one before it.
 
 - Lane: ? — the planning session splits it (new table + calibration maths = A; the entry/review UI = B)
 
+> **⚠ PRIORITY CHANGED 2026-08-26 — the owner has a DEXA + RMR test BOOKED.** This entry sat at the
+> tail because the owner filed it as *"a loose note to put more effort into later"*; that is no longer
+> the signal. It still needs a planning session before implementation, and the plan should now be
+> written **before the scan happens** so the reading has somewhere to land on the day.
+>
+> **The RMR half is split out as BF-33** and is in the main queue — it needs no calibration maths and
+> no scan to exist before it can be built.
+>
+> **Two refinements from the owner, 2026-08-26, that change the shape of the filter:**
+>
+> 1. **It must accumulate, not be a single constant.** *"This value needs to be able to accept more
+>    (i.e another dexa scan later on) so it can work together to build a correct filter."* So the
+>    stored thing is a **set of paired (scan, scale) observations** with a calibration *derived* from
+>    them — not one offset that a second scan overwrites. This also settles the ratio-vs-offset
+>    question below in the only honest way available: with one point you cannot tell them apart, so
+>    **store the pairs and pick the form once there are two**, rather than guessing now and baking it in.
+> 2. **The filter is per measurement system, not global.** *"whatever measurement system was used"* —
+>    the calibration belongs to the Renpho BIA path specifically. A different scale, or Health
+>    Connect, is a different instrument with a different bias, and applying the Renpho correction to
+>    it would be worse than applying none. Key the calibration by source, and let a source with no
+>    pairs read uncorrected.
+>
+> **The owner's own framing of the goal, worth keeping verbatim:** *"whenever I use my scale (renpho)
+> it can make it accurate to what a dexa scan would give. I hear these scales are good at consistency;
+> its just the initial value might be off."* That is the premise the whole design rests on — **and it
+> is testable rather than assumed.** The owner's last ten readings sit in a 24.9-25.3 band, which is
+> consistency; whether the *offset* is stable is what a second scan later would show, and is the
+> reason (1) above matters more than getting the first correction exactly right.
+
 **Owner request, 2026-08-23 (verbatim):** *"I'd like to be able to upload a dexa scan/RMR values;
 and 1- have a filter that aligns our scales values to a dexa scan; will call it 'dexa filter' so if
 our scale says 15% BF but dexa says 20% we will keep that ratio in mind when giving values; as well
@@ -11616,7 +11550,7 @@ values" can mean two very different things:
    phrasing says "keep that ratio in mind", but a plan should say which it picked and why, and prefer
    the one that degrades safely as the owner's weight moves.
 
-**RMR is the separate half of this request, and it is simpler.** Nothing in the tree reads a measured
+**RMR is the separate half of this request, and it is simpler — now filed as BF-33.** Nothing in the tree reads a measured
 RMR — BMR is *always* estimated (Cunningham when body fat is known, Mifflin-St Jeor otherwise,
 `goal-recommendation.ts:166–169`). A measured RMR from a metabolic cart would override the estimate at
 exactly those two call sites. Worth filing as its own task inside the plan; it needs no calibration

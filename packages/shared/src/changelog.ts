@@ -6,6 +6,34 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.381.0",
+    date: "2026-08-26",
+    changes: [
+      "The meal builder now keeps the batch totals pinned above Save meal \u2014 calories, protein, carbs, fat and what one portion works out to \u2014 so they stay on screen while you are editing the ingredients that change them, instead of scrolling away exactly when you need them. The meal name is edited straight from the header with the pencil beside it rather than in a separate field, and adding an ingredient or a photo are two buttons at the end of the list.",
+    ],
+  },
+  {
+    version: "1.380.0",
+    date: "2026-08-26",
+    changes: [
+      "Meal photos are finally visible. You could take one and it was saved and synced, but nothing anywhere displayed it \u2014 it has been that way since the picker was added. Every meal now shows a small tile: your photo if it has one, and a food icon if it does not, so the list lines up either way instead of some rows having a picture and others nothing.",
+    ],
+  },
+  {
+    version: "1.379.0",
+    date: "2026-08-26",
+    changes: [
+      "The end-of-day check-in can now see what the app already told you that morning, and is told not to reverse it without saying so. Previously each piece of coaching was written from its own slice of the day with no knowledge of the others \u2014 so on one occasion the morning advised keeping intensity low on a raised temperature, and that evening the digest cheered the two sessions that followed and said to keep the same energy tomorrow. The digest now reads the day's readiness, sleep, heart-rate and activity notes before it writes. It may still disagree with them, since by evening it knows more; what it can no longer do is disagree silently.",
+    ],
+  },
+  {
+    version: "1.378.0",
+    date: "2026-08-26",
+    changes: [
+      "Tapping a saved meal now opens the meal itself instead of unfolding the row: a full screen with its photo, the calories for one portion, protein/carbs/fat as a share and in grams, and the ingredient list at the amounts the whole batch actually contains. Log this meal, the label, edit and delete all live there. Swiping a row still gets you to label, edit and delete quickly, and delete now always asks first \u2014 it opens the meal with the confirmation showing rather than deleting straight off the swipe.",
+    ],
+  },
+  {
     version: "1.377.0",
     date: "2026-08-25",
     changes: [

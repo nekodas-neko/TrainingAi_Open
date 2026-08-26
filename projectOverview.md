@@ -24,10 +24,14 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.375.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
-**Last updated:** 2026-08-25.
+**Version:** v1.381.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Last updated:** 2026-08-26.
+
+**The day's AI surfaces can see each other now (Q-291).** The morning readiness insight once advised keeping intensity low on a raised temperature; that evening the digest cheered the two sessions that followed and said to keep the same energy tomorrow. The digest read nine sources and **readiness was not among them** — so this was data plumbing, not a prompt tweak, which is the question the entry itself asked to settle first. It now reads the day's insights before writing, inside its context hash rather than appended after it. **The read graph is one-directional and must stay acyclic:** two surfaces hashing each other's text would invalidate each other forever, and model output is not deterministic, so it would never settle — the digest is excluded from what the digest can read, in code and in two tests. The instruction permits disagreement and forbids only *silent* disagreement, which is also pinned, so a later tightening to "never contradict" fails rather than passing quietly.
 
 **The journal sweep, and the cadence it revealed (LA-25).** `check-doc-index-size.js` failed a *migration* PR at 61 unlinked entries against a limit of 60. **25 folded into a new `history-2026-08-25.md`, unlinked 59 → 34.** The finding is worth more than the sweep: the README's "~20 loose files" trigger was written for a load that no longer exists — **seventeen entries landed on 2026-08-25 alone** across the concurrent sessions, and the count went from a post-sweep 32 on the 24th to 61 the next day, so a sweep clearing 25 buys **about a day and a half**. This is a near-daily chore now, and the practical trigger is the guard failing someone's PR. **The cheaper half is the citation habit** — cite the review or handoff doc, not the loose journal entry — and this run broke it knowingly: BF-11e cited two journal entries from the nutrition index for want of a handoff doc, which costs the linked floor **two, permanently**. A sweep can undo a fold; it cannot undo a citation.
+
+**Swept again 2026-08-26 — 52 folded into `history-2026-08-26.md`, unlinked 60 → 8.** The guard failed a *nutrition* PR this time, one day after the last sweep, which is the cadence the note above predicted. **The README's link rule was wrong and is now fixed**: it said rewrite `](../../` → `](../`, which leaves `](../x)` and links to a sibling entry folded in the same sweep both broken — two more classes, caught by `check-doc-links` rather than shipped.
 
 **The repo root is guarded now, after one scratch file failed every open PR (BF-20).** `m.mjs` — a Playwright screenshot scratch script referenced by nothing — was committed at the root and merged; its `console.log` calls fail `no-console`, so **`main` itself went red and every open PR inherited it**. A Custom Rules step now refuses a stray root module by name (**Ran 57 of 57**, up from 56) and `.gitignore` stops the common shapes being staged. **The entry's proposed allowlist would have failed on nine correct files** — `auth.ts`, `middleware.ts`, `drizzle.config.ts`, the three `instrumentation*.ts` and more — and named a `tailwind.config` this repo does not have; it is derived from `git ls-files` instead, because a guard that fails on correct files gets deleted by the first person to hit it. **And the `.gitignore` half deliberately does NOT cover `.ts`**: fourteen legitimate root `.ts` files exist and a new one would be *silently untracked*, which is a worse failure than the one being fixed — the check covers `.ts` loudly instead. Sibling sweep: the root is otherwise clean.
 
@@ -418,6 +422,15 @@ order.
 **Fixed.** Both the pre-workout Intensity control and the in-workout header asked `isDeloadActive` — *"is the current PHASE a deload week"* — rather than whether today's session is a deload, which is what `prescription.deload` holds. So an auto-applied, readiness-driven deload read as a full session from the pre-workout screen to the last set, and the owner trained one that way. `sessionContextLabel` resolves the header's line in one place; `useDeloadChoice` adopts the prescription until the user chooses otherwise; "As prescribed" now sits under whichever half the engine picked, with the other labelled **Override** ([`journal`](docs/overview/entries/2026-08-24-deload-visible-on-both-surfaces.md)).
 - **Keep: not device-verified, and the active header has no end-to-end guard.** `e2e/deload-visible.spec.ts` covers the toggle against a real auto-applied prescription and is mutation-checked; the header's label is pinned by unit tests only — no spec starts a workout and reads it.
 
+### [nutrition] ⚠️ The meal builder pins its batch figures; the footer is unchecked against the gesture bar (BF-31, v1.381.0)
+
+Artboard 5's footer shipped: `Batch · kcal · P/C/F · per portion` above `Save meal`, outside the
+scroll, so the numbers stay put while the ingredients that change them are edited. The name is edited
+in place from the header. **On the S25:** the footer is a new bottom-anchored region inside a 90vh
+sheet — `SheetContent side="bottom"` owns the bottom inset, so it carries no `pb-safe*` of its own,
+but that it clears the gesture bar is unverified. Check also that the header's inline name input is
+not covered by the software keyboard.
+
 ### [nutrition] ⚠️ My Meals took artboard 3's shape, and its row actions moved to a swipe (BF-29, v1.376.0) — NOT verified on device · needs: hardware
 
 The meal library's rows collapsed to `name · what is in it · calories · chevron` inside one grouped
@@ -455,6 +468,21 @@ all of it under `colorScheme: 'light'` and was proven to fail without the fix.
 **On device:** put the S25 in light mode and confirm the app stays dark end to end, including the
 surfaces the provider cannot reach — the icon routes (no CSS) and any canvas paint. The sandbox
 emulates `prefers-color-scheme`; it does not run Samsung's WebView or its scheduled night mode.
+
+### [nutrition] ⚠️ Meal photos render at last, and a data-URI image now sits in every scrolling row (BF-32, v1.380.0)
+
+The photo feature was **write-only** since the picker landed — stored, synced, rendered nowhere. Every
+meal row now carries a 40 px tile: the photo if there is one, a gradient-and-glyph placeholder if not.
+**On the S25:** a data-URI `<img>` in a scrolling list is the shape Samsung's WebView compositor has
+mishandled before — check a long day for artefacts and jank. The day screen's tile is always the
+placeholder today; `food_items` has no image column, so only saved meals can carry a photo.
+
+### [nutrition] ⚠️ A saved meal opens onto its own screen; the nested back gesture is unverified (BF-30, v1.378.0)
+
+Artboard 4 shipped as a **nested sheet** over the meal library, not a route and not the row
+expansion BF-29 left in place. On the S25: the back gesture now unwinds **three** layers (detail →
+library → screen), which rests on BF-27's one-press-per-layer guarantee; also check that a 92vh
+sheet's action row clears the gesture bar, and that a photo plus ten ingredients still scrolls.
 
 ### [nutrition][app-shell] ⚠️ The calorie surface: one budget, a progress bar, and one open cache-ordering bug (Q-415/Q-417/Q-323 fixed, LB-4 open, 2026-08-23)
 
@@ -808,16 +836,12 @@ emulates `prefers-color-scheme`; it does not run Samsung's WebView or its schedu
 - **⚠️ The obvious check is unsound, and its own output proves it.** Asking whether the *file* touches
   the local store reports `health-content.tsx` — the Q-488 file — as fine, because it uses the store
   elsewhere and just not in the delete handler. **File-level coverage says nothing about a handler.**
-- **Two server-only writers, both clean, one for a reason worth keeping.** The Health Connect metrics
-  PATCH arrives via the pull (chain verified in sweep 23). And
+- **Two server-only writers, both clean.** The Health Connect metrics PATCH arrives via the pull, and
   `meal-plan-setup-sheet.tsx:387` creates saved meals server-only — fine, because `saved_meals` is
-  **push-only** in the outbox and kept current by **hydrate-on-read** instead
-  (`saved-meals-sheet.tsx:111` hydrates from the API; `food-logger-sheet.tsx:196` falls back to it).
-  **So "no pull mapping" is not evidence of a gap** — a future audit testing pull coverage alone would
-  file that one wrongly.
-- **Not verified:** static audit and source reading, not on the APK. The handler-window heuristic reads
-  a fixed span around each call site, so a local write further away would be missed — for the eight
-  above the call is within a few lines.
+  **push-only** in the outbox and kept current by **hydrate-on-read**. **So "no pull mapping" is not
+  evidence of a gap**; an audit testing pull coverage alone would file that one wrongly.
+- **Not verified:** static audit and source reading, not the APK. The handler-window heuristic reads a
+  fixed span around each call site, so a local write further away would be missed.
 
 ### [activity][app-shell] 🟠 Deleting an activity leaves it in the local store, so three other screens keep showing it (Q-488, 2026-08-18)
 
@@ -872,25 +896,21 @@ emulates `prefers-color-scheme`; it does not run Samsung's WebView or its schedu
   **`freshWithinTtl: true`** or a read path is **seed-only** — and this file recorded that only
   `invalidateGoalRecommendations` had ever been checked, *"the other groups are not audited."*
 - **Case (a) is now audited and clean.** Sixteen `freshWithinTtl: true` sites resolve to **seven keys**,
-  all `TTL_LONG` (6 h): `exercise-library`, `activity-types`, `progression-styles`,
-  `workout-templates`, `progress-summary`, `workout-data:all`/`workout-card:<id>`. **Every one is in an
-  invalidation group, and every client writer of the endpoint behind it calls that group.** No gap.
-- **One thing that reads as a live defect and is not.** `session-select-content.tsx:896` says the
-  `workout-data` caches are *"never invalidated … for up to 6 hours"* — that is the **comment on the
-  Q-117 fix**, and `invalidatePrescriptionChanged()` is the line below it. Recorded so the next person
-  to grep `never invalidated` does not reach for the alarm, as I did.
-- **A design property, deliberately not filed:** these invalidations are **device-local** —
-  `cache-groups.ts` clears the writing client's cache and cannot reach another device. `exercise_library`
-  and `activity_types` are **shared** tables, so a change on one device leaves other clients serving the
-  old list as a settled value for up to 6 h. Not filed because `TTL_LONG` is documented as *"slow-changing
-  config"* and the current user base has no second writer. **Worth knowing when multi-user lands** — the
-  answer then is a version/etag or a shorter TTL for shared config, not more invalidation call sites,
-  which cannot help across devices.
-- **Case (b) is still unaudited** — seed-only read paths (a screen that `readCacheSync`s a key and never
-  fetches it, the Q-260 shape). That half leaves no revalidation at all and is the likelier source of a
-  stale-value report. Named as the obvious next sweep in this lens.
-- **Not verified:** static audit plus local dev; not on the APK. Cross-device staleness was reasoned
-  about, not reproduced — this harness has one client.
+  all `TTL_LONG` (6 h) — `exercise-library`, `activity-types`, `progression-styles`,
+  `workout-templates`, `progress-summary`, `workout-data:all`/`workout-card:<id>`. Every one is in an
+  invalidation group and every client writer behind it calls that group. No gap.
+- **Reads as a live defect and is not:** `session-select-content.tsx:896` says the `workout-data`
+  caches are *"never invalidated … for up to 6 hours"* — that is the comment **on** the Q-117 fix, and
+  `invalidatePrescriptionChanged()` is the line below it.
+- **A design property, deliberately not filed:** invalidation is **device-local**, so a change to the
+  shared `exercise_library`/`activity_types` leaves other clients on the old list for up to 6 h. Fine
+  while there is no second writer; **when multi-user lands the answer is a version/etag or a shorter
+  TTL for shared config**, not more call sites, which cannot reach across devices.
+- **Case (b) is still unaudited** — seed-only read paths (the Q-260 shape: a screen that
+  `readCacheSync`s a key and never fetches it). That half has no revalidation at all and is the
+  likelier source of a stale-value report. The obvious next sweep.
+- **Not verified:** static audit plus local dev, not the APK; cross-device staleness was reasoned
+  about rather than reproduced, since this harness has one client.
 
 ### [platform] 🟠 Q-475 shipped mid-sweep; the production evidence is about the half its fix did not cover (Q-487, 2026-08-18)
 
@@ -1100,33 +1120,27 @@ emulates `prefers-color-scheme`; it does not run Samsung's WebView or its schedu
 
 ### [platform] ✅ The empty account and the n=1 account are clean — and the probe that said so was invalid until it was fixed (2026-08-18)
 
-- **All 126 static GET routes driven twice** — once as an account with zero rows in every domain, once
-  after giving it exactly one `body_metrics` row and one `sleep_sessions` row.
+- **All 126 static GET routes driven twice** — as an account with zero rows in every domain, then with
+  exactly one `body_metrics` and one `sleep_sessions` row.
   [`docs/reviews/2026-08-18-empty-and-single-datapoint-accounts.md`](docs/reviews/2026-08-18-empty-and-single-datapoint-accounts.md).
 - **The method correction is the point of the entry.** The probe grepped response bodies for `NaN`
-  and `Infinity`, came back clean twice, and **could not have detected either**:
-  `JSON.stringify({x: NaN})` → `{"x":null}`, and the same for `±Infinity`. Both serialise to `null`,
-  indistinguishable from a legitimate no-data null. **A numeric-corruption check must never be run
-  against a serialised JSON body** — audit the divisions, or use a differential (numeric at n=many,
-  `null` at n=1 while its input exists), never a string match on the response.
+  and `Infinity`, came back clean twice, and **could not have detected either** — both serialise to
+  `null`, indistinguishable from a legitimate no-data null. **Never run a numeric-corruption check
+  against a serialised JSON body**: audit the divisions, or use a differential (numeric at n=many,
+  `null` at n=1 while its input exists).
 - **By the correct method — auditing every mean-style division across `app/api`,
-  `packages/shared/src` and `lib/health` — there is no unguarded division.** The four that looked
-  unguarded from a grep each carry an explicit early return immediately above
-  (`health-trends:111`, `cardio-week:24`, `oura/hr-window:61`, `admin/program-export:51`); the rest
-  are ternary-guarded at the expression.
+  `packages/shared/src` and `lib/health` — there is no unguarded division.** The four that look
+  unguarded from a grep each carry an early return immediately above (`health-trends:111`,
+  `cardio-week:24`, `oura/hr-window:61`, `admin/program-export:51`); the rest are ternary-guarded.
 - **No route changed behaviour between zero data and one data point** — the useful half of the sweep.
-  Status distribution identical across both runs: 76–77 × 200, 33 × 403 (admin-gated), 11 × 400
-  (missing required param), 2 × 404, 3 × 5xx.
-- **All three 5xx are environmental and unchanged between runs:** `/api/download-apk` 502 (GitHub not
-  reachable from the sandbox), `/api/push/subscribe` 503 (VAPID unset), and
-  `/api/oura-ble/decoder-constants` 500 with an empty body (the vendored constants are deliberately
-  absent from the public repo). The last was **deliberately not filed**: the client's
-  `isUsable()` exists precisely to reject an error-shaped payload, and the decoder throws on an absent
-  table rather than producing plausible wrong numbers.
-- **`onRequestError` verified working.** It caught the bodiless 500 and wrote an `error_events` row
-  with the exact message — checked by querying the table after the run. The hook does what its comment
-  claims for the ~80 route files with no `catch`.
-- **Not verified:** the APK, production, or the dynamic-segment (`[id]`) routes, which were excluded.
+  Identical status distribution across both runs: 76–77 × 200, 33 × 403, 11 × 400, 2 × 404, 3 × 5xx.
+  All three 5xx are environmental and unchanged: `/api/download-apk` 502 (GitHub unreachable from the
+  sandbox), `/api/push/subscribe` 503 (VAPID unset), `/api/oura-ble/decoder-constants` 500 with an
+  empty body (the vendored constants are deliberately absent from the public repo). The last was
+  **deliberately not filed** — `isUsable()` exists precisely to reject an error-shaped payload.
+- **`onRequestError` verified working** — it caught the bodiless 500 and wrote the `error_events` row
+  with the exact message, so it does what its comment claims for the ~80 catch-less routes.
+- **Not verified:** the APK, production, or the dynamic-segment (`[id]`) routes, excluded by design.
 
 ### [nutrition][platform] 🟠 A water quick-add replayed by the outbox triple-counts — the one non-idempotent mutation of nineteen (Q-481, 2026-08-18)
 
@@ -2950,23 +2964,17 @@ next device smoke run.
 
 ### [app-shell][platform] ✅ One of the two sign-out buttons left the previous account's data on the device — fixed 2026-08-10 (Q-172, v1.277.3)
 
-More → Profile signs out through `clearLocalStoreData()` → `clearAllCache()` → `signOut()`.
-`components/chat.tsx` has **two** sign-out buttons (`:554`, `:636`) that post a bare
-`<form action={signOut}>` and do neither. After signing out that way, `ta_cache:*` and the native
-SQLite store still hold the previous account's data, and most cache keys carry no user id
-(`weekly-stats`, `readiness-score`, `home-day-timeline`), so the next account paints from them via
-`readCacheSync` before any fetch returns.
+More → Profile signs out through `clearLocalStoreData()` → `clearAllCache()` → `signOut()`;
+`components/chat.tsx`'s two buttons posted a bare `<form action={signOut}>` and did neither, so
+`ta_cache:*` and the native store kept the previous account's data — and most keys carry no user id
+(`weekly-stats`, `readiness-score`, `home-day-timeline`), so the next account painted from them via
+`readCacheSync`. Invisible with one account per device, and in the way of the multi-user direction.
 
-Invisible today — one account per device — and squarely in the way of the multi-user/Play Store
-direction recorded in the Canonical Runtime note. The localStorage half was proven in the browser;
-the native SQLite half was inferred from the absent call, not observed.
-
-**Fixed 2026-08-10 (#1235, v1.277.3)** — and the fix was larger than the finding: reading the
-sign-out that *did* work found `clearLocalStoreData()` was a hand-written list drifted to 27 of the
-schema's 37 tables. See the Current Status entry above and
-[`docs/overview/history-2026-08-08.md`](docs/overview/history-2026-08-08.md).
+**Fixed 2026-08-10 (#1235, v1.277.3)**, and larger than the finding: the sign-out that *did* work
+used a hand-written table list drifted to 27 of the schema's 37.
+[`history`](docs/overview/history-2026-08-08.md).
 ⚠️ **Still not device-verified:** `clearLocalStoreData()` is a no-op on web, so the local-store half
-has never actually run.
+has never run.
 
 ### [platform][nutrition] 🟠 90% of the DB suite is blind to a total loss of user scoping (measured 2026-08-09)
 
@@ -3917,27 +3925,17 @@ whether other recent nights hit the same bug during the same error bursts.
 
 ### [heart-rate][workouts] ✅ Per-set HR now records which device measured it (2026-08-05, v1.260.0)
 
-From the null-rate sweep — the follow-up the gap sweep named as its own blind spot. **847 columns
-across 69 tables**, one `count(col)` each: **49 are 100% null in a table that has rows.** Most were
-classified out (optional inputs, tombstones, frozen Cloud columns, and columns whose *input* is null
-rather than whose producer is missing — each checked against its writer). Two survived:
-`oura_daily_derived`'s ten always-null columns, which is the queued **Q-7b** confirmed and its count
-corrected from eight; and **`set_hr_stats.source`** — declared in migration 139, never written,
-never read, across 582 rows.
+From the null-rate sweep — **847 columns across 69 tables**, one `count(col)` each: **49 are 100%
+null in a table that has rows.** Most classified out against their writers. Two survived:
+`oura_daily_derived`'s ten always-null columns (the queued **Q-7b**, count corrected from eight),
+and **`set_hr_stats.source`** — declared in migration 139, never written, never read, 582 rows.
 
-`source` now records `chest_strap` / `oura_ble` / `mixed` per set. The data was always there —
-`getHrForWindow` selects it and the workout-level summary already used it; it just never reached the
-per-set rows. Reads the **working-set window only**, not the rest that follows (that is where the
-ring takes over if a strap comes off, and attributing it to the set would be wrong), and stays
-**null rather than `'unknown'`**.
-
-Why it matters: *"were those sets ring-only?"* is the first question asked of suspect per-set HR, and
-it is exactly what the still-open half of **Q-11** needs to answer about the sessions with zero
-attribution. Existing rows fill in via **Admin → Tools → "Backfill per-set HR stats"**.
-
-Seven tests — five on the derivation, two DB round-trips. The round-trip pair earns its place:
-`workout_hr_stats` failed at exactly that seam, computed correctly and rejected by the column, while
-its unit tests passed.
+`source` now records `chest_strap` / `oura_ble` / `mixed` per set. The data was always there;
+it never reached the per-set rows. Reads the **working-set window only**, not the rest after it
+(where the ring takes over if a strap comes off), and stays **null rather than `'unknown'`**. What
+the still-open half of **Q-11** needs. Existing rows fill in via **Admin → Tools → "Backfill per-set
+HR stats"**. Seven tests, two of them DB round-trips — `workout_hr_stats` failed at exactly that
+seam, computed correctly and rejected by the column, while its unit tests passed.
 
 ### [platform] ✅ The rollup tests weren't flaky, they were slower than the limit (2026-08-05, v1.260.1)
 

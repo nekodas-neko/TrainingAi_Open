@@ -239,9 +239,13 @@ here — so the owner read the original promise, expected a big visual change, a
 one. **The lesson is the cheap half: when an implementer refutes a claim, strike the claim where the
 claim lives**, not only where the work happened.
 
-**Q-406's gate marked parked rather than answered**, with a note saying so explicitly — the owner
-asked to check back once the other nutrition agents have possibly settled it. An unanswered question
-recorded as answered is worse than one left open.
+**Q-406's park note was written and then dropped on the rebase — it was already out of date.** The
+owner had asked to park the per-row-warning question and check back once the other nutrition agents
+had possibly settled it. They had: `main` now carries **the warning design decided 2026-08-26,
+option A**, the owner's pick, with the gate cleared and the treatment specified — plus the thumbnail
+shipped in v1.380.0. Recording "parked, not answered" on top of that would have re-opened a settled
+question, so this branch took `main`'s side whole for that region. **The check the owner asked for
+was the rebase itself**, and the answer was yes.
 
 ## 2026-08-24 — `CLAUDE.md` 1154 → 1155
 
@@ -2724,3 +2728,35 @@ alone reached.)*
 are the four new entries and two corrections, not accretion. One of those corrections retracts this
 baton's own claim that the check-in "adds little independent information" — measured, ~75% of it is
 information nothing else has.
+
+## 2026-08-26 — `docs/implementation-backlog.md` raised, 11926 → 11932 (the warning-row decision)
+
+Six lines net. Q-406's `Gate: owner` came off and was replaced by the answer: option A, an amber
+triangle before the calorie column, serving line kept, sentence moved to the food's detail.
+
+The length is mostly the two rejected options, and that is the point. **C is the intuitive answer** —
+show the warning in full, in the row — so without a written record of why it lost it gets re-proposed
+by the next person who reads that a warning "should be visible". Its cost is not visible from the row
+itself: three call sites would carry a prop they never fill, turning the shared row back into a
+wrapper, which is the thing Q-406 exists to end.
+
+**This raise was missed on the first push and CI caught it.** The branch ran
+`check-backlog-pointers` and not the doc-size check, and the PR body claimed a full `check:rules`
+pass that had not been run on this branch. The claim was corrected rather than quietly fixed.
+
+## 2026-08-26 — `projectOverview.md` 7987 → 7992, backlog 11932 → 11860 (LA-31/Q-291)
+
+Seven lines for the Q-291 status paragraph — the day's AI surfaces can now see each other — and
+twenty-eight back from Q-291 leaving the queue. Net down. **Re-derived four times: `origin/main`
+moved under this branch five times while it was open** — the numbers here are against the base it
+finally merged onto. Worth naming as a cost of running both lanes at once: every one of those needed
+the changelog rebuilt from `git show origin/main:` and the version re-bumped across three files
+(`package.json`, `changelog.ts`, and `projectOverview.md`'s header line, which is easy to forget and
+which nothing checks), plus this file's numbers re-derived. None of it was splice-able.
+
+The two lines are load-bearing rather than narrative. They record the constraint a future change
+would otherwise break: **the cross-surface read graph is one-directional and must stay acyclic.**
+Each surface caches on a hash of its prompt context, so two surfaces hashing each other's text would
+invalidate each other indefinitely, and model output is not deterministic, so it would never settle.
+That is not visible from either route's source — it is a property of the pair — which is exactly the
+kind of thing an orientation doc exists to carry.

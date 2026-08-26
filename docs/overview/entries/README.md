@@ -73,10 +73,13 @@ different ways. Both are mechanical; neither is obvious until it happens.
    which is not a file a sweep should be rewriting. Fold the **unlinked** ones and leave the rest;
    `grep -rl <entry-filename> --include='*.md' .` tells you which is which. (61 → 32 that way, which
    is under the 60-file runaway limit and enough to unblock CI.)
-2. **Rewrite `](../../` → `](../` in every folded body.** An entry lives in
-   `docs/overview/entries/`; the history file is one level up in `docs/overview/`. Every relative
-   link inside the entry loses a level when it moves. Missing this left 6 broken links pointing one
-   directory too high.
+2. **Re-express every relative link from `docs/overview/`, not just the `](../../` ones.** An entry
+   lives in `docs/overview/entries/`; the history file is one level up. The README used to say
+   "rewrite `](../../` → `](../`", which is two of the three cases and leaves the other two broken
+   (measured 2026-08-26): **`](../x)` also loses a level** and becomes `](x)`, and **a link to a
+   sibling entry that this same sweep is folding** resolves to a file that no longer exists. Resolve
+   each link against `docs/overview/entries/` and `relpath` it to `docs/overview/`; point a folded
+   sibling at `](#)`, since the note it referred to is now in the same file.
 
 3. **Entries link to EACH OTHER by bare filename, and the sweep breaks those too** (measured
    2026-08-24). Two sub-cases, and they need different fixes: a folded entry linking to another

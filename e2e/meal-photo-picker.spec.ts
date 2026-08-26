@@ -1,6 +1,6 @@
 import { test, expect, type Page } from '@playwright/test'
 import { Client } from 'pg'
-import { SEED_EMAIL, expandSavedMeal, settleRouteBoundary } from './fixtures'
+import { SEED_EMAIL, openSavedMeal, settleRouteBoundary } from './fixtures'
 
 /**
  * The meal photo can be picked, and what gets stored is inside the cap (Q-327).
@@ -126,8 +126,8 @@ async function openEditMeal(page: Page) {
     if (await page.getByRole('dialog').count() === 0) await tap(page, /^Saved Meals$/)
     await expect(page.getByText(MEAL_NAME)).toBeVisible({ timeout: 5_000 })
   }).toPass({ timeout: 90_000 })
-  // BF-29 put the row's actions inside its expansion; `Edit` is no longer on the collapsed row.
-  await expandSavedMeal(page, MEAL_NAME)
+  // BF-30 moved the row's actions onto the meal's own screen; open it first.
+  await openSavedMeal(page, MEAL_NAME)
   await tap(page, `Edit ${MEAL_NAME}`)
   // `Add`/`Change`, depending on whether this meal already has one — and never the Remove button,
   // which also matches "meal photo" and made this a strict-mode violation.
