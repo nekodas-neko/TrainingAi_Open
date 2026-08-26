@@ -23,6 +23,7 @@ second copy. Same for zone thresholds.
 
 ## Reference docs
 
+- [`docs/reviews/2026-08-26-pillar-review.md`](../../reviews/2026-08-26-pillar-review.md) — **the five Home pillars answered, 2026-08-26.** The HR tile's "52" is the **7-day average** resting HR (`oura-score-chip-row.tsx:390` → `readiness.restingHr`). Measured over 50 nights: the nightly value moves **2.11 bpm** night to night, the tile's average **0.33** — **it discards 84% of the movement**, in the signal that is the *strongest* predictor of the owner's own check-in (r = **+0.557**, best of nine). Filed **TN-13**: show last night's value with its delta against baseline. **Do not swap in HRV** — more responsive, less correlated with felt state (+0.427).
 - [`docs/reviews/2026-08-15-pillar-model-soundness-review.md`](../../reviews/2026-08-15-pillar-model-soundness-review.md)
   — §4: reviewed for model soundness and **came back clean**. Observed max **168 bpm** over 57,494
   samples independently corroborates the figure Q-57 adopted over `220 − age`; `daily_zone_minutes`

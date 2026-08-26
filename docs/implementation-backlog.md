@@ -492,16 +492,74 @@ will hit it.
   sits in that row; and whether the sheet now reads as one thing is the owner's call, not a
   measurement.
 
+### [nutrition] BF-32 — the meal photo is stored, pickable, and displayed nowhere; the placeholder is the missing piece
+
+- **Lane:** B
+- **Spec:** BF-28.
+- **Added:** 2026-08-25, owner, reviewing the artboards: *"Some are similar but not the same (i.e no
+  spot for an image) it should show the default one in the mockup if no image is attached."*
+- **⚑ The owner's sentence is the specification, and it is stronger than "add a thumbnail".** The
+  glyph tile is the **always-present** state of the row, not a fallback bolted on afterwards. A row
+  with no photo shows the placeholder; a row with one shows the photo in the same box. There is never
+  a row without the box — which is what makes a list read as one thing rather than ragged.
+
+**What already exists, and what is missing.** The storage half shipped twice over:
+
+| Piece | State |
+|---|---|
+| `saved_meals.image_data_uri` column | ✅ Q-396 — round-trips both routes, the outbox replay and the local mirror |
+| `MealPhotoTile` — pick, downscale to 128 px WebP, preview | ✅ Q-327, wired into Edit Meal |
+| **Anything that renders a stored photo** | ✗ **nothing** — grep `imageDataUri` and every hit is a route, an adapter or the picker |
+| **The placeholder** | ✗ does not exist |
+
+So a photo picked today is written, synced, and never seen again. That is the finding: **the feature
+is write-only**, and it has been since the picker landed.
+
+**`FoodRow` has no thumbnail slot at all.** Its own comment says so — *"The optional thumbnail Q-406
+lists is deliberately not here yet. No call site passes one."* **That deferral is now superseded by
+the owner's instruction** and Q-406 has been amended to say so. The thumbnail lands in `FoodRow`,
+once, and every parity entry gets it for free.
+
+**The placeholder, read off the artboards:** a 40 px tile, `border-radius: 9px`, filled with
+`linear-gradient(140deg, …)` carrying a utensils glyph at 45% white. It appears **nine times** in the
+drawings with identical values and once in a lighter variant, so it is one shared thing, not
+per-screen markup. Meal detail (artboard 4) uses the same idea at hero scale — a full-width band with
+a large glyph and a `Photo` button on it.
+
+- **⚠ The gradient in the artboards is `oklch(...)` literals, and BF-28 rule 3 applies.** Take the
+  structure; source the colours from tokens. `check-hex-literals.js` ratchets per file, so a pasted
+  literal fails the Custom Rules job.
+- **Sizes to settle in the PR, not guess:** the row tile at 40 px against the day screen's existing
+  row height, and whether the hero band is a fixed height or an aspect ratio. Say which you chose.
+- **The photo is a data URI, not a URL** — `<img src>` on a data URI needs no `no-img-element`
+  exemption for a remote host, which is the objection `food-row.tsx` recorded against building this
+  early. That objection no longer applies to saved meals; it may still apply to any future
+  food-item image from an external source, so do not widen the prop to accept a URL without saying
+  why.
+- **Scope, explicitly:** this is the shared tile plus its call sites — the day screen rows, My meals
+  rows, Meal detail's hero, the ingredient lists. It is **not** a new capture flow; picking already
+  works.
+- **Verification.** Both states on every surface — a meal with a photo and a meal without — against
+  the artboards at 412 dp per BF-28. Then the device run: a data-URI image inside a scrolling list is
+  exactly the shape Samsung's WebView compositor has mishandled before.
+
 ### [nutrition] BF-30 — artboard 4 parity: Meal detail, the one screen with no clear counterpart
 
 - **Lane:** B
 - **Spec:** BF-28.
 - **Added:** 2026-08-25, owner: the nutrition screens match their drawings.
-- **⚑ Start by answering whether this screen exists.** Artboards 1, 2, 3, 5 and 6 each map onto a
-  shipped surface. This one maps onto `saved-meal-card.tsx`'s expanded state and `my-meals-picker.tsx`
-  — neither of which is a screen. **The first task is to decide whether Meal detail is a new route, a
-  full-height sheet, or an expansion of the card**, and that decision belongs in the PR before any
-  markup. Every other parity entry is "change what is there"; this one may be "build what is drawn".
+- **Needs:** BF-32
+- **✅ THE OPEN QUESTION IS ANSWERED — the owner wants this screen.** 2026-08-25, looking at artboard
+  4: *"I dont see this screen yet"*. The entry previously allowed "it stays a card, here's why" as an
+  outcome; **that is no longer available.** Artboards 1, 2, 3, 5 and 6 each map onto a shipped
+  surface and this one does not, so unlike every other parity entry this is *build what is drawn*
+  rather than *change what is there*.
+- **Still to decide, in the PR before any markup:** route vs full-height sheet vs expanded card. The
+  owner asked for the screen, not for where it lives. A sheet reached from a My-meals row is the
+  cheapest shape that matches the drawing and keeps the back gesture working (BF-27); say what you
+  chose and why.
+- **The hero band is BF-32's placeholder at hero scale** — same gradient, same utensils glyph, a
+  `Photo` button on it, and it shows whether or not a photo is stored. Do not draw a second one here.
 - **What artboard 4 draws:** a hero band with `[back]`, an overflow action and a **`Photo`** button;
   the meal name with `Makes 2 portions · 5 ingredients`; a **`278 / per portion`** figure; three macro
   columns with **percentage, grams and label** (`48% · 33 g · Protein`); an `Ingredients` section
@@ -583,6 +641,13 @@ will hit it.
   [`Journal`](overview/entries/2026-08-23-shared-food-row.md).
 - **✅ THE DIARY ROW SHIPPED 2026-08-25 (v1.367.0)** — with the delete this entry required moved into
   `QuickEditLogSheet` first, so no capability was dropped.
+- **⚑ THE THUMBNAIL DEFERRAL IS SUPERSEDED, 2026-08-25.** `food-row.tsx` records that the optional
+  thumbnail is *"deliberately not here yet — no call site passes one"*. The owner has now specified
+  it: *"it should show the default one in the mockup if no image is attached."* The tile is the
+  **always-present** state of the row, so the slot is no longer optional-in-practice. **BF-32 owns
+  the tile and the placeholder**; this entry owns the `FoodRow` prop it lands on. Do them in one PR
+  unless there is a reason not to, and delete that comment when you do — a stale "deliberately not
+  yet" reads as a decision rather than a superseded one.
 - **Keep:** ONE call site, the external food-database row (`ingredient-search.tsx:132`), which
   carries a macro-mismatch warning and an in-flight spinner. The agreed row has nowhere to put
   either, and adding a slot makes it a wrapper rather than a unification. **It needs a design answer
@@ -1441,6 +1506,42 @@ matches what logging does.
 **Do not instead "exclude when unlogged and include when logged"** — that still moves the number the
 moment the owner answers, which is the thing being removed.
 
+**⚑ THE CHECK-IN IS NOT THE ONLY THING THAT UNSETTLES READINESS — `activityBalance` is worse.**
+`READINESS_WEIGHTS.activityBalance = 0.06`, and the composite's own doc-comment says it is
+*"Our own 0-100 activity score for **today**"* (`readiness-composite.ts:49`). Today's activity score
+is a **partial day** — its 55-weight daily-movement lane is near-empty at 7 am and fills through the
+day (measured 2026-08-26: 63 at 07:03, against 78 and 82 on the two preceding completed days).
+
+So readiness drifts **continuously, with no user action at all**, at roughly `0.06 × ~15 = ~1 point`
+across a day. Smaller than the check-in's ±3.84, and **worse in kind**: the check-in moves once when
+the owner presses a button, this moves invisibly all day. `prevDayActivity` (weight 0.09) already
+uses the previous, completed day and is settled — so the fix is to point `activityBalance` at a
+completed day too, or drop it.
+
+**The owner's requirement is one thing — "the numbers should be fully set on first open/load" — and
+it needs both changes.** Shipping only the check-in half leaves the score still drifting, and the
+owner will reasonably read that as the fix not working.
+
+**Pass test (extended):** readiness for a given day is byte-identical across two reads twelve hours
+apart with no new overnight data — which the check-in half alone does not achieve.
+
+**📏 The lookback the owner asked for is DONE (2026-08-26) — do not re-run it.**
+[`review`](reviews/2026-08-26-checkin-lookback.md), n = 33 logged days.
+- **The check-in correlates with the objective signals**: restingHeartRate **+0.557**, previousNight
+  **+0.520**, sleepBalance **+0.470**, temperature **+0.463**, hrvBalance +0.427. Yesterday's
+  training predicts it essentially not at all (**+0.028**).
+- **Best honest model: resting HR + last night's sleep, LOO R² = 0.293.** Adding predictors raises
+  in-sample R² and *lowers* out-of-sample: all eight contributors reach R² 0.541 with **LOO R²
+  0.047**.
+- **⛔ Do NOT impute the check-in on unlogged days.** That is the obvious next idea and the numbers
+  refuse it — a model explaining 5% of out-of-sample variance is a fabricated value with a model's
+  authority. Keep the neutral/exclusion path.
+- **This CORRECTS this entry's original reasoning.** It said the check-in "tracks the objective
+  contributors closely enough to add little independent information". r ≈ 0.5 is **~25% shared
+  variance**, so ~75% of the check-in is information nothing else has. Dropping it from readiness is
+  still right — because its weight is 10% and the score must be settled — but **not** because it is
+  redundant. It is worth keeping and using elsewhere.
+
 ### [sleep] TN-10 — `TOTAL_SLEEP`'s comment and its curve disagree by ~15 points, on the heaviest contributor
 
 - **Branch:** _unassigned_
@@ -1588,6 +1689,104 @@ like the feature works and would quietly teach the owner to ignore it.
 
 **Pass test:** on a day with a genuinely sedentary hour, that hour's cell reads empty on the strip and
 the day's move-hours total is below the goal.
+
+### [heart-rate] TN-13 — the HR tile shows a 7-day average of the one signal that best predicts how the owner feels
+
+- **Branch:** _unassigned_ · **Added:** 2026-08-26 · owner: *"my value is 52; what is that? what would be the more useful HR value to show?"*
+- **Lane: B** — `components/oura-score-chip-row.tsx:390`; the payload field already exists.
+
+`const hr = readiness.restingHr ?? readiness.hrCurrent`, and `restingHr` is documented as
+*"recent (7-day) average resting HR"* (`readiness-payload.ts:131`).
+
+**Measured over 50 nights:** nightly resting HR moves **2.11 bpm** night to night; the 7-day average
+moves **0.33**. **The tile discards 84% of the daily movement.** And resting HR is the **strongest
+predictor of the owner's own check-in** (r = **+0.557**, best of nine — see the
+[lookback](reviews/2026-08-26-checkin-lookback.md)). The most informative signal, shown in its least
+informative form.
+
+**Recommendation: show last night's resting HR with its delta against baseline** — "52 · −2 vs
+usual". `restingHrBaseline` is already passed to `restingHrCue`, so the comparison exists; only the
+displayed number is smoothed. **Do not simply swap in HRV** — HRV is more responsive but correlates
+less with felt state here (+0.427 vs +0.557), and it is absent from Home entirely, which is a
+separate question.
+
+**Pass test:** the tile's number changes on most days; over the stored history its night-to-night mean
+change is within 20% of 2.11 bpm rather than 0.33.
+
+### [sleep][devices] TN-14 — the 2026-08-19 partial night (3.50 h) is still stored and still feeds every baseline
+
+- **Branch:** _unassigned_ · **Added:** 2026-08-26 · owner, second time asking: *"I don't want it contributing to stats"*
+- **Lane: A**
+- **Needs: Q-520** — the partial-night flag is the mechanism this needs and is unbuilt.
+
+Verified in production 2026-08-26: `oura_daily_summary` for **2026-08-19** holds
+`sleep_duration_hours = 3.50`, efficiency 86, deep 1.00, REM 0.58 — between a 9.00 h night and a
+7.67 h night. **Nothing has removed, corrected or flagged it.** It contributes to the sleep baseline,
+to `sleepBalance` in readiness, and to any trailing sleep statistic reading that table.
+
+**Do not delete the row.** It is decoded ring data, and a hand-deletion is an unreproducible data edit
+that the next rollup may recreate. The right shape is Q-520's flag — mark the night partial and have
+consumers exclude it — which also handles the next one without another manual pass.
+
+**Establish first whether the 3.50 h is wrong or real.** The owner reports it as "decoded poorly", but
+this entry has **not** verified that against the raw frames — a genuinely short night and a
+mis-decoded one look identical in the summary table. Decode the night's frames before deciding
+whether the fix is a flag, a correction, or both.
+
+**Pass test:** a trailing sleep baseline computed with and without 2026-08-19 differs, and the shipped
+one matches the "without" version.
+
+### [readiness][body] TN-15 — Body Battery: drain that ignores exercise, and no recharge at all
+
+- **Branch:** _unassigned_ · **Added:** 2026-08-26 · owner: *"as we learn basic exercise/HR/stress through the day we should pick up a drain value — then charge it back up through sleep/rest so it's more usable"*
+- **Lane: A**
+- **Needs: TN-2** — the charge window must be fixed before a recharge model can be judged.
+- **Owner sign-off: RECEIVED 2026-08-26** for the direction. **This supersedes the standing "do not
+  propose overnight charging or an anchor redesign" guidance**, which was written against chasing a
+  symptom, not against a stated product requirement.
+
+Two halves are missing from the model the owner describes.
+
+**No recharge.** `walkBodyBattery` filters to `tsMs >= wakeTime`, so overnight is never simulated; the
+morning value is the readiness score via `resolveAnchor`. Measured 2026-08-26: mean morning anchor
+**64.8**, and mornings reading "Charged" (≥75) on **7 of 35**.
+
+**Drain does not respond to exercise.** **Q-521** measured `corr(hr_sample_count, total_drained)` =
+**+0.518** against `corr(steps, total_drained)` = **−0.153**, and a workout moving the end value by
+**0.6 points**. Drain ≈ rate × time worn.
+
+**Sequence, and it matters:** TN-6 first (it lifts the anchor 64.8 → 76.8 on its own), then TN-2 (the
+charge window), then this. Landing a recharge model on top of a boundary that already mis-classifies
+98% of waking time as "draining" cannot be evaluated — and **Q-521 is downstream of Q-515** for the
+same reason.
+
+**⛔ Do not fit a drain model on `HR_REST_THRESHOLD` as it stands**, and **do not reuse TN-11's
+answer either** — that one needs *sedentary vs moving*, this needs a graded intensity. Three
+questions, three boundaries.
+
+**Pass test:** a training day and a rest day with equal wear time differ by ≥15 end-of-day points;
+end-of-day correlates with next-morning readiness at r ≥ +0.4 (v5 alone reached +0.67, n=11 — that is
+the bar to beat, not to assume).
+
+### [readiness] TN-16 — a prolonged-stress warning and a calm-down prompt, blocked on the metric's sign
+
+- **Branch:** _unassigned_ · **Added:** 2026-08-26 · owner request
+- **Lane: B**
+- **Needs: Q-507** — deliberately. Read the next paragraph before starting.
+- **Gate: owner** — do not build until the sign question is settled.
+
+The owner asked for a warning when stress has been elevated too long, plus a calm-down ritual. **The
+metric currently rises on good days**: re-measured 2026-08-26 (n = 33), stress-high minutes correlate
+**+0.386 with readiness** and **+0.477 with the sleep score** — replicating and strengthening Q-507.
+
+**A warning built on this would fire on the owner's best days.** That is worse than no warning: it
+teaches them the app is wrong, and it is the exact failure mode Q-504 records. The HR-chart overlay
+they also asked for is **TN-3b** (`Needs: TN-3a` for per-bucket persistence) and is subject to the
+same caveat — a coloured stress line that brightens after good sleep is an anti-feature.
+
+**What has to happen first:** explain the sign. The obvious hypothesis — that stress minutes track
+data density — was **tested and refuted** (r = −0.128 vs HR sample count). No replacement mechanism is
+established. Until one is, this stays parked.
 
 ### [readiness] TN-6a — suspend the temperature penalty until its baseline is centred
 
@@ -6177,6 +6376,23 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   measurable confound without removing the feature.
 - **n = 25 is small** — at that size r = +0.40 sits near the conventional significance boundary, so the
   strength is provisional. The group means are the durable part. Re-measure at n ≈ 60.
+- **⚑ Amended 2026-08-26 — re-measured at n = 33, and it replicates and strengthens.**
+  ([pillar review](reviews/2026-08-26-pillar-review.md) §4.) `corr(stress_high_minutes,
+  readiness_score)` = **+0.386**, essentially unchanged. **New:** `corr(stress_high_minutes,
+  sleep_score)` = **+0.477** — *stronger than the readiness correlation, and untested in the original
+  entry*. More "high stress" minutes on nights the owner slept **better**. `daytime_stress_scaled`
+  again carries the right sign and no magnitude (−0.086); vs activity score, nothing (−0.033).
+- **⚑ A mechanism was proposed and REFUTED, so the sign is still unexplained.** Hypothesis: better
+  sleep → denser HRV signal → more buckets scored → more minutes classified as anything. Measured:
+  `corr(stress_high_minutes, hr_sample_count)` = **−0.128**, and total scored minutes vs sample count
+  = **−0.259**. Data density does not explain it. Also noted and unresolved: stress-high minutes vs
+  **overnight HRV** = **−0.258**, weakly the *right* way, which sits oddly beside +0.477 vs the sleep
+  score. **Record this as unresolved rather than substituting a second hypothesis** — the first
+  action above ("explain the sign before touching the constant") is now the *only* open action, and
+  one candidate explanation is off the table.
+- **This entry now blocks two more.** **TN-16** (prolonged-stress warning + calm-down prompt) carries
+  `Needs: Q-507` deliberately, and **TN-3b** (the HR-chart stress overlay the owner asked for) is
+  subject to the same caveat. Both would surface a number that currently rises on good days.
 
 ### [readiness] Q-508 — resilience has emitted exactly one value in its lifetime (level 5, granular pinned at the 5.99 clamp)
 

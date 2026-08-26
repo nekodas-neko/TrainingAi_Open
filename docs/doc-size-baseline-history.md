@@ -2654,3 +2654,51 @@ a **live** bug traded for a closed one. The owner scanned a ZMA supplement, the 
 `review-step.tsx`'s `canSave` requires `calories > 0`, so **Next** greyed out with no message. The
 server's own schema is `z.number().min(0)`, so there is no engine half — it is Lane B's, and it is
 queue position 1.
+## 2026-08-25 — `docs/implementation-backlog.md` raised, 11710 → 11775 (the meal photo)
+
+One entry, **BF-32**. The owner reviewed the artboards and found the gap none of the parity entries
+had: *"no spot for an image ... it should show the default one in the mockup if no image is
+attached."*
+
+The length is the evidence, and it is what stops the entry being re-investigated. The photo half
+shipped **twice** — `saved_meals.image_data_uri` in Q-396, the picker and its 128 px downscale in
+Q-327 — and grep proves nothing renders either one. So the entry states plainly that the feature is
+**write-only**, which is a different and smaller job than "build meal photos", and names the two
+places the deferral was recorded so a reader does not trip over a stale *"deliberately not here
+yet"* comment and treat it as a live decision.
+
+## 2026-08-25 — `docs/implementation-backlog.md` raised, 11775 → 11811 (the check-in lookback)
+
+Two entries' worth of measurement, no new entry. **TN-9** gains its second cause — readiness carries
+`activityBalance` at weight 0.06 and the composite's own comment says it is *"our own 0-100 activity
+score for **today**"*, a partial day — so the score drifts ~1 point with no user action at all, which
+the check-in half alone does not fix. Its pass test is extended to demand two byte-identical reads
+twelve hours apart.
+
+The length is doing the work the entry cannot do without it: it records that the obvious follow-up,
+**imputing the check-in on unlogged days, is refuted** — LOO R² 0.047 — so the next session does not
+spend itself rediscovering that a model explaining 5% of out-of-sample variance is a fabricated
+number wearing a regression's authority.
+## 2026-08-26 — three raised for the pillar review: backlog 11775 → 11926, `projectOverview.md` 7977 → 7987, `docs/agents/state/tuning.md` 182 → 218
+
+**Four entries, from six owner questions.** TN-13 (the HR tile averages away 84% of the movement in
+the best predictor of felt state), TN-14 (2026-08-19's 3.50 h night still feeds every baseline),
+TN-15 (Body Battery has no recharge at all and drain that ignores exercise — owner-signed-off), and
+TN-16, which is filed **parked**. Plus a long amendment to Q-507.
+
+The length is carrying the thing a short entry cannot: **a refuted hypothesis.** Stress correlating
+*positively* with readiness invited an obvious explanation — better sleep, denser HRV, more buckets
+scored — and it was measured and refuted at r = −0.128. Q-507 now says so, so the next session does
+not spend itself rediscovering it, and TN-16 says why the warning the owner asked for is parked
+rather than built. TN-15 is long for the opposite reason: it **supersedes** a standing "do not
+propose overnight charging or an anchor redesign" instruction, and a supersession that does not
+explain itself gets reverted by the next reader.
+
+*(Final figures after the check-in lookback PR landed on `main` in between and was merged in — both
+raises are in this branch's diff, which is why the backlog number is higher than the 11890 the branch
+alone reached.)*
+
+**The baton was compacted in the same pass** (221 → 216 before the raise) so the lines it grows by
+are the four new entries and two corrections, not accretion. One of those corrections retracts this
+baton's own claim that the check-in "adds little independent information" — measured, ~75% of it is
+information nothing else has.
