@@ -306,7 +306,8 @@ export type MutationDomain =
   | 'oura_daily_summary'
   | 'oura_daily_derived'
   | 'sleep_session'
-  | 'plan_meal_answers';
+  | 'plan_meal_answers'
+  | 'manual_bedtime';
 
 export interface FitnessTest {
   id: string
@@ -585,6 +586,11 @@ export interface WorkoutRepository {
    *  A caller left on a default would silently write rank-0 and win over the ring forever. */
   saveSleepSession(userId: string, session: Omit<SleepSession, 'id' | 'userId' | 'createdAt'>, source: HealthSource): Promise<void>
   listSleepSessions(userId: string, from: string, to: string): Promise<SleepSession[]>
+  /** Q-519 — set (or clear, with `null`) the remembered bedtime on an existing night. Returns false
+   *  when no session for that date exists; this never creates one. Read only by the bedtime
+   *  estimate — see `docs/reviews/2026-08-26-manual-bedtime-write-audit.md` for why it is its own
+   *  column rather than a `manual`-ranked write to `sleep_start`. */
+  setManualSleepStart(userId: string, date: string, at: Date | null): Promise<boolean>
   listMoodLogs(userId: string, from: string, to: string): Promise<MoodLog[]>
   incrementWaterLog(userId: string, date: string, ml: number): Promise<void>
   /** Q-481 — the same increment, applied at most once per outbox mutation id. Returns false when
@@ -1002,6 +1008,16 @@ export interface WorkoutRepository {
   listOuraTags(userId: string, startDay: string, endDay: string): Promise<OuraTagRow[]>
 
   // ── Body Battery (daily snapshots for model tuning) ──────────────────────────
+  // ── Colmi R09 ring, LEARNING MODE (PS-8) ────────────────────────────────────────────────
+  // Separate from every scoring input by construction. See migration 231's header: ranking a
+  // source protects writes, and every scoring read is source-blind, so isolation has to come from
+  // the data never entering those tables.
+  insertColmiReadings(userId: string, rows: import('./postgres/slices/colmi').ColmiReadingInput[]): Promise<number>
+  insertColmiSleepSegments(userId: string, rows: import('./postgres/slices/colmi').ColmiSleepSegmentInput[]): Promise<number>
+  getColmiReadings(userId: string, kinds: import('./postgres/slices/colmi').ColmiReadingKind[], from: Date, to: Date): Promise<{ kind: string; measuredAt: Date; localDate: string; value: number; valueHigh: number | null }[]>
+  getColmiSleepSegments(userId: string, fromDate: string, toDate: string): Promise<{ localDate: string; startedAt: Date; endedAt: Date; stage: number; minutes: number }[]>
+  getColmiLatestReadingAt(userId: string): Promise<Date | null>
+
   upsertBodyBatteryDaily(userId: string, row: BodyBatteryDailyRow): Promise<void>
   getBodyBatteryHistory(userId: string, startDate: string, endDate: string): Promise<BodyBatteryDailyRow[]>
   upsertOuraSleep(userId: string, sessions: OuraSleepUpsertRow[], source: HealthSource): Promise<void>

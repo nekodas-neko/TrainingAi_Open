@@ -603,7 +603,32 @@ export async function buildReadinessPayload(userId: string, tz: string): Promise
     try {
       await repo.upsertOuraDailyDerived(userId, todayIso, {
         activityScore: Math.round(activityBlend.final),
+        // Q-526 — the six component sub-scores go in beside the blend wrapper, because the wrapper
+        // alone cannot answer what the score was made of.
+        //
+        // `components` is already in memory on this request (the same object is served to the client
+        // as `activityContributors`); it was simply never written. Without it, asking "what did
+        // strengthFreq score on 2026-08-02?" means rebuilding every contributor from raw inputs at
+        // TODAY's goals — and `strengthFreqGoal` went 3 → 5 and the volume target changed basis on
+        // 2026-08-11, so the answer is not recoverable. Sleep, readiness and illness all store their
+        // breakdown; activity was the only score that did not. Measured 2026-08-26: all 30 rows
+        // carrying this column hold `{base, adjustment, trained}` and not one component key.
+        //
+        // The wrapper stays — the entry asks for a merge, not a replacement, and `trained` is the one
+        // bit the components cannot re-derive. Worth knowing what the other two are currently worth:
+        // on all 30 rows `adjustment` is 0 and `base` equals `activity_score`, because the blend only
+        // adjusts an Oura *Cloud* activity score and no such row has existed since the BLE re-key.
+        // They are kept for the pre-re-key shape and for any reader, not because they carry anything
+        // today.
+        //
+        // `preTaper` and `acwr` are what make the stored score re-derivable rather than merely
+        // itemised: the components reproduce `preTaper` under the model's weights renormalised over
+        // whichever keys are present, and `acwr` is the taper's only input, so
+        // `score = round(preTaper × (1 − taper(acwr)))` closes the loop from the row alone.
         activityContributors: {
+          ...(activityResult?.components ?? {}),
+          preTaper: activityResult?.preTaperScore ?? null,
+          acwr: acwr ?? null,
           base: activityBlend.base,
           adjustment: activityBlend.adjustment,
           trained: activityBlend.trained ? 1 : 0,

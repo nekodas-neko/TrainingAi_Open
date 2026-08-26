@@ -3114,6 +3114,16 @@ a `paths:` filter, because a required check that never reports blocks a non-UI P
 that earns its place most is the outstanding owner action — E2E is not required until branch
 protection says so, and nothing in this repository can make that true.
 
+## 2026-08-26 — `docs/implementation-backlog.md` 12348 → 12525 (+177 net; this branch added 332)
+
+Five entries from the Colmi ring work (PS-8): **PS-9** raw accelerometer, **PS-10** ring gestures,
+and the three queued at the top as tomorrow's device testing — **PS-11** first overnight sync,
+**PS-12** comparison baseline, **PS-13** the heart-rate log's dropped continuation packets.
+
+Raised rather than trimmed because this is the index doing its job: PS-11/12/13 are a device-gated
+acceptance test written the evening before it runs, and the detail in them is the part that stops it
+being re-derived at the bench. They leave the queue when they are done, which is when this number
+comes back down.
 ## 2026-08-26 — `projectOverview.md` 8116 → 8124 (+8), Q-501
 
 Eight lines for one Current Status block: the readiness contributors now record the input they were
@@ -3135,3 +3145,33 @@ after LA-33 — the old trap named a JSON file that no longer exists.
 
 A baton is state, not accretion, and this one is at the length where the next session should be
 rewriting rather than editing.
+
+## 2026-08-26 — `projectOverview.md` 8124 → 8128 (+4), Q-526
+
+Four lines, after folding Q-526's status block into Q-501's rather than adding a second. They are one
+finding read two ways — every score now stores the breakdown it was made of — and two adjacent blocks
+saying that separately would have cost eleven lines to say it worse. The measurement worth keeping in
+the index is the one that changes what a reader concludes from a stored row: both fixes are
+**forward-only**, so a day before 2026-08-26 is not merely unchecked but uncheckable.
+
+## 2026-08-26 — `projectOverview.md` 8128 → 8138 (+10), Q-519 engine half
+
+Ten lines, and the two that earn the rest are the ⚠️ ones: **no UI exists yet**, so a session reading
+"manual bedtime shipped" would otherwise go looking for a control that is not there, and **the local
+column is not device-verified**, which is the gate the Canonical Runtime rule requires stated
+somewhere a session reads before starting.
+
+The middle of the block is the design reversal rather than the feature. An entry proposed writing the
+remembered bedtime into `sleep_start`; the audit it commissioned found that turns a measured 3 h night
+into 10 h at 35%. Recording only "manual bedtime shipped" would leave the next session free to
+re-derive the rejected design as the obvious one — the numbers are what make it not obvious.
+
+## 2026-08-26 — `docs/agents/state/implementation-lane-a.md` 199 → 203 (+4), late-session refresh
+
+Net four after trimming two traps that had become narrative. What is added is the sharpest thing this
+session learned and the one a successor cannot re-derive from the queue: **an entry's own stated
+invariant is a claim, not a fact.** Q-519 said duration and efficiency are stored columns rather than
+derived from the span, and warned what would happen if anything derived them — `aggregateNight`
+already did, and building the entry as written would have turned a measured 3 h night into 10 h at
+35%. The instruction that follows is the reusable half: when an entry names the assumption its design
+rests on, that sentence is the thing to go and check.

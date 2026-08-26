@@ -89,6 +89,7 @@ import { nodeModelRuntime } from '@/lib/oura-models/inference/runtime-node'
 import { ensureServerOuraConstants } from '@/lib/oura-models/constants-inject'
 import { packOuraRawBuckets, countPackableBuckets, claimAutoPackSlot, AUTOPACK_MAX_BUCKETS } from './slices/oura-raw-pack'
 import * as bodyBattery from './slices/body-battery'
+import * as colmi from './slices/colmi'
 import { mergeSet, initialSourceMap, HEALTH_SOURCES, sourceRank, type HealthSource, type SourceColumn } from '@/lib/data/health-source'
 import type {
   SessionPeriodization, PeriodizationPhase, AiPrescription,
@@ -2557,7 +2558,30 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       respiratoryRate: r.respiratoryRate ?? undefined,
       sleepPhase5Min:  r.sleepPhase5Min  ?? undefined,
       timeInBedHours:  r.timeInBedHours  ?? undefined,
+      manualSleepStart: r.manualSleepStart ?? null,
     }))
+  }
+
+  /**
+   * Q-519 — record (or clear, with `null`) the bedtime the user remembers for a night the ring did
+   * not observe.
+   *
+   * **Writes one column on an existing row and creates nothing.** A night with no session row has no
+   * measured sleep to correct the bedtime *of*, and inventing a row here would put a session with no
+   * duration into every consumer that counts nights. `false` says nothing matched, so the caller can
+   * answer honestly rather than reporting a save that changed no row.
+   *
+   * It deliberately does **not** go through `mergeSet`/`source_map`: that merge ranks competing
+   * *measurements* of one quantity, and this is a different quantity in its own column. See
+   * `docs/reviews/2026-08-26-manual-bedtime-write-audit.md` for what happened when it was not.
+   */
+  async setManualSleepStart(userId: string, date: string, at: Date | null): Promise<boolean> {
+    const updated = await this.db
+      .update(s.sleepSessions)
+      .set({ manualSleepStart: at, updatedAt: new Date() })
+      .where(and(eq(s.sleepSessions.userId, userId), eq(s.sleepSessions.date, date)))
+      .returning({ id: s.sleepSessions.id })
+    return updated.length > 0
   }
 
   async getExerciseMuscleAssignments(names: string[]): Promise<Record<string, MuscleAssignment[]>> {
@@ -4546,6 +4570,32 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
             timeInBedHours:  num(p.timeInBedHours),
           }], 'oura_ble')
           processed++
+        } else if (mut.domain === 'manual_bedtime') {
+          // Q-519. Calls the same `setManualSleepStart` the web route calls, so the two write paths
+          // cannot drift — the standing rule that one bad `pushMutations` branch is how the web half
+          // works while the APK mutation strands silently.
+          //
+          // **Deliberately NOT routed through `upsertOuraSleep`/`mergeSet`**, unlike the
+          // `sleep_session` branch above. That merge ranks competing *measurements* of one quantity;
+          // a remembered bedtime is a different quantity in its own column, and the audit behind that
+          // split is docs/reviews/2026-08-26-manual-bedtime-write-audit.md.
+          //
+          // A date with no session row is a permanent 4xx, not a transient one — the night will not
+          // appear later because of a retry — so it quarantines rather than retrying forever.
+          const p = clean as Record<string, unknown>
+          const raw = p.at
+          if (raw != null && typeof raw !== 'string') {
+            throw new Error('manual_bedtime: `at` must be an ISO string or null')
+          }
+          const at = raw != null ? new Date(raw) : null
+          if (at != null && Number.isNaN(at.getTime())) {
+            throw new Error('manual_bedtime: unparseable `at`')
+          }
+          const saved = await this.setManualSleepStart(userId, mut.date.replace(/\//g, '-'), at)
+          if (!saved) {
+            throw new Error(`manual_bedtime: no sleep session for ${mut.date}`)
+          }
+          processed++
         } else if (mut.domain === 'plan_meal_answers') {
           // Q-187 phase 2. Calls the same `mp.savePlanMealAnswer` / `mp.deletePlanMealAnswer` the
           // web route calls, so the two write paths cannot drift — including the two-level ownership
@@ -5912,6 +5962,13 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   async finishRedecodeJob(id: number, result: Record<string, unknown> | null, error: string | null) { return oura.finishRedecodeJob(this.db, id, result, error) }
   async reapStaleRedecodeJobs(userId: string) { return oura.reapStaleRedecodeJobs(this.db, userId) }
   async listOuraTags(userId: string, startDay: string, endDay: string) { return oura.listOuraTags(this.db, userId, startDay, endDay) }
+  // Colmi R09, learning mode (PS-8). Reads/writes only the colmi_* tables.
+  async insertColmiReadings(userId: string, rows: import('./slices/colmi').ColmiReadingInput[]) { return colmi.insertColmiReadings(this.db, userId, rows) }
+  async insertColmiSleepSegments(userId: string, rows: import('./slices/colmi').ColmiSleepSegmentInput[]) { return colmi.insertColmiSleepSegments(this.db, userId, rows) }
+  async getColmiReadings(userId: string, kinds: import('./slices/colmi').ColmiReadingKind[], from: Date, to: Date) { return colmi.getColmiReadings(this.db, userId, kinds, from, to) }
+  async getColmiSleepSegments(userId: string, fromDate: string, toDate: string) { return colmi.getColmiSleepSegments(this.db, userId, fromDate, toDate) }
+  async getColmiLatestReadingAt(userId: string) { return colmi.getColmiLatestReadingAt(this.db, userId) }
+
   async upsertBodyBatteryDaily(userId: string, row: import('../repository').BodyBatteryDailyRow) { return bodyBattery.upsertBodyBatteryDaily(this.db, userId, row) }
   async getBodyBatteryHistory(userId: string, startDate: string, endDate: string) { return bodyBattery.getBodyBatteryHistory(this.db, userId, startDate, endDate) }
   async upsertOuraSleep(userId: string, sessions: import('../repository').OuraSleepUpsertRow[], source: HealthSource) { return oura.upsertOuraSleep(this.db, userId, sessions, source) }

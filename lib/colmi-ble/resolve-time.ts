@@ -1,0 +1,77 @@
+// Turning the ring's relative time into instants — the one place that decision is made.
+//
+// `decode.ts` deliberately returns time the way the ring expresses it (`daysAgo`, `minuteOfDay`,
+// BCD parts) and never builds a Date, because the reference client resolves these against the
+// DEVICE's timezone and this app must resolve them against the USER's. This module is that
+// resolution, kept pure and separate so it can be tested at the boundaries where it breaks.
+//
+// Why not `midnight + minutes * 60_000`: that is wrong across a DST transition, where a local day
+// is 23 or 25 hours long. The owner's zone (Australia/Brisbane) has no DST and would never show it,
+// which is exactly why it would ship. Building the local wall-clock string and converting once is
+// correct in every zone.
+import { fromZonedTime } from 'date-fns-tz'
+import { shiftDateStr, DEFAULT_TZ } from '@trainingai/shared/date-utils'
+
+const MINUTES_PER_DAY = 1440
+
+/**
+ * Resolve a `(daysAgo, minuteOfDay)` pair against `todayStr` (a 'YYYY-MM-DD' day already resolved
+ * in `tz`) to a UTC instant.
+ *
+ * `minuteOfDay` may fall outside a single day and is normalised rather than clamped: the ring
+ * reports a sleep session that began before midnight as a minute count past 1440 relative to the
+ * *following* day, and HRV/stress packet offsets can run past the end of a day when a series spans
+ * one. Clamping either would silently stack samples on a boundary.
+ */
+export function resolveRelative(
+  todayStr: string,
+  daysAgo: number,
+  minuteOfDay: number,
+  tz: string = DEFAULT_TZ,
+): Date {
+  const totalMinutes = Math.trunc(minuteOfDay)
+  // Floor division so a negative minute (a session that started before the day) rolls back a day
+  // rather than toward zero, which `Math.trunc` would do and which would be off by a whole day.
+  const dayShift = Math.floor(totalMinutes / MINUTES_PER_DAY)
+  const within = totalMinutes - dayShift * MINUTES_PER_DAY
+  const dayStr = shiftDateStr(todayStr, -Math.trunc(daysAgo) + dayShift)
+  const hh = String(Math.floor(within / 60)).padStart(2, '0')
+  const mm = String(within % 60).padStart(2, '0')
+  return fromZonedTime(`${dayStr}T${hh}:${mm}:00`, tz)
+}
+
+/**
+ * A sleep session's start and end, resolved. The ring gives both as minutes after the midnight of
+ * `daysAgo`; when `startMinute > endMinute` the session began BEFORE that midnight, so the start
+ * belongs to the previous day.
+ */
+export function resolveSleepWindow(
+  todayStr: string,
+  daysAgo: number,
+  startMinute: number,
+  endMinute: number,
+  tz: string = DEFAULT_TZ,
+): { startedAt: Date; endedAt: Date } {
+  const startsPreviousDay = startMinute > endMinute
+  return {
+    startedAt: resolveRelative(todayStr, daysAgo, startsPreviousDay ? startMinute - MINUTES_PER_DAY : startMinute, tz),
+    endedAt: resolveRelative(todayStr, daysAgo, endMinute, tz),
+  }
+}
+
+/**
+ * An activity bucket's instant, from the BCD date parts and the ring's quarter-of-day index.
+ * The ring's own calendar is used here rather than `daysAgo`, so this needs no reference day —
+ * but it still needs `tz`, because those parts are wall-clock, not UTC.
+ */
+export function resolveActivityBucket(
+  year: number, month: number, day: number, quarterHour: number, tz: string = DEFAULT_TZ,
+): Date | null {
+  if (month < 1 || month > 12 || day < 1 || day > 31) return null
+  if (quarterHour < 0 || quarterHour > 95) return null
+  const dayStr = `${String(year).padStart(4, '0')}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+  const hh = String(Math.floor(quarterHour / 4)).padStart(2, '0')
+  const mm = String((quarterHour % 4) * 15).padStart(2, '0')
+  const at = fromZonedTime(`${dayStr}T${hh}:${mm}:00`, tz)
+  return Number.isNaN(at.getTime()) ? null : at
+}

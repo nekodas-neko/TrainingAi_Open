@@ -27,13 +27,27 @@
 **Version:** v1.383.6 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-08-26.
 
-**A stored readiness score can now be re-derived from itself (Q-501).** Each contributor records the
-number it was scored *from*, so a persisted row no longer needs today's summary — which is often not
-the one it was built on — to explain itself. Self-consistent means the **inputs** were rewritten;
-inconsistent means the **model** moved; older rows are named `uncheckable` rather than passing
-silently. **No score moved.** Details and the re-measured population (7 un-re-derivable rows, not the
-entry's "5 of 33") in
-[the journal entry](docs/overview/entries/2026-08-26-readiness-contributor-inputs.md).
+**A remembered bedtime, in its own column (Q-519, engine half).** A night the ring only caught from
+4 am reads as a 4 am bedtime and moves the 14-day estimate ~23 minutes for a fortnight. The entry
+proposed writing it into `sleep_start` at `manual` rank; **the audit that entry commissioned falsified
+that** — `aggregateNight` derives time-in-bed and efficiency from the span, so the same night became
+10.0 h at 35% instead of 4.62 h at 75%
+([audit](docs/reviews/2026-08-26-manual-bedtime-write-audit.md), reproduced in a test). It gets its
+own column, read by the bedtime estimate and nothing else. **No UI yet — Lane B's half**, so nothing
+can write one; ⚠️ **the local column is not device-verified.**
+[Journal](docs/overview/entries/2026-08-26-manual-bedtime-engine.md).
+
+**Every score now stores the breakdown it was made of (Q-501, Q-526).** Readiness contributors record
+the number each was scored *from*, so a persisted row no longer needs today's summary — often not the
+one it was built on — to explain itself: self-consistent means the **inputs** were rewritten,
+inconsistent means the **model** moved, and older rows are named `uncheckable` rather than passing
+silently. Activity was the last score keeping the blend *wrapper* where its six components should go
+— which on all 30 rows held the score twice and a constant zero, the blend having had no Oura *Cloud*
+score to adjust since the re-key. **No score moved, and both are forward-only**: earlier rows cannot
+be recovered, so Q-505's before/after window starts here and improves the longer it waits. Details,
+and the re-measured populations that corrected both entries, in the journal
+([Q-501](docs/overview/entries/2026-08-26-readiness-contributor-inputs.md) ·
+[Q-526](docs/overview/entries/2026-08-26-persist-activity-contributors.md)).
 
 **The doc-size ledger stops being a merge conflict (LA-33), and E2E can now be required (LA-22).**
 Every PR raising a documentation baseline edited the same two lines of one shared JSON, so two open

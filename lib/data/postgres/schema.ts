@@ -451,6 +451,12 @@ export const sleepSessions = pgTable('sleep_sessions', {
   respiratoryRate:  doublePrecision('respiratory_rate'),  // breaths/min (Oura average_breath)
   sleepPhase5Min:   text('sleep_phase_5_min'),            // 5-min stage codes: 1=deep 2=light 3=REM 4=awake
   timeInBedHours:   doublePrecision('time_in_bed_hours'), // migration 112
+  // Q-519 (migration 233) — a bedtime the user remembers for a night the ring did not observe.
+  // Its own column, deliberately not `sleep_start`: read ONLY by the bedtime estimate, never by
+  // anything that derives a window, a duration or an efficiency. The audit behind that split is
+  // docs/reviews/2026-08-26-manual-bedtime-write-audit.md — and it is not a stylistic preference,
+  // it is why a 23:00 bedtime over a measured 04:23-08:03 night does not become 34% efficiency.
+  manualSleepStart: timestamp('manual_sleep_start', { withTimezone: true }),
   sourceMap:        jsonb('source_map').$type<Record<string, string>>(),   // per-field provenance (migration 120)
   createdAt:        timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt:        timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
@@ -1478,3 +1484,38 @@ export const coachMessages = pgTable('coach_messages', {
   position:  integer('position').notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 }, t => [unique().on(t.threadId, t.position)])
+
+// ── Colmi R09 ring — LEARNING MODE (migration 231, PS-8) ───────────────────────────────────
+// Deliberately separate from body_metrics / sleep_sessions / oura_daily / oura_daily_derived /
+// oura_heartrate. Every scoring read is source-blind, so a row in one of those IS a scored row
+// however it is stamped; isolation comes from the data never landing there. `colmi_ble` is also
+// absent from HEALTH_SOURCES on purpose, which makes a shared-table write a compile error.
+// Enforced by scripts/check-learning-mode-isolation.js.
+
+/** Point samples. `kind` distinguishes hr / steps / calories / distance / hrv / stress / spo2 /
+ *  temperature / battery — one table because they differ only in unit and cadence, and their whole
+ *  purpose is to be compared against another device. */
+export const colmiReadings = pgTable('colmi_readings', {
+  id:         uuid('id').primaryKey().defaultRandom(),
+  userId:     uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  kind:       text('kind').notNull(),
+  measuredAt: timestamp('measured_at', { withTimezone: true }).notNull(),
+  localDate:  date('local_date', { mode: 'string' }).notNull(),
+  value:      doublePrecision('value').notNull(),
+  /** Upper bound where the ring reports a pair (SpO2 max against `value`'s min). */
+  valueHigh:  doublePrecision('value_high'),
+  createdAt:  timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, t => [unique('colmi_readings_unique').on(t.userId, t.kind, t.measuredAt)])
+
+/** Sleep is an interval with a stage, so it cannot live in the point table. `stage` is the ring's
+ *  own encoding: 2 light, 3 deep, 4 REM, 5 awake. */
+export const colmiSleepSegments = pgTable('colmi_sleep_segments', {
+  id:        uuid('id').primaryKey().defaultRandom(),
+  userId:    uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  localDate: date('local_date', { mode: 'string' }).notNull(),
+  startedAt: timestamp('started_at', { withTimezone: true }).notNull(),
+  endedAt:   timestamp('ended_at', { withTimezone: true }).notNull(),
+  stage:     integer('stage').notNull(),
+  minutes:   integer('minutes').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, t => [unique('colmi_sleep_segments_unique').on(t.userId, t.startedAt, t.stage)])

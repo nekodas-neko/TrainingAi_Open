@@ -6,12 +6,19 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: "1.384.0",
+    version: "1.385.0",
     date: "2026-08-26",
     changes: [
       "Log Food is one screen now. It used to ask \"how would you like to log food?\" and show five tiles before showing any food at all; it opens on your food instead, with Recent, Meals and Single foods as tabs, and Photo, Barcode and Describe-or-enter as a row above them. Describe and manual entry were two separate tiles leading to two separate screens \u2014 they are one panel with both visible, because which one you want is not something you can decide before seeing the fields.",
       "Saved meals and single foods are two lists again, side by side as tabs. Merging them put a recipe you built and a single ingredient in the same list, which made \"log this\" mean two different things depending on the row. The names say which is which now rather than both starting with \"My\", and the button on the Nutrition screen is My Meals, which is where it takes you.",
       "One fewer screen to back out of: opening a meal from Log Food is two layers deep rather than three, so the back gesture gets you out in two presses.",
+    ],
+  },
+  {
+    version: "1.384.0",
+    date: "2026-08-26",
+    changes: [
+      "You can now pair a Colmi smart ring under More \u2192 Devices, alongside your Oura ring and chest strap. It records heart rate, steps, sleep stages, blood oxygen, HRV, stress and skin temperature \u2014 several of which no other device you own reports. The app switches on each of those measurements when it syncs and shows you which are recording, because a ring with one switched off collects nothing and looks exactly like a ring you forgot to wear. Everything it collects is kept separately and compared against your other devices: it does not change your readiness, sleep or any other score. Syncing is manual for now \u2014 open Devices and tap Sync now. If the ring has been sitting still it puts its sensors to sleep and will not answer, so wear it or put it on the charger first.",
     ],
   },
   {

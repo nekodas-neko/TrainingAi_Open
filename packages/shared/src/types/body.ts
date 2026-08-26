@@ -106,4 +106,19 @@ export interface SleepSession {
   respiratoryRate?: number | null    // breaths/min
   sleepPhase5Min?: string | null     // 5-min stage codes: 1=deep 2=light 3=REM 4=awake
   timeInBedHours?: number | null     // migration 112
+  /**
+   * Q-519 — a bedtime the user remembers for a night the ring did not observe.
+   *
+   * **Read only by the bedtime estimate.** It is deliberately not `sleepStart`, and the distinction
+   * is load-bearing rather than tidy: `aggregateNight` derives time-in-bed and efficiency from
+   * `sleepEnd − sleepStart`, the daytime-HRV model decides which samples are "nightly" by window
+   * membership, and `primaryCluster` unions same-date rows within an hour of the window. Widening
+   * the measured window with a remembered time turned a 3 h 5 m night into 9.05 h at 34% efficiency
+   * and moved five awake hours into a training set — see
+   * `docs/reviews/2026-08-26-manual-bedtime-write-audit.md`.
+   *
+   * The per-field source merge exists to let a better *measurement* of the same quantity win. This
+   * is a different quantity, so it never enters that merge.
+   */
+  manualSleepStart?: Date | null     // migration 233
 }

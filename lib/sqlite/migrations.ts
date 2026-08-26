@@ -335,6 +335,11 @@ export const RECONCILE_COLUMNS: { table: string; column: string; ddl: string }[]
   { table: 'sleep_sessions', column: 'respiratory_rate',  ddl: `ALTER TABLE sleep_sessions ADD COLUMN respiratory_rate REAL` },
   { table: 'sleep_sessions', column: 'sleep_phase_5_min', ddl: `ALTER TABLE sleep_sessions ADD COLUMN sleep_phase_5_min TEXT` },
   { table: 'sleep_sessions', column: 'time_in_bed_hours', ddl: `ALTER TABLE sleep_sessions ADD COLUMN time_in_bed_hours REAL` },
+  // Q-519 — the bedtime the user remembers for a night the ring did not observe. Additive via
+  // reconcile (no version bump), like every other sleep column above. It is pulled and displayed;
+  // nothing on the device derives a window, duration or efficiency from it, which is the entire
+  // reason it is not `sleep_start` — see docs/reviews/2026-08-26-manual-bedtime-write-audit.md.
+  { table: 'sleep_sessions', column: 'manual_sleep_start', ddl: `ALTER TABLE sleep_sessions ADD COLUMN manual_sleep_start TEXT` },
   { table: 'sleep_sessions', column: 'sync_status',       ddl: `ALTER TABLE sleep_sessions ADD COLUMN sync_status TEXT NOT NULL DEFAULT 'synced'` },
   // oura_daily gains sync_status so the applyDelta pull can clobber-guard a device-authored
   // (BLE rollup) row against a stale server pull — the D4 finding. Default 'synced' (existing

@@ -6,13 +6,14 @@
 
 **Updated:** 2026-08-26 · **By:** the tenth session to run as Lane A · **Next ID:** `LA-34`
 (`grep -rhoE '\bLA-[0-9]+\b' docs/ | sort -t- -k2 -n | tail -1` is the authority, not this line)
-**Migrations:** directory head **230**, next free **231** — claim against open PRs too, not just the
+**Migrations:** directory head **234**, next free **235** — claim against open PRs too, not just the
 directory. Local SQLite **v30**.
 
 ## Now
 
-**Nothing of Lane A's is open or blocked.** Ten PRs merged this session (list below); the tenth,
-Q-501, is in flight as this is written. `docs/implementation-backlog.md` is **198 entries**.
+**Nothing of Lane A's is open or blocked.** Thirteen PRs this session (list below); the last, Q-519's
+engine half, is in CI as this is written. `docs/implementation-backlog.md` is **206 entries** — it
+grew while this session shrank it, because five agents are filing into it concurrently.
 
 Start with `node scripts/next-item.js --lane A` and read its real output — see the next section.
 
@@ -61,19 +62,20 @@ work would still have been wrong.
 
 ## Shipped this session
 
-Ten PRs. **Q-280** (SQLSTATE 21000 on eight batch upserts, via a shared `collapseOnConflict`) ·
+Thirteen PRs. **Q-280** (SQLSTATE 21000 on eight batch upserts, via a shared `collapseOnConflict`) ·
 **Q-528** (`replaceOuraDailySummary` — three defects, wrapped in a transaction) · **BF-19**
 (app-load telemetry, migrations **229/230**, SQLite **v30**) · **Q-403** (the Coach swap now states
 it changes the program, and only fires when asked) · **LA-22** (E2E gated on UI paths) · **LA-33**
 (the doc-size ledger split one file per doc) · **Q-501** (readiness contributors record their own
-input).
+input) · **Q-526** (the Activity score stores its six components) · **the Q-519 audit** (docs) ·
+**Q-519 engine half** (migrations **233/234**, `manual_sleep_start`).
 
 Earlier sessions' PRs are in the journal entries; this list stays to the current session.
 
 ## Standing constraints
 
-- **The local gate is `pnpm check:rules`** — quote its `Ran N of N`, never the word "pass". **59 of
-  59** now. Never hardcode it; the runner reads it from `ci.yml`, which is the point.
+- **The local gate is `pnpm check:rules`** — quote its `Ran N of N`, never the word "pass". **60 of
+  60** now. Never hardcode it; the runner reads it from `ci.yml`, which is the point.
 - **The clone is depth 1.** `git fetch --deepen=300 origin main` before any `git merge origin/main`,
   or it refuses as "unrelated histories". Hit repeatedly; it is not optional.
 - **`get_check_runs` at `total_count: 0`** right after a push is registration lag, not a stale base
@@ -103,18 +105,20 @@ Earlier sessions' PRs are in the journal entries; this list stays to the current
 - **A mutation test that injects nothing reports a pass.** One did here: the anchor `sed` patched had
   changed, so nothing was mutated and the green suite "confirmed" a property it never tested.
   **Assert the mutation applied before believing the result** — one that does not mutate certifies.
-- **`- **Lane:** A · **Gate:** owner` on one line is not read as a gate.** `Gate:` must start its own
-  bullet. Written this way twice this session; both entries would have stayed READY while reading as
-  gated. `check-backlog-pointers.js` catches it — run it, do not eyeball it.
-- **Relative links break when prose moves a directory deeper** — five did while extracting to
-  `docs/reviews/`. A stale `.next/types/validator.ts` likewise makes `tsc` report a missing module
-  for a deleted route; clear it before diagnosing either.
+- **`Gate:` must start its own bullet** — on one line after `Lane:` it is not read as a gate, and the
+  entry stays READY while reading as gated. `check-backlog-pointers.js` catches it; do not eyeball it.
+- **Relative links break when prose moves a directory deeper**; a stale `.next/types/validator.ts`
+  makes `tsc` report a missing module for a deleted route. Clear it before diagnosing either.
 - **A mutation can be semantically equivalent and still be a coverage gap.** Two survived this
   session's Q-501 pass and both were real: a pass-through storing `Math.round(input)` re-derives to
   the same score, so nothing noticed, while reporting an input the day never had; and the audit's
   "INPUT change" note firing *alongside* "MODEL moved" gives two contradictory verdicts, which leaves
   the reader exactly where the finding found them. **A surviving mutation is a question about the
   test, not a licence to stop.**
+- **An entry's own stated invariant is a claim, not a fact — and Q-519's was false.** It said duration
+  and efficiency are stored columns rather than derived from the span, and warned what would happen
+  if anything ever derived them. `aggregateNight` already did. **When an entry names the assumption
+  its design rests on, that sentence is the thing to go and check**, not the part to take on trust.
 - **Two counts of the same thing can live on two tables.** `recovery_index_hours` exists on both
   `oura_daily_derived` (always NULL) and `oura_daily_summary` (populated, 50 of 51 rows). Querying
   the first nearly filed a finding that an estimator had never produced anything — contradicted by
