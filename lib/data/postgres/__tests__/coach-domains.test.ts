@@ -273,7 +273,12 @@ describe.skipIf(!canRun)('AI Coach — phase 3 write domains', () => {
 // The only domain whose effects can take something away, which is what earns it a pushed
 // confirmation screen rather than a card in the thread.
 describe.skipIf(!canRun)('AI Coach — program_phase (tier 3)', () => {
-  const OWNER3 = '00000000-0000-4000-8000-00000000cf01'
+  // NOT ...cf01: that is `clear-program-prescriptions.test.ts`'s USER_ID, and both files INSERT and
+  // DELETE it. Vitest runs files in parallel workers against one shared local database, so either
+  // file's cleanup can land inside the other's run — and because the two hardcoded different
+  // emails for the same id, they also raced on `users_email_unique`. Email derived from the id so
+  // the two can never drift apart again (LA-32).
+  const OWNER3 = '00000000-0000-4000-8000-00000000cfa1'
   const PROGRAM3 = '00000000-0000-4000-8000-00000000cf10'
   let pool: import('pg').Pool
   let db: ReturnType<typeof import('@/lib/data/postgres/client').getDb>
@@ -287,8 +292,8 @@ describe.skipIf(!canRun)('AI Coach — program_phase (tier 3)', () => {
     ;({ applyCoachPatch, undoCoachChange } = await import('@/lib/coach/apply'))
     ;({ previewPatch } = await import('@/lib/coach/consequences'))
     await pool.query(
-      `INSERT INTO users (id, email, password_hash, timezone) VALUES ($1, 'coach-phase@example.com', 'x', 'Australia/Brisbane')
-       ON CONFLICT (id) DO NOTHING`, [OWNER3])
+      `INSERT INTO users (id, email, password_hash, timezone) VALUES ($1, $2, 'x', 'Australia/Brisbane')
+       ON CONFLICT (id) DO NOTHING`, [OWNER3, `coach-phase-${OWNER3}@example.com`])
   })
 
   afterAll(async () => {
@@ -356,7 +361,9 @@ describe.skipIf(!canRun)('AI Coach — program_phase (tier 3)', () => {
 // sessions are excluded from every cycle count in `slices/programs.ts`, so today's logged work
 // stops advancing the block — and undo has to put that back, not just the date column.
 describe.skipIf(!canRun)('AI Coach — early_deload', () => {
-  const OWNER4 = '00000000-0000-4000-8000-00000000cf02'
+  // NOT ...cf02 — same collision as OWNER3 above, with `clear-program-prescriptions`'s
+  // OTHER_USER_ID (LA-32).
+  const OWNER4 = '00000000-0000-4000-8000-00000000cfa2'
   const PROGRAM4 = '00000000-0000-4000-8000-00000000cf20'
   const TODAY = '2026-03-05'
   let pool: import('pg').Pool
@@ -371,8 +378,8 @@ describe.skipIf(!canRun)('AI Coach — early_deload', () => {
     ;({ applyCoachPatch, undoCoachChange } = await import('@/lib/coach/apply'))
     ;({ previewPatch } = await import('@/lib/coach/consequences'))
     await pool.query(
-      `INSERT INTO users (id, email, password_hash, timezone) VALUES ($1, 'coach-deload@example.com', 'x', 'Australia/Brisbane')
-       ON CONFLICT (id) DO NOTHING`, [OWNER4])
+      `INSERT INTO users (id, email, password_hash, timezone) VALUES ($1, $2, 'x', 'Australia/Brisbane')
+       ON CONFLICT (id) DO NOTHING`, [OWNER4, `coach-deload-${OWNER4}@example.com`])
   })
 
   afterAll(async () => {

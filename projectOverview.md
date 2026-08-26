@@ -27,6 +27,19 @@
 **Version:** v1.381.2 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-08-26.
 
+**A shared test-user UUID, and a check that would have been deleted (LA-32).** Three times in two
+days, adding an unrelated test file turned the suite red in a file the PR never touched: two files
+hardcoded the same user id and one deleted it, and vitest's parallel workers share one local
+Postgres. **The entry's own survey said six remained; re-measuring found one.** `…d011` is a
+*program* id, `fe481797` is the canonical `claude_ro` owner two files are meant to share, and the
+rest are pure-logic files that never touch `users` — 83% noise, because "shares a UUID literal" is
+not the claim "shares a *user id* someone deletes". That ratio is why the fix is a script with
+tested detection rather than a grep: **a check that cries wolf gets baselined into uselessness by
+the first person it stops.** `check-test-user-uuid-collisions.js` is in Custom Rules (**59 of 59**,
+up from 58) with an **empty baseline**. Its first two implementations were wrong in ways the tests
+now pin — a fixed tail swallowed the next statement, and breaking on a line-ending `)` stopped
+inside the SQL, which ends lines that way constantly.
+
 **A model stamp that another pillar could erase (Q-273).** `oura_daily_derived.model_versions` is a
 map of pillar → model version, and the shared upsert `COALESCE`-replaced it — so a writer stamping
 its own key wiped every other pillar's. Live: `backfillBodyComp` wrote `{bodyComp: …}` flat and
