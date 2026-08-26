@@ -4,6 +4,7 @@ import { memo, useMemo } from 'react'
 import { ChevronRight, Check, Pencil, QrCode, Trash2 } from 'lucide-react'
 import { SwipeActions, type SwipeAction } from '@/components/ui/swipe-actions'
 import { cn } from '@trainingai/shared/utils'
+import { MealThumb } from './meal-thumb'
 import { portionRows, sumRows } from './saved-meal-totals'
 import type { SavedMeal } from '@trainingai/shared/types/nutrition'
 
@@ -96,6 +97,9 @@ export const SavedMealCard = memo(function SavedMealCard({
           {selected && <Check className="h-3.5 w-3.5 text-black" />}
         </span>
       )}
+      {/* Artboard 3 gives every row the tile — the meal's photo when it has one, the placeholder
+          when it does not. Not rendered while selecting: the checkbox takes that slot. */}
+      {!selecting && <MealThumb src={meal.imageDataUri} />}
       <span className="min-w-0 flex-1">
         <span className="block truncate text-sm font-medium leading-snug">
           {meal.name}

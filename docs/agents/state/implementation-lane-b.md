@@ -7,8 +7,8 @@
 
 ## Now
 Landed: **#478** (Q-93-followup), **#479** (the Q-112 re-plan), **#483** (BF-27), **#491** (BF-24),
-**#497** (BF-26), **#512** (BF-29), **#515** (BF-25 — forced dark), and the baton PRs. **BF-30**
-(the meal detail sheet) is the open one. Each has a journal entry in `docs/overview/entries/`. **Every one owes only a
+**#497** (BF-26), **#512** (BF-29), **#515** (BF-25 — forced dark), **#523** (BF-30 — the meal detail
+sheet), and the baton PRs. **BF-32** (the meal tile) is the open one. Each has a journal entry in `docs/overview/entries/`. **Every one owes only a
 device press.** Expect to re-merge `main` two or three times per PR: it landed a PR during *every*
 CI cycle tonight, and #512's first merge attempt was refused for it.
 
@@ -41,14 +41,14 @@ role.** Six for six this run, and **two entries prescribed a fix that was wrong,
 `node scripts/next-item.js --lane B` first. Known-good candidates, in the order I would take them:
 - **Q-395c** — nutrition phase 4; owns BF-24's ③ tiles. Check nobody else is on it. Also touches
   `saved-meals-sheet.tsx`, so it collides with BF-31.
-- **BF-31 · BF-32** — the rest of artboard parity. **Read BF-28 first.** **BF-31's counterpart is
-  corrected in place** — it named the *scan* flow; it is `saved-meals-sheet.tsx`'s build tab, and
-  both its open questions are answered there (neither is a behaviour change). BF-30 answered its own
-  question as **a nested sheet**, so the detail surface now exists for BF-32's photo work to land
-  on.
-- **BF-24 is PART done — do not re-take it whole.** #491 shipped ①④⑤; ②③⑥⑦ are kept on the entry.
+- **BF-31 is the last artboard-parity entry. Read BF-28 first.** Its counterpart is **corrected in
+  place** — it named the *scan* flow; it is `saved-meals-sheet.tsx`'s build tab, and both its open
+  questions are answered there (neither is a behaviour change, so it is a restyle).
+- **The artboards keep narrowing entries' prose.** BF-32 listed the ingredient lists in scope; the
+  drawings put the tile on meal-level rows only. **Extract the values from the HTML** rather than
+  reading the picture — nine identical 40 px tiles is what says it is one shared thing.
+- **BF-24 is PART done** — #491 shipped ①④⑤; ②③⑥⑦ are kept on its entry with reasons. Q-406 likewise.
 - **Q-112a** — one PR now, with [`a plan`](../../superpowers/plans/2026-08-25-unified-day-review.md) behind it; Q-112c is Lane A.
-- **Q-168, Q-154, Q-254, Q-111** — gated, parked, or owner-decision. Unchanged.
 
 ## Do not re-litigate
 - **`lib/coach/**`, `packages/shared/**`, `app/api/**`, `lib/data/**` are Lane A** whatever the edit
