@@ -130,8 +130,14 @@ test('a saved meal renders a printable label in every style', async ({ page }) =
   // sheet is idempotent, so a retry cannot toggle it shut.
   const labelButton = page.getByRole('button', { name: `Print a label for ${MEAL_NAME}` })
   await expect(async () => {
-    const box = (await savedMeals.boundingBox())!
-    await page.touchscreen.tap(box.x + box.width / 2, box.y + box.height / 2)
+    // Tap only while the sheet is still CLOSED. Since Q-395c this button opens Log Food, which
+    // then covers the coordinate — so an unconditional re-tap lands on the sheet's own content and
+    // the retry makes things worse rather than better. `meal-photo-picker.spec.ts` carries the same
+    // guard for the same reason.
+    if (await page.getByRole('dialog').count() === 0) {
+      const box = (await savedMeals.boundingBox())!
+      await page.touchscreen.tap(box.x + box.width / 2, box.y + box.height / 2)
+    }
     // BF-30 moved the row's actions onto the meal's own screen; open it first.
     await openSavedMeal(page, MEAL_NAME)
     await expect(labelButton).toBeVisible({ timeout: 5_000 })
@@ -258,8 +264,14 @@ test('Save to gallery hands over a PNG that declares its print size', async ({ p
   await expect(savedMeals).toBeVisible({ timeout: 60_000 })
   const labelButton = page.getByRole('button', { name: `Print a label for ${MEAL_NAME}` })
   await expect(async () => {
-    const box = (await savedMeals.boundingBox())!
-    await page.touchscreen.tap(box.x + box.width / 2, box.y + box.height / 2)
+    // Tap only while the sheet is still CLOSED. Since Q-395c this button opens Log Food, which
+    // then covers the coordinate — so an unconditional re-tap lands on the sheet's own content and
+    // the retry makes things worse rather than better. `meal-photo-picker.spec.ts` carries the same
+    // guard for the same reason.
+    if (await page.getByRole('dialog').count() === 0) {
+      const box = (await savedMeals.boundingBox())!
+      await page.touchscreen.tap(box.x + box.width / 2, box.y + box.height / 2)
+    }
     // BF-30 moved the row's actions onto the meal's own screen; open it first.
     await openSavedMeal(page, MEAL_NAME)
     await expect(labelButton).toBeVisible({ timeout: 5_000 })
@@ -302,8 +314,14 @@ test('the chosen label style is remembered', async ({ page }) => {
   await expect(savedMeals).toBeVisible({ timeout: 60_000 })
   const labelButton = page.getByRole('button', { name: `Print a label for ${MEAL_NAME}` })
   await expect(async () => {
-    const box = (await savedMeals.boundingBox())!
-    await page.touchscreen.tap(box.x + box.width / 2, box.y + box.height / 2)
+    // Tap only while the sheet is still CLOSED. Since Q-395c this button opens Log Food, which
+    // then covers the coordinate — so an unconditional re-tap lands on the sheet's own content and
+    // the retry makes things worse rather than better. `meal-photo-picker.spec.ts` carries the same
+    // guard for the same reason.
+    if (await page.getByRole('dialog').count() === 0) {
+      const box = (await savedMeals.boundingBox())!
+      await page.touchscreen.tap(box.x + box.width / 2, box.y + box.height / 2)
+    }
     // BF-30 moved the row's actions onto the meal's own screen; open it first.
     await openSavedMeal(page, MEAL_NAME)
     await expect(labelButton).toBeVisible({ timeout: 5_000 })
@@ -317,8 +335,14 @@ test('the chosen label style is remembered', async ({ page }) => {
   await page.reload()
   await settleRouteBoundary(page)
   await expect(async () => {
-    const box = (await savedMeals.boundingBox())!
-    await page.touchscreen.tap(box.x + box.width / 2, box.y + box.height / 2)
+    // Tap only while the sheet is still CLOSED. Since Q-395c this button opens Log Food, which
+    // then covers the coordinate — so an unconditional re-tap lands on the sheet's own content and
+    // the retry makes things worse rather than better. `meal-photo-picker.spec.ts` carries the same
+    // guard for the same reason.
+    if (await page.getByRole('dialog').count() === 0) {
+      const box = (await savedMeals.boundingBox())!
+      await page.touchscreen.tap(box.x + box.width / 2, box.y + box.height / 2)
+    }
     await openSavedMeal(page, MEAL_NAME)
     await expect(labelButton).toBeVisible({ timeout: 5_000 })
   }).toPass({ timeout: 90_000 })

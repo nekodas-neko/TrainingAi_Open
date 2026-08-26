@@ -69,8 +69,13 @@ async function openBuilder(page: Page): Promise<void> {
   const button = page.getByRole('button', { name: 'My Foods', exact: true })
   await expect(button).toBeVisible({ timeout: 60_000 })
   await expect(async () => {
-    const box = (await button.boundingBox())!
-    await page.touchscreen.tap(box.x + box.width / 2, box.y + box.height / 2)
+    // Tap only while the sheet is still CLOSED. Since Q-395c this button opens Log Food, which then
+    // covers the coordinate, so an unconditional re-tap lands on the sheet's own content and the
+    // retry makes things worse rather than better (it cost `meal-label` two runs).
+    if (await page.getByRole('dialog').count() === 0) {
+      const box = (await button.boundingBox())!
+      await page.touchscreen.tap(box.x + box.width / 2, box.y + box.height / 2)
+    }
     await expect(page.getByText(MEAL_NAME)).toBeVisible({ timeout: 5_000 })
   }).toPass({ timeout: 90_000 })
   await openSavedMeal(page, MEAL_NAME)
