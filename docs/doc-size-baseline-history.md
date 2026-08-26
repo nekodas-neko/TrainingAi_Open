@@ -2856,3 +2856,18 @@ entry that shipped half its work states the half it did not, rather than looking
 LA-32 is the survey of test files sharing a hardcoded user UUID with a file that deletes it — 233 UUIDs measured, 10 shared, 7 risky, 2 fixed, 6 remaining, with the table of
 which. Filed rather than swept because the sweep without a CI check to hold it at zero is the weaker
 half, and the entry carries the measurement so the sweep is mechanical.
+
+## 2026-08-26 — `projectOverview.md` → 8015, backlog 12078 (LA-32, the shared test-user UUID)
+
+Eleven lines up in the index, thirty-six back from LA-32 leaving the queue.
+
+The eleven earn their place by recording a **ratio, not an incident**. LA-32 was filed claiming six
+collisions remained; re-measuring found **one**, and the five false positives were each false for a
+different reason — a program id, the canonical `claude_ro` owner two files are meant to share, and
+pure-logic files that never touch `users`. The filing's rule ("shares a UUID literal, and somebody
+mentions `DELETE FROM users`") is not the claim it needed to make.
+
+That 83% noise rate is the durable part, because it decided the shape of the fix: a check that cries
+wolf is one the first person it stops will baseline into uselessness, so the detection got a script
+with seven tests — five of them false-positive cases — rather than a grep. Without the ratio written
+down, the next person to read "six collisions" re-derives the noisy rule and ships it.

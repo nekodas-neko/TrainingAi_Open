@@ -375,6 +375,14 @@ jobs:
       - name: No dead repository methods
         run: node scripts/check-dead-repo-methods.js
 
+      # LA-32: two test files hardcoding the same user UUID, where one DELETEs it, is a time bomb —
+      # parallel vitest workers share one local Postgres, so B's cleanup can land inside A's run and
+      # A dies on a foreign key in a file the PR never touched. It stays hidden for as long as
+      # scheduling keeps them apart, so ADDING AN UNRELATED TEST FILE is enough to set it off; that
+      # happened three times on 2026-08-25/26.
+      - name: No shared test-user UUIDs
+        run: node scripts/check-test-user-uuid-collisions.js
+
       # Q-424: the size ratchet asks whether THIS BRANCH grew a file, which needs the base branch's
       # copy to compare against. `actions/checkout` is shallow (depth 1), so `main` is not present —
       # one depth-1 fetch of that ref is all it takes, and the script degrades to baseline-only if it
