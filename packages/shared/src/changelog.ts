@@ -7,7 +7,7 @@ export interface ChangelogEntry {
 export const CHANGELOG: ChangelogEntry[] = [
   {
     version: "1.377.0",
-    date: "2026-08-25",
+    date: "2026-08-26",
     changes: [
       "The end-of-day check-in can now see what the app already told you that morning, and is told not to reverse it without saying so. Previously each piece of coaching was written from its own slice of the day with no knowledge of the others \u2014 so on one occasion the morning advised keeping intensity low on a raised temperature, and that evening the digest cheered the two sessions that followed and said to keep the same energy tomorrow. The digest now reads the day's readiness, sleep, heart-rate and activity notes before it writes. It may still disagree with them, since by evening it knows more; what it can no longer do is disagree silently.",
     ],

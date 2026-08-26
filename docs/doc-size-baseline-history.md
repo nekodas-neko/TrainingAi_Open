@@ -2702,3 +2702,15 @@ alone reached.)*
 are the four new entries and two corrections, not accretion. One of those corrections retracts this
 baton's own claim that the check-in "adds little independent information" — measured, ~75% of it is
 information nothing else has.
+
+## 2026-08-26 — `projectOverview.md` 7987 → 7989, backlog 11926 → 11898 (LA-31/Q-291)
+
+Two lines for the Q-291 status paragraph — the day's AI surfaces can now see each other — and
+twenty-eight back from Q-291 leaving the queue. Net down.
+
+The two lines are load-bearing rather than narrative. They record the constraint a future change
+would otherwise break: **the cross-surface read graph is one-directional and must stay acyclic.**
+Each surface caches on a hash of its prompt context, so two surfaces hashing each other's text would
+invalidate each other indefinitely, and model output is not deterministic, so it would never settle.
+That is not visible from either route's source — it is a property of the pair — which is exactly the
+kind of thing an orientation doc exists to carry.

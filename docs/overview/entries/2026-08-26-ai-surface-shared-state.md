@@ -1,4 +1,4 @@
-# 2026-08-25 — the evening digest can now see what the morning said (Q-291)
+# 2026-08-26 — the evening digest can now see what the morning said (Q-291)
 
 **Branch:** `fix/ai-surface-shared-state` · **Lane A** · no migration, no APK.
 
