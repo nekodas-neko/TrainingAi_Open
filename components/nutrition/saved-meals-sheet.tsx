@@ -34,11 +34,25 @@ import { IngredientPicker } from './ingredient-picker'
 /** Which SCREEN is showing. The tab strip within the list screen is `listTab` below. */
 type SheetTab = 'meals' | 'build'
 
-/** The two tabs of the list screen (LB-16). `Frequent` and `Recipes` were drawn; the owner decided
- *  two, and `Frequent` was a second ordering of what `Recent` already shows. */
+/**
+ * The tabs of the list screen (LB-16, then BF-37).
+ *
+ * **Three, not the two LB-16 decided.** That decision was made while saved meals and single foods
+ * were one list; the owner's report that they are *"2 seperate things"* un-merges them, and the
+ * strip is where that split lands — two tabs side by side make the difference visible in a way two
+ * separately-reached sheets never did. `Frequent` is still cut: it was a second ordering of
+ * `Recent`.
+ *
+ * **The tab labels drop the possessive deliberately.** `My Foods` against `My Meals` is the pair the
+ * owner could not tell apart, and two labels that differ only in their last word are hard to tell
+ * apart wherever they appear. `Meals` against `Single foods` names the actual distinction — a
+ * composition against one thing. (`My Meals` survives on the page's own button, where it names one
+ * list rather than one of two lookalikes.)
+ */
 const LIST_TABS = [
   { value: 'recent' as const, label: 'Recent' },
-  { value: 'foods' as const, label: 'My Foods' },
+  { value: 'meals' as const, label: 'Meals' },
+  { value: 'foods' as const, label: 'Single foods' },
 ]
 type ListTab = (typeof LIST_TABS)[number]['value']
 
@@ -68,11 +82,11 @@ interface Props {
   onManual: () => void
   /** A scanned saved-meal label (Q-389); the parent owns the logging. */
   onScannedSavedMeal?: (mealId: string) => void
-  /** Open on `My Foods` rather than `Recent` — set when the entry point was the My Foods button. */
-  openOnFoods?: boolean
+  /** Open on `Meals` rather than `Recent` — set when the entry point was the page's My Meals button. */
+  openOnMeals?: boolean
 }
 
-export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate, preselectedMealTypeId, onSelectFood, onScanResult, onManual, onScannedSavedMeal, openOnFoods }: Props) {
+export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate, preselectedMealTypeId, onSelectFood, onScanResult, onManual, onScannedSavedMeal, openOnMeals }: Props) {
   const planSavedMealIds = usePlanSavedMealIds()
   // Q-413: the eaten-at resolution happens in the USER's zone, not the device's.
   const tz = useUserTimezone()
@@ -129,7 +143,7 @@ export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate,
   useEffect(() => {
     if (!open) return
     setTab('meals')
-    setListTab(openOnFoods ? 'foods' : 'recent')
+    setListTab(openOnMeals ? 'meals' : 'recent')
     fetchMeals()
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open])
@@ -458,7 +472,7 @@ export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate,
           // the tabs cannot be left showing behind a half-open camera.
           <CaptureActions onScanResult={onScanResult} onManual={onManual} onScannedSavedMeal={onScannedSavedMeal}>
             <SegmentedTabs tabs={LIST_TABS} value={listTab} onValueChange={setListTab} size="xs" className="shrink-0 px-1" />
-            {listTab === 'foods' && (
+            {listTab === 'meals' && (
               <div className="flex shrink-0 gap-2 px-1">
                 {selectedIds ? (
                   <>
@@ -512,8 +526,11 @@ export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate,
                   onConfirm={() => void deleteSelected()}
                 />
               )}
-              {listTab === 'foods' ? (
+              {listTab === 'recent' ? (
+                <RecentFoodsPanel mealTypeId={recentMealTypeId} userId={userId} onSelectFood={onSelectFood} />
+              ) : (
                 <FoodList
+                  show={listTab}
                   meals={meals}
                   loadingMeals={loading}
                   query={mealQuery}
@@ -529,8 +546,6 @@ export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate,
                   onSelectFood={onSelectFood}
                   userId={userId}
                 />
-              ) : (
-                <RecentFoodsPanel mealTypeId={recentMealTypeId} userId={userId} onSelectFood={onSelectFood} />
               )}
             </div>
           </CaptureActions>

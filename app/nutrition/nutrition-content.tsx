@@ -697,7 +697,7 @@ export default function NutritionContent({ userId }: { userId?: string }) {
           shows foods as well as meals, and a food's tap needs the assign step this sheet owns. */}
       <FoodLoggerSheet
         open={loggerOpen || savedMealsOpen}
-        openMyFoods={savedMealsOpen}
+        openLibrary={savedMealsOpen}
         preselectedMealTypeId={loggerMealTypeId}
         onClose={() => { setLoggerOpen(false); setSavedMealsOpen(false); setLoggerMealTypeId(null); }}
         onLogged={handleFoodLogged}

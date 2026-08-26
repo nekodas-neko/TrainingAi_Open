@@ -123,7 +123,7 @@ test('a saved meal renders a printable label in every style', async ({ page }) =
   // swallows MOUSE clicks here while touch is unaffected — and `water-log-write-path.spec.ts`
   // carries the full measurement. Touch is the only input the supported runtime produces anyway, so
   // tapping is both the fix and the more faithful test.
-  const savedMeals = page.getByRole('button', { name: 'My Foods', exact: true })
+  const savedMeals = page.getByRole('button', { name: 'My Meals', exact: true })
   await expect(savedMeals).toBeVisible({ timeout: 60_000 })
 
   // Retried: a tap fired before React has attached the handler does nothing, silently. Opening the
@@ -260,7 +260,7 @@ test('Save to gallery hands over a PNG that declares its print size', async ({ p
   await page.goto('/nutrition')
   await settleRouteBoundary(page)
 
-  const savedMeals = page.getByRole('button', { name: 'My Foods', exact: true })
+  const savedMeals = page.getByRole('button', { name: 'My Meals', exact: true })
   await expect(savedMeals).toBeVisible({ timeout: 60_000 })
   const labelButton = page.getByRole('button', { name: `Print a label for ${MEAL_NAME}` })
   await expect(async () => {
@@ -310,7 +310,7 @@ test('the chosen label style is remembered', async ({ page }) => {
   await page.goto('/nutrition')
   await settleRouteBoundary(page)
 
-  const savedMeals = page.getByRole('button', { name: 'My Foods', exact: true })
+  const savedMeals = page.getByRole('button', { name: 'My Meals', exact: true })
   await expect(savedMeals).toBeVisible({ timeout: 60_000 })
   const labelButton = page.getByRole('button', { name: `Print a label for ${MEAL_NAME}` })
   await expect(async () => {

@@ -133,7 +133,7 @@ async function openEditMeal(page: Page) {
   // attempt fails on a button that is no longer visible — which is what a slow list under a full
   // suite run turned into a hard failure, while the file passed alone every time.
   await expect(async () => {
-    if (await page.getByRole('dialog').count() === 0) await tap(page, /^My Foods$/)
+    if (await page.getByRole('dialog').count() === 0) await tap(page, /^My Meals$/)
     await expect(page.getByText(MEAL_NAME)).toBeVisible({ timeout: 5_000 })
   }).toPass({ timeout: 90_000 })
   // BF-30 moved the row's actions onto the meal's own screen; open it first.

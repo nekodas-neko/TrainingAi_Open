@@ -78,16 +78,16 @@ interface Props {
   userId?: string
   logDate?: string
   /**
-   * Open on the `My Foods` tab rather than `Recent` (Q-395c, then LB-16).
+   * Open on the `Meals` tab rather than `Recent` (Q-395c, LB-16, BF-37).
    *
-   * `/nutrition`'s My Foods button used to open `SavedMealsSheet` directly. It cannot: the list
-   * shows foods as well as meals, and a food's tap needs the **assign** step, which lives here. It
-   * now selects a tab rather than opening a second sheet.
+   * `/nutrition`'s library button used to open `SavedMealsSheet` directly. It cannot: a food's tap
+   * needs the **assign** step, which lives here. It now selects a tab rather than opening a second
+   * sheet, so the button is a deep link into one screen rather than a second way in.
    */
-  openMyFoods?: boolean
+  openLibrary?: boolean
 }
 
-export function FoodLoggerSheet({ open, preselectedMealTypeId = null, onClose, onLogged, userId, logDate, openMyFoods }: Props) {
+export function FoodLoggerSheet({ open, preselectedMealTypeId = null, onClose, onLogged, userId, logDate, openLibrary }: Props) {
   // Q-413: the eaten-at resolution happens in the USER's zone, not the device's.
   const tz = useUserTimezone()
   const [stepStack, setStepStack] = useState<Step[]>(['capture'])
@@ -305,7 +305,7 @@ export function FoodLoggerSheet({ open, preselectedMealTypeId = null, onClose, o
         onScanResult={handleScanResult}
         onManual={handleManual}
         onScannedSavedMeal={handleScannedSavedMeal}
-        openOnFoods={openMyFoods}
+        openOnMeals={openLibrary}
       />
     </>
   )

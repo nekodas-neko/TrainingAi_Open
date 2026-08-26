@@ -14,7 +14,7 @@ interface Options {
 }
 
 /**
- * Copying planned meals into My Foods (Q-398).
+ * Copying planned meals into My Meals (Q-398).
  *
  * The owner builds a plan once and then mostly stops opening it. What should survive it is ordinary
  * saved meals — they log in one tap, print a label with a QR, and can be edited ingredient by
@@ -22,7 +22,7 @@ interface Options {
  *
  * **Idempotence uses the column that already exists.** `meal_plan_meals.saved_meal_id` is stamped
  * after each copy and survives a regenerate, so "Save all" pressed twice is a no-op rather than nine
- * duplicates, and it is also what the row reads to show "In My Foods". Deleting the saved meal
+ * duplicates, and it is also what the row reads to show "In My Meals". Deleting the saved meal
  * clears the stamp through the FK's `ON DELETE SET NULL`, so the offer correctly comes back.
  *
  * The stamp is best-effort on purpose: the meal is already in the library by the time it runs, and
@@ -56,8 +56,8 @@ export function usePlanMealSaving({ mealPlan, userId, onPlanChanged }: Options) 
 
     if (stamped.size > 0) {
       toast.success(todo.length === 1
-        ? `"${todo[0].name}" saved to My Foods`
-        : `${stamped.size} meals saved to My Foods`)
+        ? `"${todo[0].name}" saved to My Meals`
+        : `${stamped.size} meals saved to My Meals`)
     }
     // Reported separately rather than folded into the success line: a partial save is the case
     // where the user needs to know which half happened.
