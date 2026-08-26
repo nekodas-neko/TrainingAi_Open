@@ -14,7 +14,7 @@ silently misdirecting the next session. Update them in the same PR that consumes
 
 | Pointer | Value | Source of truth |
 |---|---|---|
-| Next free Postgres migration | **233** | `lib/data/postgres/migrations/` |
+| Next free Postgres migration | **235** | `lib/data/postgres/migrations/` |
 | Local SQLite schema version | **v30** | `lib/sqlite/migrations.ts`; `lib/sqlite/__tests__/migrations.test.ts` asserts the max |
 
 > **There is no third pointer any more.** Entry IDs are not allocated from a shared counter and
@@ -7438,7 +7438,7 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   its tests and by a comment in `TdeeAdaptationCard` explaining it was replaced. Same trap as
   `amrapScaleFactor` (Q-514); do not calibrate it.
 
-### [sleep] Q-519 — manual bedtime entry for a night the ring missed, writing exactly one column
+### [sleep] Q-519 — manual bedtime: the ENGINE half shipped; the UI half is Lane B's
 
 - **Branch:** `feat/manual-bedtime-entry`
 - **Plan:** none needed — contained, and it reuses the existing per-field merge.
@@ -7461,10 +7461,11 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   2026-08-26 —
   [`docs/reviews/2026-08-26-manual-bedtime-write-audit.md`](reviews/2026-08-26-manual-bedtime-write-audit.md):
   - **`aggregateNight` recomputes both** (`sleep-night.ts:225`): `timeInBed = last.sleepEnd −
-    first.sleepStart`, `efficiency = totalSleep / timeInBed`. On the owner's own night that is
-    9.05 h and **34%** — the warning's number, exactly. Guarded only by a single-window fast path,
-    so it fires on a **fragmented** night, and Q-274 measures ten fragment rows in production.
-    Reached by seven consumers through `nightSessions`.
+    first.sleepStart`, `efficiency = totalSleep / timeInBed`. **Reproduced in a test** on the owner's
+    own night plus one same-date fragment: the rejected design gives **10.0 h at 35%** where the
+    measured window gives **4.62 h at 75%**. Guarded only by a single-window fast path, so it fires
+    on a **fragmented** night, and Q-274 measures ten fragment rows in production. Reached by seven
+    consumers through `nightSessions`.
   - **The daytime-HRV model trains on window membership** and is fed from **stored** rows
     (`adapter.ts:5304` → `extractNightlyTrainingSamples`), so five awake hours would enter the
     *nightly* training set. **No fragmentation needed.** That fit feeds daytime-stress, which feeds
@@ -7483,10 +7484,20 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   made one unnecessary. **The merge exists to let a better *measurement* of the same quantity win; a
   remembered bedtime is a different quantity, and sharing a column with the observed one is the whole
   cause.** Reversal cost stays low: one nullable column, one reader.
-- **Shape (Lane A owns all of it):** migration for the column · `schema.ts` · repo write + read
-  mapping · `claude_ro` view regen · local SQLite column + `RECONCILE_COLUMNS` + version bump · sync
-  delta/pull/push · an ingest route · `bedtime-estimate` reading `manualSleepStart ?? sleepStart`.
-  The UI half is **Lane B's**.
+- **✅ The ENGINE half shipped 2026-08-26** — migrations **233** (`sleep_sessions.manual_sleep_start`)
+  and **234** (`claude_ro` regen); `schema.ts`; `setManualSleepStart` on the repo (user-scoped,
+  creates nothing, returns false when no night exists); `POST /api/sleep/manual-bedtime`; the
+  `manual_bedtime` outbox domain and its `pushMutations` branch, mirroring the route through the same
+  function; the local SQLite column via `RECONCILE_COLUMNS` (**no version bump** — additive, the
+  Batch F pattern) with the pull mapping; and `bedtime-estimate` reading
+  `manualSleepStart ?? sleepStart`, which is **the only read site in the codebase**.
+- **Keep: the UI half, Lane B's.** Nothing can write a bedtime yet — there is no control. What it
+  needs: a way to set and clear it on a night, `POST /api/sleep/manual-bedtime` (`{date, at|null}`,
+  404 when no session exists for the date), and a `queueMutation({domain: 'manual_bedtime'})` beside
+  the POST so it survives offline. Displaying it is a separate decision: the sleep card currently
+  shows the measured start, and whether a remembered bedtime should appear there has not been asked.
+- **Keep: not device-verified.** The engine half is server-side and web-testable, but the local column
+  arrives through `reconcileSchema` on a real device and no APK has run.
 - **Manual bedtime writes the new column and NOTHING else** — not `sleep_start`, not duration, not
   efficiency, not a synthesised `sleep_end`.
 - **What it does not fix:** the 3h 5m still reaches the sleep score, readiness's `previousNight`

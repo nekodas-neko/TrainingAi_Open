@@ -3153,3 +3153,15 @@ finding read two ways — every score now stores the breakdown it was made of �
 saying that separately would have cost eleven lines to say it worse. The measurement worth keeping in
 the index is the one that changes what a reader concludes from a stored row: both fixes are
 **forward-only**, so a day before 2026-08-26 is not merely unchecked but uncheckable.
+
+## 2026-08-26 — `projectOverview.md` 8128 → 8138 (+10), Q-519 engine half
+
+Ten lines, and the two that earn the rest are the ⚠️ ones: **no UI exists yet**, so a session reading
+"manual bedtime shipped" would otherwise go looking for a control that is not there, and **the local
+column is not device-verified**, which is the gate the Canonical Runtime rule requires stated
+somewhere a session reads before starting.
+
+The middle of the block is the design reversal rather than the feature. An entry proposed writing the
+remembered bedtime into `sleep_start`; the audit it commissioned found that turns a measured 3 h night
+into 10 h at 35%. Recording only "manual bedtime shipped" would leave the next session free to
+re-derive the rejected design as the obvious one — the numbers are what make it not obvious.
