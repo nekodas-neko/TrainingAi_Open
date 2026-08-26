@@ -2777,6 +2777,61 @@ invalidate each other indefinitely, and model output is not deterministic, so it
 That is not visible from either route's source — it is a property of the pair — which is exactly the
 kind of thing an orientation doc exists to carry.
 
+## 2026-08-26 — backlog 11903 → 11947 (PS-7, camera form capture)
+
+Forty-four lines for one new queue entry at the tail. The entry is longer than a typical one on
+purpose: it is an owner feature request whose plan rejects four alternatives with reasons, and the
+entry names them so an implementer does not re-propose one before opening the plan. Everything else
+about the feature — the storage arithmetic, the capture state machine, the Wear OS costing — is in
+`docs/superpowers/plans/2026-08-26-camera-form-capture.md`, which is where it belongs.
+
+**Only Phase 0 is queued, and that is the reason this raise is 44 lines and not four times that.**
+The plan has five later phases. Filing them now would have added an entry each for work whose shape
+is decided by a measurement nobody has taken yet, and the queue would have carried them until
+someone read far enough to find out they were all gated on the same unknown.
+## 2026-08-26 — `docs/implementation-backlog.md` raised, 11903 → 11958 (BF-34, the device-only delete)
+
+One entry, and most of it is a table of **six layers ruled out**, each with the line that rules it
+out. That is the expensive part of this bug and it is worth carrying in the queue rather than being
+re-derived: the whole delete path was driven end-to-end on web with Playwright and it **works**, so
+the failure is device-only, and an implementer who starts by re-checking the local store, the outbox
+payload or the pull-clobber gate will spend the same afternoon reaching the same dead ends.
+
+The entry ends on one question — *does the confirm dialog appear on the device at all?* — because the
+answer splits it into two different bugs with two different fixes.
+
+## 2026-08-26 — `docs/implementation-backlog.md` raised, 12002 → 12048 (BF-34 root-caused)
+
+The owner's one-line answer — *"it opens up the confirm dialog; but then instantly minimizes"* —
+turned a device-only symptom into a traced regression in **BF-27**, which shipped the day before.
+
+The added lines are the four-step sequence and the reason the hook's existing guard cannot catch it:
+`selfPopRef` is per-instance, so a closing surface's asynchronous `history.back()` lands on the
+surface that just opened, whose flag is clear and whose `sheetId` does not match — indistinguishable
+from a real back gesture. The `sheetId` guard was written for the parent/child cascade (LB-10); this
+is the sibling case.
+
+It is written out in full because the blast radius is **every close-one-open-another transition in
+the app**, and because the obvious local fix — moving the confirm inline — would hide this instance
+and leave the cause running everywhere else.
+
+## 2026-08-26 — backlog 12048 → 12064 (PS-7 decisions, camera form capture)
+
+Sixteen lines on the existing PS-7 entry, no new entry. The owner answered all four of the plan's
+open questions the same day it was written, and one answer changed the design — the analysis is
+keyed off the exercise's logged equipment rather than a whitelist of lifts. The entry carries the
+three facts an implementer would otherwise re-derive: that `equipmentClassOf()` already exists and
+should be reused, that it collapses dumbbell into a `standard` bucket the form profile has to split,
+and that 23 of 149 production exercises carry no equipment tag at all.
+
+**This raise was missed locally and CI caught it — worth recording because the local run was not
+wrong.** `pnpm check:rules` passed on this branch at the then-current baseline of 11947. Between the
+branch being cut and the PR opening, `main` merged twice and carried the baseline to 12048 with a
+larger file underneath it. CI checks the *merge* result, so the same diff that was clean locally was
+16 over once merged. The rule already in CLAUDE.md covers it — re-merge `origin/main` immediately
+before opening each PR, not only before cutting the branch — and this is one more instance of the
+cost, not a new failure mode.
+
 ## 2026-08-26 — `CLAUDE.md` 1174 → 1198, backlog 11860 → 11858, `projectOverview.md` 7992 → 8003 (Q-273)
 
 **The only `CLAUDE.md` raise of the session, and it is Q-273's own scope item 3**: *"a rule, alongside

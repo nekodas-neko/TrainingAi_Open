@@ -23,6 +23,12 @@ documentation cluster in the repo (~45 known issues, ~38 plans, 300+ model files
 
 ## Reference docs — read in this order
 
+- [`docs/superpowers/plans/2026-08-26-camera-form-capture.md`](../../superpowers/plans/2026-08-26-camera-form-capture.md)
+  — **design only, nothing built or measured (PS-7, 2026-08-26).** Proposes the phone camera as a
+  sensor: `@mediapipe/tasks-vision` in the WebView (self-hosted — the documented CDN path is
+  blocked by `connect-src 'self'`), with a native CameraX + MediaPipe Kotlin plugin as the
+  fallback if the WASM path cannot hold ~15 fps. Phase 0 is a device-gated feasibility spike;
+  §9 costs a Wear OS module and recommends against it.
 1. **[`docs/oura-ble-operations.md`](../../oura-ble-operations.md)** — the operations manual:
    failure-point matrix, sync-cadence policy, protocol-maintenance playbook, data-integrity
    runbook. **Read this before touching the pipeline**, and add a §1 matrix row for any new failure
