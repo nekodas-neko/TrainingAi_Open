@@ -1,10 +1,9 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useUserTimezone } from '@/components/shell/user-timezone-provider'
 import { X } from 'lucide-react'
 import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet'
-import { CaptureStep } from './capture-step'
 import { ReviewStep, type EditableNutrition } from './review-step'
 import { AssignStep } from './assign-step'
 import { SavedMealsSheet } from './saved-meals-sheet'
@@ -18,6 +17,14 @@ import { getLocalStore } from '@/lib/local-store'
 import { hapticLight } from '@/lib/haptics'
 import { toast } from 'sonner'
 
+/**
+ * `capture` is drawn by `SavedMealsSheet`, not by the sheet below (LB-16).
+ *
+ * That sheet owns the list, the builder and four nested sheets, so the capture screen went to it
+ * rather than the ownership layer coming here. The consequence worth stating: at `capture` this
+ * component renders **no sheet of its own** — one screen is one sheet is one back-stack layer, and
+ * an empty shell behind the list would have been a wasted press for the user to discover.
+ */
 type Step = 'capture' | 'review' | 'assign'
 
 const STEP_LABELS: Record<Step, string> = {
@@ -71,11 +78,11 @@ interface Props {
   userId?: string
   logDate?: string
   /**
-   * Open straight onto My Foods rather than the capture tiles (Q-395c).
+   * Open on the `My Foods` tab rather than `Recent` (Q-395c, then LB-16).
    *
-   * `/nutrition`'s My Foods button used to open `SavedMealsSheet` directly. It cannot any more: the
-   * list shows foods as well as meals, and a food's tap needs the **assign** step, which lives
-   * here. So the button opens the logger onto the list instead of opening the list alone.
+   * `/nutrition`'s My Foods button used to open `SavedMealsSheet` directly. It cannot: the list
+   * shows foods as well as meals, and a food's tap needs the **assign** step, which lives here. It
+   * now selects a tab rather than opening a second sheet.
    */
   openMyFoods?: boolean
 }
@@ -93,13 +100,7 @@ export function FoodLoggerSheet({ open, preselectedMealTypeId = null, onClose, o
   const [scanResult, setScanResult] = useState<NutritionScanResult | null>(null)
   const [ingredients, setIngredients] = useState<NutritionIngredient[]>([])
   const [form, setForm] = useState<EditableNutrition>(BLANK)
-  const [showSavedMeals, setShowSavedMeals] = useState(false)
 
-  // Keyed on `open` so re-opening the logger honours the flag again; a mount-only effect would run
-  // once and leave every later open on the capture tiles.
-  useEffect(() => {
-    if (open && openMyFoods) setShowSavedMeals(true)
-  }, [open, openMyFoods])
   // When logging from the food library we already have the food item — skip creation
   const [libraryItemId, setLibraryItemId] = useState<string | null>(null)
 
@@ -108,7 +109,6 @@ export function FoodLoggerSheet({ open, preselectedMealTypeId = null, onClose, o
     setScanResult(null)
     setIngredients([])
     setForm(BLANK)
-    setShowSavedMeals(false)
     setLibraryItemId(null)
   }
 
@@ -144,9 +144,6 @@ export function FoodLoggerSheet({ open, preselectedMealTypeId = null, onClose, o
   }
 
   function handleLibrarySelect(item: FoodItem) {
-    // The list is a sheet stacked ON this one, so the assign step it pushes would render behind it.
-    // Close the list first, or picking a food looks like nothing happening.
-    setShowSavedMeals(false)
     setLibraryItemId(item.id)
     setIngredients([])
     setForm(itemToEditable(item))
@@ -243,7 +240,9 @@ export function FoodLoggerSheet({ open, preselectedMealTypeId = null, onClose, o
 
   return (
     <>
-      <Sheet open={open} onOpenChange={o => !o && handleClose()}>
+      {/* Not `open` — `step !== 'capture'`. The capture screen is the sheet below, so opening this
+          one too would stack an empty shell behind it and cost a back press to get through. */}
+      <Sheet open={open && step !== 'capture'} onOpenChange={o => !o && handleClose()}>
         <SheetContent side="bottom" className="rounded-t-2xl max-h-[90vh] flex flex-col p-0 bg-secondary border-t border-border/70" hideCloseButton>
           <SheetTitle className="sr-only">{STEP_LABELS[step]}</SheetTitle>
           <div className="flex items-center justify-between px-4 pt-4 pb-2 shrink-0">
@@ -268,17 +267,6 @@ export function FoodLoggerSheet({ open, preselectedMealTypeId = null, onClose, o
           )}
 
           <div className="flex-1 overflow-y-auto">
-            {step === 'capture' && (
-              <CaptureStep
-                onScanResult={handleScanResult}
-                onManual={handleManual}
-                onMyFoods={() => setShowSavedMeals(true)}
-                preselectedMealTypeId={preselectedMealTypeId}
-                onLibrarySelect={handleLibrarySelect}
-                userId={userId}
-                onScannedSavedMeal={handleScannedSavedMeal}
-              />
-            )}
             {step === 'review' && (
               <ReviewStep
                 result={scanResult}
@@ -304,14 +292,20 @@ export function FoodLoggerSheet({ open, preselectedMealTypeId = null, onClose, o
         </SheetContent>
       </Sheet>
 
+      {/* The capture screen itself (LB-16). Closing it closes the logger: it is the first step, so
+          there is nothing behind it to go back to. */}
       <SavedMealsSheet
-        open={showSavedMeals}
-        onOpenChange={v => { if (!v) setShowSavedMeals(false) }}
+        open={open && step === 'capture'}
+        onOpenChange={v => { if (!v) handleClose() }}
         onLogged={(log) => { reset(); onClose(); onLogged(log) }}
         userId={userId}
         logDate={logDate}
         preselectedMealTypeId={preselectedMealTypeId ?? undefined}
         onSelectFood={handleLibrarySelect}
+        onScanResult={handleScanResult}
+        onManual={handleManual}
+        onScannedSavedMeal={handleScannedSavedMeal}
+        openOnFoods={openMyFoods}
       />
     </>
   )
