@@ -14,7 +14,7 @@ silently misdirecting the next session. Update them in the same PR that consumes
 
 | Pointer | Value | Source of truth |
 |---|---|---|
-| Next free Postgres migration | **231** | `lib/data/postgres/migrations/` |
+| Next free Postgres migration | **233** | `lib/data/postgres/migrations/` |
 | Local SQLite schema version | **v30** | `lib/sqlite/migrations.ts`; `lib/sqlite/__tests__/migrations.test.ts` asserts the max |
 
 > **There is no third pointer any more.** Entry IDs are not allocated from a shared counter and
@@ -351,6 +351,316 @@ below threshold and left in place for next time.
 > BF-29 (My meals), BF-30 (Meal detail), BF-31 (Edit meal) and BF-26 (Quantity). Two artboards need
 > no entry — `Tap targets` and the `srv/g` studies both shipped in Q-395a.
 
+### [devices] PS-11 — FIRST OVERNIGHT SYNC: prove every metric actually landed ⭐ TOMORROW'S JOB
+
+- **Lane:** A
+- **Gate:** device — needs the ring worn overnight 2026-08-26 and the app on the phone
+- **Plan:** [`2026-08-26-alternative-ring-colmi-testing.md`](superpowers/plans/2026-08-26-alternative-ring-colmi-testing.md)
+  · matching reference: [`multi-device-comparison.md`](multi-device-comparison.md)
+- **Added:** 2026-08-26 · owner is wearing the ring tonight; this is the acceptance test for the
+  connector shipped the same evening.
+
+**Nothing in the connector has run against the physical ring.** The BLE layer is I/O against
+hardware and has no test coverage by nature; everything under it is pure and covered. So this entry
+is the first real evidence either way, and it is a *measurement* task, not a build task.
+
+**Do this, in order, and record the result in §11 of the plan:**
+
+1. **More → Devices → Pair ring**, then **Sync now**. Ring on the charger or worn — a still ring
+   sleeps its processor and answers nothing, and the card will say so (`reason: 'silent'`).
+2. **Read the "Recording automatically" row first.** Five switches: heart rate (with its interval),
+   HRV, blood oxygen, stress, temperature. The sync enables all five and then reads them back.
+   **A switch that reads OFF means that metric recorded nothing overnight** — and an empty history
+   from a disabled switch is indistinguishable from a ring that was not worn. If any is off after a
+   sync, that is the bug, and it is the highest-value thing this entry can find.
+3. **Check every metric has rows**, per kind:
+   `SELECT kind, count(*), min(measured_at), max(measured_at) FROM colmi_readings GROUP BY 1;`
+   Expect: `heart_rate`, `steps`, `calories`, `distance`, `hrv`, `stress`, `spo2`, `temperature`,
+   `battery`. **A kind with zero rows is a finding** — either its switch was off, its decoder is
+   wrong, or the ring does not populate it. Say which.
+4. **Check sleep**: `SELECT local_date, count(*), sum(minutes) FROM colmi_sleep_segments GROUP BY 1;`
+   Stages are 2 light / 3 deep / 4 REM / 5 awake. Sum of minutes should be close to the night's
+   length; a wild mismatch means the stage-span walk is drifting.
+5. **Sync a second time and confirm it stores 0.** Dedup is unit-tested and DB-tested, but not
+   against real ring output, where the timestamps come from `resolveRelative` rather than a fixture.
+6. **Check the day boundary.** A session that started before midnight must be keyed to the day it
+   *started* in. This is the most likely place for an off-by-one and the hardest to notice later.
+
+**Known gaps to confirm rather than rediscover:** the heart-rate log's continuation packets are
+dropped (only the timestamped packet carries an anchor — see `framesToPayload`), so HR coverage may
+be sparser than the ring's own history; and activity is requested for 3 days by default.
+
+### [devices] PS-12 — baseline the three-device comparison, and write down what "agreement" was
+
+- **Lane:** A
+- **Gate:** device
+- **Needs:** PS-11
+- **Plan:** [`multi-device-comparison.md`](multi-device-comparison.md) — read it before running this;
+  most of the ways to get a wrong number here are listed in it.
+- **Added:** 2026-08-26
+
+Once PS-11 shows data landing, run `GET /api/admin/device-comparison?from=&to=&bucket=5` and record
+the first real numbers.
+
+- **Read `coverage` first.** It is the denominator for everything else, and a device with near-zero
+  coverage was not compared, whatever its pair statistics say.
+- **Bucket at 5 minutes, not 1.** Both rings sample every 5 at their finest; a 1-minute grid makes
+  two 5-minute devices look like they never agreed when they were never compared. The endpoint
+  defaults to 5 and reports `bucketMinutes` back.
+- **Ring vs ring says they differ; only ring vs strap says which is wrong.** Wear the H10 for at
+  least one workout inside the window or the comparison has no ground truth in it at all.
+- **Record `meanBias` separately from `meanAbsDelta`.** A ring reading 5 bpm high all day is
+  calibration and correctable; one alternating ±5 is noise and is not. They have identical mean
+  absolute error.
+- **Do not conclude anything from one day.** 14 nights, and split on any hand swap or firmware
+  change inside the window.
+
+### [devices] PS-13 — the heart-rate log drops its continuation packets
+
+- **Lane:** A (code plus a captured vector; no device gate of its own)
+- **Needs:** PS-11
+- **Added:** 2026-08-26 · known at write time, filed rather than left implicit
+
+`framesToPayload` keeps only sub-type 1 of the `0x15` heart-rate log — the packet carrying the
+little-endian unix anchor — and drops sub-types 2+, which hold 13 samples each and are a
+*continuation* of that anchor rather than self-describing. Dropping them was the honest choice
+without a real multi-packet capture: placing them means assuming the sample spacing, and a wrong
+assumption smears a day's heart rate across the wrong hours, which is worse than missing it.
+
+PS-11's capture is what settles the spacing. The header packet (sub-type 0) reports
+`intervalMinutes`; confirm the continuation samples step by exactly that, then extend the mapping
+and pin a multi-packet fixture. Until then, expect Colmi HR coverage to be thinner than the ring's
+own history and do not read that as the ring failing to record.
+
+### [devices][cardio] PS-9 — the R09 streams raw accelerometer on stock firmware, which makes it a tier-1 source
+
+- **Lane:** A (a decoder + an ingest path; `lib/colmi-ble/**` is engine)
+- **Gate:** device
+- **Plan:** none yet — this is a finding, not a design
+- **Added:** 2026-08-26 · found by the owner in the Web Bluetooth client's UI, command confirmed in
+  its source
+
+`0xa1` enables raw accelerometer streaming (`a1 04 04`; `a1 02` disables), **~20 Hz, no firmware
+flash required**. It is in neither Gadgetbridge's constant set nor `colmi_r02_client`. The command
+builders ship in `lib/colmi-ble/protocol.ts` with tests; **there is no payload decoder**.
+
+**Why this is more than one more command.**
+[`device-agnostic-source-architecture.md`](device-agnostic-source-architecture.md) splits sources
+into **raw-capable** (we derive the metric) and **computed** (the vendor already did). The plan
+filed the Colmi in the right-hand column beside Health Connect. Raw accelerometer moves it left,
+next to the Oura — a second tier-1 device, on a ring that costs a fraction of one and whose protocol
+is public. That is a materially different proposition from "a cheap second opinion on heart rate".
+
+- **First action is a decoder + a capture, not a feature.** The client's own note says 12-bit ADC,
+  ±4 G, `-2048…+2047`, converted to G then to angles via `atan2`, based on `@atc1441`'s MIDI Ring
+  work. Port that, pin it to a captured frame, and confirm the rate on-device before anything reads it.
+- **Streaming is battery-costly and must be bounded to an activity**, never left on. The ring is
+  small and this is a continuous radio + sensor load; the Oura pipeline's `setForced`/ambient split
+  is the pattern.
+- **Do NOT flash the mod firmware for a higher rate** (plan §8). ~20 Hz stock is enough to find out
+  whether the signal is worth anything.
+
+### [app-shell][devices] PS-10 — ring gestures for hands-free workout navigation (owner idea, unproven)
+
+- **Lane:** B (the surface); depends on **PS-9** for the raw stream
+- **Needs:** PS-9
+- **Gate:** device
+- **Added:** 2026-08-26 · owner: *"the gestures one if it works well would be good for cycling
+  through the workout pages. would need a lot of testing though"* — the caveat is the entry.
+
+The problem is real: mid-set the phone is on a bench, hands are chalked or sweaty, and advancing
+the workout screen means picking it up. A wrist flick would be better than a tap.
+
+**Why this is filed rather than built, and what would have to be true first.**
+
+- **False positives are the whole risk, and resistance training is the worst case for them.** A
+  gesture recogniser trained on a still hand has to run while the same hand is doing barbell rows.
+  A missed gesture is an annoyance; a *false* one that skips a set mid-lift corrupts the log, which
+  is the app's actual product. Any design starts from a gesture that cannot occur during a lift —
+  and it needs a confirmation beat before anything destructive.
+- **It needs PS-9's stream running continuously through a workout**, which is exactly the battery
+  cost PS-9 says to bound. A workout is bounded, so this is the one place it may be affordable.
+- **The recogniser has to be ours.** The client the owner saw trains gestures in the browser and
+  keeps them there; nothing in that transfers.
+- **Cheaper alternative to weigh first:** the phone is already on a tripod for PS-7's camera work,
+  and voice is already wired for the AI chat. Neither needs a ring. Whether a gesture beats them is
+  a question worth answering before building the hardest of the three.
+
+**Recommendation: do not start this until PS-9 has produced a real capture and someone has looked at
+what a rack pull looks like in that data.** The answer to "would this false-positive constantly"
+lives in that file and nowhere else.
+
+### [devices][platform] PS-8 — the Colmi R09 in learning mode: ingest it, compare it, score nothing with it
+
+- **Branch:** `claude/alternative-ring-testing-jzk8el` (plan + CI guard landed; the spike is a later branch)
+- **Lane:** A — `lib/colmi-ble/**` is engine and Phase 2 is a **migration**, which is Lane A's alone.
+  The pairing card is the only Lane-B surface and rides with it, as the scale and strap did.
+- **Gate:** device — **Phase 0 cannot start without the physical R09 in hand**, and every later
+  phase is conditional on it passing
+- **Plan:** [`2026-08-26-alternative-ring-colmi-testing.md`](superpowers/plans/2026-08-26-alternative-ring-colmi-testing.md)
+- **Added:** 2026-08-26 · one-off session, from an owner request for a deployment plan plus a
+  guarantee that the ring *"wont affect scoring of anything I have going"*
+
+**Learning mode is the requirement, and the obvious way to get it does not work.** Ranking
+`colmi_ble` below `oura_ble` protects *writes* only; every scoring *read* is source-blind
+(`getHrForWindow` has no source predicate, `preferStrapBuckets` is an allowlist of one), so a Colmi
+row inside a shared table is a scored row however it is stamped. Isolation comes from the data never
+entering those tables — the five being `oura_heartrate`, `body_metrics`, `sleep_sessions`,
+`oura_daily`, `oura_daily_derived`.
+
+**Already shipped on this branch:** `scripts/check-learning-mode-isolation.js`, wired into Custom
+Rules, empty baseline, all four violation shapes probed. **Do not add `colmi_ble` to
+`HEALTH_SOURCES`** — every shared writer takes `source: HealthSource`, so its absence from that
+tuple makes a shared-table write a *compile error*, which is stronger than anything the script does.
+
+- **Phase 0 (owner, no code, no repo change) — the gate.** The ring is **factory-fresh, no software
+  installed** (owner, 2026-08-26). It ships switched off: charge >1 h to green first, or a scan
+  finding nothing means nothing. Then run the gate in **nRF Connect**, not QRing — a generic GATT
+  explorer pushes no firmware, syncs nothing and consumes no on-ring history, and a failure in it is
+  unambiguously the ring rather than our decoder. Scan, read model + firmware off `0x180A` **into
+  §11 of the plan**, confirm service `6E40FFF0-B5A3-F393-E0A9-E50E24DCCA9E` exists, then write
+  `03000000000000000000000000000003` to RX and expect a 16-byte reply starting `03`.
+  **The R09 is not on the reference client's compatibility list** (R02/R06/R10 are); only a fork
+  claims it. If the round trip fails, the unit is not in that protocol family and Phases 1+ are void.
+  QRing is the fallback only if the ring will not advertise after a full charge — **decline any
+  firmware update it offers**, then uninstall it.
+- **✅ PHASE 0 COMPLETE and ✅ PHASE 1 SHIPPED, 2026-08-26.** The owner ran Start Monitoring on the
+  Web Bluetooth client with the ring worn and it returned live HR — the command round trip, which
+  was the last unmeasured thing (§11h). Caveat: that proves the ring and the transport via a
+  *third-party* client, not our code; ours is proven when Phase 3 drives it.
+  **Phase 1 is `lib/colmi-ble/protocol.ts` + `decode.ts`, 32 tests**, covering the full command
+  surface — battery, set-time, find-device, real-time HR, and the HR / activity / stress / HRV /
+  sleep / temperature / SpO2 syncs — at the owner's direction (*"a lot of features the oura ring
+  doesn't have … get full use out of it"*). Two decisions not to re-litigate: decoders return
+  **relative** time (`daysAgo`, `minuteOfDay`, BCD) and never build a Date, because the reference
+  client resolves in the *device's* zone; and decoders are **infallible**, held by a 300-case fuzz
+  test. Anchor test is the real captured packet `73-0C-64-00-…-E3`.
+- **Next: Phase 2 (storage, Lane A migration) then Phase 3 (sync + pairing card).** Pairing filters
+  by `namePrefix: 'R09_'`, never a stored device id (§11a). The sync path must treat a silent ring
+  as distinguishable from no-data, and must handle **"held by another app"** — a peripheral takes one
+  connection and stops advertising while held, so it presents as *device not found* (§11g).
+- **Historical, kept for the trail — ROOT CAUSE of the evening's silence (§11e): every write was
+  ASCII, never bytes.** The nRF Connect log shows
+  `Data written to 6e400002…, value: (0x) 30-33-30-30-…-33` — that is the 32-character *string*
+  `"0300…03"` sent as 32 ASCII bytes, not the 16 binary bytes. **And it was not a missed setting (§11e-d):** the ring reuses
+  **Nordic UART Service's exact characteristic UUIDs** (`6e400002`/`6e400003`) under its own service
+  UUID, so nRF Connect matches the NUS profile, labels them "RX/TX Characteristic", and gives that
+  characteristic a **text-only write dialog with no format selector at all** — while the unrecognised
+  `de5bf72a` gets the full BYTE ARRAY picker. **nRF Connect structurally cannot send binary to the
+  characteristic this ring needs**, which is exactly `CHARACTERISTIC_WRITE` in Gadgetbridge. Writing
+  to `de5bf72a` instead does not substitute — that is the V2 big-data channel and wants
+  `0xbc`/type/length/CRC16 framing, not a raw command. **No valid command was ever sent**, so every hypothesis tested
+  against the silence was tested against a null input. The tell was on screen for hours: nRF prefixes
+  a byte-array value with `(0x)` and a text value with nothing.
+- **The ring was talking the whole time (§11e-b).** Notifications on TX decode cleanly against
+  `YawellRingConstants`: `73-0C-64-00-…-E3` = `CMD_NOTIFICATION` / `NOTIFICATION_BATTERY_LEVEL` /
+  **100% battery** / charging flag — **and that flag flipped 0→1 exactly when the ring went on the
+  charger**. Checksum `0x73+0x0C+0x64 = 0xE3` confirms the **mod-256** arithmetic on real device
+  output. `sd…` was this packet rendered as text (`0x73`=`s`, `0x0C` invisible, `0x64`=`d`).
+- **Confirmed with hex:** transport, notify path, framing, checksum. **Still unproven:** the
+  command→response path, since nothing valid has been sent yet. Next probe with correct byte-array
+  writes is in §11e-d.
+- **Process lesson:** read the transport log before forming a hypothesis. Five rounds of protocol
+  theory ran on a Value field hiding both the outgoing bug and the incoming data; every result they
+  produced came from reading other clients' source, not from the ring. On the charger, TX showed a Value for the
+  first time (`sd…`, text-rendered). A later `0x43` on both services left that field **unchanged**,
+  which means no new notification arrived — so the value is stale, of unknown origin, and was never
+  evidenced as a `0x03` reply (a battery reply starts `0x03`; `s` is `0x73`). The command channel is
+  **unproven**; Phase 0 stands at transport-confirmed. The procedural error is the point: a gate was
+  marked passed on one ambiguous value without taking the hex that would have settled it. **The application MCU
+  sleeps, and a sleeping ring is indistinguishable from a broken one over GATT** — device-info reads,
+  CCCD writes and write ACKs are all served by the BLE stack, so four rounds of protocol probing ran
+  against a ring that could not answer while the protocol was correct throughout. **Wake state goes
+  to the top of the diagnostic order for any ring**, ahead of every protocol hypothesis.
+- **Phase 3 design consequence — a silent ring must not read as "no data".** Sync needs a timeout
+  with a distinguishable "asleep / did not answer" outcome, a retry rather than one attempt, and
+  **no cursor advance or synced-state write on a silent attempt** (the Oura durability rule,
+  unchanged). Normal wear should keep it awake; the failure mode when it does not is silence, not an
+  error, which is the dangerous shape.
+- **Still to capture:** the reply's raw bytes. nRF rendered it as text, so read the hex from the
+  nRF Connect log. Expected per Gadgetbridge: `[0]=0x03`, `[1]=battery %`, `[2]=charging flag.
+- **Superseded — earlier status, kept for the trail: transport PASSED, framing FAILED so far.** Enumerated on the
+  owner's unit in nRF Connect: `R09_C400`, firmware `RT09_3.10.22_260420`, hardware `RT09_V3.1`,
+  service `6E40FFF0-…` present with RX `6E400002` (WRITE) and TX `6E400003` (NOTIFY + CCCD). **The
+  `0x03` write lands and the ring never answers** — notifications confirmed enabled, packet echoed
+  on RX, TX silent, twice (§11c). Checksum convention is ruled out: `0x03` sums to 3 under both mod
+  255 and mod 256.
+- **The R09 is known-good with a real open-source client**, which relocates the problem to how we
+  are poking it: [Gadgetbridge #4491](https://codeberg.org/Freeyourgadget/Gadgetbridge/issues/4491)
+  is a user running an R09 with every sensor working, **temperature included**. Ranked suspects
+  (§11c): write type (RX takes WRITE *and* WRITE NO RESPONSE; nRF defaults to Write Request and
+  hides the selector under **Advanced**); the **Serial Port Service** `de5bf728` / `de5bf72a` write
+  / `de5bf729` notify, which the `RT09_*` firmware line may use in place of `6E40FFF0-…`; a required
+  handshake such as set-time `0x01`; radio power-gating. **Decisive diagnostic is `0x10` blink-twice
+  (`10000000000000000000000000000010`)** — physical feedback separates "ring rejects our commands"
+  from "ring replies and we do not receive them".
+- **Protocol section rewritten from Gadgetbridge, 2026-08-26 (§4).** The R09 is a **first-class
+  Gadgetbridge device** (`ColmiR09Coordinator.java`, OEM namespace `yawell`). Three corrections that
+  change the implementation: **(a) the checksum is mod 256, not mod 255** — the plan's earlier claim,
+  inherited from the Python clients, was wrong (§4b); **(b) there are TWO protocol versions** — V1
+  `6e40fff0` for 16-byte commands and V2 `de5bf728` for "big data", and Gadgetbridge subscribes to
+  **both** notify characteristics (§4a); **(c) sleep and skin temperature live on V2** as
+  CRC16-Modbus, length-prefixed, multi-packet payloads (`0xbc`, sleep type `0x27`, temperature
+  `0x25`). Sleep is therefore no longer speculative and **temperature is a capability the Oura
+  pipeline does not have**. Phase 6 shrinks.
+- **Why the nRF probes got nothing (§11c-resolved).** Write type eliminated (Gadgetbridge uses a
+  Write Request, which is what was sent); checksum eliminated (both conventions agree below 255);
+  `0x10` blink is **not a command in this firmware** — the equivalent is `0x50` FIND_DEVICE. The
+  surviving explanation is the **connect handshake**: subscribe both notify chars, wait 2 s, then
+  phone name `0x04` → date/time `0x01` → preferences → **battery last**. Next probe sequence with
+  exact hex is in §11c-resolved.
+- **Handshake sent, still silent — every protocol hypothesis now eliminated (§11c-exhausted).**
+  Phone name and `0x50` find-device written to V1 with both notify chars subscribed: no reply, no
+  blink. Bonding ruled out (`getBondingStyle()` → `BONDING_STYLE_NONE`) and device match confirmed
+  (`getSupportedDeviceName()` → `R09_.*`). What remains is **device state**. First-activation is
+  **eliminated** — the owner confirms the ring reached green on the charger. So the standing
+  candidate is that its **application MCU is asleep** — every successful read so far is served by the BLE stack,
+  while a command needs the app processor, and `CLAUDE.md`'s Oura section documents exactly this
+  power-gating. **Retry on the charger or worn-and-moving**, and read the nRF Connect log for ATT
+  errors the Value line hides.
+- **✅ WEB BLUETOOTH CONNECTS to the R09 on the S25, 2026-08-26 (§11g).** The web client reached
+  `Connected` in Chrome. That is the same API family as `@capacitor-community/bluetooth-le`, so §5's
+  claim — TypeScript in the WebView, **no APK, ships via Railway** — is demonstrated rather than
+  argued. **Still unmeasured: the write direction**; the dashboard has not been asked for anything
+  yet. Pressing Start Monitoring with the ring worn issues real-time HR and proves it.
+- **Design constraint found (§11g): a BLE peripheral takes exactly ONE connection, and while held it
+  stops advertising.** nRF Connect holding the ring made it invisible to Chrome's picker entirely.
+  Our pairing/sync paths must expect "held by another app" (Gadgetbridge, the vendor app, a stale
+  explorer) and **name it** — it presents as *device not found*, indistinguishable from out-of-range
+  or flat battery. Scan-by-name does not rescue it; the ring is not advertising at all.
+- **Gadgetbridge (§11d) is now the fallback, not the next action** — open-source, no vendor cloud, no firmware
+  push. It settles framing end-to-end, and if it yields **sleep and skin temperature** on this unit
+  it both confirms §4's Phase 6 is achievable and names the codebase to port from. Reversible.
+- **Blocker for Phase 3 design — the ring's BLE address is a rotating type (§11a).**
+  `31:37:41:30:C4:00` has the multicast bit set (not a valid public address) and random top-bits
+  `00` = non-resolvable private. But the advertised name encodes the address tail and the System ID
+  characteristic embeds the whole address, which argues stable. **Re-scan after a day and a BT
+  toggle before designing pairing:** stable → copy `lib/scale-ble/paired-scale.ts`; rotating → scan
+  by name like the Oura, because a stored `deviceId` would work all afternoon and be dead by morning.
+- **Two undocumented services found (§11b):** `de5bf728-d711-4e47-af26-65e3012a5dc7` (in no surveyed
+  client — plausible raw/big-data channel, do not write blind) and `0xFEE7` (Telink OTA — the
+  firmware-flash path; **do not write to it at all**, per the mod-firmware rule).
+- **Phase 1 — `lib/colmi-ble/protocol.ts`, pure, no device.** Build/checksum/parse for the HR log
+  (`0x15`) and step log (`0x43`), each decoder pinned to a captured packet hex. This is where the
+  protocol risk is actually retired, and it is fully testable in the sandbox.
+- **Phase 2 — storage, Lane A.** `colmi_raw_packets` (archival hex, so a decoder fix can re-parse
+  without re-draining) + `colmi_readings`. Next free migration was **231** on 2026-08-26; re-check
+  the pointer at claim time.
+- **Phase 3 — sync + pairing card.** Copy `chest-strap-pairing.tsx`. New route `app/api/colmi/samples`
+  — **must not reuse `app/api/hr-ingest`**, which hardcodes `source: 'chest_strap'` and writes
+  `oura_heartrate`.
+- **Phase 4 — one adapter for `lib/oura-comparison-harness.ts`.** ~40 lines; the harness and its
+  console already do the scoring. This is the single sanctioned reader of the Colmi tables.
+- **Phase 5 — 14-day wear trial.** Opposite hands, **swap at day 7** (separates device bias from
+  hand bias), H10 on for ≥3 workouts as real HR ground truth, firmware re-read at the end.
+
+**Not queued, deliberately:** sleep (needs the Gadgetbridge port — Phase 6), and promotion out of
+learning mode (§7 of the plan; the hard part is `oura_heartrate`, which has no per-field merge at
+all — `onConflictDoNothing` on `(user_id, timestamp)` makes a same-second collision first-writer-wins
+permanently).
+
+**Do not flash the circulating `…FasterRawValuesMOD.bin`.** Only step in the arc that can brick the
+device, and it would be taken before knowing the sensor is worth streaming from.
 ### [nutrition] BF-37 — My Foods merged saved meals with the food library; they are two different kinds of thing
 
 - **Lane:** B

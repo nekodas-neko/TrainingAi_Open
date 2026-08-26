@@ -1002,6 +1002,16 @@ export interface WorkoutRepository {
   listOuraTags(userId: string, startDay: string, endDay: string): Promise<OuraTagRow[]>
 
   // ── Body Battery (daily snapshots for model tuning) ──────────────────────────
+  // ── Colmi R09 ring, LEARNING MODE (PS-8) ────────────────────────────────────────────────
+  // Separate from every scoring input by construction. See migration 231's header: ranking a
+  // source protects writes, and every scoring read is source-blind, so isolation has to come from
+  // the data never entering those tables.
+  insertColmiReadings(userId: string, rows: import('./postgres/slices/colmi').ColmiReadingInput[]): Promise<number>
+  insertColmiSleepSegments(userId: string, rows: import('./postgres/slices/colmi').ColmiSleepSegmentInput[]): Promise<number>
+  getColmiReadings(userId: string, kinds: import('./postgres/slices/colmi').ColmiReadingKind[], from: Date, to: Date): Promise<{ kind: string; measuredAt: Date; localDate: string; value: number; valueHigh: number | null }[]>
+  getColmiSleepSegments(userId: string, fromDate: string, toDate: string): Promise<{ localDate: string; startedAt: Date; endedAt: Date; stage: number; minutes: number }[]>
+  getColmiLatestReadingAt(userId: string): Promise<Date | null>
+
   upsertBodyBatteryDaily(userId: string, row: BodyBatteryDailyRow): Promise<void>
   getBodyBatteryHistory(userId: string, startDate: string, endDate: string): Promise<BodyBatteryDailyRow[]>
   upsertOuraSleep(userId: string, sessions: OuraSleepUpsertRow[], source: HealthSource): Promise<void>

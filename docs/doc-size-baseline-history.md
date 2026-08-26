@@ -3114,6 +3114,16 @@ a `paths:` filter, because a required check that never reports blocks a non-UI P
 that earns its place most is the outstanding owner action — E2E is not required until branch
 protection says so, and nothing in this repository can make that true.
 
+## 2026-08-26 — `docs/implementation-backlog.md` 12348 → 12525 (+177 net; this branch added 332)
+
+Five entries from the Colmi ring work (PS-8): **PS-9** raw accelerometer, **PS-10** ring gestures,
+and the three queued at the top as tomorrow's device testing — **PS-11** first overnight sync,
+**PS-12** comparison baseline, **PS-13** the heart-rate log's dropped continuation packets.
+
+Raised rather than trimmed because this is the index doing its job: PS-11/12/13 are a device-gated
+acceptance test written the evening before it runs, and the detail in them is the part that stops it
+being re-derived at the bench. They leave the queue when they are done, which is when this number
+comes back down.
 ## 2026-08-26 — `projectOverview.md` 8116 → 8124 (+8), Q-501
 
 Eight lines for one Current Status block: the readiness contributors now record the input they were
