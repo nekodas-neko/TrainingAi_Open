@@ -494,7 +494,7 @@ delivers without a second row shape.
   select, pull mapping, local upsert, outbox payload, both write paths), and the barcode route
   fetching the Open Food Facts thumbnail. **Three things are still owed:**
   1. **The render (Lane B)** — nothing displays the column yet, so the images are stored and unseen.
-  2. **Route 2's client half (Lane B)** — `capture-step.tsx` must emit a second 128 px downscale
+  2. **Route 2's client half (Lane B)** — `capture-actions.tsx` must emit a second 128 px downscale
      beside the 1024 px scan image. The server accepts and stores one already; it is inert until
      that lands. See constraint (b) above for why the scan image itself cannot be kept as-is.
   3. **Route 3, the AI generation (Lane A)** — the owner chose it and it is unbuilt. Cached by food
@@ -575,12 +575,12 @@ governed by its reasoning, not by disk.** Nothing fails loudly if it slips — t
 sync timing out on a bad connection.
 
 **(b) "The scan photo is already in the request" is true; "so keeping it is free" is not.** The
-client sends **1024 px** (`SCAN_IMAGE_MAX_DIM`, `components/nutrition/capture-step.tsx:24`) because
+client sends **1024 px** (`SCAN_IMAGE_MAX_DIM`, `components/nutrition/capture-actions.tsx`) because
 the model has to read the label. A thumbnail is **128 px** (`THUMB_MAX_DIM`,
 `meal-photo-tile.tsx:26`) — roughly **64× fewer pixels**. Storing what arrives would blow the sync
 budget by a large factor, so route 2 needs the client to emit a *second*, small downscale beside the
 scan image. That is cheap (one more canvas pass, no network, `downscaleToDataUrl` already exists and
-already handles the WebP-fallback trap) but it is **a change in `capture-step.tsx`, which is Lane
+already handles the WebP-fallback trap) but it is **a change in `capture-actions.tsx`, which is Lane
 B** — so route 2 is split across lanes and the server half is useless until the client half lands.
 **Lane A's half is: accept and validate a thumbnail field, and store it.** Do not attempt a
 server-side downscale to avoid the split: `downscaleToDataUrl` is canvas-based and browser-only, and
@@ -1247,8 +1247,8 @@ whether or not anyone draws them first.
 - **Three add-methods beside the existing search; none replaces anything.** (a) an `https:` URL →
   whole recipe; (b) a multi-candidate list when a scan returns several dishes, each kept one becoming
   **its own** saved meal; (c) the food-item **History** list Log Food already has
-  (`capture-step.tsx:245`) as the default state before you type — **reuse that source, do not build a
-  second one.**
+  (`recent-foods-panel.tsx`, which LB-16 promoted from a three-row strip into the `Recent` tab) as the
+  default state before you type — **reuse that source, do not build a second one.**
 - **⚠ The unstated-yield case is not cosmetic.** `recipeYield: null` means the payload is the WHOLE
   recipe — a banana-bread page measured **1,956 kcal for the loaf**. Reuse `my-meals-picker.tsx`'s
   handling and the shared `perServing`, so the two divides cannot drift.
@@ -11849,7 +11849,7 @@ transmission one.** Two things are true and they point in opposite directions:
    the server, defeating the whole decision), or accept only images and let the owner photograph or
    screenshot the report. **Recommended: images only for v1.** `@capacitor/camera` with
    `CameraSource.Prompt` already gives camera-or-gallery in one call
-   (`components/nutrition/capture-step.tsx:113`), so photographing a printed report or picking a
+   (`components/nutrition/capture-actions.tsx`, `handleCapturePhoto`), so photographing a printed report or picking a
    screenshot works today with no new plumbing.
 2. **No crop UI exists anywhere in the app** — grepped `components/`, `app/` and `lib/`; the only
    hits are unrelated (voice logging, meal-label rendering, the GIF creator). So the crop is new

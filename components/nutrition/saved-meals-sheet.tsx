@@ -186,6 +186,16 @@ export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate,
     setTab('build')
   }, [])
 
+  /**
+   * Selection mode belongs to the meal list, and only that list draws its Cancel/Delete row — so
+   * leaving the tab with a selection live strands the header on "3 selected" with no way to clear
+   * it. Dropping the selection on the way out is the only exit that cannot get stuck.
+   */
+  function changeListTab(next: ListTab) {
+    if (next !== 'meals') { setSelectedIds(null); setConfirmBulkDelete(false) }
+    setListTab(next)
+  }
+
   function backToMeals() {
     setTab('meals')
     setEditingMeal(null)
@@ -471,7 +481,7 @@ export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate,
           // renders these children while idle and takes the whole screen once a capture starts, so
           // the tabs cannot be left showing behind a half-open camera.
           <CaptureActions onScanResult={onScanResult} onManual={onManual} onScannedSavedMeal={onScannedSavedMeal}>
-            <SegmentedTabs tabs={LIST_TABS} value={listTab} onValueChange={setListTab} size="xs" className="shrink-0 px-1" />
+            <SegmentedTabs tabs={LIST_TABS} value={listTab} onValueChange={changeListTab} size="xs" className="shrink-0 px-1" />
             {listTab === 'meals' && (
               <div className="flex shrink-0 gap-2 px-1">
                 {selectedIds ? (
