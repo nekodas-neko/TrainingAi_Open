@@ -374,11 +374,17 @@ Rules, empty baseline, all four violation shapes probed. **Do not add `colmi_ble
 `HEALTH_SOURCES`** — every shared writer takes `source: HealthSource`, so its absence from that
 tuple makes a shared-table write a *compile error*, which is stronger than anything the script does.
 
-- **Phase 0 (owner, ~30 min, no code) — the gate.** Disconnect the vendor app, scan on service
-  `6E40FFF0-B5A3-F393-E0A9-E50E24DCCA9E`, read firmware + model off `0x180A`, send `0x03`, confirm a
-  16-byte reply with a valid **mod-255** checksum. Record firmware and model **into the plan**.
+- **Phase 0 (owner, no code, no repo change) — the gate.** The ring is **factory-fresh, no software
+  installed** (owner, 2026-08-26). It ships switched off: charge >1 h to green first, or a scan
+  finding nothing means nothing. Then run the gate in **nRF Connect**, not QRing — a generic GATT
+  explorer pushes no firmware, syncs nothing and consumes no on-ring history, and a failure in it is
+  unambiguously the ring rather than our decoder. Scan, read model + firmware off `0x180A` **into
+  §11 of the plan**, confirm service `6E40FFF0-B5A3-F393-E0A9-E50E24DCCA9E` exists, then write
+  `03000000000000000000000000000003` to RX and expect a 16-byte reply starting `03`.
   **The R09 is not on the reference client's compatibility list** (R02/R06/R10 are); only a fork
   claims it. If the round trip fails, the unit is not in that protocol family and Phases 1+ are void.
+  QRing is the fallback only if the ring will not advertise after a full charge — **decline any
+  firmware update it offers**, then uninstall it.
 - **Phase 1 — `lib/colmi-ble/protocol.ts`, pure, no device.** Build/checksum/parse for the HR log
   (`0x15`) and step log (`0x43`), each decoder pinned to a captured packet hex. This is where the
   protocol risk is actually retired, and it is fully testable in the sandbox.

@@ -61,6 +61,35 @@ checksum together — the gate rather than a formality.
 Sleep is in neither client. Gadgetbridge has it from a separate Wireshark dissection: a port, not a
 copy, and Phase 6.
 
+## Phase 0 rewritten for a factory-fresh ring
+
+The owner confirmed no software of any kind is installed. That answers the plan's first open
+question in the best way — full on-ring history, nothing holding the BLE connection, nothing to
+undo — and it moved two facts into Phase 0 that were not there before.
+
+**The ring ships switched off.** Colmi's FAQ says to charge *"more than 1 hour until the charging
+indicator turns green"* to activate it for the first time. Until then it does not advertise, so a
+scan finding nothing proves nothing.
+
+**The gate now runs in nRF Connect, not QRing.** Colmi's support material claims the vendor app is
+required and that pairing cannot be done outside it; that is a statement about their supported flow,
+not a hardware lock — `colmi_r02_client` connects directly with `bleak` and Gadgetbridge exists to
+replace the app. A generic GATT explorer pushes no firmware, syncs nothing, consumes no on-ring
+history, and settles the entire gate **without a line of code or a repo change** — which also means
+a failure there is unambiguously the ring or the model rather than our decoder. QRing is the
+fallback if the ring will not advertise after a full charge, with its firmware-update prompt
+declined and the app removed afterwards.
+
+The probe packet is generated rather than typed: `03000000000000000000000000000003` (byte 0 `0x03`,
+bytes 1–14 zero, byte 15 = sum-of-first-15 **mod 255** = 3). **The battery packet cannot distinguish
+mod 255 from mod 256** — both give 3 — so the plan says so explicitly: they diverge once the bytes
+sum past 255 (`0x1FE` → 0 vs 254), and a decoder that assumes 256 passes Phase 0 and fails on about
+half of all real commands.
+
+§11 of the plan is an empty device record to fill in during Phase 0. A firmware string that was
+never written down is a firmware string nobody has, and re-reading it at the end of the trial is how
+a silent mid-trial update gets caught.
+
 ## Deployment shape
 
 No APK. `lib/live-hr/chest-strap-source.ts` already does the full BLE cycle in TypeScript in the

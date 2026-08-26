@@ -182,16 +182,71 @@ uninstall risk to the Oura ring key.**
 
 ## 6. The deployment phases
 
-### Phase 0 — identify the unit · owner, ~30 min, no code · **gate**
+### Phase 0 — identify the unit · owner, no code, no repo change · **gate**
 
-1. Disconnect the ring from the QRing/Colmi vendor app. A BLE peripheral holds one connection.
-2. Scan filtering on service `6E40FFF0-…` rather than a name prefix — advertised names vary by model.
-3. Read Device Information (`0x180A`) firmware revision + model string, and Battery (`0x180F`).
-   **Record both in this document.** A later protocol discrepancy gets diagnosed against them.
-4. Send `0x03` and confirm a 16-byte reply with a valid mod-255 checksum.
+**Starting position, confirmed by the owner 2026-08-26: the ring is factory-fresh and no software
+of any kind has been installed.** That is the best possible starting state — full on-ring log
+history, nothing holding the BLE connection, and no vendor app to undo. It also means two things
+must happen before any of the rest of this document is testable.
 
-Step 4 proves transport, framing and checksum in one round trip. **If it fails, the R09 is not in
-the R02 family and everything below is void** — stop and re-plan rather than guessing at bytes.
+#### 0a. Charge it first — it ships switched off
+
+Per Colmi's own FAQ the ring **leaves the factory powered down** and needs charging *"for more than
+1 hour until the charging indicator turns green"* to activate for the first time. Until that is
+done it will not advertise, and a scan finding nothing means nothing.
+
+#### 0b. Do NOT install QRing — use a generic BLE tool instead
+
+Colmi's support material says the QRing app is required and that pairing *"must be done within the
+QRing app, not directly through your phone's Bluetooth settings."* **Treat that as a statement about
+their supported flow, not a hardware lock.** `tahnok/colmi_r02_client` connects with `bleak`
+directly and documents no QRing-first step, and Gadgetbridge exists specifically to replace the
+vendor app. The vendor's insistence is most plausibly the charge-to-activate step above, which is
+real, wearing a different hat.
+
+**Use [nRF Connect for Mobile](https://play.google.com/store/apps/details?id=no.nordicsemi.android.mcp)
+(Nordic Semiconductor, free).** It is a generic GATT explorer, not vendor software: it pushes no
+firmware, syncs nothing, and consumes no on-ring history. It also does the entire Phase 0 gate
+**without a line of code being written or a single repo change** — which means a failure here is
+unambiguously the ring or the model, never our decoder.
+
+**QRing is the fallback, not the plan.** If 0c finds the ring does not advertise after a full
+charge, install it, pair, confirm the ring works, then uninstall it immediately. Its costs, in
+order: it may prompt a **firmware update — decline it** (a changed event encoding is the one thing
+that would invalidate §4); it holds the BLE connection, so it must be force-stopped or removed
+before ours can connect; and its first sync may consume on-ring log history.
+
+#### 0c. The gate itself, in nRF Connect
+
+1. **Scan.** Record the **advertised name** (expect something like `R09_xxxx` or `Colmi …`) and the
+   MAC. Filter by service `6E40FFF0-B5A3-F393-E0A9-E50E24DCCA9E` if the list is crowded.
+2. **Connect**, then open **Device Information (`0x180A`)** and read **Firmware Revision**, **Model
+   Number** and **Manufacturer Name**. **Write all three into §11 of this document.** The firmware
+   string is what a later protocol discrepancy gets diagnosed against, and re-reading it at the end
+   of the trial is how a silent mid-trial update gets caught.
+3. **Confirm service `6E40FFF0-B5A3-F393-E0A9-E50E24DCCA9E` is present.** This is the single most
+   important unknown about the R09 — the reference client does not list the model, and this is the
+   check that settles whether §4 applies to it at all.
+4. **Enable notifications** on TX `6E400003-B5A3-F393-E0A9-E50E24DCCA9E` (the triple-arrow icon).
+5. **Write this to RX `6E400002-B5A3-F393-E0A9-E50E24DCCA9E`**, as a WRITE REQUEST, hex:
+
+   ```
+   03000000000000000000000000000003
+   ```
+
+   That is the battery command: byte 0 = `0x03`, bytes 1–14 zero, byte 15 = checksum = `3`
+   (sum-of-first-15 **mod 255**). Generated and verified rather than typed by hand.
+6. **Expect a 16-byte notification whose first byte is `0x03`.**
+
+**Step 6 is the gate.** One round trip proves the transport, the framing and the checksum
+convention together. If it returns nothing, or returns something that is not 16 bytes, the R09 is
+not in the R02 protocol family and Phases 1+ are void — **stop and re-plan rather than guessing at
+command bytes**.
+
+> **Why mod 255 and not 256 is worth care.** For the battery packet they agree (both give `3`), so
+> that probe cannot distinguish them. They diverge as soon as the bytes sum past 255: a payload
+> summing to `0x1FE` is `0` under mod 255 and `254` under mod 256. Every published client says 255.
+> A decoder that assumes 256 passes Phase 0 and then fails on roughly half of all real commands.
 
 ### Phase 1 — the pure protocol module · no device needed
 
@@ -281,11 +336,15 @@ the right-hand column beside Health Connect, not beside the Oura.
 
 ## 9. Open questions
 
-1. **Is the ring already paired to the QRing/Colmi vendor app?** It must be disconnected, and if the
-   vendor app has already synced, on-ring log history may already have been consumed.
-2. **Does it fit the opposite hand's equivalent finger?** Phase 5's wear protocol depends on it.
+1. ~~**Is the ring already paired to the QRing/Colmi vendor app?**~~ **Answered 2026-08-26 — no.
+   The ring is factory-fresh and no software has been installed.** Best case: full on-ring history,
+   no connection contention, nothing to undo. Phase 0 is rewritten around that starting state.
+2. **Does it fit the opposite hand's equivalent finger?** Phase 5's wear protocol depends on it, and
+   sizing is fixed at purchase. Worth checking before the trial is planned around it.
+3. **Does the R09 advertise the `6E40FFF0-…` service at all?** Phase 0c step 3 answers it. Until
+   then, everything in §4 is an assumption inherited from a different model.
 
-Neither blocks Phase 0.
+Only question 3 gates anything, and Phase 0 is how it gets answered.
 
 ---
 
@@ -299,6 +358,22 @@ Neither blocks Phase 0.
   and the routes that read them. It was established by reading the code, and the guard freezes it.
   It has **not** been exercised against a running device, because no device exists yet.
 
+## 11. Device record — fill this in during Phase 0
+
+Left deliberately empty. A protocol discrepancy six weeks from now is diagnosed against these
+values, and a firmware string that was never written down is a firmware string nobody has.
+
+| | Value | When |
+|---|---|---|
+| Model (from `0x180A`) | _not yet read_ | |
+| Firmware revision, trial start | _not yet read_ | |
+| Firmware revision, trial end | _not yet read_ | |
+| Advertised name | _not yet read_ | |
+| `6E40FFF0-…` service present? | _not yet checked_ | |
+| `0x03` round trip | _not yet run_ | |
+
+---
+
 ## Pickup prompt
 
 Check out a branch from a freshly-fetched `main`. Read in order: `projectOverview.md`,
@@ -306,9 +381,14 @@ Check out a branch from a freshly-fetched `main`. Read in order: `projectOvervie
 `lib/live-hr/chest-strap-source.ts` and `components/settings/chest-strap-pairing.tsx` — those two
 are the working in-WebView BLE reference and Phases 1–3 are shaped like them.
 
-**First concrete action: Phase 0 (§6).** A scan, two characteristic reads and one `0x03` round trip.
-It needs the physical R09 in hand. Do not write `lib/colmi-ble/` before it passes — the command
-bytes in §4 come from a client that does not list the R09 as supported.
+**First concrete action: Phase 0 (§6), and it needs no code and no repo change.** The ring is
+factory-fresh: charge it for an hour until the indicator goes green (it ships switched off), then
+run the whole gate in **nRF Connect** — **not** QRing, which is the fallback and carries a firmware
+-update risk. Scan, read `0x180A`, confirm the `6E40FFF0-…` service exists, then write
+`03000000000000000000000000000003` to the RX characteristic and expect a 16-byte reply starting
+`03`. **Record the model and firmware into §11 before doing anything else.** Do not write
+`lib/colmi-ble/` before that round trip passes — the command bytes in §4 come from a client that
+does not list the R09 as supported.
 
 Constraints that will otherwise be rediscovered: this needs **no APK** (§5); the Colmi must write to
 **none** of `oura_heartrate` / `body_metrics` / `sleep_sessions` / `oura_daily` /
