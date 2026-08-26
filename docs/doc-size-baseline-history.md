@@ -2789,3 +2789,85 @@ about the feature — the storage arithmetic, the capture state machine, the Wea
 The plan has five later phases. Filing them now would have added an entry each for work whose shape
 is decided by a measurement nobody has taken yet, and the queue would have carried them until
 someone read far enough to find out they were all gated on the same unknown.
+## 2026-08-26 — `docs/implementation-backlog.md` raised, 11903 → 11958 (BF-34, the device-only delete)
+
+One entry, and most of it is a table of **six layers ruled out**, each with the line that rules it
+out. That is the expensive part of this bug and it is worth carrying in the queue rather than being
+re-derived: the whole delete path was driven end-to-end on web with Playwright and it **works**, so
+the failure is device-only, and an implementer who starts by re-checking the local store, the outbox
+payload or the pull-clobber gate will spend the same afternoon reaching the same dead ends.
+
+The entry ends on one question — *does the confirm dialog appear on the device at all?* — because the
+answer splits it into two different bugs with two different fixes.
+
+## 2026-08-26 — `docs/implementation-backlog.md` raised, 12002 → 12048 (BF-34 root-caused)
+
+The owner's one-line answer — *"it opens up the confirm dialog; but then instantly minimizes"* —
+turned a device-only symptom into a traced regression in **BF-27**, which shipped the day before.
+
+The added lines are the four-step sequence and the reason the hook's existing guard cannot catch it:
+`selfPopRef` is per-instance, so a closing surface's asynchronous `history.back()` lands on the
+surface that just opened, whose flag is clear and whose `sheetId` does not match — indistinguishable
+from a real back gesture. The `sheetId` guard was written for the parent/child cascade (LB-10); this
+is the sibling case.
+
+It is written out in full because the blast radius is **every close-one-open-another transition in
+the app**, and because the obvious local fix — moving the confirm inline — would hide this instance
+and leave the cause running everywhere else.
+
+## 2026-08-26 — backlog 12048 → 12064 (PS-7 decisions, camera form capture)
+
+Sixteen lines on the existing PS-7 entry, no new entry. The owner answered all four of the plan's
+open questions the same day it was written, and one answer changed the design — the analysis is
+keyed off the exercise's logged equipment rather than a whitelist of lifts. The entry carries the
+three facts an implementer would otherwise re-derive: that `equipmentClassOf()` already exists and
+should be reused, that it collapses dumbbell into a `standard` bucket the form profile has to split,
+and that 23 of 149 production exercises carry no equipment tag at all.
+
+**This raise was missed locally and CI caught it — worth recording because the local run was not
+wrong.** `pnpm check:rules` passed on this branch at the then-current baseline of 11947. Between the
+branch being cut and the PR opening, `main` merged twice and carried the baseline to 12048 with a
+larger file underneath it. CI checks the *merge* result, so the same diff that was clean locally was
+16 over once merged. The rule already in CLAUDE.md covers it — re-merge `origin/main` immediately
+before opening each PR, not only before cutting the branch — and this is one more instance of the
+cost, not a new failure mode.
+
+## 2026-08-26 — `CLAUDE.md` 1174 → 1198, backlog 11860 → 11858, `projectOverview.md` 7992 → 8003 (Q-273)
+
+**The only `CLAUDE.md` raise of the session, and it is Q-273's own scope item 3**: *"a rule, alongside
+One Formula One Place: a correlation computed across a model change is not evidence."*
+
+Twenty-four lines, carrying a worked example rather than an instruction. `body_battery_daily` held
+**four distinct model versions over 40 days** with no recompute, and pooling them produced a
+documented false conclusion — r = −0.06 recorded as evidence the model had no outcome signal, where
+**v5 days alone give r = +0.67**. That number stood in the docs for eleven days. A rule stating the
+principle without the example is one a future session reads past; the example is what makes it stick.
+
+It also records two things that are properties of a *pair* of files and so are invisible from either
+one: `model_versions` merges with `||` and must never regain a JS read-merge, and `updated_at` does
+not identify the writing model.
+
+The backlog ends **two lines DOWN** despite adding fifty, because Lane B's merges shrank it
+underneath this branch in between. The fifty are **LA-32** (36) plus Q-273's own `Keep:` block (15), which says what the entry
+still owes now that its scope item 1 is *safe* but not *complete* — the stamp can no longer be
+clobbered, three pillars still do not write one, and the backfill half is deliberately untouched. An
+entry that shipped half its work states the half it did not, rather than looking finished.
+
+LA-32 is the survey of test files sharing a hardcoded user UUID with a file that deletes it — 233 UUIDs measured, 10 shared, 7 risky, 2 fixed, 6 remaining, with the table of
+which. Filed rather than swept because the sweep without a CI check to hold it at zero is the weaker
+half, and the entry carries the measurement so the sweep is mechanical.
+
+## 2026-08-26 — `projectOverview.md` → 8015, backlog 12078 (LA-32, the shared test-user UUID)
+
+Eleven lines up in the index, thirty-six back from LA-32 leaving the queue.
+
+The eleven earn their place by recording a **ratio, not an incident**. LA-32 was filed claiming six
+collisions remained; re-measuring found **one**, and the five false positives were each false for a
+different reason — a program id, the canonical `claude_ro` owner two files are meant to share, and
+pure-logic files that never touch `users`. The filing's rule ("shares a UUID literal, and somebody
+mentions `DELETE FROM users`") is not the claim it needed to make.
+
+That 83% noise rate is the durable part, because it decided the shape of the fix: a check that cries
+wolf is one the first person it stops will baseline into uselessness, so the detection got a script
+with seven tests — five of them false-positive cases — rather than a grep. Without the ratio written
+down, the next person to read "six collisions" re-derives the noisy rule and ships it.

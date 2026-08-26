@@ -351,6 +351,99 @@ below threshold and left in place for next time.
 > BF-29 (My meals), BF-30 (Meal detail), BF-31 (Edit meal) and BF-26 (Quantity). Two artboards need
 > no entry — `Tap targets` and the `srv/g` studies both shipped in Q-395a.
 
+### [app-shell][nutrition] BF-34 — BF-27 dismisses any dialog opened as a sheet closes; the diary delete is the first report
+
+- **Lane:** B
+- **Added:** 2026-08-26 · owner, live on the APK: *"the delete feature doesnt work. so its not
+  removing from my.UI"*, with a screenshot of the converged quantity sheet open on a BARILLA
+  Spaghetti row. **Owner asked for this at the top of the queue.**
+
+**⚠ Read this before touching any code: the entire path was exercised on web and it works.** A
+Playwright run against `pnpm dev` on 2026-08-26, seeded row → tap row → tap the bin → confirm →
+`SELECT count(*) … WHERE deleted_at IS NULL` = **0**, and the row left the list. So the bug is
+**device-only**, and the layers below are already eliminated. Do not re-verify them; the value of
+this entry is the narrowing.
+
+**Eliminated by inspection, each with the line that rules it out:**
+
+| Layer | Why it is not the bug |
+|---|---|
+| The confirm dialog's wiring | Fires `handleConfirmDelete`; verified end-to-end on web |
+| `store.deleteFoodLog` | `UPDATE food_logs SET deleted_at=?, sync_status='pending'` — correct |
+| The local read | `getFoodLogsWithItems` filters `WHERE fl.deleted_at IS NULL` — correct |
+| Pull clobbering the delete | `applyDelta`'s upsert carries `WHERE food_logs.sync_status='synced'`, and the local row is `pending`, so the server copy cannot resurrect it |
+| The outbox payload | `pushMutations` strips only `syncStatus`/`updatedAt`/`deletedAt`, so `deleted: true` survives into `adapter.ts:4032` and calls `deleteFoodLog` |
+| A stale `sync_status` flip | **Nothing** flips `food_logs.sync_status` back to `'synced'` after a push; `deleteMutations` only clears the outbox rows |
+
+> **✅ ANSWERED AND ROOT-CAUSED, 2026-08-26.** Owner: *"when I press the delete button; it opens up
+> the confirm dialog; but then instantly minimizes so we cant click it."* The dialog **opens and is
+> then dismissed** — not the `pointer-events: none` variant, where it would sit there ignoring taps.
+> That is decisive, and it points at `useSheetBackDismiss`, not at Radix.
+>
+> **⚠ THE CAUSE IS BF-27, WHICH SHIPPED 2026-08-25 (v1.372.0), AND THE BLAST RADIUS IS THE WHOLE
+> APP — NOT THIS DELETE.** `BackDismiss` now renders inside **every** `SheetContent` and
+> `DialogContent`, so every close-one-open-another transition in the app runs the sequence below.
+> This delete is simply the first one the owner happened to press.
+>
+> **The sequence, from the hook's own source:**
+> 1. Trash tap → `onClose()` closes the sheet **and** `setConfirmDeleteLogId(id)` opens the dialog.
+> 2. The sheet's `BackDismiss` unmounts → cleanup sets **its own** `selfPopRef = true`, registers
+>    `absorb`, and calls `window.history.back()` — which is **asynchronous**.
+> 3. The dialog's `BackDismiss` mounts → **a different hook instance**, whose `selfPopRef` is
+>    `false` → it pushes `{ sheetId: dialogId }`.
+> 4. The pop from step 2 lands. The **dialog's** `handlePopState` runs: its own `selfPopRef` is
+>    false, and `e.state?.sheetId !== dialogId`, so it takes the genuine-back-gesture arm →
+>    `onClose()` → clicks the hidden `Close` → **the dialog closes on the frame it opened**.
+>
+> **The hook's guard cannot catch this, and its comment says why without realising it.** The
+> `sheetId` check exists to stop *"a nested sheet's `history.back()` cleanup from cascading into
+> parent sheet handlers"* — the parent/child case. This is the **sibling** case: one surface closing
+> while another opens. `selfPopRef` is **per-instance**, so the closing sheet's in-flight self-pop is
+> invisible to the dialog that receives it, and a state that is not mine is indistinguishable from a
+> real back gesture.
+>
+> **Fix direction, stated because it is small and the wrong fix here is a `setTimeout`:** the
+> in-flight self-pop flag has to be **shared across instances** (module-level), so whichever instance
+> receives the pop swallows it. Keep `sheetId` for the parent/child case it was written for. Verify
+> both: the nested case LB-10 fixed **and** this sibling case, or the fix trades one for the other.
+> A device build is the only place either is visible.
+>
+> **BF-27 is `Gate: device` and unstruck, and this is exactly what that gate was for.** Its Keep line
+> even names the case — *"a confirm dialog (it must cancel, not confirm)"* — and it had not been
+> pressed yet.
+
+**The original diagnostic, kept because it is what produced the answer above: does the
+"Delete food log?" dialog appear on the device at all?**
+
+`quick-edit-log-sheet.tsx:140` is `onClick={() => { if (log) { onClose(); onDelete(log.id) } }}` —
+it **closes a Radix Sheet and opens a Radix Dialog in the same tick**. Two things make that fragile
+on Samsung's WebView specifically and neither shows up on desktop Chromium:
+
+- Radix puts `pointer-events: none` on `<body>` while a modal is dismissing. If the Sheet's exit
+  animation is still running when the Dialog mounts, the Dialog is present but **untappable** — and
+  a Delete button that cannot be pressed looks exactly like a delete that does nothing.
+- `nutrition-content.tsx:735` keys the sheet `key={editingLog?.id}`, so `onClose()` changes the key
+  to `undefined` and **remounts the component** at that same moment.
+
+**If the dialog does appear and Delete does nothing**, it is a different bug and the table above is
+the wrong starting point — go to the local store, and check `getLocalStore(userId)` is non-null on
+the device (the `catch` at `handleConfirmDelete` falls through to the API path, which the owner may
+be offline for).
+
+**The earlier fix sketch, now superseded by the root cause above — kept only so nobody re-derives it.
+Moving the confirm inline would hide this instance and leave the app-wide cause in place.** Either keep the
+sheet open and let the dialog stack over it (drop the `onClose()` from that handler, and close both
+on confirm), or move the confirmation **inside** the sheet — the bin already sits beside Save and
+BF-26 deliberately removed Cancel from that row, so an inline "tap again to confirm" fits the shape
+the artboard settled on and removes the second modal entirely. **Recommended: the second** — one
+modal, no race, no timing dependency on a WebView this repo already treats as its own target.
+
+- **Not exercised, and it is the whole point:** the APK. The web sandbox returns `null` from
+  `getLocalStore`, so the local-store branch this bug lives in **cannot run there at all** — a green
+  `pnpm dev` proves nothing here and this entry is the evidence of that.
+- **Verification.** On the S25: delete a diary row, confirm it leaves the list, kill and reopen the
+  app, confirm it is still gone, then check the server no longer returns it. `Gate: device`.
+
 ### [nutrition] LB-15 — a zero-calorie barcode product is reported as "not found"
 
 - **Lane:** A — `packages/shared/**`, whatever the edit looks like.
@@ -1243,6 +1336,14 @@ two are app-wide and sit here.*
   hook must be a *child* of `Content` rather than a call in `SheetContent`, is in the component's
   own comment and the journal:
   [`2026-08-25-back-dismiss-sweep`](overview/entries/2026-08-25-back-dismiss-sweep.md).
+- **⚠ IT REGRESSED SOMETHING, AND BF-34 IS THE REPORT.** The owner cannot delete a diary entry: the
+  confirm dialog opens and closes on the same frame. **Cause traced to this component.** Because a
+  closing surface's `history.back()` is asynchronous and `selfPopRef` is **per-instance**, the pop
+  lands on the *newly opened* surface, whose own flag is clear and whose `sheetId` does not match —
+  so it takes the genuine-back-gesture arm and dismisses itself. The hook's `sheetId` guard was
+  written for the parent/child cascade (LB-10) and does not cover this sibling case. **Every
+  close-one-open-another transition in the app is affected**, not just this delete. Fix and
+  verification live in **BF-34**; do not fix it here.
 - **Keep:** the gesture itself, on the S25. `e2e/back-dismiss-sweep.spec.ts` drives
   `history.back()`, which is close to the Android gesture and not the same input — the entry says so
   and it is still true. Press it on: a plain sheet, a confirm dialog (it must cancel, not confirm),
@@ -5958,6 +6059,20 @@ statement. Reserve "proposal", and the future tense, for tier 3.
      pattern is the closest existing analogue.
   3. A rule, in `CLAUDE.md` alongside *One Formula, One Place*: a correlation computed across a
      model change is not evidence.
+- **Keep:** scope item 1 is now SAFE but not COMPLETE, and item 2 is untouched.
+  - ✅ **The stamp can no longer be clobbered** (2026-08-26). `model_versions` is a map and the
+    shared upsert `COALESCE`-replaced it, so `backfillBodyComp`'s flat `{bodyComp: …}` erased the
+    readiness stamp on every day it touched; readiness survived only via a racy JS read-merge. The
+    upsert now merges with `||` and the read-merge is gone. That was the precondition for stamping
+    anything else.
+  - ❌ **Sleep, activity and training load still do not stamp.** Only two model-version constants
+    exist in the tree (`BODY_COMP_MODEL_VERSION`, `READINESS_MODEL_VERSION`); the others would have
+    to be *defined*, which is a judgement about what counts as a version for each pillar and belongs
+    with whoever owns that pillar's model — not invented by an implementer in passing.
+  - ❌ **Item 2, the backfill/recompute path, is not started** and should not be taken lightly:
+    re-deriving history is the Q-304b hazard, where a recompute silently substituted a
+    since-edited prescription for the one actually trained under.
+  - ✅ Item 3, the `CLAUDE.md` rule, shipped: *A Correlation Across a Model Change Is Not Evidence*.
 - **Do this before the calibration items (Q-500, Q-272, Q-505).** Each of those creates another
   incomparable segment otherwise, and the next review re-learns §1.6 the same way this one did.
 
@@ -11810,10 +11925,26 @@ not a later optimisation.
 number would queue work gated on an unknown. The spike's result decides whether they get filed, and
 whether the capture layer stays in the WebView or moves to a Kotlin plugin.
 
-**Open for the owner before Phase 1** (all four are in §10 of the plan): is there actually a Wear OS
-watch to build against, or is §9 moot; 7 or 14 days for the local window (recommend 14); which lifts
-first (recommend the barbell four, side-on); and whether the feature is off-by-default for the other
-accounts (recommend yes).
+**✅ All four open questions were answered by the owner on 2026-08-26 — §10 of the plan is now a
+decisions table, not a question list.** No owner gate remains. In short: **no Wear OS watch exists**
+(the interest is an open-source Pebble, which is a BLE peripheral rather than a second runtime — §9
+was rewritten, and its conclusion survives for a different reason); **14-day local window**;
+**off by default** for the other accounts; and — the one that changed the design — **the lift must
+not matter.**
+
+**That last answer replaced a lift whitelist with an equipment-keyed analysis profile (§5.5), and it
+is the part to read before implementing.** Verified against production the same day: `equipment` is a
+populated `text[]` with six values, and **`equipmentClassOf()` already exists** at
+`packages/shared/src/workout/time-audit.ts:183` — reuse its vocabulary, do not start a second one,
+but note it collapses dumbbell/cable/machine/kettlebell into one `standard` bucket and form capture
+needs dumbbell split out. **The request implied object detection ("find the bar length, find the
+dumbbells"); the plan explains why that is not needed** — the hands hold the load in every case, so
+wrist landmarks give the path for barbell, dumbbell and bodyweight alike, and equipment only decides
+which metrics are valid and which camera angle to ask for.
+
+**Measured prerequisite, worth a cheap data chore before Phase 3: 23 of 149 production exercises
+carry no `equipment` tag** (15%), and 16 carry more than one. The `unknown` profile is a live path
+serving about one exercise in seven, not a defensive branch.
 
 ---
 

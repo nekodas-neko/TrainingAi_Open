@@ -1459,7 +1459,16 @@ export async function upsertOuraDailyDerived(db: Db, userId: string, day: string
   for (const k of keys) {
     values[k] = patch[k]
     const col = DERIVED_COLS[k]
-    set[k] = sql.raw(`COALESCE(excluded.${col}, oura_daily_derived.${col})`)
+    // `model_versions` is a MAP of pillar → version, and COALESCE-replace is wrong for a map: a
+    // writer stamping its own key replaces every other pillar's. That was live — `backfillBodyComp`
+    // wrote `{bodyComp: …}` flat, erasing the readiness stamp on every day it touched, and readiness
+    // survived only because it read the row first and spread the result back (two statements, so a
+    // race, and it reads a value that may already be stale). Merging with `||` inside the same
+    // statement makes a stamp additive by construction: each pillar writes only its own key, no
+    // writer can clobber another, and no caller needs a read-merge. Q-273.
+    set[k] = k === 'modelVersions'
+      ? sql.raw(`COALESCE(oura_daily_derived.${col}, '{}'::jsonb) || COALESCE(excluded.${col}, '{}'::jsonb)`)
+      : sql.raw(`COALESCE(excluded.${col}, oura_daily_derived.${col})`)
   }
   await db
     .insert(s.ouraDailyDerived)

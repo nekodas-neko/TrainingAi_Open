@@ -105,9 +105,14 @@ describe.skipIf(!canRun)('user preferences — merge semantics', () => {
   })
 
   it('is scoped to the user — one account cannot write another\'s bag', async () => {
-    const other = '00000000-0000-4000-8000-00000000f002'
+    // NOT ...f002: that is `app/api/admin/backfill-derived-scores/__tests__/backfill.test.ts`'s only
+    // test user, and the `finally` below DELETEs it. Vitest runs files in parallel workers against
+    // one shared local database, so that delete can land between the other file's seed and its
+    // query, failing it on `sleep_sessions_user_id_fkey` — a red run in a file the PR never touched.
+    // Second instance of this shape found on 2026-08-26; the survey is in LA-32.
+    const other = '00000000-0000-4000-8000-00000000f0a2'
     await pool.query(
-      `INSERT INTO users (id, email, password_hash, timezone) VALUES ($1, 'prefs-merge-2@example.com', 'x', 'Australia/Brisbane')
+      `INSERT INTO users (id, email, password_hash, timezone) VALUES ($1, 'prefs-merge-other-f0a2@example.com', 'x', 'Australia/Brisbane')
        ON CONFLICT (id) DO NOTHING`, [other])
     try {
       await repo.updateUserPreferences(USER, { scoreRingStyle: 'arc' })
