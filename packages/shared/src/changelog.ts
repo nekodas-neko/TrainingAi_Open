@@ -6,10 +6,17 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: "1.378.0",
+    version: "1.379.0",
     date: "2026-08-26",
     changes: [
       "The end-of-day check-in can now see what the app already told you that morning, and is told not to reverse it without saying so. Previously each piece of coaching was written from its own slice of the day with no knowledge of the others \u2014 so on one occasion the morning advised keeping intensity low on a raised temperature, and that evening the digest cheered the two sessions that followed and said to keep the same energy tomorrow. The digest now reads the day's readiness, sleep, heart-rate and activity notes before it writes. It may still disagree with them, since by evening it knows more; what it can no longer do is disagree silently.",
+    ],
+  },
+  {
+    version: "1.378.0",
+    date: "2026-08-26",
+    changes: [
+      "Tapping a saved meal now opens the meal itself instead of unfolding the row: a full screen with its photo, the calories for one portion, protein/carbs/fat as a share and in grams, and the ingredient list at the amounts the whole batch actually contains. Log this meal, the label, edit and delete all live there. Swiping a row still gets you to label, edit and delete quickly, and delete now always asks first \u2014 it opens the meal with the confirmation showing rather than deleting straight off the swipe.",
     ],
   },
   {

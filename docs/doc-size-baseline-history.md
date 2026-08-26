@@ -2718,12 +2718,15 @@ wrapper, which is the thing Q-406 exists to end.
 `check-backlog-pointers` and not the doc-size check, and the PR body claimed a full `check:rules`
 pass that had not been run on this branch. The claim was corrected rather than quietly fixed.
 
-## 2026-08-26 — `projectOverview.md` 7987 → 7994, backlog 11932 → 11904 (LA-31/Q-291)
+## 2026-08-26 — `projectOverview.md` 7987 → 7992, backlog 11932 → 11860 (LA-31/Q-291)
 
 Seven lines for the Q-291 status paragraph — the day's AI surfaces can now see each other — and
-twenty-eight back from Q-291 leaving the queue. Net down. (Re-derived three times: `origin/main`
-moved under this branch four times while it was open — the numbers here are against the base it
-finally merged onto, and the entry above is the one that landed in between.)
+twenty-eight back from Q-291 leaving the queue. Net down. **Re-derived four times: `origin/main`
+moved under this branch five times while it was open** — the numbers here are against the base it
+finally merged onto. Worth naming as a cost of running both lanes at once: every one of those needed
+the changelog rebuilt from `git show origin/main:` and the version re-bumped across three files
+(`package.json`, `changelog.ts`, and `projectOverview.md`'s header line, which is easy to forget and
+which nothing checks), plus this file's numbers re-derived. None of it was splice-able.
 
 The two lines are load-bearing rather than narrative. They record the constraint a future change
 would otherwise break: **the cross-surface read graph is one-directional and must stay acyclic.**
