@@ -6420,53 +6420,31 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   doing regardless: **persist the contributor sub-scores** — `activity_contributors` carries only
   `base`/`trained`/`adjustment`, so the weight arithmetic above had to be derived rather than read.
 
-### [readiness][platform] Q-501 — a stored readiness score cannot be re-derived from the inputs stored beside it
+### [readiness][platform] Q-501 — historical derived rows still carry no inputs
 
-- **Branch:** `fix/readiness-derived-recompute`
-- **Plan:** none yet
+- **Branch:** `fix/readiness-contributor-inputs`
 - **Added:** 2026-08-17 · Tuning agent · found while measuring Q-500 ·
   [`docs/reviews/2026-08-17-readiness-calibration.md`](reviews/2026-08-17-readiness-calibration.md) §6
-- **⚠️ SECOND live demonstration, 2026-08-18, and it is the more damaging one.** After the Sleep
-  (v1.319.0) and Readiness (v1.321.0) recalibrations deployed (production reports **1.321.1**), a
-  bulk job at **03:55:01** bumped `updated_at` on essentially every `oura_daily_derived` row **without
-  rewriting any score**. Result, measured: **0 of 96 rows carry a `readiness` model version**, and
-  every stored sleep/readiness score is still pre-recalibration (2026-08-17 stores **78** for a
-  7.58 h / 90% / 0.75 h-deep night — an old-model value). Every one of those rows was *created*
-  before the deploy.
-  **So `updated_at` is not evidence of which model wrote a row** — it moves for reasons unrelated to
-  the score. Anyone auditing "did the recalibration land?" by timestamp gets the wrong answer, and
-  this is exactly why the `model_version` stamp matters more than it looks.
-- **✅ RESOLVED for the "did it land" question, 2026-08-18 ~05:00 UTC** — the prediction below came
-  true within the hour. **1 of 96** rows now carries `{"bodyComp": "atlas_2_1_0", "readiness":
-  "v3:ri5:2026-08-18"}` (so the JSONB **merge** held in production, not just in review), and sleep —
-  which has no stamp — was verified by recomputation instead: 2026-08-17 stores **78** against a raw
-  blend of **77.91** (old model), 2026-08-18 stores **92** against a calibrated **92** (new model,
-  raw blend 86.07). The trend step falls between those two days.
-  [`docs/reviews/2026-08-18-recalibrations-live-verified.md`](reviews/2026-08-18-recalibrations-live-verified.md).
-  **This entry's own substance is unaffected** — a stored derived row still cannot be re-derived from
-  the inputs beside it, and `updated_at` still does not identify the writing model; the sleep check
-  worked only because that pillar's *contributors* happen to be persisted.
-- **Consequence worth knowing:** stored scores are only rewritten when the readiness route recomputes,
-  which happens on app open. Placeholder rows already exist through **2026-08-22** with null scores,
-  so the first row to carry new-model values *and* the `v3:ri5:2026-08-18` stamp will be the next day
-  actually scored — that is where the trend step falls, and the stamp is what will mark it.
-- **Demonstrated live 2026-08-17:** the 08-13 summary was re-rolled mid-session (hours 1.20 → 5.78,
-  a Q-274 fragment night resolving itself) and the derived readiness row did not follow — that day's
-  persisted score is now **7 points** off a fresh recompute at the unchanged anchor.
-- **Measured.** Each persisted `oura_daily_derived.readiness_contributors->'recoveryIndex'->>'score'`
-  against the `oura_daily_summary.recovery_index_hours` it derives from: **5 of 33 disagree** —
-  2026-07-16 (0.89 h → expected 15, persisted 4), 07-20 (2.32 → 39, persisted 4), 07-21 (1.94 → 32,
-  persisted 23), 07-26 (0.97 → 16, persisted 13), 08-03 (3.21 → 54, persisted 29).
-- **Mechanism.** `oura_daily_summary` rows get recomputed (several updated 2026-08-13); the derived
-  readiness rows built from them are not recomputed in step, so the two drift apart silently.
-- **Why it matters.** `model_versions->>'readiness'` is **NULL on all 33 rows** too, so there is no way
-  to tell whether a past readiness score moved because its inputs changed or because the model did —
-  exactly what any calibration needs. The admin score-audit panel pairs a score with "the inputs that
-  produced it", and on these five days that pairing is false. **Same class as Q-273** — consider one
-  treatment for both.
-- **First action:** decide whether derived rows get recomputed with their summary, or store the input
-  values they actually used. The second is cheaper and self-describing; the first re-scores days
-  silently and needs Q-273's version stamp first either way.
+- **✅ Shipped 2026-08-26.** The entry's own "First action" chose between recomputing derived rows with
+  their summary and storing the inputs they actually used; the second was taken, being the cheaper and
+  self-describing one. Every readiness contributor now persists the number its score was computed
+  FROM (a z, a 0-100 value, or raw hours), and `rederiveReadinessFromStored` asks a stored row whether
+  its own score follows from its own inputs. That separates the two reasons a stored score can
+  disagree with a fresh recompute — the inputs were rewritten (a data question) or the model moved (a
+  calibration question) — which is the distinction this entry says was impossible. The admin
+  day-review now says which, in a note, instead of pairing a stored score with today's raw inputs and
+  leaving the reader to assume they belong together. **No score moved:** `input` is recorded beside
+  the score and never participates in it.
+- **Re-measured 2026-08-26, correcting this entry's own "5 of 33".** Of 100 derived rows, **42** carry
+  a `recoveryIndex` contributor. Split on the model anchor: **9** match the current anchor of 5, **27**
+  match the previous 6, and **7** match neither. The old figure conflated old-model rows with genuine
+  drift — the un-re-derivable population is **7**, and 27 of the "disagreements" are simply an older
+  model, which is exactly what Q-273's stamp exists to say.
+- **Keep:** the ~100 rows written before this shipped carry no inputs and can never be checked
+  retroactively — the audit now names them `uncheckable` rather than passing them silently, which is
+  the honest reading rather than a fix. Refreshing them means running
+  `POST /api/admin/backfill-derived-scores` against production, which **rewrites stored scores** — an
+  owner call, not code work.
 
 ### [devices][readiness] Q-506 — the illness radar cannot fire: the temperature baseline's deviation is 18.7× too large
 
