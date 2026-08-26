@@ -494,6 +494,68 @@ will hit it.
   sits in that row; and whether the sheet now reads as one thing is the owner's call, not a
   measurement.
 
+### [body][nutrition] BF-33 — a measured RMR has nowhere to go, and the four-number panel the test sheet already draws
+
+- **Lane:** A — new column(s) plus a precedence rule in `packages/shared/`; the panel is B and can
+  follow.
+- **Added:** 2026-08-26 · owner, who has a **DEXA + RMR test booked**: *"its a plug and play image or
+  number (AI path)"*, and a panel of values *"for the energy consumption value, estimated RMR from
+  general predictions, the app TUNED one ... then the Scan RMR from the scancompany"*.
+- **Split out of BF-2**, which said this half *"is simpler ... it needs no calibration maths at all,
+  just a stored value and a precedence rule"*. That is still true, and it is why this is a queue item
+  while BF-2 stays a planning item: **this one does not need the scan to exist before it can be
+  built**, and should be built *before* the appointment so the numbers have somewhere to go on the day.
+
+**⚠ The correction that has to be made before the panel is designed: three of the owner's four values
+are not all RMR.** Energy balance can only ever see *total* expenditure — what went in against what
+the body weighed. The learned number is a **TDEE**, and turning it into an RMR means dividing by an
+activity factor, which is exactly the guess the measurement was meant to remove. So the honest panel
+is a 2×2, not a list of three RMRs:
+
+| | Predicted | Measured / learned |
+|---|---|---|
+| **RMR** | Cunningham `ffm·21.6+370` (`body-composition.ts:24`), Mifflin when body fat is unknown — **exists** | **the scan — this entry** |
+| **TDEE** | RMR × activity multiplier (`energy-baseline.ts`) — **exists** | `adaptive-tdee.ts` learned maintenance — **exists and shipped** |
+
+**That 2×2 is what the owner's own test sheet draws** — Measured RMR beside Predicted RMR, Projected
+TDEE beside Predicted TDEE. Three of its four cells are already computed in this app today; one is
+missing, and this entry adds it.
+
+**The prize, and it is worth naming so it does not get missed:** with a measured RMR *and* the learned
+TDEE, the owner's **real activity factor falls out as `learned TDEE ÷ measured RMR`** — no longer a
+picked word. The test sheet guesses `Mild` in two places and multiplies by it; the app would know.
+That number is more valuable than either input on its own.
+
+**What already exists, so nothing gets rebuilt:**
+- `adaptive-tdee.ts` is the *"app TUNED one which checks when you completed a diary entry"* the owner
+  describes, already built and already gated: `MIN_LOGGED_DAYS`, `MIN_LOGGED_FRACTION`,
+  `MIN_WEIGH_INS`, a plausibility clamp, and **Q-387's completed-day gate** — an abandoned half-log
+  reads identically to a light day and was measured pulling the estimate 514 kcal low. Do not
+  re-derive any of this.
+- `HEALTH_SOURCES` (`lib/data/health-source.ts:18`) is the precedence ladder a measured RMR slots
+  into. Adding a source is a change in that file **plus the inlined SQL `CASE` at line 45** — both
+  move together or the TS and SQL ladders diverge.
+
+**Scope:**
+1. **Store it.** A measured RMR with its date, the method (indirect calorimetry), and the provider.
+   It is a point-in-time clinical measurement, not a daily metric — decide whether that is a column
+   on `body_metrics` or its own small table, and say why in the PR. Prefer whatever lets a **second
+   test later** sit beside the first rather than overwrite it.
+2. **Precedence.** A measured RMR overrides the estimate at the two call sites BF-2 already traced —
+   `goal-recommendation.ts:166–169`. **⚠ It must expire or decay**: an RMR measured at 71 kg is not
+   the RMR at 78 kg, and a stale measurement silently outranking a live estimate is worse than no
+   measurement. State the rule — a validity window, or re-scaling by lean mass.
+3. **Entry.** A number the owner can type, and the AI photo path: hand the results sheet to the same
+   `generateObject` pattern the nutrition scan already uses. **Never `JSON.parse` model text**, and
+   **no model-reported number may be shown as fact** without the owner confirming it — per CLAUDE.md,
+   a model handed a score of 80 called it *"perfect"*. Show the parsed values for confirmation before
+   they are stored.
+4. **The panel**, Lane B, following the 2×2 above with each cell labelled by where it came from.
+
+- **Verification.** The real sheet's numbers (measured 1714, predicted 1513, +13%) entered by hand and
+  by photo, landing identically. Then prove the goal actually moves: `goal-recommendation.ts` must
+  return a different calorie target with the measured RMR present than without.
+
 ### [nutrition][app-shell] Q-406 — the shared food row: two call sites converted, two waiting on their phase
 
 > **✅ THE DIARY ROW CONVERTED 2026-08-25 (v1.367.0)** — `meal-card.tsx` draws the shared `FoodRow`
@@ -11379,6 +11441,35 @@ with the recap week visibly compared against the one before it.
 
 - Lane: ? — the planning session splits it (new table + calibration maths = A; the entry/review UI = B)
 
+> **⚠ PRIORITY CHANGED 2026-08-26 — the owner has a DEXA + RMR test BOOKED.** This entry sat at the
+> tail because the owner filed it as *"a loose note to put more effort into later"*; that is no longer
+> the signal. It still needs a planning session before implementation, and the plan should now be
+> written **before the scan happens** so the reading has somewhere to land on the day.
+>
+> **The RMR half is split out as BF-33** and is in the main queue — it needs no calibration maths and
+> no scan to exist before it can be built.
+>
+> **Two refinements from the owner, 2026-08-26, that change the shape of the filter:**
+>
+> 1. **It must accumulate, not be a single constant.** *"This value needs to be able to accept more
+>    (i.e another dexa scan later on) so it can work together to build a correct filter."* So the
+>    stored thing is a **set of paired (scan, scale) observations** with a calibration *derived* from
+>    them — not one offset that a second scan overwrites. This also settles the ratio-vs-offset
+>    question below in the only honest way available: with one point you cannot tell them apart, so
+>    **store the pairs and pick the form once there are two**, rather than guessing now and baking it in.
+> 2. **The filter is per measurement system, not global.** *"whatever measurement system was used"* —
+>    the calibration belongs to the Renpho BIA path specifically. A different scale, or Health
+>    Connect, is a different instrument with a different bias, and applying the Renpho correction to
+>    it would be worse than applying none. Key the calibration by source, and let a source with no
+>    pairs read uncorrected.
+>
+> **The owner's own framing of the goal, worth keeping verbatim:** *"whenever I use my scale (renpho)
+> it can make it accurate to what a dexa scan would give. I hear these scales are good at consistency;
+> its just the initial value might be off."* That is the premise the whole design rests on — **and it
+> is testable rather than assumed.** The owner's last ten readings sit in a 24.9-25.3 band, which is
+> consistency; whether the *offset* is stable is what a second scan later would show, and is the
+> reason (1) above matters more than getting the first correction exactly right.
+
 **Owner request, 2026-08-23 (verbatim):** *"I'd like to be able to upload a dexa scan/RMR values;
 and 1- have a filter that aligns our scales values to a dexa scan; will call it 'dexa filter' so if
 our scale says 15% BF but dexa says 20% we will keep that ratio in mind when giving values; as well
@@ -11434,7 +11525,7 @@ values" can mean two very different things:
    phrasing says "keep that ratio in mind", but a plan should say which it picked and why, and prefer
    the one that degrades safely as the owner's weight moves.
 
-**RMR is the separate half of this request, and it is simpler.** Nothing in the tree reads a measured
+**RMR is the separate half of this request, and it is simpler — now filed as BF-33.** Nothing in the tree reads a measured
 RMR — BMR is *always* estimated (Cunningham when body fat is known, Mifflin-St Jeor otherwise,
 `goal-recommendation.ts:166–169`). A measured RMR from a metabolic cart would override the estimate at
 exactly those two call sites. Worth filing as its own task inside the plan; it needs no calibration
