@@ -771,8 +771,19 @@ and this is the sixth.
 **14 — The other structural changes, in the order they pay off.**
 - **The macro summary becomes a donut with each macro as a share of calories**, next to grams.
   `components/nutrition/macro-ring.tsx` already exists — extend it rather than adding a second one.
-- **Grouped sections with full-bleed dividers** replace gapped cards, which is most of the vertical
-  space the day screen currently spends on nothing.
+- **Grouped sections with full-bleed dividers** replace gapped cards. ~~which is most of the vertical
+  space the day screen currently spends on nothing~~ — **⚠️ MEASURED AND WRONG, struck 2026-08-25
+  after the owner reported not seeing a difference.** Gaps were **16%** of the screen, not "most" of
+  it; shipped (v1.365.0 + v1.366.0) they are **11%** — 140 px removed, the screen **111 px shorter
+  out of 2,649**, about 4%. Lane B measured this at the time and said so in both the journal and a
+  comment in `nutrition-content.tsx` — *"Worth doing, not what the entry said"* — but **the overclaim
+  was never struck here, so the owner was still reading a promise the code had already refuted.**
+  Do not restate it at the Q-395 checkpoint. **Six sections stay ungrouped on purpose**
+  (`MealPlanReviewCard`, `MealPlanSection`, `TdeeAdaptationCard`, `FoodLoggingComplete`, the action
+  row, End of Day): each is conditional, so a fixed container would draw an empty bordered box on the
+  days it is absent. That means the continuous grouped screen in the artboards is **not** what ships;
+  closing that gap is a separate design decision, **parked 2026-08-25 at the owner's request** while
+  the other nutrition agents work the surface.
 - **Source tabs on the food picker** (Recent · Frequent · My meals · Recipes) replace separate
   sheets, so a repeat log is one tap from the top of the list.
 - **The meal name becomes the screen title**, not a labelled input box, and the three-line batch
@@ -8678,7 +8689,23 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   primitive absorbs six props including a decorative one, or the three callers accept small visual
   changes (drop the halo, unify the dot treatment) and the primitive stays general. **The second is
   the better trade and it changes how a user-facing chart looks**, which is why it is not something to
-  slip into an implementation PR unasked. `Gate: owner`
+  slip into an implementation PR unasked.
+- **✅ DECIDED BY THE OWNER 2026-08-25 — option 2. The halo goes.** *"happy to lose the halo, go with
+  option 2"*, after being shown the three states rendered at true size from the real geometry
+  ([artboard](https://claude.ai/code/artifact/7a6f774b-ee7f-47cb-8ff9-33b03543ed50)). **The gate is
+  cleared; this is now a normal conversion.** What that licenses, precisely:
+  - **Drop the halo** (`exercise-history-sheet.tsx:200`, the `r=7` ring at `strokeOpacity 0.28`) and
+    **unify dot opacity** — the non-final dots stop being dimmed to `0.45`.
+  - **Everything else is a primitive change, not a caller compromise.** The other five differences —
+    the `PAD = 4` inset, exact min/max scaling, `strokeWidth`, grid lines, an emphasized last dot —
+    are general wants that any caller could have, so they are props the primitive should gain. **Do
+    not read "option 2" as "make the three callers accept the primitive as it is today."**
+  - **⚠ The `±0.5` padding is the one that must not survive.** It halves the amplitude of a 0.5 kg
+    body-weight spread — visible in the third panel of the artboard above, and the reason a blind
+    conversion was refused in the first place.
+  - **The three time-axis charts stay EXEMPT.** `day-sections.tsx`, `exercise-review-sheet.tsx` and
+    `body-battery-card.tsx` project x by *time*; the primitive projects by *index*. Nothing here
+    changes that, and converting them would still move every unevenly-spaced point.
 - **Not blocked on effort or on the primitive — blocked on that call.** Everything else is mechanical
   once it is made.
 
