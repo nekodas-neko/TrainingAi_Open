@@ -2888,3 +2888,18 @@ says why the obvious rule was rejected.
 **That the feature is not usable yet.** The engine half stores it and the goal moves, but nothing can
 enter a number. An index that said "shipped" without that would be the "fixed from intent" failure
 CLAUDE.md names, one step removed.
+
+## 2026-08-26 — `projectOverview.md` raised, backlog down 17 (Q-512, the ACWR window)
+
+Twelve lines in, seventeen back as Q-512 leaves the queue. Net down.
+
+The twelve record a correction rather than a fix, which is why they are in the index and not only in
+the journal. **Q-512's stated consequence was wrong in a way that changed the work**: it said the
+route reads `.acwr` (always null, therefore inert), and the route reads `typicalSessionVolumeKg` —
+the activity score's volume-lane denominator, which is *not* gated and so always returned a number,
+just a median over one week where every sibling uses four. That makes the defect a live skew rather
+than a dead read, and it makes one of the two fixes the entry proposed — "drop the call" — unsafe.
+
+Also recorded: widening the fetch is **not** the one-line change it appears to be, because
+`sessions7d`/`volume7dKg` are computed from the same list and the model reads them as "this week".
+Someone re-reading the diff sees the filter; only this says what it would have broken without it.

@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.381.3",
+    date: "2026-08-26",
+    changes: [
+      "The daily health insight now judges your training against the last four weeks instead of the last one. It was reading a single week and calling that your typical session, so a quiet week with two heavy days could set the bar for what counts as normal \u2014 and the acute-vs-chronic load figure it was meant to weigh could never be worked out at all from that little history. The week-by-week numbers it quotes are unchanged.",
+    ],
+  },
+  {
     version: "1.381.2",
     date: "2026-08-26",
     changes: [
