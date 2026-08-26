@@ -24,8 +24,16 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.383.5 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Version:** v1.383.6 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-08-26.
+
+**A stored readiness score can now be re-derived from itself (Q-501).** Each contributor records the
+number it was scored *from*, so a persisted row no longer needs today's summary — which is often not
+the one it was built on — to explain itself. Self-consistent means the **inputs** were rewritten;
+inconsistent means the **model** moved; older rows are named `uncheckable` rather than passing
+silently. **No score moved.** Details and the re-measured population (7 un-re-derivable rows, not the
+entry's "5 of 33") in
+[the journal entry](docs/overview/entries/2026-08-26-readiness-contributor-inputs.md).
 
 **The doc-size ledger stops being a merge conflict (LA-33), and E2E can now be required (LA-22).**
 Every PR raising a documentation baseline edited the same two lines of one shared JSON, so two open

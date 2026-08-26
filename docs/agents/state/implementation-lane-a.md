@@ -4,48 +4,51 @@
 > is how six concurrent sessions stay tellable apart; a renamed successor is a lost thread even with a
 > perfect baton.
 
-**Updated:** 2026-08-25 · **By:** the ninth session to run as Lane A · **Next ID:** `LA-30`
+**Updated:** 2026-08-26 · **By:** the tenth session to run as Lane A · **Next ID:** `LA-34`
 (`grep -rhoE '\bLA-[0-9]+\b' docs/ | sort -t- -k2 -n | tail -1` is the authority, not this line)
-**Migrations:** directory head **224**, next free **225** — claim against open PRs too, not just the
-directory. Local SQLite **v29**.
+**Migrations:** directory head **230**, next free **231** — claim against open PRs too, not just the
+directory. Local SQLite **v30**.
 
 ## Now
 
-**Nothing of Lane A's is open or blocked.** Twelve PRs merged this session (list below); the last,
-#513, landed the compaction chore. `docs/implementation-backlog.md` is **202 entries**.
+**Nothing of Lane A's is open or blocked.** Ten PRs merged this session (list below); the tenth,
+Q-501, is in flight as this is written. `docs/implementation-backlog.md` is **198 entries**.
 
 Start with `node scripts/next-item.js --lane A` and read its real output — see the next section.
 
-**What the top of READY currently holds, and why none of it was taken:**
-- **TN-9 / Q-289 / Q-290** — scoring changes. *Tuning proposes → owner signs off → Lane A implements.*
-  Not Lane A's to start.
-- **BF-19** — four-part load telemetry whose own entry says the numbers mean nothing until the
-  reporter has run on the S25. It produces data nobody can read without a device.
-- **Q-403** — a product decision with two candidate fixes, put to the owner and not yet answered.
+**The queue's remaining Lane A work is almost entirely owner- or device-gated**, and the owner has
+said explicitly (2026-08-26) to *leave the stuff gated on me for later and continue working through
+the queue of what you can do*. So the honest state at the top of READY is:
 
-The honest state is *waiting on the owner or the device*, not *out of work*. Do not manufacture an
-item to avoid saying so.
+- **Q-289 / Q-290 / Q-272 / Q-507 / Q-508 / Q-422 / TN-10** — scoring calibrations. *Tuning proposes
+  → owner signs off → Lane A implements.* Not Lane A's to start.
+- **Q-388** — needs a night on the S25 with the pending APK. Owner-only.
+- **Q-549 / Q-551** — Railway cost and hosting decisions.
+- **13 entries** waiting on the device run the owner has agreed to make as written.
+
+Do not manufacture an item to avoid saying so, and do not start a gated one to look busy.
 
 ## Read this before you trust the queue tool
 
-`next-item.js` has now mis-reported startability **three** times — LB-11's KEEP bucket, LA-23's
-dash-form `Keep —` parse (#473), and this session's LA-29. Every one was found by reading its real
-output for this lane; its tests passed throughout.
+`next-item.js` has mis-reported startability **three** times — LB-11's KEEP bucket, LA-23's dash-form
+`Keep —` parse (#473), and LA-29, which listed at READY #4 an entry whose own heading read
+`CLOSED 2026-08-25`: `check-backlog-pointers.js` had a rule for exactly that and its word list simply
+had no `CLOSED` (Q-27 sat in the queue on that one word for three weeks; the list now lives in
+`scripts/lib/completion-words.js` with a test). Every one was found by reading the tool's real output;
+its tests passed throughout.
 
-**LA-29 is the one to learn from.** It listed **Q-304b at READY #4** — an entry whose heading reads
-`CLOSED 2026-08-25` and whose first bullet reads *"This entry is closed, not parked"*, written by
-this session hours earlier. `check-backlog-pointers.js` has a rule for exactly that, and its word
-list simply had no `CLOSED`. Two entries were sitting in the queue on that one word (Q-27 for three
-weeks). The list now lives in `scripts/lib/completion-words.js` with a test.
+**Run it, read its output for your own lane, and distrust a top entry you recognise as done.**
 
-**Run the tool, read its output for your own lane, and distrust a top entry you recognise as done.**
-
-## The habit that has now paid on sixteen consecutive entries
+## The habit that has now paid on every entry it has been applied to
 
 **Re-verify an entry's premise against current `main` or production before building it, and write
-down what you checked.** Six entries this session had premises production contradicted — Q-540
-(sizing), Q-403 (tier), Q-295 (latency), Q-304b (method *and* blast radius), BF-4 (hypotheses already
-answered), and the "add an admin button" request (the buttons had shipped two days earlier).
+down what you checked.** Of the eight entries taken this session, **six** had a stale or wrong
+premise — including two written by this session. Q-501's own "5 of 33 disagree" was really 7 of 42,
+with 27 of the "disagreements" simply carrying the *previous* model anchor. Q-403's recommended fix
+(an injury gate) turned out unnecessary because the in-workout swap already mutates local state only.
+The earlier session's six were Q-540 (sizing), Q-403 (tier), Q-295 (latency), Q-304b (method *and*
+blast radius), BF-4 (hypotheses already answered), and the "add an admin button" request (the buttons
+had shipped two days earlier).
 
 Two shapes: *the evidence is stale*, and *the evidence was never true*. Q-295 is the one to remember
 — a review doc had carried the corrected number for a week while claiming it *"corroborates Q-295
@@ -58,19 +61,19 @@ work would still have been wrong.
 
 ## Shipped this session
 
-#496 Q-540 · #499 Q-301b (migrations **220/221**, `running_baselines` dropped) · #500 Q-295 ·
-#501 Q-295 cached tokens (migrations **222/223**) · #502 · #504 · #505 · #507 LA-26 (dead-repo-method
-check) · #509 LA-28 (six dead methods deleted) · #510 · #511 (orphaned vacuum route) ·
-#513 (compaction: BF-4 and Q-388 → `docs/reviews/`).
+Ten PRs. **Q-280** (SQLSTATE 21000 on eight batch upserts, via a shared `collapseOnConflict`) ·
+**Q-528** (`replaceOuraDailySummary` — three defects, wrapped in a transaction) · **BF-19**
+(app-load telemetry, migrations **229/230**, SQLite **v30**) · **Q-403** (the Coach swap now states
+it changes the program, and only fires when asked) · **LA-22** (E2E gated on UI paths) · **LA-33**
+(the doc-size ledger split one file per doc) · **Q-501** (readiness contributors record their own
+input).
 
-Also **migration 224** (LA-24 Kind 2, the shrug and glute-bridge families) — the owner answered
-LA-24's gated half *yes, for now*, and the migration header carries that qualifier so it is not lost.
 Earlier sessions' PRs are in the journal entries; this list stays to the current session.
 
 ## Standing constraints
 
-- **The local gate is `pnpm check:rules`** — quote its `Ran N of N`, never the word "pass". **58 of
-  58** now. Never hardcode it; the runner reads it from `ci.yml`, which is the point.
+- **The local gate is `pnpm check:rules`** — quote its `Ran N of N`, never the word "pass". **59 of
+  59** now. Never hardcode it; the runner reads it from `ci.yml`, which is the point.
 - **The clone is depth 1.** `git fetch --deepen=300 origin main` before any `git merge origin/main`,
   or it refuses as "unrelated histories". Hit repeatedly; it is not optional.
 - **`get_check_runs` at `total_count: 0`** right after a push is registration lag, not a stale base
@@ -88,11 +91,13 @@ Earlier sessions' PRs are in the journal entries; this list stays to the current
 
 ## Traps this session walked into, so you do not
 
-- **`doc-size-baseline.json` needed re-deriving twice, and picking either side was wrong both times**
-  (11948 vs 11997 → 11924; then 11924 vs 12219 → 12146). Always
-  `git show origin/main:docs/doc-size-baseline.json`, then re-derive from the merged file's real
-  length — **`grep -c "" <file>` + 1**, which is the convention the script uses. The history file
-  beside it is append-only; there, keeping both sides *is* the resolution.
+- **`doc-size-baseline.json` is gone — LA-33 split it into one `docs/doc-size/<path>.size` file per
+  tracked doc**, because every PR raising a number edited the same two lines of one shared JSON and
+  so conflicted *by construction*. Two PRs raising two different docs now touch no common line; two
+  raising the **same** doc still conflict, which is correct — they genuinely disagree about one
+  number. Re-derive from the merged file's real length (**`grep -c "" <file>` + 1**, the convention
+  the script uses), never by picking a side. `docs/doc-size-baseline-history.md` beside it stays
+  append-only; there, keeping both sides *is* the resolution.
 - **A backlog conflict is usually TWO DELETIONS — keep neither side.** Read the headings inside the
   hunk, then check `git diff --numstat origin/main -- docs/implementation-backlog.md`.
 - **A mutation test that injects nothing reports a pass.** One did here: the anchor `sed` patched had
@@ -104,32 +109,48 @@ Earlier sessions' PRs are in the journal entries; this list stays to the current
 - **Relative links break when prose moves a directory deeper** — five did while extracting to
   `docs/reviews/`. A stale `.next/types/validator.ts` likewise makes `tsc` report a missing module
   for a deleted route; clear it before diagnosing either.
+- **A mutation can be semantically equivalent and still be a coverage gap.** Two survived this
+  session's Q-501 pass and both were real: a pass-through storing `Math.round(input)` re-derives to
+  the same score, so nothing noticed, while reporting an input the day never had; and the audit's
+  "INPUT change" note firing *alongside* "MODEL moved" gives two contradictory verdicts, which leaves
+  the reader exactly where the finding found them. **A surviving mutation is a question about the
+  test, not a licence to stop.**
+- **Two counts of the same thing can live on two tables.** `recovery_index_hours` exists on both
+  `oura_daily_derived` (always NULL) and `oura_daily_summary` (populated, 50 of 51 rows). Querying
+  the first nearly filed a finding that an estimator had never produced anything — contradicted by
+  another entry's own `n = 42`. Same class as the `n_live_tup` error below: **when a count implies
+  something drastic, check you are reading the table that holds the data.**
 - **Inherited and still true:** `git reset --soft origin/main` does **not** merge — diff
   `--name-only` against `origin/main` before every push. Commit, push, *then* switch branches. Never
   slice a generated file by string index. A count moving further than your change explains is the bug.
 
-## The database reclaim — DONE, and the last item was a false premise
+## The database reclaim — closed
 
-**Q-315 is closed.** The owner pressed the button; it correctly reclaimed **0 B**, because
-`error_events` was never bloated. It holds **6,168 real rows** (45 MB of stacks), 5,928 of them one
-already-fixed burst (Q-214's `oura_heartrate` cardinality violation, fixed 2026-08-13) that ages out
-of the 30-day prune by ~2026-09-12. **The "4 live rows in 49 MB" figure was `n_live_tup`** — the
-stale estimate this baton warns about two sections down, read 24 against 6,168 and repeated through
-five documents including this file. **When a size and a row count disagree, run `count(*)`.**
+**Q-315 is closed** — the owner pressed the button and it correctly reclaimed **0 B**, because
+`error_events` was never bloated (6,168 real rows, 5,928 of them one already-fixed burst that ages
+out of the 30-day prune by ~2026-09-12). The "4 live rows in 49 MB" that started it was `n_live_tup`,
+repeated through five documents including this one.
 
-Still true: **no bearer path on `/api/admin/vacuum` without an explicit yes — it is an auth change.**
-Discoverability is the real gap: a general DB control behind a row labelled for Oura, and `/admin`
-has no maintenance tab. **Q-531**, filed, owner-gated, Lane B's.
+**Still binding: no bearer path on `/api/admin/vacuum` without an explicit yes — it is an auth
+change.** The real gap is discoverability (a general DB control behind a row labelled for Oura, and
+no maintenance tab on `/admin`): **Q-531**, filed, owner-gated, Lane B's.
 
 ## Waiting on the owner
 
+The owner said on 2026-08-26 to *leave the stuff gated on me for later*. Do not chase these; do not
+start one to look busy. **Answered since:** Q-403 (swap only on request), the readiness calibration
+cluster (*"do it"*), the device run (*"it's fine — I'll run it as written"*).
+
+- **Add `E2E` to `main`'s required checks.** LA-22 made the job always run and always report; nothing
+  in this repository can make it required. Until it is, the gate is the five in Standing constraints.
 - **One photo scan in the app** — unblocks BF-4 entirely (the nutrition scan-latency question).
-- **Q-403** — the Coach's already-applied-swap wording. A product decision with two candidates.
-- **Q-422** and **TN-9 / Q-289 / Q-290** — Tuning-originated; owner signs off, then Lane A implements.
-- **Q-388 SpO₂** — the missing datum is one night *without* the measurement sequence: a Kotlin change
-  and a new APK, so owner-only.
-- Device checks owed and accumulating: **Q-400** (also decides Q-411), **Q-413**, **Q-412**,
-  **Q-405**, **Q-310**, BF-16a's catalogue hydration, plus everything from the last four sessions.
+- **Q-289 / Q-290 / Q-272 / Q-507 / Q-508 / Q-422 / TN-10** — Tuning-originated calibrations; owner
+  signs off, then Lane A implements.
+- **Q-388 SpO₂** — needs one night *without* the measurement sequence: a Kotlin change and a new APK.
+  The owner's read is that sampling rate, not SpO₂ itself, is the likelier cost — worth measuring
+  before changing anything.
+- **Q-549 / Q-551** — Railway cost and hosting decisions.
+- **The device run: 13 entries**, the owner has agreed to run the checklist as written.
 
 ## Claimed paths
 
