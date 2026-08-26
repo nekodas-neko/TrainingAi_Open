@@ -185,9 +185,18 @@ test('a saved meal reads as kept, and saving the rest never duplicates it', asyn
 test('the copy is tagged in My Meals as coming from the plan', async ({ page }) => {
   await page.goto('/nutrition')
   await settleRouteBoundary(page)
+  // Tap only while the sheet is still CLOSED. This button opens Log Food, which then covers the
+  // coordinate AND aria-hides the button — so an unconditional re-tap finds no element at all and
+  // the retry reports "not found" on a screen that is working. `meal-label` and the parity specs
+  // carry the same guard; this one did not, and the list simply took longer than 3 s to paint once.
+  const library = page.getByRole('button', { name: 'My Meals', exact: true })
+  await expect(library).toBeVisible({ timeout: 60_000 })
   await expect(async () => {
-    await tap(page, /^My Meals$/)
-    await expect(page.getByText(NAME_A)).toBeVisible({ timeout: 3_000 })
+    if (await page.getByRole('dialog').count() === 0) {
+      const box = (await library.boundingBox())!
+      await page.touchscreen.tap(box.x + box.width / 2, box.y + box.height / 2)
+    }
+    await expect(page.getByText(NAME_A)).toBeVisible({ timeout: 5_000 })
   }).toPass({ timeout: 60_000 })
 
   // Provenance is derived from `meal_plan_meals.saved_meal_id` rather than stored on the meal — a
