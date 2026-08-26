@@ -403,6 +403,24 @@ back from today, so a sync after midnight still collects the night that just end
 with the switches on (there has not been one yet); steps/calories/distance need the ring to have
 been worn and moving, and it has mostly sat on a desk or charger.
 
+**THIRD SYNC, 23:00 — steps, distance, calories and SpO2 all landed.** Stored across the three
+syncs: steps ×2 (485, 876), distance ×2 (328 m, 575 m), calories ×1 (1431), SpO2 ×2 (98),
+HRV, stress ×3, temperature ×3, battery ×3. Activity buckets resolved to 07:00 and 08:00 Brisbane,
+which is correct — the ring reports a quarter-of-day index and only the buckets with movement in
+them came back, the rest being zero and filtered.
+
+**Heart rate is still absent and that is expected, not a new fault:** the fix is in PR #566 and was
+not deployed when this sync ran.
+
+**OPEN QUESTION — `calories` may be a daily cumulative, or scaled by 10.** One bucket reported
+**1431** alongside 485 steps and 328 m. 485 steps is roughly 20–25 kcal, so 1431 is not
+per-bucket-kcal, and 143.1 (the ×10 reading the Python client warns about) is still too high for
+that bucket. A daily running total including BMR fits. **Do not sum this column until it is
+settled.** One sample cannot decide it; a full day will — a cumulative rises monotonically through
+the day and resets at midnight, a per-bucket value fluctuates. `decodeActivity` deliberately stores
+it raw for exactly this reason, so no data is lost either way and only the interpretation is
+pending.
+
 **Next sync is the discriminator for HR.** Read "Sync detail" first.
 
 **Do this, in order, and record the result in §11 of the plan:**
