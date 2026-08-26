@@ -938,16 +938,17 @@ whether or not anyone draws them first.
 - **Plan:** [`2026-08-26-log-food-one-screen.md`](superpowers/plans/2026-08-26-log-food-one-screen.md).
   **Narrowed 2026-08-26** — the capture screen split out as **LB-16**. ID and references unchanged.
 - **The finding that forced the split:** the two lists hold **different entity types** —
-  `food_items` (tapping **adds**) and `saved_meals` (tapping **opens** its screen, BF-30). "One
-  list" is one list over **two sources**, two row shapes and two tap behaviours, not a rename over a
-  shared shape. **The rename rides here and cannot go first**: renaming both while they are still
-  two lists gives the user two lists with one name, which is worse than today. 15 occurrences over 8
-  files — the rename is small; the merge is the work.
-- **Carry every action across** — bulk delete, meal-plan linkage, the label path — or say which was dropped. Order most-recently-used first so the merge does not bury saved meals.
-- **⚠ The `My Foods` P/C/F column is the question Q-406 is parked on** — it wants the shared row to
-  grow a per-screen column, the slot Q-406 rules out. Do not add the prop unilaterally.
-- **Verification.** A grep proving nothing user-facing says *Saved meals* or *My Meals*; e2e that one
-  list shows both kinds, each tap does its own thing, and bulk delete and the label path still work.
+  `food_items` and `saved_meals` — so "one list" is one list over **two sources**, two row shapes and
+  two tap behaviours, not a rename over a shared shape. **The rename rides here and cannot go
+  first**: renaming both while they are still two lists gives the user two lists with one name,
+  worse than today. 15 occurrences over 8 files — the rename is small; the merge is the work.
+- **Carry every action across** — bulk delete, meal-plan linkage, the label path — or say which was dropped. **⚠ The `My Foods` P/C/F column is the question Q-406 is parked on**: a per-screen column on the shared row is the slot it rules out, so do not add the prop unilaterally.
+- **⚠ Two findings from starting it, both detailed in the plan — read it before writing code.** A
+  food's tap goes to the **assign** step inside `FoodLoggerSheet` while a meal's opens the detail
+  sheet `SavedMealsSheet` owns, so **the merged list has to live in `FoodLoggerSheet`** and
+  `/nutrition`'s button opens the logger onto it. And **MRU is unavailable**: `food_logs` has no
+  `saved_meal_id`, so a saved meal has no last-used timestamp — order by `createdAt DESC`.
+- **Verification.** A grep proving nothing user-facing says *Saved meals* or *My Meals*; e2e that one list shows both kinds, each tap does its own thing, and bulk delete and the label path survive.
 
 ### [nutrition][app-shell] LB-16 — the capture screen: six entry points become one
 
@@ -956,13 +957,12 @@ whether or not anyone draws them first.
 - **Added:** 2026-08-26, split out of Q-395c. **Plan:** [`2026-08-26-log-food-one-screen.md`](superpowers/plans/2026-08-26-log-food-one-screen.md).
   Also **artboard 2 parity** (BF-28): `Add food` is the drawing of the screen this builds.
 - **Scope.** `capture-step.tsx`'s six tiles collapse to one screen — search across everything, two
-  tabs (`Recent`, `My Foods`), an action row **`Photo · Barcode · Describe or enter`**.
-- **⚠ Where the drawing and the owner disagree, the owner wins.** The artboard draws **four** tabs;
-  build **two**. Its `Multi-add` / `Create food` row is the decided action row under other labels.
-- **Describe and manual entry are one sheet** with the fields always visible, so neither is hidden.
-- **⚠ A coordinate tap that misses a capture tile opens its neighbour**, and `History`'s dialog has a
-  textbox that looks like the describe field — an e2e spec filled the wrong one and failed three
-  assertions later (LA-30). Wait for the destination's own copy before touching it.
+  tabs (`Recent`, `My Foods`), an action row **`Photo · Barcode · Describe or enter`**. **⚠ Where the
+  drawing and the owner disagree the owner wins**: the artboard draws four tabs, build two, and its
+  `Multi-add` / `Create food` row is the decided action row under other labels. Describe and manual
+  entry are one sheet with the fields always visible, so neither is hidden. **⚠ A coordinate tap that
+  misses a tile opens its neighbour** and `History`'s dialog has a textbox that looks like the
+  describe field — an e2e spec filled the wrong one (LA-30); wait for the destination's own copy.
 ### [nutrition] BF-11 — the meal creator/planner redesign: the spec every phase reads, and the final checkpoint
 
 - **Needs:** BF-11h
