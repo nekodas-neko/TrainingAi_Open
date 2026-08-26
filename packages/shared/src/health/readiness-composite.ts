@@ -62,6 +62,23 @@ export interface ReadinessContributor {
   /** True when this contributor fell back to neutral — either no signal, or the
    *  baseline hasn't accrued the minimum history yet. */
   provisional: boolean
+  /**
+   * The number this score was computed FROM — a z-score for the baseline-relative contributors, raw
+   * hours for the Recovery Index, a 0-100 value for the ones that pass through. `null` when the
+   * contributor fell back to neutral because there was no input at all.
+   *
+   * **This is stored, and storing it is the point (Q-501).** A persisted contributor used to be
+   * `{score, provisional}` and nothing else, so a stored row could not be re-derived from itself:
+   * the only way to ask "what produced this 58?" was to read today's `oura_daily_summary` and assume
+   * it was unchanged. It is often not — summaries get recomputed and the derived rows built from
+   * them are not recomputed in step. Measured 2026-08-26 against production: of 42 rows carrying a
+   * Recovery Index contributor, **7 match neither the current anchor nor the previous one**, so
+   * their score cannot be reproduced from any model applied to the stored hours.
+   *
+   * With the input alongside the score, a row answers the question by itself, and `score = f(input)`
+   * under the stamped `model_versions.readiness` becomes checkable without a second table.
+   */
+  input: number | null
 }
 
 export interface ReadinessCompositeResult {
@@ -69,7 +86,7 @@ export interface ReadinessCompositeResult {
   contributors: Record<keyof typeof READINESS_WEIGHTS, ReadinessContributor>
 }
 
-const NEUTRAL: ReadinessContributor = { score: 50, provisional: true }
+const NEUTRAL: ReadinessContributor = { score: 50, provisional: true, input: null }
 
 // Points added per z-unit around the neutral 50. Recalibrated 2026-07-22 (W-D): 50/1.5 ≈ 33.3, so a
 // contributor reaches a full 100 at +1.5σ (a realistically-great day) rather than the former +2.5σ
@@ -106,12 +123,12 @@ function zToScore(
   const raw = direction === 'closer-better'
     ? 100 - Math.abs(z) * (2 * Z_POINTS_PER_UNIT)
     : 50 + (direction === 'higher-better' ? z : -z) * Z_POINTS_PER_UNIT
-  return { score: Math.max(0, Math.min(100, Math.round(raw))), provisional: false }
+  return { score: Math.max(0, Math.min(100, Math.round(raw))), provisional: false, input: z }
 }
 
 function plainScore(v: number | null): ReadinessContributor {
   if (v == null) return NEUTRAL
-  return { score: Math.max(0, Math.min(100, Math.round(v))), provisional: false }
+  return { score: Math.max(0, Math.min(100, Math.round(v))), provisional: false, input: v }
 }
 
 /** Stamped onto `oura_daily_derived.model_versions.readiness` so a score can be attributed to the
@@ -154,7 +171,7 @@ export const RECOVERY_INDEX_OPTIMAL_HOURS = 5
 function recoveryIndexScore(hours: number | null | undefined): ReadinessContributor {
   if (hours == null || !Number.isFinite(hours)) return NEUTRAL
   const score = Math.max(0, Math.min(100, Math.round((hours / RECOVERY_INDEX_OPTIMAL_HOURS) * 100)))
-  return { score, provisional: true }
+  return { score, provisional: true, input: hours }
 }
 
 /**
@@ -207,4 +224,81 @@ export function computeReadinessComposite(input: ReadinessCompositeInputs): Read
   )
 
   return { score, contributors }
+}
+
+/** A contributor as it comes back out of `oura_daily_derived.readiness_contributors` (JSONB, so its
+ *  shape is whatever was written on the day). Rows written before Q-501 carry no `input`. */
+export interface StoredReadinessContributor {
+  score: number
+  provisional: boolean
+  input?: number | null
+}
+
+export interface ReadinessRederivation {
+  /** The composite the CURRENT model gives for the inputs stored on the row. Keys with no stored
+   *  input contribute their stored score, since there is nothing better to use — `uncheckable` says
+   *  how much of this number is therefore unverified. */
+  score: number
+  /** Stored score ≠ current model applied to the stored input. The score moved because the MODEL
+   *  changed, not because the inputs did — that is the whole distinction Q-501 could not make. */
+  drifted: { key: keyof typeof READINESS_WEIGHTS; stored: number; rederived: number }[]
+  /** Contributors with no stored input: rows written before Q-501, which cannot be checked either
+   *  way. Reported rather than silently counted as agreeing. */
+  uncheckable: (keyof typeof READINESS_WEIGHTS)[]
+}
+
+/** Re-derive one persisted contributor's score from the input stored beside it, under the current
+ *  model. `null` when the row carries no input at all. */
+function rederiveContributor(
+  key: keyof typeof READINESS_WEIGHTS,
+  stored: StoredReadinessContributor,
+): number | null {
+  if (!('input' in stored)) return null
+  const value = stored.input
+  if (value == null) return NEUTRAL.score      // no input → the model's neutral, by definition
+  const direction = READINESS_MODEL.directions[key]
+  if (direction === 'passthrough') return plainScore(value).score
+  if (direction === 'hours-curve') return recoveryIndexScore(value).score
+  // A z contributor that stored an input was not baseline-cold at write time — a cold one falls back
+  // to NEUTRAL, whose input is null and which returned above. So the maturity gate is satisfied.
+  return zToScore(value, direction, BASELINE_MIN_NIGHTS).score
+}
+
+/**
+ * Ask a persisted readiness row whether its own stored score follows from its own stored inputs.
+ *
+ * **This is the point of storing the input at all (Q-501).** A row used to hold `{score, provisional}`
+ * and nothing else, so the only way to ask "what produced this 58?" was to read today's
+ * `oura_daily_summary` and assume it had not been recomputed since — which it often had, silently.
+ * With the input on the row, a disagreement here means the MODEL moved; agreement plus a disagreement
+ * against a fresh recompute means the INPUTS moved. Neither was distinguishable before.
+ *
+ * Returns null for anything that is not a contributor map — old rows, nulls, and the pre-Q-501
+ * `Record<string, number>` shape included.
+ */
+export function rederiveReadinessFromStored(stored: unknown): ReadinessRederivation | null {
+  if (stored == null || typeof stored !== 'object' || Array.isArray(stored)) return null
+  const map = stored as Record<string, unknown>
+
+  const drifted: ReadinessRederivation['drifted'] = []
+  const uncheckable: ReadinessRederivation['uncheckable'] = []
+  let weighted = 0
+  let matched = 0
+
+  for (const key of Object.keys(READINESS_WEIGHTS) as (keyof typeof READINESS_WEIGHTS)[]) {
+    const entry = map[key]
+    if (entry == null || typeof entry !== 'object') continue
+    const c = entry as StoredReadinessContributor
+    if (typeof c.score !== 'number' || !Number.isFinite(c.score)) continue
+    matched++
+
+    const rederived = rederiveContributor(key, c)
+    if (rederived == null) uncheckable.push(key)
+    else if (rederived !== c.score) drifted.push({ key, stored: c.score, rederived })
+
+    weighted += (rederived ?? c.score) * READINESS_WEIGHTS[key]
+  }
+
+  if (matched === 0) return null
+  return { score: Math.round(weighted), drifted, uncheckable }
 }
