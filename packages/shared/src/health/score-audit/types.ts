@@ -51,7 +51,22 @@ export interface PillarAudit {
   /** What was missing, and what the model did about it. */
   gaps: string[]
   /** The value persisted for this day, for drift-checking against the live recompute. */
-  stored: { score: number | null; contributors: unknown; source: string | null }
+  stored: {
+    score: number | null
+    contributors: unknown
+    source: string | null
+    /**
+     * Whether the stored score follows from the inputs stored beside it, under the current model —
+     * readiness only, and null for a row written before those inputs were persisted (Q-501).
+     *
+     * This is what separates the two ways a stored score can disagree with a fresh recompute. If the
+     * stored score is reproducible from its own stored inputs, the model has not moved and the
+     * disagreement is an INPUT change (a summary recomputed after the fact). If it is not
+     * reproducible, the MODEL moved. Without the inputs on the row neither question had an answer,
+     * and the panel's pairing of a stored score with today's raw inputs was simply a guess.
+     */
+    rederived?: import('../readiness-composite').ReadinessRederivation | null
+  }
   /** False when `stored.score` and `score` disagree — i.e. what was shown ≠ what the model says now. */
   storedMatchesRecompute: boolean | null
   notes: string[]

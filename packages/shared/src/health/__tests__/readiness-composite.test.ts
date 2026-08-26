@@ -10,10 +10,12 @@ describe('computeReadinessComposite', () => {
       previousNightScore: 80, prevDayActivityScore: 70, activityBalanceScore: 60,
       nHistory: 3,
     })
-    expect(result.contributors.restingHeartRate).toEqual({ score: 50, provisional: true })
-    expect(result.contributors.hrvBalance).toEqual({ score: 50, provisional: true })
-    expect(result.contributors.temperature).toEqual({ score: 50, provisional: true })
-    expect(result.contributors.sleepBalance).toEqual({ score: 50, provisional: true })
+    // `input: null` on a cold-baseline fallback is deliberate (Q-501): the z existed, but the score
+    // was NOT computed from it, so recording it would make the row look re-derivable when it is not.
+    expect(result.contributors.restingHeartRate).toEqual({ score: 50, provisional: true, input: null })
+    expect(result.contributors.hrvBalance).toEqual({ score: 50, provisional: true, input: null })
+    expect(result.contributors.temperature).toEqual({ score: 50, provisional: true, input: null })
+    expect(result.contributors.sleepBalance).toEqual({ score: 50, provisional: true, input: null })
     // Non-baseline contributors are unaffected by cold history.
     expect(result.contributors.previousNight.provisional).toBe(false)
   })
@@ -58,7 +60,7 @@ describe('computeReadinessComposite', () => {
       previousNightScore: null, prevDayActivityScore: null, activityBalanceScore: null,
       nHistory: FULL_HISTORY,
     })
-    expect(result.contributors.recoveryIndex).toEqual({ score: 50, provisional: true })
+    expect(result.contributors.recoveryIndex).toEqual({ score: 50, provisional: true, input: null })
   })
 
   it('clamps sub-scores to [0, 100]', () => {
@@ -140,14 +142,14 @@ describe('computeReadinessComposite', () => {
     // unchanged — linear, a true 100 at the optimum, 0 at 0 h, clamped above — so only the
     // anchor-dependent literals move: the midpoint is now 2.5 h rather than 3 h.
     it('maps hours → 0-100 linearly, 100 at the ≥5h optimal, provisional', () => {
-      expect(computeReadinessComposite({ ...base, recoveryIndexHours: 5 }).contributors.recoveryIndex).toEqual({ score: 100, provisional: true })
-      expect(computeReadinessComposite({ ...base, recoveryIndexHours: 2.5 }).contributors.recoveryIndex).toEqual({ score: 50, provisional: true })
-      expect(computeReadinessComposite({ ...base, recoveryIndexHours: 0 }).contributors.recoveryIndex).toEqual({ score: 0, provisional: true })
+      expect(computeReadinessComposite({ ...base, recoveryIndexHours: 5 }).contributors.recoveryIndex).toEqual({ score: 100, provisional: true, input: 5 })
+      expect(computeReadinessComposite({ ...base, recoveryIndexHours: 2.5 }).contributors.recoveryIndex).toEqual({ score: 50, provisional: true, input: 2.5 })
+      expect(computeReadinessComposite({ ...base, recoveryIndexHours: 0 }).contributors.recoveryIndex).toEqual({ score: 0, provisional: true, input: 0 })
       expect(computeReadinessComposite({ ...base, recoveryIndexHours: 9 }).contributors.recoveryIndex.score).toBe(100) // clamped
     })
     it('is neutral (never fabricated) when there is no overnight HR series', () => {
-      expect(computeReadinessComposite({ ...base, recoveryIndexHours: null }).contributors.recoveryIndex).toEqual({ score: 50, provisional: true })
-      expect(computeReadinessComposite(base).contributors.recoveryIndex).toEqual({ score: 50, provisional: true }) // omitted
+      expect(computeReadinessComposite({ ...base, recoveryIndexHours: null }).contributors.recoveryIndex).toEqual({ score: 50, provisional: true, input: null })
+      expect(computeReadinessComposite(base).contributors.recoveryIndex).toEqual({ score: 50, provisional: true, input: null }) // omitted
     })
     it('a good recovery index lifts the composite above the former frozen 50', () => {
       // recovery-index is 10% of the weight; 6h → 100 lifts an otherwise-neutral composite by ~5 pts.

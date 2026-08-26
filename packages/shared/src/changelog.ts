@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.383.6",
+    date: "2026-08-26",
+    changes: [
+      "The day-review screen can now tell you why a saved score and a fresh one disagree. Each part of a readiness score is stored next to the measurement it came from, so the screen can say whether the score changed because the underlying night's data was rewritten later, or because the scoring itself was recalibrated \u2014 two different things that used to look identical. Days scored before today can't be checked this way and are now labelled as such rather than quietly passing. No score changes.",
+    ],
+  },
+  {
     version: "1.383.5",
     date: "2026-08-26",
     changes: [
