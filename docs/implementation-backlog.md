@@ -385,7 +385,23 @@ tuple makes a shared-table write a *compile error*, which is stronger than anyth
   claims it. If the round trip fails, the unit is not in that protocol family and Phases 1+ are void.
   QRing is the fallback only if the ring will not advertise after a full charge — **decline any
   firmware update it offers**, then uninstall it.
-- **⚠️ PHASE 0 NOT PASSED — a "gate passed" claim was made and is RETRACTED (§11e).** On the charger, TX showed a Value for the
+- **🔎 ROOT CAUSE, 2026-08-26 — every write was ASCII, never bytes (§11e).** The nRF Connect log shows
+  `Data written to 6e400002…, value: (0x) 30-33-30-30-…-33` — that is the 32-character *string*
+  `"0300…03"` sent as 32 ASCII bytes, not the 16 binary bytes. The write dialog was on **TEXT**
+  format instead of **BYTE ARRAY**. **No valid command was ever sent**, so every hypothesis tested
+  against the silence was tested against a null input. The tell was on screen for hours: nRF prefixes
+  a byte-array value with `(0x)` and a text value with nothing.
+- **The ring was talking the whole time (§11e-b).** Notifications on TX decode cleanly against
+  `YawellRingConstants`: `73-0C-64-00-…-E3` = `CMD_NOTIFICATION` / `NOTIFICATION_BATTERY_LEVEL` /
+  **100% battery** / charging flag — **and that flag flipped 0→1 exactly when the ring went on the
+  charger**. Checksum `0x73+0x0C+0x64 = 0xE3` confirms the **mod-256** arithmetic on real device
+  output. `sd…` was this packet rendered as text (`0x73`=`s`, `0x0C` invisible, `0x64`=`d`).
+- **Confirmed with hex:** transport, notify path, framing, checksum. **Still unproven:** the
+  command→response path, since nothing valid has been sent yet. Next probe with correct byte-array
+  writes is in §11e-d.
+- **Process lesson:** read the transport log before forming a hypothesis. Five rounds of protocol
+  theory ran on a Value field hiding both the outgoing bug and the incoming data; every result they
+  produced came from reading other clients' source, not from the ring. On the charger, TX showed a Value for the
   first time (`sd…`, text-rendered). A later `0x43` on both services left that field **unchanged**,
   which means no new notification arrived — so the value is stale, of unknown origin, and was never
   evidenced as a `0x03` reply (a battery reply starts `0x03`; `s` is `0x73`). The command channel is

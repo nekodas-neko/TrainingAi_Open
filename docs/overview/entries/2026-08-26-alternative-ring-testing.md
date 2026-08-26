@@ -198,35 +198,49 @@ Also noted for next time: nRF Connect's Value field shows what was *sent*, not w
 accepted. The log behind the floating button carries the ATT results and errors, and not reading it
 earlier left a gap that three rounds of probing could not close.
 
-## A "gate passed" claim, retracted the same evening
+## Root cause: every write went out as ASCII text
 
-A value appeared on TX for the first time after the ring went on the charger, rendered as the text
-`sd…`, and this entry recorded the Phase 0 gate as passed. **That was wrong.** A following `0x43`
-write on both services left the field showing the identical `sd…`. The Value field updates when a
-notification arrives, so unchanged across a new command means nothing new arrived — the value is
-stale and of unknown origin, and was never evidenced as a `0x03` reply in the first place, since a
-battery reply begins `0x03` and `s` is `0x73`.
+The nRF Connect log settled it in one line. What the phone actually transmitted for the battery
+command was `(0x) 30-33-30-30-…-30-33` — `0x30` is `'0'` and `0x33` is `'3'`, so that is the
+32-character *string* `"0300…03"` sent as 32 ASCII bytes, not the 16 binary bytes the ring expects.
+The write dialog was on TEXT format rather than BYTE ARRAY. The phone-name packet went the same way.
 
-Phase 0 stands at transport-confirmed. The command channel is unproven.
+**No valid command was ever sent to this ring.** Write type, checksum, service, opcode, bonding,
+device match, handshake, wake state — every hypothesis of the evening was tested against a null
+input. They remain correct readings of the working clients' source and not one of them was the
+cause.
 
-The failure is procedural and this repo already has the rule for it: never mark something fixed from
-intent, confirm it was observed working. A gate was called on one ambiguous value, in a rendering
-that is documented to mangle non-printable bytes, without ever taking the hex — which was one tap
-away in the nRF Connect log for the entire evening. The charger hypothesis might still be correct.
-It is simply not evidenced, and the two got merged into a claim.
+The tell was on screen for hours: nRF prefixes a byte-array value with `(0x)` and prints a text
+value bare. The V1 writes never had the prefix. The V2 writes did — those were real 16-byte writes,
+sent on the big-data channel where the raw command format does not apply, so the evening managed
+valid bytes on the wrong channel and invalid bytes on the right one.
 
-The wake-state lesson from the previous section survives as a *hypothesis worth testing first*, not
-as a measured result, and the Phase 3 sync consequences it implies are held until something confirms
-it.
+## The ring was talking the whole time, and its data decodes cleanly
 
-## Five rounds of manual probing, and the tool was available throughout
+The same log carries notifications on TX: `73-0C-64-00-…-E3`, and later `73-0C-64-01-…-E4`. Against
+`YawellRingConstants` that is `CMD_NOTIFICATION` / `NOTIFICATION_BATTERY_LEVEL` / **100% battery** /
+charging flag — and **the charging flag flipped from 0 to 1 exactly when the ring went on the
+charger**. The checksum arithmetic confirms on real output: `0x73 + 0x0C + 0x64 = 0xE3`, mod 256.
 
-The honest summary of the evening: manual GATT probing eliminated write type, checksum, service,
-opcode, bonding and device-match — all real results, all obtained by reading the working client's
-source rather than from the ring — and produced no decoded byte from the device itself.
-Gadgetbridge implements `R09_.*` specifically, including the connection parameters, MTU, transaction
-sequencing and handshake timing that a GATT explorer does not attempt. It was the recommendation
-three rounds before it was taken.
+These are the ring's own periodic pushes rather than replies, arriving 18 seconds after one write
+and one second after another — which is what a device reporting its own state while understanding
+nothing it receives looks like. It also explains `sd…`: `0x73` is `s`, `0x0C` is unprintable, `0x64`
+is `d`.
+
+## Both earlier claims about that value were wrong
+
+The first said the gate had passed; the retraction said no notification had arrived because the
+Value field was unchanged. The log shows repeated notifications with *identical content*, which
+updates the field to the same text. Claim and retraction were each unsupported, because the evidence
+sat in a log neither had read.
+
+Confirmed with hex now: transport, notify path, framing, mod-256 checksum. Unproven: the
+command→response path, since nothing valid has been sent.
+
+The cheap lesson is to read the transport log before forming a hypothesis. Five rounds of protocol
+theory ran against a Value field that was hiding the outgoing bug and the incoming data at the same
+time, and every genuine result in them came from reading other people's source rather than from the
+device.
 
 ## Deployment shape
 

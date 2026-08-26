@@ -431,6 +431,7 @@ Read in nRF Connect on a factory-fresh ring. **No vendor app was ever installed.
 | | Value |
 |---|---|
 | Advertised name | `R09_C400` |
+| Battery (decoded from a live push) | **100%**, charging flag tracks the charger |
 | BLE address | `31:37:41:30:C4:00` — **random, non-resolvable (see §11a)** |
 | Hardware Revision (`0x2A27`) | `RT09_V3.1` |
 | **Firmware Revision (`0x2A26`), trial start** | **`RT09_3.10.22_260420`** |
@@ -439,7 +440,7 @@ Read in nRF Connect on a factory-fresh ring. **No vendor app was ever installed.
 | `6E40FFF0-…` service present? | **yes** |
 | RX `6E400002-…` | **present** — WRITE, WRITE NO RESPONSE |
 | TX `6E400003-…` | **present** — NOTIFY, with CCCD `0x2902` |
-| `0x03` round trip | **UNRESOLVED** — one unverified value seen, see §11e |
+| `0x03` round trip | **not yet validly sent** — every write was ASCII, see §11e |
 | Firmware Revision, trial end | _not yet read_ |
 
 **What this settles:** the R09 exposes the R02 family's transport exactly — same service UUID, same
@@ -544,8 +545,11 @@ Gadgetbridge's source (§4) answers three of §11c's four candidates without ano
 - **`0x10` is probably not a command this firmware knows.** Gadgetbridge has no `0x10`; its
   blink-the-ring command is **`0x50` FIND_DEVICE**. So the blink probe failing tells us nothing about
   the channel — it was very likely an unknown opcode.
-- **Candidate 3 — a required handshake — is the surviving explanation**, and §4c shows its exact
-  shape: subscribe to both notify characteristics, **wait 2 seconds**, then **phone name (`0x04`) →
+- ~~**Candidate 3 — a required handshake — is the surviving explanation**~~ **— WITHDRAWN, see
+  §11f.** A TypeScript Web Bluetooth client claiming R09 support sends **no initialisation commands
+  at all** after connecting, which is the same sequence that failed by hand. Gadgetbridge's ordering
+  below is what its own device class does; it is not evidence that the ring requires it. Kept for
+  reference: subscribe to both notify characteristics, **wait 2 seconds**, then **phone name (`0x04`) →
   date/time (`0x01`) → preferences → battery**. Battery is what the working client asks for *last*.
 
 **Next probe, in order, on V1 write `6e400002` with both notify characteristics subscribed** (the
@@ -603,42 +607,93 @@ connection parameters, MTU negotiation, transaction sequencing and retry — pre
 device-support class exists to get right and a manual GATT explorer does not attempt. Continuing to
 poke by hand is now the expensive path to an answer §11d gets for free.
 
-### 11e. A value appeared on TX once, and the gate is NOT passed — corrected 2026-08-26
+### 11e. ROOT CAUSE — every write was sent as ASCII text, never as bytes (2026-08-26)
 
-**This section previously read "GATE PASSED". That was wrong and is retracted.** It was written on a
-single observation: after putting the ring on the charger and writing `0x03`, TX `6e400003` showed a
-Value for the first time, rendered by nRF as the text `sd…`.
-
-**What came next disproves the reading.** A subsequent `0x43` (sync activity) write on both V1 and V2
-left TX showing **the identical `sd…`** — unchanged. A characteristic's Value field updates when a
-notification arrives, so an unchanged field across a new command means **no new notification
-arrived**. The `sd…` is a stale single value of unknown origin, and there is no evidence it was a
-response to `0x03` at all: the battery reply must begin `0x03`, and `s` is `0x73`.
-
-**The error worth recording is procedural, not technical.** `CLAUDE.md` says never to mark something
-fixed from intent, and to confirm it was *observed working*. A gate was marked passed on one
-ambiguous value, in a rendering known to mangle non-printable bytes, without ever obtaining the hex
-that would have settled it — while the hex was one tap away in the log the whole time. The charger
-hypothesis may still be right; it is simply **not evidenced**, and the two claims got merged.
-
-**Status: Phase 0 remains at transport-confirmed.** The command channel is unproven.
-
-**The one measurement that would settle it, and has still not been taken:** the raw bytes, from the
-**nRF Connect log** — the maroon floating button, bottom right. It prints, per event:
+**Reading the nRF Connect log resolved the whole evening in one line.** What the phone actually put
+on the wire for the "battery" command:
 
 ```
-Notification received from 6e400003-…, value: (0x) XX-XX-XX-…
+Data written to 6e400002-…, value: (0x) 30-33-30-30-30-30-…-30-30-33
+                                        "03000000000000000000000000000003"
 ```
 
-The Value field shows a *decoded rendering* of the last thing that arrived. The log shows *what
-arrived, when, in hex, and whether anything arrived at all* — including ATT errors on the writes.
-Every conclusion in this section and the last two would have been decidable from it.
+`0x30` is the character `'0'`; `0x33` is `'3'`. That is the **32-character string** `"0300…03"`
+transmitted as **32 bytes of ASCII**, not the **16 binary bytes** `03 00 … 00 03`. nRF Connect's
+write dialog was on **TEXT** format rather than **BYTE ARRAY** for this characteristic. The
+phone-name write is the same: `30-34-30-32-30-61-34-37-34-32` decodes to the literal text
+`"04020a4742"`.
 
-**Recommendation, now unambiguous: stop hand-driving and install Gadgetbridge (§11d).** Five rounds
-of manual GATT probing have produced one unexplained value and no decoded data. The remaining
-differences between a GATT explorer and a device-support class — connection parameters, MTU,
-transaction sequencing, retry, and the connect handshake's timing — are exactly what is not being
-replicated by hand, and Gadgetbridge implements all of them for `R09_.*` specifically.
+**No valid command was ever sent to this ring.** The ring was correct to ignore all of them, and
+every hypothesis tested against that silence — write type, checksum, service, opcode, bonding,
+device match, handshake, wake state — was tested against a null input. They are all still *true* as
+readings of the working clients' source; none of them was ever the cause.
+
+The tell was visible for hours and misread: nRF prints a byte-array value with a `(0x)` prefix and a
+text value without one. The V1 RX Value line never had the prefix. The V2 `de5bf72a` writes **did**
+(`(0x) 10-00-…-00-10`) — those were genuine 16-byte writes, sent on the big-data channel where the
+raw command format does not apply, so they were valid bytes on the wrong channel while V1 got
+invalid bytes on the right one.
+
+### 11e-b. The ring was talking the whole time — and the data decodes cleanly
+
+The same log shows notifications arriving on TX `6e400003`:
+
+```
+73-0C-64-00-00-00-00-00-00-00-00-00-00-00-00-E3
+73-0C-64-01-00-00-00-00-00-00-00-00-00-00-00-E4   ← later, on the charger
+```
+
+Decoded against `YawellRingConstants`:
+
+| byte | value | meaning |
+|---|---|---|
+| `[0]` | `0x73` | `CMD_NOTIFICATION` |
+| `[1]` | `0x0C` | `NOTIFICATION_BATTERY_LEVEL` |
+| `[2]` | `0x64` | **battery 100%** |
+| `[3]` | `0x00` → `0x01` | **charging flag — flipped to 1 exactly when the ring went on the charger** |
+| `[15]` | `0xE3` / `0xE4` | checksum |
+
+`0x73 + 0x0C + 0x64 = 227 = 0xE3`, and with the charging byte `228 = 0xE4`. **The checksum
+arithmetic is confirmed on real device output**, and the charging flag tracking a physical action is
+semantic confirmation, not just a parse that happens to fit.
+
+These are the ring's own **periodic pushes**, not replies — they arrive on their own schedule
+(18 s after one write, 1 s after another), which is exactly what you would expect from a device
+receiving nothing it understands while still reporting its own state.
+
+**And this explains `sd…`.** `0x73` is `'s'`, `0x0C` is an unprintable form-feed, `0x64` is `'d'`.
+The text rendering was this packet all along.
+
+### 11e-c. What that means for the two earlier claims, both of which were wrong
+
+- **"GATE PASSED" (§11e, first version) — wrong reasoning, and the retraction was also wrong.** The
+  value *was* a real notification. The retraction argued that an unchanged Value field proved no new
+  notification arrived; the log shows repeated notifications with **identical content**, which
+  updates the field to the same text. Neither the claim nor its retraction was supported by the
+  evidence available at the time, because the evidence was in a log neither had read.
+- **Confirmed now, with hex:** transport, the notify path, packet framing and the mod-256 checksum.
+  **Still unproven:** the command→response path, because no valid command has yet been sent.
+
+**The lesson, and it is the cheap one:** read the transport log before forming a hypothesis. Five
+rounds of protocol theory were built on a Value field that was hiding both the outgoing bug and the
+incoming data. Every result those rounds produced came from reading other people's source code, not
+from the device.
+
+### 11e-d. The fix, and the next probe
+
+In nRF Connect's **Write value** dialog, set the format dropdown to **BYTE ARRAY** (not TEXT), then
+resend on V1 write `6e400002`, notifications enabled on `6e400003`:
+
+| # | What | Bytes |
+|---|---|---|
+| 1 | Battery | `03000000000000000000000000000003` |
+| 2 | Find device — should physically blink | `50000000000000000000000000000050` |
+| 3 | Sync heart-rate log | `15000000000000000000000000000015` |
+| 4 | Sync steps/activity | `43000000000000000000000000000043` |
+
+Expect a reply beginning `0x03` for #1 (`[1]` = level, `[2]` = charging), a visible blink for #2,
+and multi-packet responses for #3/#4. **Capture every notification's hex from the log** — those are
+the test vectors Phase 1's decoders get pinned to.
 
 ### 11d. Gadgetbridge is the reference implementation, and it should be installed next
 
