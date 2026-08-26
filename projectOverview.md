@@ -24,7 +24,7 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.381.1 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Version:** v1.381.2 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-08-26.
 
 **A model stamp that another pillar could erase (Q-273).** `oura_daily_derived.model_versions` is a

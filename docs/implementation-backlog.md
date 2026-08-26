@@ -387,32 +387,32 @@ below threshold and left in place for next time.
   `beforeAll` that throws is reported by vitest as **SKIPPED tests**, which reads exactly like a
   `describe.skipIf` guard firing; run a suspicious skip with `--reporter=verbose` before believing it.
 
-### [nutrition] LA-30 — a zero-calorie food can never be logged, and the button says nothing
+### [nutrition] LB-15 — a zero-calorie barcode product is reported as "not found"
 
-- **Lane:** B
-- **Added:** 2026-08-25, from the owner hitting it live — a ZMA supplement scan, correctly read by
-  the AI as *"It is calorie-free"*, with **Next** greyed out and no message explaining why.
-- **The gate:** `components/nutrition/review-step.tsx:159`
+- **Lane:** A — `packages/shared/**`, whatever the edit looks like.
+- **Added:** 2026-08-26, from LA-30's sibling sweep. **Read from source, not reproduced** — no Open
+  Food Facts access here. **`packages/shared/src/nutrition/open-food-facts.ts:58`**:
 
   ```ts
-  const canSave = value.name.trim().length > 0 && value.calories > 0
+  const calories = Math.round(perServing(n['energy-kcal_serving'], n['energy-kcal_100g']))
+  if (!(calories > 0)) return null
   ```
 
-  Every genuinely zero-calorie item is refused: supplements, water, black coffee, plain tea, diet
-  soft drink, sugar-free gum, zero-cal sweetener, most spices and herbs.
-- **The server already disagrees with it.** `packages/shared/src/validation/food-item.ts:19` is
-  `z.number().min(0).max(10000)` — zero is explicitly allowed, so the API would have accepted this
-  log. There is **no engine half to this fix**; it is one client-side predicate, which is what puts
-  it in Lane B.
-- **Sibling surface, same PR:** `components/nutrition/ingredient-picker.tsx:154` does
-  `if (!scan || scan.error || !(scan.calories > 0))` — a zero-calorie scan is classified as a
-  *failed* scan there. Same rule, different consequence.
-- **Suggested shape:** drop `calories > 0` from `canSave`; a name is the only field that must be
-  present. If a guard against an empty/failed AI response is still wanted, test that the scan
-  *returned* — not that its calories are nonzero, which is a legitimate value.
-- **The silent-disable is half the bug.** A disabled primary button with no reason given is
-  indistinguishable from a broken app; the owner's report was *"it wouldn't let me log it"*, not
-  *"it told me why"*. Whatever replaces the gate should say what it wants.
+  `offProductToNutrition` returning `null` is how the caller learns the barcode **did not resolve**, so
+  a genuinely calorie-free product — Coke Zero, sparkling water, sugar-free gum, a supplement — reads
+  as an unknown barcode rather than as the zero-calorie food it is.
+- **Same rule as LA-30, different layer, and NOT fixed by it.** LA-30 cleared the two client
+  predicates; this sits below both, so the barcode path stays broken after it. Separate because the
+  lane rule is the path.
+- **Two hits nearby are NOT this defect** — checked, so the next person does not "fix" them:
+  `scan-totals.ts:104` (`macroCalorieDisagreement`) returns `null` at zero because a percentage
+  deviation against zero is undefined, which is its contract; and `scan-totals.ts:140`
+  (`sanitiseNutrition`) recomputes from macros when `calories === 0`, which for a truly calorie-free
+  item yields zero again. Both correct.
+- **Suggested shape:** distinguish *absent* from *zero*. `perServing` returns `0` for a missing
+  field, so the two are indistinguishable at line 58 — the guard wants to know whether the product
+  carried an energy field, not what its value was.
+- **Verification.** Two `OffProduct` fixtures — `energy-kcal_100g: 0` present, and the field absent. The first must resolve; the second may still be `null`.
 
 ### [nutrition][app-shell] BF-28 — mockup parity: the artboards are the spec, and this is the map
 
@@ -807,8 +807,19 @@ and this is the sixth.
 **14 — The other structural changes, in the order they pay off.**
 - **The macro summary becomes a donut with each macro as a share of calories**, next to grams.
   `components/nutrition/macro-ring.tsx` already exists — extend it rather than adding a second one.
-- **Grouped sections with full-bleed dividers** replace gapped cards, which is most of the vertical
-  space the day screen currently spends on nothing.
+- **Grouped sections with full-bleed dividers** replace gapped cards. ~~which is most of the vertical
+  space the day screen currently spends on nothing~~ — **⚠️ MEASURED AND WRONG, struck 2026-08-25
+  after the owner reported not seeing a difference.** Gaps were **16%** of the screen, not "most" of
+  it; shipped (v1.365.0 + v1.366.0) they are **11%** — 140 px removed, the screen **111 px shorter
+  out of 2,649**, about 4%. Lane B measured this at the time and said so in both the journal and a
+  comment in `nutrition-content.tsx` — *"Worth doing, not what the entry said"* — but **the overclaim
+  was never struck here, so the owner was still reading a promise the code had already refuted.**
+  Do not restate it at the Q-395 checkpoint. **Six sections stay ungrouped on purpose**
+  (`MealPlanReviewCard`, `MealPlanSection`, `TdeeAdaptationCard`, `FoodLoggingComplete`, the action
+  row, End of Day): each is conditional, so a fixed container would draw an empty bordered box on the
+  days it is absent. That means the continuous grouped screen in the artboards is **not** what ships;
+  closing that gap is a separate design decision, **parked 2026-08-25 at the owner's request** while
+  the other nutrition agents work the surface.
 - **Source tabs on the food picker** (Recent · Frequent · My meals · Recipes) replace separate
   sheets, so a repeat log is one tap from the top of the list.
 - **The meal name becomes the screen title**, not a labelled input box, and the three-line batch
@@ -8728,7 +8739,23 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   primitive absorbs six props including a decorative one, or the three callers accept small visual
   changes (drop the halo, unify the dot treatment) and the primitive stays general. **The second is
   the better trade and it changes how a user-facing chart looks**, which is why it is not something to
-  slip into an implementation PR unasked. `Gate: owner`
+  slip into an implementation PR unasked.
+- **✅ DECIDED BY THE OWNER 2026-08-25 — option 2. The halo goes.** *"happy to lose the halo, go with
+  option 2"*, after being shown the three states rendered at true size from the real geometry
+  ([artboard](https://claude.ai/code/artifact/7a6f774b-ee7f-47cb-8ff9-33b03543ed50)). **The gate is
+  cleared; this is now a normal conversion.** What that licenses, precisely:
+  - **Drop the halo** (`exercise-history-sheet.tsx:200`, the `r=7` ring at `strokeOpacity 0.28`) and
+    **unify dot opacity** — the non-final dots stop being dimmed to `0.45`.
+  - **Everything else is a primitive change, not a caller compromise.** The other five differences —
+    the `PAD = 4` inset, exact min/max scaling, `strokeWidth`, grid lines, an emphasized last dot —
+    are general wants that any caller could have, so they are props the primitive should gain. **Do
+    not read "option 2" as "make the three callers accept the primitive as it is today."**
+  - **⚠ The `±0.5` padding is the one that must not survive.** It halves the amplitude of a 0.5 kg
+    body-weight spread — visible in the third panel of the artboard above, and the reason a blind
+    conversion was refused in the first place.
+  - **The three time-axis charts stay EXEMPT.** `day-sections.tsx`, `exercise-review-sheet.tsx` and
+    `body-battery-card.tsx` project x by *time*; the primitive projects by *index*. Nothing here
+    changes that, and converting them would still move every unevenly-spaced point.
 - **Not blocked on effort or on the primitive — blocked on that call.** Everything else is mechanical
   once it is made.
 

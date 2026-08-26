@@ -151,7 +151,10 @@ export function IngredientPicker({ active, userId, onAdd }: Props) {
         body: JSON.stringify({ text }),
       })
       const scan = res.ok ? await res.json() : null
-      if (!scan || scan.error || !(scan.calories > 0)) {
+      // Test that the scan RETURNED, not that its calories are nonzero (LA-30). Zero is what the
+      // AI correctly reports for a supplement or a black coffee, and treating it as a failed scan
+      // is the same defect `review-step.tsx` carried — different consequence, same rule.
+      if (!scan || scan.error || typeof scan.calories !== 'number') {
         toast.error(`Could not work out the macros for "${text}"`)
         return
       }
