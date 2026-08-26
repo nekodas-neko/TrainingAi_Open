@@ -119,11 +119,11 @@ async function openEditMeal(page: Page) {
   await page.goto('/nutrition')
   await settleRouteBoundary(page)
   // Re-tap only while the sheet is still closed. Retrying the tap unconditionally deadlocks: the
-  // first one opens the dialog, the dialog then covers the "Saved Meals" button, and every later
+  // first one opens the dialog, the dialog then covers the "My Foods" button, and every later
   // attempt fails on a button that is no longer visible — which is what a slow list under a full
   // suite run turned into a hard failure, while the file passed alone every time.
   await expect(async () => {
-    if (await page.getByRole('dialog').count() === 0) await tap(page, /^Saved Meals$/)
+    if (await page.getByRole('dialog').count() === 0) await tap(page, /^My Foods$/)
     await expect(page.getByText(MEAL_NAME)).toBeVisible({ timeout: 5_000 })
   }).toPass({ timeout: 90_000 })
   // BF-30 moved the row's actions onto the meal's own screen; open it first.

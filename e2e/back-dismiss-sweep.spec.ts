@@ -18,6 +18,9 @@ import { SEED_EMAIL, settleRouteBoundary } from './fixtures'
  */
 
 const SESSION_ID = '7e7e7e7e-7e7e-4e7e-8e7e-7e7e7e7e7e7e'
+const MEAL_ID = '7e7e7e7e-7e7e-4e7e-8e7e-1b1b1b1b1b1b'
+const MEAL_FOOD_ID = '7e7e7e7e-7e7e-4e7e-8e7e-2b2b2b2b2b2b'
+const MEAL_NAME = 'Back Sweep Nest Meal'
 const EXERCISE = 'Spec Back Sweep Press'
 // A fixed past day: nothing here is compared against the clock on either side.
 const DAY = '2026-08-14'
@@ -37,6 +40,9 @@ async function cleanup(db: Client) {
   )
   await db.query('DELETE FROM exercise_logs WHERE workout_session_id = $1', [SESSION_ID])
   await db.query('DELETE FROM workout_sessions WHERE id = $1', [SESSION_ID])
+  await db.query('DELETE FROM saved_meal_items WHERE saved_meal_id = $1', [MEAL_ID])
+  await db.query('DELETE FROM saved_meals WHERE id = $1', [MEAL_ID])
+  await db.query('DELETE FROM food_items WHERE id = $1', [MEAL_FOOD_ID])
 }
 
 /** Counts the row the delete dialog would remove — the dialog's own state would agree either way. */
@@ -74,6 +80,23 @@ test.beforeAll(async () => {
       `INSERT INTO set_logs (exercise_log_id, set_number, weight_kg, reps)
        SELECT $1, n, 50, 8 FROM generate_series(1, 3) n`,
       [log.id],
+    )
+
+    // A meal of this file's own, so the three-layer test does not depend on the seed happening to
+    // carry one — an empty list would make it pass by never reaching layer three.
+    await db.query(
+      `INSERT INTO food_items (id, user_id, name, calories, protein_g, carbs_g, fat_g, serving_size_g, source)
+       VALUES ($1, $2, 'Back Sweep Oats', 200, 8, 34, 4, 60, 'manual')`,
+      [MEAL_FOOD_ID, userId],
+    )
+    await db.query(
+      `INSERT INTO saved_meals (id, user_id, name, servings) VALUES ($1, $2, $3, 1)`,
+      [MEAL_ID, userId, MEAL_NAME],
+    )
+    await db.query(
+      `INSERT INTO saved_meal_items (id, saved_meal_id, food_item_id, quantity_multiplier)
+       VALUES (gen_random_uuid(), $1, $2, 1)`,
+      [MEAL_ID, MEAL_FOOD_ID],
     )
   })
 })
@@ -137,7 +160,7 @@ test('back cancels a confirm dialog rather than confirming it', async ({ page })
  * interaction was untested in practice; now every sheet has one and the per-instance `sheetId` in
  * `useSheetBackDismiss` is what has to keep them apart.
  *
- * Log Food → History is the shortest real nest: `food-logger-sheet.tsx` renders `FoodLibrarySheet`.
+ * Log Food → My Foods is the shortest real nest: `food-logger-sheet.tsx` renders `SavedMealsSheet`.
  */
 test('back closes the inner sheet of a nest and leaves the outer one open', async ({ page }) => {
   await page.goto('/nutrition')
@@ -147,10 +170,17 @@ test('back closes the inner sheet of a nest and leaves the outer one open', asyn
   // The tab shell mounts several panels at once, so DOM order is not screen order and
   // `getByRole(...).first()` resolves into an off-screen panel — where a tap lands on the carousel
   // and switches tabs instead. Pick the one whose box is actually within the viewport.
+  //
+  // The aria-hidden filter matters as much as the box does now that both labels appear twice: the
+  // page's own action row carries a "My Foods" button and so does the tile inside the open sheet,
+  // and the page comes FIRST in DOM order because Radix portals append to `<body>`. Radix marks
+  // everything outside the open dialog `aria-hidden`, which is exactly the "not on screen" the box
+  // test cannot see.
   const clickInView = async (name: string) => {
     const handle = await page.evaluateHandle((n) => {
       const match = [...document.querySelectorAll('button')]
         .filter(b => (b.getAttribute('aria-label') || b.textContent || '').trim() === n)
+        .filter(b => !b.closest('[aria-hidden="true"]'))
       return match.find(e => {
         const r = e.getBoundingClientRect()
         return r.width > 0 && r.x >= 0 && r.x < window.innerWidth
@@ -166,8 +196,8 @@ test('back closes the inner sheet of a nest and leaves the outer one open', asyn
   expect(await page.evaluate(() => history.length)).toBe(before + 1)
 
   await expect(async () => {
-    await clickInView('History')
-    await expect(page.getByPlaceholder('Search your food library…')).toBeVisible({ timeout: 3_000 })
+    await clickInView('My Foods')
+    await expect(page.getByPlaceholder('Search your foods')).toBeVisible({ timeout: 3_000 })
   }).toPass({ timeout: 60_000 })
   // A second entry, not a shared one — the nested sheet pushed its own.
   expect(await page.evaluate(() => history.length)).toBe(before + 2)
@@ -175,10 +205,81 @@ test('back closes the inner sheet of a nest and leaves the outer one open', asyn
   // One press takes the inner sheet only. Radix aria-hides the covered sheet, so the assertion that
   // the OUTER survived is its content coming back, not a dialog count.
   await page.goBack()
-  await expect(page.getByPlaceholder('Search your food library…')).toHaveCount(0, { timeout: 10_000 })
+  await expect(page.getByPlaceholder('Search your foods')).toHaveCount(0, { timeout: 10_000 })
   await expect(page.getByText('How would you like to log food?')).toBeVisible({ timeout: 10_000 })
   expect(new URL(page.url()).pathname).toBe('/nutrition')
 
+  await page.goBack()
+  await expect(page.getByRole('dialog')).toHaveCount(0, { timeout: 10_000 })
+  expect(new URL(page.url()).pathname).toBe('/nutrition')
+})
+
+/**
+ * LB-16: three layers, which is the depth Q-395c introduced (Log Food → My Foods → a meal) and the
+ * depth the hook was silently wrong at.
+ *
+ * `useSheetBackDismiss` used to decide "my entry is gone" by comparing the arriving state's
+ * `sheetId` against its own — so every sheet that was not the one we landed on closed itself. At two
+ * layers that is right by accident: back from the top lands on the only other sheet's entry and
+ * nothing is stacked underneath to be wrong about. At three, back from the top lands on the MIDDLE
+ * sheet's entry, and the BOTTOM sheet reads a foreign id and closes — taking the middle one down
+ * with it, because it renders inside it. One press, two layers gone.
+ *
+ * Asserted press-by-press rather than by counting dialogs: Radix aria-hides every covered layer, so
+ * `getByRole('dialog')` sees exactly one whatever the depth is, and a collapse looks identical to a
+ * correct unwind until you ask what is on screen.
+ */
+test('back unwinds a three-layer nest one press at a time', async ({ page }) => {
+  await page.goto('/nutrition')
+  await settleRouteBoundary(page)
+
+  const clickInView = async (name: string) => {
+    const handle = await page.evaluateHandle((n) => {
+      const match = [...document.querySelectorAll('button')]
+        .filter(b => (b.getAttribute('aria-label') || b.textContent || '').trim() === n)
+        .filter(b => !b.closest('[aria-hidden="true"]'))
+      return match.find(e => {
+        const r = e.getBoundingClientRect()
+        return r.width > 0 && r.x >= 0 && r.x < window.innerWidth
+      }) ?? null
+    }, name)
+    await handle.evaluate(el => (el as HTMLElement | null)?.click())
+  }
+
+  await expect(async () => {
+    await clickInView('Add food')
+    await expect(page.getByText('How would you like to log food?')).toBeVisible({ timeout: 3_000 })
+  }).toPass({ timeout: 60_000 })
+
+  await expect(async () => {
+    await clickInView('My Foods')
+    await expect(page.getByPlaceholder('Search your foods')).toBeVisible({ timeout: 3_000 })
+  }).toPass({ timeout: 60_000 })
+
+  // Layer three: a meal opens its own screen. `.click()` never lands on this screen (Q-354), so the
+  // row is tapped by coordinate — and its box is re-measured inside the retry, because the food half
+  // of the list arrives asynchronously and re-sorts what is under the finger.
+  const opened = page.getByRole('button', { name: 'Log this meal' })
+  await expect(async () => {
+    const row = page.getByRole('button', { name: new RegExp(`^${MEAL_NAME}`) }).first()
+    await expect(row).toBeVisible({ timeout: 3_000 })
+    const box = (await row.boundingBox())!
+    await page.touchscreen.tap(box.x + box.width / 2, box.y + box.height / 2)
+    await expect(opened).toBeVisible({ timeout: 3_000 })
+  }).toPass({ timeout: 60_000 })
+  await expect(opened).toBeInViewport()
+
+  // One press: the meal goes, the list stays.
+  await page.goBack()
+  await expect(opened).toHaveCount(0, { timeout: 10_000 })
+  await expect(page.getByPlaceholder('Search your foods')).toBeVisible({ timeout: 10_000 })
+
+  // Two: the list goes, the logger's capture tiles come back.
+  await page.goBack()
+  await expect(page.getByPlaceholder('Search your foods')).toHaveCount(0, { timeout: 10_000 })
+  await expect(page.getByText('How would you like to log food?')).toBeVisible({ timeout: 10_000 })
+
+  // Three: the logger goes, and only now does the page underneath still hold.
   await page.goBack()
   await expect(page.getByRole('dialog')).toHaveCount(0, { timeout: 10_000 })
   expect(new URL(page.url()).pathname).toBe('/nutrition')

@@ -323,7 +323,7 @@ export function MealPlanEditSheet({ plan, onOpenChange, onChanged }: Props) {
                       onClick={() => setPickingFor(pickingFor === m.position ? null : m.position)}
                       aria-expanded={pickingFor === m.position}
                     >
-                      <BookOpen className="w-3.5 h-3.5 mr-1.5" /> My meals
+                      <BookOpen className="w-3.5 h-3.5 mr-1.5" /> My Foods
                     </Button>
                     <Button
                       variant="secondary" className="min-h-[44px] px-3"

@@ -67,7 +67,7 @@ test.afterAll(async () => {
 async function openLibrary(page: Page): Promise<void> {
   await page.goto('/nutrition')
   await settleRouteBoundary(page)
-  const button = page.getByRole('button', { name: 'Saved Meals', exact: true })
+  const button = page.getByRole('button', { name: 'My Foods', exact: true })
   await expect(button).toBeVisible({ timeout: 60_000 })
   await expect(async () => {
     const box = (await button.boundingBox())!
@@ -108,10 +108,12 @@ test('the meal library is artboard 3: a count line, one grouped list, and per-po
   await openLibrary(page)
 
   // The search field no longer waits for a fifth meal to appear.
-  await expect(page.getByPlaceholder('Search your meals')).toBeVisible()
+  await expect(page.getByPlaceholder('Search your foods')).toBeVisible()
 
-  // The count line, which replaced the `· N` that used to ride on the sheet's title.
-  await expect(page.getByText(/^\d+ meals?$/)).toBeVisible()
+  // The count line, which replaced the `· N` that used to ride on the sheet's title. It counts
+  // ITEMS rather than meals since Q-395c merged the two lists — foods share the list now, so a
+  // "meals" count would be describing part of what is on screen.
+  await expect(page.getByText(/^\d+ items?$/)).toBeVisible()
 
   const row = page.getByRole('button', { name: new RegExp(`^${MEAL_NAME}`) }).first()
   await expect(row).toBeVisible()
@@ -124,7 +126,7 @@ test('the meal library is artboard 3: a count line, one grouped list, and per-po
   await expect(row).toContainText('160')
   await expect(row).not.toContainText('320')
 
-  await expect(page.getByText('Calories are per portion. Swipe a row for label, edit and delete.')).toBeVisible()
+  await expect(page.getByText('Meal calories are per portion. Swipe a meal for label, edit and delete.')).toBeVisible()
 })
 
 test('swiping a row left reveals its actions, and delete still asks first', async ({ page }) => {

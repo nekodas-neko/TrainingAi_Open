@@ -66,7 +66,7 @@ test.afterAll(async () => {
 async function openBuilder(page: Page): Promise<void> {
   await page.goto('/nutrition')
   await settleRouteBoundary(page)
-  const button = page.getByRole('button', { name: 'Saved Meals', exact: true })
+  const button = page.getByRole('button', { name: 'My Foods', exact: true })
   await expect(button).toBeVisible({ timeout: 60_000 })
   await expect(async () => {
     const box = (await button.boundingBox())!
