@@ -740,88 +740,37 @@ That number is more valuable than either input on its own.
   by photo, landing identically. Then prove the goal actually moves: `goal-recommendation.ts` must
   return a different calorie target with the measured RMR present than without.
 
-### [nutrition][app-shell] Q-406 — the shared food row: two call sites converted, two waiting on their phase
+### [nutrition][app-shell] Q-406 — the shared food row: all four call sites converted (shipped v1.383.5)
 
-- **Gate:** owner — option A is not buildable as decided; see the blocked note below.
-
-> **✅ THE DIARY ROW CONVERTED 2026-08-25 (v1.367.0)** — `meal-card.tsx` draws the shared `FoodRow`
-> and `QuickEditLogSheet` **gained a delete in the same change**, which this entry required before the
-> conversion could be safe. Q-395a was meant to carry it and did not. Per-item P/C/F moved into the
-> sheet's live preview. [`journal`](overview/entries/2026-08-25-diary-row-shared-shape.md).
->
-> **⚠ It turned up a pre-existing defect, LB-10 — fixed 2026-08-25.** The sheet would not open in
-> `pnpm dev` at all, on `main` too: `use-sheet-back-dismiss.ts` was not double-invoke safe. Verified
-> here with `reactStrictMode: false`; the hook is fixed and guarded now
-> ([`journal`](overview/entries/2026-08-25-sheet-back-dismiss-strict-mode.md)).
-
-- **Branch:** `refactor/nutrition-food-row`
-- **Lane B.** No schema, no route.
-- **✅ GATE CLEARED 2026-08-24 — the drawings are in the repository:**
-  [`docs/design/2026-08-18-nutrition-rework-mockups.html`](design/2026-08-18-nutrition-rework-mockups.html),
-  twelve artboards recovered from the owner-reviewed canvas, unchanged. That file's own preamble
-  carries the two corrections these entries need — `unit-options.png` never existed, and Q-395a's two
-  references are two different artboards — plus which three are TEMPLATED. Read it there rather than
-  duplicating it here. **Q-395a/b/c were unblocked by the same landing.**
-- **✅ THE COMPONENT SHIPPED 2026-08-23 (v1.338.0)** — `components/nutrition/food-row.tsx`, drawn by
-  the library sheet and the food-database search row.
-  [`Journal`](overview/entries/2026-08-23-shared-food-row.md).
-- **✅ THE DIARY ROW SHIPPED 2026-08-25 (v1.367.0)** — with the delete this entry required moved into
-  `QuickEditLogSheet` first, so no capability was dropped.
-- **✅ THE THUMBNAIL SHIPPED 2026-08-26 (v1.380.0), with BF-32 in one PR** as this entry asked.
-  `FoodRow` gained `showThumb`/`thumbSrc` and the stale *"deliberately not here yet"* comment is
-  gone. **The artboards narrowed the scope BF-32's prose stated:** the tile is drawn on artboards 1
-  and 3 only — meal-level rows — and never on the ingredient rows inside a meal, so
-  `ingredient-search.tsx`, `food-library-sheet.tsx` and the builder's list do **not** opt in.
-  [`journal`](overview/entries/2026-08-26-meal-photo-tile.md).
-- **✅ THE WARNING DESIGN IS DECIDED, 2026-08-26 — option A, owner's pick.** The `Gate: owner` that
-  held this entry is cleared. Three treatments were drawn at list density and put to the owner;
-  the choice was **A**.
-
-  **What to build on the last call site, the external food-database row (`ingredient-search.tsx:132`):**
-  - **An amber `AlertTriangle` immediately before the calorie column.** Nothing else changes — same
-    row height, same columns, same shape as the other three call sites. The icon is the whole
-    treatment.
-  - **The serving line stays** (`15P · 9C · 4F per 100 g`). This is the half that ruled out option B,
-    which put the warning sentence *in place of* that line: the rows carrying a mismatch are exactly
-    the rows where you want to read the numbers and judge for yourself.
-  - **The sentence moves to the food's detail**, not the row. Today's copy is *"Its macros and
-    calories disagree — check before using"* — carry the wording, not the position.
-  - **The row keeps ONE shape.** Do not add a warning slot to `FoodRow`. That was option C, and its
-    cost is not the ragged height — it is that three call sites carry a prop they never fill, which
-    turns the shared row back into a wrapper around per-screen differences. Ending that is what this
-    entry is for.
-  - **A → C stays open if the sentence later has to be visible in the list** — it is additive.
-    Starting at C and pulling the slot out means touching every call site again. Do not pre-build it.
-
-- **⚑ BLOCKED 2026-08-26 — option A moves the sentence somewhere that does not exist.** **This
-  surface has no food detail:** `ingredient-search.tsx:124`'s tap runs `addExternalFood` →
-  `createFoodItem` + `accept()`, which **adds the food to the meal** with no inspect step,
-  confirmation or quantity sheet in between. So *"the sentence moves to the food's detail"* has no
-  destination here, and building A **deletes the only visible explanation** — a net loss on a
-  warning meant to be read before use. Not built.
-- **What it needs to become buildable**, cheapest first: **(1)** keep the sentence in the row — that
-  is option B, but the reason B lost (it *replaced* the serving line) does not apply to keeping it
-  *alongside*, which is what ships today; **(2)** give the row an inspect step, tap to open and add
-  as a second action — a real interaction change on a path whose speed is the point; **(3)** ship A
-  with the sentence as the icon's accessible name, which loses nothing to a screen reader and
-  everything to a sighted thumb, since a phone has no hover.
-- **The conversion is blocked by the same question.** The external row is **not** `FoodRow` today —
-  it is a bespoke `<button>` (`ingredient-search.tsx:122`), while `SearchResultRow` beside it *is*.
-  Converting it is this entry's goal and needs to know where the warning goes: A's *"immediately
-  before the calorie column"* requires the shared row to draw it, which is the slot this entry rules
-  out. Pick 1, 2 or 3 and the conversion follows.
-
-- **The in-flight spinner needs no decision** and never did: it swaps the green `+` inside the same
-  16 px box, so it is a state of an existing element rather than a new slot. It works under any of
-  the three treatments.
-- **Reference:** the three treatments as drawn, at 412 dp against a three-result list —
-  <https://claude.ai/code/artifact/315b8a71-5f0d-4a18-a917-a2618b882c4f>. **Q-395's twelve artboards
-  do NOT cover this**; checked, none of them shows a warning treatment, which is why it needed its
-  own drawing rather than a re-read of the mockups.
-- **✅ RESOLVED 2026-08-24 — the drawings are in the repository.** **The lesson worth keeping: a
-  mockup that lives only in a chat artifact is a mockup the queue cannot use.** These were drawn
-  2026-08-18, reviewed twice, decided against — then blocked four entries for six days because
-  nobody committed them. **Commit the canvas in the same PR that files the entry citing it.**
+- **Lane:** B
+- **Gate:** device
+- **Shipped 2026-08-26.** All four call sites now draw `components/nutrition/food-row.tsx`. The last
+  one — the external food-database result in `ingredient-search.tsx` — was blocked because the
+  decided warning design (option A) moved its sentence to *the food's detail*, and **this surface has
+  none**: the tap adds the food outright. Building A would have deleted the only visible explanation
+  on a warning meant to be read before use.
+- **⭐ OWNER DECISION 2026-08-26 — keep the sentence in the row.** Chosen from the three the blocked
+  note offered. It is what already shipped, so there is no regression, and option B's losing reason
+  (it *replaced* the serving line) does not apply to keeping it *alongside*. Upgrading to a detail
+  step later stays additive.
+- **This knowingly overrides one bullet of the old design — say so rather than let it read as drift.**
+  That design said *"do not add a warning slot to `FoodRow`"*, written on the assumption the sentence
+  was leaving the row. It is not, so a slot is what keeping it costs: **one optional
+  `warning?: string | null`**, which three call sites omit exactly as they omit the six other optional
+  props. The alternative was leaving the external row bespoke forever, which is the thing this entry
+  existed to end.
+- **The `+` and the per-row spinner went with the conversion, and nothing was lost.**
+  `SearchResultRow` beside it has had neither since v1.338.0 — the tap adds the food. The tapped row
+  still identifies itself through the existing `highlighted` prop.
+- **It also removed a hex literal** (`#f59e0b` → `var(--accent-amber)`), so
+  `check-hex-literals.js` drops that baseline row: 427 across 85 files.
+- **Verification:** `e2e/food-row-shared.spec.ts` gained the external row, with the search route
+  **stubbed** — it reaches Open Food Facts, which is why this row had no e2e cover at all before. It
+  asserts the shared shape (calories in their own column), the sentence, and that the macros stay
+  readable beside it.
+- **Keep:** the device press. Not seen on the S25 — the amber caution line is new markup in a list,
+  and the row lost an affordance. On device: search the food database in the meal builder for
+  something with disagreeing macros; the row must show the sentence, and a tap must still add it.
 
 ### [nutrition][app-shell] Q-395 — the nutrition rework: the spec every phase reads, and the final checkpoint
 

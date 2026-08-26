@@ -24,7 +24,7 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.383.4 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Version:** v1.383.5 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-08-26.
 
 **The doc-size ledger stops being a merge conflict (LA-33), and E2E can now be required (LA-22).**
@@ -74,9 +74,7 @@ are BF-35's `Keep:` line. Alongside it, **LB-15**: a calorie-free product (spark
 drink, a supplement) scanned as *"not found"*, because `offProductToNutrition` could not tell zero
 from absent and `null` is how a caller learns the barcode failed to resolve.
 
-**A full-history rebuild that computed nothing wiped the history and reported success (Q-528).**
-`replaceOuraDailySummary` deleted every one of the user's summary rows and only *then* returned
-early on an empty input. Two more of the same class were in the same seven lines and are fixed with
+**A full-history rebuild that computed nothing wiped the history and reported success (Q-528).** `replaceOuraDailySummary` deleted every one of the user's summary rows and only *then* returned early on an empty input. Two more of the same class were in the same seven lines and are fixed with
 it: the delete and insert were **separate statements**, so a rejected insert left the delete
 committed; and the insert had **no `ON CONFLICT` arm**, so one repeated date raised 23505 and
 rejected every row — Q-280's shape under a different SQLSTATE. It now matches
@@ -94,6 +92,8 @@ cosmetic: last-wins is exact only for a bare `excluded.*` arm, and three of the 
 would have turned a loud 21000 into a silent field loss. **Owner decisions the same day:** readiness
 history is **recomputed**, not frozen, when a model is recalibrated (reversing 2026-08-24); the
 Coach's mid-program exercise swap is to be **restricted** — see Q-403.
+
+**The shared food row's last call site, and a warning that had nowhere to go (Q-406).** Three of four rows converted days ago; the external food-database result stayed a bespoke `<button>` blocked on a design question. The decided treatment moved its explanatory sentence **to the food's detail** — and this surface has none: tapping the row adds the food outright, so building it would have deleted the only visible explanation on a warning meant to be read *before* use. **Owner's answer: keep the sentence in the row** — what already shipped, so no regression, and option B's losing reason (it *replaced* the serving line) does not apply to keeping it alongside. **That knowingly overrides one bullet of the old design and the entry says so**: *"do not add a warning slot"* was written assuming the sentence was leaving the row, so a slot is what keeping it costs — one optional prop three call sites omit, exactly as they omit six others. **The `+` and the per-row spinner went with the conversion and nothing was lost**: `SearchResultRow` beside it has had neither since v1.338.0 — the tap adds the food — and the tapped row still identifies itself through the existing `highlighted`. A hex literal went too (`#f59e0b` → `var(--accent-amber)`; 427 across 85 files). **The row had no e2e cover at all** — its search reaches Open Food Facts — so the spec now stubs the route and asserts the shared shape, the sentence, and the macros still readable beside it ([`journal`](docs/overview/entries/2026-08-26-shared-food-row-last-call-site.md)).
 
 **The journal limit stopped billing the wrong PR (BF-36).** `check-doc-index-size.js` fails the Custom Rules job above 60 foldable journal entries — the right threshold, aimed at the wrong person. It landed on whichever PR happened to be open when the count crossed, and every session writes an entry, so the cost fell at random: it blocked **#527**, a docs-only intake whose diff the failure named none of, and **merging `main` fixed it** because another session had swept concurrently. That PR paid a CI cycle for a condition it neither caused nor fixed. It now applies the same attribution the line-count ratchet beside it already used — over the limit **and this branch adds an entry** fails, adds none gets a note, and an unreadable base still fails rather than silencing the limit. The decision moved to `scripts/lib/entries-verdict.js` and is tested against **fixture counts, not the live directory**, because a test that reads the real count changes verdict as the repo does. **The 250 total ceiling is deliberately left unattributed** — the same argument applies but it is 89 files away, and widening the change would be my call rather than the entry's ([`journal`](docs/overview/entries/2026-08-26-entries-limit-targets-the-grower.md)).
 
