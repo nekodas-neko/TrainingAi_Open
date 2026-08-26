@@ -135,6 +135,15 @@ unlinked entries pile up and it fires (verified by simulating 61 against the rea
 ceiling of **250 total** keeps the original 509-file readability failure caught, and its message says
 plainly that a sweep alone will not fix that one.
 
+**And since BF-36 (2026-08-26) the limit fails only a branch that ADDS an entry.** The threshold was
+right; the targeting was not. It landed on whichever PR happened to be open when the count crossed —
+it blocked #527, a docs-only intake whose diff it named none of, and merging `main` fixed it because
+another session had swept concurrently. A branch that adds none now gets a note instead, and the next
+PR adding an entry runs the sweep: it is already in the directory. The decision is
+[`scripts/lib/entries-verdict.js`](../../../scripts/lib/entries-verdict.js), unit-tested against
+fixture counts rather than the live directory — a test reading the real count would change verdict as
+the repo does. **The 250 ceiling is deliberately still unattributed** and fails everyone.
+
 **The older framing, kept for the record:** this used to be described as an undecided choice between
 the sweep rewriting citations into the history file, or durable docs citing the batched history. The
 citation habit above is cheaper than either and needs no retrofit, so that is the answer unless the
