@@ -3,7 +3,7 @@
 > **Successor sessions are titled `🎶 Tuning Agent 🟢`** — exactly, both emoji. Leading emoji = role,
 > trailing = this session's status, set by the session itself. See `docs/agents/README.md` §4.
 
-**Updated:** 2026-08-26 · **By:** `session_01VVfZtbCftbwaUHtBLJoxVr` · **Next ID:** `TN-17`.
+**Updated:** 2026-08-26 · **By:** `session_01VVfZtbCftbwaUHtBLJoxVr` · **Next ID:** `TN-18`.
 Find next free: `grep -rhoE '\bTN-[0-9]+\b' docs/ | sort -t- -k2 -n | tail -1`. Legacy `Q-` numbers
 stay valid. **Rewritten in full, never appended** — narrative lives in the linked reviews.
 
@@ -40,20 +40,18 @@ Filed this session, all propose-only, all in the queue:
 | **TN-14** | 2026-08-19's 3.50 h night still stored, still feeding every baseline | `Needs: Q-520`; decode the frames first |
 | **TN-15** | Body Battery: drain ignores exercise, no recharge at all | **signed off**; `Needs: TN-2`; supersedes the old "do not redesign" line |
 | **TN-16** | prolonged-stress warning + calm-down prompt | **parked** `Needs: Q-507` — the metric points the wrong way |
+| **TN-17** | Activity as a pace-to-goal score (owner's design) | mechanic sound; `Needs: Q-524`, `Gate: owner` — the goals make it punishing |
 
-**Owner decisions, 2026-08-24 — all recorded on the entries, nothing left gated on them.** TN-5 and
-TN-6 signed off; **TN-6a** added (suspend the temperature penalty on a self-clearing condition, ships
-outside the batch, must cover all three consumers). **History policy: leave stored days alone and
-stamp the new model** — which leans on a stamp Q-518 says gets erased, so **Q-518 is now load-bearing**.
-On **BF-13** (BugFix's entry, whose root cause supersedes TN-6's): re-derive the baselines, fix the
-seed for all six, re-derive only what is measurably wrong. **Measured: only `temp` is** (gap +2.80 sd,
-100% of nights above; the other five are ≤0.28 sd).
+**Owner decisions, 2026-08-24 — recorded on the entries, nothing gated on them.** TN-5 and TN-6
+signed off; **TN-6a** added (suspend the temperature penalty on a self-clearing condition, outside the
+batch, all three consumers). **History policy: leave stored days alone and stamp the new model** —
+which leans on a stamp Q-518 says gets erased, so **Q-518 is load-bearing**. On **BF-13**: re-derive
+the baselines, fix the seed for all six, re-derive only what is measurably wrong — **measured, only
+`temp` is** (+2.80 sd; the other five ≤0.28 sd).
 
-**BF-14 refuted 2026-08-24** — the breathing baseline is fed `rpm × 10` deliberately, so rpm =
-`meanX8 / 80`, not `/8`; corrected it reads 9.250 against 9.400, **+0.27 sd, clean**. Reasoning is on
-the entry.
+**BF-14 refuted 2026-08-24** — breathing baseline is fed `rpm × 10`, so rpm = `meanX8 / 80`; corrected it is **+0.27 sd, clean**. Reasoning on the entry.
 
-Reviews: [pillar review](../../reviews/2026-08-26-pillar-review.md) · [check-in lookback](../../reviews/2026-08-26-checkin-lookback.md) · [threshold sweep](../../reviews/2026-08-25-threshold-sweep.md) · [battery](../../reviews/2026-08-24-body-battery-charge-window-collapse.md) ·
+Reviews: [HR tile + pacing](../../reviews/2026-08-26-hr-tile-and-activity-pacing.md) · [pillar review](../../reviews/2026-08-26-pillar-review.md) · [check-in lookback](../../reviews/2026-08-26-checkin-lookback.md) · [threshold sweep](../../reviews/2026-08-25-threshold-sweep.md) · [battery](../../reviews/2026-08-24-body-battery-charge-window-collapse.md) ·
 [sleep](../../reviews/2026-08-24-sleep-score-volatility.md) ·
 [temperature](../../reviews/2026-08-24-readiness-temperature-penalty.md) ·
 [handoff](../../handoff-2026-08-24-readiness-scores-owner-batch.md).
@@ -143,18 +141,15 @@ sleep ✅ · readiness ✅ · activity ✅ · body ✅ · devices ✅ · workout
 - **"Does move-hours count sleep?" — no**, by two guards: a hardcoded `[7, 22)` window and overnight
   HR below the bar. But that window is **hardcoded** — `readiness-payload.ts:324` never passes the
   `wakeHour`/`sleepHour` the function accepts — so a 6 am wake loses real waking time at both ends.
-- **A distribution screen is BLIND to "always fires" and "never crosses".** Run against the two known
-  failures it catches neither — `temp_dev_c` has a healthy range, `illness_score` looks merely sparse.
-  It finds stuck and dead scores only. Pair every threshold with its input, or the screen reads clean
-  on a score compared against the wrong number.
+- **A distribution screen is BLIND to "always fires" and "never crosses"** — run against the two known
+  failures it catches neither. Pair every threshold with its input, or it reads clean on a score
+  compared against the wrong number.
 - **Measure coverage on a RECENT window, never all history.** `oura_daily_derived` holds pre-BLE rows
-  back to 2026-05, so whole-history coverage reads 29–49% and looks like a defect; August is 100% for
-  readiness, sleep, activity and illness. A whole-history coverage number measures when the pipeline
-  started.
+  back to 2026-05, so whole-history coverage reads 29–49% and looks like a defect while August is
+  100%. A whole-history coverage number measures when the pipeline started.
 - **~13 thresholds are not measurable from stored data** (sleep staging, `MET_ACTIVE_THRESHOLD`,
-  `APNEA_THRESHOLD`, `NIGHT_BAND_*`, `RANGE_THRESHOLD`, `CONSISTENCY_*`) — their inputs are
-  per-sample intermediates nothing persists, the same shape as TN-3a. They need a session that can
-  run the pipeline, not more SQL.
+  `APNEA_THRESHOLD`, `NIGHT_BAND_*`, `RANGE_THRESHOLD`, `CONSISTENCY_*`) — per-sample intermediates
+  nothing persists. They need a session that can run the pipeline, not more SQL.
 - **A calibration curve cannot reduce displayed volatility — its total rise is conserved.** Uniform
   gain moved night-to-night |Δ| 13.53 → **13.75**. Diagnose "the score jumps around" by
   reconstructing the pre-calibration blend first; if its |Δ| is unchanged, no curve change helps.
@@ -176,6 +171,28 @@ sleep ✅ · readiness ✅ · activity ✅ · body ✅ · devices ✅ · workout
   count as "the owner's, recently", never "the system's".
 - **A hardening fix can delete the evidence another open investigation needs** (TN-7). When a fix
   turns a 500 into a fallback, check what was waiting on that 500.
+- **The HR tile's lever is RAW-vs-BASELINE-RELATIVE, not which metric.** Against `perceived_recovery`:
+  waking-rest HR **+0.176 raw → +0.291 relative**, nightly resting HR **+0.129 → +0.278**. Expressing
+  either as a delta from the owner's own baseline roughly doubles it; picking between them barely
+  moves anything. **Do not re-run the "which HR number" comparison** — it was run.
+- **⚠ `perceived_recovery` runs 1 = fully recovered … 5 = WRECKED** (`types/day-checkin.ts:17`). A
+  positive r against it means *worse*. Half an hour went into a sign that was the scale, not the data.
+- **⚠ `readiness_contributors` carries `provisional: true` rows with the score pinned at 50.** Filter
+  them: including 4 of 39 drags the restingHeartRate correlation from **−0.553 to −0.395**. This
+  applies to every future query against that JSON, not just this one.
+- **The pillar review's +0.557 and the raw +0.129 are the SAME signal measured two ways** — the
+  contributor score is baseline-relative. Neither is wrong; do not "correct" one to the other.
+- **⛔ `step_live_windows` is effectively empty — 8 rows across 6 days, 7,745 steps total.** It is the
+  obvious intraday step source and it reads a flat zero. `body_metrics.steps` is a **running daily
+  total** (`updated_at` moves through the day), which is what any intraday step question should use.
+- **The owner's step goals are not calibrated to the owner.** Median day **4,649**; 7,000 reached on
+  **32%** of days, 10,000 on **15%**. Any change that makes the Activity score stricter (TN-17's
+  pacing) turns that from invisible into a tile that reads red most days — which is why TN-17 is
+  gated on Q-524 rather than filed as a straight improvement.
+- **TN-3a's persistence half SHIPPED** (migrations 212/213; `oura_daytime_stress_buckets`, ~26
+  buckets/day since 2026-08-24) **and its queue entry did not notice for two days.** The back-fill did
+  not ship, so it keeps a `Keep:`. **Check production for the table before assuming an entry's state
+  from the queue** — the queue lags the database.
 - **A refuted hypothesis is a result — record it, do not replace it.** Stress pointing the wrong way
   invited an obvious explanation (better sleep → denser HRV → more buckets scored). Measured:
   **r = −0.128** against HR sample count. Q-507 now carries the refutation, so the next session does
