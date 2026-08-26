@@ -410,6 +410,9 @@ jobs:
       - name: Orientation docs attribute symbols to the right file
         run: node scripts/check-module-map-symbols.js
 
+      - name: A learning-mode device cannot reach the scoring inputs
+        run: node scripts/check-learning-mode-isolation.js
+
   migrations:
     name: Migration Check
     runs-on: ubuntu-latest

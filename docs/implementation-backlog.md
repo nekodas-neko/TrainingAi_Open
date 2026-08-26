@@ -351,48 +351,55 @@ below threshold and left in place for next time.
 > BF-29 (My meals), BF-30 (Meal detail), BF-31 (Edit meal) and BF-26 (Quantity). Two artboards need
 > no entry — `Tap targets` and the `srv/g` studies both shipped in Q-395a.
 
-### [devices][platform] PS-8 — the Colmi ring: identify it, then score it against the Oura
+### [devices][platform] PS-8 — the Colmi R09 in learning mode: ingest it, compare it, score nothing with it
 
-- **Branch:** `claude/alternative-ring-testing-jzk8el` (plan only; the spike is a later branch)
-- **Lane:** A (`lib/colmi-ble/**` is engine; the pairing card is the only Lane-B surface and rides
-  with it, mirroring how the scale and strap shipped)
-- **Gate:** device — **Phase 0 cannot start without the physical ring in hand**, and everything
-  after it is conditional on Phase 0 passing
+- **Branch:** `claude/alternative-ring-testing-jzk8el` (plan + CI guard landed; the spike is a later branch)
+- **Lane:** A — `lib/colmi-ble/**` is engine and Phase 2 is a **migration**, which is Lane A's alone.
+  The pairing card is the only Lane-B surface and rides with it, as the scale and strap did.
+- **Gate:** device — **Phase 0 cannot start without the physical R09 in hand**, and every later
+  phase is conditional on it passing
 - **Plan:** [`2026-08-26-alternative-ring-colmi-testing.md`](superpowers/plans/2026-08-26-alternative-ring-colmi-testing.md)
-- **Added:** 2026-08-26 · one-off session, from an owner question (*"I now have a colmi ring … should
-  I test it on myself or another user first?"*)
+- **Added:** 2026-08-26 · one-off session, from an owner request for a deployment plan plus a
+  guarantee that the ring *"wont affect scoring of anything I have going"*
 
-**Scope is Phase 0 and Phase 1 only.** Phases 2–4 in the plan (promote to a ranked source, sleep,
-hand one to the second account holder) are deliberately **not** queued — each is conditional on the
-Phase 1 comparison report saying the ring is worth the next step.
+**Learning mode is the requirement, and the obvious way to get it does not work.** Ranking
+`colmi_ble` below `oura_ble` protects *writes* only; every scoring *read* is source-blind
+(`getHrForWindow` has no source predicate, `preferStrapBuckets` is an allowlist of one), so a Colmi
+row inside a shared table is a scored row however it is stamped. Isolation comes from the data never
+entering those tables — the five being `oura_heartrate`, `body_metrics`, `sleep_sessions`,
+`oura_daily`, `oura_daily_derived`.
 
-- **Phase 0 (30 min, no code, owner only):** disconnect the vendor app, scan on service
-  `6E40FFF0-B5A3-F393-E0A9-E50E24DCCA9E`, read the firmware revision and model off `0x180A`, send
-  `0x03` and confirm a 16-byte reply with a valid **mod-255** checksum. Record the model and
-  firmware **into the plan doc**. If that round trip fails the unit is not in the R02 protocol
-  family and Phase 1 is void — re-plan, do not guess at command bytes.
-- **Phase 1:** `lib/colmi-ble/` shaped like `lib/scale-ble/` — a pure `protocol.ts` (build / parse /
-  checksum, unit-testable with no device, packet hexes pinned as fixtures), a `sync.ts` pulling the
-  HR log (`0x15`) and step log (`0x43`), and a pairing card. Plus **one comparison adapter** for
-  `lib/oura-comparison-harness.ts`, which already does all the scoring and already has a console.
+**Already shipped on this branch:** `scripts/check-learning-mode-isolation.js`, wired into Custom
+Rules, empty baseline, all four violation shapes probed. **Do not add `colmi_ble` to
+`HEALTH_SOURCES`** — every shared writer takes `source: HealthSource`, so its absence from that
+tuple makes a shared-table write a *compile error*, which is stronger than anything the script does.
 
-**Two constraints that change the cost and are easy to miss:**
+- **Phase 0 (owner, ~30 min, no code) — the gate.** Disconnect the vendor app, scan on service
+  `6E40FFF0-B5A3-F393-E0A9-E50E24DCCA9E`, read firmware + model off `0x180A`, send `0x03`, confirm a
+  16-byte reply with a valid **mod-255** checksum. Record firmware and model **into the plan**.
+  **The R09 is not on the reference client's compatibility list** (R02/R06/R10 are); only a fork
+  claims it. If the round trip fails, the unit is not in that protocol family and Phases 1+ are void.
+- **Phase 1 — `lib/colmi-ble/protocol.ts`, pure, no device.** Build/checksum/parse for the HR log
+  (`0x15`) and step log (`0x43`), each decoder pinned to a captured packet hex. This is where the
+  protocol risk is actually retired, and it is fully testable in the sandbox.
+- **Phase 2 — storage, Lane A.** `colmi_raw_packets` (archival hex, so a decoder fix can re-parse
+  without re-draining) + `colmi_readings`. Next free migration was **231** on 2026-08-26; re-check
+  the pointer at claim time.
+- **Phase 3 — sync + pairing card.** Copy `chest-strap-pairing.tsx`. New route `app/api/colmi/samples`
+  — **must not reuse `app/api/hr-ingest`**, which hardcodes `source: 'chest_strap'` and writes
+  `oura_heartrate`.
+- **Phase 4 — one adapter for `lib/oura-comparison-harness.ts`.** ~40 lines; the harness and its
+  console already do the scoring. This is the single sanctioned reader of the Colmi tables.
+- **Phase 5 — 14-day wear trial.** Opposite hands, **swap at day 7** (separates device bias from
+  hand bias), H10 on for ≥3 workouts as real HR ground truth, firmware re-read at the end.
 
-1. **This needs no APK.** `lib/live-hr/chest-strap-source.ts` connects, subscribes and ingests
-   entirely in the WebView via `@capacitor-community/bluetooth-le` (already a dependency). The
-   Colmi logs internally and is read back on demand, so the backgrounding limit of that path barely
-   bites — unlike the Oura, whose finite history buffer is why it needs a foreground service. Ship
-   via Railway; no Gradle, and therefore **no uninstall risk to the Oura key**.
-2. **Phase 1 writes to nothing shared.** `body_metrics` / `sleep_sessions` / `oura_daily` would in
-   fact be safe — the ranked per-field merge in `lib/data/health-source.ts` means a `colmi_ble`
-   ranked below `oura_ble` can only fill a NULL — but **`oura_heartrate` is not**: bare `text`
-   source, `(user_id, timestamp)` unique, `onConflictDoNothing`, so a same-second collision is
-   first-writer-wins forever, and `app/api/hr-ingest/route.ts` hardcodes `source: 'chest_strap'`.
-   Quarantine until there is a number worth promoting on.
+**Not queued, deliberately:** sleep (needs the Gadgetbridge port — Phase 6), and promotion out of
+learning mode (§7 of the plan; the hard part is `oura_heartrate`, which has no per-field merge at
+all — `onConflictDoNothing` on `(user_id, timestamp)` makes a same-second collision first-writer-wins
+permanently).
 
-**Do not flash the circulating `…FasterRawValuesMOD.bin` raw-streaming firmware.** It is the only
-step in the whole arc that can brick the device, and it would be taken before knowing whether the
-sensor is worth streaming from. Separate owner decision, if Phase 1 earns it.
+**Do not flash the circulating `…FasterRawValuesMOD.bin`.** Only step in the arc that can brick the
+device, and it would be taken before knowing the sensor is worth streaming from.
 
 ### [app-shell][nutrition] BF-34 — the dialog that closed on the frame it opened (shipped v1.383.1)
 

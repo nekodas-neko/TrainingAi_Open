@@ -1,64 +1,78 @@
-# 2026-08-26 — The Colmi ring: a plan, and the reason it costs almost nothing (PS-8)
+# 2026-08-26 — The Colmi R09 in learning mode, and the guard that makes it true (PS-8)
 
-**Branch:** `claude/alternative-ring-testing-jzk8el` · one-off session · **docs only, nothing built**
+**Branch:** `claude/alternative-ring-testing-jzk8el` · one-off session · plan + one CI check, no
+integration code
 
-The owner acquired a Colmi smart ring and asked two questions: how to test it, and whether to test
-it on themselves or on the second account holder. This is a planning PR under the backlog-driven
-protocol — the plan and the queue entry land here; the spike is a later branch.
+The owner acquired a Colmi R09 and asked for a deployment plan plus a guarantee: *"are we sure its
+data will be read only and wont affect scoring of anything I have going? I basically just want to
+ingest the data in a 'learning' mode state."*
 
-## The answer
+## The finding that shaped the design
 
-**Wear it yourself, opposite hand to the Oura, and quarantine its writes.** The only question worth
-a fortnight is *how close is it to the Oura*, and one body has to wear both for that to have an
-answer. The reason to reach for a second person — two rings writing into one account — is a
-**write-path** problem, and this repo already owns the mechanism for it.
+**The obvious isolation mechanism does not work.** Ranking `colmi_ble` below `oura_ble` in
+`HEALTH_SOURCES` would make the per-field merge refuse to let it overwrite an Oura value — and would
+not stop it being read. Every scoring read in the app is source-blind:
 
-## Three findings that changed the shape of the plan
+- `getHrForWindow` (`lib/data/postgres/slices/oura.ts:743`) selects `oura_heartrate` with **no
+  source predicate** and hands the rows to `preferStrapBuckets`, which is an **allowlist of exactly
+  one value** (`chest_strap`) with everything else falling through untouched. A row stamped
+  `colmi_ble` would feed the readiness payload and the body-battery window directly.
+- `listBodyMetrics` / `listSleepSessions` / `getOuraDaily` / `getOuraDailyDerived` read whole rows.
+  `source_map` is per-field *write* provenance; no read consults it.
 
-**It needs no APK.** `lib/live-hr/chest-strap-source.ts` does the full BLE cycle — scan, connect,
-subscribe, decode, ingest — in TypeScript in the WebView via `@capacitor-community/bluetooth-le`,
-already a dependency. The Kotlin service came later and is an all-day-background upgrade, not a
-prerequisite. The Colmi logs HR, steps and sleep internally and is read back on demand, so the
-WebView path's backgrounding limit barely applies: sync on app open, like the scale. Ships through
-Railway, no Gradle, and so **no uninstall risk to the Oura key**.
+Repo-wide, two reads filter `oura_heartrate` by source and both are deliberate (the rollup's `'ble'`
+and the comparison adapter). **A row in a shared table is a scored row however it is stamped.** So
+isolation has to come from the data never entering those five tables — `oura_heartrate`,
+`body_metrics`, `sleep_sessions`, `oura_daily`, `oura_daily_derived`.
 
-**`oura_heartrate` is the one table with no protection.** The ranked per-field merge in
-`lib/data/health-source.ts` would make `body_metrics` / `sleep_sessions` / `oura_daily` safe for a
-second ring by construction — a `colmi_ble` ranked below `oura_ble` can only fill a NULL, and it is
-a one-line change to a `const` tuple with no migration. But `oura_heartrate` has a bare `text`
-source, a `(user_id, timestamp)` unique and `onConflictDoNothing`, so a same-second collision
-between two rings is first-writer-wins permanently. `app/api/hr-ingest/route.ts` also hardcodes
-`source: 'chest_strap'`. That is what Phase 1's quarantine is actually protecting.
+## The strongest layer is an omission
 
-**The scoring already exists.** `lib/oura-comparison-harness.ts` takes an adapter supplying two
-bucketed series and reports within-tolerance counts and mean absolute delta;
-`components/oura-ble/comparison-harness-console.tsx` renders it. A Colmi adapter is the
-`ringVsH10HrAdapter` pattern with one side re-pointed — about 40 lines, and nothing new gets built
-for measurement.
+Every shared-table write takes `source: HealthSource`, a closed union built from the
+`HEALTH_SOURCES` tuple. **Not adding `colmi_ble` to that tuple makes a Colmi write to any shared
+table a compile error.** The protection comes from the ladder entry being absent, which means adding
+it "just for provenance" is exactly the change that removes the guarantee. Worth stating in the plan
+so nobody helpfully adds it later.
 
-## Protocol, quoted rather than remembered
+## What shipped
 
-Per the external-field rule, §3 of the plan quotes the transport UUIDs, the 16-byte framing, the
-**mod-255** checksum and the command bytes (`0x03` battery, `0x01` set time, `0x15` HR log, `0x43`
-steps, `0x69`/`0x6A` real-time) from `tahnok/colmi_r02_client`, fetched today. **None of it is
-verified against the owner's unit** — the client covers R02/R06/R10 and the model is unknown, which
-is exactly what Phase 0 exists to settle.
+`scripts/check-learning-mode-isolation.js`, wired into the Custom Rules job, empty baseline. It
+fails on a learning-mode module naming a scoring table or calling a shared writer, on any import
+outside its own directory except the comparison adapters, on `colmi` appearing in `HEALTH_SOURCES`,
+and on `colmi` appearing in any scoring input.
 
-Sleep is **not** in that client. Gadgetbridge implements it from a separate Wireshark dissection,
-so it is known-possible from a second codebase — not a copy-paste, and Phase 3.
+**It was landed before the integration on purpose** — a guard written after the code is a guard that
+can be argued with, and promotion out of learning mode now has to delete a line from this script and
+show up in a diff.
 
-## What is deliberately not queued
+**Its first draft was wrong and a probe caught it.** Copying `check-aest-midnight-timezone.js`, it
+blanked string bodies as well as comments — so a ladder that *had* been given `'colmi_ble'` passed
+silently, and the leak that matters most (a raw ``sql`INSERT INTO oura_heartrate …` `` inside a
+string) would have been invisible. It strips comments only now. All four violation shapes were
+probed failing, then the tree restored and re-probed clean.
 
-Promotion to a ranked source, sleep, and handing a ring to the second account holder are all
-conditional on Phase 1's report. The friend phase tests **tier 2** — a non-Oura user getting working
-score cards, which `device-agnostic-source-architecture.md` says has never run against a real
-non-owner device — and that is a different question from ring accuracy.
+## The R09 specifically
 
-**Do not flash the circulating raw-streaming mod firmware.** It is the only step in the arc that can
-brick the device, and it would be taken before knowing whether the sensor is worth streaming from.
+The reference client `tahnok/colmi_r02_client` lists **R02/R06/R10** — the R09 is **not** on it.
+A fork (`patmorli/colmi-r09-smart-ring`) targets the R09 and reports the same UUIDs, the same
+16-byte framing with a **mod-255** checksum, and the same feature set. That is enough to start and
+not enough to build on, which makes Phase 0 — one `0x03` round trip proving transport, framing and
+checksum together — the gate rather than a formality.
+
+Sleep is in neither client. Gadgetbridge has it from a separate Wireshark dissection: a port, not a
+copy, and Phase 6.
+
+## Deployment shape
+
+No APK. `lib/live-hr/chest-strap-source.ts` already does the full BLE cycle in TypeScript in the
+WebView, and the Colmi logs internally so it syncs on app open like the scale rather than needing a
+foreground service like the Oura. Ships via Railway; **no uninstall risk to the Oura ring key**.
+
+The migration (Phase 2) was deliberately **not** claimed — Postgres numbers belong to Lane A, and
+this was a `PS-` session. Next free was 231.
 
 ## Files
 
-- `docs/superpowers/plans/2026-08-26-alternative-ring-colmi-testing.md` — the plan
-- `docs/implementation-backlog.md` — PS-8 at the queue top, `Gate: device`
-- `docs/domains/devices/README.md` — plan linked from the pillar index
+- `scripts/check-learning-mode-isolation.js` + `.github/workflows/ci.yml` — the guard
+- `docs/superpowers/plans/2026-08-26-alternative-ring-colmi-testing.md` — the deployment plan
+- `docs/implementation-backlog.md` — PS-8, `Gate: device`
+- `docs/module-map.md` · `docs/domains/devices/README.md` — index rows
