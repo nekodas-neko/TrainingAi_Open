@@ -292,6 +292,14 @@ function toUnitFixResult(fix: LbsToKgFix): UnitFixResult {
 let lastErrorEventPrune = 0
 const ERROR_EVENT_PRUNE_THROTTLE_MS = 24 * 60 * 60 * 1000
 
+// Throttled retention prune for app_load_metrics (BF-19, same pattern). Kept **14 days**, not 30:
+// this is one row per page load rather than one per exception, so it is the highest-volume
+// observability table in the app, and its whole question — "is this route slower this week than
+// last" — needs two weeks, not four. The entry asked for a cap "from day one, not later" because
+// error_events reached 52 MB before anyone looked.
+let lastAppLoadPrune = 0
+const APP_LOAD_PRUNE_THROTTLE_MS = 24 * 60 * 60 * 1000
+
 // Throttled retention prune for ai_call_log (same pattern) — observability
 // metadata, kept 30 days like error_events.
 let lastAiCallLogPrune = 0
@@ -4651,6 +4659,63 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     return rows.map(r => ({
       ...r,
       createdAt: r.createdAt.toISOString(),
+    }))
+  }
+
+  async insertAppLoadMetric(m: {
+    userId: string; route: string; totalMs: number; cold: boolean
+    responseStartMs?: number | null; domContentMs?: number | null; buildId?: string | null
+  }): Promise<void> {
+    await this.db.insert(s.appLoadMetrics).values({
+      userId: m.userId,
+      route: m.route,
+      responseStartMs: m.responseStartMs ?? null,
+      domContentMs: m.domContentMs ?? null,
+      totalMs: m.totalMs,
+      cold: m.cold,
+      buildId: m.buildId ?? null,
+    })
+
+    const now = Date.now()
+    if (shouldPrune(lastAppLoadPrune, now, APP_LOAD_PRUNE_THROTTLE_MS)) {
+      lastAppLoadPrune = now
+      this.db.execute(sql`DELETE FROM app_load_metrics WHERE created_at < now() - interval '14 days'`)
+        .catch(err => console.error('[prune] app_load_metrics failed:', err))
+    }
+  }
+
+  /**
+   * p50/p95 per route over `days`, split cold vs warm.
+   *
+   * The split is the whole report. Every merge is a Railway deploy and the service worker's cache
+   * name is stamped from the deploy SHA, so a day with 80 merges invalidates the device's shell 80
+   * times — a percentile pooling cold and warm loads measures release cadence rather than the app.
+   *
+   * `percentile_cont` rather than an ordered fetch in JS: the whole point is to avoid pulling a
+   * fortnight of per-navigation rows into the process to sort them. `worstMs` rides along because a
+   * p95 hides the load the user actually complained about.
+   */
+  async getAppLoadReport(userId: string, days: number) {
+    const rows = await this.db.execute(sql`
+      SELECT route,
+             cold,
+             count(*)::int AS samples,
+             percentile_cont(0.5)  WITHIN GROUP (ORDER BY total_ms)::int AS p50_ms,
+             percentile_cont(0.95) WITHIN GROUP (ORDER BY total_ms)::int AS p95_ms,
+             max(total_ms)::int AS worst_ms
+        FROM app_load_metrics
+       WHERE user_id = ${userId}::uuid
+         AND created_at > now() - make_interval(days => ${days})
+       GROUP BY route, cold
+       ORDER BY p95_ms DESC
+    `)
+    return (rows.rows as Record<string, unknown>[]).map(r => ({
+      route: String(r.route),
+      cold: Boolean(r.cold),
+      samples: Number(r.samples),
+      p50Ms: Number(r.p50_ms),
+      p95Ms: Number(r.p95_ms),
+      worstMs: Number(r.worst_ms),
     }))
   }
 

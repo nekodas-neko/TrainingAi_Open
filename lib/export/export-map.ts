@@ -152,6 +152,7 @@ export const EXCLUDED: Record<string, Exclusion> = {
 
   // ── App-internal bookkeeping. Not the user's content, and meaningless outside this database. ─
   ai_call_log: { category: 'ops', reason: 'token/latency accounting, no user content' },
+  app_load_metrics: { category: 'ops', reason: 'page-load timing telemetry, pruned at 14 days' },
   applied_mutations: { category: 'ops', reason: 'sync idempotency ledger' },
   db_query_log: { category: 'ops', reason: 'admin SQL audit trail' },
   error_events: { category: 'ops', reason: 'fault telemetry, pruned at 30 days' },

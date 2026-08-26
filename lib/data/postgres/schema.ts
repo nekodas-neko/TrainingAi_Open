@@ -798,6 +798,21 @@ export const errorEvents = pgTable('error_events', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 })
 
+// App-load observability (BF-19) — one row per navigation, written best-effort by
+// lib/app-load-metrics.ts. Higher volume than `error_events` by construction, so it has its own
+// table and its own prune. See migration 229 for why `cold` is load-bearing.
+export const appLoadMetrics = pgTable('app_load_metrics', {
+  id:              uuid('id').primaryKey().defaultRandom(),
+  userId:          uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  route:           text('route').notNull(),
+  responseStartMs: integer('response_start_ms'),
+  domContentMs:    integer('dom_content_ms'),
+  totalMs:         integer('total_ms').notNull(),
+  cold:            boolean('cold').notNull(),
+  buildId:         text('build_id'),
+  createdAt:       timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+})
+
 // AI call observability — one row per @ai-sdk/google model call (metadata only,
 // written best-effort by lib/ai/instrument.ts). See migration 136.
 export const aiCallLog = pgTable('ai_call_log', {

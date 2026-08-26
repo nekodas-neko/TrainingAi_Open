@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.383.3",
+    date: "2026-08-26",
+    changes: [
+      "The app now records how long it takes to open, so \"it feels slower lately\" can be checked against numbers instead of memory. Each load is timed and kept for two weeks, and the report separates loads that had to download the app fresh from ones that opened from the phone's own copy \u2014 those are very different, and mixing them would hide a real slowdown. The timing is sent in the background and can never slow down or interrupt what you are doing.",
+    ],
+  },
+  {
     version: "1.383.2",
     date: "2026-08-26",
     changes: [

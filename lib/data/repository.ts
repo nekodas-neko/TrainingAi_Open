@@ -824,6 +824,17 @@ export interface WorkoutRepository {
   countFeedback(): Promise<number>
 
   // ── Error events ─────────────────────────────────────────────────────────────
+  /** BF-19 — one row per page load, written best-effort from `POST /api/app-load`. Prunes at 14
+   *  days on write: this is the highest-volume observability table in the app. */
+  insertAppLoadMetric(m: {
+    userId: string; route: string; totalMs: number; cold: boolean
+    responseStartMs?: number | null; domContentMs?: number | null; buildId?: string | null
+  }): Promise<void>
+  /** BF-19 — p50/p95 per route, split cold/warm. The split is load-bearing: every deploy rewrites
+   *  the service-worker cache, so a pooled percentile measures release cadence, not the app. */
+  getAppLoadReport(userId: string, days: number): Promise<{
+    route: string; cold: boolean; samples: number; p50Ms: number; p95Ms: number; worstMs: number
+  }[]>
   insertErrorEvent(event: { userId: string | null; source: 'client' | 'server'; message: string; stack?: string | null; url?: string | null; userAgent?: string | null }): Promise<void>
   listErrorEvents(limit: number): Promise<{ id: string; source: string; message: string; stack: string | null; url: string | null; userAgent: string | null; createdAt: string; userEmail: string | null }[]>
 

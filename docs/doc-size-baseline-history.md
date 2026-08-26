@@ -3075,3 +3075,16 @@ The backlog is **not** re-ratcheted in this PR even though removing LB-15 took i
 baseline. Tightening a shared file that every agent's open branch also edits would fail those PRs for
 no benefit — the ratchet exists to stop growth going unnoticed, and any growth still shows in a diff.
 Deliberate, so a later sweep does not read the slack as an oversight.
+
+## 2026-08-26 — `projectOverview.md` → 8093 (+11), BF-19
+
+The Current Status paragraph for app-load measurement. Eleven lines because three of them are
+decisions a later session would otherwise reverse on sight: the cold/warm split (it looks like a
+facet and is the whole report), telemetry deliberately bypassing the outbox (it looks like a missed
+offline-first rule and is a choice), and `buildId` baked into the bundle rather than stamped
+server-side (which looks like the harder option and is the only correct one, because a stale shell is
+the case being measured). The full reasoning, the mutation proof and the lane note are in
+`docs/overview/entries/2026-08-26-feat-app-load-metrics.md`.
+
+The backlog shrank again (BF-19 removed, 61 lines) and is again left at its recorded number rather
+than re-ratcheted, for the reason given above on 2026-08-26.
