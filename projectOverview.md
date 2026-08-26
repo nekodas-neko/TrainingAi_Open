@@ -24,8 +24,10 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.375.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Version:** v1.377.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-08-25.
+
+**The day's AI surfaces can see each other now (Q-291).** The morning readiness insight once advised keeping intensity low on a raised temperature; that evening the digest cheered the two sessions that followed and said to keep the same energy tomorrow. The digest read nine sources and **readiness was not among them** — so this was data plumbing, not a prompt tweak, which is the question the entry itself asked to settle first. It now reads the day's insights before writing, inside its context hash rather than appended after it. **The read graph is one-directional and must stay acyclic:** two surfaces hashing each other's text would invalidate each other forever, and model output is not deterministic, so it would never settle — the digest is excluded from what the digest can read, in code and in two tests. The instruction permits disagreement and forbids only *silent* disagreement, which is also pinned, so a later tightening to "never contradict" fails rather than passing quietly.
 
 **The journal sweep, and the cadence it revealed (LA-25).** `check-doc-index-size.js` failed a *migration* PR at 61 unlinked entries against a limit of 60. **25 folded into a new `history-2026-08-25.md`, unlinked 59 → 34.** The finding is worth more than the sweep: the README's "~20 loose files" trigger was written for a load that no longer exists — **seventeen entries landed on 2026-08-25 alone** across the concurrent sessions, and the count went from a post-sweep 32 on the 24th to 61 the next day, so a sweep clearing 25 buys **about a day and a half**. This is a near-daily chore now, and the practical trigger is the guard failing someone's PR. **The cheaper half is the citation habit** — cite the review or handoff doc, not the loose journal entry — and this run broke it knowingly: BF-11e cited two journal entries from the nutrition index for want of a handoff doc, which costs the linked floor **two, permanently**. A sweep can undo a fold; it cannot undo a citation.
 

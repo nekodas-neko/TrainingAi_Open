@@ -85,3 +85,30 @@ export interface WorkoutRepository {
     expect(dead).toEqual(['getFoo'])
   })
 })
+
+// LA-32. The file list was `git ls-files`, which cannot see an untracked file — so adding a
+// repository method and its first caller together reported the method as dead until the caller was
+// staged. That is the exact workflow this check exists to support, and it fired on Q-291's
+// `listAiHealthInsightsForDate` whose only caller was a new file. A guard that fails on correct code
+// is one somebody deletes.
+describe('the file list covers the working tree, not just the index', () => {
+  it('includes an untracked source file', () => {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { sourceFileList } = require('../check-dead-repo-methods.js') as { sourceFileList: () => string[] }
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const fs = require('fs') as typeof import('fs')
+    const probe = 'lib/zz-dead-repo-methods-probe.ts'
+    fs.writeFileSync(probe, 'export const probe = 1\n')
+    try {
+      expect(sourceFileList()).toContain(probe)
+    } finally {
+      fs.unlinkSync(probe)
+    }
+  })
+
+  it('still includes tracked files', () => {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { sourceFileList } = require('../check-dead-repo-methods.js') as { sourceFileList: () => string[] }
+    expect(sourceFileList()).toContain('lib/data/postgres/adapter.ts')
+  })
+})

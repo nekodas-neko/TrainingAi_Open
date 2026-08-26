@@ -5332,34 +5332,6 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   logging flow. If it opens pre-set to a value, that is very likely the whole finding.
 - **Do not "fix" this by widening the model.** A flat signal made wider is still flat.
 
-### [platform][readiness] Q-291 — the AI surfaces contradict each other on the same day
-
-- **Lane: A — set 2026-08-25.** The contradiction is between AI route outputs
-  (`app/api/ai/**`, `lib/coach/**`), both of which the path rule assigns to Lane A.
-
-- **Branch:** `fix/ai-surface-shared-state`
-- **Plan:** none yet
-- **Added:** 2026-08-15 · from the uncovered-lenses review §2.2
-- **Observed in production, 2026-08-06, one user, one day:**
-  - **Readiness insight:** temperature 0.8 °C above baseline → *"Keep your planned exercise
-    intensity low."*
-  - **What happened:** `workout_sessions` shows **two** sessions — Legs 01:40, Upper 21:26.
-  - **Daily digest, same day:** *"Crushing three PRs… dominate today's 6754 kg leg volume session…
-    **Keep that same energy tomorrow!**"*
-- **Readiness then fell 79 → 76 → 76 → 65 across 08-05…08-08**, so the morning signal was arguably
-  correct and the evening digest encouraged a repeat of what degraded it.
-- **Distinct from Q-275/Q-276, and the fix is different.** Those are about the *scores* (readiness
-  is blind to load; the pillars disagree). This is about the *narration*: each AI surface builds its
-  own prompt from its own slice and none can see what another said today. Even with perfect scores,
-  the digest would still not know the morning advised backing off.
-- **Direction:** give the day's AI surfaces a shared context — the simplest version is that any
-  same-day generation reads the day's existing `ai_health_insights` rows and is instructed not to
-  contradict them without acknowledging the change. `ai_health_insights` already stores by
-  `(section, date)`, so the read is cheap and the table already exists.
-- **Check while in here:** whether the digest has any access to the day's readiness advisory at all,
-  or only to the outcome numbers. That determines whether this is a prompt change or a data-plumbing
-  change.
-
 ### [platform] Q-292 — the AI stated a score that is false, and gave an imperial measurement to a metric user
 
 - **Branch:** `fix/ai-numeric-grounding`
