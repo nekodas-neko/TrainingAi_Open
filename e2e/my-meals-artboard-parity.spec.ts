@@ -1,6 +1,6 @@
 import { test, expect, type Page } from '@playwright/test'
 import { Client } from 'pg'
-import { SEED_EMAIL, expandSavedMeal, settleRouteBoundary } from './fixtures'
+import { SEED_EMAIL, openSavedMeal, settleRouteBoundary } from './fixtures'
 
 /**
  * The meal library drawn as artboard 3 draws it (BF-29).
@@ -140,8 +140,9 @@ test('swiping a row left reveals its actions, and delete still asks first', asyn
   await swipeRowLeft(page, row, 200)
   await expect(trayDelete).toBeVisible({ timeout: 10_000 })
 
-  // Delete raises the same inline confirmation the button always did. A swipe that deletes outright
-  // is the failure mode this list cannot afford: the tray is one thumb-flick from a scroll.
+  // Delete never fires outright — it opens the meal with its confirmation up (BF-30). A swipe that
+  // deletes on release is the failure mode this list cannot afford: the tray is one thumb-flick
+  // from a scroll.
   await trayDelete.tap()
   await expect(page.getByText(`Delete “${MEAL_NAME}”?`)).toBeVisible()
 
@@ -153,8 +154,9 @@ test('swiping a row left reveals its actions, and delete still asks first', asyn
 test('the actions the swipe offers are also reachable by opening the row', async ({ page }) => {
   await openLibrary(page)
   // Swipe is an accelerator. Every action it holds has to be reachable without the gesture, or a
-  // reader — and anyone who never discovers the drag — loses delete entirely.
-  await expandSavedMeal(page, MEAL_NAME)
+  // reader — and anyone who never discovers the drag — loses delete entirely. Since BF-30 they all
+  // live one tap away inside the meal.
+  await openSavedMeal(page, MEAL_NAME)
   await expect(page.getByRole('button', { name: `Print a label for ${MEAL_NAME}` })).toBeVisible()
   await expect(page.getByRole('button', { name: `Edit ${MEAL_NAME}` })).toBeVisible()
   await expect(page.getByRole('button', { name: `Delete ${MEAL_NAME}` })).toBeVisible()

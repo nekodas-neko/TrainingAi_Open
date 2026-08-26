@@ -543,50 +543,6 @@ a large glyph and a `Photo` button on it.
   the artboards at 412 dp per BF-28. Then the device run: a data-URI image inside a scrolling list is
   exactly the shape Samsung's WebView compositor has mishandled before.
 
-### [nutrition] BF-30 — artboard 4 parity: Meal detail, the one screen with no clear counterpart
-
-- **Lane:** B
-- **Spec:** BF-28.
-- **Added:** 2026-08-25, owner: the nutrition screens match their drawings.
-- **Needs:** BF-32
-- **✅ THE OPEN QUESTION IS ANSWERED — the owner wants this screen.** 2026-08-25, looking at artboard
-  4: *"I dont see this screen yet"*. The entry previously allowed "it stays a card, here's why" as an
-  outcome; **that is no longer available.** Artboards 1, 2, 3, 5 and 6 each map onto a shipped
-  surface and this one does not, so unlike every other parity entry this is *build what is drawn*
-  rather than *change what is there*.
-- **Still to decide, in the PR before any markup:** route vs full-height sheet vs expanded card. The
-  owner asked for the screen, not for where it lives. A sheet reached from a My-meals row is the
-  cheapest shape that matches the drawing and keeps the back gesture working (BF-27); say what you
-  chose and why.
-- **The hero band is BF-32's placeholder at hero scale** — same gradient, same utensils glyph, a
-  `Photo` button on it, and it shows whether or not a photo is stored. Do not draw a second one here.
-- **What artboard 4 draws:** a hero band with `[back]`, an overflow action and a **`Photo`** button;
-  the meal name with `Makes 2 portions · 5 ingredients`; a **`278 / per portion`** figure; three macro
-  columns with **percentage, grams and label** (`48% · 33 g · Protein`); an `Ingredients` section
-  headed `whole batch` listing `name · "60 g · 2 servings" · calories`; and a bottom action row —
-  **`Log this meal`** with two icon buttons beside it.
-- **`Log this meal` already exists** at `saved-meal-card.tsx:220`, and that file's own comment records
-  the batch-vs-portion rule the artboard's `whole batch` / `per portion` split is drawing: a batch
-  recipe shows ONE portion, which is what the button writes. **The semantics are settled; this is
-  presentation.** Do not re-litigate what a portion means.
-- **The percentage column is a number that has to come from somewhere.** `48% · 33 g · Protein` is
-  macro share of energy — the Atwater conversion. `packages/shared` owns `KCAL_PER_G` after LB-9, and
-  `components/nutrition/macro-energy.ts` is the `components/` copy. Use one of those; do not write
-  `* 4` / `* 9` in a component.
-- **BF-29 shipped and left this question exactly where it found it, but narrowed the stakes.** The
-  list row is now artboard 3's compact shape and **tapping it expands in place** — which is one of
-  the three candidate answers above, chosen because it was already the shipped behaviour and
-  because deleting the expansion before a detail surface existed would have taken `Log this meal`,
-  the ingredient breakdown and the macro split off the screen entirely. Two consequences to inherit:
-  the chevron is the rotating `ChevronDown` rather than artboard 3's `ChevronRight`, deliberately,
-  because the glyph has to describe what the tap does — **decide the destination here and the glyph
-  follows**; and the label/edit/delete trio now lives in *two* places (the swipe tray, and the
-  expanded panel that keeps them reachable without the gesture). If this becomes a screen, that
-  duplication resolves into artboard 4's bottom action row and should not be carried across.
-- **Verification.** Side by side against artboard 4 at 412 dp, enumerated per BF-28; device run.
-  If the outcome is "this stays a card, not a screen", that is an acceptable result — say so with the
-  reason and close the entry rather than building a route nobody navigates to.
-
 ### [nutrition] BF-31 — artboard 5 parity: Edit meal, and the batch footer that is its point
 
 - **Lane:** B

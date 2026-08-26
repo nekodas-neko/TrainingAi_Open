@@ -456,6 +456,13 @@ all of it under `colorScheme: 'light'` and was proven to fail without the fix.
 surfaces the provider cannot reach — the icon routes (no CSS) and any canvas paint. The sandbox
 emulates `prefers-color-scheme`; it does not run Samsung's WebView or its scheduled night mode.
 
+### [nutrition] ⚠️ A saved meal opens onto its own screen; the nested back gesture is unverified (BF-30, v1.378.0)
+
+Artboard 4 shipped as a **nested sheet** over the meal library, not a route and not the row
+expansion BF-29 left in place. On the S25: the back gesture now unwinds **three** layers (detail →
+library → screen), which rests on BF-27's one-press-per-layer guarantee; also check that a 92vh
+sheet's action row clears the gesture bar, and that a photo plus ten ingredients still scrolls.
+
 ### [nutrition][app-shell] ⚠️ The calorie surface: one budget, a progress bar, and one open cache-ordering bug (Q-415/Q-417/Q-323 fixed, LB-4 open, 2026-08-23)
 
 **Fixed in v1.335.0.** Home's nutrition card and the Nutrition ring both read `budgetProvenance(...).total` — the expression the provenance line under the bar already prints — instead of composing `nutrition_targets.calories` (the **rest-day floor**) plus a separately-sourced burn. Three budgets used to be on screen at once from the same data (2,180 / 2,451 / 2,001), which is how one card said "Goal reached" while the card two rows above said "166 kcal left". Macro bars now use `macroTargets.scaled`; the label says "from movement" ([`journal`](docs/overview/entries/2026-08-23-one-calorie-budget.md)).
@@ -1110,22 +1117,17 @@ emulates `prefers-color-scheme`; it does not run Samsung's WebView or its schedu
   against a serialised JSON body** — audit the divisions, or use a differential (numeric at n=many,
   `null` at n=1 while its input exists), never a string match on the response.
 - **By the correct method — auditing every mean-style division across `app/api`,
-  `packages/shared/src` and `lib/health` — there is no unguarded division.** The four that looked
-  unguarded from a grep each carry an explicit early return immediately above
-  (`health-trends:111`, `cardio-week:24`, `oura/hr-window:61`, `admin/program-export:51`); the rest
-  are ternary-guarded at the expression.
+  `packages/shared/src` and `lib/health` — there is no unguarded division.** The four that look
+  unguarded from a grep each carry an early return immediately above (`health-trends:111`,
+  `cardio-week:24`, `oura/hr-window:61`, `admin/program-export:51`); the rest are ternary-guarded.
 - **No route changed behaviour between zero data and one data point** — the useful half of the sweep.
-  Status distribution identical across both runs: 76–77 × 200, 33 × 403 (admin-gated), 11 × 400
-  (missing required param), 2 × 404, 3 × 5xx.
-- **All three 5xx are environmental and unchanged between runs:** `/api/download-apk` 502 (GitHub not
-  reachable from the sandbox), `/api/push/subscribe` 503 (VAPID unset), and
-  `/api/oura-ble/decoder-constants` 500 with an empty body (the vendored constants are deliberately
-  absent from the public repo). The last was **deliberately not filed**: the client's
-  `isUsable()` exists precisely to reject an error-shaped payload, and the decoder throws on an absent
-  table rather than producing plausible wrong numbers.
-- **`onRequestError` verified working.** It caught the bodiless 500 and wrote an `error_events` row
-  with the exact message — checked by querying the table after the run. The hook does what its comment
-  claims for the ~80 route files with no `catch`.
+  Identical status distribution across both runs: 76–77 × 200, 33 × 403, 11 × 400, 2 × 404, 3 × 5xx.
+  All three 5xx are environmental and unchanged: `/api/download-apk` 502 (GitHub unreachable from the
+  sandbox), `/api/push/subscribe` 503 (VAPID unset), `/api/oura-ble/decoder-constants` 500 with an
+  empty body (the vendored constants are deliberately absent from the public repo). The last was
+  **deliberately not filed** — `isUsable()` exists precisely to reject an error-shaped payload.
+- **`onRequestError` verified working.** It caught the bodiless 500 and wrote the `error_events` row
+  with the exact message, so the hook does what its comment claims for the ~80 catch-less routes.
 - **Not verified:** the APK, production, or the dynamic-segment (`[id]`) routes, which were excluded.
 
 ### [nutrition][platform] 🟠 A water quick-add replayed by the outbox triple-counts — the one non-idempotent mutation of nineteen (Q-481, 2026-08-18)
@@ -3917,23 +3919,19 @@ whether other recent nights hit the same bug during the same error bursts.
 
 ### [heart-rate][workouts] ✅ Per-set HR now records which device measured it (2026-08-05, v1.260.0)
 
-From the null-rate sweep — the follow-up the gap sweep named as its own blind spot. **847 columns
-across 69 tables**, one `count(col)` each: **49 are 100% null in a table that has rows.** Most were
-classified out (optional inputs, tombstones, frozen Cloud columns, and columns whose *input* is null
-rather than whose producer is missing — each checked against its writer). Two survived:
-`oura_daily_derived`'s ten always-null columns, which is the queued **Q-7b** confirmed and its count
-corrected from eight; and **`set_hr_stats.source`** — declared in migration 139, never written,
-never read, across 582 rows.
+From the null-rate sweep — **847 columns across 69 tables**, one `count(col)` each: **49 are 100%
+null in a table that has rows.** Most classified out (optional inputs, tombstones, frozen Cloud
+columns, and columns whose *input* is null rather than whose producer is missing — each checked
+against its writer). Two survived: `oura_daily_derived`'s ten always-null columns, which is the
+queued **Q-7b** confirmed with its count corrected from eight; and **`set_hr_stats.source`** —
+declared in migration 139, never written, never read, across 582 rows.
 
 `source` now records `chest_strap` / `oura_ble` / `mixed` per set. The data was always there —
-`getHrForWindow` selects it and the workout-level summary already used it; it just never reached the
-per-set rows. Reads the **working-set window only**, not the rest that follows (that is where the
-ring takes over if a strap comes off, and attributing it to the set would be wrong), and stays
-**null rather than `'unknown'`**.
-
-Why it matters: *"were those sets ring-only?"* is the first question asked of suspect per-set HR, and
-it is exactly what the still-open half of **Q-11** needs to answer about the sessions with zero
-attribution. Existing rows fill in via **Admin → Tools → "Backfill per-set HR stats"**.
+`getHrForWindow` selects it and the workout-level summary used it; it never reached the per-set rows.
+Reads the **working-set window only**, not the rest after it (where the ring takes over if a strap
+comes off), and stays **null rather than `'unknown'`**. *"Were those sets ring-only?"* is the first
+question asked of suspect per-set HR, and what the still-open half of **Q-11** needs. Existing rows
+fill in via **Admin → Tools → "Backfill per-set HR stats"**.
 
 Seven tests — five on the derivation, two DB round-trips. The round-trip pair earns its place:
 `workout_hr_stats` failed at exactly that seam, computed correctly and rejected by the column, while

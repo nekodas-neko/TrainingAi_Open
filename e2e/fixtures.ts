@@ -150,27 +150,31 @@ export async function enableHomeCards(page: Page, keys: string[]): Promise<void>
 }
 
 /**
- * Open a saved meal's row in the meal library so its own actions are on screen (BF-29).
+ * Open a saved meal from the library, landing on its own screen (BF-30).
  *
- * The row took artboard 3's shape — `name · items · calories · chevron` — and `Log this meal`,
- * `Edit …` and `Print a label for …` moved inside the expansion, because the drawing puts those on
- * a detail surface rather than on every row of a list. A spec that reaches for one of them opens
- * the row first. Idempotent: a row that is already open is left alone, so this is safe inside the
- * `toPass` retries these specs wrap their sheet-opening taps in.
+ * The row used to expand in place; it now opens `meal-detail-sheet.tsx` stacked over the list,
+ * which is where `Log this meal`, `Edit …`, `Print a label for …` and `Delete …` live. Specs that
+ * reach for any of those open the meal first. Idempotent — a meal already open is left alone.
  *
- * Matching is anchored to the START of the row's accessible name, which is the meal name followed
- * by its grey line and calorie figure. Unanchored, it would also match `Edit <meal>` and the swipe
- * tray's buttons once the row is open, and the locator would go strict-mode ambiguous exactly when
- * it had succeeded.
+ * Matching is anchored to the START of the row's accessible name (the meal name, then its grey line
+ * and calorie figure). Unanchored, it would also match `Edit <meal>` and the swipe tray's buttons,
+ * and the locator would go strict-mode ambiguous exactly when it had succeeded.
  */
-export async function expandSavedMeal(page: Page, mealName: string): Promise<void> {
+export async function openSavedMeal(page: Page, mealName: string): Promise<void> {
+  const opened = page.getByRole('button', { name: 'Log this meal' })
+  if (await opened.count() > 0) return
   const escaped = mealName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
   const row = page.getByRole('button', { name: new RegExp(`^${escaped}`) }).first()
   await expect(row).toBeVisible({ timeout: 30_000 })
-  if (await row.getAttribute('aria-expanded') === 'true') return
   const box = (await row.boundingBox())!
   await page.touchscreen.tap(box.x + box.width / 2, box.y + box.height / 2)
-  await expect(row).toHaveAttribute('aria-expanded', 'true', { timeout: 10_000 })
+  await expect(opened).toBeVisible({ timeout: 10_000 })
+  // **`toBeVisible()` is true the instant the sheet mounts, which is 500 ms before it arrives.**
+  // `SheetContent` slides in over `duration-500`, so a caller that measures a `boundingBox()` right
+  // after this gets a position the element is still travelling through — measured at y=1127 on a
+  // 915 px viewport, where `elementFromPoint` returns nothing and a coordinate tap silently hits
+  // the void. `toBeInViewport` is the assertion that waits for the animation rather than the mount.
+  await expect(opened).toBeInViewport()
 }
 
 /**
