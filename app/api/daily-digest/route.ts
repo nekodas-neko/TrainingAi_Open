@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { getRepository } from '@/lib/data'
+import { readSameDayInsights, SAME_DAY_GUIDANCE } from '@/lib/ai/same-day-context'
 import { describePersonalRecord } from '@trainingai/shared/1rm'
 import { generateText } from 'ai'
 import { aiModel, loggedGenerateText } from '@/lib/ai/instrument'
@@ -139,6 +140,11 @@ export async function POST(req: Request) {
     }
   }
 
+  // Q-291: inside the hash, not appended to the prompt afterwards. Anything the model sees has to
+  // be hashed, or a digest cached this morning is served against an insight written since.
+  const sameDay = await readSameDayInsights(repo, userId, todayIso)
+  if (sameDay) lines.push(sameDay)
+
   const context = lines.join('\n')
   const contextHash = hashInsightContext(context)
 
@@ -157,7 +163,7 @@ export async function POST(req: Request) {
       { section: 'daily-digest', userId, fingerprint: { date: todayIso, contextHash } },
       () => generateText({
         model: aiModel(),
-        prompt: `You are a personal training coach. Write a 2-3 sentence end-of-day check-in — a quick reflection, not a report. Cover what stands out most (training, nutrition, or how the day compared to the morning check-in). Be specific, warm, and brief. Use the data below — quote its numbers, never invent or recompute any. If a line below flags a domain's logging coverage as sparse, do not give corrective advice for that domain (e.g. telling the user to eat more or less of something) — one day's numbers do not support it; mention that domain only in passing, if at all.\n\n${PROSE_GUARDS}\n\n${context}`,
+        prompt: `You are a personal training coach. Write a 2-3 sentence end-of-day check-in — a quick reflection, not a report. Cover what stands out most (training, nutrition, or how the day compared to the morning check-in). Be specific, warm, and brief. Use the data below — quote its numbers, never invent or recompute any. If a line below flags a domain's logging coverage as sparse, do not give corrective advice for that domain (e.g. telling the user to eat more or less of something) — one day's numbers do not support it; mention that domain only in passing, if at all.\n\n${PROSE_GUARDS}${sameDay ? `\n\n${SAME_DAY_GUIDANCE}` : ''}\n\n${context}`,
         maxRetries: 0,
       }),
     ))
