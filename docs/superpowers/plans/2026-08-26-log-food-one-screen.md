@@ -70,6 +70,33 @@ Merge `FoodLibrarySheet` into the saved-meals list and rename in the same PR.
   wrong box and failed three assertions later (LA-30). Whatever replaces the grid, have the spec
   wait for the destination's own copy before touching it.
 
+## Two things found while starting it, both of which change the shape
+
+**1. A food's tap destination lives in the other half.** `FoodLibrarySheet`'s `onSelect` runs
+`handleLibrarySelect` → `pushStep('assign')`: tapping a food does **not** log it, it goes to the
+assign step to pick a meal type and a quantity. That step exists only inside `FoodLoggerSheet`. A
+saved meal's tap opens `meal-detail-sheet.tsx`, which `SavedMealsSheet` owns. So the merged list has
+two tap destinations that currently live in two different parents, and `/nutrition`'s **Saved Meals**
+button opens `SavedMealsSheet` directly — where a food tap would have nowhere to go.
+
+**Decided: the merged list lives in `FoodLoggerSheet`**, the only parent where both destinations
+exist, and `/nutrition`'s Saved Meals button opens the food logger onto it. Reversal is moving one
+component back and restoring one call site. The alternative — logging a food at one serving straight
+from the list when no assign step is available — was rejected because the same row would then behave
+differently depending on which button opened the sheet, which is the confusion this entry exists to
+end.
+
+**2. "Most-recently-used" is not available, and cannot be without a schema change.** `food_logs`
+carries **no `saved_meal_id`** — logging a saved meal writes individual food rows and leaves no
+record of which meal produced them, so **a saved meal has no last-used timestamp at all**. (The
+`saved_meal_id` that does exist is on `meal_plan_meals`, which is plan linkage, not a log.)
+`searchFoodItems` orders by `createdAt DESC, limit 20`.
+
+**So order both by `createdAt DESC`** — the only recency signal the two entities share — and say so.
+It still serves the requirement's stated purpose, *"so the merge does not bury saved meals"*, because
+a newly-saved meal sorts to the top. **True MRU needs `food_logs.saved_meal_id`, which is Lane A's**
+and should be filed separately if the ordering turns out to matter in use.
+
 ## Not decided here
 
 Whether the merged list keeps two row shapes forever, or whether a saved meal eventually renders as
