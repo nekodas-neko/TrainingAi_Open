@@ -175,6 +175,29 @@ the **connect handshake**: subscribe both notify characteristics, wait two secon
 `0x04` → date/time `0x01` → preferences → **battery last**. A bare battery request on a fresh
 connection is not what the working client does.
 
+## Every protocol hypothesis died; the remaining ones are about device state
+
+The handshake was sent — phone name, then find-device — with both notify characteristics
+subscribed. No notification, no blink. Reading the rest of the working client closed the last two
+protocol doors: `getBondingStyle()` returns `BONDING_STYLE_NONE`, so no bond is required, and
+`ColmiR09Coordinator.getSupportedDeviceName()` is `Pattern.compile("R09_.*")`, which matches
+`R09_C400`. Write type, checksum, service and opcode were already eliminated.
+
+That is a useful place to arrive at, because it says to stop testing the protocol. Two candidates
+remain and both are about the ring rather than the bytes.
+
+The ring may never have finished its first-activation charge — Colmi specifies more than an hour to
+green, and the enumeration started about thirty minutes after unboxing. And the application
+processor may simply be asleep: every read that has worked so far (device info, the CCCD) is served
+by the **BLE stack**, whereas executing a command needs the **application MCU**, which these rings
+power-gate hard. `CLAUDE.md` already records the identical behaviour for the Oura — wakes on
+charger, worn and moving, or during sleep — so a ring lying still on a desk is the worst case for
+this test. Retry on the charger or worn.
+
+Also noted for next time: nRF Connect's Value field shows what was *sent*, not what the peer
+accepted. The log behind the floating button carries the ATT results and errors, and not reading it
+earlier left a gap that three rounds of probing could not close.
+
 ## Deployment shape
 
 No APK. `lib/live-hr/chest-strap-source.ts` already does the full BLE cycle in TypeScript in the

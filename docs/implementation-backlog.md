@@ -415,6 +415,15 @@ tuple makes a shared-table write a *compile error*, which is stronger than anyth
   surviving explanation is the **connect handshake**: subscribe both notify chars, wait 2 s, then
   phone name `0x04` → date/time `0x01` → preferences → **battery last**. Next probe sequence with
   exact hex is in §11c-resolved.
+- **Handshake sent, still silent — every protocol hypothesis now eliminated (§11c-exhausted).**
+  Phone name and `0x50` find-device written to V1 with both notify chars subscribed: no reply, no
+  blink. Bonding ruled out (`getBondingStyle()` → `BONDING_STYLE_NONE`) and device match confirmed
+  (`getSupportedDeviceName()` → `R09_.*`). What remains is **device state**: the ring may not have
+  had its >1 h first-activation charge (Colmi FAQ; enumeration started ~30 min after unboxing), and
+  its **application MCU may be asleep** — every successful read so far is served by the BLE stack,
+  while a command needs the app processor, and `CLAUDE.md`'s Oura section documents exactly this
+  power-gating. **Retry on the charger or worn-and-moving**, and read the nRF Connect log for ATT
+  errors the Value line hides.
 - **Next action is to install Gadgetbridge (§11d)** — open-source, no vendor cloud, no firmware
   push. It settles framing end-to-end, and if it yields **sleep and skin temperature** on this unit
   it both confirms §4's Phase 6 is achievable and names the codebase to port from. Reversible.

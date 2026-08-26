@@ -567,6 +567,43 @@ Note the date/time encoding: `Byte.parseByte(String.valueOf(n), 16)` reads the *
 *hex*, i.e. BCD. Year is `now % 2000`, so 2026 → `0x26`. Adjust bytes 4–6 to the actual clock time
 before sending; being a few minutes out is harmless for a probe and Gadgetbridge resets it anyway.
 
+### 11c-exhausted. The handshake was sent and the ring still says nothing — 2026-08-26
+
+Phone name (`04020a…99`) and find-device (`0x50`) both written to V1 RX with both notify
+characteristics subscribed. No notification, no blink. **Every protocol-side explanation is now
+eliminated from the working client's own source:**
+
+| Candidate | Verdict | Evidence |
+|---|---|---|
+| Write type | eliminated | Gadgetbridge issues a plain Write Request |
+| Checksum | eliminated | both conventions agree below 255 |
+| Wrong service | eliminated | both V1 and V2 tried; Gadgetbridge uses both |
+| Wrong opcode | eliminated | `0x04`/`0x50` are Gadgetbridge's own constants |
+| **Bonding** | **eliminated** | `AbstractYawellRingCoordinator.getBondingStyle()` → **`BONDING_STYLE_NONE`** |
+| **Device match** | **eliminated** | `ColmiR09Coordinator.getSupportedDeviceName()` → `Pattern.compile("R09_.*")`, and the ring is `R09_C400` |
+
+**When every protocol hypothesis is dead, the remaining ones are about the device's state.** Two,
+both cheap, and the second is a pattern this repo already documents for the Oura:
+
+1. **The ring may not be fully activated.** Colmi's FAQ specifies **more than an hour** on the
+   charger, until the indicator turns green, to activate a factory-fresh ring. The enumeration began
+   ~30 minutes after unboxing. A partially-activated ring can plausibly advertise and serve GATT
+   while its application firmware has never completed first boot.
+2. **The application MCU may be asleep.** Every read that has succeeded — device info, the CCCD —
+   is served by the **BLE stack**. Executing a command needs the **application processor**, and
+   these rings power-gate it hard. `CLAUDE.md`'s Oura section records the same behaviour: *"The ring
+   radio/PPG sleeps when worn-idle — wakes on charger, worn+moving, or during sleep."* A ring lying
+   still on a desk is the worst case. **Put it on the charger, or wear it and move, then retry.**
+
+**And read the nRF Connect log** — the floating button, bottom right. It timestamps every ATT
+operation and shows write results and errors (`GATT ERROR`, status 133, etc.) that the Value line
+does not. The Value field updates from what was *sent*; it is not proof of what the ring *accepted*.
+
+**Stop hand-driving after this.** The remaining differences between nRF Connect and Gadgetbridge are
+connection parameters, MTU negotiation, transaction sequencing and retry — precisely the things a
+device-support class exists to get right and a manual GATT explorer does not attempt. Continuing to
+poke by hand is now the expensive path to an answer §11d gets for free.
+
 ### 11d. Gadgetbridge is the reference implementation, and it should be installed next
 
 Given #4491, the fastest way to settle framing, sleep, and temperature at once is to install
