@@ -784,6 +784,7 @@ export interface WorkoutRepository {
   // contextHash lets a non-forced request recompute the cheap deterministic context and only
   // serve the cache when it matches — see NUT-7 (daily-digest staleness).
   getAiHealthInsightWithHash(userId: string, section: string, date: string): Promise<{ insight: string; contextHash: string | null } | null>
+  listAiHealthInsightsForDate(userId: string, date: string): Promise<{ section: string; insight: string }[]>
   upsertAiHealthInsight(userId: string, section: string, date: string, insight: string, contextHash?: string): Promise<void>
   deleteAiHealthInsight(userId: string, section: string): Promise<void>
 
