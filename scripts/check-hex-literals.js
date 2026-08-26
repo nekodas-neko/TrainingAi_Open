@@ -93,7 +93,6 @@ const BASELINE = {
   'components/more/stats-grid.tsx': 2,
   'components/muscle-heatmap.tsx': 8,
   'components/nutrition/end-of-day/scale-selector.tsx': 2,
-  'components/nutrition/ingredient-search.tsx': 1,
   'components/nutrition/meal-macro-bars.tsx': 2,
   'components/nutrition/supplements-section.tsx': 1,
   'components/nutrition/weekly-nutrition-chart.tsx': 1,

@@ -72,3 +72,55 @@ test('the library sheet lists foods in the shared row, calories in their own col
   // Right-aligned: the cell ends within a chevron's width of the row's right edge.
   expect(rowBox.x + rowBox.width - (cellBox.x + cellBox.width)).toBeLessThan(40)
 })
+
+/**
+ * The LAST call site: the external food-database result (Q-406).
+ *
+ * It stayed a bespoke `<button>` after the other three converted, because the decided warning design
+ * sent its sentence to the food's detail and **this surface has none** — the tap adds the food
+ * outright. The owner's answer (2026-08-26) was to keep the sentence in the row, which is what makes
+ * the conversion buildable at all.
+ *
+ * The search is stubbed rather than driven: it reaches Open Food Facts, so a live run would be
+ * non-deterministic and offline-fragile — which is why this row had no e2e cover at all.
+ */
+test('the external food-database row is the shared row, and keeps its mismatch warning', async ({ page }) => {
+  // Deliberately inconsistent: 96 kcal against macros that come to ~122. That is the real shape the
+  // warning exists for — a database filled in field by field by different contributors.
+  await page.route('**/api/nutrition/food-search**', route => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify({ results: [{
+      externalId: 'spec-off-1', name: 'Spec Mismatch Yoghurt', brand: 'Spec Dairy',
+      calories: 96, proteinG: 9, carbsG: 12, fatG: 4, servingSizeG: 100,
+    }] }),
+  }))
+
+  await page.goto('/nutrition')
+  await settleRouteBoundary(page)
+  await tap(page, page.getByRole('button', { name: 'Log Food' }))
+  await tap(page, page.getByRole('button', { name: 'My Foods' }).first())
+
+  // Into the builder, where the ingredient picker's search lives.
+  await tap(page, page.getByRole('button', { name: /^(New|Build your first meal)$/ }).first())
+  const search = page.getByPlaceholder(/search/i).first()
+  await expect(search).toBeVisible({ timeout: 30_000 })
+  await search.fill('spec mismatch')
+
+  const row = page.getByRole('button', { name: /Spec Dairy — Spec Mismatch Yoghurt/ }).first()
+  await expect(row).toBeVisible({ timeout: 30_000 })
+
+  // Shared shape: calories in their own right-hand column, not inline in the grey line.
+  const calorieCell = row.locator('span.tabular-nums')
+  await expect(calorieCell).toHaveCount(1)
+  await expect(calorieCell).toContainText('96')
+
+  // And the warning the owner chose to keep here — the sentence, not just an icon. An icon alone
+  // has no hover on a phone, so it would have carried no explanation at all.
+  await expect(row).toContainText('Its macros and calories disagree')
+
+  // The macros stay readable beside it: the rows carrying a mismatch are exactly the rows where you
+  // want to judge the numbers yourself, which is what ruled out replacing this line.
+  await expect(row).toContainText('9P')
+})
+

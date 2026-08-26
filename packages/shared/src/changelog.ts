@@ -13,6 +13,13 @@ export const CHANGELOG: ChangelogEntry[] = [
     ],
   },
   {
+    version: "1.383.5",
+    date: "2026-08-26",
+    changes: [
+      "Food-database results in the meal builder now match every other food list in the app \u2014 same row, calories in their own column so a list of them lines up. The warning on products whose macros and calories disagree stays where it was, in the row and in words: those are exactly the rows where you want to read the numbers and judge for yourself. Tapping a result still adds it; the separate + button is gone because the tap was always the add.",
+    ],
+  },
+  {
     version: "1.383.4",
     date: "2026-08-26",
     changes: [
