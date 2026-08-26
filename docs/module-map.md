@@ -453,7 +453,7 @@ check `components/ui/` first** (`CLAUDE.md` visual-consistency rules).
 |---|---|
 | Count-up animation | `lib/hooks/use-count-up.ts` |
 | Back / fallback nav | `lib/hooks/use-back-or-fallback.ts` |
-| Sheet back-dismiss | `lib/hooks/use-sheet-back-dismiss.ts` |
+| Sheet back-dismiss | `lib/hooks/use-sheet-back-dismiss.ts` (React wiring) → `lib/hooks/sheet-back-stack.ts` (**the decision logic — when to close, whether a pop is one of ours, how deep a surface sits**; module-level stack and self-pop counter, unit-tested against the sibling/nested/StrictMode sequences) |
 | Roving tabindex + arrow keys for a `role="radiogroup"` | `lib/hooks/use-roving-radio-group.ts` — a hook, not a component: the 8 call sites render 5 different shapes, so what they share is behaviour. Selection is delegated by clicking the target, so each site keeps its own semantics (Q-350). |
 | Pin a scroll panel to its newest content | `lib/hooks/use-scroll-to-bottom.ts` — ref goes on the `overflow-y-auto` element. **Never `scrollIntoView` a sentinel child**: it scrolls every scrollable ancestor including the document, so an appending panel drags the whole page (Q-532). |
 | Edit/delete a day's logged exercise, session or activity | `lib/hooks/use-day-entry-mutations.ts` — the four write handlers plus their dialog state, shared by `/health/day` and `health-content.tsx` so there is one write path per domain (LB-1). Each mirrors into the local store and clears the caches **before** the caller refetches; `onChanged(date)` is that refetch. |

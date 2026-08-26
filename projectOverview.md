@@ -24,7 +24,7 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.383.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Version:** v1.383.1 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-08-26.
 
 **A food item can hold a picture now, and it survives offline (BF-35, engine half).** A barcode scan
@@ -58,6 +58,8 @@ cosmetic: last-wins is exact only for a bare `excluded.*` arm, and three of the 
 would have turned a loud 21000 into a silent field loss. **Owner decisions the same day:** readiness
 history is **recomputed**, not frozen, when a model is recalibrated (reversing 2026-08-24); the
 Coach's mid-program exercise swap is to be **restricted** — see Q-403.
+
+**The delete button that opened a confirmation and closed it in the same instant (BF-34).** The owner: *"the delete feature doesnt work"*, then the detail that decided it — *"it opens up the confirm dialog; but then instantly minimizes so we cant click it."* The diary's bin closes its sheet and opens the dialog in ONE TICK, so the sheet's `history.back()` was still in flight when the dialog mounted; the flag marking *"this pop is ours"* was **per-instance**, invisible to the dialog that received it, and a state that is not mine is indistinguishable from a real back gesture. **Since BF-27 put `BackDismiss` in every sheet and dialog, that was every close-one-open-another transition in the app** — this delete was just the first one pressed. Module-level counter now, consumed by whichever surface gets the pop; one listener owns the stack. **Two corrections to the entry's own analysis:** its "share the flag" fix has an ordering trap — `absorb` is registered by the *closing* sheet, so it runs first and would clear a shared boolean too early — and **LB-17 did not fix this** despite changing the same line hours earlier (that was the *nested* case; this is the *sibling* case). The logic now lives in `lib/hooks/sheet-back-stack.ts` with the hook reduced to wiring, because all three failures it has carried were in *when to close* and none was reachable from a test inside an effect. **The sibling sequence cannot be staged through the web UI at all** — the bin is not even actionable in Chromium — so an attempted repro produced a mis-aimed tap that closed the sheet without opening the dialog, which reads exactly like the bug. Seven tests drive it directly; reverting to the per-instance flag fails both sibling tests and the StrictMode one ([`journal`](docs/overview/entries/2026-08-26-sibling-sheet-back-dismiss.md)).
 
 **Two food lists became one, and the back gesture turned out to be wrong at three layers (Q-395c).** The owner asked what the difference between *My Meals* and *My foods* was; there wasn't one a user could hold — one listed `saved_meals`, the other `food_items`, and which list a thing was in came down to how it had been added. They are **one list called My Foods** now, newest-first across both sources, with two row shapes because a food's tap opens the assign step and a meal's opens its own screen. `food-library-sheet.tsx` is deleted. **MRU was asked for and is unavailable:** `food_logs` carries no `saved_meal_id`, so a saved meal has **no last-used timestamp at all** — `createdAt DESC` is the only recency signal the two share, and true MRU needs a Lane A column. **Routing the list through the logger made the app's first three-deep sheet nest, and one back press closed two layers.** `useSheetBackDismiss` decided "my entry is gone" by comparing the arriving `sheetId` against its own, so every sheet that was not the one landed on closed itself — right by accident at two layers, wrong at three, where back lands on the *middle* sheet's entry and the *bottom* one reads a foreign id. "Gone" is a **depth** now. The symptom in Playwright was `element was detached from the DOM` on a button just asserted visible, which reads as animation timing and is not; instrumenting `pushState`/`back`/`popstate` is what settled it ([`journal`](docs/overview/entries/2026-08-26-one-food-list.md)).
 
@@ -134,11 +136,7 @@ r = +0.67 into r = −0.06 and stood in the docs for eleven days.
 
 **Five exercises now record the muscles their sibling movement already had (BF-16a).** A cable chest dip left out the shoulders, a dumbbell shoulder press the traps, a cable pulldown the upper back, a barbell shrug the upper back and forearms, and a barbell hip thrust the quads, lower back and adductors. That is the real defect behind *"hip thrusts and dumbbell shoulder press should be able to be a secondary"* — the role rule reads muscle counts and BF-15's anchor rule wants ≥ 3, so a row seeded with two was barred whatever the thresholds said. **The entry's premise was wrong in one way that mattered:** it called this production drift, and it is a defective *seed* — all 140 seeded rows fingerprint identically in the dev DB and production, so it reproduces locally and was proved through the live `/api/weekly-muscle-sets` route rather than reasoned about. Migration **216**, idempotent and case-insensitive. **The scan found eight more rows with the same shape; they are LA-24**, split into the five that a family member already answers and the three families where BF-16a's own additions have no precedent to propagate.
 
-**Lane B's 2026-08-25 run — 19 PRs — is written up in
-[`docs/handoff-2026-08-25-platform-lane-b-nineteen-prs.md`](docs/handoff-2026-08-25-platform-lane-b-nineteen-prs.md).**
-Read it with the baton at `docs/agents/state/implementation-lane-b.md` before taking a Lane B item:
-the entire Lane B surface was traversed and every remaining candidate is gated, declined, parked,
-needs hardware, or wants a plan first. **Nothing that run shipped is device-verified.**
+**Lane B's 2026-08-25 run — 19 PRs — is written up in [`docs/handoff-2026-08-25-platform-lane-b-nineteen-prs.md`](docs/handoff-2026-08-25-platform-lane-b-nineteen-prs.md).** Read it with the baton at `docs/agents/state/implementation-lane-b.md` before taking a Lane B item: the entire Lane B surface was traversed and every remaining candidate is gated, declined, parked, needs hardware, or wants a plan first. **Nothing that run shipped is device-verified.**
 
 **There were two quantity sheets and the busier one was wrong (BF-26).** The owner's *"everything looks the same"* was literally true of the diary's: its `−`, value and `+` were the same square at the same fill. Both sheets render one `quantity-editor.tsx` now — `srv`/`g`, absolute presets, `MACRO_COLORS`. **And a font-size class on an `<input>` does nothing on a phone:** `globals.css` sets `16px !important` under 640 px for the iOS-zoom guard, so the value needed `!text-2xl` to outgrow its steppers at all. Only two other inputs carry a size class and both want ≤16 px, so it is narrow — but silent ([`journal`](docs/overview/entries/2026-08-25-quantity-sheet-convergence.md)).
 
@@ -556,25 +554,25 @@ meal row now carries a 40 px tile: the photo if there is one, a gradient-and-gly
 mishandled before — check a long day for artefacts and jank. The day screen's tile is always the
 placeholder today; `food_items` has no image column, so only saved meals can carry a photo.
 
-### [nutrition][app-shell] ⚠️ A saved meal opens onto its own screen, and the nest that reaches it is now four deep (BF-30 v1.378.0 · LB-17 v1.382.0)
+### [nutrition][app-shell] ⚠️ One back-dismiss primitive, three failures, and a device pass none has had (BF-30 v1.378.0 · LB-17 v1.382.0 · BF-34 v1.383.1)
 
-Artboard 4 shipped as a **nested sheet** over the meal library, not a route and not the row
-expansion BF-29 left in place. **This row said the unwind "rests on BF-27's one-press-per-layer
-guarantee", and that guarantee did not hold** — `useSheetBackDismiss` compared the arriving
-`sheetId` against its own, so every sheet but the one landed on closed itself. Correct at two
-layers by accident, wrong from three, which is exactly what Q-395c built by reaching the list
-through Log Food. Fixed in v1.382.0 (each entry carries its depth) and pinned by an e2e case that
-fails on the old comparison — **but a real back gesture on a real gesture bar is still unproven.**
-**BF-29's swipe is folded in here** (v1.376.0) — same screen, same single device pass, and its
-heading still said *My Meals*. Row actions are reached by **dragging a row left**, a gesture this app
-had nowhere else; e2e drives it with real CDP touch events so the handler is proven to fire, but
-**no sandbox can prove it coexists with the Samsung WebView's own scroll physics.**
+Artboard 4 shipped as a **nested sheet**, and this row said its unwind "rests on BF-27's
+one-press-per-layer guarantee". **That guarantee has now failed twice.** LB-17: an id comparison read
+every entry that was not a sheet's own as "mine is gone" — right at two layers by accident, wrong
+from three, which is what Q-395c built by reaching the list through Log Food. BF-34: the flag marking
+one of our own `history.back()` calls was per-instance, so a sheet closing and a dialog opening in
+the same tick could not see each other's and **the confirm dialog closed on the frame it opened** —
+the owner's *"the delete feature doesnt work"*. Both fixed, both pinned by tests that fail on the old
+logic. **Neither has been felt on a real gesture bar, which is the only place either lived.**
+**BF-29's swipe folds in here** (v1.376.0) — same screen, one device pass. Row actions come from
+**dragging a row left**, a gesture this app had nowhere else; e2e drives it with real CDP touch
+events so the handler fires, but **no sandbox proves it coexists with Samsung's scroll physics.**
 
-On the S25: press back from an open meal and watch it unwind **one layer per press** — meal → the
-My Foods list → Log Food → the page — with nothing skipping two. Scrolling the list vertically must
-never reveal a tray; a deliberate left-drag opens one and a right-drag closes it; opening a second
-row closes the first; tray `Delete` raises the confirmation rather than deleting. Also check that a
-92vh sheet's action row clears the gesture bar, and that a photo plus ten ingredients still scrolls.
+On the S25: tap a diary row, tap the bin — the confirm dialog must **stay** open and be tappable, and
+Cancel must cancel. Press back from an open meal and watch it unwind **one layer per press** — meal →
+My Foods → Log Food → the page — nothing skipping two. Scrolling the list must never reveal a tray; a
+left-drag opens one and a right-drag closes it; opening a second row closes the first. And a 92vh
+sheet's action row must clear the gesture bar.
 
 ### [nutrition][app-shell] ⚠️ The calorie surface: one budget, a progress bar, and one open cache-ordering bug (Q-415/Q-417/Q-323 fixed, LB-4 open, 2026-08-23)
 
