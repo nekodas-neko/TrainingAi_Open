@@ -932,37 +932,37 @@ whether or not anyone draws them first.
   in both themes, so a green `pnpm dev` is not sufficient evidence and a Known-Issues row is the
   fallback if no device is available.
 
-### [nutrition][app-shell] Q-395c — phase 4: Log Food becomes one screen, and `My Foods` becomes one name
+### [nutrition][app-shell] Q-395c — one list, one name: merge My Foods into Saved Meals
 
 - **Lane:** B
-- **Spec:** Q-395, findings 15 and 17 — **and BF-28**, because this entry is also **artboard 2
-  parity**: `Add food` is the drawing of the screen it builds. Read that artboard alongside the
-  findings.
-- **⚠ Where the drawing and the owner disagree, the owner wins, and here they do.** Artboard 2 draws
-  **four** tabs — `Recent · Frequent · My meals · Recipes`. The decision below is **two**. Build two.
-  The artboard also draws a bottom row of `Multi-add` and `Create food`, which is the same idea as
-  the decided `Photo · Barcode · Describe or enter` action row under a different set of labels —
-  reconcile them in the PR rather than shipping both rows.
-- **Scope.** The capture step's six scattered entry points collapse to one screen: search across
-  everything · two tabs · a bottom row of capture actions.
-- **The decided details, all owner-set:** tabs are **`Recent` and `My Foods`**, two not four
-  (`Frequent` was a second ordering of what `Recent` already shows). Action row ordered **Photo ·
-  Barcode · Describe or enter**. Describe and manual entry are one sheet with the fields always
-  visible, so neither is a hidden mode. `My Foods` rows carry their P/C/F split beside the calorie
-  column; the label/QR and full breakdown stay inside the meal.
-- **⚠ The merge is a RENAME as well as a merge, and the rename must be swept in one pass.** Saved
-  meals and My Foods become one list. The owner caught the half-done version immediately — *"So im
-  picking up a discrepancy between My Meals and My foods? Whats the difference"* — and there is no
-  difference, which is the point. **Two names for one list is the defect.** Grep every user-facing
-  occurrence of *Saved meals*, *My Meals* and *My Foods* — sheet titles, tab labels, empty states,
-  toasts, `+ Add food` destinations, nav copy — and land on the single name together. A surface left
-  on the old name reads as a second list that is missing rows.
-- **⚠ Diff `FoodLibrarySheet` against `SavedMealsSheet` before merging them.** Carry every action
-  across — bulk delete, meal-plan linkage, the label path — or say in the PR which was dropped.
-  Order `My Foods` most-recently-used first so the merge does not bury saved meals.
-- **Verification.** As Q-395a, plus a grep proving nothing user-facing still says *Saved meals* or
-  *My Meals*.
+- **Plan:** [`2026-08-26-log-food-one-screen.md`](superpowers/plans/2026-08-26-log-food-one-screen.md).
+  **Narrowed 2026-08-26** — the capture screen split out as **LB-16**. ID and references unchanged.
+- **The finding that forced the split:** the two lists hold **different entity types** —
+  `food_items` (tapping **adds**) and `saved_meals` (tapping **opens** its screen, BF-30). "One
+  list" is one list over **two sources**, two row shapes and two tap behaviours, not a rename over a
+  shared shape. **The rename rides here and cannot go first**: renaming both while they are still
+  two lists gives the user two lists with one name, which is worse than today. 15 occurrences over 8
+  files — the rename is small; the merge is the work.
+- **Carry every action across** — bulk delete, meal-plan linkage, the label path — or say which was dropped. Order most-recently-used first so the merge does not bury saved meals.
+- **⚠ The `My Foods` P/C/F column is the question Q-406 is parked on** — it wants the shared row to
+  grow a per-screen column, the slot Q-406 rules out. Do not add the prop unilaterally.
+- **Verification.** A grep proving nothing user-facing says *Saved meals* or *My Meals*; e2e that one
+  list shows both kinds, each tap does its own thing, and bulk delete and the label path still work.
 
+### [nutrition][app-shell] LB-16 — the capture screen: six entry points become one
+
+- **Lane:** B
+- **Needs:** Q-395c — the `My Foods` tab **is** the merged list, so building this first builds it twice.
+- **Added:** 2026-08-26, split out of Q-395c. **Plan:** [`2026-08-26-log-food-one-screen.md`](superpowers/plans/2026-08-26-log-food-one-screen.md).
+  Also **artboard 2 parity** (BF-28): `Add food` is the drawing of the screen this builds.
+- **Scope.** `capture-step.tsx`'s six tiles collapse to one screen — search across everything, two
+  tabs (`Recent`, `My Foods`), an action row **`Photo · Barcode · Describe or enter`**.
+- **⚠ Where the drawing and the owner disagree, the owner wins.** The artboard draws **four** tabs;
+  build **two**. Its `Multi-add` / `Create food` row is the decided action row under other labels.
+- **Describe and manual entry are one sheet** with the fields always visible, so neither is hidden.
+- **⚠ A coordinate tap that misses a capture tile opens its neighbour**, and `History`'s dialog has a
+  textbox that looks like the describe field — an e2e spec filled the wrong one and failed three
+  assertions later (LA-30). Wait for the destination's own copy before touching it.
 ### [nutrition] BF-11 — the meal creator/planner redesign: the spec every phase reads, and the final checkpoint
 
 - **Needs:** BF-11h
