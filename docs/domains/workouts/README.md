@@ -27,6 +27,14 @@ Mode flow and the orchestrator pattern are documented in [`CLAUDE.md`](../../../
 
 ## Reference docs
 
+- [`docs/superpowers/plans/2026-08-26-camera-form-capture.md`](../../superpowers/plans/2026-08-26-camera-form-capture.md)
+  — **design only, nothing built (PS-7, 2026-08-26).** Camera on a tripod → on-device pose
+  landmarks → stick-figure playback of a set, with the bar path taken from the wrist midpoint.
+  Camera frames never reach disk or the network; landmarks stay in device SQLite on a 14-day
+  window; only a ~1 KB-per-set numeric summary reaches Postgres. Carries the storage arithmetic,
+  the hands-free capture state machine, and four rejected alternatives (native capture layer
+  first, a pose model on `onnxruntime-web`, stored GIFs, a Wear OS remote). Only the Phase 0
+  feasibility spike is queued.
 - [`docs/reviews/2026-08-20-rpe-prefill-mapping-fit.md`](../../reviews/2026-08-20-rpe-prefill-mapping-fit.md)
   — **Q-423 REFUTED, 2026-08-20.** `defaultRpeFromPct`'s `clamp(floor(pct/10), 6, 10)` is the
   **modal rating at all sixteen observed `planned_pct` values**, covering 313 of 313 sets; `round`
