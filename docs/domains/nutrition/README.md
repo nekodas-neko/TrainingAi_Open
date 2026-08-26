@@ -187,6 +187,13 @@ Live at the time of writing (2026-07-30):
 
 ## History
 
+- **[`docs/overview/entries/2026-08-26-build-a-meal-add-methods.md`](../../overview/entries/2026-08-26-build-a-meal-add-methods.md)**
+  — 🆕 **BF-11c**: Build a Meal takes a pasted **recipe link**, and a page holding several dishes
+  asks which to keep (each becomes its own saved meal). **⚠ Read this before touching any recipe
+  import**: `/api/nutrition/scan` **divides before it answers**, so a page stating *makes 12* arrives
+  as one slice — a caller that then sets `servings: 12` logs a twelfth of a slice. The decision is
+  [`recipe-import.ts`](../../../components/nutrition/recipe-import.ts) → `recipeBuilderPatch`, with
+  tests. Also: the picker's default list was never missing, only unlabelled.
 - **[`docs/overview/entries/2026-08-26-log-food-one-screen.md`](../../overview/entries/2026-08-26-log-food-one-screen.md)**
   — 🆕 **LB-16 + BF-37**: Log Food is **one screen** — no tile grid, a
   `Recent · Meals · Single foods` tab strip and a `Photo · Barcode · Describe or enter` action row

@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { cachedFetch, readCacheSync } from '@/lib/sqlite/cache'
 import { TTL_MEDIUM } from '@trainingai/shared/cache-ttl'
 import { perServing, sumIngredients } from '@trainingai/shared/nutrition/scan-totals'
+import { asHttpsUrl, hostOf } from './recipe-url'
 import type { SavedMeal, NutritionIngredient } from '@trainingai/shared/types/nutrition'
 
 /**
@@ -319,31 +320,6 @@ export function MyMealsPicker({
       </div>
     </div>
   )
-}
-
-/**
- * The input as an `https:` URL, or null.
- *
- * Parsed with `new URL()` and compared on `protocol`, never matched as a prefix string — the route
- * rejects every other scheme outright (`http:`, `file:`, `data:`), so anything else has to fall
- * through to the text branch rather than be sent and refused.
- */
-function asHttpsUrl(text: string): string | null {
-  try {
-    const u = new URL(text)
-    return u.protocol === 'https:' ? u.toString() : null
-  } catch {
-    return null
-  }
-}
-
-/** The site's name, as a placeholder until the recipe's own name comes back. */
-function hostOf(url: string): string {
-  try {
-    return new URL(url).hostname.replace(/^www\./, '')
-  } catch {
-    return url
-  }
 }
 
 function replaceByText(list: TypedMeal[], text: string, next: TypedMeal): TypedMeal[] {

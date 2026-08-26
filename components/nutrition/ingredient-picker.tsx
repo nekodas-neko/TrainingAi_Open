@@ -2,11 +2,14 @@
 
 import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
-import type { FoodItem } from '@trainingai/shared/types/nutrition'
+import type { FoodItem, NutritionIngredient } from '@trainingai/shared/types/nutrition'
+import { ingredientToEntry } from '@trainingai/shared/nutrition/log-plan-meal'
 import { createFoodItem } from '@trainingai/shared/nutrition/create-food-item'
 import { getLocalStore } from '@/lib/local-store'
 import { AddFoodByHandForm, type AddFoodByHandValues } from './add-food-by-hand-form'
 import { IngredientSearch, type ExternalFood } from './ingredient-search'
+import { hostOf } from './recipe-url'
+import type { RecipeCandidate } from './recipe-candidates'
 import type { FoodSearchResponse } from '@/app/api/nutrition/food-search/route'
 
 interface Props {
@@ -15,6 +18,20 @@ interface Props {
   userId?: string
   /** Hand an acquired food up. The picker clears its own query; the parent owns the meal. */
   onAdd: (item: FoodItem) => void
+  /**
+   * A whole recipe, imported from a pasted link (BF-11c).
+   *
+   * Separate from `onAdd` because a recipe is not one ingredient: it carries a name, a batch size
+   * and N foods at their own weights, and the builder already owns fields for all three.
+   * `recipeYield` is `null` when the page never stated one — see `importRecipe` below.
+   */
+  onImportRecipe: (recipe: { name: string; entries: { item: FoodItem; qty: number }[]; recipeYield: number | null }) => void
+  /**
+   * A page that held several dishes (BF-11c §5.2). Handed up UNCONVERTED — no food items are minted
+   * until the user says which dishes to keep, or a four-recipe page would add four meals' worth of
+   * foods to the library for one press.
+   */
+  onRecipeCandidates: (candidates: RecipeCandidate[]) => void
 }
 
 /**
@@ -28,7 +45,7 @@ interface Props {
  * owns no state, this one owns the searches, the debounce clocks and the three add paths. Neither
  * is useful without the other and neither repeats the other's job.
  */
-export function IngredientPicker({ active, userId, onAdd }: Props) {
+export function IngredientPicker({ active, userId, onAdd, onImportRecipe, onRecipeCandidates }: Props) {
   const [query, setQuery] = useState('')
   const [searchResults, setSearchResults] = useState<FoodItem[]>([])
   const [dbResults, setDbResults] = useState<ExternalFood[]>([])
@@ -36,6 +53,7 @@ export function IngredientPicker({ active, userId, onAdd }: Props) {
   const [dbUnavailable, setDbUnavailable] = useState(false)
   const [addingExternal, setAddingExternal] = useState<string | null>(null)
   const [estimating, setEstimating] = useState(false)
+  const [importing, setImporting] = useState(false)
   const [showAddFood, setShowAddFood] = useState(false)
   const [addFoodSaving, setAddFoodSaving] = useState(false)
 
@@ -140,6 +158,69 @@ export function IngredientPicker({ active, userId, onAdd }: Props) {
     }
   }
 
+  /**
+   * A pasted recipe link becomes the ingredients of the meal being built (BF-11c).
+   *
+   * **The conversion is `ingredientToEntry`, not a local one.** It stores each food per 100 g and
+   * puts the weight in the quantity, so the library gains "Cooked quinoa" rather than "Cooked
+   * quinoa (236 g)" — and it is the same function the plan's copy-to-library path uses, so a recipe
+   * imported here and the same recipe saved from a plan mint identical numbers. A second conversion
+   * would drift the first time either side rounded differently.
+   *
+   * **`recipeYield: null` is handed straight up rather than defaulted to 1.** It means the page
+   * never said how many the recipe serves, so the payload is the WHOLE batch — a banana-bread page
+   * measured 1,956 kcal for the loaf. Deciding here that it is one portion is exactly the four-fold
+   * calorie error that reads as plausible; the builder has a batch-size field and asks instead.
+   */
+  async function importRecipe(url: string) {
+    setImporting(true)
+    try {
+      const res = await fetch('/api/nutrition/scan', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url }),
+      })
+      const body = res.ok ? await res.json() : null
+      const ingredients: NutritionIngredient[] = Array.isArray(body?.ingredients) ? body.ingredients : []
+      if (ingredients.length === 0) {
+        toast.error(offlineHint() ?? 'No recipe could be read from that page')
+        return
+      }
+      // Several dishes: ask which, before minting anything. The top level is `candidates[0]`, so
+      // taking it and stopping would silently drop the rest of the page.
+      const candidates: RecipeCandidate[] = Array.isArray(body.candidates)
+        ? body.candidates.filter((c: RecipeCandidate) => Array.isArray(c?.ingredients) && c.ingredients.length > 0)
+        : []
+      if (candidates.length > 1) {
+        onRecipeCandidates(candidates)
+        setQuery('')
+        setSearchResults([])
+        return
+      }
+      // Serial, not `Promise.all`: each one writes the same local table and queues its own outbox
+      // row, and a nine-ingredient recipe is not worth racing them for. Same reasoning, same shape
+      // as `savePlanMealToLibrary`.
+      const entries: { item: FoodItem; qty: number }[] = []
+      for (const ing of ingredients) {
+        const entry = ingredientToEntry(ing)
+        const item = await createFoodItem(entry, userId)
+        // The schema floor is 0.01, and a sub-gram garnish rounds to 0.00 two decimals in.
+        entries.push({ item, qty: Math.max(0.01, entry.quantityMultiplier) })
+      }
+      onImportRecipe({
+        name: typeof body.name === 'string' ? body.name : hostOf(url),
+        entries,
+        recipeYield: typeof body.recipeYield === 'number' ? body.recipeYield : null,
+      })
+      setQuery('')
+      setSearchResults([])
+    } catch {
+      toast.error(offlineHint() ?? 'Could not read that recipe')
+    } finally {
+      setImporting(false)
+    }
+  }
+
   async function estimateAndAdd() {
     const text = query.trim()
     if (!text) return
@@ -208,6 +289,8 @@ export function IngredientPicker({ active, userId, onAdd }: Props) {
         onAdd={accept}
         estimating={estimating}
         onEstimate={() => void estimateAndAdd()}
+        importing={importing}
+        onImportRecipe={url => void importRecipe(url)}
         dbResults={dbResults}
         dbSearching={dbSearching}
         dbUnavailable={dbUnavailable}

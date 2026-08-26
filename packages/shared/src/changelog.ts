@@ -6,6 +6,16 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.386.0",
+    date: "2026-08-26",
+    changes: [
+      "Build a Meal takes a recipe link. Paste an https address into the ingredient search and the whole recipe is imported \u2014 every ingredient at its own weight, each one saved to your foods so you can use it again. This was already possible inside the meal-plan wizard; it is now reachable without starting a plan.",
+      "A link to a page with several dishes asks which ones you want. Each dish you keep becomes its own saved meal, so a \"five weeknight dinners\" page gives you five meals you can log separately rather than one that nobody eats. Nothing is added to your foods until you choose.",
+      "A recipe page that never says how many it serves now says so, in the builder, next to the field that sets it \u2014 those ingredients are the whole batch, and saving them as one portion would have quietly multiplied everything you logged from it.",
+      "The ingredient search says what its first list is: Recently used before you type, Your foods after. The list was always there; nothing named it.",
+    ],
+  },
+  {
     version: "1.385.0",
     date: "2026-08-26",
     changes: [

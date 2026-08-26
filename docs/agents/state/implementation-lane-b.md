@@ -61,6 +61,19 @@ Polar H10). **Q-315 needs a DESKTOP.**
 None held.
 
 ## Gotchas worth carrying
+- **`get_check_runs` returning `total_count: 0` has THREE causes, not one.** CLAUDE.md names a stale
+  base; the others are a runner backlog and a **wedged run**. A run that has not started creates no
+  check runs at all, so the zero says nothing on its own — read `actions_list`/`get_workflow_run` for
+  the branch before concluding anything, and never re-push on the strength of the zero.
+- **A run can wedge in a state GitHub will neither cancel nor re-run.** Measured 2026-08-26 on #565:
+  `get_workflow_run` reported `status: queued` for **five hours** with zero jobs and an `updated_at`
+  that never moved off creation. `rerun_workflow_run` → **403 "This workflow is already running"**;
+  `cancel_workflow_run` → **409 "Cannot cancel a workflow run that has not been queued yet"**. Those
+  two together are the signature: the API says queued, GitHub's own scheduler says it never was.
+  There is no dispatch trigger on `ci.yml` (`pull_request` only), so the only way out is a **new
+  commit** — and `concurrency: cancel-in-progress` on `ci-${{ github.ref }}` makes that supersede the
+  wedged run by design. **Push real content, never an empty commit**: fold in a docs correction the PR
+  already owes rather than manufacturing a no-op.
 - **E2E takes 16–40 min and the base WILL drift under it.** #547 went green twice and lost the merge
   to conflicts both times. **Merge on the five REQUIRED checks when E2E cannot be informative** — a
   docs/scripts change, or a re-push whose diff against an already-E2E-green head is

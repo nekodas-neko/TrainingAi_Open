@@ -77,11 +77,27 @@ own scroll physics.
 *Why this one matters:* it is a new tab strip, a rebuilt action row and one fewer sheet in the back
 stack, and the sandbox renders none of those the way the phone does.
 
-## N5. The meal builder's pinned footer — BF-31 / BF-26
+## N5. The meal builder — pinned footer, and importing a recipe link — BF-31 / BF-26 / BF-11c
 1. **Meals** tab → open a meal → **Edit** → scroll the ingredients to the end.
 2. **Pass:** the batch figures stay pinned above **Save**, and the action row clears the gesture bar.
+   *(That footer moved to its own component on 2026-08-26, so this is a re-check, not a first one.)*
 3. Tap the inline **name** field. **Pass:** the keyboard does not push the footer over the input or
    off screen.
+4. **New** → paste a **recipe URL** into the ingredient search. **Pass:** the offer changes to
+   *"Import the recipe from &lt;site&gt;"* — the AI-estimate offer must be gone, not sitting beside it —
+   and pressing it fills the ingredient list.
+5. **The number that matters:** after importing a recipe whose page states a yield (most do), the
+   batch field must read **1 portion**, and the calories must look like **one serving**, not the
+   whole tray. If it reads the recipe's yield, stop and say so — that is a logging error of exactly
+   that factor.
+6. Import a page that does **not** state a yield. **Pass:** an amber line says the ingredients are
+   the whole recipe and to set how many portions it makes; setting it clears the line.
+7. Paste a URL for a page with **several dishes** (a "5 weeknight dinners" roundup). **Pass:** a list
+   of dishes with tick controls; tapping one leaves it out; **Save N meals** creates one saved meal
+   per kept dish, and they appear on the Meals tab.
+
+*Why:* every scan here is a live AI call against a live page, so nothing in the sandbox exercises it
+end to end — the multi-dish list has never seen a real page, only the shape the route promises.
 
 *Why:* BF-26 converged the two quantity sheets and its action row's inset renders 0 in the sandbox.
 
