@@ -9,7 +9,14 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: "1.384.0",
     date: "2026-08-26",
     changes: [
-      "You can now pair a Colmi smart ring under More \u2192 Devices, alongside your Oura ring and chest strap. It records heart rate, steps, sleep stages, blood oxygen, HRV, stress and skin temperature \u2014 several of which no other device you own reports. Everything it collects is kept separately and compared against your other devices: it does not change your readiness, sleep or any other score. Syncing is manual for now \u2014 open Devices and tap Sync now. If the ring has been sitting still it puts its sensors to sleep and will not answer, so wear it or put it on the charger first; the card says so rather than pretending there was no data.",
+      "You can now pair a Colmi smart ring under More \u2192 Devices, alongside your Oura ring and chest strap. It records heart rate, steps, sleep stages, blood oxygen, HRV, stress and skin temperature \u2014 several of which no other device you own reports. The app switches on each of those measurements when it syncs and shows you which are recording, because a ring with one switched off collects nothing and looks exactly like a ring you forgot to wear. Everything it collects is kept separately and compared against your other devices: it does not change your readiness, sleep or any other score. Syncing is manual for now \u2014 open Devices and tap Sync now. If the ring has been sitting still it puts its sensors to sleep and will not answer, so wear it or put it on the charger first.",
+    ],
+  },
+  {
+    version: "1.383.6",
+    date: "2026-08-26",
+    changes: [
+      "The day-review screen can now tell you why a saved score and a fresh one disagree. Each part of a readiness score is stored next to the measurement it came from, so the screen can say whether the score changed because the underlying night's data was rewritten later, or because the scoring itself was recalibrated \u2014 two different things that used to look identical. Days scored before today can't be checked this way and are now labelled as such rather than quietly passing. No score changes.",
     ],
   },
   {

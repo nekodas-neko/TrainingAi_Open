@@ -252,6 +252,73 @@ describe('buildReadinessAudit', () => {
     expect(audit.gaps.join(' ')).toContain('No morning check-in')
     expect(audit.contributors.find(c => c.key === 'checkin')!.subScore).toBe(50)
   })
+
+  // Q-501 — the panel used to pair a STORED score with TODAY's raw inputs and call them "the inputs
+  // that produced it". They are only the same thing if the summary underneath was never rewritten,
+  // and it often was. With each contributor carrying its own input, the audit can say which of the
+  // two moved instead of leaving the reader to guess.
+  describe('a stored score that disagrees with the recompute (Q-501)', () => {
+    const withPrior = { ...common, summary: summary(), priorSummary: summary({ date: '2026-07-23' }) }
+    const storedContributors = (over: Record<string, unknown> = {}) => {
+      const live = buildReadinessAudit(withPrior).persist!.contributors as Record<string, unknown>
+      return { ...live, ...over }
+    }
+
+    it('calls it an INPUT change when the stored score re-derives from its own stored inputs', () => {
+      // The row is self-consistent, so the model is not what moved — the summary was re-rolled after
+      // the derived row was written and nothing recomputed it in step.
+      const derived = {
+        day: '2026-07-24', readinessScore: 41, readinessSource: 'ble-derived',
+        readinessContributors: storedContributors(),
+      } as never
+      const audit = buildReadinessAudit({ ...withPrior, derived })
+      expect(audit.storedMatchesRecompute).toBe(false)
+      expect(audit.notes.join(' ')).toContain('INPUT change')
+      expect(audit.stored.rederived!.drifted).toEqual([])
+    })
+
+    it('calls it a MODEL change when a stored contributor does not follow from its own input', () => {
+      const live = buildReadinessAudit(withPrior).persist!.contributors as Record<string, { score: number }>
+      const derived = {
+        day: '2026-07-24', readinessScore: 41, readinessSource: 'ble-derived',
+        readinessContributors: storedContributors({
+          recoveryIndex: { ...live.recoveryIndex, score: 4 },   // the shape Q-501 measured
+        }),
+      } as never
+      const audit = buildReadinessAudit({ ...withPrior, derived })
+      expect(audit.notes.join(' ')).toContain('MODEL moved')
+      expect(audit.stored.rederived!.drifted.map(d => d.key)).toEqual(['recoveryIndex'])
+      // The two verdicts are mutually exclusive. Emitting both would leave the reader exactly where
+      // Q-501 found them — with a disagreement and no way to attribute it.
+      expect(audit.notes.join(' ')).not.toContain('INPUT change')
+    })
+
+    // Every row written before this shipped. Saying nothing would read as "checked and fine".
+    it('says so when the stored row predates the inputs being persisted', () => {
+      const derived = {
+        day: '2026-07-24', readinessScore: 41, readinessSource: 'ble-derived',
+        readinessContributors: { recoveryIndex: { score: 24, provisional: true } },
+      } as never
+      const audit = buildReadinessAudit({ ...withPrior, derived })
+      expect(audit.notes.join(' ')).toContain('carry no inputs')
+      expect(audit.stored.rederived!.uncheckable).toEqual(['recoveryIndex'])
+    })
+
+    it('stays quiet when the stored score matches the recompute', () => {
+      const derived = {
+        day: '2026-07-24', readinessScore: buildReadinessAudit(withPrior).persist!.score,
+        readinessSource: 'ble-derived', readinessContributors: storedContributors(),
+      } as never
+      const audit = buildReadinessAudit({ ...withPrior, derived })
+      expect(audit.storedMatchesRecompute).toBe(true)
+      expect(audit.notes.join(' ')).not.toContain('INPUT change')
+      expect(audit.notes.join(' ')).not.toContain('MODEL moved')
+    })
+
+    it('reports no verdict at all when nothing is stored', () => {
+      expect(buildReadinessAudit(withPrior).stored.rederived).toBeNull()
+    })
+  })
 })
 
 describe('buildHeartRateAudit', () => {

@@ -3124,3 +3124,24 @@ Raised rather than trimmed because this is the index doing its job: PS-11/12/13 
 acceptance test written the evening before it runs, and the detail in them is the part that stops it
 being re-derived at the bench. They leave the queue when they are done, which is when this number
 comes back down.
+## 2026-08-26 — `projectOverview.md` 8116 → 8124 (+8), Q-501
+
+Eight lines for one Current Status block: the readiness contributors now record the input they were
+scored from, which is what lets a stored score be re-derived from itself rather than from today's
+summary. Most of the material went to the journal entry — the block links it rather than restating
+it. What stays here is the pair of readings that changes how the next session interprets a
+disagreement (self-consistent = the inputs were rewritten, inconsistent = the model moved) and the
+one number worth carrying forward: the entry's own "5 of 33" was wrong, and the un-re-derivable
+population is **7** of 42.
+
+## 2026-08-26 — `docs/agents/state/implementation-lane-a.md` 178 → 199 (+21), the tenth Lane A session
+
+Twenty-one lines net after trimming three sections that had become narrative — the closed database
+reclaim, the queue-tool mis-reports, and the owner-waiting list, which had four answered items still
+on it. What replaces them is state a successor cannot re-derive: which entries are gated and on whom
+(the owner said on this date to leave those for later, so a successor reading the queue top-down
+would otherwise start one), the two traps this session hit, and the doc-size ledger's own new shape
+after LA-33 — the old trap named a JSON file that no longer exists.
+
+A baton is state, not accretion, and this one is at the length where the next session should be
+rewriting rather than editing.
