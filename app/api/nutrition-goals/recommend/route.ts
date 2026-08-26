@@ -207,6 +207,11 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'profile_incomplete', missing: ['dateOfBirth'] }, { status: 400 })
   }
 
+  // BF-33: a clinically measured resting rate outranks the prediction, re-scaled to today's lean
+  // mass rather than trusted-then-expired. Null when no test exists, which is the ordinary case.
+  const rmrTest = await repo.getLatestMeasuredRmr(userId)
+  const measuredRmr = rmrTest ? { rmrKcal: rmrTest.rmrKcal, ffmKgAtTest: rmrTest.ffmKgAtTest } : null
+
   const baseline = calculateBaseline({
     weightKg: latestWeight,
     heightCm: user.heightCm!,
@@ -215,6 +220,7 @@ export async function POST(req: Request) {
     activityLevel: user.activityLevel!,
     fitnessGoal: user.fitnessGoal!,
     bodyFatPct: latestBodyFatPct,
+    measuredRmr,
   })
 
   const context = buildContext({
@@ -276,6 +282,7 @@ Instructions:
         activityLevel: ai.recommendedActivityLevel,
         fitnessGoal: user.fitnessGoal!,
         bodyFatPct: latestBodyFatPct,
+        measuredRmr,
       })
     }
 
