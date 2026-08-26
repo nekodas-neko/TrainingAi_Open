@@ -145,6 +145,36 @@ no blink under either write type on either service means nothing is getting thro
 already works on this model — so it settles framing end-to-end and, if it produces sleep and skin
 temperature here, both confirms §4's Phase 6 is achievable and names the codebase to port from.
 
+## Reading the working client settled it, and corrected the plan
+
+The R09 turns out to be a **first-class Gadgetbridge device** — `ColmiR09Coordinator.java`, under the
+`yawell` OEM namespace. Reading `YawellRingConstants.java` and `YawellRingDeviceSupport.java`
+answered the silence and overturned three things the plan had asserted.
+
+**The checksum is mod 256, not mod 255.** `buildPacket` accumulates `(byte)(checksum + content) &
+0xff`. Every Python client says 255, this plan repeated it, and went out of its way to warn that
+assuming 256 would fail on half of all commands. Backwards. The two agree below 255 — including
+every probe run so far — and diverge above it. The correction is §4b, and the lesson is the repo's
+own rule: pin the decoder to a captured vector, not to either claim.
+
+**There are two protocol versions and the ring speaks both.** V1 `6e40fff0` carries the 16-byte
+commands; V2 `de5bf728` carries "big data". Gadgetbridge registers both services and subscribes to
+both notify characteristics on connect. So §11b's unknown second service is answered — and it is
+where **sleep and skin temperature** live, as CRC16-Modbus, length-prefixed, multi-packet payloads.
+A different integrity scheme from V1's, in the same device.
+
+That moves sleep from "known-solvable from a second codebase" to solved-on-paper: command `0xbc`,
+type `0x27`, stages light/deep/REM/awake as `0x02`/`0x03`/`0x04`/`0x05`. Temperature comes with it
+(`0x25`), which neither the Oura BLE pipeline nor any Python client provides.
+
+**Why nothing answered.** Write type eliminated — Gadgetbridge issues a plain Write Request, which
+is what was already being sent. Checksum eliminated — both conventions agree on these payloads.
+And `0x10` blink-twice **is not a command in this firmware**; Gadgetbridge's equivalent is `0x50`
+FIND_DEVICE, so that probe was very likely an unknown opcode and told us nothing. What survives is
+the **connect handshake**: subscribe both notify characteristics, wait two seconds, then phone name
+`0x04` → date/time `0x01` → preferences → **battery last**. A bare battery request on a fresh
+connection is not what the working client does.
+
 ## Deployment shape
 
 No APK. `lib/live-hr/chest-strap-source.ts` already does the full BLE cycle in TypeScript in the

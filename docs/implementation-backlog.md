@@ -400,6 +400,21 @@ tuple makes a shared-table write a *compile error*, which is stronger than anyth
   handshake such as set-time `0x01`; radio power-gating. **Decisive diagnostic is `0x10` blink-twice
   (`10000000000000000000000000000010`)** — physical feedback separates "ring rejects our commands"
   from "ring replies and we do not receive them".
+- **Protocol section rewritten from Gadgetbridge, 2026-08-26 (§4).** The R09 is a **first-class
+  Gadgetbridge device** (`ColmiR09Coordinator.java`, OEM namespace `yawell`). Three corrections that
+  change the implementation: **(a) the checksum is mod 256, not mod 255** — the plan's earlier claim,
+  inherited from the Python clients, was wrong (§4b); **(b) there are TWO protocol versions** — V1
+  `6e40fff0` for 16-byte commands and V2 `de5bf728` for "big data", and Gadgetbridge subscribes to
+  **both** notify characteristics (§4a); **(c) sleep and skin temperature live on V2** as
+  CRC16-Modbus, length-prefixed, multi-packet payloads (`0xbc`, sleep type `0x27`, temperature
+  `0x25`). Sleep is therefore no longer speculative and **temperature is a capability the Oura
+  pipeline does not have**. Phase 6 shrinks.
+- **Why the nRF probes got nothing (§11c-resolved).** Write type eliminated (Gadgetbridge uses a
+  Write Request, which is what was sent); checksum eliminated (both conventions agree below 255);
+  `0x10` blink is **not a command in this firmware** — the equivalent is `0x50` FIND_DEVICE. The
+  surviving explanation is the **connect handshake**: subscribe both notify chars, wait 2 s, then
+  phone name `0x04` → date/time `0x01` → preferences → **battery last**. Next probe sequence with
+  exact hex is in §11c-resolved.
 - **Next action is to install Gadgetbridge (§11d)** — open-source, no vendor cloud, no firmware
   push. It settles framing end-to-end, and if it yields **sleep and skin temperature** on this unit
   it both confirms §4's Phase 6 is achievable and names the codebase to port from. Reversible.

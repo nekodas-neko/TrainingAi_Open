@@ -134,38 +134,93 @@ and it is the one step of the gate still outstanding.
 
 ---
 
-## 4. Protocol, quoted rather than remembered
+## 4. Protocol — from the implementation that works on the R09
 
-Per `CLAUDE.md`'s external-field rule. Fetched 2026-08-26 from the clients named above.
+**Rewritten 2026-08-26.** The earlier version of this section quoted `tahnok/colmi_r02_client`, a
+Python client that does not list the R09. The authority is now **Gadgetbridge**, which carries a
+first-class `ColmiR09Coordinator.java` and a user running the model with every sensor working
+([#4491](https://codeberg.org/Freeyourgadget/Gadgetbridge/issues/4491)). Source:
+`devices/yawell/ring/YawellRingConstants.java` and
+`service/devices/yawell/ring/YawellRingDeviceSupport.java` (the rings are Yawell-OEM; Colmi is the
+brand). Where the two sources disagree, Gadgetbridge wins — it is the one demonstrated on this model.
 
-**Transport** — a Nordic-UART-shaped custom service:
+### 4a. There are TWO protocol versions and the ring speaks both
 
-| | UUID |
-|---|---|
-| Service | `6E40FFF0-B5A3-F393-E0A9-E50E24DCCA9E` |
-| RX (we write) | `6E400002-B5A3-F393-E0A9-E50E24DCCA9E` |
-| TX (we subscribe) | `6E400003-B5A3-F393-E0A9-E50E24DCCA9E` |
+This is the structural fact the earlier version missed entirely.
 
-**Framing** — fixed 16 bytes both directions. Byte 0 = command, bytes 1–14 = payload, byte 15 =
-checksum: the sum of the first 15 bytes **modulo 255**. Note 255, not 256 — that is what the source
-says, and assuming 256 fails every write silently.
+| | Service | Write | Notify |
+|---|---|---|---|
+| **V1** — ordinary commands | `6e40fff0-…` | `6e400002-…` | `6e400003-…` |
+| **V2** — "big data" | `de5bf728-…` | `de5bf72a-…` | `de5bf729-…` |
 
-| Command | Byte | Notes |
-|---|---|---|
-| Set time | `0x01` | the ring's clock is what every log timestamp is relative to — **send this first** |
-| Battery | `0x03` | request and response share the tag |
-| Read HR log | `0x15` (21) | multi-packet: sub-type 0 = header (packet count + interval), sub-type 1 carries a little-endian `<l` unix timestamp then 9 values, sub-types 2+ carry 13 each, sub-type 23 terminates, `0xFF` = no data |
-| Read steps | `0x43` (67) | per-day, `day_offset` from the ring clock; records are steps / calories / distance-m keyed to a 15-min `time_index` |
-| Start real-time | `0x69` (105) | + reading type + action |
-| Stop real-time | `0x6A` (106) | + reading type |
-| Reading types | | HR `1`, blood pressure `2`, SpO2 `3`, fatigue `4`, ECG `7`, HRV `10` |
-| Actions | | start `1`, pause `2`, continue `3`, stop `4` |
+Gadgetbridge registers **both** services and subscribes to **both** notify characteristics on
+connect. V1 carries the 16-byte command traffic; **V2 carries sleep, temperature, SpO2 and alarms**
+as length-prefixed, CRC16-Modbus-checksummed, *multi-packet* payloads that must be reassembled.
 
-**Not implemented in either client: sleep, SpO2 logs, raw accelerometer, raw PPG.** Gadgetbridge
-implements Colmi sleep sync from a separate Wireshark dissection of the vendor app — known-possible,
-from a second codebase, and therefore a port rather than a copy. That is Phase 6.
+So §11b's "second custom service, purpose unknown" is answered: it is where the data this plan most
+wanted — **sleep and skin temperature** — actually lives.
 
----
+### 4b. The checksum is mod 256 — **the earlier mod-255 claim was wrong**
+
+`buildPacket` in `YawellRingDeviceSupport.java`:
+
+```java
+int checksum = 0;
+for (byte content : contents) { checksum = (byte) (checksum + content) & 0xff; }
+buffer.put(15, (byte) checksum);
+```
+
+`& 0xff` is **mod 256**. Every Python client says mod 255, and this plan repeated that with a
+warning that assuming 256 would fail on half of all commands. **That was backwards.** The two agree
+for any payload summing under 255 — including every probe run so far — and diverge above it
+(`ff ff` → 254 vs 0; `80 7f` → 255 vs 0). Take mod 256, from the implementation that works, and pin
+a test to a captured vector rather than to either claim.
+
+**The V2 big-data channel does not use this checksum at all** — it uses CRC16-Modbus over the
+payload, with a 6-byte header (`0xbc`, type, u16 length, u16 crc). Two different integrity schemes
+in one device.
+
+### 4c. There is a connect handshake, and battery is requested LAST
+
+`initializeDevice` → read `0x180A` → subscribe **both** notify characteristics → **wait 2 seconds
+("to give the ring time to settle")** → then, in order: **phone name → date/time → preferences →
+battery**.
+
+A bare battery request on a freshly-connected ring is not what the working client does, which is the
+most likely reason the probes in §11c got nothing back.
+
+### 4d. Commands (Gadgetbridge, R09-verified)
+
+| Command | Byte | | Command | Byte |
+|---|---|---|---|---|
+| Set date/time | `0x01` | | Sync stress | `0x37` |
+| Battery | `0x03` | | Auto-HRV pref | `0x38` |
+| **Phone name** (handshake) | `0x04` | | **Sync HRV** | `0x39` |
+| Display pref | `0x05` | | Auto-temperature pref | `0x3a` |
+| Power off | `0x08` | | **Sync activity/steps** | `0x43` |
+| Preferences | `0x0a` | | **Find device** (blink) | `0x50` |
+| **Sync heart rate** | `0x15` | | Manual heart rate | `0x69` |
+| Auto-HR pref | `0x16` | | Notification | `0x73` |
+| Realtime heart rate | `0x1e` | | **Big data (V2)** | `0xbc` |
+| Goals | `0x21` | | Factory reset | `0xff` |
+| Auto-SpO2 pref | `0x2c` | | Packet size | `0x2f` |
+| Auto-stress pref | `0x36` | | | |
+
+**V2 big-data types:** temperature `0x25` · **sleep `0x27`** · SpO2 `0x2a` · alarm `0x2c`.
+**Sleep stages:** light `0x02` · deep `0x03` · REM `0x04` · awake `0x05`.
+**Push notifications from the ring:** new HR `0x01` · new SpO2 `0x03` · new steps `0x04` ·
+battery `0x0c` · live activity `0x12`.
+
+**Note `0x50` FIND_DEVICE, not `0x10`.** The Python client's `CMD_BLINK_TWICE = 0x10` has no
+counterpart in Gadgetbridge's set, which is the simplest explanation for the §11c blink probe doing
+nothing: it may not be a command this firmware knows.
+
+**What this rewrite buys the plan.** Sleep is no longer "known-solvable from a second codebase" —
+the command, the type byte, the stage encoding and the framing are all in hand, and **skin
+temperature**, which neither the Oura BLE pipeline nor any Python client provides, comes with it.
+Phase 6 shrinks accordingly. Cross-check: the commands the Python client did document
+(`0x01`/`0x03`/`0x15`/`0x43`/`0x1e`) all agree with Gadgetbridge, so §4's older material was right
+as far as it went.
 
 ## 5. Why deployment is cheap: no APK
 
@@ -358,9 +413,10 @@ Only question 3 gates anything, and Phase 0 is how it gets answered.
 - No Colmi ring has connected to **this app**. The Phase 0 enumeration in §11 was done in nRF
   Connect, which proves the ring's GATT layout and nothing about our code.
 - **The transport is measured; the protocol is not.** Service and characteristic UUIDs are confirmed
-  on the owner's unit (§11). The 16-byte framing, the mod-255 checksum and every command byte in §4
-  still come from a client that does not list the R09, and remain **unverified on hardware** until
-  the `0x03` round trip runs.
+  on the owner's unit (§11), and §4 now comes from Gadgetbridge, which supports the R09 as a
+  first-class device. **Nothing in §4 has been exercised against this ring**: no command has yet
+  produced a reply (§11c). The plan's earlier mod-255 checksum claim was **wrong** and is corrected
+  in §4b — read from a working implementation, not measured here either.
 - **The pairing model is unresolved** (§11a). The address is a rotating type by its own bits and
   looks stable by every other sign; which it is decides whether Phase 3 copies the scale or the Oura.
 - Sleep is not solved; it is known-solvable from a second codebase, which is not the same thing.
@@ -474,6 +530,42 @@ otherwise look identical: *the ring is not accepting our commands* versus *the r
 we are not receiving its replies*. If the ring blinks, the command channel works and only the notify
 path is broken. If it does not blink under either write type on either service, nothing is getting
 through and the framing is wrong for this firmware.
+
+### 11c-resolved. Why the probes got nothing — read from the working client
+
+Gadgetbridge's source (§4) answers three of §11c's four candidates without another probe:
+
+- **Write type is NOT the cause.** Gadgetbridge calls `builder.write(characteristic, contents)` —
+  Android's default write type, a Write **Request**. That is what was already being sent. Candidate 1
+  is eliminated.
+- **Checksum is NOT the cause**, and could not have been: `0x03` and `0x10` sum below 255, where both
+  conventions agree. (It *was* wrong in the plan — see §4b — just not wrong in a way that mattered
+  here.)
+- **`0x10` is probably not a command this firmware knows.** Gadgetbridge has no `0x10`; its
+  blink-the-ring command is **`0x50` FIND_DEVICE**. So the blink probe failing tells us nothing about
+  the channel — it was very likely an unknown opcode.
+- **Candidate 3 — a required handshake — is the surviving explanation**, and §4c shows its exact
+  shape: subscribe to both notify characteristics, **wait 2 seconds**, then **phone name (`0x04`) →
+  date/time (`0x01`) → preferences → battery**. Battery is what the working client asks for *last*.
+
+**Next probe, in order, on V1 write `6e400002` with both notify characteristics subscribed** (the
+checksums below are mod 256; every one of them sums under 255, so they are valid under either
+convention):
+
+| # | What | Hex |
+|---|---|---|
+| 1 | Phone name — the handshake | `04020a47420000000000000000000099` |
+| 2 | Set date/time (2026-08-26 20:00:00 local, BCD) | `01260826200000000000000000000075` |
+| 3 | Battery | `03000000000000000000000000000003` |
+| 4 | Find device — should make the ring blink | `50000000000000000000000000000050` |
+
+Send 1, wait a beat, then 2, then 3. If TX answers on `0x03` after the handshake, the channel is
+proven and Phase 1 can start. **`0x50` is the new physical-feedback test**, replacing the `0x10`
+that was never a real command.
+
+Note the date/time encoding: `Byte.parseByte(String.valueOf(n), 16)` reads the *decimal* digits as
+*hex*, i.e. BCD. Year is `now % 2000`, so 2026 → `0x26`. Adjust bytes 4–6 to the actual clock time
+before sending; being a few minutes out is harmless for a probe and Gadgetbridge resets it anyway.
 
 ### 11d. Gadgetbridge is the reference implementation, and it should be installed next
 
