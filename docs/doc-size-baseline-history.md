@@ -221,6 +221,28 @@ against `CLAUDE.md`'s stated ~0.4**, almost all of it `oura_raw_samples` doing i
 reading* rather than a defect — two points off a baseline taken immediately after a repack is not
 a trend, and the honest next step is another reading, not a fix.
 
+## 2026-08-25 — `docs/implementation-backlog.md` 11811 → 11848 (Q-154 decided, two corrections)
+
+Three owner-facing edits, none of them new entries.
+
+**Q-154's gate cleared** — the owner chose option 2 after being shown the three sparkline states
+rendered at true size from the real geometry rather than described. Most of the added length is the
+part that stops the decision being over-read: option 2 licenses dropping *the halo and the dimmed
+dots*, not accepting today's primitive as-is. The other five differences are general wants any
+caller could have, so they stay primitive props — and the `±0.5` padding in particular must not
+survive, since it halves the amplitude of a small-range series.
+
+**Q-395 finding 14's overclaim struck.** It promised grouped sections would reclaim "most of the
+vertical space"; the measurement was 16% → 11%, a screen 111 px shorter out of 2,649. Lane B
+measured that at the time and wrote it in the journal and in a code comment, but nobody struck it
+here — so the owner read the original promise, expected a big visual change, and reported not seeing
+one. **The lesson is the cheap half: when an implementer refutes a claim, strike the claim where the
+claim lives**, not only where the work happened.
+
+**Q-406's gate marked parked rather than answered**, with a note saying so explicitly — the owner
+asked to check back once the other nutrition agents have possibly settled it. An unanswered question
+recorded as answered is worse than one left open.
+
 ## 2026-08-24 — `CLAUDE.md` 1154 → 1155
 
 One line on the backlog-conflict rule, because the class recurred a third time and the rule now has a
