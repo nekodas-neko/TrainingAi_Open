@@ -6296,10 +6296,27 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 ### [readiness] Q-500 — re-derive the Recovery Index anchor on BLE-era nights (the 5 h constant is live, v1.320.0)
 
 - **The constant shipped and is verified in source** (`RECOVERY_INDEX_OPTIMAL_HOURS = 5`,
-  `READINESS_MODEL_VERSION = 'v3:ri5:2026-08-18'`, checked 2026-08-20). **This entry is now only
-  its own follow-up:** the fit is Cloud-era, over 15 pre-re-key nights, and BLE overnight HR is
-  ~2× noisier — so re-derive the anchor once ~15 BLE-era nights exist. Not blocking; the current
-  anchor errs toward under-scoring, which is the safe direction.
+  `READINESS_MODEL_VERSION = 'v3:ri5:2026-08-18'`, checked 2026-08-20).
+
+- **✅ THE FOLLOW-UP BELOW IS DONE, AND ITS ANSWER IS "DO NOT RE-ANCHOR" — verified 2026-08-26.**
+  It says *"re-derive the anchor once ~15 BLE-era nights exist"*. **50 exist** (`oura_daily_summary`,
+  2026-07-07 → 2026-08-26, 50 of 51 rows populated, mean **2.625 h**), and **Q-509 already ran the
+  refit** at n = 42 and landed on **3.31 h** — then argued against applying it, which is the part
+  that matters here: the anchor shrank by **0.715×** while its input shrank by **0.74×**, so an
+  anchor moved to match is absorbing a **multiplicative bias in the estimator** rather than
+  correcting a score. Q-509's own words: *"Do NOT move `RECOVERY_INDEX_OPTIMAL_HOURS`."* The real
+  work item is Q-509's smoothing experiment on the BLE HR series, not a constant. **Anyone reading
+  this entry top-down would otherwise re-derive an anchor Q-509 has already told them not to
+  apply** — the sample-size condition reads as the blocker and it is not.
+
+- **⚠️ A caution for whoever measures this, because it was walked into on 2026-08-26.**
+  `recovery_index_hours` exists on **two** tables. `oura_daily_derived.recovery_index_hours` is
+  **NULL on all 100 rows across the whole history** and is one of the known always-null columns;
+  the populated one is **`oura_daily_summary.recovery_index_hours`**. A count against the derived
+  table returns a confident **zero** and reads as "the estimator has never produced anything",
+  which was written down and nearly filed before Q-509's own n = 42 contradicted it. Same shape as
+  the `n_live_tup` retraction that rewrote Q-528: a number from the wrong source is not a smaller
+  fact than a right one, it is a different claim entirely. **Query `oura_daily_summary`.**
 
 - **Shipped 2026-08-18** after the owner approved it (*"we will go with whatever your recommendation
   is"*). One constant in `packages/shared/src/health/readiness-composite.ts`.
@@ -6741,6 +6758,11 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   real seasonal/behavioural change is not excluded by this data alone — the flat BLE-era level and the
   anchor-tracks-input result argue against it without proving it. The smoothing experiment does not
   depend on the comparison at all, which is why it is the first action.
+- **Re-measured 2026-08-26 on a larger sample, and the finding holds.** `oura_daily_summary` now
+  carries **50 of 51** BLE-era nights (07-07 → 08-26) at mean **2.625 h**, against this entry's
+  **2.657** at n = 42. Eight more nights moved the mean by **0.03 h**, so the level shift is not a
+  small-sample artefact and waiting for more data will not change the answer. That also retires
+  Q-500's *"re-derive once ~15 BLE-era nights exist"* follow-up, which is annotated there.
 
 ### [devices][readiness] Q-510 — resilience's missing days are the daytime-stress coverage gate, and that coverage is not persisted anywhere
 
