@@ -445,6 +445,15 @@ order.
   2026-08-24 ~13:00 UTC and it is silence from the guard, not evidence, and must not be counted
   toward the clean window this row is waiting on.
 
+### [heart-rate][activity] 🟡 The HR tile's problem is the absolute bpm, not the metric; a paced Activity score works but the goals do not (TN-17, 2026-08-26)
+
+**Measured, nothing fixed.** Owner follow-ups to the pillar review. [`review`](docs/reviews/2026-08-26-hr-tile-and-activity-pacing.md).
+- **HR tile — both of the owner's alternatives were tested and neither choice is the lever.** Against `perceived_recovery` (**1 = fully recovered … 5 = wrecked**, so positive r is correct): waking-rest HR **+0.176 raw / +0.291 baseline-relative**, nightly resting HR **+0.129 / +0.278**. **Baseline-relative roughly doubles either; picking between them barely moves anything.** TN-13's recommendation stands with a measured reason.
+- **The +0.557 headline is reconciled**, not retracted: that was the baseline-relative *contributor score*, which measures **−0.553 (n = 35)** — same magnitude, sign carried by two scales running opposite ways. **Dropping the 4 `provisional: true` days (score pinned at 50) takes it from −0.395 to −0.553** — check that before any future correlation against `readiness_contributors`.
+- **A waking-rest HR is a real second-tile candidate** (10th pct of BLE samples 08–21; 70 days, 984 samples/day, moving **6.24 bpm/night** against the tile's 0.44) and the better **stress** proxy — but **nothing in the app computes it**, so it is not folded into TN-13.
+- **TN-17 — Activity as a pace-to-goal score.** Mechanically sound: `body_metrics.steps` is a running daily total. **⛔ `step_live_windows` is effectively empty (8 rows / 6 days)** and would read a flat zero. **The obstacle is goal calibration** — median day **4,649 steps**, 7,000 reached on **32%** of days and 10,000 on **15%**, so a paced score goes red from mid-morning where today's average reads 63–82. **Pacing does not create that; it stops the averaging from hiding it.** `Needs: Q-524`, `Gate: owner`.
+- **TN-3a's persistence half has SHIPPED** — `oura_daytime_stress_buckets` live via migrations 212/213, **69 rows / 3 days / ~26 buckets a day**. The **back-fill has not**, so the entry stays queued with a `Keep:`. **This does not unblock TN-3b** — it and TN-16 are parked on Q-507's sign, unchanged.
+
 ### [readiness][sleep][activity][heart-rate][body] 🔴 The five Home pillars, answered one at a time — four new findings (TN-13…TN-16, 2026-08-26)
 
 **Measured, nothing fixed.** Owner: *"Overall the pillars are not working great and not very useful. Requires tuning."* Six questions, six measurements. [`review`](docs/reviews/2026-08-26-pillar-review.md).
