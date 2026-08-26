@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.379.0",
+    date: "2026-08-26",
+    changes: [
+      "Meal photos are finally visible. You could take one and it was saved and synced, but nothing anywhere displayed it \u2014 it has been that way since the picker was added. Every meal now shows a small tile: your photo if it has one, and a food icon if it does not, so the list lines up either way instead of some rows having a picture and others nothing.",
+    ],
+  },
+  {
     version: "1.378.0",
     date: "2026-08-26",
     changes: [

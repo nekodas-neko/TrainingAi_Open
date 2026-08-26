@@ -2,6 +2,7 @@
 
 import { memo } from 'react'
 import { ChevronRight } from 'lucide-react'
+import { MealThumb } from './meal-thumb'
 
 interface Props {
   name: string
@@ -11,6 +12,15 @@ interface Props {
    *  rows keeps one ragged-right edge even when a row has no figure. */
   calories?: number | null
   showChevron?: boolean
+  /**
+   * Renders the 40 px meal tile on the left. Two props, not one nullable string, because the
+   * distinction is real: `showThumb` says a row belongs to a list that has tiles, `thumbSrc` says
+   * whether this particular row has a photo. A row in a tiled list with no photo still gets the
+   * placeholder — that is the point of it (BF-32), and one nullable prop could not say so.
+   */
+  showThumb?: boolean
+  /** A stored `data:` URI. Null renders the placeholder; only meaningful with `showThumb`. */
+  thumbSrc?: string | null
   /** Keeps the tapped row visible under a sheet's scrim, so the sheet reads as belonging to it
    *  rather than as an unrelated screen (Q-395a). */
   highlighted?: boolean
@@ -27,9 +37,11 @@ interface Props {
  * two search lists — and each was written separately. This is the shape Q-395's design pass settled
  * on: name · grey secondary line · calories right-aligned in a fixed column · optional chevron.
  *
- * **The optional thumbnail Q-406 lists is deliberately not here yet.** No call site passes one, and
- * an unused `<img>` costs a `no-img-element` exemption for arbitrary user photo URLs. The phase that
- * first shows a thumbnail adds it, with the loader decision made where it can be seen.
+ * **The thumbnail arrived in BF-32**, on the owner's instruction. It was deferred because an
+ * `<img>` for an arbitrary user photo URL costs a `no-img-element` exemption and a loader decision;
+ * a saved meal's photo is a `data:` URI capped at 128 px, so neither applies. It is opt-in per call
+ * site — the artboards put tiles on meal-level rows only (the day screen, My Meals), never on the
+ * ingredient rows inside a meal — and `meal-thumb.tsx` carries the rest of the reasoning.
  *
  * **Props are scalars, not objects.** The row renders inside `.map()`, where hooks are unavailable,
  * so a call site cannot memoise an object literal and one would silently defeat `React.memo` —
@@ -41,10 +53,11 @@ interface Props {
  * with a fixed width is what makes a column of numbers scannable.
  */
 export const FoodRow = memo(function FoodRow({
-  name, secondary, calories, showChevron, highlighted, onPress, disabled,
+  name, secondary, calories, showChevron, showThumb, thumbSrc, highlighted, onPress, disabled,
 }: Props) {
   const body = (
     <>
+      {showThumb && <MealThumb src={thumbSrc} />}
       <span className="min-w-0 flex-1">
         <span className="block truncate text-sm font-medium leading-snug">{name}</span>
         {secondary && (

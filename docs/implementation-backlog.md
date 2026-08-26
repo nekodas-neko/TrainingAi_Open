@@ -492,57 +492,6 @@ will hit it.
   sits in that row; and whether the sheet now reads as one thing is the owner's call, not a
   measurement.
 
-### [nutrition] BF-32 — the meal photo is stored, pickable, and displayed nowhere; the placeholder is the missing piece
-
-- **Lane:** B
-- **Spec:** BF-28.
-- **Added:** 2026-08-25, owner, reviewing the artboards: *"Some are similar but not the same (i.e no
-  spot for an image) it should show the default one in the mockup if no image is attached."*
-- **⚑ The owner's sentence is the specification, and it is stronger than "add a thumbnail".** The
-  glyph tile is the **always-present** state of the row, not a fallback bolted on afterwards. A row
-  with no photo shows the placeholder; a row with one shows the photo in the same box. There is never
-  a row without the box — which is what makes a list read as one thing rather than ragged.
-
-**What already exists, and what is missing.** The storage half shipped twice over:
-
-| Piece | State |
-|---|---|
-| `saved_meals.image_data_uri` column | ✅ Q-396 — round-trips both routes, the outbox replay and the local mirror |
-| `MealPhotoTile` — pick, downscale to 128 px WebP, preview | ✅ Q-327, wired into Edit Meal |
-| **Anything that renders a stored photo** | ✗ **nothing** — grep `imageDataUri` and every hit is a route, an adapter or the picker |
-| **The placeholder** | ✗ does not exist |
-
-So a photo picked today is written, synced, and never seen again. That is the finding: **the feature
-is write-only**, and it has been since the picker landed.
-
-**`FoodRow` has no thumbnail slot at all.** Its own comment says so — *"The optional thumbnail Q-406
-lists is deliberately not here yet. No call site passes one."* **That deferral is now superseded by
-the owner's instruction** and Q-406 has been amended to say so. The thumbnail lands in `FoodRow`,
-once, and every parity entry gets it for free.
-
-**The placeholder, read off the artboards:** a 40 px tile, `border-radius: 9px`, filled with
-`linear-gradient(140deg, …)` carrying a utensils glyph at 45% white. It appears **nine times** in the
-drawings with identical values and once in a lighter variant, so it is one shared thing, not
-per-screen markup. Meal detail (artboard 4) uses the same idea at hero scale — a full-width band with
-a large glyph and a `Photo` button on it.
-
-- **⚠ The gradient in the artboards is `oklch(...)` literals, and BF-28 rule 3 applies.** Take the
-  structure; source the colours from tokens. `check-hex-literals.js` ratchets per file, so a pasted
-  literal fails the Custom Rules job.
-- **Sizes to settle in the PR, not guess:** the row tile at 40 px against the day screen's existing
-  row height, and whether the hero band is a fixed height or an aspect ratio. Say which you chose.
-- **The photo is a data URI, not a URL** — `<img src>` on a data URI needs no `no-img-element`
-  exemption for a remote host, which is the objection `food-row.tsx` recorded against building this
-  early. That objection no longer applies to saved meals; it may still apply to any future
-  food-item image from an external source, so do not widen the prop to accept a URL without saying
-  why.
-- **Scope, explicitly:** this is the shared tile plus its call sites — the day screen rows, My meals
-  rows, Meal detail's hero, the ingredient lists. It is **not** a new capture flow; picking already
-  works.
-- **Verification.** Both states on every surface — a meal with a photo and a meal without — against
-  the artboards at 412 dp per BF-28. Then the device run: a data-URI image inside a scrolling list is
-  exactly the shape Samsung's WebView compositor has mishandled before.
-
 ### [nutrition] BF-31 — artboard 5 parity: Edit meal, and the batch footer that is its point
 
 - **Lane:** B
@@ -612,13 +561,12 @@ a large glyph and a `Photo` button on it.
   [`Journal`](overview/entries/2026-08-23-shared-food-row.md).
 - **✅ THE DIARY ROW SHIPPED 2026-08-25 (v1.367.0)** — with the delete this entry required moved into
   `QuickEditLogSheet` first, so no capability was dropped.
-- **⚑ THE THUMBNAIL DEFERRAL IS SUPERSEDED, 2026-08-25.** `food-row.tsx` records that the optional
-  thumbnail is *"deliberately not here yet — no call site passes one"*. The owner has now specified
-  it: *"it should show the default one in the mockup if no image is attached."* The tile is the
-  **always-present** state of the row, so the slot is no longer optional-in-practice. **BF-32 owns
-  the tile and the placeholder**; this entry owns the `FoodRow` prop it lands on. Do them in one PR
-  unless there is a reason not to, and delete that comment when you do — a stale "deliberately not
-  yet" reads as a decision rather than a superseded one.
+- **✅ THE THUMBNAIL SHIPPED 2026-08-26 (v1.379.0), with BF-32 in one PR** as this entry asked.
+  `FoodRow` gained `showThumb`/`thumbSrc` and the stale *"deliberately not here yet"* comment is
+  gone. **The artboards narrowed the scope BF-32's prose stated:** the tile is drawn on artboards 1
+  and 3 only — meal-level rows — and never on the ingredient rows inside a meal, so
+  `ingredient-search.tsx`, `food-library-sheet.tsx` and the builder's list do **not** opt in.
+  [`journal`](overview/entries/2026-08-26-meal-photo-tile.md).
 - **✅ THE WARNING DESIGN IS DECIDED, 2026-08-26 — option A, owner's pick.** The `Gate: owner` that
   held this entry is cleared. Three treatments were drawn at list density and put to the owner;
   the choice was **A**.
