@@ -1,7 +1,8 @@
 'use client'
 
 import { memo, useCallback } from 'react'
-import { Search, X, Loader2, Sparkles } from 'lucide-react'
+import { Search, X, Loader2, Sparkles, Link2 } from 'lucide-react'
+import { asHttpsUrl, hostOf } from './recipe-url'
 import type { FoodItem } from '@trainingai/shared/types/nutrition'
 import { FoodRow } from '@/components/nutrition/food-row'
 import type { FoodSearchResponse } from '@/app/api/nutrition/food-search/route'
@@ -17,6 +18,9 @@ interface Props {
   onAdd: (item: FoodItem) => void
   estimating: boolean
   onEstimate: () => void
+  /** Importing a pasted recipe link (BF-11c). Runs instead of the estimate, never beside it. */
+  importing: boolean
+  onImportRecipe: (url: string) => void
   dbResults: ExternalFood[]
   dbSearching: boolean
   dbUnavailable: boolean
@@ -40,10 +44,11 @@ interface Props {
  */
 export function IngredientSearch({
   query, onQueryChange, searchResults, onAdd,
-  estimating, onEstimate,
+  estimating, onEstimate, importing, onImportRecipe,
   dbResults, dbSearching, dbUnavailable, addingExternal, onAddExternal,
   showAddFood, onAddByHand,
 }: Props) {
+  const recipeUrl = asHttpsUrl(query.trim())
   return (
     <>
       {/* Ingredient search */}
@@ -81,7 +86,28 @@ export function IngredientSearch({
         </div>
       )}
 
-      {query.trim().length >= 2 && (
+      {recipeUrl ? (
+        // A pasted link is unambiguous, so it REPLACES the estimate rather than sitting beside it:
+        // running an AI estimate over the text of a URL produces a food called "https" with
+        // invented macros, which is worse than no offer at all.
+        <button
+          onClick={() => onImportRecipe(recipeUrl)}
+          disabled={importing}
+          className="w-full min-h-[48px] flex items-center gap-2 rounded-xl border border-brand/40 bg-brand/10 px-3 py-2 text-left active:bg-brand/5 disabled:opacity-50"
+        >
+          {importing
+            ? <Loader2 className="h-4 w-4 animate-spin flex-none text-brand" />
+            : <Link2 className="h-4 w-4 flex-none text-brand" />}
+          <span className="min-w-0 flex-1">
+            <span className="block truncate text-sm font-medium">
+              {importing ? `Reading ${hostOf(recipeUrl)}…` : `Import the recipe from ${hostOf(recipeUrl)}`}
+            </span>
+            <span className="block text-[11px] text-muted-foreground">
+              Every ingredient is added at its own weight, and each one is saved to your foods.
+            </span>
+          </span>
+        </button>
+      ) : query.trim().length >= 2 && (
         <button
           onClick={onEstimate}
           disabled={estimating}
@@ -101,7 +127,7 @@ export function IngredientSearch({
         </button>
       )}
 
-      {query.trim().length >= 2 && (dbSearching || dbResults.length > 0 || dbUnavailable) && (
+      {!recipeUrl && query.trim().length >= 2 && (dbSearching || dbResults.length > 0 || dbUnavailable) && (
         <div className="space-y-1.5">
           <p className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
             Food database
@@ -132,7 +158,7 @@ export function IngredientSearch({
         </div>
       )}
 
-      {query.trim() && searchResults.length === 0 && dbResults.length === 0 && !dbSearching && !showAddFood && (
+      {!recipeUrl && query.trim() && searchResults.length === 0 && dbResults.length === 0 && !dbSearching && !showAddFood && (
         <p className="text-sm text-muted-foreground">
           No results for &ldquo;{query}&rdquo;.{' '}
           <button

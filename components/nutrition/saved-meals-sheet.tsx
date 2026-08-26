@@ -2,7 +2,7 @@
 
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useState } from 'react'
 import { useUserTimezone } from '@/components/shell/user-timezone-provider'
-import { ChevronLeft, Plus, Minus, Trash2, Loader2, CheckSquare, Pencil, Camera } from 'lucide-react'
+import { ChevronLeft, Plus, Trash2, Loader2, CheckSquare, Pencil, Camera } from 'lucide-react'
 import { toast } from 'sonner'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { Button } from '@/components/ui/button'
@@ -30,6 +30,7 @@ import { FoodRow } from './food-row'
 import { QuantitySheet } from './quantity-sheet'
 import { qtyFromInput, steppedQty, type QtyUnit } from './saved-meal-qty'
 import { IngredientPicker } from './ingredient-picker'
+import { MealBatchSize } from './meal-batch-size'
 
 /** Which SCREEN is showing. The tab strip within the list screen is `listTab` below. */
 type SheetTab = 'meals' | 'build'
@@ -139,6 +140,9 @@ export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate,
   // The picker starts open for a NEW meal — an empty builder with a collapsed search is a dead end —
   // and closed when editing one, which is the state artboard 5 draws.
   const [pickerOpen, setPickerOpen] = useState(true)
+  // An imported recipe whose page never stated a yield: the figures below are the whole batch until
+  // the user says otherwise, and nothing else on screen would reveal that.
+  const [unstatedYield, setUnstatedYield] = useState(false)
 
   useEffect(() => {
     if (!open) return
@@ -183,6 +187,7 @@ export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate,
     setBuildSession(n => n + 1)
     setRenamingMeal(!meal)
     setPickerOpen(!meal || meal.items.length === 0)
+    setUnstatedYield(false)
     setTab('build')
   }, [])
 
@@ -199,6 +204,44 @@ export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate,
   function backToMeals() {
     setTab('meals')
     setEditingMeal(null)
+  }
+
+  /**
+   * A recipe pasted as a link becomes this meal (BF-11c).
+   *
+   * It fills three fields the builder already has rather than inventing a mode: the ingredients, the
+   * name (only when blank — a link pasted into a meal you have already named must not rename it),
+   * and the batch size.
+   *
+   * **An unstated yield is asked, never assumed.** `recipeYield: null` means the page never said how
+   * many the recipe serves, so what came back is the WHOLE batch. `SavedMeal.totals` is the whole
+   * recipe by contract and `oneServingItems()` is the one place that divides, so the honest landing
+   * is the ingredients as-is with `servings` left at 1 and a line saying so — the stepper is already
+   * on screen directly above. Guessing 1 here is the four-fold calorie error that reads as
+   * plausible; pre-dividing instead would double-divide on log.
+   */
+  // `[]` is stable by React's guarantee — a setter, not a value. Hoisted rather than inline because
+  // `MealBatchSize` is memoised and one inline arrow would defeat it silently (Q-490).
+  const clearUnstatedYield = useCallback(() => setUnstatedYield(false), [])
+
+  function importRecipe(recipe: { name: string; entries: { item: FoodItem; qty: number }[]; recipeYield: number | null }) {
+    setIngredients(prev => {
+      const next = [...prev]
+      for (const { item, qty } of recipe.entries) {
+        const at = next.findIndex(e => e.item.id === item.id)
+        if (at === -1) next.push({ item, qty })
+        else next[at] = { ...next[at], qty: next[at].qty + qty }
+      }
+      return next
+    })
+    setMealName(prevName => prevName.trim() ? prevName : recipe.name)
+    if (recipe.recipeYield != null && recipe.recipeYield > 1) {
+      setMealServings(recipe.recipeYield)
+      setUnstatedYield(false)
+    } else {
+      setUnstatedYield(recipe.recipeYield == null)
+    }
+    setRenamingMeal(false)
   }
 
   function addIngredient(item: FoodItem) {
@@ -562,54 +605,13 @@ export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate,
         ) : (
           <>
             <div className="flex-1 overflow-y-auto px-1 space-y-4 pb-2">
-              {/* Batch size. A recipe is often not one plate — the ingredients below describe the
-                  whole batch, and this is what turns that into a portion. Without it a meal plan
-                  put a two-serving tub of ice cream into one slot as if it were one meal. */}
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                  This recipe makes
-                </label>
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => setMealServings(v => Math.max(1, Math.round((v - 1) * 4) / 4))}
-                    aria-label="Fewer servings"
-                    className="flex-none w-12 h-12 rounded-lg bg-muted flex items-center justify-center"
-                  >
-                    <Minus className="h-4 w-4" />
-                  </button>
-                  <input
-                    type="number"
-                    inputMode="decimal"
-                    min={1}
-                    step={1}
-                    value={mealServings}
-                    onChange={e => {
-                      const n = parseFloat(e.target.value)
-                      if (Number.isFinite(n) && n >= 0.25) setMealServings(Math.min(50, Math.round(n * 4) / 4))
-                    }}
-                    aria-label="Servings this meal makes"
-                    className="min-w-0 flex-1 min-h-12 rounded-lg bg-muted px-2 text-sm font-bold tabular-nums text-center outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none"
-                  />
-                  <button
-                    onClick={() => setMealServings(v => Math.min(50, Math.round((v + 1) * 4) / 4))}
-                    aria-label="More servings"
-                    className="flex-none w-12 h-12 rounded-lg bg-muted flex items-center justify-center"
-                  >
-                    <Plus className="h-4 w-4" />
-                  </button>
-                  <span className="flex-none text-xs text-muted-foreground">
-                    {mealServings === 1 ? 'portion' : 'portions'}
-                  </span>
-                </div>
-                {mealServings !== 1 && (
-                  <p className="text-[11px] leading-snug text-muted-foreground">
-                    Enter the ingredients for the <strong>whole batch</strong> below. Logging this
-                    meal, and a meal plan using it, takes one portion —{' '}
-                    {Math.round(totalMacros.kcal / mealServings)} kcal of the{' '}
-                    {Math.round(totalMacros.kcal)} below.
-                  </p>
-                )}
-              </div>
+              <MealBatchSize
+                servings={mealServings}
+                onChange={setMealServings}
+                unstatedYield={unstatedYield}
+                onYieldAnswered={clearUnstatedYield}
+                batchKcal={totalMacros.kcal}
+              />
 
               {/* Ingredient list above search so existing items are visible first */}
               {ingredients.length > 0 && (
@@ -643,6 +645,7 @@ export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate,
                   active={open && tab === 'build'}
                   userId={userId}
                   onAdd={addIngredient}
+                  onImportRecipe={importRecipe}
                 />
               ) : (
                 <button
