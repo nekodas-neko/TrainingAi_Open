@@ -2999,3 +2999,15 @@ the 203 that would route to generation cannot be split after the fact, and the r
 where the code still knows whether an image was in hand.
 
 Both are the kind of thing that reads as a detail and re-scopes the work.
+
+## 2026-08-26 — `docs/implementation-backlog.md` raised, 12298 → 12324 (BF-36)
+
+One entry, filed to close an orphaned finding: the entries runaway limit blocked PR #527 for a
+condition that PR neither caused nor fixed, and it was flagged in conversation and never written
+down. Per **No orphaned findings**, that made it a dropped finding.
+
+The entry argues the targeting rather than the threshold — the check should fail a PR that **adds**
+an entry and merely note it for one that does not, using the attribution the doc-size ratchet a few
+lines above already performs. It also records why the two obvious alternatives are worse: raising
+the limit defers the collision and makes the eventual sweep bigger, and warn-only is how the
+directory reached 198 files.
