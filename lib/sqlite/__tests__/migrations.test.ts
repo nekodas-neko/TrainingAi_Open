@@ -5,7 +5,7 @@ describe('local schema', () => {
   // The describe and the title used to say v25 while the assertion said 27 — a stale label on a
   // guard whose whole job is to be the authority on the number. Named after what it checks now.
   it('tops out at the current version', () => {
-    expect(Math.max(...MIGRATIONS.map(m => m.toVersion))).toBe(29)
+    expect(Math.max(...MIGRATIONS.map(m => m.toVersion))).toBe(30)
   })
 
   it('v23 creates the meal-plan tables without any ALTER', () => {

@@ -27,6 +27,17 @@ export const FoodItemFieldsSchema = z.object({
   source:       z.enum(['manual', 'ai', 'barcode', 'text']).optional(),
   barcode:      z.string().max(20).optional(),
   region:       z.string().max(10).optional(),
+  /**
+   * BF-35. A capped base64 thumbnail. `.nullable()` as well as `.optional()` because the local
+   * mirror stores `null` for "no picture" and the outbox pushes what it stored — Zod `.optional()`
+   * alone REJECTS null, which is the bug that broke every food save in v1.42.4.
+   *
+   * The length bound is a coarse backstop only: the real cap is `FOOD_ITEM_IMAGE_MAX_BYTES` in
+   * bytes, enforced by `rejectMealImage` at the write site. Two definitions of one limit would
+   * drift, so this one is deliberately loose — it exists to keep a megabyte out of the parser,
+   * not to be the limit.
+   */
+  imageDataUri: z.string().max(64_000).nullable().optional(),
 })
 
 /** The offline-push shape: the same fields, plus the client-generated row id. */

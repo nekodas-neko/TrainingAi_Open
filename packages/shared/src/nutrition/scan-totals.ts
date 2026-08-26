@@ -66,6 +66,8 @@ export interface RawNutrition {
   confidence?: string
   notes?: string
   ingredients?: NutritionIngredient[]
+  /** BF-35. Carried from a barcode/search lookup's Open Food Facts thumbnail. */
+  imageDataUri?: string | null
 }
 
 function clamp(v: number, min: number, max: number) { return Math.max(min, Math.min(max, v)) }

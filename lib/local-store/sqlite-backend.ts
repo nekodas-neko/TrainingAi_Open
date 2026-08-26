@@ -2151,18 +2151,19 @@ export class SQLiteLocalStore implements LocalStore {
     await runSQL(
       `INSERT INTO food_items
          (id, name, brand, serving_size_g, calories, protein_g, carbs_g, fat_g,
-          fiber_g, sugar_g, sodium_mg, sat_fat_g, source, updated_at)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+          fiber_g, sugar_g, sodium_mg, sat_fat_g, source, image_data_uri, updated_at)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
        ON CONFLICT(id) DO UPDATE SET
          name=excluded.name, brand=excluded.brand, serving_size_g=excluded.serving_size_g,
          calories=excluded.calories, protein_g=excluded.protein_g, carbs_g=excluded.carbs_g,
          fat_g=excluded.fat_g, fiber_g=excluded.fiber_g, sugar_g=excluded.sugar_g,
          sodium_mg=excluded.sodium_mg, sat_fat_g=excluded.sat_fat_g, source=excluded.source,
+         image_data_uri=excluded.image_data_uri,
          updated_at=excluded.updated_at`,
       [
         record.id, record.name, record.brand, record.servingSizeG, record.calories,
         record.proteinG, record.carbsG, record.fatG, record.fiberG, record.sugarG,
-        record.sodiumMg, record.satFatG, record.source, record.updatedAt,
+        record.sodiumMg, record.satFatG, record.source, record.imageDataUri, record.updatedAt,
       ],
     );
   }

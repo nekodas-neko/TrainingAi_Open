@@ -3039,3 +3039,28 @@ conflict a lot" would be re-litigated by whoever picks it up.
 entry did **not** name, because a session reading only the entry would fix one of three; the
 reproduction detail and the not-batched-with-TN-1 reasoning are in
 `docs/overview/entries/2026-08-26-fix-daily-summary-replace-guard.md`.
+
+## 2026-08-26 — backlog → 12348 (+44), `projectOverview.md` → 8082 (+11), BF-35
+
+Three amendments to BF-35, all of them corrections rather than additions, made before implementing it
+and verified against the code rather than reasoned about:
+
+- Its closing section still concluded **"never generate one"** — the pre-decision recommendation the
+  owner overruled the same day. A session skimming to the measured-evidence block would have built
+  the opposite of what was decided.
+- It sized the feature against **database storage**. `food_items` is a synced domain, so the binding
+  constraint is outbox and on-device payload — the exact axis confusion `meal-image.ts` warns about
+  by name, where `users.avatar`'s harmless 5 MB becomes "the largest single regression the sync
+  engine has taken" if copied to a synced table.
+- **"The scan photo is already in the request, so keeping it is free"** is half true: the request
+  carries 1024 px because the model has to read the label, against a 128 px thumbnail — ~64× the
+  pixels. The fix lives in `capture-step.tsx`, which is Lane B, so route 2 is split across lanes.
+
+The pointer table also moves (migration 227 → 229, SQLite v29 → v30), which is two lines of the
+count and is what `check-backlog-pointers.js` enforces.
+
+The remaining fifteen are BF-35's `Keep:` line. It stays queued because only the engine half of two
+of its three routes shipped: the render and route 2's client downscale are Lane B, route 3 is
+unbuilt, and the search route's deliberate omission needed its reason recorded (60 products, so a
+thumbnail each is 60 requests per search). A `Keep:` that says only "partly done" sends the next
+session to re-derive all of that.

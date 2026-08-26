@@ -3,7 +3,8 @@ import { z } from 'zod'
 import { auth } from '@/auth'
 import { rateLimit } from '@/lib/rate-limit'
 import { reportServerError } from '@/lib/observability'
-import { offProductToNutrition, offFetchJson, OFF_FIELDS, OFF_TIMEOUT_MS } from '@trainingai/shared/nutrition/open-food-facts'
+import { offProductToNutrition, offFetchJson, fetchOffThumbDataUri, OFF_FIELDS, OFF_TIMEOUT_MS, type OffProduct } from '@trainingai/shared/nutrition/open-food-facts'
+import { FOOD_ITEM_IMAGE_MAX_BYTES } from '@trainingai/shared/nutrition/meal-image'
 
 // Built from `searchParams` below, not a raw client body — `.strict()` guards nothing today but
 // costs nothing and catches the day this route reads a spread of the query instead (Q-464).
@@ -67,6 +68,18 @@ export async function GET(req: Request) {
   const result = offProductToNutrition(data.product)
   if (!result) return NextResponse.json({ notFound: true }, { status: 404 })
   result.notes = 'From Open Food Facts barcode database'
+
+  // BF-35. The thumbnail URL rode the lookup above for free; turning it into something this app can
+  // store costs one fetch, here, once per scan — never per render. Bytes rather than the URL because
+  // `food_items` is read local-first and a URL renders nothing in airplane mode.
+  //
+  // Awaited deliberately: the result has to carry the image, and OFF's thumb is ~6 KB off a CDN.
+  // `fetchOffThumbDataUri` swallows every failure and returns null, so this cannot turn a working
+  // barcode scan into a failed one — the worst case is the placeholder tile BF-32 already ships.
+  result.imageDataUri = await fetchOffThumbDataUri(
+    (data.product as OffProduct).image_front_thumb_url,
+    FOOD_ITEM_IMAGE_MAX_BYTES,
+  )
 
   return NextResponse.json(result)
 }

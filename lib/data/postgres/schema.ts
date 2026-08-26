@@ -577,6 +577,9 @@ export const foodItems = pgTable('food_items', {
   source:       text('source').notNull().$type<'ai' | 'barcode' | 'manual' | 'text'>(),
   barcode:      text('barcode'),
   region:       text('region').notNull().default('AU'),
+  // BF-35 (migration 227). Bytes, not a URL — this table is read local-first and mirrored into
+  // on-device SQLite, where a URL renders nothing offline. Capped by FOOD_ITEM_IMAGE_MAX_BYTES.
+  imageDataUri: text('image_data_uri'),
   createdAt:    timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 })
 

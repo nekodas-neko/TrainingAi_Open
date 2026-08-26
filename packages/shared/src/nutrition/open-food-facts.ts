@@ -13,6 +13,16 @@ export interface OffProduct {
   serving_size?: string
   nutriments?: Record<string, number | undefined>
   code?: string
+  /**
+   * BF-35. The ~100px front-of-pack thumbnail, on the same product object the barcode and search
+   * calls already fetch — so asking for it costs a field in a query string, not a request.
+   *
+   * It is a URL, and this app cannot store a URL: `food_items` is read local-first and mirrored into
+   * on-device SQLite, where a URL renders nothing in airplane mode. The bytes are fetched once, at
+   * item creation, by `fetchOffThumbDataUri` below. Absent on plenty of products; that is normal and
+   * BF-32's placeholder tile is the answer.
+   */
+  image_front_thumb_url?: string
 }
 
 const NUM = String.raw`(\d+(?:[.,]\d+)?)`
@@ -77,8 +87,52 @@ export function offProductToNutrition(p: OffProduct): NutritionScanResult | null
 }
 
 /** The fields both the barcode and search calls ask OFF for. */
-export const OFF_FIELDS = 'code,product_name,brands,serving_size,nutriments'
+export const OFF_FIELDS = 'code,product_name,brands,serving_size,nutriments,image_front_thumb_url'
 export const OFF_USER_AGENT = 'TrainingAI/1.0'
+
+/**
+ * Fetch an OFF thumbnail and return it as a capped base64 data URI, or `null`.
+ *
+ * **Why bytes rather than the URL** (BF-35): `food_items` is read local-first and mirrored into
+ * on-device SQLite, so a URL renders nothing in airplane mode — the same reasoning
+ * `meal-image.ts` records for `saved_meals.image_data_uri`. The URL is free; making it *renderable*
+ * is what costs a request, and it is one request per NEW item, never per render.
+ *
+ * **Infallible on purpose.** A picture is decoration on a row whose nutrition is already correct, so
+ * every failure path — unreachable, non-2xx, wrong content type, oversized, a body that is not an
+ * image — returns `null` and leaves BF-32's placeholder in place. It must never be able to fail a
+ * food save.
+ *
+ * The cap is checked against the DECODED size before encoding, so an oversized image is dropped
+ * without ever being base64'd; `maxBytes` is the caller's (`FOOD_ITEM_IMAGE_MAX_BYTES`) so this
+ * function does not import a nutrition constant it would otherwise have no reason to know.
+ */
+export async function fetchOffThumbDataUri(
+  url: string | undefined,
+  maxBytes: number,
+  opts?: { signal?: AbortSignal },
+): Promise<string | null> {
+  if (!url) return null
+  try {
+    const res = await fetch(url, { headers: { 'User-Agent': OFF_USER_AGENT }, signal: opts?.signal })
+    if (!res.ok) return null
+    const type = (res.headers.get('content-type') ?? '').split(';')[0].trim().toLowerCase()
+    if (!OFF_THUMB_MIME.includes(type)) return null
+    const bytes = new Uint8Array(await res.arrayBuffer())
+    // Checked before encoding: base64 is 4/3 the size, so encoding first to measure would allocate
+    // a third more than the thing we are about to throw away.
+    if (bytes.byteLength === 0 || bytes.byteLength > maxBytes) return null
+    let binary = ''
+    for (const b of bytes) binary += String.fromCharCode(b)
+    return `data:${type};base64,${btoa(binary)}`
+  } catch {
+    return null
+  }
+}
+
+/** What OFF actually serves for a thumbnail, and what every target can render. */
+const OFF_THUMB_MIME = ['image/jpeg', 'image/png', 'image/webp']
+
 
 export const OFF_TIMEOUT_MS = 9000
 export const OFF_RETRY_DELAY_MS = 400

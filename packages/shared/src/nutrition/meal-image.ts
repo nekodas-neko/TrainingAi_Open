@@ -20,6 +20,22 @@
 /** 128 x 128 WebP lands around 6 KB; 16 KB is generous headroom, and 100 meals is then ~600 KB. */
 export const SAVED_MEAL_IMAGE_MAX_BYTES = 16 * 1024
 
+/**
+ * The same cap for a food item's picture (BF-35), and it lives here rather than beside the food code
+ * because the reasoning above is what governs it — `food_items` syncs too, so an image on it rides
+ * the outbox push, the pull delta and the device's SQLite copy exactly as a saved meal's does.
+ *
+ * **It is a separate constant deliberately, not a re-export.** The two are equal today and there is
+ * a real chance they should not stay equal: there are far more food items than saved meals (209
+ * against a handful, measured 2026-08-26), so if either number ever moves it is this one, and a
+ * shared constant would move both. Equal values, independent knobs.
+ *
+ * Sources are an Open Food Facts thumbnail (~100 px, already small) or the user's own scan photo
+ * downscaled to the same 128 px box. Neither should come close to the cap; the check is for the
+ * case where one does.
+ */
+export const FOOD_ITEM_IMAGE_MAX_BYTES = 16 * 1024
+
 /** The formats a browser canvas can produce and every target can render. */
 const ALLOWED_MIME = ['image/webp', 'image/jpeg', 'image/png']
 
@@ -46,21 +62,30 @@ export function mealImageBytes(dataUri: string | null | undefined): number {
  * **Server-side, always** — the client downscales before upload, but a client-side cap is not a cap.
  * `null`/empty is valid and means "no image", which is how a photo is removed.
  */
-export function rejectMealImage(dataUri: string | null | undefined): MealImageRejection | null {
+export function rejectMealImage(
+  dataUri: string | null | undefined,
+  /** BF-35 — a food item's picture is validated by the same rules against its own cap. Defaulted so
+   *  every existing saved-meal call site is unchanged; pass `FOOD_ITEM_IMAGE_MAX_BYTES` for a food. */
+  maxBytes: number = SAVED_MEAL_IMAGE_MAX_BYTES,
+): MealImageRejection | null {
   if (!dataUri) return null
 
   const match = /^data:([^;,]+);base64,([\s\S]*)$/.exec(dataUri)
   if (!match) return 'not_a_data_uri'
   if (!ALLOWED_MIME.includes(match[1].toLowerCase())) return 'unsupported_type'
-  if (mealImageBytes(dataUri) > SAVED_MEAL_IMAGE_MAX_BYTES) return 'too_large'
+  if (mealImageBytes(dataUri) > maxBytes) return 'too_large'
   return null
 }
 
-/** A sentence for the rejection, so every caller says the same thing. */
-export function mealImageRejectionMessage(reason: MealImageRejection): string {
+/** A sentence for the rejection, so every caller says the same thing. The cap has to be passed when
+ *  it was passed to `rejectMealImage`, or the message quotes a limit that is not the one enforced. */
+export function mealImageRejectionMessage(
+  reason: MealImageRejection,
+  maxBytes: number = SAVED_MEAL_IMAGE_MAX_BYTES,
+): string {
   switch (reason) {
     case 'not_a_data_uri':   return 'Image must be a base64 data URI'
     case 'unsupported_type': return 'Unsupported image type (use WebP, JPEG or PNG)'
-    case 'too_large':        return `Image too large (max ${SAVED_MEAL_IMAGE_MAX_BYTES / 1024} KB — resize before saving)`
+    case 'too_large':        return `Image too large (max ${maxBytes / 1024} KB — resize before saving)`
   }
 }

@@ -1,0 +1,31 @@
+-- BF-35: somewhere to put a food's picture.
+--
+-- The owner asked whether an AI food match could bring an image, gated on "only if it doesnt add
+-- more time/expense", and set the routing on 2026-08-26: the barcode lookup's own product image,
+-- the user's scan photo, and a generated image for a typed food. All three need the same column.
+--
+-- ## Bytes, not a URL — and that is not the obvious choice
+--
+-- Open Food Facts serves `image_front_thumb_url` on the product object the barcode call already
+-- fetches, so a URL is free in a way bytes are not. It is still the wrong shape here.
+-- `food_items` is read local-first and mirrored into on-device SQLite, and a URL renders nothing in
+-- airplane mode — which breaks the standing rule that a local table must hold everything needed to
+-- render its row offline. `packages/shared/src/nutrition/meal-image.ts` made the same call for
+-- `saved_meals.image_data_uri` and documents the reasoning; this is the same decision on the same
+-- grounds, so the two columns match in name and shape rather than diverging.
+--
+-- The cost of storing bytes is one server-side fetch per NEW food item, never per render. OFF's
+-- thumb is already ~100px, so nothing has to be re-encoded and no image library is needed.
+--
+-- ## The size cap is a SYNC budget, not a disk budget
+--
+-- `food_items` is a synced domain (`MUTATION_DOMAINS`), so every image rides the outbox push, the
+-- pull delta and the device's SQLite copy. Sizing this against database storage is the mistake
+-- `meal-image.ts` warns about by name: `users.avatar` allows 5 MB harmlessly because it is one row
+-- per user that never enters the sync delta. The cap lives beside `SAVED_MEAL_IMAGE_MAX_BYTES` and
+-- is enforced in the shared validator, not here — a CHECK constraint on a base64 length would be a
+-- second, drifting definition of the same number.
+--
+-- Nullable with no default: a food without a picture is the normal case, and BF-32 already put a
+-- placeholder tile on every row for exactly that.
+ALTER TABLE food_items ADD COLUMN IF NOT EXISTS image_data_uri TEXT;

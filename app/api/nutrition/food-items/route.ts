@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { FoodItemFieldsSchema } from '@trainingai/shared/validation/food-item'
+import { rejectMealImage, mealImageRejectionMessage, FOOD_ITEM_IMAGE_MAX_BYTES } from '@trainingai/shared/nutrition/meal-image'
 import { sanitiseNutrition } from '@trainingai/shared/nutrition/scan-totals'
 import { auth } from '@/auth'
 import { getRepository } from '@/lib/data'
@@ -46,6 +47,18 @@ export async function POST(req: Request) {
     servingSizeG: body.servingSizeG, fiberG: body.fiberG, sugarG: body.sugarG,
     sodiumMg: body.sodiumMg, satFatG: body.satFatG,
   })
+  // BF-35. Server-side, always — a client-side cap is not a cap, and this one is a SYNC budget:
+  // `food_items` rides the outbox and the device's SQLite copy, so an oversized image is paid on
+  // every device forever. Interactive caller, so it is refused with a message; the offline push
+  // branch drops the field instead (see `pushMutations`), because a picture must not cost a food.
+  const imageRejection = rejectMealImage(body.imageDataUri, FOOD_ITEM_IMAGE_MAX_BYTES)
+  if (imageRejection) {
+    return NextResponse.json(
+      { error: mealImageRejectionMessage(imageRejection, FOOD_ITEM_IMAGE_MAX_BYTES) },
+      { status: 400 },
+    )
+  }
+
   const repo = await getRepository()
   const item = await repo.createFoodItem(userId, {
     name: body.name, brand: body.brand,
@@ -58,6 +71,7 @@ export async function POST(req: Request) {
     sodiumMg: sanitised.sodiumMg, satFatG: sanitised.satFatG,
     source: body.source ?? 'manual',
     barcode: body.barcode, region: body.region ?? 'AU',
+    imageDataUri: body.imageDataUri ?? null,
   })
   return NextResponse.json(item, { status: 201 })
 }
