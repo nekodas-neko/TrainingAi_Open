@@ -1,7 +1,7 @@
 'use client'
 
 import { memo } from 'react'
-import { ChevronRight } from 'lucide-react'
+import { AlertTriangle, ChevronRight } from 'lucide-react'
 import { MealThumb } from './meal-thumb'
 
 interface Props {
@@ -24,6 +24,17 @@ interface Props {
   /** Keeps the tapped row visible under a sheet's scrim, so the sheet reads as belonging to it
    *  rather than as an unrelated screen (Q-395a). */
   highlighted?: boolean
+  /**
+   * An amber caution line under `secondary`. Q-406's owner decision (2026-08-26): the warning
+   * **stays in the row**. The decided design had sent its sentence to the food's detail, and this
+   * surface has none — tapping the row adds the food outright — so building that would have deleted
+   * the only visible explanation on a warning meant to be read *before* use.
+   *
+   * One optional string, not a node: three call sites omit it, the same as the six other optional
+   * props here. The entry's "no warning slot" bullet was written when the sentence was leaving the
+   * row; it is not, so a slot is what keeping it costs.
+   */
+  warning?: string | null
   onPress?: () => void
   /** Row is `<button>` when pressable and a plain `<div>` otherwise — never a div with a click
    *  handler, which the WebView treats as untappable for accessibility purposes. */
@@ -53,7 +64,7 @@ interface Props {
  * with a fixed width is what makes a column of numbers scannable.
  */
 export const FoodRow = memo(function FoodRow({
-  name, secondary, calories, showChevron, showThumb, thumbSrc, highlighted, onPress, disabled,
+  name, secondary, calories, showChevron, showThumb, thumbSrc, highlighted, warning, onPress, disabled,
 }: Props) {
   const body = (
     <>
@@ -62,6 +73,18 @@ export const FoodRow = memo(function FoodRow({
         <span className="block truncate text-sm font-medium leading-snug">{name}</span>
         {secondary && (
           <span className="mt-0.5 block truncate text-xs text-muted-foreground">{secondary}</span>
+        )}
+        {warning && (
+          // Not truncated, unlike the lines above: a caution that trails off into an ellipsis is a
+          // caution nobody reads. The icon carries the state alongside the words, so this is not
+          // colour-only.
+          <span
+            className="mt-0.5 flex items-start gap-1 text-[10px] leading-snug"
+            style={{ color: 'var(--accent-amber)' }}
+          >
+            <AlertTriangle className="mt-px h-3 w-3 flex-none" />
+            {warning}
+          </span>
         )}
       </span>
       <span className="w-16 flex-none text-right text-sm font-semibold tabular-nums">
