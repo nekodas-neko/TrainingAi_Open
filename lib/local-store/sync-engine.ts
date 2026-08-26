@@ -157,6 +157,10 @@ export async function pullDelta(userId: string, force = false, fullResync = fals
     respiratoryRate: (r.respiratoryRate as number) ?? null,
     sleepPhase5Min:  (r.sleepPhase5Min as string) ?? null,
     timeInBedHours:  (r.timeInBedHours as number) ?? null,
+    // Q-519 — carried through the pull so a device shows the bedtime the user recorded from
+    // anywhere. It is a plain value here, not a merge input: nothing on the device derives a
+    // window, duration or efficiency from it.
+    manualSleepStart: r.manualSleepStart ? toIso(r.manualSleepStart) : null,
     syncStatus:      'synced' as const,
     updatedAt:       toIso(r.updatedAt),
   } satisfies LocalSleepSession));

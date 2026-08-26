@@ -28,9 +28,18 @@ const timeInBed = (last.sleepEnd.getTime() - first.sleepStart.getTime()) / 3_600
 efficiency: timeInBed > 0 ? Math.min(100, Math.round((totalSleep / timeInBed) * 100)) : null,
 ```
 
-On the owner's own reported night — measured 04:23→08:03, 3 h 5 m — a manual bedtime of 23:00 gives
-`timeInBed = 9.05 h` and `efficiency = round(3.08 / 9.05 × 100)` = **34%**. That is the entry's
-hypothetical, to the number.
+**Reproduced in a test rather than argued** (`packages/shared/src/health/__tests__/manual-bedtime-isolation.test.ts`).
+On the owner's own reported night — measured 04:23→08:03, 3 h 5 m — plus one same-date fragment (an
+08:30–09:00 doze, the shape Q-274 measures ten of in production):
+
+| | time in bed | efficiency |
+|---|---|---|
+| the rejected design (`sleep_start` overwritten) | **10.0 h** | **35%** |
+| the measured window | 4.62 h | 75% |
+
+Same night, same 3.48 h of measured sleep. Twice the time in bed and less than half the efficiency —
+the entry's hypothetical, arrived at by running it. Both numbers are pinned exactly, so reinstating
+the design fails the suite rather than a review.
 
 **It is guarded, but not by anything the design controls.** `aggregateNight` returns the row
 untouched when the night has exactly one window; the recomputation runs only on a **fragmented**

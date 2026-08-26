@@ -27,6 +27,16 @@
 **Version:** v1.383.6 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-08-26.
 
+**A remembered bedtime, in its own column (Q-519, engine half).** A night the ring only caught from
+4 am reads as a 4 am bedtime and moves the 14-day estimate ~23 minutes for a fortnight. The entry
+proposed writing it into `sleep_start` at `manual` rank; **the audit that entry commissioned falsified
+that** — `aggregateNight` derives time-in-bed and efficiency from the span, so the same night became
+10.0 h at 35% instead of 4.62 h at 75%
+([audit](docs/reviews/2026-08-26-manual-bedtime-write-audit.md), reproduced in a test). It gets its
+own column, read by the bedtime estimate and nothing else. **No UI yet — Lane B's half**, so nothing
+can write one; ⚠️ **the local column is not device-verified.**
+[Journal](docs/overview/entries/2026-08-26-manual-bedtime-engine.md).
+
 **Every score now stores the breakdown it was made of (Q-501, Q-526).** Readiness contributors record
 the number each was scored *from*, so a persisted row no longer needs today's summary — often not the
 one it was built on — to explain itself: self-consistent means the **inputs** were rewritten,

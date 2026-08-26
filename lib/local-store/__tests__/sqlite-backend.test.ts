@@ -33,7 +33,8 @@ const sleepSession = {
   remSleepHours: 1.8, lightSleepHours: 4.5, ouraId: 'oura-abc', efficiency: 91,
   onsetLatencySec: 600, averageHrvMs: 62, avgHeartRate: 54, lowestHeartRate: 48,
   restlessPeriods: 12, sleepScore: 84, respiratoryRate: 14.2, sleepPhase5Min: '1,2,3',
-  timeInBedHours: 8.1, syncStatus: 'synced' as const, updatedAt: '2026-07-01T09:00:00.000Z',
+  timeInBedHours: 8.1, manualSleepStart: '2026-06-30T13:00:00.000Z',
+  syncStatus: 'synced' as const, updatedAt: '2026-07-01T09:00:00.000Z',
 }
 const ouraDailyRow = {
   day: '2026-07-01', readinessScore: 80, sleepScore: 84, activityScore: 77,
@@ -250,6 +251,43 @@ describe('applyDelta pull-clobber guards', () => {
     expect(params).toContain('oura-abc')  // ouraId
     expect(params).toContain(62)          // averageHrvMs
     expect(params).toContain('1,2,3')     // sleepPhase5Min stage codes
+  })
+
+  // Q-519. A column present in the delta and absent from this statement is the exact sync-drift
+  // shape the standing rule names: server payload, delta output and applyDelta columns must be one
+  // set, and a mismatch shows up as data that silently never reaches the device.
+  it('sleep_sessions upsert carries the remembered bedtime (Q-519)', async () => {
+    await store.applyDelta({ sleepSessions: [sleepSession] })
+    const stmt = sqlCalls().find(s => s.includes('INTO sleep_sessions'))!
+    expect(stmt).toContain('manual_sleep_start')
+    expect(stmt).toContain('manual_sleep_start=excluded.manual_sleep_start')
+    const params = runSQL.mock.calls.find(c => String(c[0]).includes('INTO sleep_sessions'))![1] as unknown[]
+    expect(params).toContain('2026-06-30T13:00:00.000Z')
+
+    // Column count must equal the VALUES arity, or every value after the missing column lands one
+    // slot to the left — silent, and worse than not writing it at all. Counting placeholders alone
+    // does NOT catch this: dropping a column name while keeping its `?` leaves both counts matching
+    // the params array and only the columns short. (Found by mutating exactly that.)
+    const cols = stmt.slice(stmt.indexOf('(') + 1, stmt.indexOf('VALUES')).replace(/\)\s*$/, '')
+      .split(',').map(c => c.trim()).filter(Boolean)
+    const values = stmt.slice(stmt.indexOf('VALUES ('))
+    const arity = values.slice(0, values.indexOf(')')).split(',').length
+    expect(cols).toHaveLength(arity)
+    expect((stmt.slice(0, stmt.indexOf('ON CONFLICT')).match(/\?/g) ?? []).length).toBe(params.length)
+  })
+
+  it('getSleepSessions reads the remembered bedtime back (Q-519)', async () => {
+    querySQL.mockResolvedValueOnce([{
+      id: 'ss-1', date: '2026-07-01', duration_hours: 7.5, deep_sleep_hours: 1.2,
+      rem_sleep_hours: 1.8, light_sleep_hours: 4.5, oura_id: 'oura-abc', efficiency: 91,
+      onset_latency_sec: 600, average_hrv_ms: 62, avg_heart_rate: 54, lowest_heart_rate: 48,
+      restless_periods: 12, sleep_score: 84, respiratory_rate: 14.2, sleep_phase_5_min: '1,2,3',
+      time_in_bed_hours: 8.1, manual_sleep_start: '2026-06-30T13:00:00.000Z',
+      sync_status: 'synced', updated_at: '2026-07-01T09:00:00.000Z',
+    }])
+    const [row] = await store.getSleepSessions('2026-07-01')
+    expect(row.manualSleepStart).toBe('2026-06-30T13:00:00.000Z')
+    expect(row.durationHours).toBe(7.5)   // and nothing else moved
   })
 
   it('oura_daily upsert is clobber-guarded, not INSERT OR REPLACE (D4)', async () => {

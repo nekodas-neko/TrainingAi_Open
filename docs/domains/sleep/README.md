@@ -22,6 +22,18 @@ canonical-display-source table in the same section).
 
 ## Reference docs
 
+- [`docs/reviews/2026-08-26-manual-bedtime-write-audit.md`](../../reviews/2026-08-26-manual-bedtime-write-audit.md)
+  — **what reads the sleep WINDOW, as opposed to the stored duration columns, 2026-08-26** (Q-519's own
+  commissioned audit, which falsified Q-519's design). Three consumers derive behaviour from
+  `sleepStart`/`sleepEnd` rather than from `duration_hours`/`efficiency`: `aggregateNight` recomputes
+  time-in-bed **and efficiency** from the span on a fragmented night, the daytime-HRV model decides
+  which samples are "nightly" by window membership off **stored** rows, and `primaryCluster` unions
+  same-date rows within an hour of the window. Widening a measured 3 h 5 m night with a remembered
+  23:00 gave **10.0 h at 35%** against 4.62 h at 75%, reproduced in a test. **Read this before writing
+  anything to `sleep_start`** — the standing assumption that duration and efficiency are "stored, not
+  derived" is true of the columns and false of the pipeline. Also records one consumer that looks
+  affected and is not: `stress-resilience` runs the identical window test but reads the rollup's own
+  freshly-built rows, never storage.
 - [`docs/reviews/2026-08-26-pillar-review.md`](../../reviews/2026-08-26-pillar-review.md) — **the five Home pillars answered, 2026-08-26.** Sleep's "60 is way off" has **three** causes: the display curve (**TN-5**, signed off — a 73.15 blend maps to exactly 57, where TN-5's curve gives ≈63), the duration curve whose comment and anchors disagree by ~15 points (**TN-10**), and a genuine autonomic dip that night. **And 2026-08-19 still holds 3.50 h in `oura_daily_summary` and still feeds every trailing baseline** — nothing in the pipeline removed or flagged it, Q-520's flag is unbuilt, and the owner has now asked twice. Filed **TN-14**, which also says to decode the night's raw frames before assuming the 3.50 h is wrong.
 - [`docs/reviews/2026-08-24-sleep-score-volatility.md`](../../reviews/2026-08-24-sleep-score-volatility.md)
   — **"the scores have been very varied lately", measured 2026-08-24.** Stored sleep score's

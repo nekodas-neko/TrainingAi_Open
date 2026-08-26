@@ -2558,7 +2558,30 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       respiratoryRate: r.respiratoryRate ?? undefined,
       sleepPhase5Min:  r.sleepPhase5Min  ?? undefined,
       timeInBedHours:  r.timeInBedHours  ?? undefined,
+      manualSleepStart: r.manualSleepStart ?? null,
     }))
+  }
+
+  /**
+   * Q-519 — record (or clear, with `null`) the bedtime the user remembers for a night the ring did
+   * not observe.
+   *
+   * **Writes one column on an existing row and creates nothing.** A night with no session row has no
+   * measured sleep to correct the bedtime *of*, and inventing a row here would put a session with no
+   * duration into every consumer that counts nights. `false` says nothing matched, so the caller can
+   * answer honestly rather than reporting a save that changed no row.
+   *
+   * It deliberately does **not** go through `mergeSet`/`source_map`: that merge ranks competing
+   * *measurements* of one quantity, and this is a different quantity in its own column. See
+   * `docs/reviews/2026-08-26-manual-bedtime-write-audit.md` for what happened when it was not.
+   */
+  async setManualSleepStart(userId: string, date: string, at: Date | null): Promise<boolean> {
+    const updated = await this.db
+      .update(s.sleepSessions)
+      .set({ manualSleepStart: at, updatedAt: new Date() })
+      .where(and(eq(s.sleepSessions.userId, userId), eq(s.sleepSessions.date, date)))
+      .returning({ id: s.sleepSessions.id })
+    return updated.length > 0
   }
 
   async getExerciseMuscleAssignments(names: string[]): Promise<Record<string, MuscleAssignment[]>> {
@@ -4546,6 +4569,32 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
             sleepPhase5Min:  str(p.sleepPhase5Min),
             timeInBedHours:  num(p.timeInBedHours),
           }], 'oura_ble')
+          processed++
+        } else if (mut.domain === 'manual_bedtime') {
+          // Q-519. Calls the same `setManualSleepStart` the web route calls, so the two write paths
+          // cannot drift — the standing rule that one bad `pushMutations` branch is how the web half
+          // works while the APK mutation strands silently.
+          //
+          // **Deliberately NOT routed through `upsertOuraSleep`/`mergeSet`**, unlike the
+          // `sleep_session` branch above. That merge ranks competing *measurements* of one quantity;
+          // a remembered bedtime is a different quantity in its own column, and the audit behind that
+          // split is docs/reviews/2026-08-26-manual-bedtime-write-audit.md.
+          //
+          // A date with no session row is a permanent 4xx, not a transient one — the night will not
+          // appear later because of a retry — so it quarantines rather than retrying forever.
+          const p = clean as Record<string, unknown>
+          const raw = p.at
+          if (raw != null && typeof raw !== 'string') {
+            throw new Error('manual_bedtime: `at` must be an ISO string or null')
+          }
+          const at = raw != null ? new Date(raw) : null
+          if (at != null && Number.isNaN(at.getTime())) {
+            throw new Error('manual_bedtime: unparseable `at`')
+          }
+          const saved = await this.setManualSleepStart(userId, mut.date.replace(/\//g, '-'), at)
+          if (!saved) {
+            throw new Error(`manual_bedtime: no sleep session for ${mut.date}`)
+          }
           processed++
         } else if (mut.domain === 'plan_meal_answers') {
           // Q-187 phase 2. Calls the same `mp.savePlanMealAnswer` / `mp.deletePlanMealAnswer` the

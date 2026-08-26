@@ -126,6 +126,7 @@ export class SQLiteLocalStore implements LocalStore {
       respiratoryRate: (r.respiratory_rate as number) ?? null,
       sleepPhase5Min:  (r.sleep_phase_5_min as string) ?? null,
       timeInBedHours:  (r.time_in_bed_hours as number) ?? null,
+      manualSleepStart: (r.manual_sleep_start as string) ?? null,
       syncStatus:      (r.sync_status as 'pending' | 'synced') ?? 'synced',
       updatedAt:       String(r.updated_at),
     }));
@@ -1374,8 +1375,9 @@ export class SQLiteLocalStore implements LocalStore {
            (id, date, duration_hours, deep_sleep_hours, rem_sleep_hours,
             light_sleep_hours, oura_id, efficiency, onset_latency_sec, average_hrv_ms,
             avg_heart_rate, lowest_heart_rate, restless_periods, sleep_score,
-            respiratory_rate, sleep_phase_5_min, time_in_bed_hours, updated_at, sync_status)
-         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'synced')
+            respiratory_rate, sleep_phase_5_min, time_in_bed_hours, manual_sleep_start,
+            updated_at, sync_status)
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'synced')
          ON CONFLICT(id) DO UPDATE SET
            date=excluded.date, duration_hours=excluded.duration_hours,
            deep_sleep_hours=excluded.deep_sleep_hours,
@@ -1387,13 +1389,14 @@ export class SQLiteLocalStore implements LocalStore {
            restless_periods=excluded.restless_periods, sleep_score=excluded.sleep_score,
            respiratory_rate=excluded.respiratory_rate, sleep_phase_5_min=excluded.sleep_phase_5_min,
            time_in_bed_hours=excluded.time_in_bed_hours,
+           manual_sleep_start=excluded.manual_sleep_start,
            updated_at=excluded.updated_at, sync_status='synced'
          WHERE sleep_sessions.sync_status='synced'
            AND excluded.updated_at > sleep_sessions.updated_at`,
         [r.id, r.date, r.durationHours, r.deepSleepHours, r.remSleepHours, r.lightSleepHours,
          r.ouraId, r.efficiency, r.onsetLatencySec, r.averageHrvMs, r.avgHeartRate,
          r.lowestHeartRate, r.restlessPeriods, r.sleepScore, r.respiratoryRate,
-         r.sleepPhase5Min, r.timeInBedHours, r.updatedAt],
+         r.sleepPhase5Min, r.timeInBedHours, r.manualSleepStart, r.updatedAt],
       );
     }
 
