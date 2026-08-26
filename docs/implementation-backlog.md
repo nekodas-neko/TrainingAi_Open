@@ -1779,8 +1779,79 @@ displayed number is smoothed. **Do not simply swap in HRV** — HRV is more resp
 less with felt state here (+0.427 vs +0.557), and it is absent from Home entirely, which is a
 separate question.
 
+**⚑ Amended 2026-08-26 — the recommendation is unchanged and now has a measured reason, and the
+owner's two alternatives were both tested.** ([review](reviews/2026-08-26-hr-tile-and-activity-pacing.md).)
+Owner: *"Maybe it needs to show the average awake resting HR? … or maybe its better to have resting
+HR comparison? not sure what could be used here?"*
+
+**Against `perceived_recovery`** (scale **1 = fully recovered … 5 = wrecked**, so a **positive** r is
+the correct direction):
+
+| | r | n |
+|---|---|---|
+| waking-rest HR, **raw bpm** | +0.176 | 51 |
+| nightly resting HR, **raw bpm** | +0.129 | 46 |
+| waking-rest HR, **Δ vs its own 7-day baseline** | **+0.291** | 51 |
+| nightly resting HR, **Δ vs its own 7-day baseline** | **+0.278** | 43 |
+
+**Expressing either candidate as a deviation from the owner's own baseline roughly doubles its
+correlation with felt state.** Which metric you pick moves the number far less (+0.291 vs +0.278)
+than raw-vs-relative does. **So the defect is not the choice of metric — it is showing an absolute
+bpm at all.** 69 bpm means nothing without knowing the usual is 63.
+
+**This also reconciles the +0.557 headline** quoted in the pillar review against the +0.129 here.
+Both are correct and pair different things: the stored `readiness_contributors.restingHeartRate`
+score (0–100, baseline-relative, higher = better) against `perceived_recovery` (higher = worse)
+measures **r = −0.553, n = 35** — same magnitude, sign carried by the two scales running opposite
+ways. **Dropping the 4 `provisional: true` days (score pinned at 50) is what takes it from −0.395 to
+−0.553** — worth knowing before any future correlation against that field.
+
+**The owner's "average awake resting HR" is a real signal and belongs in a SEPARATE entry.** Computed
+as the 10th percentile of BLE HR samples 08:00–21:00 Brisbane: **70 days, mean 984 samples/day, mean
+69.5 bpm, moving 6.24 bpm night to night** — 3× the nightly resting HR and 14× the tile's current
+0.44. That makes it the better **stress** candidate the owner intuited. **But nothing in the app
+computes it** — it was derived in SQL for the review — and it does not belong on a tile labelled
+"Heart Rate". Do not fold it into this entry.
+
 **Pass test:** the tile's number changes on most days; over the stored history its night-to-night mean
-change is within 20% of 2.11 bpm rather than 0.33.
+change is within 20% of 2.11 bpm rather than 0.33. **And the tile renders a baseline delta, not a
+bare bpm** — a change that keeps the 7-day average and merely adds a cue beside it fails this entry.
+
+### [activity] TN-17 — Activity as a pace-to-goal score: the mechanic works, the goals make it punishing
+
+- **Branch:** _unassigned_ · **Added:** 2026-08-26 · owner design: *"from wakeup you start close to 100; then as time goes on it lowers unless you do all parts of what's needed"*
+- **Lane: A** — the score is computed server-side in `packages/shared/src/health/activity-score.ts`
+- **Needs: Q-524** — three step goals are live at once; a pace score makes which one is real load-bearing
+- **Gate: owner** — the decision below is the owner's, and it is about *their goal*, not about code
+
+Replace the flat daily average with a **prorated target**: at wake the day's goal is spread across
+waking hours, you start near 100, and you decay if you fall behind. This directly fixes the "63 at
+7 am is a partial day" confusion, because a partial day would correctly read ~100 rather than ~63.
+
+**The data exists.** `body_metrics.steps` is a **running daily total** — `updated_at` moves through
+the day on every recent row — so "steps so far" needs no new plumbing.
+
+**⛔ Do NOT reach for `step_live_windows`.** It is the obvious intraday source and it is effectively
+empty: **8 rows across 6 days since 2026-07-22, 7,745 steps total.** A pacing implementation built on
+it reads a flat zero. Use the running daily total.
+
+**⚠ The measured obstacle, and it is the whole entry.** Over the last 60 days the owner's median day
+is **4,649 steps**; they reach 7,000 (the stored `users.steps_goal`) on **19 of 60 days — 32%**, and
+10,000 (the goal derived from `activity_level = 'moderate'`) on **9 of 60 — 15%**.
+
+**So a pace score against 7,000 reads below par on two days in three, and against 10,000 on five days
+in six.** Today's lenient average reads 63–82; the paced version of the same day goes red from
+mid-morning. **That is a worse tile, not a better one**, and it arrives as *"the app now says I'm
+failing"* — the Q-504 failure mode in a new costume. **The pacing mechanic does not create this
+problem; it stops the averaging from hiding it.**
+
+**Pace only what is measured.** `zoneMinutes` is floored at 0 on 53 of 59 days (Q-523) and
+`activeEnergy` is present on 8 of 51 — pacing a contributor that is structurally absent guarantees a
+decay to zero. Steps today; MET-derived movement after **TN-11**.
+
+**Pass test:** at 08:00 on a day the owner is on pace, the score reads ≥90; the same day's end value
+is within 5 points of what the current model produces, so the change is about *when* the score is
+informative rather than a re-scoring of history.
 
 ### [sleep][devices] TN-14 — the 2026-08-19 partial night (3.50 h) is still stored and still feeds every baseline
 
@@ -2112,10 +2183,22 @@ one — the "treadmill" the activity-goal volume lane already removed (Q-190).
 
 ### [readiness] TN-3a — the per-bucket daytime-stress series is computed and thrown away
 
+> **✅ THE PERSISTENCE HALF SHIPPED — verified in production 2026-08-26.**
+> `oura_daytime_stress_buckets` exists (migrations **212** and **213**) and is writing: **69 rows
+> across 2026-08-24…26, ~26 buckets/day**, which is the 30-minute series over a ~13-hour waking day.
+> The table this entry asked for is live and populating daily.
+>
+> **⚠ The BACK-FILL has not happened, which is why this entry stays queued.** History begins
+> 2026-08-24, so *"which hours cause most stress"* is answerable over three days and no further —
+> exactly the condition this entry's own third numbered point named. **This does not unblock TN-3b**:
+> the mechanism now exists, but TN-3b and TN-16 are parked on Q-507's sign, which is unchanged.
+
 - **Branch:** _unassigned_
 - **Added:** 2026-08-24 · owner request
 - **Lane: A** — needs a Postgres migration, so Lane A only
 - **Do not batch** (migration).
+- **Keep:** the back-fill of stress buckets over the stored history. The table and the forward write
+  are done; re-decoding past days into it is not.
 
 The owner asked to see *"what days/hours cause most stress"*. That question cannot be answered today.
 `buildDaytimeStressSeriesFromModel` produces a 30-minute bucket series on [−1,+1], and
