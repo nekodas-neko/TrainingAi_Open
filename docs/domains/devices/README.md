@@ -29,6 +29,20 @@ documentation cluster in the repo (~45 known issues, ~38 plans, 300+ model files
   blocked by `connect-src 'self'`), with a native CameraX + MediaPipe Kotlin plugin as the
   fallback if the WASM path cannot hold ~15 fps. Phase 0 is a device-gated feasibility spike;
   §9 costs a Wear OS module and recommends against it.
+- [`docs/superpowers/plans/2026-08-26-alternative-ring-colmi-testing.md`](../../superpowers/plans/2026-08-26-alternative-ring-colmi-testing.md)
+  — **design only, no Colmi ring has ever connected to this app (PS-8, 2026-08-26).** How to test
+  the owner's new Colmi ring and where it lands in the source tiers. The answer to *self or a second
+  user*: **self, opposite hand, writes quarantined** — one body has to wear both rings for
+  "how close is it to the Oura" to have an answer, and the two-rings-one-account worry is a
+  write-path problem the ranked per-field merge already solves. Three findings shape it: the spike
+  needs **no APK** (the in-WebView `@capacitor-community/bluetooth-le` path that
+  `lib/live-hr/chest-strap-source.ts` already uses, and the ring logs internally so it syncs on
+  demand like the scale); **`oura_heartrate` is the one table with no merge protection** (bare
+  `text` source, `onConflictDoNothing`, and `hr-ingest` hardcodes `chest_strap`); and
+  `lib/oura-comparison-harness.ts` already does all the scoring. Protocol constants in §3 are quoted
+  from `tahnok/colmi_r02_client` and are **unverified on hardware** — Phase 0 is a 30-minute
+  identify-the-unit gate. Sleep is not in that client (Gadgetbridge has it, from a separate
+  dissection). **Do not flash the circulating raw-streaming mod firmware** — §7.
 1. **[`docs/oura-ble-operations.md`](../../oura-ble-operations.md)** — the operations manual:
    failure-point matrix, sync-cadence policy, protocol-maintenance playbook, data-integrity
    runbook. **Read this before touching the pipeline**, and add a §1 matrix row for any new failure
