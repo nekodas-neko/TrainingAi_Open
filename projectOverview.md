@@ -24,8 +24,19 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.382.3 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Version:** v1.383.1 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-08-26.
+
+**A food item can hold a picture now, and it survives offline (BF-35, engine half).** A barcode scan
+stores the Open Food Facts thumbnail as **bytes, not a URL** — `food_items` is read local-first and
+a URL renders nothing in airplane mode — fetched once at scan time, never per render. Migrations 227
++ 228, local SQLite **v30**, and the full offline chain. **Three of the entry's premises were wrong
+and are corrected in place:** it still concluded *"never generate one"* after the owner had overruled
+that; it sized the feature against **disk** when `food_items` **syncs**, which is the axis
+`meal-image.ts` warns about by name; and "the scan photo is already in the request" understates
+1024 px against a 128 px thumbnail (~64× the pixels), which makes route 2 a **Lane B** change.
+**Nothing renders these yet** — the display, route 2's client downscale and route 3's AI generation
+are BF-35's `Keep:` line.
 
 **A full-history rebuild that computed nothing wiped the history and reported success (Q-528).**
 `replaceOuraDailySummary` deleted every one of the user's summary rows and only *then* returned
@@ -543,7 +554,7 @@ meal row now carries a 40 px tile: the photo if there is one, a gradient-and-gly
 mishandled before — check a long day for artefacts and jank. The day screen's tile is always the
 placeholder today; `food_items` has no image column, so only saved meals can carry a photo.
 
-### [nutrition][app-shell] ⚠️ One back-dismiss primitive, three failures, and a device pass none has had (BF-30 v1.378.0 · LB-17 v1.382.0 · BF-34 v1.382.3)
+### [nutrition][app-shell] ⚠️ One back-dismiss primitive, three failures, and a device pass none has had (BF-30 v1.378.0 · LB-17 v1.382.0 · BF-34 v1.383.1)
 
 Artboard 4 shipped as a **nested sheet**, and this row said its unwind "rests on BF-27's
 one-press-per-layer guarantee". **That guarantee has now failed twice.** LB-17: an id comparison read

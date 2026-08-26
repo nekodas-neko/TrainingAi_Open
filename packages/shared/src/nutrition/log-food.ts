@@ -209,7 +209,9 @@ export async function logFoodEntries(
           proteinG: entry.proteinG, carbsG: entry.carbsG, fatG: entry.fatG,
           fiberG: entry.fiberG ?? null, sugarG: entry.sugarG ?? null,
           sodiumMg: entry.sodiumMg ?? null, satFatG: entry.satFatG ?? null,
-          source: entry.source, updatedAt: now,
+          // BF-35. This path creates items from a log entry, which carries no picture — an item
+          // logged this way gets one only if a later lookup supplies it.
+          source: entry.source, imageDataUri: null, updatedAt: now,
         })
         if (isNew) {
           await store.queueMutation({

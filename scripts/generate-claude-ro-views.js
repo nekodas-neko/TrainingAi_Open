@@ -34,6 +34,10 @@ const DENY = {
   // useful than the value: this feature's whole stated risk is the 16 KB cap slipping unnoticed —
   // nothing fails loudly, the outbox just gets slower — so a queryable byte count is the tripwire.
   saved_meals: ['image_data_uri'],
+  // BF-35. Same reasoning as `saved_meals` above, and the tripwire argument is stronger here:
+  // `food_items` is a SYNCED domain, so an oversized image costs outbox and on-device bytes on every
+  // device rather than server disk. The byte count is what makes that visible.
+  food_items: ['image_data_uri'],
   // All three together ARE the Web Push credential — holding them lets anyone push to the device.
 }
 
@@ -48,6 +52,7 @@ const DERIVED = {
   ],
   feedback_submissions: ['octet_length(t.screenshot_data) AS screenshot_bytes'],
   saved_meals: ['octet_length(t.image_data_uri) AS image_bytes'],
+  food_items: ['octet_length(t.image_data_uri) AS image_bytes'],
 }
 
 

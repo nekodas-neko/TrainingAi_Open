@@ -14,8 +14,8 @@ silently misdirecting the next session. Update them in the same PR that consumes
 
 | Pointer | Value | Source of truth |
 |---|---|---|
-| Next free Postgres migration | **227** | `lib/data/postgres/migrations/` |
-| Local SQLite schema version | **v29** | `lib/sqlite/migrations.ts`; `lib/sqlite/__tests__/migrations.test.ts` asserts the max |
+| Next free Postgres migration | **229** | `lib/data/postgres/migrations/` |
+| Local SQLite schema version | **v30** | `lib/sqlite/migrations.ts`; `lib/sqlite/__tests__/migrations.test.ts` asserts the max |
 
 > **There is no third pointer any more.** Entry IDs are not allocated from a shared counter and
 > never were safely: a next-free pointer is a *floor*, not an authority, because it cannot see an
@@ -351,7 +351,7 @@ below threshold and left in place for next time.
 > BF-29 (My meals), BF-30 (Meal detail), BF-31 (Edit meal) and BF-26 (Quantity). Two artboards need
 > no entry — `Tap targets` and the `srv/g` studies both shipped in Q-395a.
 
-### [app-shell][nutrition] BF-34 — the dialog that closed on the frame it opened (shipped v1.382.3)
+### [app-shell][nutrition] BF-34 — the dialog that closed on the frame it opened (shipped v1.383.1)
 
 - **Lane:** B
 - **Gate:** device
@@ -468,6 +468,21 @@ convenient".
 ### [nutrition] BF-35 — fill the food placeholder: two of the three sources are already free
 
 - **Lane:** A for the storage + the OFF field; B for the render.
+- **Keep:** the ENGINE half of routes 1 and 2 shipped 2026-08-26 (migrations 227 + 228, local SQLite
+  v30) — `food_items.image_data_uri`, `FOOD_ITEM_IMAGE_MAX_BYTES`, the whole offline chain (delta
+  select, pull mapping, local upsert, outbox payload, both write paths), and the barcode route
+  fetching the Open Food Facts thumbnail. **Three things are still owed:**
+  1. **The render (Lane B)** — nothing displays the column yet, so the images are stored and unseen.
+  2. **Route 2's client half (Lane B)** — `capture-step.tsx` must emit a second 128 px downscale
+     beside the 1024 px scan image. The server accepts and stores one already; it is inert until
+     that lands. See constraint (b) above for why the scan image itself cannot be kept as-is.
+  3. **Route 3, the AI generation (Lane A)** — the owner chose it and it is unbuilt. Cached by food
+     name (`exercise_gif_cache` is the pattern), generated off the save path, on first log.
+  **Deliberately NOT done, with the reason:** the *search* route does not fetch thumbnails. It
+  returns up to 60 products, so a thumbnail each is 60 requests per search — precisely the cost this
+  entry exists to avoid. The barcode route fetches because it resolves exactly one product. If
+  search images are wanted, the shape is to carry the URL through and fetch at item-creation time,
+  which is one fetch per item created rather than per result shown.
 - **Added:** 2026-08-26 · owner, after BF-32 put a placeholder tile on every row: *"When the AI does a
   food match; does it come with a picture/image of the food that could be added to our photo as the
   default? ... ONly if it doesnt add more time/expense."*
@@ -524,6 +539,32 @@ that do:
   returning a JSON error. A generation failure must leave the placeholder, never an error state on a
   food row.
 
+**⚠️ TWO CONSTRAINTS VERIFIED 2026-08-26 (Lane A) THAT CHANGE THE IMPLEMENTATION. Read before
+starting.**
+
+**(a) `food_items` is a SYNCED domain, so the size axis in the measured table below is the wrong
+one.** It is in `MUTATION_DOMAINS` (`packages/shared/src/sync/mutation-schema.ts:13`), so every image
+rides the outbox push, the pull delta and the on-device SQLite mirror — on a phone, forever. The
+table below sizes this against *database storage* (0.15% of 187 MB, ~1.2 MB at 209 items), and that
+is exactly the mistake `packages/shared/src/nutrition/meal-image.ts` already warns about in writing:
+`users.avatar` allows **5 MB** harmlessly because it is one row per user that never enters the sync
+delta, and copying that cap to a synced table *"would be the largest single regression the sync
+engine has taken."* **The food-image cap belongs beside `SAVED_MEAL_IMAGE_MAX_BYTES` (16 KB) and is
+governed by its reasoning, not by disk.** Nothing fails loudly if it slips — the first symptom is a
+sync timing out on a bad connection.
+
+**(b) "The scan photo is already in the request" is true; "so keeping it is free" is not.** The
+client sends **1024 px** (`SCAN_IMAGE_MAX_DIM`, `components/nutrition/capture-step.tsx:24`) because
+the model has to read the label. A thumbnail is **128 px** (`THUMB_MAX_DIM`,
+`meal-photo-tile.tsx:26`) — roughly **64× fewer pixels**. Storing what arrives would blow the sync
+budget by a large factor, so route 2 needs the client to emit a *second*, small downscale beside the
+scan image. That is cheap (one more canvas pass, no network, `downscaleToDataUrl` already exists and
+already handles the WebP-fallback trap) but it is **a change in `capture-step.tsx`, which is Lane
+B** — so route 2 is split across lanes and the server half is useless until the client half lands.
+**Lane A's half is: accept and validate a thumbnail field, and store it.** Do not attempt a
+server-side downscale to avoid the split: `downscaleToDataUrl` is canvas-based and browser-only, and
+adding a server image library for this is a new dependency for one field.
+
 **The scan photo is the best default of the three, and it is the one currently being discarded.** It
 is the user's actual meal rather than a stock shot of a similar product. Whoever builds this should
 take it first: it needs no new external dependency, and the downscale is already written —
@@ -549,9 +590,12 @@ referenced by any log cannot be deleted while that log exists, so "expire items 
 is really "delete 14 days of history first", which nobody wants. **The only rows a retention sweep
 could actually remove are the 26 never-logged orphans — about 10 kB.**
 
-**So the lever is acquisition, not expiry**, and this entry already pulls it: take an image only
-where one arrives free (an OFF field on a call already being made; the scan photo already in hand),
-and never generate one. An image that is never fetched costs nothing and needs no rule to clean up.
+**So the lever is acquisition, not expiry.** ⚠️ **The sentence that used to end this paragraph —
+*"and never generate one"* — was the PRE-decision recommendation and is now WRONG.** The owner
+overruled it the same day (see the ✅ routing block above): route 3 generates. Left uncorrected, a
+session skimming to this measured-evidence section would build the opposite of what was decided.
+What survives is the rest: an image that arrives free costs nothing and needs no cleanup rule, which
+is why routes 1 and 2 come first and route 3 is cached by food name.
 Even the pessimistic case is small — 209 items × 6 KB ≈ **1.2 MB**, and pruning 55% of that would
 recover 700 kB against a 187 MB database at $0.15/GB/month.
 

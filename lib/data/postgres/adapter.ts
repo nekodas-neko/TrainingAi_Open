@@ -1,5 +1,5 @@
 import { randomUUID } from 'crypto'
-import { rejectMealImage, mealImageRejectionMessage } from '@trainingai/shared/nutrition/meal-image'
+import { rejectMealImage, mealImageRejectionMessage, FOOD_ITEM_IMAGE_MAX_BYTES } from '@trainingai/shared/nutrition/meal-image'
 import { NotFoundError, UserFacingError } from '@trainingai/shared/errors'
 import { formatInTimeZone } from 'date-fns-tz'
 import { eq, and, or, inArray, gt, gte, lt, lte, asc, desc, sql, ne, isNotNull, isNull } from 'drizzle-orm'
@@ -3499,7 +3499,11 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       servingSizeG: s.foodItems.servingSizeG, calories: s.foodItems.calories,
       proteinG: s.foodItems.proteinG, carbsG: s.foodItems.carbsG, fatG: s.foodItems.fatG,
       fiberG: s.foodItems.fiberG, sugarG: s.foodItems.sugarG, sodiumMg: s.foodItems.sodiumMg,
-      satFatG: s.foodItems.satFatG, source: s.foodItems.source, createdAt: s.foodItems.createdAt,
+      satFatG: s.foodItems.satFatG, source: s.foodItems.source,
+      // BF-35. Absent here means the picture never reaches the device, which is the whole point of
+      // storing bytes rather than a URL.
+      imageDataUri: s.foodItems.imageDataUri,
+      createdAt: s.foodItems.createdAt,
     }
 
     const [programs, progressionStyles, bodyMetrics, sleepSessions,
@@ -4080,6 +4084,12 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
             servingSizeG: p.servingSizeG, fiberG: p.fiberG, sugarG: p.sugarG,
             sodiumMg: p.sodiumMg, satFatG: p.satFatG,
           })
+          // BF-35. The web route REFUSES a bad image; this branch drops it and keeps the food.
+          // That asymmetry is the RV-32 precedent and it is deliberate: a 4xx here is a poison pill
+          // the outbox quarantines, so refusing would cost the user a whole food item over a
+          // picture. Same validator, same cap — only the consequence differs.
+          const imageRejection = rejectMealImage(p.imageDataUri, FOOD_ITEM_IMAGE_MAX_BYTES)
+          const foodImage = imageRejection ? null : (p.imageDataUri ?? null)
           await this.createFoodItem(userId, {
             id: p.id,
             name: p.name,
@@ -4099,7 +4109,16 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
             // lost its barcode (no rescan match afterwards) and landed region-less.
             barcode: p.barcode,
             region: p.region ?? 'AU',
+            imageDataUri: foodImage,
           })
+          // Q-485: accepted the mutation, silently dropped a field the web route would have named.
+          if (imageRejection) {
+            console.warn('[pushMutations] food_items: discarded image', { date: mut.date, reason: imageRejection })
+            warnings.push({
+              id: mut.id, domain: mut.domain, date: mut.date,
+              warning: mealImageRejectionMessage(imageRejection, FOOD_ITEM_IMAGE_MAX_BYTES),
+            })
+          }
           processed++
         } else if (mut.domain === 'food_logs') {
           const p = clean as Record<string, unknown>

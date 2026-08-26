@@ -28,6 +28,9 @@ export interface FoodItem {
   source: 'ai' | 'barcode' | 'manual' | 'text'
   barcode?: string
   region: string
+  /** BF-35. A capped base64 thumbnail, not a URL — `food_items` is read local-first and a URL
+   *  renders nothing offline. Absent is the normal case; BF-32's placeholder tile covers it. */
+  imageDataUri?: string | null
   createdAt: Date
 }
 
@@ -128,6 +131,9 @@ export interface NutritionScanResult {
   confidence: 'high' | 'medium' | 'low'
   notes?: string
   ingredients?: NutritionIngredient[]
+  /** BF-35. Set by the barcode/search routes when Open Food Facts had a thumbnail and it fetched
+   *  cleanly. Always optional: a picture must never be able to fail a nutrition lookup. */
+  imageDataUri?: string | null
 }
 
 // ── Meal Plan (Q-186) ──────────────────────────────────────────────────────────

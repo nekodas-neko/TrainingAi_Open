@@ -78,6 +78,7 @@ export function useFoodLogsLoader({ userId, logsDateRef, selectedDateRef, setLog
           proteinG: l.foodItem.proteinG, carbsG: l.foodItem.carbsG, fatG: l.foodItem.fatG,
           fiberG: l.foodItem.fiberG ?? null, sugarG: l.foodItem.sugarG ?? null,
           sodiumMg: l.foodItem.sodiumMg ?? null, satFatG: l.foodItem.satFatG ?? null,
+          imageDataUri: l.foodItem.imageDataUri ?? null,
           source: l.foodItem.source, updatedAt: nowIso,
         })),
         foodLogs: server.map(l => ({
