@@ -24,7 +24,7 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.383.1 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Version:** v1.383.2 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-08-26.
 
 **A food item can hold a picture now, and it survives offline (BF-35, engine half).** A barcode scan
@@ -36,7 +36,9 @@ that; it sized the feature against **disk** when `food_items` **syncs**, which i
 `meal-image.ts` warns about by name; and "the scan photo is already in the request" understates
 1024 px against a 128 px thumbnail (~64× the pixels), which makes route 2 a **Lane B** change.
 **Nothing renders these yet** — the display, route 2's client downscale and route 3's AI generation
-are BF-35's `Keep:` line.
+are BF-35's `Keep:` line. Alongside it, **LB-15**: a calorie-free product (sparkling water, a diet
+drink, a supplement) scanned as *"not found"*, because `offProductToNutrition` could not tell zero
+from absent and `null` is how a caller learns the barcode failed to resolve.
 
 **A full-history rebuild that computed nothing wiped the history and reported success (Q-528).**
 `replaceOuraDailySummary` deleted every one of the user's summary rows and only *then* returned

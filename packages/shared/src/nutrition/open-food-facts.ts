@@ -49,9 +49,18 @@ export function servingSizeGrams(servingSize: string | undefined): number {
 /**
  * One OFF product as a nutrition result.
  *
- * Returns null when the product carries no usable energy value — OFF has many entries that are a
- * name and nothing else, and an ingredient claiming 0 kcal would silently poison every total it
- * ever lands in.
+ * Returns null when the product carries **no energy field at all** — OFF has many entries that are a
+ * name and nothing else, and `null` is how the caller learns the barcode did not resolve.
+ *
+ * **Absent and zero are different, and conflating them was LB-15.** The guard used to be
+ * `if (!(calories > 0)) return null`, and `perServing` returns `0` for a missing field — so a
+ * genuinely calorie-free product (sparkling water, Coke Zero, sugar-free gum, most supplements)
+ * came back indistinguishable from an unknown barcode, and the scanner reported the user's real,
+ * scannable product as "not found". The question this guard needs to ask is whether the product
+ * *carried* an energy value, not what that value was.
+ *
+ * A negative energy is still rejected. That is corrupt data rather than a calorie-free food, and the
+ * old `> 0` test excluded it as a side effect — kept deliberately rather than lost in the fix.
  */
 export function offProductToNutrition(p: OffProduct): NutritionScanResult | null {
   const n = p.nutriments ?? {}
@@ -64,8 +73,12 @@ export function offProductToNutrition(p: OffProduct): NutritionScanResult | null
     return 0
   }
 
-  const calories = Math.round(perServing(n['energy-kcal_serving'], n['energy-kcal_100g']))
-  if (!(calories > 0)) return null
+  const kcalServing = n['energy-kcal_serving']
+  const kcal100g = n['energy-kcal_100g']
+  if (kcalServing == null && kcal100g == null) return null
+
+  const calories = Math.round(perServing(kcalServing, kcal100g))
+  if (calories < 0) return null
 
   return {
     name: p.product_name ?? 'Unknown product',

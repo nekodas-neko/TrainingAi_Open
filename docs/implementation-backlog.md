@@ -643,33 +643,6 @@ raw* store, which is a different table and a different decision.
   rounding error on today's data; whether route 2 or route 3 carries the rest is the real question,
   and it is the one the next bullet says cannot be answered from the column.
 
-### [nutrition] LB-15 — a zero-calorie barcode product is reported as "not found"
-
-- **Lane:** A — `packages/shared/**`, whatever the edit looks like.
-- **Added:** 2026-08-26, from LA-30's sibling sweep. **Read from source, not reproduced** — no Open
-  Food Facts access here. **`packages/shared/src/nutrition/open-food-facts.ts:58`**:
-
-  ```ts
-  const calories = Math.round(perServing(n['energy-kcal_serving'], n['energy-kcal_100g']))
-  if (!(calories > 0)) return null
-  ```
-
-  `offProductToNutrition` returning `null` is how the caller learns the barcode **did not resolve**, so
-  a genuinely calorie-free product — Coke Zero, sparkling water, sugar-free gum, a supplement — reads
-  as an unknown barcode rather than as the zero-calorie food it is.
-- **Same rule as LA-30, different layer, and NOT fixed by it.** LA-30 cleared the two client
-  predicates; this sits below both, so the barcode path stays broken after it. Separate because the
-  lane rule is the path.
-- **Two hits nearby are NOT this defect** — checked, so the next person does not "fix" them:
-  `scan-totals.ts:104` (`macroCalorieDisagreement`) returns `null` at zero because a percentage
-  deviation against zero is undefined, which is its contract; and `scan-totals.ts:140`
-  (`sanitiseNutrition`) recomputes from macros when `calories === 0`, which for a truly calorie-free
-  item yields zero again. Both correct.
-- **Suggested shape:** distinguish *absent* from *zero*. `perServing` returns `0` for a missing
-  field, so the two are indistinguishable at line 58 — the guard wants to know whether the product
-  carried an energy field, not what its value was.
-- **Verification.** Two `OffProduct` fixtures — `energy-kcal_100g: 0` present, and the field absent. The first must resolve; the second may still be `null`.
-
 ### [nutrition][app-shell] BF-28 — mockup parity: the artboards are the spec, and this is the map
 
 - **Lane:** B
