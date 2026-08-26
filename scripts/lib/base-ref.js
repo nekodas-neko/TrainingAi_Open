@@ -122,6 +122,23 @@ function lineCountAtBase(baseRef, relPath) {
  *   - `inherited` over it, but no bigger than the base already is: real, and not this branch's doing
  *   - `fail`      over it, and this branch is what pushed it there
  */
+/**
+ * The file names directly inside `dirRelPath` at `baseRef`, or `null` when there is no base or the
+ * directory does not exist there — which must NOT read as an empty directory, because "the base had
+ * nothing" and "we cannot see the base" lead to opposite conclusions about what this branch added.
+ */
+function dirNamesAtBase(baseRef, dirRelPath) {
+  if (!baseRef) return null;
+  try {
+    return git(['ls-tree', '--name-only', `${baseRef}:${dirRelPath}`])
+      .split('\n')
+      .map((n) => n.trim())
+      .filter(Boolean);
+  } catch {
+    return null;
+  }
+}
+
 function verdict({ count, limit, atBase }) {
   if (count <= limit) return 'ok';
   if (atBase !== null && atBase !== undefined && count <= atBase) return 'inherited';
@@ -129,6 +146,6 @@ function verdict({ count, limit, atBase }) {
 }
 
 module.exports = {
-  resolveBaseRef, fileAtBase, lineCountAtBase, countAtBase,
+  resolveBaseRef, fileAtBase, lineCountAtBase, countAtBase, dirNamesAtBase,
   materialiseBaseTree, cleanupBaseTree, verdict,
 };
