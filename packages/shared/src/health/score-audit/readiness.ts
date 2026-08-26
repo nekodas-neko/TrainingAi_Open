@@ -1,6 +1,7 @@
 import {
   computeReadinessComposite,
   checkinScoreFromEnergy,
+  rederiveReadinessFromStored,
   READINESS_MODEL,
   READINESS_WEIGHTS,
   BASELINE_MIN_NIGHTS,
@@ -179,6 +180,38 @@ export function buildReadinessAudit(input: ReadinessAuditInput): PillarAudit {
   const contributors = fixedWeightContributors(specs, READINESS_WEIGHTS)
   const storedScore = derived?.readinessScore ?? null
 
+  // Q-501 — does the STORED score follow from the inputs stored beside it?
+  //
+  // Everything above recomputes from today's summary, so it can only say *that* a stored score
+  // disagrees, never why. The two reasons need opposite responses: an input that was recomputed
+  // after the fact is a data question, a model that moved is a calibration question. Contributors
+  // persist their own input from 2026-08-26, which is what makes the two separable at all.
+  const rederived = rederiveReadinessFromStored(derived?.readinessContributors)
+  if (storedScore != null && rederived) {
+    if (rederived.uncheckable.length > 0) {
+      notes.push(
+        `The stored contributors carry no inputs for ${rederived.uncheckable.join(', ')} — this row ` +
+        'predates the inputs being persisted (Q-501), so those terms cannot be checked against the ' +
+        'model that wrote them, only against today\'s summary.',
+      )
+    }
+    if (rederived.drifted.length > 0) {
+      notes.push(
+        `The stored score is NOT reproducible from its own stored inputs: ` +
+        rederived.drifted.map(d => `${d.key} stored ${d.stored}, current model gives ${d.rederived}`).join('; ') +
+        `. The current model rebuilds this row's inputs into ${rederived.score} against a stored ` +
+        `${storedScore} — so the MODEL moved since this day was scored, not the inputs.`,
+      )
+    } else if (rederived.uncheckable.length === 0 && storedScore !== compositeScore && compositeScore != null) {
+      notes.push(
+        `The stored score IS reproducible from its own stored inputs (${rederived.score}), so the ` +
+        `model has not moved — the ${storedScore} → ${compositeScore} difference against this ` +
+        'recompute is an INPUT change: the summary this day derives from was rewritten after the ' +
+        'derived row was written, and nothing recomputed the row in step.',
+      )
+    }
+  }
+
   return {
     pillar: 'readiness',
     label: 'Readiness',
@@ -235,6 +268,7 @@ export function buildReadinessAudit(input: ReadinessAuditInput): PillarAudit {
       score: storedScore,
       contributors: derived?.readinessContributors ?? null,
       source: derived?.readinessSource ?? null,
+      rederived,
     },
     storedMatchesRecompute: storedScore != null && compositeScore != null ? storedScore === compositeScore : null,
     notes,
