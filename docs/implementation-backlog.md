@@ -385,7 +385,21 @@ tuple makes a shared-table write a *compile error*, which is stronger than anyth
   claims it. If the round trip fails, the unit is not in that protocol family and Phases 1+ are void.
   QRing is the fallback only if the ring will not advertise after a full charge — **decline any
   firmware update it offers**, then uninstall it.
-- **Phase 0 status, 2026-08-26 — transport PASSED, framing FAILED so far.** Enumerated on the
+- **✅ PHASE 0 GATE PASSED, 2026-08-26 — the ring answers on the charger (§11e).** The `0x03` battery
+  write produced a TX notification with the identical packet, characteristic and write type that had
+  been silent all evening; the only change was putting the ring on the charger. **The application MCU
+  sleeps, and a sleeping ring is indistinguishable from a broken one over GATT** — device-info reads,
+  CCCD writes and write ACKs are all served by the BLE stack, so four rounds of protocol probing ran
+  against a ring that could not answer while the protocol was correct throughout. **Wake state goes
+  to the top of the diagnostic order for any ring**, ahead of every protocol hypothesis.
+- **Phase 3 design consequence — a silent ring must not read as "no data".** Sync needs a timeout
+  with a distinguishable "asleep / did not answer" outcome, a retry rather than one attempt, and
+  **no cursor advance or synced-state write on a silent attempt** (the Oura durability rule,
+  unchanged). Normal wear should keep it awake; the failure mode when it does not is silence, not an
+  error, which is the dangerous shape.
+- **Still to capture:** the reply's raw bytes. nRF rendered it as text, so read the hex from the
+  nRF Connect log. Expected per Gadgetbridge: `[0]=0x03`, `[1]=battery %`, `[2]=charging flag.
+- **Superseded — earlier status, kept for the trail: transport PASSED, framing FAILED so far.** Enumerated on the
   owner's unit in nRF Connect: `R09_C400`, firmware `RT09_3.10.22_260420`, hardware `RT09_V3.1`,
   service `6E40FFF0-…` present with RX `6E400002` (WRITE) and TX `6E400003` (NOTIFY + CCCD). **The
   `0x03` write lands and the ring never answers** — notifications confirmed enabled, packet echoed

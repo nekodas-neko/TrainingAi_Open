@@ -439,7 +439,7 @@ Read in nRF Connect on a factory-fresh ring. **No vendor app was ever installed.
 | `6E40FFF0-…` service present? | **yes** |
 | RX `6E400002-…` | **present** — WRITE, WRITE NO RESPONSE |
 | TX `6E400003-…` | **present** — NOTIFY, with CCCD `0x2902` |
-| `0x03` round trip | **written, no reply** — see §11c |
+| `0x03` round trip | **REPLY RECEIVED on the charger** — see §11e |
 | Firmware Revision, trial end | _not yet read_ |
 
 **What this settles:** the R09 exposes the R02 family's transport exactly — same service UUID, same
@@ -602,6 +602,46 @@ does not. The Value field updates from what was *sent*; it is not proof of what 
 connection parameters, MTU negotiation, transaction sequencing and retry — precisely the things a
 device-support class exists to get right and a manual GATT explorer does not attempt. Continuing to
 poke by hand is now the expensive path to an answer §11d gets for free.
+
+### 11e. GATE PASSED — the ring answers, but only with its application MCU awake (2026-08-26)
+
+**On the charger, the `0x03` battery write produced a notification on TX `6e400003` for the first
+time.** Same packet, same characteristic, same write type that had been silent all evening. The only
+variable changed was the charger.
+
+**This is the Phase 0 gate, passed.** Transport, framing and the command channel are now confirmed
+on the owner's own unit rather than inherited from a client that does not list the model.
+
+**The finding that matters more than the gate: the ring's application processor sleeps, and a
+sleeping ring is indistinguishable from a broken one over GATT.** Everything that worked during the
+silent period — device info reads, CCCD writes, and the write ACKs themselves — is served by the
+**BLE stack**. Executing a command needs the **application MCU**, which these rings power-gate hard.
+Four rounds of protocol probing were run against a ring that was never going to answer, and the
+protocol was correct the whole time.
+
+`CLAUDE.md` already documents the identical behaviour for the Oura — *"the ring radio/PPG sleeps
+when worn-idle — wakes on charger, worn+moving, or during sleep"* — and this plan cited it as a
+low-ranked candidate rather than checking it first. **Wake state belongs at the top of the
+diagnostic order for any ring, before any protocol hypothesis**, because it is free to test and it
+invalidates every result taken while it holds.
+
+**Design consequence for Phase 3, and it is not cosmetic.** A sync that assumes the ring answers on
+demand will silently return nothing whenever the ring has been still. In normal use the ring is worn
+and moving, which should keep it awake — but "should" is doing work there, and the failure mode is
+*silence*, not an error. The sync path therefore needs:
+
+- a **timeout with a distinguishable outcome** — "ring asleep / did not answer" must not surface as
+  "no data", which is what would otherwise be recorded;
+- a **retry** rather than a single attempt, since wake is a race against the user's own movement;
+- **no cursor advance and no "synced" state** on a silent attempt. The Oura pipeline's rule applies
+  unchanged: only advance past what was durably received.
+
+**Still to capture:** nRF renders the reply as text (`sd…`) rather than hex, so the actual bytes are
+not yet recorded. Read them from the **nRF Connect log** (floating button), which prints
+`Notification received from 6e400003…, value: (0x) …`. Expected layout per Gadgetbridge:
+`[0] = 0x03`, `[1] = battery %`, `[2] = charging flag (1 while on the charger)`. **Do not decode the
+text rendering** — it drops and mangles non-printable bytes, and guessing from it is how the last
+few hours went.
 
 ### 11d. Gadgetbridge is the reference implementation, and it should be installed next
 

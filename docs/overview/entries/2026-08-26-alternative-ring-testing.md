@@ -198,6 +198,30 @@ Also noted for next time: nRF Connect's Value field shows what was *sent*, not w
 accepted. The log behind the floating button carries the ATT results and errors, and not reading it
 earlier left a gap that three rounds of probing could not close.
 
+## The ring answers on the charger — gate passed, and the lesson is the interesting part
+
+The same `0x03` battery packet, the same characteristic, the same write type that had been silent
+all evening produced a notification the moment the ring was on the charger. Phase 0 is passed:
+transport, framing and the command channel are confirmed on this unit rather than inherited from a
+client that does not list the model.
+
+**The application processor sleeps, and a sleeping ring is indistinguishable from a broken one over
+GATT.** Every read that succeeded during the silent period — device info, the CCCD, the write ACKs
+themselves — is served by the BLE stack. Running a command needs the application MCU, which these
+rings power-gate hard. So four rounds of protocol probing were spent on a ring that was never going
+to answer, while the protocol was right the whole way through.
+
+`CLAUDE.md` already carries this for the Oura, in almost these words: the ring wakes on charger,
+worn and moving, or during sleep. The plan cited it as a low-ranked candidate instead of testing it
+first, which is backwards — wake state is free to check and it invalidates every measurement taken
+while it holds. It belongs above every protocol hypothesis in the diagnostic order for any ring.
+
+**It also changes Phase 3.** A sync that assumes the ring answers on demand returns nothing whenever
+the ring has been still, and returns it *as silence rather than as an error*. In normal wear the
+ring should stay awake, but the sync path still needs a timeout whose outcome is distinguishable
+from "no data", a retry rather than a single attempt, and no cursor advance or synced-state write on
+a silent attempt — the Oura durability rule, unchanged.
+
 ## Deployment shape
 
 No APK. `lib/live-hr/chest-strap-source.ts` already does the full BLE cycle in TypeScript in the
