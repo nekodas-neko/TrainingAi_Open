@@ -97,6 +97,30 @@ It still serves the requirement's stated purpose, *"so the merge does not bury s
 a newly-saved meal sorts to the top. **True MRU needs `food_logs.saved_meal_id`, which is Lane A's**
 and should be filed separately if the ordering turns out to matter in use.
 
+## Measured after Q-395c shipped (2026-08-26) — the part this plan does not settle
+
+**Q-395c-1 landed, and it makes Q-395c-2 bigger than written.** "The `My Foods` tab is the merged
+list" is true, and it hides the cost. `FoodList` takes **13 props**, every one backed by state
+`saved-meals-sheet.tsx` owns — the meal fetch, selection mode, the detail sheet, the builder, the
+label sheet, the plan ids, delete. That file holds **24 `useState` calls** and renders **four nested
+sheets** around the list, in **696 lines**. Making the list a *tab* moves that ownership layer, and
+the blast radius includes the ~8 e2e specs that reach the list through the `My Foods` tile.
+
+**Three ways to give the tab a list. The recommendation is the third.**
+
+1. **Extract a `MyFoodsPanel`** owning the meals and the four sheets, rendered by both
+   `SavedMealsSheet` and the capture screen. Correct, and the most movement.
+2. **Reduce the list for this tab** — no selection, no bulk delete, no label. Rejected: `FoodList`'s
+   swipe tray would still be present with dead actions, which is worse than today.
+3. ⭐ **Invert: put the capture screen inside `SavedMealsSheet`.** That file already owns the list,
+   the builder and all four sheets, so `Recent` and the action row are additions rather than an
+   extraction and nothing moves. It also matches the shipped flow — `/nutrition`'s `My Foods` button
+   already opens the logger, which opens this sheet. The cost is the 800-line ceiling, so the
+   capture half lands as a child component, which the repo wants regardless.
+
+Reversal is one component and one call site either way, so this is the implementer's call — but make
+it before writing code, not during.
+
 ## Not decided here
 
 Whether the merged list keeps two row shapes forever, or whether a saved meal eventually renders as

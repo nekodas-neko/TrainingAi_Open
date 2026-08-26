@@ -1184,6 +1184,28 @@ whether or not anyone draws them first.
   drawing and the owner disagree the owner wins**: the artboard draws four tabs, build two, and its
   `Multi-add` / `Create food` row is the decided action row under other labels. Describe and manual
   entry are one sheet with the fields always visible, so neither is hidden.
+- **⚠ MEASURED 2026-08-26, AND IT IS BIGGER THAN THIS ENTRY SAYS — read before starting.** "The
+  `My Foods` tab is the merged list" is true and still understates the work. `FoodList` takes **13
+  props**, every one backed by state `saved-meals-sheet.tsx` owns: the meal fetch, selection mode,
+  the detail sheet, the builder, the label sheet, the plan ids, delete. It holds **24 `useState`
+  calls** and renders **four nested sheets** around that list. Making it a *tab* moves that whole
+  ownership layer out of a **696-line** file. This is not five tiles collapsing into one screen; it
+  is a restructure of two components, and the blast radius includes the ~8 e2e specs that reach the
+  list through the `My Foods` tile.
+- **The structuring decision, with a recommendation, so it is not re-derived.** Three ways to give
+  the tab a list, none of which the plan settles:
+  1. **Extract a `MyFoodsPanel`** owning the meals and the four sheets; `SavedMealsSheet` and the
+     capture screen both render it. Correct and the most movement.
+  2. **Reduce the list for this tab** — no selection, no bulk delete, no label. Rejected on sight:
+     `FoodList`'s swipe tray would still be there with dead actions, which is worse than today.
+  3. **Invert — put the capture screen INTO `SavedMealsSheet`.** ⭐ **Recommended.** That file
+     already owns the list, the builder and all four sheets, so a `Recent` tab and the action row are
+     additions rather than an extraction, and nothing has to move. It also matches what already
+     happens: `/nutrition`'s `My Foods` button opens the logger, which opens this sheet. The cost is
+     that the file grows against the 800-line ceiling, so the capture half lands as a child
+     component — which the repo wants anyway.
+  **Reversal cost is low either way** (moving one component and one call site), which is why this is
+  an implementer's call and not the owner's — but it should be *made* before code, not during.
 ### [nutrition] BF-11 — the meal creator/planner redesign: the spec every phase reads, and the final checkpoint
 
 - **Needs:** BF-11h
