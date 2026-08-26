@@ -347,7 +347,7 @@ below threshold and left in place for next time.
 > **Then the owner set the acceptance test for the whole arc, 2026-08-25** — *"I want the design to
 > match the mockup images ... make sure the design/ui is made to match the mockup"*. **BF-28 is the
 > map**: every artboard, its shipped counterpart, and the rules that stop six entries re-deriving the
-> same three arguments. The per-screen parity entries are BF-24 (the day), Q-395c (Add food),
+> same three arguments. The per-screen parity entries are BF-24 (the day), LB-16 (Add food),
 > BF-29 (My meals), BF-30 (Meal detail), BF-31 (Edit meal) and BF-26 (Quantity). Two artboards need
 > no entry — `Tap targets` and the `srv/g` studies both shipped in Q-395a.
 
@@ -492,7 +492,7 @@ looks like"*. Parity is now the acceptance test, not a nice-to-have alongside it
 | # | Artboard | Shipped counterpart | Entry |
 |---|---|---|---|
 | 1 | Nutrition — the day | `app/nutrition/nutrition-content.tsx` + `meal-card.tsx` | **BF-24** |
-| 2 | Add food | `food-logger-sheet.tsx` · `capture-step.tsx` | **Q-395c** (already owns it) |
+| 2 | Add food | `food-logger-sheet.tsx` · `capture-step.tsx` | **LB-16** (split out of Q-395c) |
 | 3 | My meals | `saved-meals-sheet.tsx` · `saved-meal-card.tsx` | **BF-29** |
 | 4 | Meal detail | `saved-meal-card.tsx` expanded · `my-meals-picker.tsx` | **BF-30** |
 | 5 | Edit meal | the builder — `assign-step` · `review-step` · `ingredient-picker` | **BF-31** |
@@ -510,8 +510,8 @@ looks like"*. Parity is now the acceptance test, not a nice-to-have alongside it
    from a drawing.** Where a screen has more than its artboard, the entry decides where the extra
    goes and says so in the PR.
 2. **An owner decision beats the drawing, and one already does.** Artboard 2 draws four tabs —
-   `Recent · Frequent · My meals · Recipes`. Q-395c's owner-set decision is **two**: `Recent` and
-   `My Foods`, because *Frequent* was a second ordering of what *Recent* already shows. Build the
+   `Recent · Frequent · My meals · Recipes`. The owner-set decision, inherited by LB-16, is **two**:
+   `Recent` and `My Foods`, because *Frequent* was a second ordering of what *Recent* already shows. Build the
    two. Any other case where a drawing and a written owner decision disagree comes back here rather
    than being resolved by whoever notices.
 3. **Match the layout, not the literals.** The artboards are hand-written HTML with inline
@@ -550,9 +550,10 @@ P/C/F chips gone. Journal:
 - **② the energy block** (one card, 104 px donut left, macro columns right) is not day-screen-only:
   `CalorieBalanceBar` also renders on `/health` (`health-sections.tsx:658`), so merging it with
   `MacroRing` changes two screens and wants its own PR with Health verified alongside.
-- **③ the four-tile action row** (Search · Scan · Photo · My meals) overlaps **Q-395c**, which owns
+- **③ the four-tile action row** (Search · Scan · Photo · My meals) overlaps **LB-16**, which owns
   collapsing the capture entry points. Building the tiles first would wire four destinations that
-  entry may then change. **Q-395c ships the tiles**; this entry defers.
+  entry may then change. **LB-16 ships the tiles**; this entry defers. (Q-395c held this before the
+  capture screen was split out of it; Q-395c shipped 2026-08-26 and the tiles were not its half.)
 - **⑥ the row thumbnail** is **Q-406's**, as this entry already said.
 - **⑦ the four sections the drawing lacks** (`MealPlanReviewCard`, `MealPlanSection`,
   `TdeeAdaptationCard`, day-tools) **stay where they are**, below the meals — BF-28's rule 1: an
@@ -733,13 +734,14 @@ That number is more valuable than either input on its own.
 ### [nutrition][app-shell] Q-395 — the nutrition rework: the spec every phase reads, and the final checkpoint
 
 - **Lane:** B
-- **Needs:** Q-395c
+- **Needs:** LB-16
 - **⚑ SPLIT INTO PHASES 2026-08-23 — this entry is now the specification, not the work.** It was a
   269-line item describing sixteen screens, listed as one thing an implementer could pick up. The
   work is **Q-406** (the shared row) → **Q-395a** (quantity sheet + Edit Meal) → **Q-395b** (the day
-  screen) → **Q-395c** (Log Food + the `My Foods` rename). Each phase points back here rather than
+  screen) → **Q-395c** (the merged list + the `My Foods` rename, shipped 2026-08-26) → **LB-16**
+  (the capture screen, split out of Q-395c). Each phase points back here rather than
   copying the decisions, so they still live in exactly one place. **Read this before any phase.**
-- **Why it parks behind its own last phase.** It is the completion checkpoint: when Q-395c lands,
+- **Why it parks behind its own last phase.** It is the completion checkpoint: when LB-16 lands,
   this confirms the drawn screens match what shipped, sweeps the ~11 sheets finding 18 lists as
   never drawn, and leaves the queue. Never pick it up as a work item.
 
@@ -1025,37 +1027,22 @@ whether or not anyone draws them first.
   in both themes, so a green `pnpm dev` is not sufficient evidence and a Known-Issues row is the
   fallback if no device is available.
 
-### [nutrition][app-shell] Q-395c — one list, one name: merge My Foods into Saved Meals
-
-- **Lane:** B
-- **Plan:** [`2026-08-26-log-food-one-screen.md`](superpowers/plans/2026-08-26-log-food-one-screen.md).
-  **Narrowed 2026-08-26** — the capture screen split out as **LB-16**. ID and references unchanged.
-- **The finding that forced the split:** the two lists hold **different entity types** —
-  `food_items` and `saved_meals` — so "one list" is one list over **two sources**, two row shapes and
-  two tap behaviours, not a rename over a shared shape. **The rename rides here and cannot go
-  first**: renaming both while they are still two lists gives the user two lists with one name,
-  worse than today. 15 occurrences over 8 files — the rename is small; the merge is the work.
-- **Carry every action across** — bulk delete, meal-plan linkage, the label path — or say which was dropped. **⚠ The `My Foods` P/C/F column is the question Q-406 is parked on**: a per-screen column on the shared row is the slot it rules out, so do not add the prop unilaterally.
-- **⚠ Two findings from starting it, both detailed in the plan — read it before writing code.** A
-  food's tap goes to the **assign** step inside `FoodLoggerSheet` while a meal's opens the detail
-  sheet `SavedMealsSheet` owns, so **the merged list has to live in `FoodLoggerSheet`** and
-  `/nutrition`'s button opens the logger onto it. And **MRU is unavailable**: `food_logs` has no
-  `saved_meal_id`, so a saved meal has no last-used timestamp — order by `createdAt DESC`.
-- **Verification.** A grep proving nothing user-facing says *Saved meals* or *My Meals*; e2e that one list shows both kinds, each tap does its own thing, and bulk delete and the label path survive.
-
 ### [nutrition][app-shell] LB-16 — the capture screen: six entry points become one
 
 - **Lane:** B
-- **Needs:** Q-395c — the `My Foods` tab **is** the merged list, so building this first builds it twice.
 - **Added:** 2026-08-26, split out of Q-395c. **Plan:** [`2026-08-26-log-food-one-screen.md`](superpowers/plans/2026-08-26-log-food-one-screen.md).
   Also **artboard 2 parity** (BF-28): `Add food` is the drawing of the screen this builds.
-- **Scope.** `capture-step.tsx`'s six tiles collapse to one screen — search across everything, two
+- **⚠ Re-scope before writing code — Q-395c moved the ground under this.** It shipped 2026-08-26 and
+  the `My Foods` tab **is** its merged list, already reachable from a tile: build the tabs around
+  that component, never the list again. `capture-step.tsx` is down to **five** tiles, not six —
+  `History` and `Saved Meals` became one `My Foods`, and `food-library-sheet.tsx` is deleted, so its
+  describe-field lookalike is gone with it and the LA-30 warning below no longer applies to that
+  dialog. The coordinate-tap hazard itself stands: wait for the destination's own copy.
+- **Scope.** The remaining tiles collapse to one screen — search across everything, two
   tabs (`Recent`, `My Foods`), an action row **`Photo · Barcode · Describe or enter`**. **⚠ Where the
   drawing and the owner disagree the owner wins**: the artboard draws four tabs, build two, and its
   `Multi-add` / `Create food` row is the decided action row under other labels. Describe and manual
-  entry are one sheet with the fields always visible, so neither is hidden. **⚠ A coordinate tap that
-  misses a tile opens its neighbour** and `History`'s dialog has a textbox that looks like the
-  describe field — an e2e spec filled the wrong one (LA-30); wait for the destination's own copy.
+  entry are one sheet with the fields always visible, so neither is hidden.
 ### [nutrition] BF-11 — the meal creator/planner redesign: the spec every phase reads, and the final checkpoint
 
 - **Needs:** BF-11h

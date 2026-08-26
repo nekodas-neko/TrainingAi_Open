@@ -10,7 +10,7 @@ import { useEffect, useRef } from 'react'
 // this prevents a nested sheet's history.back() cleanup from cascading into
 // parent sheet handlers and silently closing them.
 //
-// LB-16: "below" has to be a DEPTH, not an id mismatch. An id test reads every
+// LB-17: "below" has to be a DEPTH, not an id mismatch. An id test reads every
 // entry that is not this sheet's own as "mine is gone", which is true only when
 // nothing is stacked under it — at two layers the sheet underneath happens to
 // be the one we land on, so it stayed correct by coincidence. At three, a back
