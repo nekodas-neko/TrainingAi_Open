@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.383.0",
+    date: "2026-08-26",
+    changes: [
+      "Scanning a barcode now saves the product's picture along with its nutrition, so a food can show what it is instead of a blank tile. The picture is stored on your device rather than fetched each time, which means it still shows with no signal. It comes from the same lookup that already reads the nutrition, so a scan is no slower, and a food with no picture available saves exactly as before. Nothing displays these yet \u2014 that is the next piece.",
+    ],
+  },
+  {
     version: "1.382.2",
     date: "2026-08-26",
     changes: [

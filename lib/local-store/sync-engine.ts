@@ -468,6 +468,7 @@ export async function pullDelta(userId: string, force = false, fullResync = fals
     sodiumMg:     (r.sodiumMg as number) ?? null,
     satFatG:      (r.satFatG as number) ?? null,
     source:       r.source ? String(r.source) : null,
+    imageDataUri: r.imageDataUri ? String(r.imageDataUri) : null,
     updatedAt:    toIso(r.updatedAt),
   } satisfies LocalFoodItem));
 

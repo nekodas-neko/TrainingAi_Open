@@ -222,6 +222,7 @@ export const RECONCILE_COLUMNS: { table: string; column: string; ddl: string }[]
   { table: 'meal_plan_meals', column: 'suggested_time', ddl: `ALTER TABLE meal_plan_meals ADD COLUMN suggested_time TEXT` },
   { table: 'saved_meals',     column: 'servings',       ddl: `ALTER TABLE saved_meals ADD COLUMN servings REAL NOT NULL DEFAULT 1` },
   { table: 'saved_meals',     column: 'image_data_uri',  ddl: `ALTER TABLE saved_meals ADD COLUMN image_data_uri TEXT` },
+  { table: 'food_items',      column: 'image_data_uri',  ddl: `ALTER TABLE food_items ADD COLUMN image_data_uri TEXT` },
   { table: 'workout_sessions', column: 'deleted_at',  ddl: `ALTER TABLE workout_sessions ADD COLUMN deleted_at TEXT` },
   { table: 'workout_sessions', column: 'sync_status', ddl: `ALTER TABLE workout_sessions ADD COLUMN sync_status TEXT NOT NULL DEFAULT 'synced'` },
   { table: 'exercise_logs',    column: 'deleted_at',  ddl: `ALTER TABLE exercise_logs ADD COLUMN deleted_at TEXT` },
@@ -444,6 +445,10 @@ const CREATE_FOOD_ITEMS = `CREATE TABLE IF NOT EXISTS food_items (
   sodium_mg      REAL,
   sat_fat_g      REAL,
   source         TEXT,
+  -- BF-35. A ~100px OFF thumbnail or the user's own scan photo, as a capped data URI rather than a
+  -- URL: food_items is read local-first and a URL renders nothing in airplane mode. Reaches fresh
+  -- installs only -- the v30 ALTER is what reaches an upgraded device.
+  image_data_uri TEXT,
   updated_at     TEXT NOT NULL
 )`;
 
@@ -1290,6 +1295,15 @@ export const MIGRATIONS: UpgradeStatement[] = [
       // not there yet. Repeating it here is what makes an upgraded device get it; it is also
       // idempotent, so a retried partial upgrade cannot throw the way a duplicate ADD COLUMN does.
       CREATE_SAVED_MEAL_MEAL_TYPES,
+    ],
+  },
+  {
+    toVersion: 30,
+    statements: [
+      // BF-35. Same shape as v27/v28: `food_items` exists on every upgraded device, so the column
+      // added to the CREATE TABLE body above reaches fresh installs ONLY — this ALTER is what
+      // reaches everyone else, and the RECONCILE_COLUMNS row is the authority if it half-applies.
+      `ALTER TABLE food_items ADD COLUMN image_data_uri TEXT`,
     ],
   },
 ];

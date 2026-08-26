@@ -24,8 +24,19 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.382.2 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Version:** v1.383.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-08-26.
+
+**A food item can hold a picture now, and it survives offline (BF-35, engine half).** A barcode scan
+stores the Open Food Facts thumbnail as **bytes, not a URL** — `food_items` is read local-first and
+a URL renders nothing in airplane mode — fetched once at scan time, never per render. Migrations 227
++ 228, local SQLite **v30**, and the full offline chain. **Three of the entry's premises were wrong
+and are corrected in place:** it still concluded *"never generate one"* after the owner had overruled
+that; it sized the feature against **disk** when `food_items` **syncs**, which is the axis
+`meal-image.ts` warns about by name; and "the scan photo is already in the request" understates
+1024 px against a 128 px thumbnail (~64× the pixels), which makes route 2 a **Lane B** change.
+**Nothing renders these yet** — the display, route 2's client downscale and route 3's AI generation
+are BF-35's `Keep:` line.
 
 **A full-history rebuild that computed nothing wiped the history and reported success (Q-528).**
 `replaceOuraDailySummary` deleted every one of the user's summary rows and only *then* returned

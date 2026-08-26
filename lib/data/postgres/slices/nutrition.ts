@@ -34,6 +34,7 @@ export function rowToFoodItem(r: typeof s.foodItems.$inferSelect): FoodItem {
     sodiumMg: r.sodiumMg ?? undefined, satFatG: r.satFatG ?? undefined,
     source: r.source as FoodItem['source'],
     barcode: r.barcode ?? undefined, region: r.region,
+    imageDataUri: r.imageDataUri ?? null,
     createdAt: r.createdAt,
   }
 }

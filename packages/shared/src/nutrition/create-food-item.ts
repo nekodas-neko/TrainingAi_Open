@@ -61,6 +61,10 @@ export async function createFoodItem(input: NewFoodItem, userId?: string): Promi
     satFatG: s.satFatG,
     source: input.source,
     region: 'AU',
+    // BF-35. Present when the scan came from a barcode/search lookup whose Open Food Facts product
+    // carried a thumbnail. Never blocks the save: `fetchOffThumbDataUri` returns null on every
+    // failure path, so absent is the ordinary case and the placeholder tile covers it.
+    imageDataUri: s.imageDataUri ?? null,
     createdAt: new Date(),
   }
 
@@ -71,6 +75,9 @@ export async function createFoodItem(input: NewFoodItem, userId?: string): Promi
     proteinG: item.proteinG, carbsG: item.carbsG, fatG: item.fatG,
     fiberG: item.fiberG, sugarG: item.sugarG, sodiumMg: item.sodiumMg, satFatG: item.satFatG,
     source: item.source,
+    // Rides the outbox payload too — the offline rule is that adding a route field means updating
+    // the local table, the queued payload, the push branch and the pull mapping in ONE change.
+    imageDataUri: item.imageDataUri ?? null,
   }
 
   if (store && userId) {
@@ -81,7 +88,7 @@ export async function createFoodItem(input: NewFoodItem, userId?: string): Promi
       proteinG: item.proteinG, carbsG: item.carbsG, fatG: item.fatG,
       fiberG: item.fiberG ?? null, sugarG: item.sugarG ?? null,
       sodiumMg: item.sodiumMg ?? null, satFatG: item.satFatG ?? null,
-      source: item.source, updatedAt: now,
+      source: item.source, imageDataUri: item.imageDataUri ?? null, updatedAt: now,
     })
     // Same domain and same client-minted id as logFoodEntries' branch, so a replay lands in place
     // rather than duplicating.
