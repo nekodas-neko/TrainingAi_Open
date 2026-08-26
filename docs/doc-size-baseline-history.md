@@ -2776,3 +2776,16 @@ Each surface caches on a hash of its prompt context, so two surfaces hashing eac
 invalidate each other indefinitely, and model output is not deterministic, so it would never settle.
 That is not visible from either route's source — it is a property of the pair — which is exactly the
 kind of thing an orientation doc exists to carry.
+
+## 2026-08-26 — backlog 11903 → 11947 (PS-7, camera form capture)
+
+Forty-four lines for one new queue entry at the tail. The entry is longer than a typical one on
+purpose: it is an owner feature request whose plan rejects four alternatives with reasons, and the
+entry names them so an implementer does not re-propose one before opening the plan. Everything else
+about the feature — the storage arithmetic, the capture state machine, the Wear OS costing — is in
+`docs/superpowers/plans/2026-08-26-camera-form-capture.md`, which is where it belongs.
+
+**Only Phase 0 is queued, and that is the reason this raise is 44 lines and not four times that.**
+The plan has five later phases. Filing them now would have added an entry each for work whose shape
+is decided by a measurement nobody has taken yet, and the queue would have carried them until
+someone read far enough to find out they were all gated on the same unknown.
