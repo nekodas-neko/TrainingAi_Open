@@ -2701,3 +2701,26 @@ The length is doing the work the entry cannot do without it: it records that the
 **imputing the check-in on unlogged days, is refuted** — LOO R² 0.047 — so the next session does not
 spend itself rediscovering that a model explaining 5% of out-of-sample variance is a fabricated
 number wearing a regression's authority.
+## 2026-08-26 — three raised for the pillar review: backlog 11775 → 11926, `projectOverview.md` 7977 → 7987, `docs/agents/state/tuning.md` 182 → 218
+
+**Four entries, from six owner questions.** TN-13 (the HR tile averages away 84% of the movement in
+the best predictor of felt state), TN-14 (2026-08-19's 3.50 h night still feeds every baseline),
+TN-15 (Body Battery has no recharge at all and drain that ignores exercise — owner-signed-off), and
+TN-16, which is filed **parked**. Plus a long amendment to Q-507.
+
+The length is carrying the thing a short entry cannot: **a refuted hypothesis.** Stress correlating
+*positively* with readiness invited an obvious explanation — better sleep, denser HRV, more buckets
+scored — and it was measured and refuted at r = −0.128. Q-507 now says so, so the next session does
+not spend itself rediscovering it, and TN-16 says why the warning the owner asked for is parked
+rather than built. TN-15 is long for the opposite reason: it **supersedes** a standing "do not
+propose overnight charging or an anchor redesign" instruction, and a supersession that does not
+explain itself gets reverted by the next reader.
+
+*(Final figures after the check-in lookback PR landed on `main` in between and was merged in — both
+raises are in this branch's diff, which is why the backlog number is higher than the 11890 the branch
+alone reached.)*
+
+**The baton was compacted in the same pass** (221 → 216 before the raise) so the lines it grows by
+are the four new entries and two corrections, not accretion. One of those corrections retracts this
+baton's own claim that the check-in "adds little independent information" — measured, ~75% of it is
+information nothing else has.

@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.377.0",
+    date: "2026-08-25",
+    changes: [
+      "The app is now dark all the time. It used to follow the phone's own light/dark setting, so switching the S25 to light — or letting it switch itself on a schedule — turned the whole app light, which nobody had asked for and which no screen was designed against. One design, one theme. The accent colour you pick is unaffected.",
+    ],
+  },
+  {
     version: "1.376.0",
     date: "2026-08-25",
     changes: [

@@ -380,6 +380,16 @@ order.
   2026-08-24 ~13:00 UTC and it is silence from the guard, not evidence, and must not be counted
   toward the clean window this row is waiting on.
 
+### [readiness][sleep][activity][heart-rate][body] 🔴 The five Home pillars, answered one at a time — four new findings (TN-13…TN-16, 2026-08-26)
+
+**Measured, nothing fixed.** Owner: *"Overall the pillars are not working great and not very useful. Requires tuning."* Six questions, six measurements. [`review`](docs/reviews/2026-08-26-pillar-review.md).
+- **Heart Rate — TN-13.** The tile's "52" is the **7-day average** resting HR. Over 50 nights the nightly value moves **2.11 bpm** night to night, the average **0.33** — the tile **discards 84% of the movement** in the signal that best predicts the owner's own check-in (r = **+0.557**, best of nine). Show last night's value with its baseline delta. **Do not swap in HRV** (+0.427, and absent from Home).
+- **Sleep — TN-14.** "60 is way off" is mostly **TN-5's display curve** (a 73.15 blend maps to exactly 57; TN-5's curve gives ≈63), plus TN-10 and a real autonomic dip. Separately: **2026-08-19 still holds 3.50 h** in `oura_daily_summary` and still feeds every trailing baseline. Nothing removed or flagged it, Q-520's flag is unbuilt, and the owner has asked twice. **Do not hand-delete the row** — decode the night's raw frames first; a genuinely short night and a mis-decoded one look identical in the summary.
+- **Activity — no entry, a fact.** The tile is **today's** partial score; readiness carries `prevDayActivity` for the completed day, so both windows exist in different places. Over 30 days: mean **75.1**, range **51–91**, **never 100** — and 100 is **not reachable by behaviour** while `zoneMinutes` is floored on 53/59 days (Q-523), `activeEnergy` is present on 8/51, and `moveHours` qualifies 99.8% of hours (TN-11).
+- **Body Battery — TN-15, owner-signed-off.** Both halves the owner describes are missing: `walkBodyBattery` filters to `tsMs >= wakeTime`, so **there is no overnight recharge at all**, and drain is Q-521's wear-time proxy. **This supersedes the standing "do not propose overnight charging or an anchor redesign" guidance** — that was written against chasing a symptom, not against a stated requirement. **Sequence: TN-6, then TN-2, then this.**
+- **Stress — TN-16, parked deliberately.** Q-507 **replicates and strengthens** at n = 33: high-stress minutes correlate **+0.386 with readiness** and **+0.477 with the sleep score**. The data-density explanation was **tested and refuted** (−0.128 vs HR sample count) and **not replaced**. So the prolonged-stress warning, calm-down prompt and HR-chart overlay the owner asked for would all surface a number that rises on good days — the Q-504 failure mode — and stay behind the sign question.
+- **Readiness is the pillar in the best shape**: resting HR (+0.557) and previous night (+0.520) genuinely track felt state, so its ingredients are sound and its problems are contaminated inputs already queued (TN-6, TN-9, Q-509).
+
 ### [readiness][heart-rate] 🔴 Body Battery floors by early afternoon: the charge window is below the owner's 5th-percentile waking HR (TN-2, 2026-08-24)
 
 **Found, not fixed.** Charging requires `HR ≤ restingHr + 0.05 × reserve` = **57.8 bpm** today, against a 5th-percentile waking HR of **62** and a median of **86** — so a **time-weighted 0.5%** of the waking day can charge and 98.4% drains. Owner report: *"its 9:19pm here and its already at looks like its been 0 for awhile"*. Measured: 2026-08-24 anchor 57, charged **1**, drained **79**, floored ~12:30pm; **7 of 56 days end at 0, 5 of the last 8**. Both causes are the data being *correct* — resting HR fell 67 → 52 (real fitness gain) and `hrMax` fell 187 → 168 on 2026-08-05 when observed-peak resolution replaced the age estimate — so the ceiling shrinks from both ends. This is **Q-515's mechanism with a visible consequence**. Owner signed off on the direction (anchor to *waking* rest, an explicit bpm offset); the offset itself is unfitted, bracket **+8 … +12**. [`review`](docs/reviews/2026-08-24-body-battery-charge-window-collapse.md).
@@ -433,6 +443,18 @@ from the tray raises the confirmation rather than deleting.
 **Shipped.** `savePlanMealToLibrary`/`savePlanMealsToLibrary` (`packages/shared/src/nutrition/save-plan-meal.ts`) are the one plan→meal copy path — the plan card and the setup sheet's ticks both call it. The setup sheet's own copy created food items with a bare POST and stamped nothing, so a meal ticked there and saved again from the card produced **two copies of one recipe**. Provenance (`From plan`) is derived from `meal_plan_meals.saved_meal_id`, never stored. Guarded by `e2e/plan-meal-to-saved-meal.spec.ts`, asserting on the copied rows rather than a toast ([`journal`](docs/overview/entries/2026-08-24-meal-plan-to-saved-meals.md)).
 - **Keep: not device-verified.** Every e2e run took the web fallback (`getLocalStore` is null in a browser), so the local-store mirror and the two outbox mutations per copy are verified by reading only, as are the new controls' 48dp targets.
 - **Keep: step 3 of the entry is not done and needs the owner.** It proposes deleting `meal-plan-section` and the staleness nag once meals live in My Meals; the entry gates that on confirmation and this PR did not take it.
+
+### [app-shell][platform] ⚠️ The app is pinned to dark; the device has not been switched to light to check (BF-25, v1.377.0)
+
+`forcedTheme="dark" defaultTheme="dark" enableSystem={false}` on the `ThemeProvider`. The
+one-line version BF-25 prescribed was measured and **would have shipped the bug it was meant to
+close**: `forcedTheme` alone governs only the class on `<html>`, so `/health/heart-rate` painted
+pale-pink hero art under a **white** scrim over a dark page. `e2e/forced-dark-theme.spec.ts` guards
+all of it under `colorScheme: 'light'` and was proven to fail without the fix.
+
+**On device:** put the S25 in light mode and confirm the app stays dark end to end, including the
+surfaces the provider cannot reach — the icon routes (no CSS) and any canvas paint. The sandbox
+emulates `prefers-color-scheme`; it does not run Samsung's WebView or its scheduled night mode.
 
 ### [nutrition][app-shell] ⚠️ The calorie surface: one budget, a progress bar, and one open cache-ordering bug (Q-415/Q-417/Q-323 fixed, LB-4 open, 2026-08-23)
 
@@ -1738,22 +1760,15 @@ the next device change.
 - **466 test files, none of which opened a browser** — until now. `playwright.config.ts`, `e2e/`,
   `pnpm e2e` and a separate `E2E` CI job. One spec: the five tabs must paint real content on a
   repeat visit, which makes the instant-paint rule executable instead of reviewed by eye.
-- **Read [`e2e/README.md`](e2e/README.md) before trusting a green run.** It records what the harness
-  proves and what it cannot, all measured: it drives the **web** build (`getLocalStore` returns null,
-  so every offline-first domain takes its web fallback and the device branch never runs); it uses
-  `pnpm dev` because the pg pool forces SSL under `NODE_ENV=production` and the local Postgres does
-  not speak it; and its skeleton check covers **only the panel in the viewport**, so a tabbed screen
-  like Health is roughly a third covered.
-- **The harness was shown to discriminate, and the first attempt to do so failed usefully.** Forcing
-  a Training-panel card to stay loading turns Health red. Forcing the Body-tile skeletons does not —
-  that panel is off-screen — which is how the viewport limitation was found rather than shipped as a
-  false guarantee. A Health "bug" found on the first run was traced, fixed, and then **reverted**
-  once the off-screen carousel panel explained it.
-- **The per-tab coverage gap is closed for Health** (2026-08-15, Q-297): `e2e/health-tabs-instant-paint.spec.ts`
-  drives `?tab=` and asserts the requested tab is *selected* before checking, so each panel is
-  actually in the viewport. Verified by the mutation Q-249's spec could not catch — pinning the
-  Body tiles' skeleton now fails, and fails only the Body case. **Every other tabbed screen still
-  has the gap.**
+- **Read [`e2e/README.md`](e2e/README.md) before trusting a green run** — it records, all measured,
+  what the harness proves and what it cannot: it drives the **web** build, so every offline-first
+  domain takes its web fallback and the device branch never runs; it uses `pnpm dev` because the pg
+  pool forces SSL under `NODE_ENV=production`; and its skeleton check covers **only the panel in the
+  viewport**. That last limitation was found by the harness failing to discriminate — forcing the
+  off-screen Body tiles' skeleton did not turn Health red — rather than shipped as a false guarantee.
+- **The per-tab gap is closed for Health only** (Q-297): `health-tabs-instant-paint.spec.ts` drives
+  `?tab=` and asserts the tab is *selected* first, so each panel is really in the viewport, and
+  pinning the Body skeleton now fails only the Body case. **Every other tabbed screen still has it.**
 - **The `E2E` job is not a required status check** and should stay that way until it has a track
   record. Remaining write-path specs and the promotion are **Q-297**.
 - Detail: [`docs/overview/history-2026-08-15.md`](docs/overview/history-2026-08-15.md).

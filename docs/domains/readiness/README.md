@@ -57,6 +57,20 @@ render the band's label/icon alongside its colour (CLAUDE.md, One Formula One Pl
   measured and **both pass** — 43 summary rows against a threshold of 21, and 27 of 31 nights complete
   in the trailing window — so the refusal is inside the **granular** layer, which persists no reason
   for a null. Filed **TN-1**.
+- [`docs/reviews/2026-08-26-pillar-review.md`](../../reviews/2026-08-26-pillar-review.md)
+  — **the five Home pillars answered one at a time, 2026-08-26**, on the owner's *"the pillars are not
+  working great and not very useful"*. **Readiness is the pillar in the best shape** — resting HR
+  (+0.557) and previous night (+0.520) genuinely track the owner's check-in, so its ingredients are
+  sound and its problems are contaminated inputs already queued (TN-6, TN-9, Q-509). **Stress
+  replicates backwards at n = 33**: high-stress minutes correlate **+0.386 with readiness** and
+  **+0.477 with the sleep score**, and the data-density explanation was **tested and refuted**
+  (−0.128 vs HR sample count) — so the sign is unexplained, Q-507 is amended, and **TN-16** (the
+  warning + calm-down prompt the owner asked for) is parked behind it deliberately. Also files
+  **TN-13** (the HR tile averages away 84% of the movement in the best predictor there is),
+  **TN-14** (2026-08-19's 3.50 h night still feeds every baseline) and **TN-15** (Body Battery's
+  drain ignores exercise and there is no recharge at all — owner-signed-off redesign). **Activity's
+  100 is not reachable by behaviour** while `zoneMinutes` is floored on 53/59 days, `activeEnergy` is
+  present on 8/51, and `moveHours` qualifies 99.8% of hours.
 - [`docs/reviews/2026-08-25-threshold-sweep.md`](../../reviews/2026-08-25-threshold-sweep.md)
   — **the threshold sweep, 2026-08-25.** 246 constants → 27 that decide a user-visible branch, each
   checked against its input's real distribution. **One new finding: TN-8**, the chronic-stress fever
