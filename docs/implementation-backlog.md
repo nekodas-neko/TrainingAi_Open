@@ -444,6 +444,140 @@ modal, no race, no timing dependency on a WebView this repo already treats as it
 - **Verification.** On the S25: delete a diary row, confirm it leaves the list, kill and reopen the
   app, confirm it is still gone, then check the server no longer returns it. `Gate: device`.
 
+### [nutrition] BF-35 — fill the food placeholder: two of the three sources are already free
+
+- **Lane:** A for the storage + the OFF field; B for the render.
+- **Added:** 2026-08-26 · owner, after BF-32 put a placeholder tile on every row: *"When the AI does a
+  food match; does it come with a picture/image of the food that could be added to our photo as the
+  default? ... ONly if it doesnt add more time/expense."*
+
+**The cost question is the whole entry, and the answer differs per source. Two are free; the third is
+not and should not be built.**
+
+| Source | Covers | What an image costs |
+|---|---|---|
+| **Open Food Facts** (barcode + food search) | packaged foods — the BARILLA, the WPI, the Chobani | **Zero extra requests.** OFF already serves `image_front_small_url`/`image_front_thumb_url` on the *same* product object; `OFF_FIELDS` in `packages/shared/src/nutrition/open-food-facts.ts:80` is `'code,product_name,brands,serving_size,nutriments'` and simply does not ask for it. Adding a field to a call already being made costs a few hundred bytes. |
+| **The photo scan** (`app/api/nutrition/scan/route.ts`) | anything photographed | **Zero API cost.** The user's own photo is already in the request — `body.image`, base64, sent to `generateObject` at line 188 — and is **thrown away** once the nutrition JSON comes back. Keeping a downscaled copy adds no call and no model spend. |
+| **AI image generation** | text-typed foods with no barcode and no photo | **Real money, per image.** `lib/exercise-image-gen.ts` is the precedent. **The owner decided on 2026-08-26 to build it** — see the routing below. |
+
+**✅ THE OWNER SET THE ROUTING, 2026-08-26 — all three sources, one per entry path:**
+
+1. **Barcode scan → the product image from the lookup.** Add the image field to `OFF_FIELDS`; it
+   rides the call already being made.
+2. **Photo scan → the user's own photo.** Stop discarding it; downscale and keep it.
+3. **Text / AI describe → generate a "super small" image and attach it.**
+
+**Route 3 was recommended against on cost and the owner chose it anyway; that is their call and it is
+the scope.** One fact the implementer needs, because it changes *how* rather than *whether*:
+**image models bill per image, not per pixel — "super small" does not reduce the spend.** The levers
+that do:
+
+- **Cache by food name, not per log.** `exercise_gif_cache` is the existing pattern: one generation
+  serves every future occurrence of the same food, for every user. Most of the catalogue is
+  supermarket staples, so the hit rate should be high.
+- **Generate asynchronously, never in the save path.** Route 3's food is being *typed*, and the save
+  must stay instant per the repo's feedback-first rule. Write the row, return, fill the image after.
+  The placeholder is what shows until it lands — which is exactly what BF-32 built it for.
+- **~~Only for items that survive~~ — WITHDRAWN 2026-08-26, the owner is right.** The suggestion was
+  to generate on the *second* log, skipping four in five. Owner: *"I think that means the first
+  person wouldnt get an image right? We always want an image?"* — and yes: the first log is exactly
+  the moment the row is being looked at, so the saving buys a placeholder at the only time it is
+  noticed. With effectively one user, "the first person" is always the owner, so the rule would mean
+  *never* seeing an image on a new food. **Generate on first log.**
+- **⚠ `source` CANNOT tell route 2 from route 3, so the routing must happen at creation.**
+  `food-logger-sheet.tsx:165` writes `source: scanResult?.confidence ? 'ai' : 'manual'`, and
+  `ingredient-picker.tsx:169` writes `'ai'` for a text estimate. **A photo scan and a typed
+  description both land as `'ai'`** — the column records *that a model was involved*, not *what the
+  user gave it*. So the 203 `ai` items cannot be split into "already has a photo" and "needs one
+  generated" after the fact. **Decide the route where the code still knows whether an image was in
+  hand** — at the call site, not by reading the column back. If a durable split is wanted later, that
+  is a new value on `source` (or a separate column) and a Lane A migration; say so rather than
+  inferring.
+- **Volume, so the spend is a number rather than a worry.** 203 `ai` items over 87 days
+  (2026-05-31 → 2026-08-26) is **~2.3 new food items per day**. Worst case — every one of them a
+  typed description with no photo — that is **~70 generations a month**, and route 2 removes however
+  many were photographed. Check the model's current per-image price against that rate rather than
+  assuming; at any plausible figure this is a small monthly number, which is what makes "always
+  generate" affordable.
+- **Rate-limit it like every other AI route**, per CLAUDE.md, and give it the standard try/catch
+  returning a JSON error. A generation failure must leave the placeholder, never an error state on a
+  food row.
+
+**The scan photo is the best default of the three, and it is the one currently being discarded.** It
+is the user's actual meal rather than a stock shot of a similar product. Whoever builds this should
+take it first: it needs no new external dependency, and the downscale is already written —
+`components/nutrition/meal-photo-tile.tsx` does 128 px WebP at ~6 KB against a server-side
+`SAVED_MEAL_IMAGE_MAX_BYTES` cap, sized for exactly this.
+
+**📏 MEASURED AGAINST PRODUCTION 2026-08-26, because the owner asked whether a 7/14-day image
+expiry would save space. It would not, and the reason is structural rather than a judgement call.**
+
+| Measure | Value |
+|---|---|
+| Whole production database | **187 MB** |
+| `food_items` + `food_logs`, both, total | **288 kB** — **0.15%** of it |
+| Cost per text row | ~400 bytes |
+| The owner's food items | **209** |
+| …logged **exactly once** | **170 (81%)** |
+| …unused for 14 days | **114 (55%)** |
+| …never logged at all | 26 |
+
+**The reuse instinct is right — 81% of items are logged once and never again — but it does not
+translate into a deletion rule, because `food_logs.food_item_id` is `ON DELETE RESTRICT`.** An item
+referenced by any log cannot be deleted while that log exists, so "expire items unused for 14 days"
+is really "delete 14 days of history first", which nobody wants. **The only rows a retention sweep
+could actually remove are the 26 never-logged orphans — about 10 kB.**
+
+**So the lever is acquisition, not expiry**, and this entry already pulls it: take an image only
+where one arrives free (an OFF field on a call already being made; the scan photo already in hand),
+and never generate one. An image that is never fetched costs nothing and needs no rule to clean up.
+Even the pessimistic case is small — 209 items × 6 KB ≈ **1.2 MB**, and pruning 55% of that would
+recover 700 kB against a 187 MB database at $0.15/GB/month.
+
+**If storage ever does bite, the lever is history, not the catalogue.** `food_logs` is the larger and
+faster-growing of the two, and expiring it is a product decision about how far back the diary goes —
+a different and bigger conversation than images. **Do not solve it by half here.**
+
+- **Re-measure rather than trust this table.** These are the numbers on 2026-08-26; the session-start
+  database read is where a change would show. If `food_items` ever passes ~1% of the database, reopen
+  the question with fresh counts.
+
+**⚠ Correcting a premise, and it holds on the device too.** The owner expected *"we save foods for x
+amount of days in history so only a small repertoire will have its food image saved"*, and asked
+*"do all the details stay on the phone/app?"* — **yes, on both sides, and nothing prunes either.**
+The server has no cleanup job. The phone mirrors what `getSyncDelta` sends (`foodItemsReferenced` +
+`foodItemsCreated`, so items arrive as the logs that reference them arrive) and the local store has
+no `DELETE FROM food_items` at all. The 14-day window the owner is thinking of is the *local Oura
+raw* store, which is a different table and a different decision.
+
+**Two decisions to make and write down, not settle by accident:**
+1. **Store the bytes, or store the OFF URL?** A URL is free and always current but breaks offline —
+   and the row it decorates is read local-first. A stored data URI matches how `saved_meals` already
+   does it and works on a plane. **Recommended: store bytes**, for consistency with the meal photo
+   and because offline-first is the app's premise; note the licence line below.
+2. **`food_items` is shared, not per-user** — decide whether the image lives on the item (one copy,
+   everyone benefits) or per log. Item-level is right for OFF product shots; a scan photo is the
+   user's own and belongs to the log or to a user-scoped column.
+
+- **Licence, and it is a real constraint rather than a formality.** Open Food Facts product images
+  are **CC-BY-SA**. Displaying them in-app is fine; the obligation is attribution. Decide where that
+  line goes before shipping — a single credit in Settings is the cheap answer.
+- **No new render work — BF-32 already shipped it.** `FoodRow` carries `showThumb` + `thumbSrc` and
+  `components/nutrition/meal-thumb.tsx` draws the placeholder when `thumbSrc` is null. **The prop is
+  waiting and nothing fills it**, which is precisely the gap this entry closes: pass a `data:` URI
+  and the tile stops being a placeholder.
+- **Verification.** One sitting, one of each route: a barcode scan shows the product image, a photo
+  scan shows the user's own photo, and a typed food shows the placeholder **and then fills in** once
+  generation lands. Kill the network mid-generation and confirm the row keeps the placeholder rather
+  than showing an error. Then confirm offline still renders whatever was already stored.
+  `Gate: device`.
+- **Ship it in that order — 1, 2, 3 — but do NOT expect routes 1 and 2 to carry it.** An earlier note
+  here said the free routes would "fill most rows". **Measured 2026-08-26, that is wrong and the
+  correction matters for scoping:** of the owner's 209 food items, **`barcode` is 3 and `text` (the
+  OFF name search) is 3 — six items, 3%.** The other **203 are `source: 'ai'`**. Route 1 is a
+  rounding error on today's data; whether route 2 or route 3 carries the rest is the real question,
+  and it is the one the next bullet says cannot be answered from the column.
+
 ### [nutrition] LB-15 — a zero-calorie barcode product is reported as "not found"
 
 - **Lane:** A — `packages/shared/**`, whatever the edit looks like.
