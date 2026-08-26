@@ -2702,3 +2702,18 @@ alone reached.)*
 are the four new entries and two corrections, not accretion. One of those corrections retracts this
 baton's own claim that the check-in "adds little independent information" — measured, ~75% of it is
 information nothing else has.
+
+## 2026-08-26 — `docs/implementation-backlog.md` raised, 11926 → 11932 (the warning-row decision)
+
+Six lines net. Q-406's `Gate: owner` came off and was replaced by the answer: option A, an amber
+triangle before the calorie column, serving line kept, sentence moved to the food's detail.
+
+The length is mostly the two rejected options, and that is the point. **C is the intuitive answer** —
+show the warning in full, in the row — so without a written record of why it lost it gets re-proposed
+by the next person who reads that a warning "should be visible". Its cost is not visible from the row
+itself: three call sites would carry a prop they never fill, turning the shared row back into a
+wrapper, which is the thing Q-406 exists to end.
+
+**This raise was missed on the first push and CI caught it.** The branch ran
+`check-backlog-pointers` and not the doc-size check, and the PR body claimed a full `check:rules`
+pass that had not been run on this branch. The claim was corrected rather than quietly fixed.

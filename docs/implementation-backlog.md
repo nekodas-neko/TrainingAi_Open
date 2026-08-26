@@ -619,11 +619,32 @@ a large glyph and a `Photo` button on it.
   the tile and the placeholder**; this entry owns the `FoodRow` prop it lands on. Do them in one PR
   unless there is a reason not to, and delete that comment when you do — a stale "deliberately not
   yet" reads as a decision rather than a superseded one.
-- **Keep:** ONE call site, the external food-database row (`ingredient-search.tsx:132`), which
-  carries a macro-mismatch warning and an in-flight spinner. The agreed row has nowhere to put
-  either, and adding a slot makes it a wrapper rather than a unification. **It needs a design answer
-  — where a per-row warning goes** — and Q-395's drawings do not settle it (checked: none of the
-  twelve artboards shows a warning treatment). `Gate: owner`.
+- **✅ THE WARNING DESIGN IS DECIDED, 2026-08-26 — option A, owner's pick.** The `Gate: owner` that
+  held this entry is cleared. Three treatments were drawn at list density and put to the owner;
+  the choice was **A**.
+
+  **What to build on the last call site, the external food-database row (`ingredient-search.tsx:132`):**
+  - **An amber `AlertTriangle` immediately before the calorie column.** Nothing else changes — same
+    row height, same columns, same shape as the other three call sites. The icon is the whole
+    treatment.
+  - **The serving line stays** (`15P · 9C · 4F per 100 g`). This is the half that ruled out option B,
+    which put the warning sentence *in place of* that line: the rows carrying a mismatch are exactly
+    the rows where you want to read the numbers and judge for yourself.
+  - **The sentence moves to the food's detail**, not the row. Today's copy is *"Its macros and
+    calories disagree — check before using"* — carry the wording, not the position.
+  - **The row keeps ONE shape.** Do not add a warning slot to `FoodRow`. That was option C, and its
+    cost is not the ragged height — it is that three call sites carry a prop they never fill, which
+    turns the shared row back into a wrapper around per-screen differences. Ending that is what this
+    entry is for.
+  - **A → C stays open if the sentence later has to be visible in the list** — it is additive.
+    Starting at C and pulling the slot out means touching every call site again. Do not pre-build it.
+- **The in-flight spinner needs no decision** and never did: it swaps the green `+` inside the same
+  16 px box, so it is a state of an existing element rather than a new slot. It works under any of
+  the three treatments.
+- **Reference:** the three treatments as drawn, at 412 dp against a three-result list —
+  <https://claude.ai/code/artifact/315b8a71-5f0d-4a18-a917-a2618b882c4f>. **Q-395's twelve artboards
+  do NOT cover this**; checked, none of them shows a warning treatment, which is why it needed its
+  own drawing rather than a re-read of the mockups.
 - **✅ RESOLVED 2026-08-24 — the drawings are in the repository.** **The lesson worth keeping: a
   mockup that lives only in a chat artifact is a mockup the queue cannot use.** These were drawn
   2026-08-18, reviewed twice, decided against — then blocked four entries for six days because
