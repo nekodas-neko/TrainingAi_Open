@@ -24,8 +24,20 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.379.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Version:** v1.379.1 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-08-26.
+
+**A model stamp that another pillar could erase (Q-273).** `oura_daily_derived.model_versions` is a
+map of pillar → model version, and the shared upsert `COALESCE`-replaced it — so a writer stamping
+its own key wiped every other pillar's. Live: `backfillBodyComp` wrote `{bodyComp: …}` flat and
+erased the readiness stamp on every day it touched; readiness survived only through a racy JS
+read-merge, now deleted. The upsert merges with `||` inside the statement, so stamping is additive by
+construction. **Five DB tests, and reverting the fix fails 3 of them** — including the live sequence
+— while the two that should pass either way still pass. **Q-273 is NOT complete:** sleep, activity
+and training load still carry no stamp, because only two model-version constants exist and defining
+three more is a judgement about each pillar's model, not an implementer's aside. `CLAUDE.md` gains
+the rule the entry asked for, with the worked example where pooling four model versions turned
+r = +0.67 into r = −0.06 and stood in the docs for eleven days.
 
 **The day's AI surfaces can see each other now (Q-291).** The morning readiness insight once advised keeping intensity low on a raised temperature; that evening the digest cheered the two sessions that followed and said to keep the same energy tomorrow. The digest read nine sources and **readiness was not among them** — so this was data plumbing, not a prompt tweak, which is the question the entry itself asked to settle first. It now reads the day's insights before writing, inside its context hash rather than appended after it. **The read graph is one-directional and must stay acyclic:** two surfaces hashing each other's text would invalidate each other forever, and model output is not deterministic, so it would never settle — the digest is excluded from what the digest can read, in code and in two tests. The instruction permits disagreement and forbids only *silent* disagreement, which is also pinned, so a later tightening to "never contradict" fails rather than passing quietly.
 

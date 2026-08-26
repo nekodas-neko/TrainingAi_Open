@@ -351,6 +351,42 @@ below threshold and left in place for next time.
 > BF-29 (My meals), BF-30 (Meal detail), BF-31 (Edit meal) and BF-26 (Quantity). Two artboards need
 > no entry — `Tap targets` and the `srv/g` studies both shipped in Q-395a.
 
+### [platform] LA-32 — six test files still share a hardcoded user UUID with a file that deletes it
+
+- **Lane:** A
+- **Added:** 2026-08-26, after hitting this twice in one session. Both times a **new, unrelated test
+  file** turned the suite red in a file the change never touched, because adding a file reshuffles
+  vitest's parallel workers and that is all it takes.
+- **The shape.** File A hardcodes a user UUID as its only test user; file B hardcodes the same UUID
+  as an incidental "other user" and `DELETE FROM users` it in cleanup. One shared local database,
+  parallel workers, so B's delete can land between A's seed and its query — A dies on a foreign key,
+  naming a table neither PR touched. **Latent for exactly as long as scheduling keeps them apart.**
+- **Two already fixed** (both in the PRs that hit them): `...05e3`
+  (`daily-summary-incremental` × `daytime-stress-buckets`) and `...f002`
+  (`backfill-derived-scores` × `user-preferences-merge`).
+- **Measured 2026-08-26** over 603 test files: **233 distinct hardcoded UUIDs, 10 shared across
+  files, 7 of them risky** (shared *and* some holder deletes from `users` *and* some holder inserts).
+  Two are now fixed; **six remain**:
+
+  | UUID | files |
+  |---|---|
+  | `…0000ff` | `claude-ro-program-phases-scope` · `saved-meal-meal-types` |
+  | `…00cf01` | `clear-program-prescriptions` · `coach-domains` |
+  | `…00cf02` | `clear-program-prescriptions` · `coach-domains` |
+  | `…00d011` | `coach-options-source` · `oura-ble-step-rollup` |
+  | `1111…4111…` | `bodyweight-volume-migration` (deletes) + 4 pure-logic files |
+  | `fe481797…` | `db-snapshot-integration` (deletes) · `claude-ro-readonly-role` · `label-payload` |
+
+- **Do both halves.** Renaming the six is mechanical; what keeps it at zero is
+  `scripts/check-test-user-uuid-collisions.js` in the Custom Rules job — scan `git ls-files
+  '*.test.ts'` for hardcoded UUIDs, flag one held by two files where at least one issues
+  `DELETE FROM users`. Baseline **empty** after the sweep, so the next one is a regression rather
+  than a debt row.
+- **Two traps when renaming**, both paid for already: a seed email hardcoded beside the UUID stays
+  behind and the new id then fails `users_email_unique` — **derive the email from the id**. And a
+  `beforeAll` that throws is reported by vitest as **SKIPPED tests**, which reads exactly like a
+  `describe.skipIf` guard firing; run a suspicious skip with `--reporter=verbose` before believing it.
+
 ### [nutrition] LA-30 — a zero-calorie food can never be logged, and the button says nothing
 
 - **Lane:** B
@@ -5960,6 +5996,20 @@ statement. Reserve "proposal", and the future tense, for tier 3.
      pattern is the closest existing analogue.
   3. A rule, in `CLAUDE.md` alongside *One Formula, One Place*: a correlation computed across a
      model change is not evidence.
+- **Keep:** scope item 1 is now SAFE but not COMPLETE, and item 2 is untouched.
+  - ✅ **The stamp can no longer be clobbered** (2026-08-26). `model_versions` is a map and the
+    shared upsert `COALESCE`-replaced it, so `backfillBodyComp`'s flat `{bodyComp: …}` erased the
+    readiness stamp on every day it touched; readiness survived only via a racy JS read-merge. The
+    upsert now merges with `||` and the read-merge is gone. That was the precondition for stamping
+    anything else.
+  - ❌ **Sleep, activity and training load still do not stamp.** Only two model-version constants
+    exist in the tree (`BODY_COMP_MODEL_VERSION`, `READINESS_MODEL_VERSION`); the others would have
+    to be *defined*, which is a judgement about what counts as a version for each pillar and belongs
+    with whoever owns that pillar's model — not invented by an implementer in passing.
+  - ❌ **Item 2, the backfill/recompute path, is not started** and should not be taken lightly:
+    re-deriving history is the Q-304b hazard, where a recompute silently substituted a
+    since-edited prescription for the one actually trained under.
+  - ✅ Item 3, the `CLAUDE.md` rule, shipped: *A Correlation Across a Model Change Is Not Evidence*.
 - **Do this before the calibration items (Q-500, Q-272, Q-505).** Each of those creates another
   incomparable segment otherwise, and the next review re-learns §1.6 the same way this one did.
 
