@@ -1,56 +1,63 @@
-# 2026-08-26 — the diary delete works on web, so the bug is the device
+# 2026-08-26 — the diary delete, and the regression it uncovered
 
 **Branch:** `fix/diary-delete-intake` · docs-only · BugFix Intake
 
-## The report
+## What was reported
 
-From the owner, live on the APK: *"the delete feature doesnt work. so its not removing from my.UI"*,
-with the converged quantity sheet open on a BARILLA Spaghetti row. Asked for at the top of the queue,
-and it is there — **BF-34** is Lane B's #1.
+*"the delete feature doesnt work. so its not removing from my.UI"*, live on the APK, with the
+quantity sheet open on a BARILLA Spaghetti row.
 
-## What was actually done, and why it matters
+## First pass: drive it, don't read it
 
-The entry is short on speculation because the path was **driven end to end** rather than read.
-Playwright against `pnpm dev`, seeded row → tap row → tap the bin → confirm → the row left the list
-and `SELECT count(*) … WHERE deleted_at IS NULL` returned **0**.
+Playwright against `pnpm dev` — seeded row → tap row → tap the bin → confirm → row gone,
+`SELECT count(*) … WHERE deleted_at IS NULL` = **0**. So the bug was device-only, and six layers fell
+out: the local delete, the local read's `deleted_at` filter, `applyDelta`'s `sync_status='synced'`
+gate, the outbox payload surviving into the push branch, and the absence of any flip back to
+`synced`.
 
-**So the bug is device-only, and six layers are eliminated:**
+That left one question worth one tap: **does the confirm dialog appear on the device at all?**
 
-| Layer | The line that rules it out |
-|---|---|
-| Confirm dialog wiring | fires `handleConfirmDelete`; verified on web |
-| `store.deleteFoodLog` | `UPDATE … SET deleted_at=?, sync_status='pending'` |
-| Local read | `getFoodLogsWithItems` filters `WHERE fl.deleted_at IS NULL` |
-| Pull clobbering the delete | `applyDelta`'s upsert has `WHERE food_logs.sync_status='synced'`; the row is `pending` |
-| Outbox payload | push strips only `syncStatus`/`updatedAt`/`deletedAt`, so `deleted: true` survives to `adapter.ts:4032` |
-| A stale status flip | **nothing** flips `food_logs.sync_status` back to `'synced'`; `deleteMutations` only clears outbox rows |
+## The answer root-caused it
 
-That table is the expensive part and it belongs in the queue. An implementer who starts by
-re-checking the local store or the pull-clobber gate spends the same afternoon reaching the same
-dead ends.
+*"it opens up the confirm dialog; but then instantly minimizes so we cant click it."*
 
-## The remaining candidate
+Opens **and is then dismissed** — not the `pointer-events: none` variant, where it would sit there
+ignoring taps. That distinction is what moved the search off Radix and onto
+`useSheetBackDismiss`.
 
-`quick-edit-log-sheet.tsx:140` **closes a Radix Sheet and opens a Radix Dialog in the same tick**.
-Two things make that fragile on Samsung's WebView and invisible on desktop Chromium: Radix sets
-`pointer-events: none` on `<body>` while a modal dismisses, so a Dialog mounting during the Sheet's
-exit can be present but untappable; and `key={editingLog?.id}` **remounts** the sheet at that same
-moment.
+**The cause is BF-27, which shipped the day before (v1.372.0).** `BackDismiss` now renders inside
+every `SheetContent` and `DialogContent`, so:
 
-A Delete button that cannot be pressed looks exactly like a delete that does nothing.
+1. The trash tap closes the sheet **and** opens the confirm dialog.
+2. The sheet's `BackDismiss` unmounts → its cleanup sets **its own** `selfPopRef = true` and calls
+   `window.history.back()`, which is **asynchronous**.
+3. The dialog's `BackDismiss` mounts — **a different hook instance**, `selfPopRef` clear — and
+   pushes its own entry.
+4. The pop lands on the **dialog's** handler. Its flag is clear and `e.state?.sheetId` is not its
+   id, so it takes the genuine-back-gesture arm and closes itself on the frame it opened.
 
-**So the entry ends on one question — does the "Delete food log?" dialog appear on the device at
-all?** Yes and no split it into two different bugs with two different fixes, and it costs one tap to
-answer.
+**The hook's guard cannot catch this, and its own comment explains why without realising it.** The
+`sheetId` check exists to stop *"a nested sheet's `history.back()` cleanup from cascading into parent
+sheet handlers"* — the parent/child case. This is the **sibling** case: one surface closing while
+another opens. `selfPopRef` is per-instance, so the closing sheet's in-flight self-pop is invisible
+to the surface that receives it.
 
-The recommended fix if it is the race is **not** a `setTimeout`: move the confirmation *inside* the
-sheet. The bin already sits beside Save, and BF-26 deliberately removed Cancel from that row, so an
-inline "tap again to confirm" fits the shape the artboard settled on and deletes the second modal
-rather than sequencing it.
+**The blast radius is every close-one-open-another transition in the app.** The diary delete is
+simply the first one that got pressed.
 
-## The rule this is a case study in
+## Two things this changes
 
-`getLocalStore` returns `null` in the web sandbox, so **the branch this bug lives in cannot execute
-there at all**. The green Playwright run is not weak evidence of a fix — it is strong evidence of
-*where the bug is not*, and that is the only thing a web run can honestly buy on an offline-first
-domain.
+**The entry was retitled.** "Deleting a diary entry does nothing on the device" is a true symptom and
+a misleading title once the cause is known — an implementer reading it would start in the nutrition
+domain, which is the one place the bug is *not*.
+
+**The obvious local fix is now the wrong one.** Moving the confirmation inline into the sheet — which
+this entry recommended before the cause was known, and which fits artboard 6 — would make this
+instance work and leave the cause running everywhere else. It is kept in the entry only so nobody
+re-derives it.
+
+## What BF-27's gate was for
+
+BF-27 is `Gate: device`, unstruck, and its Keep line names this exact case: *"a confirm dialog (it
+must cancel, not confirm)"*. It had not been pressed yet. The gate was right; the day between
+shipping and pressing is where this lived.

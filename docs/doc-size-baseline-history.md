@@ -2799,3 +2799,18 @@ payload or the pull-clobber gate will spend the same afternoon reaching the same
 
 The entry ends on one question — *does the confirm dialog appear on the device at all?* — because the
 answer splits it into two different bugs with two different fixes.
+
+## 2026-08-26 — `docs/implementation-backlog.md` raised, 12002 → 12048 (BF-34 root-caused)
+
+The owner's one-line answer — *"it opens up the confirm dialog; but then instantly minimizes"* —
+turned a device-only symptom into a traced regression in **BF-27**, which shipped the day before.
+
+The added lines are the four-step sequence and the reason the hook's existing guard cannot catch it:
+`selfPopRef` is per-instance, so a closing surface's asynchronous `history.back()` lands on the
+surface that just opened, whose flag is clear and whose `sheetId` does not match — indistinguishable
+from a real back gesture. The `sheetId` guard was written for the parent/child cascade (LB-10); this
+is the sibling case.
+
+It is written out in full because the blast radius is **every close-one-open-another transition in
+the app**, and because the obvious local fix — moving the confirm inline — would hide this instance
+and leave the cause running everywhere else.
