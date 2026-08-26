@@ -18,7 +18,8 @@
 'use strict';
 const fs = require('fs');
 const path = require('path');
-const { resolveBaseRef, lineCountAtBase, verdict } = require('./lib/base-ref');
+const { resolveBaseRef, lineCountAtBase, dirNamesAtBase, verdict } = require('./lib/base-ref');
+const { entriesVerdict } = require('./lib/entries-verdict');
 
 const root = path.join(__dirname, '..');
 const config = JSON.parse(fs.readFileSync(path.join(root, 'docs/doc-size-baseline.json'), 'utf8'));
@@ -94,28 +95,23 @@ if (fs.existsSync(entriesAbs)) {
   const unlinked = names.filter((f) => !blob.includes(f));
   const linked = count - unlinked.length;
 
-  if (unlinked.length > ENTRIES_LIMIT) {
-    failures.push(
-      `${ENTRIES_DIR}/ holds ${unlinked.length} foldable entries, over the ${ENTRIES_LIMIT} runaway limit\n` +
-        `      (${count} total; ${linked} are linked by a durable doc and must NOT be folded).\n` +
-        `      Run the compaction sweep in ${ENTRIES_DIR}/README.md: fold the UNLINKED ones oldest-first\n` +
-        `      into a batched docs/overview/history-*.md, rewriting ](../../ to ](../ in each body, then\n` +
-        `      git rm the folded files.`,
-    );
-  } else if (count > ENTRIES_TOTAL_CEILING) {
-    failures.push(
-      `${ENTRIES_DIR}/ holds ${count} entries, over the ${ENTRIES_TOTAL_CEILING} total ceiling — it has\n` +
-        `      stopped being a readable recent-window. Only ${unlinked.length} are foldable, so a sweep\n` +
-        `      alone will not fix this: the durable docs citing the other ${linked} need to point at the\n` +
-        `      batched history instead.`,
-    );
-  } else if (unlinked.length >= ENTRIES_CHORE) {
-    console.log(
-      `check-doc-index-size: note — ${ENTRIES_DIR}/ holds ${unlinked.length} foldable entries ` +
-        `(${count} total, ${linked} linked), at or over the ${ENTRIES_CHORE}-file compaction chore ` +
-        `threshold. Not a failure; sweep it when convenient.`,
-    );
-  }
+  // BF-36: the limit fails the branch that GREW the directory, not whichever PR is open when the
+  // count crosses. `null` when the base cannot be read, which keeps the old behaviour rather than
+  // letting an unreadable base silence the limit.
+  const baseNames = dirNamesAtBase(baseRef, ENTRIES_DIR);
+  const addedHere = baseNames === null ? null : names.filter((n) => !baseNames.includes(n)).length;
+
+  const outcome = entriesVerdict({
+    total: count,
+    unlinked: unlinked.length,
+    addedHere,
+    chore: ENTRIES_CHORE,
+    limit: ENTRIES_LIMIT,
+    totalCeiling: ENTRIES_TOTAL_CEILING,
+    dir: ENTRIES_DIR,
+  });
+  if (outcome.level === 'fail') failures.push(outcome.message);
+  else if (outcome.level === 'note') console.log(`check-doc-index-size: note — ${outcome.message}`);
 }
 
 // Reported whether or not the run fails, and never as a failure: `main` being over its own baseline

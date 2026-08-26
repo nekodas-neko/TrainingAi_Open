@@ -426,45 +426,6 @@ ledger is the same problem with the same available answer.
   **Recommendation: do it** — the measuring rule works but depends on every agent remembering it,
   and this session already caught itself tightening two *other* agents' baselines while applying it.
 
-### [platform] BF-36 — the entries runaway limit fails whichever PR is open when it trips, not the one that caused it
-
-- **Lane:** B — `scripts/check-doc-index-size.js` and the README beside it; no schema, no route.
-- **Added:** 2026-08-26 · BugFix, after it blocked **PR #527**, a docs-only intake PR whose one new
-  journal file took the count from 60 to 61.
-- **The finding is the targeting, not the limit.** `check-doc-index-size.js:97` fails the Custom Rules
-  job when `docs/overview/entries/` holds more than **60 foldable** (unlinked) entries. The threshold
-  is right and the chore is real. What is wrong is **who pays**: the failure lands on whichever PR
-  happens to be open at the moment the count crosses, which is unrelated to whoever grew the
-  directory. Every session writes a journal entry, so the cost falls at random.
-- **What it costs, measured on the day.** #527's diff was four docs files and the failure named none
-  of them. The resolution was not the sweep — **merging `main` fixed it**, because another session
-  had run a sweep concurrently. So the blocked PR paid a CI cycle and a diagnosis for a condition it
-  neither caused nor fixed.
-- **The headroom is small enough that this recurs.** The README's own arithmetic: limit 60, linked
-  floor ~41, so **~19 files of slack**, which it measures at *"roughly twenty minutes on the busiest
-  stretch of the day and about half a day at the average rate."* At the current merge rate this will
-  block an unrelated PR again within days.
-
-**Recommended fix, and it is small: fail only a PR that adds an entry.** The check already knows how
-to attribute — the doc-size ratchet a few lines above prints *"N of which this branch added"*. Apply
-the same idea here: over the limit **and** this branch adds a file to `entries/` → fail, because that
-PR is the growth and its author is the right person to sweep. Over the limit and the branch adds
-none → the existing `console.log` note, which is already the mechanism for "sweep it when
-convenient".
-
-- **Why not just raise the limit.** It defers the same collision by about a week and makes the eventual
-  sweep bigger. The README records that sweeps have already failed the link checker in **five**
-  separate ways; a larger fold is a worse fold.
-- **Why not make it warn-only.** A warning nobody is obliged to act on is how the directory reached
-  198 files in the first place. The obligation should stay — it should just land on someone who is
-  already touching the directory.
-- **⚠ Do not "fix" this by skipping the journal entry.** The entry riding in the same PR is what stops
-  a stale "done" claim outliving an abandoned branch (see `entries/README.md`). The chore is the cost
-  of that guarantee and is worth paying; this entry is about *who* pays it.
-- **Verification.** A branch adding one entry while the count is over the limit fails; a branch adding
-  none, at the same count, passes with the note. Both against a fixture directory rather than the
-  live one, so the test does not move with the repo's real count.
-
 ### [nutrition] BF-35 — fill the food placeholder: two of the three sources are already free
 
 - **Lane:** A for the storage + the OFF field; B for the render.
@@ -1223,6 +1184,28 @@ whether or not anyone draws them first.
   drawing and the owner disagree the owner wins**: the artboard draws four tabs, build two, and its
   `Multi-add` / `Create food` row is the decided action row under other labels. Describe and manual
   entry are one sheet with the fields always visible, so neither is hidden.
+- **⚠ MEASURED 2026-08-26, AND IT IS BIGGER THAN THIS ENTRY SAYS — read before starting.** "The
+  `My Foods` tab is the merged list" is true and still understates the work. `FoodList` takes **13
+  props**, every one backed by state `saved-meals-sheet.tsx` owns: the meal fetch, selection mode,
+  the detail sheet, the builder, the label sheet, the plan ids, delete. It holds **24 `useState`
+  calls** and renders **four nested sheets** around that list. Making it a *tab* moves that whole
+  ownership layer out of a **696-line** file. This is not five tiles collapsing into one screen; it
+  is a restructure of two components, and the blast radius includes the ~8 e2e specs that reach the
+  list through the `My Foods` tile.
+- **The structuring decision, with a recommendation, so it is not re-derived.** Three ways to give
+  the tab a list, none of which the plan settles:
+  1. **Extract a `MyFoodsPanel`** owning the meals and the four sheets; `SavedMealsSheet` and the
+     capture screen both render it. Correct and the most movement.
+  2. **Reduce the list for this tab** — no selection, no bulk delete, no label. Rejected on sight:
+     `FoodList`'s swipe tray would still be there with dead actions, which is worse than today.
+  3. **Invert — put the capture screen INTO `SavedMealsSheet`.** ⭐ **Recommended.** That file
+     already owns the list, the builder and all four sheets, so a `Recent` tab and the action row are
+     additions rather than an extraction, and nothing has to move. It also matches what already
+     happens: `/nutrition`'s `My Foods` button opens the logger, which opens this sheet. The cost is
+     that the file grows against the 800-line ceiling, so the capture half lands as a child
+     component — which the repo wants anyway.
+  **Reversal cost is low either way** (moving one component and one call site), which is why this is
+  an implementer's call and not the owner's — but it should be *made* before code, not during.
 ### [nutrition] BF-11 — the meal creator/planner redesign: the spec every phase reads, and the final checkpoint
 
 - **Needs:** BF-11h
