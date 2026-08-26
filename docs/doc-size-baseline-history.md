@@ -2814,3 +2814,20 @@ is the sibling case.
 It is written out in full because the blast radius is **every close-one-open-another transition in
 the app**, and because the obvious local fix — moving the confirm inline — would hide this instance
 and leave the cause running everywhere else.
+
+## 2026-08-26 — backlog 12048 → 12064 (PS-7 decisions, camera form capture)
+
+Sixteen lines on the existing PS-7 entry, no new entry. The owner answered all four of the plan's
+open questions the same day it was written, and one answer changed the design — the analysis is
+keyed off the exercise's logged equipment rather than a whitelist of lifts. The entry carries the
+three facts an implementer would otherwise re-derive: that `equipmentClassOf()` already exists and
+should be reused, that it collapses dumbbell into a `standard` bucket the form profile has to split,
+and that 23 of 149 production exercises carry no equipment tag at all.
+
+**This raise was missed locally and CI caught it — worth recording because the local run was not
+wrong.** `pnpm check:rules` passed on this branch at the then-current baseline of 11947. Between the
+branch being cut and the PR opening, `main` merged twice and carried the baseline to 12048 with a
+larger file underneath it. CI checks the *merge* result, so the same diff that was clean locally was
+16 over once merged. The rule already in CLAUDE.md covers it — re-merge `origin/main` immediately
+before opening each PR, not only before cutting the branch — and this is one more instance of the
+cost, not a new failure mode.
