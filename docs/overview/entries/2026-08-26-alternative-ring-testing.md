@@ -117,6 +117,34 @@ candidate for the raw/big-data channel behind §4's missing sleep and PPG paths,
 Telink's OTA service, which is the firmware-flash path the mod-firmware rule says to stay away from.
 Recorded because knowing where that one lives is the point of an enumeration pass.
 
+## The ring accepts the write and answers nothing
+
+Notifications confirmed enabled on TX, `03000000000000000000000000000003` written to RX and echoed
+in its Value field, TX silent. Twice.
+
+**The checksum convention is ruled out and could never have been the cause here** — `0x03` with a
+zero payload sums to 3, and 3 is 3 under both mod 255 and mod 256. The one distinction the plan went
+out of its way to be careful about is the one thing this probe cannot test, which is worth noticing
+about probe design rather than about the ring.
+
+**The R09 is known-good.** [Gadgetbridge #4491](https://codeberg.org/Freeyourgadget/Gadgetbridge/issues/4491)
+is a user running this exact model with every sensor working, temperature included. So the question
+moved from *is the R09 in the protocol family* to *how are we poking it*, which is a much better
+question to have.
+
+Ranked suspects in §11c: the write type (RX advertises WRITE and WRITE NO RESPONSE; nRF defaults to
+Write Request and hides the selector under **Advanced**); the **Serial Port Service** `de5bf728`,
+whose `de5bf72a`/`de5bf729` pair the `RT09_*` firmware line may use instead of `6E40FFF0-…`; a
+required handshake; radio power-gating.
+
+The diagnostic that actually separates the failure modes is **`0x10` blink-twice**, because the ring
+answers it physically. A blink means the command channel works and only the notify path is broken;
+no blink under either write type on either service means nothing is getting through at all.
+
+**Next step is Gadgetbridge, not more nRF poking.** It is open-source, pushes no firmware, and
+already works on this model — so it settles framing end-to-end and, if it produces sleep and skin
+temperature here, both confirms §4's Phase 6 is achievable and names the codebase to port from.
+
 ## Deployment shape
 
 No APK. `lib/live-hr/chest-strap-source.ts` already does the full BLE cycle in TypeScript in the

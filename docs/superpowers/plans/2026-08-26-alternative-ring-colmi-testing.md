@@ -383,7 +383,7 @@ Read in nRF Connect on a factory-fresh ring. **No vendor app was ever installed.
 | `6E40FFF0-…` service present? | **yes** |
 | RX `6E400002-…` | **present** — WRITE, WRITE NO RESPONSE |
 | TX `6E400003-…` | **present** — NOTIFY, with CCCD `0x2902` |
-| `0x03` round trip | **not yet run** — the remaining gate step |
+| `0x03` round trip | **written, no reply** — see §11c |
 | Firmware Revision, trial end | _not yet read_ |
 
 **What this settles:** the R09 exposes the R02 family's transport exactly — same service UUID, same
@@ -421,16 +421,76 @@ Getting this wrong produces a pairing that works all afternoon and is dead the n
 
 Beyond `6E40FFF0-…` and the standard `0x1800`/`0x1801`/`0x180A`, the ring exposes:
 
-- **`de5bf728-d711-4e47-af26-65e3012a5dc7`** — a second custom service, in none of the clients
-  surveyed in §3/§4. Worth enumerating its characteristics in nRF Connect out of curiosity; a
-  plausible candidate for the "big data"/raw-sample channel the published clients never implemented
-  (§4's missing sleep and raw-PPG paths). **Do not write to it blind.**
+- **`de5bf728-d711-4e47-af26-65e3012a5dc7`** — **enumerated 2026-08-26**: `de5bf72a` (WRITE, WRITE
+  NO RESPONSE) and `de5bf729` (NOTIFY + CCCD). Identified in the ATC RF03 and Colmi R02/R03/R06 work
+  as a **Serial Port Service**. It is in none of the clients surveyed in §3/§4, and it is now a
+  prime suspect for why the ring answers nothing on `6E40FFF0-…` — see §11c candidate 2.
 - **`0xFEE7`** — Telink's OTA firmware-update service. This is the channel a firmware flash would
   go through, including the mod firmware §8 says to stay away from. **Do not write to it at all.**
   Noting it because knowing where the loaded gun is kept is the point of an enumeration pass.
 - `0x1812` (HID) — the ring can present as a Human Interface Device, which is how these rings do
   camera-shutter/gesture control. Irrelevant to this plan; recorded so it is not rediscovered as a
   mystery.
+
+### 11c. The `0x03` write lands and the ring does not answer — 2026-08-26
+
+Observed in nRF Connect: notifications enabled on TX (`0x2902` reads *"Notifications enabled"*),
+`03000000000000000000000000000003` written to RX and echoed back in its Value field, **and TX never
+produced a Value at all.** Repeated; no reply either time.
+
+**The checksum convention is not the cause and cannot be.** For `0x03` with a zero payload the sum
+is 3, and 3 is 3 under both mod 255 and mod 256. Whatever is wrong here, it is not that.
+
+**What the ring is NOT is broken.** Gadgetbridge supports the **R09 specifically** —
+[issue #4491](https://codeberg.org/Freeyourgadget/Gadgetbridge/issues/4491) is a user running one
+with every sensor working, temperature included, on a nightly build. So a working open-source
+implementation of this exact model exists, which relocates the problem from "is the R09 in the
+protocol family" to "how are we poking it". That is a much better problem.
+
+**Ranked candidates:**
+
+1. **Write type.** RX advertises WRITE *and* WRITE NO RESPONSE. nRF's Write-value dialog hides the
+   selector behind its **Advanced** expander and defaults to Write Request. Several of these rings
+   only act on Write Command. **Cheapest test, try first.**
+2. **Wrong service.** The ring also exposes `de5bf728-d711-4e47-af26-65e3012a5dc7` — identified in
+   the ATC RF03 and Colmi R02/R03/R06 work as a **Serial Port Service**, with `de5bf72a` (write) and
+   `de5bf729` (notify). The `RT09_*` firmware line is not the `R02_3.00.x` line the published
+   clients were written against, so `6E40FFF0-…` may be vestigial here and the serial service live.
+   **Enable notify on `de5bf729`, write the same packet to `de5bf72a`.**
+3. **A required handshake.** The ring may answer nothing until its clock is set (`0x01`) or some
+   enable packet is sent. Plausible on a ring that has never been paired to anything.
+4. **Power gating.** These rings sleep their radio/sensors when idle, like the Oura. Less likely to
+   suppress a battery reply, but worn-and-moving or on-charger is a free thing to vary.
+
+**The decisive diagnostic is `0x10` — blink twice.** `CMD_BLINK_TWICE = 16` in the reference client;
+the packet is:
+
+```
+10000000000000000000000000000010
+```
+
+It produces **physical feedback from the ring itself**, which separates the two failure modes that
+otherwise look identical: *the ring is not accepting our commands* versus *the ring accepts them and
+we are not receiving its replies*. If the ring blinks, the command channel works and only the notify
+path is broken. If it does not blink under either write type on either service, nothing is getting
+through and the framing is wrong for this firmware.
+
+### 11d. Gadgetbridge is the reference implementation, and it should be installed next
+
+Given #4491, the fastest way to settle framing, sleep, and temperature at once is to install
+**Gadgetbridge** — open-source, no vendor cloud, no firmware push — and let it drive the ring.
+
+What it buys, beyond confirming the hardware end to end:
+
+- **Sleep and skin temperature**, which no surveyed Python client implements (§4). If the R09 yields
+  those through Gadgetbridge, §4's "sleep is Phase 6, a port from a second codebase" is confirmed
+  as achievable and Gadgetbridge becomes the source to port from.
+- A working baseline to diff our own decoder against later.
+- It sets the ring's clock, which has to happen regardless.
+
+**Costs, stated plainly:** it will connect and sync, so it may consume some on-ring history buffer —
+irrelevant on a ring with a day of data and nothing depending on it. It is reversible (uninstall).
+It is **not** QRing and carries none of QRing's firmware-update exposure.
 
 ## Pickup prompt
 

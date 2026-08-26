@@ -385,11 +385,24 @@ tuple makes a shared-table write a *compile error*, which is stronger than anyth
   claims it. If the round trip fails, the unit is not in that protocol family and Phases 1+ are void.
   QRing is the fallback only if the ring will not advertise after a full charge — **decline any
   firmware update it offers**, then uninstall it.
-- **Phase 0 status, 2026-08-26 — transport PASSED, framing outstanding.** Enumerated on the owner's
-  unit in nRF Connect: `R09_C400`, firmware `RT09_3.10.22_260420`, hardware `RT09_V3.1`, service
-  `6E40FFF0-…` present with RX `6E400002` (WRITE) and TX `6E400003` (NOTIFY + CCCD). The R09 is in
-  the R02 family **at the transport layer**. The `0x03` round trip has not run, so framing and
-  checksum are still inherited assumptions. Full record: §11 of the plan.
+- **Phase 0 status, 2026-08-26 — transport PASSED, framing FAILED so far.** Enumerated on the
+  owner's unit in nRF Connect: `R09_C400`, firmware `RT09_3.10.22_260420`, hardware `RT09_V3.1`,
+  service `6E40FFF0-…` present with RX `6E400002` (WRITE) and TX `6E400003` (NOTIFY + CCCD). **The
+  `0x03` write lands and the ring never answers** — notifications confirmed enabled, packet echoed
+  on RX, TX silent, twice (§11c). Checksum convention is ruled out: `0x03` sums to 3 under both mod
+  255 and mod 256.
+- **The R09 is known-good with a real open-source client**, which relocates the problem to how we
+  are poking it: [Gadgetbridge #4491](https://codeberg.org/Freeyourgadget/Gadgetbridge/issues/4491)
+  is a user running an R09 with every sensor working, **temperature included**. Ranked suspects
+  (§11c): write type (RX takes WRITE *and* WRITE NO RESPONSE; nRF defaults to Write Request and
+  hides the selector under **Advanced**); the **Serial Port Service** `de5bf728` / `de5bf72a` write
+  / `de5bf729` notify, which the `RT09_*` firmware line may use in place of `6E40FFF0-…`; a required
+  handshake such as set-time `0x01`; radio power-gating. **Decisive diagnostic is `0x10` blink-twice
+  (`10000000000000000000000000000010`)** — physical feedback separates "ring rejects our commands"
+  from "ring replies and we do not receive them".
+- **Next action is to install Gadgetbridge (§11d)** — open-source, no vendor cloud, no firmware
+  push. It settles framing end-to-end, and if it yields **sleep and skin temperature** on this unit
+  it both confirms §4's Phase 6 is achievable and names the codebase to port from. Reversible.
 - **Blocker for Phase 3 design — the ring's BLE address is a rotating type (§11a).**
   `31:37:41:30:C4:00` has the multicast bit set (not a valid public address) and random top-bits
   `00` = non-resolvable private. But the advertised name encodes the address tail and the System ID
