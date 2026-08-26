@@ -44,12 +44,14 @@ totals and hourly movement, and activity auto-detection (the "activity detected"
   **167**) rather than `maxHr` (age-predicted **187**), takes the contributor from **0 on 53 of 59
   days** to sub-score **mean 63.8, sd 38.7** — **the highest-variance input in the Activity Score.**
   **Do not re-cut `ZONE_DEFS`** — training zones are not the defect; the roll-up that borrows them is.
-- [`docs/reviews/2026-08-19-score-audit-trail.md`](../../reviews/2026-08-19-score-audit-trail.md) — **whether each score can be re-audited later, 2026-08-19** (Q-526 — **activity is
-  the only score that stores the wrong thing**: `activity_contributors` holds the blend wrapper
-  `{base, adjustment, trained}`, not `computeActivityScore`'s six components, which are already in
+- [`docs/reviews/2026-08-19-score-audit-trail.md`](../../reviews/2026-08-19-score-audit-trail.md) — **whether each score can be re-audited later, 2026-08-19** (Q-526 — **activity was
+  the only score that stored the wrong thing**: `activity_contributors` held the blend wrapper
+  `{base, adjustment, trained}`, not `computeActivityScore`'s six components, which were already in
   memory on the same request. Sleep stores 10 real sub-scores, readiness stores its contributors plus
-  `provisional` flags, illness stores all four biomarker z-scores on every scored row. **Do Q-526
-  before Q-505** or the old model's contributor history is lost permanently.)
+  `provisional` flags and, since Q-501, each contributor's own input; illness stores all four
+  biomarker z-scores on every scored row. **Fixed 2026-08-26** — the six components, `preTaper` and
+  `acwr` are now stored, so a row reproduces its own score. **Forward only**: rows before that date
+  hold the wrapper and cannot be recovered, so Q-505's before/after comparison window starts there.)
 - [`docs/reviews/2026-08-19-activity-contributor-audit.md`](../../reviews/2026-08-19-activity-contributor-audit.md) — **every Activity Score contributor measured, 2026-08-19 — read before touching
   the model** (the audit Q-277 asked for and never got). Over 90 days: **steps** (sd **33.4**) and
   **strengthVolume** (sd 23.8) carry real information; **strengthFreq** sits at 100 on **78%** of days;

@@ -3145,3 +3145,11 @@ after LA-33 — the old trap named a JSON file that no longer exists.
 
 A baton is state, not accretion, and this one is at the length where the next session should be
 rewriting rather than editing.
+
+## 2026-08-26 — `projectOverview.md` 8124 → 8128 (+4), Q-526
+
+Four lines, after folding Q-526's status block into Q-501's rather than adding a second. They are one
+finding read two ways — every score now stores the breakdown it was made of — and two adjacent blocks
+saying that separately would have cost eleven lines to say it worse. The measurement worth keeping in
+the index is the one that changes what a reader concludes from a stored row: both fixes are
+**forward-only**, so a day before 2026-08-26 is not merely unchecked but uncheckable.
