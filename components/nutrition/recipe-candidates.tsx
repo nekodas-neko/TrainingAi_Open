@@ -13,6 +13,13 @@ export interface RecipeCandidate {
 
 interface Props {
   candidates: RecipeCandidate[]
+  /**
+   * Per candidate, the name of a meal you already have that it duplicates — or null (BF-11d).
+   *
+   * Parallel to `candidates` by index rather than carried on the candidate, because it is a fact
+   * about your library rather than about the page that was scanned.
+   */
+  duplicateNames: (string | null)[]
   saving: boolean
   onCancel: () => void
   /** Every candidate the user kept. Each becomes its own saved meal. */
@@ -38,9 +45,16 @@ interface Props {
  * single optional string, not a node. So the candidate list is drawn here, and the shared row keeps
  * its shape.
  */
-export function RecipeCandidates({ candidates, saving, onCancel, onKeep }: Props) {
-  // Everything starts kept: the user asked to import this page, so discarding is the exception.
-  const [dropped, setDropped] = useState<Set<number>>(new Set())
+export function RecipeCandidates({ candidates, duplicateNames, saving, onCancel, onKeep }: Props) {
+  /**
+   * Everything starts kept — the user asked to import this page, so discarding is the exception.
+   * **Except a dish you already have** (BF-11d): a link is easy to paste twice, and a four-dish page
+   * pasted twice would otherwise add four duplicates in one press. Starting those unticked is the
+   * ask, made in the UI that is already for choosing rather than in four dialogs.
+   */
+  const [dropped, setDropped] = useState<Set<number>>(
+    () => new Set(duplicateNames.flatMap((d, i) => d ? [i] : [])),
+  )
 
   const toggle = useCallback((index: number) => {
     setDropped(prev => {
@@ -60,6 +74,7 @@ export function RecipeCandidates({ candidates, saving, onCancel, onKeep }: Props
         <p className="text-[11px] leading-snug text-muted-foreground">
           Each one you keep is saved as its own meal, so you can log them separately. Tap a dish to
           leave it out.
+          {duplicateNames.some(Boolean) && ' Ones you already have are unticked — tap to keep a copy anyway.'}
         </p>
       </div>
 
@@ -72,6 +87,7 @@ export function RecipeCandidates({ candidates, saving, onCancel, onKeep }: Props
             itemCount={c.ingredients.length}
             calories={Math.round(sumIngredients(c.ingredients).calories)}
             kept={!dropped.has(i)}
+            duplicate={duplicateNames[i] != null}
             onToggle={toggle}
           />
         ))}
@@ -101,13 +117,14 @@ export function RecipeCandidates({ candidates, saving, onCancel, onKeep }: Props
  * The kept state is a tick AND the row's opacity, never colour alone.
  */
 const CandidateRow = memo(function CandidateRow({
-  index, name, itemCount, calories, kept, onToggle,
+  index, name, itemCount, calories, kept, duplicate, onToggle,
 }: {
   index: number
   name: string
   itemCount: number
   calories: number
   kept: boolean
+  duplicate: boolean
   onToggle: (index: number) => void
 }) {
   const press = useCallback(() => onToggle(index), [index, onToggle])
@@ -127,7 +144,7 @@ const CandidateRow = memo(function CandidateRow({
         <span className="block truncate text-sm font-medium leading-snug">{name}</span>
         <span className="block truncate text-xs text-muted-foreground">
           {itemCount} ingredient{itemCount === 1 ? '' : 's'}
-          {kept ? '' : ' · left out'}
+          {duplicate ? ' · already in your meals' : kept ? '' : ' · left out'}
         </span>
       </span>
       <span className="w-16 flex-none text-right text-sm font-semibold tabular-nums">

@@ -2,11 +2,10 @@
 
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useState } from 'react'
 import { useUserTimezone } from '@/components/shell/user-timezone-provider'
-import { ChevronLeft, Plus, Trash2, Loader2, CheckSquare, Pencil, Camera } from 'lucide-react'
+import { Plus, Trash2, Loader2, CheckSquare, Camera } from 'lucide-react'
 import { toast } from 'sonner'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import type { FoodItem, SavedMeal, MealType, FoodLogWithItem, NutritionScanResult } from '@trainingai/shared/types/nutrition'
 import { todayInTz } from '@trainingai/shared/date-utils'
 import { logMealItems } from '@trainingai/shared/nutrition/log-meal'
@@ -31,7 +30,12 @@ import { qtyFromInput, steppedQty, type QtyUnit } from './saved-meal-qty'
 import { IngredientPicker } from './ingredient-picker'
 import { MealBatchSize } from './meal-batch-size'
 import { MealBuilderFooter } from './meal-builder-footer'
+import { MealBuilderHeader } from './meal-builder-header'
 import { recipeBuilderPatch } from './recipe-import'
+import { findDuplicateMeal, type ComparableMeal } from './meal-duplicate'
+import { sumIngredients } from '@trainingai/shared/nutrition/scan-totals'
+import { saveMealToLibrary } from './save-meal'
+import { DuplicateMealPrompt } from './duplicate-meal-prompt'
 import { RecipeCandidates, type RecipeCandidate } from './recipe-candidates'
 import { savePlanMealToLibrary } from '@trainingai/shared/nutrition/save-plan-meal'
 
@@ -150,6 +154,10 @@ export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate,
   // picker: the choice is which dishes to save, not what to put in the meal on screen.
   const [candidates, setCandidates] = useState<RecipeCandidate[] | null>(null)
   const [savingCandidates, setSavingCandidates] = useState(false)
+  // BF-11d: the meal this one looks like, once a save has found one. Non-null puts the question on
+  // screen; `duplicateAnswered` is what stops it being asked again on the way through its own answer.
+  const [duplicateOf, setDuplicateOf] = useState<ComparableMeal | null>(null)
+  const [duplicateAnswered, setDuplicateAnswered] = useState(false)
 
   useEffect(() => {
     if (!open) return
@@ -196,6 +204,8 @@ export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate,
     setPickerOpen(!meal || meal.items.length === 0)
     setUnstatedYield(false)
     setCandidates(null)
+    setDuplicateOf(null)
+    setDuplicateAnswered(false)
     setTab('build')
   }, [])
 
@@ -336,62 +346,70 @@ export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate,
     { kcal: 0, protein: 0, carbs: 0, fat: 0 }
   )
 
-  async function handleSave() {
+  /** The same figures in `MacroTotals` shape, which is what duplicate detection compares (BF-11d). */
+  /**
+   * Which imported dishes you already have (BF-11d), by index.
+   *
+   * Computed here rather than in the picker because the library lives here — and computed once for
+   * the whole list rather than per row, so a four-dish page is four lookups, not four per render.
+   */
+  const candidateDuplicates = useMemo(
+    () => (candidates ?? []).map(c =>
+      findDuplicateMeal({ name: c.name, totals: sumIngredients(c.ingredients) }, meals)?.name ?? null),
+    [candidates, meals],
+  )
+
+  const candidateTotals = {
+    calories: totalMacros.kcal,
+    proteinG: totalMacros.protein,
+    carbsG: totalMacros.carbs,
+    fatG: totalMacros.fat,
+  }
+
+  /**
+   * Save, unless it looks like something you already have (BF-11d).
+   *
+   * `overwrite` is the meal the user chose to update. Its **id is kept**, which is the whole reason
+   * this is not a delete-and-recreate: `meal_plan_meals.saved_meal_id` references it, and so does a
+   * printed QR label the owner may already have stuck on a container.
+   */
+  async function handleSave(overwrite?: ComparableMeal) {
     const name = mealName.trim()
     if (!name) { toast.error('Enter a meal name'); return }
     if (ingredients.length === 0) { toast.error('Add at least one ingredient'); return }
+
+    // Runs on save, never per keystroke — and never when the user has already answered, or the
+    // question would come back on the way through its own answer.
+    if (!overwrite && !duplicateAnswered) {
+      const match = findDuplicateMeal({ name, totals: candidateTotals }, meals, editingMeal?.id)
+      if (match) { setDuplicateOf(match); return }
+    }
+
     setSaving(true)
-    const items = ingredients.map(e => ({ foodItemId: e.item.id, quantityMultiplier: e.qty }))
-    const store = userId ? getLocalStore(userId) : null
-    const mealId = editingMeal?.id ?? crypto.randomUUID()
-    const now = new Date().toISOString()
+    // Keeps the meal's own creation date when re-saving over one, whether it was opened for editing
+    // or matched as a duplicate: it is the same meal either way.
+    const target = editingMeal ?? (overwrite ? meals.find(m => m.id === overwrite.id) ?? null : null)
+    const mealId = target?.id ?? crypto.randomUUID()
     try {
-      let savedLocally = false  // Q-216: the local branch owns its own failure, see the catch below
-      if (store) {
-        try {
-        // Local-first: write the meal to the on-device store + queue the outbox mutation,
-        // then update the UI synchronously — no waiting on the network (works offline).
-        const createdAt = editingMeal
-          ? (editingMeal.createdAt instanceof Date ? editingMeal.createdAt.toISOString() : String(editingMeal.createdAt))
-          : now
-        await store.upsertSavedMeal(
-          { id: mealId, name, servings: mealServings, imageDataUri: mealImage, createdAt, updatedAt: now, deletedAt: null, syncStatus: 'pending' },
-          items.map(it => ({ id: crypto.randomUUID(), savedMealId: mealId, foodItemId: it.foodItemId, quantityMultiplier: it.quantityMultiplier })),
-        )
-        // BF-11e added `mealTypeIds` to the route, the outbox branch and the local table. This
-        // payload deliberately does NOT send it yet, and that is the correct no-op rather than an
-        // omission: absent means "leave the stored tags alone" on both the local upsert above and
-        // the server replay, while sending the currently-loaded tags would REVERT a change made on
-        // another device between this sheet loading and this save. There is no asymmetry for the
-        // sync rule to catch either — no surface can set a tag today, web or native.
-        // **BF-11f adds the picker: it must add `mealTypeIds` HERE and to `upsertSavedMeal` above,
-        // in the same PR**, or tags will save on the web and strand offline.
-        await store.queueMutation({ userId: userId!, domain: 'saved_meals', date: todayInTz(tz), payload: { id: mealId, name, items, servings: mealServings, imageDataUri: mealImage } })
-        await invalidateSavedMeals()
-        setMeals(await store.getSavedMeals())
-        pushThenRevalidate(userId!, invalidateSavedMeals)
-        savedLocally = true
-        // Without this the throw reached the outer catch and reported a failed save, never trying
-        // the server write in the arm below.
-        } catch (e) { console.error('Saved-meal SQLite write failed, falling back to API:', e) }
-      }
-      if (!savedLocally) {
-        // Web fallback (no local store), and the recovery path when the local write above threw.
-        const url = editingMeal ? `/api/nutrition/saved-meals/${mealId}` : '/api/nutrition/saved-meals'
-        const method = editingMeal ? 'PUT' : 'POST'
-        const res = await fetch(url, {
-          method,
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ id: mealId, name, items, servings: mealServings, imageDataUri: mealImage }),
-        })
-        if (!res.ok) throw new Error()
-        await invalidateSavedMeals()
-        fetchMeals()
-      }
-      toast.success(editingMeal ? `"${name}" updated` : `"${name}" saved to meal library`)
+      const fresh = await saveMealToLibrary({
+        mealId,
+        name,
+        items: ingredients.map(e => ({ foodItemId: e.item.id, quantityMultiplier: e.qty })),
+        servings: mealServings,
+        imageDataUri: mealImage,
+        createdAt: target
+          ? (target.createdAt instanceof Date ? target.createdAt.toISOString() : String(target.createdAt))
+          : new Date().toISOString(),
+        isUpdate: target != null,
+        userId,
+        tz,
+      })
+      if (fresh) setMeals(fresh)
+      else fetchMeals()
+      toast.success(target ? `"${name}" updated` : `"${name}" saved to meal library`)
       backToMeals()
     } catch {
-      toast.error(editingMeal ? 'Failed to update meal' : 'Failed to save meal')
+      toast.error(target ? 'Failed to update meal' : 'Failed to save meal')
     } finally {
       setSaving(false)
     }
@@ -507,48 +525,17 @@ export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate,
               {selectedIds ? `${selectedIds.size} selected` : 'Log Food'}
             </SheetTitle>
           ) : (
-            <div className="flex items-center gap-2">
-              <button onClick={backToMeals} aria-label="Back" className="p-2.5 -ml-1.5 text-muted-foreground hover:text-foreground rounded-lg">
-                <ChevronLeft className="w-5 h-5" />
-              </button>
-              {/* Q-395a: the meal's name is the screen title once it has one, and the batch
-                  explainer is its subtitle — "Edit Meal" said nothing the screen did not already
-                  show, and the batch figure was buried below the fold. */}
-              <div className="min-w-0 flex-1">
-                {/* Artboard 5 edits the name in place, next to a pencil. It used to cost a labelled
-                    field of its own in the body — which was never a separate step, but did mean the
-                    name and the figure describing it sat a screen apart. */}
-                {renamingMeal ? (
-                  <Input
-                    autoFocus
-                    value={mealName}
-                    onChange={e => setMealName(e.target.value)}
-                    onBlur={() => setRenamingMeal(false)}
-                    onKeyDown={e => { if (e.key === 'Enter' || e.key === 'Escape') setRenamingMeal(false) }}
-                    placeholder="e.g. Post-workout shake"
-                    aria-label="Meal name"
-                    className="h-8 rounded-lg px-2 text-base font-semibold"
-                  />
-                ) : (
-                  <button
-                    onClick={() => setRenamingMeal(true)}
-                    aria-label={`Rename ${mealName.trim() || 'this meal'}`}
-                    className="flex min-w-0 items-center gap-1.5 text-left"
-                  >
-                    <SheetTitle className="truncate">
-                      {mealName.trim() || (editingMeal ? 'Edit Meal' : 'Build a Meal')}
-                    </SheetTitle>
-                    <Pencil className="h-3.5 w-3.5 flex-none text-muted-foreground" />
-                  </button>
-                )}
-                {ingredients.length > 0 && (
-                  <p className="truncate text-xs tabular-nums text-muted-foreground">
-                    Makes {mealServings} {mealServings === 1 ? 'portion' : 'portions'} ·{' '}
-                    {Math.round(totalMacros.kcal / mealServings)} kcal each
-                  </p>
-                )}
-              </div>
-            </div>
+            <MealBuilderHeader
+              onBack={backToMeals}
+              name={mealName}
+              onNameChange={setMealName}
+              renaming={renamingMeal}
+              onRenamingChange={setRenamingMeal}
+              editing={editingMeal != null}
+              hasIngredients={ingredients.length > 0}
+              servings={mealServings}
+              batchKcal={totalMacros.kcal}
+            />
           )}
         </SheetHeader>
 
@@ -643,6 +630,7 @@ export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate,
               <div className="flex-1 overflow-y-auto px-1 pb-2">
                 <RecipeCandidates
                   candidates={candidates}
+                  duplicateNames={candidateDuplicates}
                   saving={savingCandidates}
                   onCancel={() => setCandidates(null)}
                   onKeep={kept => void keepCandidates(kept)}
@@ -735,6 +723,16 @@ export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate,
               />
             </div>
 
+            {duplicateOf && (
+              <div className="shrink-0 px-1 pb-2">
+                <DuplicateMealPrompt
+                  existingName={duplicateOf.name}
+                  saving={saving}
+                  onUpdate={() => { const m = duplicateOf; setDuplicateOf(null); setDuplicateAnswered(true); void handleSave(m) }}
+                  onSaveAsNew={() => { setDuplicateOf(null); setDuplicateAnswered(true); void handleSave() }}
+                />
+              </div>
+            )}
             <MealBuilderFooter
               hasIngredients={ingredients.length > 0}
               batchKcal={totalMacros.kcal}
