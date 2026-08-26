@@ -463,7 +463,17 @@ tuple makes a shared-table write a *compile error*, which is stronger than anyth
   while a command needs the app processor, and `CLAUDE.md`'s Oura section documents exactly this
   power-gating. **Retry on the charger or worn-and-moving**, and read the nRF Connect log for ATT
   errors the Value line hides.
-- **Next action is to install Gadgetbridge (§11d)** — open-source, no vendor cloud, no firmware
+- **✅ WEB BLUETOOTH CONNECTS to the R09 on the S25, 2026-08-26 (§11g).** The web client reached
+  `Connected` in Chrome. That is the same API family as `@capacitor-community/bluetooth-le`, so §5's
+  claim — TypeScript in the WebView, **no APK, ships via Railway** — is demonstrated rather than
+  argued. **Still unmeasured: the write direction**; the dashboard has not been asked for anything
+  yet. Pressing Start Monitoring with the ring worn issues real-time HR and proves it.
+- **Design constraint found (§11g): a BLE peripheral takes exactly ONE connection, and while held it
+  stops advertising.** nRF Connect holding the ring made it invisible to Chrome's picker entirely.
+  Our pairing/sync paths must expect "held by another app" (Gadgetbridge, the vendor app, a stale
+  explorer) and **name it** — it presents as *device not found*, indistinguishable from out-of-range
+  or flat battery. Scan-by-name does not rescue it; the ring is not advertising at all.
+- **Gadgetbridge (§11d) is now the fallback, not the next action** — open-source, no vendor cloud, no firmware
   push. It settles framing end-to-end, and if it yields **sleep and skin temperature** on this unit
   it both confirms §4's Phase 6 is achievable and names the codebase to port from. Reversible.
 - **Blocker for Phase 3 design — the ring's BLE address is a rotating type (§11a).**
