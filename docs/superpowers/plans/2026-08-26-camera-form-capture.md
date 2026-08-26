@@ -1,8 +1,8 @@
 # Camera form capture — on-device pose, stick-figure playback, summary-only sync
 
-**Status:** design proposed 2026-08-26 from an owner conversation. Nothing implemented, nothing
-measured on device. **Phase 0 is a feasibility gate and everything after it is conditional on that
-number.**
+**Status:** design proposed 2026-08-26 from an owner conversation; **all four open questions
+answered by the owner the same day** (§10). Nothing implemented, nothing measured on device.
+**Phase 0 is a feasibility gate and everything after it is conditional on that number.**
 **Backlog entry:** PS-7 (Phase 0 spike only — later phases are not queued yet, on purpose).
 **Domain:** [`workouts`](../../domains/workouts/README.md) · [`devices`](../../domains/devices/README.md)
 
@@ -24,6 +24,9 @@ From the conversation on 2026-08-26, these are constraints, not preferences:
    go into rest as normal.
 4. **Ideally driven from a watch**, so the phone stays on the tripod and never has to be touched.
 5. Storage cheap, security concerns minimal.
+6. **The lift should not matter.** The workout already records whether an exercise is barbell,
+   dumbbell or bodyweight, so the app should adapt to it rather than shipping for a whitelist of
+   lifts. Raised by the owner as the important one of the four questions — §5.5.
 
 Requirements 1–3 are what this plan builds. Requirement 4 is costed in §9 and **recommended
 against for this feature** — the camera solves the same problem for free, and the watch is a second
@@ -169,8 +172,10 @@ quantised to int16 is far more precision than a 1080p frame carries, so this los
 | 14-day window, 8 sessions | **~10 MB** | ~3 MB |
 
 Human motion is smooth and strongly autocorrelated, so the compression estimate is conservative.
-Either way a 14-day local window is nothing on a phone — **recommend 14 days, matching the Oura
-local window**, and prune on the same schedule.
+Either way a 14-day local window is nothing on a phone. **Owner decision 2026-08-26: 14 days**,
+matching the Oura local window, pruned on the same schedule. The numbers above are an estimate —
+Phase 2 measures the real per-set size before the window is fixed, and if it lands far above this,
+the keep-list or the frame rate gives way rather than the window.
 
 **Postgres side: one row per set, not per rep.** A session of 25 sets × 8 reps is 200 reps; 200 rows
 per session is row growth for no benefit, and the per-rep detail is only ever read together.
@@ -232,8 +237,13 @@ bar path traced over it and the per-rep numbers beside it.
 ### 5.1 Bar path is two landmarks
 
 You do not detect the barbell. On any barbell lift the hands do not move on the bar, so **the
-midpoint of the two wrist landmarks is the bar**. One subtraction. Object detection would only be
-needed for a trap bar or a lift where the hands are occluded, and neither is worth building for.
+midpoint of the two wrist landmarks is the bar**. One subtraction.
+
+This generalises, which is what makes §5.5's equipment profile cheap: the hands hold the load on a
+dumbbell and a kettlebell too, so the same landmarks give **two independent paths** for dumbbells
+and a single wrist path for everything else. No bar, plate or dumbbell is ever detected. Object
+detection would only add value for a trap bar, a lift where the hands are occluded, or catching a
+mismatch between the logged exercise and what is actually being held — see §5.5.
 
 ### 5.2 Rep counting is signal processing
 
@@ -263,11 +273,66 @@ same lift:
 Gate every metric on the landmark visibility scores. An occluded hip must produce "not measurable",
 never a confident number.
 
-### 5.5 The constraints a single camera actually imposes
+### 5.5 The analysis profile comes from the exercise's equipment — no second model
+
+**Owner decision, 2026-08-26.** The feature should not launch "for the barbell four". The workout
+already knows what you are holding, so the app should adapt to it: dumbbells behave differently from
+a bar, and the analysis should follow the exercise rather than the other way round.
+
+**The app already has the field, and a classifier for it.** Measured against production on
+2026-08-26:
+
+- `exercise_library.equipment` is a populated `text[]`. Six values in production, and the same six
+  locally: **dumbbell, barbell, cable, machine, bodyweight, kettlebell**.
+- `exercise_library.exercise_type` is `weighted` (117) or `bodyweight` (24).
+- **`equipmentClassOf(equipment)` already exists** in
+  `packages/shared/src/workout/time-audit.ts:183`, returning
+  `'barbell' | 'standard' | 'bodyweight' | 'unknown'`. It is already used to model inter-exercise
+  transition times.
+
+**Reuse that vocabulary; do not invent a second one** (One Formula, One Place). But
+`equipmentClassOf` collapses dumbbell, cable, machine and kettlebell into one `standard` bucket,
+and form capture needs dumbbell separated — so the form profile needs a **finer** classifier living
+beside it in the same module, sharing the same input and the same tag strings.
+
+| Class | Bar path | What is actually measurable | Camera |
+|---|---|---|---|
+| `barbell` | one path, wrist midpoint | ROM, tempo, forward drift, **bar tilt** (wrist height difference) | side-on |
+| `dumbbell` | **two independent paths**, one per wrist | ROM, tempo, **left/right asymmetry** — impossible on a bar | side-on or front-on |
+| `bodyweight` | wrist or hip, per movement | ROM, tempo, hip/knee angles. No external load | side-on |
+| `machine` / `cable` | fixed by the machine | tempo and ROM only — the path is the machine's, not yours | low value; consider skipping |
+| `kettlebell` | wrist path | ROM, tempo; swings are ballistic, so rep detection needs its own threshold | side-on |
+| `unknown` | wrist midpoint | the generic profile — still useful | side-on, ask the user |
+
+**The honest correction to the request.** The owner described the model *looking for* the equipment:
+finding the full bar length and where the hands sit, or spotting one or two dumbbells. That is
+**object detection — a second model** running alongside pose, costing more memory, more latency and
+more thermal budget on a device that is already the binding constraint.
+
+It is not needed, because **the hands hold the load in every one of these cases**. The wrist
+landmarks give the bar path for a barbell, each dumbbell's path for dumbbells, and the movement path
+for bodyweight — with no bar or plate ever detected. What the equipment tag has to decide is not
+*what to look for* but **which metrics are valid, how to count a rep, and which camera angle to
+ask for**. That is a lookup table, computed in our own code, deterministic and testable — and it
+delivers what the request was actually after.
+
+**Visual equipment detection is therefore deferred, not rejected.** It would buy two things the tag
+cannot: catching a mismatch between the logged exercise and what is actually in your hands, and bar
+tilt measured from the bar itself rather than inferred from wrist heights. Neither justifies a
+second model before Phase 0 has established there is thermal headroom for the first one.
+
+**Measured prerequisite: 23 of 149 production exercises carry no equipment tag** (15%), and 16
+carry more than one. So the `unknown` row of that table is a real code path serving roughly one
+exercise in seven, not a defensive branch — it must be genuinely useful, and the multi-tag case
+(`['barbell','bodyweight']`) must resolve deterministically. Tagging the 23 is a cheap, separate
+data chore worth doing before Phase 3, and it is not a blocker: the generic profile still produces
+ROM, tempo and a wrist path.
+
+### 5.6 The constraints a single camera actually imposes
 
 - **2D.** BlazePose emits world landmarks in metres, but monocular depth is a hint. Treat it as one.
-- **Side-on** for squat, deadlift, bench and overhead press — the sagittal plane is where the cues
-  live. **Front-on** for knee valgus and bar tilt. The app should say which, per exercise.
+- **The angle is per-profile, not per-lift** — the table above carries it, and the capture screen
+  states it before recording rather than silently scoring a set shot from the wrong side.
 - **The phone must not move.** If it moves, the bar path you draw is the phone's path. Detect camera
   motion from the static background and invalidate the set rather than storing a lie.
 - **Occlusion is the real enemy** — a rack upright, a bench, a plate across the hip.
@@ -321,8 +386,15 @@ metrics. This is the phase that tells you whether the ritual is tolerable.
 playback with scrubbing. The 7/14-day review surface.
 
 **Phase 3 — the metrics.** Rep detection, joint angles, bar path in `packages/shared/` with
-fixtures. `set_form_metrics` (**Postgres migration 225 or later — Lane A only**), its write path
+fixtures, plus §5.5's equipment-keyed profile — the finer classifier beside `equipmentClassOf` in
+`packages/shared/src/workout/time-audit.ts`, sharing its tag vocabulary rather than starting a
+second one. `set_form_metrics` (**Postgres migration 225 or later — Lane A only**), its write path
 mirrored between the API route and the `pushMutations` branch through one shared function.
+
+Worth doing before this phase, separately and cheaply: **tag the 23 of 149 production exercises that
+carry no `equipment` value**, so the `unknown` profile serves the genuinely ambiguous cases rather
+than one exercise in seven. Not a blocker — the generic profile still yields ROM, tempo and a wrist
+path — so it is a data chore, not a dependency.
 
 **Phase 4 — surfaces.** Set-against-set and week-against-week comparison, bar-path overlay, coach
 text summary.
@@ -336,53 +408,83 @@ entries for work gated on an unknown is how a queue rots.
 
 ---
 
-## 9. The watch — costed, and recommended against for this feature
+## 9. The watch — the platform changed, and so does half the argument
 
-**There is no Wear OS module in this repo.** `android/` contains one module, `app`. So this is not a
-small addition:
+**Owner answer, 2026-08-26: there is no Wear OS watch.** The interest is in buying an open-source
+watch — a Pebble — *"to try make something on"*. That is a different platform, and it invalidates
+most of what this section originally said, so the reasoning is rewritten rather than defended.
 
-- A Wear OS app is a **separate Gradle module** with its own manifest, its own APK and its own
-  sideload/delivery story. It is native Kotlin/Compose. **Capacitor is not involved** — none of the
-  WebView UI can be reused, so every screen on the watch is written twice.
-- Phone↔watch messaging is the Wearable Data Layer (`MessageClient`/`DataClient`), which is a new
-  transport to learn, debug and keep alive alongside the three BLE ones already here.
-- It introduces a **second supported runtime**, against the standing canonical-runtime policy, and
-  doubles the device-verification surface for anything it touches.
-- None of it is testable in the sandbox. Every iteration is an APK cycle on two devices.
+**What the original objection was, and why it mostly dissolves.** The costing here was against
+Wear OS: a separate Gradle module, a native Compose UI, a new transport, and — the load-bearing
+part — **a second supported runtime** against the canonical-runtime policy, doubling the
+device-verification surface.
 
-**Recommendation: do not build the watch for this feature.** The camera is already pointed at you
-and already knows when you started and stopped moving — §4.3 gets the hands-free set boundary for
-free, from a pipeline that has to exist anyway. Voice ("done", "next") covers the remainder using a
-dependency already installed. A watch would be solving a problem the camera has already solved, at
-the cost of a whole new runtime.
+A Pebble is not that. PebbleOS was open-sourced in 2025 and the watch is, from the phone's point of
+view, **a BLE peripheral** — and this app already runs three of those (`OuraBlePlugin`,
+`PolarBlePlugin`, `ScaleBlePlugin`) with a foreground-service pattern for exactly this. A Pebble
+remote is plausibly **a fifth Kotlin plugin in the existing module**, not a second runtime. The
+watch-side app is small: three controls and a number. Battery life measured in days rather than
+hours also suits something that has to be alive whenever you walk into a gym.
 
-**What would revive it:** if Phase 1 shows pose-triggered boundaries are unreliable on-device *and*
-voice is unworkable in a gym. Even then it should be scoped as a **general remote for the whole
-workout screen** — rest timer, next exercise, live HR from the H10, set logging — because that is the
-version that earns a second runtime. Not as a form-capture accessory.
+So the honest position: **the "second runtime" objection was against Wear OS and does not carry to
+Pebble.** What remains is scope, not architecture.
 
-**Open question for the owner: is there actually a Wear OS or Galaxy Watch to build against?** The
-tracked hardware in this repo is an Oura Ring 5 and a Polar H10. If the watch is hypothetical, that
-settles §9 without further discussion.
+**What still has to be verified before committing to it** — none of it checked here, and it should
+not be assumed:
+
+- Whether the current phone-side SDK is usable from a Capacitor app at all, and what it requires;
+  the Pebble ecosystem changed hands and the tooling for current hardware needs reading, not
+  recalling. Treat every SDK detail as unverified until the docs are open.
+- Whether a background service can hold the connection through a session the way the existing three
+  BLE services do.
+- Which hardware actually ships and when.
+
+**Recommendation, unchanged in conclusion and changed in reasoning: do not put the watch on the
+critical path for form capture.** Not because it is architecturally expensive any more, but because
+the camera already solves the problem it would solve. §4.3 gets the hands-free set boundary from a
+pipeline that has to exist regardless, and voice ("done", "next") covers the rest through
+`@capacitor-community/speech-recognition`, already installed. Gating a camera feature on hardware
+nobody owns yet would be gating it on a purchase decision.
+
+**If a Pebble is bought, scope it as a general workout remote** — rest timer, next exercise, live HR
+from the H10, set logging — not as a form-capture accessory. That is the version worth a native
+plugin, it is useful on every session rather than only the filmed ones, and it composes with this
+feature for free: a remote that can end a set is a remote that can end a *recorded* set. Its own
+planning session, its own entry, no dependency in either direction.
 
 ---
 
-## 10. Open questions for the owner
+## 10. Decisions — all four answered by the owner, 2026-08-26
 
-1. **Wear OS hardware — owned, or hypothetical?** Decides whether §9 is a real option at all.
-2. **Local window: 7 or 14 days?** Recommend **14**, matching the Oura local retention decision.
-   Worst case ~10 MB on the phone, so the shorter window buys nothing.
-3. **Which lifts first?** Recommend the barbell four, side-on, because the metrics are best defined
-   there and the bar-path trick works cleanly.
-4. **Other users:** off by default, opt-in per user? Recommend **yes** — the app has other real
-   accounts, and a camera feature should never be on for someone who did not ask for it.
+| # | Question | Owner's answer | Where it lands |
+|---|---|---|---|
+| 1 | Wear OS hardware owned? | **No.** Interested in buying a Pebble to build on | §9 rewritten — the platform objection does not carry to Pebble; still off the critical path |
+| 2 | 7 or 14 days locally? | **14, "if we can afford it"** | We can — §4.4 puts the worst case near 10 MB. Confirmed as 14 |
+| 3 | Which lifts first? | **"Ideally it doesn't matter"** — drive it off the logged equipment | §5.5 — an equipment-keyed analysis profile, not a lift whitelist |
+| 4 | Off by default for other accounts? | **Yes** | Opt-in per user, off until enabled. Never on for someone who did not ask |
+
+**On (2), the affordability is an estimate and not yet a measurement.** §4.4's ~10 MB assumes the
+landmark keep-list and frame rate proposed there. Phase 2 measures the real per-set size on device
+before the window is fixed; if it lands far above the estimate, the honest response is to shrink the
+keep-list or the frame rate, not to quietly cut the window the owner asked for.
+
+**On (4), off-by-default is a floor, not the whole answer.** A camera feature also needs a visible
+recording indicator while armed, and the capture screen must be reachable only from a deliberate
+action — never auto-opened by starting a set until the user has turned the feature on.
 
 ---
 
 ## 11. What has not been verified
 
-Everything. This document is design only. No code was written and nothing was measured. In
-particular, none of these has been exercised: `getUserMedia` inside the Capacitor WebView on the
+Almost everything. This document is design only and no code was written.
+
+**Four things WERE measured against production on 2026-08-26**, via `/api/admin/db-query`, and are
+quoted rather than assumed: the six `equipment` values, the `exercise_type` split, that **23 of 149**
+exercises are untagged and **16** carry multiple tags, and that `equipmentClassOf` already exists at
+`packages/shared/src/workout/time-audit.ts:183`. Note the row-scoping caveat does not bite here —
+`exercise_library` is a shared catalogue, not user rows.
+
+**Nothing else is measured**, and none of these has been exercised: `getUserMedia` inside the Capacitor WebView on the
 S25, MediaPipe under this app's CSP, sustained inference frame rate or thermals on the device,
 the compression ratio estimated in §4.4, or rep-detection accuracy against any real lift. Phase 0
 exists to replace the first four of those with measurements.

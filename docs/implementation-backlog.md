@@ -11911,10 +11911,26 @@ not a later optimisation.
 number would queue work gated on an unknown. The spike's result decides whether they get filed, and
 whether the capture layer stays in the WebView or moves to a Kotlin plugin.
 
-**Open for the owner before Phase 1** (all four are in §10 of the plan): is there actually a Wear OS
-watch to build against, or is §9 moot; 7 or 14 days for the local window (recommend 14); which lifts
-first (recommend the barbell four, side-on); and whether the feature is off-by-default for the other
-accounts (recommend yes).
+**✅ All four open questions were answered by the owner on 2026-08-26 — §10 of the plan is now a
+decisions table, not a question list.** No owner gate remains. In short: **no Wear OS watch exists**
+(the interest is an open-source Pebble, which is a BLE peripheral rather than a second runtime — §9
+was rewritten, and its conclusion survives for a different reason); **14-day local window**;
+**off by default** for the other accounts; and — the one that changed the design — **the lift must
+not matter.**
+
+**That last answer replaced a lift whitelist with an equipment-keyed analysis profile (§5.5), and it
+is the part to read before implementing.** Verified against production the same day: `equipment` is a
+populated `text[]` with six values, and **`equipmentClassOf()` already exists** at
+`packages/shared/src/workout/time-audit.ts:183` — reuse its vocabulary, do not start a second one,
+but note it collapses dumbbell/cable/machine/kettlebell into one `standard` bucket and form capture
+needs dumbbell split out. **The request implied object detection ("find the bar length, find the
+dumbbells"); the plan explains why that is not needed** — the hands hold the load in every case, so
+wrist landmarks give the path for barbell, dumbbell and bodyweight alike, and equipment only decides
+which metrics are valid and which camera angle to ask for.
+
+**Measured prerequisite, worth a cheap data chore before Phase 3: 23 of 149 production exercises
+carry no `equipment` tag** (15%), and 16 carry more than one. The `unknown` profile is a live path
+serving about one exercise in seven, not a defensive branch.
 
 ---
 
