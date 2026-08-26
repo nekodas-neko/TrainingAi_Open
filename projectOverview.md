@@ -24,8 +24,19 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.383.2 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Version:** v1.383.3 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-08-26.
+
+**The app's load time is measured now (BF-19).** The owner reported it "VERY slowly lately" and asked
+for a second opinion; nothing could give one — the two existing timing endpoints measure **workout**
+duration, and everything server-side was already ruled out by measurement. `lib/app-load-metrics.ts`
+reports navigation timing once per JS context via `sendBeacon`; `GET /api/admin/app-load-report`
+gives p50/p95 per route **split cold vs warm**. That split is the report: every merge is a deploy
+that rewrites the service-worker cache name, so a pooled percentile measures release cadence rather
+than the app. **Never via the outbox** — telemetry queued as a mutation would sit ahead of the user's
+food logs on the next push. `buildId` is baked into the client bundle rather than stamped on ingest,
+so a device on a stale shell reports the build it is actually running. **The table stays empty until
+it runs on the S25**, which is where the numbers mean anything. Unblocks BF-22.
 
 **A food item can hold a picture now, and it survives offline (BF-35, engine half).** A barcode scan
 stores the Open Food Facts thumbnail as **bytes, not a URL** — `food_items` is read local-first and

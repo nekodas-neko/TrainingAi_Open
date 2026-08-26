@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect } from "react"
+import { startAppLoadReporting } from "@/lib/app-load-metrics"
 
 const MAX_REPORTS_PER_MINUTE = 5
 const THROTTLE_WINDOW_MS = 60_000
@@ -42,9 +43,17 @@ export function ErrorReporter() {
 
     window.addEventListener("error", onError)
     window.addEventListener("unhandledrejection", onRejection)
+
+    // BF-19. Mounted here rather than as a second component because this is already the app's one
+    // global client-telemetry mount, and app-load timing is telemetry. All of its logic lives in
+    // `lib/app-load-metrics.ts` (waiting for `load`, reading the navigation entry, the
+    // once-per-context guard, the beacon) so this file's share of it stays one call.
+    const stopAppLoadReporting = startAppLoadReporting(process.env.NEXT_PUBLIC_BUILD_ID || undefined)
+
     return () => {
       window.removeEventListener("error", onError)
       window.removeEventListener("unhandledrejection", onRejection)
+      stopAppLoadReporting()
     }
   }, [])
 

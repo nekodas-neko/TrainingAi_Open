@@ -34,6 +34,21 @@ const securityHeaders = [
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
+  // BF-19. The build that produced THIS client bundle, baked in at build time and read by
+  // `lib/app-load-metrics.ts` so a load-time regression can be pinned to a release.
+  //
+  // **Baked in rather than stamped by the server on ingest, and that distinction is the point.**
+  // A device holding a stale shell from an earlier deploy is exactly the case this feature exists
+  // to measure — the service worker's cache name is stamped from the deploy SHA, so every merge
+  // invalidates it and a slow load is often a shell being re-fetched. Stamping server-side would
+  // label such a load with the deploy that is live *now*, not the one the device is running, and
+  // the report would attribute the slowness to the wrong release.
+  //
+  // Absent locally, which is correct: a `pnpm dev` build has no deploy SHA and its timings are not
+  // the APK's anyway.
+  env: {
+    NEXT_PUBLIC_BUILD_ID: process.env.RAILWAY_GIT_COMMIT_SHA?.slice(0, 12) ?? '',
+  },
   // onnxruntime-node is a native addon (Oura neural-model inference, server-side rollup only) —
   // keep it external so Next never tries to bundle its .node binaries.
   serverExternalPackages: ['onnxruntime-node'],
