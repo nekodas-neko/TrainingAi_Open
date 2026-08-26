@@ -478,9 +478,27 @@ that do:
 - **Generate asynchronously, never in the save path.** Route 3's food is being *typed*, and the save
   must stay instant per the repo's feedback-first rule. Write the row, return, fill the image after.
   The placeholder is what shows until it lands — which is exactly what BF-32 built it for.
-- **Only for items that survive.** 81% of items are logged exactly once (see the measurement below).
-  Generating on the *second* log rather than the first would skip four in five generations for no
-  visible loss. **Recommended, and cheap to change later if it feels wrong.**
+- **~~Only for items that survive~~ — WITHDRAWN 2026-08-26, the owner is right.** The suggestion was
+  to generate on the *second* log, skipping four in five. Owner: *"I think that means the first
+  person wouldnt get an image right? We always want an image?"* — and yes: the first log is exactly
+  the moment the row is being looked at, so the saving buys a placeholder at the only time it is
+  noticed. With effectively one user, "the first person" is always the owner, so the rule would mean
+  *never* seeing an image on a new food. **Generate on first log.**
+- **⚠ `source` CANNOT tell route 2 from route 3, so the routing must happen at creation.**
+  `food-logger-sheet.tsx:165` writes `source: scanResult?.confidence ? 'ai' : 'manual'`, and
+  `ingredient-picker.tsx:169` writes `'ai'` for a text estimate. **A photo scan and a typed
+  description both land as `'ai'`** — the column records *that a model was involved*, not *what the
+  user gave it*. So the 203 `ai` items cannot be split into "already has a photo" and "needs one
+  generated" after the fact. **Decide the route where the code still knows whether an image was in
+  hand** — at the call site, not by reading the column back. If a durable split is wanted later, that
+  is a new value on `source` (or a separate column) and a Lane A migration; say so rather than
+  inferring.
+- **Volume, so the spend is a number rather than a worry.** 203 `ai` items over 87 days
+  (2026-05-31 → 2026-08-26) is **~2.3 new food items per day**. Worst case — every one of them a
+  typed description with no photo — that is **~70 generations a month**, and route 2 removes however
+  many were photographed. Check the model's current per-image price against that rate rather than
+  assuming; at any plausible figure this is a small monthly number, which is what makes "always
+  generate" affordable.
 - **Rate-limit it like every other AI route**, per CLAUDE.md, and give it the standard try/catch
   returning a JSON error. A generation failure must leave the placeholder, never an error state on a
   food row.
@@ -553,10 +571,12 @@ raw* store, which is a different table and a different decision.
   generation lands. Kill the network mid-generation and confirm the row keeps the placeholder rather
   than showing an error. Then confirm offline still renders whatever was already stored.
   `Gate: device`.
-- **Ship it in that order — 1, 2, 3 — and consider stopping to look after 2.** Routes 1 and 2 are
-  free, cover the packaged and photographed foods, and between them will fill most rows. Route 3 is
-  the only one that spends money, and it is much easier to judge whether it is worth it once the
-  other two are on screen and the remaining placeholders are visible.
+- **Ship it in that order — 1, 2, 3 — but do NOT expect routes 1 and 2 to carry it.** An earlier note
+  here said the free routes would "fill most rows". **Measured 2026-08-26, that is wrong and the
+  correction matters for scoping:** of the owner's 209 food items, **`barcode` is 3 and `text` (the
+  OFF name search) is 3 — six items, 3%.** The other **203 are `source: 'ai'`**. Route 1 is a
+  rounding error on today's data; whether route 2 or route 3 carries the rest is the real question,
+  and it is the one the next bullet says cannot be answered from the column.
 
 ### [nutrition] LB-15 — a zero-calorie barcode product is reported as "not found"
 

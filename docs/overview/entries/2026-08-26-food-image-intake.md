@@ -111,3 +111,38 @@ work, all written into the entry:
 And a sequencing note: ship 1, 2, 3 in that order and consider stopping to look after 2. The free
 routes cover the packaged and photographed foods between them, and whether route 3 is worth paying
 for is much easier to judge once the remaining placeholders are visible on screen.
+
+## The owner rejected the cost lever, and measuring the alternative corrected two claims
+
+*"I dont know about this - I think that means the first person wouldnt get an image right? We always
+want an image?"*
+
+**Right, and withdrawn.** Generating on the second log saves four in five generations by removing the
+image at the one moment the row is actually being looked at — the first time you log something new.
+And with effectively one user, "the first person" is always the owner, so the rule would mean never
+seeing an image on a new food. It stays in the entry struck through rather than deleted, so it is not
+re-proposed on the same reasoning.
+
+Measuring the replacement corrected two things this entry had wrong.
+
+**"Routes 1 and 2 will fill most rows" was wrong.** Of the owner's 209 food items:
+
+| `source` | Items | What it is |
+|---|---|---|
+| `ai` | **203** | a model estimate — from a photo **or** from typed text |
+| `text` | 3 | the Open Food Facts **name search** |
+| `barcode` | 3 | a barcode scan |
+
+**Route 1 covers six items — 3%.** The free product-image route is a rounding error on real data,
+which is the opposite of what was claimed a message earlier.
+
+**And `source` cannot tell route 2 from route 3.** `food-logger-sheet.tsx:165` writes
+`source: scanResult?.confidence ? 'ai' : 'manual'`; `ingredient-picker.tsx:169` writes `'ai'` for a
+text estimate. A photo scan and a typed description **both land as `'ai'`** — the column records that
+a model was involved, not what the user gave it. So the 203 cannot be split after the fact, and the
+routing has to be decided where the code still knows whether an image was in hand.
+
+**The volume that makes "always generate" affordable:** 203 items over 87 days is **~2.3 new food
+items a day**, so a worst case of every one being typed is **~70 generations a month**, less whatever
+route 2 covers. The entry says to check the model's current per-image price against that rate rather
+than assume a figure.

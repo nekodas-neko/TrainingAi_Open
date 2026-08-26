@@ -2955,3 +2955,18 @@ The added lines are the four cost levers that actually work, because the owner's
 does not: **image models bill per image, not per pixel, so "super small" does not reduce spend.**
 Cache by food name, generate off the save path, generate on the second log rather than the first
 (81% of items are logged once), and rate-limit it like every other AI route.
+
+## 2026-08-26 — `docs/implementation-backlog.md` raised, 12195 → 12215 (BF-35 corrected twice)
+
+The owner rejected the generate-on-second-log lever — *"that means the first person wouldnt get an
+image right? We always want an image?"* — and is right: the first log is the moment the row is being
+looked at, and with one user "the first person" is always them. Withdrawn rather than deleted, so it
+is not re-proposed.
+
+Measuring the replacement corrected two things this entry had wrong. **`barcode` is 3 items and the
+OFF name search is 3**, so the free route covers 3% of the catalogue, not "most rows" as claimed.
+And **`source` cannot distinguish a photo scan from a typed description** — both write `'ai'` — so
+the 203 that would route to generation cannot be split after the fact, and the routing has to happen
+where the code still knows whether an image was in hand.
+
+Both are the kind of thing that reads as a detail and re-scopes the work.
