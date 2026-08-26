@@ -136,9 +136,11 @@ Live at the time of writing (2026-07-30):
   every blocking question, and the coverage audit is done — so the design is not the bottleneck.
   **Q-395 is now the spec and the final checkpoint, not a work item.** The work is **Q-406** (one
   shared `food-row.tsx`, replacing four shapes for one thing) → **Q-395a** (quantity sheet + Edit
-  Meal) → **Q-395b** (the day screen, against an 11-section coverage list) → **Q-395c** (Log Food as
-  one screen, and the `Saved meals` / `My Meals` / `My Foods` rename swept in one pass). Read Q-395
-  before starting any phase; the phases point back rather than copying its decisions.
+  Meal) → **Q-395b** (the day screen, against an 11-section coverage list) → **Q-395c** (the merged
+  list and the naming sweep) → **LB-16** (Log Food as one screen). **All phases have shipped**, so
+  Q-395 itself is startable — but wait for the LB-16/BF-37 device pass before signing off parity on a
+  screen nobody has seen on the phone. Read Q-395 before starting any phase; the phases point back
+  rather than copying its decisions.
 - ⚠️ **The finished-logging control was never reached** (BF-6, 2026-08-24, v1.344.0) — last on the
   page, **zero presses in seven weeks**, while the calibration it feeds excludes an unmarked day
   rather than treating it as light. Now directly under the meals, End of Day last. **Not
@@ -185,8 +187,19 @@ Live at the time of writing (2026-07-30):
 
 ## History
 
+- **[`docs/overview/entries/2026-08-26-log-food-one-screen.md`](../../overview/entries/2026-08-26-log-food-one-screen.md)**
+  — 🆕 **LB-16 + BF-37**: Log Food is **one screen** — no tile grid, a
+  `Recent · Meals · Single foods` tab strip and a `Photo · Barcode · Describe or enter` action row
+  ([`capture-actions.tsx`](../../../components/nutrition/capture-actions.tsx),
+  [`recent-foods-panel.tsx`](../../../components/nutrition/recent-foods-panel.tsx), both rendered by
+  `saved-meals-sheet.tsx`). **Two consequences to know before touching it:** `FoodLoggerSheet` renders
+  **no sheet of its own** at the capture step — one screen is one sheet is one back-stack layer — and
+  the entry below's merged list is **un-merged**, because the owner reported it the same morning
+  (*"they are 2 seperate things"*). `FoodList` takes a `show` prop; nothing else about it moved.
+  `Recent` is scoped to a meal bucket, which is **LB-18**'s open question rather than a defect.
 - **[`docs/overview/entries/2026-08-26-one-food-list.md`](../../overview/entries/2026-08-26-one-food-list.md)**
-  — 🆕 **Q-395c**: *My Meals* and the food library are **one list called My Foods**
+  — **Q-395c** *(the merge above reversed the list half of this the same day)*: *My Meals* and the
+  food library were **one list called My Foods**
   ([`components/nutrition/food-list.tsx`](../../../components/nutrition/food-list.tsx));
   `food-library-sheet.tsx` is deleted and `/nutrition`'s button opens the logger onto the list,
   because a food's tap needs the assign step and that step is `FoodLoggerSheet`'s. **Two things to
