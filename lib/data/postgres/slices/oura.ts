@@ -7,6 +7,7 @@ import type { OuraDailyRow, OuraSleepUpsertRow, OuraTagRow, OuraDailySummaryRow,
 import type { SetHrRow, RichSetMarker } from '@trainingai/shared/workout/set-hr-stats'
 import { aestMidnight, todayInTz, DEFAULT_TZ, shiftDateStr } from '@trainingai/shared/date-utils'
 import { shouldPrune } from '../retention-throttle'
+import { collapseOnConflict, keepLatestNonNull } from '../collapse-conflicts'
 import { bodyCompSnapshot } from '@trainingai/shared/health/body-composition'
 import { mergeSet, initialSourceMap, type HealthSource, type SourceColumn } from '@/lib/data/health-source'
 import { resolveDsToMs, type ClockAnchor } from '@/lib/oura-ble/clock'
@@ -435,9 +436,14 @@ export async function listOuraTags(db: Db, userId: string, startDay: string, end
 
 export async function upsertOuraSleep(db: Db, userId: string, sessions: OuraSleepUpsertRow[], source: HealthSource): Promise<void> {
   if (sessions.length === 0) return
+  // Two re-segmentations of the same night reach here with one `sleep_start` — the conflict target
+  // — and would reject the whole batch (21000). Every row shares `source`, so the rank arm reduces
+  // to "newer non-null wins": `keepLatestNonNull` is that arm, applied before `initialSourceMap`
+  // reads the merged values.
+  const collapsed = collapseOnConflict(sessions, r => r.sleepStart.getTime(), keepLatestNonNull)
   await db
     .insert(s.sleepSessions)
-    .values(sessions.map(r => {
+    .values(collapsed.map(r => {
      const v = {
       userId,
       date:             r.date,
@@ -484,19 +490,13 @@ const HR_PRUNE_THROTTLE_MS = 24 * 60 * 60 * 1000
 
 export async function upsertOuraHeartrate(db: Db, userId: string, rows: { timestamp: Date; bpm: number; source: string | null }[]) {
   if (rows.length === 0) return
-  // Collapse repeats on the conflict target BEFORE the insert. Postgres rejects a whole command
-  // whose VALUES list hits the same conflict row twice ("ON CONFLICT DO UPDATE command cannot
-  // affect row a second time"), so one duplicated timestamp discarded an entire CHUNK — up to
-  // 5,000 points, not just the duplicate. Live in production: the chest strap sent repeats within
-  // a second and every batch failed identically on retry, losing those samples permanently
-  // (Q-214, 2026-08-13). Last value wins, matching the ON CONFLICT arm's excluded.* semantics.
-  // The BLE rollup already merges by timestamp before calling here; this makes the guarantee the
-  // function's own, so every caller gets it rather than each one remembering.
-  const byTimestamp = new Map<number, { userId: string; timestamp: Date; bpm: number; source: string | null }>()
-  for (const r of rows) {
-    byTimestamp.set(r.timestamp.getTime(), { userId, timestamp: r.timestamp, bpm: r.bpm, source: r.source })
-  }
-  const values = Array.from(byTimestamp.values())
+  // Collapse repeats on the conflict target BEFORE the insert — one duplicated timestamp otherwise
+  // discards an entire 5,000-point CHUNK, which is what Q-214 was (see `collapse-conflicts.ts`).
+  // Last value wins, matching this arm's bare excluded.* semantics.
+  const values = collapseOnConflict(
+    rows.map(r => ({ userId, timestamp: r.timestamp, bpm: r.bpm, source: r.source })),
+    r => r.timestamp.getTime(),
+  )
   // 4 params/row → chunk well under pg's 65535 bind-parameter ceiling. A BLE
   // rollup can produce thousands of binned rows in one pass.
   const CHUNK = 5000
@@ -547,7 +547,12 @@ export interface OuraBucketRow {
 
 export async function upsertOuraBucket(db: Db, userId: string, rows: OuraBucketRow[]) {
   if (rows.length === 0) return
-  const values = rows.map(r => ({ userId, ...r }))
+  // Same 21000 hazard as `upsertOuraHeartrate`, and worse per failure: a duplicated
+  // (tier, bucket_start_ms) discards 2,000 buckets. Bare excluded.* arm → last wins.
+  const values = collapseOnConflict(
+    rows.map(r => ({ userId, ...r })),
+    r => `${r.tier}\u0000${r.bucketStartMs}`,
+  )
   // ~17 cols/row → stay well under pg's 65535 bind-parameter ceiling.
   const CHUNK = 2000
   // Bump `updated_at` ONLY when a metric actually changed, so an idempotent re-roll of the
@@ -1064,8 +1069,14 @@ export async function getSetDetailsForSession(db: Db, workoutSessionId: string):
  *  one; a later fuller compute that gained a value fills the gap without wiping fields it lost. */
 export async function upsertSetHrStats(db: Db, userId: string, workoutSessionId: string, rows: SetHrRow[]): Promise<void> {
   if (!rows.length) return
+  // Conflict target is `set_log_id`, so a batch naming one set twice rejects every set in the
+  // workout (21000). The arm is COALESCE gated on `readings_count >=`, so the collapse mirrors it:
+  // the fuller compute survives, later wins a tie. Plain last-wins would let a partial recompute
+  // beat a fuller sibling — the exact clobber this function's setWhere exists to prevent.
+  const collapsed = collapseOnConflict(rows, r => r.setLogId, (existing, incoming) =>
+    incoming.readingsCount >= existing.readingsCount ? incoming : existing)
   await db.insert(s.setHrStats)
-    .values(rows.map(r => ({
+    .values(collapsed.map(r => ({
       setLogId: r.setLogId, userId, workoutSessionId,
       exerciseLogId: r.exerciseLogId, exerciseId: r.exerciseId, exerciseName: r.exerciseName,
       phaseType: r.phaseType, setNumber: r.setNumber,
@@ -1797,8 +1808,12 @@ export async function replaceDaytimeStressBuckets(
       and(eq(s.ouraDaytimeStressBuckets.userId, userId), eq(s.ouraDaytimeStressBuckets.day, day)),
     )
     if (buckets.length === 0) return
+    // One repeated bucket instant would reject the whole day's insert (21000). Bare excluded.* arm.
     await tx.insert(s.ouraDaytimeStressBuckets).values(
-      buckets.map(b => ({ userId, day, bucketStart: b.bucketStart, level: b.level, updatedAt: new Date() })),
+      collapseOnConflict(
+        buckets.map(b => ({ userId, day, bucketStart: b.bucketStart, level: b.level, updatedAt: new Date() })),
+        b => b.bucketStart.getTime(),
+      ),
     ).onConflictDoUpdate({
       target: [s.ouraDaytimeStressBuckets.userId, s.ouraDaytimeStressBuckets.bucketStart],
       set: { level: sql`excluded.level`, day: sql`excluded.day`, updatedAt: new Date() },

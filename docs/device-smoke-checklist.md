@@ -9,12 +9,17 @@ checklist is the **merge gate** for anything the web sandbox can't exercise — 
 alone is never sufficient for offline-first domains, native plugins, safe-area, gestures, or
 notifications.
 
+**For the specific checks currently owed to the owner**, see
+[`docs/device-verification-queue.md`](device-verification-queue.md) — the running list of items
+that shipped without a device run, each with the screen, the action, and what a pass looks like.
+This file is the generic pass; that one is what a given device session should actually work through.
+
 ## 1. Safe-area
 
 - Open every new/changed screen. Confirm content clears the status bar at the top
   and the gesture bar / bottom nav at the bottom — no button or text sits under
   either.
-- Repeat in **both** light and dark theme (Settings → theme toggle).
+- Dark theme only — the app is pinned to dark (`forcedTheme="dark"`, owner decision 2026-08-25) and there is no theme toggle to repeat this in.
 - Toggle Android's navigation mode (Settings → System → Gestures → System
   navigation → Gesture / 2-button / 3-button) and re-check the same screens — the
   inset differs by mode and gesture-nav is not the only config real users have.

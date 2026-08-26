@@ -2917,3 +2917,13 @@ The lines also keep the half that is genuinely open: the entry's *"then re-measu
 and mean-0.150 figures were measured against the OLD window and nobody has re-run them, so they may
 already be zero. That replay is Tuning's, which is why the entry is now `Gate: owner` rather than
 deleted — deleting it would lose a live question, and leaving it READY would invite the no-op.
+
+## 2026-08-26 — `projectOverview.md` 8041 → 8051 (+10), Q-280
+
+The Current Status paragraph for the batch-upsert duplicate-collapse sweep. Trimmed from 16 lines to
+10 before raising: the mechanism, the eight-site count and the per-site-strategy caveat are the parts
+a session needs before touching a batch write; the full site table, the premise corrections and the
+mutation proof live in `docs/overview/entries/2026-08-26-fix-batch-upsert-duplicate-collapse.md`.
+Also carries the two owner decisions of 2026-08-26 (readiness history recomputed rather than frozen;
+Coach mid-program swap to be restricted), which are pointers to Q-403 and the Body Battery tuning
+section rather than the decisions themselves.

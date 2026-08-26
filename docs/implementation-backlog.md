@@ -2064,12 +2064,17 @@ shipped TypeScript with the stress term included, not against this table.
 **Pass test:** over the same 56 days, end-of-day mean **55–65**, sd **≥ 28**, **≤ 3 days at 0** and
 **≤ 6 days at 100**, with the stress-drain term active.
 
-**History policy (owner, 2026-08-24): leave stored history alone and stamp the new model.** Old days
-keep what the owner saw; the `MODEL_VERSION` bump below is what makes the two eras separable.
-**⚠️ That policy leans on the stamp surviving, and Q-518 says it does not** — a sibling writer erases
-`model_versions` within hours. Body Battery writes its own `model_version` column and is fine; a
-readiness-side stamp is not, so **Q-518 is now load-bearing for this decision** rather than a tidy-up. Bump `MODEL_VERSION` to `v6` in the same PR
-so v5 and v6 days are never pooled — `docs/body-battery-tuning.md` depends on that stamp.
+**History policy — REVERSED by the owner on 2026-08-26. Recompute history; do not freeze it.** The
+2026-08-24 policy was *leave stored history alone and stamp the new model*. Asked again with the cost
+stated plainly (a night remembered as 71 may re-read as 78), the owner chose recomputation: *"Our
+history is still not accurate so I dont mind losing it till its something real to us."* So a
+recalibration in this cluster **re-scores the stored days** rather than applying only going forward,
+and each PR states how many past days moved and by how much before it merges.
+Still bump `MODEL_VERSION` to `v6` — the stamp is what stops a v5 day and a v6 day being pooled in a
+correlation, which is a separate guarantee from whether history was rewritten, and
+`docs/body-battery-tuning.md` depends on it. **The stamp now survives:** the sibling-writer clobber
+(Q-518/Q-273) was fixed in #525 — `model_versions` merges with `||` inside the shared upsert, so no
+pillar can erase another's key.
 
 **Not to be done here:** do not fit the boundary to a percentile of the owner's own waking HR. It is
 stable by construction, so charge goes near-constant and a genuinely restful day stops reading as
@@ -4459,6 +4464,41 @@ cross-session against the local DB. Nothing user-visible changed — **no read s
 - **Branch:** `fix/coach-applied-change-copy`
 - **Added:** 2026-08-18, from owner screenshots of a working swap. **The swap itself is fine** — this
   is the sentence around it.
+
+> ### 🔴 OWNER DECISION 2026-08-26 — the scope changed. Read this before implementing.
+>
+> Told that a Coach swap writes `session_exercises` — the **program** row, so it applies to every
+> future run of that session and not just today — the owner did not want the capability as it
+> stands: *"You dont want to be changing excercises during a program or you will lose progress for
+> it — plus for some people it would be hard to learn a new movement. Only useful if you use the
+> chat function to try change something because you got injured. So would be during a 'program'
+> creation/editing realistically."*
+>
+> **That is a behaviour change, not a copy change, and it lands first.** Two things follow:
+> 1. **The mid-program swap should not be offered as general advice.** The owner named exactly one
+>    case worth keeping — an injury forcing a substitution.
+> 2. **The copy defect mostly evaporates with it.** The stale *"Here is the proposal to…"* sentence
+>    was only ever reachable on the surface being restricted, so fixing the wording first would be
+>    building the sentence for a flow that is about to be gated.
+>
+> **Recommendation (Lane A): gate the swap on an open injury, rather than removing it.** Allow the
+> Coach's `session_exercise` swap only when the user has an open row in the `injury` domain that the
+> current exercise loads and the replacement avoids — `muscleDelta` in
+> `lib/coach/domains/session-exercise.ts` already computes exactly that coverage delta, so the
+> evidence is in hand. Outside that case the Coach explains the trade-off in the owner's own terms
+> (progress on the lift resets; a new movement has to be learned) and points at Config, which is
+> where a deliberate program edit belongs. **Why this over removing the tool:** removal also removes
+> the injury case, which is the one the owner called useful, and an injured user reaching for chat
+> is the moment they least want to be sent to a settings screen. **Reversal cost: low** — it is a
+> guard in one handler plus a prompt clause; deleting the guard restores today's behaviour exactly.
+> **Alternative worth naming:** make a chat swap *today-only* instead of program-wide. It answers
+> the progress-loss objection directly and is better if the owner wants ad-hoc substitutions at all,
+> but there is no per-day override table today, so it is a schema change rather than a guard — a
+> much larger job for a case the owner has not asked for.
+>
+> **Still open for the owner:** whether the injury gate is the right line, or whether the Coach
+> should lose the swap outright. Everything below the investigation note is the pre-decision copy
+> analysis and stays only as evidence.
 - **Lane: A — corrected 2026-08-25 (by Lane B, which this was being served to).** The entry reasoned
   from the *nature* of the edit ("it is only the system prompt, so Lane B"), and the ownership rule
   is deliberately not that: **reached by `app/api/**` → Lane A**, whatever the edit looks like. The
@@ -6912,59 +6952,6 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   its tests and by a comment in `TdeeAdaptationCard` explaining it was replaced. Same trap as
   `amrapScaleFactor` (Q-514); do not calibrate it.
 
-### [platform][readiness] Q-518 — the readiness model stamp survived 5h40m, then a sibling writer erased it
-
-- **Branch:** `fix/model-versions-jsonb-merge`
-- **Plan:** none — one conflict-arm expression. **Lane A implements; Tuning proposes only.**
-- **Added:** 2026-08-18 · Tuning agent ·
-  [`docs/reviews/2026-08-18-model-version-clobber.md`](reviews/2026-08-18-model-version-clobber.md)
-- **⚠️ This INVALIDATES a claim published today.** PR #85 reported the shared `model_versions` merge
-  *"held in production"*. It held for the readiness write and **does not survive the next
-  body-composition backfill**.
-- **Observed, same row (`oura_daily_derived`, day 2026-08-18), twice in one session:**
-
-  | read at | `model_versions` | `readiness_score` |
-  |---|---|---|
-  | **04:38:27** | `{"bodyComp": "atlas_2_1_0", "readiness": "v3:ri5:2026-08-18"}` | 76 |
-  | **10:18:40** | `{"bodyComp": "atlas_2_1_0"}` | 77 |
-
-  Rows 08-16/17/18 all carry `updated_at = 10:18:40`, so one job rewrote all three. Stamped rows across
-  the table went **1 → 0** (they had gone 0 → 1 earlier the same session, which is how it was noticed).
-- **Mechanism — `COALESCE` does not merge JSON.** `upsertOuraDailyDerived` sets every column as
-  `COALESCE(excluded.col, oura_daily_derived.col)`. Correct for scalars; for a `jsonb` column it picks
-  the first non-null **document whole**, so a non-null incoming value replaces the stored one entirely.
-  The merge is therefore left to each caller, and **only one of two callers does it**:
-
-  | writer | passes | merges? |
-  |---|---|---|
-  | `lib/health/readiness-payload.ts:544` | `{ ...existingVersions, readiness: … }` (reads the row first) | **yes** |
-  | `lib/data/postgres/slices/oura.ts:1664` | `{ bodyComp: BODY_COMP_MODEL_VERSION }` (flat literal) | **no** |
-
-  **The readiness code did nothing wrong** — it is the only participant honouring a convention the
-  shared writer does not enforce.
-- **Cost.** (1) **Q-501's purpose is defeated** — the stamp was the fix for "did this score move because
-  the inputs changed or the model did", and it does not survive a backfill. (2) Readiness was supposed
-  to be the pillar that *had* a stamp where sleep does not; in stored data it now does not either.
-  (3) Every future pillar that stamps has the same exposure — the next agent will copy readiness's
-  correct merge and still be clobbered.
-- **First action: move the merge into `upsertOuraDailyDerived`**, not into the bodyComp caller. For
-  `model_versions` the conflict arm should be
-  `COALESCE(existing.model_versions,'{}'::jsonb) || COALESCE(excluded.model_versions,'{}'::jsonb)` —
-  keeping every existing key and letting an incoming key win on collision, which is what both callers
-  already assume. **This is the pattern the codebase already chose one column over**:
-  `upsertOuraHeartrate`'s comment — *"this makes the guarantee the function's own, so every caller gets
-  it rather than each one remembering"* — and **Q-280 exists because two of its siblings missed it**.
-  Identical shape; fix it the same way.
-- **Do NOT patch the bodyComp caller alone** — that restores today's stamp and leaves the next writer to
-  rediscover the rule, which is how this happened.
-- **Re-verify by observation, not reasoning:** stamp a row via the readiness route, run the
-  body-composition backfill, re-read. Reasoning about this is what produced the wrong claim.
-- **Caveats.** The `||` expression above was **written, not run** — no test, no local DB. **The job that
-  ran at 10:18:40 was not identified directly**: the bodyComp backfill is the only `model_versions`
-  writer passing a flat object and its payload matches the surviving document exactly, but no
-  scheduler/trigger was traced, so **its cadence is unknown** and "short half-life" is an inference from
-  one observation. `readiness_score` also moved 76 → 77 between reads and **that is not explained here**.
-
 ### [sleep] Q-519 — manual bedtime entry for a night the ring missed, writing exactly one column
 
 - **Branch:** `feat/manual-bedtime-entry`
@@ -7384,8 +7371,12 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   `met_minutes` and `motion_mad`. **MET and motion do not drift with fitness**: they measure the
   effort rather than the body's response to it, so a MET of 3.0 is 3.0 at any training age. That is
   the principled answer to the difficulty below. **It has 0 rows system-wide** (as does
-  `step_live_windows`), so it is unavailable — see Q-528 §4. Until that sync path delivers, this fix
-  must come from heart rate or steps, and will inherit the drift.
+  `step_live_windows`), so it is unavailable — see Q-528 §4. **Mechanism found 2026-08-26 (Q-280
+  sweep): the server-side `upsertOuraBucket` has NO caller.** Its only references in the repo are the
+  separate local-store implementation, its tests, and the slice itself — so the table is empty
+  because nothing on the server ever writes it, not because the device stopped sending. The write
+  function is finished and correct; what is missing is the ingest route that calls it. Until that
+  sync path delivers, this fix must come from heart rate or steps, and will inherit the drift.
 - **Open question for the fix — this is the whole difficulty.** A boundary that is a fixed fraction
   of reserve re-saturates as soon as the owner's resting HR drops again (which is exactly what Q-515
   measured happening). Candidates, none yet fitted: a **personal EMA of waking HR** rather than
@@ -7634,38 +7625,6 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   owner decided the *question* each score answers, which does not depend on where the correlation
   settles. The labelling work can proceed now; Q-272 and Q-521 change Body Battery's behaviour
   underneath it without changing what it is for.
-
-### [platform][devices] Q-280 — Q-214's duplicate-collapse fix reached one of three same-shaped batch upserts
-
-- **Branch:** `fix/batch-upsert-duplicate-collapse`
-- **Plan:** none needed — this is a contained change with a clear reference implementation
-- **Added:** 2026-08-15 · from the comprehensive review §3.1
-- **Background, confirmed from production.** `error_events` holds **5,771 hits** of `[pg 21000]`
-  (cardinality violation) on `POST /api/hr-ingest` — an `ON CONFLICT DO UPDATE` whose VALUES list
-  hit the same conflict row twice, which Postgres rejects **for the whole statement**, discarding
-  chunks of up to 5,000 HR points. **Last occurrence 2026-08-13T00:17; Q-214's fix landed the same
-  day and it has stopped.** Not a regression — this entry is the sibling sweep.
-- **`upsertOuraHeartrate`'s own comment states the intent:** *"this makes the guarantee the
-  function's own, so every caller gets it rather than each one remembering."* Two siblings in the
-  same file have the identical shape and did not get it:
-
-  | function (`lib/data/postgres/slices/oura.ts`) | conflict target | collapses duplicates first? |
-  |---|---|---|
-  | `upsertOuraHeartrate` (L258) | `(user_id, timestamp)` | ✅ fixed by Q-214 |
-  | **`upsertOuraBucket` (L321)** | `(user_id, tier, bucket_start_ms)` | ❌ no — 2,000-row chunks |
-  | **`upsertSetHrStats` (L818)** | `set_log_id` | ❌ no |
-  | `insertRrIntervals` (L636) | — | n/a — `onConflictDoNothing` is exempt from 21000 |
-  | `upsertOuraDailySummary` (L1107) | `(user_id, date)` | n/a — one row per statement |
-- **`upsertOuraBucket` is the one that matters.** It is fed by the same BLE rollup that produced the
-  duplicates on `oura_heartrate`, and it writes 2,000-row chunks — so one duplicated
-  `(tier, bucket_start_ms)` discards 2,000 buckets. `upsertSetHrStats` is lower risk (a repeated
-  `set_log_id` in one batch needs a caller bug) but is the same class and the fix is three lines.
-- **Fix:** lift the `Map`-keyed-on-conflict-target collapse out of `upsertOuraHeartrate` into a small
-  shared helper and use it in all three, so the next batch upsert added to this file inherits it
-  rather than remembering it. Last-value-wins, matching the `excluded.*` semantics the ON CONFLICT
-  arms already use.
-- **Test:** the existing `hr-ingest-poison-pill.test.ts` is the pattern — a batch containing a
-  deliberate duplicate must persist, not 500.
 
 ### [platform][readiness] Q-278 — a score that could not be computed is rendered identically to a score of 76
 

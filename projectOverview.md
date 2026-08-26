@@ -24,8 +24,18 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.381.3 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Version:** v1.381.4 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-08-26.
+
+**One duplicate in a batch discarded the whole batch, at eight write sites (Q-280).** Postgres aborts
+an entire command whose VALUES list hits the same `ON CONFLICT` row twice — nothing lands, not just
+the repeat. `error_events` recorded **5,771** hits on `POST /api/hr-ingest` (up to 5,000 HR points
+each) before Q-214 fixed `upsertOuraHeartrate` alone; a sweep found **eight** sites of that shape,
+not the two the entry named. All now use one `collapseOnConflict`. Strategy is per-site and not
+cosmetic: last-wins is exact only for a bare `excluded.*` arm, and three of the eight merge, where it
+would have turned a loud 21000 into a silent field loss. **Owner decisions the same day:** readiness
+history is **recomputed**, not frozen, when a model is recalibrated (reversing 2026-08-24); the
+Coach's mid-program exercise swap is to be **restricted** — see Q-403.
 
 **A window that made an ACWR impossible, and what it was really breaking (Q-512).** `health-insight`
 handed `computeVolumeAcwr` a **7-day** session list against a **21-day** span gate measured from the
