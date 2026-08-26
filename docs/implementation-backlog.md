@@ -364,6 +364,30 @@ below threshold and left in place for next time.
 hardware and has no test coverage by nature; everything under it is pure and covered. So this entry
 is the first real evidence either way, and it is a *measurement* task, not a build task.
 
+**FIRST RESULT, 2026-08-26 evening — the sync works and the night produced nothing.** The card
+showed all five switches on, battery 100%, and **"Read 1 samples"**. Confirmed against production:
+`colmi_readings` holds exactly one row, a battery reading; `colmi_sleep_segments` is empty. So the
+connection, the switch writes, the pref read-back, the ingest and the dedup all work end to end, and
+**no history came back at all**.
+
+Two causes remain and they are not distinguishable from what was captured:
+
+- **(A) There was nothing to sync.** The five switches are off from the factory; this sync is what
+  turned them on, and it enables *then* drains. If so, last night genuinely recorded nothing and
+  tonight is the first real night. Benign.
+- **(B) The history commands are not answering, or their answers are not being mapped.** The
+  weak counter-evidence for (A): steps come from the activity log (`0x43`), which is **not** gated by
+  those five switches, so some step history should have existed — though the ring spent most of
+  yesterday on a desk or a charger, so near-zero is also plausible.
+
+**The number that separates them was being collected and not shown.** `framesSeen` and a per-command
+tally now surface in the card under "Sync detail", with the raw hex of anything that did not decode.
+If a history command's tag is absent, the ring never answered it — a different problem from
+answering and failing to map. Also raised the drain window 12s → 30s, since the heart-rate log alone
+can be 24 packets and a drain that ends early looks exactly like a ring with no history.
+
+**Next sync is the discriminator.** Read "Sync detail" first.
+
 **Do this, in order, and record the result in §11 of the plan:**
 
 1. **More → Devices → Pair ring**, then **Sync now**. Ring on the charger or worn — a still ring

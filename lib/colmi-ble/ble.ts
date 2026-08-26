@@ -21,8 +21,15 @@ import { getPairedRing, setPairedRing, type PairedRing } from '@/lib/colmi-ble/p
 /** Gadgetbridge waits this long after connecting "to give the ring time to settle" before its
  *  first command. Copied rather than reasoned about — it is the only client known to work here. */
 const SETTLE_MS = 2000
-/** How long to keep collecting notifications after the last command before giving up on stragglers. */
-const DRAIN_MS = 12_000
+/**
+ * How long to keep collecting notifications after the last command.
+ *
+ * Raised 12s → 30s after the first real overnight sync returned only a battery reading. The
+ * history commands answer in multi-packet bursts (the heart-rate log alone can be 24 packets) and
+ * a manual sync the user is watching can afford to wait. A drain that ends early is indistinguishable
+ * from a ring with no history, which is the failure this whole diagnostic exists to tell apart.
+ */
+const DRAIN_MS = 30_000
 const COMMAND_GAP_MS = 400
 
 export interface ColmiSyncOutcome {
@@ -35,6 +42,21 @@ export interface ColmiSyncOutcome {
   sleepSegments: number
   stored?: { readings: number; sleep: number }
   battery?: { percent: number; charging: boolean }
+  /**
+   * Every frame the ring sent, tallied by its command byte (`'0x73'`, `'0x43'`, …), plus how many
+   * decoded to nothing usable.
+   *
+   * This is the number that tells the two failure modes apart, and without it they look identical:
+   * a ring that recorded nothing overnight and a decoder that dropped everything both produce
+   * "1 sample". If a history command's tag is absent here the ring never answered it; if it is
+   * present and `readings` is still low, we answered and failed to map it.
+   */
+  diagnostics?: {
+    frameTags: Record<string, number>
+    unmapped: number
+    /** A few raw frames we could not use, newest last — the input to a decoder fix. */
+    unmappedHex: string[]
+  }
   /** Which automatic measurements the ring reports as ON, read back AFTER we tried to enable them.
    *  A metric missing here recorded nothing, which is why an empty history is not proof of a
    *  ring that was not worn. */
@@ -111,10 +133,27 @@ export async function syncColmiRing(opts: SyncOptions): Promise<ColmiSyncOutcome
   let bigDataBuffer: number[] = []
 
   const autoPrefs: NonNullable<ColmiSyncOutcome['autoPrefs']> = {}
+  const frameTags: Record<string, number> = {}
+  const unmappedHex: string[] = []
+  let unmapped = 0
+  const MAX_UNMAPPED_HEX = 8
+
+  const toHex = (b: Uint8Array) => Array.from(b).map(x => x.toString(16).padStart(2, '0')).join('')
+
+  const note = (bytes: Uint8Array, frame: ColmiFrame) => {
+    const tag = `0x${(bytes[0] ?? 0).toString(16).padStart(2, '0')}`
+    frameTags[tag] = (frameTags[tag] ?? 0) + 1
+    if (frame.kind === 'unknown') {
+      unmapped++
+      if (unmappedHex.length < MAX_UNMAPPED_HEX) unmappedHex.push(toHex(bytes))
+    }
+  }
 
   const onV1 = (view: DataView) => {
     framesSeen++
-    const f = decodeV1(new Uint8Array(view.buffer))
+    const bytes = new Uint8Array(view.buffer)
+    const f = decodeV1(bytes)
+    note(bytes, f)
     if (f.kind === 'battery') battery = { percent: f.percent, charging: f.charging }
     if (f.kind === 'autoPref') autoPrefs[f.metric] = { enabled: f.enabled, intervalMinutes: f.intervalMinutes }
     frames.push(f)
@@ -127,7 +166,10 @@ export async function syncColmiRing(opts: SyncOptions): Promise<ColmiSyncOutcome
     const declared = bigDataPayloadLength(bigDataBuffer)
     if (declared === null) { bigDataBuffer = []; return }          // not a frame start — drop and resync
     if (bigDataBuffer.length < declared + 6) return                 // more to come
-    frames.push(decodeBigData(bigDataBuffer))
+    const whole = Uint8Array.from(bigDataBuffer)
+    const decoded = decodeBigData(whole)
+    note(whole, decoded)
+    frames.push(decoded)
     bigDataBuffer = []
   }
 
@@ -181,11 +223,13 @@ export async function syncColmiRing(opts: SyncOptions): Promise<ColmiSyncOutcome
     try { await Ble.disconnect(paired.deviceId) } catch { /* closing */ }
   }
 
+  const diagnostics = { frameTags, unmapped, unmappedHex }
+
   if (framesSeen === 0) {
     // The ring's application processor sleeps when it has been still, and a sleeping ring is
     // indistinguishable from a broken one over GATT (plan §11e). Say so rather than recording "no
     // data" — and do NOT treat this as a successful empty sync.
-    return { ...empty, reason: 'silent',
+    return { ...empty, diagnostics, reason: 'silent',
              message: 'The ring did not respond. Put it on or place it on the charger and try again.' }
   }
 
@@ -198,15 +242,15 @@ export async function syncColmiRing(opts: SyncOptions): Promise<ColmiSyncOutcome
       cache: 'no-store',
     })
     if (!res.ok) {
-      return { ok: false, framesSeen, reason: 'post-failed', battery, autoPrefs,
+      return { ok: false, framesSeen, reason: 'post-failed', battery, autoPrefs, diagnostics,
                readings: payload.readings.length, sleepSegments: payload.sleep.length,
                message: `Upload failed (${res.status}).` }
     }
     const body = await res.json() as { stored?: { readings: number; sleep: number } }
-    return { ok: true, framesSeen, battery, autoPrefs,
+    return { ok: true, framesSeen, battery, autoPrefs, diagnostics,
              readings: payload.readings.length, sleepSegments: payload.sleep.length, stored: body.stored }
   } catch (e) {
-    return { ok: false, framesSeen, reason: 'post-failed', battery, autoPrefs,
+    return { ok: false, framesSeen, reason: 'post-failed', battery, autoPrefs, diagnostics,
              readings: payload.readings.length, sleepSegments: payload.sleep.length, message: describe(e) }
   }
 }
