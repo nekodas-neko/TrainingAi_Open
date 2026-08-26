@@ -377,55 +377,6 @@ below threshold and left in place for next time.
   must **stay** open and be tappable; Cancel must cancel. Then the nest from LB-17 (Log Food →
   My Foods → a meal) must still unwind one layer per press.
 
-### [platform] LA-33 — three shared-line ledgers cause a merge conflict on essentially every pair of PRs
-
-- **Branch:** `chore/per-pr-doc-size-baseline` · **Lane:** A (it is a script + a JSON schema change;
-  the files belong to Orchestrator, so **`Gate: owner`** on the format choice)
-- **Gate:** owner
-- **Plan:** none yet
-- **Added:** 2026-08-26 · Lane A, measured during #544 rather than reasoned about.
-
-**Measured.** PR #544 was outrun by `main` **four times in 35 minutes** (#530, Q-395c, #543, #545).
-CI takes ~3.5 min; `main` landed every ~5–8 min. Every one of the four required a merge and a
-conflict resolution, and **every conflict was in the same three files** — never in code:
-
-| file | why every PR touches it | conflict shape |
-|---|---|---|
-| `docs/doc-size-baseline.json` | one line per tracked file; the two that move are `projectOverview.md` and the backlog | two branches edit the same two lines |
-| `docs/implementation-backlog.md` | every PR removes the entry it finished | **two deletions** — keeping both resurrects shipped entries |
-| `package.json` + `packages/shared/src/changelog.ts` | every user-visible change bumps the version | the hunk lands *inside* an entry's `changes:` array, below the shared `version:` header |
-
-**This exact shape was already solved once in this repo, and the fix worked.** The session journal
-used to be a shared `docs/overview/history-*.md` that every PR prepended to;
-[`docs/overview/entries/README.md`](overview/entries/README.md) records that it was *"the most
-frequent multi-PR merge conflict"* and that one-file-per-entry **took it to zero**. The baseline
-ledger is the same problem with the same available answer.
-
-- **First action — the baseline ledger, because it is the cheapest and the most mechanical.**
-  `scripts/check-doc-index-size.js` reads one number per file out of a shared JSON. If each tracked
-  file carried its own baseline (a sibling `<file>.size` or a `docs/doc-size/` directory of
-  one-number files), two PRs raising two different files would not touch the same line at all. The
-  check reads a directory instead of a map; nothing else changes.
-- **Do NOT extend this to the backlog in the same change.** Its conflict is real but its resolution
-  is a *judgement* (two deletions vs two additions — CLAUDE.md says to read the headings every
-  time), and splitting the backlog into per-entry files is a much larger restructuring with its own
-  costs: the queue *order* is currently expressed by position in one file, and that ordering has to
-  live somewhere.
-- **The changelog is third and may not be worth it.** A changelog-fragment scheme is the known fix
-  and CLAUDE.md already names it as a possibility (*"a future changelog-fragment change could remove
-  that too"*), but the version bump itself is one line in `package.json` and will conflict
-  regardless. Cheaper mitigation, no restructuring: **rebuild from `origin/main` rather than splicing
-  the hunks** — that is already the documented rule, and it is what makes the conflict a 30-second
-  resolution instead of a corruption. It corrupted the changelog twice before that rule existed.
-- **Why this is worth doing at all.** The cost is not the conflict, it is the *re-run*: each merge
-  invalidates a green CI result, and four rounds is ~15 minutes of compute plus four chances to
-  resolve a two-deletion conflict wrongly — which has already put shipped entries back in the queue
-  **three times** (LB-4, Q-454, Q-455, Q-465 on 2026-08-23, then LB-4 again four commits later).
-- **Owner decision needed on format only:** a directory of one-number files is ugly in a way a
-  single JSON is not. The alternative is to accept the conflict and keep resolving it by measuring.
-  **Recommendation: do it** — the measuring rule works but depends on every agent remembering it,
-  and this session already caught itself tightening two *other* agents' baselines while applying it.
-
 ### [nutrition] BF-35 — fill the food placeholder: two of the three sources are already free
 
 - **Lane:** A for the storage + the OFF field; B for the render.
@@ -1543,7 +1494,24 @@ signed off by the owner in that conversation. Review:
 ### [platform] LA-22 — E2E is not a required check, and a PR merged with it red
 
 - **Lane: A** · **Added:** 2026-08-25
-- **Gate:** owner — a governance decision, not a fix.
+- **Owner answered 2026-08-26: required on UI PRs only.** Offered required-on-UI-PRs /
+  not-required-but-loud-on-main / required-everywhere / leave-it, they chose the first. The `Gate:`
+  field is removed rather than struck through — a struck one still parses as a live gate.
+- **Keep:** the workflow half shipped 2026-08-26 — the E2E job now always runs and always reports,
+  and short-circuits to success when a PR touches none of `app/`, `components/`, `e2e/` or
+  `playwright.config.ts`. **What is owed is one setting only, and it is the owner's:** add **E2E** to
+  the required checks in `main`'s branch protection. Until that is done nothing has changed — E2E
+  still cannot block a merge, exactly as #454 showed.
+  - **The obvious implementation is the wrong one and was not used.** A `paths:` filter on the job
+    would leave a required check that never reports on a non-UI PR, which blocks it forever — the
+    same reason the Android workflow is deliberately *not* required. Running always and skipping the
+    expensive half is what makes it safe to require. A non-UI PR pays ~20 s (checkout + the Postgres
+    service) instead of ~10 min.
+  - **Confirmed empirically before changing anything, because ci.yml claimed the opposite.** A
+    comment in the E2E job read *"E2E is a required check, so it blocked the merge outright"*. It is
+    not: three PRs were merged on 2026-08-26 while E2E was still `in_progress`, and
+    `merge_pull_request` validates against real branch-protection state. The comment is corrected in
+    the same change.
 - **#454 merged with its own E2E `failure`** (run 32807689333). Branch protection permitted it, so
   **E2E is not in the required-check set** — which also explains why a merge succeeds while E2E is
   still in progress. Worth deciding deliberately: a guard that cannot block anything let a red main
@@ -5273,7 +5241,36 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   (49,644 of 50,200/week) because the ring's own firmware gates it to sleep — so *"only run it at
   night"* is a **no-op**, not a fix. Temperature is flat across 24 h and only 6.1% of events; the
   daytime stream is already dropped from the readiness score, so it is not a lever either.
-- **➡️ The decision is binary: does SpO₂ stay on?** Off is the only lever that exists today — it is
+> ### ⚠️ OWNER, 2026-08-26: THE BINARY FRAMING BELOW IS WRONG. Re-open the investigation.
+>
+> Asked to choose on-or-off, the owner supplied a datum this entry does not account for:
+> ***"It was on on the oura ring software too and it wasnt this bad. I think the issue would be
+> elsewhere; maybe we reduce the sampling instead?"***
+>
+> **That breaks the argument.** The entry reasons that SpO₂ is the largest event source, therefore
+> SpO₂ is the cost. But SpO₂ was equally on under Oura's own firmware, at ~14%/day — so the sensor
+> being enabled is **not** what distinguishes our 15–38%/night. Something *we* do differs from what
+> stock did with the same sensor running. Turning SpO₂ off would trade away real data to work around
+> a cause that has not been identified, and would likely still not reach stock's figure.
+>
+> **What this makes the work item.** Find the difference between our drain and stock's *with SpO₂ on
+> in both*. Candidates, none yet measured against each other: our BLE connection/notification
+> pattern versus stock's (a held connection and a subscribed notify stream cost radio time
+> independently of the PPG); the battery-poll cadence itself (production holds 6,346 polls since
+> 2026-07-19 — the instrument may be part of the load); the live-HR service's connect behaviour; and
+> the fast-HR trap fixed in `feat/ring-service-device-pass`, **which has not reached the device yet
+> and needs an APK** — that alone may move the number and should be measured before anything else is
+> attempted.
+>
+> **The density argument below stands as written and is still the honest blocker** — no code here
+> exposes a PPG duty cycle, and the radio-side knobs cannot reach one. But "reduce sampling" is now
+> a *hypothesis to test against stock's behaviour*, not a dismissed alternative. Establish where our
+> extra drain comes from before spending protocol work on a duty cycle that may not be the lever.
+>
+> **First action, cheapest and already paid for:** get the pending APK onto the device, then compare
+> a week of `oura_ble_battery_poll` against the pre-fix week. That is a measurement, not a change.
+
+- **➡️ ~~The decision is binary: does SpO₂ stay on?~~ (superseded — see the owner note above)** Off is the only lever that exists today — it is
   the largest single event source. The alternative, reducing sampling *density* inside the night
   window (hour 5 averages ~23 events/min), needs a sensor duty-cycle control that **no code in this
   repo exposes**; the radio-side knobs cannot reach a PPG duty cycle. That is new protocol work, not

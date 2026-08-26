@@ -3100,3 +3100,16 @@ the next reader free to re-derive the discarded recommendation from the same rea
 
 The rest is the decision itself, which is neither of the shapes the entry had carried since
 2026-08-18 and would otherwise be re-litigated from the entry's older prose.
+
+## 2026-08-26 — `projectOverview.md` → 8116 (+11), LA-33 + LA-22
+
+**The first raise made under the new scheme, and it is one file.** `docs/doc-size/projectOverview.md.size`
+holds a number and nothing else, so a second PR raising a different document's baseline now conflicts
+with nothing here — which is the whole point of the split.
+
+Eleven lines for two entries because both carry a decision that would otherwise be re-derived: the
+size ledger's conflict was structural rather than a discipline problem (every PR edits the same two
+lines whether or not it is about the same doc), and E2E's gate must **always report** rather than use
+a `paths:` filter, because a required check that never reports blocks a non-UI PR forever. The line
+that earns its place most is the outstanding owner action — E2E is not required until branch
+protection says so, and nothing in this repository can make that true.

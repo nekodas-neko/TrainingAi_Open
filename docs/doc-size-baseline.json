@@ -1,16 +1,5 @@
 {
-  "_comment": "Shrink-only line-count baselines. A file may sit at or below its number and may never grow. Raising one is a deliberate act that shows up in the diff; record why in docs/doc-size-baseline-history.md, not here. Counts are `wc -l` + 1 (the script splits on newline).",
-  "files": {
-    "projectOverview.md": 8105,
-    "docs/implementation-backlog.md": 12348,
-    "CLAUDE.md": 1198,
-    "docs/agents/state/implementation-lane-a.md": 178,
-    "docs/agents/state/implementation-lane-b.md": 109,
-    "docs/agents/state/bugfix.md": 161,
-    "docs/agents/state/review.md": 173,
-    "docs/agents/state/tuning.md": 235,
-    "docs/agents/state/orchestrator.md": 62
-  },
+  "_comment": "Per-FILE line-count baselines moved to docs/doc-size/ (one <path>.size file each, LA-33) \u2014 a single shared map made every pair of PRs conflict on the same two lines. What stays here is the entries-directory policy, which is one rule about a whole directory rather than a number per file, so splitting it would buy nothing. Reasoning for any change goes in docs/doc-size-baseline-history.md, not here.",
   "entries": {
     "dir": "docs/overview/entries",
     "chore": 20,
