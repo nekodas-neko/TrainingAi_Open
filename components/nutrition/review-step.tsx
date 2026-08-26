@@ -156,7 +156,17 @@ export function ReviewStep({ result, value, ingredients, onIngredientsChange, on
     )
   }
 
-  const canSave = value.name.trim().length > 0 && value.calories > 0
+  /**
+   * A name is the only field that must be present (LA-30).
+   *
+   * `calories > 0` refused every genuinely calorie-free item — supplements, water, black coffee,
+   * plain tea, diet soft drink, sugar-free gum, sweetener, most spices. The owner hit it on a ZMA
+   * scan the AI had read correctly as *"It is calorie-free"*. **The server never agreed with the
+   * gate**: `FoodItemFieldsSchema` is `calories: z.number().min(0)`, so the log it was refusing
+   * would have been accepted. Zero is a value, not a missing one.
+   */
+  const missingName = value.name.trim().length === 0
+  const canSave = !missingName
 
   return (
     <div className="flex flex-col gap-4 p-4">
@@ -277,6 +287,13 @@ export function ReviewStep({ result, value, ingredients, onIngredientsChange, on
       )}
 
 
+      {/* The silent disable was half the bug: the report was "it wouldn't let me log it", not "it
+          told me why". A greyed-out primary action with no reason reads as a broken app. */}
+      {missingName && (
+        <p className="text-xs text-muted-foreground" role="status">
+          Give this food a name to continue.
+        </p>
+      )}
       <div className="flex gap-2 pt-2">
         <button onClick={onBack} className="flex-1 rounded-xl border px-4 py-2.5 text-sm font-medium">Back</button>
         <Button onClick={onNext} disabled={!canSave} className="flex-1">
