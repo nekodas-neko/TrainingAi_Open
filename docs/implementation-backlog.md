@@ -351,6 +351,99 @@ below threshold and left in place for next time.
 > BF-29 (My meals), BF-30 (Meal detail), BF-31 (Edit meal) and BF-26 (Quantity). Two artboards need
 > no entry — `Tap targets` and the `srv/g` studies both shipped in Q-395a.
 
+### [app-shell][nutrition] BF-34 — BF-27 dismisses any dialog opened as a sheet closes; the diary delete is the first report
+
+- **Lane:** B
+- **Added:** 2026-08-26 · owner, live on the APK: *"the delete feature doesnt work. so its not
+  removing from my.UI"*, with a screenshot of the converged quantity sheet open on a BARILLA
+  Spaghetti row. **Owner asked for this at the top of the queue.**
+
+**⚠ Read this before touching any code: the entire path was exercised on web and it works.** A
+Playwright run against `pnpm dev` on 2026-08-26, seeded row → tap row → tap the bin → confirm →
+`SELECT count(*) … WHERE deleted_at IS NULL` = **0**, and the row left the list. So the bug is
+**device-only**, and the layers below are already eliminated. Do not re-verify them; the value of
+this entry is the narrowing.
+
+**Eliminated by inspection, each with the line that rules it out:**
+
+| Layer | Why it is not the bug |
+|---|---|
+| The confirm dialog's wiring | Fires `handleConfirmDelete`; verified end-to-end on web |
+| `store.deleteFoodLog` | `UPDATE food_logs SET deleted_at=?, sync_status='pending'` — correct |
+| The local read | `getFoodLogsWithItems` filters `WHERE fl.deleted_at IS NULL` — correct |
+| Pull clobbering the delete | `applyDelta`'s upsert carries `WHERE food_logs.sync_status='synced'`, and the local row is `pending`, so the server copy cannot resurrect it |
+| The outbox payload | `pushMutations` strips only `syncStatus`/`updatedAt`/`deletedAt`, so `deleted: true` survives into `adapter.ts:4032` and calls `deleteFoodLog` |
+| A stale `sync_status` flip | **Nothing** flips `food_logs.sync_status` back to `'synced'` after a push; `deleteMutations` only clears the outbox rows |
+
+> **✅ ANSWERED AND ROOT-CAUSED, 2026-08-26.** Owner: *"when I press the delete button; it opens up
+> the confirm dialog; but then instantly minimizes so we cant click it."* The dialog **opens and is
+> then dismissed** — not the `pointer-events: none` variant, where it would sit there ignoring taps.
+> That is decisive, and it points at `useSheetBackDismiss`, not at Radix.
+>
+> **⚠ THE CAUSE IS BF-27, WHICH SHIPPED 2026-08-25 (v1.372.0), AND THE BLAST RADIUS IS THE WHOLE
+> APP — NOT THIS DELETE.** `BackDismiss` now renders inside **every** `SheetContent` and
+> `DialogContent`, so every close-one-open-another transition in the app runs the sequence below.
+> This delete is simply the first one the owner happened to press.
+>
+> **The sequence, from the hook's own source:**
+> 1. Trash tap → `onClose()` closes the sheet **and** `setConfirmDeleteLogId(id)` opens the dialog.
+> 2. The sheet's `BackDismiss` unmounts → cleanup sets **its own** `selfPopRef = true`, registers
+>    `absorb`, and calls `window.history.back()` — which is **asynchronous**.
+> 3. The dialog's `BackDismiss` mounts → **a different hook instance**, whose `selfPopRef` is
+>    `false` → it pushes `{ sheetId: dialogId }`.
+> 4. The pop from step 2 lands. The **dialog's** `handlePopState` runs: its own `selfPopRef` is
+>    false, and `e.state?.sheetId !== dialogId`, so it takes the genuine-back-gesture arm →
+>    `onClose()` → clicks the hidden `Close` → **the dialog closes on the frame it opened**.
+>
+> **The hook's guard cannot catch this, and its comment says why without realising it.** The
+> `sheetId` check exists to stop *"a nested sheet's `history.back()` cleanup from cascading into
+> parent sheet handlers"* — the parent/child case. This is the **sibling** case: one surface closing
+> while another opens. `selfPopRef` is **per-instance**, so the closing sheet's in-flight self-pop is
+> invisible to the dialog that receives it, and a state that is not mine is indistinguishable from a
+> real back gesture.
+>
+> **Fix direction, stated because it is small and the wrong fix here is a `setTimeout`:** the
+> in-flight self-pop flag has to be **shared across instances** (module-level), so whichever instance
+> receives the pop swallows it. Keep `sheetId` for the parent/child case it was written for. Verify
+> both: the nested case LB-10 fixed **and** this sibling case, or the fix trades one for the other.
+> A device build is the only place either is visible.
+>
+> **BF-27 is `Gate: device` and unstruck, and this is exactly what that gate was for.** Its Keep line
+> even names the case — *"a confirm dialog (it must cancel, not confirm)"* — and it had not been
+> pressed yet.
+
+**The original diagnostic, kept because it is what produced the answer above: does the
+"Delete food log?" dialog appear on the device at all?**
+
+`quick-edit-log-sheet.tsx:140` is `onClick={() => { if (log) { onClose(); onDelete(log.id) } }}` —
+it **closes a Radix Sheet and opens a Radix Dialog in the same tick**. Two things make that fragile
+on Samsung's WebView specifically and neither shows up on desktop Chromium:
+
+- Radix puts `pointer-events: none` on `<body>` while a modal is dismissing. If the Sheet's exit
+  animation is still running when the Dialog mounts, the Dialog is present but **untappable** — and
+  a Delete button that cannot be pressed looks exactly like a delete that does nothing.
+- `nutrition-content.tsx:735` keys the sheet `key={editingLog?.id}`, so `onClose()` changes the key
+  to `undefined` and **remounts the component** at that same moment.
+
+**If the dialog does appear and Delete does nothing**, it is a different bug and the table above is
+the wrong starting point — go to the local store, and check `getLocalStore(userId)` is non-null on
+the device (the `catch` at `handleConfirmDelete` falls through to the API path, which the owner may
+be offline for).
+
+**The earlier fix sketch, now superseded by the root cause above — kept only so nobody re-derives it.
+Moving the confirm inline would hide this instance and leave the app-wide cause in place.** Either keep the
+sheet open and let the dialog stack over it (drop the `onClose()` from that handler, and close both
+on confirm), or move the confirmation **inside** the sheet — the bin already sits beside Save and
+BF-26 deliberately removed Cancel from that row, so an inline "tap again to confirm" fits the shape
+the artboard settled on and removes the second modal entirely. **Recommended: the second** — one
+modal, no race, no timing dependency on a WebView this repo already treats as its own target.
+
+- **Not exercised, and it is the whole point:** the APK. The web sandbox returns `null` from
+  `getLocalStore`, so the local-store branch this bug lives in **cannot run there at all** — a green
+  `pnpm dev` proves nothing here and this entry is the evidence of that.
+- **Verification.** On the S25: delete a diary row, confirm it leaves the list, kill and reopen the
+  app, confirm it is still gone, then check the server no longer returns it. `Gate: device`.
+
 ### [nutrition] LB-15 — a zero-calorie barcode product is reported as "not found"
 
 - **Lane:** A — `packages/shared/**`, whatever the edit looks like.
@@ -938,16 +1031,17 @@ whether or not anyone draws them first.
 - **Plan:** [`2026-08-26-log-food-one-screen.md`](superpowers/plans/2026-08-26-log-food-one-screen.md).
   **Narrowed 2026-08-26** — the capture screen split out as **LB-16**. ID and references unchanged.
 - **The finding that forced the split:** the two lists hold **different entity types** —
-  `food_items` (tapping **adds**) and `saved_meals` (tapping **opens** its screen, BF-30). "One
-  list" is one list over **two sources**, two row shapes and two tap behaviours, not a rename over a
-  shared shape. **The rename rides here and cannot go first**: renaming both while they are still
-  two lists gives the user two lists with one name, which is worse than today. 15 occurrences over 8
-  files — the rename is small; the merge is the work.
-- **Carry every action across** — bulk delete, meal-plan linkage, the label path — or say which was dropped. Order most-recently-used first so the merge does not bury saved meals.
-- **⚠ The `My Foods` P/C/F column is the question Q-406 is parked on** — it wants the shared row to
-  grow a per-screen column, the slot Q-406 rules out. Do not add the prop unilaterally.
-- **Verification.** A grep proving nothing user-facing says *Saved meals* or *My Meals*; e2e that one
-  list shows both kinds, each tap does its own thing, and bulk delete and the label path still work.
+  `food_items` and `saved_meals` — so "one list" is one list over **two sources**, two row shapes and
+  two tap behaviours, not a rename over a shared shape. **The rename rides here and cannot go
+  first**: renaming both while they are still two lists gives the user two lists with one name,
+  worse than today. 15 occurrences over 8 files — the rename is small; the merge is the work.
+- **Carry every action across** — bulk delete, meal-plan linkage, the label path — or say which was dropped. **⚠ The `My Foods` P/C/F column is the question Q-406 is parked on**: a per-screen column on the shared row is the slot it rules out, so do not add the prop unilaterally.
+- **⚠ Two findings from starting it, both detailed in the plan — read it before writing code.** A
+  food's tap goes to the **assign** step inside `FoodLoggerSheet` while a meal's opens the detail
+  sheet `SavedMealsSheet` owns, so **the merged list has to live in `FoodLoggerSheet`** and
+  `/nutrition`'s button opens the logger onto it. And **MRU is unavailable**: `food_logs` has no
+  `saved_meal_id`, so a saved meal has no last-used timestamp — order by `createdAt DESC`.
+- **Verification.** A grep proving nothing user-facing says *Saved meals* or *My Meals*; e2e that one list shows both kinds, each tap does its own thing, and bulk delete and the label path survive.
 
 ### [nutrition][app-shell] LB-16 — the capture screen: six entry points become one
 
@@ -956,13 +1050,12 @@ whether or not anyone draws them first.
 - **Added:** 2026-08-26, split out of Q-395c. **Plan:** [`2026-08-26-log-food-one-screen.md`](superpowers/plans/2026-08-26-log-food-one-screen.md).
   Also **artboard 2 parity** (BF-28): `Add food` is the drawing of the screen this builds.
 - **Scope.** `capture-step.tsx`'s six tiles collapse to one screen — search across everything, two
-  tabs (`Recent`, `My Foods`), an action row **`Photo · Barcode · Describe or enter`**.
-- **⚠ Where the drawing and the owner disagree, the owner wins.** The artboard draws **four** tabs;
-  build **two**. Its `Multi-add` / `Create food` row is the decided action row under other labels.
-- **Describe and manual entry are one sheet** with the fields always visible, so neither is hidden.
-- **⚠ A coordinate tap that misses a capture tile opens its neighbour**, and `History`'s dialog has a
-  textbox that looks like the describe field — an e2e spec filled the wrong one and failed three
-  assertions later (LA-30). Wait for the destination's own copy before touching it.
+  tabs (`Recent`, `My Foods`), an action row **`Photo · Barcode · Describe or enter`**. **⚠ Where the
+  drawing and the owner disagree the owner wins**: the artboard draws four tabs, build two, and its
+  `Multi-add` / `Create food` row is the decided action row under other labels. Describe and manual
+  entry are one sheet with the fields always visible, so neither is hidden. **⚠ A coordinate tap that
+  misses a tile opens its neighbour** and `History`'s dialog has a textbox that looks like the
+  describe field — an e2e spec filled the wrong one (LA-30); wait for the destination's own copy.
 ### [nutrition] BF-11 — the meal creator/planner redesign: the spec every phase reads, and the final checkpoint
 
 - **Needs:** BF-11h
@@ -1243,6 +1336,14 @@ two are app-wide and sit here.*
   hook must be a *child* of `Content` rather than a call in `SheetContent`, is in the component's
   own comment and the journal:
   [`2026-08-25-back-dismiss-sweep`](overview/entries/2026-08-25-back-dismiss-sweep.md).
+- **⚠ IT REGRESSED SOMETHING, AND BF-34 IS THE REPORT.** The owner cannot delete a diary entry: the
+  confirm dialog opens and closes on the same frame. **Cause traced to this component.** Because a
+  closing surface's `history.back()` is asynchronous and `selfPopRef` is **per-instance**, the pop
+  lands on the *newly opened* surface, whose own flag is clear and whose `sheetId` does not match —
+  so it takes the genuine-back-gesture arm and dismisses itself. The hook's `sheetId` guard was
+  written for the parent/child cascade (LB-10) and does not cover this sibling case. **Every
+  close-one-open-another transition in the app is affected**, not just this delete. Fix and
+  verification live in **BF-34**; do not fix it here.
 - **Keep:** the gesture itself, on the S25. `e2e/back-dismiss-sweep.spec.ts` drives
   `history.back()`, which is close to the Android gesture and not the same input — the entry says so
   and it is still true. Press it on: a plain sheet, a confirm dialog (it must cancel, not confirm),

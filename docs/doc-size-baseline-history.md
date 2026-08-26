@@ -2789,3 +2789,28 @@ about the feature — the storage arithmetic, the capture state machine, the Wea
 The plan has five later phases. Filing them now would have added an entry each for work whose shape
 is decided by a measurement nobody has taken yet, and the queue would have carried them until
 someone read far enough to find out they were all gated on the same unknown.
+## 2026-08-26 — `docs/implementation-backlog.md` raised, 11903 → 11958 (BF-34, the device-only delete)
+
+One entry, and most of it is a table of **six layers ruled out**, each with the line that rules it
+out. That is the expensive part of this bug and it is worth carrying in the queue rather than being
+re-derived: the whole delete path was driven end-to-end on web with Playwright and it **works**, so
+the failure is device-only, and an implementer who starts by re-checking the local store, the outbox
+payload or the pull-clobber gate will spend the same afternoon reaching the same dead ends.
+
+The entry ends on one question — *does the confirm dialog appear on the device at all?* — because the
+answer splits it into two different bugs with two different fixes.
+
+## 2026-08-26 — `docs/implementation-backlog.md` raised, 12002 → 12048 (BF-34 root-caused)
+
+The owner's one-line answer — *"it opens up the confirm dialog; but then instantly minimizes"* —
+turned a device-only symptom into a traced regression in **BF-27**, which shipped the day before.
+
+The added lines are the four-step sequence and the reason the hook's existing guard cannot catch it:
+`selfPopRef` is per-instance, so a closing surface's asynchronous `history.back()` lands on the
+surface that just opened, whose flag is clear and whose `sheetId` does not match — indistinguishable
+from a real back gesture. The `sheetId` guard was written for the parent/child cascade (LB-10); this
+is the sibling case.
+
+It is written out in full because the blast radius is **every close-one-open-another transition in
+the app**, and because the obvious local fix — moving the confirm inline — would hide this instance
+and leave the cause running everywhere else.
