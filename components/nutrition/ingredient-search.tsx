@@ -1,7 +1,7 @@
 'use client'
 
 import { memo, useCallback } from 'react'
-import { Search, X, Plus, Loader2, Sparkles, AlertTriangle } from 'lucide-react'
+import { Search, X, Loader2, Sparkles } from 'lucide-react'
 import type { FoodItem } from '@trainingai/shared/types/nutrition'
 import { FoodRow } from '@/components/nutrition/food-row'
 import type { FoodSearchResponse } from '@/app/api/nutrition/food-search/route'
@@ -119,32 +119,14 @@ export function IngredientSearch({
             const off = macroCalorieDisagreement(food)
             const mismatched = off != null && off > MACRO_MISMATCH_VISIBLE_LIMIT
             return (
-            <button
-              key={food.externalId}
-              onClick={() => onAddExternal(food)}
-              disabled={addingExternal != null}
-              className="w-full min-h-[48px] flex items-center gap-2 rounded-xl border border-border bg-muted/40 px-3 py-2 text-left active:bg-muted/20 disabled:opacity-40"
-            >
-              <span className="min-w-0 flex-1">
-                <span className="block text-sm font-medium truncate">
-                  {food.brand ? `${food.brand} — ${food.name}` : food.name}
-                </span>
-                <span className="block text-[11px] tabular-nums text-muted-foreground">
-                  {Math.round(food.calories)} kcal · {Math.round(food.proteinG ?? 0)}P ·{' '}
-                  {Math.round(food.carbsG ?? 0)}C · {Math.round(food.fatG ?? 0)}F
-                  {' '}per {Math.round(food.servingSizeG)} g
-                </span>
-                {mismatched && (
-                  <span className="mt-0.5 flex items-center gap-1 text-[10px] leading-snug text-[#f59e0b]">
-                    <AlertTriangle className="w-3 h-3 flex-none" />
-                    Its macros and calories disagree — check before using
-                  </span>
-                )}
-              </span>
-              {addingExternal === food.externalId
-                ? <Loader2 className="h-4 w-4 animate-spin flex-none" />
-                : <Plus className="h-4 w-4 text-brand flex-none" />}
-            </button>
+              <ExternalFoodRow
+                key={food.externalId}
+                food={food}
+                mismatched={mismatched}
+                adding={addingExternal != null}
+                pending={addingExternal === food.externalId}
+                onAdd={onAddExternal}
+              />
             )
           })}
         </div>
@@ -178,6 +160,37 @@ const SearchResultRow = memo(function SearchResultRow(
       secondary={`${Math.round(item.proteinG ?? 0)}g P per ${serving}`}
       calories={item.calories}
       onPress={press}
+    />
+  )
+})
+
+/**
+ * The external food-database result, as the shared row (Q-406's last call site).
+ *
+ * **It loses its trailing `+` and per-row spinner deliberately.** `SearchResultRow` above — the
+ * sibling that has been `FoodRow` since v1.338.0 — has neither: the tap adds the food, and an add
+ * affordance on top of that is a per-screen difference, which is what converting these rows exists
+ * to end. The tapped row still says so, through `highlighted`, so nothing about *which* row is being
+ * added is lost.
+ *
+ * A wrapper rather than an inline arrow, because the row is memoised and an inline `onPress` inside
+ * `.map()` defeats that silently (Q-490).
+ */
+const ExternalFoodRow = memo(function ExternalFoodRow(
+  { food, mismatched, adding, pending, onAdd }:
+  { food: ExternalFood; mismatched: boolean; adding: boolean; pending: boolean; onAdd: (f: ExternalFood) => void },
+) {
+  const press = useCallback(() => onAdd(food), [food, onAdd])
+  const secondary = `${Math.round(food.proteinG ?? 0)}P · ${Math.round(food.carbsG ?? 0)}C · ${Math.round(food.fatG ?? 0)}F per ${Math.round(food.servingSizeG)} g`
+  return (
+    <FoodRow
+      name={food.brand ? `${food.brand} — ${food.name}` : food.name}
+      secondary={secondary}
+      calories={food.calories}
+      warning={mismatched ? 'Its macros and calories disagree — check before using' : null}
+      highlighted={pending}
+      onPress={press}
+      disabled={adding}
     />
   )
 })
