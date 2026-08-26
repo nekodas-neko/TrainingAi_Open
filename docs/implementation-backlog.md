@@ -351,32 +351,34 @@ below threshold and left in place for next time.
 > BF-29 (My meals), BF-30 (Meal detail), BF-31 (Edit meal) and BF-26 (Quantity). Two artboards need
 > no entry — `Tap targets` and the `srv/g` studies both shipped in Q-395a.
 
-### [nutrition] LA-30 — a zero-calorie food can never be logged, and the button says nothing
+### [nutrition] LB-15 — a zero-calorie barcode product is reported as "not found"
 
-- **Lane:** B
-- **Added:** 2026-08-25, from the owner hitting it live — a ZMA supplement scan, correctly read by
-  the AI as *"It is calorie-free"*, with **Next** greyed out and no message explaining why.
-- **The gate:** `components/nutrition/review-step.tsx:159`
+- **Lane:** A — `packages/shared/**`, whatever the edit looks like.
+- **Added:** 2026-08-26, found by the sibling-surface sweep for LA-30. **Read from source, not
+  reproduced** — the sandbox has no Open Food Facts access.
+- **`packages/shared/src/nutrition/open-food-facts.ts:58`**
 
   ```ts
-  const canSave = value.name.trim().length > 0 && value.calories > 0
+  const calories = Math.round(perServing(n['energy-kcal_serving'], n['energy-kcal_100g']))
+  if (!(calories > 0)) return null
   ```
 
-  Every genuinely zero-calorie item is refused: supplements, water, black coffee, plain tea, diet
-  soft drink, sugar-free gum, zero-cal sweetener, most spices and herbs.
-- **The server already disagrees with it.** `packages/shared/src/validation/food-item.ts:19` is
-  `z.number().min(0).max(10000)` — zero is explicitly allowed, so the API would have accepted this
-  log. There is **no engine half to this fix**; it is one client-side predicate, which is what puts
-  it in Lane B.
-- **Sibling surface, same PR:** `components/nutrition/ingredient-picker.tsx:154` does
-  `if (!scan || scan.error || !(scan.calories > 0))` — a zero-calorie scan is classified as a
-  *failed* scan there. Same rule, different consequence.
-- **Suggested shape:** drop `calories > 0` from `canSave`; a name is the only field that must be
-  present. If a guard against an empty/failed AI response is still wanted, test that the scan
-  *returned* — not that its calories are nonzero, which is a legitimate value.
-- **The silent-disable is half the bug.** A disabled primary button with no reason given is
-  indistinguishable from a broken app; the owner's report was *"it wouldn't let me log it"*, not
-  *"it told me why"*. Whatever replaces the gate should say what it wants.
+  `offProductToNutrition` returning `null` is how the caller learns the barcode **did not resolve**.
+  So scanning a genuinely calorie-free product — Coke Zero, sparkling water, sugar-free gum, a
+  supplement — reports it as an unknown barcode rather than as the zero-calorie food it is.
+- **Same rule as LA-30, different layer, and NOT fixed by it.** LA-30 cleared the two client
+  predicates (`review-step.tsx`, `ingredient-picker.tsx`); this one sits below both, so the barcode
+  path stays broken after that PR. Filing it separately because the lane rule is the path.
+- **Two hits nearby are NOT this defect** — checked, so the next person does not "fix" them:
+  `scan-totals.ts:104` (`macroCalorieDisagreement`) returns `null` at zero because a percentage
+  deviation against zero is undefined, which is its contract; and `scan-totals.ts:140`
+  (`sanitiseNutrition`) recomputes from macros when `calories === 0`, which for a truly calorie-free
+  item yields zero again. Both correct.
+- **Suggested shape:** distinguish *absent* from *zero*. `perServing` already returns `0` for a
+  missing field, so the two are indistinguishable at line 58 — the guard wants to test whether the
+  product carried an energy field at all, not what its value was.
+- **Verification.** A unit test over an `OffProduct` fixture with `energy-kcal_100g: 0` present, and
+  one with the field absent; the first must resolve, the second may still be `null`.
 
 ### [nutrition][app-shell] BF-28 — mockup parity: the artboards are the spec, and this is the map
 

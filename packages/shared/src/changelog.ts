@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.381.1",
+    date: "2026-08-26",
+    changes: [
+      "Foods with no calories can be logged again \u2014 supplements, water, black coffee, plain tea, diet drinks, sugar-free gum, sweetener and most spices. The Next button was refusing anything that came back as zero calories, including scans the AI had read perfectly well as calorie-free, and it did not say why it was greyed out. A name is now the only thing it asks for, and if that is what is missing it tells you.",
+    ],
+  },
+  {
     version: "1.381.0",
     date: "2026-08-26",
     changes: [
