@@ -354,31 +354,29 @@ below threshold and left in place for next time.
 ### [nutrition] LB-15 — a zero-calorie barcode product is reported as "not found"
 
 - **Lane:** A — `packages/shared/**`, whatever the edit looks like.
-- **Added:** 2026-08-26, found by the sibling-surface sweep for LA-30. **Read from source, not
-  reproduced** — the sandbox has no Open Food Facts access.
-- **`packages/shared/src/nutrition/open-food-facts.ts:58`**
+- **Added:** 2026-08-26, from LA-30's sibling sweep. **Read from source, not reproduced** — no Open
+  Food Facts access here. **`packages/shared/src/nutrition/open-food-facts.ts:58`**:
 
   ```ts
   const calories = Math.round(perServing(n['energy-kcal_serving'], n['energy-kcal_100g']))
   if (!(calories > 0)) return null
   ```
 
-  `offProductToNutrition` returning `null` is how the caller learns the barcode **did not resolve**.
-  So scanning a genuinely calorie-free product — Coke Zero, sparkling water, sugar-free gum, a
-  supplement — reports it as an unknown barcode rather than as the zero-calorie food it is.
+  `offProductToNutrition` returning `null` is how the caller learns the barcode **did not resolve**, so
+  a genuinely calorie-free product — Coke Zero, sparkling water, sugar-free gum, a supplement — reads
+  as an unknown barcode rather than as the zero-calorie food it is.
 - **Same rule as LA-30, different layer, and NOT fixed by it.** LA-30 cleared the two client
-  predicates (`review-step.tsx`, `ingredient-picker.tsx`); this one sits below both, so the barcode
-  path stays broken after that PR. Filing it separately because the lane rule is the path.
+  predicates; this sits below both, so the barcode path stays broken after it. Separate because the
+  lane rule is the path.
 - **Two hits nearby are NOT this defect** — checked, so the next person does not "fix" them:
   `scan-totals.ts:104` (`macroCalorieDisagreement`) returns `null` at zero because a percentage
   deviation against zero is undefined, which is its contract; and `scan-totals.ts:140`
   (`sanitiseNutrition`) recomputes from macros when `calories === 0`, which for a truly calorie-free
   item yields zero again. Both correct.
-- **Suggested shape:** distinguish *absent* from *zero*. `perServing` already returns `0` for a
-  missing field, so the two are indistinguishable at line 58 — the guard wants to test whether the
-  product carried an energy field at all, not what its value was.
-- **Verification.** A unit test over an `OffProduct` fixture with `energy-kcal_100g: 0` present, and
-  one with the field absent; the first must resolve, the second may still be `null`.
+- **Suggested shape:** distinguish *absent* from *zero*. `perServing` returns `0` for a missing
+  field, so the two are indistinguishable at line 58 — the guard wants to know whether the product
+  carried an energy field, not what its value was.
+- **Verification.** Two `OffProduct` fixtures — `energy-kcal_100g: 0` present, and the field absent. The first must resolve; the second may still be `null`.
 
 ### [nutrition][app-shell] BF-28 — mockup parity: the artboards are the spec, and this is the map
 
