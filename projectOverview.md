@@ -418,6 +418,15 @@ order.
 **Fixed.** Both the pre-workout Intensity control and the in-workout header asked `isDeloadActive` — *"is the current PHASE a deload week"* — rather than whether today's session is a deload, which is what `prescription.deload` holds. So an auto-applied, readiness-driven deload read as a full session from the pre-workout screen to the last set, and the owner trained one that way. `sessionContextLabel` resolves the header's line in one place; `useDeloadChoice` adopts the prescription until the user chooses otherwise; "As prescribed" now sits under whichever half the engine picked, with the other labelled **Override** ([`journal`](docs/overview/entries/2026-08-24-deload-visible-on-both-surfaces.md)).
 - **Keep: not device-verified, and the active header has no end-to-end guard.** `e2e/deload-visible.spec.ts` covers the toggle against a real auto-applied prescription and is mutation-checked; the header's label is pinned by unit tests only — no spec starts a workout and reads it.
 
+### [nutrition] ⚠️ The meal builder pins its batch figures; the footer is unchecked against the gesture bar (BF-31, v1.381.0)
+
+Artboard 5's footer shipped: `Batch · kcal · P/C/F · per portion` above `Save meal`, outside the
+scroll, so the numbers stay put while the ingredients that change them are edited. The name is edited
+in place from the header. **On the S25:** the footer is a new bottom-anchored region inside a 90vh
+sheet — `SheetContent side="bottom"` owns the bottom inset, so it carries no `pb-safe*` of its own,
+but that it clears the gesture bar is unverified. Check also that the header's inline name input is
+not covered by the software keyboard.
+
 ### [nutrition] ⚠️ My Meals took artboard 3's shape, and its row actions moved to a swipe (BF-29, v1.376.0) — NOT verified on device · needs: hardware
 
 The meal library's rows collapsed to `name · what is in it · calories · chevron` inside one grouped
@@ -2952,23 +2961,17 @@ next device smoke run.
 
 ### [app-shell][platform] ✅ One of the two sign-out buttons left the previous account's data on the device — fixed 2026-08-10 (Q-172, v1.277.3)
 
-More → Profile signs out through `clearLocalStoreData()` → `clearAllCache()` → `signOut()`.
-`components/chat.tsx` has **two** sign-out buttons (`:554`, `:636`) that post a bare
-`<form action={signOut}>` and do neither. After signing out that way, `ta_cache:*` and the native
-SQLite store still hold the previous account's data, and most cache keys carry no user id
-(`weekly-stats`, `readiness-score`, `home-day-timeline`), so the next account paints from them via
-`readCacheSync` before any fetch returns.
+More → Profile signs out through `clearLocalStoreData()` → `clearAllCache()` → `signOut()`;
+`components/chat.tsx`'s two buttons posted a bare `<form action={signOut}>` and did neither, so
+`ta_cache:*` and the native store kept the previous account's data — and most keys carry no user id
+(`weekly-stats`, `readiness-score`, `home-day-timeline`), so the next account painted from them via
+`readCacheSync`. Invisible with one account per device, and in the way of the multi-user direction.
 
-Invisible today — one account per device — and squarely in the way of the multi-user/Play Store
-direction recorded in the Canonical Runtime note. The localStorage half was proven in the browser;
-the native SQLite half was inferred from the absent call, not observed.
-
-**Fixed 2026-08-10 (#1235, v1.277.3)** — and the fix was larger than the finding: reading the
-sign-out that *did* work found `clearLocalStoreData()` was a hand-written list drifted to 27 of the
-schema's 37 tables. See the Current Status entry above and
-[`docs/overview/history-2026-08-08.md`](docs/overview/history-2026-08-08.md).
+**Fixed 2026-08-10 (#1235, v1.277.3)**, and larger than the finding: the sign-out that *did* work
+used a hand-written table list drifted to 27 of the schema's 37.
+[`history`](docs/overview/history-2026-08-08.md).
 ⚠️ **Still not device-verified:** `clearLocalStoreData()` is a no-op on web, so the local-store half
-has never actually run.
+has never run.
 
 ### [platform][nutrition] 🟠 90% of the DB suite is blind to a total loss of user scoping (measured 2026-08-09)
 
@@ -3920,22 +3923,16 @@ whether other recent nights hit the same bug during the same error bursts.
 ### [heart-rate][workouts] ✅ Per-set HR now records which device measured it (2026-08-05, v1.260.0)
 
 From the null-rate sweep — **847 columns across 69 tables**, one `count(col)` each: **49 are 100%
-null in a table that has rows.** Most classified out (optional inputs, tombstones, frozen Cloud
-columns, and columns whose *input* is null rather than whose producer is missing — each checked
-against its writer). Two survived: `oura_daily_derived`'s ten always-null columns, which is the
-queued **Q-7b** confirmed with its count corrected from eight; and **`set_hr_stats.source`** —
-declared in migration 139, never written, never read, across 582 rows.
+null in a table that has rows.** Most classified out against their writers. Two survived:
+`oura_daily_derived`'s ten always-null columns (the queued **Q-7b**, count corrected from eight),
+and **`set_hr_stats.source`** — declared in migration 139, never written, never read, 582 rows.
 
-`source` now records `chest_strap` / `oura_ble` / `mixed` per set. The data was always there —
-`getHrForWindow` selects it and the workout-level summary used it; it never reached the per-set rows.
-Reads the **working-set window only**, not the rest after it (where the ring takes over if a strap
-comes off), and stays **null rather than `'unknown'`**. *"Were those sets ring-only?"* is the first
-question asked of suspect per-set HR, and what the still-open half of **Q-11** needs. Existing rows
-fill in via **Admin → Tools → "Backfill per-set HR stats"**.
-
-Seven tests — five on the derivation, two DB round-trips. The round-trip pair earns its place:
-`workout_hr_stats` failed at exactly that seam, computed correctly and rejected by the column, while
-its unit tests passed.
+`source` now records `chest_strap` / `oura_ble` / `mixed` per set. The data was always there;
+it never reached the per-set rows. Reads the **working-set window only**, not the rest after it
+(where the ring takes over if a strap comes off), and stays **null rather than `'unknown'`**. What
+the still-open half of **Q-11** needs. Existing rows fill in via **Admin → Tools → "Backfill per-set
+HR stats"**. Seven tests, two of them DB round-trips — `workout_hr_stats` failed at exactly that
+seam, computed correctly and rejected by the column, while its unit tests passed.
 
 ### [platform] ✅ The rollup tests weren't flaky, they were slower than the limit (2026-08-05, v1.260.1)
 
