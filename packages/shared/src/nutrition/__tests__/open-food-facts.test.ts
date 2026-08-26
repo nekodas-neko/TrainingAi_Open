@@ -64,3 +64,48 @@ describe('offProductToNutrition', () => {
     expect(offProductToNutrition({ product_name: 'Mystery' })).toBeNull()
   })
 })
+
+// LB-15 — `offProductToNutrition` returning null is how the caller learns the barcode DID NOT
+// RESOLVE, and the guard used to be `if (!(calories > 0)) return null`. `perServing` returns 0 for a
+// missing field, so a genuinely calorie-free product was indistinguishable from an unknown barcode
+// and the scanner reported the user's real, scannable product as "not found".
+//
+// Filed from LA-30's sibling sweep and marked "read from source, not reproduced" — these are the
+// two fixtures its verification section asked for, plus the edges around them.
+describe('offProductToNutrition — a calorie-free product is not a missing one (LB-15)', () => {
+  const product = (nutriments: Record<string, number | undefined>) => ({
+    product_name: 'Sparkling Water', brands: 'Test', serving_size: '250 ml', nutriments,
+  })
+
+  it('resolves a product whose energy is present and zero', () => {
+    const out = offProductToNutrition(product({ 'energy-kcal_100g': 0 }))
+    expect(out).not.toBeNull()
+    expect(out!.calories).toBe(0)
+    expect(out!.name).toBe('Sparkling Water')
+  })
+
+  it('resolves when the zero arrives per serving rather than per 100 g', () => {
+    const out = offProductToNutrition(product({ 'energy-kcal_serving': 0 }))
+    expect(out).not.toBeNull()
+    expect(out!.calories).toBe(0)
+  })
+
+  // The behaviour the guard exists for, and it must survive the fix: OFF is full of entries that
+  // are a name and nothing else.
+  it('still returns null when no energy field is present at all', () => {
+    expect(offProductToNutrition(product({}))).toBeNull()
+    expect(offProductToNutrition(product({ proteinG: 3 } as never))).toBeNull()
+  })
+
+  it('still resolves an ordinary product with real energy', () => {
+    const out = offProductToNutrition(product({ 'energy-kcal_100g': 200 }))
+    expect(out).not.toBeNull()
+    expect(out!.calories).toBe(500) // 200 per 100 g at a 250 ml serving
+  })
+
+  // A negative energy is corrupt rather than calorie-free. The old `> 0` test rejected it as a side
+  // effect; the fix keeps that deliberately rather than dropping it along with the zero case.
+  it('returns null for a negative energy', () => {
+    expect(offProductToNutrition(product({ 'energy-kcal_100g': -50 }))).toBeNull()
+  })
+})

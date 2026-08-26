@@ -3064,3 +3064,14 @@ of its three routes shipped: the render and route 2's client downscale are Lane 
 unbuilt, and the search route's deliberate omission needed its reason recorded (60 products, so a
 thumbnail each is 60 requests per search). A `Keep:` that says only "partly done" sends the next
 session to re-derive all of that.
+
+## 2026-08-26 — `projectOverview.md` → 8084 (+2), LB-15
+
+Two lines, appended to the existing food-image paragraph rather than opening a new Current Status
+block: a small fix on the same surface does not need its own section, and the index is kept lean on
+purpose.
+
+The backlog is **not** re-ratcheted in this PR even though removing LB-15 took it 27 lines below its
+baseline. Tightening a shared file that every agent's open branch also edits would fail those PRs for
+no benefit — the ratchet exists to stop growth going unnoticed, and any growth still shows in a diff.
+Deliberate, so a later sweep does not read the slack as an oversight.

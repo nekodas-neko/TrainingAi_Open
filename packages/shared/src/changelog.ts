@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.383.1",
+    date: "2026-08-26",
+    changes: [
+      "Scanning the barcode of something with no calories \u2014 sparkling water, a diet drink, sugar-free gum, most supplements \u2014 said the product was not found. It was found; the scanner had no way to tell \"this product has zero calories\" apart from \"this product has no calorie information\", so it treated the first as the second. Those are now different things, and a calorie-free product scans and logs like any other. A barcode with genuinely no nutrition data still reports as not found.",
+    ],
+  },
+  {
     version: "1.383.0",
     date: "2026-08-26",
     changes: [
