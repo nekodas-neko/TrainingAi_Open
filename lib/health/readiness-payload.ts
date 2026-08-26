@@ -553,12 +553,15 @@ export async function buildReadinessPayload(userId: string, tz: string): Promise
       // leaves an unmarked step in the readiness trend where old and new model scores meet, and no
       // later correlation can tell an input change from a model change. Sleep shipped without one and
       // has exactly that problem.
-      const existingVersions = (derivedToday?.modelVersions ?? {}) as Record<string, unknown>
+      // Writes only its own key: `upsertOuraDailyDerived` merges `model_versions` with `||` inside
+      // the statement, so this no longer has to read the row and spread it back. That read-merge was
+      // a two-statement race against any other pillar stamping the same day, and it read a value
+      // that could already be stale (Q-273).
       await repo.upsertOuraDailyDerived(userId, latestSummary?.date ?? todayIso, {
         readinessScore: ownComposite.score,
         readinessContributors: ownComposite.contributors,
         readinessSource: latestSummary ? 'ble-derived' : 'generic-derived',
-        modelVersions: { ...existingVersions, readiness: READINESS_MODEL_VERSION },
+        modelVersions: { readiness: READINESS_MODEL_VERSION },
       })
     } catch (err) {
       console.error('[readiness-score] readiness persist failed (read still served):', err)

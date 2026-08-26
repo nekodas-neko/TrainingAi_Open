@@ -2831,3 +2831,28 @@ larger file underneath it. CI checks the *merge* result, so the same diff that w
 16 over once merged. The rule already in CLAUDE.md covers it — re-merge `origin/main` immediately
 before opening each PR, not only before cutting the branch — and this is one more instance of the
 cost, not a new failure mode.
+
+## 2026-08-26 — `CLAUDE.md` 1174 → 1198, backlog 11860 → 11858, `projectOverview.md` 7992 → 8003 (Q-273)
+
+**The only `CLAUDE.md` raise of the session, and it is Q-273's own scope item 3**: *"a rule, alongside
+One Formula One Place: a correlation computed across a model change is not evidence."*
+
+Twenty-four lines, carrying a worked example rather than an instruction. `body_battery_daily` held
+**four distinct model versions over 40 days** with no recompute, and pooling them produced a
+documented false conclusion — r = −0.06 recorded as evidence the model had no outcome signal, where
+**v5 days alone give r = +0.67**. That number stood in the docs for eleven days. A rule stating the
+principle without the example is one a future session reads past; the example is what makes it stick.
+
+It also records two things that are properties of a *pair* of files and so are invisible from either
+one: `model_versions` merges with `||` and must never regain a JS read-merge, and `updated_at` does
+not identify the writing model.
+
+The backlog ends **two lines DOWN** despite adding fifty, because Lane B's merges shrank it
+underneath this branch in between. The fifty are **LA-32** (36) plus Q-273's own `Keep:` block (15), which says what the entry
+still owes now that its scope item 1 is *safe* but not *complete* — the stamp can no longer be
+clobbered, three pillars still do not write one, and the backfill half is deliberately untouched. An
+entry that shipped half its work states the half it did not, rather than looking finished.
+
+LA-32 is the survey of test files sharing a hardcoded user UUID with a file that deletes it — 233 UUIDs measured, 10 shared, 7 risky, 2 fixed, 6 remaining, with the table of
+which. Filed rather than swept because the sweep without a CI check to hold it at zero is the weaker
+half, and the entry carries the measurement so the sweep is mechanical.
