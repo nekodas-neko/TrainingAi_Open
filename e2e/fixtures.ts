@@ -166,9 +166,20 @@ export async function openSavedMeal(page: Page, mealName: string): Promise<void>
   const escaped = mealName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
   const row = page.getByRole('button', { name: new RegExp(`^${escaped}`) }).first()
   await expect(row).toBeVisible({ timeout: 30_000 })
-  const box = (await row.boundingBox())!
-  await page.touchscreen.tap(box.x + box.width / 2, box.y + box.height / 2)
-  await expect(opened).toBeVisible({ timeout: 10_000 })
+  // **Re-measure inside the retry — one measure and one tap is a race here.** Since Q-395c this list
+  // merges foods in asynchronously and re-sorts, and a meal that has a photo grows a tile whose
+  // image decodes later still, so the row can move between `boundingBox()` and the tap and the
+  // finger lands on whatever slid into that position. It cost a CI run: the FIRST photo-picker test
+  // passed and the second — the one running against a meal test 1 had just given a photo — failed on
+  // both attempts. The `count()` guard is what stops a retry re-tapping through an open sheet's
+  // overlay and dismissing it.
+  await expect(async () => {
+    if (await opened.count() === 0) {
+      const box = (await row.boundingBox())!
+      await page.touchscreen.tap(box.x + box.width / 2, box.y + box.height / 2)
+    }
+    await expect(opened).toBeVisible({ timeout: 5_000 })
+  }).toPass({ timeout: 60_000 })
   // **`toBeVisible()` is true the instant the sheet mounts, which is 500 ms before it arrives.**
   // `SheetContent` slides in over `duration-500`, so a caller that measures a `boundingBox()` right
   // after this gets a position the element is still travelling through — measured at y=1127 on a
