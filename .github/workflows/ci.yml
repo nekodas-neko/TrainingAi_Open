@@ -478,17 +478,53 @@ jobs:
       AUTH_SECRET: e2e-ci-secret-not-used-outside-this-job
     steps:
       - uses: actions/checkout@v5
+        with:
+          # The UI-paths check below diffs against the base branch, which a depth-1 clone cannot see.
+          fetch-depth: 0
+      # LA-22. E2E is meant to gate UI changes and only UI changes, and the owner chose exactly that
+      # on 2026-08-26. The obvious implementation — a `paths:` filter on the job — is the wrong one:
+      # a REQUIRED check that does not run leaves the PR pending forever, which is why the Android
+      # workflow is deliberately not required. So the job always runs and always reports, and skips
+      # its expensive half when nothing it can test has changed. That makes it safe to require.
+      #
+      # A non-UI PR still pays for checkout and the Postgres service (~20 s) rather than the full
+      # ~10 min. On a push to main there is no base to diff against, so everything runs.
+      - name: Does this change touch the UI?
+        id: ui
+        run: |
+          if [ "${{ github.event_name }}" != "pull_request" ]; then
+            echo "Not a pull request — running the full suite."
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          BASE="origin/${{ github.base_ref }}"
+          git fetch --quiet origin "${{ github.base_ref }}"
+          # `...` compares against the merge base, so unrelated commits landing on the base branch
+          # while this PR is open do not make an engine-only PR look like a UI one.
+          FILES=$(git diff --name-only "$BASE...HEAD")
+          echo "$FILES" | sed 's/^/  /'
+          if echo "$FILES" | grep -qE '^(app/|components/|e2e/|playwright\.config\.ts$)'; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "No app/, components/, e2e/ or playwright.config.ts changes — skipping the browser run."
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          fi
       - uses: pnpm/action-setup@v5
+        if: steps.ui.outputs.changed == 'true'
         with:
           version: 10.33.0
       - uses: actions/setup-node@v5
+        if: steps.ui.outputs.changed == 'true'
         with:
           node-version: '20'
           cache: 'pnpm'
       - run: pnpm install --frozen-lockfile
+        if: steps.ui.outputs.changed == 'true'
       - name: Apply all migrations
+        if: steps.ui.outputs.changed == 'true'
         run: node scripts/local-db/migrate.js
       - name: Seed the test user and program
+        if: steps.ui.outputs.changed == 'true'
         run: psql "$DATABASE_URL" -f scripts/local-db/seed.sql
       # No PLAYWRIGHT_BROWSERS_PATH here: the runner has no pre-installed Chromium, so Playwright
       # manages its own. playwright.config.ts only pins an executablePath when the sandbox's
@@ -498,17 +534,22 @@ jobs:
       # `cache: 'pnpm'` covers node_modules and nothing else; Chromium lives in
       # ~/.cache/ms-playwright and was re-downloaded — ~150 MB — on every single E2E run. Three
       # times on 2026-08-18 that download sat in_progress for 6–22 minutes with every other job
-      # already green, and E2E is a required check, so it blocked the merge outright rather than
+      # already green, and at the time E2E was believed to be a required check. LA-22 later measured
+      # that it was NOT in the required set (#454 merged with E2E red), so it slowed the merge rather
+      # than blocking it. Correct as of 2026-08-26: the job is gated on UI paths above so that it CAN
+      # safely be required, and the owner adds it to branch protection. The cache lesson stands:
       # merely slowing it. The tell: `Install Chromium` running while `pnpm e2e` is still pending
       # means the CDN, not the specs.
       - name: Resolve the installed Playwright version
         id: playwright
+        if: steps.ui.outputs.changed == 'true'
         # The RESOLVED version, not the `^1.62.1` range in package.json — the range does not change
         # when the lockfile moves to a new build, and a cache keyed on it would serve the previous
         # browser forever. Hashing the whole lockfile would work too, and would throw the browsers
         # away on every unrelated dependency bump.
         run: echo "version=$(node -p "require('@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
       - name: Cache the Playwright browsers
+        if: steps.ui.outputs.changed == 'true'
         uses: actions/cache@v4
         with:
           path: ~/.cache/ms-playwright
@@ -520,8 +561,10 @@ jobs:
       # which are apt packages outside ~/.cache and cannot be cached here. On a hit it finds the
       # browser already present and skips the download, which is the whole saving.
       - name: Install Chromium
+        if: steps.ui.outputs.changed == 'true'
         run: npx playwright install --with-deps chromium
       - run: pnpm e2e
+        if: steps.ui.outputs.changed == 'true'
       - uses: actions/upload-artifact@v6
         if: failure()
         with:

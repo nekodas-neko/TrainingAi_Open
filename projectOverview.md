@@ -27,6 +27,17 @@
 **Version:** v1.383.4 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-08-26.
 
+**The doc-size ledger stops being a merge conflict (LA-33), and E2E can now be required (LA-22).**
+Every PR raising a documentation baseline edited the same two lines of one shared JSON, so two open
+PRs conflicted *by construction* — measured this session at four merge races in 35 minutes, every
+conflict in that ledger, the backlog or the changelog, never in code. Baselines are now one file
+each at `docs/doc-size/<path>.size`; two PRs raising different docs touch no common line. Same fix
+the session journal already took. E2E is gated on `app/`/`components/`/`e2e/` but **always runs and
+always reports** — a `paths:` filter would leave a required check that never reports, blocking a
+non-UI PR forever. ⛔ **One owner action outstanding: add `E2E` to `main`'s required checks**, or
+nothing changes. A ci.yml comment claiming E2E was already required was disproved first — three PRs
+merged this session with it still in progress.
+
 **The Coach only swaps an exercise when asked, and says what a swap costs (Q-403).** The owner did
 not know the Coach's swap edits the **program** rather than today's workout, and did not want it once
 told. Offered remove / keep-and-warn / gate-on-injury, they chose a fourth thing: keep it, never

@@ -8,22 +8,37 @@
 // recorded size and may never grow, and a change that genuinely has to add lines raises the number
 // in the same PR — which puts the growth in the diff where it can be seen.
 //
-// The baselines live in docs/doc-size-baseline.json and the reasoning behind each change lives in
-// docs/doc-size-baseline-history.md. They used to live here as comments, which is why this file had
-// reached 1,091 lines with 955 of them prose: every PR that added a documentation line prepended a
-// paragraph to the same region, making this the repository's most frequent merge conflict (32 of
-// the last 40 commits touched it) and corrupting two blocks into verbatim duplicates. Keep the
-// rationale out of this file.
+// Each baseline is ONE FILE — docs/doc-size/<the tracked path>.size, holding a single number — and
+// the reasoning for any change lives in docs/doc-size-baseline-history.md.
+//
+// They were a shared map in docs/doc-size-baseline.json until LA-33, and before that they were
+// comments in this file, which is why it had reached 1,091 lines with 955 of them prose: every PR
+// prepended a paragraph to the same region, making this the repository's most frequent merge
+// conflict (32 of the last 40 commits touched it) and corrupting two blocks into verbatim
+// duplicates. Moving them to a shared JSON fixed the prose problem and kept the structural one —
+// every PR that raises a number edits the same two lines, so two open PRs conflict by construction.
+// Measured on 2026-08-26: one PR was outrun by main four times in 35 minutes and EVERY conflict was
+// in this ledger, the backlog, or the changelog — never in code.
+//
+// One file per tracked doc is the same fix the session journal already took (a shared history file
+// → one file per entry, which its README records as taking the most frequent multi-PR conflict to
+// zero). Two PRs raising two different docs now touch no common line at all; two raising the SAME
+// doc still conflict, which is correct, because they genuinely disagree about one number.
+//
+// Keep the rationale out of this file, and out of the .size files — they hold a number and nothing
+// else, so a conflict in one is a two-way choice between two integers.
 //
 'use strict';
 const fs = require('fs');
 const path = require('path');
 const { resolveBaseRef, lineCountAtBase, dirNamesAtBase, verdict } = require('./lib/base-ref');
 const { entriesVerdict } = require('./lib/entries-verdict');
+const { BASELINE_DIR, loadBaselines, baselinePathFor } = require('./lib/doc-size-baselines');
 
 const root = path.join(__dirname, '..');
 const config = JSON.parse(fs.readFileSync(path.join(root, 'docs/doc-size-baseline.json'), 'utf8'));
-const BASELINE = config.files;
+
+const BASELINE = loadBaselines(path.join(root, BASELINE_DIR));
 const { dir: ENTRIES_DIR, chore: ENTRIES_CHORE, limit: ENTRIES_LIMIT, totalCeiling: ENTRIES_TOTAL_CEILING } =
   config.entries;
 
@@ -82,7 +97,7 @@ for (const [rel, limit] of Object.entries(BASELINE)) {
     `${rel} is ${lines} lines, over its ${limit}-line baseline by ${lines - limit}` +
       (grew === null ? '.' : ` — ${grew} of which this branch added.`) + `\n` +
       `      Move the new material to where it belongs — a journal entry, an archive, a reference\n` +
-      `      doc — or raise the baseline in docs/doc-size-baseline.json in the same PR, with a note\n` +
+      `      doc — or raise the number in ${baselinePathFor(rel)} in the same PR, with a note\n` +
       `      in docs/doc-size-baseline-history.md, if the growth is genuinely part of the index.`,
   );
 }
