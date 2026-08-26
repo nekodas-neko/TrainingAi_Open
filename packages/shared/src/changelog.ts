@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.381.0",
+    date: "2026-08-26",
+    changes: [
+      "The meal builder now keeps the batch totals pinned above Save meal \u2014 calories, protein, carbs, fat and what one portion works out to \u2014 so they stay on screen while you are editing the ingredients that change them, instead of scrolling away exactly when you need them. The meal name is edited straight from the header with the pencil beside it rather than in a separate field, and adding an ingredient or a photo are two buttons at the end of the list.",
+    ],
+  },
+  {
     version: "1.380.0",
     date: "2026-08-26",
     changes: [
