@@ -1355,11 +1355,34 @@ function summaryRowValues(userId: string, r: OuraDailySummaryRow) {
 
 /** Full-history replace: delete every summary row and reinsert. Used by the redecode/full-recompute
  *  path only — the incremental windowed rollup uses upsertOuraDailySummary so it never deletes the
- *  older rows it deliberately didn't recompute. */
+ *  older rows it deliberately didn't recompute.
+ *
+ *  Shaped like `replaceDaytimeStressBuckets` below, and for its reasons (Q-528). Three ways this
+ *  used to lose a history it had no business touching, all reproduced against Postgres before they
+ *  were fixed:
+ *
+ *  1. **The guard sat below the delete.** A full-history pass that assembled no nights — a narrow
+ *     window, a decode that produced nothing — deleted every row and returned successfully. No
+ *     error, no log. Returning before the delete is what makes "computed nothing" mean "change
+ *     nothing" instead of "erase everything". **The trade, stated:** a user whose history genuinely
+ *     should end up empty now keeps their stale rows, because this function can no longer tell that
+ *     apart from a pass that failed to compute. Deliberately clearing a history is a separate act
+ *     and wants its own path; inferring it from an empty argument is what made the wipe silent.
+ *  2. **The delete and the insert were separate statements.** A rejected insert left the delete
+ *     committed and the user with an empty table, so a bad row cost the whole history rather than
+ *     itself. They share a transaction now, which also means a concurrent reader never sees the
+ *     empty window between them.
+ *  3. **The insert had no conflict arm** against the `(user_id, date)` UNIQUE, so one repeated day
+ *     raised 23505 and rejected every row in the statement — Q-280's shape under a different
+ *     SQLSTATE. Duplicates are collapsed last-wins, matching what a replace means. */
 export async function replaceOuraDailySummary(db: Db, userId: string, rows: OuraDailySummaryRow[]): Promise<void> {
-  await db.delete(s.ouraDailySummary).where(eq(s.ouraDailySummary.userId, userId))
+  // Before the delete, not after it: a pass that computed nothing must not erase what is stored.
   if (rows.length === 0) return
-  await db.insert(s.ouraDailySummary).values(rows.map(r => summaryRowValues(userId, r)))
+  const values = collapseOnConflict(rows.map(r => summaryRowValues(userId, r)), r => r.date)
+  await db.transaction(async tx => {
+    await tx.delete(s.ouraDailySummary).where(eq(s.ouraDailySummary.userId, userId))
+    await tx.insert(s.ouraDailySummary).values(values)
+  })
 }
 
 /** Window-scoped upsert (on the unique (user_id, date)): rewrites only the given days in place,

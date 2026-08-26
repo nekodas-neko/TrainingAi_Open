@@ -24,8 +24,19 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.382.1 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Version:** v1.382.2 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-08-26.
+
+**A full-history rebuild that computed nothing wiped the history and reported success (Q-528).**
+`replaceOuraDailySummary` deleted every one of the user's summary rows and only *then* returned
+early on an empty input. Two more of the same class were in the same seven lines and are fixed with
+it: the delete and insert were **separate statements**, so a rejected insert left the delete
+committed; and the insert had **no `ON CONFLICT` arm**, so one repeated date raised 23505 and
+rejected every row — Q-280's shape under a different SQLSTATE. It now matches
+`replaceDaytimeStressBuckets`, which already had all three right. **All three were reproduced against
+Postgres before being fixed** — the entry admitted its mechanism was read rather than measured, and
+its predecessor had already been retracted once for exactly that. Still latent: only the
+hand-triggered redecode reaches it.
 
 **One duplicate in a batch discarded the whole batch, at eight write sites (Q-280).** Postgres aborts
 an entire command whose VALUES list hits the same `ON CONFLICT` row twice — nothing lands, not just

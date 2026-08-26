@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.382.2",
+    date: "2026-08-26",
+    changes: [
+      "Closed a way the app could have thrown away your whole sleep-and-recovery history. Rebuilding that history from scratch is a manual action, and if the rebuild found nothing to write \u2014 a bad decode, too narrow a range \u2014 it cleared the stored history first and then quietly did nothing, reporting success. It now leaves what is stored alone unless it has something to replace it with, and the clear-and-rewrite happens as one step, so a rebuild that fails partway can no longer leave you with an empty history. Nothing you see changes; this had not happened.",
+    ],
+  },
+  {
     version: "1.382.1",
     date: "2026-08-26",
     changes: [
