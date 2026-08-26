@@ -387,8 +387,14 @@ tuple makes a shared-table write a *compile error*, which is stronger than anyth
   firmware update it offers**, then uninstall it.
 - **🔎 ROOT CAUSE, 2026-08-26 — every write was ASCII, never bytes (§11e).** The nRF Connect log shows
   `Data written to 6e400002…, value: (0x) 30-33-30-30-…-33` — that is the 32-character *string*
-  `"0300…03"` sent as 32 ASCII bytes, not the 16 binary bytes. The write dialog was on **TEXT**
-  format instead of **BYTE ARRAY**. **No valid command was ever sent**, so every hypothesis tested
+  `"0300…03"` sent as 32 ASCII bytes, not the 16 binary bytes. **And it was not a missed setting (§11e-d):** the ring reuses
+  **Nordic UART Service's exact characteristic UUIDs** (`6e400002`/`6e400003`) under its own service
+  UUID, so nRF Connect matches the NUS profile, labels them "RX/TX Characteristic", and gives that
+  characteristic a **text-only write dialog with no format selector at all** — while the unrecognised
+  `de5bf72a` gets the full BYTE ARRAY picker. **nRF Connect structurally cannot send binary to the
+  characteristic this ring needs**, which is exactly `CHARACTERISTIC_WRITE` in Gadgetbridge. Writing
+  to `de5bf72a` instead does not substitute — that is the V2 big-data channel and wants
+  `0xbc`/type/length/CRC16 framing, not a raw command. **No valid command was ever sent**, so every hypothesis tested
   against the silence was tested against a null input. The tell was on screen for hours: nRF prefixes
   a byte-array value with `(0x)` and a text value with nothing.
 - **The ring was talking the whole time (§11e-b).** Notifications on TX decode cleanly against

@@ -679,7 +679,50 @@ rounds of protocol theory were built on a Value field that was hiding both the o
 incoming data. Every result those rounds produced came from reading other people's source code, not
 from the device.
 
-### 11e-d. The fix, and the next probe
+### 11e-d. Why the writes were ASCII: nRF Connect cannot send binary to this characteristic
+
+**Not a missed setting — a UUID collision with Nordic's own UART profile.**
+
+| | Nordic UART Service (NUS) | Colmi R09 |
+|---|---|---|
+| Service | `6E400001-B5A3-F393-…` | **`6e40fff0-b5a3-f393-…`** (different) |
+| Write char | `6E400002-B5A3-F393-…` | **`6e400002-b5a3-f393-…`** (identical) |
+| Notify char | `6E400003-B5A3-F393-…` | **`6e400003-b5a3-f393-…`** (identical) |
+
+The ring reuses **Nordic's exact characteristic UUIDs** under its own service UUID. nRF Connect
+matches on the *characteristic*, decides this is NUS — a **text** transport — and applies its UART
+profile. Consequences, all visible on screen:
+
+- It labels them **"RX Characteristic" / "TX Characteristic"** (NUS's own names), while
+  `de5bf72a`/`de5bf729` are **"Unknown Characteristic"**.
+- The write dialog for `6e400002` has **no `0x` prefix and no format dropdown at all** — text only.
+- The dialog for `de5bf72a` has the `0x` prefix and the full BYTE ARRAY / TEXT / UINT selector.
+
+**So every V1 write was UTF-8 because nRF Connect offers no other option there.** And the required
+target is exactly that characteristic: Gadgetbridge's `requestBatteryInfo()` builds its packet and
+calls `sendWrite`, which resolves `CHARACTERISTIC_WRITE` = `6e400002`.
+
+**nRF Connect therefore cannot complete this test.** Writing the same bytes to `de5bf72a` does not
+substitute: that is the V2 big-data channel, which expects the `0xbc`/type/length/CRC16 framing of
+§4a, not a raw 16-byte command — which is why the byte-array `03-00-…-03` written there also drew
+no response.
+
+**This is a debugging-tool gotcha, not an implementation problem.** `@capacitor-community/bluetooth-le`
+(§5) writes a raw `DataView` and has no profile layer, so the app's own path is unaffected. Worth
+recording so the next person who reaches for a GATT explorer on this ring does not lose an evening
+to it.
+
+### 11e-e. Where to go instead
+
+Both bypass the profile layer entirely:
+
+1. **The Web Bluetooth client (§11f), first.** Chrome on the S25, `writeValue()` on a raw
+   `Uint8Array`, no profile interference — **and it is the same transport family the app itself
+   will use**, so a success there is a direct signal about our own path rather than about a
+   third-party tool.
+2. **Gadgetbridge**, as the reference client with first-class `R09_.*` support.
+
+### 11e-f. Packets to send, once a tool that can send bytes is in hand
 
 In nRF Connect's **Write value** dialog, set the format dropdown to **BYTE ARRAY** (not TEXT), then
 resend on V1 write `6e400002`, notifications enabled on `6e400003`:
