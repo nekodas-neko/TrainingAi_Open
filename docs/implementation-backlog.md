@@ -6515,7 +6515,14 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 ### [platform][app-shell] Q-294 — the failure cells whose intended behaviour is undefined
 
 - **Branch:** folded into Q-249's E2E scenario list — **no branch of its own**
+- **Gate:** owner
 - **Plan:** none · **this is a note against Q-249, not independent work**
+- **Why the gate, added 2026-08-26:** this sat at READY #3 of Lane A's queue while its own body says
+  *"Do not start this as a standalone item"*. It is not startable and it never was — each of the four
+  cells needs a decision on intended behaviour before a test can assert anything, and that decision is
+  the owner's. `Gate: owner` is the field that says so, so the queue tool stops offering it. (The
+  broader "notes should leave READY" sweep is still the Orchestrator's; this is the one-line truth
+  until then.)
 - **Added:** 2026-08-15 · from the uncovered-lenses review §6
 - **Filed only so it is not lost** (*No orphaned findings*). The degradation matrix was a **desk
   exercise — no failure was induced**, and a desk-derived list is a weaker artefact than the same
@@ -7445,35 +7452,57 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   to 683 — **the estimated bedtime reads ~23 minutes later for two weeks**. `nightSessions()` cannot
   help: it reassembles a night split by a wake-up (Q-76) and needs an earlier fragment, which does not
   exist when the ring was off.
-- **The design (owner's proposal, and better than a flag alone).** `lib/data/health-source.ts` merges
-  **per field, not per row** — its own comment: *"a manual weight must not stop the ring's HRV … from"*
-  being kept. `manual` is rank 5, `oura_ble` rank 3. So writing **only `sleep_start`** at `manual`:
-
-  | column | source after | value |
-  |---|---|---|
-  | `sleep_start` | **manual (5)** | the real bedtime |
-  | `duration_hours`, `efficiency`, `average_hrv_ms`, `lowest_heart_rate`, `respiratory_rate` | oura_ble (3) — **untouched** | as measured |
-
-  **No new schema, no new merge logic.**
-- **⚠️ THE INVARIANT THIS RESTS ON.** `duration_hours`, `time_in_bed_hours` and `efficiency` are
-  **stored columns, not derived from `sleep_end − sleep_start`.** That is the *only* reason this is
-  safe. **If anyone later recomputes duration or efficiency from the span, this silently produces a
-  9-hour night at 34% efficiency.** Say so in a comment beside the write.
-- **Manual bedtime writes `sleep_start` and NOTHING else** — not duration, not efficiency, not a
-  synthesised `sleep_end`.
+- **⛔ THE ORIGINAL DESIGN IS FALSIFIED — read this before building.** It proposed writing **only
+  `sleep_start`** at `manual` rank (5), leaning on the per-field merge in `lib/data/health-source.ts`
+  to leave the measured columns at `oura_ble` (3), and rested on an invariant: *"`duration_hours`,
+  `time_in_bed_hours` and `efficiency` are stored columns, not derived from `sleep_end − sleep_start`
+  … if anyone later recomputes duration or efficiency from the span, this silently produces a 9-hour
+  night at 34% efficiency."* **Something already does.** The audit this entry commissioned was run
+  2026-08-26 —
+  [`docs/reviews/2026-08-26-manual-bedtime-write-audit.md`](reviews/2026-08-26-manual-bedtime-write-audit.md):
+  - **`aggregateNight` recomputes both** (`sleep-night.ts:225`): `timeInBed = last.sleepEnd −
+    first.sleepStart`, `efficiency = totalSleep / timeInBed`. On the owner's own night that is
+    9.05 h and **34%** — the warning's number, exactly. Guarded only by a single-window fast path,
+    so it fires on a **fragmented** night, and Q-274 measures ten fragment rows in production.
+    Reached by seven consumers through `nightSessions`.
+  - **The daytime-HRV model trains on window membership** and is fed from **stored** rows
+    (`adapter.ts:5304` → `extractNightlyTrainingSamples`), so five awake hours would enter the
+    *nightly* training set. **No fragmentation needed.** That fit feeds daytime-stress, which feeds
+    resilience — already open as Q-507/Q-508/Q-510.
+  - **`primaryCluster` unions rows within 1 h of the window** (`merge-sessions.ts:41`), so widening
+    the start can pull in an evening fragment — the "7:40 pm bedtime" bug that function prevents.
+  - Also, smaller: `sleep-score.ts:390` feeds `sleepStart` into `habitualBedHour`, and
+    `/api/oura/hr-day` would shade five unobserved hours as asleep.
+  - **Checked and NOT affected:** `stress-resilience.ts:104` uses the same window test but its
+    windows come from the rollup's own freshly-built rows, never from storage.
+- **Build this instead: a nullable `manual_sleep_start` on `sleep_sessions`**, read by the bedtime
+  estimate (and any display that wants it) and by **nothing else**. It delivers the owner's stated
+  outcome — *"I don't want it to change estimated bed time values"* — while the measured window stays
+  measured, and every consequence above disappears because none of those consumers reads the new
+  column. It costs the migration the entry ruled out; that ruling was made on the belief the merge
+  made one unnecessary. **The merge exists to let a better *measurement* of the same quantity win; a
+  remembered bedtime is a different quantity, and sharing a column with the observed one is the whole
+  cause.** Reversal cost stays low: one nullable column, one reader.
+- **Shape (Lane A owns all of it):** migration for the column · `schema.ts` · repo write + read
+  mapping · `claude_ro` view regen · local SQLite column + `RECONCILE_COLUMNS` + version bump · sync
+  delta/pull/push · an ingest route · `bedtime-estimate` reading `manualSleepStart ?? sleepStart`.
+  The UI half is **Lane B's**.
+- **Manual bedtime writes the new column and NOTHING else** — not `sleep_start`, not duration, not
+  efficiency, not a synthesised `sleep_end`.
 - **What it does not fix:** the 3h 5m still reaches the sleep score, readiness's `previousNight`
   contributor, resilience's `sr`, and the Body Battery anchor. That is Q-520, deliberately separate.
-- **Before relying on it, prove the merge with a test** — that writing `sleep_start` at `manual` leaves
-  `average_hrv_ms` at `oura_ble`. This review read that behaviour from the source and its comments and
-  **did not demonstrate it**. Also **audit whether any consumer recomputes duration/efficiency from the
-  span**; that audit is part of this item, not a finding of the review.
+- **✅ The commissioned audit is done** (2026-08-26, above). The merge-behaviour test it also asked for
+  is moot under the corrected design — nothing is merged into a measured column any more, so there is
+  no rank interaction left to demonstrate.
 - **Reversal cost:** low — it is one column written by one new path.
 
 ### [sleep] Q-520 — a partial-night flag, so an unworn night stops distorting the scores
 
 - **Branch:** `feat/partial-night-flag`
+- **Needs:** Q-519
 - **Plan:** none yet. **Do Q-519 first** — it removes the timing noise, and whether this is worth
-  building is easier to judge afterwards.
+  building is easier to judge afterwards. (That ordering was prose until 2026-08-26; it is a field now,
+  so the queue tool parks this instead of offering it above its own prerequisite.)
 - **Added:** 2026-08-19 · Tuning agent ·
   [`docs/reviews/2026-08-19-partial-night-manual-bedtime.md`](reviews/2026-08-19-partial-night-manual-bedtime.md) §4
 - **The problem Q-519 leaves behind.** A genuinely-measured-but-incomplete night reads as a bad night
