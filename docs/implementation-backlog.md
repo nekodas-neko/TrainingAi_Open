@@ -351,6 +351,170 @@ below threshold and left in place for next time.
 > BF-29 (My meals), BF-30 (Meal detail), BF-31 (Edit meal) and BF-26 (Quantity). Two artboards need
 > no entry — `Tap targets` and the `srv/g` studies both shipped in Q-395a.
 
+### [nutrition] BF-37 — My Foods merged saved meals with the food library; they are two different kinds of thing
+
+- **Lane:** B
+- **Added:** 2026-08-26 · owner, on v1.382.0: *"my foods combined saved meals + history thats not
+  right they are 2 seperate things."*
+- **This reverses the merge Q-395c shipped**, not the rename. Read
+  [`2026-08-26-one-food-list`](overview/entries/2026-08-26-one-food-list.md) before starting — it
+  deleted `food-library-sheet.tsx`, built `components/nutrition/food-list.tsx` over two sources, and
+  swept the naming across 8 files.
+
+**⚠ The original complaint was about NAMES, and the merge answered it by deleting one of the two
+things.** Q-395c was specified from the owner's own earlier question — *"So im picking up a
+discrepancy between My Meals and My foods? Whats the difference"* — and read it as *these are one
+list wearing two names*. Re-read against today's report, it says something narrower: **two lists with
+confusingly similar names, and no way to tell which held what.** The fix was to name them so the
+difference is obvious. It was not to merge them.
+
+That distinction is the whole entry, and it is worth stating rather than recording this as the owner
+changing their mind. **They are genuinely different kinds of thing:**
+
+| | Saved meal | Food item |
+|---|---|---|
+| What it is | a composition you built — ingredients, a batch, a per-portion figure | one ingredient with a serving size |
+| Where it comes from | you assembled and saved it deliberately | it appeared because you logged it once |
+| Logging it means | log the whole thing | pick a quantity of one thing |
+
+**A composed recipe and a raw ingredient sitting in one list makes "log this" ambiguous** — which is
+what the merged list now asks the owner to disambiguate on every tap.
+
+**Evidence in the owner's own screenshot, unreported:** `LOADED MAC & CHEESE / CORE POWERFOODS /
+350 g` appears **twice** in a 24-item list. That is **BF-38** (`food_items` duplicates on re-log,
+19 of 209 rows) rather than a merge artefact — but the merged list is where it becomes visible and
+annoying, and the two should be looked at together.
+
+**Keep what Q-395c got right — do not revert the PR wholesale:**
+- **The naming sweep.** One name per list, and the two names must be tellable apart at a glance.
+  *My Foods* and *My Meals* were the confusing pair; pick names that say composition vs ingredient.
+- **`food-list.tsx`'s two-source design.** Its own journal says it is *"one list over two sources,
+  not one shape over a merged type — a food row opens the assign step, a meal row opens its own
+  screen"*. The separation already exists inside the component; what changed is that both render in
+  one scroll. Splitting the presentation should not mean rewriting it.
+- **LB-17, the three-deep back-dismiss fix.** Unrelated to the merge and hard-won — see the journal.
+  Do not lose it.
+
+- **Decide the shape and say which you chose:** two tabs in one sheet, two tiles on the Log Food
+  screen (which is what `capture-step.tsx` had before Q-395c collapsed them), or two sheets. **Two
+  tiles is the cheapest and is what the owner was using before**; artboard 2 draws four tabs and
+  BF-28's rule 2 says an owner decision beats the drawing.
+- **⚠ Check the `MRU` note before changing ordering.** `food_logs` carries no `saved_meal_id`, so a
+  saved meal has **no last-used timestamp at all** and `createdAt DESC` is the only shared signal.
+  True most-recently-used needs a column that does not exist — Lane A's, and out of scope here.
+- **Verification.** Both lists reachable, each showing only its own kind, names distinguishable
+  without reading the rows. Then the three-deep back gesture again, since that path changes.
+  `Gate: device`.
+
+### [nutrition] BF-38 — logging the same food twice creates a second `food_items` row: 19 of 209 are redundant
+
+- **Lane:** A — the matching happens at creation, in the route and the shared create path.
+- **Added:** 2026-08-26 · BugFix, from the owner's My Foods screenshot. **Not reported** — it was
+  visible in the picture sent about something else: `LOADED MAC & CHEESE / CORE POWERFOODS / 350 g /
+  672 kcal` appears **twice in a 24-item list**.
+
+**Measured against production 2026-08-26:**
+
+| Measure | Value |
+|---|---|
+| `food_items` rows (owner's) | **209** |
+| Distinct `name` + `brand` | **190** |
+| **Redundant rows** | **19 — 9% of the catalogue** |
+| Worst offenders | `Mandarin` ×4 · `Mini Pretzels BBQ Pizza Aussie Animal` (Parker's) ×3 · `LOADED MAC & CHEESE` (CORE POWERFOODS) ×3 |
+
+**By source, which is where the fix is:**
+
+| `source` | Names with duplicates | Rows involved |
+|---|---|---|
+| `ai` | **14** | 32 |
+| `barcode` | 1 | 2 |
+| `text` (OFF name search) | 0 | — |
+
+**The `barcode` case is the unambiguous one and the place to start.** A barcode is an exact product
+identity and `food_items` carries the column — so re-scanning a product the catalogue already holds
+should reuse the row, and does not. One pair today, but it is the case with a definitively correct
+answer, and fixing it needs no judgement about what "the same food" means.
+
+**The `ai` case needs a matching rule, and that rule is the actual design work.** A model naming the
+same food twice will not produce byte-identical strings, so exact match is too strict and fuzzy match
+risks collapsing *Greek Yogurt Plain* into *Greek Yogurt Vanilla* — which silently corrupts the
+macros of every past log pointing at the survivor. **Prefer under-merging to over-merging**, and say
+in the PR which rule was chosen and what it deliberately does not catch.
+
+**Why it is worth fixing rather than tolerating at 9%:**
+- **It is the visible defect in a list the owner is already unhappy with** (BF-37) — a 24-item list
+  showing the same product twice reads as broken regardless of how the list is organised.
+- **It multiplies BF-35's spend.** That entry generates an image per food item; three rows for one
+  mac and cheese is three generations, three stored images, and three different-looking pictures of
+  the same product in one list.
+- **It quietly inflated this session's own retention measurement.** The "209 food items" behind the
+  BF-35 storage estimate is really **190 foods and 19 accidents**.
+
+- **⚠ Do NOT clean up history with a merge migration in this entry.** `food_logs.food_item_id` is
+  `ON DELETE RESTRICT`, so collapsing duplicates means re-pointing every log at the survivor first —
+  and if the matching rule is wrong, that rewrites what the owner ate. **Stop the creation first,
+  live with the existing 19, and make de-duplicating history a separate decision** once the rule has
+  been shown correct on new writes.
+- **Verification.** Scan the same barcode twice → one row. Log the same food by AI description twice
+  → one row, and a deliberately similar-but-different food → two. Then confirm past logs still
+  resolve to the right item.
+
+### [nutrition] BF-39 — a logged meal stops being a meal: `food_logs` has no `saved_meal_id`, and three symptoms trace to that
+
+- **Lane:** A — a migration plus the write path; the diary rendering is B and follows.
+- **Added:** 2026-08-26 · owner: *"the meal is a complete in 'saved meal' and it can have a picture
+  etc. but when adding it to the log; its broken down into its components so the image wont transfer
+  over. not sure what the best way around this would be. maybe it needs to stay as a whole item."*
+
+**The owner's instinct is right, and the missing piece is already documented elsewhere as a
+different problem.** Logging a saved meal writes one `food_logs` row per ingredient and **nothing
+records that they came from a meal**. `food_logs` carries `food_item_id` and no `saved_meal_id`, so
+the moment a meal is logged its identity is gone.
+
+**Three symptoms, one cause — which is what makes this worth fixing rather than patching:**
+
+| Symptom | Where it was noticed |
+|---|---|
+| The meal's photo cannot follow it into the diary | **here**, the owner's report |
+| A saved meal has **no last-used timestamp at all**, so My Foods can only order by `createdAt DESC` | Q-395c's journal, filed as a constraint rather than a defect |
+| The diary shows five ingredients where the owner ate one thing | implied by both |
+
+Q-395c's journal already says it: *"`food_logs` carries no `saved_meal_id`, so a saved meal has no
+last-used timestamp at all … True MRU needs a column that does not exist — Lane A's to add."* **That
+is this column.** Adding it for MRU alone would be under-selling it.
+
+**Two shapes, and the choice is the entry's real content:**
+
+1. **Stamp the ingredients.** Keep one row per ingredient, add a nullable `saved_meal_id` (plus a
+   per-log group id, so two servings of the same meal on one day stay distinct). The diary groups
+   rows that share it and renders the meal's name and photo over them.
+   - **Keeps** every macro total, every per-ingredient edit, and every existing query working
+     unchanged — a log row is still a log row.
+   - **Costs** grouping logic on every diary read.
+2. **Log the meal as one row.** What the owner reached for — *"maybe it needs to stay as a whole
+   item"*.
+   - **Keeps** the diary trivially correct: one thing eaten, one row, one photo.
+   - **Costs** a second shape in `food_logs`: a row that points at a meal rather than a food item,
+     which every reader, the sync delta, the local mirror and the macro sums must now handle. And
+     editing one ingredient of a logged meal stops being possible without decomposing it anyway.
+
+**Recommended: (1).** It is additive — a nullable column and a grouping pass — where (2) changes what
+a `food_logs` row *is*, and this table is read by the diary, the energy balance, the adaptive-TDEE
+window, the sync delta and the local store. **The owner's phrasing asks for the outcome, not the
+storage**: "stay as a whole item" is satisfied by the diary *showing* one grouped item, which (1)
+delivers without a second row shape.
+
+- **⚠ Sequencing against BF-35.** BF-35 fills the food tile with images; a meal's photo reaching the
+  diary needs this column first. If BF-35 lands first the meal rows simply show ingredient images —
+  correct, not broken — so this is an ordering preference, not a `Needs:`.
+- **⚠ The full offline-first chain applies**, per CLAUDE.md: local table column = server payload =
+  `getSyncDelta` output = `pullDelta` mapping = `applyDelta` upsert columns = the `pushMutations`
+  branch. A new nullable column on a synced table is exactly where that chain gets half-done.
+- **Verification.** Log a saved meal with a photo: the diary shows one grouped entry with the meal's
+  name and picture, the day's macro total is unchanged from before, and a single ingredient inside it
+  can still be edited and deleted. Then the same on a second serving of the same meal on the same
+  day — they must not merge into one.
+
 ### [app-shell][nutrition] BF-34 — the dialog that closed on the frame it opened (shipped v1.383.1)
 
 - **Lane:** B
@@ -11633,6 +11797,20 @@ maths at all, just a stored value and a precedence rule.
 `manual(5) > scale_ble(4) > oura_ble(3) > oura_cloud(2) > health_connect(1)`. A DEXA is a clinical
 measurement and outranks all of them; adding a source is a code change in that file **plus** the
 inlined SQL `CASE` at line 45 — both must move together or the SQL and TS ladders diverge.
+
+**⏰ THE SCAN IS 2026-08-27, AND ONE THING MUST HAPPEN ON THE DAY OR THE CALIBRATION CANNOT BE BUILT
+LATER.** Owner: *"Will need to get the dexa matched with the same days renpho scale measurement so we
+can calibrate our scale by the dexa scan."* Exactly right, and it is the only irreversible part:
+
+- **Take a Renpho reading the same day, as close in time to the scan as practical** — ideally both
+  fasted and before training, since BIA moves with hydration and a meal. That reading is one half of
+  the calibration pair and **cannot be reconstructed afterwards**; the DEXA figure can be typed in
+  any time, because the record is dated by when it was measured rather than when it was entered.
+- **Keep the DEXA report itself**, not just body-fat %. Fat mass, lean mass and bone mineral content
+  in kg are what let a later entry re-derive the pair if the stored percentage turns out to be
+  computed differently from the app's.
+- **The reading needs no app work.** `body_metrics` already records the scale over BLE; it is the
+  DEXA half that has nowhere to go yet, which is this entry.
 
 **Done looks like:** a DEXA reading (date, body fat %, and ideally lean/fat mass) can be entered; the
 app states the measured offset against the scale for the same period; corrected body fat feeds the
