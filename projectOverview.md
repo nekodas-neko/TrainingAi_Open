@@ -24,8 +24,20 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.381.2 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Version:** v1.381.3 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-08-26.
+
+**A window that made an ACWR impossible, and what it was really breaking (Q-512).** `health-insight`
+handed `computeVolumeAcwr` a **7-day** session list against a **21-day** span gate measured from the
+earliest session in that list — so ACWR was null on **110 of 110** replayed days, structurally rather
+than for want of history. **The entry's mechanism was right and its consequence was wrong:** the route
+never reads `.acwr`. It reads `typicalSessionVolumeKg`, the activity score's *volume-lane denominator*
+— which is **not** gated, so it always returned a number, a median over one week where every sibling
+uses four. Two heavy sessions in a quiet week set the bar. That also makes one of the entry's two
+proposed fixes unsafe: dropping the call would have removed the denominator. **And it was not the
+one-line fix it looked like** — widening the fetch silently turns `sessions7d`/`volume7dKg`, which the
+model reads as "this week", into 28-day figures, trading a visibly-absent null for a wrong number.
+They filter back explicitly. `minSpanDays` was not lowered.
 
 **A measured RMR has somewhere to go, and a rule for how it ages (BF-33, engine half).** The owner has
 a DEXA + RMR test booked and every resting rate the app used was *predicted*. Migrations **225** (a
