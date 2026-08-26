@@ -24,8 +24,20 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.383.3 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Version:** v1.383.4 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-08-26.
+
+**The Coach only swaps an exercise when asked, and says what a swap costs (Q-403).** The owner did
+not know the Coach's swap edits the **program** rather than today's workout, and did not want it once
+told. Offered remove / keep-and-warn / gate-on-injury, they chose a fourth thing: keep it, never
+volunteer it. The prompt now forbids an unprompted swap (mirroring the Deloads idiom), and the
+confirmation card states that it changes the named session from now on, that progression history on
+the outgoing lift stops advancing, and that a one-off change is the in-workout swap. **On the card,
+not the prompt** — this entry measured the prompt's existing ordering rule being ignored 3 of 3
+times. **The recommendation I gave was wrong and verifying it is what caught it:** the injury case is
+already handled by `injurySafeAlternatives` mid-workout, whose handler mutates local React state
+only, so gating a *permanent* edit on injury would have been the worst option. Q-403 stays queued for
+the sentence-ordering residual.
 
 **The app's load time is measured now (BF-19).** The owner reported it "VERY slowly lately" and asked
 for a second opinion; nothing could give one — the two existing timing endpoints measure **workout**

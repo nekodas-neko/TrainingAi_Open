@@ -3088,3 +3088,15 @@ the case being measured). The full reasoning, the mutation proof and the lane no
 
 The backlog shrank again (BF-19 removed, 61 lines) and is again left at its recorded number rather
 than re-ratcheted, for the reason given above on 2026-08-26.
+
+## 2026-08-26 — `projectOverview.md` → 8105 (+12), Q-403
+
+The Current Status paragraph for the Coach swap. Twelve lines because two of them exist to stop the
+next session repeating a mistake this one made: the recommendation given to the owner (gate the swap
+on injury) was **wrong**, and only verifying it before building caught that — `injurySafeAlternatives`
+already substitutes mid-workout without touching the program, so gating a permanent edit on injury
+would have been the worst of the options. A status line that recorded only the outcome would leave
+the next reader free to re-derive the discarded recommendation from the same reasoning.
+
+The rest is the decision itself, which is neither of the shapes the entry had carried since
+2026-08-18 and would otherwise be re-litigated from the entry's older prose.
