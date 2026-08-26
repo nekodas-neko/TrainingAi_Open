@@ -592,9 +592,24 @@ a large glyph and a `Photo` button on it.
 - **Lane:** B
 - **Spec:** BF-28.
 - **Added:** 2026-08-25, owner: the nutrition screens match their drawings.
-- **Shipped counterpart:** the builder — `assign-step.tsx`, `review-step.tsx`, `ingredient-picker.tsx`.
-  Q-395a already converted its ingredient rows to the shared `FoodRow` and deleted `ingredient-row.tsx`,
-  so the **rows** are done and this entry is the frame around them.
+- **⚠ Shipped counterpart — CORRECTED 2026-08-25, the entry named the wrong files.** `assign-step.tsx`
+  and `review-step.tsx` belong to `food-logger-sheet.tsx`, the **scan / Log Food** flow; neither is
+  reachable from Edit Meal. The real counterpart is **`saved-meals-sheet.tsx`'s `tab === 'build'`**
+  (`ingredient-picker.tsx` is correct, and is rendered from there). Q-395a already converted its
+  ingredient rows to the shared `FoodRow` and deleted `ingredient-row.tsx`, so the **rows** are done
+  and this entry is the frame around them.
+- **Both "first things to check" are answered — neither is a behaviour change.** (a) The builder
+  **does** show batch kcal and the P/C/F split live while ingredients are edited: a `bg-brand/10`
+  card sits inline in the ingredient list, with a `One portion — what gets logged` block beneath it
+  when servings ≠ 1. So the footer is a **restyle** — pin that block above `Save meal` instead of
+  letting it scroll away mid-list, colour `66 P · 48 C · 13 F` with `MACRO_COLORS`, and put the
+  per-portion figure on the same line as `278 / portion`. (b) Renaming costs **no** separate sheet:
+  the name is a labelled `<Input>` in the body beside the photo tile, and the `SheetTitle` already
+  mirrors it with `Makes N portions · X kcal each` beneath (Q-395a). Artboard 5 moves that input
+  *into* the header behind a pencil and drops the standalone field.
+- **Still genuinely different:** `+ Add ingredient` / `+ Add a photo` are drawn as two affordances at
+  the **end of the list**; shipped, `IngredientPicker` is a persistent search block and the photo is a
+  tile at the top beside the name.
 - **What artboard 5 draws:** a header carrying the meal name **inline-editable** (a pencil beside it)
   with `Makes 2 portions · 278 kcal each` beneath; an `Ingredients` section headed `whole batch`, each
   row `name · "60 g" · calories · [chevron]`; then **`+ Add ingredient`** and **`+ Add a photo`** as
@@ -1241,36 +1256,6 @@ whether or not anyone draws them first.
 Both device gates passed and both entries closed. Four findings came out of the answers rather
 than the checks: two are nutrition-screen work and sit in the section above (BF-24, BF-26); these
 two are app-wide and sit here.*
-
-### [app-shell][platform] BF-25 — pin the app to dark: `forcedTheme="dark"`, palette kept
-
-- **Lane:** B
-- **✅ DECIDED BY THE OWNER 2026-08-25** — *"yes lets keep it as forced dark mode. then we need to
-  only make one UI/design"*. The `Gate: owner` is cleared; this is now ordinary implementation work.
-- **The standing consequence is already in `CLAUDE.md`** → *Visual consistency & theme*, the dark-only
-  rule. Read it before starting: it is what future sessions bind to, and it draws the one distinction
-  that matters — **theme is pinned, accent is not.** `data-brand` is still user-picked, so hex
-  literals are still a defect and `check-hex-literals.js` still ratchets them.
-
-**The change, and its two halves — only the first ships.**
-
-- **DO:** `forcedTheme="dark"` on the `ThemeProvider` in `app/layout.tsx:140` (currently
-  `defaultTheme="system" enableSystem`). One line. After it, no OS setting and no auto-scheduled
-  night mode can produce a light render. Reversing it is deleting the prop.
-- **DO NOT:** delete the light palette — the `:root` block in `globals.css` (`.dark` overrides it),
-  the `resolveColor` scheme pairs, `HERO_GRADIENTS`, `lib/background/screen-palettes.ts`, and the
-  `resolvedTheme` reads in `weekly-nutrition-chart.tsx` and `detail-hero.tsx`. Dead CSS custom
-  properties are not paid for at runtime. Deleting them is a wide hand-verified sweep whose only
-  benefit is tidiness, and it is the half that cannot be undone.
-- **⚠ Check one thing before shipping even the one-liner.** Three components document depending on
-  `next-themes` stamping `.dark` on `<html>` **synchronously, before React hydrates**. Confirm that
-  still holds under `forcedTheme` rather than assuming — if it does not, a page-root surface flashes
-  on every navigation, which is the exact bug this is supposed to close.
-- **Verification.** Put the S25 in light mode and confirm the app stays dark end to end. Then check
-  the surfaces the provider cannot reach — the icon routes, which have no CSS, and any canvas paint.
-  `Gate: device`.
-- **What it buys immediately:** every "verify in both themes" gate in this repo collapses to one, and
-  every artboard and mockup from here is drawn dark only.
 
 ### [app-shell] BF-27 — the back gesture now closes every sheet and dialog; nobody has pressed it on the phone
 
