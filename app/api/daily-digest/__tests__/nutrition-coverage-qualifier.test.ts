@@ -45,6 +45,7 @@ vi.mock('@/lib/data', () => ({
     listExerciseLibrary: async () => [],
     getWorkoutSessionsFrom: async () => [],
     getAiHealthInsightWithHash: async () => null,
+    listAiHealthInsightsForDate: async () => [],
     upsertAiHealthInsight: async () => {},
     listFoodLogsSummary: async (_userId: string, from: string, to: string) => {
       foodLogsSummaryWindow = { from, to }

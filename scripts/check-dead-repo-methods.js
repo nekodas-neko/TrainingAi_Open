@@ -87,14 +87,25 @@ function findDead(interfaceSrc, texts, implFile = IMPL_FILE) {
   return { names, dead }
 }
 
-function trackedSourceFiles() {
-  return execSync('git ls-files "*.ts" "*.tsx"', { encoding: 'utf8' })
+/**
+ * Every source file in the WORKING TREE, tracked or not.
+ *
+ * `git ls-files` alone was wrong, and wrong in the one way that matters: it cannot see an untracked
+ * file, so adding a repository method and its first caller in the same change reported the method as
+ * dead until the caller happened to be staged. That is precisely the workflow this check exists to
+ * support, and a guard that fails on correct code is a guard somebody deletes (LA-32 — hit while
+ * shipping Q-291's `listAiHealthInsightsForDate`, whose caller was a new file).
+ *
+ * `--cached --others --exclude-standard` = tracked plus untracked, minus anything gitignored.
+ */
+function sourceFileList() {
+  return execSync('git ls-files --cached --others --exclude-standard "*.ts" "*.tsx"', { encoding: 'utf8' })
     .trim().split('\n').filter(Boolean)
 }
 
 function main() {
   const interfaceSrc = fs.readFileSync(INTERFACE_FILE, 'utf8')
-  const texts = trackedSourceFiles().filter(f => f !== INTERFACE_FILE).map(f => {
+  const texts = sourceFileList().filter(f => f !== INTERFACE_FILE).map(f => {
     try { return [f, fs.readFileSync(f, 'utf8')] } catch { return [f, ''] }
   })
   const { names, dead } = findDead(interfaceSrc, texts)
@@ -133,4 +144,4 @@ BASELINE in ${__filename.split('/').pop()} with the reason.`)
 
 if (require.main === module) main()
 
-module.exports = { findDead, BASELINE }
+module.exports = { findDead, BASELINE, sourceFileList }

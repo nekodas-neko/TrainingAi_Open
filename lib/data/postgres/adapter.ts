@@ -3374,6 +3374,21 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     return row ?? null
   }
 
+  /**
+   * Every insight already written for this user on this day, so one AI surface can see what another
+   * has said (Q-291). Ordered by section for a stable prompt — an unordered read would change the
+   * caller's context hash on row order alone and regenerate an unchanged insight.
+   */
+  async listAiHealthInsightsForDate(userId: string, date: string): Promise<{ section: string; insight: string }[]> {
+    return this.db.select({ section: s.aiHealthInsights.section, insight: s.aiHealthInsights.insight })
+      .from(s.aiHealthInsights)
+      .where(and(
+        eq(s.aiHealthInsights.userId, userId),
+        eq(s.aiHealthInsights.date, date),
+      ))
+      .orderBy(s.aiHealthInsights.section)
+  }
+
   async upsertAiHealthInsight(userId: string, section: string, date: string, insight: string, contextHash?: string): Promise<void> {
     await this.db.insert(s.aiHealthInsights)
       .values({ userId, section, date, insight, contextHash: contextHash ?? null })

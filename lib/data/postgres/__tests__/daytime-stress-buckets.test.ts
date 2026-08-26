@@ -13,7 +13,12 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 
 const canRun = !!process.env.DATABASE_URL
 const TEST_USER_ID = '00000000-0000-4000-8000-0000000005e2'
-const OTHER_USER_ID = '00000000-0000-4000-8000-0000000005e3'
+// NOT ...05e3: that id is `daily-summary-incremental.test.ts`'s only test user, and the cleanup
+// below DELETEs it. Vitest runs files in parallel workers against one shared local database,
+// so this file's afterAll could land between that file's beforeAll insert and its first query,
+// failing it on `oura_daily_summary_user_id_fkey` — a red run in a file neither PR touched.
+// Latent for as long as scheduling kept them apart; adding one unrelated test file surfaced it.
+const OTHER_USER_ID = '00000000-0000-4000-8000-0000000005f3'
 
 describe.skipIf(!canRun)('daytime stress buckets (TN-3a)', () => {
   let pool: import('pg').Pool
