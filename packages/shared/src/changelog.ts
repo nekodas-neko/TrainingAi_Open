@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.383.4",
+    date: "2026-08-26",
+    changes: [
+      "The Coach will no longer suggest swapping an exercise unless you ask it to. Swapping changes your program rather than just today's workout \u2014 it applies to every future run of that session and your progression history on the old lift stops advancing \u2014 and the confirmation now says so before you accept, and points you at the swap inside the workout for a one-off change.",
+    ],
+  },
+  {
     version: "1.383.3",
     date: "2026-08-26",
     changes: [

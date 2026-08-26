@@ -150,6 +150,18 @@ export const sessionExerciseHandler: DomainHandler = {
     const swap = patch.changes.find(c => c.field === 'exerciseName')
     const removal = patch.changes.find(c => c.field === 'removed')
 
+    // Q-403. The owner did not know this was a PROGRAM edit rather than a change for today, and
+    // said so plainly: "You dont want to be changing excercises during a program or you will lose
+    // progress for it". The card is where that has to be said — a prompt instruction is advisory
+    // and the model already ignores one of them 3 times out of 3, whereas this is rendered from the
+    // patch itself and cannot be forgotten. Named first so it is read before the detail below.
+    if (swap || removal) {
+      consequences.push({
+        kind: 'warn',
+        text: `Changes the ${row.sessionName} session itself, so it applies every ${row.sessionName} day from now on — not just today. Progression history on ${row.exerciseName} stops advancing. For a one-off change today, use the swap inside the workout instead.`,
+      })
+    }
+
     // A swap to a name the catalogue does not have creates it — say so before it happens, and say
     // what it will be recorded as training, because those muscles go on to drive deload weighting,
     // muscle recovery and volume ACWR.
