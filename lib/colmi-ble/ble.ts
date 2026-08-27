@@ -144,20 +144,19 @@ export async function syncColmiRing(opts: SyncOptions): Promise<ColmiSyncOutcome
 
   const autoPrefs: NonNullable<ColmiSyncOutcome['autoPrefs']> = {}
   const frameTags: Record<string, number> = {}
+  // The archival copy. Every frame, before any decoding — including the ones the decoders read
+  // fine, because "read fine" is a claim the bytes are what checks.
+  const rawFrames: { channel: 'v1' | 'v2'; tag: number | null; hex: string }[] = []
   const hrSubTypes: Record<string, { packets: number; samples: number }> = {}
   const unmappedHex: string[] = []
   let unmapped = 0
-  /** Answers that ARE understood, and mean "nothing to send". They decode to `unknown` because they
- *  carry no sample, and counting them as not-understood made a healthy sync report frames it could
- *  not read — which is the opposite of what the panel is for. */
-const SENTINEL_REASONS = new Set(['no activity history'])
-
-const MAX_UNMAPPED_HEX = 8
-
   const toHex = (b: Uint8Array) => Array.from(b).map(x => x.toString(16).padStart(2, '0')).join('')
 
-  const note = (bytes: Uint8Array, frame: ColmiFrame) => {
+  const note = (bytes: Uint8Array, frame: ColmiFrame, channel: 'v1' | 'v2' = 'v1') => {
     const tag = `0x${(bytes[0] ?? 0).toString(16).padStart(2, '0')}`
+    if (rawFrames.length < MAX_RAW_FRAMES) {
+      rawFrames.push({ channel, tag: bytes[0] ?? null, hex: toHex(bytes) })
+    }
     frameTags[tag] = (frameTags[tag] ?? 0) + 1
     if (frame.kind === 'heartRateLog') {
       const key = `s${frame.subType}`
@@ -192,7 +191,7 @@ const MAX_UNMAPPED_HEX = 8
     if (bigDataBuffer.length < declared + 6) return                 // more to come
     const whole = Uint8Array.from(bigDataBuffer)
     const decoded = decodeBigData(whole)
-    note(whole, decoded)
+    note(whole, decoded, 'v2')
     frames.push(decoded)
     bigDataBuffer = []
   }
@@ -269,7 +268,7 @@ const MAX_UNMAPPED_HEX = 8
     const res = await fetch('/api/colmi/samples', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
+      body: JSON.stringify({ ...payload, rawFrames }),
       cache: 'no-store',
     })
     if (!res.ok) {
@@ -298,6 +297,17 @@ const HR_ANCHOR_SAMPLES = 9
 const HR_CONTINUATION_SAMPLES = 13
 /** Used only until the header names the real one — the ring's own default is 5 minutes. */
 const HR_DEFAULT_INTERVAL_MINUTES = 5
+
+/** Answers that ARE understood, and mean "nothing to send". They decode to `unknown` because they
+ *  carry no sample, and counting them as not-understood made a healthy sync report frames it could
+ *  not read — which is the opposite of what the panel is for. */
+const SENTINEL_REASONS = new Set(['no activity history'])
+
+/** The route caps the array at 500; stop before it so an oversized sync loses the samples' own
+ *  request rather than being rejected whole. A sync sends about 66. */
+const MAX_RAW_FRAMES = 480
+
+const MAX_UNMAPPED_HEX = 8
 
 export interface ColmiPayload {
   readings: { kind: string; at: number; value: number; valueHigh?: number }[]

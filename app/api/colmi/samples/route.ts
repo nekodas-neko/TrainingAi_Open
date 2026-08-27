@@ -37,6 +37,15 @@ const BodySchema = z.object({
     stage: z.number().int().min(0).max(255),
     minutes: z.number().int().min(1).max(24 * 60),
   }).strict()).max(2000).optional(),
+  // The archival half. Sent alongside the decoded readings rather than on its own route, so a frame
+  // and the samples read out of it arrive in one transaction-shaped request and cannot diverge.
+  rawFrames: z.array(z.object({
+    channel: z.enum(['v1', 'v2']),
+    tag: z.number().int().min(0).max(255).nullish(),
+    // 16-byte v1 frames are 32 hex chars; a reassembled v2 frame is larger but bounded by the
+    // ring's own payload length field.
+    hex: z.string().regex(/^[0-9a-f]{2,4096}$/),
+  }).strict()).max(500).optional(),
 }).strict()
 
 // A sync can carry the ring's whole buffer, so the past window is generous; the future window is
@@ -114,9 +123,15 @@ export async function POST(req: Request) {
   }
 
   const repo = await getRepositoryAsync()
-  const [storedReadings, storedSleep] = await Promise.all([
+  // Raw frames are written UNFILTERED and unconditionally. Every filter above discards something,
+  // and what it discards is exactly what a later decoder fix needs to see.
+  const rawFrames = (parsed.data.rawFrames ?? []).map(f => ({
+    channel: f.channel, tag: f.tag ?? null, hex: f.hex,
+  }))
+  const [storedReadings, storedSleep, storedFrames] = await Promise.all([
     repo.insertColmiReadings(userId, readings),
     repo.insertColmiSleepSegments(userId, sleep),
+    repo.insertColmiRawFrames(userId, rawFrames),
   ])
 
   return NextResponse.json({
@@ -125,6 +140,6 @@ export async function POST(req: Request) {
     // both numbers a repeat sync looks identical to a broken one.
     received: { readings: parsed.data.readings?.length ?? 0, sleep: parsed.data.sleep?.length ?? 0 },
     accepted: { readings: readings.length, sleep: sleep.length },
-    stored: { readings: storedReadings, sleep: storedSleep },
+    stored: { readings: storedReadings, sleep: storedSleep, frames: storedFrames },
   })
 }
