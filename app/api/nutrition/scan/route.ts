@@ -9,6 +9,7 @@ import { perServing, sumIngredients, sanitiseNutrition } from '@trainingai/share
 import { extractRecipeJsonLd, extractReadableText, sliceAroundIngredients } from '@trainingai/shared/nutrition/recipe-parse'
 import { fetchPublicUrl, type SafeFetchFailure } from '@/lib/net/safe-fetch'
 import { z } from 'zod'
+import { scanImageKind, scanImagePrompt } from '@trainingai/shared/nutrition/scan-prompt'
 
 const REGION_CONTEXT: Record<string, string> = {
   AU: 'Assume products from Australian supermarkets (Coles, Woolworths, Aldi) where applicable.',
@@ -170,14 +171,17 @@ Rules:
       const userNote = typeof body.text === 'string'
         ? String(body.text).slice(0, 500).replace(/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/g, '').trim()
         : ''
-      const prompt = userNote
-        ? `Analyse this food photo. Additional context from user: "${userNote}". Return the nutrition JSON.`
-        : 'Analyse this food photo and return the nutrition JSON.'
+      // BF-40. An image is one of two different questions, and the per-request line is the only
+      // place that says which. The choice is a tested pure function because getting it wrong fails
+      // silently: dinner comes back as a recipe, or a recipe as one plated portion, and both read
+      // as plausible. Absent means 'plate', so every caller that predates BF-40 is unchanged.
+      const imageKind = scanImageKind(body.imageKind)
+      const prompt = scanImagePrompt(imageKind, userNote)
       result = await loggedGenerateObject(
         // `imageBuffer.byteLength` is the DECODED image, not the base64 the client sent — the wire
         // cost is ~4/3 of it. The decoded size is the honest one to store: it is what the upload
         // actually represents, and the base64 inflation is a constant anyone can apply.
-        { section: 'nutrition-scan', userId: session.user.id, fingerprint: { mode: 'image', note: userNote }, payloadBytes: imageBuffer.byteLength },
+        { section: 'nutrition-scan', userId: session.user.id, fingerprint: { mode: 'image', imageKind, note: userNote }, payloadBytes: imageBuffer.byteLength },
         () => generateObject({
           model: aiModel(),
           schema: ScanSchema,

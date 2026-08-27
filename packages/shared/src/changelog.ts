@@ -6,6 +6,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.390.0",
+    date: "2026-08-27",
+    changes: [
+      "Build a meal from a picture of a recipe. In the meal builder, tap \u201cBuild from a recipe picture\u201d and hand it a screenshot of an ingredient list \u2014 or a photo of the ingredients laid out \u2014 and every ingredient is added at its own weight and saved to your foods. This is for the case a link cannot cover: a search-results page that shows you the recipe but gives you nowhere to copy it from.",
+      "It asks how many the recipe makes rather than guessing. A picture never says, so assuming one portion would quietly multiply everything you logged from it \u2014 set the portions and watch the per-portion calories fall until the number looks right.",
+    ],
+  },
+  {
     version: "1.389.1",
     date: "2026-08-27",
     changes: [

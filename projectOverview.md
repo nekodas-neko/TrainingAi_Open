@@ -24,8 +24,14 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.389.1 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Version:** v1.390.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-08-26.
+
+**A recipe from a picture, and the prompt that assumed a plate (BF-40).** The route already took
+images; its prompt told the model to estimate a **plate** from a picture of a word list. One line
+served both acts, so rewording it would have made dinner read as a recipe, silently — the choice is a
+tested pure function now, absent means `plate`. The ⚠ four-fold yield error was already handled: an
+image returns `recipeYield: null`. ⚠️ Not device-verified; the model's reading is stubbed ([journal](docs/overview/entries/2026-08-27-recipe-screenshot-import.md)).
 
 **A test flake that was the service worker, not the component (PS-14).** The filed hypothesis — a
 remount discarding the typed query — was **wrong**, and testing it (a probe asserting the value
