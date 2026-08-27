@@ -364,6 +364,65 @@ below threshold and left in place for next time.
 hardware and has no test coverage by nature; everything under it is pure and covered. So this entry
 is the first real evidence either way, and it is a *measurement* task, not a build task.
 
+**FIRST RESULT, 2026-08-26 evening — the sync works and the night produced nothing.** The card
+showed all five switches on, battery 100%, and **"Read 1 samples"**. Confirmed against production:
+`colmi_readings` holds exactly one row, a battery reading; `colmi_sleep_segments` is empty. So the
+connection, the switch writes, the pref read-back, the ingest and the dedup all work end to end, and
+**no history came back at all**.
+
+Two causes remain and they are not distinguishable from what was captured:
+
+- **(A) There was nothing to sync.** The five switches are off from the factory; this sync is what
+  turned them on, and it enables *then* drains. If so, last night genuinely recorded nothing and
+  tonight is the first real night. Benign.
+- **(B) The history commands are not answering, or their answers are not being mapped.** The
+  weak counter-evidence for (A): steps come from the activity log (`0x43`), which is **not** gated by
+  those five switches, so some step history should have existed — though the ring spent most of
+  yesterday on a desk or a charger, so near-zero is also plausible.
+
+**The number that separates them was being collected and not shown.** `framesSeen` and a per-command
+tally now surface in the card under "Sync detail", with the raw hex of anything that did not decode.
+If a history command's tag is absent, the ring never answered it — a different problem from
+answering and failing to map. Also raised the drain window 12s → 30s, since the heart-rate log alone
+can be 24 packets and a drain that ends early looks exactly like a ring with no history.
+
+**SECOND SYNC, 21:02 — cause (A) confirmed, plus one real bug found.** Stored HRV 47, stress 31,
+**temperature 36.4 °C** and battery. All plausible, and the timing settles it: the switches were
+enabled at 20:48 and the first samples are stamped **21:00** — the ring's first 30-minute slot after
+being switched on. So there was genuinely nothing before, and it is recording now. `local_date`
+also resolved to 2026-08-27 for a 21:00 UTC sample, which is the right Brisbane day.
+
+**The bug: the heart-rate log request was a bare `0x15` and the ring ignored it.** Gadgetbridge
+sends `[0x15, <int32 LE>]` where the int is the day's LOCAL midnight expressed as though it were UTC
+(`millis + ZONE_OFFSET + DST_OFFSET`). HRV, stress and temperature take no argument and worked; this
+one does and returned silence rather than an error — which is exactly why HR was the only enabled
+metric with nothing to show. Fixed with `localDayStartSeconds()` and one request per day walking
+back from today, so a sync after midnight still collects the night that just ended.
+
+**Still outstanding after this fix, and expected rather than broken:** sleep and SpO2 need a night
+with the switches on (there has not been one yet); steps/calories/distance need the ring to have
+been worn and moving, and it has mostly sat on a desk or charger.
+
+**THIRD SYNC, 23:00 — steps, distance, calories and SpO2 all landed.** Stored across the three
+syncs: steps ×2 (485, 876), distance ×2 (328 m, 575 m), calories ×1 (1431), SpO2 ×2 (98),
+HRV, stress ×3, temperature ×3, battery ×3. Activity buckets resolved to 07:00 and 08:00 Brisbane,
+which is correct — the ring reports a quarter-of-day index and only the buckets with movement in
+them came back, the rest being zero and filtered.
+
+**Heart rate is still absent and that is expected, not a new fault:** the fix is in PR #566 and was
+not deployed when this sync ran.
+
+**OPEN QUESTION — `calories` may be a daily cumulative, or scaled by 10.** One bucket reported
+**1431** alongside 485 steps and 328 m. 485 steps is roughly 20–25 kcal, so 1431 is not
+per-bucket-kcal, and 143.1 (the ×10 reading the Python client warns about) is still too high for
+that bucket. A daily running total including BMR fits. **Do not sum this column until it is
+settled.** One sample cannot decide it; a full day will — a cumulative rises monotonically through
+the day and resets at midnight, a per-bucket value fluctuates. `decodeActivity` deliberately stores
+it raw for exactly this reason, so no data is lost either way and only the interpretation is
+pending.
+
+**Next sync is the discriminator for HR.** Read "Sync detail" first.
+
 **Do this, in order, and record the result in §11 of the plan:**
 
 1. **More → Devices → Pair ring**, then **Sync now**. Ring on the charger or worn — a still ring
@@ -661,6 +720,43 @@ permanently).
 
 **Do not flash the circulating `…FasterRawValuesMOD.bin`.** Only step in the arc that can brick the
 device, and it would be taken before knowing the sensor is worth streaming from.
+### [nutrition] PS-14 — `food-row-shared.spec.ts` fails intermittently: the typed query can be eaten by a remount
+
+- **Lane:** B (the surface)
+- **Added:** 2026-08-27, from CI on PR #566
+
+`e2e/food-row-shared.spec.ts:115` — *the external food-database row is the shared row, and keeps its
+mismatch warning* — waits 30 s for the stubbed Open Food Facts row and times out with
+`element(s) not found`. It is not deterministic: measured across three CI runs on
+`fix/colmi-sync-diagnostics`, a branch whose diff touches no nutrition file at all, it went
+**fail → pass → fail**, with the nutrition code byte-identical between the last two. A Bluetooth
+branch cannot break a food search, so this is the spec, not the diff.
+
+**Hypothesis, not a diagnosis — this has not been reproduced locally.** `IngredientPicker` is
+mounted with `key={buildSession}` in `saved-meals-sheet.tsx:651`, and `buildSession` bumps on every
+entry to the build form. The picker owns the search query, so a remount clears it. The test does
+`search.fill('spec mismatch')` immediately after clicking `New`, which is what bumps the key — so if
+the remount lands after the fill, the query is discarded, the 700 ms debounce in
+`ingredient-picker.tsx:93` never sees a non-empty string, and no request is made. Nothing in the
+test would notice: `fill()` has already returned.
+
+**Proposed patch** — assert the value survived, and let Playwright retry the fill if it did not:
+
+```ts
+await expect(async () => {
+  await search.fill('spec mismatch')
+  await expect(search).toHaveValue('spec mismatch')
+}).toPass({ timeout: 10_000 })
+```
+
+Confirm the mechanism before taking the patch. If the remount is real, the same shape is a hazard for
+every spec that types into the builder right after opening it — `saved-meal-tags.spec.ts` and
+`empty-meal-library.spec.ts` both do, and both pass today, which is what a race looks like before it
+bites. If it is something else, the trace zip on the failing run
+(`playwright show-trace`) is the place to start, because the failure ships one.
+
+**Do not skip or quarantine the spec** — it covers a warning the owner explicitly asked to keep.
+
 ### [nutrition] BF-38 — logging the same food twice creates a second `food_items` row: 19 of 209 are redundant
 
 - **Lane:** A — the matching happens at creation, in the route and the shared create path.
@@ -1669,30 +1765,6 @@ whether or not anyone draws them first.
   what this entry exists to prevent — and the cost of raising a timeout is that a genuinely hung
   test takes longer to fail. **Do not weaken what they check** either way: `meal-label`'s decode
   loop is the closest the sandbox gets to the print test that is still owed.
-
-### [nutrition] LB-20 — the meal library's empty state is untested, and it is where the click-event bug hid
-
-- **Lane:** B
-- **Branch:** `test/empty-meal-library-e2e`
-- **Added:** 2026-08-26 · Lane B, found by sweep while shipping BF-11f.
-- **What happened.** `handleSave(overwrite?)` was wired as `onClick={onSave}`, so React's click event
-  arrived as `overwrite` on every save from the footer — which skipped BF-11d's duplicate check
-  entirely and, once BF-11f added tags, sent `undefined` where the tags should be. A network trace on
-  the new tag round-trip is what caught it; nothing else could, because both symptoms are silent.
-  **Fixed in the same PR**, along with the one sibling the sweep found: `food-list.tsx`'s
-  `onClick={onBuildFirst}`, wired to `openBuild(meal?)`, which reads `meal.items` off the event.
-- **What is still owed.** That second site was fixed **by inspection, not reproduced** — it is only
-  reachable with an empty meal library, and no spec has one. `food-row-shared.spec.ts:109` matches
-  `/^(New|Build your first meal)$/` and always lands on `New`, because the seed has meals.
-- **The awkward part, and why this is an entry rather than a line in that PR:** emptying
-  `saved_meals` for the seed user in a `beforeAll` mutates state five other specs read. Either give
-  the empty-library spec its own user, or drive the empty state from a route mock — decide before
-  writing it, because the wrong choice makes the whole nutrition suite flaky rather than this one
-  spec.
-- Neither TypeScript nor `check-memo-prop-stability.js` can see this class: `() => void` accepts a
-  handler with *more* parameters, and `onClick` accepts a nullary one. The sweep that found both
-  sites is two greps and is written out in the journal entry for v1.388.0 — a check is plausible if
-  it recurs, but two instances in one file pair is not yet a pattern worth a script.
 
 ### [nutrition] LB-18 — `Recent` on Log Food is scoped to a meal bucket; it may want to be global
 

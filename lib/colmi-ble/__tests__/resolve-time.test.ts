@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { resolveRelative, resolveSleepWindow, resolveActivityBucket } from '@/lib/colmi-ble/resolve-time'
+import { resolveRelative, resolveSleepWindow, resolveActivityBucket, localDayStartSeconds } from '@/lib/colmi-ble/resolve-time'
 import { formatInTimeZone } from 'date-fns-tz'
 
 const BNE = 'Australia/Brisbane'   // no DST — the owner's zone
@@ -81,5 +81,24 @@ describe('resolveActivityBucket', () => {
     expect(resolveActivityBucket(2026, 8, 0, 0, BNE)).toBeNull()
     expect(resolveActivityBucket(2026, 8, 26, 96, BNE)).toBeNull()
     expect(resolveActivityBucket(2026, 8, 26, -1, BNE)).toBeNull()
+  })
+})
+
+describe('localDayStartSeconds', () => {
+  it('is the day\'s wall-clock midnight as though it were UTC — deliberately zone-free', () => {
+    expect(localDayStartSeconds('2026-08-27')).toBe(Math.floor(Date.UTC(2026, 7, 27) / 1000))
+  })
+
+  it('does not shift with the timezone, because the ring wants local wall-clock', () => {
+    // A true epoch for Brisbane midnight would be 10 hours earlier and would ask for the day before.
+    const asIfUtc = localDayStartSeconds('2026-08-27')
+    const trueBrisbaneEpoch = Math.floor(new Date('2026-08-27T00:00:00+10:00').getTime() / 1000)
+    expect(asIfUtc - trueBrisbaneEpoch).toBe(10 * 3600)
+  })
+
+  it('returns 0 for anything that is not a plain date key, rather than NaN', () => {
+    for (const bad of ['', '2026/08/27', 'yesterday', '2026-8-7']) {
+      expect(localDayStartSeconds(bad)).toBe(0)
+    }
   })
 })
