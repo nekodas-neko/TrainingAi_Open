@@ -449,6 +449,56 @@ pending.
 dropped (only the timestamped packet carries an anchor — see `framesToPayload`), so HR coverage may
 be sparser than the ring's own history; and activity is requested for 3 days by default.
 
+### [devices] PS-15 — the comparison endpoint cannot pair the two rings' stress, and cannot see steps at all
+
+- **Lane:** A (the engine)
+- **Added:** 2026-08-27, from a hand comparison the endpoint should have produced
+
+Two separate reasons a three-device comparison returned nothing useful, both in
+`lib/health/device-comparison.ts` and `app/api/admin/device-comparison/route.ts`.
+
+**Phase, not absence.** Oura's daytime stress lands at **:15 and :45**
+(`oura_daytime_stress_buckets`); the Colmi's lands at **:00 and :30**. They are permanently 15
+minutes out of phase, so at the route's `DEFAULT_BUCKET_MINUTES = 5` no pair ever forms and
+`overlap` reads 0 — which reads as two devices that disagree when it means two devices that were
+never compared. Bucketing at 30 minutes pairs them: measured by hand over the 8 afternoon
+buckets of 2026-08-27, **Spearman rho = 0.64**, Pearson 0.58.
+The route should pick its bucket width from the coarser of the two series rather than a constant,
+and report "not comparable at this width" distinctly from "compared, and they disagree".
+
+**Shape, not phase.** Steps have no path through the harness at all: Oura writes a **daily scalar**
+to `body_metrics.steps`, the Colmi writes an **hourly series** to `colmi_readings`. `alignSeries`
+takes two series. Comparing them needs the Colmi side summed to a day first, which is a different
+operation and currently exists nowhere.
+
+**Scales differ and the harness does not know it.** Oura stress is normalised to −1..+1; Colmi's is
+0..100 raw. `meanBias` and `meanAbsDelta` are meaningless across them — only rank agreement is.
+A pair whose units differ should return rank statistics and suppress the magnitude ones rather than
+printing a bias in mixed units.
+
+### [devices] PS-16 — settle whether the Colmi's activity buckets are cumulative, with a counted walk
+
+- **Lane:** A (the engine)
+- **Added:** 2026-08-27
+- **Gate:** device
+
+The four buckets 07:00–10:00 on 2026-08-27 read 485 → 876 → 1128 → 1524, then 11:00 reads 55. Read
+per-bucket the day totals **4562** steps; read as a running total that resets, **2073**. Oura says
+**2506** for the same day, which is 82% below the first reading and 17% above the second — evidence
+for the cumulative interpretation, and not proof of it.
+
+Nothing sums these today and nothing should until this is settled: summing a cumulative counter
+gives a number that is badly wrong and still looks plausible.
+
+**The test is not a query.** Wear the ring, walk a counted 200 steps inside one bucket, stand still
+for the next, sync, and read the two buckets. Cumulative gives 200 then 200; per-bucket gives 200
+then 0. One walk answers it.
+
+Two related unknowns the same capture settles: three buckets (08:00, 09:00, 10:00) carry steps and
+distance but **no calories** while every other bucket carries all three; and the buckets arrive
+**hourly** although the decoder handles quarter-hours correctly and the ring is documented as
+recording at 15 minutes.
+
 ### [devices] PS-12 — baseline the three-device comparison, and write down what "agreement" was
 
 - **Lane:** A
