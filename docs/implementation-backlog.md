@@ -1162,6 +1162,70 @@ will hit it.
   sits in that row; and whether the sheet now reads as one thing is the owner's call, not a
   measurement.
 
+### [body][nutrition][platform] BF-41 — RMR, DEXA and blood are one intake shape; build the pipeline once
+
+- **Lane:** A for storage and extraction, B for the upload/crop/confirm surface.
+- **Added:** 2026-08-27 · owner, about to send all three at once: *"ideally you can see what we are
+  getting and create an endpoint or so to record these down- then the ability to upload the documents
+  and have it auto scan. I will scrub it of my PII first. but there is a lot of fields/details."*
+- **⚑ Read this before BF-1 or BF-2.** It does not replace them; it says what they share, so the
+  second one built does not re-derive the first one's pipeline.
+
+**Three entries already exist and they are at three different stages:**
+
+| Result | Entry | State |
+|---|---|---|
+| **RMR** | BF-33 | **engine shipped** — `measured_rmr` (migrations 225/226), `POST /api/measured-rmr`, plausibility bounds, `ffm_kg_at_test` so a reading re-scales instead of expiring. **No UI.** |
+| **DEXA** | BF-2 | filed, planning item, `⏰` note for the 2026-08-27 scan |
+| **Blood panel** | BF-1 | filed, **owner's crop-before-upload decision already made** |
+
+**They are the same shape.** Each is a **dated clinical measurement from an external provider**, with
+many mostly-nullable fields, arriving either typed by hand or read off a document, and each needs the
+same three things: a PII-safe path to the model, a confirm-before-store step, and a provenance stamp.
+Built separately that is three upload flows, three extraction routes, three review screens and three
+sets of the same mistakes.
+
+**The split that matters — typed storage, one shared pipeline.**
+
+- **Storage stays typed, per result.** `measured_rmr` is already the template and it is the right
+  one: BF-2's calibration and BF-33's precedence rule both do **arithmetic on named columns**, and a
+  JSONB blob makes exactly that hard. DEXA gets its own table; a blood panel gets a **parent plus a
+  child analyte table** (`name, value, unit, ref_low, ref_high, flag`), because a panel is N rows and
+  not N columns.
+- **The pipeline is built once and parameterised by result type:** pick a document → crop → extract
+  with `generateObject` against that type's Zod schema → **show the parsed fields for confirmation**
+  → save. `app/api/nutrition/scan/route.ts` is the working reference for the middle of that, as BF-1
+  already says.
+
+**⚠ Do not design the field lists before seeing a real report.** This repo's own rule about external
+field names — *read the pinned source, never memory* — applies to a DEXA printout and a pathology
+panel just as much as to an API. Providers differ, units differ, and a schema invented from a
+description will silently drop the field that turns out to matter. **The owner is sending real
+(PII-scrubbed) reports; the schemas get written from those.**
+
+**⚠ Two different redactions, and conflating them would be the security bug.**
+1. **The owner scrubbing a report before sending it to a chat session** — happening now, their call,
+   outside the app.
+2. **The app's own crop-before-upload step** — BF-1's decided route (a), because the extraction call
+   sends the document to Google and *"redacting after extraction is too late"*. **That still has to
+   be built even though step 1 happened**, and it applies to DEXA reports too: they carry name, date
+   of birth and a patient reference exactly like a pathology report. BF-1 made this decision for
+   blood panels; **it is hereby the rule for every document type.**
+
+- **No document store exists, and think before adding one.** The only `bytea` column in the schema is
+  `oura_raw_packed.blob`. **Recommended: do not store the source document at all** — extract, confirm,
+  save the fields, discard the file. It removes the largest PII surface in the feature, and the app's
+  Play Store ambition (health data + a declared-use-case review) makes a stored pathology PDF a
+  liability rather than an asset. If a document must be kept, that is its own decision with its own
+  entry, not a side effect of this one.
+- **Sequencing.** BF-33's UI first — the table exists, so it is the smallest end-to-end slice and it
+  proves the confirm step on real numbers. Then DEXA (BF-2), which BF-33's UI can be widened into and
+  which unblocks the scale calibration. Then blood (BF-1), the largest field set.
+- **Verification.** Each type: hand entry and document extraction produce the same stored row; a
+  deliberately wrong extraction is caught at the confirm step and not stored; and no model-reported
+  number is ever displayed as fact before the owner confirms it (CLAUDE.md — a model handed a score
+  of 80 called it *"perfect"*).
+
 ### [body][nutrition] BF-33 — a measured RMR has nowhere to go, and the four-number panel the test sheet already draws
 
 - **Lane:** A — new column(s) plus a precedence rule in `packages/shared/`; the panel is B and can
