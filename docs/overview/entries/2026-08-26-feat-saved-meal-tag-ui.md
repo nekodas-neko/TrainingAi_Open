@@ -64,12 +64,17 @@ Three hits, one benign (`onLogged: (log?) => void` — the prop type declares th
 caller passes a log). The second real one: `food-list.tsx`'s `onClick={onBuildFirst}`, wired to
 `openBuild(meal?)`, which does `meal.items.map(...)` — an event has no `.items`. Fixed the same way.
 
-**That second site was fixed by inspection and NOT reproduced.** It is only reachable with an empty
-meal library and no spec has one: `food-row-shared.spec.ts:109` matches
-`/^(New|Build your first meal)$/` and always lands on `New`, because the seed has meals. **LB-20** is
-filed for that coverage gap, including the reason it is an entry rather than a line in this PR —
-emptying `saved_meals` in a `beforeAll` mutates state five other specs read, so the empty-library
-spec needs its own user or a route mock, decided before it is written.
+**That second site was fixed by inspection and NOT reproduced** when this shipped — it is only
+reachable with an empty meal library and no spec had one (`food-row-shared.spec.ts:109` matches
+`/^(New|Build your first meal)$/` and always lands on `New`, because the seed has meals), so **LB-20**
+was filed for the gap.
+
+> **Closed the same day, v1.388.1 — and the reproduction changed one claim here.** With the fix
+> reverted, React **swallows** the TypeError: nothing reaches `pageerror`, the sheet stays on an
+> empty Meals tab, and the only symptom is a dead button. So the prediction above ("throws") was
+> right about the mechanism and wrong about what a user would see — this would have been reported as
+> *"the button does nothing"*, not as a crash. See
+> [that entry](2026-08-26-empty-meal-library-e2e.md).
 
 ## Verification
 

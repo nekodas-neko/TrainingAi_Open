@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.388.1",
+    date: "2026-08-26",
+    changes: [
+      "Internal: test cover for the meal library when it is empty. The \"Build your first meal\" button was fixed in the last release without ever being reproduced \u2014 running it against the old code turned out to leave the button silently dead rather than showing an error, which is exactly the kind of thing that gets reported as \"nothing happens\".",
+    ],
+  },
+  {
     version: "1.388.0",
     date: "2026-08-26",
     changes: [
