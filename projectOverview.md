@@ -24,7 +24,7 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.392.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Version:** v1.393.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-08-27.
 
 **One evening flow, one door (Q-112a).** Home opened a thinner `DayReviewSheet` only Home had,

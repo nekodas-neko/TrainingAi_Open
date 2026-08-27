@@ -1,6 +1,6 @@
 # 2026-08-27 — `feat/day-review-one-door` (Q-112a) — one evening flow, one door
 
-**Lane B · v1.392.0 · one entry shipped (Q-112a), two filed (LB-23, LB-24).** Every file is
+**Lane B · v1.393.0 · one entry shipped (Q-112a), two filed (LB-23, LB-24).** Every file is
 `app/**`, `components/**` or `lib/**` outside storage — Lane B throughout, no engine half.
 
 The day review had two entrances. Home's "Your day in review is ready" banner opened

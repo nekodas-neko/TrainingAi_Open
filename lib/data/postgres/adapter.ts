@@ -5964,6 +5964,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   async listOuraTags(userId: string, startDay: string, endDay: string) { return oura.listOuraTags(this.db, userId, startDay, endDay) }
   // Colmi R09, learning mode (PS-8). Reads/writes only the colmi_* tables.
   async insertColmiReadings(userId: string, rows: import('./slices/colmi').ColmiReadingInput[]) { return colmi.insertColmiReadings(this.db, userId, rows) }
+  async insertColmiRawFrames(userId: string, rows: import('./slices/colmi').ColmiRawFrameInput[]) { return colmi.insertColmiRawFrames(this.db, userId, rows) }
   async insertColmiSleepSegments(userId: string, rows: import('./slices/colmi').ColmiSleepSegmentInput[]) { return colmi.insertColmiSleepSegments(this.db, userId, rows) }
   async getColmiReadings(userId: string, kinds: import('./slices/colmi').ColmiReadingKind[], from: Date, to: Date) { return colmi.getColmiReadings(this.db, userId, kinds, from, to) }
   async getColmiSleepSegments(userId: string, fromDate: string, toDate: string) { return colmi.getColmiSleepSegments(this.db, userId, fromDate, toDate) }

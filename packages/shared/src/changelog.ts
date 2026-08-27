@@ -6,12 +6,19 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: "1.392.0",
+    version: "1.393.0",
     date: "2026-08-27",
     changes: [
       "The end-of-day review has one home now. Home\u2019s \u201cYour day in review is ready\u201d banner used to open a shorter version of it that only Home had, while the End of Day button on Nutrition opened the full one. There is one review, it lives on Nutrition, and both routes reach it.",
       "The bedtime and Sunday reminders now open the thing they are reminding you about. Tapping either used to drop you on Home to go find the right banner \u2014 the evening one opens the day review, the weekly one opens your week in review already unfolded, even if you dismissed that banner earlier.",
       "Fixed: if the day\u2019s written summary failed to generate, it simply was not there \u2014 indistinguishable from a quiet day. It now says it could not be written.",
+    ],
+  },
+  {
+    version: "1.392.0",
+    date: "2026-08-27",
+    changes: [
+      "The Colmi ring now keeps every frame it sends, exactly as it sent it, before anything is read out of it. 119 of 140 heart-rate readings a day were being discarded as impossible and nothing recorded what they were \u2014 so whether they are sensor noise or a misread could not be answered, and each day spent answering it was a day of history that could not be recovered. Now it can be: a fix to how the ring is read applies to everything already recorded, not just to what comes after.",
     ],
   },
   {

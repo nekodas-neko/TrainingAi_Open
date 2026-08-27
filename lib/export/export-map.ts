@@ -113,6 +113,9 @@ export const EXPORTED: Record<string, ExportScope> = {
   // other — being quarantined from SCORING says nothing about whether it is theirs to take.
   colmi_readings: { kind: 'user_id' },
   colmi_sleep_segments: { kind: 'user_id' },
+  // The ring's raw frames. Exported rather than excluded: they are the archival source the decoded
+  // rows are read from, so an export without them cannot be re-decoded if a decoder turns out wrong.
+  colmi_raw_frames: { kind: 'user_id' },
   oura_heartrate: { kind: 'user_id' },
   rr_intervals: { kind: 'user_id' },
 
