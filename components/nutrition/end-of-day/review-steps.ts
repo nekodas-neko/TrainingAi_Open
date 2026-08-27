@@ -35,7 +35,10 @@ export function visibleReviewSteps(input: StepInput): ReviewStepId[] {
 }
 
 export const STEP_TITLES: Record<ReviewStepId, string> = {
-  day: 'Your day',
+  // "The day", not "Your day": the digest card on this very step carries a "Your day" eyebrow, and
+  // two nodes reading the same words on one screen is the LB-23 shape — redundant to a screen reader
+  // and ambiguous to a locator. Verified by screenshot at 412 dp before renaming.
+  day: 'The day',
   meals: 'Anything missed?',
   wrapUp: 'How it felt',
 }

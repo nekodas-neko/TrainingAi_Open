@@ -60,12 +60,20 @@ standing on. And it resets when the sheet closes — reopening on "How it felt" 
 read-through the flow exists to show, which is the persisted-transient-state class one level down
 from the Zustand rule.
 
-## "Previous", not "Back"
+## Two naming collisions, both found by looking rather than by reading
 
-The step-back control cannot say *Back*: the wrap-up step's sore-muscle chips include one labelled
-**Back**, so two buttons on one screen would share an accessible name. Playwright found it as a
-strict-mode violation; it is an accessibility defect first. Same class as **LB-23**, from the other
-direction — there a control collides with itself, here with user-facing content.
+**"Previous", not "Back".** The step-back control cannot say *Back*: the wrap-up step's sore-muscle
+chips include one labelled **Back**, so two buttons on one screen would share an accessible name.
+Playwright found it as a strict-mode violation; it is an accessibility defect first. Same class as
+**LB-23**, from the other direction — there a control collides with itself, here with user-facing
+content.
+
+**"The day", not "Your day".** Screenshotting all three steps at 412 dp is what surfaced the second:
+the step-1 title read *Your day* and the digest card **on that step** carries a *Your day* eyebrow.
+Renaming it then failed the spec for a *third* reason worth writing down — `getByText` matches
+substrings, and "The day" is inside the summary card's *"Totals are the day's figures…"* one line
+below. The assertion is exact and includes the separator the header renders. A short English phrase
+as a step title is ambiguous by default; only an exact match makes it a locator.
 
 ## What did not ship, and why it is a Lane A entry
 

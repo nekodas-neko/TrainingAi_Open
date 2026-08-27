@@ -42,7 +42,13 @@ test('the wrap-up steps through to a Save', async ({ page }) => {
 
   const review = page.getByRole('dialog')
   await expect(review).toBeVisible({ timeout: 60_000 })
-  await expect(review.getByText('Your day')).toBeVisible()
+  // Exact, and including the separator the header actually renders. `getByText` matches
+  // SUBSTRINGS, and a step title is a short English phrase — "The day" is inside the summary card's
+  // "Totals are the day's figures…" one line below it. (The title is not "Your day" because the
+  // digest card on this step carries that as its eyebrow, which is the LB-23 shape; swapping it for
+  // a phrase that appears in body copy is the same trap wearing a different hat, and this is what
+  // closes both.)
+  await expect(review.getByText('· The day', { exact: true })).toBeVisible()
 
   const save = review.getByRole('button', { name: 'Save' })
   const next = review.getByRole('button', { name: 'Next' })
