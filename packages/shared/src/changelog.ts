@@ -6,10 +6,17 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: "1.391.0",
+    version: "1.392.0",
     date: "2026-08-27",
     changes: [
       "The Colmi ring now keeps every frame it sends, exactly as it sent it, before anything is read out of it. 119 of 140 heart-rate readings a day were being discarded as impossible and nothing recorded what they were \u2014 so whether they are sensor noise or a misread could not be answered, and each day spent answering it was a day of history that could not be recovered. Now it can be: a fix to how the ring is read applies to everything already recorded, not just to what comes after.",
+    ],
+  },
+  {
+    version: "1.391.0",
+    date: "2026-08-27",
+    changes: [
+      "The top of Nutrition is one card now, matching the mockup: your calories in a ring on the left, what's left beside it, and protein, carbs and fat as three columns with their share of what you've eaten. The on-track band and the eaten/burned/net detail are still there, below in the same card. Nothing about the numbers changed \u2014 the big one is no longer coloured red, because \u201cwell under\u201d at 10 in the morning is not a verdict.",
     ],
   },
   {

@@ -24,8 +24,17 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.390.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
-**Last updated:** 2026-08-26.
+**Version:** v1.391.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Last updated:** 2026-08-27.
+
+**Nutrition's energy block is artboard 1's card now (BF-24 ②).** Ring left, `kcal left` and
+`+burned` beside it, three macro columns; the on-track band and the eaten/burned/net detail kept
+below a divider in the same card, because the drawing stops at the fold and the band is what says
+whether "left" is on track. **No number changed** — and the reason is the finding: the card takes
+`goalCalories`, `earnedKcal` and the *effective* targets from the screen and derives none of them,
+because Q-401, Q-417 and Q-323 each came from a surface computing its own. A first draft that called
+`budgetProvenance` in the card would have been the fourth. ⚠️ Not device-verified — BF-24's gate
+covers it ([journal](docs/overview/entries/2026-08-27-nutrition-energy-card.md)).
 
 **A recipe from a picture, and the prompt that assumed a plate (BF-40).** The route already took
 images; its prompt told the model to estimate a **plate** from a picture of a word list. One line

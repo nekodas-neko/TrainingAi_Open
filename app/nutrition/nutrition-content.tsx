@@ -7,7 +7,6 @@ import dynamic from "next/dynamic";
 import { useDrag } from "@use-gesture/react";
 import { AnimatePresence, motion } from "motion/react";
 import { Settings, ChevronLeft, ChevronRight } from "lucide-react";
-import { MacroRing } from "@/components/nutrition/macro-ring";
 import { DayToolsSection } from "@/components/nutrition/day-tools-section";
 import { MIN_LOGGED_DAYS } from "@trainingai/shared/nutrition/adaptive-tdee";
 import { budgetProvenance } from "@trainingai/shared/nutrition/calorie-balance";
@@ -40,7 +39,7 @@ import type { NutritionAdherenceResponse } from "@/app/api/nutrition/adherence/r
 import { getLocalStore } from "@/lib/local-store";
 import { pushThenRevalidate } from "@/lib/local-store/push-then-revalidate";
 import { TdeeAdaptationCard } from "@/components/nutrition/tdee-adaptation-card";
-import { CalorieBalanceBar } from "@/components/nutrition/calorie-balance-bar";
+import { EnergyCard } from "@/components/nutrition/energy-card";
 import { MealPlanSection } from "@/components/nutrition/meal-plan-section";
 import { usePlanMealLogging } from "./use-plan-meal-logging";
 import { usePlanMealSaving } from "./use-plan-meal-saving";
@@ -561,28 +560,25 @@ export default function NutritionContent({ userId }: { userId?: string }) {
             transition={{ duration: 0.18 }}
             className="space-y-5"
           >
-            {/* Q-395b: today's energy is ONE section — the balance bar and the ring are two views of
-                the same number, and a gap between them read as two unrelated cards. */}
-            <div className="divide-y divide-border/50 overflow-hidden rounded-2xl border border-border">
-              {/* Guarded on the payload's own date: the swipe re-renders before the new date's
-                  fetch resolves, and showing the previous day's balance is worse than a skeleton. */}
-              <CalorieBalanceBar
-                data={energyBalance?.date === selectedDate ? energyBalance : null}
-                isToday={selectedDate === todayStr}
-                loading={loading}
-                grouped
-              />
+            {/* Artboard 1's energy block (BF-24 ②). Q-395b had already made the balance bar and the
+                ring ONE section, two rows apart — the drawing makes them one card, and merging them
+                surfaced that the two rows carried two different "left" numbers against two
+                different budgets. `EnergyCard` keeps the burn-aware one; see its own comment.
 
-              <MacroRing
-                calories={totals.calories}
-                proteinG={totals.proteinG}
-                carbsG={totals.carbsG}
-                fatG={totals.fatG}
-                targets={effectiveTargets}
-                earnedKcal={earnedForSelectedDate}
-                grouped
-              />
-            </div>
+                Guarded on the payload's own date: the swipe re-renders before the new date's fetch
+                resolves, and showing the previous day's balance is worse than a skeleton. */}
+            <EnergyCard
+              data={energyBalance?.date === selectedDate ? energyBalance : null}
+              isToday={selectedDate === todayStr}
+              loading={loading}
+              calories={totals.calories}
+              proteinG={totals.proteinG}
+              carbsG={totals.carbsG}
+              fatG={totals.fatG}
+              goalCalories={effectiveCalorieGoal}
+              earnedKcal={earnedForSelectedDate}
+              targets={effectiveTargets}
+            />
 
             {/* Actions sit here, directly under the ring, rather than being reached by scroll depth
                 (Q-237). My Foods is a library, not an action, and it used to be reachable only
