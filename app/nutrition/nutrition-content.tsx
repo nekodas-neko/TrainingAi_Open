@@ -135,7 +135,10 @@ export default function NutritionContent({ userId }: { userId?: string }) {
   const [savedMealsOpen, setSavedMealsOpen] = useState(false);
   const [confirmDeleteLogId, setConfirmDeleteLogId] = useState<string | null>(null);
   const [mealRemindersEnabled, setMealRemindersEnabled] = useState(true);
-  const [chatOpen, setChatOpen] = useState(false);
+  // Q-112a: named for what it opens. It was `chatOpen`, a leftover from a chat surface that no
+  // longer exists, so the call site read `onEndOfDay={() => setChatOpen(true)}` and every reader had
+  // to already know those were the same thing.
+  const [reviewOpen, setReviewOpen] = useState(false);
   const [supplements, setSupplements] = useState<SupplementWithStatus[]>([])
   const [supplementsLoading, setSupplementsLoading] = useState(true)
 
@@ -171,7 +174,11 @@ export default function NutritionContent({ userId }: { userId?: string }) {
   }, []);
 
   useEffect(() => {
-    if (searchParams.get("chat") === "backfill") setChatOpen(true);
+    // Two params, one destination. `?review=day` is the day review's own deep link (Q-112a — the
+    // evening reminder and Home's banner both use it). `?chat=backfill` is the MEAL reminder's, and
+    // it is still accepted because notifications already scheduled on the phone carry it: changing
+    // `lib/meal-reminders.ts` only changes the ones scheduled from here on.
+    if (searchParams.get("review") === "day" || searchParams.get("chat") === "backfill") setReviewOpen(true);
   }, [searchParams]);
 
   // Deep-link from the home/health timeline's meal card (Q-93) — jump straight to that day's
@@ -682,7 +689,7 @@ export default function NutritionContent({ userId }: { userId?: string }) {
           supplementsLoading={supplementsLoading}
           onSupplementsChanged={setSupplements}
           userId={userId}
-          onEndOfDay={() => setChatOpen(true)}
+          onEndOfDay={() => setReviewOpen(true)}
         />
       </div>
 
@@ -768,8 +775,8 @@ export default function NutritionContent({ userId }: { userId?: string }) {
       </Dialog>
 
       <EndOfDayReview
-        open={chatOpen}
-        onClose={() => setChatOpen(false)}
+        open={reviewOpen}
+        onClose={() => setReviewOpen(false)}
         mealTypes={mealTypes}
         logs={logs}
         date={selectedDate}

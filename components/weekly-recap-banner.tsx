@@ -19,20 +19,31 @@ interface CachedRecap {
 // A one-time notification for the week that just ended — not an always-there card.
 // Fetches at most once per completed week (cached in localStorage) and stays gone
 // once dismissed, mirroring the early-deload/APK-download banners on this screen.
-export function WeeklyRecapBanner() {
+interface Props {
+  /**
+   * Opened from the weekly reminder's deep link (`/?review=week`, Q-112a).
+   *
+   * It overrides `dismissed` deliberately: tapping the notification is a clearer request to see the
+   * recap than an earlier dismissal was a request never to. It cannot override `error` or an empty
+   * recap — there would be nothing to show.
+   */
+  forceOpen?: boolean
+}
+
+export function WeeklyRecapBanner({ forceOpen = false }: Props) {
   const weekStart = shiftDateStr(startOfWeekInTz(), -7);
   const dismissKey = DISMISSED_KEY_PREFIX + weekStart;
   const cacheKey = CONTENT_CACHE_PREFIX + weekStart;
 
   const [dismissed, setDismissed] = useState(true);
   const [content, setContent] = useState<string | null>(null);
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(forceOpen);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(false);
   const hasFetched = useRef(false);
 
   useEffect(() => {
-    const alreadyDismissed = !!localStorage.getItem(dismissKey);
+    const alreadyDismissed = !forceOpen && !!localStorage.getItem(dismissKey);
     setDismissed(alreadyDismissed);
     if (alreadyDismissed || hasFetched.current) return;
     hasFetched.current = true;
@@ -58,7 +69,7 @@ export function WeeklyRecapBanner() {
       .catch(() => setError(true))
       .finally(() => setIsLoading(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [weekStart]);
+  }, [weekStart, forceOpen]);
 
   function handleDismiss() {
     localStorage.setItem(dismissKey, "1");

@@ -78,7 +78,8 @@ export async function scheduleEveningReminder(): Promise<void> {
         body: 'Begin your wind-down and complete your end-of-day review.',
         schedule: { at: action.at },
         channelId: DAY_REVIEW_CHANNEL,
-        extra: { route: '/' },
+        // Q-112a: the review itself, not the screen that used to hold a banner linking to it.
+        extra: { route: '/nutrition?review=day' },
       }],
     })
     localStorage.setItem(EVENING_REMINDER_KEY, today)
@@ -100,7 +101,8 @@ export async function scheduleWeeklyRecapReminder(): Promise<void> {
         body: 'See how your week went and what to focus on next.',
         schedule: { at: action.at },
         channelId: DAY_REVIEW_CHANNEL,
-        extra: { route: '/' },
+        // The recap lives on Home, so this stays on '/' — but with the param that opens it.
+        extra: { route: '/?review=week' },
       }],
     })
     localStorage.setItem(WEEKLY_RECAP_REMINDER_KEY, action.sundayIso)

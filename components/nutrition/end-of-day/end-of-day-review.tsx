@@ -22,6 +22,7 @@ import { MealBackfillSection } from './meal-backfill-section'
 import { WellnessSection } from './wellness-section'
 import { JournalSection } from './journal-section'
 import { TodayInsightCard } from './today-insight-card'
+import { DayDigestCard } from './day-digest-card'
 
 interface BodyBattery {
   current: number
@@ -222,6 +223,10 @@ export function EndOfDayReview({ open, onClose, mealTypes, logs, date, userId, t
         </div>
 
         <div className="flex-1 overflow-y-auto px-4 pb-4 flex flex-col gap-4">
+          {/* Q-112a: the narrative opener, above the numbers it is talking about. Q-112b puts the
+              read-through in this position too, so it is placed where that entry wants it rather
+              than somewhere b would have to move it from. */}
+          <DayDigestCard active={open} />
           <DaySummaryCard totals={totals} targets={targets} battery={battery} />
           <MealBackfillSection mealTypes={mealTypes} logs={logs} date={date} userId={userId} onLogged={onLogged} />
           <WellnessSection scales={scales} onScale={(k, v) => setScales(s => ({ ...s, [k]: v }))} soreMuscles={soreMuscles} onToggleMuscle={toggleMuscle} />

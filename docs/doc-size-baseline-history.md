@@ -3241,3 +3241,20 @@ The entry is long because the floor is the half that gets missed: substituting t
 come from different instruments — at the measured 3.2-point gap that is 53.56 kg against 51.46 kg,
 which re-scales the measurement onto 45 kcal/day of lean mass that is not there. The order of the
 two fixes is load-bearing and neither entry said so.
+
+## 2026-08-27 — `docs/implementation-backlog.md` raised (LB-23, LB-24 filed by Q-112a)
+
+11 net lines (12724): two entries filed, minus Q-112a's own removal on shipping.
+
+**LB-24 is the one worth the space.** Deleting `day-review-sheet.tsx` left
+`workout-load-comparison-chart.tsx` with zero call sites and `/api/workout-load-history` with zero
+client callers — and the obvious tidy-up is wrong, because Q-112c's plan names that route as one of
+the series it reuses for the 7-day window. Without the entry the next dead-code sweep deletes work
+Q-112c is about to need, or leaves it forever because nobody wrote down which. It records the
+decision point (after Q-112d) and the fact that `invalidateWorkoutSummaries()` still prefix-clears
+an inert key.
+
+**LB-23** costs less and exists because an E2E comment already pointed at it: three sheets render an
+`sr-only` `SheetTitle` and a visible `<h2>` carrying the same string, so the dialog's accessible name
+is announced twice and `getByRole('heading')` is ambiguous. It names the fourth sheet that is *not* a
+violator, so a sweep does not "fix" the one that is already right.

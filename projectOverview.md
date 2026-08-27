@@ -24,8 +24,16 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.390.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
-**Last updated:** 2026-08-26.
+**Version:** v1.391.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Last updated:** 2026-08-27.
+
+**One evening flow, one door (Q-112a).** Home opened a thinner `DayReviewSheet` only Home had,
+Nutrition's End of Day button opened the real one, and **both reminders' `extra.route` was `'/'`** —
+tapping either landed you on Home to hunt for a banner. All of it reaches `/nutrition?review=day`.
+**The plan hosted the review on Home and that was wrong:** `EndOfDayReview` needs meal types, logs
+and targets, all Nutrition's state, so the door moved instead. `day-review-sheet.tsx` is deleted,
+its digest carried across **with the `.catch()` and error state it never had**; that orphaned the
+load-comparison chart and its route, both kept for Q-112c (**LB-24**). ⚠️ Not device-verified ([journal](docs/overview/entries/2026-08-27-day-review-one-door.md)).
 
 **A recipe from a picture, and the prompt that assumed a plate (BF-40).** The route already took
 images; its prompt told the model to estimate a **plate** from a picture of a word list. One line
@@ -358,14 +366,6 @@ live — its callbacks take the meal and hand it back, so the parent shares one 
 **Body-metric bounds are asked at the keyboard (Q-321, v1.348.0).** `validation/body-metrics.ts` held every threshold and nothing under `components/`/`app/` imported it, so a 5,000 kg weight was queued and dropped server-side. **Three** sheets, not the one the entry named.
 
 **Sixteen writes revalidated around their push, not after it (LB-6, v1.345.0).** The entry listed six; its finder read only *above* each call. `check-invalidate-after-push.js` holds it.
-
-**The finished-logging control moved above End of Day (BF-6, v1.344.0).** **Zero presses in seven weeks**, and the calibration excludes an unmarked day rather than treating it as light.
-
-**A deload session says so now (BF-8, v1.343.0).** Intensity read "Full · As prescribed" while the card under it read "Deload session" — the owner trained one believing it was full. Both asked `isDeloadActive` (the PHASE), not today's session.
-
-**A recipe link becomes a meal (Q-409's Lane B half, v1.342.0).** A page stating no yield hands back the **whole recipe** (1,956 kcal for a loaf), so the row asks how many it serves and cannot be kept until answered.
-
-**Saved meals can carry a photo (Q-327, v1.341.0).** A 64 px tile in Edit Meal, downscaling to 128 px WebP (~6 KB); the tile prints the stored size, because nothing else fails loudly when the cap slips.
 
 **The meal plan can be written to again, and it now produces saved meals (Q-398, v1.340.0).** Five
 write routes validated a variable nothing had assigned, so every one answered `400 Invalid input:
