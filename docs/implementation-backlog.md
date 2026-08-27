@@ -1601,6 +1601,58 @@ whether or not anyone draws them first.
   reference drawings were never committed). Part 1 §8 has the file-by-file collision table and the
   carry-across rule. **Do not plan around that chain landing, and do not wait for it.**
 
+### [nutrition] BF-40 — build a meal from a recipe screenshot: the route already takes images, the prompt tells it they are plates
+
+- **Lane:** B, with one prompt line in `app/api/nutrition/scan/route.ts` (Lane A by path, trivial by
+  size — take it in the same PR and say so).
+- **Added:** 2026-08-26 · owner, with a screenshot of a Google recipe overview: *"id like to be able
+  to upload an image like above to the meal creator and have it make it - i see we dont have that
+  upload option yet."*
+
+**Most of this is already built, which is the point of the entry.** BF-11c shipped recipe import: the
+builder's search field detects a URL and `importRecipe()` POSTs `{ url }` to
+`/api/nutrition/scan`, which returns `ingredients[]` + `candidates[]`, mints a `food_item` per
+ingredient and hands the lot to the builder.
+
+**That same route already accepts `{ image, mimeType }`** (`route.ts:163`) and both branches share one
+`ScanSchema` — which already carries `ingredients[]` and `candidates[]`. So the plumbing for a recipe
+image exists end to end. Two things are missing:
+
+1. **The image branch's prompt says the wrong thing.** It is
+   `'Analyse this food photo and return the nutrition JSON.'` Handed a screenshot of an ingredient
+   list, that instructs the model to estimate a *finished plate* rather than read the list. The
+   system prompt above it already understands recipes and multi-dish pages — it is only the
+   per-request line that assumes a photo of food.
+2. **No affordance.** The builder offers a URL path (typed into search) and no way to hand it an
+   image.
+
+**Why the existing URL path does not already cover this, using the owner's own example.** The
+screenshot is a **Google AI overview**, not a recipe site — the ingredients are rendered into
+Google's own results page, with the source behind a `YouTube · MOMables` chip. There is no recipe URL
+to paste. **The image is the only handle on that content**, which is exactly the case the URL path
+cannot serve.
+
+**⚠ The trap, and it is a documented four-fold calorie error.** `importRecipe()`'s comment: the URL
+branch reads `recipeYield` from the page's JSON-LD and *"is handed straight up rather than defaulted
+to 1 … a banana-bread page measured 1,956 kcal for the loaf. Deciding here that it is one portion is
+exactly the four-fold calorie error that reads as plausible."* **A screenshot has no JSON-LD**, so the
+yield can only come from the model reading it off the image ("makes 8 pancakes") or from the
+builder's batch-size field. **Never default it to 1.** Null is the correct answer and the builder
+already asks.
+
+- **Distinguish it from the photo scan, in the UI and in the prompt.** *Photograph your dinner* and
+  *screenshot a recipe* are different acts with different outputs — a logged food versus a saved meal
+  — and one tile that guesses which one you meant will guess wrong. The owner said *"the meal
+  creator"*, so this belongs in the builder, beside the URL path, not on Log Food.
+- **Reuse, do not re-derive.** `importRecipe()` already handles the multi-candidate case, mints items
+  serially (one local write and one outbox row each), and floors quantity at 0.01 for sub-gram
+  garnishes. An image path should differ only in what it posts.
+- **Rate-limit and fail soft**, per CLAUDE.md — same as every AI route. A screenshot that yields no
+  ingredients gets the existing *"No recipe could be read"* toast, not an error state.
+- **Verification.** The owner's own screenshot end to end: seven ingredients, a name, and a yield the
+  builder asks for rather than assumes. Then a photo of a plate through the *photo* path, to confirm
+  the prompt change did not turn dinner into a recipe.
+
 ### [nutrition] BF-11h — the wizard surfaces the library, the reasons, and the meal-count prompt
 
 > **⚠ BF-11g shipped the engine half. The response already carries what this entry needs to render:**
