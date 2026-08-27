@@ -80,6 +80,11 @@ and `nutrition-meal-types` from the client cache, and on device those are also h
 local store. The web path is verified; the device path is not. No migration, no new route, no write
 — so the risk is a swap offering nothing where it should offer something, not data loss.
 
-Also untested: a plan generated with `useLibrary` **on** against a real library, end to end. The
-e2e stubs the library for the wizard steps but does not run a generation, which would mean an AI
-call in CI.
+Also untested: a plan generated with `useLibrary` **on**, end to end. `grep -rl useLibrary
+--include=*.test.ts` returns nothing — BF-11g shipped the flag untested and this entry made it
+settable, so the route wiring has never been exercised even though `selectLibraryMeals` itself is
+well covered. **Filed as LB-21**, Lane A (the work is in the route). The e2e here stubs the library
+for the wizard steps but does not generate.
+
+The instinct that this needs an AI call is wrong and the entry says so: the library path is the half
+that does *not* call the model, so a fully-filled request is cheap and deterministic to test.
