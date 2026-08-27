@@ -5,6 +5,8 @@ import {
   cmdSyncHeartRate, cmdSyncSleep, cmdRawSensorEnable, cmdRawSensorDisable,
   cmdReadAutoPref, cmdWriteAutoPref, AUTO_METRICS, BIG_DATA_TYPE, CMD,
 } from '@/lib/colmi-ble/protocol'
+import { framesToPayload } from '@/lib/colmi-ble/ble'
+import type { ColmiFrame } from '@/lib/colmi-ble/decode'
 
 const hex = (b: Uint8Array) => Buffer.from(b).toString('hex')
 
@@ -171,5 +173,61 @@ describe('the heart-rate log request carries a timestamp', () => {
   it('clamps a negative or fractional day rather than emitting rubbish', () => {
     expect(Array.from(cmdSyncHeartRate(-5).slice(1, 5))).toEqual([0, 0, 0, 0])
     expect(cmdSyncHeartRate(1.9)[1]).toBe(1)
+  })
+})
+
+/**
+ * The heart-rate log arrives as a numbered series and only packet 1 names its clock. Dropping the
+ * continuations left 9 samples covering 00:00–00:45 — a window in which the ring has never
+ * recorded anything, so the log read as empty while 26 packets were arriving.
+ */
+describe('heart-rate log continuation packets', () => {
+  const START = 1_800_000_000              // arbitrary fixed epoch; both sides derive from it
+  const opts = { todayStr: '2026-08-27', timezone: 'Australia/Brisbane' }
+
+  function header(intervalMinutes: number): ColmiFrame {
+    return { kind: 'heartRateLog', subType: 0, packetTotal: 3, intervalMinutes,
+             startedAtUnixSec: null, values: [], isFinal: false, isEmpty: false }
+  }
+  function packet(subType: number, values: number[], startedAtUnixSec: number | null = null): ColmiFrame {
+    return { kind: 'heartRateLog', subType, packetTotal: null, intervalMinutes: null,
+             startedAtUnixSec, values, isFinal: false, isEmpty: false }
+  }
+
+  it('places continuation samples after the anchor at the header interval', () => {
+    const { readings } = framesToPayload([
+      header(5),
+      packet(1, [0, 0, 0, 0, 0, 0, 0, 0, 61], START),
+      packet(2, [62, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 63]),
+    ], opts)
+
+    const hr = readings.filter(r => r.kind === 'heart_rate')
+    expect(hr).toHaveLength(3)
+    // Anchor slot 8, then continuation slots 9 and 21 — 9 anchor samples precede packet 2.
+    expect(hr[0]).toMatchObject({ value: 61, at: (START + 8 * 300) * 1000 })
+    expect(hr[1]).toMatchObject({ value: 62, at: (START + 9 * 300) * 1000 })
+    expect(hr[2]).toMatchObject({ value: 63, at: (START + 21 * 300) * 1000 })
+  })
+
+  it('spaces samples by the interval the header declares, not a hardcoded five minutes', () => {
+    const { readings } = framesToPayload([
+      header(15),
+      packet(1, [70, 71], START),
+    ], opts)
+    const hr = readings.filter(r => r.kind === 'heart_rate')
+    expect(hr[1].at - hr[0].at).toBe(15 * 60_000)
+  })
+
+  it('drops a continuation that arrives with no anchor rather than guessing a clock', () => {
+    const { readings } = framesToPayload([header(5), packet(4, [80, 81])], opts)
+    expect(readings.filter(r => r.kind === 'heart_rate')).toHaveLength(0)
+  })
+
+  it('treats a zero as "not measured", so an all-zero anchor is not a reading of zero', () => {
+    const { readings } = framesToPayload([
+      header(5),
+      packet(1, [0, 0, 0, 0, 0, 0, 0, 0, 0], START),
+    ], opts)
+    expect(readings.filter(r => r.kind === 'heart_rate')).toHaveLength(0)
   })
 })
