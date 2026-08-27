@@ -41,6 +41,10 @@ export interface ColmiSyncOutcome {
   readings: number
   sleepSegments: number
   stored?: { readings: number; sleep: number }
+  /** What the route kept after its per-sample window and range filters, before the de-dup insert.
+   *  `readings` sent minus this is what the FILTERS dropped; this minus `stored` is what the unique
+   *  key deduped. Without both, 223 sent reaching 17 rows has two explanations and no way to pick. */
+  accepted?: { readings: number; sleep: number }
   battery?: { percent: number; charging: boolean }
   /**
    * Every frame the ring sent, tallied by its command byte (`'0x73'`, `'0x43'`, …), plus how many
@@ -56,6 +60,12 @@ export interface ColmiSyncOutcome {
     unmapped: number
     /** A few raw frames we could not use, newest last — the input to a decoder fix. */
     unmappedHex: string[]
+    /** How many heart-rate packets arrived carrying each sub-type byte, and how many samples each
+     *  produced. `framesToPayload` reads that byte as a packet NUMBER and spaces the series by it;
+     *  if the ring repeats a value instead of counting up, every packet lands on the same
+     *  timestamps and all but one is discarded on the unique key. 122 samples reaching 7 rows is
+     *  what that looks like from the database, and only this tally tells the two apart. */
+    hrSubTypes: Record<string, { packets: number; samples: number }>
   }
   /** Which automatic measurements the ring reports as ON, read back AFTER we tried to enable them.
    *  A metric missing here recorded nothing, which is why an empty history is not proof of a
@@ -134,16 +144,30 @@ export async function syncColmiRing(opts: SyncOptions): Promise<ColmiSyncOutcome
 
   const autoPrefs: NonNullable<ColmiSyncOutcome['autoPrefs']> = {}
   const frameTags: Record<string, number> = {}
+  const hrSubTypes: Record<string, { packets: number; samples: number }> = {}
   const unmappedHex: string[] = []
   let unmapped = 0
-  const MAX_UNMAPPED_HEX = 8
+  /** Answers that ARE understood, and mean "nothing to send". They decode to `unknown` because they
+ *  carry no sample, and counting them as not-understood made a healthy sync report frames it could
+ *  not read — which is the opposite of what the panel is for. */
+const SENTINEL_REASONS = new Set(['no activity history'])
+
+const MAX_UNMAPPED_HEX = 8
 
   const toHex = (b: Uint8Array) => Array.from(b).map(x => x.toString(16).padStart(2, '0')).join('')
 
   const note = (bytes: Uint8Array, frame: ColmiFrame) => {
     const tag = `0x${(bytes[0] ?? 0).toString(16).padStart(2, '0')}`
     frameTags[tag] = (frameTags[tag] ?? 0) + 1
-    if (frame.kind === 'unknown') {
+    if (frame.kind === 'heartRateLog') {
+      const key = `s${frame.subType}`
+      const seen = hrSubTypes[key] ?? { packets: 0, samples: 0 }
+      hrSubTypes[key] = {
+        packets: seen.packets + 1,
+        samples: seen.samples + frame.values.filter(v => v > 0).length,
+      }
+    }
+    if (frame.kind === 'unknown' && !SENTINEL_REASONS.has(frame.reason)) {
       unmapped++
       if (unmappedHex.length < MAX_UNMAPPED_HEX) unmappedHex.push(toHex(bytes))
     }
@@ -230,7 +254,7 @@ export async function syncColmiRing(opts: SyncOptions): Promise<ColmiSyncOutcome
     try { await Ble.disconnect(paired.deviceId) } catch { /* closing */ }
   }
 
-  const diagnostics = { frameTags, unmapped, unmappedHex }
+  const diagnostics = { frameTags, unmapped, unmappedHex, hrSubTypes }
 
   if (framesSeen === 0) {
     // The ring's application processor sleeps when it has been still, and a sleeping ring is
@@ -253,14 +277,27 @@ export async function syncColmiRing(opts: SyncOptions): Promise<ColmiSyncOutcome
                readings: payload.readings.length, sleepSegments: payload.sleep.length,
                message: `Upload failed (${res.status}).` }
     }
-    const body = await res.json() as { stored?: { readings: number; sleep: number } }
+    const body = await res.json() as {
+      stored?: { readings: number; sleep: number }
+      accepted?: { readings: number; sleep: number }
+    }
     return { ok: true, framesSeen, battery, autoPrefs, diagnostics,
-             readings: payload.readings.length, sleepSegments: payload.sleep.length, stored: body.stored }
+             readings: payload.readings.length, sleepSegments: payload.sleep.length,
+             stored: body.stored, accepted: body.accepted }
   } catch (e) {
     return { ok: false, framesSeen, reason: 'post-failed', battery, autoPrefs, diagnostics,
              readings: payload.readings.length, sleepSegments: payload.sleep.length, message: describe(e) }
   }
 }
+
+/** Heart-rate log packet numbering. Packet 0 is the header, packet 1 carries the start time and 9
+ *  samples, and every packet after it carries 13 that continue the same series. */
+const HR_LOG_HEADER = 0
+const HR_LOG_ANCHOR = 1
+const HR_ANCHOR_SAMPLES = 9
+const HR_CONTINUATION_SAMPLES = 13
+/** Used only until the header names the real one — the ring's own default is 5 minutes. */
+const HR_DEFAULT_INTERVAL_MINUTES = 5
 
 export interface ColmiPayload {
   readings: { kind: string; at: number; value: number; valueHigh?: number }[]
@@ -272,6 +309,10 @@ export function framesToPayload(frames: ColmiFrame[], opts: Pick<SyncOptions, 't
   const readings: ColmiPayload['readings'] = []
   const sleepOut: ColmiPayload['sleep'] = []
   const { todayStr, timezone: tz } = opts
+  // Carried across frames: the heart-rate log is one series split over numbered packets, and the
+  // clock it starts from is named once, in packet 1.
+  let hrAnchorSec: number | null = null
+  let hrIntervalMinutes = HR_DEFAULT_INTERVAL_MINUTES
 
   for (const f of frames) {
     switch (f.kind) {
@@ -304,15 +345,32 @@ export function framesToPayload(frames: ColmiFrame[], opts: Pick<SyncOptions, 't
         }
         break
 
-      case 'heartRateLog':
-        // Only the timestamped packet carries an anchor; the ring gives the rest as a continuation
-        // of it, so without the anchor we cannot place them and drop them rather than guess.
-        if (f.startedAtUnixSec !== null) {
-          f.values.forEach((bpm, i) => {
-            if (bpm > 0) readings.push({ kind: 'heart_rate', at: (f.startedAtUnixSec! + i * 300) * 1000, value: bpm })
-          })
+      case 'heartRateLog': {
+        if (f.isEmpty) break
+        // The ring answers one request with a numbered series covering the whole day. Packet 0 is a
+        // header, packet 1 names the clock, and packets 2..n continue from it — so only packet 1
+        // carries `startedAtUnixSec`, and dropping the rest for lack of one threw away 24 of 26
+        // packets. Worse, the 9 samples packet 1 does carry are the first 45 minutes after local
+        // midnight, which is exactly when nobody is awake to have a heart rate recorded: they came
+        // back as zeros, were filtered, and the whole log read as "the ring sent nothing".
+        if (f.subType === HR_LOG_HEADER) {
+          hrAnchorSec = null
+          if (f.intervalMinutes && f.intervalMinutes > 0) hrIntervalMinutes = f.intervalMinutes
+          break
         }
+        if (f.subType === HR_LOG_ANCHOR) hrAnchorSec = f.startedAtUnixSec
+        if (hrAnchorSec === null) break
+        const index = f.subType === HR_LOG_ANCHOR
+          ? 0
+          : HR_ANCHOR_SAMPLES + (f.subType - HR_LOG_ANCHOR - 1) * HR_CONTINUATION_SAMPLES
+        const stepMs = hrIntervalMinutes * 60_000
+        f.values.forEach((bpm, i) => {
+          // A zero is "not measured", not a reading of zero — the ring stores a slot for every
+          // interval whether or not it sampled one.
+          if (bpm > 0) readings.push({ kind: 'heart_rate', at: hrAnchorSec! * 1000 + (index + i) * stepMs, value: bpm })
+        })
         break
+      }
 
       case 'sleep':
         for (const s of f.sessions) {

@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button'
 import { useUserTimezone } from '@/components/shell/user-timezone-provider'
 import { formatTimeOfDay } from '@trainingai/shared/date-utils'
 import { pairColmiRing, forgetColmiRing, syncColmiRing, type ColmiSyncOutcome } from '@/lib/colmi-ble/ble'
+import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { getPairedRing, type PairedRing } from '@/lib/colmi-ble/paired-ring'
 import type { AutoMetric } from '@/lib/colmi-ble/protocol'
 
@@ -36,6 +37,9 @@ export function ColmiPairing() {
   const [syncing, setSyncing] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [outcome, setOutcome] = useState<ColmiSyncOutcome | null>(null)
+  // Forget sits beside the button pressed on every visit, and undoing it means re-pairing over
+  // Bluetooth with the ring in hand — far more than a mis-tap should cost.
+  const [confirmForget, setConfirmForget] = useState(false)
   const [lastSyncAt, setLastSyncAt] = useState<string | null>(null)
 
   // Seed in an effect, never a useState initializer — a localStorage read in an initializer causes
@@ -85,6 +89,7 @@ export function ColmiPairing() {
   }
 
   function forget() {
+    setConfirmForget(false)
     forgetColmiRing(); setPaired(null); setOutcome(null); setError(null)
   }
 
@@ -118,7 +123,7 @@ export function ColmiPairing() {
             <Button onClick={runSync} disabled={syncing}>
               {syncing ? (<><Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden />Syncing…</>) : 'Sync now'}
             </Button>
-            <Button variant="outline" onClick={forget} disabled={syncing}>Forget</Button>
+            <Button variant="outline" onClick={() => setConfirmForget(true)} disabled={syncing}>Forget</Button>
           </div>
 
           {outcome?.autoPrefs && Object.keys(outcome.autoPrefs).length > 0 && (
@@ -165,6 +170,17 @@ export function ColmiPairing() {
                     .map(([tag, n]) => `${tag}×${n}`)
                     .join('  ')}
                 </div>
+                {Object.keys(outcome.diagnostics.hrSubTypes ?? {}).length > 0 && (
+                  <div>
+                    Heart-rate packets:
+                    <div className="mt-0.5 break-all font-mono">
+                      {Object.entries(outcome.diagnostics.hrSubTypes)
+                        .sort(([a], [b]) => Number(a.slice(1)) - Number(b.slice(1)))
+                        .map(([k, v]) => `${k}:${v.packets}p/${v.samples}s`)
+                        .join('  ')}
+                    </div>
+                  </div>
+                )}
                 {outcome.diagnostics.unmapped > 0 && (
                   <div>
                     {outcome.diagnostics.unmapped} frame(s) not understood:
@@ -182,6 +198,10 @@ export function ColmiPairing() {
               {/* Both numbers on purpose: a repeat sync storing 0 of 400 is deduping, not failing,
                   and without the pair those look identical. */}
               Read {outcome.readings} samples
+              {/* Three numbers, because two cannot tell a filter from a de-dup: read minus kept is
+                  what the server rejected as implausible or out of window, kept minus new is what
+                  it already had. */}
+              {outcome.accepted ? `, kept ${outcome.accepted.readings}` : ''}
               {outcome.stored ? `, stored ${outcome.stored.readings} new` : ''}
               {outcome.sleepSegments > 0 ? ` · ${outcome.sleepSegments} sleep segments` : ''}
               {outcome.battery ? ` · battery ${outcome.battery.percent}%` : ''}
@@ -204,6 +224,15 @@ export function ColmiPairing() {
           which looks the same as a flat one. Wear it or put it on the charger, then sync again.
         </p>
       )}
+
+      <ConfirmDialog
+        open={confirmForget}
+        onOpenChange={setConfirmForget}
+        title="Forget this ring?"
+        message="Pairing it again needs the ring in your hand and Bluetooth in range. Readings already synced are kept."
+        confirmLabel="Forget ring"
+        onConfirm={forget}
+      />
     </div>
   )
 }

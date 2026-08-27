@@ -6,6 +6,29 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.390.3",
+    date: "2026-08-27",
+    changes: [
+      "The Colmi sync now says how many readings the server kept, not just how many it read and how many were new. 223 read reaching 17 rows has two explanations \u2014 readings rejected as implausible, or readings it already had \u2014 and two numbers could not tell them apart.",
+    ],
+  },
+  {
+    version: "1.390.2",
+    date: "2026-08-27",
+    changes: [
+      "The Colmi ring's sync detail now says how its heart-rate packets are numbered. Heart rate started arriving in the last release and most of it is still being discarded \u2014 122 readings reaching 7 rows \u2014 which happens when packets land on the same timestamps instead of in sequence. This says which, rather than leaving it to be inferred from row counts.",
+    ],
+  },
+  {
+    version: "1.390.1",
+    date: "2026-08-27",
+    changes: [
+      "The Colmi ring's heart rate now arrives. The ring sends a day of readings split across 26 packets, and only the second one says what time the series starts \u2014 so the other 24 were being thrown away for lack of a clock, and the two that were kept covered the 45 minutes after midnight, where there is never a reading to find. The whole day is read now, at whatever interval the ring says it is using.",
+      "Forgetting the Colmi ring asks first. It sits next to the button you press on every visit, and undoing it means having the ring in your hand.",
+      "The ring's sync detail no longer reports frames it could not read when it could. Two of them were the ring saying \u201cno more activity history\u201d, which is an answer rather than a failure.",
+    ],
+  },
+  {
     version: "1.390.0",
     date: "2026-08-27",
     changes: [
