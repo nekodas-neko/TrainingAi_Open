@@ -103,10 +103,21 @@ Chromium-on-Linux, and gestures behave differently under a real thumb. Those sti
 
 - **Stubbing an `/api/` route needs `test.use({ serviceWorkers: 'block' })`.** `public/sw-template.js`
   re-issues **every** `/api/` request — no method filter — so once the worker controls the page the
-  request comes from the worker and **`page.route` never sees it**; Playwright does not intercept
-  service-worker fetches. Whether the worker has taken control yet is a race, so the spec passes
-  locally and fails on CI *sometimes*, with the real route answering in the server log. Measured on
-  `recipe-url-to-meal.spec.ts`: three attempts hit the route, a fourth was stubbed and passed.
+  request comes from the worker and **`page.route` never sees it**; Playwright's own types say so
+  (1.62.1, `types.d.ts:10184`: route "will not intercept requests intercepted by Service Worker").
+  The worker calls `skipWaiting()` then `clients.claim()`, so control arrives **mid-page-life**
+  rather than on the next navigation — which is what makes it a race rather than a constant, and why
+  the spec passes locally and fails on CI *sometimes*, with the real route answering in the server
+  log. Measured on `recipe-url-to-meal.spec.ts`: three attempts hit the route, a fourth was stubbed
+  and passed.
+
+  **`scripts/check-e2e-api-stub-sw.js` enforces it now (PS-14).** This paragraph alone did not hold:
+  three specs were written against it afterwards, two of them on the day PS-14 was filed, by a
+  session that had the entry open. PS-14's own hypothesis — a remount discarding the typed query —
+  was **wrong**, and testing it is what found this: a probe asserting the query survived passed
+  8 for 8, while a page-context fetch before the worker's claim reached the stub and the identical
+  fetch after it did not. If you are debugging a stubbed route that "sometimes" misses, check the
+  worker before you check your component.
 - **Never put an `expect` inside a `page.route` handler.** A throw there skips `route.fulfill`, so the
   app's request breaks and the failure surfaces several assertions later as something unrelated —
   a locator error, usually. Record the request and assert in the test body.

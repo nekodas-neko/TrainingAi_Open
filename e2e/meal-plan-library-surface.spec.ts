@@ -10,6 +10,10 @@ import { settleRouteBoundary } from './fixtures'
  * that — which is exactly why the entry says to verify the regression rather than inspect it.
  */
 
+// The library stub below is only reliable with the worker blocked — `sw-template.js` re-issues
+// every `/api/` request and Playwright cannot intercept a service-worker fetch (PS-14).
+test.use({ serviceWorkers: 'block' })
+
 const MEAL_A = 'Wizard Chicken Bowl'
 const MEAL_B = 'Wizard Oat Breakfast'
 
