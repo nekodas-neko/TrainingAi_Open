@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.393.1",
+    date: "2026-08-27",
+    changes: [
+      "Internal: three checks on the Nutrition energy card were still looking for wording the card stopped using when it was redrawn. Two of them were failing loudly; the third was a check that the macro targets scale with what you burn, and it had quietly stopped being able to fail at all. All three are fixed, and the last one is proven to catch the bug it was written for.",
+    ],
+  },
+  {
     version: "1.393.0",
     date: "2026-08-27",
     changes: [
