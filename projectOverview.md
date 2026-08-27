@@ -24,8 +24,17 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.391.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Version:** v1.392.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-08-27.
+
+**The Coach can ask a multi-answer question, and stopped retyping six lists (Q-407, widget half).**
+The owner's complaint was literal — *"there should be options for 'select all' as I keep clicking
+each grocery store"* — and nothing produced one: `ChoiceListSchema` had no multi flag and the
+callback resolved a single option. Both flags are flat and optional, so every existing picker is
+unchanged. The six meal-plan catalogues are `CHOICE_SOURCES` now, served from `/api/coach/options` —
+a nine-option list the model types out costs **~554 output tokens**, and output is essentially all of
+Coach's latency. ⚠️ **The conversational half of Q-407 is untouched**; this is the widget it needs
+([journal](docs/overview/entries/2026-08-27-coach-multi-select.md)).
 
 **Nutrition's energy block is artboard 1's card now (BF-24 ②).** Ring left, `kcal left` and
 `+burned` beside it, three macro columns; the on-track band and the eaten/burned/net detail kept

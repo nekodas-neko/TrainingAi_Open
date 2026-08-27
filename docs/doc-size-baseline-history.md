@@ -3261,3 +3261,15 @@ program, which is correct for the three program-backed sources and would have ma
 come back empty for a user who has not built a program yet. That is a nutrition question failing on a
 training precondition, it was invisible until the new branches were placed, and the placement is the
 whole fix.
+
+## 2026-08-27 — `projectOverview.md` 8147 → 8156 (+9), Q-407's widget half
+
+Nine lines, and the ⚠ is the one that has to be there: **Q-407's conversational half is untouched**.
+The entry describes a seven-step wizard becoming a conversation *and* a multi-select widget as one
+item; only the widget exists. A status line reading "Q-407 shipped" would have the next session skip
+the larger half entirely.
+
+The rest is the measurement that makes the change worth understanding rather than just noting — a
+nine-option picker the model types out costs ~554 output tokens, and output is essentially all of
+Coach's latency, which is why six curated lists became choice sources rather than staying literals
+in a component.
