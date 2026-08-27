@@ -88,3 +88,25 @@ export function localDayStartSeconds(dayStr: string): number {
   if (!m) return 0
   return Math.floor(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3])) / 1000)
 }
+
+/**
+ * Turn the ring's echoed heart-rate anchor into a real instant.
+ *
+ * `cmdSyncHeartRate` sends the day's local midnight expressed as though it were UTC, because that
+ * is what the ring wants (see its comment). The ring echoes that same number back in packet 1, and
+ * reading it as a genuine epoch puts every sample **the size of the timezone offset late** — ten
+ * hours in Brisbane. Measured 2026-08-27: the ring's own log ran 06:50–20:50 and was stored as
+ * 16:50–06:50 the next day, so 119 of 157 samples landed in the future and were rejected by the
+ * ingest's 60-second future tolerance. The 38 that survived were morning readings wearing evening
+ * timestamps, which is what made the ring look 15 bpm high against the Oura.
+ *
+ * So: read the number as the wall clock it actually is, then place that wall clock in the user's
+ * zone.
+ */
+export function wallClockSecondsToEpochMs(wallSeconds: number, tz: string = DEFAULT_TZ): number {
+  const asIfUtc = new Date(Math.trunc(wallSeconds) * 1000)
+  const p = (n: number) => String(n).padStart(2, '0')
+  const wall = `${asIfUtc.getUTCFullYear()}-${p(asIfUtc.getUTCMonth() + 1)}-${p(asIfUtc.getUTCDate())}`
+    + `T${p(asIfUtc.getUTCHours())}:${p(asIfUtc.getUTCMinutes())}:${p(asIfUtc.getUTCSeconds())}`
+  return fromZonedTime(wall, tz).getTime()
+}

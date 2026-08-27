@@ -6,6 +6,8 @@ import {
   cmdReadAutoPref, cmdWriteAutoPref, AUTO_METRICS, BIG_DATA_TYPE, CMD,
 } from '@/lib/colmi-ble/protocol'
 import { framesToPayload } from '@/lib/colmi-ble/ble'
+import { localDayStartSeconds, wallClockSecondsToEpochMs } from '@/lib/colmi-ble/resolve-time'
+import { formatInTimeZone } from 'date-fns-tz'
 import type { ColmiFrame } from '@/lib/colmi-ble/decode'
 
 const hex = (b: Uint8Array) => Buffer.from(b).toString('hex')
@@ -182,8 +184,13 @@ describe('the heart-rate log request carries a timestamp', () => {
  * recorded anything, so the log read as empty while 26 packets were arriving.
  */
 describe('heart-rate log continuation packets', () => {
-  const START = 1_800_000_000              // arbitrary fixed epoch; both sides derive from it
+  // What `cmdSyncHeartRate` sends and the ring echoes back: local midnight expressed AS IF UTC,
+  // which is not an epoch. Both sides of every assertion derive from it the same way the code does.
+  const START = localDayStartSeconds('2026-08-27')
   const opts = { todayStr: '2026-08-27', timezone: 'Australia/Brisbane' }
+  const slot = (i: number) =>
+    formatInTimeZone(new Date(wallClockSecondsToEpochMs(START, opts.timezone) + i * 300_000),
+                     opts.timezone, 'HH:mm')
 
   function header(intervalMinutes: number): ColmiFrame {
     return { kind: 'heartRateLog', subType: 0, packetTotal: 3, intervalMinutes,
@@ -203,10 +210,12 @@ describe('heart-rate log continuation packets', () => {
 
     const hr = readings.filter(r => r.kind === 'heart_rate')
     expect(hr).toHaveLength(3)
-    // Anchor slot 8, then continuation slots 9 and 21 — 9 anchor samples precede packet 2.
-    expect(hr[0]).toMatchObject({ value: 61, at: (START + 8 * 300) * 1000 })
-    expect(hr[1]).toMatchObject({ value: 62, at: (START + 9 * 300) * 1000 })
-    expect(hr[2]).toMatchObject({ value: 63, at: (START + 21 * 300) * 1000 })
+    // Anchor slot 8, then continuation slots 9 and 21 — 9 anchor samples precede packet 2. Slot 0
+    // is local midnight, so slot 8 is 00:40, not 10:40: the anchor is a wall clock, not an epoch.
+    expect(hr.map(r => formatInTimeZone(new Date(r.at), opts.timezone, 'HH:mm')))
+      .toEqual([slot(8), slot(9), slot(21)])
+    expect([slot(8), slot(9), slot(21)]).toEqual(['00:40', '00:45', '01:45'])
+    expect(hr.map(r => r.value)).toEqual([61, 62, 63])
   })
 
   it('spaces samples by the interval the header declares, not a hardcoded five minutes', () => {

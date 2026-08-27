@@ -1,0 +1,22 @@
+-- Delete the Colmi heart-rate readings written with a ten-hour timestamp error.
+--
+-- `cmdSyncHeartRate` sends the day's local midnight expressed AS IF UTC, which is what the ring
+-- wants. The ring echoes that number back in packet 1, and `framesToPayload` read the echo as a
+-- genuine epoch — so every heart-rate sample was stored the size of the timezone offset late. In
+-- Brisbane that is ten hours: a log the ring recorded 06:50–20:50 was stored as 16:50 through
+-- 06:50 the next morning.
+--
+-- Two consequences, both of which make these rows worse than missing:
+--   * 119 of 157 samples per sync landed in the future and were rejected by the ingest's 60-second
+--     future tolerance, so what survived is a biased fifth of the day rather than a sample of it.
+--   * The survivors are morning readings wearing evening timestamps. Compared against the Oura at
+--     the same wall-clock minute they read +15.6 bpm, which was recorded as a sensor difference and
+--     was in fact this bug.
+--
+-- These rows are re-derivable: the ring holds the log for the day and re-syncs are free, and from
+-- 2026-08-27 the raw frames are archived in `colmi_raw_frames`. Only `heart_rate` is touched —
+-- every other kind is placed by a different path and is unaffected.
+--
+-- `colmi_readings` is learning-mode storage. Nothing scores off it, so this cannot move a number
+-- the owner sees anywhere else.
+DELETE FROM colmi_readings WHERE kind = 'heart_rate';
