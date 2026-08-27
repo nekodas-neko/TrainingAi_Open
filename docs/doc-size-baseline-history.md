@@ -3219,3 +3219,16 @@ into a constant**, because one pair cannot separate an offset from a ratio. BF-3
 Cunningham runs 156 kcal high even on the owner's own DEXA lean mass — so the error is not body
 composition and a measured value must override rather than blend. BF-1 records the five shape
 questions a real 58-analyte panel answers that a described one could not.
+
+## 2026-08-27 — `docs/implementation-backlog.md` raised (BF-42, and the owner promoting BF-2)
+
+47 lines. Most of it is **BF-42**, filed from a question rather than a bug report: the owner asked
+whether exercise calories add on to the RMR base correctly. They do — `computeActiveEnergy` is
+net-of-rest and `calculateBaseline` refuses to multiply an activity factor in, both from Q-401. But
+checking it surfaced that `energy-balance-service.ts` computes its **own** BMR and never reads the
+measured RMR that BF-33 shipped, so the goal wizard and the Energy Balance card are about to disagree
+about one person's resting rate — and that BMR is also the floor under the calibrated maintenance,
+which for this owner sits 156 kcal above the measured value.
+
+The entry is long because the floor is the half that gets missed: substituting the base and leaving
+`Math.max(bmr, …)` alone would look correct and still clamp the calibration.
