@@ -24,8 +24,16 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.389.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Version:** v1.389.1 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-08-26.
+
+**A test flake that was the service worker, not the component (PS-14).** The filed hypothesis — a
+remount discarding the typed query — was **wrong**, and testing it (a probe asserting the value
+survived passed 8 of 8) is what found the real cause: `sw-template.js` re-issues **every** `/api/`
+request, Playwright cannot intercept a service-worker fetch, and the worker `claim()`s mid-page-life
+— so whether a `page.route` stub applies is a race. **The rule was already in `e2e/README.md`** and
+three specs were written against it anyway, two of them mine hours earlier, so
+`check-e2e-api-stub-sw.js` now holds it ([journal](docs/overview/entries/2026-08-27-e2e-api-stub-service-worker.md)).
 
 **The meal-plan wizard can finally reach the library, and stops dropping pins silently (BF-11h).**
 BF-11g shipped the engine and **nothing on the client sent `useLibrary` or read `matchReason`,
@@ -438,19 +446,6 @@ creating a view over a table `143` creates, aborting on every fresh CI database.
 missing `'wasm-unsafe-eval'` and the done screen's first-ever-weight calorie estimate. **PS-3 closed
 on top:** the four migrations retried on every cold start are idempotent now, 206 of 206
 ([journal](docs/overview/entries/2026-08-20-non-idempotent-migrations.md)).
-
-**Q-331 closed on top of that (2026-08-20, v1.333.1):** the done screen and the day screen were
-estimating the same workout with **different formulas** — Q-421 gave the day path a heart-rate
-estimate and left the done screen's route on the MET fallback, so the 42 of 78 sessions carrying an
-`avg_bpm` were reported twice, differently. Both now call one `estSessionKcal`, and a
-mutation-verified parity test fails if either side drifts again
-([journal](docs/overview/entries/2026-08-20-session-energy-cross-surface-parity.md)).
-
-**RV-33 closed alongside it** — two routes answered a *correct* ownership refusal with an
-empty-bodied 500, because the `NotFoundError` escaped an unguarded handler. Both are 404s with a body
-now, and `updateMealType` — the only repository writer passing its argument into `.set()` wholesale
-— is whitelisted column by column
-([journal](docs/overview/entries/2026-08-20-ownership-refusal-status.md)).
 
 **Older session handoffs:** [2026-08-20 workouts energy/RPE intake](docs/handoff-2026-08-20-workouts-energy-accuracy-and-rpe-intake.md)
 (reasoning, not status) and [2026-08-17 agent model/device findings](docs/handoff-2026-08-17-platform-agent-model-and-device-session-findings.md)

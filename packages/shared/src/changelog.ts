@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.389.1",
+    date: "2026-08-27",
+    changes: [
+      "Internal: a test that stubbed a network call was racing the app\u2019s own offline worker, so it passed or failed depending on timing rather than on anything being broken. The suggested cause turned out to be wrong \u2014 testing it is what found the real one \u2014 and the rule that prevents it is now checked automatically rather than only written down.",
+    ],
+  },
+  {
     version: "1.389.0",
     date: "2026-08-27",
     changes: [

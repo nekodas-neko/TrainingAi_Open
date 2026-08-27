@@ -86,6 +86,11 @@ test('the library sheet lists foods in the shared row, calories in their own col
  * The search is stubbed rather than driven: it reaches Open Food Facts, so a live run would be
  * non-deterministic and offline-fragile — which is why this row had no e2e cover at all.
  */
+// PS-14: `page.route` never sees a request the service worker re-issued, and `sw-template.js`
+// re-issues EVERY `/api/` request. Whether the worker has claimed the page yet is a race, so the
+// stub below silently stopped applying on some runs and the real Open Food Facts route answered.
+test.use({ serviceWorkers: 'block' })
+
 test('the external food-database row is the shared row, and keeps its mismatch warning', async ({ page }) => {
   // Deliberately inconsistent: 96 kcal against macros that come to ~122. That is the real shape the
   // warning exists for — a database filled in field by field by different contributors.
