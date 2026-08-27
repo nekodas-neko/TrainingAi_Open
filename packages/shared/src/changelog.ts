@@ -13,6 +13,13 @@ export const CHANGELOG: ChangelogEntry[] = [
     ],
   },
   {
+    version: "1.390.3",
+    date: "2026-08-27",
+    changes: [
+      "The Colmi sync now says how many readings the server kept, not just how many it read and how many were new. 223 read reaching 17 rows has two explanations \u2014 readings rejected as implausible, or readings it already had \u2014 and two numbers could not tell them apart.",
+    ],
+  },
+  {
     version: "1.390.2",
     date: "2026-08-27",
     changes: [
