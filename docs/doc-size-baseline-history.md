@@ -3287,3 +3287,18 @@ first place a meal photo could live.
 Two are one-liners with a reason worth recording — `nutrition-action-row.tsx` puts three buttons in a
 two-column grid, and `meal-card.tsx` keeps its P/C/F footer inside `CollapsibleContent`, so
 collapsing a meal drops the summary that collapsing exists to leave behind.
+
+## 2026-08-27 — `docs/implementation-backlog.md` raised (the owner answered the four open questions)
+
+39 lines across BF-45 and BF-46, and one of them is a correction rather than an addition.
+
+**The photo report was misdiagnosed here and the entry now says so out loud.** It read as "the picker
+was never found"; the owner had found it, saved, and the photo did not appear. So there is a real
+save failure, unreproducible in source — every layer seeds and sends correctly — and the entry now
+carries the device candidates and the one check that splits a write bug from a render bug (read the
+row back after a save that looked fine). Deleting the wrong guess would have let the next session
+re-make it.
+
+The gutter report also changed shape: asked which screens, the owner named bottom sheets rather than
+screens, which turns a per-screen sweep into one change in the shared `SheetContent side="bottom"` —
+with the warning that bottom sheets already own their bottom inset, so it is horizontal only.

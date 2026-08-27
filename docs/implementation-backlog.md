@@ -1011,12 +1011,19 @@ number. Collapsing exists precisely to skip the rows and keep the summary, and t
 it. Put the macro trio in the header (compact, collapsed-only, or always), sized so a long meal-type
 name still truncates rather than pushing it off.
 
-**③ Side gutters.** Owner: *"on many of the nutrition screens the text is too spread out on the
-sides; not enough safe space."* The scroll container is `px-4` (16 dp on a 412 dp screen) and the
-prose cards inherit it, so a long sentence runs nearly edge to edge. **Do not pick a new number
-here** — measure the gutter in the nutrition artboards and match it, and apply it once at the
-container rather than per-card. Name the screens fixed; the owner said *"many"*, so a fix on the day
-screen alone leaves the report half-answered.
+**③ Side gutters — and the owner scoped this on 2026-08-27, which makes it a different job.**
+Asked which screens, they answered: *"Mostly when an interactive tab opens from the bottom like;
+logging food or editing meals, those types of events."* So this is **`SheetContent side="bottom"`,
+not the day screen** — the food logger, the meal builder, the quantity sheet, the label sheet, every
+bottom sheet in the tab. That is one shared component, so **fix it once in
+`components/ui/sheet.tsx`'s bottom variant rather than per-sheet**, and the whole class moves
+together. A per-screen patch here would be the copy-paste that the pill-tab markup already taught
+this repo about (~17 drifting copies).
+
+⚠ **`SheetContent side="bottom"` owns the BOTTOM inset already** — CLAUDE.md forbids adding `pb-safe*`
+inside a bottom sheet, and `p-0` does not strip the baked padding, because tailwind-merge does not
+know the custom classes. **This is a horizontal change only.** Measure the gutter from the nutrition
+artboards rather than inventing a number.
 
 - **Verification.** On the S25: My Meals spans the row; a collapsed meal still shows P/C/F and its
   calories; the gutter matches the artboard on the day screen and every other nutrition screen
@@ -1027,26 +1034,49 @@ screen alone leaves the report half-answered.
 - **Lane:** B
 - **Batch:** `nutrition-ui-uplift` — ships with BF-45.
 - **Gate: device**
+- **Gate: owner** — item ③ only; the layout choice below. ①, ② and the photo repro are unblocked.
 - **Added:** 2026-08-27 · owner, with screenshots. *"overall just a UI rework/uplift. almost there."*
 
-**① "Adding an image doesn't show it" and "the photo should be at the top" are ONE bug, and it is
-placement rather than plumbing.** The column, the API, the sync mapping and the local table all
-carry `imageDataUri`, and `MealPhotoTile` downscales to 128 px WebP under a 16 KB cap. What is wrong
-is where the control is: `saved-meals-sheet.tsx:672` renders the tile **below `Add ingredient`**, at
-the bottom of a scrolling builder. And the detail sheet's `Add a photo` hero
-(`meal-detail-sheet.tsx:107`) does not open a picker at all — it calls `onEdit`, dropping the user
-into that builder above the buried tile. So the reported *"doesn't show it"* is most likely a photo
-never actually attached. **Move the tile to the top of the builder, at hero scale, matching the
-detail sheet's own band** — the two screens then agree about where a meal's photo lives. Reproduce
-the original report first: attach a photo, save, and confirm it renders in the meal list, the detail
-hero and the diary row before calling it placement rather than a write bug.
+**① Two things, and the owner corrected the first reading of them. ⚠ THE SAVE FAILURE IS REAL AND
+UNEXPLAINED — do not treat this as a layout ticket.**
+
+Asked whether they had ever found the picker, the owner answered: *"Yes I found the photo picker;
+its in two locations; once at the top of the page and once at the bottom. I only want the one at the
+top; I saved it; and it didnt show."* So a photo **was** attached and saved, and did not appear. The
+earlier guess in this entry — that the control was simply never found — is **wrong and is corrected
+here** rather than quietly deleted, because a session that reads only the fix would go looking for
+the wrong thing.
+
+**(a) One picker, at the top.** Two affordances say *Add a photo*: the detail sheet's hero
+(`meal-detail-sheet.tsx:107`), which **is not a picker at all** — it calls `onEdit` and drops the
+user into the builder — and the builder's real tile at `saved-meals-sheet.tsx:672`, rendered
+**below `Add ingredient`** at the bottom of a scroll. Owner wants the top one and only the top one.
+**Move the real tile to the top of the builder at hero scale**, matching the detail sheet's band, so
+the two screens agree where a meal's photo lives and there is one control rather than two things
+wearing one label.
+
+**(b) The save failure does not reproduce in source, so reproduce it on the device first.** Every
+layer reads correct: `openBuild` seeds `mealImage` from the meal being edited
+(`saved-meals-sheet.tsx:200`), the save sends it explicitly rather than omitting it (`:361`, the
+Q-396 rule), and the column, route, `getSyncDelta` mapping and local table all carry `imageDataUri`.
+**Candidates, in the order worth checking:** the Capacitor path re-encodes to WebP on Samsung's
+WebView and a failed encode returns a PNG data URI far over the 16 KB cap — `accept()` rejects with a
+toast that a user mid-flow can miss, and the save then proceeds with no photo; `width`/`height` on
+`CapCamera.getPhoto` are a first pass only, as the file's own comment says; or the write lands and a
+**read** path renders the placeholder anyway. Distinguish them by reading the row back
+(`/api/nutrition/saved-meals`) after a save that appeared to succeed — if the column holds a URI, it
+is a render bug and not a write bug, and that single check splits the two.
+
+⚠ **Do not ship (a) and call the report closed.** Moving the control does not make a photo save.
 
 **② A serving inside a serving.** Owner: *"I see there are serving size of each ingredient within the
 meal; so a serving size in a serving size is probably excessive; we should keep it weight/portion."*
 The builder lists `8 servings · 1000 g` per ingredient while the meal itself is measured in portions,
-so "serving" means two different things one line apart. Show ingredients in **weight**, and keep
-portions for the meal. Grams stay the stored truth either way, so this is a display change — but
-check the quantity editor's unit toggle, which is the same decision seen from the other side.
+so "serving" means two different things one line apart. **Settled by the owner, 2026-08-27:
+*"just the weight would be fine for the meals. Only portions are really needed when making serving
+sizes for the meals."*** So an ingredient row reads `1000 g` and nothing else — **not** a per-portion
+gram figure alongside it, which is what started the doubling. Portions stay the meal's own unit.
+Grams are already the stored truth, so this is display only.
 
 **③ The quantity sheet's layout.** Owner: *"the grams/serve could be smaller and to the right of the
 − x + button then the other buttons could be enlarged and spread to match the width it has: more
@@ -1058,6 +1088,15 @@ the stepper, the presets span the width, and the calorie total and macros read a
 are. **Keep BF-26's earned constraints:** the macro colours stay (four uncoloured columns were the
 *"everything looks the same"* complaint), and the grams chip is still hidden when there is no serving
 size to divide by, since a chip that cannot apply is worse than no chip.
+
+**⚑ Three layouts drawn for ③, 2026-08-27, awaiting the owner's pick:**
+<https://claude.ai/code/artifact/9388bd52-37e4-4986-b145-45cf96c5c3cb> — at 412 dp on the app's real
+dark tokens. All three apply the parts the owner specified (toggle shrunk beside the stepper, presets
+grown into the freed width) and differ only in the result block: **A** total as a headline with three
+macro tiles, **B** one result bar, **C** four colour-capped chips. Recommendation on the page is A —
+the only one where the calorie total leads rather than competing with a macro. **When the owner
+picks, replace this line with the choice**; a prose description of a layout is what sent this entry
+round once already. `Gate: owner` until then.
 
 - **Verification.** On the S25, in both sheets that render the editor: a photo attached in the
   builder appears in the list, the detail hero and the diary row; ingredients read in grams; every
