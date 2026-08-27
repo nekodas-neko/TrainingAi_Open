@@ -49,10 +49,20 @@ a per-bucket figure nor the ×10 scaling some firmware applies; a running daily 
 is stored raw and summed nowhere until a full day settles it — summing a cumulative counter would
 produce an inflated number that still looks plausible.
 
-## Note on the CI failure this branch hit
+## Note on the CI failure this branch hit — and the wrong call made about it
 
-`e2e/food-row-shared.spec.ts` went red here and on no other branch. The cause was the base, not the
-diff: #567 changed the meal-builder entry path and #568 is what makes the ingredient search
-reachable again, and this branch had the first without the second. Merging `main` cleared it. Worth
-recording because a nutrition e2e failure on a Bluetooth branch reads as unrelated noise, and the
-correct response was to update the base rather than to dismiss it.
+`e2e/food-row-shared.spec.ts:115` went red here twice. The first read was that the base was stale:
+#567 changed the meal-builder entry path, #568 touches the components the spec walks through, and
+this branch had the first without the second. Merging `main` cleared it, which looked like
+confirmation.
+
+**It was not.** The spec failed again on a head that already contained #568, with the nutrition code
+byte-identical between the passing and failing runs. Three runs on a branch that touches no nutrition
+file at all went fail → pass → fail. That is a flaky spec, and merging `main` fixed nothing — it
+coincided with a pass.
+
+Recorded because the wrong conclusion was the plausible one, and because a single green run after a
+base update is exactly the evidence that makes a flake look solved. The finding is filed as **PS-14**
+with the mechanism it is most likely to be — `IngredientPicker` is keyed on `buildSession`, so a
+remount landing after the test's `fill()` would discard the typed query silently — and a proposed
+patch. It has not been reproduced locally, and the entry says so.

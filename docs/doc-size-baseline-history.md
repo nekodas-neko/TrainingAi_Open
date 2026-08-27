@@ -3175,3 +3175,20 @@ derived from the span, and warned what would happen if anything derived them —
 already did, and building the entry as written would have turned a measured 3 h night into 10 h at
 35%. The instruction that follows is the reusable half: when an entry names the assumption its design
 rests on, that sentence is the thing to go and check.
+
+## 2026-08-27 — `docs/implementation-backlog.md` 12525 → 12600 (+75), PS-14 and the ring queue
+
+Two additions, both queue material rather than narrative.
+
+The first is PS-11/12/13, the Colmi R09 follow-ups: the overnight-sync verification, the
+three-device comparison baseline, and the heart-rate log's dropped continuation packets. They are
+long because the ring is undocumented — each entry has to carry the byte layout or the command
+shape it depends on, and there is no reference doc to point at instead.
+
+The second is PS-14, an intermittent nutrition e2e failure found from CI rather than from the app.
+It carries a hypothesis and a proposed patch but no reproduction, which is deliberate: an entry that
+says "flaky, look into it" is one nobody can start, and the mechanism is the part that would
+otherwise have to be re-derived from three run logs that expire.
+
+Raised to 12600 rather than to the exact 12595 so the next small entry does not need its own
+history note for five lines.
