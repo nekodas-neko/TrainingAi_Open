@@ -1806,33 +1806,30 @@ whether or not anyone draws them first.
   reference drawings were never committed). Part 1 §8 has the file-by-file collision table and the
   carry-across rule. **Do not plan around that chain landing, and do not wait for it.**
 
-### [nutrition] BF-11h — the wizard surfaces the library, the reasons, and the meal-count prompt
+### [nutrition] LB-21 — `useLibrary` is reachable by users now, and no test has ever run a generation with it on
 
-> **⚠ BF-11g shipped the engine half. The response already carries what this entry needs to render:**
-> `source` (`'kept' | 'library' | 'ai'`) and `matchReason` per meal, `libraryMatchCount`, and
-> `droppedPins` — the pins the server could not honour because there were more of them than slots.
-> **Nothing sets `useLibrary` yet**, so the library search is off for every real request until this
-> entry turns it on; the field is a boolean on the generate request, not a list of ids.
-
-- **Lane:** B
-- **Needs:** BF-11f, BF-11g
-- **Plan:** [`plans/2026-08-24-library-first-meal-planner.md`](superpowers/plans/2026-08-24-library-first-meal-planner.md) §5.5
-- **Branch:** `feat/meal-plan-library-surface`
-- **Added:** 2026-08-24 · planning session, from BF-11 (design items 10, 11, 12).
-- Four things, one screen pair, one verification pass: a **"use all my saved meals"** toggle in the
-  *Yours* step (the existing checkboxes stay and keep meaning *pin* — the copy must distinguish
-  them); **"why this meal"** from `matchReason`, and its inverse on a fallback slot, which is the
-  useful half of the rejected prompt-to-create option; **reroll offers a library swap first**, AI
-  second; and the **meal-count reduction prompt**.
-- **⚠ The reduction prompt is fixing a live silent drop, not adding a nicety** — see BF-11 above and
-  Part 2 §2. It fires **only when `K > M − 1`** (pins exceed the slots left after the planner's
-  reserved one). Below that, re-run the split and say nothing: **there is nothing to "transfer"**,
-  because the split derives from the day's totals, so removing a slot redistributes automatically.
-  What the user loses is a meal *choice*, and that is what the prompt is about.
-- **Verify the regression, don't inspect it:** pick the maximum meals, go back, lower the count,
-  confirm the prompt fires and nothing is dropped. The failure is invisible from the UI.
-- Read Q-407 first (Part 2 §6) — it edits the same two files, and its instruction *"do not delete the
-  stepper in this PR"* holds here too.
+- **Lane:** A — the work is in `app/api/nutrition/meal-plans/generate/route.ts`, which the path rule
+  puts in Lane A. Filed by Lane B (the letter records who found it, not who ships it).
+- **Branch:** `test/generate-with-library`
+- **Added:** 2026-08-27 · Lane B, from BF-11h's own "Not exercised" section.
+- **What is and is not covered.** `selectLibraryMeals` is well tested in
+  `packages/shared/src/nutrition/__tests__/library-match.test.ts` — the ranking, the eligibility
+  windows, untagged-suits-any-slot, no-meal-twice. **The route WIRING is not.** `grep -rl useLibrary
+  --include=*.test.ts` returns nothing: BF-11g shipped the flag with no test, BF-11h made it
+  settable from the wizard, and between them nobody has run a generation with it on.
+- **What a test should pin, none of which the shared tests can see:**
+  - `useLibrary: false` still skips both `listSavedMeals` and `listMealTypes` — the conditional
+    fetches at route.ts:132/135 are the reason the common path costs nothing, and a regression there
+    is invisible except as latency.
+  - Picks land at the slot they were matched against, **after** the pinned meals — the `kept.length`
+    offset at route.ts:203 is arithmetic nothing currently checks.
+  - `libraryMatchCount` equals the picks actually used, and `matchReason` is null on an AI slot when
+    `useLibrary` was off but a sentence when it was on. **BF-11h's UI depends on exactly that
+    distinction** — it is how the review step tells "the library had no say" from "nothing fitted".
+  - A pinned meal is never also offered by the library pass (route.ts filters it, untested).
+- **Do not reach for an AI call to test this.** The library path is the half that does NOT call the
+  model — a fully-pinned or fully-library-filled request generates nothing, which is what makes an
+  end-to-end test of this flag cheap and deterministic. That is the shape to aim for.
 
 ### [nutrition][platform] Q-407 — the meal-plan wizard is seven screens for six answers, and the one piece the Coach lacks is multi-select
 

@@ -24,8 +24,21 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.388.1 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Version:** v1.389.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-08-26.
+
+**The meal-plan wizard can finally reach the library, and stops dropping pins silently (BF-11h).**
+BF-11g shipped the engine and **nothing on the client sent `useLibrary` or read `matchReason`,
+`libraryMatchCount` or `droppedPins`** — the search was off for every real request since it landed.
+Four things: the toggle, why-this-meal, a reroll offering **one of yours before something new** (no
+route, no model call — it runs the generator's own matcher on cached data), and the meal-count
+reduction prompt. **That last fixes a live silent drop** — the picker caps pins at `mealCount - 1`
+while you pick and `setMealCount` never re-truncated them, so lowering the count afterwards
+discarded pins the server capped and reported to nobody. **It also exposed a badge bug BF-11g
+created:** `kept` and `library` both carry a `savedMealId`, so a meal the planner *chose* claimed to
+be one the user had *pinned*. Regression driven, not inspected — reverting the wiring fails both
+reduction e2e tests. ⚠️ Not device-verified, and no end-to-end generation with `useLibrary` on.
+[Journal](docs/overview/entries/2026-08-27-meal-plan-library-surface.md).
 
 **A saved meal can say which meals of the day it suits (BF-11f) — and the save button was eating
 its own argument.** BF-11e built the column, the join table, the route field and the outbox replay and
@@ -433,24 +446,11 @@ estimate and left the done screen's route on the MET fallback, so the 42 of 78 s
 mutation-verified parity test fails if either side drifts again
 ([journal](docs/overview/entries/2026-08-20-session-energy-cross-surface-parity.md)).
 
-**RV-32 and RV-34 closed (2026-08-20)** — the program-config write surface took two client-supplied
-FKs on trust: three of four write paths accepted another user's `progression_styles` id, and
-`listPhaseSets` joined the style **name** in unscoped, so their words reached a screen and an LLM
-prompt. A foreign `program_sessions.id` was a raw duplicate-key 500. All guarded, refusals verified
-live with two accounts; production shows no mis-linked row, but `claude_ro` is row-scoped to the
-owner, so that is *no evidence*, not *has not happened*
-([journal](docs/overview/entries/2026-08-20-program-write-fk-ownership.md)).
-
 **RV-33 closed alongside it** — two routes answered a *correct* ownership refusal with an
 empty-bodied 500, because the `NotFoundError` escaped an unguarded handler. Both are 404s with a body
 now, and `updateMealType` — the only repository writer passing its argument into `.set()` wholesale
 — is whitelisted column by column
 ([journal](docs/overview/entries/2026-08-20-ownership-refusal-status.md)).
-
-**Q-362a closed (2026-08-20)** — `/api/day-log` keyed workout durations by session **name**, so two
-`Push` sessions in one day left one window and the earlier vanished. Now keyed by id, **additively**:
-the name-keyed record still ships until Q-362b moves the three Lane B readers, LA-15 removes it after
-([journal](docs/overview/entries/2026-08-20-day-log-duration-session-identity.md)).
 
 **Older session handoffs:** [2026-08-20 workouts energy/RPE intake](docs/handoff-2026-08-20-workouts-energy-accuracy-and-rpe-intake.md)
 (reasoning, not status) and [2026-08-17 agent model/device findings](docs/handoff-2026-08-17-platform-agent-model-and-device-session-findings.md)

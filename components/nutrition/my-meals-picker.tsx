@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { Check, Link2, Loader2, Plus, X } from 'lucide-react'
 import { cn } from '@trainingai/shared/utils'
 import { Button } from '@/components/ui/button'
+import { Switch } from '@/components/ui/switch'
 import { cachedFetch, readCacheSync } from '@/lib/sqlite/cache'
 import { TTL_MEDIUM } from '@trainingai/shared/cache-ttl'
 import { perServing, sumIngredients } from '@trainingai/shared/nutrition/scan-totals'
@@ -48,6 +49,15 @@ interface Props {
   onChangeTyped: (meals: TypedMeal[]) => void
   /** Slots available in total, so the picker can stop the user filling every one. */
   mealCount: number
+  /**
+   * Let the planner CHOOSE from the library for the slots nobody pinned (BF-11h → `useLibrary`).
+   *
+   * A different question from the checkboxes below, and the copy has to make that survive a glance:
+   * ticking a meal **forces** it into the plan, this lets the planner reach for one when it fits.
+   * Off by default, because on is a change to what every generation returns.
+   */
+  useLibrary: boolean
+  onChangeUseLibrary: (next: boolean) => void
 }
 
 /**
@@ -64,6 +74,7 @@ interface Props {
  */
 export function MyMealsPicker({
   selectedIds, onChangeSelected, typedMeals, onChangeTyped, mealCount,
+  useLibrary, onChangeUseLibrary,
 }: Props) {
   const [meals, setMeals] = useState<SavedMeal[] | null>(null)
   const [draftText, setDraftText] = useState('')
@@ -153,13 +164,33 @@ export function MyMealsPicker({
 
   return (
     <div className="space-y-5">
+      {/* Above the checkboxes on purpose: the distinction between "choose from these" and "always
+          include this one" only reads if you meet the broad question first. */}
+      <div className="rounded-xl border border-border bg-muted/40 p-3">
+        <label className="flex items-start gap-3">
+          <Switch
+            checked={useLibrary}
+            onCheckedChange={onChangeUseLibrary}
+            aria-label="Let the plan use my saved meals"
+          />
+          <span className="min-w-0 flex-1">
+            <span className="block text-sm font-medium">Use my saved meals</span>
+            <span className="mt-0.5 block text-[11px] leading-snug text-muted-foreground">
+              The plan fills a slot from your library whenever one fits, and writes something new
+              when none does. Tag a meal in My Meals to say which times of day it suits.
+            </span>
+          </span>
+        </label>
+      </div>
+
       <div>
         <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-2">
-          Keep meals from your library
+          Always include these
         </p>
         <p className="mb-2 text-[11px] leading-snug text-muted-foreground">
-          These go into the plan exactly as you saved them, with the portions adjusted to fit the
-          day. The plan is built around whatever you keep.
+          {useLibrary
+            ? 'Ticking a meal forces it in, rather than leaving it to the plan to choose. It goes in exactly as you saved it, with the portions adjusted to fit the day.'
+            : 'These go into the plan exactly as you saved them, with the portions adjusted to fit the day. The plan is built around whatever you keep.'}
         </p>
 
         {meals == null ? (
