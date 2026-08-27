@@ -110,6 +110,9 @@ test('the external food-database row is the shared row, and keeps its mismatch w
   const search = page.getByPlaceholder(/search/i).first()
   await expect(search).toBeVisible({ timeout: 30_000 })
   await search.fill('spec mismatch')
+  // PS-14 PROBE (temporary): does the typed query survive? If the hypothesis is right this is what
+  // fails; if it holds and the row still never appears, the remount theory is wrong.
+  await expect(search, 'PS-14 PROBE: query was discarded').toHaveValue('spec mismatch', { timeout: 3_000 })
 
   const row = page.getByRole('button', { name: /Spec Dairy — Spec Mismatch Yoghurt/ }).first()
   await expect(row).toBeVisible({ timeout: 30_000 })
