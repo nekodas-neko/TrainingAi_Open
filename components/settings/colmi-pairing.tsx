@@ -151,6 +151,32 @@ export function ColmiPairing() {
             </div>
           )}
 
+          {outcome?.diagnostics && Object.keys(outcome.diagnostics.frameTags).length > 0 && (
+            <details className="text-xs">
+              <summary className="cursor-pointer text-muted-foreground">
+                Sync detail — {outcome.framesSeen} frames from the ring
+              </summary>
+              <div className="mt-1 space-y-1 text-muted-foreground">
+                {/* Tallied by command byte. A history command whose tag is missing here was never
+                    answered, which is a different problem from one that answered and did not map. */}
+                <div className="font-mono">
+                  {Object.entries(outcome.diagnostics.frameTags)
+                    .sort(([a], [b]) => a.localeCompare(b))
+                    .map(([tag, n]) => `${tag}×${n}`)
+                    .join('  ')}
+                </div>
+                {outcome.diagnostics.unmapped > 0 && (
+                  <div>
+                    {outcome.diagnostics.unmapped} frame(s) not understood:
+                    <div className="mt-0.5 break-all font-mono">
+                      {outcome.diagnostics.unmappedHex.join(' · ')}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </details>
+          )}
+
           {outcome?.ok && (
             <p className="text-sm text-muted-foreground">
               {/* Both numbers on purpose: a repeat sync storing 0 of 400 is deduping, not failing,

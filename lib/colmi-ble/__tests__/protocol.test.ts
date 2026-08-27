@@ -90,7 +90,7 @@ describe('CRC16/MODBUS (V2 big data)', () => {
 
 describe('command bytes match the reference client', () => {
   it('uses Gadgetbridge\'s constants, not the Python client\'s where they differ', () => {
-    expect(cmdSyncHeartRate()[0]).toBe(0x15)
+    expect(cmdSyncHeartRate(0)[0]).toBe(0x15)
     // 0x50 FIND_DEVICE is the blink command. The Python client's 0x10 has no counterpart here and
     // produced nothing on the real ring.
     expect(cmdFindDevice()[0]).toBe(0x50)
@@ -148,5 +148,28 @@ describe('automatic-measurement preferences', () => {
     expect(cmdWriteAutoPref('heart_rate', true, 90)[3]).toBe(60)
     expect(cmdWriteAutoPref('heart_rate', true, 1)[3]).toBe(5)     // 5 is the finest it will do
     expect(cmdWriteAutoPref('heart_rate', true, 30)[3]).toBe(30)
+  })
+})
+
+describe('the heart-rate log request carries a timestamp', () => {
+  it('encodes the day as 4 little-endian bytes after the command', () => {
+    // 2026-08-27 local midnight, as-if-UTC: Date.UTC(2026,7,27)/1000
+    const t = Math.floor(Date.UTC(2026, 7, 27) / 1000)
+    const p = cmdSyncHeartRate(t)
+    expect(p[0]).toBe(0x15)
+    expect(p[1] | (p[2] << 8) | (p[3] << 16) | (p[4] << 24)).toBe(t)
+    expect(isValidPacket(p)).toBe(true)
+  })
+
+  it('is NOT a bare 0x15 — the bare form is what the ring silently ignored', () => {
+    // Two syncs returned HRV, stress and temperature and never one heart-rate sample: those three
+    // take no argument and this one does.
+    expect(cmdSyncHeartRate(1000).length).toBe(16)
+    expect(Array.from(cmdSyncHeartRate(1000).slice(1, 5)).some(b => b !== 0)).toBe(true)
+  })
+
+  it('clamps a negative or fractional day rather than emitting rubbish', () => {
+    expect(Array.from(cmdSyncHeartRate(-5).slice(1, 5))).toEqual([0, 0, 0, 0])
+    expect(cmdSyncHeartRate(1.9)[1]).toBe(1)
   })
 })
