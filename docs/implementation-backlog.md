@@ -2351,7 +2351,30 @@ the day's move-hours total is below the goal.
 ### [heart-rate] TN-13 — the HR tile shows a 7-day average of the one signal that best predicts how the owner feels
 
 - **Branch:** _unassigned_ · **Added:** 2026-08-26 · owner: *"my value is 52; what is that? what would be the more useful HR value to show?"*
-- **Lane: B** — `components/oura-score-chip-row.tsx:390`; the payload field already exists.
+- **Lane: A** — corrected 2026-08-27 by Lane B, which picked this up and found its lane premise false.
+  The tile itself is `components/oura-score-chip-row.tsx:390` and that half is Lane B's, but it
+  cannot be done alone; see the ⚑ below.
+
+> **⚑ The payload field this entry assumed does NOT exist, and that is what moves the lane.**
+> Verified against `main` at cd09c990. `lib/health/readiness-payload.ts` returns `restingHr`
+> (**the 7-day mean** — `recentRhr`, averaged over `recentRhrRows`, line 271) and `restingHrBaseline`
+> (28-day, low-wear-excluded), plus `hrCurrent`/`hrMin`/`hrAvg`/`hrMax`, which are **today's live BLE
+> readings, not a nightly resting HR**. Nothing carries last night's single-night value, under that
+> name or any other — no `lowestHeartRate`, no sleep-derived HR.
+>
+> So the recommendation below needs a **new payload field**, and `readiness-payload.ts` is consumed
+> by three routes — `app/api/readiness-score`, `app/api/body-battery`, `app/api/ai/health-insight`.
+> Reached by `app/api/**` → Lane A, by the path rule in `docs/agents/README.md` §3.
+>
+> **Do not split it and take the presentation half.** The pass test at the bottom of this entry rules
+> that out in as many words: *"a change that keeps the 7-day average and merely adds a cue beside it
+> fails this entry."* Rendering a delta between `restingHr` and `restingHrBaseline` is possible in
+> Lane B **today** and would look like progress while failing the entry — both halves ship together.
+>
+> **Do not re-derive the nightly value on the client either.** `body_metrics.restingHeartRate` is
+> reachable from the local store, but computing a health value a second time in the client is the
+> One-Formula-One-Place violation this repo has paid for repeatedly, and it would bypass the ranked
+> per-field merge in `lib/data/health-source.ts` that decides which source owns that column.
 
 `const hr = readiness.restingHr ?? readiness.hrCurrent`, and `restingHr` is documented as
 *"recent (7-day) average resting HR"* (`readiness-payload.ts:131`).
