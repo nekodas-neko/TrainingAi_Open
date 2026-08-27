@@ -720,43 +720,6 @@ permanently).
 
 **Do not flash the circulating `…FasterRawValuesMOD.bin`.** Only step in the arc that can brick the
 device, and it would be taken before knowing the sensor is worth streaming from.
-### [nutrition] PS-14 — `food-row-shared.spec.ts` fails intermittently: the typed query can be eaten by a remount
-
-- **Lane:** B (the surface)
-- **Added:** 2026-08-27, from CI on PR #566
-
-`e2e/food-row-shared.spec.ts:115` — *the external food-database row is the shared row, and keeps its
-mismatch warning* — waits 30 s for the stubbed Open Food Facts row and times out with
-`element(s) not found`. It is not deterministic: measured across three CI runs on
-`fix/colmi-sync-diagnostics`, a branch whose diff touches no nutrition file at all, it went
-**fail → pass → fail**, with the nutrition code byte-identical between the last two. A Bluetooth
-branch cannot break a food search, so this is the spec, not the diff.
-
-**Hypothesis, not a diagnosis — this has not been reproduced locally.** `IngredientPicker` is
-mounted with `key={buildSession}` in `saved-meals-sheet.tsx:651`, and `buildSession` bumps on every
-entry to the build form. The picker owns the search query, so a remount clears it. The test does
-`search.fill('spec mismatch')` immediately after clicking `New`, which is what bumps the key — so if
-the remount lands after the fill, the query is discarded, the 700 ms debounce in
-`ingredient-picker.tsx:93` never sees a non-empty string, and no request is made. Nothing in the
-test would notice: `fill()` has already returned.
-
-**Proposed patch** — assert the value survived, and let Playwright retry the fill if it did not:
-
-```ts
-await expect(async () => {
-  await search.fill('spec mismatch')
-  await expect(search).toHaveValue('spec mismatch')
-}).toPass({ timeout: 10_000 })
-```
-
-Confirm the mechanism before taking the patch. If the remount is real, the same shape is a hazard for
-every spec that types into the builder right after opening it — `saved-meal-tags.spec.ts` and
-`empty-meal-library.spec.ts` both do, and both pass today, which is what a race looks like before it
-bites. If it is something else, the trace zip on the failing run
-(`playwright show-trace`) is the place to start, because the failure ships one.
-
-**Do not skip or quarantine the spec** — it covers a warning the owner explicitly asked to keep.
-
 ### [body][nutrition] BF-42 — the daily energy model computes its own BMR and never reads the measured RMR
 
 - **Lane:** A — `lib/health/energy-balance-service.ts`.
