@@ -118,6 +118,18 @@ Chromium-on-Linux, and gestures behave differently under a real thumb. Those sti
   8 for 8, while a page-context fetch before the worker's claim reached the stub and the identical
   fetch after it did not. If you are debugging a stubbed route that "sometimes" misses, check the
   worker before you check your component.
+- **A spec that WRITES rows must delete them, either side.** The local database persists between
+  runs and CI provisions a fresh one, so a spec that leaves rows behind passes on CI **forever**
+  while failing every local run after the first. That is the inverse of the aged-fixture trap in
+  `CLAUDE.md` and it hides just as well: `recipe-image-to-meal.spec.ts` mints a `food_item` per
+  imported ingredient, and on the second run its own leavings came back in the picker's list, where
+  a bare-name assertion matched both the ingredient row and a stale search row. Clean up in
+  `beforeAll` **and** `afterAll` — before, because a previous run may have died mid-way.
+
+  Two habits make it moot. Assert on the **row's own shape** (`/Spec Flour.*250 g/`) rather than a
+  name anything can carry; and run a new spec **twice in a row** before believing it, which is the
+  cheapest thing that distinguishes "passes" from "passes once".
+
 - **Never put an `expect` inside a `page.route` handler.** A throw there skips `route.fulfill`, so the
   app's request breaks and the failure surfaces several assertions later as something unrelated —
   a locator error, usually. Record the request and assert in the test body.
