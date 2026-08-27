@@ -3244,7 +3244,8 @@ two fixes is load-bearing and neither entry said so.
 
 ## 2026-08-27 — `docs/implementation-backlog.md` raised (LB-23, LB-24 filed by Q-112a)
 
-11 net lines (12724): two entries filed, minus Q-112a's own removal on shipping.
+48 net lines (12758 after merging main, which added 34 of its own without needing a raise): two
+entries filed, minus Q-112a's own removal on shipping.
 
 **LB-24 is the one worth the space.** Deleting `day-review-sheet.tsx` left
 `workout-load-comparison-chart.tsx` with zero call sites and `/api/workout-load-history` with zero
