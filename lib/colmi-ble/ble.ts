@@ -41,6 +41,10 @@ export interface ColmiSyncOutcome {
   readings: number
   sleepSegments: number
   stored?: { readings: number; sleep: number }
+  /** What the route kept after its per-sample window and range filters, before the de-dup insert.
+   *  `readings` sent minus this is what the FILTERS dropped; this minus `stored` is what the unique
+   *  key deduped. Without both, 223 sent reaching 17 rows has two explanations and no way to pick. */
+  accepted?: { readings: number; sleep: number }
   battery?: { percent: number; charging: boolean }
   /**
    * Every frame the ring sent, tallied by its command byte (`'0x73'`, `'0x43'`, …), plus how many
@@ -273,9 +277,13 @@ const MAX_UNMAPPED_HEX = 8
                readings: payload.readings.length, sleepSegments: payload.sleep.length,
                message: `Upload failed (${res.status}).` }
     }
-    const body = await res.json() as { stored?: { readings: number; sleep: number } }
+    const body = await res.json() as {
+      stored?: { readings: number; sleep: number }
+      accepted?: { readings: number; sleep: number }
+    }
     return { ok: true, framesSeen, battery, autoPrefs, diagnostics,
-             readings: payload.readings.length, sleepSegments: payload.sleep.length, stored: body.stored }
+             readings: payload.readings.length, sleepSegments: payload.sleep.length,
+             stored: body.stored, accepted: body.accepted }
   } catch (e) {
     return { ok: false, framesSeen, reason: 'post-failed', battery, autoPrefs, diagnostics,
              readings: payload.readings.length, sleepSegments: payload.sleep.length, message: describe(e) }
