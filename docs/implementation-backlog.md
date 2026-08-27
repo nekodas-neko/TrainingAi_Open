@@ -10540,17 +10540,37 @@ per-field merge where an AI write has no honest source rank to claim.
   reusable components. What is missing is one entry point instead of two, three stats, a 7-day
   comparison, and the wrap-up continuing from the read-through. Reasoning and alternatives: the plan.
 
-### [nutrition][app-shell] Q-112b — the read-through becomes step 1, plus the three missing stats
+### [sleep][readiness] LB-25 — body temperature has no way to reach a screen, so Q-112b shipped without it
 
-- **Branch:** `feat/day-review-read-through` · **Lane: B** · **Plan:** the above, §4
-- `day-sections` render inside the flow off the shared `day-log:<date>` key — no second fetch, no
-  second implementation. Adds HR min/max, body temp (Q-105's derived-first precedence, never the
-  frozen Cloud column) and the AI digest; the same three land on `/health/day` itself.
+- **Branch:** `feat/day-log-body-temp` · **Lane: A** — the fix is a field on
+  `app/api/day-log/route.ts`; the render that consumes it is a handful of lines in
+  `components/health/day-detail/day-read-through.tsx` and can ride along.
+- **Added:** 2026-08-27 · Lane B, split out of Q-112b when the premise was checked against `main`.
+- **Why it is not simply "add a stat".** Q-112b asked for HR min/max, body temp and the AI digest.
+  Two of the three shipped; body temp is the one with **no client-reachable source**:
+  - `oura_daily.temperature_deviation` is the frozen Cloud column the plan explicitly forbids — it
+    stops at the BLE re-key and would print a months-old figure as today's.
+  - The live derived values are `oura_daily_summary.temp_mean_c` / `temp_dev_c`
+    (`lib/data/postgres/schema.ts:1315`). **No route returns either.** `app/api/ai/health-insight`
+    reads `tempDevC` and feeds it to a prompt; nothing hands it to a component.
+  - They *are* synced to the local store (`store.getOuraDailySummary(from, to)`), so a device-only
+    local-first read would work — and would be unverifiable in `pnpm dev` or Playwright, where
+    `getLocalStore` returns null. That is the trade this entry exists to avoid making silently.
+- **The shape:** add `bodyTemp: { meanC, devC } | null` to `DayLogResult`, sourced from
+  `oura_daily_summary` for the requested day. One field, one `Stat` pair beside the sleep or body
+  section. Q-105's precedence is what decides the source; it is **not** a new precedence.
+- **Do not reach for `oura_daily`** even as a fallback for pre-re-key days. A value that is correct
+  for 2026-07-05 and stale for every day since is worse than a blank, because a blank says so.
+- **Related, deliberately not folded in:** the day HR trace is bucketed by **mean** over 15 minutes
+  (`app/api/day-log/route.ts:271`), so the range Q-112b shipped is labelled *"15-min averages"*
+  rather than min/max — a three-minute resting dip to 48 surfaces as about 55. The true per-bucket
+  extremes exist as `oura_bucket.hr_min` / `hr_max`. If this entry is taken, adding
+  `hrLow`/`hrHigh` to the same payload is nearly free and would let that label become *Low* / *High*
+  honestly.
 
 ### [readiness][nutrition] Q-112c — the 7-day comparison window
 
 - **Branch:** `feat/day-review-week-window` · **Lane: A** — `app/api/**`
-- **Needs: Q-112b**
 - The prior-7-day series for the stats that get a trend. Reuse `computeActiveEnergy()`,
   `/api/workout-load-history`, `body_metrics`, `buildDayAudit`. Anchor at `todayMidnightUtc(tz)`.
 

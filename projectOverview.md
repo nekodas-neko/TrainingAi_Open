@@ -24,8 +24,16 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.393.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Version:** v1.394.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-08-27.
+
+**The wrap-up shows the day it is wrapping up (Q-112b).** The evening review asked how the day felt
+without ever showing the day. The read-through — training, activity, energy, sleep, HR, body — is
+step 1 now, drawn by **the same component `/health/day` draws**, off the same `day-log:` key; three
+steps, and the meals step is skipped once nothing is missing. **Two findings the entry did not
+have:** the HR pair is labelled *15-min averages*, not min/max, because the trace is bucketed by
+mean and a resting dip to 48 surfaces as ~55; and **body temp had no route at all** — the live
+values are in `oura_daily_summary`, returned by nothing, so it is Lane A (**LB-25**). ⚠️ Not device-verified ([journal](docs/overview/entries/2026-08-27-day-review-read-through.md)).
 
 **One evening flow, one door (Q-112a).** Home opened a thinner `DayReviewSheet` only Home had,
 Nutrition's End of Day button opened the real one, and **both reminders' `extra.route` was `'/'`** —
@@ -364,17 +372,9 @@ Three GET routes answered a parameter or configuration question before establish
 **Three ring-service fixes, none verified on the ring (Q-537, Q-533, Q-388 item 2).** Key backup
 (`/admin/oura-ble` → **Show key for backup**), a re-sync completion notification, and a connect sequence that resets the live-HR levers a killed session left on. **All native — inert until a new APK is installed, and until then the ring key has one copy.** `Gate: device`. **Item (3) needed no work:** 6,346 battery polls measure the drain the entry called unmeasurable (−22/−24/−22/−38/−15 overnight), confirming the owner's report; the SpO₂ A/B is wear, not code.
 
-**Two affordances came back and the sheet that owned them is gone (LB-3, v1.347.0).** Nothing opened `day-overlay-sheet.tsx` after Q-110, so tapping a logged exercise or an activity was dead a fortnight. Both on `/health/day` (the NAME is the target); `health-content.tsx` lost 167 lines.
-
-**Deleting an activity works offline now (Q-328, v1.350.0).** The one activity-log write with no outbox domain — deleted by a bare `fetch` that failed with no connection. `softDeleteActivityLogPending`: a queued delete must stay `pending` or a pull clobbers it; `'synced'` is what lets `applyDelta` reap it.
-
 **The memo-stability baseline is empty (Q-357, v1.349.0).** All four defeated call sites cleared, so a
 new one is a regression. The expensive one sat inside `visibleMeals.map(...)`, where a hook cannot
 live — its callbacks take the meal and hand it back, so the parent shares one per action.
-
-**Body-metric bounds are asked at the keyboard (Q-321, v1.348.0).** `validation/body-metrics.ts` held every threshold and nothing under `components/`/`app/` imported it, so a 5,000 kg weight was queued and dropped server-side. **Three** sheets, not the one the entry named.
-
-**Sixteen writes revalidated around their push, not after it (LB-6, v1.345.0).** The entry listed six; its finder read only *above* each call. `check-invalidate-after-push.js` holds it.
 
 **The meal plan can be written to again, and it now produces saved meals (Q-398, v1.340.0).** Five
 write routes validated a variable nothing had assigned, so every one answered `400 Invalid input:

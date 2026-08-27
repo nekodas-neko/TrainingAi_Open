@@ -22,7 +22,9 @@ test('the day-review deep link opens the review', async ({ page }) => {
   // That duplication is a real accessibility defect and is filed as LB-23, not fixed here.
   const review = page.getByRole('dialog')
   await expect(review).toBeVisible({ timeout: 60_000 })
-  await expect(review.getByRole('button', { name: 'Save' })).toBeVisible()
+  // `Next`, not `Save`: Q-112b made this a stepped sheet and step 1 is the read-through. `Save`
+  // lives on the last step, which is what `day-review-read-through.spec.ts` walks to.
+  await expect(review.getByRole('button', { name: 'Next' })).toBeVisible()
 })
 
 test('the meal reminder’s older link still opens it', async ({ page }) => {
@@ -30,7 +32,7 @@ test('the meal reminder’s older link still opens it', async ({ page }) => {
   // affects ones written from here on, so dropping this param would strand every pending reminder.
   await page.goto('/nutrition?chat=backfill')
   await settleRouteBoundary(page)
-  await expect(page.getByRole('dialog').getByRole('button', { name: 'Save' })).toBeVisible({ timeout: 60_000 })
+  await expect(page.getByRole('dialog').getByRole('button', { name: 'Next' })).toBeVisible({ timeout: 60_000 })
 })
 
 test('the param reaches an already-mounted Nutrition tab', async ({ page }) => {
@@ -57,7 +59,7 @@ test('the param reaches an already-mounted Nutrition tab', async ({ page }) => {
   await expect(page.getByRole('dialog')).toHaveCount(0)
 
   await page.evaluate(() => window.history.replaceState(null, '', '/nutrition?review=day'))
-  await expect(page.getByRole('dialog').getByRole('button', { name: 'Save' }))
+  await expect(page.getByRole('dialog').getByRole('button', { name: 'Next' }))
     .toBeVisible({ timeout: 60_000 })
 })
 

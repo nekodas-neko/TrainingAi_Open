@@ -6,6 +6,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.394.0",
+    date: "2026-08-27",
+    changes: [
+      "The end-of-day review now shows you the day before it asks how the day felt. Everything the day screen draws \u2014 your sessions, walks, energy in and out, sleep, heart rate and body numbers \u2014 is the first step of the wrap-up, so you are answering with the day in front of you rather than from memory.",
+      "It is three steps instead of one long scroll: the day, anything you missed, then how it felt. The middle step is skipped entirely once every meal has something logged against it, rather than showing you an empty question.",
+      "Your heart rate through the day now says its low and its high beside the trace. They are labelled as 15-minute averages, because that is what the trace is built from \u2014 a brief resting dip or a workout peak is smoothed, so calling them your lowest and highest would overstate what the app can actually see.",
+    ],
+  },
+  {
     version: "1.393.1",
     date: "2026-08-27",
     changes: [
