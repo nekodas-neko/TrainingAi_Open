@@ -1,13 +1,20 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
-import { AlertTriangle, Loader2, RefreshCw, Wand2, ArrowUp, ArrowDown } from 'lucide-react'
+import { AlertTriangle, BookOpen, Loader2, RefreshCw, Sparkles, Wand2, ArrowUp, ArrowDown } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
 import { cn } from '@trainingai/shared/utils'
 import { sumMacroTotals } from '@trainingai/shared/nutrition/meal-macro-fit'
 import { MealMacroBars, DayMacroTotals } from './meal-macro-bars'
 import { MealSourceBadge } from './meal-source-badge'
+import { libraryMealForSlot, usedSavedMealIds } from './library-swap'
+import { savedMealToIngredients } from '@trainingai/shared/nutrition/saved-meal-ingredients'
+import type { MealTypeWindow } from '@trainingai/shared/nutrition/library-match'
+import type { MealType, SavedMeal } from '@trainingai/shared/types/nutrition'
+import { cachedFetch, readCacheSync } from '@/lib/sqlite/cache'
+import { TTL_LONG, TTL_MEDIUM } from '@trainingai/shared/cache-ttl'
 import { replaceMealInDraft, reorderDraft, type Draft, type DraftMeal } from './meal-plan-draft'
 
 interface Props {
@@ -29,8 +36,25 @@ export function MealPlanReviewStep({ draft, onDraftChange, saveToLibrary, onTogg
   const [variantIdx, setVariantIdx] = useState(0)
   const [rerolling, setRerolling] = useState<number | null>(null)
   const [instructingFor, setInstructingFor] = useState<number | null>(null)
+  // BF-11h item 11: the library is offered on a reroll BEFORE the model is asked. Read from the
+  // same keys the rest of the app uses and seeded synchronously, so the offer is there on the first
+  // paint rather than appearing a beat after the user has already tapped.
+  const [library, setLibrary] = useState<SavedMeal[]>(() => [])
+  const [mealTypes, setMealTypes] = useState<MealTypeWindow[]>(() => [])
+  const [swapFor, setSwapFor] = useState<number | null>(null)
   const [instruction, setInstruction] = useState('')
   const variant = draft.variants[Math.min(variantIdx, draft.variants.length - 1)]
+
+  useEffect(() => {
+    const seededMeals = readCacheSync<SavedMeal[]>('saved-meals')
+    if (Array.isArray(seededMeals)) setLibrary(seededMeals)
+    const seededTypes = readCacheSync<MealType[]>('nutrition-meal-types')
+    if (Array.isArray(seededTypes)) setMealTypes(seededTypes)
+    cachedFetch<SavedMeal[]>('saved-meals', '/api/nutrition/saved-meals', TTL_MEDIUM,
+      d => setLibrary(Array.isArray(d) ? d : [])).catch(() => {})
+    cachedFetch<MealType[]>('nutrition-meal-types', '/api/nutrition/meal-types', TTL_LONG,
+      d => setMealTypes(Array.isArray(d) ? d : [])).catch(() => {})
+  }, [])
 
   /**
    * Reroll or rewrite one meal. Both go through the same route and the same request body — the only
@@ -73,6 +97,25 @@ export function MealPlanReviewStep({ draft, onDraftChange, saveToLibrary, onTogg
     } finally {
       setRerolling(null)
     }
+  }
+
+  /**
+   * Swap one slot for the best saved meal that fits it (BF-11h item 11).
+   *
+   * No route and no model call — `libraryMealForSlot` runs the generator's own matcher on data the
+   * client already has cached. So this is instant and free where the AI reroll is neither, which is
+   * the whole reason it is offered first.
+   */
+  function swapForLibraryMeal(meal: DraftMeal) {
+    const swap = libraryMealForSlot(meal, library, mealTypes, usedSavedMealIds(variant.meals))
+    if (!swap) { toast.error('Nothing in your meals fits this slot'); return }
+    onDraftChange(replaceMealInDraft(draft, meal.position, {
+      name: swap.meal.name,
+      notes: null,
+      ingredients: savedMealToIngredients(swap.meal),
+      fromLibrary: { savedMealId: swap.meal.id, matchReason: swap.matchReason },
+    }))
+    setSwapFor(null)
   }
 
   /**
@@ -199,9 +242,10 @@ export function MealPlanReviewStep({ draft, onDraftChange, saveToLibrary, onTogg
                   <ArrowDown className="w-4 h-4 text-muted-foreground" />
                 </button>
                 <button
-                  onClick={() => askForMeal(m)}
+                  onClick={() => setSwapFor(swapFor === m.position ? null : m.position)}
                   disabled={rerolling != null}
-                  aria-label={`Suggest a different meal instead of ${m.name}`}
+                  aria-expanded={swapFor === m.position}
+                  aria-label={`Replace ${m.name}`}
                   className="min-h-[44px] min-w-[44px] grid place-items-center rounded-xl active:bg-muted/40 disabled:opacity-40 transition-colors"
                 >
                   {rerolling === m.position
@@ -210,6 +254,32 @@ export function MealPlanReviewStep({ draft, onDraftChange, saveToLibrary, onTogg
                 </button>
               </div>
             </div>
+
+            {/* The library is offered FIRST because it is the better answer when it exists: a meal
+                the user already eats, instantly, with no model call. The AI option stays because
+                "nothing of mine fits here" is a real and common answer — this replaces one button
+                with a choice, not with a different button. */}
+            {swapFor === m.position && (
+              <div className="mt-2 flex gap-2">
+                <Button
+                  variant="secondary"
+                  className="flex-1 min-h-[44px] text-xs"
+                  onClick={() => swapForLibraryMeal(m)}
+                  disabled={library.length === 0}
+                >
+                  <BookOpen className="w-3.5 h-3.5" />
+                  {library.length === 0 ? 'No saved meals' : 'One of mine'}
+                </Button>
+                <Button
+                  variant="secondary"
+                  className="flex-1 min-h-[44px] text-xs"
+                  onClick={() => { setSwapFor(null); void askForMeal(m) }}
+                >
+                  <Sparkles className="w-3.5 h-3.5" />
+                  Something new
+                </Button>
+              </div>
+            )}
 
             {m.notes && (
               <p className="mt-1 text-[11px] leading-snug text-muted-foreground">{m.notes}</p>
