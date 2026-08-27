@@ -3175,3 +3175,15 @@ derived from the span, and warned what would happen if anything derived them —
 already did, and building the entry as written would have turned a measured 3 h night into 10 h at
 35%. The instruction that follows is the reusable half: when an entry names the assumption its design
 rests on, that sentence is the thing to go and check.
+
+## 2026-08-27 — `docs/implementation-backlog.md` raised (BF-41, the clinical-import shape)
+
+The owner is about to send RMR, DEXA and blood results together and asked for an endpoint plus
+document scanning. Three entries already covered those separately — BF-33 (engine shipped), BF-2 and
+BF-1 — at three different stages, and nothing said they are the same shape.
+
+BF-41 is that statement: **typed storage per result, one shared upload → crop → extract → confirm
+pipeline**. The length is two arguments worth not re-deriving. Storage stays typed because BF-2's
+calibration and BF-33's precedence both do arithmetic on named columns, which JSONB makes hard. And
+**the app's crop-before-upload step is still required even though the owner scrubs the file by hand**
+— those are two different redactions, and conflating them is how the security half gets skipped.
