@@ -1558,11 +1558,13 @@ That number is more valuable than either input on its own.
   (the capture screen, shipped 2026-08-26, carrying **BF-37**'s split of that merged list). Each
   phase points back here rather than copying the decisions, so they still live in exactly one place.
   **Read this before any phase.**
-- **Every phase has now shipped, so this is startable.** It is the completion checkpoint: confirm the
-  drawn screens match what shipped, sweep the ~11 sheets finding 18 lists as never drawn, then leave
-  the queue. **⚠ Wait for the LB-16/BF-37 device pass before confirming parity** — the screen those
-  two rebuilt has never been seen on the S25, so a parity sweep run now would be signing off a
-  drawing against a screenshot nobody has taken.
+- **Gate:** device — see the ⚠ immediately below. Every phase has shipped and this is the completion
+  checkpoint (confirm the drawn screens match what shipped, sweep the ~11 sheets finding 18 lists as
+  never drawn, then leave the queue), but its own instruction is to **wait**, so it is gated rather
+  than READY: it printed second in the Lane B queue while telling any taker not to start it.
+- **⚠ Wait for the LB-16/BF-37 device pass before confirming parity** — the screen those two rebuilt
+  has never been seen on the S25, so a parity sweep run now would be signing off a drawing against a
+  screenshot nobody has taken.
 
 - **Branch:** `feat/nutrition-visual-uplift`
 - **Added:** 2026-08-18 · owner: *"can we backlog a UI uplift for the nutrition side. I think it
@@ -1895,7 +1897,9 @@ whether or not anyone draws them first.
 
 ### [nutrition] BF-11 — the meal creator/planner redesign: the spec every phase reads, and the final checkpoint
 
-- **Needs:** BF-11h
+- **Gate:** device — **all eight phases have shipped** (BF-11h merged 2026-08-27, v1.389.0). The only
+  thing still owed is the S25 walk this entry defines below, so it is gated rather than READY: it
+  printed at the top of the Lane B queue with nothing an implementer could do.
 - **Not a work item.** Split into eight phases 2026-08-24 (BF-11a…BF-11h below), the way Q-395 was.
   This entry is the spec pointer and the closing checkpoint: strike it when every phase has shipped
   *and* the whole flow has been walked once on the S25 — creating a meal from a recipe URL, from a
@@ -1916,12 +1920,20 @@ whether or not anyone draws them first.
   a pin would be dropped**, and there is **nothing to "transfer"** because the split derives from the
   day's totals rather than the sum of the slots; and "select all" is **`useLibrary: boolean`**, not a
   list, because the route already reads the library server-side. **None needed the owner.**
-- **⚠ Two live defects found while planning, in the path BF-11h rewrites.** Lower the meal count
-  after picking meals (the picker's `maxKeepable` guard only holds going forward) and
-  `generate/route.ts` puts a **negative number in the prompt** (`Meals: exactly -1`) and **silently
-  discards** every pinned meal past the slot count — `names[i]` is never read beyond `slots.length`.
-  Part 2 §2 has the trace. It is the mechanism behind the owner's *"it's gotta prompt you
-  somewhere"*, and it is a silent drop, not just a missing prompt.
+- **⚠ Two live defects were found while planning. BOTH ARE CLOSED — verified 2026-08-27, and the
+  attribution is not what this entry expected.**
+  - **The silent discard** of pinned meals past the slot count: closed in two halves. **BF-11g**
+    capped `kept` at `mealCount` and started *reporting* `droppedPins`; **BF-11h** made the client
+    read that field and, before it can happen at all, prompt when lowering the meal count leaves
+    more pins than slots. That prompt is the owner's *"it's gotta prompt you somewhere"*.
+  - **`Meals: exactly -1` in the prompt** was closed by **BF-11g alone**, incidentally — not by
+    BF-11h, which is where this entry expected it. `route.ts:247` still computes
+    `mealCount - kept.length - libraryPicks.length` **unfloored**, but it can no longer go negative:
+    `kept.length` is capped at `mealCount`, and the library pass is handed
+    `canonicalSlots.slice(kept.length)` — at most `mealCount - kept.length` slots, one pick each.
+    **Left unfloored deliberately**: the sibling at line 288 floors the identical expression, and
+    adding a second `Math.max(0, …)` would guard a case the surrounding code makes unreachable.
+    Re-read those three lines before trusting this, if the slot arithmetic ever changes.
 - **Overlap with Q-407 (below), not a duplicate.** Q-407 reworks the whole wizard into a coach
   conversation and touches neither scanning location nor planner matching. The engine phases
   (BF-11e, BF-11g) are untouched by it either way, which is why they lead. Part 2 §6 has the
@@ -2198,6 +2210,35 @@ signed off by the owner in that conversation. Review:
   issue on red, so it is loud without being blocking.
 - *Lane B filed the identical finding the same day (as LB-14) after **OR-1** and **BF-23** were also
   filed independently for the same red; folded here rather than kept as a fourth duplicate.*
+
+### [platform] LB-22 — an entry that declares itself unimplementable still prints first in the queue
+
+- **Lane:** ? — `scripts/next-item.js` is the implementers' shared tool and serves both lanes, so
+  this is arguably the Orchestrator's the way LB-12's sweep is. **Decide before starting.** Lane B
+  filed it after gating two other entries and finding the third could not be gated honestly.
+- **Branch:** _unassigned_
+- **Added:** 2026-08-27 · Lane B, from a queue read where the top three READY rows were all
+  unstartable for three different reasons.
+- **What happened.** Working the Lane B queue top-down on 2026-08-27, positions 1–3 were BF-28,
+  Q-395 and BF-11. **None could be started**, and only two could be fixed:
+  - **BF-11** — every phase shipped; only the S25 walk it defines was left. Gated `device`. ✅
+  - **Q-395** — its own text says *"⚠ Wait for the LB-16/BF-37 device pass before confirming
+    parity"*, while printing as READY #2. Gated `device`. ✅
+  - **BF-28** — *"⚑ Not implementable on its own. This is the entry the per-screen parity entries
+    read"*. **This one cannot be gated honestly**: `Gate:` takes only `owner` or `device`, and it is
+    waiting on neither. It is a reference document that lives in the queue on purpose.
+- **So the gap is a missing category, not a mis-tagged entry.** Two entries carry a self-declared
+  marker today — `⚑ Not implementable on its own` (BF-28:1041) and `Not a work item` (BF-11:1673) —
+  and `next-item.js` has no notion of either, so it prints them under a header that says *"top of
+  the list is next"*.
+- **The cheap fix, if the lane call lands here:** a `REFERENCE` section beside READY/PARKED/KEEP,
+  selected on those markers, so the map entries stay findable without heading the work list. That is
+  a few lines. **The part that needs deciding first is whether the marker should be a FIELD** — the
+  protocol's argument against prose-detection is exactly why `Lane:`, `Needs:` and `Gate:` are
+  fields that `check-backlog-pointers.js` validates, and a grep for two English phrases is the thing
+  those replaced.
+- **Not LB-12.** That entry is about *lane* tagging and its remaining half is the Orchestrator's
+  sweep. This is a different category and neither blocks the other.
 
 ### [platform] LB-12 — 77 of 193 queue entries state no lane, so both implementers are served each other's work
 
@@ -2540,7 +2581,30 @@ the day's move-hours total is below the goal.
 ### [heart-rate] TN-13 — the HR tile shows a 7-day average of the one signal that best predicts how the owner feels
 
 - **Branch:** _unassigned_ · **Added:** 2026-08-26 · owner: *"my value is 52; what is that? what would be the more useful HR value to show?"*
-- **Lane: B** — `components/oura-score-chip-row.tsx:390`; the payload field already exists.
+- **Lane: A** — corrected 2026-08-27 by Lane B, which picked this up and found its lane premise false.
+  The tile itself is `components/oura-score-chip-row.tsx:390` and that half is Lane B's, but it
+  cannot be done alone; see the ⚑ below.
+
+> **⚑ The payload field this entry assumed does NOT exist, and that is what moves the lane.**
+> Verified against `main` at cd09c990. `lib/health/readiness-payload.ts` returns `restingHr`
+> (**the 7-day mean** — `recentRhr`, averaged over `recentRhrRows`, line 271) and `restingHrBaseline`
+> (28-day, low-wear-excluded), plus `hrCurrent`/`hrMin`/`hrAvg`/`hrMax`, which are **today's live BLE
+> readings, not a nightly resting HR**. Nothing carries last night's single-night value, under that
+> name or any other — no `lowestHeartRate`, no sleep-derived HR.
+>
+> So the recommendation below needs a **new payload field**, and `readiness-payload.ts` is consumed
+> by three routes — `app/api/readiness-score`, `app/api/body-battery`, `app/api/ai/health-insight`.
+> Reached by `app/api/**` → Lane A, by the path rule in `docs/agents/README.md` §3.
+>
+> **Do not split it and take the presentation half.** The pass test at the bottom of this entry rules
+> that out in as many words: *"a change that keeps the 7-day average and merely adds a cue beside it
+> fails this entry."* Rendering a delta between `restingHr` and `restingHrBaseline` is possible in
+> Lane B **today** and would look like progress while failing the entry — both halves ship together.
+>
+> **Do not re-derive the nightly value on the client either.** `body_metrics.restingHeartRate` is
+> reachable from the local store, but computing a health value a second time in the client is the
+> One-Formula-One-Place violation this repo has paid for repeatedly, and it would bypass the ranked
+> per-field merge in `lib/data/health-source.ts` that decides which source owns that column.
 
 `const hr = readiness.restingHr ?? readiness.hrCurrent`, and `restingHr` is documented as
 *"recent (7-day) average resting HR"* (`readiness-payload.ts:131`).
@@ -3572,8 +3636,15 @@ permanently-mounted panels; DOM accumulation in long lists; and the interaction 
 churn, where a rewritten service-worker cache forces the shell to be re-fetched into an already-long-
 lived context.
 
+- **Gate:** device — added 2026-08-27 by Lane B, which reached this as the top startable row and
+  found it says the opposite of startable: *"cannot be root-caused from a sandbox and should not be
+  attempted again from one"*, *"Surface: device only"*.
 - **Needs:** BF-19 — the client reporter is what produces the device measurement this entry cannot
-  get any other way.
+  get any other way. **⚑ `Needs:` cleared on a technicality and that is worth noticing.** BF-19 has
+  shipped, so the pointer resolves and this row printed as READY — but BF-19 shipped the *reporter*,
+  and `projectOverview.md` records that its table **stays empty until it runs on the S25**. What
+  this entry needs is the reporter's OUTPUT, which no merge can produce. A `Needs:` target leaving
+  the queue means the dependency is built, not that its data exists.
 - **This cannot be root-caused from a sandbox** and should not be attempted again from one. It wants
   a heap and main-thread profile from the S25 across a long-running session.
 - **What would count as fixed:** the owner can go a normal week without a force restart changing how
