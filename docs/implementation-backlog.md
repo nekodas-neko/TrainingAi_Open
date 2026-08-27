@@ -803,6 +803,14 @@ bug is that it is using a prediction as the definition of BMR when a measurement
 > same correction**, so ship it as the single-pair case — store the pair, derive the correction from
 > the stored pairs, and let a second scan decide the form. Do not hardcode 3.2. The pair and the
 > surrounding scale days are in [`docs/clinical-baseline-2026-08-27.md`](clinical-baseline-2026-08-27.md).
+>
+> **⚑ This entry and BF-33 interact, and getting the order wrong silently inflates the RMR.**
+> `personalRmr` ages a measurement by re-scaling its Cunningham residual to **today's** fat-free
+> mass. The stored `ffm_kg_at_test` comes from the DEXA (51.46 kg); today's comes from the scale.
+> Feed it the **uncorrected** scale number and the two are from different instruments — at the
+> measured 3.2-point gap that is 53.56 vs 51.46 kg, so the residual re-scales onto **+45 kcal/day**
+> of fat-free mass the owner does not have, on the very first day. **The corrected body fat has to
+> reach `personalRmr`'s `currentFfmKg`,** not just the protein dose and the goal screen.
 
 - **⚑ The first calibration pair exists (2026-08-27): DEXA 28.5 % vs Renpho 25.3 % — the scale
   under-reads body fat by 3.2 points; weight 72.1 kg vs 71.7 kg.** Recorded with surrounding scale

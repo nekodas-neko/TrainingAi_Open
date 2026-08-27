@@ -3232,3 +3232,12 @@ which for this owner sits 156 kcal above the measured value.
 
 The entry is long because the floor is the half that gets missed: substituting the base and leaving
 `Math.max(bmr, …)` alone would look correct and still clamp the calibration.
+
+## 2026-08-27 — `docs/implementation-backlog.md` raised (BF-2 × BF-33 interact)
+
+8 lines on BF-2. Found while working out what the owner's daily calorie targets actually become:
+`personalRmr` re-scales a measurement's residual to today's fat-free mass, and the stored
+`ffm_kg_at_test` is the DEXA's. Feed today's side an **uncorrected** scale reading and the two ends
+come from different instruments — at the measured 3.2-point gap that is 53.56 kg against 51.46 kg,
+which re-scales the measurement onto 45 kcal/day of lean mass that is not there. The order of the
+two fixes is load-bearing and neither entry said so.
