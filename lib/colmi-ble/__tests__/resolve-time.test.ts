@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { resolveRelative, resolveSleepWindow, resolveActivityBucket, localDayStartSeconds } from '@/lib/colmi-ble/resolve-time'
+import { resolveRelative, resolveSleepWindow, resolveActivityBucket, localDayStartSeconds, wallClockSecondsToEpochMs } from '@/lib/colmi-ble/resolve-time'
 import { formatInTimeZone } from 'date-fns-tz'
 
 const BNE = 'Australia/Brisbane'   // no DST — the owner's zone
@@ -100,5 +100,34 @@ describe('localDayStartSeconds', () => {
     for (const bad of ['', '2026/08/27', 'yesterday', '2026-8-7']) {
       expect(localDayStartSeconds(bad)).toBe(0)
     }
+  })
+})
+
+/**
+ * The ring echoes back the local-wall-clock-as-UTC anchor we send it. Reading that as a genuine
+ * epoch put every heart-rate sample ten hours late in Brisbane — which is what pushed most of them
+ * past the ingest's future tolerance and made the survivors look like evening readings.
+ */
+describe('wallClockSecondsToEpochMs', () => {
+  it('reads the ring\'s echoed anchor as local midnight, not as a UTC instant', () => {
+    // What cmdSyncHeartRate sends for 2026-08-27, and what the ring echoed back on that day.
+    const echoed = 1_787_788_800
+    const at = wallClockSecondsToEpochMs(echoed, 'Australia/Brisbane')
+    // Brisbane midnight on the 27th is 14:00Z on the 26th.
+    expect(new Date(at).toISOString()).toBe('2026-08-26T14:00:00.000Z')
+  })
+
+  it('is the inverse of localDayStartSeconds for the same day and zone', () => {
+    for (const day of ['2026-01-15', '2026-08-27', '2026-12-31']) {
+      const at = wallClockSecondsToEpochMs(localDayStartSeconds(day), 'Australia/Brisbane')
+      expect(formatInTimeZone(new Date(at), 'Australia/Brisbane', 'yyyy-MM-dd HH:mm')).toBe(`${day} 00:00`)
+    }
+  })
+
+  it('places the anchor by the zone, so a different zone gives a different instant', () => {
+    const echoed = localDayStartSeconds('2026-08-27')
+    const bne = wallClockSecondsToEpochMs(echoed, 'Australia/Brisbane')
+    const nyc = wallClockSecondsToEpochMs(echoed, 'America/New_York')
+    expect(nyc - bne).toBe(14 * 60 * 60 * 1000)   // UTC+10 against UTC-4 in August
   })
 })

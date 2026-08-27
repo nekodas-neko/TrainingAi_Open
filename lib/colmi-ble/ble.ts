@@ -9,7 +9,7 @@
 // the Oura's continuous capture. That is why the WebView path's suspension while backgrounded does
 // not matter here.
 import { decodeV1, decodeBigData, bigDataPayloadLength, type ColmiFrame } from '@/lib/colmi-ble/decode'
-import { resolveRelative, resolveSleepWindow, resolveActivityBucket, localDayStartSeconds } from '@/lib/colmi-ble/resolve-time'
+import { resolveRelative, resolveSleepWindow, resolveActivityBucket, localDayStartSeconds, wallClockSecondsToEpochMs } from '@/lib/colmi-ble/resolve-time'
 import {
   V1_SERVICE, V1_WRITE, V1_NOTIFY, V2_SERVICE, V2_WRITE, V2_NOTIFY, NAME_PREFIX,
   cmdBattery, cmdSetDateTime, cmdPhoneName, cmdSyncActivity, cmdSyncHeartRate,
@@ -367,7 +367,8 @@ export function framesToPayload(frames: ColmiFrame[], opts: Pick<SyncOptions, 't
         f.values.forEach((bpm, i) => {
           // A zero is "not measured", not a reading of zero — the ring stores a slot for every
           // interval whether or not it sampled one.
-          if (bpm > 0) readings.push({ kind: 'heart_rate', at: hrAnchorSec! * 1000 + (index + i) * stepMs, value: bpm })
+          // The anchor is the local-wall-clock-as-UTC value we sent, echoed back — not an epoch.
+          if (bpm > 0) readings.push({ kind: 'heart_rate', at: wallClockSecondsToEpochMs(hrAnchorSec!, tz) + (index + i) * stepMs, value: bpm })
         })
         break
       }

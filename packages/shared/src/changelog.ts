@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.392.1",
+    date: "2026-08-27",
+    changes: [
+      "Colmi heart rate was being stored ten hours late, which is why most of it vanished and the rest looked wrong. The ring is asked for a day using local wall-clock time, it repeats that back, and the reply was being read as a real time \u2014 so a day the ring recorded from 6:50 am to 8:50 pm was filed as 4:50 pm to 6:50 the next morning. Everything past the current moment was thrown away as impossible: 119 of 157 readings a day. What survived were morning readings wearing evening timestamps, which is what made the ring look 15 beats high against the Oura. The readings stored under the old times have been removed; sync once and the day comes back correctly.",
+    ],
+  },
+  {
     version: "1.391.0",
     date: "2026-08-27",
     changes: [
