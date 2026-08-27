@@ -67,6 +67,30 @@ on every visit.
 strict-mode violation. That duplication is real and is filed as **LB-23** (three sheets do it;
 `quick-edit-log-sheet.tsx` is the one that does not), not fixed here.
 
+## The deep link crosses a shell that does not use the router, and `forceOpen` had a hole
+
+Two things about `/?review=week` needed checking rather than assuming, and one of them was a bug.
+
+**Does the param survive the tab shell?** Home's banner calls `navigateToTab`, which the tab shell
+intercepts: it flips the tab and writes the URL with `window.history.replaceState`
+(`tab-shell.tsx:78`) — the raw History API, not the Next router. That is normally invisible to
+`useSearchParams()`. It works here because **Next 15 patches `replaceState`** to reflect external
+history changes in the router (`next/dist/client/components/app-router.js:324`, *"Patch replaceState
+to ensure external changes to the history are reflected in the Next.js Router"*). Read, not assumed —
+and worth writing down, because every existing spec for this shape (`/health?tab=body`) uses
+`page.goto`, a hard load, which cannot tell a working patch from a broken one.
+
+**`forceOpen` only reached `expanded` through a `useState` initializer, which never re-runs.** Home
+is statically imported and the tab shell never unmounts it, so a notification tapped while the app is
+open re-renders `WeeklyRecapBanner` with `forceOpen` true against an `expanded` that was initialised
+false — the banner would have appeared **collapsed**, which is the state the user already had before
+tapping. The effect sets it now. The `dismissed` half was already correct, because it lives in that
+effect and `forceOpen` is in its deps; it is the half that goes through `useState` that failed, which
+is the same shape as Q-402 one layer up.
+
+There is no React Testing Library in this repo, so that fix is guarded by the comment beside it
+rather than by a test.
+
 ## Deleting the sheet orphaned three things, and only one of them is wrong to keep
 
 `day-review-sheet.tsx` also drew an HR day chart and a workout-load comparison chart.
@@ -94,7 +118,18 @@ deleting one of its features would have been the wrong record.
 - **Not device-verified.** `extra.route` only does anything on Android — `scheduleEveningReminder`
   returns early off `Capacitor.isNativePlatform()`, so the sandbox cannot reach the line that
   changed. Whether the tap lands on `/nutrition?review=day` is unverified on the phone.
-- `WeeklyRecapBanner`'s `forceOpen` path is unit-tested only through the route-agreement test; the
-  expanded-on-arrival rendering was not driven in Playwright (it needs a `/api/weekly-digest`
-  response, which is an AI call).
+- `WeeklyRecapBanner`'s `forceOpen` path was not driven in Playwright: rendering it needs a
+  `/api/weekly-digest` response, which is an AI call. Nor was **Home's day-review banner**, which
+  only renders after 17:00 local (`session-select-content.tsx:354`) — a spec written now would
+  pass this evening and fail every morning, which is the hour-dependence class `CLAUDE.md`
+  warns about. The mechanism under both is covered indirectly by the shipped `/health?tab=body`
+  tile, which takes the identical `navigateToTab` → `replaceState` → `useSearchParams` path.
 - Safe-area: no anchored control moved. The review's footer is unchanged.
+- **One local E2E failure, not this branch's.** `goal-invalidation.spec.ts` failed locally in both
+  full runs — 94 passed, 1 failed — and it is the aged-fixture class `CLAUDE.md` documents. That
+  spec's own header records the dependency: the seed inserts `body_metrics` for `current_date - d`,
+  so **today** must carry a steps value or the row it asserts on never renders. `SELECT max(date)
+  FROM body_metrics WHERE steps IS NOT NULL` returns **2026-08-25** against a `current_date` of
+  2026-08-27, because the seed dates everything relative to the day it ran and nothing back-fills.
+  CI provisions a fresh database per run, which is why it is green there. Nothing in this diff is
+  reachable from that spec — it drives `/more` → goals → `/health?tab=progress`.

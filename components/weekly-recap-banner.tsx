@@ -45,6 +45,11 @@ export function WeeklyRecapBanner({ forceOpen = false }: Props) {
   useEffect(() => {
     const alreadyDismissed = !forceOpen && !!localStorage.getItem(dismissKey);
     setDismissed(alreadyDismissed);
+    // Not only the `useState(forceOpen)` initializer: Home is statically imported and the tab shell
+    // never unmounts it, so a notification arriving while the app is open re-renders this with
+    // `forceOpen` true against an `expanded` that was initialised false and will never re-run. The
+    // banner would appear collapsed — the state the user already had before tapping.
+    if (forceOpen) setExpanded(true);
     if (alreadyDismissed || hasFetched.current) return;
     hasFetched.current = true;
 
