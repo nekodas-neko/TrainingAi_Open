@@ -1034,7 +1034,6 @@ artboards rather than inventing a number.
 - **Lane:** B
 - **Batch:** `nutrition-ui-uplift` — ships with BF-45.
 - **Gate: device**
-- **Gate: owner** — item ③ only; the layout choice below. ①, ② and the photo repro are unblocked.
 - **Added:** 2026-08-27 · owner, with screenshots. *"overall just a UI rework/uplift. almost there."*
 
 **① Two things, and the owner corrected the first reading of them. ⚠ THE SAVE FAILURE IS REAL AND
@@ -1089,14 +1088,28 @@ are. **Keep BF-26's earned constraints:** the macro colours stay (four uncoloure
 *"everything looks the same"* complaint), and the grams chip is still hidden when there is no serving
 size to divide by, since a chip that cannot apply is worse than no chip.
 
-**⚑ Three layouts drawn for ③, 2026-08-27, awaiting the owner's pick:**
-<https://claude.ai/code/artifact/9388bd52-37e4-4986-b145-45cf96c5c3cb> — at 412 dp on the app's real
-dark tokens. All three apply the parts the owner specified (toggle shrunk beside the stepper, presets
-grown into the freed width) and differ only in the result block: **A** total as a headline with three
-macro tiles, **B** one result bar, **C** four colour-capped chips. Recommendation on the page is A —
-the only one where the calorie total leads rather than competing with a macro. **When the owner
-picks, replace this line with the choice**; a prose description of a layout is what sent this entry
-round once already. `Gate: owner` until then.
+**✅ LAYOUT CHOSEN — OPTION A, owner, 2026-08-27: *"option A looks the best lets go with that."***
+Drawing: <https://claude.ai/code/artifact/9388bd52-37e4-4986-b145-45cf96c5c3cb> (three options at
+412 dp on the app's real dark tokens; A is the left one). **Build A. Do not re-derive it from the
+prose above** — where the two disagree, the drawing wins, and B and C are recorded only so nobody
+re-opens a settled question.
+
+**Option A, top to bottom:**
+
+| Band | What it is |
+|---|---|
+| Title | Food name, and `1 serving = 65 g` beneath it. Close ✕ at the right. |
+| **Stepper** | `−` · the value · `+`, the value tallest and heaviest — it is what the sheet exists to set. |
+| **Unit toggle** | `srv` / `g` **stacked vertically in a narrow column to the RIGHT of the stepper**, same height as it. This is the owner's *"smaller and to the right of the − x + button"* and it is what frees the width below. |
+| **Presets** | Four equal chips spanning the full width — `1 srv` `2 srv` `3 srv` `100 g`. Three wide when the food has no serving size (see below). |
+| **Calorie total** | The number alone, centred, largest type on the sheet, with a small `KCAL` label under it. It leads; nothing sits beside it. |
+| **Macro tiles** | Three equal tiles — Protein · Carbs · Fat — each a bordered surface with the value in its macro colour and the name spelled out beneath. Not `P`/`C`/`F`. |
+| Footer | Delete at the left, `Save` filling the rest. |
+
+**What A costs, so it is not discovered late:** it is the tallest of the three, because the total and
+the macros are two stacked blocks rather than one. On a long food name the sheet may scroll. That was
+put to the owner and accepted — distinctness was the goal. If it scrolls badly on the S25, tighten
+the gaps rather than merging the two blocks back together, which would be option B.
 
 - **Verification.** On the S25, in both sheets that render the editor: a photo attached in the
   builder appears in the list, the detail hero and the diary row; ingredients read in grams; every

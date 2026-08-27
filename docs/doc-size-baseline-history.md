@@ -3302,3 +3302,15 @@ re-make it.
 The gutter report also changed shape: asked which screens, the owner named bottom sheets rather than
 screens, which turns a per-screen sweep into one change in the shared `SheetContent side="bottom"` —
 with the warning that bottom sheets already own their bottom inset, so it is horizontal only.
+
+## 2026-08-27 — `docs/implementation-backlog.md` raised (BF-46's layout chosen)
+
+17 lines: option A recorded as a band-by-band table, replacing the link-and-wait note. The table
+exists because a prose description of this exact layout is what sent the entry round once already —
+"more distinct macro and total calorie buttons" has a dozen valid readings, and the drawing settled
+which one. The entry now says the drawing wins where the two disagree, and keeps B and C named only
+so a later session does not re-open a decision the owner has made.
+
+It also records what A costs — the tallest of the three, two stacked result blocks, may scroll on a
+long food name — and what to do about it, which is tighten the gaps rather than merge the blocks,
+because merging them is option B and the owner did not pick option B.
