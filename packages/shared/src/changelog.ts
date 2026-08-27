@@ -6,6 +6,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.390.1",
+    date: "2026-08-27",
+    changes: [
+      "The Colmi ring's heart rate now arrives. The ring sends a day of readings split across 26 packets, and only the second one says what time the series starts \u2014 so the other 24 were being thrown away for lack of a clock, and the two that were kept covered the 45 minutes after midnight, where there is never a reading to find. The whole day is read now, at whatever interval the ring says it is using.",
+      "Forgetting the Colmi ring asks first. It sits next to the button you press on every visit, and undoing it means having the ring in your hand.",
+      "The ring's sync detail no longer reports frames it could not read when it could. Two of them were the ring saying \u201cno more activity history\u201d, which is an answer rather than a failure.",
+    ],
+  },
+  {
     version: "1.390.0",
     date: "2026-08-27",
     changes: [

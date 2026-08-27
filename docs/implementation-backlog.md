@@ -474,22 +474,6 @@ the first real numbers.
 - **Do not conclude anything from one day.** 14 nights, and split on any hand swap or firmware
   change inside the window.
 
-### [devices] PS-13 — the heart-rate log drops its continuation packets
-
-- **Lane:** A (code plus a captured vector; no device gate of its own)
-- **Needs:** PS-11
-- **Added:** 2026-08-26 · known at write time, filed rather than left implicit
-
-`framesToPayload` keeps only sub-type 1 of the `0x15` heart-rate log — the packet carrying the
-little-endian unix anchor — and drops sub-types 2+, which hold 13 samples each and are a
-*continuation* of that anchor rather than self-describing. Dropping them was the honest choice
-without a real multi-packet capture: placing them means assuming the sample spacing, and a wrong
-assumption smears a day's heart rate across the wrong hours, which is worse than missing it.
-
-PS-11's capture is what settles the spacing. The header packet (sub-type 0) reports
-`intervalMinutes`; confirm the continuation samples step by exactly that, then extend the mapping
-and pin a multi-packet fixture. Until then, expect Colmi HR coverage to be thinner than the ring's
-own history and do not read that as the ring failing to record.
 
 ### [devices][cardio] PS-9 — the R09 streams raw accelerometer on stock firmware, which makes it a tier-1 source
 

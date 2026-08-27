@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button'
 import { useUserTimezone } from '@/components/shell/user-timezone-provider'
 import { formatTimeOfDay } from '@trainingai/shared/date-utils'
 import { pairColmiRing, forgetColmiRing, syncColmiRing, type ColmiSyncOutcome } from '@/lib/colmi-ble/ble'
+import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { getPairedRing, type PairedRing } from '@/lib/colmi-ble/paired-ring'
 import type { AutoMetric } from '@/lib/colmi-ble/protocol'
 
@@ -36,6 +37,9 @@ export function ColmiPairing() {
   const [syncing, setSyncing] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [outcome, setOutcome] = useState<ColmiSyncOutcome | null>(null)
+  // Forget sits beside the button pressed on every visit, and undoing it means re-pairing over
+  // Bluetooth with the ring in hand — far more than a mis-tap should cost.
+  const [confirmForget, setConfirmForget] = useState(false)
   const [lastSyncAt, setLastSyncAt] = useState<string | null>(null)
 
   // Seed in an effect, never a useState initializer — a localStorage read in an initializer causes
@@ -85,6 +89,7 @@ export function ColmiPairing() {
   }
 
   function forget() {
+    setConfirmForget(false)
     forgetColmiRing(); setPaired(null); setOutcome(null); setError(null)
   }
 
@@ -118,7 +123,7 @@ export function ColmiPairing() {
             <Button onClick={runSync} disabled={syncing}>
               {syncing ? (<><Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden />Syncing…</>) : 'Sync now'}
             </Button>
-            <Button variant="outline" onClick={forget} disabled={syncing}>Forget</Button>
+            <Button variant="outline" onClick={() => setConfirmForget(true)} disabled={syncing}>Forget</Button>
           </div>
 
           {outcome?.autoPrefs && Object.keys(outcome.autoPrefs).length > 0 && (
@@ -204,6 +209,15 @@ export function ColmiPairing() {
           which looks the same as a flat one. Wear it or put it on the charger, then sync again.
         </p>
       )}
+
+      <ConfirmDialog
+        open={confirmForget}
+        onOpenChange={setConfirmForget}
+        title="Forget this ring?"
+        message="Pairing it again needs the ring in your hand and Bluetooth in range. Readings already synced are kept."
+        confirmLabel="Forget ring"
+        onConfirm={forget}
+      />
     </div>
   )
 }
