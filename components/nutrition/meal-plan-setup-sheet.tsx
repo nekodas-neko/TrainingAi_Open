@@ -13,9 +13,12 @@ import { savePlanMealsToLibrary } from '@trainingai/shared/nutrition/save-plan-m
 import { RestrictionsPicker, type RestrictionSelection } from './restrictions-picker'
 import { MealPlanReviewStep } from './meal-plan-review-step'
 import { MyMealsPicker, type TypedMeal } from './my-meals-picker'
+import { MealCountReductionPrompt } from './meal-count-reduction-prompt'
+import { reductionNeeded, applyReduction, type Pin, type ReductionDecision } from './meal-count-reduction'
 import type { Draft } from './meal-plan-draft'
 import { MEAL_COUNT_MIN, MEAL_COUNT_MAX } from '@trainingai/shared/nutrition/meal-split'
-import type { DietaryRestriction, MealPlan } from '@trainingai/shared/types/nutrition'
+import type { DietaryRestriction, MealPlan, SavedMeal } from '@trainingai/shared/types/nutrition'
+import { readCacheSync } from '@/lib/sqlite/cache'
 import type { DietaryRestrictionsResponse } from '@/app/api/nutrition/dietary-restrictions/route'
 
 /** AU chains. A curated list, not geolocation: the store names only bias what the model suggests,
@@ -55,6 +58,15 @@ export function MealPlanSetupSheet({ open, onOpenChange, onSaved, userId }: Prop
   const [trainingTime, setTrainingTime] = useState('')
   const [splitDays, setSplitDays] = useState(false)
   const [keepMealIds, setKeepMealIds] = useState<string[]>([])
+  // BF-11h: let the planner pick from the library for the slots nobody pinned. Off by default —
+  // on changes what every generation returns, so it is the user's call rather than a new default.
+  const [useLibrary, setUseLibrary] = useState(false)
+  // Non-null while the user is answering "you have more meals kept than slots". Holds the count
+  // they asked for and the one to go back to, because Cancel must restore the previous count and
+  // that is not always one more (5 → 2 is a single tap on this chip row).
+  const [reduction, setReduction] = useState<
+    { decision: ReductionDecision; next: number; previous: number } | null
+  >(null)
   const [typedMeals, setTypedMeals] = useState<TypedMeal[]>([])
   const [generating, setGenerating] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -63,7 +75,7 @@ export function MealPlanSetupSheet({ open, onOpenChange, onSaved, userId }: Prop
 
   useEffect(() => {
     if (!open) return
-    setStep(0); setDraft(null); setKeepMealIds([]); setTypedMeals([])
+    setStep(0); setDraft(null); setKeepMealIds([]); setTypedMeals([]); setUseLibrary(false)
     fetch('/api/nutrition/dietary-restrictions')
       .then(r => r.ok ? r.json() as Promise<DietaryRestrictionsResponse> : null)
       .then(d => {
@@ -75,6 +87,47 @@ export function MealPlanSetupSheet({ open, onOpenChange, onSaved, userId }: Prop
       })
       .catch(() => {})
   }, [open])
+
+  /**
+   * Everything currently pinned, in the order the server will honour it — saved-meal picks first,
+   * then resolved typed meals, which is exactly how `handleGenerate` builds the request.
+   */
+  function currentPins(): Pin[] {
+    return [
+      ...keepMealIds.map(id => ({
+        key: id,
+        // The same `saved-meals` key the picker seeds from, read synchronously rather than fetched:
+        // the picker has already populated it by the time anything can be pinned, and a prompt that
+        // named ids instead of meals would be worse than no prompt.
+        name: readCacheSync<SavedMeal[]>('saved-meals')?.find(m => m.id === id)?.name ?? 'A saved meal',
+        kind: 'saved' as const,
+      })),
+      ...typedMeals
+        .filter(m => m.keep && m.ingredients.length > 0)
+        .map(m => ({ key: m.text, name: m.name, kind: 'typed' as const })),
+    ]
+  }
+
+  /**
+   * Lowering the meal count with meals already pinned (BF-11h).
+   *
+   * The picker caps pins at `mealCount - 1` while you pick and never re-checks, so this is the only
+   * place that can catch it. Raising the count can never overflow, so it applies straight through.
+   */
+  function changeMealCount(next: number) {
+    const decision = next < mealCount ? reductionNeeded(currentPins(), next) : null
+    if (!decision) { setMealCount(next); return }
+    setReduction({ decision, next, previous: mealCount })
+  }
+
+  function resolveReduction(keptKeys: string[]) {
+    if (!reduction) return
+    const applied = applyReduction(keptKeys, keepMealIds, typedMeals)
+    setKeepMealIds(applied.selectedIds)
+    setTypedMeals(applied.typedMeals)
+    setMealCount(reduction.next)
+    setReduction(null)
+  }
 
   const toggle = (list: string[], set: (v: string[]) => void, value: string) =>
     set(list.includes(value) ? list.filter(v => v !== value) : [...list, value])
@@ -100,6 +153,7 @@ export function MealPlanSetupSheet({ open, onOpenChange, onSaved, userId }: Prop
           excludedFoods: [...excluded, ...(note.trim() ? [note.trim()] : [])],
           splitTrainingRest: splitDays,
           keepSavedMealIds: keepMealIds,
+          useLibrary,
           // Resolved and ticked: real macros, so the plan keeps them verbatim.
           keepMeals: typedMeals
             .filter(m => m.keep && m.ingredients.length > 0)
@@ -260,8 +314,19 @@ export function MealPlanSetupSheet({ open, onOpenChange, onSaved, userId }: Prop
                 heading="Meals per day"
                 options={Array.from({ length: MEAL_COUNT_MAX - MEAL_COUNT_MIN + 1 }, (_, i) => String(MEAL_COUNT_MIN + i))}
                 selected={[String(mealCount)]}
-                onToggle={v => setMealCount(Number(v))}
+                onToggle={v => changeMealCount(Number(v))}
               />
+
+              {reduction && (
+                <MealCountReductionPrompt
+                  mealCount={reduction.next}
+                  previousCount={reduction.previous}
+                  decision={reduction.decision}
+                  pins={currentPins()}
+                  onKeep={resolveReduction}
+                  onCancel={() => setReduction(null)}
+                />
+              )}
               {/* Honest about what the evidence supports — see the plan doc, decision D2. */}
               <p className="text-[11px] leading-relaxed text-muted-foreground">
                 How many meals you eat makes little difference on its own once the daily totals are
@@ -278,6 +343,8 @@ export function MealPlanSetupSheet({ open, onOpenChange, onSaved, userId }: Prop
               typedMeals={typedMeals}
               onChangeTyped={setTypedMeals}
               mealCount={mealCount}
+              useLibrary={useLibrary}
+              onChangeUseLibrary={setUseLibrary}
             />
           )}
 

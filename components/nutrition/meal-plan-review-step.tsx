@@ -2,11 +2,12 @@
 
 import { useState } from 'react'
 import { toast } from 'sonner'
-import { Loader2, RefreshCw, BookOpen, Wand2, ArrowUp, ArrowDown } from 'lucide-react'
+import { AlertTriangle, Loader2, RefreshCw, Wand2, ArrowUp, ArrowDown } from 'lucide-react'
 import { Switch } from '@/components/ui/switch'
 import { cn } from '@trainingai/shared/utils'
 import { sumMacroTotals } from '@trainingai/shared/nutrition/meal-macro-fit'
 import { MealMacroBars, DayMacroTotals } from './meal-macro-bars'
+import { MealSourceBadge } from './meal-source-badge'
 import { replaceMealInDraft, reorderDraft, type Draft, type DraftMeal } from './meal-plan-draft'
 
 interface Props {
@@ -121,6 +122,29 @@ export function MealPlanReviewStep({ draft, onDraftChange, saveToLibrary, onTogg
         </div>
       )}
 
+      {/* The pins the server could not honour. The client caps at `mealCount - 1` while you pick and
+          the reduction prompt catches a lowered count, so reaching this means both were bypassed —
+          it is the last place a silently dropped pin can still be named rather than vanish. */}
+      {draft.droppedPins != null && draft.droppedPins.length > 0 && (
+        <p
+          className="flex items-start gap-1.5 text-[11px] leading-snug"
+          style={{ color: 'var(--accent-amber)' }}
+        >
+          <AlertTriangle className="mt-px h-3 w-3 flex-none" />
+          <span>
+            There was no room for {draft.droppedPins.join(', ')} — the plan has{' '}
+            {draft.mealsPerDay} {draft.mealsPerDay === 1 ? 'meal' : 'meals'} a day. Go back to raise
+            the count if you want {draft.droppedPins.length === 1 ? 'it' : 'them'} in.
+          </span>
+        </p>
+      )}
+
+      {draft.libraryMatchCount != null && draft.libraryMatchCount > 0 && (
+        <p className="text-[11px] leading-snug text-muted-foreground">
+          {draft.libraryMatchCount} of these came from your saved meals.
+        </p>
+      )}
+
       {draft.macrosAdjusted && (
         <p className="text-[11px] leading-snug text-muted-foreground">
           Your saved macros did not add up to your {draft.targetCalories.toLocaleString()} kcal goal,
@@ -149,13 +173,11 @@ export function MealPlanReviewStep({ draft, onDraftChange, saveToLibrary, onTogg
                   {m.timingRole === 'pre_workout' && ' · before training'}
                   {m.timingRole === 'post_workout' && ' · after training'}
                 </p>
-                {/* Without this a kept meal is indistinguishable from a suggestion, and the reroll
-                    button sits on it identically — you would replace your own food by accident. */}
-                {m.savedMealId != null && (
-                  <p className="mt-0.5 inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-brand">
-                    <BookOpen className="w-3 h-3" /> Yours — kept
-                  </p>
-                )}
+                <MealSourceBadge
+                  source={m.source}
+                  matchReason={m.matchReason ?? null}
+                  hasSavedMeal={m.savedMealId != null}
+                />
               </div>
               <div className="flex flex-none items-center -mr-1 -mt-1">
                 {/* Buttons rather than drag: at most six items, and drag-reorder has a documented
