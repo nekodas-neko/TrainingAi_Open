@@ -720,6 +720,219 @@ permanently).
 
 **Do not flash the circulating `…FasterRawValuesMOD.bin`.** Only step in the arc that can brick the
 device, and it would be taken before knowing the sensor is worth streaming from.
+### [nutrition] PS-14 — `food-row-shared.spec.ts` fails intermittently: the typed query can be eaten by a remount
+
+- **Lane:** B (the surface)
+- **Added:** 2026-08-27, from CI on PR #566
+
+`e2e/food-row-shared.spec.ts:115` — *the external food-database row is the shared row, and keeps its
+mismatch warning* — waits 30 s for the stubbed Open Food Facts row and times out with
+`element(s) not found`. It is not deterministic: measured across three CI runs on
+`fix/colmi-sync-diagnostics`, a branch whose diff touches no nutrition file at all, it went
+**fail → pass → fail**, with the nutrition code byte-identical between the last two. A Bluetooth
+branch cannot break a food search, so this is the spec, not the diff.
+
+**Hypothesis, not a diagnosis — this has not been reproduced locally.** `IngredientPicker` is
+mounted with `key={buildSession}` in `saved-meals-sheet.tsx:651`, and `buildSession` bumps on every
+entry to the build form. The picker owns the search query, so a remount clears it. The test does
+`search.fill('spec mismatch')` immediately after clicking `New`, which is what bumps the key — so if
+the remount lands after the fill, the query is discarded, the 700 ms debounce in
+`ingredient-picker.tsx:93` never sees a non-empty string, and no request is made. Nothing in the
+test would notice: `fill()` has already returned.
+
+**Proposed patch** — assert the value survived, and let Playwright retry the fill if it did not:
+
+```ts
+await expect(async () => {
+  await search.fill('spec mismatch')
+  await expect(search).toHaveValue('spec mismatch')
+}).toPass({ timeout: 10_000 })
+```
+
+Confirm the mechanism before taking the patch. If the remount is real, the same shape is a hazard for
+every spec that types into the builder right after opening it — `saved-meal-tags.spec.ts` and
+`empty-meal-library.spec.ts` both do, and both pass today, which is what a race looks like before it
+bites. If it is something else, the trace zip on the failing run
+(`playwright show-trace`) is the place to start, because the failure ships one.
+
+**Do not skip or quarantine the spec** — it covers a warning the owner explicitly asked to keep.
+
+### [body][nutrition] BF-42 — the daily energy model computes its own BMR and never reads the measured RMR
+
+- **Lane:** A — `lib/health/energy-balance-service.ts`.
+- **Added:** 2026-08-27 · found while answering the owner's question *"are we able to make sure that
+  our excercise calculations add on to the base correctly."* The adding-on is correct. The **base**
+  is not going to be.
+
+**BF-33 wired the measurement into `calculateBaseline`, which is the goal wizard. The live daily
+model is a third path and it was missed.** `energy-balance-service.ts:191-197` computes its own BMR:
+
+```ts
+const bmr = latestBodyFatPct != null
+  ? cunninghamBmr(latestWeightKg! * (1 - latestBodyFatPct / 100))
+  : mifflinStJeorBmr(...)
+const formulaBaseline = Math.round(bmr * SEDENTARY_MULTIPLIER)
+```
+
+No `personalRmr`, no `getLatestMeasuredRmr`. So the moment the owner types 1325 into BF-33's UI, the
+goal wizard will use it and the **Energy Balance card will not** — two numbers for one person's
+resting rate, on two screens, which is the same failure Q-401 fixed for activity multipliers.
+
+**It is worse than a missed read, because that BMR is also a floor.** `restingBaseKcal` is
+`Math.max(Math.round(bmr), maintenanceKcal - avgActiveKcal)`. For this owner the formula BMR is
+**1481** and the measured RMR is **1325**, so the floor sits **156 kcal above the measured resting
+rate** and clamps the calibrated maintenance up to it — the calibration cannot report the truth even
+when the data says so. The floor's comment (*"resting burn can never fall below BMR"*) is sound; the
+bug is that it is using a prediction as the definition of BMR when a measurement is available.
+
+- **Fix:** read the measurement in the service, run it through `personalRmr(measured, leanMassKg)`
+  the same way `calculateBaseline` does, and use the result as both the base and the floor. The
+  repository method already exists (`repo.getLatestMeasuredRmr`, used by
+  `app/api/nutrition-goals/recommend/route.ts:212`), so this is a read plus one substitution, not new
+  infrastructure.
+- **Needs:** BF-33 — pointless to wire up before there is a way to enter a measurement, and unverifiable
+  before then.
+- **Verification:** with a measurement stored, the Energy Balance card's resting base and the goal
+  wizard's BMR agree; with none stored, both fall back to the same prediction and nothing moves.
+
+### [body][nutrition] 🔵 BF-2 — the "DEXA filter": calibrate the scale's body-fat estimate against a real DEXA, and correct history
+
+> **⚑ PROMOTED TO THE HEAD OF THE QUEUE, 2026-08-27 — owner: *"first we need that Dexa scan filter
+> applied so it shows Body fat on the current scale as per a dexa result."*** The pair it was waiting
+> on exists (DEXA 28.5 % vs same-day Renpho 25.3 %). **With one pair an offset and a ratio are the
+> same correction**, so ship it as the single-pair case — store the pair, derive the correction from
+> the stored pairs, and let a second scan decide the form. Do not hardcode 3.2. The pair and the
+> surrounding scale days are in [`docs/clinical-baseline-2026-08-27.md`](clinical-baseline-2026-08-27.md).
+>
+> **⚑ This entry and BF-33 interact, and getting the order wrong silently inflates the RMR.**
+> `personalRmr` ages a measurement by re-scaling its Cunningham residual to **today's** fat-free
+> mass. The stored `ffm_kg_at_test` comes from the DEXA (51.46 kg); today's comes from the scale.
+> Feed it the **uncorrected** scale number and the two are from different instruments — at the
+> measured 3.2-point gap that is 53.56 vs 51.46 kg, so the residual re-scales onto **+45 kcal/day**
+> of fat-free mass the owner does not have, on the very first day. **The corrected body fat has to
+> reach `personalRmr`'s `currentFfmKg`,** not just the protein dose and the goal screen.
+
+- **⚑ The first calibration pair exists (2026-08-27): DEXA 28.5 % vs Renpho 25.3 % — the scale
+  under-reads body fat by 3.2 points; weight 72.1 kg vs 71.7 kg.** Recorded with surrounding scale
+  days in [`docs/clinical-baseline-2026-08-27.md`](clinical-baseline-2026-08-27.md). **One pair still cannot separate an offset from a ratio**, which is precisely why
+  this entry stores pairs and derives the form at two — do not bake +3.2 in as a constant.
+
+- Lane: ? — the planning session splits it (new table + calibration maths = A; the entry/review UI = B)
+
+> **⚠ PRIORITY CHANGED 2026-08-26 — the owner has a DEXA + RMR test BOOKED.** This entry sat at the
+> tail because the owner filed it as *"a loose note to put more effort into later"*; that is no longer
+> the signal. It still needs a planning session before implementation, and the plan should now be
+> written **before the scan happens** so the reading has somewhere to land on the day.
+>
+> **The RMR half is split out as BF-33** and is in the main queue — it needs no calibration maths and
+> no scan to exist before it can be built.
+>
+> **Two refinements from the owner, 2026-08-26, that change the shape of the filter:**
+>
+> 1. **It must accumulate, not be a single constant.** *"This value needs to be able to accept more
+>    (i.e another dexa scan later on) so it can work together to build a correct filter."* So the
+>    stored thing is a **set of paired (scan, scale) observations** with a calibration *derived* from
+>    them — not one offset that a second scan overwrites. This also settles the ratio-vs-offset
+>    question below in the only honest way available: with one point you cannot tell them apart, so
+>    **store the pairs and pick the form once there are two**, rather than guessing now and baking it in.
+> 2. **The filter is per measurement system, not global.** *"whatever measurement system was used"* —
+>    the calibration belongs to the Renpho BIA path specifically. A different scale, or Health
+>    Connect, is a different instrument with a different bias, and applying the Renpho correction to
+>    it would be worse than applying none. Key the calibration by source, and let a source with no
+>    pairs read uncorrected.
+>
+> **The owner's own framing of the goal, worth keeping verbatim:** *"whenever I use my scale (renpho)
+> it can make it accurate to what a dexa scan would give. I hear these scales are good at consistency;
+> its just the initial value might be off."* That is the premise the whole design rests on — **and it
+> is testable rather than assumed.** The owner's last ten readings sit in a 24.9-25.3 band, which is
+> consistency; whether the *offset* is stable is what a second scan later would show, and is the
+> reason (1) above matters more than getting the first correction exactly right.
+
+**Owner request, 2026-08-23 (verbatim):** *"I'd like to be able to upload a dexa scan/RMR values;
+and 1- have a filter that aligns our scales values to a dexa scan; will call it 'dexa filter' so if
+our scale says 15% BF but dexa says 20% we will keep that ratio in mind when giving values; as well
+as fixing previous values."*
+
+**This is not a cosmetic display fix — the scale's body-fat % is an input to the calorie and protein
+goals.** Traced chain:
+
+| Step | Where |
+|---|---|
+| BIA estimate from impedance | `lib/scale-ble/composition.ts` → `computeBodyComposition()` |
+| Stored | `body_metrics.body_fat_pct`, `source_map->>'body_fat_pct' = 'scale_ble'` |
+| Lean mass → BMR (Cunningham, `ffm·21.6 + 370`) | `packages/shared/src/health/body-composition.ts:24` |
+| → calorie + protein goal | `packages/shared/src/nutrition/goal-recommendation.ts:166,178` |
+| → energy balance / TDEE | `lib/health/energy-balance-service.ts:193` |
+| → stored `body_comp` snapshot | `lib/data/postgres/slices/oura.ts:1680` |
+| → display panel | `app/health/health-sections.tsx:285` |
+
+**Measured leverage, against the owner's real current numbers** (71.25 kg, 25.2 % BF, 2026-08-23,
+every row `scale_ble`; last 10 readings sit in a tight 24.9–25.3 band). BMR is linear in body-fat %,
+so the error is exact rather than estimated: **`d(BMR)/d(BF point) = −weightKg × 0.216 = −15.4
+kcal/day per percentage point`**, and the calorie goal carries that through `SEDENTARY_MULTIPLIER`
+(1.2) as **−18.5 kcal/day per point**. The owner's own 5-point example is therefore worth **≈92
+kcal/day on the calorie goal and ≈8 g/day on the protein goal** (protein is dosed per kg of *lean*
+mass, `PROTEIN_G_PER_KG_BY_GOAL`, 2.2 for recomp). A DEXA gap does not just change a number on a
+card; it moves the budget the app tells the owner to eat to.
+
+**The premise is already documented as true — this is not speculative.** `lib/scale-ble/composition.ts`
+opens by saying it is *"a GENERIC single-frequency BIA estimator (Deurenberg-style … ), NOT Renpho's
+own proprietary algorithm"* and that its numbers *"will be close to, but not numerically identical
+to"* a reference. So there is a known, unquantified offset and no mechanism to measure it. A DEXA is
+exactly the measurement that quantifies it.
+
+**Design question the plan must answer — do not let it get decided by accident.** "Fixing previous
+values" can mean two very different things:
+- **(a) correct at read time** — store the DEXA reading plus a derived calibration (offset or ratio),
+  leave `body_metrics.body_fat_pct` holding the raw scale value, apply the correction wherever it is
+  consumed. Reversible; the raw reading stays archival, mirroring the `body_hex` rule.
+- **(b) re-stamp the stored column** — a corrective migration over history. Irreversible, needs a
+  migration number (**Lane A only**), and destroys the ability to re-derive if a later DEXA disagrees.
+
+  Recommended: **(a)**. It gives the owner everything asked for, including retroactive correction,
+  without a data-dropping migration, and a second DEXA then just updates the constant.
+
+**Two traps for whoever scopes this:**
+1. **`body_fat_pct` is not the only BIA-derived column.** `muscle_mass_kg`, `bone_mass_kg`,
+   `body_water_pct`, `visceral_fat_index`, `subcutaneous_fat_pct`, `protein_pct` and `metabolic_age`
+   all come out of the same `computeBodyComposition()` call. Correcting body fat alone leaves the row
+   internally inconsistent (fat % and muscle mass disagreeing about the same body). Decide whether
+   the filter is one scalar on body fat or a whole-panel re-derivation.
+2. **Ratio vs offset is an empirical question with one data point.** With a single DEXA you cannot
+   tell a multiplicative bias from an additive one; they only diverge as weight changes. The owner's
+   phrasing says "keep that ratio in mind", but a plan should say which it picked and why, and prefer
+   the one that degrades safely as the owner's weight moves.
+
+**RMR is the separate half of this request, and it is simpler — now filed as BF-33.** Nothing in the tree reads a measured
+RMR — BMR is *always* estimated (Cunningham when body fat is known, Mifflin-St Jeor otherwise,
+`goal-recommendation.ts:166–169`). A measured RMR from a metabolic cart would override the estimate at
+exactly those two call sites. Worth filing as its own task inside the plan; it needs no calibration
+maths at all, just a stored value and a precedence rule.
+
+**Provenance note:** `HEALTH_SOURCES` in `lib/data/health-source.ts:18` ranks
+`manual(5) > scale_ble(4) > oura_ble(3) > oura_cloud(2) > health_connect(1)`. A DEXA is a clinical
+measurement and outranks all of them; adding a source is a code change in that file **plus** the
+inlined SQL `CASE` at line 45 — both must move together or the SQL and TS ladders diverge.
+
+**⏰ THE SCAN IS 2026-08-27, AND ONE THING MUST HAPPEN ON THE DAY OR THE CALIBRATION CANNOT BE BUILT
+LATER.** Owner: *"Will need to get the dexa matched with the same days renpho scale measurement so we
+can calibrate our scale by the dexa scan."* Exactly right, and it is the only irreversible part:
+
+- **Take a Renpho reading the same day, as close in time to the scan as practical** — ideally both
+  fasted and before training, since BIA moves with hydration and a meal. That reading is one half of
+  the calibration pair and **cannot be reconstructed afterwards**; the DEXA figure can be typed in
+  any time, because the record is dated by when it was measured rather than when it was entered.
+- **Keep the DEXA report itself**, not just body-fat %. Fat mass, lean mass and bone mineral content
+  in kg are what let a later entry re-derive the pair if the stored percentage turns out to be
+  computed differently from the app's.
+- **The reading needs no app work.** `body_metrics` already records the scale over BLE; it is the
+  DEXA half that has nowhere to go yet, which is this entry.
+
+**Done looks like:** a DEXA reading (date, body fat %, and ideally lean/fat mass) can be entered; the
+app states the measured offset against the scale for the same period; corrected body fat feeds the
+calorie and protein goals; and history reads corrected without the raw scale values having been
+overwritten.
+
 ### [nutrition] BF-38 — logging the same food twice creates a second `food_items` row: 19 of 209 are redundant
 
 - **Lane:** A — the matching happens at creation, in the route and the shared create path.
@@ -1154,6 +1367,11 @@ will hit it.
 
 ### [body][nutrition][platform] BF-41 — RMR, DEXA and blood are one intake shape; build the pipeline once
 
+- **⚑ The real reports have arrived and are recorded, de-identified, in [`docs/clinical-baseline-2026-08-27.md`](clinical-baseline-2026-08-27.md)** — DEXA and RMR
+  (2026-08-27) and a 58-analyte blood panel (2026-04). Write each schema from that file, not from a
+  description. It already settles BF-1's hardest shape questions (one-sided and absent reference
+  ranges, a `<0.2` non-numeric result, free-text flags with commentary, a month-precision date).
+
 - **Lane:** A for storage and extraction, B for the upload/crop/confirm surface.
 - **Added:** 2026-08-27 · owner, about to send all three at once: *"ideally you can see what we are
   getting and create an endpoint or so to record these down- then the ability to upload the documents
@@ -1217,6 +1435,18 @@ description will silently drop the field that turns out to matter. **The owner i
   of 80 called it *"perfect"*).
 
 ### [body][nutrition] BF-33 — a measured RMR has nowhere to go, and the four-number panel the test sheet already draws
+
+- **⚑ Owner directive 2026-08-27: *"we need to get these numbers into the app."*** The measurement
+  exists (1325 kcal, 2026-08-27) and there is still no field to type it into, which makes item 3 —
+  the entry surface — the highest-value thing left in this entry. Do it before the 2×2 panel.
+
+- **⚑ The measurement exists (2026-08-27): 1325 kcal measured vs 1549 predicted, −14 %.** Full
+  numbers and both provider TDEE variants in [`docs/clinical-baseline-2026-08-27.md`](clinical-baseline-2026-08-27.md). Two findings that bear on the design: Cunningham
+  on the owner's own **DEXA** lean+BMC gives 1481, still **156 kcal over** the measured value — so the
+  over-estimate is not a body-composition error and a measured reading must override rather than be
+  blended; and the app's learned maintenance (1,827) lands within **5 kcal** of the provider's Mild
+  projected TDEE (1822), implying a real activity factor of ≈**1.38**. Until the UI ships there is
+  still nowhere to type any of it.
 
 - **Lane:** A — new column(s) plus a precedence rule in `packages/shared/`; the panel is B and can
   follow.
@@ -12103,124 +12333,6 @@ intake traced it, it did not design it.
 Health entry point, drawing its charts from values the route returned rather than from parsed prose,
 with the recap week visibly compared against the one before it.
 
-### [body][nutrition] 🔵 BF-2 — the "DEXA filter": calibrate the scale's body-fat estimate against a real DEXA, and correct history
-
-- Lane: ? — the planning session splits it (new table + calibration maths = A; the entry/review UI = B)
-
-> **⚠ PRIORITY CHANGED 2026-08-26 — the owner has a DEXA + RMR test BOOKED.** This entry sat at the
-> tail because the owner filed it as *"a loose note to put more effort into later"*; that is no longer
-> the signal. It still needs a planning session before implementation, and the plan should now be
-> written **before the scan happens** so the reading has somewhere to land on the day.
->
-> **The RMR half is split out as BF-33** and is in the main queue — it needs no calibration maths and
-> no scan to exist before it can be built.
->
-> **Two refinements from the owner, 2026-08-26, that change the shape of the filter:**
->
-> 1. **It must accumulate, not be a single constant.** *"This value needs to be able to accept more
->    (i.e another dexa scan later on) so it can work together to build a correct filter."* So the
->    stored thing is a **set of paired (scan, scale) observations** with a calibration *derived* from
->    them — not one offset that a second scan overwrites. This also settles the ratio-vs-offset
->    question below in the only honest way available: with one point you cannot tell them apart, so
->    **store the pairs and pick the form once there are two**, rather than guessing now and baking it in.
-> 2. **The filter is per measurement system, not global.** *"whatever measurement system was used"* —
->    the calibration belongs to the Renpho BIA path specifically. A different scale, or Health
->    Connect, is a different instrument with a different bias, and applying the Renpho correction to
->    it would be worse than applying none. Key the calibration by source, and let a source with no
->    pairs read uncorrected.
->
-> **The owner's own framing of the goal, worth keeping verbatim:** *"whenever I use my scale (renpho)
-> it can make it accurate to what a dexa scan would give. I hear these scales are good at consistency;
-> its just the initial value might be off."* That is the premise the whole design rests on — **and it
-> is testable rather than assumed.** The owner's last ten readings sit in a 24.9-25.3 band, which is
-> consistency; whether the *offset* is stable is what a second scan later would show, and is the
-> reason (1) above matters more than getting the first correction exactly right.
-
-**Owner request, 2026-08-23 (verbatim):** *"I'd like to be able to upload a dexa scan/RMR values;
-and 1- have a filter that aligns our scales values to a dexa scan; will call it 'dexa filter' so if
-our scale says 15% BF but dexa says 20% we will keep that ratio in mind when giving values; as well
-as fixing previous values."*
-
-**This is not a cosmetic display fix — the scale's body-fat % is an input to the calorie and protein
-goals.** Traced chain:
-
-| Step | Where |
-|---|---|
-| BIA estimate from impedance | `lib/scale-ble/composition.ts` → `computeBodyComposition()` |
-| Stored | `body_metrics.body_fat_pct`, `source_map->>'body_fat_pct' = 'scale_ble'` |
-| Lean mass → BMR (Cunningham, `ffm·21.6 + 370`) | `packages/shared/src/health/body-composition.ts:24` |
-| → calorie + protein goal | `packages/shared/src/nutrition/goal-recommendation.ts:166,178` |
-| → energy balance / TDEE | `lib/health/energy-balance-service.ts:193` |
-| → stored `body_comp` snapshot | `lib/data/postgres/slices/oura.ts:1680` |
-| → display panel | `app/health/health-sections.tsx:285` |
-
-**Measured leverage, against the owner's real current numbers** (71.25 kg, 25.2 % BF, 2026-08-23,
-every row `scale_ble`; last 10 readings sit in a tight 24.9–25.3 band). BMR is linear in body-fat %,
-so the error is exact rather than estimated: **`d(BMR)/d(BF point) = −weightKg × 0.216 = −15.4
-kcal/day per percentage point`**, and the calorie goal carries that through `SEDENTARY_MULTIPLIER`
-(1.2) as **−18.5 kcal/day per point**. The owner's own 5-point example is therefore worth **≈92
-kcal/day on the calorie goal and ≈8 g/day on the protein goal** (protein is dosed per kg of *lean*
-mass, `PROTEIN_G_PER_KG_BY_GOAL`, 2.2 for recomp). A DEXA gap does not just change a number on a
-card; it moves the budget the app tells the owner to eat to.
-
-**The premise is already documented as true — this is not speculative.** `lib/scale-ble/composition.ts`
-opens by saying it is *"a GENERIC single-frequency BIA estimator (Deurenberg-style … ), NOT Renpho's
-own proprietary algorithm"* and that its numbers *"will be close to, but not numerically identical
-to"* a reference. So there is a known, unquantified offset and no mechanism to measure it. A DEXA is
-exactly the measurement that quantifies it.
-
-**Design question the plan must answer — do not let it get decided by accident.** "Fixing previous
-values" can mean two very different things:
-- **(a) correct at read time** — store the DEXA reading plus a derived calibration (offset or ratio),
-  leave `body_metrics.body_fat_pct` holding the raw scale value, apply the correction wherever it is
-  consumed. Reversible; the raw reading stays archival, mirroring the `body_hex` rule.
-- **(b) re-stamp the stored column** — a corrective migration over history. Irreversible, needs a
-  migration number (**Lane A only**), and destroys the ability to re-derive if a later DEXA disagrees.
-
-  Recommended: **(a)**. It gives the owner everything asked for, including retroactive correction,
-  without a data-dropping migration, and a second DEXA then just updates the constant.
-
-**Two traps for whoever scopes this:**
-1. **`body_fat_pct` is not the only BIA-derived column.** `muscle_mass_kg`, `bone_mass_kg`,
-   `body_water_pct`, `visceral_fat_index`, `subcutaneous_fat_pct`, `protein_pct` and `metabolic_age`
-   all come out of the same `computeBodyComposition()` call. Correcting body fat alone leaves the row
-   internally inconsistent (fat % and muscle mass disagreeing about the same body). Decide whether
-   the filter is one scalar on body fat or a whole-panel re-derivation.
-2. **Ratio vs offset is an empirical question with one data point.** With a single DEXA you cannot
-   tell a multiplicative bias from an additive one; they only diverge as weight changes. The owner's
-   phrasing says "keep that ratio in mind", but a plan should say which it picked and why, and prefer
-   the one that degrades safely as the owner's weight moves.
-
-**RMR is the separate half of this request, and it is simpler — now filed as BF-33.** Nothing in the tree reads a measured
-RMR — BMR is *always* estimated (Cunningham when body fat is known, Mifflin-St Jeor otherwise,
-`goal-recommendation.ts:166–169`). A measured RMR from a metabolic cart would override the estimate at
-exactly those two call sites. Worth filing as its own task inside the plan; it needs no calibration
-maths at all, just a stored value and a precedence rule.
-
-**Provenance note:** `HEALTH_SOURCES` in `lib/data/health-source.ts:18` ranks
-`manual(5) > scale_ble(4) > oura_ble(3) > oura_cloud(2) > health_connect(1)`. A DEXA is a clinical
-measurement and outranks all of them; adding a source is a code change in that file **plus** the
-inlined SQL `CASE` at line 45 — both must move together or the SQL and TS ladders diverge.
-
-**⏰ THE SCAN IS 2026-08-27, AND ONE THING MUST HAPPEN ON THE DAY OR THE CALIBRATION CANNOT BE BUILT
-LATER.** Owner: *"Will need to get the dexa matched with the same days renpho scale measurement so we
-can calibrate our scale by the dexa scan."* Exactly right, and it is the only irreversible part:
-
-- **Take a Renpho reading the same day, as close in time to the scan as practical** — ideally both
-  fasted and before training, since BIA moves with hydration and a meal. That reading is one half of
-  the calibration pair and **cannot be reconstructed afterwards**; the DEXA figure can be typed in
-  any time, because the record is dated by when it was measured rather than when it was entered.
-- **Keep the DEXA report itself**, not just body-fat %. Fat mass, lean mass and bone mineral content
-  in kg are what let a later entry re-derive the pair if the stored percentage turns out to be
-  computed differently from the app's.
-- **The reading needs no app work.** `body_metrics` already records the scale over BLE; it is the
-  DEXA half that has nowhere to go yet, which is this entry.
-
-**Done looks like:** a DEXA reading (date, body fat %, and ideally lean/fat mass) can be entered; the
-app states the measured offset against the scale for the same period; corrected body fat feeds the
-calorie and protein goals; and history reads corrected without the raw scale values having been
-overwritten.
-
 ### [nutrition][body] 🔵 BF-3 — track dosed substances (GLP-1s, creatine) — the supplements model cannot represent a titrating or weekly drug
 
 - Lane: ? — schema + sync push is A, the logging surface is B; needs a migration (**Lane A**)
@@ -12270,6 +12382,10 @@ actually taken on the day it was taken; changing today's dose leaves last month'
 they read before; and a weekly substance's reminder fires weekly.
 
 ### [nutrition][body] 🔵 BF-1 — import blood panel results as a nutrition baseline, de-identified
+
+- **⚑ A real panel is available, de-identified, in [`docs/clinical-baseline-2026-08-27.md`](clinical-baseline-2026-08-27.md)** — 58 analytes, April 2026. Write the
+  schema from it: reference ranges arrive as `low-high`, one-sided (`<25`, `>59`) and absent; one
+  result is `<0.2` and not a number; flags are free text carrying commentary; the date is a month.
 
 - Lane: ? — new table + extraction route is A, the upload/review surface is B; needs a migration (**Lane A**)
 
