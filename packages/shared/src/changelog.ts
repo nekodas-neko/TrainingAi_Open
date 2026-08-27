@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.391.0",
+    date: "2026-08-27",
+    changes: [
+      "The top of Nutrition is one card now, matching the mockup: your calories in a ring on the left, what's left beside it, and protein, carbs and fat as three columns with their share of what you've eaten. The on-track band and the eaten/burned/net detail are still there, below in the same card. Nothing about the numbers changed \u2014 the big one is no longer coloured red, because \u201cwell under\u201d at 10 in the morning is not a verdict.",
+    ],
+  },
+  {
     version: "1.390.3",
     date: "2026-08-27",
     changes: [

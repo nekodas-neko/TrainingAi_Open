@@ -3241,3 +3241,12 @@ The entry is long because the floor is the half that gets missed: substituting t
 come from different instruments — at the measured 3.2-point gap that is 53.56 kg against 51.46 kg,
 which re-scales the measurement onto 45 kcal/day of lean mass that is not there. The order of the
 two fixes is load-bearing and neither entry said so.
+
+## 2026-08-27 — `projectOverview.md` 8138 → 8147 (+9), BF-24 ②
+
+Nine lines for the nutrition energy card. Four of them are the feature; the rest are the part a
+successor cannot re-derive from the diff — **the card derives no number of its own**, and the three
+findings that put that rule there (Q-401's two budgets on one screen, Q-417's third one appearing the
+moment a screen composed its own, Q-323's earned-scaled macro targets). A first draft of this card
+called `budgetProvenance` internally and would have been the fourth; recording only "the energy block
+now matches the mockup" leaves the next person free to do exactly that.
