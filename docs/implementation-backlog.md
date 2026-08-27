@@ -1164,6 +1164,11 @@ will hit it.
 
 ### [body][nutrition][platform] BF-41 — RMR, DEXA and blood are one intake shape; build the pipeline once
 
+- **⚑ The real reports have arrived and are recorded, de-identified, in [`docs/clinical-baseline-2026-08-27.md`](clinical-baseline-2026-08-27.md)** — DEXA and RMR
+  (2026-08-27) and a 58-analyte blood panel (2026-04). Write each schema from that file, not from a
+  description. It already settles BF-1's hardest shape questions (one-sided and absent reference
+  ranges, a `<0.2` non-numeric result, free-text flags with commentary, a month-precision date).
+
 - **Lane:** A for storage and extraction, B for the upload/crop/confirm surface.
 - **Added:** 2026-08-27 · owner, about to send all three at once: *"ideally you can see what we are
   getting and create an endpoint or so to record these down- then the ability to upload the documents
@@ -1227,6 +1232,14 @@ description will silently drop the field that turns out to matter. **The owner i
   of 80 called it *"perfect"*).
 
 ### [body][nutrition] BF-33 — a measured RMR has nowhere to go, and the four-number panel the test sheet already draws
+
+- **⚑ The measurement exists (2026-08-27): 1325 kcal measured vs 1549 predicted, −14 %.** Full
+  numbers and both provider TDEE variants in [`docs/clinical-baseline-2026-08-27.md`](clinical-baseline-2026-08-27.md). Two findings that bear on the design: Cunningham
+  on the owner's own **DEXA** lean+BMC gives 1481, still **156 kcal over** the measured value — so the
+  over-estimate is not a body-composition error and a measured reading must override rather than be
+  blended; and the app's learned maintenance (1,827) lands within **5 kcal** of the provider's Mild
+  projected TDEE (1822), implying a real activity factor of ≈**1.38**. Until the UI ships there is
+  still nowhere to type any of it.
 
 - **Lane:** A — new column(s) plus a precedence rule in `packages/shared/`; the panel is B and can
   follow.
@@ -12071,6 +12084,11 @@ with the recap week visibly compared against the one before it.
 
 ### [body][nutrition] 🔵 BF-2 — the "DEXA filter": calibrate the scale's body-fat estimate against a real DEXA, and correct history
 
+- **⚑ The first calibration pair exists (2026-08-27): DEXA 28.5 % vs Renpho 25.3 % — the scale
+  under-reads body fat by 3.2 points; weight 72.1 kg vs 71.7 kg.** Recorded with surrounding scale
+  days in [`docs/clinical-baseline-2026-08-27.md`](clinical-baseline-2026-08-27.md). **One pair still cannot separate an offset from a ratio**, which is precisely why
+  this entry stores pairs and derives the form at two — do not bake +3.2 in as a constant.
+
 - Lane: ? — the planning session splits it (new table + calibration maths = A; the entry/review UI = B)
 
 > **⚠ PRIORITY CHANGED 2026-08-26 — the owner has a DEXA + RMR test BOOKED.** This entry sat at the
@@ -12236,6 +12254,10 @@ actually taken on the day it was taken; changing today's dose leaves last month'
 they read before; and a weekly substance's reminder fires weekly.
 
 ### [nutrition][body] 🔵 BF-1 — import blood panel results as a nutrition baseline, de-identified
+
+- **⚑ A real panel is available, de-identified, in [`docs/clinical-baseline-2026-08-27.md`](clinical-baseline-2026-08-27.md)** — 58 analytes, April 2026. Write the
+  schema from it: reference ranges arrive as `low-high`, one-sided (`<25`, `>59`) and absent; one
+  result is `<0.2` and not a number; flags are free text carrying commentary; the date is a month.
 
 - Lane: ? — new table + extraction route is A, the upload/review surface is B; needs a migration (**Lane A**)
 

@@ -3187,3 +3187,17 @@ pipeline**. The length is two arguments worth not re-deriving. Storage stays typ
 calibration and BF-33's precedence both do arithmetic on named columns, which JSONB makes hard. And
 **the app's crop-before-upload step is still required even though the owner scrubs the file by hand**
 — those are two different redactions, and conflating them is how the security half gets skipped.
+
+## 2026-08-27 — `docs/implementation-backlog.md` raised (the measurements arrived)
+
+22 lines: four ⚑ pointers, one each on BF-41, BF-33, BF-2 and BF-1, into the new
+`docs/clinical-baseline-2026-08-27.md`. The owner's DEXA, RMR and blood results landed in a session
+thread, and every one of those four entries was filed *waiting on exactly these numbers* — so the
+values go in a reference doc and each entry gets the one line that changes what it should be built as.
+
+The lines are not summaries. Each carries the finding that would otherwise be re-derived: BF-2 now
+has its first calibration pair (DEXA 28.5 % vs Renpho 25.3 %) **and the warning not to bake the 3.2
+into a constant**, because one pair cannot separate an offset from a ratio. BF-33 records that
+Cunningham runs 156 kcal high even on the owner's own DEXA lean mass — so the error is not body
+composition and a measured value must override rather than blend. BF-1 records the five shape
+questions a real 58-analyte panel answers that a described one could not.
