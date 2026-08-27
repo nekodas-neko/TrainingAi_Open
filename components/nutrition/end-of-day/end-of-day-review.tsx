@@ -1,7 +1,7 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { X, Moon, Loader2 } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { X, Moon, Loader2, ChevronLeft } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet'
 import { toast } from 'sonner'
@@ -23,6 +23,8 @@ import { WellnessSection } from './wellness-section'
 import { JournalSection } from './journal-section'
 import { TodayInsightCard } from './today-insight-card'
 import { DayDigestCard } from './day-digest-card'
+import { DayReadThroughSection } from './day-read-through-section'
+import { visibleReviewSteps, STEP_TITLES } from './review-steps'
 
 interface BodyBattery {
   current: number
@@ -63,10 +65,22 @@ export function EndOfDayReview({ open, onClose, mealTypes, logs, date, userId, t
   const [battery, setBattery] = useState<BodyBattery | null>(null)
   const [saving, setSaving] = useState(false)
   const [loaded, setLoaded] = useState(false)
+  const [stepIndex, setStepIndex] = useState(0)
+
+  // Recomputed as meals are logged, so backfilling the last empty meal on step 2 removes step 2 —
+  // which is why `stepIndex` is clamped rather than trusted below.
+  const steps = useMemo(
+    () => visibleReviewSteps({ mealTypes, loggedMealTypeIds: logs.map(l => l.mealTypeId) }),
+    [mealTypes, logs],
+  )
+  const safeIndex = Math.min(stepIndex, steps.length - 1)
+  const step = steps[safeIndex]
+  const isLast = safeIndex === steps.length - 1
 
   useEffect(() => {
     if (!open) {
       setLoaded(false)
+      setStepIndex(0)
       return
     }
     if (loaded) return
@@ -216,6 +230,7 @@ export function EndOfDayReview({ open, onClose, mealTypes, logs, date, userId, t
           <div className="flex items-center gap-2">
             <Moon className="w-4 h-4 text-brand" />
             <h2 className="text-base font-semibold">End of Day</h2>
+            <span className="text-xs text-muted-foreground">· {STEP_TITLES[step]}</span>
           </div>
           <button onClick={onClose} aria-label="Close" className="min-w-[48px] min-h-[48px] flex items-center justify-center text-muted-foreground hover:text-foreground">
             <X className="w-5 h-5" />
@@ -223,25 +238,52 @@ export function EndOfDayReview({ open, onClose, mealTypes, logs, date, userId, t
         </div>
 
         <div className="flex-1 overflow-y-auto px-4 pb-4 flex flex-col gap-4">
-          {/* Q-112a: the narrative opener, above the numbers it is talking about. Q-112b puts the
-              read-through in this position too, so it is placed where that entry wants it rather
-              than somewhere b would have to move it from. */}
-          <DayDigestCard active={open} />
-          <DaySummaryCard totals={totals} targets={targets} battery={battery} />
-          <MealBackfillSection mealTypes={mealTypes} logs={logs} date={date} userId={userId} onLogged={onLogged} />
-          <WellnessSection scales={scales} onScale={(k, v) => setScales(s => ({ ...s, [k]: v }))} soreMuscles={soreMuscles} onToggleMuscle={toggleMuscle} />
-          <JournalSection value={journal} onChange={setJournal} />
-          <TodayInsightCard text={insight} />
+          {step === 'day' && (
+            <>
+              {/* The narrative opener, above the numbers it is talking about (Q-112a), then the
+                  day's totals, then the read-through those totals came out of (Q-112b). */}
+              <DayDigestCard active={open} />
+              <DaySummaryCard totals={totals} targets={targets} battery={battery} />
+              <DayReadThroughSection date={date} tz={tz} logs={logs} />
+            </>
+          )}
+          {step === 'meals' && (
+            <MealBackfillSection mealTypes={mealTypes} logs={logs} date={date} userId={userId} onLogged={onLogged} />
+          )}
+          {step === 'wrapUp' && (
+            <>
+              <WellnessSection scales={scales} onScale={(k, v) => setScales(s => ({ ...s, [k]: v }))} soreMuscles={soreMuscles} onToggleMuscle={toggleMuscle} />
+              <JournalSection value={journal} onChange={setJournal} />
+              <TodayInsightCard text={insight} />
+            </>
+          )}
         </div>
 
+        {/* No `pb-safe*` here: `SheetContent side="bottom"` bakes the bottom inset and `p-0` does not
+            strip it, so adding one would double the clearance (CLAUDE.md, safe-area). */}
         <div
-          className="shrink-0 px-4 pt-2 pb-2 border-t border-border/60 backdrop-blur-sm"
+          className="shrink-0 px-4 pt-2 pb-2 border-t border-border/60 backdrop-blur-sm flex gap-2"
           style={{ background: isLight ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.3)' }}
         >
-          <Button onClick={handleSave} disabled={saving} className="w-full h-12 gap-2">
-            {saving && <Loader2 className="w-4 h-4 animate-spin" />}
-            Save
-          </Button>
+          {/* "Previous", not "Back": the wrap-up step's sore-muscle chips include one labelled
+              **Back**, and two controls with the same accessible name on one screen is ambiguous to
+              a screen reader before it is ambiguous to a test. */}
+          {safeIndex > 0 && (
+            <Button variant="outline" onClick={() => setStepIndex(i => Math.max(0, i - 1))} className="h-12 px-4 gap-1">
+              <ChevronLeft className="w-4 h-4" />
+              Previous
+            </Button>
+          )}
+          {isLast ? (
+            <Button onClick={handleSave} disabled={saving} className="flex-1 h-12 gap-2">
+              {saving && <Loader2 className="w-4 h-4 animate-spin" />}
+              Save
+            </Button>
+          ) : (
+            <Button onClick={() => setStepIndex(i => i + 1)} className="flex-1 h-12">
+              Next
+            </Button>
+          )}
         </div>
       </SheetContent>
     </Sheet>
