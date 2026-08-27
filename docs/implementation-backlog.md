@@ -3406,8 +3406,15 @@ permanently-mounted panels; DOM accumulation in long lists; and the interaction 
 churn, where a rewritten service-worker cache forces the shell to be re-fetched into an already-long-
 lived context.
 
+- **Gate:** device — added 2026-08-27 by Lane B, which reached this as the top startable row and
+  found it says the opposite of startable: *"cannot be root-caused from a sandbox and should not be
+  attempted again from one"*, *"Surface: device only"*.
 - **Needs:** BF-19 — the client reporter is what produces the device measurement this entry cannot
-  get any other way.
+  get any other way. **⚑ `Needs:` cleared on a technicality and that is worth noticing.** BF-19 has
+  shipped, so the pointer resolves and this row printed as READY — but BF-19 shipped the *reporter*,
+  and `projectOverview.md` records that its table **stays empty until it runs on the S25**. What
+  this entry needs is the reporter's OUTPUT, which no merge can produce. A `Needs:` target leaving
+  the queue means the dependency is built, not that its data exists.
 - **This cannot be root-caused from a sandbox** and should not be attempted again from one. It wants
   a heap and main-thread profile from the S25 across a long-running session.
 - **What would count as fixed:** the owner can go a normal week without a force restart changing how
