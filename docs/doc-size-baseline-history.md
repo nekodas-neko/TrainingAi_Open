@@ -3269,3 +3269,20 @@ an inert key.
 `sr-only` `SheetTitle` and a visible `<h2>` carrying the same string, so the dialog's accessible name
 is announced twice and `getByRole('heading')` is ambiguous. It names the fourth sheet that is *not* a
 violator, so a sweep does not "fix" the one that is already right.
+
+## 2026-08-27 — `docs/implementation-backlog.md` raised (LB-25 replaces the shipped Q-112b)
+
+20 net lines (12780). Q-112b's four-line entry is gone; LB-25 is longer because it records **why**
+the one stat it could not ship is not simply "add a stat".
+
+Body temperature has no client-reachable source. `oura_daily.temperature_deviation` is the frozen
+Cloud column the plan forbids; the live derived values (`oura_daily_summary.temp_mean_c` /
+`temp_dev_c`) are returned by **no route** — `health-insight` reads `tempDevC` and feeds it to a
+prompt, which is not a payload. They *are* in the local store, so a device-only local-first read
+would work and would be unverifiable in `pnpm dev` or Playwright. Without that written down, the
+next attempt either re-derives it or takes the local-first path without noticing it has given up the
+web harness.
+
+It also records the near-free adjacency: the day HR trace is bucketed by **mean**, so the range that
+shipped is labelled "15-min averages"; `oura_bucket.hr_min` / `hr_max` would let it say Low and High
+honestly, in the same route change.
