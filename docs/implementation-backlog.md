@@ -1238,75 +1238,6 @@ raw* store, which is a different table and a different decision.
   rounding error on today's data; whether route 2 or route 3 carries the rest is the real question,
   and it is the one the next bullet says cannot be answered from the column.
 
-### [nutrition] BF-40 — build a meal from a recipe screenshot: the route already takes images, the prompt tells it they are plates
-
-- **Lane:** B, with one prompt line in `app/api/nutrition/scan/route.ts` (Lane A by path, trivial by
-  size — take it in the same PR and say so).
-- **Added:** 2026-08-26 · owner, with a screenshot of a Google recipe overview: *"id like to be able
-  to upload an image like above to the meal creator and have it make it - i see we dont have that
-  upload option yet."*
-
-**Most of this is already built, which is the point of the entry.** BF-11c shipped recipe import: the
-builder's search field detects a URL and `importRecipe()` POSTs `{ url }` to
-`/api/nutrition/scan`, which returns `ingredients[]` + `candidates[]`, mints a `food_item` per
-ingredient and hands the lot to the builder.
-
-**That same route already accepts `{ image, mimeType }`** (`route.ts:163`) and both branches share one
-`ScanSchema` — which already carries `ingredients[]` and `candidates[]`. So the plumbing for a recipe
-image exists end to end. Two things are missing:
-
-1. **The image branch's prompt says the wrong thing.** It is
-   `'Analyse this food photo and return the nutrition JSON.'` Handed a screenshot of an ingredient
-   list, that instructs the model to estimate a *finished plate* rather than read the list. The
-   system prompt above it already understands recipes and multi-dish pages — it is only the
-   per-request line that assumes a photo of food.
-2. **No affordance.** The builder offers a URL path (typed into search) and no way to hand it an
-   image.
-
-**Why the existing URL path does not already cover this, using the owner's own example.** The
-screenshot is a **Google AI overview**, not a recipe site — the ingredients are rendered into
-Google's own results page, with the source behind a `YouTube · MOMables` chip. There is no recipe URL
-to paste. **The image is the only handle on that content**, which is exactly the case the URL path
-cannot serve.
-
-**⚠ The trap, and it is a documented four-fold calorie error.** `importRecipe()`'s comment: the URL
-branch reads `recipeYield` from the page's JSON-LD and *"is handed straight up rather than defaulted
-to 1 … a banana-bread page measured 1,956 kcal for the loaf. Deciding here that it is one portion is
-exactly the four-fold calorie error that reads as plausible."* **A screenshot has no JSON-LD**, so the
-yield can only come from the model reading it off the image ("makes 8 pancakes") or from the
-builder's batch-size field. **Never default it to 1.** Null is the correct answer and the builder
-already asks.
-
-- **Distinguish it from the photo scan, in the UI and in the prompt.** *Photograph your dinner* and
-  *screenshot a recipe* are different acts with different outputs — a logged food versus a saved meal
-  — and one tile that guesses which one you meant will guess wrong. The owner said *"the meal
-  creator"*, so this belongs in the builder, beside the URL path, not on Log Food.
-- **Reuse, do not re-derive.** `importRecipe()` already handles the multi-candidate case, mints items
-  serially (one local write and one outbox row each), and floors quantity at 0.01 for sub-gram
-  garnishes. An image path should differ only in what it posts.
-- **Rate-limit and fail soft**, per CLAUDE.md — same as every AI route. A screenshot that yields no
-  ingredients gets the existing *"No recipe could be read"* toast, not an error state.
-**✅ THE PAYOFF THE OWNER WANTS ALREADY EXISTS — do not rebuild it.** 2026-08-27: *"that way when I
-increase serving size I can see calories drop till its a good serving size from a batch."* That is
-`components/nutrition/meal-batch-size.tsx` plus the batch footer, both shipped:
-
-- **"This recipe makes N portions"** — `−`/`+` and a number input, quarter-portion steps, capped at 50.
-- **Live per-portion arithmetic underneath it:** *"Logging this meal takes one portion — 278 kcal of
-  the 555 below."*
-- **`meal-builder-footer.tsx` keeps the batch total, the macro split and `N / portion` on screen
-  *while ingredients are edited*.**
-
-So raising the servings count already makes per-portion calories fall, in two places at once. **This
-entry is only the missing entry point.** Once an image can reach the builder, the behaviour the owner
-described is what happens next with no further work.
-
-- **"An image of ingredients" covers two things and one change serves both** — a screenshot of a
-  written ingredient list, and a photo of physical ingredients laid out. Both are an image posted to
-  the same route; the prompt has to admit either rather than assuming a plated dish.
-- **Verification.** The owner's own screenshot end to end: seven ingredients, a name, and a yield the
-  builder asks for rather than assumes. Then a photo of a plate through the *photo* path, to confirm
-  the prompt change did not turn dinner into a recipe.
-
 ### [nutrition][app-shell] BF-28 — mockup parity: the artboards are the spec, and this is the map
 
 - **Lane:** B
@@ -1991,33 +1922,30 @@ whether or not anyone draws them first.
   reference drawings were never committed). Part 1 §8 has the file-by-file collision table and the
   carry-across rule. **Do not plan around that chain landing, and do not wait for it.**
 
-### [nutrition] BF-11h — the wizard surfaces the library, the reasons, and the meal-count prompt
+### [nutrition] LB-21 — `useLibrary` is reachable by users now, and no test has ever run a generation with it on
 
-> **⚠ BF-11g shipped the engine half. The response already carries what this entry needs to render:**
-> `source` (`'kept' | 'library' | 'ai'`) and `matchReason` per meal, `libraryMatchCount`, and
-> `droppedPins` — the pins the server could not honour because there were more of them than slots.
-> **Nothing sets `useLibrary` yet**, so the library search is off for every real request until this
-> entry turns it on; the field is a boolean on the generate request, not a list of ids.
-
-- **Lane:** B
-- **Needs:** BF-11f, BF-11g
-- **Plan:** [`plans/2026-08-24-library-first-meal-planner.md`](superpowers/plans/2026-08-24-library-first-meal-planner.md) §5.5
-- **Branch:** `feat/meal-plan-library-surface`
-- **Added:** 2026-08-24 · planning session, from BF-11 (design items 10, 11, 12).
-- Four things, one screen pair, one verification pass: a **"use all my saved meals"** toggle in the
-  *Yours* step (the existing checkboxes stay and keep meaning *pin* — the copy must distinguish
-  them); **"why this meal"** from `matchReason`, and its inverse on a fallback slot, which is the
-  useful half of the rejected prompt-to-create option; **reroll offers a library swap first**, AI
-  second; and the **meal-count reduction prompt**.
-- **⚠ The reduction prompt is fixing a live silent drop, not adding a nicety** — see BF-11 above and
-  Part 2 §2. It fires **only when `K > M − 1`** (pins exceed the slots left after the planner's
-  reserved one). Below that, re-run the split and say nothing: **there is nothing to "transfer"**,
-  because the split derives from the day's totals, so removing a slot redistributes automatically.
-  What the user loses is a meal *choice*, and that is what the prompt is about.
-- **Verify the regression, don't inspect it:** pick the maximum meals, go back, lower the count,
-  confirm the prompt fires and nothing is dropped. The failure is invisible from the UI.
-- Read Q-407 first (Part 2 §6) — it edits the same two files, and its instruction *"do not delete the
-  stepper in this PR"* holds here too.
+- **Lane:** A — the work is in `app/api/nutrition/meal-plans/generate/route.ts`, which the path rule
+  puts in Lane A. Filed by Lane B (the letter records who found it, not who ships it).
+- **Branch:** `test/generate-with-library`
+- **Added:** 2026-08-27 · Lane B, from BF-11h's own "Not exercised" section.
+- **What is and is not covered.** `selectLibraryMeals` is well tested in
+  `packages/shared/src/nutrition/__tests__/library-match.test.ts` — the ranking, the eligibility
+  windows, untagged-suits-any-slot, no-meal-twice. **The route WIRING is not.** `grep -rl useLibrary
+  --include=*.test.ts` returns nothing: BF-11g shipped the flag with no test, BF-11h made it
+  settable from the wizard, and between them nobody has run a generation with it on.
+- **What a test should pin, none of which the shared tests can see:**
+  - `useLibrary: false` still skips both `listSavedMeals` and `listMealTypes` — the conditional
+    fetches at route.ts:132/135 are the reason the common path costs nothing, and a regression there
+    is invisible except as latency.
+  - Picks land at the slot they were matched against, **after** the pinned meals — the `kept.length`
+    offset at route.ts:203 is arithmetic nothing currently checks.
+  - `libraryMatchCount` equals the picks actually used, and `matchReason` is null on an AI slot when
+    `useLibrary` was off but a sentence when it was on. **BF-11h's UI depends on exactly that
+    distinction** — it is how the review step tells "the library had no say" from "nothing fitted".
+  - A pinned meal is never also offered by the library pass (route.ts filters it, untested).
+- **Do not reach for an AI call to test this.** The library path is the half that does NOT call the
+  model — a fully-pinned or fully-library-filled request generates nothing, which is what makes an
+  end-to-end test of this flag cheap and deterministic. That is the shape to aim for.
 
 ### [nutrition][platform] Q-407 — the meal-plan wizard is seven screens for six answers, and the one piece the Coach lacks is multi-select
 

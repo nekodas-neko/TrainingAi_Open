@@ -3222,7 +3222,7 @@ questions a real 58-analyte panel answers that a described one could not.
 
 ## 2026-08-27 — `docs/implementation-backlog.md` raised (BF-42, and the owner promoting BF-2)
 
-47 lines. Most of it is **BF-42**, filed from a question rather than a bug report: the owner asked
+47 lines (12634 after merging main, which removed the shipped BF-40). Most of it is **BF-42**, filed from a question rather than a bug report: the owner asked
 whether exercise calories add on to the RMR base correctly. They do — `computeActiveEnergy` is
 net-of-rest and `calculateBaseline` refuses to multiply an activity factor in, both from Q-401. But
 checking it surfaced that `energy-balance-service.ts` computes its **own** BMR and never reads the

@@ -16,6 +16,22 @@
  *
  * **It revokes the object URL.** Both copies leaked one per call.
  */
+/**
+ * Longest edge for an image posted to `/api/nutrition/scan`, in pixels (BF-4).
+ *
+ * **Chosen from the token budget, not from taste.** Every image scan in a month of production
+ * reports 1,275–1,298 input tokens regardless of the photo's size, because Gemini normalises an
+ * image to a fixed tile budget before the model sees it. A 4 MB photo and a 400 KB photo therefore
+ * do the same model work — the extra bytes buy no accuracy and are pure upload latency. 1024 sits
+ * comfortably above the tiles that budget covers while bounding an S25's 12 MP capture, which is
+ * otherwise ~4000 px wide plus base64's ~33%.
+ *
+ * **Shared since BF-40 gave that route a second caller** — the meal builder's recipe-picture import,
+ * beside the Log Food photo scan. Two constants would let the paths disagree about how much of a
+ * photo survives, which is a silent difference in what the model can read rather than a visible one.
+ */
+export const SCAN_IMAGE_MAX_DIM = 1024
+
 export interface DownscaleOptions {
   /** Longest edge of the result, in pixels. The aspect ratio is kept. */
   maxDim: number

@@ -173,17 +173,44 @@ export function IngredientPicker({ active, userId, onAdd, onImportRecipe, onReci
    * calorie error that reads as plausible; the builder has a batch-size field and asks instead.
    */
   async function importRecipe(url: string) {
+    return importRecipeFrom({ url }, hostOf(url), 'No recipe could be read from that page')
+  }
+
+  /**
+   * A recipe from a SCREENSHOT rather than a link (BF-40).
+   *
+   * The owner's case is a Google AI overview: the ingredients are rendered into Google's own results
+   * page with the source behind a chip, so there is no recipe URL to paste and the image is the only
+   * handle on that content.
+   *
+   * `imageKind: 'recipe'` is the entire difference at the route — without it the model is asked to
+   * estimate a finished plate from a picture of a word list. **`recipeYield` still comes back null**,
+   * because a screenshot carries no JSON-LD and nothing here invents one: the builder's batch-size
+   * field asks, which is the same refusal the URL path makes and for the same reason.
+   */
+  async function importRecipeImage(image: string, mimeType: string) {
+    return importRecipeFrom({ image, mimeType, imageKind: 'recipe' }, 'Recipe', 'No recipe could be read from that image')
+  }
+
+  /**
+   * Everything both import paths do, which is everything except the request body.
+   *
+   * Extracted rather than copied: the multi-candidate branch, the serial minting, the 0.01 floor and
+   * the `recipeYield` refusal below are the parts that took two entries to get right, and a second
+   * copy of them is a second place for them to drift.
+   */
+  async function importRecipeFrom(payload: Record<string, unknown>, fallbackName: string, emptyMessage: string) {
     setImporting(true)
     try {
       const res = await fetch('/api/nutrition/scan', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url }),
+        body: JSON.stringify(payload),
       })
       const body = res.ok ? await res.json() : null
       const ingredients: NutritionIngredient[] = Array.isArray(body?.ingredients) ? body.ingredients : []
       if (ingredients.length === 0) {
-        toast.error(offlineHint() ?? 'No recipe could be read from that page')
+        toast.error(offlineHint() ?? emptyMessage)
         return
       }
       // Several dishes: ask which, before minting anything. The top level is `candidates[0]`, so
@@ -208,7 +235,7 @@ export function IngredientPicker({ active, userId, onAdd, onImportRecipe, onReci
         entries.push({ item, qty: Math.max(0.01, entry.quantityMultiplier) })
       }
       onImportRecipe({
-        name: typeof body.name === 'string' ? body.name : hostOf(url),
+        name: typeof body.name === 'string' ? body.name : fallbackName,
         entries,
         recipeYield: typeof body.recipeYield === 'number' ? body.recipeYield : null,
       })
@@ -291,6 +318,7 @@ export function IngredientPicker({ active, userId, onAdd, onImportRecipe, onReci
         onEstimate={() => void estimateAndAdd()}
         importing={importing}
         onImportRecipe={url => void importRecipe(url)}
+        onImportRecipeImage={(image, mimeType) => void importRecipeImage(image, mimeType)}
         dbResults={dbResults}
         dbSearching={dbSearching}
         dbUnavailable={dbUnavailable}

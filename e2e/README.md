@@ -103,10 +103,33 @@ Chromium-on-Linux, and gestures behave differently under a real thumb. Those sti
 
 - **Stubbing an `/api/` route needs `test.use({ serviceWorkers: 'block' })`.** `public/sw-template.js`
   re-issues **every** `/api/` request — no method filter — so once the worker controls the page the
-  request comes from the worker and **`page.route` never sees it**; Playwright does not intercept
-  service-worker fetches. Whether the worker has taken control yet is a race, so the spec passes
-  locally and fails on CI *sometimes*, with the real route answering in the server log. Measured on
-  `recipe-url-to-meal.spec.ts`: three attempts hit the route, a fourth was stubbed and passed.
+  request comes from the worker and **`page.route` never sees it**; Playwright's own types say so
+  (1.62.1, `types.d.ts:10184`: route "will not intercept requests intercepted by Service Worker").
+  The worker calls `skipWaiting()` then `clients.claim()`, so control arrives **mid-page-life**
+  rather than on the next navigation — which is what makes it a race rather than a constant, and why
+  the spec passes locally and fails on CI *sometimes*, with the real route answering in the server
+  log. Measured on `recipe-url-to-meal.spec.ts`: three attempts hit the route, a fourth was stubbed
+  and passed.
+
+  **`scripts/check-e2e-api-stub-sw.js` enforces it now (PS-14).** This paragraph alone did not hold:
+  three specs were written against it afterwards, two of them on the day PS-14 was filed, by a
+  session that had the entry open. PS-14's own hypothesis — a remount discarding the typed query —
+  was **wrong**, and testing it is what found this: a probe asserting the query survived passed
+  8 for 8, while a page-context fetch before the worker's claim reached the stub and the identical
+  fetch after it did not. If you are debugging a stubbed route that "sometimes" misses, check the
+  worker before you check your component.
+- **A spec that WRITES rows must delete them, either side.** The local database persists between
+  runs and CI provisions a fresh one, so a spec that leaves rows behind passes on CI **forever**
+  while failing every local run after the first. That is the inverse of the aged-fixture trap in
+  `CLAUDE.md` and it hides just as well: `recipe-image-to-meal.spec.ts` mints a `food_item` per
+  imported ingredient, and on the second run its own leavings came back in the picker's list, where
+  a bare-name assertion matched both the ingredient row and a stale search row. Clean up in
+  `beforeAll` **and** `afterAll` — before, because a previous run may have died mid-way.
+
+  Two habits make it moot. Assert on the **row's own shape** (`/Spec Flour.*250 g/`) rather than a
+  name anything can carry; and run a new spec **twice in a row** before believing it, which is the
+  cheapest thing that distinguishes "passes" from "passes once".
+
 - **Never put an `expect` inside a `page.route` handler.** A throw there skips `route.fulfill`, so the
   app's request breaks and the failure surfaces several assertions later as something unrelated —
   a locator error, usually. Record the request and assert in the test body.

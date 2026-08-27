@@ -3,6 +3,7 @@
 import { memo, useCallback } from 'react'
 import { Search, X, Loader2, Sparkles, Link2 } from 'lucide-react'
 import { asHttpsUrl, hostOf } from './recipe-url'
+import { RecipeImageButton } from './recipe-image-button'
 import type { FoodItem } from '@trainingai/shared/types/nutrition'
 import { FoodRow } from '@/components/nutrition/food-row'
 import type { FoodSearchResponse } from '@/app/api/nutrition/food-search/route'
@@ -21,6 +22,8 @@ interface Props {
   /** Importing a pasted recipe link (BF-11c). Runs instead of the estimate, never beside it. */
   importing: boolean
   onImportRecipe: (url: string) => void
+  /** BF-40: the same import, from a picture, for content that has no URL to paste. */
+  onImportRecipeImage: (image: string, mimeType: string) => void
   dbResults: ExternalFood[]
   dbSearching: boolean
   dbUnavailable: boolean
@@ -44,7 +47,7 @@ interface Props {
  */
 export function IngredientSearch({
   query, onQueryChange, searchResults, onAdd,
-  estimating, onEstimate, importing, onImportRecipe,
+  estimating, onEstimate, importing, onImportRecipe, onImportRecipeImage,
   dbResults, dbSearching, dbUnavailable, addingExternal, onAddExternal,
   showAddFood, onAddByHand,
 }: Props) {
@@ -116,7 +119,12 @@ export function IngredientSearch({
             </span>
           </span>
         </button>
-      ) : query.trim().length >= 2 && (
+      ) : query.trim().length < 2 ? (
+        // Offered only on an EMPTY search, where nothing else is: a typed query means the estimate
+        // row below, and a pasted link means the row above. Neither competes with a picture, and a
+        // third permanent button would crowd the one control that matters here — the search itself.
+        <RecipeImageButton importing={importing} onPick={onImportRecipeImage} />
+      ) : (
         <button
           onClick={onEstimate}
           disabled={estimating}

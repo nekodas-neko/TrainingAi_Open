@@ -17,6 +17,10 @@ import { settleRouteBoundary } from './fixtures'
  * flaky rather than this one spec. The mock is per-page and mutates nothing.
  */
 
+// The saved-meals stub below is only reliable with the worker blocked: `sw-template.js` re-issues
+// every `/api/` request, and Playwright does not intercept a service-worker fetch (PS-14).
+test.use({ serviceWorkers: 'block' })
+
 async function openEmptyMealsTab(page: import('@playwright/test').Page) {
   // Per-page, so nothing else in the suite sees an empty library. The GET is what fills the list;
   // the sheet reads local-first first, and `getLocalStore` is null outside the APK.

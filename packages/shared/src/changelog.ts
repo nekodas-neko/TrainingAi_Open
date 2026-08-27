@@ -6,6 +6,31 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.390.0",
+    date: "2026-08-27",
+    changes: [
+      "Build a meal from a picture of a recipe. In the meal builder, tap \u201cBuild from a recipe picture\u201d and hand it a screenshot of an ingredient list \u2014 or a photo of the ingredients laid out \u2014 and every ingredient is added at its own weight and saved to your foods. This is for the case a link cannot cover: a search-results page that shows you the recipe but gives you nowhere to copy it from.",
+      "It asks how many the recipe makes rather than guessing. A picture never says, so assuming one portion would quietly multiply everything you logged from it \u2014 set the portions and watch the per-portion calories fall until the number looks right.",
+    ],
+  },
+  {
+    version: "1.389.1",
+    date: "2026-08-27",
+    changes: [
+      "Internal: a test that stubbed a network call was racing the app\u2019s own offline worker, so it passed or failed depending on timing rather than on anything being broken. The suggested cause turned out to be wrong \u2014 testing it is what found the real one \u2014 and the rule that prevents it is now checked automatically rather than only written down.",
+    ],
+  },
+  {
+    version: "1.389.0",
+    date: "2026-08-27",
+    changes: [
+      "A meal plan can build itself from meals you already have. Turn on \"Use my saved meals\" when making a plan and it fills a slot from your library whenever one fits, writing something new only when none does. Ticking a meal still forces it in \u2014 the toggle is the looser question, and the wording now says which is which.",
+      "Each meal in a new plan says where it came from: kept because you asked for it, chosen from your library, or written for the slot. A library pick says which macro it matched on, and a slot that got something new says whether your meals were even searched \u2014 \"none of yours fitted here\" and \"the library had no say\" are different answers.",
+      "Replacing a meal now offers one of yours before offering something new. Picking from your library is instant and free; the AI option is still there for when nothing of yours suits the slot.",
+      "Fixed: lowering the meals-per-day after choosing meals to keep silently dropped the ones that no longer fitted. It now names them and asks which to keep \u2014 nothing is deleted, and the ones you drop still steer what the plan suggests.",
+    ],
+  },
+  {
     version: "1.388.2",
     date: "2026-08-27",
     changes: [

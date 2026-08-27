@@ -2,12 +2,24 @@
 
 import { useState } from 'react'
 import { toast } from 'sonner'
-import { Loader2, RefreshCw, BookOpen, Wand2, ArrowUp, ArrowDown } from 'lucide-react'
+import { AlertTriangle, BookOpen, Loader2, RefreshCw, Sparkles, Wand2, ArrowUp, ArrowDown } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
 import { cn } from '@trainingai/shared/utils'
 import { sumMacroTotals } from '@trainingai/shared/nutrition/meal-macro-fit'
 import { MealMacroBars, DayMacroTotals } from './meal-macro-bars'
+import { MealSourceBadge } from './meal-source-badge'
+import { libraryMealForSlot, usedSavedMealIds } from './library-swap'
+import { savedMealToIngredients } from '@trainingai/shared/nutrition/saved-meal-ingredients'
+import type { MealTypeWindow } from '@trainingai/shared/nutrition/library-match'
+import type { MealType, SavedMeal } from '@trainingai/shared/types/nutrition'
+import { useCachedValue } from '@/lib/hooks/use-cached-value'
+import { TTL_LONG, TTL_MEDIUM } from '@trainingai/shared/cache-ttl'
 import { replaceMealInDraft, reorderDraft, type Draft, type DraftMeal } from './meal-plan-draft'
+
+/** Module-level, so a null payload does not hand a fresh array identity to every render. */
+const EMPTY_MEALS: SavedMeal[] = []
+const EMPTY_TYPES: MealTypeWindow[] = []
 
 interface Props {
   draft: Draft
@@ -28,6 +40,14 @@ export function MealPlanReviewStep({ draft, onDraftChange, saveToLibrary, onTogg
   const [variantIdx, setVariantIdx] = useState(0)
   const [rerolling, setRerolling] = useState<number | null>(null)
   const [instructingFor, setInstructingFor] = useState<number | null>(null)
+  // BF-11h item 11: the library is offered on a reroll BEFORE the model is asked, from the same
+  // keys the rest of the app uses. `useCachedValue` rather than a `useEffect(…, [])` — it seeds
+  // synchronously AND refetches when the key is invalidated, which matters here because saving a
+  // plan meal to the library (the switch two lines below this list) clears `saved-meals`, and a
+  // fetch-once effect would then offer a swap list that no longer matches what the user owns.
+  const library = useCachedValue<SavedMeal[]>('saved-meals', '/api/nutrition/saved-meals', TTL_MEDIUM) ?? EMPTY_MEALS
+  const mealTypes = useCachedValue<MealType[]>('nutrition-meal-types', '/api/nutrition/meal-types', TTL_LONG) ?? EMPTY_TYPES
+  const [swapFor, setSwapFor] = useState<number | null>(null)
   const [instruction, setInstruction] = useState('')
   const variant = draft.variants[Math.min(variantIdx, draft.variants.length - 1)]
 
@@ -72,6 +92,25 @@ export function MealPlanReviewStep({ draft, onDraftChange, saveToLibrary, onTogg
     } finally {
       setRerolling(null)
     }
+  }
+
+  /**
+   * Swap one slot for the best saved meal that fits it (BF-11h item 11).
+   *
+   * No route and no model call — `libraryMealForSlot` runs the generator's own matcher on data the
+   * client already has cached. So this is instant and free where the AI reroll is neither, which is
+   * the whole reason it is offered first.
+   */
+  function swapForLibraryMeal(meal: DraftMeal) {
+    const swap = libraryMealForSlot(meal, library, mealTypes, usedSavedMealIds(variant.meals))
+    if (!swap) { toast.error('Nothing in your meals fits this slot'); return }
+    onDraftChange(replaceMealInDraft(draft, meal.position, {
+      name: swap.meal.name,
+      notes: null,
+      ingredients: savedMealToIngredients(swap.meal),
+      fromLibrary: { savedMealId: swap.meal.id, matchReason: swap.matchReason },
+    }))
+    setSwapFor(null)
   }
 
   /**
@@ -121,6 +160,29 @@ export function MealPlanReviewStep({ draft, onDraftChange, saveToLibrary, onTogg
         </div>
       )}
 
+      {/* The pins the server could not honour. The client caps at `mealCount - 1` while you pick and
+          the reduction prompt catches a lowered count, so reaching this means both were bypassed —
+          it is the last place a silently dropped pin can still be named rather than vanish. */}
+      {draft.droppedPins != null && draft.droppedPins.length > 0 && (
+        <p
+          className="flex items-start gap-1.5 text-[11px] leading-snug"
+          style={{ color: 'var(--accent-amber)' }}
+        >
+          <AlertTriangle className="mt-px h-3 w-3 flex-none" />
+          <span>
+            There was no room for {draft.droppedPins.join(', ')} — the plan has{' '}
+            {draft.mealsPerDay} {draft.mealsPerDay === 1 ? 'meal' : 'meals'} a day. Go back to raise
+            the count if you want {draft.droppedPins.length === 1 ? 'it' : 'them'} in.
+          </span>
+        </p>
+      )}
+
+      {draft.libraryMatchCount != null && draft.libraryMatchCount > 0 && (
+        <p className="text-[11px] leading-snug text-muted-foreground">
+          {draft.libraryMatchCount} of these came from your saved meals.
+        </p>
+      )}
+
       {draft.macrosAdjusted && (
         <p className="text-[11px] leading-snug text-muted-foreground">
           Your saved macros did not add up to your {draft.targetCalories.toLocaleString()} kcal goal,
@@ -149,13 +211,11 @@ export function MealPlanReviewStep({ draft, onDraftChange, saveToLibrary, onTogg
                   {m.timingRole === 'pre_workout' && ' · before training'}
                   {m.timingRole === 'post_workout' && ' · after training'}
                 </p>
-                {/* Without this a kept meal is indistinguishable from a suggestion, and the reroll
-                    button sits on it identically — you would replace your own food by accident. */}
-                {m.savedMealId != null && (
-                  <p className="mt-0.5 inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-brand">
-                    <BookOpen className="w-3 h-3" /> Yours — kept
-                  </p>
-                )}
+                <MealSourceBadge
+                  source={m.source}
+                  matchReason={m.matchReason ?? null}
+                  hasSavedMeal={m.savedMealId != null}
+                />
               </div>
               <div className="flex flex-none items-center -mr-1 -mt-1">
                 {/* Buttons rather than drag: at most six items, and drag-reorder has a documented
@@ -177,9 +237,10 @@ export function MealPlanReviewStep({ draft, onDraftChange, saveToLibrary, onTogg
                   <ArrowDown className="w-4 h-4 text-muted-foreground" />
                 </button>
                 <button
-                  onClick={() => askForMeal(m)}
+                  onClick={() => setSwapFor(swapFor === m.position ? null : m.position)}
                   disabled={rerolling != null}
-                  aria-label={`Suggest a different meal instead of ${m.name}`}
+                  aria-expanded={swapFor === m.position}
+                  aria-label={`Replace ${m.name}`}
                   className="min-h-[44px] min-w-[44px] grid place-items-center rounded-xl active:bg-muted/40 disabled:opacity-40 transition-colors"
                 >
                   {rerolling === m.position
@@ -188,6 +249,32 @@ export function MealPlanReviewStep({ draft, onDraftChange, saveToLibrary, onTogg
                 </button>
               </div>
             </div>
+
+            {/* The library is offered FIRST because it is the better answer when it exists: a meal
+                the user already eats, instantly, with no model call. The AI option stays because
+                "nothing of mine fits here" is a real and common answer — this replaces one button
+                with a choice, not with a different button. */}
+            {swapFor === m.position && (
+              <div className="mt-2 flex gap-2">
+                <Button
+                  variant="secondary"
+                  className="flex-1 min-h-[44px] text-xs"
+                  onClick={() => swapForLibraryMeal(m)}
+                  disabled={library.length === 0}
+                >
+                  <BookOpen className="w-3.5 h-3.5" />
+                  {library.length === 0 ? 'No saved meals' : 'One of mine'}
+                </Button>
+                <Button
+                  variant="secondary"
+                  className="flex-1 min-h-[44px] text-xs"
+                  onClick={() => { setSwapFor(null); void askForMeal(m) }}
+                >
+                  <Sparkles className="w-3.5 h-3.5" />
+                  Something new
+                </Button>
+              </div>
+            )}
 
             {m.notes && (
               <p className="mt-1 text-[11px] leading-snug text-muted-foreground">{m.notes}</p>
