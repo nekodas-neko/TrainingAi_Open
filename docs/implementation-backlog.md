@@ -720,42 +720,41 @@ permanently).
 
 **Do not flash the circulating `…FasterRawValuesMOD.bin`.** Only step in the arc that can brick the
 device, and it would be taken before knowing the sensor is worth streaming from.
-### [nutrition] PS-14 — `food-row-shared.spec.ts` fails intermittently: the typed query can be eaten by a remount
+### [workouts][platform] BF-44 — the chat AI has no idea you are injured; the workout engine has known all along
 
-- **Lane:** B (the surface)
-- **Added:** 2026-08-27, from CI on PR #566
+- **Lane:** A — `lib/ai-chat/tools.ts` and `lib/ai-chat/context.ts`.
+- **Added:** 2026-08-27 · owner: *"I'd like to flag somewhere I have a sore lower back or something;
+  and have it keep that in mind to not do overloading on the lower back like deadlift
+  excercise reccomendations etc. A real - intuitive type of system."*
 
-`e2e/food-row-shared.spec.ts:115` — *the external food-database row is the shared row, and keeps its
-mismatch warning* — waits 30 s for the stubbed Open Food Facts row and times out with
-`element(s) not found`. It is not deterministic: measured across three CI runs on
-`fix/colmi-sync-diagnostics`, a branch whose diff touches no nutrition file at all, it went
-**fail → pass → fail**, with the nutrition code byte-identical between the last two. A Bluetooth
-branch cannot break a food search, so this is the spec, not the diff.
+**Most of what the owner is describing already exists, and saying so is the point of this entry.**
+Log an injury and the app already: derives `activeInjuredMusclesInSession`
+(`packages/shared/src/ai-periodization/signals.ts`), lets the periodization prompt return
+`session_swap_recommended` or `deload_recommended`, offers per-exercise substitutions through
+`injurySafeAlternatives` and the injury-swap sheet, and lets **Coach** log an injury
+conversationally. Deadlifts really would stop being recommended for a flagged lower back. **Nothing
+here needs building.**
 
-**Hypothesis, not a diagnosis — this has not been reproduced locally.** `IngredientPicker` is
-mounted with `key={buildSession}` in `saved-meals-sheet.tsx:651`, and `buildSession` bumps on every
-entry to the build form. The picker owns the search query, so a remount clears it. The test does
-`search.fill('spec mismatch')` immediately after clicking `New`, which is what bumps the key — so if
-the remount lands after the fill, the query is discarded, the 700 ms debounce in
-`ingredient-picker.tsx:93` never sees a non-empty string, and no request is made. Nothing in the
-test would notice: `fill()` has already returned.
+**The gap is one surface, and it is the one the owner was talking to.** `lib/ai-chat/tools.ts` and
+`lib/ai-chat/context.ts` contain the string `injur` **zero times**. Sixteen tools, none of them
+injury-aware, and no injury line in the always-on context. So the chat will happily talk you through
+a deadlift progression while the workout screen is substituting the movement out — two surfaces, one
+app, opposite advice. **That contradiction is the defect**, not the absence of a feature.
 
-**Proposed patch** — assert the value survived, and let Playwright retry the fill if it did not:
+**Fix, smallest first:**
+1. **An always-on line in `context.ts`** — active injuries as muscle, severity and days active. It
+   belongs in context rather than a tool because a tool only fires when the model thinks to call it,
+   and an injury has to constrain an answer the model did not realise was about injury. This is the
+   half that delivers the owner's *"keep it in mind"*.
+2. **A `getHealthOverview` tool** for the deliberate question — active injuries, latest composition,
+   measured RMR, and (once BF-41 lands and exposure is decided) the clinical results. Depends on
+   BF-43 for what may be exposed.
 
-```ts
-await expect(async () => {
-  await search.fill('spec mismatch')
-  await expect(search).toHaveValue('spec mismatch')
-}).toPass({ timeout: 10_000 })
-```
-
-Confirm the mechanism before taking the patch. If the remount is real, the same shape is a hazard for
-every spec that types into the builder right after opening it — `saved-meal-tags.spec.ts` and
-`empty-meal-library.spec.ts` both do, and both pass today, which is what a race looks like before it
-bites. If it is something else, the trace zip on the failing run
-(`playwright show-trace`) is the place to start, because the failure ships one.
-
-**Do not skip or quarantine the spec** — it covers a warning the owner explicitly asked to keep.
+- **Needs:** BF-43 — the clinical half of the overview cannot be wired before it is decided what the
+  model may see. **The injury line does not wait on it** and should ship first, alone if need be.
+- **Verification.** Ask the chat for a lower-body session with an active lower-back injury logged: it
+  names the injury unprompted and does not recommend a deadlift, matching what the workout screen
+  does for the same state. Resolve the injury and the constraint disappears from both.
 
 ### [body][nutrition][platform] BF-43 — the clinical results the app stores are invisible to every AI surface, and one of them must stay that way
 
@@ -768,6 +767,12 @@ bites. If it is something else, the trace zip on the failing run
 percentage**. `lib/ai-chat/context.ts` adds 1RMs, sleep and HRV, and nothing about composition. So
 today the owner can ask *"what should I eat"* and the model answers without knowing their measured
 resting rate, their real body fat, or their lean mass. It is not filtered out; it was never wired in.
+
+**✅ STORAGE DECIDED, 2026-08-27 — owner: *"I'd rather it all documented in the app and database
+for now; we can choose how to use it later."*** Store **every** field of all three results, in full,
+including the analytes nothing reads yet. The cost is kilobytes; the cost of a field dropped at
+ingest is a re-scan of a document that no longer exists. **Exposure is a separate, later decision**
+and the table below is the recommendation waiting for it, not a settled permission.
 
 **The three results are not one permission, and treating them as one is the mistake to avoid.**
 
@@ -1415,6 +1420,13 @@ will hit it.
   measurement.
 
 ### [body][nutrition][platform] BF-41 — RMR, DEXA and blood are one intake shape; build the pipeline once
+
+> **⚑ PROMOTED, 2026-08-27 — owner: *"So lets prioritize getting this data saved and uploaded."***
+> This entry is now the pipeline's own priority, not a note attached to three others. The reports
+> exist de-identified in [`docs/clinical-baseline-2026-08-27.md`](clinical-baseline-2026-08-27.md),
+> so every schema can be written from a real one today. **Storage is decided: keep every field**
+> (BF-43), which means the DEXA table carries all 11 regions and both index blocks, and the analyte
+> table carries the raw range string and the printed result text, not just what a screen renders.
 
 - **⚑ The real reports have arrived and are recorded, de-identified, in [`docs/clinical-baseline-2026-08-27.md`](clinical-baseline-2026-08-27.md)** — DEXA and RMR
   (2026-08-27) and a 58-analyte blood panel (2026-04). Write each schema from that file, not from a

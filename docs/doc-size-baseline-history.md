@@ -3256,3 +3256,16 @@ interpretation does not, and the refusal gets tested with a leading prompt rathe
 
 BF-35's two open decisions are closed in the same diff (store bytes, not the OFF URL; the image
 lives where its ownership does), replacing the recommendations with the decision and the reason.
+
+## 2026-08-27 — `docs/implementation-backlog.md` raised (BF-44, BF-41 promoted, BF-43's storage decided)
+
+Net after merging main, which removed the shipped PS-14. BF-44 is filed from the owner describing an
+injury-aware coach — and most of what they described already ships: `activeInjuredMusclesInSession`,
+the periodization swap, `injurySafeAlternatives`, Coach's own injury logging. Saying that plainly is
+half the entry's value, because building it again is the obvious wrong move.
+
+The real defect is narrower and worse: `lib/ai-chat/tools.ts` and `context.ts` contain `injur` **zero
+times**, so the chat surface will talk a user through a deadlift progression while the workout screen
+substitutes the movement out. Two surfaces, opposite advice. The fix is an always-on context line
+rather than a tool — a tool fires only when the model thinks to call it, and an injury has to
+constrain answers the model does not recognise as injury questions.
