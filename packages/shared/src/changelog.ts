@@ -6,6 +6,16 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.389.0",
+    date: "2026-08-27",
+    changes: [
+      "A meal plan can build itself from meals you already have. Turn on \"Use my saved meals\" when making a plan and it fills a slot from your library whenever one fits, writing something new only when none does. Ticking a meal still forces it in \u2014 the toggle is the looser question, and the wording now says which is which.",
+      "Each meal in a new plan says where it came from: kept because you asked for it, chosen from your library, or written for the slot. A library pick says which macro it matched on, and a slot that got something new says whether your meals were even searched \u2014 \"none of yours fitted here\" and \"the library had no say\" are different answers.",
+      "Replacing a meal now offers one of yours before offering something new. Picking from your library is instant and free; the AI option is still there for when nothing of yours suits the slot.",
+      "Fixed: lowering the meals-per-day after choosing meals to keep silently dropped the ones that no longer fitted. It now names them and asks which to keep \u2014 nothing is deleted, and the ones you drop still steer what the plan suggests.",
+    ],
+  },
+  {
     version: "1.388.1",
     date: "2026-08-26",
     changes: [

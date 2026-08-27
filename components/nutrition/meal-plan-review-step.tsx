@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { toast } from 'sonner'
 import { AlertTriangle, BookOpen, Loader2, RefreshCw, Sparkles, Wand2, ArrowUp, ArrowDown } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -13,9 +13,13 @@ import { libraryMealForSlot, usedSavedMealIds } from './library-swap'
 import { savedMealToIngredients } from '@trainingai/shared/nutrition/saved-meal-ingredients'
 import type { MealTypeWindow } from '@trainingai/shared/nutrition/library-match'
 import type { MealType, SavedMeal } from '@trainingai/shared/types/nutrition'
-import { cachedFetch, readCacheSync } from '@/lib/sqlite/cache'
+import { useCachedValue } from '@/lib/hooks/use-cached-value'
 import { TTL_LONG, TTL_MEDIUM } from '@trainingai/shared/cache-ttl'
 import { replaceMealInDraft, reorderDraft, type Draft, type DraftMeal } from './meal-plan-draft'
+
+/** Module-level, so a null payload does not hand a fresh array identity to every render. */
+const EMPTY_MEALS: SavedMeal[] = []
+const EMPTY_TYPES: MealTypeWindow[] = []
 
 interface Props {
   draft: Draft
@@ -36,25 +40,16 @@ export function MealPlanReviewStep({ draft, onDraftChange, saveToLibrary, onTogg
   const [variantIdx, setVariantIdx] = useState(0)
   const [rerolling, setRerolling] = useState<number | null>(null)
   const [instructingFor, setInstructingFor] = useState<number | null>(null)
-  // BF-11h item 11: the library is offered on a reroll BEFORE the model is asked. Read from the
-  // same keys the rest of the app uses and seeded synchronously, so the offer is there on the first
-  // paint rather than appearing a beat after the user has already tapped.
-  const [library, setLibrary] = useState<SavedMeal[]>(() => [])
-  const [mealTypes, setMealTypes] = useState<MealTypeWindow[]>(() => [])
+  // BF-11h item 11: the library is offered on a reroll BEFORE the model is asked, from the same
+  // keys the rest of the app uses. `useCachedValue` rather than a `useEffect(…, [])` — it seeds
+  // synchronously AND refetches when the key is invalidated, which matters here because saving a
+  // plan meal to the library (the switch two lines below this list) clears `saved-meals`, and a
+  // fetch-once effect would then offer a swap list that no longer matches what the user owns.
+  const library = useCachedValue<SavedMeal[]>('saved-meals', '/api/nutrition/saved-meals', TTL_MEDIUM) ?? EMPTY_MEALS
+  const mealTypes = useCachedValue<MealType[]>('nutrition-meal-types', '/api/nutrition/meal-types', TTL_LONG) ?? EMPTY_TYPES
   const [swapFor, setSwapFor] = useState<number | null>(null)
   const [instruction, setInstruction] = useState('')
   const variant = draft.variants[Math.min(variantIdx, draft.variants.length - 1)]
-
-  useEffect(() => {
-    const seededMeals = readCacheSync<SavedMeal[]>('saved-meals')
-    if (Array.isArray(seededMeals)) setLibrary(seededMeals)
-    const seededTypes = readCacheSync<MealType[]>('nutrition-meal-types')
-    if (Array.isArray(seededTypes)) setMealTypes(seededTypes)
-    cachedFetch<SavedMeal[]>('saved-meals', '/api/nutrition/saved-meals', TTL_MEDIUM,
-      d => setLibrary(Array.isArray(d) ? d : [])).catch(() => {})
-    cachedFetch<MealType[]>('nutrition-meal-types', '/api/nutrition/meal-types', TTL_LONG,
-      d => setMealTypes(Array.isArray(d) ? d : [])).catch(() => {})
-  }, [])
 
   /**
    * Reroll or rewrite one meal. Both go through the same route and the same request body — the only
