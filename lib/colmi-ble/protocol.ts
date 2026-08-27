@@ -182,7 +182,27 @@ export function u16(lo: number, hi: number): number {
 
 export const cmdBattery = () => buildPacket([CMD.BATTERY])
 export const cmdFindDevice = () => buildPacket([CMD.FIND_DEVICE])
-export const cmdSyncHeartRate = () => buildPacket([CMD.SYNC_HEART_RATE])
+/**
+ * Request one day's heart-rate log.
+ *
+ * **The timestamp is required — a bare `0x15` is ignored.** That is why the first two syncs
+ * returned HRV, stress and temperature but never a single heart-rate sample: those three take no
+ * argument, this one does, and a command the ring does not understand is answered with silence
+ * rather than an error.
+ *
+ * `dayStartSeconds` is the day's LOCAL midnight expressed as though it were UTC — Gadgetbridge
+ * builds it as `millis + ZONE_OFFSET + DST_OFFSET`, i.e. the ring wants local wall-clock seconds,
+ * not a real epoch. Use `localDayStartSeconds()` from `resolve-time.ts`; passing a true UTC epoch
+ * asks for the wrong day by the size of the offset, which in Brisbane is 10 hours and lands on the
+ * day before.
+ */
+export function cmdSyncHeartRate(dayStartSeconds: number): Uint8Array {
+  const t = Math.max(0, Math.trunc(dayStartSeconds))
+  return buildPacket([
+    CMD.SYNC_HEART_RATE,
+    t & 0xff, (t >>> 8) & 0xff, (t >>> 16) & 0xff, (t >>> 24) & 0xff,
+  ])
+}
 export const cmdSyncStress = () => buildPacket([CMD.SYNC_STRESS])
 export const cmdSyncHrv = () => buildPacket([CMD.SYNC_HRV])
 

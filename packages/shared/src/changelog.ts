@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.388.2",
+    date: "2026-08-27",
+    changes: [
+      "Heart rate now syncs from the Colmi ring. The request was missing the day it was asking for, and the ring answers a command it does not understand with silence rather than an error \u2014 so every other measurement appeared and heart rate never did. The ring card also shows how many frames the ring actually sent, under \u201cSync detail\u201d, and the ring is given longer to answer, because its history arrives in bursts and cutting the wait short looks identical to having no history.",
+    ],
+  },
+  {
     version: "1.388.1",
     date: "2026-08-26",
     changes: [
