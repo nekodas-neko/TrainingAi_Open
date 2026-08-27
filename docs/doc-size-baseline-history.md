@@ -3250,3 +3250,14 @@ findings that put that rule there (Q-401's two budgets on one screen, Q-417's th
 moment a screen composed its own, Q-323's earned-scaled macro targets). A first draft of this card
 called `budgetProvenance` internally and would have been the fourth; recording only "the energy block
 now matches the mockup" leaves the next person free to do exactly that.
+
+## 2026-08-27 — `docs/implementation-backlog.md` 12713 → 12728 (+15), Q-407's widget half
+
+Fifteen lines on one entry, and they buy two things a successor cannot re-derive. First, **which half
+of Q-407 shipped**: the entry describes a conversational redesign and a multi-select widget as one
+item, and only the widget exists — a reader seeing "✅" against the heading would skip the larger
+half. Second, **the catch**: `/api/coach/options` returns an empty list when there is no active
+program, which is correct for the three program-backed sources and would have made a grocery picker
+come back empty for a user who has not built a program yet. That is a nutrition question failing on a
+training precondition, it was invisible until the new branches were placed, and the placement is the
+whole fix.

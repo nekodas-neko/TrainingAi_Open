@@ -4,6 +4,7 @@ import { auth } from '@/auth'
 import { getRepositoryAsync } from '@/lib/data'
 import { rateLimit } from '@/lib/rate-limit'
 import { CHOICE_SOURCES } from '@/lib/coach/widgets'
+import { GROCERY_CATALOGUE, type GroceryCatalogueKey } from '@trainingai/shared/nutrition/grocery-catalogue'
 import { injurySafeAlternatives } from '@trainingai/shared/workout/injury-substitution'
 import { errorLog } from '@trainingai/shared/logger'
 
@@ -45,6 +46,33 @@ export async function GET(req: Request) {
 
   try {
     const repo = await getRepositoryAsync()
+
+    // The catalogue sources are answered before the program is fetched, and deliberately so: they
+    // are global lists with nothing user-scoped in them, and the `if (!program) return []` below
+    // would otherwise make a grocery picker come back empty for anyone who has not built a program
+    // — a nutrition question failing on a training precondition.
+    const catalogueKey = parsed.data.source as GroceryCatalogueKey
+    if (catalogueKey in GROCERY_CATALOGUE) {
+      return NextResponse.json({
+        // The id is the name; `grocery-catalogue.ts` says why these are the one source where that
+        // is right.
+        options: GROCERY_CATALOGUE[catalogueKey].map(name => ({ id: name, title: name })),
+      })
+    }
+
+    if (parsed.data.source === 'dietary_restrictions') {
+      // The seeded catalogue, not this user's selections: the widget is asking what to avoid, so
+      // offering back only what they already avoid would make the picker unable to add anything.
+      const catalogue = await repo.listDietaryRestrictions()
+      return NextResponse.json({
+        options: catalogue
+          .slice()
+          .sort((a, b) => a.sortOrder - b.sortOrder)
+          .slice(0, 24)
+          .map(r => ({ id: r.id, title: r.label, subtitle: r.category })),
+      })
+    }
+
     const program = await repo.getActiveProgram(userId)
     if (!program) return NextResponse.json({ options: [] })
 
