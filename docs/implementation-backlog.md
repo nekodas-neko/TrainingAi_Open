@@ -1263,11 +1263,11 @@ looks like"*. Parity is now the acceptance test, not a nice-to-have alongside it
 
 | # | Artboard | Shipped counterpart | Entry |
 |---|---|---|---|
-| 1 | Nutrition — the day | `app/nutrition/nutrition-content.tsx` + `meal-card.tsx` | **BF-24** |
+| 1 | Nutrition — the day | `app/nutrition/nutrition-content.tsx` + `meal-card.tsx` + `energy-card.tsx` | **BF-24** ✅ built 2026-08-27 |
 | 2 | Add food | `food-logger-sheet.tsx` · `capture-actions.tsx` · `saved-meals-sheet.tsx` | **LB-16** ✅ shipped 2026-08-26 |
-| 3 | My meals | `saved-meals-sheet.tsx` · `saved-meal-card.tsx` | **BF-29** |
-| 4 | Meal detail | `saved-meal-card.tsx` expanded · `my-meals-picker.tsx` | **BF-30** |
-| 5 | Edit meal | the builder — `assign-step` · `review-step` · `ingredient-picker` | **BF-31** |
+| 3 | My meals | `saved-meals-sheet.tsx` · `saved-meal-card.tsx` | **BF-29** ✅ shipped 2026-08-26 |
+| 4 | Meal detail | `saved-meal-card.tsx` expanded · `my-meals-picker.tsx` | **BF-30** ✅ shipped 2026-08-26 |
+| 5 | Edit meal | the builder — `assign-step` · `review-step` · `ingredient-picker` | **BF-31** ✅ shipped 2026-08-26 |
 | 6 | Quantity | `quantity-sheet.tsx` ✅ · `quick-edit-log-sheet.tsx` ✗ | **BF-26** |
 | — | Saved Meals — today | the meal-plan slot cards | folded into BF-29 |
 | — | Tap targets | ✅ done — `ui/segmented-tabs.tsx`, 48 dp once for 8 call sites (Q-395a) | closed |
@@ -1321,10 +1321,12 @@ container; and the meal header line is the name and one calorie number, the emoj
 P/C/F chips gone. Journal:
 [`2026-08-25-nutrition-day-artboard-parity`](overview/entries/2026-08-25-nutrition-day-artboard-parity.md).
 
-**Keep — ②, ③, ⑥, ⑦, each for a stated reason:**
-- **② the energy block** (one card, 104 px donut left, macro columns right) is not day-screen-only:
-  `CalorieBalanceBar` also renders on `/health` (`health-sections.tsx:658`), so merging it with
-  `MacroRing` changes two screens and wants its own PR with Health verified alongside.
+**Keep — ③, ⑥, ⑦, each for a stated reason:**
+- **② the energy block — ✅ shipped 2026-08-27** ([journal](overview/entries/2026-08-27-nutrition-energy-card.md)).
+  One card: donut left, `N kcal left` and `+N burned`, three macro columns, with the zone band kept
+  below a divider inside it (BF-28 rule 1 — the drawing stops at two rows and the band is the only
+  thing saying whether "left" is on track). The two-screen risk never arose: the day screen got a new
+  `energy-card.tsx` and `MacroRing` was deleted, while `CalorieBalanceBar` is untouched on `/health`.
 - **③ the four-tile action row** (Search · Scan · Photo · My meals) was deferred to **LB-16**, which
   owned collapsing the capture entry points — building tiles first would have wired four destinations
   that entry then changed. **LB-16 shipped 2026-08-26** and what it built is not four tiles: search

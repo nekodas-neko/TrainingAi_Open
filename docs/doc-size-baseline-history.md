@@ -3242,9 +3242,19 @@ come from different instruments — at the measured 3.2-point gap that is 53.56 
 which re-scales the measurement onto 45 kcal/day of lean mass that is not there. The order of the
 two fixes is load-bearing and neither entry said so.
 
+## 2026-08-27 — `projectOverview.md` 8138 → 8147 (+9), BF-24 ②
+
+Nine lines for the nutrition energy card. Four of them are the feature; the rest are the part a
+successor cannot re-derive from the diff — **the card derives no number of its own**, and the three
+findings that put that rule there (Q-401's two budgets on one screen, Q-417's third one appearing the
+moment a screen composed its own, Q-323's earned-scaled macro targets). A first draft of this card
+called `budgetProvenance` internally and would have been the fourth; recording only "the energy block
+now matches the mockup" leaves the next person free to do exactly that.
+
 ## 2026-08-27 — `docs/implementation-backlog.md` raised (LB-23, LB-24 filed by Q-112a)
 
-48 net lines (12758 after merging main, which added 34 of its own without needing a raise): two
+48 net lines (12760 after merging main twice, which added 36 of its own without needing a raise):
+two
 entries filed, minus Q-112a's own removal on shipping.
 
 **LB-24 is the one worth the space.** Deleting `day-review-sheet.tsx` left
