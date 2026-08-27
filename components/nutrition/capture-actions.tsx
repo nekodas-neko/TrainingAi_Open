@@ -8,17 +8,6 @@ import type { NutritionScanResult } from '@trainingai/shared/types/nutrition'
 import { decodeMealLabelToken } from '@trainingai/shared/nutrition/label-payload'
 import { downscaleToJpegDataUrl, base64FromDataUrl, SCAN_IMAGE_MAX_DIM } from '@/lib/media/downscale-image'
 
-/**
- * Longest edge of an uploaded food photo, in pixels (BF-4).
- *
- * **Chosen from the token budget, not from taste.** Every image scan in a month of production
- * reports 1,275–1,298 input tokens regardless of the photo's size, because Gemini normalises an
- * image to a fixed tile budget before the model sees it. A 4 MB photo and a 400 KB photo therefore
- * do the same model work — the extra bytes buy no accuracy and are pure upload latency. 1024 sits
- * comfortably above the tiles that budget covers while bounding an S25's 12 MP capture, which is
- * otherwise ~4000 px wide plus base64's ~33%.
- */
-
 interface Props {
   onScanResult: (result: NutritionScanResult) => void
   onManual: () => void
