@@ -24,7 +24,7 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.388.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Version:** v1.388.1 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-08-26.
 
 **A saved meal can say which meals of the day it suits (BF-11f) — and the save button was eating
@@ -37,7 +37,8 @@ footer looked like an overwrite — which meant **BF-11d's duplicate prompt, shi
 had never fired once**, and the new tags arrived as `undefined`. Neither TypeScript nor the memo check
 can see that shape. A sweep found one sibling (`food-list.tsx`'s empty-state button, which reads
 `.items` off the event); it is fixed **by inspection, not reproduced** — no spec has an empty meal
-library, which is **LB-20**. ⚠️ Not device-verified.
+library — **closed the same day in v1.388.1, and the reproduction corrected the claim**: React
+swallows the throw, so the only symptom is a **dead button**, not a crash. ⚠️ Not device-verified.
 [Journal](docs/overview/entries/2026-08-26-feat-saved-meal-tag-ui.md).
 
 **A remembered bedtime, in its own column (Q-519, engine half).** A night the ring only caught from

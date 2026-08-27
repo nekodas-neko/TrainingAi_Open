@@ -1258,6 +1258,70 @@ will hit it.
   sits in that row; and whether the sheet now reads as one thing is the owner's call, not a
   measurement.
 
+### [body][nutrition][platform] BF-41 — RMR, DEXA and blood are one intake shape; build the pipeline once
+
+- **Lane:** A for storage and extraction, B for the upload/crop/confirm surface.
+- **Added:** 2026-08-27 · owner, about to send all three at once: *"ideally you can see what we are
+  getting and create an endpoint or so to record these down- then the ability to upload the documents
+  and have it auto scan. I will scrub it of my PII first. but there is a lot of fields/details."*
+- **⚑ Read this before BF-1 or BF-2.** It does not replace them; it says what they share, so the
+  second one built does not re-derive the first one's pipeline.
+
+**Three entries already exist and they are at three different stages:**
+
+| Result | Entry | State |
+|---|---|---|
+| **RMR** | BF-33 | **engine shipped** — `measured_rmr` (migrations 225/226), `POST /api/measured-rmr`, plausibility bounds, `ffm_kg_at_test` so a reading re-scales instead of expiring. **No UI.** |
+| **DEXA** | BF-2 | filed, planning item, `⏰` note for the 2026-08-27 scan |
+| **Blood panel** | BF-1 | filed, **owner's crop-before-upload decision already made** |
+
+**They are the same shape.** Each is a **dated clinical measurement from an external provider**, with
+many mostly-nullable fields, arriving either typed by hand or read off a document, and each needs the
+same three things: a PII-safe path to the model, a confirm-before-store step, and a provenance stamp.
+Built separately that is three upload flows, three extraction routes, three review screens and three
+sets of the same mistakes.
+
+**The split that matters — typed storage, one shared pipeline.**
+
+- **Storage stays typed, per result.** `measured_rmr` is already the template and it is the right
+  one: BF-2's calibration and BF-33's precedence rule both do **arithmetic on named columns**, and a
+  JSONB blob makes exactly that hard. DEXA gets its own table; a blood panel gets a **parent plus a
+  child analyte table** (`name, value, unit, ref_low, ref_high, flag`), because a panel is N rows and
+  not N columns.
+- **The pipeline is built once and parameterised by result type:** pick a document → crop → extract
+  with `generateObject` against that type's Zod schema → **show the parsed fields for confirmation**
+  → save. `app/api/nutrition/scan/route.ts` is the working reference for the middle of that, as BF-1
+  already says.
+
+**⚠ Do not design the field lists before seeing a real report.** This repo's own rule about external
+field names — *read the pinned source, never memory* — applies to a DEXA printout and a pathology
+panel just as much as to an API. Providers differ, units differ, and a schema invented from a
+description will silently drop the field that turns out to matter. **The owner is sending real
+(PII-scrubbed) reports; the schemas get written from those.**
+
+**⚠ Two different redactions, and conflating them would be the security bug.**
+1. **The owner scrubbing a report before sending it to a chat session** — happening now, their call,
+   outside the app.
+2. **The app's own crop-before-upload step** — BF-1's decided route (a), because the extraction call
+   sends the document to Google and *"redacting after extraction is too late"*. **That still has to
+   be built even though step 1 happened**, and it applies to DEXA reports too: they carry name, date
+   of birth and a patient reference exactly like a pathology report. BF-1 made this decision for
+   blood panels; **it is hereby the rule for every document type.**
+
+- **No document store exists, and think before adding one.** The only `bytea` column in the schema is
+  `oura_raw_packed.blob`. **Recommended: do not store the source document at all** — extract, confirm,
+  save the fields, discard the file. It removes the largest PII surface in the feature, and the app's
+  Play Store ambition (health data + a declared-use-case review) makes a stored pathology PDF a
+  liability rather than an asset. If a document must be kept, that is its own decision with its own
+  entry, not a side effect of this one.
+- **Sequencing.** BF-33's UI first — the table exists, so it is the smallest end-to-end slice and it
+  proves the confirm step on real numbers. Then DEXA (BF-2), which BF-33's UI can be widened into and
+  which unblocks the scale calibration. Then blood (BF-1), the largest field set.
+- **Verification.** Each type: hand entry and document extraction produce the same stored row; a
+  deliberately wrong extraction is caught at the confirm step and not stored; and no model-reported
+  number is ever displayed as fact before the owner confirms it (CLAUDE.md — a model handed a score
+  of 80 called it *"perfect"*).
+
 ### [body][nutrition] BF-33 — a measured RMR has nowhere to go, and the four-number panel the test sheet already draws
 
 - **Lane:** A — new column(s) plus a precedence rule in `packages/shared/`; the panel is B and can
@@ -1688,30 +1752,6 @@ whether or not anyone draws them first.
   what this entry exists to prevent — and the cost of raising a timeout is that a genuinely hung
   test takes longer to fail. **Do not weaken what they check** either way: `meal-label`'s decode
   loop is the closest the sandbox gets to the print test that is still owed.
-
-### [nutrition] LB-20 — the meal library's empty state is untested, and it is where the click-event bug hid
-
-- **Lane:** B
-- **Branch:** `test/empty-meal-library-e2e`
-- **Added:** 2026-08-26 · Lane B, found by sweep while shipping BF-11f.
-- **What happened.** `handleSave(overwrite?)` was wired as `onClick={onSave}`, so React's click event
-  arrived as `overwrite` on every save from the footer — which skipped BF-11d's duplicate check
-  entirely and, once BF-11f added tags, sent `undefined` where the tags should be. A network trace on
-  the new tag round-trip is what caught it; nothing else could, because both symptoms are silent.
-  **Fixed in the same PR**, along with the one sibling the sweep found: `food-list.tsx`'s
-  `onClick={onBuildFirst}`, wired to `openBuild(meal?)`, which reads `meal.items` off the event.
-- **What is still owed.** That second site was fixed **by inspection, not reproduced** — it is only
-  reachable with an empty meal library, and no spec has one. `food-row-shared.spec.ts:109` matches
-  `/^(New|Build your first meal)$/` and always lands on `New`, because the seed has meals.
-- **The awkward part, and why this is an entry rather than a line in that PR:** emptying
-  `saved_meals` for the seed user in a `beforeAll` mutates state five other specs read. Either give
-  the empty-library spec its own user, or drive the empty state from a route mock — decide before
-  writing it, because the wrong choice makes the whole nutrition suite flaky rather than this one
-  spec.
-- Neither TypeScript nor `check-memo-prop-stability.js` can see this class: `() => void` accepts a
-  handler with *more* parameters, and `onClick` accepts a nullary one. The sweep that found both
-  sites is two greps and is written out in the journal entry for v1.388.0 — a check is plausible if
-  it recurs, but two instances in one file pair is not yet a pattern worth a script.
 
 ### [nutrition] LB-18 — `Recent` on Log Food is scoped to a meal bucket; it may want to be global
 

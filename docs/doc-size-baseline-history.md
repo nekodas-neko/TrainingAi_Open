@@ -3190,5 +3190,18 @@ It carries a hypothesis and a proposed patch but no reproduction, which is delib
 says "flaky, look into it" is one nobody can start, and the mechanism is the part that would
 otherwise have to be re-derived from three run logs that expire.
 
-Raised to 12600 rather than to the exact 12595 so the next small entry does not need its own
-history note for five lines.
+Raised to 12650 on the merge, not 12600 as first written: #570 raised the same baseline to 12563
+in parallel, and the two sets of entries stack to 12634. Two PRs raising one document is the one
+case where these files still conflict, and it is the correct case — they genuinely disagree about
+the number, and the answer is neither side but the sum of what both added.
+## 2026-08-27 — `docs/implementation-backlog.md` raised (BF-41, the clinical-import shape)
+
+The owner is about to send RMR, DEXA and blood results together and asked for an endpoint plus
+document scanning. Three entries already covered those separately — BF-33 (engine shipped), BF-2 and
+BF-1 — at three different stages, and nothing said they are the same shape.
+
+BF-41 is that statement: **typed storage per result, one shared upload → crop → extract → confirm
+pipeline**. The length is two arguments worth not re-deriving. Storage stays typed because BF-2's
+calibration and BF-33's precedence both do arithmetic on named columns, which JSONB makes hard. And
+**the app's crop-before-upload step is still required even though the owner scrubs the file by hand**
+— those are two different redactions, and conflating them is how the security half gets skipped.
