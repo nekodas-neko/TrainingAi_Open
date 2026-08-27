@@ -10540,17 +10540,9 @@ per-field merge where an AI write has no honest source rank to claim.
   reusable components. What is missing is one entry point instead of two, three stats, a 7-day
   comparison, and the wrap-up continuing from the read-through. Reasoning and alternatives: the plan.
 
-### [nutrition][app-shell] Q-112a — one evening flow, one door
-
-- **Branch:** `feat/day-review-one-door` · **Lane: B** · **Plan:** the above, §4
-- Home's banner, Nutrition's End of Day button and **both local reminders' `extra.route`** reach one
-  destination; today the reminders land on `/` and ask the user to find the banner.
-  `day-review-sheet.tsx` is deleted, its digest moving in with the error state it never had.
-
 ### [nutrition][app-shell] Q-112b — the read-through becomes step 1, plus the three missing stats
 
 - **Branch:** `feat/day-review-read-through` · **Lane: B** · **Plan:** the above, §4
-- **Needs: Q-112a**
 - `day-sections` render inside the flow off the shared `day-log:<date>` key — no second fetch, no
   second implementation. Adds HR min/max, body temp (Q-105's derived-first precedence, never the
   frozen Cloud column) and the AI digest; the same three land on `/health/day` itself.
@@ -10576,6 +10568,62 @@ per-field merge where an AI write has no honest source rank to claim.
 - **Needs: Q-112d**
 - `weekly-recap-banner.tsx` + `/api/weekly-digest` at the owner's "monthly scale" lookback.
   Deliberately last, so the daily version settles the layout first.
+
+### [app-shell][nutrition] LB-23 — three sheets announce their own title twice
+
+- **Branch:** `fix/sheet-title-duplication` · **Lane: B** — `components/**` only.
+- **Added:** 2026-08-27 · Lane B, found while writing Q-112a's E2E spec.
+- **What it is.** Radix requires a `SheetTitle` for the dialog's accessible name, so these sheets
+  render an `sr-only` one *and* a visible `<h2>` carrying the identical string. A screen reader
+  therefore reads the name once as the dialog's, then again as a heading; and
+  `getByRole('heading', { name })` is ambiguous, which is why `e2e/day-review-one-door.spec.ts`
+  matches on `getByRole('dialog')` and says so in a comment pointing here.
+- **The three, swept 2026-08-27** (`grep -rn 'SheetTitle className="sr-only"' components/ app/`):
+  - `components/nutrition/end-of-day/end-of-day-review.tsx:214` / `:218` — "End of Day"
+  - `components/morning-checkin-sheet.tsx:171` / `:175` — "Morning Check-in"
+  - `components/nutrition/food-logger-sheet.tsx:247` / `:249` — `STEP_LABELS[step]`, both sides
+  - `components/nutrition/quick-edit-log-sheet.tsx:118` is **not** a violator — sr-only title, no
+    visible heading. Leave it as it is; it is the shape the others become if the `<h2>` is ever
+    dropped instead.
+- **The fix is one line each:** `<SheetTitle asChild><h2 className="…">…</h2></SheetTitle>` and
+  delete the `sr-only` node. `SheetTitle` is `React.ComponentProps<typeof SheetPrimitive.Title>`, so
+  `asChild` is already in its type — no change to `components/ui/sheet.tsx`. Note `SheetTitle` also
+  applies `text-foreground font-semibold`, which the existing `<h2>` classes must survive being
+  merged with.
+- **Severity is low and stated as such.** Nothing is unreachable and nothing is unlabelled; it is
+  redundancy plus a test-locator hazard. It earns an entry because the E2E comment already names it
+  and because a fourth sheet copying the pattern is the cheapest moment to stop it.
+- **Verification.** No behavioural test to add — assert the count instead: after the change,
+  `page.getByRole('heading', { name: 'End of Day' })` resolves to exactly one node, which is the
+  locator the spec can then go back to using.
+
+### [workouts][platform] LB-24 — deleting the Home day-review orphaned a chart, a route and a cache group
+
+- **Branch:** `chore/load-comparison-rehome-or-delete` · **Lane: A** — the decision reaches
+  `app/api/workout-load-history/route.ts`; the re-home half alone would be Lane B.
+- **Added:** 2026-08-27 · Lane B, from Q-112a's own diff. Filed rather than acted on, because the
+  right answer depends on Q-112b–d, which are not built yet.
+- **What Q-112a removed.** `components/day-review-sheet.tsx` was the **only** renderer of
+  `components/health/workout-load-comparison-chart.tsx` and the only caller of
+  `/api/workout-load-history`. After Q-112a shipped:
+  - the chart component has zero call sites (`app/api/workout-load-history/route.ts:5` imports its
+    `LoadComparisonEntry` *type*, which is not a render — the type lives in the component file, so
+    even a type-only import keeps the file alive to `tsc` while nothing draws it);
+  - the route has zero client callers;
+  - `invalidateWorkoutSummaries()` still prefix-clears `workout-load-history:`
+    (`lib/cache-groups.ts:65`), which is now inert. Harmless, and deliberately left — it is correct
+    the moment anything fetches the key again, and removing it is the half that has to be
+    remembered.
+- **Nothing else was lost.** The sheet's other chart, `HrDayChart`, has three surviving renderers
+  (`app/health/heart-rate/page.tsx`, `components/home/home-card-widget.tsx`,
+  `components/health/hr-day-card.tsx`), so that deletion cost no surface.
+- **Do not delete the route yet.** Q-112c's plan names `/api/workout-load-history` as one of the
+  series it reuses for the 7-day comparison window, so a tidy-up now is work Q-112c would have to
+  undo. The decision point is *after* Q-112d: if the trends phase has not re-homed the chart by
+  then, delete component + route + the cache-group line together.
+- **What "re-home" would mean.** Per-session load-vs-history is a workout read, and the natural
+  surfaces are `/health/day` (which already draws per-session volume) or Q-112b's read-through step
+  — not the evening wrap-up, where it was one more chart nobody had asked for.
 
 ### [devices][app-shell] Q-111 — Home header device-battery chips (ring/strap/scale); question whether the manual refresh button is still needed
 
