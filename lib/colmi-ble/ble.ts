@@ -56,6 +56,12 @@ export interface ColmiSyncOutcome {
     unmapped: number
     /** A few raw frames we could not use, newest last — the input to a decoder fix. */
     unmappedHex: string[]
+    /** How many heart-rate packets arrived carrying each sub-type byte, and how many samples each
+     *  produced. `framesToPayload` reads that byte as a packet NUMBER and spaces the series by it;
+     *  if the ring repeats a value instead of counting up, every packet lands on the same
+     *  timestamps and all but one is discarded on the unique key. 122 samples reaching 7 rows is
+     *  what that looks like from the database, and only this tally tells the two apart. */
+    hrSubTypes: Record<string, { packets: number; samples: number }>
   }
   /** Which automatic measurements the ring reports as ON, read back AFTER we tried to enable them.
    *  A metric missing here recorded nothing, which is why an empty history is not proof of a
@@ -134,6 +140,7 @@ export async function syncColmiRing(opts: SyncOptions): Promise<ColmiSyncOutcome
 
   const autoPrefs: NonNullable<ColmiSyncOutcome['autoPrefs']> = {}
   const frameTags: Record<string, number> = {}
+  const hrSubTypes: Record<string, { packets: number; samples: number }> = {}
   const unmappedHex: string[] = []
   let unmapped = 0
   /** Answers that ARE understood, and mean "nothing to send". They decode to `unknown` because they
@@ -148,6 +155,14 @@ const MAX_UNMAPPED_HEX = 8
   const note = (bytes: Uint8Array, frame: ColmiFrame) => {
     const tag = `0x${(bytes[0] ?? 0).toString(16).padStart(2, '0')}`
     frameTags[tag] = (frameTags[tag] ?? 0) + 1
+    if (frame.kind === 'heartRateLog') {
+      const key = `s${frame.subType}`
+      const seen = hrSubTypes[key] ?? { packets: 0, samples: 0 }
+      hrSubTypes[key] = {
+        packets: seen.packets + 1,
+        samples: seen.samples + frame.values.filter(v => v > 0).length,
+      }
+    }
     if (frame.kind === 'unknown' && !SENTINEL_REASONS.has(frame.reason)) {
       unmapped++
       if (unmappedHex.length < MAX_UNMAPPED_HEX) unmappedHex.push(toHex(bytes))
@@ -235,7 +250,7 @@ const MAX_UNMAPPED_HEX = 8
     try { await Ble.disconnect(paired.deviceId) } catch { /* closing */ }
   }
 
-  const diagnostics = { frameTags, unmapped, unmappedHex }
+  const diagnostics = { frameTags, unmapped, unmappedHex, hrSubTypes }
 
   if (framesSeen === 0) {
     // The ring's application processor sleeps when it has been still, and a sleeping ring is

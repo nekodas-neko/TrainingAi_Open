@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.390.2",
+    date: "2026-08-27",
+    changes: [
+      "The Colmi ring's sync detail now says how its heart-rate packets are numbered. Heart rate started arriving in the last release and most of it is still being discarded \u2014 122 readings reaching 7 rows \u2014 which happens when packets land on the same timestamps instead of in sequence. This says which, rather than leaving it to be inferred from row counts.",
+    ],
+  },
+  {
     version: "1.390.1",
     date: "2026-08-27",
     changes: [

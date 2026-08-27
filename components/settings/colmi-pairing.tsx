@@ -170,6 +170,17 @@ export function ColmiPairing() {
                     .map(([tag, n]) => `${tag}×${n}`)
                     .join('  ')}
                 </div>
+                {Object.keys(outcome.diagnostics.hrSubTypes ?? {}).length > 0 && (
+                  <div>
+                    Heart-rate packets:
+                    <div className="mt-0.5 break-all font-mono">
+                      {Object.entries(outcome.diagnostics.hrSubTypes)
+                        .sort(([a], [b]) => Number(a.slice(1)) - Number(b.slice(1)))
+                        .map(([k, v]) => `${k}:${v.packets}p/${v.samples}s`)
+                        .join('  ')}
+                    </div>
+                  </div>
+                )}
                 {outcome.diagnostics.unmapped > 0 && (
                   <div>
                     {outcome.diagnostics.unmapped} frame(s) not understood:
