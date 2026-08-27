@@ -3305,7 +3305,7 @@ with the warning that bottom sheets already own their bottom inset, so it is hor
 
 ## 2026-08-27 — `docs/implementation-backlog.md` raised (BF-46's layout chosen)
 
-17 lines: option A recorded as a band-by-band table, replacing the link-and-wait note. The table
+17 lines (12957 after merging main): option A recorded as a band-by-band table, replacing the link-and-wait note. The table
 exists because a prose description of this exact layout is what sent the entry round once already —
 "more distinct macro and total calorie buttons" has a dozen valid readings, and the drawing settled
 which one. The entry now says the drawing wins where the two disagree, and keeps B and C named only
