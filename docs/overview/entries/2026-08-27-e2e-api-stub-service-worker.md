@@ -55,6 +55,24 @@ that stubs `**/api/…` without `serviceWorkers: 'block'` — **Ran 61 of 61** a
 - The probe spec and the temporary `toHaveValue` assertion are both removed — they were instruments,
   not tests.
 
+## Postscript: the entry came back
+
+**PS-14 was resurrected by #574**, which merged 40 minutes after #575 removed it. Traced with
+`git log -S`: #566 added it, #575 removed it, #574 restored it — a branch cut before #575 landed,
+whose backlog conflict was resolved by keeping the side that still had the entry.
+
+That is the two-deletions trap `CLAUDE.md` documents, now on its **fifth** recorded instance
+(LB-4 twice, Q-454, Q-455, Q-465). It is also the shape `check-backlog-pointers.js` deliberately
+cannot catch: the check fails on a heading with *nothing under it*, and this restored the **full
+entry**, bullets and all. The file says so in as many words — *"a resurrection that restores a full
+entry still passes"* — and the general check it rejected wants git history, which CI cannot reach at
+depth 1.
+
+Removed again. Worth noting that a rule cannot reach a branch that predates it, which is the
+argument for the check rather than against it, and that the four other entries this session removed
+(BF-11f, LB-20, BF-11h, BF-40) all survived — so the practice of grepping after every merge is what
+caught this, not luck.
+
 ## Not exercised
 
 **Whether this fully closes the flake on CI.** The mechanism is proven and the guard is the
