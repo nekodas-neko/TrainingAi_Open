@@ -757,6 +757,53 @@ bites. If it is something else, the trace zip on the failing run
 
 **Do not skip or quarantine the spec** — it covers a warning the owner explicitly asked to keep.
 
+### [body][nutrition][platform] BF-43 — the clinical results the app stores are invisible to every AI surface, and one of them must stay that way
+
+- **Lane:** A — `lib/ai-chat/tools.ts`, `lib/ai-chat/context.ts`, `lib/ai/prompt-guards.ts`.
+- **Added:** 2026-08-27 · owner: *"will the AI be able to see data? what could it use it for."*
+- **Needs:** BF-41 — DEXA and blood have no table yet; only the RMR does.
+
+**Measured, not assumed.** The chat AI has **16 tools**. None of them reaches `measured_rmr`, and
+`getRecoveryData` — the only tool carrying body data at all — returns `weightKg` and **no body-fat
+percentage**. `lib/ai-chat/context.ts` adds 1RMs, sleep and HRV, and nothing about composition. So
+today the owner can ask *"what should I eat"* and the model answers without knowing their measured
+resting rate, their real body fat, or their lean mass. It is not filtered out; it was never wired in.
+
+**The three results are not one permission, and treating them as one is the mistake to avoid.**
+
+| Result | Give the AI? | Why |
+|---|---|---|
+| **RMR** | **Yes** | It is a calorie number the app already reasons in. The model quoting 1325 instead of a formula's 1481 makes every nutrition answer more correct. |
+| **DEXA composition** | **Yes** — fat %, lean mass, VAT, the indices | Body composition drives protein dosing and every recomposition question the owner actually asks. |
+| **Blood panel** | **Values yes. Interpretation no.** | See below. It is the entry's whole safety argument. |
+
+**Blood work is where a general-purpose model is at its most confident and least qualified.** Handed
+`ALT 46, ref 0-45` it will volunteer liver advice; handed `LDL 3.57, ref <2.5` it will prescribe. The
+repo already has the rule this needs — a model handed a score of 80 called it *"perfect"* (Q-292),
+which is why no LLM-reported number may be shown as fact. Blood is that failure with a health
+consequence attached. **Recommended: expose the panel as values, ranges and the PROVIDER's own flag,
+and extend `PROSE_GUARDS` to forbid diagnosis, causation and any change to medication or
+supplementation.** The provider already wrote *"High (likely protein intake)"* — the model's job is
+to repeat that attribution, not to invent one.
+
+**What it is genuinely good for, once it can see all three:**
+
+- **Nutrition answers anchored on a measured base** rather than a formula that runs 156 kcal high for
+  this person.
+- **Protein dosed on real lean mass** — the DEXA-corrected 51.5 kg, not the scale's 53.6 kg.
+- **Explaining its own recommendation** — *"your target is 1,327 because your measured RMR is 1325
+  and you average 240 kcal of movement"* is a sentence the model cannot currently say.
+- **Noticing a trend across tests**, once there are two of anything: fat % moving while weight does
+  not, or a re-tested analyte moving toward its range.
+- **Connecting a flag to logged behaviour, as a question rather than a claim** — urea high and
+  protein intake logged daily is an observation the app uniquely can make, and it must be phrased as
+  *"worth asking your doctor about"*, never as a finding.
+
+- **Verification.** With a stored RMR the model quotes the measurement, not Cunningham, and says
+  which it used. With a stored panel it will repeat a value and its provider flag and **refuse** to
+  say what caused it or what to take — test that refusal explicitly, with a leading prompt, because a
+  guard that has never been attacked has not been tested.
+
 ### [body][nutrition] BF-42 — the daily energy model computes its own BMR and never reads the measured RMR
 
 - **Lane:** A — `lib/health/energy-balance-service.ts`.
@@ -1218,14 +1265,16 @@ The server has no cleanup job. The phone mirrors what `getSyncDelta` sends (`foo
 no `DELETE FROM food_items` at all. The 14-day window the owner is thinking of is the *local Oura
 raw* store, which is a different table and a different decision.
 
-**Two decisions to make and write down, not settle by accident:**
-1. **Store the bytes, or store the OFF URL?** A URL is free and always current but breaks offline —
-   and the row it decorates is read local-first. A stored data URI matches how `saved_meals` already
-   does it and works on a plane. **Recommended: store bytes**, for consistency with the meal photo
-   and because offline-first is the app's premise; note the licence line below.
-2. **`food_items` is shared, not per-user** — decide whether the image lives on the item (one copy,
-   everyone benefits) or per log. Item-level is right for OFF product shots; a scan photo is the
-   user's own and belongs to the log or to a user-scoped column.
+**✅ Both decisions taken by the owner, 2026-08-27 — *"yes lets go with that"*, on the
+recommendations that were put to them. Do not re-open either.**
+1. **Store the bytes, not the OFF URL.** A URL is free and always current and breaks the moment the
+   phone is offline — and the row it decorates is read local-first, so the failure lands exactly
+   where this app promises it will not. A stored data URI matches how `saved_meals` already carries
+   its photo. The licence line below still applies.
+2. **The image goes where its ownership goes.** `food_items` is shared across users, so an Open Food
+   Facts product shot lives **on the item** — one copy, and every user of that barcode gets it. A
+   photo the user took is **theirs** and belongs to the log or to a user-scoped column; it must never
+   be written onto a shared item row, where it would decorate a stranger's diary.
 
 - **Licence, and it is a real constraint rather than a formality.** Open Food Facts product images
   are **CC-BY-SA**. Displaying them in-app is fine; the obligation is attribution. Decide where that

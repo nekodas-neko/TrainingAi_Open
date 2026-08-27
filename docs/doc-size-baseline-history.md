@@ -3241,3 +3241,18 @@ The entry is long because the floor is the half that gets missed: substituting t
 come from different instruments — at the measured 3.2-point gap that is 53.56 kg against 51.46 kg,
 which re-scales the measurement onto 45 kcal/day of lean mass that is not there. The order of the
 two fixes is load-bearing and neither entry said so.
+
+## 2026-08-27 — `docs/implementation-backlog.md` raised (BF-43, and BF-35's two decisions closed)
+
+47 lines net. BF-43 is filed from the owner asking whether the AI will see the clinical results. It
+will not: the chat has 16 tools, none reaches `measured_rmr`, and the one tool carrying body data
+returns weight with no body-fat percentage. Nothing filters it — it was never wired in.
+
+The length is the safety argument, which is the half a shorter entry would drop. **The three results
+are three different permissions.** RMR and DEXA composition are calorie and protein inputs the app
+already reasons in. A blood panel is where a general model is most confident and least qualified —
+handed `ALT 46, ref 0-45` it volunteers liver advice. So values and the provider's own flag go in,
+interpretation does not, and the refusal gets tested with a leading prompt rather than assumed.
+
+BF-35's two open decisions are closed in the same diff (store bytes, not the OFF URL; the image
+lives where its ownership does), replacing the recommendations with the decision and the reason.
