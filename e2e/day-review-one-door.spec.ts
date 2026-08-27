@@ -33,6 +33,34 @@ test('the meal reminder’s older link still opens it', async ({ page }) => {
   await expect(page.getByRole('dialog').getByRole('button', { name: 'Save' })).toBeVisible({ timeout: 60_000 })
 })
 
+test('the param reaches an already-mounted Nutrition tab', async ({ page }) => {
+  // **The case the other three cannot reach, and the one the two live entry points actually take.**
+  // Home's banner calls `navigateToTab`, which the tab shell intercepts: it flips the tab and writes
+  // the URL with `window.history.replaceState` (`components/shell/tab-shell.tsx:78`) — the raw
+  // History API, chosen so an Android back press exits the app instead of unwinding every tab visit.
+  // A raw `replaceState` does not normally reach the Next router at all; it works only because
+  // Next 15 patches it ("Patch replaceState to ensure external changes to the history are reflected
+  // in the Next.js Router" — `next/dist/client/components/app-router.js`). Every `page.goto` above is
+  // a full document load and cannot tell a working patch from a broken one.
+  //
+  // The shell keeps a tab mounted once activated, so the param has to reach an effect — Nutrition's
+  // review has no `useState` initializer reading it. That distinction is not theoretical: the first
+  // draft of this drove Health's `?tab=body` instead, and renaming the `searchParams.get` in
+  // Health's effect left it PASSING, because Health *does* have an initializer and it was quietly
+  // doing the work.
+  //
+  // `replaceState` is called here rather than through the Home banner because that banner only
+  // renders after 17:00 local (`session-select-content.tsx:354`) — a spec on it would pass each
+  // evening and fail every morning.
+  await page.goto('/nutrition')
+  await settleRouteBoundary(page)
+  await expect(page.getByRole('dialog')).toHaveCount(0)
+
+  await page.evaluate(() => window.history.replaceState(null, '', '/nutrition?review=day'))
+  await expect(page.getByRole('dialog').getByRole('button', { name: 'Save' }))
+    .toBeVisible({ timeout: 60_000 })
+})
+
 test('nutrition without the param does not open it', async ({ page }) => {
   await page.goto('/nutrition')
   await settleRouteBoundary(page)

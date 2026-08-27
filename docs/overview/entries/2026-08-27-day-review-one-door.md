@@ -58,9 +58,9 @@ parses that exact param, plus that no scheduler still writes a bare `route: '/'`
 a unit test cannot catch — both halves are individually correct and disagree with each other, and
 the only symptom is a notification that opens the wrong screen on a phone.
 
-`e2e/day-review-one-door.spec.ts` (3 tests) drives the URLs. The third is the inverse: `/nutrition`
-with no param must open no dialog, because a param check that matched anything would open the review
-on every visit.
+`e2e/day-review-one-door.spec.ts` (4 tests) drives the URLs. One is the inverse: `/nutrition` with
+no param must open no dialog, because a param check that matched anything would open the review on
+every visit. The fourth is the tab-shell case below.
 
 **The spec matches on `getByRole('dialog')`, not the heading.** The review carries two nodes reading
 "End of Day" — Radix's `sr-only` `SheetTitle` and the visible `<h2>` — so a heading query is a
@@ -74,11 +74,20 @@ Two things about `/?review=week` needed checking rather than assuming, and one o
 **Does the param survive the tab shell?** Home's banner calls `navigateToTab`, which the tab shell
 intercepts: it flips the tab and writes the URL with `window.history.replaceState`
 (`tab-shell.tsx:78`) — the raw History API, not the Next router. That is normally invisible to
-`useSearchParams()`. It works here because **Next 15 patches `replaceState`** to reflect external
-history changes in the router (`next/dist/client/components/app-router.js:324`, *"Patch replaceState
-to ensure external changes to the history are reflected in the Next.js Router"*). Read, not assumed —
-and worth writing down, because every existing spec for this shape (`/health?tab=body`) uses
-`page.goto`, a hard load, which cannot tell a working patch from a broken one.
+`useSearchParams()`. It works because **Next 15 patches `replaceState`** to reflect external history
+changes in the router (`next/dist/client/components/app-router.js`, *"Patch replaceState to ensure
+external changes to the history are reflected in the Next.js Router"*). Read in the source, then
+driven: the fourth E2E test replaces the URL on an already-mounted Nutrition tab and the review
+opens. Every other spec for this shape uses `page.goto`, a full document load, which cannot tell a
+working patch from a broken one.
+
+**Writing that test found the trap it now documents.** The first draft drove Health's `?tab=body`
+instead — same mechanism, not hour-gated, and it passed. Then renaming the `searchParams.get` inside
+Health's effect **left it passing**, because Health also reads the param in a `useState` lazy
+initializer and that was quietly doing the work. The tab shell keeps a tab mounted once activated, so
+the initializer is exactly what does *not* re-run on the second visit — and Nutrition's review has no
+initializer at all. Aimed at the real feature, the discriminating mutation lands: changing the effect
+deps from `[searchParams]` to `[]` fails that one test and leaves the other three green.
 
 **`forceOpen` only reached `expanded` through a `useState` initializer, which never re-runs.** Home
 is statically imported and the tab shell never unmounts it, so a notification tapped while the app is
