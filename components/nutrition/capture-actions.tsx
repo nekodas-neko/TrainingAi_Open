@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import { BarcodeScanner } from './barcode-scanner'
 import type { NutritionScanResult } from '@trainingai/shared/types/nutrition'
 import { decodeMealLabelToken } from '@trainingai/shared/nutrition/label-payload'
-import { downscaleToJpegDataUrl, base64FromDataUrl } from '@/lib/media/downscale-image'
+import { downscaleToJpegDataUrl, base64FromDataUrl, SCAN_IMAGE_MAX_DIM } from '@/lib/media/downscale-image'
 
 /**
  * Longest edge of an uploaded food photo, in pixels (BF-4).
@@ -18,7 +18,6 @@ import { downscaleToJpegDataUrl, base64FromDataUrl } from '@/lib/media/downscale
  * comfortably above the tiles that budget covers while bounding an S25's 12 MP capture, which is
  * otherwise ~4000 px wide plus base64's ~33%.
  */
-const SCAN_IMAGE_MAX_DIM = 1024
 
 interface Props {
   onScanResult: (result: NutritionScanResult) => void

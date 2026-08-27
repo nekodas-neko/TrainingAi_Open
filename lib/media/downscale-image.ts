@@ -16,6 +16,16 @@
  *
  * **It revokes the object URL.** Both copies leaked one per call.
  */
+/**
+ * Longest edge for an image posted to `/api/nutrition/scan`.
+ *
+ * Shared because BF-40 gave that route a second caller: the meal builder's recipe-screenshot import
+ * sits beside the Log Food photo scan, and two constants would let the two paths disagree about how
+ * much of a phone photo survives — which is a silent difference in what the model can read, not a
+ * visible one.
+ */
+export const SCAN_IMAGE_MAX_DIM = 1024
+
 export interface DownscaleOptions {
   /** Longest edge of the result, in pixels. The aspect ratio is kept. */
   maxDim: number
