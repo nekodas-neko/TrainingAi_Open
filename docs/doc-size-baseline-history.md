@@ -3269,3 +3269,21 @@ times**, so the chat surface will talk a user through a deadlift progression whi
 substitutes the movement out. Two surfaces, opposite advice. The fix is an always-on context line
 rather than a tool — a tool fires only when the model thinks to call it, and an injury has to
 constrain answers the model does not recognise as injury questions.
+
+## 2026-08-27 — `docs/implementation-backlog.md` raised (BF-45, BF-46, and BF-39 re-reported)
+
+97 lines. Eight owner reports against the live Nutrition tab, filed as two batched Lane B entries
+plus a note on an entry that already existed.
+
+The value is in what tracing them found, which is less than eight problems. **"Adding an image
+doesn't show it" and "the photo should be at the top" are one bug**: every layer of the photo
+plumbing works, and `saved-meals-sheet.tsx:672` renders the picker below `Add ingredient` at the
+bottom of a scrolling builder — while the detail sheet's `Add a photo` hero opens that same builder
+rather than a picker, so the user lands above a control they never see. And **"an AI meal floods the
+list" is BF-39**, already filed, now with a screenshot of one breakfast as eight rows and a sharper
+requirement than the original: a collapsed parent that expands to its ingredients, which is also the
+first place a meal photo could live.
+
+Two are one-liners with a reason worth recording — `nutrition-action-row.tsx` puts three buttons in a
+two-column grid, and `meal-card.tsx` keeps its P/C/F footer inside `CollapsibleContent`, so
+collapsing a meal drops the summary that collapsing exists to leave behind.

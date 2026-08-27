@@ -985,6 +985,85 @@ app states the measured offset against the scale for the same period; corrected 
 calorie and protein goals; and history reads corrected without the raw scale values having been
 overwritten.
 
+### [nutrition] BF-45 — the Nutrition day screen: an empty grid slot, macros that vanish when you collapse, and gutters the artboards did not ask for
+
+- **Lane:** B
+- **Batch:** `nutrition-ui-uplift` — ships with BF-46. Both are surface-only and both are verified by
+  the same walk through the same tab on the same device; splitting them buys two device passes for
+  one screen.
+- **Gate: device**
+- **Added:** 2026-08-27 · owner, with screenshots of the live tab (v1.383.x).
+- **Spec:** BF-28's parity rules still bind — where an artboard covers one of these, the artboard
+  wins over a number invented here.
+
+**① `My Meals` sits in a two-column grid with nothing beside it.** Owner: *"id like the my meals
+button to be bigger and take up both left and right slots (as its empty for now)."* Confirmed in
+`components/nutrition/nutrition-action-row.tsx`: `grid grid-cols-2` with **three** children, so Log
+Food and Water fill row 1 and My Meals takes the left half of row 2 with dead space beside it. The
+change is `col-span-2` on the third button. **Say in the diff that this is contingent on the slot
+being empty** — a fourth action later reclaims it, and the next person should know the span was a
+consequence rather than a design.
+
+**② Collapsing a meal hides its macro breakdown.** Owner: *"minimizing the tab doesnt show the
+calorie break down."* In `components/nutrition/meal-card.tsx` the P/C/F footer lives inside
+`<CollapsibleContent>`, so it is removed with the rows; the collapsed header keeps only the calorie
+number. Collapsing exists precisely to skip the rows and keep the summary, and today it drops half of
+it. Put the macro trio in the header (compact, collapsed-only, or always), sized so a long meal-type
+name still truncates rather than pushing it off.
+
+**③ Side gutters.** Owner: *"on many of the nutrition screens the text is too spread out on the
+sides; not enough safe space."* The scroll container is `px-4` (16 dp on a 412 dp screen) and the
+prose cards inherit it, so a long sentence runs nearly edge to edge. **Do not pick a new number
+here** — measure the gutter in the nutrition artboards and match it, and apply it once at the
+container rather than per-card. Name the screens fixed; the owner said *"many"*, so a fix on the day
+screen alone leaves the report half-answered.
+
+- **Verification.** On the S25: My Meals spans the row; a collapsed meal still shows P/C/F and its
+  calories; the gutter matches the artboard on the day screen and every other nutrition screen
+  touched. The sandbox renders these at desktop width, so all three are device-judged.
+
+### [nutrition] BF-46 — the meal builder buries its photo picker below the fold, and the quantity sheet spends its space on the wrong things
+
+- **Lane:** B
+- **Batch:** `nutrition-ui-uplift` — ships with BF-45.
+- **Gate: device**
+- **Added:** 2026-08-27 · owner, with screenshots. *"overall just a UI rework/uplift. almost there."*
+
+**① "Adding an image doesn't show it" and "the photo should be at the top" are ONE bug, and it is
+placement rather than plumbing.** The column, the API, the sync mapping and the local table all
+carry `imageDataUri`, and `MealPhotoTile` downscales to 128 px WebP under a 16 KB cap. What is wrong
+is where the control is: `saved-meals-sheet.tsx:672` renders the tile **below `Add ingredient`**, at
+the bottom of a scrolling builder. And the detail sheet's `Add a photo` hero
+(`meal-detail-sheet.tsx:107`) does not open a picker at all — it calls `onEdit`, dropping the user
+into that builder above the buried tile. So the reported *"doesn't show it"* is most likely a photo
+never actually attached. **Move the tile to the top of the builder, at hero scale, matching the
+detail sheet's own band** — the two screens then agree about where a meal's photo lives. Reproduce
+the original report first: attach a photo, save, and confirm it renders in the meal list, the detail
+hero and the diary row before calling it placement rather than a write bug.
+
+**② A serving inside a serving.** Owner: *"I see there are serving size of each ingredient within the
+meal; so a serving size in a serving size is probably excessive; we should keep it weight/portion."*
+The builder lists `8 servings · 1000 g` per ingredient while the meal itself is measured in portions,
+so "serving" means two different things one line apart. Show ingredients in **weight**, and keep
+portions for the meal. Grams stay the stored truth either way, so this is a display change — but
+check the quantity editor's unit toggle, which is the same decision seen from the other side.
+
+**③ The quantity sheet's layout.** Owner: *"the grams/serve could be smaller and to the right of the
+− x + button then the other buttons could be enlarged and spread to match the width it has: more
+distinct macro and total calorie buttons."* One component to change —
+`components/nutrition/quantity-editor.tsx`, which BF-26 converged both sheets onto, so this lands
+everywhere at once. The srv/g toggle currently takes a full-width row of its own; the presets are a
+cramped four; the macro line is small text under them. Rework so the toggle is secondary and beside
+the stepper, the presets span the width, and the calorie total and macros read as the result they
+are. **Keep BF-26's earned constraints:** the macro colours stay (four uncoloured columns were the
+*"everything looks the same"* complaint), and the grams chip is still hidden when there is no serving
+size to divide by, since a chip that cannot apply is worse than no chip.
+
+- **Verification.** On the S25, in both sheets that render the editor: a photo attached in the
+  builder appears in the list, the detail hero and the diary row; ingredients read in grams; every
+  control clears the 48 dp floor and the action row clears the gesture bar (`pb-safe-action*`, which
+  renders 0 in the sandbox).
+
 ### [nutrition] BF-38 — logging the same food twice creates a second `food_items` row: 19 of 209 are redundant
 
 - **Lane:** A — the matching happens at creation, in the route and the shared create path.
@@ -1039,6 +1118,24 @@ in the PR which rule was chosen and what it deliberately does not catch.
   resolve to the right item.
 
 ### [nutrition] BF-39 — a logged meal stops being a meal: `food_logs` has no `saved_meal_id`, and three symptoms trace to that
+
+> **⚑ RE-REPORTED WITH SCREENSHOTS, 2026-08-27, and the owner's wording sharpens the requirement.**
+> *"when I add a meal from ai; it breaks it down into its components and floods the list. we need to
+> be able to create an over arching food and have the ingredients and macro break down inside of
+> it."* The screenshot is one AI-logged breakfast rendered as **eight** diary rows — flour, protein
+> powder, baking powder, salt, milk, eggs, butter, bacon — each with its own `1 serving · Ng` line
+> and chevron, filling the whole meal section.
+>
+> **This is the same defect this entry already describes, not a new one**, and it is now the owner's
+> most-repeated nutrition complaint (raised on 2026-08-26 about a saved meal's photo, again here
+> about an AI meal). What the re-report adds is the shape of the fix: **one collapsed parent row
+> carrying the meal's name and total, expanding to the ingredients and their macro split** — not
+> eight siblings, and not a single opaque row that loses the breakdown. Both halves are stated, so
+> build both.
+>
+> It also answers the photo question the earlier report left open: a parent row is a place a meal
+> photo can live. Decomposed siblings had nowhere to put one, which is why *"the image won't transfer
+> over"* had no good answer while the rows stayed flat.
 
 - **Lane:** A — a migration plus the write path; the diary rendering is B and follows.
 - **Added:** 2026-08-26 · owner: *"the meal is a complete in 'saved meal' and it can have a picture
