@@ -105,14 +105,23 @@ test('the Nutrition ring counts against the budget the zone bar describes', asyn
   await page.goto('/nutrition')
   await settleRouteBoundary(page)
 
-  // "movement", not "cardio": the figure includes strength sessions and steps, and this fixture's
-  // whole contribution is a strength session — the exact case the old wording mislabelled.
-  await expect(page.getByText(`+${earned} from movement`)).toBeVisible({ timeout: 30_000 })
+  // BF-24 ② split this across two lines: the header reads `+N burned` and the word "movement" moved
+  // down to the zone bar's detail. Both are asserted, because each carries half of what this test is
+  // for — the header proves the earned figure is on screen at all, and "movement", not "cardio", is
+  // the wording that matters (the figure includes strength sessions and steps, and this fixture's
+  // whole contribution is a strength session — the exact case the old wording mislabelled).
+  await expect(page.getByText(`+${earned} burned`)).toBeVisible({ timeout: 30_000 })
+  await expect(page.getByText(`${earned} earned from movement`)).toBeVisible()
 
   // The ring prints what is LEFT rather than the budget, and that remaining figure is what read
   // "Goal reached" on a day with 166 kcal still to eat.
+  //
+  // Matched loosely because BF-24 ② now formats it: `3196` renders as `3,196 kcal left`. Not
+  // `left.toLocaleString()` — that resolves in the RUNNER's locale, and the browser's need not
+  // agree, which is a green-today-red-elsewhere trade for a separator nothing here cares about.
   const left = Math.max(0, total - intakeKcal)
-  await expect(left > 0 ? page.getByText(`${left} left`) : page.getByText('Goal reached')).toBeVisible()
+  const kcalLeft = new RegExp(`${String(left).replace(/\B(?=(\d{3})+(?!\d))/g, '[,.\\s]?')}\\s*kcal left`)
+  await expect(left > 0 ? page.getByText(kcalLeft) : page.getByText('Goal reached')).toBeVisible()
 })
 
 test('the ring\'s macro bars use the scaled targets, not the stored ones', async ({ page }) => {
@@ -124,9 +133,14 @@ test('the ring\'s macro bars use the scaled targets, not the stored ones', async
   await page.goto('/nutrition')
   await settleRouteBoundary(page)
 
-  await expect(page.getByText(new RegExp(`/${Math.round(scaled.carbsG)}g`))).toBeVisible({ timeout: 30_000 })
-  await expect(page.getByText(new RegExp(`/${Math.round(scaled.fatG)}g`))).toBeVisible()
-  await expect(page.getByText(`/${BASE.carbsG}g`)).toHaveCount(0)
+  // `\s*` before the unit, not a bare `g`. BF-24 ② renders `{grams}<span>/{target}</span><span> g</span>`
+  // (`energy-card.tsx:225`), so the text node is `0/295 g` — and the space is why the negative
+  // assertion below MATTERS: written as `/NNNg` it matched nothing at all after that change, so it
+  // reported 0 whether or not the base target was on screen. A guard that cannot fail is not a guard.
+  const perTarget = (grams: number) => new RegExp(`/${grams}\\s*g`)
+  await expect(page.getByText(perTarget(Math.round(scaled.carbsG)))).toBeVisible({ timeout: 30_000 })
+  await expect(page.getByText(perTarget(Math.round(scaled.fatG)))).toBeVisible()
+  await expect(page.getByText(perTarget(BASE.carbsG))).toHaveCount(0)
 })
 
 test('Home\'s nutrition card counts against that same budget', async ({ page }) => {

@@ -6,10 +6,33 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: "1.392.1",
+    version: "1.393.2",
     date: "2026-08-27",
     changes: [
       "Colmi heart rate was being stored ten hours late, which is why most of it vanished and the rest looked wrong. The ring is asked for a day using local wall-clock time, it repeats that back, and the reply was being read as a real time \u2014 so a day the ring recorded from 6:50 am to 8:50 pm was filed as 4:50 pm to 6:50 the next morning. Everything past the current moment was thrown away as impossible: 119 of 157 readings a day. What survived were morning readings wearing evening timestamps, which is what made the ring look 15 beats high against the Oura. The readings stored under the old times have been removed; sync once and the day comes back correctly.",
+    ],
+  },
+  {
+    version: "1.393.1",
+    date: "2026-08-27",
+    changes: [
+      "Internal: three checks on the Nutrition energy card were still looking for wording the card stopped using when it was redrawn. Two of them were failing loudly; the third was a check that the macro targets scale with what you burn, and it had quietly stopped being able to fail at all. All three are fixed, and the last one is proven to catch the bug it was written for.",
+    ],
+  },
+  {
+    version: "1.393.0",
+    date: "2026-08-27",
+    changes: [
+      "The end-of-day review has one home now. Home\u2019s \u201cYour day in review is ready\u201d banner used to open a shorter version of it that only Home had, while the End of Day button on Nutrition opened the full one. There is one review, it lives on Nutrition, and both routes reach it.",
+      "The bedtime and Sunday reminders now open the thing they are reminding you about. Tapping either used to drop you on Home to go find the right banner \u2014 the evening one opens the day review, the weekly one opens your week in review already unfolded, even if you dismissed that banner earlier.",
+      "Fixed: if the day\u2019s written summary failed to generate, it simply was not there \u2014 indistinguishable from a quiet day. It now says it could not be written.",
+    ],
+  },
+  {
+    version: "1.392.0",
+    date: "2026-08-27",
+    changes: [
+      "The Colmi ring now keeps every frame it sends, exactly as it sent it, before anything is read out of it. 119 of 140 heart-rate readings a day were being discarded as impossible and nothing recorded what they were \u2014 so whether they are sensor noise or a misread could not be answered, and each day spent answering it was a day of history that could not be recovered. Now it can be: a fix to how the ring is read applies to everything already recorded, not just to what comes after.",
     ],
   },
   {

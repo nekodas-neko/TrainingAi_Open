@@ -1507,6 +1507,25 @@ export const colmiReadings = pgTable('colmi_readings', {
   createdAt:  timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 }, t => [unique('colmi_readings_unique').on(t.userId, t.kind, t.measuredAt)])
 
+/** Every frame the ring sent, as hex, before any decoding — the archival source of truth.
+ *
+ *  The decoded tables are a reading of these bytes, and readings have been wrong: the ingest
+ *  discards any heart-rate sample outside 20–250 bpm, which on 2026-08-27 was 119 of 140 per sync,
+ *  and nothing recorded what those values were. This is what makes a decoder fix able to back-fill
+ *  rather than only help from the day it ships. Never prune it. */
+export const colmiRawFrames = pgTable('colmi_raw_frames', {
+  id:         uuid('id').primaryKey().defaultRandom(),
+  userId:     uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  /** When the PHONE received it — the ring's own clock is what these frames exist to decode. */
+  receivedAt: timestamp('received_at', { withTimezone: true }).notNull().defaultNow(),
+  /** 'v1' = the 16-byte command channel, 'v2' = the reassembled big-data channel. */
+  channel:    text('channel').notNull(),
+  /** Command byte (v1) or big-data type (v2), so a query can filter without re-parsing the hex. */
+  tag:        integer('tag'),
+  hex:        text('hex').notNull(),
+  createdAt:  timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, t => [unique('colmi_raw_frames_unique').on(t.userId, t.channel, t.hex)])
+
 /** Sleep is an interval with a stage, so it cannot live in the point table. `stage` is the ring's
  *  own encoding: 2 light, 3 deep, 4 REM, 5 awake. */
 export const colmiSleepSegments = pgTable('colmi_sleep_segments', {
