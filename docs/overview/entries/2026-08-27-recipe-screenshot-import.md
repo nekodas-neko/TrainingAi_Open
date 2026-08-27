@@ -69,6 +69,30 @@ rather than declaring it, and it sends no `imageKind`.
   Plus that the affordance yields to both a typed query and a pasted link.
 - `pnpm check:rules` — Ran 61 of 61. Full vitest and full Playwright.
 
+## The full suite caught a defect in this PR's own spec
+
+`recipe-image-to-meal.spec.ts` passed 4 of 4 alone and then **failed in the full run** — a
+strict-mode violation, two `Spec Flour` elements. The accessible names identified them: one was the
+ingredient row (`Spec Flour 2.5 servings · 250 g`), the other a search-result row
+(`Spec Flour 10g P per 100 g`).
+
+The import mints a real `food_item` per ingredient and the spec never cleaned up, so from the
+**second** local run onward its own leavings reappeared in the picker's list and the bare-name
+assertion matched both. It passed alone because that was the first run — and **CI provisions a fresh
+database every time, so CI would have stayed green indefinitely** while every local run after the
+first failed. That is the inverse of the aged-fixture trap `CLAUDE.md` documents, and it hides just
+as well.
+
+Fixed on both sides rather than only the visible one: `beforeAll`/`afterAll` cleanup so the spec
+stops accumulating rows in the shared local database, and assertions matched to the ingredient row's
+own shape rather than a name anything can carry. Verified by three consecutive solo runs — run 2 is
+where it previously broke — with zero residue left in `food_items` afterwards. The rule is now in
+`e2e/README.md`, including the cheap habit that would have caught it: **run a new spec twice before
+believing it.**
+
+**A subset run would have shipped this.** It is the second time tonight the full suite has earned
+its fifteen minutes.
+
 ## Not exercised
 
 **The model's actual reading of an image.** The e2e stubs `/api/nutrition/scan`, because a live run
