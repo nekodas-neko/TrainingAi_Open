@@ -3261,7 +3261,10 @@ apart with no new overnight data — which the check-in half alone does not achi
 - **Branch:** _unassigned_
 - **Added:** 2026-08-26 · found while explaining a 57 on a 7.75 h night
 - **Lane: A** — `packages/shared/src/health/sleep-score.ts:60-61`
-- **Gate: owner** — changes a score. Not signed off.
+- **✅ Gate: owner SIGNED OFF 2026-08-30.** The owner approved the tuning batch; this is the one of
+  the four that was actually ready. It meets the bar CLAUDE.md sets for a scoring change: the blast
+  radius is stated and measured — **~3.3 blend points on every night in the 7.5–8 h band**, which is
+  where most of the owner's nights land. **Lane A implements.**
 - **Sequence after TN-5** (the calibration curve) so two sleep changes are not evaluated at once.
 
 The anchors and the line documenting them do not agree:
@@ -3490,7 +3493,15 @@ bare bpm** — a change that keeps the 7-day average and merely adds a cue besid
 - **Branch:** _unassigned_ · **Added:** 2026-08-26 · owner design: *"from wakeup you start close to 100; then as time goes on it lowers unless you do all parts of what's needed"*
 - **Lane: A** — the score is computed server-side in `packages/shared/src/health/activity-score.ts`
 - **Needs: Q-524** — three step goals are live at once; a pace score makes which one is real load-bearing
-- **Gate: owner** — the decision below is the owner's, and it is about *their goal*, not about code
+- **⚠ Gate: owner — the sign-off offered on 2026-08-30 does not fit this gate, and it is NOT applied.**
+  This one does not ask *may we change the score*; it asks **what the owner's step goal actually is**,
+  and the mechanic below is sound either way. Measured: the owner's median day is **4,649 steps** and
+  they reach the stored 7,000 on **19 of 60 days — 32%**. A pace-to-goal score against a goal missed
+  two days in three is punishing by construction, which is the entry's title.
+- **The question to put to the owner, in one line:** *is 7,000 the goal you want held to, or should
+  the goal move to something your median day can reach?* Answer that and this becomes buildable.
+- **Also `Needs: Q-524`** — three step goals are live at once, so which one is real is load-bearing
+  here and cannot be settled inside this entry.
 
 Replace the flat daily average with a **prorated target**: at wake the day's goal is spread across
 waking hours, you start near 100, and you decay if you fall behind. This directly fixes the "63 at
@@ -3581,7 +3592,14 @@ the bar to beat, not to assume).
 - **Branch:** _unassigned_ · **Added:** 2026-08-26 · owner request
 - **Lane: B**
 - **Needs: Q-507** — deliberately. Read the next paragraph before starting.
-- **Gate: owner** — do not build until the sign question is settled.
+- **⛔ Gate: owner — NOT SIGNABLE, and a blanket sign-off does not clear it.** Offered one on
+  2026-08-30 as part of a tuning batch and **deliberately not applied here.** This gate is a stop
+  sign, not a request for approval: the entry's own measurement (n = 33) is that stress-high minutes
+  correlate the *wrong way*, so **a warning built on today's metric would fire on the owner's best
+  days** — which the entry calls worse than no warning at all. Approving that would be approving a
+  known-broken feature.
+- **What actually clears it:** Q-507 settling the sign. Then this becomes a normal proposal and can
+  be signed off on its merits.
 
 The owner asked for a warning when stress has been elevated too long, plus a calm-down ritual. **The
 metric currently rises on good days**: re-measured 2026-08-26 (n = 33), stress-high minutes correlate
@@ -5004,7 +5022,10 @@ tapping. Observed set-RPE range is 6–10, mean 7.48.
 
 ### [workouts][nutrition] Q-422 — calibrate the burn estimate against the owner's own energy balance
 
-- **Gate: owner** — a scoring change: Tuning proposes, the owner signs off, Lane A implements. Added
+- **⚠ Gate: owner — held 2026-08-30, `Needs: Q-420` is not yet clear.** The owner signed off the
+  tuning batch, and this entry is a legitimate scoring sign-off in principle — but Q-420 sets the
+  intensity scale this calibration multiplies, so approving the multiplier before its input is fixed
+  approves an unknown. **Re-offer it the moment Q-420 lands**; nothing else about it is blocked. Added
   2026-08-20 because `scripts/next-item.js` listed this as READY: the blocker was stated in prose
   further down the entry, and prose is exactly what the `Gate:` field replaced.
 - **Needs:** Q-420
@@ -5626,6 +5647,11 @@ this fits without an extraction.
   matters. Start from Profile → **Auto-detect timezone**, the button that triggers the whole class.
   `Gate: device`.
 ### [platform] Q-551 — OWNER DECISION: stay on Railway or leave, once the D-track has shrunk the server
+
+> **⏸ HELD BY THE OWNER, 2026-08-30 — *"hold the railway portion of leaving it for now."*** Not
+> answered, not withdrawn: parked. **Do not re-put this to the owner** until Q-545 has shrunk the
+> server, which the entry already says is the right order. Nothing depends on it and it costs about
+> three cents a month to leave alone.
 
 > **⚑ THIS IS NOW THE ONLY RAILWAY DECISION — Q-549 folded in and removed, 2026-08-30.** Three
 > entries were asking the owner about the same hosting question from different angles. What survives

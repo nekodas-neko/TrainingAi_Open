@@ -3882,3 +3882,25 @@ was falsified on 2026-08-25 (423 MB flat at 0.0 vCPU, not 0.79 GB) and its only 
 console setting, so it is folded into Q-551 and removed. Q-547's remaining half is re-framed as what
 it is — a *reading* taken during a quiet window, feeding Q-551 rather than competing with it. **The
 owner now has one Railway question instead of three.**
+
+## 2026-08-30 — `docs/implementation-backlog.md` (the tuning sign-off, applied to one of four)
+
+The owner signed off "the four tuning tasks". Checked against CLAUDE.md's bar for a scoring change —
+*a proposal is incomplete until it states how many other days the change moves* — and **only TN-10
+met it**, so only TN-10 carries the sign-off.
+
+The other three are recorded as explicitly **not** signed, with the reason on each, because a blanket
+approval applied to them would authorise things nobody intends:
+
+- **TN-16** is a stop sign, not a request. Its own measurement (n = 33) is that stress-high minutes
+  correlate the *wrong way*, so the warning it proposes **would fire on the owner's best days** — the
+  entry calls that worse than no warning. Approving it approves a known-broken feature. Q-507 clears
+  it.
+- **TN-17** does not ask *may we change the score*; it asks **what the owner's step goal is**. Median
+  day 4,649 steps against a stored goal of 7,000 reached on 19 of 60 days. The entry now carries the
+  one-line question to put to them instead.
+- **Q-422** is a legitimate sign-off blocked on `Needs: Q-420`, which sets the intensity scale it
+  multiplies. Approving the multiplier before its input is fixed approves an unknown. Re-offer it
+  when Q-420 lands.
+
+Q-551 is marked **held** rather than answered, per the owner.
