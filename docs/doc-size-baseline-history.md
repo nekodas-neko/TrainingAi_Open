@@ -3671,3 +3671,16 @@ Hence the rule the entry now leads with: **the totals are sacred, the detail is 
 ingredients to save bytes silently changes the meal's calories, and the person scanning the label has
 no way to know. Only identity may be dropped, never numbers — and the printed label has to say it is
 showing four of ten, or it reads as the whole recipe.
+
+## 2026-08-30 — `docs/implementation-backlog.md` (net ~+8: a `Gate:` field removed from four entries)
+
+Found while reporting queue state: `Gate: device` **parks** an entry in `next-item.js`, and in this
+queue it means *shipped, awaiting a device check* — which is how BF-24, BF-26, BF-34 and Q-406 use
+it. BF-45, BF-46, BF-50 and BF-51 are unbuilt, so carrying it hid the whole `nutrition-ui-uplift`
+batch from Lane B's runner: four entries, the owner's most-repeated surface complaints, invisible to
+the tool an implementer is told to start from.
+
+Removed, with a note on each explaining why not to add it back. The device is still what judges these
+done — that belongs in Verification, which all four already state. **A gate parks work; a
+verification requirement does not.** The rule was in `docs/agents/README.md` the whole time; it was
+filled in from the field name rather than from the runner.
