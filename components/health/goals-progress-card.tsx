@@ -1,7 +1,7 @@
 'use client'
 
-import { memo, useState, useEffect } from 'react'
-import { savePreference } from '@/lib/user/preferences-sync'
+import { memo, useState } from 'react'
+import { usePersistedPreference } from '@/lib/user/preferences-sync'
 import { Footprints, Flame, Droplet, Moon, Dumbbell, type LucideIcon } from 'lucide-react'
 import { accentCardStyle } from '@trainingai/shared/utils'
 import { GoalProgressBar } from './goal-progress-bar'
@@ -40,9 +40,8 @@ export const GoalsProgressCard = memo(function GoalsProgressCard({ metaToday, we
     } catch { return 'today' }
   })
 
-  useEffect(() => {
-    savePreference('goalsProgressView', view)
-  }, [view])
+  // Mirrors state, so it must not PATCH on mount — this card renders inside Health's launch burst.
+  usePersistedPreference('goalsProgressView', view)
 
   const rows: GoalRow[] = []
 

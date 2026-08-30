@@ -1,5 +1,6 @@
 'use client'
 
+import { useEffect, useRef } from 'react'
 import { PREFERENCE_STORAGE, type UserPreferences } from '@trainingai/shared/user/preferences'
 
 /**
@@ -92,6 +93,54 @@ export function savePreference<K extends PreferenceName>(
   name: K, value: UserPreferences[K] | null,
 ): void {
   savePreferences({ [name]: value } as PreferencePatch)
+}
+
+/**
+ * The device half alone — no PATCH. For a write that cannot be news to the server.
+ *
+ * It exists because the conversion this module performed was not the one-to-one swap it looked
+ * like: a `localStorage.setItem` in a mirror effect was free, and the same line calling
+ * `savePreference` is a network write **on every mount**. One such site — the Health goals card —
+ * put a PATCH into the launch burst and left it, and a `GET` behind it, unresolved for over fifty
+ * seconds, which failed nine e2e specs on `waitUntil: 'networkidle'`. Measured 2026-08-30:
+ * reverting that one line took `card-429-error-state` from a 45 s timeout to a 21.5 s pass.
+ */
+export function writePreferenceLocally<K extends PreferenceName>(
+  name: K, value: UserPreferences[K] | null,
+): void {
+  if (typeof window === 'undefined') return
+  const { key } = PREFERENCE_STORAGE[name]
+  try {
+    if (value === null || value === undefined) localStorage.removeItem(key)
+    else localStorage.setItem(key, encode(name, value))
+  } catch { /* private mode or quota */ }
+}
+
+/**
+ * Mirror a piece of component state into a preference: locally on mount, to the server only when
+ * it CHANGES.
+ *
+ * Use this wherever the old code was `useEffect(() => localStorage.setItem(K, v), [v])`. Calling
+ * `savePreference` from such an effect looks identical and is not — see `writePreferenceLocally`
+ * for what that costs. A handler that runs because the user tapped something needs neither: call
+ * `savePreference` there directly.
+ */
+export function usePersistedPreference<K extends PreferenceName>(
+  name: K, value: UserPreferences[K],
+): void {
+  const seen = useRef<string | null>(null)
+  useEffect(() => {
+    const next = encode(name, value)
+    // **The test is the VALUE, not the run count.** React's StrictMode invokes an effect twice on
+    // mount, so a `firstRun` ref is already spent by the second invocation and PATCHes — in the
+    // launch burst, which is exactly what this hook exists to prevent. Measured: the ref version
+    // failed `card-429-error-state` identically to no guard at all.
+    if (seen.current === next) return
+    const firstRun = seen.current === null
+    seen.current = next
+    if (firstRun) writePreferenceLocally(name, value)
+    else savePreference(name, value)
+  }, [name, value])
 }
 
 /** A patch of one or more preferences. `null` clears a key — the route's own contract, and what

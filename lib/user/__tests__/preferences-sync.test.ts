@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest'
 import { PREFERENCE_STORAGE } from '@trainingai/shared/user/preferences'
-import { hydrateUserPreferences, savePreference, savePreferences } from '../preferences-sync'
+import { hydrateUserPreferences, savePreference, savePreferences, writePreferenceLocally } from '../preferences-sync'
 
 /**
  * Seeding and saving preferences (Q-392).
@@ -124,5 +124,27 @@ describe('savePreferences', () => {
     expect(fetch).toHaveBeenCalledWith('/api/user/preferences', expect.objectContaining({
       body: JSON.stringify({ brandTheme: 'purple', brandHue: null }),
     }))
+  })
+})
+
+describe('writePreferenceLocally', () => {
+  it('writes the device copy and sends NOTHING — a mirror on mount is not news to the server', () => {
+    writePreferenceLocally('goalsProgressView', 'week')
+    expect(store.get('ta_goals_progress_view')).toBe('week')
+    expect(fetch).not.toHaveBeenCalled()
+  })
+
+  it('encodes the same way the PATCH path does, so the two cannot drift', () => {
+    writePreferenceLocally('weightLookback', 30)
+    writePreferenceLocally('mealReminders', false)
+    expect(store.get('ta_weight_lookback')).toBe('30')
+    expect(store.get('ta_pref_meal_reminders')).toBe('false')
+  })
+
+  it('null clears the key, matching savePreference', () => {
+    store.set('ta_brand_hue', '210')
+    writePreferenceLocally('brandHue', null)
+    expect(store.has('ta_brand_hue')).toBe(false)
+    expect(fetch).not.toHaveBeenCalled()
   })
 })

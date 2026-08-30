@@ -1074,6 +1074,58 @@ deliberate choice, on a session where the absence of a Primary is the design.
   outgoing one's role, the prescribed sets and percentages are unchanged, and the session still has
   no Primary afterwards.
 
+### [platform] LB-27 — one extra request during launch strands several for over a minute, and nothing explains why
+
+- **Lane:** A
+- **Added:** 2026-08-30 · Lane B, measured while fixing Q-392's own version of this.
+- **Reference:** the symptom is written up in
+  [`docs/overview/entries/2026-08-30-preferences-read-sites.md`](overview/entries/2026-08-30-preferences-read-sites.md);
+  Q-392's mirror-effect PATCH is already fixed, so this entry is the **unexplained** half only.
+
+**The measurement.** Health's launch fires ~25 API requests in the first seven seconds. Adding one
+more — a single `PATCH /api/user/preferences` from a card's mount effect — left that PATCH **and a
+`GET` behind it pending past sixty seconds**, with nothing else in flight and no further requests
+after twenty seconds. Instrumented on a cold dev server with Playwright's `requestfinished`, so
+these are genuinely unresolved connections, not slow ones. The same PATCH fired *after* the burst
+settles answers in **340 ms**, and a burst of five answers in **641 ms**. Removing that one request
+took the page from never reaching `networkidle` to reaching it in ~19 s.
+
+**Why it matters beyond a test.** Nine e2e specs failed on `waitUntil: 'networkidle'` and none of
+them mention preferences, so the next person to add a request to a launch path gets a failure that
+names someone else's screen. And if a request really can strand for a minute on the device, that is
+a launch-time hang, not a test artefact.
+
+**Where to look, in order.** `updateUserPreferences` (`lib/data/postgres/adapter.ts`) is the only
+route in that burst that opens a **transaction with `SELECT … FOR UPDATE`** on the `users` row, and
+it holds a pool client for its duration; the pool is `max: 10` (`lib/data/postgres/client.ts`) with
+`pg`'s default `connectionTimeoutMillis: 0`, which waits **forever** for a client rather than
+erroring. A `statement_timeout` cannot fire on a query that never starts. That is a hypothesis, not
+a finding — it does not by itself explain a plain `GET` hanging beside it.
+
+- **Not reproduced in production**, and it may be dev-server-specific (route compilation under
+  concurrency). Establish that first: it changes whether this is a bug or a harness note.
+- **Keep:** whatever the cause, `connectionTimeoutMillis: 0` on a pool of 10 is worth a decision of
+  its own — a bounded wait turns a hang into an error state a card can show.
+
+### [platform] LB-28 — CI should refuse `savePreference` inside a `useEffect`
+
+- **Lane:** B
+- **Added:** 2026-08-30 · Lane B, from the defect LB-27 describes.
+- **Needs:** LB-27
+
+The footgun is invisible at the call site: `useEffect(() => localStorage.setItem(K, v), [v])` is a
+free write, and the same line calling `savePreference` is a **network PATCH on every mount**.
+`usePersistedPreference` exists for the mirror case, but nothing stops the next conversion reaching
+for `savePreference` again — and the failure it produces names unrelated specs.
+
+**One check, narrow on purpose:** flag `savePreference(`/`savePreferences(` that appears inside a
+`useEffect(` block in `app/`, `components/` or `lib/`. A tap handler nested inside an effect would
+be a false positive; there are none today, and the escape hatch is the same as every other rule
+here — an entry in the script with a written reason.
+
+**Do not widen it to "no fetch in an effect"**, which is most of this codebase. The rule is about
+one helper whose cost is not visible in its name.
+
 ### [platform] BF-55 — 84 MB of index against 63 MB of table, and the database is growing ~7× its expected trend
 
 - **Lane:** A

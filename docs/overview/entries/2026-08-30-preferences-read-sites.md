@@ -56,6 +56,39 @@ thing — the mutually-exclusive brand preset / custom hue pair — and `EXCLUSI
 when the bag carries one member, the others go locally. Without it a stale hue would override a
 preset chosen elsewhere, the same ordering bug `savePreferences` prevents one layer out.
 
+## The second thing CI found: a mirror effect is not a free write any more
+
+`goals-progress-card.tsx` held the shape this whole change walks into:
+
+```ts
+useEffect(() => { localStorage.setItem(GOALS_VIEW_KEY, view) }, [view])
+```
+
+Converting that line to `savePreference` looks like a one-to-one swap and is not. The old write was
+free and idempotent; the new one is **a network PATCH on every mount**, and this card renders inside
+Health's launch burst — roughly twenty-five requests in the first seven seconds.
+
+**One extra request there is enough to break the page.** Instrumented on a cold dev server: the
+PATCH and a `GET /api/user/preferences` behind it stayed *pending* past sixty seconds while nothing
+else was in flight, so `page.goto(…, { waitUntil: 'networkidle' })` never resolved. That failed
+**nine e2e specs** — `card-429-error-state` (×4), `health-tabs-instant-paint` (×3),
+`tabs-instant-paint` Health, and this branch's own `preferences-survive-reinstall` — none of which
+mention preferences. Reverting that single line took `card-429` from a 45 s timeout to a 21.5 s
+pass; the same PATCH fired on its own, after the burst settles, answers in **340 ms**.
+
+**Why the requests hang rather than queue is NOT explained here**, and it is the more interesting
+half: the app is evidently at a capacity cliff during launch where one more request can strand
+several. Filed as its own entry rather than guessed at — it is engine-side (pool, `FOR UPDATE`
+transaction, dev-server concurrency), not a preferences bug.
+
+The fix is `usePersistedPreference(name, value)`: write the device copy on mount, PATCH only when
+the value *changes*. Every other converted site is already inside a tap handler and needed nothing.
+
+**And the obvious guard for it is wrong, which is worth more than the fix.** A `firstRun` ref does
+not work: React StrictMode invokes an effect twice on mount, so the guard is spent by the second
+invocation and it PATCHes anyway. Measured — that version failed `card-429` identically to no guard
+at all. The test has to be the **value**, not the run count.
+
 ## Three decisions worth keeping
 
 **`savePreferences` exists because of the theme picker.** A brand preset and a custom hue are
@@ -84,12 +117,12 @@ asserts all three come back in the right shapes: `'30'`, `'arc'`, and the litera
 
 **Proved both ways.** With the hydration replaced by a no-op and nothing else changed, it fails.
 
-Ten unit tests cover each encoding, an absent key being **left alone** (the regression above,
+Thirteen unit tests cover each encoding, an absent key being **left alone** (the regression above,
 pinned), the exclusive partner being cleared, a `null` server response not touching the device, every
 key in the map being covered so a new preference cannot be seeded under no name, `null` meaning clear
-on a save, a failed PATCH not throwing, and the exclusive pair going out as one request.
+on a save, a failed PATCH not throwing, the exclusive pair going out as one request, and `writePreferenceLocally` writing the device copy while sending **nothing**.
 
-Full unit suite **5,575 passed** / 666 files. `pnpm check:rules` — Ran 62 of 62. Typecheck and lint
+Full unit suite **5,625 passed** / 670 files. `pnpm check:rules` — Ran 62 of 62. Typecheck and lint
 clean. `session-select-content.tsx` is **net zero lines** — it is a baselined hotspot.
 
 ## Not exercised
