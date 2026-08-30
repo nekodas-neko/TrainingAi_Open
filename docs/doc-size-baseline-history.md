@@ -3935,3 +3935,22 @@ worse than no target.
 TN-17 is a line: the owner kept 7,000 steps, and the entry now records that the number came from the
 `sedentary` rung of a tier table rather than any per-person calculation — defensible by accident, and
 worth saying so plainly.
+
+## 2026-08-30 — `docs/implementation-backlog.md` (BF-59 reframed by one remark from the owner)
+
+The entry was written as "flat binary plus a missing goal multiplier". The owner then said *"oh yes
+cause its realization phase its been less sets"* — and that is the actual cause, with the original
+two demoted to second-order. In a peaking block low volume **is** the prescription; the app's own
+`explain.ts` calls realisation *"peak strength — heaviest load, lowest reps"* and `autoregulation.ts`
+refuses rep pushes in it. So the screen painted correct training red.
+
+Two things worth keeping from the trace. **MAV is an accumulation target**, so displaying it during a
+peak is measuring the wrong thing rather than measuring it wrongly. And **phase is per program
+session, not per week** — production shows the owner's sessions spanning `accumulation`,
+`intensification` and `realisation` simultaneously — so a weekly target is a computation over the
+phases the week contains, not a number that can be stored at all.
+
+A question the entry had raised — *does the program prescribe enough volume to reach MAV?* — is
+struck rather than deleted, because it was reasonable on the data available and the next person
+looking at 50-against-106 without the phase would ask it again. That is itself the argument for
+putting the phase on the screen.

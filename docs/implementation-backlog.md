@@ -1046,7 +1046,32 @@ overwritten.
   full sessions for the week; and i was nowhere near hitting the reccomended amount of muscle sets.
   are we aiming too high; is it calculating wrong? whats the issue?"*
 
-**The counting is right. The target is wrong.** Measured from the owner's screen and production:
+> **⚑ THE OWNER SUPPLIED THE MISSING CAUSE, 2026-08-30: *"oh yes cause its realization phase its
+> been less sets."*** This reframes the entry and **the framing below is incomplete without it.** In a
+> realisation/peaking block, low volume is the *prescription* — the app's own `explain.ts` calls it
+> *"peak strength — heaviest load, lowest reps"*, and `autoregulation.ts` refuses rep pushes in it.
+> **So the owner's week was correct training, and the screen painted correct training red.**
+>
+> **MAV is an ACCUMULATION target.** Showing it during a peak and colouring the shortfall as failure
+> tells an athlete that doing the right thing is wrong — which is worse than a wrong number, because
+> the wrong number is at least ignorable.
+>
+> **And it is not one phase per week.** Phase lives in `session_periodization`, **per program
+> session**, and production shows the owner's sessions spanning three at once — `accumulation`,
+> `intensification` and `realisation`, all with recent `updated_at`. So "this week's volume target"
+> is a computation over the phases the week's sessions are actually in, not a constant that can be
+> stored anywhere.
+>
+> **What this makes the real fix**, in order of how much it matters:
+> 1. **The target must take the phase.** A realisation week should show a reduced target, or the
+>    progress bar should say *"peaking — volume is meant to be low"* rather than showing a deficit.
+> 2. The per-muscle landmarks and the goal multiplier (below) — real, but second-order beside this.
+>
+> **⚠ Do not ship (2) alone and call this closed.** Correcting 128 → ≈106 still paints a peaking week
+> red; it just paints it slightly less red.
+
+**The counting is right. The target is wrong — for three reasons, and the entry originally found only
+two.** Measured from the owner's screen and production:
 
 | | |
 |---|---|
@@ -1097,12 +1122,19 @@ screen cannot currently tell the two apart.
   `UPDATE … WHERE` or every existing program keeps the flat numbers forever.
 - **Do not silently overwrite a target the owner set by hand.** If the schema cannot tell a seeded
   target from an edited one, say so and ask before the corrective migration runs.
-- **A second question this raises, and it is the owner's:** whether the *program* prescribes enough
-  volume to reach MAV at all — 50 sets against a goal-adjusted 106 credits is still short, so either
-  the program needs more sets or the sessions need to be longer. That is a conversation, not a bug.
-- **Verification:** displayed targets match `volumeLandmarks` for the active program's goal; a
-  `strength` program (×0.65) shows visibly lower targets than a `hypertrophy` one (×1.0); and the
-  owner's completed week reads at-or-near target on the muscles the table says it should.
+- ~~**A second question: does the program prescribe enough volume to reach MAV at all?**~~
+  **Withdrawn 2026-08-30 — the owner answered it before it was asked.** 50 sets is short of MAV
+  because it is a **peaking block**, which is what a peaking block is for. There is no volume
+  shortfall to explain. *(Kept struck rather than deleted: the question was reasonable on the data
+  available and would be re-asked by the next person who looks at 50-against-106 without knowing the
+  phase — which is itself the argument for putting the phase on the screen.)*
+- **Verification:** **a week of realisation sessions does not read as a deficit** — either the target
+  drops or the card says why it is low; displayed targets match `volumeLandmarks` for the active
+  program's goal; a `strength` program (×0.65) shows visibly lower targets than a `hypertrophy` one
+  (×1.0); and an accumulation week reads at-or-near target on the muscles the table says it should.
+- **Do not "fix" this by lowering the numbers until they match.** The owner's week was correct
+  training; the target was measuring the wrong thing for that week. A target tuned until nothing ever
+  reads red measures nothing at all.
 
 ### [workouts] BF-56 — swapping an exercise silently changes its role, which changes the prescribed sets and percentages
 
