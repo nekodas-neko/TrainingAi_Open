@@ -29,37 +29,49 @@ function encode(name: PreferenceName, value: unknown): string {
 }
 
 /**
- * Preferences the server knows about but does NOT yet own, so hydration must not touch their keys.
+ * Preferences that are mutually exclusive: when the server has one, the others are stale here.
  *
- * **`backgroundSettings` is here because clearing it would destroy data.** Its device key is a
- * Zustand `persist` envelope owned by `lib/stores/background-settings-store.ts`, and no write site
- * sends it to the server — so the bag is permanently absent for it, and the absent-clears rule below
- * would `removeItem` the user's wallpaper choices on **every launch**. The rule is right; it is only
- * safe for a key whose writes actually reach the server.
- *
- * Connecting that store's write path removes this entry. Until then the key syncs on neither read
- * nor write, which is what it did before — no worse, and not silently destructive.
+ * A brand preset and a custom hue cannot both apply — `theme-color-picker.tsx` reads the hue first
+ * and lets it win — so a device that still holds a hue would override a preset chosen elsewhere.
+ * Hydration does not delete an absent key (see below), so this is what resolves the pair.
  */
-const NOT_SERVER_OWNED = new Set<PreferenceName>(['backgroundSettings'])
+const EXCLUSIVE_GROUPS: readonly (readonly PreferenceName[])[] = [['brandTheme', 'brandHue']]
 
 /**
- * Seed every device key from the server bag.
+ * Seed the device keys from the server bag.
  *
- * **An absent key clears the device copy rather than being skipped.** Absent means "never set" on
- * the server, and leaving a stale local value behind is exactly the "my setting came back" bug this
- * rule exists to prevent — the same call `hydrateGoalSeeds` makes for a null goal. The one exception
- * is `NOT_SERVER_OWNED` above, and it is an exception about *ownership*, not about the rule.
+ * **It never deletes a key the bag does not carry, and that is a correction rather than a
+ * shortcut.** The obvious rule is "absent means never set, so clear the device copy", which is
+ * right for a settled system and wrong in the window that matters: `savePreference` writes locally
+ * and PATCHes in the background, so between the tap and the acknowledgement the bag legitimately
+ * lacks a key the user has just chosen. CI caught exactly that — the meal-label spec picked a
+ * style, reloaded, and hydration wiped it — and **offline it never comes back at all**, because the
+ * PATCH simply never lands.
+ *
+ * The server *could* distinguish "cleared" from "never set" by storing a null, but `mergePreferences`
+ * deletes the key instead, so the GET cannot tell them apart. Changing that is a server change; not
+ * deleting is the correct client behaviour either way.
+ *
+ * What this gives up is a key cleared on another device lingering here. The only clearing the app
+ * does is the exclusive pair above, which `EXCLUSIVE_GROUPS` resolves.
  */
 export function hydrateUserPreferences(prefs: UserPreferences | null | undefined): void {
   if (!prefs || typeof window === 'undefined') return
   for (const [name, { key }] of Object.entries(PREFERENCE_STORAGE)) {
-    if (NOT_SERVER_OWNED.has(name as PreferenceName)) continue
     const value = prefs[name as PreferenceName]
+    if (value === undefined) continue
     try {
-      if (value === undefined) localStorage.removeItem(key)
-      else localStorage.setItem(key, encode(name as PreferenceName, value))
+      localStorage.setItem(key, encode(name as PreferenceName, value))
     } catch {
       // Private mode or quota. The server copy is still authoritative and the next launch retries.
+    }
+  }
+  for (const group of EXCLUSIVE_GROUPS) {
+    const chosen = group.find(n => prefs[n] !== undefined)
+    if (!chosen) continue
+    for (const other of group) {
+      if (other === chosen) continue
+      try { localStorage.removeItem(PREFERENCE_STORAGE[other].key) } catch { /* see above */ }
     }
   }
 }

@@ -39,10 +39,19 @@ describe('hydrateUserPreferences', () => {
     expect(store.get('ta_pref_meal_reminders')).toBe('false')
   })
 
-  it('an absent key CLEARS the device copy — the server owns the value', () => {
-    store.set('ta_score_ring_style', 'stale-from-a-previous-account')
+  it('an absent key is LEFT ALONE — a write in flight has not reached the bag yet', () => {
+    // The regression CI caught: pick a meal-label style, the PATCH is still in flight, the page
+    // reloads, and hydration wiped the choice. Offline it would never come back at all.
+    store.set('ta_meal_label_style', 'deli')
     hydrateUserPreferences({ homeWidgets: [] })
-    expect(store.has('ta_score_ring_style')).toBe(false)
+    expect(store.get('ta_meal_label_style')).toBe('deli')
+  })
+
+  it('a mutually-exclusive partner IS cleared, so a stale hue cannot beat a preset set elsewhere', () => {
+    store.set('ta_brand_hue', '210')
+    hydrateUserPreferences({ brandTheme: 'purple' })
+    expect(store.get('ta_brand_theme')).toBe('purple')
+    expect(store.has('ta_brand_hue')).toBe(false)
   })
 
   it('does nothing at all when the server has no bag', () => {
@@ -53,10 +62,10 @@ describe('hydrateUserPreferences', () => {
     expect(store.get('ta_score_ring_style')).toBe('chosen-here')
   })
 
-  it('never clears a key the server does not own — that would destroy the wallpaper on every launch', () => {
-    // `backgroundSettings` is a Zustand `persist` envelope and no write site sends it to the server,
-    // so the bag is permanently absent for it. Under the absent-clears rule that is a `removeItem`
-    // on every single launch, taking the user's background choices with it.
+  it('leaves the wallpaper envelope alone — nothing writes it, so the bag never carries it', () => {
+    // `backgroundSettings` is a Zustand `persist` envelope no write site sends to the server, so it
+    // is permanently absent. It needed an explicit exclusion under the old absent-clears rule; under
+    // this one it is simply an absent key, and this pins that it stays that way.
     store.set('ta_background_settings', '{"state":{"wallpaper":"dunes"},"version":0}')
     hydrateUserPreferences({ scoreRingStyle: 'arc' })
     expect(store.get('ta_background_settings')).toBe('{"state":{"wallpaper":"dunes"},"version":0}')
@@ -71,8 +80,8 @@ describe('hydrateUserPreferences', () => {
     )
     hydrateUserPreferences(full as never)
     for (const [name, { key }] of Object.entries(PREFERENCE_STORAGE)) {
-      // `backgroundSettings` is deliberately not server-owned yet — see the test above.
-      if (name === 'backgroundSettings') continue
+      // `brandHue` loses to `brandTheme`: a full bag has both, and they are exclusive.
+      if (name === 'brandHue') continue
       expect(store.has(key), `${name} should be seeded`).toBe(true)
     }
   })

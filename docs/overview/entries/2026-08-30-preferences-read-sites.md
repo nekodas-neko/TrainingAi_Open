@@ -20,14 +20,41 @@ beside `hydrateGoalSeeds`, which is the same shape of problem solved the same wa
 **`savePreference(name, value)`** / **`savePreferences(patch)`** write the device copy and PATCH the
 server. `null` clears a key, which is the route's own contract.
 
-**The conflict rule was already settled and is one-directional: the server wins.** `localStorage` is
-a seed written *from* the server, never the reverse. So hydration overwrites without comparing, and
-an **absent** key clears the device copy — absent means "never set" on the server, and leaving a
-stale local value is the "my setting came back" bug this prevents.
+**The conflict rule is one-directional: the server wins.** `localStorage` is a seed written *from*
+the server, never the reverse, so hydration overwrites without comparing. **But it does not clear a
+key the bag lacks** — see below, that took two attempts.
 
 **Seeding rather than reading through** is what keeps first paint synchronous. Every one of these
 surfaces reads its `localStorage` key during render; making them await a fetch would trade a fixed
 bug for a flash of defaults on every launch.
+
+## The rule that was wrong, and how CI found it
+
+The first version cleared a key the bag did not carry — absent means "never set", and a stale local
+value is the "my setting came back" bug. That is right for a **settled** system and wrong in the
+window that matters.
+
+`savePreference` writes locally and PATCHes in the background, so between the tap and the
+acknowledgement the bag legitimately lacks a key the user has just chosen. **`meal-label.spec.ts`
+caught it**: pick a label style, reload, and hydration wiped the choice. It failed and passed on
+retry — the signature of a race, not a broken assertion. **Offline it is worse than a race**: the
+PATCH never lands, so the setting is reverted on the next launch, every time.
+
+I had already caught the extreme version while writing up `backgroundSettings` — a key whose writes
+*never* reach the server, so the clear fires on every launch — and treated it as one key needing an
+exclusion. It was the general rule that was wrong, and **the narrow fix would have left the race in
+place for every other key.** That is the part worth carrying: an exclusion list is what you reach for
+when you have mistaken a rule's failure for a single key's.
+
+Hydration now writes what the bag has and deletes nothing. The server *could* distinguish "cleared"
+from "never set" by storing a null, but `mergePreferences` deletes the key, so the GET cannot tell
+them apart — and changing that is a server change (Lane A). Not deleting is the right client
+behaviour either way.
+
+What that gives up is a key cleared on another device lingering here. The app clears exactly one
+thing — the mutually-exclusive brand preset / custom hue pair — and `EXCLUSIVE_GROUPS` resolves it:
+when the bag carries one member, the others go locally. Without it a stale hue would override a
+preset chosen elsewhere, the same ordering bug `savePreferences` prevents one layer out.
 
 ## Three decisions worth keeping
 
@@ -57,11 +84,10 @@ asserts all three come back in the right shapes: `'30'`, `'arc'`, and the litera
 
 **Proved both ways.** With the hydration replaced by a no-op and nothing else changed, it fails.
 
-Nine unit tests on the sync module cover each encoding, an absent key clearing the device copy, a
-`null` server response *not* clearing it (a failed fetch must not wipe the device), that every key in
-the map is covered so a new preference cannot be seeded under no name, `null` meaning clear, a failed
-PATCH not throwing, the mutually-exclusive pair going out as one request, and — the one that matters
-most — that a key the server does not own is never cleared.
+Ten unit tests cover each encoding, an absent key being **left alone** (the regression above,
+pinned), the exclusive partner being cleared, a `null` server response not touching the device, every
+key in the map being covered so a new preference cannot be seeded under no name, `null` meaning clear
+on a save, a failed PATCH not throwing, and the exclusive pair going out as one request.
 
 Full unit suite **5,575 passed** / 666 files. `pnpm check:rules` — Ran 62 of 62. Typecheck and lint
 clean. `session-select-content.tsx` is **net zero lines** — it is a baselined hotspot.
@@ -70,12 +96,8 @@ clean. `session-select-content.tsx` is **net zero lines** — it is a baselined 
 
 - **A second real device.** The test wipes `localStorage` in one browser, which proves hydration.
   It does not prove two devices converge, and it cannot: the sandbox has one session.
-- **`backgroundSettings` is excluded from hydration, and finding out why was the near-miss of this
-  change.** Its key is a Zustand `persist` envelope owned by the background store, and no write site
-  sends it to the server — so the bag is permanently absent for it, and the absent-clears rule would
-  have called `removeItem` on it **every single launch**, destroying the user's wallpaper choices.
-  The rule is right; it is only safe for a key whose writes actually reach the server. It is in a
-  `NOT_SERVER_OWNED` set with that reason, and a test pins it. Connecting the store's write path
-  removes the entry; until then that key syncs on neither read nor write, exactly as before.
+- **`backgroundSettings`' write path.** It is a Zustand `persist` envelope the background store owns
+  and no write site sends, so the bag never carries it and hydration leaves it alone. It syncs on
+  neither read nor write, exactly as before. Connecting that store's write path is what changes it.
 - **The APK.** Nothing here is native, so it reaches the device through a Railway deploy — but no
   preference was toggled on the S25.
