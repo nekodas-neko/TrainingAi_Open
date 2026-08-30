@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.395.2",
+    date: "2026-08-30",
+    changes: [
+      "Internal: a check on the step-goal screen had been failing for days on a stale test database, and was recorded as simply being too slow to finish. It was not \u2014 the row it looks for could not appear at all, because the sample data stops on the day it was created. The check now supplies what it needs, and the note explaining the failure has been corrected rather than left to mislead the next person.",
+    ],
+  },
+  {
     version: "1.395.1",
     date: "2026-08-30",
     changes: [

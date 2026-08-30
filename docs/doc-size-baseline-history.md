@@ -3427,9 +3427,30 @@ read proves nothing, and `pg_stat_statements.max` silently evicts the least-exec
 5,000 are tracked. Checking `dealloc` is 0 is what separates "nothing slow is happening" from "the
 slow thing was evicted".
 
+
+## 2026-08-30 — `docs/implementation-backlog.md` raised (LB-19's premise replaced by measurement)
+
+17 lines (13116 after merging main four times; it raised the number three times of its own —
+two entries genuinely disagreeing about one number is the case this file conflicts on correctly). The entry said two flaky e2e specs
+were a sandbox **time budget** and prescribed
+`test.setTimeout`. Measuring both showed neither is, and the prescription would have fixed neither —
+so the replacement is longer than the claim it removes, because the two failures turn out to have
+nothing in common and each needs its own mechanism written down.
+
+`goal-invalidation` fails on a locator that never resolves, 60 s into a test with a minute of budget
+left: the seed's newest steps row was five days old and the row it asserts on cannot render without
+one. `meal-label` fails intermittently on a zxing decode returning null, and the guard before that
+read (`inkFraction > 0.01`) cannot distinguish the new style's paint from the previous style's — the
+canvas already has ink. The entry also records why the obvious fix for the second (poll the decode
+until it succeeds) is wrong: every style encodes the same meal, so a stale paint decodes to the same
+token and would pass.
+
+Kept because the class generalises: a spec that depends on the seed having run *recently* is the
+hardcoded-timestamp rule wearing a different hat, and CI's fresh database makes it invisible exactly
+where it would be caught.
 ## 2026-08-30 — `docs/implementation-backlog.md` raised (the first device pass came back)
 
-185 lines: six new entries and three amendments, from the owner working the device queue.
+185 lines (13301 after merging main): six new entries and three amendments, from the owner working the device queue.
 
 Most of it is BF-50/BF-51/BF-52 — surface findings that are cheap to state and expensive to
 rediscover. The two that earn their length are traced rather than reported. **BF-47** is CLAUDE.md's
