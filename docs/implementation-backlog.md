@@ -1095,7 +1095,14 @@ real".
 
 ### [nutrition] BF-48 — "Single foods" searches only what you have logged, so the food database is unreachable from Log Food
 
-- **Lane:** A for the search wiring, B for the row.
+- **Lane:** **B — all of it.** (Corrected 2026-08-30 from *"A for the search wiring, B for the row"*.
+  Lane A took the entry off the queue, looked for its half, and there is not one: the route
+  `app/api/nutrition/food-search` already exists and needs no change; the only fetch of it is
+  `components/nutrition/ingredient-picker.tsx:100`, a component; `ingredient-search.tsx` is
+  presentational and takes `dbResults` as a prop, so the piece to reuse is that component's own
+  state, and extracting it lands in `lib/hooks/` — Lane B by the path rule. The mismatch threshold is
+  already shared, in `packages/shared/src/nutrition/goal-recommendation.ts`. Nothing here reaches
+  `app/api/**`, storage or `packages/shared/**`.)
 - **Added:** 2026-08-30 · owner, device pass N7: *"When I try add a food via the 'single food'
   section; it only searches saved/history food - its not checking the food data base. So its not
   useful."*
