@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.395.5",
+    date: "2026-08-30",
+    changes: [
+      "Deleting a logged food no longer brings it back. The entry vanished, reappeared a moment later, and only went for good once you left the screen \u2014 because the delete was still queued to send, so the copy on the server was still there and the app trusted it. It now knows which deletions are still in flight and stops them being undone.",
+    ],
+  },
+  {
     version: "1.395.4",
     date: "2026-08-30",
     changes: [

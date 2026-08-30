@@ -2833,6 +2833,17 @@ export class SQLiteLocalStore implements LocalStore {
     return rows.map(r => this.mapMutation(r));
   }
 
+  // BF-47. No `next_retry_at` clause and no status filter, unlike getPendingMutations above: a
+  // delete waiting out a backoff, or quarantined after a failure, is still a row the user has
+  // deleted locally — and a read path that forgets it re-renders the row from the server copy.
+  async getQueuedMutationsForDomain(userId: string, domain: string): Promise<PendingMutation[]> {
+    const rows = await querySQL<Record<string, unknown>>(
+      `SELECT * FROM mutations_outbox WHERE user_id = ? AND domain = ? ORDER BY created_at`,
+      [userId, domain],
+    );
+    return rows.map(r => this.mapMutation(r));
+  }
+
   async getFailedMutations(userId: string): Promise<PendingMutation[]> {
     const rows = await querySQL<Record<string, unknown>>(
       `SELECT * FROM mutations_outbox WHERE user_id = ? AND status = 'failed' ORDER BY created_at`,

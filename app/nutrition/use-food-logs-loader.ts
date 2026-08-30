@@ -4,6 +4,7 @@ import { cachedFetch } from '@/lib/sqlite/cache'
 import { NUTRITION_FOOD_LOGS_TTL } from '@trainingai/shared/cache-ttl'
 import { getLocalStore } from '@/lib/local-store'
 import { decideLogsApplication } from './food-log-application'
+import { pendingDeletedIds, withoutPendingDeletes } from '@trainingai/shared/sync/pending-deletes'
 
 /**
  * Load one day's food logs, local-first, and hydrate the local store from the server copy.
@@ -68,6 +69,25 @@ export function useFoodLogsLoader({ userId, logsDateRef, selectedDateRef, setLog
       }
     } catch { /* offline — keep whatever the local render above produced */ }
     if (!server) return;
+
+    // BF-47. The server copy is authoritative about everything EXCEPT a row the user has already
+    // deleted here and whose delete is still in the outbox. `pushMutations` has not run yet, so the
+    // server still holds it — and both uses of `server` below would put it back: `applyDelta`
+    // re-inserts it locally when this device never held the row (a log created on web or another
+    // device), and the `catch` fallback renders it outright. The owner sees the row vanish, come
+    // back, and then go for good on the next screen swap, which is when the push has landed.
+    //
+    // This is the screen-level twin of the `sync_status = 'synced'` gate `applyDelta` already
+    // applies to pulls. Inverting the authority instead is the fix NOT to make: that line's comment
+    // records the bug it exists to prevent — a local read that threw once left the page blank, so
+    // logged food "vanished on reload" even though the server had it. Both failures are real.
+    //
+    // Best-effort: an outbox read that throws leaves the previous behaviour rather than blanking
+    // the list, which is the same trade every other step in this function makes.
+    try {
+      const deleted = pendingDeletedIds(await store.getQueuedMutationsForDomain(userId!, 'food_logs'), 'food_logs');
+      server = withoutPendingDeletes(server, deleted, l => l.id);
+    } catch { /* outbox unreadable — fall through with the unfiltered server copy */ }
 
     try {
       const nowIso = new Date().toISOString();
