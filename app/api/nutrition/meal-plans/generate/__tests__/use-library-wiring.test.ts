@@ -28,13 +28,12 @@ vi.mock('@/lib/ai/instrument', () => ({
 
 /** What the model returns, and how many times it was asked. */
 const model = { meals: [] as unknown[], calls: 0, prompts: [] as string[] }
-vi.mock('ai', () => ({
-  generateObject: vi.fn(async (opts: { prompt: string }) => {
-    model.calls++
-    model.prompts.push(opts.prompt)
-    return { object: { planName: 'Test plan', meals: model.meals, restDayAdjustment: '' } }
-  }),
-}))
+const replyNormally = async (opts: { prompt: string }) => {
+  model.calls++
+  model.prompts.push(opts.prompt)
+  return { object: { planName: 'Test plan', meals: model.meals, restDayAdjustment: '' } }
+}
+vi.mock('ai', () => ({ generateObject: vi.fn(replyNormally) }))
 
 // Portioning is not what this file is about, and its own top-up path makes a second model call.
 // Identity keeps every assertion below about WIRING — which meal landed in which slot, and what the
@@ -103,11 +102,17 @@ const aiMeals = (n: number) => Array.from({ length: n }, (_, i) => ({
   ingredients: [{ name: 'Chicken', weightG: 200, caloriesPer100g: 165, proteinPer100g: 31, carbsPer100g: 0, fatPer100g: 3.6 }],
 }))
 
-beforeEach(() => {
+beforeEach(async () => {
   vi.clearAllMocks()
   model.calls = 0; model.prompts = []; model.meals = aiMeals(6)
   repo.listSavedMeals.mockResolvedValue([])
   repo.listMealTypes.mockResolvedValue([])
+  // `clearAllMocks` clears CALLS, not implementations, and the fix means a rejection queued with
+  // `mockRejectedValueOnce` may never be consumed — the route no longer calls the model at all on a
+  // full plan. So the implementation is re-set here rather than queued per-test, which is the
+  // difference between one failing case and a rejection leaking into whichever test runs next.
+  const { generateObject } = await import('ai')
+  vi.mocked(generateObject).mockImplementation(replyNormally as never)
 })
 
 describe('useLibrary off — the common path pays nothing for a feature it is not using', () => {
@@ -234,20 +239,70 @@ describe('useLibrary on', () => {
   })
 })
 
-// LA-38, pinned rather than fixed here: the call is unconditional because the plan's NAME comes out
-// of it. That is a real cost on a plan with nothing to generate, and it is the assumption the entry
-// that asked for this file made in the other direction — so it is recorded as behaviour rather than
-// left for the next reader to re-derive.
-describe('a plan the library filled entirely still calls the model, for its name', () => {
-  it('asks for zero meals rather than skipping the call', async () => {
-    repo.listSavedMeals.mockResolvedValue([
-      libraryMeal(MEAL_A, 'One'), libraryMeal(MEAL_B, 'Two'), libraryMeal(MEAL_C, 'Three'),
-    ])
+// LA-38 — this file first PINNED the unconditional call, then the fix removed it. The case is kept
+// in the same place, inverted, because the reason it was written is the reason it must not come back.
+describe('a plan with nothing to generate does not call the model at all (LA-38)', () => {
+  const fillAll = () => repo.listSavedMeals.mockResolvedValue([
+    libraryMeal(MEAL_A, 'One'), libraryMeal(MEAL_B, 'Two'), libraryMeal(MEAL_C, 'Three'),
+  ])
+
+  it('skips the call and names the plan after its own meals', async () => {
+    fillAll()
     const plan = await generate({ mealCount: 3, useLibrary: true })
 
     expect(plan.libraryMatchCount).toBe(3)
+    expect(model.calls).toBe(0)
+    expect(plan.planName).toBe('One, Two and Three')
+  })
+
+  // The half that is not about tokens, and the reason this was worth fixing rather than logging:
+  // the catch around the model call cannot tell that the call was unnecessary, so a plan needing
+  // nothing from the model used to fail outright whenever the model was down.
+  it('still returns a plan when the model is unavailable', async () => {
+    fillAll()
+    const { generateObject } = await import('ai')
+    vi.mocked(generateObject).mockRejectedValue(new Error('model down'))
+
+    const res = await POST(new Request('http://x/api/nutrition/meal-plans/generate', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ mealCount: 3, useLibrary: true }),
+    }))
+    expect(res.status).toBe(200)
+    expect((await res.json()).variants[0].meals.map((m: Meal) => m.name)).toEqual(['One', 'Two', 'Three'])
+  })
+
+  // The inverse, so the skip cannot be mistaken for "the model is never called".
+  it('still calls the model when even one slot is left to fill', async () => {
+    repo.listSavedMeals.mockResolvedValue([libraryMeal(MEAL_A, 'One'), libraryMeal(MEAL_B, 'Two')])
+    const plan = await generate({ mealCount: 3, useLibrary: true })
+
+    expect(plan.libraryMatchCount).toBe(2)
     expect(model.calls).toBe(1)
-    expect(model.prompts[0]).toContain('Meals: exactly 0.')
-    expect(plan.planName).toBe('Test plan')
+    expect(plan.planName).toBe('Test plan')       // the model's, not the derived one
+    expect(model.prompts[0]).toContain('Meals: exactly 1.')
+  })
+
+  // Pinning is the other way to reach a full plan, and it does not need the library at all.
+  it('skips the call for a fully PINNED plan too', async () => {
+    repo.listSavedMeals.mockResolvedValue([libraryMeal(MEAL_A, 'Pinned one'), libraryMeal(MEAL_B, 'Pinned two')])
+    const plan = await generate({ mealCount: 2, keepSavedMealIds: [MEAL_A, MEAL_B] })
+
+    expect(model.calls).toBe(0)
+    expect(plan.planName).toBe('Pinned one and Pinned two')
+  })
+
+  // The other field the model used to supply. Nothing renders it today, but it is in the response
+  // contract, and answering "" to a caller that asked for a split would be a silent break.
+  it('answers the rest-day field from the shift the code applies', async () => {
+    fillAll()
+    const plan = await generate({ mealCount: 3, useLibrary: true, splitTrainingRest: true }) as PlanResponse & { restDayAdjustment: string }
+    // 200 g of carbohydrate a day, reduced by REST_DAY_CARB_REDUCTION (15 %).
+    expect(plan.restDayAdjustment).toBe('About 30 g fewer carbohydrates on a rest day.')
+  })
+
+  it('leaves it empty when no split was asked for', async () => {
+    fillAll()
+    const plan = await generate({ mealCount: 3, useLibrary: true }) as PlanResponse & { restDayAdjustment: string }
+    expect(plan.restDayAdjustment).toBe('')
   })
 })
