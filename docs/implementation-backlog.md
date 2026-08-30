@@ -1148,27 +1148,26 @@ opened on, unchanged.
 - **Added:** 2026-08-27 · owner, with screenshots of the live tab (v1.383.x).
 - **Spec:** BF-28's parity rules bind — where an artboard covers this, the artboard wins.
 
-**①②③④ shipped (v1.397.0)** and are struck from this entry rather than left looking open:
-① `My Meals` spans both columns (`col-span-2`, contingent on the slot beside it being empty);
-② a collapsed meal keeps its calories **and** macros, on a summary line **below** the header, which
-is the shape the owner corrected to on the device in N6 — one `MealTotals` component serves it and
-the expanded footer, so the two cannot report different numbers for one meal;
-③ the bottom-sheet gutters are 16 px, matching the artboards — **and not where this entry said to
-put it.** It called for `SheetContent`'s bottom variant, which was measured and rejected: **26 of 48**
-bottom sheets set their own `px-*`/`p-0`, and of the remainder most already pad their inner content
-at 16, so a shared outer gutter would have doubled theirs. The nutrition sheets were at `px-1`
-(4 px); they are the ones that moved;
-④ both macro rings start at 12 o'clock — `from -90deg` is the SVG/canvas idiom for reaching the top
-and CSS `conic-gradient` already starts there, so all three call sites simply dropped the clause.
+**①②③④ shipped (v1.397.0)**, struck here rather than left looking open — the reasoning is in the
+[journal](overview/entries/2026-08-30-nutrition-ui-uplift.md). The one worth carrying: ③'s gutter fix
+is **not** where this entry said to put it. It called for `SheetContent`'s bottom variant; measured,
+**26 of 48** bottom sheets set their own `px-*`/`p-0` and most of the rest already pad inner content
+at 16, so a shared outer gutter would have doubled theirs.
 
 - **Keep — ⑤ swipe-to-delete on a logged food row.** Owner: *"for logging food; we could possibly add
   the option to swipe and delete it (with confirmation) like we do in the other screen."* The gesture
   exists on the meal list (BF-29, device-verified 2026-08-30) — reuse that tray, keep its
   confirmation, and **do not remove the bin in the edit sheet**: a swipe is a shortcut for people who
   know it is there, not a replacement for a visible affordance.
-- **Verification for ⑤:** on the S25, a food row swipes to a tray whose Delete confirms. ①②④ are
-  shipped but **not device-verified** — the sandbox renders at desktop width and cannot judge a
-  gutter or a ring.
+- **⚠ ⑤ was gated on BF-47 and the gate moved rather than lifted** *(bullet restored 2026-08-30 —
+  it was lost when this entry was rewritten to strike ①②④, which is how a blocker goes invisible
+  while its subject stays queued)*. The reason: a swipe is a faster route to exactly the delete that
+  was reappearing, and reaching a failing delete faster is worse than not adding the gesture.
+  BF-47's fix shipped, but it is **reasoned rather than reproduced** — `getLocalStore` is null in
+  `pnpm dev` and Playwright — so confirm it on the device in the same pass as ⑤.
+- **Verification for ⑤:** on the S25, a food row swipes to a tray whose Delete confirms **and the row
+  stays gone across a screen swap and a force-close**. ①②④ are shipped but **not device-verified** —
+  the sandbox renders at desktop width and cannot judge a gutter or a ring.
 
 ### [nutrition] BF-46 — the meal builder buries its photo picker below the fold, and the quantity sheet spends its space on the wrong things
 
