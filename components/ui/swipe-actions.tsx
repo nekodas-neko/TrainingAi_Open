@@ -20,6 +20,13 @@ interface Props {
   itemLabel: string
   children: React.ReactNode
   className?: string
+  /**
+   * The row's own surface, which must be OPAQUE — the tray sits behind it, and a translucent row
+   * shows the Delete button through its own text. `bg-card` suits a list whose container paints
+   * nothing; a row inside an already-tinted card passes that card's colour instead, or it reads as
+   * a darker band between the header and the totals.
+   */
+  surfaceClassName?: string
 }
 
 // Only one row rests open at a time — a list holding three half-open rows reads as a rendering
@@ -40,7 +47,7 @@ const openRows = new Set<() => void>()
  * action it offers must therefore also be reachable by tapping the row itself. A row whose only
  * route to delete is a horizontal drag is not shippable on a touch-only product.
  */
-export function SwipeActions({ actions, itemLabel, children, className }: Props) {
+export function SwipeActions({ actions, itemLabel, children, className, surfaceClassName = 'bg-card' }: Props) {
   const [offset, setOffset] = useState(0)
   const [dragging, setDragging] = useState(false)
   const openRef = useRef(false)
@@ -78,7 +85,11 @@ export function SwipeActions({ actions, itemLabel, children, className }: Props)
   const isOpen = offset <= -width
 
   return (
-    <div className={cn('relative overflow-hidden', className)}>
+    // `data-swipe-actions` marks the row as owning horizontal gestures that start on it, the way
+    // `data-swipe-carousel` already marks a carousel. A screen with its own horizontal drag — the
+    // nutrition tab changes the DAY on one — otherwise runs both from the same touch, and a thumb
+    // opening a tray also moves the list out from under itself.
+    <div data-swipe-actions className={cn('relative overflow-hidden', className)}>
       <div className="absolute inset-y-0 right-0 flex" aria-hidden={!isOpen}>
         {actions.map(a => (
           <button
@@ -105,7 +116,7 @@ export function SwipeActions({ actions, itemLabel, children, className }: Props)
           transition: dragging || reduced ? 'none' : 'transform 0.22s cubic-bezier(0.25, 0.46, 0.45, 0.94)',
           touchAction: 'pan-y',
         }}
-        className="relative bg-card"
+        className={cn('relative', surfaceClassName)}
       >
         {children}
       </div>
