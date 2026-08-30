@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useState, useCallback, useMemo, useRef } from "react";
+import { savePreference } from '@/lib/user/preferences-sync'
 import { useSearchParams } from "next/navigation";
 import { useTabVisibility } from "@/components/shell/tab-visibility";
 import dynamic from "next/dynamic";
@@ -190,7 +191,7 @@ export default function NutritionContent({ userId }: { userId?: string }) {
 
   const toggleMealReminders = (val: boolean) => {
     setMealRemindersEnabled(val);
-    localStorage.setItem("ta_pref_meal_reminders", String(val));
+    savePreference('mealReminders', val);
     if (val) {
       reconcileMealReminders(mealTypes, logs);
     } else {

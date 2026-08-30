@@ -3866,6 +3866,21 @@ it happened here to a session that had read the warning about it hours earlier. 
 backlog's protocol header in the same PR, which is the durable fix; this line is what makes an
 orientation read mention it at all.
 
-**Re-derived on each rebase as PRs landed under it; final 8420 → 8422.** The branch was cut before Q-154 landed
+**Re-derived on each rebase as PRs landed under it; final 8422 → 8424.** The branch was cut before Q-154 landed
 and two more PRs merged under it while CI ran; every paragraph is kept, so the number is set from the
 merged file each time rather than from either side of a conflict.
+---
+
+## 2026-08-30 — `projectOverview.md` 8422 → 8424 → 8405 → **8413** (Q-392, settings follow the account)
+
+One Current Status paragraph plus its blank line, for the owner's own report finally being answered.
+The half that earns the index is the rule that was wrong: hydration cleared any key the server bag
+did not carry, which is right for a settled system and wrong in the window between a tap and its
+PATCH landing — and offline it reverts every change on the next launch. CI caught it. That is the
+kind of thing an orientation read should surface before someone adds the next preference.
+
+(The number moved four times while this sat in CI; set from the merged file each time. The third
+move was DOWN — a compaction on `main` had left 20 lines of slack under the baseline, and a
+ratchet is only worth having if it sits on the file. The fourth is BF-45 ⑤'s own paragraph
+landing on `main` under the old slack, which is what tightening converts from invisible into a
+number someone has to write down. That is the trade, and it is the right one.)

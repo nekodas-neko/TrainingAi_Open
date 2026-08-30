@@ -1074,6 +1074,58 @@ deliberate choice, on a session where the absence of a Primary is the design.
   outgoing one's role, the prescribed sets and percentages are unchanged, and the session still has
   no Primary afterwards.
 
+### [platform] LB-27 — one extra request during launch strands several for over a minute, and nothing explains why
+
+- **Lane:** A
+- **Added:** 2026-08-30 · Lane B, measured while fixing Q-392's own version of this.
+- **Reference:** the symptom is written up in
+  [`docs/overview/entries/2026-08-30-preferences-read-sites.md`](overview/entries/2026-08-30-preferences-read-sites.md);
+  Q-392's mirror-effect PATCH is already fixed, so this entry is the **unexplained** half only.
+
+**The measurement.** Health's launch fires ~25 API requests in the first seven seconds. Adding one
+more — a single `PATCH /api/user/preferences` from a card's mount effect — left that PATCH **and a
+`GET` behind it pending past sixty seconds**, with nothing else in flight and no further requests
+after twenty seconds. Instrumented on a cold dev server with Playwright's `requestfinished`, so
+these are genuinely unresolved connections, not slow ones. The same PATCH fired *after* the burst
+settles answers in **340 ms**, and a burst of five answers in **641 ms**. Removing that one request
+took the page from never reaching `networkidle` to reaching it in ~19 s.
+
+**Why it matters beyond a test.** Nine e2e specs failed on `waitUntil: 'networkidle'` and none of
+them mention preferences, so the next person to add a request to a launch path gets a failure that
+names someone else's screen. And if a request really can strand for a minute on the device, that is
+a launch-time hang, not a test artefact.
+
+**Where to look, in order.** `updateUserPreferences` (`lib/data/postgres/adapter.ts`) is the only
+route in that burst that opens a **transaction with `SELECT … FOR UPDATE`** on the `users` row, and
+it holds a pool client for its duration; the pool is `max: 10` (`lib/data/postgres/client.ts`) with
+`pg`'s default `connectionTimeoutMillis: 0`, which waits **forever** for a client rather than
+erroring. A `statement_timeout` cannot fire on a query that never starts. That is a hypothesis, not
+a finding — it does not by itself explain a plain `GET` hanging beside it.
+
+- **Not reproduced in production**, and it may be dev-server-specific (route compilation under
+  concurrency). Establish that first: it changes whether this is a bug or a harness note.
+- **Keep:** whatever the cause, `connectionTimeoutMillis: 0` on a pool of 10 is worth a decision of
+  its own — a bounded wait turns a hang into an error state a card can show.
+
+### [platform] LB-28 — CI should refuse `savePreference` inside a `useEffect`
+
+- **Lane:** B
+- **Added:** 2026-08-30 · Lane B, from the defect LB-27 describes.
+- **Needs:** LB-27
+
+The footgun is invisible at the call site: `useEffect(() => localStorage.setItem(K, v), [v])` is a
+free write, and the same line calling `savePreference` is a **network PATCH on every mount**.
+`usePersistedPreference` exists for the mirror case, but nothing stops the next conversion reaching
+for `savePreference` again — and the failure it produces names unrelated specs.
+
+**One check, narrow on purpose:** flag `savePreference(`/`savePreferences(` that appears inside a
+`useEffect(` block in `app/`, `components/` or `lib/`. A tap handler nested inside an effect would
+be a false positive; there are none today, and the escape hatch is the same as every other rule
+here — an entry in the script with a written reason.
+
+**Do not widen it to "no fetch in an effect"**, which is most of this codebase. The rule is about
+one helper whose cost is not visible in its name.
+
 ### [platform] BF-55 — 84 MB of index against 63 MB of table, and the database is growing ~7× its expected trend
 
 - **Lane:** A
@@ -5995,87 +6047,6 @@ this fits without an extraction.
   two whose restore is hardest to express. The `stale` 409 (a later change still in effect) renders
   through the same path and was not driven separately. Plus the tap-target/wrap check at S25 width.
   `Gate: device`.
-### [platform][app-shell] Q-392 — the preference API exists; the read sites still read `localStorage`
-
-- **⚑ ABSORBS Q-393 (removed 2026-08-23). The `mealLabelStyle` row below IS that entry.** Q-393
-  was filed as *"an ingredient breakdown on the printed label, which does not fit on a round one"*
-  and everything about the label itself has since shipped: **Q-397** (v1.324.0) refuted the premise
-  by fitting the full list on a **round** label as an inline wrapping run rather than a stacked one,
-  and **Q-399** retuned the geometry to 0.401 mm per module with three wrapped lines asserted. What
-  was left of Q-393 was one sentence — the chosen style is picked at print time and forgotten —
-  which is exactly this entry's `mealLabelStyle` → `ta_meal_label_style` row. Two entries for one
-  row is what this fold removes.
-- **⛔ OWNER DECISION 2026-08-23 — Option 2, the round trimmed label, is dead. Do not re-cost it.**
-  Q-393 carried two bullets that contradicted each other for five days, one calling Option 2 an open
-  owner decision and a later one calling it moot, and that contradiction is why the entry sat parked
-  behind `Gate: owner` at the position the owner had personally moved it to. The number that settles
-  it: at 44 units its true module pitch is **0.353 mm**, below every shipped style including the
-  0.369 the old default printed. The square die is the answer to wanting the stacked list on paper.
-- **The two physical checks Q-393 owed are already tracked** — print one and scan it — by the
-  `projectOverview.md` Known-Issues row for Q-400 (*"NOT verified on device · needs: hardware + a
-  printer"*). They were never this entry's and are not lost.
-
-- **Branch:** `feat/preferences-read-sites`
-- **Lane:** B
-- **Added:** 2026-08-18 · owner: *"I would like the app/settings to remember the settings we choose
-  — when i do a new install or open on computer - it loses all the saved preferences. We need to
-  make it persist across installs/etc."* **Re-scoped 2026-08-23** to the half that is left.
-
-**The engine half shipped** (Lane A, `feat/server-backed-user-preferences`): `users.preferences`
-is a JSONB bag (migration 206), `GET`/`PATCH /api/user/preferences` read and merge it, proven
-cross-session against the local DB. Nothing user-visible changed — **no read site calls it yet**.
-
-- **What is left is entirely in Lane B's files.** Every surface in the table below still reads its
-  `localStorage` key directly and writes only there. Each needs: read the server bag once (as
-  `hydrateGoalSeeds` does for goals), seed the same `localStorage` keys from it so first paint
-  stays synchronous, and PATCH on change.
-- **The correspondence is already written down — do not re-derive it.**
-  `PREFERENCE_STORAGE` in `packages/shared/src/user/preferences.ts` maps every preference name to
-  its `localStorage` key **and its encoding**, which is the part that bites: `ta_ss_widgets` is
-  JSON, `ta_weight_lookback` is a bare number, and the reminder toggles are `String(boolean)`
-  compared against the literal `'false'`. A test asserts the map covers every schema key.
-
-| what | preference key | storage key |
-|---|---|---|
-| Home widgets / cards | `homeWidgets`, `homeCards` | `ta_ss_widgets`, `ta_ss_cards` |
-| Home section order / hidden | `homeSectionOrder`, `homeHiddenSections` | `ta_home_section_order`, `ta_home_hidden_sections` |
-| Pill & card colours | `pillColors`, `cardColors` | `ta_pill_colors`, `ta_card_colors` |
-| Score-ring style | `scoreRingStyle` | `ta_score_ring_style` |
-| Weight lookback | `weightLookback` | `ta_weight_lookback` |
-| Goals progress view | `goalsProgressView` | `ta_goals_progress_view` |
-| Brand theme / hue | `brandTheme`, `brandHue` | `ta_brand_theme`, `ta_brand_hue` |
-| Background / wallpaper | `backgroundSettings` | `ta_background_settings` (a Zustand `persist` bag) |
-| Meal label style | `mealLabelStyle` | `ta_meal_label_style` |
-| Rest duration | `restDurationSec` | `ta_rest_duration` |
-| Food region | `foodRegion` | `ta_food_region` |
-| Meal / health / day-review / calendar toggles | `mealReminders`, `healthAlerts`, `dayReviewReminders`, `calendarSync` | `ta_pref_*` |
-
-- **⚠ `backgroundSettings` is the one that is not a plain key.** It is a Zustand `persist` store
-  (`lib/stores/background-settings-store.ts`), so the value under that key is the `{ state,
-  version }` envelope, not the settings. Sync the store's `state`, not the raw string, or a
-  version bump on one device writes an unreadable bag to the other. The schema types it as an
-  opaque record on purpose — the shape belongs to that store, and a second definition here would
-  drift.
-- **⚠ `users.food_region` is a dead column** (`schema.ts`, `NOT NULL DEFAULT 'AU'`, never read or
-  written); the live value is `preferences.foodRegion`. Leave it — dropping it is a data-losing
-  migration for no gain — and do not wire a read site to it by mistake.
-- **What deliberately does NOT sync is decided and listed**, in `DEVICE_LOCAL_PREFERENCES` with a
-  reason per key: push enablement, the two Android chip toggles, the ring and scale/HR BLE pairings,
-  and light/dark. If a surface needs one of them to sync after all, move it into the schema rather
-  than writing a second path.
-- **Conflict rule, already settled:** server wins, `localStorage` is a seed written *from* the
-  server and never the reverse — the same rule Q-241 set for goals.
-- **What would count as done:** sign in on a fresh install or a different browser and the chosen
-  ring style, widgets, colours, weight lookback and food region are already applied — no
-  re-configuration; changing one on either device and reopening the other shows the new value.
-  Browser-reproducible end to end (two profiles, or one and a private window); no device needed.
-- **⚠ Related, and more urgent than it looks now that the owner has said they reinstall:** **Q-537
-  — the ring key has one copy and no way to back it up.** `CLAUDE.md` is explicit that an uninstall
-  destroys the Oura ring key irrecoverably (it lives only in Android SharedPreferences) and that
-  re-onboarding the official app to recover risks a firmware update that breaks the BLE protocol.
-  This report establishes that reinstalls are part of the owner's normal routine, which changes
-  Q-537 from a latent risk to a live one. **Not this entry's work — but worth re-prioritising.**
-
 ### [workouts][platform] Q-403 — the Coach calls an already-applied swap a "proposal", and says it after the fact
 
 - **Branch:** `fix/coach-applied-change-copy`
