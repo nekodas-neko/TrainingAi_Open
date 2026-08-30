@@ -1111,6 +1111,27 @@ back resolving to the tab that owns the destination instead of unwinding to the 
 - **Note:** N2 passed on this same pass — the nested-sheet back stack is correct — so this is
   specific to cross-tab navigation, not the general back handling BF-27 fixed.
 
+- **Gate: device**
+- **⚠ It does not reproduce in the web harness, measured 2026-08-30 (Lane B).** Driven end to end in
+  Playwright with the seeded workout row: Home → tap the timeline row →
+  `http://localhost:3100/health/day?date=2026-08-30` → back → `http://localhost:3100/` with
+  `h1 = "Good afternoon, Test User."`. Home, not Health. **So the fix is not in the router**, and the
+  next attempt should not start there.
+- **Three things ruled out by reading, so they are not re-checked:**
+  - Both back affordances are the same call. The day screen's arrow is `router.back()`
+    (`day-detail-content.tsx`), and the Android handler is `window.history.back()`
+    (`mobile-auth-handler.tsx:50`) — Playwright's `goBack()` exercises the same history step.
+  - `useTransitionRouter.push` really pushes (`lib/view-transition.ts`). Its tab-route branch calls
+    `router.push`; only `replace()` calls `router.replace`. A push-that-replaces would have explained
+    the report exactly, which is why it was checked rather than assumed.
+  - A tab flip adds **no** history entry — `show()` uses `replaceState`, measured as `history.length`
+    staying at 2 across a Home → Health flip. So a rewritten entry is a real hazard in this shell,
+    but it is not reached by the sequence in the report.
+- **What the next attempt needs is a device repro with the surrounding steps**, since the harness
+  disagrees with the phone: what screen preceded Home, and whether "back" was the gesture, the
+  three-button key, or the on-screen arrow. The difference has to be found, not guessed — the code
+  it would touch is app-wide navigation.
+
 ### [nutrition] BF-50 — the Log Food screen after its first device pass: four things, one screen
 
 - **Lane:** B
