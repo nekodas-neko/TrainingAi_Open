@@ -60,6 +60,24 @@ unchanged at 427 (the render uses tokens).
 slash→dash conversion fails **all 4**, which is what proves the J-8/J-9 hazard was live rather than
 theoretical.
 
+**Exercised on `pnpm dev`, not only through vitest** — the DB test calls `GET` directly, which is not
+the same thing as the route serving a real signed-in request. Both branches, against a seeded window:
+
+| window | `bodyTemp` |
+|---|---|
+| centred (mean 0.04) | `{"meanC": 36, "devC": 0.04}` |
+| uncentred, the production shape (every night +0.5) | `{"meanC": 36, "devC": null}` |
+
+`/health/day` answers 200. The stat is not in the SSR shell because that section hydrates
+client-side, which is why the assertion above is on the payload.
+
+**The dev run caught a mistake worth recording — my own, in the fixture.** The first seed dated its
+rows from Postgres `current_date`, which is UTC. At 21:53 UTC the Brisbane day is already tomorrow,
+so the newest seeded row was 08-30 while the route asked for 08-31 and `bodyTemp` came back `null` —
+looking exactly like the lookup bug I had just fixed. The vitest fixture had it right (`todayInTz`);
+the ad-hoc SQL did not. It is the same timezone trap the repo has a rule for, arriving through a
+hand-written query rather than through code.
+
 **Not exercised: the S25.** The render is a handful of lines in an existing section and was not seen
 on the phone. Nothing about it is device-specific — no safe-area, no gesture, no local store — so it
 is a look, not a gate.
