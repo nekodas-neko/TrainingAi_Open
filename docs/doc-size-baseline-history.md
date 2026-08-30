@@ -3922,19 +3922,7 @@ happening.
 
 (Re-derived on the rebase: this branch was cut at 8425 and BF-46 ② ③'s paragraph landed under it.)
 
-## 2026-08-30 — `projectOverview.md` 8449 → **8461** (BF-39, the diary's nested meal rows)
-
-Eleven lines for the owner's most-repeated nutrition ask, and the half that earns the index is the
-pair of rules the implementation turns on: **grouped on `meal_group_id`, never `saved_meal_id`** —
-two servings of one meal on one day share the meal and not the group — and **a group needs a
-resolvable meal**, so pre-BF-39 rows and a deleted meal's rows stay loose because nothing back-fills.
-
-Both are the kind of thing a later session would "simplify" from the code alone. The rest is in the
-journal entry.
-
-(Re-derived on the rebase: this branch was cut at 8425 and BF-46 ② ③'s paragraph landed under it.)
-
-## 2026-08-30 — `docs/agents/state/implementation-lane-b.md` 109 → **120** (the seventeenth Lane B run)
+## 2026-08-30 — `docs/agents/state/implementation-lane-b.md` 109 → **126** (the seventeenth Lane B run)
 
 Eleven lines after a run that merged six PRs and left two open. Two sections earn them and one was
 cut to pay for them.
@@ -3949,6 +3937,9 @@ BF-46 ①a.
 **Paying for it:** the "What is genuinely left for B" heading is gone, folded into `Now` — the queue
 survey it held is one `next-item.js` call away and does not need a section. Several gotchas were
 merged into single bullets rather than dropped; nothing in the previous baton was deleted outright.
+
+Six of the seventeen are a late addition: **BF-39 was built and held**, and a baton that said it
+shipped would be the most expensive kind of wrong.
 
 (Re-derived twice on rebases: this branch was cut at 8425, and BF-46 ② ③'s and ①a's paragraphs
 landed under it in turn.)

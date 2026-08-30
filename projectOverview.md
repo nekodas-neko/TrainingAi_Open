@@ -24,22 +24,10 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.403.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Version:** v1.402.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Version:** v1.401.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Version:** v1.401.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-08-30.
-
-**A logged meal is one diary row that opens to its ingredients (BF-39).** Three owner reports, the
-clearest a screenshot of one AI-logged breakfast as **eight** rows. The engine half shipped
-separately; this is the read. **Grouped on `meal_group_id`, never on `saved_meal_id`** — two
-servings of the same meal on one day share the meal and not the group, and merging them would report
-one helping where two were eaten. **A group needs a resolvable meal**, so pre-BF-39 rows and a
-deleted meal's rows stay loose: nothing back-fills, and heading them "Meal" would invent a name the
-app does not have. The name and photo come from `useSavedMealSummaries`, local-first because
-`saved_meals` is a local-first domain. **Not device-verified** — and the local-first branch never
-ran, since the sandbox has no local store
-([journal](docs/overview/entries/2026-08-30-diary-nested-meal-rows.md)).
 
 **One photo picker per screen, and the held rebuild's failure was the spec (BF-46 ①a).** Two things
 said *Add a photo* and only one was a picker — the meal's own screen called `onEdit`. Both are real

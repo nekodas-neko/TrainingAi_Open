@@ -7,12 +7,15 @@
 
 ## Now
 Merged: **#628** (LB-26), **#633**, **#640** (BF-45 ⑤), **#631** (Q-392), **#641** (BF-46 ①b),
-**#642** (BF-46 ② ③). Open, queued to merge on green: **#643** (BF-46 ①a), **#644** (BF-39).
-Filed: **LB-27**, **LB-28**, **LB-29**.
+**#642** (BF-46 ② ③), **#643** (BF-46 ①a). Filed: **LB-27**, **LB-28**, **LB-29**.
 
-**The whole `nutrition-ui-uplift` batch is shipped** — BF-24, BF-45, BF-46, BF-51 ①②④, BF-39 — **and
-every one owes the same single thing: the on-device pass.** That is this lane's binding constraint,
-not a queue of unwritten code.
+**BF-39 was built and HELD**: its render half works and its own three tests pass, and it broke the
+meal library's swipe tray deterministically. **#644 carries the docs only**, and the four-step
+measurement isolating it to the `saved-meals` invalidation subscription is on the entry.
+
+**The `nutrition-ui-uplift` batch is shipped apart from BF-39** — BF-24, BF-45, BF-46, BF-51 ①②④ —
+**and every one owes the same single thing: the on-device pass.** That is this lane's binding
+constraint, not a queue of unwritten code.
 
 **Three things are blocked on the owner, each with a written recommendation. Do not decide them
 yourself and do not build past them:**
@@ -61,7 +64,10 @@ target state (`Update Meal`, `Log this meal`).
   `dataUrlToBlob` or `CameraResultType.Base64`; `no-data-url-fetch.test.ts` fails on the next one.
 - **A `SwipeActions` row owns horizontal gestures starting on it** (`[data-swipe-actions]`). The
   nutrition container's own drag steps the DAY and is **invisible on today** — test on a past day.
-- **The diary groups on `meal_group_id`, never `saved_meal_id`.**
+- **BF-39's grouping rule is settled and proved by mutation even though the feature is held** —
+  `meal_group_id`, never `saved_meal_id`; a group needs a resolvable meal; one row is not nested.
+  **And a subscriber re-rendering a sibling subtree can drop an in-flight `useDrag`**, which is what
+  held it and is NOT understood: establish re-render vs remount before touching `SwipeActions`.
 - **Back-dismissal's logic is [`sheet-back-stack.ts`](../../../lib/hooks/sheet-back-stack.ts)**, the
   hook only React wiring: **depth** and a **module-level self-pop counter**, both load-bearing.
   Never call `useSheetBackDismiss` at a call site; its three-deep case is covered ONLY by unit tests.

@@ -12,7 +12,6 @@ import { DayToolsSection } from "@/components/nutrition/day-tools-section";
 import { MIN_LOGGED_DAYS } from "@trainingai/shared/nutrition/adaptive-tdee";
 import { budgetProvenance } from "@trainingai/shared/nutrition/calorie-balance";
 import { MealCard } from "@/components/nutrition/meal-card";
-import { useSavedMealSummaries } from "@/lib/hooks/use-saved-meal-summaries";
 import { FoodLoggerSheet } from "@/components/nutrition/food-logger-sheet";
 import { QuickEditLogSheet } from "@/components/nutrition/quick-edit-log-sheet";
 const MealTypeManager = dynamic(
@@ -393,9 +392,6 @@ export default function NutritionContent({ userId }: { userId?: string }) {
   }, [logs]);
   const openLogger = useCallback((mealTypeId: string) => { setLoggerMealTypeId(mealTypeId); setLoggerOpen(true); }, []);
   const requestDeleteLog = useCallback((logId: string) => setConfirmDeleteLogId(logId), []);
-  // BF-39: the diary heads a logged meal's rows with the meal's own name and photo. Local-first,
-  // because `saved_meals` is a local-first domain — see the hook.
-  const savedMeals = useSavedMealSummaries(userId);
   // By id: the diary row is the shared `FoodRow` now and passes scalars, so the lookup happens
   // here, where the logs live (Q-406).
   const openQuickEdit = useCallback((logId: string) => {
@@ -666,7 +662,6 @@ export default function NutritionContent({ userId }: { userId?: string }) {
                     onAdd={openLogger}
                     onQuickEdit={openQuickEdit}
                     onDeleteLog={requestDeleteLog}
-                    savedMeals={savedMeals}
                   />
                 ))}
               </div>

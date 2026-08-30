@@ -1478,36 +1478,52 @@ sheets are at the artboards' 16 px gutter now. See BF-45 ③ for why the fix is 
   this more."* So N5's recipe-import checks (yield, multi-dish, duplicate handling) are **not
   answered** and stay owed — do not read this entry as clearing them.
 
-### [nutrition] BF-39 — a logged meal draws as one nested row (shipped; device check owed)
+### [nutrition] BF-39 — a logged meal draws as one nested row (BUILT AND HELD — read the measurement first)
 
 - **Lane:** B
 - **Batch:** `nutrition-ui-uplift`
 - **Added:** 2026-08-26 · owner, re-raised 2026-08-27 with a screenshot and again 2026-08-30 — three
-  reports from three screens, which made it the strongest priority signal in the nutrition cluster.
+  reports from three screens, the strongest priority signal in the nutrition cluster.
 
-**Both halves have shipped.** The engine on 2026-08-30 (migrations 238 + 239, local SQLite **v31**):
+**The engine shipped 2026-08-30** (migrations 238 + 239, local SQLite **v31**):
 `food_logs.saved_meal_id` and `food_logs.meal_group_id`, stamped by `logMealItems` on both write
 paths and carried through the outbox payload, the push branch, the sync delta, the pull mapping and
-the local read. The rendering in **v1.403.0** — the diary groups on `meal_group_id` and draws one
-collapsed row per logged meal, carrying the meal's name, its photo and its totals, opening to the
-ingredients and their macro split. Shape **(1)** as recommended, so a log row is still a log row and
-every existing query is untouched.
-[Journal](overview/entries/2026-08-30-diary-nested-meal-rows.md).
+the local read. **What is owed is the rendering, and it was built and NOT shipped.**
 
-**Two rules the implementation turns on, both pinned by tests:**
-- **Grouped on `meal_group_id`, NEVER on `saved_meal_id`.** Two servings of the same meal on one day
-  share the meal and not the group; merging them would report one helping where two were eaten.
-- **A group needs a resolvable meal**, so pre-BF-39 rows (both columns NULL) and a deleted meal's
-  rows render loose. **Nothing back-fills** — there is no way to recover which rows belonged
-  together — and heading them "Meal" would be inventing a name the app does not have.
+**⚠ IT WAS BUILT, IT WORKS, AND IT BROKE A DIFFERENT SCREEN'S GESTURE. Do not rebuild it the same
+way.** The render half is straightforward and its own three e2e tests pass. What it could not do is
+coexist with the meal library's swipe tray: `meal-detail-artboard-parity` and
+`my-meals-artboard-parity`'s swipe tests failed **deterministically, on both CI attempts and
+locally**, with the tray's `Delete <meal>` button never appearing after a left-swipe.
 
-- **Keep — the device check.** On the S25: log a saved meal that has a photo, and the diary shows one
-  grouped entry with the meal's name and picture; the day's macro total is unchanged; a single
-  ingredient inside it can still be edited and deleted; and a second serving of the same meal on the
-  same day is a **second** row. Also confirm the group's name survives offline — `saved_meals` is
-  read local-first here and the sandbox has no local store, so only the web fallback ran.
-- **⚠ Ordering against BF-35**, unchanged: BF-35 fills the food tile with images, and a meal's photo
-  reaching the diary needed this column first. If BF-35 lands after, nothing here changes.
+**What was measured, in order — this is the valuable part:**
+1. **It is a regression of this work, not a flake.** The same two specs pass on `main` and fail on
+   the branch, run the same way, minutes apart.
+2. **The cause is the saved-meal summaries hook**, not the grouping or the rendering. Disabling
+   `useSavedMealSummaries` alone — leaving every other line — turns both specs green.
+3. **Moving the hook out of `nutrition-content.tsx`** into a memoised `DiaryMealList` (so the map's
+   arrival cannot re-render the library sheet) fixed `my-meals-artboard-parity` and **not**
+   `meal-detail-artboard-parity`.
+4. **The trigger is the `saved-meals` invalidation subscription**, not its network fetch. Removing
+   `useInvalidationRefetch` entirely turns both green; keeping it but re-reading only from the local
+   store and the cache seed — no request — leaves both red. So something in opening a meal
+   invalidates `saved-meals`, and the resulting work lands while a `SwipeActions` row is mid-drag.
+
+**Where to start.** Find what invalidates `saved-meals` during `openSavedMeal`, and why a subscriber
+re-rendering a sibling subtree drops an in-flight `useDrag`. `SwipeActions` keeps `offset` in
+`useState` and a module-level `openRows` registry — a re-render should be harmless and a **remount**
+would not be, so establish which is happening before changing either component.
+
+**The diary needs the meal's name and photo from somewhere**, and every option has a cost: this hook
+(above), a join into the food-log read (**Lane A** — `app/api` and `lib/data`), or a seed-only read
+that goes stale (the Q-260 shape). Settle that before building again.
+
+- **The grouping rule itself is settled and was proved by mutation** — keep it: group on
+  `meal_group_id`, **never** `saved_meal_id` (two servings of one meal on one day share the meal and
+  not the group); a group needs a *resolvable* meal, so pre-BF-39 rows and a deleted meal's rows
+  render loose because **nothing back-fills**; and a one-row group is not nested.
+- **Verification when it is rebuilt:** the three tests written for it, **plus** the meal-library
+  swipe specs in the same run — the pair this attempt broke.
 
 ### [nutrition] BF-38 — logging the same food twice creates a second `food_items` row: 19 of 209 are redundant
 
