@@ -32,6 +32,7 @@ const fs = require('fs');
 const path = require('path');
 const { idPattern, idPartsPattern } = require('./lib/entry-id');
 const { announcesCompletion } = require('./lib/completion-words');
+const { referenceFromLines, hasProseMarker, PROSE_MARKERS } = require('./lib/reference');
 
 const ROOT = path.resolve(__dirname, '..');
 const BACKLOG = path.join(ROOT, 'docs/implementation-backlog.md');
@@ -61,7 +62,7 @@ const queue = lines.slice(queueStart);
 // ---- 1 & 2: entry headings -------------------------------------------------
 const seen = new Map();
 const entryOrder = [];
-/** id -> { needs: [], gates: [], batch: null, lane: null, keep: false, body: 0 } for the most recently opened heading. */
+/** id -> { needs: [], gates: [], batch: null, lane: null, keep: false, body: 0, lines: [] } for the most recently opened heading. */
 const meta = new Map();
 let currentId = null;
 
@@ -108,6 +109,9 @@ for (let i = 0; i < queue.length; i++) {
 
       if (/^\s*[-*]\s*\*{0,2}Keep:\*{0,2}\s*\S/i.test(line)) meta.get(currentId).keep = true;
 
+      // Collected whole so the `Reference:` ratchet below sees the same lines `next-item.js` does.
+      meta.get(currentId).lines.push(line);
+
       const lane = line.match(/\*{0,2}Lane:?\*{0,2}\s*\*{0,2}(A\b|B\b|\?)/);
       if (lane && !meta.get(currentId).lane) meta.get(currentId).lane = lane[1].trim();
     }
@@ -142,7 +146,7 @@ for (let i = 0; i < queue.length; i++) {
   const id = `${q[1]}-${q[2]}${q[3]}`;
   entryOrder.push(id);
   currentId = id;
-  if (!meta.has(id)) meta.set(id, { needs: [], gates: [], batch: null, lane: null, keep: false, body: 0, heading: line });
+  if (!meta.has(id)) meta.set(id, { needs: [], gates: [], batch: null, lane: null, keep: false, body: 0, lines: [], heading: line });
 
   if (seen.has(id)) {
     failures.push(
@@ -189,6 +193,27 @@ for (const [id, m] of meta) {
 // ---- 2b: Gate values -------------------------------------------------------
 // Three different blockers used to be written the same way as prose `blocked:` markers, with three
 // different resolvers. A free-text gate is the same problem wearing a field name.
+// ---- Reference entries: the marker must be a FIELD ------------------------
+//
+// Two entries in the queue exist to be READ rather than built, and said so only in prose —
+// `⚑ Not implementable on its own` (BF-28) and `Not a work item` (BF-11). `next-item.js` had no
+// notion of either, so BF-28 printed as READY #1 under a header that says "top of the list is
+// next", and three sessions in a row opened the queue and met a row that cannot be started.
+//
+// The fix is a `- **Reference:** <why>` field, and this is what stops it decaying back into prose:
+// an entry may keep the sentence for its detail, but the field has to be there beside it. Without
+// this check the next map entry gets written with a third phrasing and the tool silently mis-sorts
+// it again — which is the same argument that made `Lane:`, `Needs:` and `Gate:` fields.
+for (const [id, m] of meta) {
+  if (!hasProseMarker(m.lines)) continue;
+  if (referenceFromLines(m.lines)) continue;
+  failures.push(
+    `${id}: says it is not implementable (${PROSE_MARKERS.map((p) => `"${p}"`).join(' / ')}) in prose ` +
+      `only. next-item.js reads a FIELD, so this entry still prints as startable work — add ` +
+      `\`- **Reference:** <why it is read rather than built>\` beside the sentence.`,
+  );
+}
+
 const GATES = new Set(['owner', 'device']);
 for (const [id, m] of meta) {
   for (const g of m.gates) {

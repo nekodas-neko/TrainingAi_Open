@@ -107,11 +107,11 @@ and never write code — which is what keeps the collision surface to Lane A aga
   migration. Batch native/Kotlin hardest, because each costs an APK cycle and an install can force
   the uninstall that destroys the ring key. A sweep across N files is already a batch: do not split
   it. Assign batches when an entry is next touched, not in a bulk pass.
-- **`Needs:` / `Gate: owner` / `Gate: device` are fields, not prose.** `Needs:` names another entry
-  and clears when that entry leaves the queue — **an absent target counts as shipped**, because the
-  protocol removes completed entries. `Gate:` takes only `owner` or `device`.
-  `scripts/check-backlog-pointers.js` enforces all of it, including cycles and a `Needs:` target
-  that never existed.
+- **`Needs:` / `Gate:` / `Reference:` are fields, not prose.** `Needs:` names another entry and clears
+  when that entry leaves the queue — **an absent target counts as shipped**, because the protocol
+  removes completed entries. `Gate:` takes only `owner` or `device`. **`Reference:` marks an entry other
+  entries READ rather than build**, so it prints in its own section, never heading the work list.
+  `check-backlog-pointers.js` enforces all of it — cycles, an invented `Needs:`, a prose-only reference.
 - **Postgres migration numbers and local SQLite versions belong to Lane A alone.** Any other agent
   that finds it needs a schema change stops and hands the item to Lane A.
 - **Tuning proposes; it never ships a scoring change.** Scoring drives every recommendation the app
