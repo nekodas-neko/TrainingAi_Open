@@ -3739,3 +3739,26 @@ The second is that the one real candidate, at 18 MB, is the keyset index for a m
 deliberately kept** on the stated ground that *"it costs nothing at runtime"*. Reversing part of a
 signed-off decision needs the decision quoted and the new number beside it, or the next reader is
 choosing between two sentences with no evidence attached to either.
+
+## 2026-08-30 — `projectOverview.md` 8367 → 8381, `docs/implementation-backlog.md` 13749 → 13639 (BF-53 fixed, LA-39 closed)
+
+The backlog **shrinks 110**: BF-53 collapses to a `Keep:` for the device check and LA-39 leaves
+entirely, an hour after it was filed — the owner ran the grant and the query text is live.
+
+`projectOverview.md` +14, two Current Status paragraphs. BF-53's says what the buttons did rather
+than naming the guard, because "a bigserial validated as a uuid" describes a line of code and the
+finding is that a feature was dead in production. LA-39's is five lines and closes itself in the same
+breath it opens, which is the shape a same-day resolution should take here — the alternative is a
+Known-Issues row filed and struck within the hour.
+
+## 2026-08-30 — `docs/implementation-backlog.md` (nutrition to the top, re-derived from current main)
+
+Replaces an earlier attempt that had gone stale. A reordering branch carries a full copy of every
+entry it moved, so the longer it stays open the more of those copies rot — and on this repo `main`
+moves every few minutes. That branch had already come within one merge of **resurrecting BF-54 after
+it shipped and reverting BF-55 to its pre-fix text**, both caught only by diffing each moved entry
+against `main` rather than trusting the conflict resolution.
+
+Re-deriving the move from current `main` in one pass removes the whole class: nothing is carried, so
+nothing can be stale. **The lesson for the next reorder: do it in one commit against fresh `main` and
+merge it the same minute, or expect to hand-verify every moved entry.**
