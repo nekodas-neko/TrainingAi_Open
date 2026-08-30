@@ -3484,3 +3484,17 @@ nothing, with the three-row table naming which reads omit it.
 device-verification gate, so it carries the smoke step and — the part that is not boilerplate — why
 the device path is *different code* rather than the same code untested: it de-duplicates before an
 id is minted, because the offline push deliberately does not de-duplicate at all.
+
+## 2026-08-30 — `projectOverview.md` 8226 → 8258 (LA-37)
+
+One Current Status paragraph and one Known-Issues row for a fault found in `error_events` rather
+than reported: the Voice button was not rendering on the APK at all, because a getter resolved to a
+raw `registerPlugin()` proxy and the promise never settled.
+
+The row is longer than a bare device-verification gate because the useful part is **why no existing
+check could have caught it** — `Capacitor.isNativePlatform()` is false in `pnpm dev` and in
+Playwright, so the native branch never executes outside a real WebView, and a reader who does not
+know that will read "unit tests pass" as "verified". The status paragraph carries the distinction
+the new CI check turns on (a `registerPlugin` proxy is the hazard; `BleClient`, which looks
+identical at two other call sites, is a plain instance and correct), because that is the sentence
+that stops the check being "fixed" into flagging two working files.
