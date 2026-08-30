@@ -3864,3 +3864,21 @@ already dealt with:
 
 The LB-18 case is the reusable one: an owner gate can be answered in prose and stay closed to the
 tools, which makes it indistinguishable from an unanswered one at a glance.
+
+## 2026-08-30 — `docs/implementation-backlog.md` (lane classification and the Railway aggregation)
+
+Net negative on entries: 216 → 215, with Q-549 removed.
+
+**Nine entries carried `Lane: ?` and were therefore offered by neither runner** — including BF-1, BF-2
+and BF-9. Every one of them already described its own split ("engine is A, the surface is B"), so
+none of them was actually undecided; the field simply never got the answer the prose already had.
+Classified by CLAUDE.md's path rule, with the rule cited in each so the reasoning is checkable rather
+than asserted. Eight resolved to a lane; **PS-4 stays `Lane: ?` on purpose** and now says so, because
+the runner accepts only A or B and rewriting a baton is not implementer work — recorded so the next
+audit does not try again.
+
+**Three entries were asking the owner the same hosting question three ways.** Q-549's headline premise
+was falsified on 2026-08-25 (423 MB flat at 0.0 vCPU, not 0.79 GB) and its only live residue was one
+console setting, so it is folded into Q-551 and removed. Q-547's remaining half is re-framed as what
+it is — a *reading* taken during a quiet window, feeding Q-551 rather than competing with it. **The
+owner now has one Railway question instead of three.**

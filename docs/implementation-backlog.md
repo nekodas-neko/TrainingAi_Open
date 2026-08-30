@@ -920,7 +920,9 @@ bug is that it is using a prediction as the definition of BMR when a measurement
   days in [`docs/clinical-baseline-2026-08-27.md`](clinical-baseline-2026-08-27.md). **One pair still cannot separate an offset from a ratio**, which is precisely why
   this entry stores pairs and derives the form at two — do not bake +3.2 in as a constant.
 
-- Lane: ? — the planning session splits it (new table + calibration maths = A; the entry/review UI = B)
+- **Lane:** A — classified 2026-08-30 by the path rule (*both halves → A, engine first*). The new
+  table and the calibration maths are the engine; the entry/review UI follows as **B**. The planning
+  session still splits the work; it does not re-decide the lane.
 
 > **⚠ PRIORITY CHANGED 2026-08-26 — the owner has a DEXA + RMR test BOOKED.** This entry sat at the
 > tail because the owner filed it as *"a loose note to put more effort into later"*; that is no longer
@@ -2806,7 +2808,7 @@ place to start rendering pictures.
 
 - **Branch:** `feat/nutrition-coach-meal-plan`
 - **Added:** 2026-08-19 · BugFix Intake, from the owner · mockup rendered in-session
-- **Lane:** ?
+- **Lane:** B — classified 2026-08-30 by CLAUDE.md's path rule (*reached only from `app/**` and `components/**` → B*; this is a wizard's screens and a multi-select control, with no storage or route change).
 - **Placement:** in the nutrition cluster, after Q-398 — **which shipped 2026-08-24**, so the
   dependency is cleared. The plan's exit route in this design is "Save all as meals", and plan meals
   can now become ordinary saved meals; before that, a conversational plan had nowhere to land and
@@ -4072,7 +4074,9 @@ without a queue entry is a dropped finding.*
 
 - **Branch:** `docs/baton-compaction`
 - **Added:** 2026-08-19 · measured while adding batons to the size ratchet
-- **Lane: ?** — whichever role is doing its own handoff next; this is not one job.
+- **Lane: ?** — and it stays that way. **This entry will always print as UNCLASSIFIED and that is
+  correct, not an omission**: the runner accepts only A or B, and this is not implementer work.
+  Recorded 2026-08-30 so the next gate audit does not try to classify it again. **Deliberately not A or B:** each role rewrites its own baton, so this is done by whoever hands over next rather than assigned. Left lane-agnostic on purpose, not by omission.
 
 `docs/agents/state/README.md` says a baton is *"state, not narrative"* and *"if it is over a screen,
 the narrative has leaked in"*. Measured 2026-08-19: BugFix **135** lines, Lane A **162**, Lane B
@@ -5122,7 +5126,7 @@ screenshot is a **1:39** walk with the screen on, which exercises none of it.
 
 - **Branch:** `feat/walk-step-goal`
 - **Added:** 2026-08-19 · owner, mid-session, with a screenshot of a live walk
-- **Lane:** ?
+- **Lane:** B — classified 2026-08-30 by CLAUDE.md's path rule (*reached only from `app/**` and `components/**` → B*; the speed readout and cadence pacing are surface — the gated cadence signal it depends on is already produced).
 - **Owner's words:** *"for the walking section I'd it to show the speed and total step count.
   rather than a HR goal we should be looking at a step goal; we should enough data on how to do
   this."*
@@ -5621,68 +5625,23 @@ this fits without an extraction.
   a WebView than a desktop tab, and a real backgrounding across local midnight is the case that
   matters. Start from Profile → **Auto-detect timezone**, the button that triggers the whole class.
   `Gate: device`.
-### [platform] Q-549 — Postgres holds 0.79 GB to serve 171 MB, at 0.002 vCPU
-
-- **Gate: owner** — narrowed 2026-08-25 (see the reading below). The 0.79 GB premise is **gone**;
-  all that is left of this entry is `max_connections = 500`, a Railway console setting worth tens of
-  MB. **The recommendation is to close this entry** — that call is one line and it is the owner's.
-
-> **⚠️⚠️ THE PREMISE IS FALSIFIED — owner pulled the Railway charts 2026-08-25.** `prod_DB` reads
-> **423 MB flat** across the 3-hour window (limit 8 GB) at **0.0 vCPU**, not 0.79 GB. This entry
-> predicted from a climbing post-restart reading that *"0.79 GB is the warmed steady state and will
-> return"*; seven days on a warm container, it has not. The 0.79 GB average spanned the 2026-08-17
-> `disk_full` outage. `shared_buffers` 128 MB / `max_connections` 500 confirmed unchanged.
-> **Full readings, caveats and the recommendation to close:**
-> [`2026-08-25-railway-and-db-readings.md`](reviews/2026-08-25-railway-and-db-readings.md) §2.
-
-> **⚠️ MEASURED against production 2026-08-19 — both named candidates are falsified. Read this before
-> starting; the entry below sends you at two dead ends.**
->
-> Read through `POST /api/admin/db-query` (`pg_settings`, `pg_stat_activity`, `pg_stat_database`):
->
-> | reading | value | what it means |
-> |---|---|---|
-> | `shared_buffers` | **128 MB** (16384 × 8 kB) | the Postgres **default**, not "sized for the container" — **candidate 1 is wrong** |
-> | cache hit ratio | **99.866%** (10,063,661 hits vs 13,485 disk reads) | 128 MB is *comfortably sufficient*; shrinking it is the wrong direction and growing it buys nothing |
-> | live backends on `railway` | **3** (2 app, 1 `claude_readonly` — mine) | not the "up to 12 backend processes" of **candidate 2** |
-> | `work_mem` | 4 MB | per-backend private memory is single-digit MB at this backend count |
-> | `max_connections` | **500** | against a ceiling of ~12 (`max: 10` + `PG_POOL_MAX=2`) |
-> | database size | **188 MB** | up from the entry's 171 MB, consistent with the ~0.4 MB/day trend |
-> | version | PostgreSQL **18.6** | |
->
-> **The one over-provision visible from inside is `max_connections = 500`.** Postgres pre-allocates
-> per-connection shared structures at startup, so that is fixed cost paid at boot whether or not the
-> connections are used. Whether Railway's managed Postgres exposes it is an owner/console question,
-> not a code one.
->
-> **⚠️ And the premise may not hold at all.** Most of a Postgres container's RSS on a ~190 MB database
-> is `shared_buffers` plus OS page cache — **reclaimable, not a leak**. The entry's own observation
-> that memory "grows as caches warm" describes exactly that. 0.79 GB may be near the floor for this
-> container rather than $7.87/month of waste, in which case there is nothing here to reclaim.
->
-> **What this measurement cannot settle:** container RSS attribution. Railway's metric is the
-> authority and a sandbox cannot see it. **Before spending a session here, get the owner to confirm
-> the 0.79 GB steady state is still real** — the figure is from 2026-08-18, immediately after a volume
-> incident and restart, which the entry itself flags as the wrong moment to measure.
-
-
-- **Plan:** [`docs/superpowers/plans/2026-08-18-device-primary-compute.md`](superpowers/plans/2026-08-18-device-primary-compute.md) section 1
-- **Branch:** `perf/postgres-memory-footprint`
-- **Added:** 2026-08-18 · **Lane A.** Largest single line item on the bill and near-zero risk.
-- **Measured (Railway, ~19.6 days to 2026-08-18):** `prod_DB` averages **0.79 GB RAM** and **0.002
-  vCPU** — **$7.87/month of memory for a database that does essentially no work**, against 171 MB of
-  data. Its own CPU graph is flat at 0.0 across a 3-hour window.
-- **Candidates:** `shared_buffers` sized for the container rather than the data; the app pool is
-  `max: 10` and the rollup worker carries its own `PG_POOL_MAX=2`, so up to 12 backend processes each
-  with their own memory. `work_mem` is already 4 MB (noted on Q-534) and is not the problem.
-- **Careful with the "it's only 200 MB now" reading.** The 3-hour graph taken 2026-08-18 shows ~200 MB
-  **climbing** — the service had just restarted during the volume incident and Postgres memory grows as
-  caches warm. **0.79 GB is the warmed steady state and will return.** Measure over a full day, not
-  after a restart.
-- **Load-bearing constraint (`CLAUDE.md`):** total connections = `max` x replicas must stay under the
-  Railway connection limit, and the pool's error handler and timeouts must survive any change here.
-
 ### [platform] Q-551 — OWNER DECISION: stay on Railway or leave, once the D-track has shrunk the server
+
+> **⚑ THIS IS NOW THE ONLY RAILWAY DECISION — Q-549 folded in and removed, 2026-08-30.** Three
+> entries were asking the owner about the same hosting question from different angles. What survives
+> of Q-549 is one line: **`max_connections` is 500**, a Railway console setting worth tens of MB, and
+> its own headline premise (*0.79 GB to serve 171 MB*) was **falsified** on 2026-08-25 when the owner
+> pulled the charts — 423 MB flat at 0.0 vCPU across a three-hour window, with the 0.79 GB average
+> spanning the `disk_full` outage. `shared_buffers` is the Postgres default of 128 MB at a **99.87%**
+> cache hit ratio, so it is neither oversized nor worth growing.
+>
+> **Q-547 is not a decision and should not be read as one** — its remaining half is a *reading*: the
+> CPU/RAM baseline during a genuinely quiet window, which no sandbox can take because every sample so
+> far landed on a shipping day. It feeds this entry rather than competing with it.
+>
+> **So the owner has one question here, not three:** stay on Railway or leave — and it is deliberately
+> after Q-545, which shrinks the server first. Nothing about it is urgent: at $0.15/GB/month the whole
+> database costs about three cents a month.
 
 - **Gate: owner** · **Needs: Q-545** — the entry says both in prose ("BLOCKED: owner, and
   deliberately **after** Q-545"); these are the fields that keep it out of an implementer's queue.
@@ -5854,9 +5813,13 @@ this fits without an extraction.
 
 ### [platform] Q-547 — ANSWERED 2026-08-18: the app CPU is spiky (so Q-545 fixes it), and much of it is deploy churn
 
-- **Gate: owner** — **halved 2026-08-25.** The deploy-marker half is corroborated (below). What is
-  still owed is only the second half: **the CPU/RAM baseline during a genuinely quiet window** — a
-  sandbox cannot read Railway metrics, and every reading taken so far has been on a shipping day.
+- **Gate: owner — a READING, not a decision.** What is owed is the CPU/RAM baseline during a
+  genuinely quiet window; a sandbox cannot read Railway metrics and every sample so far landed on a
+  shipping day. **It feeds Q-551 (the one Railway decision) rather than asking its own question** —
+  do not present this to the owner as something to decide. The deploy-marker half is corroborated
+  below and is done.
+- **Needs:** Q-551 is where the answer goes. *(Recorded 2026-08-30 during a gate audit: three
+  entries were putting the same hosting question to the owner three ways.)*
 
 > **Deploy-marker half corroborated 2026-08-25.** The owner's `TrainingAI` chart carries the ~10-12
 > dashed markers, CPU spiking to **2.5 vCPU** and memory to ~1.2 GB off a 400 MB baseline, 649
@@ -6303,7 +6266,7 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 
 - **Branch:** `fix/redecode-async-job`
 - **Added:** 2026-08-17, after a redecode reported `redecode failed: 502` while in fact completing.
-- **Lane:** ?
+- **Lane:** A — classified 2026-08-30 by CLAUDE.md's path rule (*touches `app/api/**` → A*; the fix is in `POST /api/oura-ble/samples/redecode` and its job handling).
 - **What happens.** `POST /api/oura-ble/samples/redecode` hardcodes `fullHistory: true` — there is
   no scoped variant — so it walks all 1.1M rows and then rebuilds **every** daily summary. Q-213
   moved that work off the event loop into the rollup worker, which is why the rest of the process
@@ -12838,7 +12801,8 @@ reads.
 
 ### [platform][workouts] 🔵 BF-9 — a trainer role: build a program for someone else and assign it to them
 
-- Lane: ? — new tables + authorization + routes are **A** (needs migrations); the trainer UI is **B**. The planning session splits it.
+- **Lane:** A — classified 2026-08-30 by CLAUDE.md's path rule (*touches storage or `app/api/**` → A; both halves → A, engine first*). New tables, authorization and routes are the engine; the trainer UI follows as **B**. The planning session still splits the work — it does not re-decide the lane.
+
 
 **Owner request, 2026-08-23 (verbatim):** *"I want to be able to train people; which means assigning
 myself as a 'trainer' and being able to create workout and/or meal plans (meals can be deferred till
@@ -12947,7 +12911,8 @@ is a much larger consent question), and how revocation behaves for programs alre
 
 ### [workouts] 🔵 BF-7 — a 45-minute session cannot be chosen; the length picker offers three relative presets
 
-- Lane: ? — the model is `packages/shared/**` (**A**), the picker is `components/**` (**B**); engine half first
+- **Lane:** A — classified 2026-08-30 by CLAUDE.md's path rule (*touches storage or `app/api/**` → A; both halves → A, engine first*). The model in `packages/shared/**` is the engine; the picker in `components/**` follows as **B**.
+
 
 **Owner request, 2026-08-23 (verbatim):** *"id like to have the ability to choose a 45min session -
 maybe we have a slider - and the default one is shown - but have the option to to slide to
@@ -13030,7 +12995,8 @@ what the warm-up countdown shows, and dragging the control does not fire a presc
 
 ### [app-shell][platform] 🔵 BF-5 — the week in review should be a page, not a banner that expands
 
-- Lane: ? — the route must return its numbers (A) before a page can chart them (B); the planning session splits it
+- **Lane:** A — classified 2026-08-30 by CLAUDE.md's path rule (*touches storage or `app/api/**` → A; both halves → A, engine first*). The route must return its numbers before a page can chart them; the page follows as **B**.
+
 
 **Owner request, 2026-08-23 (verbatim):** *"rather than chevron type display; id rathee its own page
 that you can get to from a banner notifcation; or a permanent link in the health tab somewhere - the
@@ -13095,7 +13061,8 @@ with the recap week visibly compared against the one before it.
   schema from it: reference ranges arrive as `low-high`, one-sided (`<25`, `>59`) and absent; one
   result is `<0.2` and not a number; flags are free text carrying commentary; the date is a month.
 
-- Lane: ? — new table + extraction route is A, the upload/review surface is B; needs a migration (**Lane A**)
+- **Lane:** A — classified 2026-08-30 by CLAUDE.md's path rule (*touches storage or `app/api/**` → A; both halves → A, engine first*). New table plus extraction route is the engine and needs a migration, which only **A** may number; the upload/review surface follows as **B**.
+
 
 **Owner request, 2026-08-23 (verbatim):** *"I'd like to be able to import some blood scan results and
 de-identify myself/user etc to have a baseline - should help with reccomendations for nutrition etc."*
