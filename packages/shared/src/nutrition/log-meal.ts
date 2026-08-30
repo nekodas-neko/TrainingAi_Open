@@ -14,7 +14,7 @@ function r1(n: number) { return Math.round(n * 10) / 10 }
 // scaled by its per-item quantity multiplier.
 export function savedMealItemToWithItem(
   item: SavedMealItem,
-  log: { id: string; date: string; mealTypeId: string; loggedAt: string },
+  log: { id: string; date: string; mealTypeId: string; loggedAt: string; savedMealId?: string | null; mealGroupId?: string | null },
 ): FoodLogWithItem {
   const q = item.quantityMultiplier
   const fi = item.foodItem
@@ -24,6 +24,10 @@ export function savedMealItemToWithItem(
     date: log.date,
     mealTypeId: log.mealTypeId,
     foodItemId: item.foodItemId,
+    // BF-39. Carried onto the optimistic row so the caller can group it immediately — a refetch to
+    // learn the grouping would blank the optimistic state, which is what this shape exists to avoid.
+    savedMealId: log.savedMealId ?? null,
+    mealGroupId: log.mealGroupId ?? null,
     quantityMultiplier: q,
     loggedAt: new Date(log.loggedAt),
     foodItem: fi,
@@ -48,6 +52,11 @@ export async function logMealItems(
   const store = userId ? getLocalStore(userId) : null
   const optimistic: FoodLogWithItem[] = []
 
+  // BF-39. One id per CALL, shared by every ingredient it writes — that is what makes the diary
+  // able to draw one row for one meal. Deliberately not the saved meal's id: logging the same meal
+  // twice on one day must produce two groups, or the second serving disappears into the first.
+  const mealGroupId = crypto.randomUUID()
+
   if (store) {
     try {
       const now = new Date().toISOString()
@@ -70,6 +79,7 @@ export async function logMealItems(
         const logId = crypto.randomUUID()
         await store.upsertFoodLog({
           id: logId, date, mealTypeId, foodItemId: item.foodItemId,
+          savedMealId: meal.id, mealGroupId,
           quantityMultiplier: item.quantityMultiplier,
           loggedAt: eatenAt, updatedAt: now, deletedAt: null, syncStatus: 'pending',
         })
@@ -77,9 +87,16 @@ export async function logMealItems(
           userId: userId!,
           domain: 'food_logs',
           date,
-          payload: { id: logId, mealTypeId, foodItemId: item.foodItemId, quantityMultiplier: item.quantityMultiplier, loggedAt: eatenAt },
+          // The payload carries both, or the rows reach the server ungrouped and every other
+          // device sees loose ingredients — the offline rule is that a new column lands on the
+          // local table, the queued payload, the push branch and the pull mapping together.
+          payload: {
+            id: logId, mealTypeId, foodItemId: item.foodItemId,
+            savedMealId: meal.id, mealGroupId,
+            quantityMultiplier: item.quantityMultiplier, loggedAt: eatenAt,
+          },
         })
-        optimistic.push(savedMealItemToWithItem(item, { id: logId, date, mealTypeId, loggedAt: eatenAt }))
+        optimistic.push(savedMealItemToWithItem(item, { id: logId, date, mealTypeId, loggedAt: eatenAt, savedMealId: meal.id, mealGroupId }))
       }
       await cancelMealReminder(mealTypeId)
       // Twice, deliberately: now so this device's screens repaint at once (and because offline
@@ -108,7 +125,11 @@ export async function logMealItems(
         const res = await fetch('/api/nutrition/food-logs', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ date, mealTypeId, foodItemId: item.foodItemId, quantityMultiplier: item.quantityMultiplier }),
+          body: JSON.stringify({
+            date, mealTypeId, foodItemId: item.foodItemId,
+            savedMealId: meal.id, mealGroupId,
+            quantityMultiplier: item.quantityMultiplier,
+          }),
         })
         if (!res.ok) throw new Error('Failed to log item')
         return { item, log: await res.json() as { id: string; loggedAt?: string } }
@@ -133,6 +154,7 @@ export async function logMealItems(
       const { item, log } = r.value
       optimistic.push(savedMealItemToWithItem(item, {
         id: log.id, date, mealTypeId, loggedAt: log.loggedAt ?? new Date().toISOString(),
+        savedMealId: meal.id, mealGroupId,
       }))
     }
     await cancelMealReminder(mealTypeId)

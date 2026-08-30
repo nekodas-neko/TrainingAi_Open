@@ -39,7 +39,7 @@ export async function POST(req: Request) {
       : NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
   }
   const body = read.body as Record<string, unknown>
-  const { date: rawBodyDate, mealTypeId, foodItemId, quantityMultiplier } = body
+  const { date: rawBodyDate, mealTypeId, foodItemId, quantityMultiplier, savedMealId, mealGroupId } = body
   // Typed explicitly now the body is `unknown` rather than `any`. Both ids went straight into
   // `foodLogRefsValid` and `createFoodLog` with only a truthiness check before this.
   if (!rawBodyDate || typeof mealTypeId !== 'string' || typeof foodItemId !== 'string') {
@@ -52,13 +52,26 @@ export async function POST(req: Request) {
   if (typeof qm !== 'number' || qm < 0.01 || qm > 100) {
     return NextResponse.json({ error: 'quantityMultiplier must be between 0.01 and 100' }, { status: 400 })
   }
+  // BF-39. Both are optional and both are ids, so both are typed before they reach the DB — a
+  // non-string here would otherwise go straight into a uuid column as a driver-level error.
+  if (savedMealId != null && typeof savedMealId !== 'string') {
+    return NextResponse.json({ error: 'savedMealId must be a string' }, { status: 400 })
+  }
+  if (mealGroupId != null && typeof mealGroupId !== 'string') {
+    return NextResponse.json({ error: 'mealGroupId must be a string' }, { status: 400 })
+  }
   const repo = await getRepository()
-  if (!(await repo.foodLogRefsValid(userId, mealTypeId, foodItemId))) {
-    return NextResponse.json({ error: 'Invalid mealTypeId or foodItemId' }, { status: 400 })
+  // `savedMealId` is a client-supplied row id, so it is ownership-checked alongside the other two
+  // rather than trusted — a log naming someone else's meal would render their name and picture in
+  // this user's diary.
+  if (!(await repo.foodLogRefsValid(userId, mealTypeId, foodItemId, savedMealId ?? null))) {
+    return NextResponse.json({ error: 'Invalid mealTypeId, foodItemId or savedMealId' }, { status: 400 })
   }
   const log = await repo.createFoodLog(userId, {
     date, mealTypeId, foodItemId,
     quantityMultiplier: qm,
+    savedMealId: savedMealId ?? null,
+    mealGroupId: mealGroupId ?? null,
   })
   return NextResponse.json(log, { status: 201 })
 }

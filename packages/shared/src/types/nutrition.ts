@@ -42,6 +42,11 @@ export interface FoodLog {
   foodItemId: string
   quantityMultiplier: number
   loggedAt: Date
+  /** BF-39. The saved meal this row came from, when it came from one. WHAT was eaten. */
+  savedMealId?: string | null
+  /** BF-39. One id per logging OCCASION. Two servings of the same meal on one day share
+   *  `savedMealId` and differ here, which is why the diary groups on this and not on that. */
+  mealGroupId?: string | null
 }
 
 export interface FoodLogWithItem extends FoodLog {

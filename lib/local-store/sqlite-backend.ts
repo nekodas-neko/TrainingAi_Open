@@ -1861,9 +1861,9 @@ export class SQLiteLocalStore implements LocalStore {
       } else {
         await runSQL(
           `INSERT INTO food_logs
-             (id, date, meal_type_id, food_item_id, quantity_multiplier,
-              logged_at, updated_at, deleted_at, sync_status)
-           VALUES (?,?,?,?,?,?,?,?,'synced')
+             (id, date, meal_type_id, food_item_id, saved_meal_id, meal_group_id,
+              quantity_multiplier, logged_at, updated_at, deleted_at, sync_status)
+           VALUES (?,?,?,?,?,?,?,?,?,?,'synced')
            ON CONFLICT(id) DO UPDATE SET
              -- Q-325: this arm used to set only quantity_multiplier, updated_at and deleted_at, so a
              -- server-side change to any OTHER column never reached a device that already held the
@@ -1873,12 +1873,16 @@ export class SQLiteLocalStore implements LocalStore {
              -- protects a pending local edit; the narrow SET was never the protection.
              date=excluded.date, meal_type_id=excluded.meal_type_id,
              food_item_id=excluded.food_item_id,
+             -- BF-39, and Q-325's lesson applied rather than repeated: the narrow SET is exactly
+             -- how a server-side change to a column stops at the server.
+             saved_meal_id=excluded.saved_meal_id, meal_group_id=excluded.meal_group_id,
              quantity_multiplier=excluded.quantity_multiplier,
              logged_at=excluded.logged_at,
              updated_at=excluded.updated_at, deleted_at=excluded.deleted_at,
              sync_status='synced'
            WHERE food_logs.sync_status='synced'`,
-          [r.id, r.date, r.mealTypeId, r.foodItemId, r.quantityMultiplier,
+          [r.id, r.date, r.mealTypeId, r.foodItemId,
+           r.savedMealId ?? null, r.mealGroupId ?? null, r.quantityMultiplier,
            r.loggedAt, r.updatedAt, r.deletedAt],
         );
       }
@@ -2012,15 +2016,20 @@ export class SQLiteLocalStore implements LocalStore {
   async upsertFoodLog(record: LocalFoodLog): Promise<void> {
     await runSQL(
       `INSERT INTO food_logs
-         (id, date, meal_type_id, food_item_id, quantity_multiplier,
-          logged_at, updated_at, deleted_at, sync_status)
-       VALUES (?,?,?,?,?,?,?,?,?)
+         (id, date, meal_type_id, food_item_id, saved_meal_id, meal_group_id,
+          quantity_multiplier, logged_at, updated_at, deleted_at, sync_status)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?)
        ON CONFLICT(id) DO UPDATE SET
          quantity_multiplier=excluded.quantity_multiplier,
+         -- BF-39: on the update arm too. A local single-field save read-merges through this
+         -- function, and omitting the meal columns here would strip a logged meal's grouping the
+         -- first time its quantity was edited.
+         saved_meal_id=excluded.saved_meal_id, meal_group_id=excluded.meal_group_id,
          updated_at=excluded.updated_at, deleted_at=excluded.deleted_at,
          sync_status=excluded.sync_status`,
       [
         record.id, record.date, record.mealTypeId, record.foodItemId,
+        record.savedMealId ?? null, record.mealGroupId ?? null,
         record.quantityMultiplier, record.loggedAt, record.updatedAt,
         record.deletedAt, record.syncStatus,
       ],
@@ -2200,6 +2209,7 @@ export class SQLiteLocalStore implements LocalStore {
   async getFoodLogsWithItems(date: string): Promise<FoodLogWithItem[]> {
     const rows = await querySQL<Record<string, unknown>>(
       `SELECT fl.id, fl.date, fl.meal_type_id, fl.food_item_id, fl.quantity_multiplier, fl.logged_at,
+              fl.saved_meal_id, fl.meal_group_id,
               fi.name, fi.brand, fi.serving_size_g, fi.calories, fi.protein_g, fi.carbs_g, fi.fat_g,
               fi.fiber_g, fi.sugar_g, fi.sodium_mg, fi.sat_fat_g, fi.source
          FROM food_logs fl
@@ -2215,6 +2225,10 @@ export class SQLiteLocalStore implements LocalStore {
       return {
         id: String(r.id), userId: '', date: String(r.date),
         mealTypeId: String(r.meal_type_id), foodItemId: String(r.food_item_id),
+        // BF-39. The local-first read carries the grouping too, or the device — which is the
+        // canonical runtime — would be the one surface that cannot draw a logged meal as a meal.
+        savedMealId: r.saved_meal_id ? String(r.saved_meal_id) : null,
+        mealGroupId: r.meal_group_id ? String(r.meal_group_id) : null,
         quantityMultiplier: qty, loggedAt: new Date(String(r.logged_at)),
         foodItem: {
           id: String(r.food_item_id), userId: '', name: String(r.name),

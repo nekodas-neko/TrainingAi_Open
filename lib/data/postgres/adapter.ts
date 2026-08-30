@@ -3325,8 +3325,9 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   async createFoodItem(userId: string, data: Omit<FoodItem, 'id' | 'userId' | 'createdAt'> & { id?: string }, opts?: { reuseExisting?: boolean }) { return n.createFoodItem(this.db, userId, data, opts) }
   async searchFoodItems(userId: string, query: string) { return n.searchFoodItems(this.db, userId, query) }
   async listFoodLogs(userId: string, date: string) { return n.listFoodLogs(this.db, userId, date) }
-  async createFoodLog(userId: string, data: Pick<FoodLog, 'date' | 'mealTypeId' | 'foodItemId' | 'quantityMultiplier'> & { id?: string; loggedAt?: Date }) { return n.createFoodLog(this.db, userId, data) }
-  async foodLogRefsValid(userId: string, mealTypeId: string, foodItemId: string) { return n.foodLogRefsValid(this.db, userId, mealTypeId, foodItemId) }
+  async createFoodLog(userId: string, data: Pick<FoodLog, 'date' | 'mealTypeId' | 'foodItemId' | 'quantityMultiplier'>
+    & { id?: string; loggedAt?: Date; savedMealId?: string | null; mealGroupId?: string | null }) { return n.createFoodLog(this.db, userId, data) }
+  async foodLogRefsValid(userId: string, mealTypeId: string, foodItemId: string, savedMealId?: string | null) { return n.foodLogRefsValid(this.db, userId, mealTypeId, foodItemId, savedMealId) }
   async updateFoodLog(id: string, userId: string, quantityMultiplier: number) { return n.updateFoodLog(this.db, id, userId, quantityMultiplier) }
   async deleteFoodLog(id: string, userId: string) { return n.deleteFoodLog(this.db, id, userId) }
   async listFoodLogsSummary(userId: string, from: string, to: string) { return n.listFoodLogsSummary(this.db, userId, from, to) }
@@ -3576,6 +3577,9 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       this.db.select({
         id: s.foodLogs.id, date: s.foodLogs.date, mealTypeId: s.foodLogs.mealTypeId,
         foodItemId: s.foodLogs.foodItemId, quantityMultiplier: s.foodLogs.quantityMultiplier,
+        // BF-39. In the delta because the diary groups on it: a device that pulled these rows
+        // without the grouping would render the ingredients as siblings again.
+        savedMealId: s.foodLogs.savedMealId, mealGroupId: s.foodLogs.mealGroupId,
         loggedAt: s.foodLogs.loggedAt, updatedAt: s.foodLogs.updatedAt, deletedAt: s.foodLogs.deletedAt,
       }).from(s.foodLogs)
         .where(and(eq(s.foodLogs.userId, userId), gt(s.foodLogs.updatedAt, effectiveSince)))
@@ -4165,7 +4169,14 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
               errors.push({ id: mut.id, domain: mut.domain, date: mut.date, error: 'quantityMultiplier must be between 0.01 and 100' })
               continue
             }
-            if (!(await this.foodLogRefsValid(userId, String(p.mealTypeId), String(p.foodItemId)))) {
+            // BF-39. Typed rather than String()-coerced: `String(undefined)` is the literal
+            // "undefined", which a uuid column rejects at the driver — and a driver error here is a
+            // poison pill the outbox quarantines, costing the whole log over an optional field.
+            const savedMealId = typeof p.savedMealId === 'string' ? p.savedMealId : null
+            const mealGroupId = typeof p.mealGroupId === 'string' ? p.mealGroupId : null
+            // Same ownership check as the web route, savedMealId included — the sibling-surface
+            // rule: a check the route makes and the push branch skips is how the two drift.
+            if (!(await this.foodLogRefsValid(userId, String(p.mealTypeId), String(p.foodItemId), savedMealId))) {
               errors.push({ id: mut.id, domain: mut.domain, date: mut.date, error: 'FK ownership check failed' })
               continue
             }
@@ -4176,6 +4187,8 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
               foodItemId:         String(p.foodItemId),
               quantityMultiplier: qm,
               loggedAt:           p.loggedAt ? new Date(String(p.loggedAt)) : undefined,
+              savedMealId,
+              mealGroupId,
             })
           }
           processed++
