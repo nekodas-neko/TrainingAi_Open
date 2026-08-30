@@ -1,6 +1,6 @@
 import { test, expect, type Page } from '@playwright/test'
 import { Client } from 'pg'
-import { SEED_EMAIL, openSavedMeal, settleRouteBoundary } from './fixtures'
+import { SEED_EMAIL, openSavedMeal, settleRouteBoundary, swipeRowLeft } from './fixtures'
 
 /**
  * The meal library drawn as artboard 3 draws it (BF-29).
@@ -81,33 +81,6 @@ async function openLibrary(page: Page): Promise<void> {
   }).toPass({ timeout: 90_000 })
 }
 
-/**
- * Drag a row to the left with a real touch sequence.
- *
- * Playwright's `touchscreen` can tap and nothing else, and a mouse drag proves nothing about a
- * handler bound with `pointer: { touch: true }` — so the moves go through CDP directly. They are
- * spaced in time on purpose: `@use-gesture` derives velocity from the interval, and a burst
- * dispatched in one tick reads as an instant flick rather than a drag.
- */
-async function swipeRowLeft(page: Page, row: ReturnType<Page['getByRole']>, distance: number): Promise<void> {
-  const box = (await row.boundingBox())!
-  const y = box.y + box.height / 2
-  const startX = box.x + box.width - 16
-  const cdp = await page.context().newCDPSession(page)
-  try {
-    await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: startX, y }] })
-    for (let step = 1; step <= 10; step++) {
-      await cdp.send('Input.dispatchTouchEvent', {
-        type: 'touchMove',
-        touchPoints: [{ x: startX - (distance * step) / 10, y }],
-      })
-      await page.waitForTimeout(16)
-    }
-    await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] })
-  } finally {
-    await cdp.detach()
-  }
-}
 
 test('the meal library is artboard 3: a count line, one grouped list, and per-portion calories', async ({ page }) => {
   await openLibrary(page)
@@ -145,7 +118,7 @@ test('swiping a row left reveals its actions, and delete still asks first', asyn
   const trayDelete = page.getByRole('button', { name: `Delete ${MEAL_NAME}` })
   await expect(trayDelete).toHaveCount(0)
 
-  await swipeRowLeft(page, row, 200)
+  await swipeRowLeft(page, row)
   await expect(trayDelete).toBeVisible({ timeout: 10_000 })
 
   // Delete never fires outright — it opens the meal with its confirmation up (BF-30). A swipe that

@@ -24,10 +24,10 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.402.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
-**Version:** v1.401.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
-**Version:** v1.401.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
-**Last updated:** 2026-08-30.
+**Version:** v1.403.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Last updated:** 2026-08-31.
+
+**A logged meal is one diary row, and the week-long hold was the spec measuring a moving element (BF-39).** The render half was built on 2026-08-30, passed its own three tests, and was held because the meal library's swipe tray then failed deterministically — recorded as *"a subscriber re-rendering a sibling subtree drops an in-flight `useDrag`"*. **It is none of that.** Sampling the row's rect every frame while the gesture ran: `SwipeActions` mounts once and the drag handler is **never invoked at all**. `toBeVisible()` passes while the sheet is still running its `enter` animation, so `boundingBox()` returned y=605 and the row was at y=503 by the time the CDP touch landed — every point hit the scroll container beneath it. BF-39 never touched the gesture; it added enough work behind the sheet that the animation had not settled. `swipeRowLeft` (`e2e/fixtures.ts`) now waits for two reads a frame apart to agree, all three swipe specs share it, and the pair that failed together passes with the grouping shipped. **The same latent race is in 46 other coordinate reads** — filed as LB-30, not swept ([journal](docs/overview/entries/2026-08-31-diary-nested-meal-rows.md)).
 
 **One photo picker per screen, and the held rebuild's failure was the spec (BF-46 ①a).** Two things
 said *Add a photo* and only one was a picker — the meal's own screen called `onEdit`. Both are real
@@ -48,9 +48,6 @@ for picker cancellations, so choosing a photo on the phone did nothing and said 
 branch takes a `File` from an `<input>` and never fetches, which is why every browser test passed.
 Now `Base64` + `dataUrlToBlob`, and non-cancellations toast. **Verifiable only on the S25**
 ([journal](docs/overview/entries/2026-08-30-meal-photo-data-url-fetch.md)).
-
-**Version:** v1.398.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
-**Last updated:** 2026-08-30.
 
 **The quantity editor is the owner's Option A, and an ingredient stopped claiming servings (BF-46
 ② ③).** The unit toggle moved into a narrow column beside the stepper — which is what frees the
