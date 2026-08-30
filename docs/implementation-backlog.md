@@ -8872,30 +8872,56 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 ### [body][platform] Q-527 — one corrupt body-composition row, and it becomes load-bearing the moment Body Battery uses BMR
 
 - **Branch:** `fix/body-comp-plausibility-guard` · **Lane:** A
-- **Plan:** none needed — a plausibility guard at the write site. Evidence:
+- **Plan:** none needed. Evidence:
   [`docs/reviews/2026-08-19-body-battery-drain-model.md`](reviews/2026-08-19-body-battery-drain-model.md) §2.
 - **Added:** 2026-08-19 · Tuning agent, found while checking the owner's *"BMR draining should
   naturally go up too"* premise against the data.
-- **Measured.** `body_comp` holds 71 daily snapshots. **One is impossible: 2026-07-29 records body fat
-  **3.0%**, fat-free mass **70.4 kg of 72.6 kg** bodyweight, and BMR **1,890** — against ~24% body fat
-  and ~1,520 BMR on the surrounding days.** Three per cent is below the essential-fat floor for a male;
-  this is a bad scale reading propagated through `cunninghamBmr` into a stored BMR **24% above
-  baseline**. One row of 71, so ~1.4% — rare, not impossible.
-- **Why it matters now and did not before.** Nothing currently keys a user-visible number off stored
-  BMR. **Q-521's drain model makes baseline drain proportional to it** (`baseline = 25 × bmrToday /
-  bmrReference`), so this single row becomes a day that drains a quarter faster for no reason the
-  owner can see or explain.
-- **First action:** a plausibility guard at the `body_comp` write site — reject or clamp a snapshot
-  whose body fat falls outside a physiologically possible band, or whose fat-free mass exceeds a
-  plausible share of bodyweight. **Guard the input, not the output**: BMR is derived, so a BMR range
-  check would catch this case and miss the next one.
-- **Also decide what a rejected snapshot does.** Dropping the row leaves a gap; carrying the previous
-  day forward hides that the scale misread. Prefer storing it flagged over storing it silently, so a
-  future audit can see the reading happened — the same reasoning behind readiness's `provisional`
-  flags, which are the reference for this (Q-526).
-- **Do this BEFORE Q-521.** A guard added afterwards leaves already-stored bad rows driving drain.
-- **Caveats:** one athlete, one bad row, 71 snapshots — the *rate* here is not a population estimate.
-  The band itself is a published physiological range, not a fit to this data.
+- **Measured, and re-measured 2026-08-30.** `body_comp` now holds **81** daily snapshots. **One is
+  impossible: 2026-07-29 records body fat 3.0%, fat-free mass 70.4 kg of 72.6 kg bodyweight, and BMR
+  1,890** — against ~24% and ~1,520 on the surrounding days. The next-lowest reading in the entire
+  series is **22.2%**, so the outlier sits alone across a 19-point gap.
+- **⚠️ THE CAUSE IS KNOWN AND THE INPUT GUARD ALREADY SHIPPED — read this before planning.** The
+  entry was written as though nothing guarded the write. Measured 2026-08-30:
+  - **The row is the 2026-07-28 no-contact incident**, which `lib/scale-ble/composition.ts` names in
+    its own comment: socks or dry feet break the foot-plate contact BIA needs, the scale reports
+    impedance **0** rather than omitting the reading, and that drives the impedance term to −∞ and
+    lands the estimate on the estimator's own `clamp(…, 3, 60)` **floor**. `body_metrics` confirms
+    it — the 2026-07-29 row was created `2026-07-28T14:27:43`, `source = scale_ble`, body fat 3.
+  - **`hasValidImpedance` / `MIN_VALID_IMPEDANCE_OHMS = 200` was added in response**, and is called
+    at *both* scale write sites (`/api/scale-ble/samples`, `/api/scale-ble/pending/[id]/confirm`).
+  - **It has held.** `scale_ble` has since written **30** body-fat readings (2026-07-29 → 2026-08-30)
+    and **exactly one is under 10%** — the incident itself, the first of the thirty. Every reading
+    after it is 22.2–25.5%.
+- **The last-line guard shipped 2026-08-30**: `PLAUSIBLE_BODY_FAT_PCT = { min: 4, max: 60 }` in
+  `packages/shared/src/health/body-composition.ts`, applied by `bodyComposition()` and therefore by
+  `bodyCompSnapshot()`. **Its floor sits deliberately above the estimator's clamp floor of 3**, so a
+  floored value cannot walk through, and it covers the sources `hasValidImpedance` cannot see —
+  Health Connect, a manual entry, a second scale. Mutation-verified. It also improves Health's
+  lean-mass card, which shares the helper and was plotting a 17 kg spike on that day.
+- **The sibling sweep is where the real exposure was, and this entry did not name it.** A band in one
+  helper only guards callers that go through it; grepping for the *arithmetic* found **two live
+  surfaces re-deriving `weight × (1 − bf/100)` inline**, both now routed through
+  `bodyComposition()`: `lib/health/energy-balance-service.ts` (the formula baseline behind "what you
+  may eat today" — measured by mutation, a 3% reading gives **2,268 kcal against 1,991**, a
+  **277 kcal/day** inflation) and `calculateBaseline` in
+  `packages/shared/src/nutrition/goal-recommendation.ts` (calorie *and* protein targets, since
+  protein is dosed per kg of lean mass). That is also the One-Formula-One-Place fix — there were
+  three implementations. **The stored row this entry was filed about is inert until Q-521; these two
+  were not.**
+- **Keep:** two things, neither of them code this entry can write.
+  1. **The one historical row is untouched, and that is the owner's call** (same shape as Q-298's
+     ten zero-1RM rows). The guard is forward-only: `persistBodyCompFromMetrics` upserts, so a
+     re-run now *skips* 2026-07-29 rather than correcting it, and the stored snapshot survives.
+     Nulling it is a production data edit, and it is **not** reversible by re-running the backfill —
+     the guard would refuse to re-derive it. The measurement itself stays in `body_metrics` either
+     way, so nothing is lost by nulling and nothing is at risk by keeping it *until* Q-521 ships.
+  2. **Q-521 must not trust a stored snapshot blindly.** Its drain model reads `body_comp.bmr_kcal`,
+     and a write-site guard cannot reach a row already written. Apply `isPlausibleBodyFatPct` to the
+     snapshot on read, or resolve item 1 first. **This is the "do it BEFORE Q-521" line, restated as
+     something Q-521's implementer can act on** — the guard alone does not discharge it.
+- **Caveats, unchanged:** one athlete, one bad row, 81 snapshots — the *rate* here is not a
+  population estimate. The band is published physiology, not a fit to this data.
+
 
 ### [activity][heart-rate] Q-522 — the movement-per-hour contributor is saturated: it measures ring wear, not movement
 
@@ -9520,39 +9546,49 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   mouse input. (Q-282 shipped as `e2e/touch-target-size.spec.ts` and does **not** — it measures
   rendered geometry from the DOM and never clicks, so it does not revive this.)
 
-### [platform] Q-297 — finish the E2E specs Q-249's first PR deliberately left, and cover more than one tab per screen
+### [platform] Q-297 — cover Nutrition's day navigation; the write-path specs it asked for have shipped
 
 - **Branch:** `feat/e2e-specs-round-2`
-- **Added:** 2026-08-15 · follow-up to Q-249, which shipped the harness
-  (`playwright.config.ts`, `e2e/`, the `E2E` CI job) plus one spec. Read
-  [`e2e/README.md`](../e2e/README.md) first — it records what a green run does and does not prove,
-  and every limitation below was measured, not guessed.
-- **DONE 2026-08-15 for Health — the multi-panel coverage gap.** `e2e/health-tabs-instant-paint.spec.ts`
-  drives `?tab=training|body|progress` and asserts the requested tab is the *selected* one before
-  checking, so the panel under test is actually in the viewport. Verified by the mutation Q-249's
-  spec could not catch: forcing Health's Body-tile skeletons to never clear now fails — and fails
-  **only** the Body case, leaving Training and Progress green.
-- **Still open for every other tabbed screen.** The `expectNoSkeleton` viewport rule is unchanged and
-  correct (an inactive `SwipeCarousel` panel is mounted but unseen, and its data loads on swipe by
-  design), so any single-URL spec still covers one tab. Nutrition's date swipe and any other tabbed
-  surface need the same treatment: drive the tab, assert which panel is selected, then check.
-- **The specs Q-249 scoped and this did not ship:** log a set, a food entry and a water entry and
-  assert each appears without a reload; change a goal and assert the Health tab reflects it (the
-  Q-240 regression, four lines of E2E for a bug this repo has already had once).
-- **A limitation worth closing separately:** the 20 s skeleton budget cannot tell "seeds instantly
-  from cache" from "seeds in 8 s off the network", because the harness runs `pnpm dev` and route
-  handlers compile on first call. It catches a card that *never* seeds, not a regression from
-  instant to sluggish. Measuring the second would need a warmed server and a much tighter budget.
-- **The E2E job is NOT a required status check** and should stay that way until it has a track
-  record — branch protection requires Lint, Tests, Build, Custom Rules and Migration Check. Promote
-  it once it has run green across a few weeks without flaking, and say so in the PR that does.
+- **Added:** 2026-08-15 · follow-up to Q-249, which shipped the harness. Read
+  [`e2e/README.md`](../e2e/README.md) first — it records what a green run does and does not prove.
+- **⚠️ RE-VERIFIED 2026-08-30 and most of this entry was stale.** Read this block before planning;
+  four of the five things it asked for are in `e2e/` already, under other entries' numbers.
+  - *"log a set … assert it appears without a reload"* → **`workout-set-loop.spec.ts`** (Q-461).
+  - *"a food entry"* → **`food-logging-complete.spec.ts`** (Q-387).
+  - *"a water entry"* → **`water-log-write-path.spec.ts`**, whose header names Q-297 outright:
+    *"the first write-path spec: a logged value must appear on the screen that triggered it,
+    without a reload."*
+  - *"change a goal and assert the Health tab reflects it (the Q-240 regression)"* →
+    **`goal-round-trip.spec.ts`** covers the write reaching another screen, and
+    **`goal-invalidation.spec.ts`** establishes by mutation that **no guard can exist** for the
+    Q-240 path specifically: `cachedFetchCore` always revalidates unless `freshWithinTtl` is set,
+    and the stale flash comes from Health's retained React state rather than the cache. That is a
+    settled negative result, not an outstanding item.
+  - *"Nutrition's date swipe and any other tabbed surface"* → **there is no other tabbed surface.**
+    `SwipeCarousel` is used by exactly one screen (`health-content.tsx`) plus two pickers
+    (`walk-config`, `run-type-carousel`), so `health-tabs-instant-paint.spec.ts` already covers the
+    whole population. Nutrition has a **day**, not tabs.
+- **Nutrition's day navigation is covered as of 2026-08-30** — `e2e/nutrition-day-navigation.spec.ts`
+  pins the two entry points to each other (the header chevrons and the `?date=` deep link the Home
+  timeline's meal cards use), the today guard on Next day, and instant paint on returning to a day
+  already viewed. **Driven by the chevrons, not the swipe**, because `useDrag` on this screen
+  swallows mouse input (**Q-354**, open) and mouse is what Playwright sends — a swipe-driven spec
+  would assert against a known-broken path. Cover the swipe when Q-354 lands.
+- **What is genuinely left, and it is small:**
+  - The **20 s skeleton budget cannot tell "seeds instantly from cache" from "seeds in 8 s off the
+    network"**, because the harness runs `pnpm dev` and route handlers compile on first call. It
+    catches a card that *never* seeds, not a regression from instant to sluggish. Measuring the
+    second needs a warmed server and a much tighter budget, and is its own piece of work.
+  - **Whether the E2E job should become a required check.** This entry said keep it optional until
+    it has a track record; LA-22 has since made it always-run and always-report specifically so it
+    is safe to require. Its current branch-protection state was not checked here — check before
+    changing anything.
 - **Do not chase a skeleton into a "fix" without checking which panel it is on.** The Q-249 session
-  found the Injuries card stuck in a loading state, traced it to `injuries` being fetched only by
-  the Body tab's group, and changed `health-content.tsx` — then reverted it on discovering the card
-  is off-screen in an inactive carousel panel and loads on swipe, exactly as designed. The milder
-  real behaviour is that arriving on Body or Progress for the first time shows a brief skeleton,
-  because nothing has written the cache the mount seed reads. That may be worth fixing; it is not
-  the bug it first looked like.
+  found the Injuries card stuck loading, traced it to `injuries` being fetched only by the Body tab's
+  group, changed `health-content.tsx` — then reverted on discovering the card is off-screen in an
+  inactive carousel panel and loads on swipe, exactly as designed. The milder real behaviour is that
+  arriving on Body or Progress for the first time shows a brief skeleton, because nothing has written
+  the cache the mount seed reads. That may be worth fixing; it is not the bug it first looked like.
 
 ### [platform][devices] Q-250 — an Android emulator job in CI, to close the 17 rows that need an Android runtime and nothing else
 

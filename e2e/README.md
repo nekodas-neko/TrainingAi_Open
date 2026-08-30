@@ -95,6 +95,13 @@ Chromium-on-Linux, and gestures behave differently under a real thumb. Those sti
 - **Assert a direction, not a figure, for anything a rerun changes.** The water spec asserts the
   total *increased*; an absolute litre value would pass on the first run and fail on the second,
   since the seeded DB is shared and not reset between runs.
+- **A control that Playwright never clicks may be `aria-disabled` rather than broken.** Playwright
+  counts `aria-disabled="true"` as *not enabled*, so `click()` waits for it to become enabled and
+  hits the 45 s test timeout instead of failing with anything useful. The browser and a real tap
+  both dispatch the click — `aria-disabled` blocks no pointer event — so the app's own handler is
+  the only thing refusing the action, and that is usually the thing worth testing. Click it with
+  `{ force: true }` and assert the *outcome*, not the attribute: an attribute assertion passes with
+  the handler's guard deleted. `nutrition-day-navigation.spec.ts`'s today guard is the reference.
 - **If a tap does nothing, suspect a gesture handler before you suspect hydration.** On Nutrition a
   real touch sequence does not open the water sheet while a synthesised `click` event does — filed
   as Q-309, with the workaround and its reasoning in `water-log-write-path.spec.ts`. A spec that

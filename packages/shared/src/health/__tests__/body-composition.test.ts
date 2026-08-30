@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest'
-import { bodyComposition, cunninghamBmr, bodyCompSnapshot } from '../body-composition'
+import {
+  bodyComposition, cunninghamBmr, bodyCompSnapshot,
+  isPlausibleBodyFatPct, PLAUSIBLE_BODY_FAT_PCT,
+} from '../body-composition'
 
 describe('bodyComposition', () => {
   it('derives fat mass, lean mass, and Cunningham BMR', () => {
@@ -9,11 +12,11 @@ describe('bodyComposition', () => {
     expect(c.bmrKcal).toBeCloseTo(64 * 21.6 + 370, 6) // 1752.4
   })
 
-  it('0% body fat → all mass is lean', () => {
-    const c = bodyComposition(70, 0)!
-    expect(c.fatMassKg).toBe(0)
-    expect(c.ffmKg).toBe(70)
-    expect(c.bmrKcal).toBeCloseTo(70 * 21.6 + 370, 6)
+  it('holds at the low end of the plausible band', () => {
+    const c = bodyComposition(70, PLAUSIBLE_BODY_FAT_PCT.min)!
+    expect(c.fatMassKg).toBeCloseTo(70 * 0.04, 6)
+    expect(c.ffmKg).toBeCloseTo(70 - 70 * 0.04, 6)
+    expect(c.bmrKcal).toBeCloseTo((70 - 70 * 0.04) * 21.6 + 370, 6)
   })
 
   it('returns null for missing/implausible inputs (never fabricates)', () => {
@@ -25,6 +28,48 @@ describe('bodyComposition', () => {
     expect(bodyComposition(80, -1)).toBeNull()
     expect(bodyComposition(80, 101)).toBeNull()
     expect(bodyComposition(NaN, 20)).toBeNull()
+  })
+
+  /**
+   * Q-527. `body_comp` held one snapshot of 81 reading 3.0% body fat — 70.4 kg of lean mass on a
+   * 72.6 kg bodyweight, and a stored BMR 24% above baseline. It is a no-contact scale reading
+   * (impedance 0) that the estimator's own `clamp(…, 3, 60)` floored to 3, arriving here
+   * indistinguishable from a measurement. `hasValidImpedance` refuses those at the scale now; this
+   * is the last line before storage, for the sources it cannot see.
+   *
+   * Pinned to the real numbers rather than a round fixture, so the case this exists for is the
+   * case that is tested.
+   */
+  it('rejects the floored no-contact scale reading (Q-527, 2026-07-29)', () => {
+    expect(bodyComposition(72.55, 3)).toBeNull()
+    expect(bodyCompSnapshot(72.55, 3)).toBeNull()
+  })
+
+  it('leaves every real reading in the series alone', () => {
+    // The lowest and highest body fat actually recorded across all three sources in 81 snapshots.
+    expect(bodyComposition(71.1, 22.2)).not.toBeNull()
+    expect(bodyComposition(71.1, 25.5)).not.toBeNull()
+  })
+})
+
+describe('isPlausibleBodyFatPct', () => {
+  it('is inclusive at both ends of the band', () => {
+    expect(isPlausibleBodyFatPct(PLAUSIBLE_BODY_FAT_PCT.min)).toBe(true)
+    expect(isPlausibleBodyFatPct(PLAUSIBLE_BODY_FAT_PCT.max)).toBe(true)
+  })
+
+  it('rejects just outside it', () => {
+    expect(isPlausibleBodyFatPct(PLAUSIBLE_BODY_FAT_PCT.min - 0.1)).toBe(false)
+    expect(isPlausibleBodyFatPct(PLAUSIBLE_BODY_FAT_PCT.max + 0.1)).toBe(false)
+  })
+
+  /**
+   * The floor has to sit ABOVE the scale estimator's own clamp floor or the floored value it
+   * produces walks straight through. `lib/scale-ble/composition.ts` clamps to `[3, 60]`; a floor
+   * equal to 3 would accept exactly the reading this guard exists for.
+   */
+  it('sits above the scale estimator clamp floor of 3', () => {
+    expect(PLAUSIBLE_BODY_FAT_PCT.min).toBeGreaterThan(3)
   })
 })
 
