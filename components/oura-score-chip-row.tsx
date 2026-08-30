@@ -4,6 +4,7 @@ import { memo, useEffect, useState, type CSSProperties, type ReactNode } from "r
 import { useTransitionRouter } from "@/lib/view-transition";
 import { Zap, Moon, Flame, HeartPulse, TriangleAlert, type LucideIcon } from "lucide-react";
 import { scoreBand } from "@trainingai/shared/health/score-band";
+import { restingHrCue } from "@trainingai/shared/health/resting-hr-cue";
 import { loadScoreRingStyle, SCORE_RING_STYLE_CHANGE_EVENT, type ScoreRingStyle } from "@/lib/home/home-prefs";
 import {
   SolidRingFrame, OpenRingFrame, PerforatedRingFrame, AccentRingFrame, HaloFrame,
@@ -23,17 +24,6 @@ function scoreCue(value: number | null): { color: string; word: string } | null 
   if (value == null) return null;
   const b = scoreBand(value);
   return { color: b.color, word: b.label };
-}
-
-// Resting-HR cue — NOT a 0–100 score, so this is a status tier rather than a fabricated percentage.
-function restingHrCue(bpm: number | null, baseline: number | null): { color: string; word: string } | null {
-  if (bpm == null) return null;
-  if (baseline == null) return { color: "hsl(var(--muted-foreground))", word: "Resting" };
-  const delta = bpm - baseline;
-  if (delta <= -2) return { color: scoreBand(85).color, word: "Low" };
-  if (delta <= 2) return { color: scoreBand(75).color, word: "Steady" };
-  if (delta <= 5) return { color: scoreBand(60).color, word: "Elevated" };
-  return { color: scoreBand(40).color, word: "High" };
 }
 
 // Which layout family a style belongs to. The five original styles and the two frameless ones added
@@ -379,6 +369,7 @@ export const OuraScoreChipRow = memo(function OuraScoreChipRow({ readiness }: Pr
 
   if (
     readiness.readinessDisplayScore == null &&
+    readiness.restingHrLastNight == null &&
     readiness.restingHr == null &&
     readiness.hrCurrent == null &&
     readiness.sleepScore == null &&
@@ -387,7 +378,16 @@ export const OuraScoreChipRow = memo(function OuraScoreChipRow({ readiness }: Pr
     return null;
   }
 
-  const hr = readiness.restingHr ?? readiness.hrCurrent;
+  // TN-13 — LAST NIGHT's resting HR, not the 7-day mean. Measured against production over 71
+  // nights: the nightly value changes on **61 of 70** night-pairs, while the rounded 7-day mean
+  // changes on **29** — so the number on this tile stood still on nearly six days in ten, in the
+  // signal that best predicts how the owner feels (r = +0.557 against their own check-in, the best
+  // of nine).
+  //
+  // `restingHr` stays the fallback for a user with no reading in the last 7 days: a week-old mean
+  // beats an empty tile, and beats `hrCurrent`, which is a live BLE sample rather than a resting
+  // rate — a desk reading, not a night.
+  const hr = readiness.restingHrLastNight ?? readiness.restingHr ?? readiness.hrCurrent;
 
   const cells: CellProps[] = [
     {
