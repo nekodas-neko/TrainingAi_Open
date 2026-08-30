@@ -27,6 +27,8 @@
 **Version:** v1.395.6 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-08-30.
 
+**The accessibility scanner that would have passed a 12 px button (Q-282).** `@axe-core/playwright` was installed, measured and removed: WCAG 2.5.8 exempts a *spaced* undersized control, so a deliberately-shrunk **12×12** button (confirmed by `boundingBox`) came back a **pass**, and `color-contrast` cannot read this app at all — it fails to parse the `oklch` tokens (*"Could not parse color string oklab(…)"*) and **evaluated no nodes on Home**. `e2e/touch-target-size.spec.ts` ships instead: DOM geometry against **this repo's 48 dp bar**, covering the roles `globals.css`'s `button, [role="button"]` floor cannot (`<a>`, `role="tab"`, `role="radio"`). It fails on the mutation axe passed. One real finding, **LB-26**: Home's APK-banner link is 258×33 ([journal](docs/overview/entries/2026-08-30-touch-target-gate.md)).
+
 **The BLE console counted rows it had been guessing (BF-54).** Its DB footprint printed
 `n_live_tup` under a column headed *rows* — a planner estimate, and `last_analyze` is NULL on every
 table here, so it read **552** against `oura_raw_samples`' **180,415**, 0 against `rr_intervals`'
@@ -853,8 +855,6 @@ one of our own `history.back()` calls was per-instance, so a sheet closing and a
 the same tick could not see each other's and **the confirm dialog closed on the frame it opened** —
 the owner's *"the delete feature doesnt work"*. Both fixed, both pinned by tests that fail on the old
 logic. **Neither has been felt on a real gesture bar, which is the only place either lived.**
-**BF-29's swipe folds in here** (v1.376.0) — same screen, one device pass: row actions come from **dragging a row left**, a gesture this app had nowhere else, and e2e drives it with real CDP touch events so the handler fires — but **no sandbox proves it coexists with Samsung's scroll physics.**
-
 On the S25: tap a diary row, tap the bin — the confirm dialog must **stay** open and be tappable, and
 Cancel must cancel. Press back from an open meal: it unwinds one layer per press, meal → Log Food →
 the page. **Two presses now, not three** — LB-16 collapsed that screen, so the middle layer is gone and
