@@ -22,6 +22,12 @@ export interface ColmiReadingInput {
   valueHigh?: number | null
 }
 
+export interface ColmiRawFrameInput {
+  channel: 'v1' | 'v2'
+  tag: number | null
+  hex: string
+}
+
 export interface ColmiSleepSegmentInput {
   localDate: string
   startedAt: Date
@@ -121,4 +127,20 @@ export async function getColmiLatestReadingAt(db: Db, userId: string): Promise<D
     .orderBy(desc(s.colmiReadings.measuredAt))
     .limit(1)
   return row?.measuredAt ?? null
+}
+
+/**
+ * The archival write. Deduped on `(user_id, channel, hex)` because a re-sync re-sends the same
+ * history verbatim — two identical frames carry the same information, so keeping one is not a loss.
+ *
+ * This never rejects. A frame the decoders cannot read is exactly the frame worth having, which is
+ * the whole reason the decoded tables are not sufficient on their own.
+ */
+export async function insertColmiRawFrames(db: Db, userId: string, rows: ColmiRawFrameInput[]): Promise<number> {
+  if (rows.length === 0) return 0
+  const inserted = await db.insert(s.colmiRawFrames)
+    .values(rows.map(r => ({ userId, channel: r.channel, tag: r.tag, hex: r.hex })))
+    .onConflictDoNothing()
+    .returning({ id: s.colmiRawFrames.id })
+  return inserted.length
 }

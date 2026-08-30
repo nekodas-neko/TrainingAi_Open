@@ -3273,3 +3273,38 @@ The rest is the measurement that makes the change worth understanding rather tha
 nine-option picker the model types out costs ~554 output tokens, and output is essentially all of
 Coach's latency, which is why six curated lists became choice sources rather than staying literals
 in a component.
+## 2026-08-27 — `docs/implementation-backlog.md` raised (LB-23, LB-24 filed by Q-112a)
+
+48 net lines (12760 after merging main twice, which added 36 of its own without needing a raise):
+two
+entries filed, minus Q-112a's own removal on shipping.
+
+**LB-24 is the one worth the space.** Deleting `day-review-sheet.tsx` left
+`workout-load-comparison-chart.tsx` with zero call sites and `/api/workout-load-history` with zero
+client callers — and the obvious tidy-up is wrong, because Q-112c's plan names that route as one of
+the series it reuses for the 7-day window. Without the entry the next dead-code sweep deletes work
+Q-112c is about to need, or leaves it forever because nobody wrote down which. It records the
+decision point (after Q-112d) and the fact that `invalidateWorkoutSummaries()` still prefix-clears
+an inert key.
+
+**LB-23** costs less and exists because an E2E comment already pointed at it: three sheets render an
+`sr-only` `SheetTitle` and a visible `<h2>` carrying the same string, so the dialog's accessible name
+is announced twice and `getByRole('heading')` is ambiguous. It names the fourth sheet that is *not* a
+violator, so a sweep does not "fix" the one that is already right.
+
+## 2026-08-27 — `docs/implementation-backlog.md` raised (LB-25 replaces the shipped Q-112b)
+
+20 net lines (12780). Q-112b's four-line entry is gone; LB-25 is longer because it records **why**
+the one stat it could not ship is not simply "add a stat".
+
+Body temperature has no client-reachable source. `oura_daily.temperature_deviation` is the frozen
+Cloud column the plan forbids; the live derived values (`oura_daily_summary.temp_mean_c` /
+`temp_dev_c`) are returned by **no route** — `health-insight` reads `tempDevC` and feeds it to a
+prompt, which is not a payload. They *are* in the local store, so a device-only local-first read
+would work and would be unverifiable in `pnpm dev` or Playwright. Without that written down, the
+next attempt either re-derives it or takes the local-first path without noticing it has given up the
+web harness.
+
+It also records the near-free adjacency: the day HR trace is bucketed by **mean**, so the range that
+shipped is labelled "15-min averages"; `oura_bucket.hr_min` / `hr_max` would let it say Low and High
+honestly, in the same route change.

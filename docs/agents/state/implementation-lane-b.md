@@ -3,7 +3,7 @@
 > **Successor sessions are titled `🚧 Implementation Agent (B) 🟢`** — exactly. A renamed successor
 > is a lost thread.
 
-**Updated:** 2026-08-27 · **By:** the fifteenth Lane B run · **Next ID:** `LB-23`
+**Updated:** 2026-08-27 · **By:** the fifteenth Lane B run · **Next ID:** `LB-26`
 
 ## Now
 Merged this run: **#568** (BF-11f meal-type tags), **#570** (LB-20), **#573** (BF-11h the planner's
