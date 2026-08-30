@@ -453,28 +453,40 @@ be sparser than the ring's own history; and activity is requested for 3 days by 
 
 - **Lane:** A (the engine)
 - **Added:** 2026-08-27, from a hand comparison the endpoint should have produced
+- **Needs:** PS-16
+- **Keep:** only the STEPS half. The phase and the units halves shipped 2026-08-30 (PR pending) —
+  the route now derives its bucket width from the coarser series and reports `bucketSource`,
+  `pairSummary` returns `verdict: 'out-of-phase' | 'no-data' | 'compared'`, and a pair in mismatched
+  units returns rank agreement with the magnitudes suppressed. `stress` is a comparable metric.
+  Steps stay unbuilt **on purpose**: see the shape paragraph below and PS-16.
 
 Two separate reasons a three-device comparison returned nothing useful, both in
 `lib/health/device-comparison.ts` and `app/api/admin/device-comparison/route.ts`.
 
-**Phase, not absence.** Oura's daytime stress lands at **:15 and :45**
+**Phase, not absence — SHIPPED 2026-08-30.** Oura's daytime stress lands at **:15 and :45**
 (`oura_daytime_stress_buckets`); the Colmi's lands at **:00 and :30**. They are permanently 15
-minutes out of phase, so at the route's `DEFAULT_BUCKET_MINUTES = 5` no pair ever forms and
-`overlap` reads 0 — which reads as two devices that disagree when it means two devices that were
+minutes out of phase, so at the route's `DEFAULT_BUCKET_MINUTES = 5` no pair ever formed and
+`overlap` read 0 — which reads as two devices that disagree when it means two devices that were
 never compared. Bucketing at 30 minutes pairs them: measured by hand over the 8 afternoon
 buckets of 2026-08-27, **Spearman rho = 0.64**, Pearson 0.58.
-The route should pick its bucket width from the coarser of the two series rather than a constant,
-and report "not comparable at this width" distinctly from "compared, and they disagree".
+`coarsestCadenceMinutes` now picks the width from the coarser series (median inter-sample gap, so a
+single overnight gap cannot drag it), an explicit `?bucket=` still wins, and the response says which
+happened. `DEFAULT_BUCKET_MINUTES` survives as the fallback for a series too short to have a cadence.
 
-**Shape, not phase.** Steps have no path through the harness at all: Oura writes a **daily scalar**
-to `body_metrics.steps`, the Colmi writes an **hourly series** to `colmi_readings`. `alignSeries`
-takes two series. Comparing them needs the Colmi side summed to a day first, which is a different
-operation and currently exists nowhere.
+**Shape, not phase — NOT built, and blocked behind PS-16.** Steps have no path through the harness
+at all: Oura writes a **daily scalar** to `body_metrics.steps`, the Colmi writes an **hourly series**
+to `colmi_readings`. `alignSeries` takes two series. Comparing them needs the Colmi side summed to a
+day first, which is a different operation and currently exists nowhere — and PS-16 is the reason it
+should stay that way for now: *"summing a cumulative counter gives a number that is badly wrong and
+still looks plausible."* Building the summation before the counted walk answers the question would
+put exactly that number in front of a reader. `METRICS` therefore rejects `steps` explicitly rather
+than quietly comparing heart rate instead.
 
-**Scales differ and the harness does not know it.** Oura stress is normalised to −1..+1; Colmi's is
-0..100 raw. `meanBias` and `meanAbsDelta` are meaningless across them — only rank agreement is.
-A pair whose units differ should return rank statistics and suppress the magnitude ones rather than
-printing a bias in mixed units.
+**Scales differ and the harness does not know it — SHIPPED 2026-08-30.** Oura stress is normalised
+to −1..+1; Colmi's is 0..100 raw. `meanBias` and `meanAbsDelta` are meaningless across them — only
+rank agreement is. `NamedSeries.unit` declares the scale, `pairSummary` suppresses the magnitude
+statistics when two units differ and names them in `unitsDiffer`, and `spearman` (new, in
+`packages/shared/src/health/correlation.ts` beside `pearson`) is reported for every compared pair.
 
 ### [devices] PS-16 — settle whether the Colmi's activity buckets are cumulative, with a counted walk
 
@@ -2093,6 +2105,44 @@ whether or not anyone draws them first.
   `pnpm check:rules`. Then the **on-device smoke run** — this is pure UI on the canonical runtime,
   in both themes, so a green `pnpm dev` is not sufficient evidence and a Known-Issues row is the
   fallback if no device is available.
+
+### [platform] LA-35 — the module map points at `lib/` for 34 modules that live in `packages/shared/`, and the check that should catch it blesses the mistake
+
+- **Lane:** A (the engine)
+- **Added:** 2026-08-30, found while updating the map for PS-15
+
+`CLAUDE.md` names this exact trap under **One Formula, One Place**: *"Most of it is in
+`packages/shared/src/`, not `lib/` — the monorepo extraction moved it and this rule kept saying
+`lib/` for months (Q-153). Check `docs/module-map.md` for where a given formula actually is rather
+than guessing a directory."* The map it sends you to is wrong the same way, for **34 paths**:
+
+```
+lib/health/{activity-score,body-composition,cadence,chronic-stress-assembly,daily-medians,
+daily-summary,daytime-hrv,daytime-hrv-model,fitness-tests,gait-classifier,hr-recovery-by-exercise,
+hr-smoothing,hr-zones,hrv-5min,hrv-frequency,illness-radar,intraday-spo2,intraday-temp,metric-trend,
+model-report-calibration,personal-baseline,readiness-composite,recovery-band,sleep-night,sleep-score,
+sleep-staging,sleep-trend,step-estimate,tachogram,temperature-baseline,training-stress,vo2max,
+wear-confidence,zone-minutes}.ts
+```
+
+Every one is `packages/shared/src/health/<same>.ts`. `lib/health/` is a real directory with nine
+other files in it, so the wrong paths look plausible and resolve to nothing.
+
+**The reason it has survived is the check.** `scripts/check-index-doc-paths.js` was written (Q-554)
+precisely so an orientation doc cannot name a path that does not exist — and its `resolves()` ends
+with `'packages/shared/src/' + p.replace(/^lib\//, '')`. That fallback accepts a `lib/` path whenever
+the file exists under `packages/shared/src/`, which is not a lenient edge case: **it is the single
+error class the map exists to prevent, whitelisted.** The check reports OK on all 34.
+
+**The work:** move the paths to where the files are (mechanical, docs-only, verify each with
+`ls`), then delete the `packages/shared/src/` fallback from `resolves()` so the check holds it. Run
+the whole thing in that order — the fallback deletion turns the sweep into a CI-enforced fact rather
+than a state the next edit can undo. Expect the deletion to surface a handful outside
+`lib/health/` too (`lib/1rm.ts`, `lib/date-utils.ts` and similar), which is the point.
+
+**Not urgent, and not cosmetic.** Nothing breaks, but the failure mode is a session concluding a
+module is absent and writing a second copy — which is what `docs/module-map.md` is read to prevent,
+and what the One Formula rule calls "a bug by definition".
 
 ### [platform] LB-19 — two e2e specs fail on `main` in-session, and the cause is a time budget rather than a defect
 

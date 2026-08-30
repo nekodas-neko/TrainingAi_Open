@@ -20,6 +20,12 @@
 // reverse this; the column does not). `ratingAsScore` inverts that onto the model's higher-is-better
 // axis. Getting it backwards inverts every correlation reported, which is why it has its own test.
 
+// `averageRanks` is imported rather than kept private: rank correlation is the statistic that
+// survives a comparison in mismatched units, and PS-15 needed a second one — the device-comparison
+// endpoint, where Oura stress is normalised -1..+1 and the Colmi's is raw 0..100. One copy, in the
+// module that owns correlation.
+import { averageRanks } from './correlation'
+
 export interface CalibrationCopy {
   /** Singular noun for one observation — 'night', 'day'. */
   unit: string
@@ -95,21 +101,6 @@ export const MIN_PAIRED_FOR_CORRELATION = 8
 const WORST_LIMIT = 5
 /** A bucket mean is only compared against its neighbours when it has at least this many days. */
 const MIN_BUCKET_FOR_MONOTONICITY = 2
-
-/** Average ranks (1-based), ties sharing the mean of the positions they span. */
-function averageRanks(values: number[]): number[] {
-  const order = values.map((_, i) => i).sort((a, b) => values[a] - values[b])
-  const ranks = new Array<number>(values.length)
-  let i = 0
-  while (i < order.length) {
-    let j = i
-    while (j + 1 < order.length && values[order[j + 1]] === values[order[i]]) j++
-    const shared = (i + j) / 2 + 1
-    for (let k = i; k <= j; k++) ranks[order[k]] = shared
-    i = j + 1
-  }
-  return ranks
-}
 
 function pearson(xs: number[], ys: number[]): number | null {
   const n = xs.length

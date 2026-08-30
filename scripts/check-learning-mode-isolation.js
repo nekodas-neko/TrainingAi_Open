@@ -159,6 +159,12 @@ for (const family of LEARNING_MODE) {
     const SANCTIONED_READERS = new Set([
       'lib/oura-comparison-harness-adapters.ts',   // the comparison harness — the point of learning mode
       'components/settings/colmi-pairing.tsx',     // pair / sync UI: drives the device, computes nothing
+      // Mounted in the tab shell so the ring syncs unattended. It TRIGGERS a sync and reads nothing:
+      // the isolation protected here is that no scoring input is fed from the ring, and a caller
+      // that only starts an ingest cannot breach it. Needed because four of the ring's metrics are
+      // offered for the CURRENT DAY ONLY — a day whose evening is never synced loses them for good,
+      // which happened twice in the baseline week's first three days.
+      'lib/hooks/use-colmi-auto-sync.ts',
     ]);
     if (!owned(rel) && !SANCTIONED_READERS.has(rel)) {
       for (const d of family.ownDirs) {

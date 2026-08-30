@@ -9,7 +9,7 @@
 // is 23 or 25 hours long. The owner's zone (Australia/Brisbane) has no DST and would never show it,
 // which is exactly why it would ship. Building the local wall-clock string and converting once is
 // correct in every zone.
-import { fromZonedTime } from 'date-fns-tz'
+import { fromZonedTime, formatInTimeZone } from 'date-fns-tz'
 import { shiftDateStr, DEFAULT_TZ } from '@trainingai/shared/date-utils'
 
 const MINUTES_PER_DAY = 1440
@@ -109,4 +109,14 @@ export function wallClockSecondsToEpochMs(wallSeconds: number, tz: string = DEFA
   const wall = `${asIfUtc.getUTCFullYear()}-${p(asIfUtc.getUTCMonth() + 1)}-${p(asIfUtc.getUTCDate())}`
     + `T${p(asIfUtc.getUTCHours())}:${p(asIfUtc.getUTCMinutes())}:${p(asIfUtc.getUTCSeconds())}`
   return fromZonedTime(wall, tz).getTime()
+}
+
+/** Wall-clock parts in the USER's zone — the ring's clock is set from these, never from the device's
+ *  own locale, so a phone carried into another zone cannot mis-stamp the ring's history. Shared:
+ *  the sync card and the auto-sync hook both build the same argument, and two copies of a clock
+ *  helper is how they drift. */
+export function nowPartsInTz(tz: string = DEFAULT_TZ) {
+  const [year, month, day, hour, minute, second] =
+    formatInTimeZone(new Date(), tz, 'yyyy-MM-dd-HH-mm-ss').split('-').map(Number)
+  return { year, month, day, hour, minute, second }
 }
