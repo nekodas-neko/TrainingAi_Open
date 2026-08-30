@@ -3580,6 +3580,7 @@ reading that matters is not "the route stopped wasting tokens" — it is that an
 a plan the AI had nothing to do with. A status line that led with the tokens would leave the next
 reader thinking this was an optimisation, and the reproduction (no API key: pre-fix 502, post-fix
 200) is the sentence that stops it.
+
 ## 2026-08-30 — `docs/implementation-backlog.md` raised (second device pass; net +54 after a closure)
 
 68 lines added and one entry deleted. **BF-53 is most of it and it is a live production defect found
@@ -3619,6 +3620,7 @@ earlier — roughly seven times the expected trend, which CLAUDE.md says to reco
 "only allowed for making it primary" and in fact proposed the swap correctly; one line in its
 consequence list disclosed a role promotion nobody asked for, which silently undoes the owner's
 deliberate no-Primary session. The card is not at fault — disclosing the change is how it was caught.
+
 ## 2026-08-30 — `docs/implementation-backlog.md` raised (third device pass; four of six reports already filed)
 
 85 lines, and the ratio is the point: **six owner reports produced one new entry.** Four landed on
@@ -3684,3 +3686,21 @@ Removed, with a note on each explaining why not to add it back. The device is st
 done — that belongs in Verification, which all four already state. **A gate parks work; a
 verification requirement does not.** The rule was in `docs/agents/README.md` the whole time; it was
 filled in from the field name rather than from the runner.
+## 2026-08-30 — `projectOverview.md` 8347 → 8357, `docs/implementation-backlog.md` 13376 → 13330 (BF-21 shipped)
+
+**Amended on the merge with `main`.** Two branches touched this number in parallel — the second
+device pass raised it to 13539 while BF-21 lowered it to 13330 — so the conflict is two PRs
+disagreeing about one document, which is the case the per-file split is meant to surface rather than
+hide. Resolved to the merged file's actual **13493**: both sides' edits are present, and the ratchet
+sits on the truth rather than on either branch's view of it. Then **again**, on a second re-merge minutes
+later: `main` had moved twice more and the number was 13731, resolved the same way to the merged
+actual. Three branches disagreeing about one line in one morning is the shape to expect while several
+agents are landing — the resolution is never to pick a side, it is to count the file.
+
+The backlog **shrinks 46** — BF-21 left the queue, and the new number is the floor.
+
+`projectOverview.md` +10, one Current Status paragraph. Two of its lines exist to stop a wrong
+conclusion rather than to describe the change: that the counters start empty from the restart, so a
+read in the first hours means nothing, and that BF-19 already measured the database and it is not
+where the reported slowness is. Without them the next session reads a clean `pg_stat_statements` and
+closes the slow-load question on it, which is the mistake the entry itself warned about.

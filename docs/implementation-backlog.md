@@ -14,7 +14,7 @@ silently misdirecting the next session. Update them in the same PR that consumes
 
 | Pointer | Value | Source of truth |
 |---|---|---|
-| Next free Postgres migration | **242** | `lib/data/postgres/migrations/` |
+| Next free Postgres migration | **243** | `lib/data/postgres/migrations/` |
 | Local SQLite schema version | **v31** | `lib/sqlite/migrations.ts`; `lib/sqlite/__tests__/migrations.test.ts` asserts the max |
 
 > **There is no third pointer any more.** Entry IDs are not allocated from a shared counter and
@@ -4551,52 +4551,6 @@ lived context.
 - **What would count as fixed:** the owner can go a normal week without a force restart changing how
   the app feels, and there is a measurement showing why rather than an inference.
 - **Surface: device only.** Every negative above is from source inspection, not from a running S25.
-
-### [platform] BF-21 — expose `pg_stat_statements` to `claude_ro` once the owner enables it
-
-- **Branch:** _unassigned_
-- **Added:** 2026-08-25 · owner approved enabling it after BF-19's investigation
-- **Lane: A** — **this entry exists because it needs a migration number, which BugFix may not take.**
-  One `claude_ro` view + grant, at the next free number.
-- **✅ OWNER GATE CLEARED 2026-08-30.** Verified by the owner in the Railway Postgres console:
-  `SHOW shared_preload_libraries` returns `pg_stat_statements`, and
-  `SELECT count(*) FROM pg_extension WHERE extname='pg_stat_statements'` returns **1**. The owner's
-  half below is done; **only this entry's half remains** — the `claude_ro` view plus grant, at the
-  next free migration number, which is why this is Lane A's and not intake's.
-- **The counters start empty and fill from that restart onward.** A read in the first minutes is not
-  evidence of anything. Give it a day of normal use before drawing a conclusion, and note that
-  `pg_stat_statements.max` (default 5,000 statements) silently evicts the least-executed shapes —
-  check `pg_stat_statements_info.dealloc` is 0 before treating the table as complete.
-
-**The owner's half, in order.** `shared_preload_libraries` must include `pg_stat_statements` before
-the extension can work; it is a start-time parameter, so it needs a Postgres **restart**, not a
-reload. Then, as a superuser: `CREATE EXTENSION pg_stat_statements;`. Verified 2026-08-25 that it is
-**available and not installed** — `pg_available_extensions` lists `default_version` 1.12 with
-`installed_version` null, on PostgreSQL 18.6.
-
-**This entry's half.** The read-only role cannot see it without a view: `current_user` is
-`claude_readonly` and `search_path` is `claude_ro` alone, and that schema is **default-deny**, so
-`pg_stat_statements` is unreachable until a view exists. Add one and grant SELECT, at the next free
-migration number, in a NEW migration file (never edit an applied one — `ensureSchema` tracks by
-filename and would skip it forever).
-
-**Safe to expose, and why it is worth stating.** Every other `claude_ro` view is row-scoped to one
-user because production holds other people's health data. This one is not user-scoped and does not
-need to be: `pg_stat_statements` stores **normalised** query text — literals are replaced with `$n`
-placeholders — so it carries query *shapes* and timings, never parameter values or row content.
-Expose `query`, `calls`, `total_exec_time`, `mean_exec_time`, `rows`; there is no reason to expose
-anything else.
-
-**Temper the expectation.** BF-19 measured the database and it is not where the reported slowness
-is: `SELECT 1` returns in **3 ms**, cache hit is **99.90%**, and nothing sits idle in transaction.
-This is worth having as a baseline and it will catch a future regression, but it is unlikely to
-explain the load times — BF-19's client-side reporter is where that answer lives. Do not close the
-slow-load question on a clean `pg_stat_statements` read.
-
-- **What would count as fixed:** a session can run
-  `SELECT query, calls, mean_exec_time FROM claude_ro.pg_stat_statements ORDER BY total_exec_time DESC LIMIT 20`
-  and get rows.
-- **Surface: production only.** Nothing to verify locally beyond the migration applying.
 
 ### [nutrition][platform] BF-12 — logging a saved meal takes ~20s and the owner couldn't find it after navigating away; traced to the slow fallback firing, not a lost write
 
