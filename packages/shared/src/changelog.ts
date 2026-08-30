@@ -6,6 +6,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.399.0",
+    date: "2026-08-30",
+    changes: [
+      "Your settings follow your account. Home widgets and card colours, the section order and what you have hidden, the score-ring style, the weight window, the brand colour, the meal-label style, rest duration, food region and the reminder toggles are all saved to your account now \u2014 so a fresh install, or opening the app on another device, starts with the choices you already made instead of the defaults.",
+      "One exception, on purpose: the background and wallpaper settings still stay on the device they were chosen on.",
+    ],
+  },
+  {
     version: "1.398.0",
     date: "2026-08-30",
     changes: [

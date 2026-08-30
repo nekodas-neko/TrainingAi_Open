@@ -1,3 +1,4 @@
+import { savePreference } from '@/lib/user/preferences-sync'
 const KEY = "ta_rest_duration";
 export const REST_DURATION_DEFAULT = 90;
 
@@ -10,7 +11,7 @@ export function getRestDuration(): number {
 }
 
 export function saveRestDuration(seconds: number): void {
-  localStorage.setItem(KEY, String(seconds));
+  savePreference('restDurationSec', seconds);
 }
 
 export const REST_DURATION_PRESETS = [
