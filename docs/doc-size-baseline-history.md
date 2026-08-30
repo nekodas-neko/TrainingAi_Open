@@ -3619,3 +3619,55 @@ earlier — roughly seven times the expected trend, which CLAUDE.md says to reco
 "only allowed for making it primary" and in fact proposed the swap correctly; one line in its
 consequence list disclosed a role promotion nobody asked for, which silently undoes the owner's
 deliberate no-Primary session. The card is not at fault — disclosing the change is how it was caught.
+## 2026-08-30 — `docs/implementation-backlog.md` raised (third device pass; four of six reports already filed)
+
+85 lines, and the ratio is the point: **six owner reports produced one new entry.** Four landed on
+entries that already existed, which is what the dedup rule is for — the meals-in-a-nest ask is BF-39's
+*third* report in five days and got a note rather than a fourth number.
+
+**BF-45 ④ is the find.** The macro ring "starts at an odd spot" because all three call sites write
+`conic-gradient(from -90deg, …)`. In CSS a conic gradient already starts at 12 o'clock, so `-90deg`
+rotates it a quarter turn counter-clockwise to 9. The `-90` is correct for SVG and canvas, where 0°
+is at 3 o'clock, and was carried across. Home's ring is offset identically and nobody had noticed.
+
+**BF-57 is a decision rather than a defect.** A printed meal label carries a bare `saved_meals.id`
+and the scanner resolves it against the scanning user's own meals, so another person's label reports
+*"no longer exists"* — wrong twice, since the meal exists and the reason is ownership. The entry
+argues against the obvious fix: globally resolvable meal ids turn a photograph of a label into read
+access to someone's health data, on an app heading for a Play Store health declaration. The
+recommendation is a share token that **copies**, so the two users' rows stop being coupled the moment
+the scan lands.
+
+## 2026-08-30 — `docs/implementation-backlog.md` raised again (BF-57's design settled by measurement)
+
+68 further lines on BF-57. The owner rejected the share-token recommendation and proposed putting the
+whole meal in the QR. **Measured rather than argued**, because the answer was not obvious either way:
+their real 3-ingredient meal is **167 bytes** as positional JSON, needing QR version 9 at 53×53
+modules — and the binding constraint turns out to be the printed label, not the format. At the
+current 12.2–16.4 mm code that is 0.31 mm per module, too fine for a home printer; at 30 mm it is
+0.57 mm, better than the design's own current worst case.
+
+So the entry now carries a capacity table by ingredient count, a cap at ~5 ingredients with the
+instruction to refuse the print above it and say why, and one counter-intuitive measurement worth
+keeping: **compressing makes it worse** — deflate plus base64url came out 164 bytes against 146 for
+plain compact JSON, because base64's 33% tax exceeds the gain at this size.
+
+The superseded token design is kept in a collapsed block rather than deleted, with the reason it
+lost, so nobody re-proposes it. The one part of it that survives unconditionally is the security
+argument: never make `saved_meals.id` resolvable across users.
+
+## 2026-08-30 — `docs/implementation-backlog.md` raised (BF-57: how the ingredient list gets cut)
+
+25 lines. The owner settled the sizing — grow the QR, trim the list — and the entry now says *how*,
+because the two obvious ways to trim are not equal and one of them is a data bug.
+
+Measured: truncating ingredient names is cosmetic. It buys one QR version (280 → 240 bytes on a
+5-ingredient meal) and cannot rescue a 10-ingredient recipe, which stays at 0.35 mm/module and
+unprintable, while making brands unreadable. **Rolling the tail into a single remainder line carrying
+the dropped items' summed macros gets a 10-ingredient meal to 244 bytes, version 11, 0.49 mm/module**
+— printable, and the totals stay exact to the gram.
+
+Hence the rule the entry now leads with: **the totals are sacred, the detail is negotiable.** Dropping
+ingredients to save bytes silently changes the meal's calories, and the person scanning the label has
+no way to know. Only identity may be dropped, never numbers — and the printed label has to say it is
+showing four of ten, or it reads as the whole recipe.

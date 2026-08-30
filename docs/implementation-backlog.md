@@ -1383,6 +1383,141 @@ render what comes back.
 - **Verification:** each of the three inputs reaches the builder with the same populated ingredient
   list it produces today, and the yield behaviour is unchanged.
 
+### [nutrition][platform] BF-57 — a printed meal label only works for the person who printed it, and making it work for anyone is a decision, not a fix
+
+- **Lane:** A — the resolve path and whatever share mechanism is chosen.
+- **Added:** 2026-08-30 · owner: *"if another user makes meal and adds the QR code to it, another
+  user scans it and it comes up as 'meal not found' so clearly it doesnt work across users. need to
+  look at that."*
+
+**It is working as built, and the message is the misleading part.** The label's QR carries a
+`saved_meals.id` and nothing else (`encodeMealLabelToken`, 22 base64url chars — the payload is
+capped at a version-2 QR so it cannot afford a prefix or a URL). On scan,
+`food-logger-sheet.tsx:204` resolves that id **against the scanning user's own meals**: the local
+store first, then `GET /api/nutrition/saved-meals`, which returns only their rows. Another person's
+id is never in that list, so it falls to *"That saved meal no longer exists"* — which is wrong twice
+over: the meal exists, and the sentence blames deletion for what is really "not yours".
+
+Q-389 built this as a **private bookmark** — print a label for your own batch cook, scan it later to
+log it. Cross-user sharing was never in scope, and nothing about it is broken.
+
+**⚠ Do NOT fix this by making meal ids globally resolvable.** That would turn any photograph of a
+label into read access to someone's meal — its name, ingredients and macros — and this app is heading
+for a Play Store listing with a health-data declaration. It also breaks the moment the owner edits or
+deletes the meal, because every other user's future scans would follow the change or 404.
+
+**✅ DESIGN CHOSEN BY THE OWNER, 2026-08-30 — put the whole meal in the QR.** *"could we have the
+full meal details/portion etc within the QR code? so that it could be fully shareable/load up as a
+'meal'? Meals need to be shareable and simply."*
+
+**This supersedes the share-token recommendation that stood here** (mark shareable → mint a token →
+resolve server-side → copy). That design is recorded below only so it is not re-proposed. The
+owner's is better on every axis that matters here, and the measurements back it.
+
+**It fits — measured, not estimated.**
+
+The owner's real Turkey Pasta meal (3 ingredients, brand names included) encoded as positional JSON:
+
+| Encoding | Bytes |
+|---|---|
+| Verbose JSON | 262 |
+| **Positional JSON** (`[name, servings, [[name,g,kcal,p,c,f], …]]`) | **167** |
+| deflate, raw bytes | 123 |
+| deflate + base64url | **164** |
+
+**Do not compress.** At this size base64's 33% tax cancels deflate's gain — 164 bytes against 146
+for plain compact JSON of the same meal. Compression only pays past ~400 bytes, which is past where
+the physical limit bites anyway.
+
+**The real constraint is the LABEL, not the QR.**
+
+167 bytes needs QR **version 9** at EC level M — 53×53 modules. What decides whether a phone reads
+it is millimetres per module, and the current layout gives the code only 12.2–16.4 mm:
+
+| Ingredients | Bytes | QR version | Modules | mm/module @16.4 mm | **@30 mm** |
+|---|---|---|---|---|---|
+| 1 | 69 | 5 | 37 | 0.44 | **0.81** |
+| **3** | **167** | **9** | **53** | 0.31 | **0.57** |
+| 5 | 265 | 12 | 65 | 0.25 | **0.46** |
+| 8 | 412 | 15 | 77 | 0.21 | 0.39 |
+| 10 | 510 | 18 | 89 | 0.18 | 0.34 |
+
+At today's 16.4 mm a 3-ingredient meal lands at **0.31 mm/module — too fine for a home printer**,
+below the 0.49–0.66 mm the current design was built to. **Give the code ~30 mm of the 50 mm label and
+it reaches 0.57 mm, better than today's worst case.** So this is a label-layout change first and a
+payload change second.
+
+**Recommendation: self-contained QR, with a stated cap.**
+
+- **Redesign the label to give the QR ~30 mm.** The circle-safe layout that caps it at 16.4 mm is
+  what makes this impossible, not the QR format.
+- **✅ OWNER, 2026-08-30: size the code to what it needs, and trim the ingredient list to fit.**
+  *"focus on the QR code making it the size it needs to be; and then the ingredient list can be cut
+  back for it if needed."* So the QR grows to the size the payload demands **and the payload is what
+  gives way**, rather than the print being refused. The recommendation above to refuse above a cap is
+  **superseded** — but *how* the list is cut decides whether this is sound or a data bug, and the two
+  obvious ways are not equal.
+
+- **⚠ THE TOTALS ARE SACRED. THE DETAIL IS NEGOTIABLE.** Dropping ingredients to save bytes changes
+  the meal's calories and macros, and the person scanning it has no way to know. **Never drop an
+  ingredient's numbers — only its identity.**
+
+- **Measured: rolling the tail beats truncating names, and it is not close.**
+
+  | Shape | Bytes | Version | mm/module @30 mm |
+  |---|---|---|---|
+  | 5 ingredients, full names | 280 | 12 | 0.46 |
+  | 5 ingredients, names cut to 12 chars | 240 | 11 | 0.49 |
+  | 10 ingredients, names cut to 12 | 460 | 17 | **0.35** ✗ |
+  | 10 ingredients, names cut to 8 | 420 | 16 | **0.37** ✗ |
+  | **4 named + one `"+6 more"` line carrying the tail's combined macros** | **244** | **11** | **0.49** ✓ |
+
+  **Truncating names is cosmetic** — it buys one QR version and cannot rescue a long recipe, while
+  making brands unreadable. **Rolling the tail into a single remainder line fits any meal at a
+  printable size and keeps the arithmetic exact**, because the dropped items' kcal/P/C/F are summed
+  into that line rather than discarded.
+
+- **So the encoder's rule:** name as many ingredients as fit, then emit one remainder entry carrying
+  the sum of everything left. The scanning user gets a meal whose totals are correct to the gram, with
+  the top ingredients named and the rest honestly labelled as a group. **Show that on the label too**
+  — a printed label that lists four of ten ingredients must say so, or it reads as the whole recipe.
+
+**Why this beats the token design it replaces:** no server round-trip, so it scans offline and for a
+user with no account; **no privacy surface at all**, because the data is on paper the owner physically
+handed over rather than an id that unlocks a row; it is inherently a **copy**, so the two users' data
+are never coupled and the author editing theirs cannot reach into anyone else's history; and there is
+no share state, no token store and nothing to revoke.
+
+**What it costs, stated plainly:** a printed label cannot be updated — edit the meal and you reprint,
+which is already true today. No photo can travel in the QR. And the ingredient cap is real.
+
+- **Backwards compatibility is required, not optional.** Labels already printed carry the 22-character
+  id token, and decoding is **by shape**. The new payload must be distinguishable from both that and
+  an EAN-13, and `decodeMealLabelToken` must keep resolving old labels against the owner's own meals.
+  Two formats, one decoder, indefinitely.
+- **Still worth doing whatever else happens:** fix the message. *"That meal belongs to someone else"*
+  beats *"no longer exists"*, and an old-format label scanned by another user will still hit it.
+- **Verification:** a label printed from a 3-ingredient meal scans on a second phone, on a second
+  account, **in airplane mode**, and creates that user's own meal with the same portions and macros.
+  A 12-ingredient meal prints, scans, and produces **the same total calories and macros as the
+  original** with its tail rolled into one labelled remainder. A previously-printed old-format label
+  still resolves for its owner.
+
+---
+
+<details><summary>Superseded 2026-08-30: the share-token design, kept so it is not re-proposed</summary>
+
+Mark a meal shareable → mint a share token distinct from the row id → scanning resolves it
+server-side and copies the meal into the scanner's library. Rejected because it needs a server round
+trip (so it cannot work offline or without an account), introduces a token store and revocation
+semantics, and creates a resolvable-id surface on an app heading for a Play Store health-data
+declaration. Its one advantage over the chosen design — no ingredient cap — is not worth the rest.
+
+**The argument against globally-resolvable raw meal ids stands and is unaffected by this change:**
+never make `saved_meals.id` resolvable across users.
+
+</details>
+
 ### [nutrition] BF-45 — the Nutrition day screen: an empty grid slot, macros that vanish when you collapse, and gutters the artboards did not ask for
 
 - **Lane:** B
@@ -1394,7 +1529,9 @@ render what comes back.
 - **Spec:** BF-28's parity rules still bind — where an artboard covers one of these, the artboard
   wins over a number invented here.
 
-**① `My Meals` sits in a two-column grid with nothing beside it.** Owner: *"id like the my meals
+**① `My Meals` sits in a two-column grid with nothing beside it.** *(Re-reported 2026-08-30 —
+**this entry has not shipped yet**, so it is unchanged rather than regressed. Noted because a second
+report of an unbuilt item is easy to mistake for a failed fix.)* Owner: *"id like the my meals
 button to be bigger and take up both left and right slots (as its empty for now)."* Confirmed in
 `components/nutrition/nutrition-action-row.tsx`: `grid grid-cols-2` with **three** children, so Log
 Food and Water fill row 1 and My Meals takes the left half of row 2 with dead space beside it. The
@@ -1429,9 +1566,37 @@ inside a bottom sheet, and `p-0` does not strip the baked padding, because tailw
 know the custom classes. **This is a horizontal change only.** Measure the gutter from the nutrition
 artboards rather than inventing a number.
 
+**④ The macro ring starts at 9 o'clock, and the cause is a one-word CSS mistake repeated three
+times.** Owner, 2026-08-30: *"the macro bar starts at an odd spot rather than 12 o clock."* Traced:
+
+```
+conic-gradient(from -90deg, …)
+```
+
+**In CSS, `conic-gradient` already starts at 12 o'clock — 0deg is the top.** `from -90deg` therefore
+rotates the start a quarter turn *counter-clockwise*, to 9 o'clock. The `-90` idiom is correct for
+**SVG and canvas**, where 0° is at 3 o'clock and you subtract 90° to reach the top; it was carried
+into CSS where it is not needed. The fix is `from 0deg`, or dropping the `from` clause entirely.
+
+**Three call sites, all wrong the same way** — fix them together (sibling-surface sweep):
+`components/nutrition/energy-card.tsx:85` and `:93`, and `components/home/home-nutrition-card.tsx:96`.
+So Home's ring is offset identically and nobody had reported it.
+
+**⑤ Swipe-to-delete on a logged food row.** Owner: *"for logging food; we could possibly add the
+option to swipe and delete it (with confirmation) like we do in the other screen."* The gesture
+already exists on the meal list (BF-29, device-verified 2026-08-30) — reuse that tray rather than
+writing a second one, and keep its confirmation step. **Do not remove the existing bin control in the
+edit sheet**; a swipe is a shortcut for people who know it is there, not a replacement for a visible
+affordance.
+
+- ⚠ **Blocked behind BF-47 in practice.** Deleting a logged food currently makes it reappear until
+  the outbox pushes. Adding a faster way to reach a delete that visibly fails is worse than not
+  adding it — ship BF-47 first, or ship them together.
+
 - **Verification.** On the S25: My Meals spans the row; a collapsed meal still shows P/C/F and its
   calories; the gutter matches the artboard on the day screen and every other nutrition screen
-  touched. The sandbox renders these at desktop width, so all three are device-judged.
+  touched; **both rings start at 12 o'clock**; a food row swipes to a tray whose Delete confirms. The
+  sandbox renders these at desktop width, so all of it is device-judged.
 
 ### [nutrition] BF-46 — the meal builder buries its photo picker below the fold, and the quantity sheet spends its space on the wrong things
 
@@ -1471,6 +1636,10 @@ toast that a user mid-flow can miss, and the save then proceeds with no photo; `
 is a render bug and not a write bug, and that single check splits the two.
 
 ⚠ **Do not ship (a) and call the report closed.** Moving the control does not make a photo save.
+**Re-confirmed 2026-08-30 from the meal detail screen** — owner: *"the photo still doesnt get added
+from this screen at the top. not saving."* The hero still reads `Add a photo` on a meal the owner has
+tried to give one. Two independent attempts, same result, so this is reproducible rather than a
+one-off.
 
 **Device pass, 2026-08-30 — the failure is confirmed and its shape is narrower than feared.** Owner,
 N4: *"Meal photo tile shows; but its always the default cant add a custom picture"*, and N5: the top
@@ -1621,6 +1790,15 @@ the match. `Gate: owner` when it is next picked up.
   a wrong or missing field reads as `undefined` and fails silently.
 
 ### [nutrition] BF-39 — a logged meal stops being a meal: `food_logs` has no `saved_meal_id`, and three symptoms trace to that
+
+> **⚑ RAISED AGAIN 2026-08-30 — third report, and the owner reached the fix independently.** *"we
+> need to sort out meals and ingredients; in a nest. so that when you add a meal it adds the meal and
+> not every ingredient or at least nests in the meal."* **Nest** is the same shape this entry already
+> specifies: one parent row that expands to its ingredients. **No new entry** — filing a fourth
+> number for the same defect is the failure this repo has had before (Q-397).
+>
+> Three reports across five days, from three different screens, is the strongest priority signal in
+> the nutrition cluster. Treat it accordingly.
 
 > **⚑ RE-REPORTED WITH SCREENSHOTS, 2026-08-27, and the owner's wording sharpens the requirement.**
 > *"when I add a meal from ai; it breaks it down into its components and floods the list. we need to
