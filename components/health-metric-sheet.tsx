@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Sparkline } from '@/components/ui/sparkline'
 import { formatTimeOfDay } from '@trainingai/shared/date-utils';
 import { useUserTimezone } from '@/components/shell/user-timezone-provider';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
@@ -58,6 +59,19 @@ interface HealthMetricSheetProps {
  *  bigger final dot, and — the part that actually blocks conversion — scales y to the exact
  *  min/max, where the primitive pads by ±0.5 and would halve the amplitude of a 0.5 kg spread.
  *  See Q-154. */
+/**
+ * The metric trend, drawn by the shared `Sparkline` (Q-154).
+ *
+ * It was a hand-rolled polyline, one of three the repo carried. What kept it inline was that the
+ * primitive could not draw it: it padded values by ±0.5 (which halves a 0.5 kg body-weight spread),
+ * hardcoded `strokeWidth`, insets nothing, and had no emphasized last dot or value label. Those are
+ * props now — all defaulted, so the call sites that predate them are untouched.
+ *
+ * **One deliberate visual change, decided by the owner 2026-08-25:** the non-final dots are no
+ * longer dimmed to 0.4. Keeping them would have meant a per-caller opacity prop, and a primitive
+ * that grows a prop for each caller's art is a wrapper over a config object rather than a
+ * unification — the same call Q-406 made when it declined a warning slot on `FoodRow`.
+ */
 function MetricTrendChart({ pts, color, unit, formatValue }: {
   pts: { date: string; value: number }[];
   color: string;
@@ -66,35 +80,23 @@ function MetricTrendChart({ pts, color, unit, formatValue }: {
 }) {
   if (pts.length < 2) return null;
   const vals = pts.map(p => p.value);
-  const min = Math.min(...vals); const max = Math.max(...vals);
-  const range = max - min || 1;
-  const W = 300; const H = 72; const PAD = 10;
-  const spark = pts.map((p, i) => ({
-    x: PAD + (i / (pts.length - 1)) * (W - PAD * 2),
-    y: H - PAD - ((p.value - min) / range) * (H - PAD * 2),
-    v: p.value,
-  }));
-  const polyline = spark.map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" ");
-  const last = spark[spark.length - 1];
+  const last = vals[vals.length - 1];
   return (
     <div className="rounded-xl border p-3">
-      <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{ display: "block" }}>
-        <defs>
-          <linearGradient id="hms-line-grad" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor={color} stopOpacity="0.25" />
-            <stop offset="100%" stopColor={color} stopOpacity="0" />
-          </linearGradient>
-        </defs>
-        <polygon points={`${PAD},${H} ${polyline} ${W - PAD},${H}`} fill="url(#hms-line-grad)" />
-        <polyline points={polyline} fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-        {spark.map((p, i) => (
-          <circle key={i} cx={p.x} cy={p.y} r={i === spark.length - 1 ? 4 : 2.5}
-            fill={color} opacity={i === spark.length - 1 ? 1 : 0.4} />
-        ))}
-        <text x={last.x} y={last.y - 8} textAnchor="middle" fill={color} fontSize="10" fontWeight="700">
-          {formatValue(last.v)}{unit}
-        </text>
-      </svg>
+      <Sparkline
+        values={vals}
+        width={300}
+        height={72}
+        color={color}
+        responsive
+        fill
+        showDots
+        pad={10}
+        valuePadding={0}
+        strokeWidth={2}
+        emphasizeLast
+        valueLabel={`${formatValue(last)}${unit}`}
+      />
     </div>
   );
 }

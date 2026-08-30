@@ -40,9 +40,12 @@ const EXEMPT = new Set([
 // draw them yet — it has no value label, no stroke width, no emphasized last point, and its fixed
 // ±0.5 value padding flattens a small-range series (a 0.5 kg body-weight spread loses half its
 // amplitude). See Q-154 for the exact prop list.
+// Q-154 converted the first two on 2026-08-30, once the primitive gained the six props that had
+// blocked them (`pad`, `valuePadding`, `strokeWidth`, `gridLines`, `emphasizeLast`, `valueLabel`).
+// `active-workout-screen` is deliberately NOT converted and is not a to-do: it wants asymmetric
+// padding, uniform dots, no fill, a dimmed stroke and an end-anchored label — four more props no
+// other caller would use, which is a pass-through wearing a primitive's name.
 const GRANDFATHERED = new Set([
-  'components/exercise-history-sheet.tsx',
-  'components/health-metric-sheet.tsx',
   'components/workout/active-workout-screen.tsx',
 ]);
 
