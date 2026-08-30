@@ -3560,3 +3560,22 @@ and BF-2 gains a line saying its dependency is satisfied and what it still owes 
 that a finished entry must not sit in the queue looking finished, an entry that ships half its work
 states what is left rather than being deleted — which is exactly what these lines are, so the growth
 is the mechanism working.
+
+## 2026-08-30 — `docs/implementation-backlog.md` raised (third device pass; four of six reports already filed)
+
+85 lines, and the ratio is the point: **six owner reports produced one new entry.** Four landed on
+entries that already existed, which is what the dedup rule is for — the meals-in-a-nest ask is BF-39's
+*third* report in five days and got a note rather than a fourth number.
+
+**BF-45 ④ is the find.** The macro ring "starts at an odd spot" because all three call sites write
+`conic-gradient(from -90deg, …)`. In CSS a conic gradient already starts at 12 o'clock, so `-90deg`
+rotates it a quarter turn counter-clockwise to 9. The `-90` is correct for SVG and canvas, where 0°
+is at 3 o'clock, and was carried across. Home's ring is offset identically and nobody had noticed.
+
+**BF-57 is a decision rather than a defect.** A printed meal label carries a bare `saved_meals.id`
+and the scanner resolves it against the scanning user's own meals, so another person's label reports
+*"no longer exists"* — wrong twice, since the meal exists and the reason is ownership. The entry
+argues against the obvious fix: globally resolvable meal ids turn a photograph of a label into read
+access to someone's health data, on an app heading for a Play Store health declaration. The
+recommendation is a share token that **copies**, so the two users' rows stop being coupled the moment
+the scan lands.

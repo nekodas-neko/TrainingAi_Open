@@ -1250,6 +1250,48 @@ render what comes back.
 - **Verification:** each of the three inputs reaches the builder with the same populated ingredient
   list it produces today, and the yield behaviour is unchanged.
 
+### [nutrition][platform] BF-57 — a printed meal label only works for the person who printed it, and making it work for anyone is a decision, not a fix
+
+- **Lane:** A — the resolve path and whatever share mechanism is chosen.
+- **Added:** 2026-08-30 · owner: *"if another user makes meal and adds the QR code to it, another
+  user scans it and it comes up as 'meal not found' so clearly it doesnt work across users. need to
+  look at that."*
+
+**It is working as built, and the message is the misleading part.** The label's QR carries a
+`saved_meals.id` and nothing else (`encodeMealLabelToken`, 22 base64url chars — the payload is
+capped at a version-2 QR so it cannot afford a prefix or a URL). On scan,
+`food-logger-sheet.tsx:204` resolves that id **against the scanning user's own meals**: the local
+store first, then `GET /api/nutrition/saved-meals`, which returns only their rows. Another person's
+id is never in that list, so it falls to *"That saved meal no longer exists"* — which is wrong twice
+over: the meal exists, and the sentence blames deletion for what is really "not yours".
+
+Q-389 built this as a **private bookmark** — print a label for your own batch cook, scan it later to
+log it. Cross-user sharing was never in scope, and nothing about it is broken.
+
+**⚠ Do NOT fix this by making meal ids globally resolvable.** That would turn any photograph of a
+label into read access to someone's meal — its name, ingredients and macros — and this app is heading
+for a Play Store listing with a health-data declaration. It also breaks the moment the owner edits or
+deletes the meal, because every other user's future scans would follow the change or 404.
+
+**Recommendation: an explicit share that COPIES.** A meal is marked shareable, which mints a *share
+token* distinct from the row id; scanning that token copies the meal into the scanner's own library
+as their own row. Copying is the important half — it means the two users' data stop being coupled the
+instant the scan completes, so an edit or delete by the author cannot reach into someone else's
+history.
+
+- **Cheapest correct step, and worth doing whatever is decided:** fix the message. *"That meal
+  belongs to someone else"* versus *"no longer exists"* is the difference between a user
+  understanding the product and filing this report.
+- **Payload budget is the real constraint.** A share token must fit the same version-2 QR at EC level
+  M — 26 bytes, with 22 already spent — so it cannot be "id + signature". Most likely the token
+  *replaces* the id and is itself a random 16-byte handle resolving server-side, which is the same
+  size as today.
+- **Gate: owner** — whether meal sharing is a product this app wants at all. If the answer is no,
+  keep the label private and ship the message fix alone; that closes the report honestly.
+- **Verification:** a shared label scanned by a second account creates a copy in their library, and
+  the author then editing or deleting theirs leaves the copy untouched. An unshared label scanned by
+  anyone else says it is not theirs, and reveals nothing about it.
+
 ### [nutrition] BF-45 — the Nutrition day screen: an empty grid slot, macros that vanish when you collapse, and gutters the artboards did not ask for
 
 - **Lane:** B
@@ -1261,7 +1303,9 @@ render what comes back.
 - **Spec:** BF-28's parity rules still bind — where an artboard covers one of these, the artboard
   wins over a number invented here.
 
-**① `My Meals` sits in a two-column grid with nothing beside it.** Owner: *"id like the my meals
+**① `My Meals` sits in a two-column grid with nothing beside it.** *(Re-reported 2026-08-30 —
+**this entry has not shipped yet**, so it is unchanged rather than regressed. Noted because a second
+report of an unbuilt item is easy to mistake for a failed fix.)* Owner: *"id like the my meals
 button to be bigger and take up both left and right slots (as its empty for now)."* Confirmed in
 `components/nutrition/nutrition-action-row.tsx`: `grid grid-cols-2` with **three** children, so Log
 Food and Water fill row 1 and My Meals takes the left half of row 2 with dead space beside it. The
@@ -1296,9 +1340,37 @@ inside a bottom sheet, and `p-0` does not strip the baked padding, because tailw
 know the custom classes. **This is a horizontal change only.** Measure the gutter from the nutrition
 artboards rather than inventing a number.
 
+**④ The macro ring starts at 9 o'clock, and the cause is a one-word CSS mistake repeated three
+times.** Owner, 2026-08-30: *"the macro bar starts at an odd spot rather than 12 o clock."* Traced:
+
+```
+conic-gradient(from -90deg, …)
+```
+
+**In CSS, `conic-gradient` already starts at 12 o'clock — 0deg is the top.** `from -90deg` therefore
+rotates the start a quarter turn *counter-clockwise*, to 9 o'clock. The `-90` idiom is correct for
+**SVG and canvas**, where 0° is at 3 o'clock and you subtract 90° to reach the top; it was carried
+into CSS where it is not needed. The fix is `from 0deg`, or dropping the `from` clause entirely.
+
+**Three call sites, all wrong the same way** — fix them together (sibling-surface sweep):
+`components/nutrition/energy-card.tsx:85` and `:93`, and `components/home/home-nutrition-card.tsx:96`.
+So Home's ring is offset identically and nobody had reported it.
+
+**⑤ Swipe-to-delete on a logged food row.** Owner: *"for logging food; we could possibly add the
+option to swipe and delete it (with confirmation) like we do in the other screen."* The gesture
+already exists on the meal list (BF-29, device-verified 2026-08-30) — reuse that tray rather than
+writing a second one, and keep its confirmation step. **Do not remove the existing bin control in the
+edit sheet**; a swipe is a shortcut for people who know it is there, not a replacement for a visible
+affordance.
+
+- ⚠ **Blocked behind BF-47 in practice.** Deleting a logged food currently makes it reappear until
+  the outbox pushes. Adding a faster way to reach a delete that visibly fails is worse than not
+  adding it — ship BF-47 first, or ship them together.
+
 - **Verification.** On the S25: My Meals spans the row; a collapsed meal still shows P/C/F and its
   calories; the gutter matches the artboard on the day screen and every other nutrition screen
-  touched. The sandbox renders these at desktop width, so all three are device-judged.
+  touched; **both rings start at 12 o'clock**; a food row swipes to a tray whose Delete confirms. The
+  sandbox renders these at desktop width, so all of it is device-judged.
 
 ### [nutrition] BF-46 — the meal builder buries its photo picker below the fold, and the quantity sheet spends its space on the wrong things
 
@@ -1338,6 +1410,10 @@ toast that a user mid-flow can miss, and the save then proceeds with no photo; `
 is a render bug and not a write bug, and that single check splits the two.
 
 ⚠ **Do not ship (a) and call the report closed.** Moving the control does not make a photo save.
+**Re-confirmed 2026-08-30 from the meal detail screen** — owner: *"the photo still doesnt get added
+from this screen at the top. not saving."* The hero still reads `Add a photo` on a meal the owner has
+tried to give one. Two independent attempts, same result, so this is reproducible rather than a
+one-off.
 
 **Device pass, 2026-08-30 — the failure is confirmed and its shape is narrower than feared.** Owner,
 N4: *"Meal photo tile shows; but its always the default cant add a custom picture"*, and N5: the top
@@ -1488,6 +1564,15 @@ the match. `Gate: owner` when it is next picked up.
   a wrong or missing field reads as `undefined` and fails silently.
 
 ### [nutrition] BF-39 — a logged meal stops being a meal: `food_logs` has no `saved_meal_id`, and three symptoms trace to that
+
+> **⚑ RAISED AGAIN 2026-08-30 — third report, and the owner reached the fix independently.** *"we
+> need to sort out meals and ingredients; in a nest. so that when you add a meal it adds the meal and
+> not every ingredient or at least nests in the meal."* **Nest** is the same shape this entry already
+> specifies: one parent row that expands to its ingredients. **No new entry** — filing a fourth
+> number for the same defect is the failure this repo has had before (Q-397).
+>
+> Three reports across five days, from three different screens, is the strongest priority signal in
+> the nutrition cluster. Treat it accordingly.
 
 > **⚑ RE-REPORTED WITH SCREENSHOTS, 2026-08-27, and the owner's wording sharpens the requirement.**
 > *"when I add a meal from ai; it breaks it down into its components and floods the list. we need to
