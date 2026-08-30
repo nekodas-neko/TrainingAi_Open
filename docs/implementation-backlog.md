@@ -10797,88 +10797,69 @@ per-field merge where an AI write has no honest source rank to claim.
   `active_calories_est` weakens considerably — a calorie estimate and an HR load term measure much
   the same thing, and Q-184's own entry already says to check this first.
 
-### [readiness][devices] 🔴 Q-270 — `training_load_ots` is still 0 of 96 days: the 2026-08-15 warm-list fix did not take
+### [readiness][devices] 🔴 Q-270 — `training_load_ots` is still 0 of 104 days, and the route is neither failing nor succeeding
 
-- **🔴 Re-measured in production 2026-08-20 — the fix did not take.** `claude_ro.oura_daily_derived`
-  holds **96 days**, `training_load_ots` populated on **0** of them and `active_calories_est` on
-  **0**, latest day 2026-08-22. That is five days after the 2026-08-15 warm-list entry shipped,
-  against this entry’s own re-check condition: *"Re-read `training_load_ots` in a day or two; if
-  it is still 0, the diagnosis was incomplete."* **It is still 0, so the diagnosis was
-  incomplete** — all four gates were measured passing, so the remaining suspects are the warm-list
-  entry not firing, the route erroring before the write, or the persist itself (which the entry
-  already flags as unproven locally, since the seed carries no `ble-derived` readiness).
-- **Start by proving the route is called at all**, not by re-measuring the four gates — those were
-  measured 2026-08-15 and re-measuring them is the trap this entry has already fallen into once.
+- **Branch:** `fix/training-stress-column-empty` · **Lane:** A
+- **🔴 Re-measured 2026-08-30. Still 0 — of 104 days now, ten days after the last re-check.**
+  `active_calories_est` likewise 0. The 2026-08-15 warm-list fix did not take, and neither did the
+  diagnosis after it.
+- **What was ruled OUT on 2026-08-30, so the next session does not re-derive it.** Every one of these
+  was measured, not read:
+  - **All four gates pass, on all eight most recent days** — evaluated per date the way the route
+    does, not in aggregate: `readiness_source = 'ble-derived'` with a score ✓, `n_history` 48–55
+    against a floor of 14 ✓, `resting_heart_rate` present ✓, sex and date of birth present ✓.
+  - **The MET gate passes from midday.** Samples span the whole local day (first sample 00:02–00:14,
+    last 22:25–23:55, span **1,338–1,427 minutes**) against a floor of 720, so it clears by ~12:07
+    local — not late evening, as the shape of the gate suggests.
+  - **The route is not erroring.** `error_events` holds **no** `/api/training-stress` row over seven
+    days. So it is not 500ing; the column is empty because the route is not being called, or is
+    called and returns `gated` — and nothing on the server distinguishes those.
+  - **The write path is correct.** `trainingLoadOts` is in `DERIVED_COLS`, the upsert's COALESCE arm
+    updates rather than swallows a real number, and there is now a test pinning that
+    (`training-stress-persist.test.ts` — its upsert case runs everywhere; the two OTS cases need the
+    vendored constants and skip without them).
+- **The structural problem, which is why this entry keeps being wrong.** The persist is a *side
+  effect of a GET*, it happens only when `result.status === 'ok'`, and nothing records that the
+  route ran or what it decided. So "not called" and "called and gated" are indistinguishable from
+  outside, and every diagnosis so far has had to guess between them. **Fix the observability before
+  the cause** — a session that cannot tell those apart will produce a fourth wrong answer.
+- **Two candidate causes left, both unproven:**
+  1. **`warmCache` returns early whenever the key is cached** (`components/sync-provider.tsx`) and
+     does not check the stored envelope's date, so a `today: true` key warmed before midday can keep
+     serving a `gated` answer. Whether TTL_MEDIUM expiry defeats that in practice is unmeasured.
+  2. **A constants-delivery miss.** `getOtsTypedConstants` reads a directory downloaded at boot, and
+     `lib/oura-models/constants/index.ts` records that a route handler read `OURA_CONSTANTS_DIR` as
+     undefined while boot had logged success — *"every stress read 500s. That is what
+     `/api/body-battery` was doing in production for two hours."* The 12 `error_events` rows for that
+     route (last 2026-08-23T20:59) are that incident. Whether `/api/training-stress` shares it is
+     unknown, because it has no error rows either way.
+- **Every caller passes TODAY** — the warm list (no `?date=`, so the route resolves today), the
+  Health → Body card, and the done-screen badge. So a completed day is only ever scored while it is
+  still in progress, which is worth questioning independently of the bug.
 - **This still gates Q-204**, whose design assumes this column is most of its input.
 
-> **The column was empty because nothing called the route.** All four gates were measured and all
-> four pass — readiness `ble-derived` (31 days), `n_history` 40 vs 14, RHR on 30 of 30 days, and a
-> MET grid of 1,425 min / 1,146 values against floors of 720/360. `/api/training-stress` persists
-> only as a side effect of being called, and its only caller was a Health → **Body** card while the
-> tab defaults to **Training**. Fixed with one sync-provider warm-list entry: once per launch,
-> **deliberately off the BLE ingest path** that Q-213 traced an outage to, and with no cron layer
-> available. ⚠️ **Populates forward only — the 89 empty days stay empty**, and the persist itself is
-> unproven locally (the seed has no `ble-derived` readiness, so the route gates before the write).
-> **Re-read `training_load_ots` in a day or two**; if it is still 0, the diagnosis was incomplete.
-> **This unblocks Q-204**, whose design assumes the column is most of its input. Journal:
-> [`docs/overview/overview/history-2026-08-15.md`](overview/history-2026-08-15.md).
-> Original entry below.
+### [platform][devices] LA-40 — `runTrainingStressScore` throws for a young user, out of a function that documents itself as infallible
 
-#### (original) Q-270 — `training_load_ots` has a producer and is still 0 of 89 days in production
+- **Branch:** `fix/training-stress-column-empty` (shipped with the Q-270 investigation that found it)
+- **Added:** 2026-08-30 · found by running the persist Q-270 asked for and watching it crash.
+- **SHIPPED 2026-08-30.** `getRhrCategory` returns null for an age with no row in the percentile
+  table, and `runTrainingStressScore` returns null rather than throwing — the "can't produce a
+  result" path its own docblock already promises. Mutation-verified, and the test runs **without**
+  the vendored constants, so it holds in CI where every parity block skips.
+- **The defect, for the record.** `validate` bounds rhr, readiness and vo2max but **not age**.
+  `getAgeGroup` then clamps only the TOP for female/male (`age >= 80 ? 80`) while the `other` branch
+  clamps both ends — so an age below the lowest group left `indexOf` at -1, indexed `table[-1]`, and
+  handed `undefined` to `argminAbsDiff`. The route calls it with no try/catch, so
+  `GET /api/training-stress` 500s for that user.
+- **Reachable, and increasingly so.** The owner is 33 and safe; the app has other users and a Play
+  Store listing is the stated direction, so a teenage user or a mistyped date of birth is a live
+  path. It also fires on any partial constants table, which is not hypothetical — see Q-270's
+  candidate 2.
+- **Keep:** the asymmetry itself is untouched. Whether the female/male branch *should* clamp its low
+  end the way the `other` branch does is a question about vendor intent, and guessing at it from
+  outside the model is what this fix deliberately declined to do. Returning null is correct and
+  conservative; clamping might be more useful and needs the vendor tables to decide.
 
-- **Branch:** none yet · **Added:** 2026-08-14, doing the check Q-184's own entry asks for before building.
-- **The measurement.** `claude_ro.oura_daily_derived` holds **89 days** for the owner. Both
-  `training_load_ots` **and** `active_calories_est` are populated on **0** of them.
-- **Why that matters more than it looks.** `docs/activity-goal-calibration.md` §5-B justifies the
-  HR-load direction (Q-204) partly on *"`training_load_ots` already exists and may be most of it"*.
-  That is **true in code and false in the data**: the column has a real server-side producer
-  (`app/api/training-stress/route.ts`, computing OTS from the ring's MET stream + our derived
-  readiness + derived VO₂max) and it has never persisted a single value.
-- **Two gates ruled OUT by measurement**, so the next session does not re-check them:
-  - **Readiness is not it.** `oura_daily_derived` has **31 days** of `readiness_source='ble-derived'`
-    with a non-null score, latest **today**.
-  - **MET data is not absent.** Tag `0x50` events are arriving — **222 rows in the most recent
-    50,000** `oura_raw_samples` (bounded query; do not scan that table).
-- **✅ DIAGNOSIS COMPLETE 2026-08-15 — all four gates pass, so the value is computable and simply
-  never computed.** Measured each gate of `computeTrainingStress` against production rather than
-  reasoning about them:
-
-  | gate | condition | measured | verdict |
-  |---|---|---|---|
-  | `no_readiness` | `readinessSource === 'ble-derived'` | 31 days, latest today | **passes** |
-  | `readiness_learning` | `nHistory < BASELINE_MIN_NIGHTS` (14) | `n_history` = **40** | **passes** |
-  | `no_profile` | age / sex / **RHR** present | RHR on **30 of 30** recent days | **passes** |
-  | `insufficient_met` | grid < 720 min **or** valid < 360 | 2026-08-13: **1,425 min span, 1,146 values** | **passes** |
-
-  MET decoding detail, since it looked like the likely culprit and is not: **104 events on 08-13**,
-  14 values each (~1/min), 17 gaps over 20 min, largest 59 min — patchy but far above both floors.
-  **Corrected 2026-08-15:** an earlier note here said `decoded` is NULL on every `0x50` row, implying
-  a tag-specific decoder gap. Re-measured over the most recent 50,000 samples, it is NULL for **every
-  tag** — that is the archival design (`body_hex` is truth so a later decoder can re-derive; the
-  adapter re-decodes on read), not a fault. No `0x50` decoder bug exists to find.
-- **So the cause is the remaining one: nothing ever calls the route.** It computes and persists
-  **only as a side effect of rendering `training-stress-line.tsx`**, for `?date=${today}` only. That
-  card sits in Health → **Body**, and the Health tab defaults to **training** — so the value is
-  written only if the user switches tabs on the day in question, and never for any past day.
-- **⚠️ The fix has a real footgun: do NOT hang this off the BLE ingest path.** That is where
-  `aggregateOuraRawSamples` runs, and Q-213 traced a multi-week production outage to exactly that
-  loop being saturated. Adding an OTS computation to the hot ingest path risks reintroducing the
-  fault that was just fixed. There is also **no cron layer** (`docs/module-map.md` §0), so a
-  scheduled job is not available either.
-- **Fix shape, unbuilt:** compute-and-persist for *yesterday* from a path that already runs at most
-  once per app open and is off the ingest loop, and/or a bounded backfill for the retained window.
-  Whatever the trigger, it must be measured against the Q-213 CPU signature before merging.
-- **Original leading cause, now confirmed as the answer:** the route only ever computes **today**, on demand,
-  and only persists when `result.status === 'ok'`. Its only client is
-  `components/health/training-stress-line.tsx`, which fetches `?date=${today}`. So nothing backfills,
-  and a day only persists if the Health card renders that day *and* the OTS core returns `ok`. Either
-  the card is rarely reaching a passing state, or `computeTrainingStress` is gating (insufficient MET
-  minutes is the candidate — 222 events is thin).
-- **What to do:** confirm which, by calling the route for a recent day with a real session and reading
-  `result.status` / its gate reason. If it is the never-backfilled shape, this is **server-side work
-  with no APK** — much cheaper than Q-184's Kotlin.
-- **This gates Q-204.** The HR-load lane assumes this column is most of its input. It is currently
-  none of it.
 
 ### [devices][activity] Q-184 — `active_calories_est` is plumbed end-to-end and never written
 

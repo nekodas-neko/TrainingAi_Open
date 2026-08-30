@@ -91,12 +91,26 @@ function argminAbsDiff(row: number[], rhr: number): number {
   return best
 }
 
-function getRhrCategory(ageGroup: number, biologicalSex: number, rhr: number): number {
+/**
+ * `null` when the age has no row in the percentile table, which `getAgeGroup` signals by returning
+ * `indexOf`'s -1. That is reachable: `validate` bounds rhr, readiness and vo2max but **not age**,
+ * and `getAgeGroup` clamps only the TOP for female/male (`age >= 80 ? 80`) while the `other` branch
+ * clamps both ends. So a user below the lowest group indexed `table[-1]`, handed `undefined` to
+ * `argminAbsDiff`, and threw — out of a function whose own contract is *"Infallible: never throws"*
+ * (LA-40).
+ *
+ * Returning null rather than clamping the age: the clamp the other branch uses is a vendor
+ * behaviour, and inventing the same bound here would be guessing at the model's intent from
+ * outside it. A day that cannot be scored is a case this pipeline already has a path for.
+ */
+function getRhrCategory(ageGroup: number, biologicalSex: number, rhr: number): number | null {
   const C = C_()
   const table = biologicalSex === -1 ? C.femalePercentiles
     : biologicalSex === 1 ? C.malePercentiles
       : C.otherPercentiles
-  return argminAbsDiff(table[ageGroup], rhr)
+  const row = table[ageGroup]
+  if (!row) return null
+  return argminAbsDiff(row, rhr)
 }
 
 // met < min_met_value → NaN (clean_met_values)
@@ -143,6 +157,7 @@ export function runTrainingStressScore(input: OtsInput): { ots: number; high: bo
   let categoryWeight: number
   if (Number.isNaN(vo2maxCategory) || vo2maxWeightsHaveNaN) {
     const rhrCategory = getRhrCategory(getAgeGroup(input.age, input.biologicalSex), input.biologicalSex, input.rhr)
+    if (rhrCategory === null) return null
     categoryWeight = C.rhrWeights[rhrCategory]
   } else {
     categoryWeight = C.vo2maxWeights[vo2maxCategory]
