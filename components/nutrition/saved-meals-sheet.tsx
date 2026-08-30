@@ -5,7 +5,6 @@ import { useUserTimezone } from '@/components/shell/user-timezone-provider'
 import { Plus, Camera } from 'lucide-react'
 import { toast } from 'sonner'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
-import { useSheetBackDismiss } from '@/lib/hooks/use-sheet-back-dismiss'
 import type { FoodItem, SavedMeal, MealType, FoodLogWithItem, NutritionScanResult } from '@trainingai/shared/types/nutrition'
 import { todayInTz } from '@trainingai/shared/date-utils'
 import { logMealItems } from '@trainingai/shared/nutrition/log-meal'
@@ -124,16 +123,6 @@ export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate,
   // BF-30: the meal's own screen, one layer above this list. Held here for the same reason as the
   // label sheet — one mounted instance, not one per row.
   const [detailMeal, setDetailMeal] = useState<SavedMeal | null>(null)
-  /**
-   * BF-51 ①: the meal the builder was opened FROM, so back returns there.
-   *
-   * Owner: *"clicking edit meal then pressing back - takes you all the way to the nutrition tab;
-   * rather than back to the saved meal."* The detail sheet closes to hand over to the builder, and
-   * the builder is a `tab` of THIS sheet rather than a surface of its own — so its back press was
-   * the library sheet's, and that closes the lot. Null when the builder was reached from the list,
-   * where returning to the list is already right.
-   */
-  const [builderCameFromDetail, setBuilderCameFromDetail] = useState<SavedMeal | null>(null)
   const [detailConfirmDelete, setDetailConfirmDelete] = useState(false)
   const [mealName, setMealName] = useState('')
   // Always sent explicitly, never omitted. Both write paths treat `undefined` as "leave a stored
@@ -236,35 +225,8 @@ export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate,
   function backToMeals() {
     setTab('meals')
     setEditingMeal(null)
-    if (builderCameFromDetail) {
-      setDetailMeal(builderCameFromDetail)
-      setBuilderCameFromDetail(null)
-    }
   }
 
-  /**
-   * The builder is its own back surface (BF-51 ①).
-   *
-   * `SheetContent` renders one `<BackDismiss />` for the whole library sheet, so while the builder
-   * was just a `tab` of it an Android back press closed the sheet outright — past the detail screen
-   * the user came from and out to the Nutrition tab. Registering here puts the builder ABOVE the
-   * sheet on the shared surface stack, so the first back leaves the builder and the second closes
-   * the sheet, which is the order the screens are stacked in.
-   */
-  useSheetBackDismiss(open && tab === 'build', backToMeals)
-
-  /**
-   * Leaving the builder for good — a save, not a back press.
-   *
-   * Separate from `backToMeals` because the detail sheet would re-open holding the meal as it was
-   * BEFORE the edit: `builderCameFromDetail` is a snapshot taken on the way in, and the list behind
-   * it has just been refetched. Landing on the refreshed list is the honest end of a save.
-   */
-  function leaveBuilder() {
-    setBuilderCameFromDetail(null)
-    setTab('meals')
-    setEditingMeal(null)
-  }
 
   /**
    * A recipe pasted as a link becomes this meal (BF-11c).
@@ -322,7 +284,7 @@ export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate,
     // Reported separately rather than folded in: a partial save is exactly when the user needs to
     // know which half happened.
     if (failed > 0) toast.error(failed === 1 ? 'One dish could not be saved' : `${failed} dishes could not be saved`)
-    if (saved > 0) { await invalidateSavedMeals(); leaveBuilder(); fetchMeals() }
+    if (saved > 0) { await invalidateSavedMeals(); backToMeals(); fetchMeals() }
   }
 
   // `[]` is stable by React's guarantee — a setter, not a value. Hoisted rather than inline because
@@ -413,7 +375,7 @@ export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate,
       if (fresh) setMeals(fresh)
       else fetchMeals()
       toast.success(target ? `"${name}" updated` : `"${name}" saved to meal library`)
-      leaveBuilder()
+      backToMeals()
     } catch {
       toast.error(target ? 'Failed to update meal' : 'Failed to save meal')
     } finally {
@@ -737,7 +699,7 @@ export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate,
         onConfirmingDeleteChange={setDetailConfirmDelete}
         onOpenChange={o => { if (!o) { setDetailMeal(null); setDetailConfirmDelete(false) } }}
         onLog={async m => { await quickLog(m); setDetailMeal(null) }}
-        onEdit={m => { setDetailMeal(null); setBuilderCameFromDetail(m); openBuild(m) }}
+        onEdit={m => { setDetailMeal(null); openBuild(m) }}
         onDelete={async m => { await deleteMeal(m); setDetailMeal(null) }}
         onLabel={m => setLabelMeal(m)}
       />
