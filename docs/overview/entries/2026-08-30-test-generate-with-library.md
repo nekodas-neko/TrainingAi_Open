@@ -24,11 +24,17 @@ because `planName` and `restDayAdjustment` come out of that same call. Fill all 
 library and the route still sends the full generate prompt, saying `Meals: exactly 0.`
 
 Two consequences. The test mocks the model, the way `app/api/nutrition/scan/__tests__` already does —
-so the file is still cheap and deterministic, just not for the reason the entry gave. And the waste
-is now **LA-38**, with the fix stated as a *cheaper naming path* rather than a deleted call: the plan
-needs a name whoever chose its meals, so shipping an unnamed plan is the one option that is wrong.
-The last case in the file pins the current behaviour, so the cost is a recorded fact instead of a
-surprise for the next reader.
+so the file is still cheap and deterministic, just not for the reason the entry gave. And the finding
+is filed as **LA-38**, with the last case in this file pinning the behaviour so it is a recorded fact
+rather than a surprise for the next reader.
+
+**Then measuring it changed what LA-38 is.** With the model made to reject, a three-meal plan the
+library filled completely returns **`502 "Could not generate a plan right now."`** — the `catch` does
+not know the call was unnecessary, so a plan that needed nothing from the model fails when the model
+is down. That is an availability bug, not a token bill, and it settles the fix: **skip the call**,
+rather than make it cheaper. Both fields it supplies are derivable when nothing is being generated —
+every meal in hand already has a name, and the rest-day line can state the reduction the code
+actually applies instead of prose that may not match it.
 
 ## What the 12 cases pin
 

@@ -3560,3 +3560,12 @@ and BF-2 gains a line saying its dependency is satisfied and what it still owes 
 that a finished entry must not sit in the queue looking finished, an entry that ships half its work
 states what is left rather than being deleted — which is exactly what these lines are, so the growth
 is the mechanism working.
+
+## 2026-08-30 — `docs/implementation-backlog.md` 13401 → 13408 (LB-21 out, LA-38 in)
+
+LB-21's 23-line entry left the queue and LA-38's 30-line entry replaced it, at the same position.
+Net +7, and the seven are the measurement: LA-38 was filed as a token-cost note and then measured,
+which turned it into an availability bug — a plan the library filled completely returns 502 when the
+model is down, having needed nothing from it. That reversed the recommended fix (skip the call, not
+make it cheaper), so the lines are the difference between an entry the next session would implement
+wrongly and one it would not.
