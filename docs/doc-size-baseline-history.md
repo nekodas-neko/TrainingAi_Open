@@ -3846,3 +3846,12 @@ the log now" reads as a feature the owner has to go and configure before their h
 is the opposite of what shipped. The second is the **v32** device warning: a local SQLite migration is
 the highest-risk change this repo makes, and a paragraph announcing a fix without saying it is
 unverified on the phone is how a Known-Issues row gets skipped.
+
+---
+
+## 2026-08-30 — `projectOverview.md` 8409 → 8411 (Q-392, settings follow the account)
+
+One Current Status paragraph plus its blank line, for the owner's own report finally being answered.
+The half that earns the index is the near-miss: the server-wins rule clears a device key the bag does
+not carry, which is correct — and destructive for a key whose writes never reach the server. That is
+the kind of thing an orientation read should surface before someone adds the next preference.
