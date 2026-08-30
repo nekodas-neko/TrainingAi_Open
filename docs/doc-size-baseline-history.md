@@ -3894,3 +3894,15 @@ nothing in this repo runs. It cost three owner reports and a held rebuild before
 
 The rest of the story is in the journal entry and in `docs/module-map.md`'s row, which is where an
 implementer reaching for `fetch(dataUrl)` would actually be looking.
+
+## 2026-08-30 — `projectOverview.md` 8425 → **8436** (BF-46 ①a, one picker per screen)
+
+Eleven lines, and nine of them are the *failure*, not the feature. Moving a picker is a paragraph
+nobody needs; what the index owes the next session is why a previous one built this, measured a
+picked photo reaching nothing, and held it — the file was landing in the **other** instance of the
+same component, because the screen being left is still mounted while it closes and both carried the
+same accessible name.
+
+That is the third time in one day a check was satisfied by the state it was meant to replace (the
+meal-label ink gate, the builder's `Ingredients` marker, this). It is worth the lines until it stops
+happening.

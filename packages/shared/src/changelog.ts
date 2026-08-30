@@ -6,6 +6,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.402.0",
+    date: "2026-08-30",
+    changes: [
+      "A meal's photo can be added from the meal itself. That screen had an \u201cAdd a photo\u201d band that was not a picker \u2014 it just opened the editor, where the real control sat as a small tile below \u201cAdd ingredient\u201d at the bottom of a scroll.",
+      "The editor's picker moved to the top of that screen and is now the same size, so the photo is in the same place whichever way you got there.",
+    ],
+  },
+  {
     version: "1.400.0",
     date: "2026-08-30",
     changes: [

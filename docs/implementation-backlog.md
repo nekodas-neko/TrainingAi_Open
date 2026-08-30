@@ -1224,7 +1224,7 @@ that handler defers, the way it already defers to a carousel.
   exactly that delete, which is why the two are checked in one pass. ①②④ are equally unverified: the
   sandbox renders at desktop width and cannot judge a gutter or a ring.
 
-### [nutrition] BF-46 — the meal builder buries its photo picker below the fold, and the quantity sheet spends its space on the wrong things
+### [nutrition] BF-46 — the meal builder's photo picker and quantity sheet (all shipped; device check owed)
 
 - **Lane:** B
 - **Batch:** `nutrition-ui-uplift` — ships with BF-45.
@@ -1269,6 +1269,21 @@ toasts anything that is not a recognised cancellation.
   reopen.** If it still fails it now fails *loudly*, which is itself the smaller half of this fix.
 - **(a), the PLACEMENT, is still owed** — one picker, at the top, at hero scale — and so is removing
   the detail sheet's fake *Add a photo*, which calls `onEdit` rather than picking anything.
+
+**✅ (a) SHIPPED (v1.402.0), and the held rebuild's failure was the SPEC, not the app.** Both screens
+have a real picker at the top now, at the size the artboard gives a meal's photo. The meal's own
+screen writes through the parent's `saveMealToLibrary` — the same function the builder calls — so
+there is still one write path to `image_data_uri`, which is what the old comment argued for and
+achieved by having no picker there at all. `MealPhotoTile` grew a `variant="hero"` rather than a
+`MealPhotoHero` being built beside it.
+
+**And the previous session's measurement is now explained.** Rebuilt, the same failure reproduced —
+`onChange` firing with a valid data URI and the component never receiving it. The cause: the meal's
+own screen is **still in the DOM while it closes**, so its picker and the builder's are momentarily
+both mounted with the same accessible name, and the spec waited for that name before picking. It was
+already satisfied by the screen it was leaving, and the photo went to that instance. *A precondition
+satisfied by the state it is meant to replace cannot fail* — the third time this repo has hit that
+shape in a day. The spec waits for `Update Meal` now, and both pickers are named after the meal.
 
 **⚠ (a) WAS BUILT AND HELD, AND WHAT IT MEASURED BEARS DIRECTLY ON (b) — read this first.**
 2026-08-30, Lane B. The rework is straightforward and it did not work, in a way that looks like the
