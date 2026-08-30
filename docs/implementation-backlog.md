@@ -1200,33 +1200,29 @@ opened on, unchanged.
 - **Verification:** index total drops below the heap total, and a re-read a week later shows growth
   back near trend.
 
-### [nutrition] BF-45 — swipe-to-delete on a logged food row (⑤; ①②④ shipped v1.397.0)
+### [nutrition] BF-45 — the nutrition tab's UI uplift (all five shipped; device check owed)
 
 - **Lane:** B
 - **Batch:** `nutrition-ui-uplift`
 - **Added:** 2026-08-27 · owner, with screenshots of the live tab (v1.383.x).
 - **Spec:** BF-28's parity rules bind — where an artboard covers this, the artboard wins.
 
-**①②③④ shipped (v1.397.0)**, struck here rather than left looking open — the reasoning is in the
-[journal](overview/entries/2026-08-30-nutrition-ui-uplift.md). The one worth carrying: ③'s gutter fix
-is **not** where this entry said to put it. It called for `SheetContent`'s bottom variant; measured,
-**26 of 48** bottom sheets set their own `px-*`/`p-0` and most of the rest already pad inner content
-at 16, so a shared outer gutter would have doubled theirs.
+**①②③④ shipped v1.397.0; ⑤ shipped v1.398.0.** Reasoning in the journal
+([①–④](overview/entries/2026-08-30-nutrition-ui-uplift.md) ·
+[⑤](overview/entries/2026-08-30-food-log-swipe-delete.md)). Two things worth carrying: ③'s gutter fix
+is **not** where this entry said to put it — it called for `SheetContent`'s bottom variant, and
+measured, **26 of 48** bottom sheets set their own `px-*`/`p-0` while most of the rest already pad
+inner content at 16, so a shared outer gutter would have doubled theirs. And ⑤ needed one thing the
+meal list did not: the nutrition scroll container owns a horizontal drag of its own that steps the
+day, so a row swipe fed both gestures. `SwipeActions` now marks itself `[data-swipe-actions]` and
+that handler defers, the way it already defers to a carousel.
 
-- **Keep — ⑤ swipe-to-delete on a logged food row.** Owner: *"for logging food; we could possibly add
-  the option to swipe and delete it (with confirmation) like we do in the other screen."* The gesture
-  exists on the meal list (BF-29, device-verified 2026-08-30) — reuse that tray, keep its
-  confirmation, and **do not remove the bin in the edit sheet**: a swipe is a shortcut for people who
-  know it is there, not a replacement for a visible affordance.
-- **⚠ ⑤ was gated on BF-47 and the gate moved rather than lifted** *(bullet restored 2026-08-30 —
-  it was lost when this entry was rewritten to strike ①②④, which is how a blocker goes invisible
-  while its subject stays queued)*. The reason: a swipe is a faster route to exactly the delete that
-  was reappearing, and reaching a failing delete faster is worse than not adding the gesture.
-  BF-47's fix shipped, but it is **reasoned rather than reproduced** — `getLocalStore` is null in
-  `pnpm dev` and Playwright — so confirm it on the device in the same pass as ⑤.
-- **Verification for ⑤:** on the S25, a food row swipes to a tray whose Delete confirms **and the row
-  stays gone across a screen swap and a force-close**. ①②④ are shipped but **not device-verified** —
-  the sandbox renders at desktop width and cannot judge a gutter or a ring.
+- **Keep — the device check, which is the whole of what is still owed.** On the S25: a food row
+  swipes to a tray whose Delete confirms, **and the row stays gone across a screen swap and a
+  force-close**. That last clause is BF-47's failure, whose fix is *reasoned rather than reproduced*
+  (`getLocalStore` is null in `pnpm dev` and in Playwright) — and a swipe is a faster route to
+  exactly that delete, which is why the two are checked in one pass. ①②④ are equally unverified: the
+  sandbox renders at desktop width and cannot judge a gutter or a ring.
 
 ### [nutrition] BF-46 — the meal builder buries its photo picker below the fold, and the quantity sheet spends its space on the wrong things
 
