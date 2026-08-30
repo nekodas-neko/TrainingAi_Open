@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
-import type { FoodItem, NutritionIngredient } from '@trainingai/shared/types/nutrition'
+import type { FoodItem, NutritionIngredient, NutritionScanResult } from '@trainingai/shared/types/nutrition'
 import { ingredientToEntry } from '@trainingai/shared/nutrition/log-plan-meal'
 import { createFoodItem } from '@trainingai/shared/nutrition/create-food-item'
 import { getLocalStore } from '@/lib/local-store'
@@ -11,6 +11,8 @@ import { IngredientSearch } from './ingredient-search'
 import { hostOf } from './recipe-url'
 import type { RecipeCandidate } from './recipe-candidates'
 import { useFoodDatabaseSearch, type ExternalFood } from '@/lib/hooks/use-food-database-search'
+import { BarcodeScanner } from './barcode-scanner'
+import { decodeMealLabelToken } from '@trainingai/shared/nutrition/label-payload'
 
 interface Props {
   /** Whether the picker's screen is on. Both searches idle when it is not. */
@@ -56,6 +58,8 @@ export function IngredientPicker({ active, userId, onAdd, onImportRecipe, onReci
   const [importing, setImporting] = useState(false)
   const [showAddFood, setShowAddFood] = useState(false)
   const [addFoodSaving, setAddFoodSaving] = useState(false)
+  const [scanning, setScanning] = useState(false)
+  const [lookingUp, setLookingUp] = useState(false)
 
   // The database search runs on its own clock in `useFoodDatabaseSearch`, deliberately not chained
   // behind this one: they are independent queries, and chaining them meant a slow library fetch
@@ -125,6 +129,64 @@ export function IngredientPicker({ active, userId, onAdd, onImportRecipe, onReci
       toast.error(offlineHint() ?? `Could not add "${food.name}"`)
     } finally {
       setAddingExternal(null)
+    }
+  }
+
+  /**
+   * A scanned packet becomes an ingredient of the meal being built (BF-63).
+   *
+   * **Not `CaptureActions`, though it holds the same scanner.** That component's hit goes to the
+   * food logger and lands on today's diary — reusing it here would silently log breakfast while the
+   * user thought they were writing a recipe. What a scan means inside a builder is `addExternalFood`
+   * with a different source, so that is the shape.
+   *
+   * **`source: 'barcode'`, and that is the whole reason this is not the search path.** A barcode
+   * identifies one exact product; a name search returns a plausible near-match picked off a list.
+   *
+   * **The code itself is NOT stored, and that is deliberate rather than forgotten.** `barcode` is
+   * NULL on every `food_items` row in production, including the three whose `source` already says
+   * `'barcode'` — `/api/nutrition/barcode` does not return the code it looked up, and `NewFoodItem`
+   * has no field to carry it. Threading it means the route, the shared create path, the local table
+   * and the outbox payload, all of which are Lane A and all of which are BF-38's subject. This path
+   * defers to it rather than adding a fourth writer of NULL.
+   */
+  async function addScannedFood(code: string) {
+    setScanning(false)
+    // A printed meal label is a saved meal, not a product, and scanned inside a builder it would
+    // mean "nest this meal as an ingredient" — which does not exist. Say so, rather than handing a
+    // 22-character token to a product lookup that can only 400 it.
+    if (decodeMealLabelToken(code)) {
+      toast.error('That is a meal label. Scan a product barcode to add it as an ingredient.')
+      return
+    }
+    setLookingUp(true)
+    try {
+      const res = await fetch(`/api/nutrition/barcode?code=${encodeURIComponent(code)}`)
+      const data = await res.json()
+      // The route draws the distinction, so keep it: a database that is down is not a product that
+      // does not exist, and telling the user the second when it is the first sends them to re-scan.
+      if (data.unavailable) { toast.error('The food database is not responding. Try again, or add it by hand.'); return }
+      if (!res.ok) { toast.error('Barcode lookup failed.'); return }
+      if (data.notFound) { toast.error('That barcode is not in the database. Add it by hand, or photograph the label.'); return }
+      const scan = data as NutritionScanResult
+      accept(await createFoodItem({
+        name: scan.name,
+        brand: scan.brand,
+        servingSizeG: scan.servingSizeG,
+        calories: scan.calories,
+        proteinG: scan.proteinG,
+        carbsG: scan.carbsG,
+        fatG: scan.fatG,
+        fiberG: scan.fiberG,
+        sugarG: scan.sugarG,
+        sodiumMg: scan.sodiumMg,
+        satFatG: scan.satFatG,
+        source: 'barcode',
+      }, userId))
+    } catch {
+      toast.error(offlineHint() ?? 'Network error looking up barcode.')
+    } finally {
+      setLookingUp(false)
     }
   }
 
@@ -277,9 +339,15 @@ export function IngredientPicker({ active, userId, onAdd, onImportRecipe, onReci
     }
   }
 
+  // Mutation-checked by `e2e/builder-barcode-scan.spec.ts`: removing this returns the picker and
+  // the scan button never goes away.
+  if (scanning) return <BarcodeScanner onResult={code => void addScannedFood(code)} onClose={() => setScanning(false)} />
+
   return (
     <>
       <IngredientSearch
+        onScan={() => setScanning(true)}
+        lookingUpBarcode={lookingUp}
         query={query}
         onQueryChange={setQuery}
         searchResults={searchResults}
