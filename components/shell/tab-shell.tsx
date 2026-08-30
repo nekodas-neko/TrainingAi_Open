@@ -9,6 +9,8 @@ import { hrefForTab, tabKeyForHref, type TabKey } from "./tabs";
 import { TAB_NAV_EVENT } from "@/lib/shell-nav";
 import { cn } from "@trainingai/shared/utils";
 import type { ActivityLevel } from "@trainingai/shared/types/user";
+import { useColmiAutoSync } from "@/lib/hooks/use-colmi-auto-sync";
+import { useUserTimezone } from "@/components/shell/user-timezone-provider";
 
 // Shown only on a tab's FIRST activation while its chunk loads (SW-cached →
 // near-instant when warm). Never shown again for the life of the shell.
@@ -54,6 +56,10 @@ interface ShellState {
 }
 
 export function TabShell({ initialTab, session }: { initialTab: TabKey; session: TabShellSession }) {
+  // The shell never unmounts, which is exactly what the ring needs: four of its metrics are only
+  // ever offered for the current day, so a day whose evening is never synced loses them for good.
+  useColmiAutoSync(useUserTimezone());
+
   const [state, setState] = useState<ShellState>({
     active: initialTab,
     mounted: [initialTab],
