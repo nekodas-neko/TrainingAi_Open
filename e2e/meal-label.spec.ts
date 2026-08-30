@@ -165,15 +165,70 @@ test('a saved meal renders a printable label in every style', async ({ page }) =
     return dark / (data.length / 4)
   })
 
+  /**
+   * Switch to a style and wait until the canvas is actually showing IT (LB-19).
+   *
+   * **`inkFraction > 0.01` could not do this, and that is the whole bug.** The canvas already
+   * carries the previous style's ink when the radio is clicked, so the condition is true before
+   * anything repaints — a precondition satisfied by the state it is meant to replace cannot fail.
+   * The read then lands mid-repaint and the decode below returns null, intermittently, more often
+   * under file-level load.
+   *
+   * Two signals, because one is not enough:
+   *
+   * **The `mm` line changes with the style**, and it is derived from the style rather than from the
+   * paint, so it says the sheet has switched. Measured 2026-08-30, all six distinct — centred 18.5,
+   * black band 16.4, editorial 16.9, deli 17.7, plaque 20.9, big code 20.1.
+   * **Then the ink settles**, which is the only thing that can say the CANVAS is finished: the
+   * sheet's text can update a frame before the draw, and a repaint passes through a cleared canvas,
+   * so "ink changed" on its own can fire on a blank one.
+   *
+   * **Canvas dimensions were the other candidate and they are not usable** — probed the same day,
+   * every style renders 1179×1179. Recorded so nobody re-measures it.
+   */
+  const styleFigure = () => page.getByText(/mm at \d+×\d+ modules/).first().textContent()
+
+  /** Two identical consecutive reads with ink on them. Settled, not merely non-zero: a repaint
+   *  clears the canvas first, so a single sample can catch it empty. */
+  async function waitForSettledInk(style: string) {
+    let previous = -1
+    await expect
+      .poll(async () => {
+        const now = await inkFraction()
+        const settled = now > 0.01 && Math.abs(now - previous) < 1e-9
+        previous = now
+        return settled
+      }, { message: `${style}'s canvas should settle with ink on it`, timeout: 20_000, intervals: [150] })
+      .toBe(true)
+  }
+
+  async function selectStyle(style: string) {
+    const radio = page.getByRole('radio', { name: new RegExp(escapeRe(style), 'i') })
+    // Already showing — the style was selected before the loop, or the loops overlap at their
+    // edges. Still wait for the paint: skipping the check here is how the first iteration of a
+    // loop ends up asserting nothing.
+    if (await radio.getAttribute('aria-checked') === 'true') return waitForSettledInk(style)
+
+    const figureBefore = (await styleFigure())?.trim()
+    await radio.click()
+
+    await expect
+      .poll(async () => (await styleFigure())?.trim(), {
+        message: `${style} should report its own code size — if it matches the previous style's `
+          + `(${figureBefore}), this signal cannot tell the two apart and the gate is blind again`,
+        timeout: 20_000,
+      })
+      .not.toBe(figureBefore)
+
+    await waitForSettledInk(style)
+  }
+
   // Every style must paint. Black band is the default and is checked first because it is also the
   // one whose code is tightest, so a regression there matters most. "Square" is Q-393's ingredient
   // layout, which takes a different draw path entirely — it would be the easiest one to break
   // silently, since it is the only style that renders from a second data source.
   for (const style of ['Ingredients · centred', 'Black band', 'Editorial', 'Deli ticket', 'Plaque', 'Big code']) {
-    await page.getByRole('radio', { name: new RegExp(escapeRe(style), 'i') }).click()
-    await expect
-      .poll(inkFraction, { message: `${style} should paint ink onto the canvas`, timeout: 20_000 })
-      .toBeGreaterThan(0.01)
+    await selectStyle(style)
   }
 
   // **Does the code actually survive the layout?** The canvas pixels are pulled into Node and
@@ -184,8 +239,7 @@ test('a saved meal renders a printable label in every style', async ({ page }) =
   // the code — an earlier version of the centred layout ran the list into it, and a covered code
   // still looks like a code.
   for (const style of ['Ingredients · centred', 'Black band', 'Plaque', 'Big code']) {
-    await page.getByRole('radio', { name: new RegExp(escapeRe(style), 'i') }).click()
-    await expect.poll(inkFraction, { timeout: 20_000 }).toBeGreaterThan(0.01)
+    await selectStyle(style)
 
     const shot = await canvas.evaluate((el: HTMLCanvasElement) => {
       const ctx = el.getContext('2d')!
