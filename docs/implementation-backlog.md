@@ -2569,30 +2569,37 @@ tell is a locator that never resolves rather than a wrong value.
   reference drawings were never committed). Part 1 §8 has the file-by-file collision table and the
   carry-across rule. **Do not plan around that chain landing, and do not wait for it.**
 
-### [nutrition] LB-21 — `useLibrary` is reachable by users now, and no test has ever run a generation with it on
+### [nutrition][platform] LA-38 — the meal-plan generator calls the model even when it has nothing to generate
 
-- **Lane:** A — the work is in `app/api/nutrition/meal-plans/generate/route.ts`, which the path rule
-  puts in Lane A. Filed by Lane B (the letter records who found it, not who ships it).
-- **Branch:** `test/generate-with-library`
-- **Added:** 2026-08-27 · Lane B, from BF-11h's own "Not exercised" section.
-- **What is and is not covered.** `selectLibraryMeals` is well tested in
-  `packages/shared/src/nutrition/__tests__/library-match.test.ts` — the ranking, the eligibility
-  windows, untagged-suits-any-slot, no-meal-twice. **The route WIRING is not.** `grep -rl useLibrary
-  --include=*.test.ts` returns nothing: BF-11g shipped the flag with no test, BF-11h made it
-  settable from the wizard, and between them nobody has run a generation with it on.
-- **What a test should pin, none of which the shared tests can see:**
-  - `useLibrary: false` still skips both `listSavedMeals` and `listMealTypes` — the conditional
-    fetches at route.ts:132/135 are the reason the common path costs nothing, and a regression there
-    is invisible except as latency.
-  - Picks land at the slot they were matched against, **after** the pinned meals — the `kept.length`
-    offset at route.ts:203 is arithmetic nothing currently checks.
-  - `libraryMatchCount` equals the picks actually used, and `matchReason` is null on an AI slot when
-    `useLibrary` was off but a sentence when it was on. **BF-11h's UI depends on exactly that
-    distinction** — it is how the review step tells "the library had no say" from "nothing fitted".
-  - A pinned meal is never also offered by the library pass (route.ts filters it, untested).
-- **Do not reach for an AI call to test this.** The library path is the half that does NOT call the
-  model — a fully-pinned or fully-library-filled request generates nothing, which is what makes an
-  end-to-end test of this flag cheap and deterministic. That is the shape to aim for.
+- **Lane:** A — `app/api/nutrition/meal-plans/generate/route.ts`.
+- **Branch:** `perf/generate-skip-empty-model-call`
+- **Added:** 2026-08-30 · Lane A, while writing LB-21's wiring test — which found it by falsifying
+  LB-21's own premise (*"a fully-pinned or fully-library-filled request generates nothing, which is
+  what makes an end-to-end test of this flag cheap and deterministic"*). It does not.
+- **What happens.** `generateObject` is called **unconditionally**, before `generatedNeeded` is
+  computed. Pin three meals into a three-meal plan, or let the library fill all three, and the route
+  still issues a full model call whose prompt says `Meals: exactly 0.` — then slices the reply to
+  nothing. Pinned by test: *"a plan the library filled entirely still calls the model, for its name"*
+  in `app/api/nutrition/meal-plans/generate/__tests__/use-library-wiring.test.ts`.
+- **⚑ It is an AVAILABILITY bug, not just a cost one — measured 2026-08-30.** With the model made to
+  reject, a three-meal plan the library filled completely returns
+  **`502 "Could not generate a plan right now. Try again shortly."`** The `catch` around the call
+  does not know the call was unnecessary, so a plan that needed nothing from the model fails when the
+  model is down. Tokens are the smaller half of this.
+- **So the fix is to skip the call, not to make it cheaper.** The blocker is that the same call
+  supplies `planName` and `restDayAdjustment`, which the plan needs whoever chose its meals — and
+  shipping an unnamed plan is the one option that is wrong. Both are derivable when nothing is being
+  generated: every meal in hand already has a name, and the rest-day line can state the reduction the
+  code **actually applies** (`REST_DAY_CARB_REDUCTION`, 15 %) rather than model prose that may not
+  match it. Keep the derived line to the skip branch and say so — the AI path's prose is not in scope
+  here, and reconciling the two is a separate question.
+- **Worth doing because the trigger is the ordinary case, not the edge one.** BF-11h made
+  `useLibrary` settable from the wizard, so a user with a stocked library reaches a fully-filled plan
+  by design, and the full generate prompt is the most expensive one this route sends.
+- **Verification.** The fully-filled case makes **no** model call and still returns a named plan;
+  the same case with the model rejecting returns **200**, not 502 — that is the test that says the
+  bug is fixed; a partially filled plan is unchanged, name included; `libraryMatchCount`, slot
+  placement and `matchReason` all still hold — the LB-21 test file covers those and must stay green.
 
 ### [nutrition][platform] Q-407 — the meal-plan wizard is seven screens for six answers, and the one piece the Coach lacks is multi-select
 
