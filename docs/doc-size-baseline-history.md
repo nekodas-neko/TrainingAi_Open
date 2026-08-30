@@ -3895,7 +3895,20 @@ nothing in this repo runs. It cost three owner reports and a held rebuild before
 The rest of the story is in the journal entry and in `docs/module-map.md`'s row, which is where an
 implementer reaching for `fetch(dataUrl)` would actually be looking.
 
-## 2026-08-30 — `projectOverview.md` 8425 → **8436** (BF-46 ①a, one picker per screen)
+## 2026-08-30 — `projectOverview.md` 8425 → **8437** (BF-46 ② ③, the quantity editor's Option A)
+
+Eleven lines, and the half that earns them is the **departure**: the chosen drawing puts the unit
+toggle at the stepper's height, and this app's 48 dp floor makes a stacked two-option toggle 96 px,
+so the stepper grew rather than the toggle shrinking. A session that reads only the artboard and
+only the shipped code will see a disagreement and "fix" it back — including by reaching for
+`.tap-dense`, which is what the floor exists to refuse.
+
+The rest — what was built, what the e2e asserts, why the geometry rather than the text — is in the
+journal entry.
+
+(Re-derived on the rebase: this branch was cut at 8413 and BF-46 ①b's paragraph landed under it.)
+
+## 2026-08-30 — `projectOverview.md` 8437 → **8449** (BF-46 ①a, one picker per screen)
 
 Eleven lines, and nine of them are the *failure*, not the feature. Moving a picker is a paragraph
 nobody needs; what the index owes the next session is why a previous one built this, measured a
@@ -3906,3 +3919,5 @@ same accessible name.
 That is the third time in one day a check was satisfied by the state it was meant to replace (the
 meal-label ink gate, the builder's `Ingredients` marker, this). It is worth the lines until it stops
 happening.
+
+(Re-derived on the rebase: this branch was cut at 8425 and BF-46 ② ③'s paragraph landed under it.)

@@ -1334,6 +1334,27 @@ control *"should be able to be set from there"*. So the tile renders (no composi
 data URIs in a list) and the placeholder is what persists. **BF-51 ② carries the same finding from the
 builder side** — read them together; they are one bug seen from two screens.
 
+**✅ ② SHIPPED (v1.401.0).** An ingredient row reads `1000 g` and nothing else. The rule is
+`ingredientAmountLabel` in `saved-meal-qty.ts` — extracted from the hook so it is testable at all —
+and servings survive only for a food with no serving size, which has no gram equivalent to show
+instead. Display only: grams were already the stored truth, and the editor still offers both units.
+
+**✅ ③ SHIPPED (v1.401.0), Option A, with one stated departure.** The toggle sits in a narrow column
+to the right of the stepper; the presets span the width in equal columns; the calorie total stands
+alone at the largest type; the macros are three named tiles rather than `P`/`C`/`F`. **The drawing
+puts the toggle at the stepper's height and that is not buildable here** — every `button` carries a
+48 dp floor (`globals.css`), so a stacked two-option toggle is 96 px and cannot shrink to meet a
+56 px stepper; `.tap-dense` exists for inline text buttons, not for a real control. **The stepper
+grew to 96 px instead**, which the drawing's own intent supports — the value is meant to be the
+tallest, heaviest thing there. A food with no serving size has no toggle and keeps the short row.
+`SegmentedTabs` gained `orientation="vertical"`. Guarded by `e2e/quantity-editor-option-a.spec.ts`,
+which asserts the toggle's **geometry** and not merely its presence, because "beside the stepper" is
+the whole of the request and is invisible to a text-only check.
+
+- **⚠ Option A is the tallest of the three drawings and may scroll on a long food name** — that was
+  put to the owner and accepted. **If it scrolls badly on the S25, tighten the gaps**; do not merge
+  the total and the macros back into one block, which is option B and a settled question.
+
 **② A serving inside a serving.** Owner: *"I see there are serving size of each ingredient within the
 meal; so a serving size in a serving size is probably excessive; we should keep it weight/portion."*
 The builder lists `8 servings · 1000 g` per ingredient while the meal itself is measured in portions,
@@ -1377,7 +1398,7 @@ the macros are two stacked blocks rather than one. On a long food name the sheet
 put to the owner and accepted — distinctness was the goal. If it scrolls badly on the S25, tighten
 the gaps rather than merging the two blocks back together, which would be option B.
 
-- **Verification.** On the S25, in both sheets that render the editor: a photo attached in the
+- **Verification — the whole of what is still owed for ② and ③.** On the S25, in both sheets that render the editor: a photo attached in the
   builder appears in the list, the detail hero and the diary row; ingredients read in grams; every
   control clears the 48 dp floor and the action row clears the gesture bar (`pb-safe-action*`, which
   renders 0 in the sandbox).

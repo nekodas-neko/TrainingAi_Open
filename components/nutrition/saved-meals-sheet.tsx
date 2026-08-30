@@ -27,6 +27,7 @@ import { BulkDeleteConfirm } from './bulk-delete-confirm'
 import { FoodRow } from './food-row'
 import { QuantitySheet } from './quantity-sheet'
 import { useIngredientQuantities } from './use-ingredient-quantities'
+import { ingredientAmountLabel } from './saved-meal-qty'
 import { MealTypeTags } from './meal-type-tags'
 import { IngredientPicker } from './ingredient-picker'
 import { MealBatchSize } from './meal-batch-size'
@@ -133,7 +134,7 @@ export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate,
   const [mealServings, setMealServings] = useState(1)
   const {
     ingredients, setIngredients, addIngredient, removeIngredient,
-    unitFor, setUnit, amountLabel, setDisplayQty, stepQty,
+    unitFor, setUnit, setDisplayQty, stepQty,
   } = useIngredientQuantities()
   // Which meal slots a plan may use this meal in (BF-11f). Empty = every slot, which is what
   // `mealFitsSlot` already means by an untagged meal — never "no slot".
@@ -656,7 +657,7 @@ export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate,
                         key={item.id}
                         id={item.id}
                         name={item.name}
-                        secondary={amountLabel(item, qty, unitFor(item))}
+                        secondary={ingredientAmountLabel(item.servingSizeG, qty)}
                         calories={(item.calories ?? 0) * qty}
                         highlighted={item.id === editingIngredientId}
                         onEdit={setEditingIngredientId}

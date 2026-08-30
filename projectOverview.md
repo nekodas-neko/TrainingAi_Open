@@ -25,6 +25,8 @@
 ## 🔖 Current Status
 
 **Version:** v1.402.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Version:** v1.401.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Version:** v1.401.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-08-30.
 
 **One photo picker per screen, and the held rebuild's failure was the spec (BF-46 ①a).** Two things
@@ -49,6 +51,17 @@ Now `Base64` + `dataUrlToBlob`, and non-cancellations toast. **Verifiable only o
 
 **Version:** v1.398.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-08-30.
+
+**The quantity editor is the owner's Option A, and an ingredient stopped claiming servings (BF-46
+② ③).** The unit toggle moved into a narrow column beside the stepper — which is what frees the
+width the presets now span — the calorie total stands alone, and the macros are three named tiles
+rather than `P`/`C`/`F`. **One stated departure from the drawing:** it puts that column at the
+stepper's height, and the app's 48 dp floor makes a stacked two-option toggle 96 px, so the
+*stepper* grew instead. And an ingredient row reads `1000 g`, never `8 servings · 1000 g` — a meal
+is measured in portions, so "serving" meant two different things one line apart. The e2e asserts the
+toggle's **geometry**, because "beside the stepper" is the whole request and is invisible to a
+text-only check. **Not device-verified**, and Option A is the tallest of the three drawings
+([journal](docs/overview/entries/2026-08-30-quantity-editor-option-a.md)).
 
 **Settings follow the account now (Q-392).** The owner's *"when i do a new install or open on computer - it loses all the saved preferences"* was still true in full: the engine (`users.preferences`, `GET`/`PATCH /api/user/preferences`) had shipped and **no read site called it**. `lib/user/preferences-sync.ts` connects them — `hydrateUserPreferences` seeds every device key from the server bag on launch, `savePreference` writes both. Proved by `e2e/preferences-survive-reinstall.spec.ts`, which is the owner's sentence as a test: PATCH three preferences, `localStorage.clear()`, reload, and all three come back in their right encodings — and it fails with the hydration replaced by a no-op. **The rule that was wrong, and CI found it:** hydration first cleared any key the bag did not carry — right for a settled system, wrong in the window between a tap and its PATCH landing. `meal-label.spec.ts` caught it wiping a label style mid-flight, and **offline it reverts every change on the next launch**. Hydration now deletes nothing; the one thing the app clears, the mutually-exclusive brand preset / hue pair, is resolved by `EXCLUSIVE_GROUPS`. The earlier `backgroundSettings` catch was the same rule failing at its extreme, and treating it as one key needing an exclusion would have left the race in place for every other ([journal](docs/overview/entries/2026-08-30-preferences-read-sites.md)).
 
