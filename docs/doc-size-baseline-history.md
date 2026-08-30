@@ -3328,10 +3328,109 @@ further down records the module map's `path → symbol` claims as holding, 110 o
 verifies attribution to the right *file* — not that the file is in the right *directory*. Without
 that sentence the two rows read as a contradiction and the next reader has to re-derive which is
 right.
+## 2026-08-27 — `docs/implementation-backlog.md` raised (BF-43, and BF-35's two decisions closed)
+
+47 lines net. BF-43 is filed from the owner asking whether the AI will see the clinical results. It
+will not: the chat has 16 tools, none reaches `measured_rmr`, and the one tool carrying body data
+returns weight with no body-fat percentage. Nothing filters it — it was never wired in.
+
+The length is the safety argument, which is the half a shorter entry would drop. **The three results
+are three different permissions.** RMR and DEXA composition are calorie and protein inputs the app
+already reasons in. A blood panel is where a general model is most confident and least qualified —
+handed `ALT 46, ref 0-45` it volunteers liver advice. So values and the provider's own flag go in,
+interpretation does not, and the refusal gets tested with a leading prompt rather than assumed.
+
+BF-35's two open decisions are closed in the same diff (store bytes, not the OFF URL; the image
+lives where its ownership does), replacing the recommendations with the decision and the reason.
+
+## 2026-08-27 — `docs/implementation-backlog.md` raised (BF-44, BF-41 promoted, BF-43's storage decided)
+
+Net after merging main, which removed the shipped PS-14. BF-44 is filed from the owner describing an
+injury-aware coach — and most of what they described already ships: `activeInjuredMusclesInSession`,
+the periodization swap, `injurySafeAlternatives`, Coach's own injury logging. Saying that plainly is
+half the entry's value, because building it again is the obvious wrong move.
+
+The real defect is narrower and worse: `lib/ai-chat/tools.ts` and `context.ts` contain `injur` **zero
+times**, so the chat surface will talk a user through a deadlift progression while the workout screen
+substitutes the movement out. Two surfaces, opposite advice. The fix is an always-on context line
+rather than a tool — a tool fires only when the model thinks to call it, and an injury has to
+constrain answers the model does not recognise as injury questions.
+
+## 2026-08-27 — `docs/implementation-backlog.md` raised (BF-45, BF-46, and BF-39 re-reported)
+
+97 lines. Eight owner reports against the live Nutrition tab, filed as two batched Lane B entries
+plus a note on an entry that already existed.
+
+The value is in what tracing them found, which is less than eight problems. **"Adding an image
+doesn't show it" and "the photo should be at the top" are one bug**: every layer of the photo
+plumbing works, and `saved-meals-sheet.tsx:672` renders the picker below `Add ingredient` at the
+bottom of a scrolling builder — while the detail sheet's `Add a photo` hero opens that same builder
+rather than a picker, so the user lands above a control they never see. And **"an AI meal floods the
+list" is BF-39**, already filed, now with a screenshot of one breakfast as eight rows and a sharper
+requirement than the original: a collapsed parent that expands to its ingredients, which is also the
+first place a meal photo could live.
+
+Two are one-liners with a reason worth recording — `nutrition-action-row.tsx` puts three buttons in a
+two-column grid, and `meal-card.tsx` keeps its P/C/F footer inside `CollapsibleContent`, so
+collapsing a meal drops the summary that collapsing exists to leave behind.
+
+## 2026-08-27 — `docs/implementation-backlog.md` raised (the owner answered the four open questions)
+
+39 lines across BF-45 and BF-46, and one of them is a correction rather than an addition.
+
+**The photo report was misdiagnosed here and the entry now says so out loud.** It read as "the picker
+was never found"; the owner had found it, saved, and the photo did not appear. So there is a real
+save failure, unreproducible in source — every layer seeds and sends correctly — and the entry now
+carries the device candidates and the one check that splits a write bug from a render bug (read the
+row back after a save that looked fine). Deleting the wrong guess would have let the next session
+re-make it.
+
+The gutter report also changed shape: asked which screens, the owner named bottom sheets rather than
+screens, which turns a per-screen sweep into one change in the shared `SheetContent side="bottom"` —
+with the warning that bottom sheets already own their bottom inset, so it is horizontal only.
+
+## 2026-08-27 — `docs/implementation-backlog.md` raised (BF-46's layout chosen)
+
+17 lines (13027 after merging main twice more): option A recorded as a band-by-band table, replacing the link-and-wait note. The table
+exists because a prose description of this exact layout is what sent the entry round once already —
+"more distinct macro and total calorie buttons" has a dozen valid readings, and the drawing settled
+which one. The entry now says the drawing wins where the two disagree, and keeps B and C named only
+so a later session does not re-open a decision the owner has made.
+
+It also records what A costs — the tallest of the three, two stacked result blocks, may scroll on a
+long food name — and what to do about it, which is tighten the gaps rather than merge the blocks,
+because merging them is option B and the owner did not pick option B.
+
+## 2026-08-27 — `docs/agents/state/bugfix.md` raised 161 → 204 (the baton was four sessions stale)
+
+The BugFix baton still said *"Current: BF-9 filed, next is BF-10"* while the queue held BF-46. A
+successor trusting that line would have collided on nine numbers, so the ID line now says to run the
+grep rather than trust the line — the failure was believing a hand-maintained number, and the fix is
+to stop having one.
+
+The 44 lines are the session's record: the six owner decisions taken across three days (dark-only,
+the warning row, food-image routing and storage, store-everything for the clinical results,
+weight-only ingredients, quantity-sheet option A), a pointer to the de-identified clinical baseline
+with the three numbers a successor should not re-derive, and six method notes. The sharpest is the
+first: eight owner reports about one tab became fewer causes than reports, and filing eight numbers
+would have buried the two real bugs among six duplicates.
+
+## 2026-08-30 — `docs/implementation-backlog.md` raised (BF-21's owner gate cleared)
+
+6 lines (13099 after merging main repeatedly). The owner enabled `pg_stat_statements` on Railway and verified it in the console, so the
+gate is struck with the evidence rather than a bare tick — `SHOW shared_preload_libraries` and the
+`pg_extension` count, both quoted, because a later session should be able to tell a cleared gate from
+an assumed one.
+
+Two lines are a warning the entry did not carry: the counters start empty at the restart, so an early
+read proves nothing, and `pg_stat_statements.max` silently evicts the least-executed shapes once
+5,000 are tracked. Checking `dealloc` is 0 is what separates "nothing slow is happening" from "the
+slow thing was evicted".
+
 
 ## 2026-08-30 — `docs/implementation-backlog.md` raised (LB-19's premise replaced by measurement)
 
-17 lines (12863 after merging main three times; it raised the number twice of its own —
+17 lines (13116 after merging main four times; it raised the number three times of its own —
 two entries genuinely disagreeing about one number is the case this file conflicts on correctly). The entry said two flaky e2e specs
 were a sandbox **time budget** and prescribed
 `test.setTimeout`. Measuring both showed neither is, and the prescription would have fixed neither —
