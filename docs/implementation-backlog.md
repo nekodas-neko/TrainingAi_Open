@@ -1074,6 +1074,44 @@ deliberate choice, on a session where the absence of a Primary is the design.
   outgoing one's role, the prescribed sets and percentages are unchanged, and the session still has
   no Primary afterwards.
 
+### [platform] LB-29 — a preference chosen and then reloaded can be overwritten by the server's older copy
+
+- **Lane:** B
+- **Added:** 2026-08-30 · Lane B, from a CI flake on `meal-label.spec.ts` in PR #643's run.
+- **Reference:** the mechanism is Q-392's, shipped the same day
+  ([journal](overview/entries/2026-08-30-preferences-read-sites.md)).
+
+**The observation.** `meal-label.spec.ts › the chosen label style is remembered` failed with
+`aria-checked="false"` for the full 10 s and passed on retry. It is an assertion failure, not
+infrastructure — and it is the same spec that caught Q-392's first rule being wrong.
+
+**The mechanism, from the code rather than a reproduction.** `savePreference` writes `localStorage`
+synchronously and PATCHes the server fire-and-forget. The spec taps a style and **reloads
+immediately**. On the new page `hydrateUserPreferences` GETs the bag and writes every key it
+carries, unconditionally — so if the PATCH has not landed, the response still holds the *previous*
+style and overwrites the choice the user just made. The sheet then reads the old value.
+
+**Offline it is not a race, it is permanent.** The PATCH never lands, so every launch re-writes the
+server's old value over the device's. That is the same reasoning that retired the first version of
+this rule; the delete case was fixed and the overwrite case was not.
+
+**Recommended fix — a dirty mark, not an outbox.** `savePreferences` records the key as unsynced in
+`localStorage` (so it survives the reload) and clears it when its PATCH resolves. Hydration skips a
+marked key and **re-PATCHes the local value instead of taking the server's**, which also self-heals
+the offline case on the next launch. ~20 lines, no queue and no table, so it does not reopen the
+"not an outbox domain" decision.
+
+- **Two alternatives, and why they lose.** *Seed-if-absent* (hydration only writes a key the device
+  lacks) cannot clobber and exactly satisfies the owner's report — *"a new install or open on
+  computer loses all the saved preferences"* — but gives up cross-device **updates**: change a
+  setting on the phone and the laptop keeps its own forever. *A session-scoped "written here" set*
+  does not work at all, because the reload is what loses the value and the set does not survive it.
+- **Keep:** whether cross-device update is wanted at all is the owner's call, and it decides between
+  the recommendation and seed-if-absent. Ask before building — the two differ in what they promise,
+  not just in how they are written.
+- **Verification:** with the PATCH stubbed to hang, pick a style, reload, and it is still chosen;
+  and with the network off, it survives a second launch.
+
 ### [platform] LB-27 — one extra request during launch strands several for over a minute, and nothing explains why
 
 - **Lane:** A
@@ -1440,114 +1478,52 @@ sheets are at the artboards' 16 px gutter now. See BF-45 ③ for why the fix is 
   this more."* So N5's recipe-import checks (yield, multi-dish, duplicate handling) are **not
   answered** and stay owed — do not read this entry as clearing them.
 
-### [nutrition] BF-39 — a logged meal stops being a meal: `food_logs` has no `saved_meal_id`, and three symptoms trace to that
+### [nutrition] BF-39 — a logged meal draws as one nested row (BUILT AND HELD — read the measurement first)
 
-> **⚑ RAISED AGAIN 2026-08-30 — third report, and the owner reached the fix independently.** *"we
-> need to sort out meals and ingredients; in a nest. so that when you add a meal it adds the meal and
-> not every ingredient or at least nests in the meal."* **Nest** is the same shape this entry already
-> specifies: one parent row that expands to its ingredients. **No new entry** — filing a fourth
-> number for the same defect is the failure this repo has had before (Q-397).
->
-> Three reports across five days, from three different screens, is the strongest priority signal in
-> the nutrition cluster. Treat it accordingly.
+- **Lane:** B
+- **Batch:** `nutrition-ui-uplift`
+- **Added:** 2026-08-26 · owner, re-raised 2026-08-27 with a screenshot and again 2026-08-30 — three
+  reports from three screens, the strongest priority signal in the nutrition cluster.
 
-> **⚑ RE-REPORTED WITH SCREENSHOTS, 2026-08-27, and the owner's wording sharpens the requirement.**
-> *"when I add a meal from ai; it breaks it down into its components and floods the list. we need to
-> be able to create an over arching food and have the ingredients and macro break down inside of
-> it."* The screenshot is one AI-logged breakfast rendered as **eight** diary rows — flour, protein
-> powder, baking powder, salt, milk, eggs, butter, bacon — each with its own `1 serving · Ng` line
-> and chevron, filling the whole meal section.
->
-> **This is the same defect this entry already describes, not a new one**, and it is now the owner's
-> most-repeated nutrition complaint (raised on 2026-08-26 about a saved meal's photo, again here
-> about an AI meal). What the re-report adds is the shape of the fix: **one collapsed parent row
-> carrying the meal's name and total, expanding to the ingredients and their macro split** — not
-> eight siblings, and not a single opaque row that loses the breakdown. Both halves are stated, so
-> build both.
->
-> It also answers the photo question the earlier report left open: a parent row is a place a meal
-> photo can live. Decomposed siblings had nowhere to put one, which is why *"the image won't transfer
-> over"* had no good answer while the rows stayed flat.
+**The engine shipped 2026-08-30** (migrations 238 + 239, local SQLite **v31**):
+`food_logs.saved_meal_id` and `food_logs.meal_group_id`, stamped by `logMealItems` on both write
+paths and carried through the outbox payload, the push branch, the sync delta, the pull mapping and
+the local read. **What is owed is the rendering, and it was built and NOT shipped.**
 
-- **Lane:** B — the migration and write path shipped 2026-08-30 as Lane A's half; all that remains is
-  the diary rendering. *(Was `Lane: A`; a struck-through value here parses as no lane at all and lands
-  the entry in UNCLASSIFIED, so state the current lane plainly and say the rest in prose.)*
-- **Batch:** `nutrition-ui-uplift` — **added 2026-08-30 so the owed half is visible.** The runner
-  warns *"mentions a schema change — do not batch a migration"*; **that does not apply here and the
-  reason is checkable: migrations 238/239 and local SQLite v31 are already on `main`.** What remains
-  is rendering only, so there is no migration in this batch to revert. Do not split it out on the
-  warning alone — but if any part of the render turns out to need a column, that part leaves the
-  batch and goes to Lane A.
-- **⚠ NOT a `Keep:` — this is unbuilt Lane B work.** It was filed as one on 2026-08-30 when the engine
-  shipped, which parks the entry in the runner's KEEP list under *"not new work"*. That is right for
-  an owner or device check and wrong for a whole UI half nobody has written; it made the owner's
-  most-repeated nutrition ask invisible to the tool Lane B starts from. Restated as a live entry with
-  its scope shrunk to what remains. **The engine
-  shipped 2026-08-30** (migrations 238 + 239, local SQLite **v31**): `food_logs.saved_meal_id` and
-  `food_logs.meal_group_id`, stamped by `logMealItems` on both write paths, carried through the
-  outbox payload, the push branch, the sync delta, the pull mapping and the local read. **Shape (1)
-  was built, as recommended** — one row per ingredient, grouped — so nothing about a log row
-  changed and every existing query is untouched. What is owed:
-  - **Lane B:** the diary draws one collapsed parent row per `mealGroupId`, carrying the meal's name
-    and photo, expanding to the ingredients and their macro split. Both halves, per the re-report.
-  - ~~**Lane A (small):** true MRU for My Foods~~ — **shipped 2026-08-30.** `listSavedMeals` returns
-    `lastUsedAt` (`max(logged_at)` per `saved_meal_id`, user-scoped, deleted logs excluded) and
-    orders most-recently-eaten first, never-eaten last in their existing `createdAt` order. Derived
-    on read, never a stored counter.
-  - **Nothing back-fills.** Meals logged before 2026-08-30 have both columns NULL and will keep
-    rendering as loose ingredients; there is no way to recover which rows belonged together.
-- **Added:** 2026-08-26 · owner: *"the meal is a complete in 'saved meal' and it can have a picture
-  etc. but when adding it to the log; its broken down into its components so the image wont transfer
-  over. not sure what the best way around this would be. maybe it needs to stay as a whole item."*
+**⚠ IT WAS BUILT, IT WORKS, AND IT BROKE A DIFFERENT SCREEN'S GESTURE. Do not rebuild it the same
+way.** The render half is straightforward and its own three e2e tests pass. What it could not do is
+coexist with the meal library's swipe tray: `meal-detail-artboard-parity` and
+`my-meals-artboard-parity`'s swipe tests failed **deterministically, on both CI attempts and
+locally**, with the tray's `Delete <meal>` button never appearing after a left-swipe.
 
-**The owner's instinct is right, and the missing piece is already documented elsewhere as a
-different problem.** Logging a saved meal writes one `food_logs` row per ingredient and **nothing
-records that they came from a meal**. `food_logs` carries `food_item_id` and no `saved_meal_id`, so
-the moment a meal is logged its identity is gone.
+**What was measured, in order — this is the valuable part:**
+1. **It is a regression of this work, not a flake.** The same two specs pass on `main` and fail on
+   the branch, run the same way, minutes apart.
+2. **The cause is the saved-meal summaries hook**, not the grouping or the rendering. Disabling
+   `useSavedMealSummaries` alone — leaving every other line — turns both specs green.
+3. **Moving the hook out of `nutrition-content.tsx`** into a memoised `DiaryMealList` (so the map's
+   arrival cannot re-render the library sheet) fixed `my-meals-artboard-parity` and **not**
+   `meal-detail-artboard-parity`.
+4. **The trigger is the `saved-meals` invalidation subscription**, not its network fetch. Removing
+   `useInvalidationRefetch` entirely turns both green; keeping it but re-reading only from the local
+   store and the cache seed — no request — leaves both red. So something in opening a meal
+   invalidates `saved-meals`, and the resulting work lands while a `SwipeActions` row is mid-drag.
 
-**Three symptoms, one cause — which is what makes this worth fixing rather than patching:**
+**Where to start.** Find what invalidates `saved-meals` during `openSavedMeal`, and why a subscriber
+re-rendering a sibling subtree drops an in-flight `useDrag`. `SwipeActions` keeps `offset` in
+`useState` and a module-level `openRows` registry — a re-render should be harmless and a **remount**
+would not be, so establish which is happening before changing either component.
 
-| Symptom | Where it was noticed |
-|---|---|
-| The meal's photo cannot follow it into the diary | **here**, the owner's report |
-| A saved meal has **no last-used timestamp at all**, so My Foods can only order by `createdAt DESC` | Q-395c's journal, filed as a constraint rather than a defect |
-| The diary shows five ingredients where the owner ate one thing | implied by both |
+**The diary needs the meal's name and photo from somewhere**, and every option has a cost: this hook
+(above), a join into the food-log read (**Lane A** — `app/api` and `lib/data`), or a seed-only read
+that goes stale (the Q-260 shape). Settle that before building again.
 
-Q-395c's journal already says it: *"`food_logs` carries no `saved_meal_id`, so a saved meal has no
-last-used timestamp at all … True MRU needs a column that does not exist — Lane A's to add."* **That
-is this column.** Adding it for MRU alone would be under-selling it.
-
-**Two shapes, and the choice is the entry's real content:**
-
-1. **Stamp the ingredients.** Keep one row per ingredient, add a nullable `saved_meal_id` (plus a
-   per-log group id, so two servings of the same meal on one day stay distinct). The diary groups
-   rows that share it and renders the meal's name and photo over them.
-   - **Keeps** every macro total, every per-ingredient edit, and every existing query working
-     unchanged — a log row is still a log row.
-   - **Costs** grouping logic on every diary read.
-2. **Log the meal as one row.** What the owner reached for — *"maybe it needs to stay as a whole
-   item"*.
-   - **Keeps** the diary trivially correct: one thing eaten, one row, one photo.
-   - **Costs** a second shape in `food_logs`: a row that points at a meal rather than a food item,
-     which every reader, the sync delta, the local mirror and the macro sums must now handle. And
-     editing one ingredient of a logged meal stops being possible without decomposing it anyway.
-
-**Recommended: (1).** It is additive — a nullable column and a grouping pass — where (2) changes what
-a `food_logs` row *is*, and this table is read by the diary, the energy balance, the adaptive-TDEE
-window, the sync delta and the local store. **The owner's phrasing asks for the outcome, not the
-storage**: "stay as a whole item" is satisfied by the diary *showing* one grouped item, which (1)
-delivers without a second row shape.
-
-- **⚠ Sequencing against BF-35.** BF-35 fills the food tile with images; a meal's photo reaching the
-  diary needs this column first. If BF-35 lands first the meal rows simply show ingredient images —
-  correct, not broken — so this is an ordering preference, not a `Needs:`.
-- **⚠ The full offline-first chain applies**, per CLAUDE.md: local table column = server payload =
-  `getSyncDelta` output = `pullDelta` mapping = `applyDelta` upsert columns = the `pushMutations`
-  branch. A new nullable column on a synced table is exactly where that chain gets half-done.
-- **Verification.** Log a saved meal with a photo: the diary shows one grouped entry with the meal's
-  name and picture, the day's macro total is unchanged from before, and a single ingredient inside it
-  can still be edited and deleted. Then the same on a second serving of the same meal on the same
-  day — they must not merge into one.
+- **The grouping rule itself is settled and was proved by mutation** — keep it: group on
+  `meal_group_id`, **never** `saved_meal_id` (two servings of one meal on one day share the meal and
+  not the group); a group needs a *resolvable* meal, so pre-BF-39 rows and a deleted meal's rows
+  render loose because **nothing back-fills**; and a one-row group is not nested.
+- **Verification when it is rebuilt:** the three tests written for it, **plus** the meal-library
+  swipe specs in the same run — the pair this attempt broke.
 
 ### [nutrition] BF-38 — logging the same food twice creates a second `food_items` row: 19 of 209 are redundant
 
