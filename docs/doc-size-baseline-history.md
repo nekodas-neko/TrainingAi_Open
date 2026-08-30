@@ -3970,8 +3970,117 @@ actually happened. It earns the index because the fix is not the one the entry d
 the branch Q-211 named left the behaviour unchanged, since a second branch re-applied the deload, and
 that branch carried a comment calling such a clause unreachable — true when written, false the moment
 the first exemption landed. A reader of this file should know the shipped fix has two halves.
+## 2026-08-30 — `docs/implementation-backlog.md` (gate audit: three stale owner gates)
 
-## 2026-08-31 — `projectOverview.md` 8453 → 8450, `docs/implementation-backlog.md` 13368 → 13251, `implementation-lane-b.md` held at 126
+Small. Asked which entries were waiting on him, the owner turned out to be waiting on three he had
+already dealt with:
+
+- **BF-4** — the photo scan was run during the device pass (~4 s, no complaint), which is not the
+  slowdown the entry was filed about. Gate cleared, with the instruction to close it as *stopped*
+  rather than *fixed*, since no diff was traced to it.
+- **LB-18** — answered on the device the same day, and the answer was written *above* the `Gate:`
+  line while the line itself survived. **A cleared gate has to be struck in the field, not narrated
+  next to it, because the runner reads the field.**
+- **Q-388** — void rather than answered. It asked the owner to choose SpO₂ on or off; he refused the
+  question and was right to, since SpO₂ was equally on under stock firmware at a quarter the drain.
+  Re-marked as blocked on a device reading (S9), not on a decision.
+
+The LB-18 case is the reusable one: an owner gate can be answered in prose and stay closed to the
+tools, which makes it indistinguishable from an unanswered one at a glance.
+
+## 2026-08-30 — `docs/implementation-backlog.md` (lane classification and the Railway aggregation)
+
+Net negative on entries: 216 → 215, with Q-549 removed.
+
+**Nine entries carried `Lane: ?` and were therefore offered by neither runner** — including BF-1, BF-2
+and BF-9. Every one of them already described its own split ("engine is A, the surface is B"), so
+none of them was actually undecided; the field simply never got the answer the prose already had.
+Classified by CLAUDE.md's path rule, with the rule cited in each so the reasoning is checkable rather
+than asserted. Eight resolved to a lane; **PS-4 stays `Lane: ?` on purpose** and now says so, because
+the runner accepts only A or B and rewriting a baton is not implementer work — recorded so the next
+audit does not try again.
+
+**Three entries were asking the owner the same hosting question three ways.** Q-549's headline premise
+was falsified on 2026-08-25 (423 MB flat at 0.0 vCPU, not 0.79 GB) and its only live residue was one
+console setting, so it is folded into Q-551 and removed. Q-547's remaining half is re-framed as what
+it is — a *reading* taken during a quiet window, feeding Q-551 rather than competing with it. **The
+owner now has one Railway question instead of three.**
+
+## 2026-08-30 — `docs/implementation-backlog.md` (the tuning sign-off, applied to one of four)
+
+The owner signed off "the four tuning tasks". Checked against CLAUDE.md's bar for a scoring change —
+*a proposal is incomplete until it states how many other days the change moves* — and **only TN-10
+met it**, so only TN-10 carries the sign-off.
+
+The other three are recorded as explicitly **not** signed, with the reason on each, because a blanket
+approval applied to them would authorise things nobody intends:
+
+- **TN-16** is a stop sign, not a request. Its own measurement (n = 33) is that stress-high minutes
+  correlate the *wrong way*, so the warning it proposes **would fire on the owner's best days** — the
+  entry calls that worse than no warning. Approving it approves a known-broken feature. Q-507 clears
+  it.
+- **TN-17** does not ask *may we change the score*; it asks **what the owner's step goal is**. Median
+  day 4,649 steps against a stored goal of 7,000 reached on 19 of 60 days. The entry now carries the
+  one-line question to put to them instead.
+- **Q-422** is a legitimate sign-off blocked on `Needs: Q-420`, which sets the intensity scale it
+  multiplies. Approving the multiplier before its input is fixed approves an unknown. Re-offer it
+  when Q-420 lands.
+
+Q-551 is marked **held** rather than answered, per the owner.
+
+## 2026-08-30 — `docs/implementation-backlog.md` (BF-59, and TN-17 answered)
+
+BF-59 is the largest of the two and earns it by being arithmetic rather than opinion. The owner
+completed a full training week and the screen still showed them well short, so the question was
+whether the target or the counting was wrong. **The counting is right** — 50 logged sets producing 79
+muscle-set credits is the 0.5 secondary weighting working as designed. **The target is wrong**:
+`program_volume_targets` stores a flat 14/10 large-small binary, which is precisely what
+`volume-targets.ts` opens by saying it does not do, and it ignores the `powerbuilding` ×0.8 multiplier
+on the owner's own active program. 128 displayed against ≈106 correct, and reaching 128 would need
+~81 sets — 62% more than the program prescribes.
+
+The per-muscle table is what makes it worth writing down: against goal-adjusted landmarks the owner
+**exceeded** glutes and lower back and **met** hamstrings in the same week the screen painted them
+red. A target that cannot distinguish "you are past the sweet spot" from "you are half way there" is
+worse than no target.
+
+TN-17 is a line: the owner kept 7,000 steps, and the entry now records that the number came from the
+`sedentary` rung of a tier table rather than any per-person calculation — defensible by accident, and
+worth saying so plainly.
+
+## 2026-08-30 — `docs/implementation-backlog.md` (BF-59 reframed by one remark from the owner)
+
+The entry was written as "flat binary plus a missing goal multiplier". The owner then said *"oh yes
+cause its realization phase its been less sets"* — and that is the actual cause, with the original
+two demoted to second-order. In a peaking block low volume **is** the prescription; the app's own
+`explain.ts` calls realisation *"peak strength — heaviest load, lowest reps"* and `autoregulation.ts`
+refuses rep pushes in it. So the screen painted correct training red.
+
+Two things worth keeping from the trace. **MAV is an accumulation target**, so displaying it during a
+peak is measuring the wrong thing rather than measuring it wrongly. And **phase is per program
+session, not per week** — production shows the owner's sessions spanning `accumulation`,
+`intensification` and `realisation` simultaneously — so a weekly target is a computation over the
+phases the week contains, not a number that can be stored at all.
+
+A question the entry had raised — *does the program prescribe enough volume to reach MAV?* — is
+struck rather than deleted, because it was reasonable on the data available and the next person
+looking at 50-against-106 without the phase would ask it again. That is itself the argument for
+putting the phase on the screen.
+
+## 2026-08-30 — `docs/implementation-backlog.md` (BF-60, a one-word rename with a reason)
+
+Small, and it would be smaller still except for two things worth writing down. **The old label was
+correct when written** — the file carries a comment explaining that `Single foods` names a
+composition against one thing — and **BF-48 is what made it wrong** by giving that tab the food
+database. So the entry says to update the comment in the same change, because a file defending a name
+it no longer uses is how a later session talks itself into reverting.
+
+And the wrinkle: `Meals` has a search box too, so `Search` is not strictly exclusive. The distinction
+that makes the rename honest is that Meals *filters* a list you own while this tab *searches* beyond
+it — which means the two placeholders have to read differently, or the rename swaps one ambiguity for
+another. Batched into `nutrition-ui-uplift` rather than given its own PR and its own device look.
+
+## 2026-08-31 — `projectOverview.md` 8453 → 8450, `docs/implementation-backlog.md` 13576 → 13500, `implementation-lane-b.md` held at 126
 
 Three baselines fall; none rises. **Re-derived on the merge**: this branch was cut at 8449, and
 Q-211's four-line paragraph landed under it. **`projectOverview.md`** loses four lines of merge debris — its
@@ -3979,7 +4088,7 @@ Current Status carried *three* duplicated `**Version:**` lines and a stray `v1.3
 `**Last updated:**` pair mid-section, all of it from parallel PRs resolving the same shared line —
 and gains one paragraph, written as a single long line in the section's current house style.
 
-**`docs/implementation-backlog.md`** falls 117 as BF-39's entry is removed on shipping and LB-30 is
+**`docs/implementation-backlog.md`** falls 76 as BF-39's entry is removed on shipping and LB-30 is
 filed, which is the queue working rather than a compaction.
 
 **The baton was rewritten and then cut back to its baseline**, which is the part worth recording:

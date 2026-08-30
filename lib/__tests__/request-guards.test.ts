@@ -22,6 +22,34 @@ describe('readJsonLimited', () => {
   it('rejects invalid JSON within the limit', async () => {
     expect(await readJsonLimited(post('not json'), 1024)).toEqual({ ok: false, reason: 'invalid_json' })
   })
+
+  /**
+   * LB-14 — a client that hangs up mid-post is not a server fault.
+   *
+   * The error is pinned to the shape a real disconnect produces, measured against the dev server
+   * with a chunked POST whose socket is destroyed mid-body: `Error` with `code: 'ECONNRESET'` and
+   * message `aborted`. **It is not a `DOMException`**, so the obvious `err.name === 'AbortError'`
+   * guard would not have matched it — which is why this is caught at the read rather than
+   * recognised by name anywhere.
+   */
+  it('reports an inbound stream that resets mid-body as aborted, not as bad JSON', async () => {
+    const reset = Object.assign(new Error('aborted'), { code: 'ECONNRESET' })
+    const body = new ReadableStream<Uint8Array>({
+      start(c) {
+        c.enqueue(new TextEncoder().encode('{"percent":8'))
+        c.error(reset)
+      },
+    })
+    const req = new Request('http://localhost/test', {
+      method: 'POST', body,
+      // @ts-expect-error -- `duplex` is required for a streamed request body and is not yet in lib.dom
+      duplex: 'half',
+    })
+
+    // Not `invalid_json`: the truncated bytes DO parse as broken JSON, so without the catch this
+    // returns a 400 for the wrong reason after the throw has already been reported.
+    expect(await readJsonLimited(req, 1024)).toEqual({ ok: false, reason: 'aborted' })
+  })
 })
 
 describe('isAllowedImageMime', () => {
