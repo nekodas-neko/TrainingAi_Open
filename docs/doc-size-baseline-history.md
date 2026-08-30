@@ -3954,3 +3954,16 @@ A question the entry had raised — *does the program prescribe enough volume to
 struck rather than deleted, because it was reasonable on the data available and the next person
 looking at 50-against-106 without the phase would ask it again. That is itself the argument for
 putting the phase on the screen.
+
+## 2026-08-30 — `docs/implementation-backlog.md` (BF-60, a one-word rename with a reason)
+
+Small, and it would be smaller still except for two things worth writing down. **The old label was
+correct when written** — the file carries a comment explaining that `Single foods` names a
+composition against one thing — and **BF-48 is what made it wrong** by giving that tab the food
+database. So the entry says to update the comment in the same change, because a file defending a name
+it no longer uses is how a later session talks itself into reverting.
+
+And the wrinkle: `Meals` has a search box too, so `Search` is not strictly exclusive. The distinction
+that makes the rename honest is that Meals *filters* a list you own while this tab *searches* beyond
+it — which means the two placeholders have to read differently, or the rename swaps one ambiguity for
+another. Batched into `nutrition-ui-uplift` rather than given its own PR and its own device look.

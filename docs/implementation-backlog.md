@@ -1241,6 +1241,36 @@ opened on, unchanged.
 - **Verification:** index total drops below the heap total, and a re-read a week later shows growth
   back near trend.
 
+### [nutrition] BF-60 — the `Single foods` tab is the search surface now, so call it `Search`
+
+- **Batch:** `nutrition-ui-uplift` — a one-word rename that should ride the batch already touching this
+  screen rather than costing its own PR and its own device look.
+- **Lane:** B — `components/nutrition/saved-meals-sheet.tsx:64` (`LIST_TABS`).
+- **Added:** 2026-08-30 · owner, with the Log Food screen: *"single foods here should be → Search. I
+  think that would represent it better."*
+
+**The label was right when it was written and BF-48 made it wrong.** `Single foods` was chosen to
+name a *composition against one thing* — the code carries a comment saying so, and it was a good
+label for a tab listing the single foods you had logged. **BF-48 then gave that tab the food
+database**, and the screen now says it out loud: the placeholder reads *"Search your foods or the
+food database…"*. A tab that reaches outside your own data is not "your single foods" any more.
+
+- **Rename to `Search`, and update the comment above `LIST_TABS` in the same change.** That comment
+  is the recorded reasoning for the old label; leaving it in place would have the file defending a
+  name it no longer uses, which is how a later session talks itself into reverting this.
+
+**⚠ One wrinkle, worth deciding rather than discovering.** `Meals` has a search box too — `FoodList`
+renders one with placeholder *"Search your meals"*. So `Search` as a tab name is not strictly
+exclusive. The distinction that makes it honest: **Meals *filters* a list you already own; this tab
+*searches* beyond it.** Make the two read differently — filter placeholder on Meals, search
+placeholder here — or the rename swaps one ambiguity for another.
+
+- **Alternatives considered, in case this comes back:** `All foods` (accurate, but reads as a bigger
+  list of yours rather than a lookup), `Database` (jargon), `Find food` (parallel with the other tabs
+  as an action but wordier at 412 dp). **`Search` is the owner's pick and the shortest true one.**
+- **Verification:** the tab reads `Search`, the `LIST_TABS` comment describes the current labels, and
+  the two search inputs are worded so a filter and a lookup do not read the same.
+
 ### [nutrition] BF-45 — swipe-to-delete on a logged food row (⑤; ①②④ shipped v1.397.0)
 
 - **Lane:** B
