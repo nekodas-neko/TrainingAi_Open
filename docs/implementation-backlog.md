@@ -11493,24 +11493,6 @@ per-field merge where an AI write has no honest source rank to claim.
   existing scale-toast Known-Issues entry in `projectOverview.md` rather than adding a duplicate
   when this ships.
 
-### [platform][devices] LB-14 — a client that hangs up mid-request is written to `error_events` as a server fault
-
-- **Branch:** _unassigned_ · **Added:** 2026-08-25, on the Lane B session-start `error_events` read · **Lane: A** — `packages/shared/src/http/request-guards.ts` and/or `instrumentation.ts`.
-
-`POST /api/oura-ble/battery-poll` and `POST /api/oura-ble/samples` log bare `aborted` rows — **nine
-in the 30-day window** (six 08-13, two 08-17, one 08-25), sporadic, self-healing, no user-visible
-effect: the battery-poll route's own comment says *"a dropped poll is inconsequential — the next
-tick re-posts."* **Read from source, not reproduced:** `readJsonLimited` streams the body through
-`reader.read()`, which rejects when the request stream is cancelled — the native BLE service being
-backgrounded mid-post is the obvious cause. Nothing catches it, so it reaches `onRequestError`,
-which reports to **both** `error_events` and Sentry. The helper is shared, so every route using it
-has this shape. It matters only because `error_events` is the table every session reads to orient,
-it prunes at 30 days, and Q-315 measured it at 52 MB of genuinely live rows (not bloat) — a client hanging up
-is not our fault and each one spends an alert plus a row of that record. **Fix shape:** return
-`{ ok: false, reason: 'aborted' }` from the helper so the route answers 400 without reporting, or
-filter aborts in `recordRequestError` (wider — it covers routes not using the helper); either way
-filter on the abort *signal*, never on message text. Counts are the owner's rows only.
-
 ### [app-shell] Q-93-followup — the timeline's workout and walk taps have not been pressed on the phone
 
 - **Branch:** `feat/timeline-workout-day-detail` (merged 2026-08-25, v1.371.0) · **Lane: B**
