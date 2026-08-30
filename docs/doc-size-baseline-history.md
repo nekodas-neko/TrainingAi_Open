@@ -3824,3 +3824,16 @@ was known to be checking: the decode loop had been reading the previous style's 
 iteration and passing because all six styles encode the same meal. That belongs in the index rather
 than only in a journal entry — the next person to touch the label renderer needs to know the spec
 was not covering what its name says.
+
+## 2026-08-30 — `projectOverview.md` → 8407, `docs/implementation-backlog.md` → 13516 (BF-3 gap 1)
+
+The backlog shrinks: BF-3's 5,846-character entry becomes a 3,177-character `Keep:`, since the three
+gaps it diagnosed are now one shipped and two queued, and the design argument for the shipped one
+lives in the migration's own comments.
+
+`projectOverview.md` +11, one Current Status paragraph, and two of its lines are the ones that stop a
+wrong reading. The first is that it works with the dose already typed in — without it "the dose is on
+the log now" reads as a feature the owner has to go and configure before their history is safe, which
+is the opposite of what shipped. The second is the **v32** device warning: a local SQLite migration is
+the highest-risk change this repo makes, and a paragraph announcing a fix without saying it is
+unverified on the phone is how a Known-Issues row gets skipped.

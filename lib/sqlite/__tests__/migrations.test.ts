@@ -5,7 +5,7 @@ describe('local schema', () => {
   // The describe and the title used to say v25 while the assertion said 27 — a stale label on a
   // guard whose whole job is to be the authority on the number. Named after what it checks now.
   it('tops out at the current version', () => {
-    expect(Math.max(...MIGRATIONS.map(m => m.toVersion))).toBe(31)
+    expect(Math.max(...MIGRATIONS.map(m => m.toVersion))).toBe(32)
   })
 
   // BF-39. The trap this file exists for: a column added to a `CREATE TABLE IF NOT EXISTS` body
@@ -20,6 +20,24 @@ describe('local schema', () => {
       expect(
         RECONCILE_COLUMNS.some(c => c.table === 'food_logs' && c.column === column),
         `food_logs.${column} missing from RECONCILE_COLUMNS`,
+      ).toBe(true)
+    }
+  })
+
+  // BF-3, same shape once more. Five columns across two tables that both already exist on every
+  // upgraded device — the dose stamped on a log is what stops a titration rewriting history, so a
+  // device that got the CREATE body and not the ALTERs would keep the exact bug this closes.
+  it('v32 adds the dose columns by ALTER, not only in the CREATE bodies', () => {
+    const v32 = MIGRATIONS.find(m => m.toVersion === 32)!
+    const ddl = v32.statements.join('\n')
+    for (const [table, column] of [
+      ['supplement_logs', 'amount'], ['supplement_logs', 'unit'], ['supplement_logs', 'dose_text'],
+      ['supplements', 'default_amount'], ['supplements', 'unit'],
+    ] as const) {
+      expect(ddl, `${table}.${column} has no ALTER`).toContain(`ALTER TABLE ${table} ADD COLUMN ${column}`)
+      expect(
+        RECONCILE_COLUMNS.some(c => c.table === table && c.column === column),
+        `${table}.${column} missing from RECONCILE_COLUMNS`,
       ).toBe(true)
     }
   })
