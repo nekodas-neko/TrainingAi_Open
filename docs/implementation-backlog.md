@@ -1067,6 +1067,58 @@ deliberate choice, on a session where the absence of a Primary is the design.
   outgoing one's role, the prescribed sets and percentages are unchanged, and the session still has
   no Primary afterwards.
 
+### [platform] LA-39 — `claude_ro.pg_stat_statements` returns timings but redacts every query, and only the owner can fix it
+
+- **Lane:** A — to verify it once the grant lands.
+- **Gate:** owner — the fix is a role GRANT, superuser work done out of band, exactly like the role's
+  own creation.
+- **Branch:** _unassigned_
+- **Added:** 2026-08-30 · Lane A, measured against production minutes after BF-21 deployed.
+
+**BF-21 shipped and half-works.** The view exists on production and returns rows — the entry's own
+pass test. But `query` reads **`<insufficient privilege>`** on every row:
+
+```
+   553 x     22.0 ms  <insufficient privilege>
+    30 x     31.4 ms  <insufficient privilege>
+     1 x    760.4 ms  <insufficient privilege>
+```
+
+Calls, `mean_exec_time` and `rows` are all real. **The one column that says which query is not.**
+
+**Root cause, verified rather than inferred.** `pg_stat_statements` redacts query text for anyone who
+is not the statement's own role and not a member of **`pg_read_all_stats`**; the check reads the
+*session* role inside the extension's own function, so it is unaffected by who owns the view or by
+`security_invoker`. Measured on production (PostgreSQL 18.6):
+`pg_has_role(current_user, 'pg_read_all_stats', 'MEMBER')` → **false**, and `claude_readonly` has no
+role memberships at all.
+
+**The fix is one statement and it is not ours to run:**
+
+```sql
+GRANT pg_read_all_stats TO claude_readonly;
+```
+
+**The trade-off, stated plainly, because this is a widening and the owner should decide it.**
+`pg_read_all_stats` grants **no table data** — it cannot read a row of anyone's health history, and
+every `claude_ro` view stays row-scoped exactly as it is. What it does grant is every *statistics*
+view cluster-wide, and the one worth thinking about is `pg_stat_activity`, whose `query` column would
+become readable for **other sessions**. The app's queries are parameterised through `pg`/Drizzle, so
+that text carries `$1` placeholders rather than values — the same property that makes
+`pg_stat_statements` safe in the first place — but it is a live window rather than a normalised
+history, and a query built with an inlined literal anywhere would show it.
+
+- **Recommendation: grant it.** Timings without query text cannot answer the question BF-21 exists
+  for — "which query is slow" — so the view as it stands is a table of anonymous numbers. The
+  exposure added is query *shapes* on a second surface, on a database whose row data stays
+  unreachable either way. Reversal is one `REVOKE`, immediate, no deploy.
+- **The alternative, if the answer is no:** leave the grant off and **say so in the view's own
+  comment**, so the next session reading `<insufficient privilege>` does not spend a session
+  rediscovering this. That is strictly worse than granting, but it is better than the current state,
+  where the redaction looks like a bug.
+- **What would count as fixed:** the same query returns real SQL text in `query`. Until then BF-21 is
+  shipped-but-not-useful, and this entry is why.
+
 ### [nutrition] BF-48 — "Single foods" searches only what you have logged, so the food database is unreachable from Log Food
 
 - **Lane:** **B — all of it.** (Corrected 2026-08-30 from *"A for the search wiring, B for the row"*.

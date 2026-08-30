@@ -3705,6 +3705,26 @@ read in the first hours means nothing, and that BF-19 already measured the datab
 where the reported slowness is. Without them the next session reads a clean `pg_stat_statements` and
 closes the slow-load question on it, which is the mistake the entry itself warned about.
 
+## 2026-08-30 — `projectOverview.md` 8357 → 8367, `docs/implementation-backlog.md` 13685 → 13652 (BF-54 shipped)
+
+The backlog **shrinks 33** — BF-54 left the queue, and the new number is the floor.
+
+`projectOverview.md` +10, one Current Status paragraph. Half of it is the three measured pairs
+(552/180,415 · 0/87,015 · 1/6,102), and they earn the space: without a number the entry reads as
+"the console was slightly off", and the actual finding is that a button which takes an ACCESS
+EXCLUSIVE lock was being justified by a figure three orders of magnitude wrong. The last sentence —
+that the SIZE columns were never wrong — is there because the neighbouring reflex is to distrust the
+whole readout, and Q-528 was a data-loss incident filed on exactly that over-correction.
+
+
+## 2026-08-30 — `docs/implementation-backlog.md` 13652 → 13704 (LA-39 filed)
+
+52 lines, and they are the ones a `GRANT` decision needs rather than a description of it. BF-21
+shipped, its pass test passes, and every row's `query` still reads `<insufficient privilege>` — so
+the entry has to say what was measured on production, that the redaction follows the session role
+rather than the view's owner (which is what stops the next session trying `security_invoker`), and
+what `pg_read_all_stats` does and does not widen. Left shorter it reads as "grant this", and the one
+thing an owner-gated entry must not do is hide the trade-off it is asking about.
 ## 2026-08-30 — `docs/implementation-backlog.md` (nutrition moved to the top, and two entries un-hidden)
 
 Net small; the bulk is eleven entries relocated rather than written. The owner asked for the
