@@ -1,6 +1,6 @@
 import { KCAL_PER_G } from './atwater'
 import { ACTIVITY_LEVELS, type ActivityLevel, type FitnessGoal } from '../types/user'
-import { cunninghamBmr, personalRmr, type MeasuredRmr } from '../health/body-composition'
+import { bodyComposition, cunninghamBmr, personalRmr, type MeasuredRmr } from '../health/body-composition'
 import { SEDENTARY_MULTIPLIER } from '../health/energy-baseline'
 
 // Q-401: `ACTIVITY_MULTIPLIERS` used to live here — sedentary 1.2 through extra_active 1.9 — and
@@ -164,9 +164,12 @@ export interface BaselineResult {
 }
 
 export function calculateBaseline(input: BaselineInput): BaselineResult {
-  const leanMassKg = input.bodyFatPct != null
-    ? Math.round(input.weightKg * (1 - input.bodyFatPct / 100) * 10) / 10
-    : undefined
+  // Lean mass comes from `bodyComposition`, not an inline `weight × (1 − bf/100)` — that helper is
+  // where the body-fat plausibility band lives (Q-527), and it is what makes an implausible reading
+  // fall through to Mifflin-St Jeor below instead of turning a scale misread into a calorie and
+  // protein target. Still rounded to 1 dp here, because the figure is quoted back to the model.
+  const comp = bodyComposition(input.weightKg, input.bodyFatPct)
+  const leanMassKg = comp != null ? Math.round(comp.ffmKg * 10) / 10 : undefined
 
   // A measurement outranks both predictions (BF-33). It is re-scaled to today's lean mass, so it
   // ages by how much the body changed rather than by the calendar; `personalRmr` returns null when

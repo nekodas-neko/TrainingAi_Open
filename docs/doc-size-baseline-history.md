@@ -3858,6 +3858,118 @@ someone changing the rule will actually be standing.
 which is the point of it: TN-13 said 2.11 / 0.33 / 84 % over 50 nights and the same query over 71
 gives 2.50 / 0.58 / 77 %. Same conclusion, and restating it is cheaper than the next session
 discovering the discrepancy and wondering which figure was wrong.
+## 2026-08-30 — `projectOverview.md` +2 (LB-26, the APK banner's tap target)
+
+One Current Status paragraph plus its blank line. The defect half is small; the half that earns the
+index is the process one — a `Gate: device` applied to unbuilt work parks it from `next-item.js`, and
+it happened here to a session that had read the warning about it hours earlier. The rule moved to the
+backlog's protocol header in the same PR, which is the durable fix; this line is what makes an
+orientation read mention it at all.
+
+**Re-derived on each rebase as PRs landed under it; final 8422 → 8424.** The branch was cut before Q-154 landed
+and two more PRs merged under it while CI ran; every paragraph is kept, so the number is set from the
+merged file each time rather than from either side of a conflict.
+---
+
+## 2026-08-30 — `projectOverview.md` 8422 → 8424 → 8405 → **8413** (Q-392, settings follow the account)
+
+One Current Status paragraph plus its blank line, for the owner's own report finally being answered.
+The half that earns the index is the rule that was wrong: hydration cleared any key the server bag
+did not carry, which is right for a settled system and wrong in the window between a tap and its
+PATCH landing — and offline it reverts every change on the next launch. CI caught it. That is the
+kind of thing an orientation read should surface before someone adds the next preference.
+
+(The number moved four times while this sat in CI; set from the merged file each time. The third
+move was DOWN — a compaction on `main` had left 20 lines of slack under the baseline, and a
+ratchet is only worth having if it sits on the file. The fourth is BF-45 ⑤'s own paragraph
+landing on `main` under the old slack, which is what tightening converts from invisible into a
+number someone has to write down. That is the trade, and it is the right one.)
+
+## 2026-08-30 — `projectOverview.md` 8413 → **8425** (BF-46 ①b, the meal photo's CSP block)
+
+Twelve lines for a paragraph that is mostly one transferable fact: **a `fetch()` of a `data:` URL is
+a `connect-src` request**, and this app's CSP does not allow one. That is not a nutrition detail —
+it is a rule any surface handling an image from a plugin can break, on the native branch only, where
+nothing in this repo runs. It cost three owner reports and a held rebuild before anyone read the CSP.
+
+The rest of the story is in the journal entry and in `docs/module-map.md`'s row, which is where an
+implementer reaching for `fetch(dataUrl)` would actually be looking.
+
+## 2026-08-30 — `projectOverview.md` 8425 → **8437** (BF-46 ② ③, the quantity editor's Option A)
+
+Eleven lines, and the half that earns them is the **departure**: the chosen drawing puts the unit
+toggle at the stepper's height, and this app's 48 dp floor makes a stacked two-option toggle 96 px,
+so the stepper grew rather than the toggle shrinking. A session that reads only the artboard and
+only the shipped code will see a disagreement and "fix" it back — including by reaching for
+`.tap-dense`, which is what the floor exists to refuse.
+
+The rest — what was built, what the e2e asserts, why the geometry rather than the text — is in the
+journal entry.
+
+(Re-derived on the rebase: this branch was cut at 8413 and BF-46 ①b's paragraph landed under it.)
+
+## 2026-08-30 — `projectOverview.md` 8437 → **8449** (BF-46 ①a, one picker per screen)
+
+Eleven lines, and nine of them are the *failure*, not the feature. Moving a picker is a paragraph
+nobody needs; what the index owes the next session is why a previous one built this, measured a
+picked photo reaching nothing, and held it — the file was landing in the **other** instance of the
+same component, because the screen being left is still mounted while it closes and both carried the
+same accessible name.
+
+That is the third time in one day a check was satisfied by the state it was meant to replace (the
+meal-label ink gate, the builder's `Ingredients` marker, this). It is worth the lines until it stops
+happening.
+
+(Re-derived on the rebase: this branch was cut at 8425 and BF-46 ② ③'s paragraph landed under it.)
+
+## 2026-08-30 — `docs/agents/state/implementation-lane-b.md` 109 → **126** (the seventeenth Lane B run)
+
+Eleven lines after a run that merged six PRs and left two open. Two sections earn them and one was
+cut to pay for them.
+
+**Earning it:** three items are now blocked on the owner rather than on work — BF-51 ③, LB-29 and
+the device pass for the whole shipped `nutrition-ui-uplift` batch — and each carries a written
+recommendation, because a successor that re-derives them will reach a different answer and build the
+wrong thing. And *a precondition satisfied by the state it is meant to replace cannot fail*, which
+cost three separate investigations in one day and had already cost a previous session the whole of
+BF-46 ①a.
+
+**Paying for it:** the "What is genuinely left for B" heading is gone, folded into `Now` — the queue
+survey it held is one `next-item.js` call away and does not need a section. Several gotchas were
+merged into single bullets rather than dropped; nothing in the previous baton was deleted outright.
+
+Six of the seventeen are a late addition: **BF-39 was built and held**, and a baton that said it
+shipped would be the most expensive kind of wrong.
+
+(Re-derived twice on rebases: this branch was cut at 8425, and BF-46 ② ③'s and ①a's paragraphs
+landed under it in turn.)
+## 2026-08-30 — `docs/agents/state/implementation-lane-a.md` 203 → 208 (Q-211 batch)
+
+Five lines, and they are the two things a baton exists to carry. (`wc -l` reads 207 and the
+check reads 208 — it counts a final line with no trailing newline, so trust the check.)
+
+The first is a **correction**: this baton said the remaining Lane A work was *"almost entirely owner-
+or device-gated"*, and that was wrong. It propagated — a session read the ~21 scoring entries at the
+top of READY, reported the queue blocked to the owner, then found six startable items below them and
+shipped all six. The baton is where that error lived for four days, so the warning belongs in it and
+nowhere else; a journal entry would not be read before the same mistake was made again.
+
+The second is two new rows in **Waiting on the owner**, which is the section that exists for exactly
+those: nulling the corrupt `body_comp` snapshot, and dropping `oura_heartrate_user_updated`.
+
+Paid for where it could be: the *Shipped this session* list was replaced rather than appended, and
+the correction was compressed twice (six lines to four) before raising the number. What was **not**
+done is trimming the previous session's `Traps` section to make room — it is 37 lines of durable
+knowledge under a header that says "this session", and restructuring another session's baton to buy
+five lines is a worse trade than this note.
+
+## 2026-08-30 — `projectOverview.md` 8449 → 8453 (Q-211, the baseline deload exemption)
+
+Four lines on the existing Q-185 status block, turning its *"related open issue"* pointer into what
+actually happened. It earns the index because the fix is not the one the entry described: exempting
+the branch Q-211 named left the behaviour unchanged, since a second branch re-applied the deload, and
+that branch carried a comment calling such a clause unreachable — true when written, false the moment
+the first exemption landed. A reader of this file should know the shipped fix has two halves.
 ## 2026-08-30 — `docs/implementation-backlog.md` (gate audit: three stale owner gates)
 
 Small. Asked which entries were waiting on him, the owner turned out to be waiting on three he had

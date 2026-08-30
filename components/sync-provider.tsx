@@ -17,6 +17,8 @@ import { pullDelta, pushMutations } from '@/lib/local-store/sync-engine';
 import { markLocalStoreDead } from '@/lib/local-store/dead-store-signal';
 import { reportClientError } from '@/lib/client-error';
 import { hydrateGoalSeeds, type GoalSeedValues } from '@/lib/home/home-prefs';
+import { hydrateUserPreferences } from '@/lib/user/preferences-sync';
+import type { UserPreferences } from '@trainingai/shared/user/preferences';
 import {
   invalidateBiometrics, invalidateProgramStructure, invalidateWorkoutSummaries,
   invalidateMealPlans,
@@ -56,6 +58,12 @@ const CACHE_TASKS: CacheTask[] = [
   { key: 'progress-summary',        url: '/api/progress-summary',           ttl: TTL_MEDIUM, today: true },
   { key: 'user-goals',              url: '/api/user/goals',                 ttl: TTL_MEDIUM,
     afterData: d => hydrateGoalSeeds(d as GoalSeedValues | null) },
+  // Q-392: the server bag seeds the `localStorage` keys every preference surface already reads, so
+  // a fresh install picks up the settings this device chose. Warmed here beside goals because it is
+  // the same shape of problem and the same one-directional rule — server wins, the device copy is a
+  // seed. Nothing renders from the response; the seeding IS the effect.
+  { key: 'user-preferences',        url: '/api/user/preferences',           ttl: TTL_MEDIUM,
+    afterData: d => hydrateUserPreferences(d as UserPreferences | null) },
   { key: 'readiness-score',         url: '/api/readiness-score',            ttl: READINESS_SCORE_TTL, today: true },
   // Q-270: this route computes the day's OTS and persists it to oura_daily_derived as a side
   // effect, but nothing called it except the Health → Body card — so `training_load_ots` was 0 of

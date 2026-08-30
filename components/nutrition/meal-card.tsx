@@ -1,11 +1,12 @@
 'use client'
 
-import { memo, useCallback, useState } from 'react'
-import { Plus, ChevronDown } from 'lucide-react'
+import { memo, useCallback, useMemo, useState } from 'react'
+import { Plus, ChevronDown, Trash2 } from 'lucide-react'
 import { AnimatePresence, motion } from 'motion/react'
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/components/ui/collapsible'
 import type { MealType, FoodLogWithItem } from '@trainingai/shared/types/nutrition'
 import { MACRO_COLORS } from '@trainingai/shared/nutrition/macro-colors'
+import { SwipeActions, type SwipeAction } from '@/components/ui/swipe-actions'
 import { FoodRow } from './food-row'
 
 interface Props {
@@ -15,9 +16,12 @@ interface Props {
   /** By id, not the log object: the row renders inside `.map()` where a hook cannot memoise an
    *  object literal, and one would defeat `FoodRow`'s `memo` silently (Q-490). */
   onQuickEdit: (logId: string) => void
+  /** Asks for the delete. The confirmation is the parent's, the same dialog the edit sheet's bin
+   *  raises — a drag must never be the one route that skips it (BF-45 ⑤). */
+  onDeleteLog: (logId: string) => void
 }
 
-export const MealCard = memo(function MealCard({ mealType, logs, onAdd, onQuickEdit }: Props) {
+export const MealCard = memo(function MealCard({ mealType, logs, onAdd, onQuickEdit, onDeleteLog }: Props) {
   const [expanded, setExpanded] = useState(true)
   const totals = logs.reduce(
     (acc, l) => ({ calories: acc.calories + l.calories, proteinG: acc.proteinG + l.proteinG, carbsG: acc.carbsG + l.carbsG, fatG: acc.fatG + l.fatG }),
@@ -109,6 +113,7 @@ export const MealCard = memo(function MealCard({ mealType, logs, onAdd, onQuickE
                       secondary={logAmountLabel(log)}
                       calories={log.calories}
                       onEdit={onQuickEdit}
+                      onDelete={onDeleteLog}
                     />
                   </motion.div>
                 ))}
@@ -136,14 +141,24 @@ function logAmountLabel(log: FoodLogWithItem): string {
 /** Wrapper so the memoised row gets a stable `onPress` from inside a `.map()`, where a hook cannot
  *  live and an inline arrow would defeat `React.memo` silently (Q-490). Scalars only. */
 const DiaryRow = memo(function DiaryRow(
-  { id, name, secondary, calories, onEdit }:
-  { id: string; name: string; secondary: string; calories: number; onEdit: (id: string) => void },
+  { id, name, secondary, calories, onEdit, onDelete }:
+  {
+    id: string; name: string; secondary: string; calories: number
+    onEdit: (id: string) => void; onDelete: (id: string) => void
+  },
 ) {
   const press = useCallback(() => onEdit(id), [id, onEdit])
+  const actions = useMemo<SwipeAction[]>(() => [
+    { key: 'delete', label: 'Delete', icon: <Trash2 className="h-4 w-4" />, onPress: () => onDelete(id), destructive: true },
+  ], [id, onDelete])
   // Artboard 1 draws the tile on every diary row. `food_items` carries no image column, so today
   // this is always the placeholder — which is the state the drawing shows, and the box is what stops
   // the list reading as ragged once any row does have a photo.
-  return <FoodRow name={name} secondary={secondary} calories={calories} showChevron showThumb thumbSrc={null} onPress={press} />
+  const row = <FoodRow name={name} secondary={secondary} calories={calories} showChevron showThumb thumbSrc={null} onPress={press} />
+  // BF-45 ⑤. One action, not the meal list's three: label and edit belong to a saved meal, and a
+  // logged row's edit is the tap it already has. `bg-muted` because the meal card is `bg-muted/60`
+  // — `bg-card` is two steps darker and would draw a band around the rows.
+  return <SwipeActions actions={actions} itemLabel={name} surfaceClassName="bg-muted">{row}</SwipeActions>
 })
 
 /**

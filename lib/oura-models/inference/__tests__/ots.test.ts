@@ -60,3 +60,32 @@ describe('OTS core parity vs TorchScript golden', () => {
     expect(out!.high).toBe(true)
   })
 })
+
+/**
+ * LA-40 — `runTrainingStressScore`'s docblock says *"Infallible: never throws"*, and one path did.
+ *
+ * `validate` bounds rhr, readiness and vo2max but **not age**. `getAgeGroup` then clamps only the
+ * top for female/male (`age >= 80 ? 80`) while the `other` branch clamps both ends, so an age below
+ * the lowest group left `indexOf` at -1, indexed `table[-1]`, and handed `undefined` to
+ * `argminAbsDiff` — a TypeError out of a function the route calls with no try/catch, so
+ * `GET /api/training-stress` 500s for that user rather than reporting a gate.
+ *
+ * Runs WITHOUT the vendored constants on purpose: an age of 5 has no row in any plausible
+ * percentile table, so this discriminates against the synthetic fixtures too — which is the only
+ * reason it can run in CI at all, where every parity block above skips.
+ */
+describe('an age outside the percentile table is gated, not thrown (LA-40)', () => {
+  it('returns null rather than throwing', () => {
+    const run = () => runTrainingStressScore(inputFromGolden({ age: 5, vo2max: NaN }))
+    expect(run).not.toThrow()
+    expect(run()).toBeNull()
+  })
+
+  it('and an ordinary age is covered by the same guard', () => {
+    // Deliberately NOT "a normal age takes a different path": the synthetic age-group table is
+    // placeholder values, so 33 is out of it too and this case throws without the fix exactly as
+    // age 5 does. Against the vendor's own table 33 is in range and scores. What both cases pin,
+    // on either set, is that no age reaches `argminAbsDiff` with an undefined row.
+    expect(() => runTrainingStressScore(inputFromGolden({ age: 33, vo2max: NaN }))).not.toThrow()
+  })
+})

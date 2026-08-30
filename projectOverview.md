@@ -24,8 +24,56 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.395.6 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Version:** v1.402.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Version:** v1.401.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Version:** v1.401.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-08-30.
+
+**One photo picker per screen, and the held rebuild's failure was the spec (BF-46 ①a).** Two things
+said *Add a photo* and only one was a picker — the meal's own screen called `onEdit`. Both are real
+now, at the top of their own screen, and the meal screen writes through the same
+`saveMealToLibrary` the builder calls, so there is still one write path. **The interesting half:**
+rebuilt, the previous session's failure reproduced — `onChange` firing with a valid data URI and the
+component never receiving it — and instrumenting the *parent* showed the file was landing in the
+**other** picker. The meal's own screen is still in the DOM while it closes, both carried the same
+accessible name, and the spec waited for that name before picking. *A precondition satisfied by the
+state it is meant to replace cannot fail* — the third time that shape cost time in one day
+([journal](docs/overview/entries/2026-08-30-meal-photo-one-picker.md)).
+
+**The meal photo was blocked by the app's own CSP, on the branch no test runs (BF-46 ①b).** Three
+owner reports, recorded as a save failure that *"does not reproduce in source"*. `MealPhotoTile`'s
+**native** branch did `await fetch(photo.dataUrl)` — and **a `fetch()` of a `data:` URL is governed
+by `connect-src`**, which this CSP does not open to `data:`. It rejected into a `catch {}` written
+for picker cancellations, so choosing a photo on the phone did nothing and said nothing. The web
+branch takes a `File` from an `<input>` and never fetches, which is why every browser test passed.
+Now `Base64` + `dataUrlToBlob`, and non-cancellations toast. **Verifiable only on the S25**
+([journal](docs/overview/entries/2026-08-30-meal-photo-data-url-fetch.md)).
+
+**Version:** v1.398.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Last updated:** 2026-08-30.
+
+**The quantity editor is the owner's Option A, and an ingredient stopped claiming servings (BF-46
+② ③).** The unit toggle moved into a narrow column beside the stepper — which is what frees the
+width the presets now span — the calorie total stands alone, and the macros are three named tiles
+rather than `P`/`C`/`F`. **One stated departure from the drawing:** it puts that column at the
+stepper's height, and the app's 48 dp floor makes a stacked two-option toggle 96 px, so the
+*stepper* grew instead. And an ingredient row reads `1000 g`, never `8 servings · 1000 g` — a meal
+is measured in portions, so "serving" meant two different things one line apart. The e2e asserts the
+toggle's **geometry**, because "beside the stepper" is the whole request and is invisible to a
+text-only check. **Not device-verified**, and Option A is the tallest of the three drawings
+([journal](docs/overview/entries/2026-08-30-quantity-editor-option-a.md)).
+
+**Settings follow the account now (Q-392).** The owner's *"when i do a new install or open on computer - it loses all the saved preferences"* was still true in full: the engine (`users.preferences`, `GET`/`PATCH /api/user/preferences`) had shipped and **no read site called it**. `lib/user/preferences-sync.ts` connects them — `hydrateUserPreferences` seeds every device key from the server bag on launch, `savePreference` writes both. Proved by `e2e/preferences-survive-reinstall.spec.ts`, which is the owner's sentence as a test: PATCH three preferences, `localStorage.clear()`, reload, and all three come back in their right encodings — and it fails with the hydration replaced by a no-op. **The rule that was wrong, and CI found it:** hydration first cleared any key the bag did not carry — right for a settled system, wrong in the window between a tap and its PATCH landing. `meal-label.spec.ts` caught it wiping a label style mid-flight, and **offline it reverts every change on the next launch**. Hydration now deletes nothing; the one thing the app clears, the mutually-exclusive brand preset / hue pair, is resolved by `EXCLUSIVE_GROUPS`. The earlier `backgroundSettings` catch was the same rule failing at its extreme, and treating it as one key needing an exclusion would have left the race in place for every other ([journal](docs/overview/entries/2026-08-30-preferences-read-sites.md)).
+
+**A logged food swipes to Delete, and the day stopped moving with it (BF-45 ⑤).** The diary reuses
+the meal list's `SwipeActions` tray, routed to the confirmation the edit sheet's bin already raises.
+What earns the index is the collision: `nutrition-content.tsx`'s scroll container owns a horizontal
+drag that steps the **day**, so one touch fed both gestures — and it is **invisible on today**, since
+that handler refuses to step past today. `SwipeActions` marks itself `[data-swipe-actions]` and the
+day handler defers, as `tab-swipe-navigator.tsx` already does for a carousel. **Not device-verified**
+([journal](docs/overview/entries/2026-08-30-food-log-swipe-delete.md)).
+
+**Home's APK-banner link was a 33 px tap target, and the gate that hid the entry was self-inflicted (LB-26).** The link rendered **258×33** against the 48 dp floor — an `<a>`, which `globals.css` excludes on purpose so an inline prose link is not forced to 48 px. It takes the floor locally instead of widening the selector, and the reasoning moved beside the CSS rule rather than sitting in the banner's JSX, which is not where someone tempted to widen it would look. **The spec's allowlist is now empty** — an allowlist that never empties is a backlog wearing a test's clothes. Proved both ways: removing the floor fails the spec with the exact reported measurement. **The process half is the more useful one:** LB-26 carried `Gate: device` on work that had never been built, filed by the session that had read BF-45's warning about that exact mistake hours earlier — a gate parks an entry, so it hid it from `next-item.js`. The rule now sits in the backlog's protocol header where entries are written, not only inside the entry that found it ([journal](docs/overview/entries/2026-08-30-apk-banner-tap-target.md)).
 
 **The sparkline primitive can draw the charts that were bypassing it (Q-154).** Three files hand-rolled a `<polyline>`, and "replace on touch" would have been a bug — the primitive could not draw them. It gained six props, all defaulted so its twenty existing call sites are untouched: `pad`, `valuePadding`, `strokeWidth`, `gridLines`, `emphasizeLast`, `valueLabel`. **`valuePadding` is not cosmetic** — the default 0.5 renders a 0.5 kg body-weight spread at half its true amplitude, so the chart says something different from the data; that is now pinned by a test rather than a comment, after the projection moved to `sparkline-geometry.ts` so it can be driven in node at all. Two callers converted; **`active-workout-screen` stays inline on purpose** and is no longer a to-do (four more props no other caller would use). The owner's 2026-08-25 call — **the halo goes** — is what cleared it, and the reasoning generalises: a primitive that grows a prop per caller's art is a wrapper over a config object. **Neither converted chart has been looked at** — no e2e reaches those sheets, and it is a deliberate visual change at 412 dp ([journal](docs/overview/entries/2026-08-30-sparkline-primitive-props.md)).
 
@@ -3113,8 +3161,12 @@ smaller than production.
   this build returns 50% / 2 sets, `deloaded: true`.
 - **Not exercised**: the S25, and the partially-covered case against a *real* model-generated
   prescription (covered by fixture-based unit tests instead).
-- **Related open issue**: **Q-211** — a deload week also reduces a *baseline* lift, which the 1RM
-  and PR paths both treat as a genuine max effort. Pre-existing, filed not fixed.
+- **Related, now fixed**: **Q-211** — a deload week also reduced a *baseline* lift, which the 1RM
+  and PR paths both treat as a genuine max effort, so the app prescribed half weight and recorded
+  the result as a real max. Fixed 2026-08-30 (v1.402.1), and **it took two guards, not the one the
+  entry named**: exempting only the prescribed branch left the behaviour unchanged, because the
+  un-prescribed branch re-applied it. Its comment saying such a clause was unreachable was true
+  against the code that proved it and false the moment the first exemption landed.
 ### [workouts] Prescription basis changed to the last non-deload session (v1.300.0, 2026-08-12) — NOT verified on device · needs: browser
 
 - **What changed**: `resolveWorkingBasis` returns the last non-deload 1RM outright instead of
@@ -4333,25 +4385,6 @@ device/live-API verified**, unit-test-verified only).
 Full/Deload/Rest choice moved off Home (now Rest/Full only) onto the pre-workout screen, beside the
 Quick/Normal/Long duration picker, so choosing Deload happens at the point that actually determines
 the session.
-
-### [sleep][devices][platform] 🟠 A sleep session can get stuck on a stale, narrower window with no self-heal (Q-225, found 2026-08-13/14)
-
-Owner reported the previous night's displayed bedtime (1:15am) looked far too late. Not the
-anchor-lag bug (Q-71/Q-139, ≤3 min correction) — a 2h35min gap, so traced separately. **Confirmed by
-full local reproduction, not inference**: pulled all of that night's real raw samples (11,208 rows)
-and clock anchors from production, loaded them into the local dev DB under a throwaway user, and ran
-the actual `aggregateOuraRawSamples` function directly against them (both `fullHistory: true` and a
-bare incremental call). Both produced the same correct answer — sleep 22:40pm→8:05am (8.5h), onset
-10 min, with the neural stager correctly flagging a brief overheating-driven wake bout around
-00:50am as `awake` rather than delaying the start — exactly matching the owner's account ("asleep,
-woke here and there from overheating"). The live stored row does not match this and fails every
-check run against it (no >2h raw-data gap, no bedtime-event override, no stale-decoded-JSONB issue).
-Leading theory (not confirmed): the DB-pool-contention pattern amended into the `[platform]` Q-107
-row above — the timing correlates, though the causal link isn't proven. **Verified fix**: an admin
-Redecode (`fullHistory: true`) deletes the stale row (keyed by wake-day, not `oura_id`) and inserts
-the correct one — confirmed by running that exact code path locally. Backlog: **Q-225**
-(`docs/implementation-backlog.md`), which also has a reusable local-repro harness for checking
-whether other recent nights hit the same bug during the same error bursts.
 
 ### [heart-rate][workouts] ✅ Per-set HR now records which device measured it (2026-08-05, v1.260.0)
 

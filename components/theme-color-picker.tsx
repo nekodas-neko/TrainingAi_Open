@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { savePreferences } from '@/lib/user/preferences-sync'
 import { CheckIcon } from "lucide-react";
 import {
   BRAND_THEMES,
@@ -43,8 +44,9 @@ export function applyCustomHue(hue: number) {
   html.style.setProperty("--brand-card-bg", `rgba(${r},${g},${b},0.07)`);
   html.style.setProperty("--brand-card-border", `rgba(${r},${g},${b},0.18)`);
   html.style.setProperty("--brand-glow", `rgba(${r},${g},${b},0.25)`);
-  localStorage.setItem(CUSTOM_HUE_STORAGE_KEY, String(hue));
-  localStorage.removeItem(BRAND_THEME_STORAGE_KEY);
+  // One patch, not two: a preset and a custom hue are mutually exclusive, and two PATCHes can land
+  // out of order and leave both set — which renders as the hue winning a choice made for the preset.
+  savePreferences({ brandHue: hue, brandTheme: null });
 }
 
 export function applyBrandTheme(key: BrandThemeKey) {
@@ -60,8 +62,7 @@ export function applyBrandTheme(key: BrandThemeKey) {
   } else {
     html.dataset.brand = key;
   }
-  localStorage.setItem(BRAND_THEME_STORAGE_KEY, key);
-  localStorage.removeItem(CUSTOM_HUE_STORAGE_KEY);
+  savePreferences({ brandTheme: key, brandHue: null });
 }
 
 export function ThemeColorPicker() {

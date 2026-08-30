@@ -50,15 +50,6 @@ export function useIngredientQuantities() {
     setUnitById(prev => ({ ...prev, [id]: unit }))
   }
 
-  /** The collapsed row's grey line — *how much*, in whichever unit this ingredient is set to. */
-  function amountLabel(item: FoodItem, qty: number, unit: QtyUnit): string {
-    const servingG = item.servingSizeG ?? 0
-    if (unit === 'g' && servingG > 0) return `${Math.round(servingG * qty)} g`
-    const servings = Math.round(qty * 100) / 100
-    const label = `${servings} ${servings === 1 ? 'serving' : 'servings'}`
-    return servingG > 0 ? `${label} · ${Math.round(servingG * qty)} g` : label
-  }
-
   function setDisplayQty(item: FoodItem, raw: string, unit: QtyUnit) {
     const next = qtyFromInput(raw, unit, item.servingSizeG)
     if (next == null) return
@@ -79,6 +70,6 @@ export function useIngredientQuantities() {
   return {
     ingredients, setIngredients,
     addIngredient, removeIngredient,
-    unitFor, setUnit, amountLabel, setDisplayQty, stepQty,
+    unitFor, setUnit, setDisplayQty, stepQty,
   }
 }

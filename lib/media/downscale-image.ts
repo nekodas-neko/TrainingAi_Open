@@ -105,3 +105,30 @@ export function downscaleToDataUrl(source: Blob, { maxDim, quality = 0.8, mimeTy
 export function base64FromDataUrl(dataUrl: string): string {
   return dataUrl.slice(dataUrl.indexOf(',') + 1)
 }
+
+/**
+ * A `data:` URL as a `Blob`, decoded in-process.
+ *
+ * **`await fetch(dataUrl)` is the obvious way to do this and it is blocked here.** A `fetch()` of a
+ * `data:` URL is governed by **`connect-src`**, which this app's CSP (`lib/security/csp.ts`) does
+ * not open to `data:` — so the call rejects with a bare `TypeError`. That cost three owner reports:
+ * `MealPhotoTile` used it on the **native** branch only, where the one thing that catches it was a
+ * `catch {}` written to swallow picker cancellations, so choosing a meal photo on the phone did
+ * nothing at all and said nothing. The web branch takes a `File` straight from an `<input>` and
+ * never fetches, which is why every browser test passed.
+ *
+ * Prefer `CameraResultType.Base64` where the plugin offers it (`capture-actions.tsx` does) and skip
+ * this entirely. This exists for the callers that are handed a data URL and have no such choice.
+ */
+export function dataUrlToBlob(dataUrl: string): Blob {
+  const comma = dataUrl.indexOf(',')
+  if (!dataUrl.startsWith('data:') || comma < 0) throw new Error('not a data: URL')
+  const header = dataUrl.slice(5, comma)
+  const isBase64 = header.endsWith(';base64')
+  const type = (isBase64 ? header.slice(0, -';base64'.length) : header) || 'application/octet-stream'
+  if (!isBase64) return new Blob([decodeURIComponent(dataUrl.slice(comma + 1))], { type })
+  const binary = atob(dataUrl.slice(comma + 1))
+  const bytes = new Uint8Array(binary.length)
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
+  return new Blob([bytes], { type })
+}

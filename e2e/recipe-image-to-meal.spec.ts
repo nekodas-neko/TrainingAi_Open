@@ -85,7 +85,10 @@ test('a recipe picture becomes ingredients, and the builder asks how many it ser
   const pick = page.getByRole('button', { name: /Build from a recipe picture/ })
   await expect(pick, 'the affordance is offered on an empty search').toBeVisible()
 
-  await page.setInputFiles('input[type="file"]', {
+  // **By name, not by type.** BF-46 ①a put the meal's photo picker at the top of this same builder,
+  // so `input[type="file"]` reaches that one first and the recipe picture went to it — silently,
+  // and the ingredient rows below simply never appeared.
+  await page.setInputFiles('input[name="recipe-picture"]', {
     name: 'recipe.png', mimeType: 'image/png', buffer: Buffer.from(PIXEL, 'base64'),
   })
 

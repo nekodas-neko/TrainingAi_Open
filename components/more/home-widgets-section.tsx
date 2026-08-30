@@ -9,7 +9,8 @@ import {
 } from 'lucide-react'
 import { ColorSwatchPicker } from '@/components/ui/color-swatch-picker'
 import { useRovingRadioGroup } from '@/lib/hooks/use-roving-radio-group'
-import { SCORE_RING_STYLE_KEY, SCORE_RING_STYLES, SCORE_RING_STYLE_CHANGE_EVENT, loadScoreRingStyle, type ScoreRingStyle } from '@/lib/home/home-prefs'
+import { savePreference } from '@/lib/user/preferences-sync'
+import { SCORE_RING_STYLES, SCORE_RING_STYLE_CHANGE_EVENT, loadScoreRingStyle, type ScoreRingStyle } from '@/lib/home/home-prefs'
 
 type MetaKey = "weightKg" | "steps" | "calories" | "protein" | "carb" | "fat" | "distanceKm" | "waterIntake"
 type CardWidgetKey =
@@ -121,7 +122,7 @@ export function HomeWidgetsSection() {
   function toggleHomeWidget(key: MetaKey) {
     setHomeWidgets(prev => {
       const next = prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]
-      localStorage.setItem(WIDGETS_KEY, JSON.stringify(next))
+      savePreference('homeWidgets', next)
       return next
     })
   }
@@ -129,7 +130,7 @@ export function HomeWidgetsSection() {
   function toggleHomeCardWidget(key: CardWidgetKey) {
     setHomeCardWidgets(prev => {
       const next = prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]
-      localStorage.setItem(CARD_WIDGETS_KEY, JSON.stringify(next))
+      savePreference('homeCards', next)
       return next
     })
   }
@@ -138,7 +139,7 @@ export function HomeWidgetsSection() {
     setHiddenSections(prev => {
       const next = new Set(prev)
       if (next.has(key)) next.delete(key); else next.add(key)
-      localStorage.setItem(HIDDEN_SECTIONS_KEY, JSON.stringify([...next]))
+      savePreference('homeHiddenSections', [...next])
       return next
     })
   }
@@ -208,7 +209,7 @@ export function HomeWidgetsSection() {
                       onChange={hex => {
                         const next = { ...cardColors, [def.key]: hex }
                         setCardColors(next)
-                        localStorage.setItem(CARD_COLORS_KEY, JSON.stringify(next))
+                        savePreference('cardColors', next)
                       }}
                     />
                     <button
@@ -230,7 +231,7 @@ export function HomeWidgetsSection() {
                           const next = { ...cardColors }
                           delete next[def.key]
                           setCardColors(next)
-                          localStorage.setItem(CARD_COLORS_KEY, JSON.stringify(next))
+                          savePreference('cardColors', next)
                         }}
                       >
                         reset
@@ -256,7 +257,7 @@ export function HomeWidgetsSection() {
                     onChange={hex => {
                       const next = { ...pillColors, [def.key]: hex }
                       setPillColors(next)
-                      localStorage.setItem(PILL_COLORS_KEY, JSON.stringify(next))
+                      savePreference('pillColors', next)
                     }}
                   />
                   <button
@@ -278,7 +279,7 @@ export function HomeWidgetsSection() {
                         const next = { ...pillColors }
                         delete next[def.key]
                         setPillColors(next)
-                        localStorage.setItem(PILL_COLORS_KEY, JSON.stringify(next))
+                        savePreference('pillColors', next)
                       }}
                     >
                       reset
@@ -299,12 +300,12 @@ export function HomeWidgetsSection() {
             <div className="flex items-center gap-0.5 rounded-xl bg-muted p-0.5 text-xs font-semibold border border-border">
               <button
                 type="button"
-                onClick={() => { setWeightLookback(7); localStorage.setItem(WEIGHT_LOOKBACK_KEY, '7') }}
+                onClick={() => { setWeightLookback(7); savePreference('weightLookback', 7) }}
                 className={`rounded-lg px-3 py-1.5 transition ${weightLookback === 7 ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground'}`}
               >7d</button>
               <button
                 type="button"
-                onClick={() => { setWeightLookback(30); localStorage.setItem(WEIGHT_LOOKBACK_KEY, '30') }}
+                onClick={() => { setWeightLookback(30); savePreference('weightLookback', 30) }}
                 className={`rounded-lg px-3 py-1.5 transition ${weightLookback === 30 ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground'}`}
               >30d</button>
             </div>
@@ -325,7 +326,7 @@ export function HomeWidgetsSection() {
                     {...scoreStyleGroup.getRadioProps(active, i)}
                     onClick={() => {
                       setScoreRingStyle(opt.value)
-                      localStorage.setItem(SCORE_RING_STYLE_KEY, opt.value)
+                      savePreference('scoreRingStyle', opt.value)
                       window.dispatchEvent(new Event(SCORE_RING_STYLE_CHANGE_EVENT))
                     }}
                     className={`flex w-full items-center justify-between gap-2 rounded-xl border px-3 py-2.5 text-left transition ${

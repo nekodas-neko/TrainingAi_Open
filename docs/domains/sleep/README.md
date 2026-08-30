@@ -135,12 +135,14 @@ Live at the time of writing (2026-07-30) — always re-run the grep rather than 
   rollups get the fix; existing stored nights need an owner-triggered Redecode. See
   [`docs/oura-ble-operations.md`](../../oura-ble-operations.md) I25 and
   [`docs/overview/history-2026-08-12.md`](../../overview/history-2026-08-12.md).
-- 🟠 **A sleep session can get stuck on a stale, narrower window with no self-heal (Q-225, found
-  2026-08-13/14)** — a different bug from the above: verified via a full local reproduction that
-  `aggregateOuraRawSamples` computes the *correct* window from real raw data, but a production row
-  didn't match it. Leading theory ties it to `platform`'s DB-pool-contention fault (Q-107), not
-  confirmed. See
-  [`docs/overview/history-2026-08-12.md`](../../overview/history-2026-08-12.md).
+- ✅ **A sleep session could get stuck on a stale, narrower window with no self-heal (Q-225, found
+  2026-08-13/14, closed 2026-08-30)** — a night whose early frames fell before `rollupCutoffDs` came
+  back truncated rather than absent, so the clusterer opened the window at the cutoff and the
+  wake-day delete replaced the good row with the clipped one. `run.ts` drops any night not clear of
+  the cutoff by `MAX_SLEEP_DS`; that guard had no test until
+  `lib/data/postgres/__tests__/oura-ble-sleep-truncation-guard.test.ts`, which fails without it. The
+  owner's row is repaired and a sweep of all 67 BLE-era nights found no other one affected. Full
+  record in [`docs/overview/known-issues-resolved.md`](../../overview/known-issues-resolved.md).
 - 🟠 **`respiratory_rate` is persisted from an estimator its own docs call uncalibrated** — queue
   item Q-4.
 - 🟡 ~~Degenerate sleep rows are stored~~ **fixed 2026-08-02 (v1.250.8)**; what is left of Q-10 is only the nice-to-have of persisting a session `type`.

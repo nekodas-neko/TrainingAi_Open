@@ -73,6 +73,13 @@ silently misdirecting the next session. Update them in the same PR that consumes
 > - **`Gate: owner`** / **`Gate: device`** — waiting on an owner decision, or on the S25 smoke run.
 >   Only these two values; anything else fails the check. A dependency on another entry is `Needs:`,
 >   not a gate.
+>   **⚠ `Gate: device` means SHIPPED and awaiting a device check — never "will need one when built".**
+>   A gate **parks** the entry, so putting it on unbuilt work hides that work from `next-item.js`,
+>   which is where an implementer starts. A device requirement on unbuilt work is a **Verification**
+>   line, not a gate. This is not hypothetical and it is not rare: it hid the whole
+>   `nutrition-ui-uplift` batch until BF-45 caught it (2026-08-30), and **LB-26 was filed with the
+>   same mistake later the same day, by a session that had read BF-45's warning** — which is why the
+>   rule now lives here, where entries are written, rather than only inside the entry that found it.
 >
 > - **`Batch: <slug>`** — these entries ship as **one PR**, because one verification pass covers all
 >   of them. `next-item.js` groups them and the batch takes its highest member's queue position.
@@ -1167,6 +1174,96 @@ deliberate choice, on a session where the absence of a Primary is the design.
   outgoing one's role, the prescribed sets and percentages are unchanged, and the session still has
   no Primary afterwards.
 
+### [platform] LB-29 — a preference chosen and then reloaded can be overwritten by the server's older copy
+
+- **Lane:** B
+- **Added:** 2026-08-30 · Lane B, from a CI flake on `meal-label.spec.ts` in PR #643's run.
+- **Reference:** the mechanism is Q-392's, shipped the same day
+  ([journal](overview/entries/2026-08-30-preferences-read-sites.md)).
+
+**The observation.** `meal-label.spec.ts › the chosen label style is remembered` failed with
+`aria-checked="false"` for the full 10 s and passed on retry. It is an assertion failure, not
+infrastructure — and it is the same spec that caught Q-392's first rule being wrong.
+
+**The mechanism, from the code rather than a reproduction.** `savePreference` writes `localStorage`
+synchronously and PATCHes the server fire-and-forget. The spec taps a style and **reloads
+immediately**. On the new page `hydrateUserPreferences` GETs the bag and writes every key it
+carries, unconditionally — so if the PATCH has not landed, the response still holds the *previous*
+style and overwrites the choice the user just made. The sheet then reads the old value.
+
+**Offline it is not a race, it is permanent.** The PATCH never lands, so every launch re-writes the
+server's old value over the device's. That is the same reasoning that retired the first version of
+this rule; the delete case was fixed and the overwrite case was not.
+
+**Recommended fix — a dirty mark, not an outbox.** `savePreferences` records the key as unsynced in
+`localStorage` (so it survives the reload) and clears it when its PATCH resolves. Hydration skips a
+marked key and **re-PATCHes the local value instead of taking the server's**, which also self-heals
+the offline case on the next launch. ~20 lines, no queue and no table, so it does not reopen the
+"not an outbox domain" decision.
+
+- **Two alternatives, and why they lose.** *Seed-if-absent* (hydration only writes a key the device
+  lacks) cannot clobber and exactly satisfies the owner's report — *"a new install or open on
+  computer loses all the saved preferences"* — but gives up cross-device **updates**: change a
+  setting on the phone and the laptop keeps its own forever. *A session-scoped "written here" set*
+  does not work at all, because the reload is what loses the value and the set does not survive it.
+- **Keep:** whether cross-device update is wanted at all is the owner's call, and it decides between
+  the recommendation and seed-if-absent. Ask before building — the two differ in what they promise,
+  not just in how they are written.
+- **Verification:** with the PATCH stubbed to hang, pick a style, reload, and it is still chosen;
+  and with the network off, it survives a second launch.
+
+### [platform] LB-27 — one extra request during launch strands several for over a minute, and nothing explains why
+
+- **Lane:** A
+- **Added:** 2026-08-30 · Lane B, measured while fixing Q-392's own version of this.
+- **Reference:** the symptom is written up in
+  [`docs/overview/entries/2026-08-30-preferences-read-sites.md`](overview/entries/2026-08-30-preferences-read-sites.md);
+  Q-392's mirror-effect PATCH is already fixed, so this entry is the **unexplained** half only.
+
+**The measurement.** Health's launch fires ~25 API requests in the first seven seconds. Adding one
+more — a single `PATCH /api/user/preferences` from a card's mount effect — left that PATCH **and a
+`GET` behind it pending past sixty seconds**, with nothing else in flight and no further requests
+after twenty seconds. Instrumented on a cold dev server with Playwright's `requestfinished`, so
+these are genuinely unresolved connections, not slow ones. The same PATCH fired *after* the burst
+settles answers in **340 ms**, and a burst of five answers in **641 ms**. Removing that one request
+took the page from never reaching `networkidle` to reaching it in ~19 s.
+
+**Why it matters beyond a test.** Nine e2e specs failed on `waitUntil: 'networkidle'` and none of
+them mention preferences, so the next person to add a request to a launch path gets a failure that
+names someone else's screen. And if a request really can strand for a minute on the device, that is
+a launch-time hang, not a test artefact.
+
+**Where to look, in order.** `updateUserPreferences` (`lib/data/postgres/adapter.ts`) is the only
+route in that burst that opens a **transaction with `SELECT … FOR UPDATE`** on the `users` row, and
+it holds a pool client for its duration; the pool is `max: 10` (`lib/data/postgres/client.ts`) with
+`pg`'s default `connectionTimeoutMillis: 0`, which waits **forever** for a client rather than
+erroring. A `statement_timeout` cannot fire on a query that never starts. That is a hypothesis, not
+a finding — it does not by itself explain a plain `GET` hanging beside it.
+
+- **Not reproduced in production**, and it may be dev-server-specific (route compilation under
+  concurrency). Establish that first: it changes whether this is a bug or a harness note.
+- **Keep:** whatever the cause, `connectionTimeoutMillis: 0` on a pool of 10 is worth a decision of
+  its own — a bounded wait turns a hang into an error state a card can show.
+
+### [platform] LB-28 — CI should refuse `savePreference` inside a `useEffect`
+
+- **Lane:** B
+- **Added:** 2026-08-30 · Lane B, from the defect LB-27 describes.
+- **Needs:** LB-27
+
+The footgun is invisible at the call site: `useEffect(() => localStorage.setItem(K, v), [v])` is a
+free write, and the same line calling `savePreference` is a **network PATCH on every mount**.
+`usePersistedPreference` exists for the mirror case, but nothing stops the next conversion reaching
+for `savePreference` again — and the failure it produces names unrelated specs.
+
+**One check, narrow on purpose:** flag `savePreference(`/`savePreferences(` that appears inside a
+`useEffect(` block in `app/`, `components/` or `lib/`. A tap handler nested inside an effect would
+be a false positive; there are none today, and the escape hatch is the same as every other rule
+here — an entry in the script with a written reason.
+
+**Do not widen it to "no fetch in an effect"**, which is most of this codebase. The rule is about
+one helper whose cost is not visible in its name.
+
 ### [platform] BF-55 — 84 MB of index against 63 MB of table, and the database is growing ~7× its expected trend
 
 - **Lane:** A
@@ -1335,36 +1432,31 @@ placeholder here — or the rename swaps one ambiguity for another.
 - **Verification:** the tab reads `Search`, the `LIST_TABS` comment describes the current labels, and
   the two search inputs are worded so a filter and a lookup do not read the same.
 
-### [nutrition] BF-45 — swipe-to-delete on a logged food row (⑤; ①②④ shipped v1.397.0)
+### [nutrition] BF-45 — the nutrition tab's UI uplift (all five shipped; device check owed)
 
 - **Lane:** B
 - **Batch:** `nutrition-ui-uplift`
 - **Added:** 2026-08-27 · owner, with screenshots of the live tab (v1.383.x).
 - **Spec:** BF-28's parity rules bind — where an artboard covers this, the artboard wins.
 
-**①②③④ shipped (v1.397.0)** and are struck from this entry rather than left looking open:
-① `My Meals` spans both columns (`col-span-2`, contingent on the slot beside it being empty);
-② a collapsed meal keeps its calories **and** macros, on a summary line **below** the header, which
-is the shape the owner corrected to on the device in N6 — one `MealTotals` component serves it and
-the expanded footer, so the two cannot report different numbers for one meal;
-③ the bottom-sheet gutters are 16 px, matching the artboards — **and not where this entry said to
-put it.** It called for `SheetContent`'s bottom variant, which was measured and rejected: **26 of 48**
-bottom sheets set their own `px-*`/`p-0`, and of the remainder most already pad their inner content
-at 16, so a shared outer gutter would have doubled theirs. The nutrition sheets were at `px-1`
-(4 px); they are the ones that moved;
-④ both macro rings start at 12 o'clock — `from -90deg` is the SVG/canvas idiom for reaching the top
-and CSS `conic-gradient` already starts there, so all three call sites simply dropped the clause.
+**①②③④ shipped v1.397.0; ⑤ shipped v1.398.0.** Reasoning in the journal
+([①–④](overview/entries/2026-08-30-nutrition-ui-uplift.md) ·
+[⑤](overview/entries/2026-08-30-food-log-swipe-delete.md)). Two things worth carrying: ③'s gutter fix
+is **not** where this entry said to put it — it called for `SheetContent`'s bottom variant, and
+measured, **26 of 48** bottom sheets set their own `px-*`/`p-0` while most of the rest already pad
+inner content at 16, so a shared outer gutter would have doubled theirs. And ⑤ needed one thing the
+meal list did not: the nutrition scroll container owns a horizontal drag of its own that steps the
+day, so a row swipe fed both gestures. `SwipeActions` now marks itself `[data-swipe-actions]` and
+that handler defers, the way it already defers to a carousel.
 
-- **Keep — ⑤ swipe-to-delete on a logged food row.** Owner: *"for logging food; we could possibly add
-  the option to swipe and delete it (with confirmation) like we do in the other screen."* The gesture
-  exists on the meal list (BF-29, device-verified 2026-08-30) — reuse that tray, keep its
-  confirmation, and **do not remove the bin in the edit sheet**: a swipe is a shortcut for people who
-  know it is there, not a replacement for a visible affordance.
-- **Verification for ⑤:** on the S25, a food row swipes to a tray whose Delete confirms. ①②④ are
-  shipped but **not device-verified** — the sandbox renders at desktop width and cannot judge a
-  gutter or a ring.
+- **Keep — the device check, which is the whole of what is still owed.** On the S25: a food row
+  swipes to a tray whose Delete confirms, **and the row stays gone across a screen swap and a
+  force-close**. That last clause is BF-47's failure, whose fix is *reasoned rather than reproduced*
+  (`getLocalStore` is null in `pnpm dev` and in Playwright) — and a swipe is a faster route to
+  exactly that delete, which is why the two are checked in one pass. ①②④ are equally unverified: the
+  sandbox renders at desktop width and cannot judge a gutter or a ring.
 
-### [nutrition] BF-46 — the meal builder buries its photo picker below the fold, and the quantity sheet spends its space on the wrong things
+### [nutrition] BF-46 — the meal builder's photo picker and quantity sheet (all shipped; device check owed)
 
 - **Lane:** B
 - **Batch:** `nutrition-ui-uplift` — ships with BF-45.
@@ -1389,6 +1481,41 @@ user into the builder — and the builder's real tile at `saved-meals-sheet.tsx:
 **Move the real tile to the top of the builder at hero scale**, matching the detail sheet's band, so
 the two screens agree where a meal's photo lives and there is one control rather than two things
 wearing one label.
+
+**✅ (b)'s ROOT CAUSE IS FOUND AND FIXED (v1.399.0) — the save was never the save path.**
+`MealPhotoTile`'s **native** branch asked the camera plugin for `CameraResultType.DataUrl` and then
+did `await fetch(photo.dataUrl)` to get a Blob. **A `fetch()` of a `data:` URL is governed by
+`connect-src`**, and `lib/security/csp.ts` does not open `connect-src` to `data:` — so the call
+rejected with a bare `TypeError`, into a `catch {}` written to swallow picker cancellations. Picking
+a meal photo on the phone therefore did nothing and *said* nothing, which is exactly the owner's
+*"always the default cant add a custom picture"*. The web branch takes a `File` from an `<input>`
+and fetches nothing, which is why `meal-photo-picker.spec.ts` passed on every run. It now asks for
+`Base64` — as the working `capture-actions.tsx` already does — decodes with `dataUrlToBlob`, and
+toasts anything that is not a recognised cancellation.
+`lib/media/__tests__/no-data-url-fetch.test.ts` scans source and fails on the next one.
+
+- **⚠ NOT DEVICE-VERIFIED, and this fix in particular cannot be verified anywhere else.** The
+  failing branch only runs inside the Capacitor WebView. What is *checkable* here is the mechanism
+  (the CSP has no `data:`; the plugin call and the decode are the shape `capture-actions.tsx` runs on
+  the same device every day) — the outcome is not. **On the S25: pick a photo in Edit Meal, save,
+  reopen.** If it still fails it now fails *loudly*, which is itself the smaller half of this fix.
+- **(a), the PLACEMENT, is still owed** — one picker, at the top, at hero scale — and so is removing
+  the detail sheet's fake *Add a photo*, which calls `onEdit` rather than picking anything.
+
+**✅ (a) SHIPPED (v1.402.0), and the held rebuild's failure was the SPEC, not the app.** Both screens
+have a real picker at the top now, at the size the artboard gives a meal's photo. The meal's own
+screen writes through the parent's `saveMealToLibrary` — the same function the builder calls — so
+there is still one write path to `image_data_uri`, which is what the old comment argued for and
+achieved by having no picker there at all. `MealPhotoTile` grew a `variant="hero"` rather than a
+`MealPhotoHero` being built beside it.
+
+**And the previous session's measurement is now explained.** Rebuilt, the same failure reproduced —
+`onChange` firing with a valid data URI and the component never receiving it. The cause: the meal's
+own screen is **still in the DOM while it closes**, so its picker and the builder's are momentarily
+both mounted with the same accessible name, and the spec waited for that name before picking. It was
+already satisfied by the screen it was leaving, and the photo went to that instance. *A precondition
+satisfied by the state it is meant to replace cannot fail* — the third time this repo has hit that
+shape in a day. The spec waits for `Update Meal` now, and both pickers are named after the meal.
 
 **⚠ (a) WAS BUILT AND HELD, AND WHAT IT MEASURED BEARS DIRECTLY ON (b) — read this first.**
 2026-08-30, Lane B. The rework is straightforward and it did not work, in a way that looks like the
@@ -1439,6 +1566,27 @@ control *"should be able to be set from there"*. So the tile renders (no composi
 data URIs in a list) and the placeholder is what persists. **BF-51 ② carries the same finding from the
 builder side** — read them together; they are one bug seen from two screens.
 
+**✅ ② SHIPPED (v1.401.0).** An ingredient row reads `1000 g` and nothing else. The rule is
+`ingredientAmountLabel` in `saved-meal-qty.ts` — extracted from the hook so it is testable at all —
+and servings survive only for a food with no serving size, which has no gram equivalent to show
+instead. Display only: grams were already the stored truth, and the editor still offers both units.
+
+**✅ ③ SHIPPED (v1.401.0), Option A, with one stated departure.** The toggle sits in a narrow column
+to the right of the stepper; the presets span the width in equal columns; the calorie total stands
+alone at the largest type; the macros are three named tiles rather than `P`/`C`/`F`. **The drawing
+puts the toggle at the stepper's height and that is not buildable here** — every `button` carries a
+48 dp floor (`globals.css`), so a stacked two-option toggle is 96 px and cannot shrink to meet a
+56 px stepper; `.tap-dense` exists for inline text buttons, not for a real control. **The stepper
+grew to 96 px instead**, which the drawing's own intent supports — the value is meant to be the
+tallest, heaviest thing there. A food with no serving size has no toggle and keeps the short row.
+`SegmentedTabs` gained `orientation="vertical"`. Guarded by `e2e/quantity-editor-option-a.spec.ts`,
+which asserts the toggle's **geometry** and not merely its presence, because "beside the stepper" is
+the whole of the request and is invisible to a text-only check.
+
+- **⚠ Option A is the tallest of the three drawings and may scroll on a long food name** — that was
+  put to the owner and accepted. **If it scrolls badly on the S25, tighten the gaps**; do not merge
+  the total and the macros back into one block, which is option B and a settled question.
+
 **② A serving inside a serving.** Owner: *"I see there are serving size of each ingredient within the
 meal; so a serving size in a serving size is probably excessive; we should keep it weight/portion."*
 The builder lists `8 servings · 1000 g` per ingredient while the meal itself is measured in portions,
@@ -1482,7 +1630,7 @@ the macros are two stacked blocks rather than one. On a long food name the sheet
 put to the owner and accepted — distinctness was the goal. If it scrolls badly on the S25, tighten
 the gaps rather than merging the two blocks back together, which would be option B.
 
-- **Verification.** On the S25, in both sheets that render the editor: a photo attached in the
+- **Verification — the whole of what is still owed for ② and ③.** On the S25, in both sheets that render the editor: a photo attached in the
   builder appears in the list, the detail hero and the diary row; ingredients read in grams; every
   control clears the 48 dp floor and the action row clears the gesture bar (`pb-safe-action*`, which
   renders 0 in the sandbox).
@@ -1524,114 +1672,52 @@ sheets are at the artboards' 16 px gutter now. See BF-45 ③ for why the fix is 
   this more."* So N5's recipe-import checks (yield, multi-dish, duplicate handling) are **not
   answered** and stay owed — do not read this entry as clearing them.
 
-### [nutrition] BF-39 — a logged meal stops being a meal: `food_logs` has no `saved_meal_id`, and three symptoms trace to that
+### [nutrition] BF-39 — a logged meal draws as one nested row (BUILT AND HELD — read the measurement first)
 
-> **⚑ RAISED AGAIN 2026-08-30 — third report, and the owner reached the fix independently.** *"we
-> need to sort out meals and ingredients; in a nest. so that when you add a meal it adds the meal and
-> not every ingredient or at least nests in the meal."* **Nest** is the same shape this entry already
-> specifies: one parent row that expands to its ingredients. **No new entry** — filing a fourth
-> number for the same defect is the failure this repo has had before (Q-397).
->
-> Three reports across five days, from three different screens, is the strongest priority signal in
-> the nutrition cluster. Treat it accordingly.
+- **Lane:** B
+- **Batch:** `nutrition-ui-uplift`
+- **Added:** 2026-08-26 · owner, re-raised 2026-08-27 with a screenshot and again 2026-08-30 — three
+  reports from three screens, the strongest priority signal in the nutrition cluster.
 
-> **⚑ RE-REPORTED WITH SCREENSHOTS, 2026-08-27, and the owner's wording sharpens the requirement.**
-> *"when I add a meal from ai; it breaks it down into its components and floods the list. we need to
-> be able to create an over arching food and have the ingredients and macro break down inside of
-> it."* The screenshot is one AI-logged breakfast rendered as **eight** diary rows — flour, protein
-> powder, baking powder, salt, milk, eggs, butter, bacon — each with its own `1 serving · Ng` line
-> and chevron, filling the whole meal section.
->
-> **This is the same defect this entry already describes, not a new one**, and it is now the owner's
-> most-repeated nutrition complaint (raised on 2026-08-26 about a saved meal's photo, again here
-> about an AI meal). What the re-report adds is the shape of the fix: **one collapsed parent row
-> carrying the meal's name and total, expanding to the ingredients and their macro split** — not
-> eight siblings, and not a single opaque row that loses the breakdown. Both halves are stated, so
-> build both.
->
-> It also answers the photo question the earlier report left open: a parent row is a place a meal
-> photo can live. Decomposed siblings had nowhere to put one, which is why *"the image won't transfer
-> over"* had no good answer while the rows stayed flat.
+**The engine shipped 2026-08-30** (migrations 238 + 239, local SQLite **v31**):
+`food_logs.saved_meal_id` and `food_logs.meal_group_id`, stamped by `logMealItems` on both write
+paths and carried through the outbox payload, the push branch, the sync delta, the pull mapping and
+the local read. **What is owed is the rendering, and it was built and NOT shipped.**
 
-- **Lane:** B — the migration and write path shipped 2026-08-30 as Lane A's half; all that remains is
-  the diary rendering. *(Was `Lane: A`; a struck-through value here parses as no lane at all and lands
-  the entry in UNCLASSIFIED, so state the current lane plainly and say the rest in prose.)*
-- **Batch:** `nutrition-ui-uplift` — **added 2026-08-30 so the owed half is visible.** The runner
-  warns *"mentions a schema change — do not batch a migration"*; **that does not apply here and the
-  reason is checkable: migrations 238/239 and local SQLite v31 are already on `main`.** What remains
-  is rendering only, so there is no migration in this batch to revert. Do not split it out on the
-  warning alone — but if any part of the render turns out to need a column, that part leaves the
-  batch and goes to Lane A.
-- **⚠ NOT a `Keep:` — this is unbuilt Lane B work.** It was filed as one on 2026-08-30 when the engine
-  shipped, which parks the entry in the runner's KEEP list under *"not new work"*. That is right for
-  an owner or device check and wrong for a whole UI half nobody has written; it made the owner's
-  most-repeated nutrition ask invisible to the tool Lane B starts from. Restated as a live entry with
-  its scope shrunk to what remains. **The engine
-  shipped 2026-08-30** (migrations 238 + 239, local SQLite **v31**): `food_logs.saved_meal_id` and
-  `food_logs.meal_group_id`, stamped by `logMealItems` on both write paths, carried through the
-  outbox payload, the push branch, the sync delta, the pull mapping and the local read. **Shape (1)
-  was built, as recommended** — one row per ingredient, grouped — so nothing about a log row
-  changed and every existing query is untouched. What is owed:
-  - **Lane B:** the diary draws one collapsed parent row per `mealGroupId`, carrying the meal's name
-    and photo, expanding to the ingredients and their macro split. Both halves, per the re-report.
-  - ~~**Lane A (small):** true MRU for My Foods~~ — **shipped 2026-08-30.** `listSavedMeals` returns
-    `lastUsedAt` (`max(logged_at)` per `saved_meal_id`, user-scoped, deleted logs excluded) and
-    orders most-recently-eaten first, never-eaten last in their existing `createdAt` order. Derived
-    on read, never a stored counter.
-  - **Nothing back-fills.** Meals logged before 2026-08-30 have both columns NULL and will keep
-    rendering as loose ingredients; there is no way to recover which rows belonged together.
-- **Added:** 2026-08-26 · owner: *"the meal is a complete in 'saved meal' and it can have a picture
-  etc. but when adding it to the log; its broken down into its components so the image wont transfer
-  over. not sure what the best way around this would be. maybe it needs to stay as a whole item."*
+**⚠ IT WAS BUILT, IT WORKS, AND IT BROKE A DIFFERENT SCREEN'S GESTURE. Do not rebuild it the same
+way.** The render half is straightforward and its own three e2e tests pass. What it could not do is
+coexist with the meal library's swipe tray: `meal-detail-artboard-parity` and
+`my-meals-artboard-parity`'s swipe tests failed **deterministically, on both CI attempts and
+locally**, with the tray's `Delete <meal>` button never appearing after a left-swipe.
 
-**The owner's instinct is right, and the missing piece is already documented elsewhere as a
-different problem.** Logging a saved meal writes one `food_logs` row per ingredient and **nothing
-records that they came from a meal**. `food_logs` carries `food_item_id` and no `saved_meal_id`, so
-the moment a meal is logged its identity is gone.
+**What was measured, in order — this is the valuable part:**
+1. **It is a regression of this work, not a flake.** The same two specs pass on `main` and fail on
+   the branch, run the same way, minutes apart.
+2. **The cause is the saved-meal summaries hook**, not the grouping or the rendering. Disabling
+   `useSavedMealSummaries` alone — leaving every other line — turns both specs green.
+3. **Moving the hook out of `nutrition-content.tsx`** into a memoised `DiaryMealList` (so the map's
+   arrival cannot re-render the library sheet) fixed `my-meals-artboard-parity` and **not**
+   `meal-detail-artboard-parity`.
+4. **The trigger is the `saved-meals` invalidation subscription**, not its network fetch. Removing
+   `useInvalidationRefetch` entirely turns both green; keeping it but re-reading only from the local
+   store and the cache seed — no request — leaves both red. So something in opening a meal
+   invalidates `saved-meals`, and the resulting work lands while a `SwipeActions` row is mid-drag.
 
-**Three symptoms, one cause — which is what makes this worth fixing rather than patching:**
+**Where to start.** Find what invalidates `saved-meals` during `openSavedMeal`, and why a subscriber
+re-rendering a sibling subtree drops an in-flight `useDrag`. `SwipeActions` keeps `offset` in
+`useState` and a module-level `openRows` registry — a re-render should be harmless and a **remount**
+would not be, so establish which is happening before changing either component.
 
-| Symptom | Where it was noticed |
-|---|---|
-| The meal's photo cannot follow it into the diary | **here**, the owner's report |
-| A saved meal has **no last-used timestamp at all**, so My Foods can only order by `createdAt DESC` | Q-395c's journal, filed as a constraint rather than a defect |
-| The diary shows five ingredients where the owner ate one thing | implied by both |
+**The diary needs the meal's name and photo from somewhere**, and every option has a cost: this hook
+(above), a join into the food-log read (**Lane A** — `app/api` and `lib/data`), or a seed-only read
+that goes stale (the Q-260 shape). Settle that before building again.
 
-Q-395c's journal already says it: *"`food_logs` carries no `saved_meal_id`, so a saved meal has no
-last-used timestamp at all … True MRU needs a column that does not exist — Lane A's to add."* **That
-is this column.** Adding it for MRU alone would be under-selling it.
-
-**Two shapes, and the choice is the entry's real content:**
-
-1. **Stamp the ingredients.** Keep one row per ingredient, add a nullable `saved_meal_id` (plus a
-   per-log group id, so two servings of the same meal on one day stay distinct). The diary groups
-   rows that share it and renders the meal's name and photo over them.
-   - **Keeps** every macro total, every per-ingredient edit, and every existing query working
-     unchanged — a log row is still a log row.
-   - **Costs** grouping logic on every diary read.
-2. **Log the meal as one row.** What the owner reached for — *"maybe it needs to stay as a whole
-   item"*.
-   - **Keeps** the diary trivially correct: one thing eaten, one row, one photo.
-   - **Costs** a second shape in `food_logs`: a row that points at a meal rather than a food item,
-     which every reader, the sync delta, the local mirror and the macro sums must now handle. And
-     editing one ingredient of a logged meal stops being possible without decomposing it anyway.
-
-**Recommended: (1).** It is additive — a nullable column and a grouping pass — where (2) changes what
-a `food_logs` row *is*, and this table is read by the diary, the energy balance, the adaptive-TDEE
-window, the sync delta and the local store. **The owner's phrasing asks for the outcome, not the
-storage**: "stay as a whole item" is satisfied by the diary *showing* one grouped item, which (1)
-delivers without a second row shape.
-
-- **⚠ Sequencing against BF-35.** BF-35 fills the food tile with images; a meal's photo reaching the
-  diary needs this column first. If BF-35 lands first the meal rows simply show ingredient images —
-  correct, not broken — so this is an ordering preference, not a `Needs:`.
-- **⚠ The full offline-first chain applies**, per CLAUDE.md: local table column = server payload =
-  `getSyncDelta` output = `pullDelta` mapping = `applyDelta` upsert columns = the `pushMutations`
-  branch. A new nullable column on a synced table is exactly where that chain gets half-done.
-- **Verification.** Log a saved meal with a photo: the diary shows one grouped entry with the meal's
-  name and picture, the day's macro total is unchanged from before, and a single ingredient inside it
-  can still be edited and deleted. Then the same on a second serving of the same meal on the same
-  day — they must not merge into one.
+- **The grouping rule itself is settled and was proved by mutation** — keep it: group on
+  `meal_group_id`, **never** `saved_meal_id` (two servings of one meal on one day share the meal and
+  not the group); a group needs a *resolvable* meal, so pre-BF-39 rows and a deleted meal's rows
+  render loose because **nothing back-fills**; and a one-row group is not nested.
+- **Verification when it is rebuilt:** the three tests written for it, **plus** the meal-library
+  swipe specs in the same run — the pair this attempt broke.
 
 ### [nutrition] BF-38 — logging the same food twice creates a second `food_items` row: 19 of 209 are redundant
 
@@ -6193,87 +6279,6 @@ this fits without an extraction.
   two whose restore is hardest to express. The `stale` 409 (a later change still in effect) renders
   through the same path and was not driven separately. Plus the tap-target/wrap check at S25 width.
   `Gate: device`.
-### [platform][app-shell] Q-392 — the preference API exists; the read sites still read `localStorage`
-
-- **⚑ ABSORBS Q-393 (removed 2026-08-23). The `mealLabelStyle` row below IS that entry.** Q-393
-  was filed as *"an ingredient breakdown on the printed label, which does not fit on a round one"*
-  and everything about the label itself has since shipped: **Q-397** (v1.324.0) refuted the premise
-  by fitting the full list on a **round** label as an inline wrapping run rather than a stacked one,
-  and **Q-399** retuned the geometry to 0.401 mm per module with three wrapped lines asserted. What
-  was left of Q-393 was one sentence — the chosen style is picked at print time and forgotten —
-  which is exactly this entry's `mealLabelStyle` → `ta_meal_label_style` row. Two entries for one
-  row is what this fold removes.
-- **⛔ OWNER DECISION 2026-08-23 — Option 2, the round trimmed label, is dead. Do not re-cost it.**
-  Q-393 carried two bullets that contradicted each other for five days, one calling Option 2 an open
-  owner decision and a later one calling it moot, and that contradiction is why the entry sat parked
-  behind `Gate: owner` at the position the owner had personally moved it to. The number that settles
-  it: at 44 units its true module pitch is **0.353 mm**, below every shipped style including the
-  0.369 the old default printed. The square die is the answer to wanting the stacked list on paper.
-- **The two physical checks Q-393 owed are already tracked** — print one and scan it — by the
-  `projectOverview.md` Known-Issues row for Q-400 (*"NOT verified on device · needs: hardware + a
-  printer"*). They were never this entry's and are not lost.
-
-- **Branch:** `feat/preferences-read-sites`
-- **Lane:** B
-- **Added:** 2026-08-18 · owner: *"I would like the app/settings to remember the settings we choose
-  — when i do a new install or open on computer - it loses all the saved preferences. We need to
-  make it persist across installs/etc."* **Re-scoped 2026-08-23** to the half that is left.
-
-**The engine half shipped** (Lane A, `feat/server-backed-user-preferences`): `users.preferences`
-is a JSONB bag (migration 206), `GET`/`PATCH /api/user/preferences` read and merge it, proven
-cross-session against the local DB. Nothing user-visible changed — **no read site calls it yet**.
-
-- **What is left is entirely in Lane B's files.** Every surface in the table below still reads its
-  `localStorage` key directly and writes only there. Each needs: read the server bag once (as
-  `hydrateGoalSeeds` does for goals), seed the same `localStorage` keys from it so first paint
-  stays synchronous, and PATCH on change.
-- **The correspondence is already written down — do not re-derive it.**
-  `PREFERENCE_STORAGE` in `packages/shared/src/user/preferences.ts` maps every preference name to
-  its `localStorage` key **and its encoding**, which is the part that bites: `ta_ss_widgets` is
-  JSON, `ta_weight_lookback` is a bare number, and the reminder toggles are `String(boolean)`
-  compared against the literal `'false'`. A test asserts the map covers every schema key.
-
-| what | preference key | storage key |
-|---|---|---|
-| Home widgets / cards | `homeWidgets`, `homeCards` | `ta_ss_widgets`, `ta_ss_cards` |
-| Home section order / hidden | `homeSectionOrder`, `homeHiddenSections` | `ta_home_section_order`, `ta_home_hidden_sections` |
-| Pill & card colours | `pillColors`, `cardColors` | `ta_pill_colors`, `ta_card_colors` |
-| Score-ring style | `scoreRingStyle` | `ta_score_ring_style` |
-| Weight lookback | `weightLookback` | `ta_weight_lookback` |
-| Goals progress view | `goalsProgressView` | `ta_goals_progress_view` |
-| Brand theme / hue | `brandTheme`, `brandHue` | `ta_brand_theme`, `ta_brand_hue` |
-| Background / wallpaper | `backgroundSettings` | `ta_background_settings` (a Zustand `persist` bag) |
-| Meal label style | `mealLabelStyle` | `ta_meal_label_style` |
-| Rest duration | `restDurationSec` | `ta_rest_duration` |
-| Food region | `foodRegion` | `ta_food_region` |
-| Meal / health / day-review / calendar toggles | `mealReminders`, `healthAlerts`, `dayReviewReminders`, `calendarSync` | `ta_pref_*` |
-
-- **⚠ `backgroundSettings` is the one that is not a plain key.** It is a Zustand `persist` store
-  (`lib/stores/background-settings-store.ts`), so the value under that key is the `{ state,
-  version }` envelope, not the settings. Sync the store's `state`, not the raw string, or a
-  version bump on one device writes an unreadable bag to the other. The schema types it as an
-  opaque record on purpose — the shape belongs to that store, and a second definition here would
-  drift.
-- **⚠ `users.food_region` is a dead column** (`schema.ts`, `NOT NULL DEFAULT 'AU'`, never read or
-  written); the live value is `preferences.foodRegion`. Leave it — dropping it is a data-losing
-  migration for no gain — and do not wire a read site to it by mistake.
-- **What deliberately does NOT sync is decided and listed**, in `DEVICE_LOCAL_PREFERENCES` with a
-  reason per key: push enablement, the two Android chip toggles, the ring and scale/HR BLE pairings,
-  and light/dark. If a surface needs one of them to sync after all, move it into the schema rather
-  than writing a second path.
-- **Conflict rule, already settled:** server wins, `localStorage` is a seed written *from* the
-  server and never the reverse — the same rule Q-241 set for goals.
-- **What would count as done:** sign in on a fresh install or a different browser and the chosen
-  ring style, widgets, colours, weight lookback and food region are already applied — no
-  re-configuration; changing one on either device and reopening the other shows the new value.
-  Browser-reproducible end to end (two profiles, or one and a private window); no device needed.
-- **⚠ Related, and more urgent than it looks now that the owner has said they reinstall:** **Q-537
-  — the ring key has one copy and no way to back it up.** `CLAUDE.md` is explicit that an uninstall
-  destroys the Oura ring key irrecoverably (it lives only in Android SharedPreferences) and that
-  re-onboarding the official app to recover risks a firmware update that breaks the BLE protocol.
-  This report establishes that reinstalls are part of the owner's normal routine, which changes
-  Q-537 from a latent risk to a live one. **Not this entry's work — but worth re-prioritising.**
-
 ### [workouts][platform] Q-403 — the Coach calls an already-applied swap a "proposal", and says it after the fact
 
 - **Branch:** `fix/coach-applied-change-copy`
@@ -7856,12 +7861,21 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 - **Why it matters beyond the sleep card.** These rows feed `previousNight` (16% of readiness) and
   `sleepBalance` (10%). The stored readiness contributors for the affected days show `sleepBalance`
   collapsing to 0 and 9 — a saturated z-score against a baseline the fragment has poisoned.
-- **Relationship to Q-225 — sharpen it, do not replace it.** 2026-08-13 is the night Q-225 was
-  opened on, and that entry explicitly asks for *"a reusable local-repro harness for checking whether
-  other recent nights hit the same bug"*. **This is that sweep, done at the data layer, and it found
-  at least one more: 2026-08-11 shares the signature** (single row, near-zero duration). Whether
-  08-11 has the same *cause* as 08-13 is unproven — Q-225's local repro harness is the tool that
-  would settle it.
+- **⚠️ Q-225 CLOSED 2026-08-30, and it took half of this entry's evidence with it. Re-measure before
+  planning.** Q-225 was the stale-narrow-window bug this entry was sharpened against; its record is
+  now in [`docs/overview/known-issues-resolved.md`](overview/known-issues-resolved.md). Two things
+  it settled bear directly on the bullets above:
+  1. **The sweep this entry asked for is done, and 08-11 and 08-13 are not truncation.** All 67
+     BLE-era nights were checked for the clipping signature (a late start against a normal wake);
+     the only night-shaped candidate was 2026-08-19, and `oura_heartrate` has a genuine seven-hour
+     hole across it, so the ring recorded nothing to clip. Whatever produced the fragments, it was
+     not the cutoff.
+  2. **"The ONLY record for this date" no longer holds for either named date.** Both 2026-08-11 and
+     2026-08-13 now carry a full night beside the fragment (08-11: 8.50 h + 0.00 h; 08-13: 8.17 h +
+     1.42 h), re-derived since this entry was filed. Across the whole BLE era exactly **two** dates
+     have no full-night row at all — 2026-07-07 (the re-key day, 0.33 h) and 2026-08-19 (the
+     not-worn night above). **So problem 2 below does not currently reproduce anywhere**, and the
+     rows-per-date table above is stale. Problem 1 is untouched: 0.00 h rows are still being written.
 - **Two distinguishable problems, and they may need different fixes:**
   1. A **0.00 h row exists at all.** A sleep session of zero duration is not a short night, it is a
      failed rollup or a stray detection. Decide whether the rollup should refuse to write it.
@@ -9061,30 +9075,56 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 ### [body][platform] Q-527 — one corrupt body-composition row, and it becomes load-bearing the moment Body Battery uses BMR
 
 - **Branch:** `fix/body-comp-plausibility-guard` · **Lane:** A
-- **Plan:** none needed — a plausibility guard at the write site. Evidence:
+- **Plan:** none needed. Evidence:
   [`docs/reviews/2026-08-19-body-battery-drain-model.md`](reviews/2026-08-19-body-battery-drain-model.md) §2.
 - **Added:** 2026-08-19 · Tuning agent, found while checking the owner's *"BMR draining should
   naturally go up too"* premise against the data.
-- **Measured.** `body_comp` holds 71 daily snapshots. **One is impossible: 2026-07-29 records body fat
-  **3.0%**, fat-free mass **70.4 kg of 72.6 kg** bodyweight, and BMR **1,890** — against ~24% body fat
-  and ~1,520 BMR on the surrounding days.** Three per cent is below the essential-fat floor for a male;
-  this is a bad scale reading propagated through `cunninghamBmr` into a stored BMR **24% above
-  baseline**. One row of 71, so ~1.4% — rare, not impossible.
-- **Why it matters now and did not before.** Nothing currently keys a user-visible number off stored
-  BMR. **Q-521's drain model makes baseline drain proportional to it** (`baseline = 25 × bmrToday /
-  bmrReference`), so this single row becomes a day that drains a quarter faster for no reason the
-  owner can see or explain.
-- **First action:** a plausibility guard at the `body_comp` write site — reject or clamp a snapshot
-  whose body fat falls outside a physiologically possible band, or whose fat-free mass exceeds a
-  plausible share of bodyweight. **Guard the input, not the output**: BMR is derived, so a BMR range
-  check would catch this case and miss the next one.
-- **Also decide what a rejected snapshot does.** Dropping the row leaves a gap; carrying the previous
-  day forward hides that the scale misread. Prefer storing it flagged over storing it silently, so a
-  future audit can see the reading happened — the same reasoning behind readiness's `provisional`
-  flags, which are the reference for this (Q-526).
-- **Do this BEFORE Q-521.** A guard added afterwards leaves already-stored bad rows driving drain.
-- **Caveats:** one athlete, one bad row, 71 snapshots — the *rate* here is not a population estimate.
-  The band itself is a published physiological range, not a fit to this data.
+- **Measured, and re-measured 2026-08-30.** `body_comp` now holds **81** daily snapshots. **One is
+  impossible: 2026-07-29 records body fat 3.0%, fat-free mass 70.4 kg of 72.6 kg bodyweight, and BMR
+  1,890** — against ~24% and ~1,520 on the surrounding days. The next-lowest reading in the entire
+  series is **22.2%**, so the outlier sits alone across a 19-point gap.
+- **⚠️ THE CAUSE IS KNOWN AND THE INPUT GUARD ALREADY SHIPPED — read this before planning.** The
+  entry was written as though nothing guarded the write. Measured 2026-08-30:
+  - **The row is the 2026-07-28 no-contact incident**, which `lib/scale-ble/composition.ts` names in
+    its own comment: socks or dry feet break the foot-plate contact BIA needs, the scale reports
+    impedance **0** rather than omitting the reading, and that drives the impedance term to −∞ and
+    lands the estimate on the estimator's own `clamp(…, 3, 60)` **floor**. `body_metrics` confirms
+    it — the 2026-07-29 row was created `2026-07-28T14:27:43`, `source = scale_ble`, body fat 3.
+  - **`hasValidImpedance` / `MIN_VALID_IMPEDANCE_OHMS = 200` was added in response**, and is called
+    at *both* scale write sites (`/api/scale-ble/samples`, `/api/scale-ble/pending/[id]/confirm`).
+  - **It has held.** `scale_ble` has since written **30** body-fat readings (2026-07-29 → 2026-08-30)
+    and **exactly one is under 10%** — the incident itself, the first of the thirty. Every reading
+    after it is 22.2–25.5%.
+- **The last-line guard shipped 2026-08-30**: `PLAUSIBLE_BODY_FAT_PCT = { min: 4, max: 60 }` in
+  `packages/shared/src/health/body-composition.ts`, applied by `bodyComposition()` and therefore by
+  `bodyCompSnapshot()`. **Its floor sits deliberately above the estimator's clamp floor of 3**, so a
+  floored value cannot walk through, and it covers the sources `hasValidImpedance` cannot see —
+  Health Connect, a manual entry, a second scale. Mutation-verified. It also improves Health's
+  lean-mass card, which shares the helper and was plotting a 17 kg spike on that day.
+- **The sibling sweep is where the real exposure was, and this entry did not name it.** A band in one
+  helper only guards callers that go through it; grepping for the *arithmetic* found **two live
+  surfaces re-deriving `weight × (1 − bf/100)` inline**, both now routed through
+  `bodyComposition()`: `lib/health/energy-balance-service.ts` (the formula baseline behind "what you
+  may eat today" — measured by mutation, a 3% reading gives **2,268 kcal against 1,991**, a
+  **277 kcal/day** inflation) and `calculateBaseline` in
+  `packages/shared/src/nutrition/goal-recommendation.ts` (calorie *and* protein targets, since
+  protein is dosed per kg of lean mass). That is also the One-Formula-One-Place fix — there were
+  three implementations. **The stored row this entry was filed about is inert until Q-521; these two
+  were not.**
+- **Keep:** two things, neither of them code this entry can write.
+  1. **The one historical row is untouched, and that is the owner's call** (same shape as Q-298's
+     ten zero-1RM rows). The guard is forward-only: `persistBodyCompFromMetrics` upserts, so a
+     re-run now *skips* 2026-07-29 rather than correcting it, and the stored snapshot survives.
+     Nulling it is a production data edit, and it is **not** reversible by re-running the backfill —
+     the guard would refuse to re-derive it. The measurement itself stays in `body_metrics` either
+     way, so nothing is lost by nulling and nothing is at risk by keeping it *until* Q-521 ships.
+  2. **Q-521 must not trust a stored snapshot blindly.** Its drain model reads `body_comp.bmr_kcal`,
+     and a write-site guard cannot reach a row already written. Apply `isPlausibleBodyFatPct` to the
+     snapshot on read, or resolve item 1 first. **This is the "do it BEFORE Q-521" line, restated as
+     something Q-521's implementer can act on** — the guard alone does not discharge it.
+- **Caveats, unchanged:** one athlete, one bad row, 81 snapshots — the *rate* here is not a
+  population estimate. The band is published physiology, not a fit to this data.
+
 
 ### [activity][heart-rate] Q-522 — the movement-per-hour contributor is saturated: it measures ring wear, not movement
 
@@ -9503,26 +9543,6 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   own recommendation: **trend is the missing dimension, not contributors** (contributors are
   genuinely inapplicable to a chip or a timeline row; a 7-day sparkline is not).
 
-### [app-shell] LB-26 — the APK banner's link is a 33 px tap target, and the CSS floor cannot reach it
-
-- **Lane:** B · **Branch:** `fix/apk-banner-link-height`
-- **Gate: device** — it is a visual change on Home's banner; the web harness measures the box but not
-  how it reads under a thumb.
-- **Added:** 2026-08-30 · Lane B, from Q-282's measurement pass.
-- **What it is.** On Home, the *Download Android App* banner's body link renders **258×33**, below
-  this repo's 48 dp floor. It is an `<a>`, and `app/globals.css`'s floor is `button, [role="button"]`
-  — `<a>` is excluded **on purpose**, because a 48 px floor on an inline prose link would wreck
-  paragraph layout. So nothing raises it and nothing was measuring it either.
-- **It is the only one.** Measured across all five tabs: every other undersized control is a
-  `button` carrying a documented compensating hit box (`tap-target-dot` on the three 7×7 workout
-  carousel dots, `tap-target-44` on More's 32×32 photo control).
-- **Do not fix it by widening the floor to `a`.** The exclusion is deliberate and the comment says
-  why. Either give this link `min-height: 48px` where it is a banner action, or wrap the tappable
-  area in the container-div + separate-dismiss-button pattern the session-select APK banner already
-  uses (CLAUDE.md, WebView gotchas).
-- **`e2e/touch-target-size.spec.ts` allowlists it by label**, shrink-only — removing the entry from
-  `ALLOWED` is part of the fix, and the spec then fails until the size is right.
-
 ### [platform] Q-283 — ~11 MB of indexes have never served a scan, on a DB where index bloat already caused an incident
 
 - **Branch:** `chore/drop-unused-indexes`
@@ -9579,80 +9599,6 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   unambiguous.
 - **Low priority.** No user-visible fault, no data loss. This is dead-weight removal, and it should
   not jump ahead of anything in the scoring cluster above.
-
-### [sleep][devices][platform] Q-225 — a sleep session can get stuck on a stale, narrower window that a fresh rollup would compute correctly, with no self-heal
-
-- **Added:** 2026-08-13/14 · owner reported the app's displayed bedtime for the previous night
-  (1:15am) looked way too late. Not the anchor-lag bug (Q-71/Q-139, ≤3 min correction) — this is a
-  2h35min gap between the stored value and what the ring's real data supports, so a different
-  investigation.
-- **Confirmed by full local reproduction, not inference.** Pulled all of that night's real raw
-  samples (11,208 rows, 9 tags) and clock anchors from production via the read-only endpoint,
-  loaded them into the local dev DB under a throwaway test user, and ran
-  `repo.aggregateOuraRawSamples(...)` — the actual shipped function, unmodified — directly against
-  them, twice (once with `fullHistory: true` + `debugDate`, once as a bare incremental call). **Both
-  runs produced the same, correct result: sleep 22:40pm→8:05am (8.5h), onset 10 min, with the
-  neural stager correctly flagging a brief HR-up/movement epoch around 00:50am as `awake`** — i.e.
-  the owner's account ("asleep, woke here and there from overheating") is exactly what the current
-  algorithm computes from the real data. **What's stored in production does not match this**: the
-  live row (`oura_id: ble:33100097`, `sleep_start` 1:15am, 6h05m) is stale/wrong by every check run
-  against it — no >2h gap in the raw `sleep_acm_period`/`sleep_temp` stream (biggest gap 17 min), no
-  `bedtime_period` (0x76) event to override the clustering, no persisted-`decoded` staleness (every
-  row for the night decodes fresh from `body_hex`, as expected post-Lever-1).
-- **🔻 The pool-contention lead is contradicted by measurement (2026-08-14). Do not start from it.**
-  Three facts, all from the read-only endpoint against live production:
-  1. **A rollup HAS re-run since, and reproduced the same wrong window.** Both 08-13 rows and the
-     08-14 row share `updated_at = 2026-08-14T11:13:03.720Z` to the millisecond — one range rewrite —
-     and `ble:33100097` still reads `sleep_start` 15:15 UTC / 6.08 h. The entry's "evidently none has
-     produced the correct window since" is false.
-  2. **The raw data is complete right now.** A bounded query over that night returns a dense stream
-     from **13:15 UTC** (23:15 AEST) — tag 0x60 alone has 1,036 rows before the stored start. So the
-     frames a correct window needs are present and were present for that rewrite.
-  3. **It has not self-healed** (unlike Q-228's and Q-229's symptoms, both of which had).
-  Together those make it **deterministic given the current data**, not a one-off partial read. A race
-  that has stopped racing cannot keep producing the same answer from complete data.
-- **Leading hypothesis now: an asymmetric truncation guard. NOT CONFIRMED — see below.**
-  `aggregateOuraRawSamples` reads an incremental window (`rollupCutoffDs`), and a night whose early
-  frames fall outside it is *truncated, not short*. The daily-summary fold refuses those:
-  `summaryFloorDate` (`adapter.ts` ~5824) discards any night within 2 days of the cutoff, and the
-  3-day margin on `incrementalFloorDs` exists expressly to give it room — its own comment says so.
-  **The `sleep_sessions` write (~5523) has no equivalent filter**, and it deletes by wake-day before
-  inserting, so a clipped pass replaces a previously-correct row rather than merely failing to
-  improve it. That fits every observation: front-clipped (start late, wake time right), deterministic
-  on re-run, and repaired only by `fullHistory` — which has no cutoff and therefore no filter.
-- **⚠️ Attempted and withdrawn on 2026-08-14: a one-line guard mirroring `summaryFloorDate`, plus a
-  four-case rollup test. Both reverted, unshipped, because the test never discriminated.** Three
-  fixture generations were tried and all four cases passed with the guard removed:
-  (a) a night seeded with a `bedtime_period` (0x76/118) event — that event carries an explicit
-  `bedtime_start_ds` and is stamped at the night's *end*, so it survives any narrowing and the night
-  cannot exhibit the bug at all; **the owner's night has no such event**, which is why clustering is
-  what gets cut;
-  (b) IBI-only samples — no sleep row is produced at all, so nothing to protect;
-  (c) `sleep_acm_period` (0x72) + `sleep_temp` (0x75) + IBI, which is what the clusterer actually
-  reads (`adapter.ts` ~5064) — a row is produced, but a narrowed run still does not clip it.
-  So the mechanism above remains **unreproduced**, and shipping a sleep-pipeline write change that
-  cannot be shown to fix anything was judged worse than the bug. **The next session's first job is a
-  fixture that fails without the guard** — most likely by driving the exported production samples for
-  that night through a narrowed (`sinceDs`) call rather than a synthetic night, since the synthetic
-  ones do not clip.
-- **Owner-visible state is unchanged:** the 08-12 night still displays 1:15am. A `fullHistory`
-  Redecode still repairs it (confirmed locally in the original investigation) and remains the only
-  known repair.
-- **Immediate fix, verified working:** an admin **Redecode** (`fullHistory: true`) for this user
-  would delete the stale row (keyed by wake-day, not `oura_id`/`sleep_start`, so the key mismatch
-  between the old narrow window and the new wide one is not a problem) and insert the correct one —
-  confirmed by literally running that code path locally. This is the same Redecode the Q-71 backlog
-  entry already has queued for the historical-sleep rewrite; the two can likely be done together
-  once Q-71 lands, but this row (and possibly other recent nights hit during the same pool-exhaustion
-  bursts) may need it sooner, independent of the anchor-offset fix.
-- **Not yet done:** checking whether other recent nights (not just this one) also landed a
-  stale/narrow window during the same 2026-08-12/13 error bursts — the local-repro harness this
-  entry built (raw-sample + anchor CSV export → local DB load → direct `aggregateOuraRawSamples`
-  call) is reusable for that sweep without re-deriving the method; confirming the pool-contention
-  causal link against Railway's own logs (same "not yet done" item Q-107 already carries); and
-  deciding whether the rollup needs a structural fix (e.g., don't write a sleep row from a partial
-  read, or re-validate/re-run automatically when new data for an already-written night's wake-day
-  arrives) rather than relying on someone noticing and running Redecode by hand.
 
 > **⚑ Q-232 … Q-244 are one cluster** — the 2026-08-14 UI/flow/IA + caching review, requested by the
 > owner ("a good review on the ui and flow/location mainly … alongside that have a look at caching
@@ -9803,39 +9749,49 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   mouse input. (Q-282 shipped as `e2e/touch-target-size.spec.ts` and does **not** — it measures
   rendered geometry from the DOM and never clicks, so it does not revive this.)
 
-### [platform] Q-297 — finish the E2E specs Q-249's first PR deliberately left, and cover more than one tab per screen
+### [platform] Q-297 — cover Nutrition's day navigation; the write-path specs it asked for have shipped
 
 - **Branch:** `feat/e2e-specs-round-2`
-- **Added:** 2026-08-15 · follow-up to Q-249, which shipped the harness
-  (`playwright.config.ts`, `e2e/`, the `E2E` CI job) plus one spec. Read
-  [`e2e/README.md`](../e2e/README.md) first — it records what a green run does and does not prove,
-  and every limitation below was measured, not guessed.
-- **DONE 2026-08-15 for Health — the multi-panel coverage gap.** `e2e/health-tabs-instant-paint.spec.ts`
-  drives `?tab=training|body|progress` and asserts the requested tab is the *selected* one before
-  checking, so the panel under test is actually in the viewport. Verified by the mutation Q-249's
-  spec could not catch: forcing Health's Body-tile skeletons to never clear now fails — and fails
-  **only** the Body case, leaving Training and Progress green.
-- **Still open for every other tabbed screen.** The `expectNoSkeleton` viewport rule is unchanged and
-  correct (an inactive `SwipeCarousel` panel is mounted but unseen, and its data loads on swipe by
-  design), so any single-URL spec still covers one tab. Nutrition's date swipe and any other tabbed
-  surface need the same treatment: drive the tab, assert which panel is selected, then check.
-- **The specs Q-249 scoped and this did not ship:** log a set, a food entry and a water entry and
-  assert each appears without a reload; change a goal and assert the Health tab reflects it (the
-  Q-240 regression, four lines of E2E for a bug this repo has already had once).
-- **A limitation worth closing separately:** the 20 s skeleton budget cannot tell "seeds instantly
-  from cache" from "seeds in 8 s off the network", because the harness runs `pnpm dev` and route
-  handlers compile on first call. It catches a card that *never* seeds, not a regression from
-  instant to sluggish. Measuring the second would need a warmed server and a much tighter budget.
-- **The E2E job is NOT a required status check** and should stay that way until it has a track
-  record — branch protection requires Lint, Tests, Build, Custom Rules and Migration Check. Promote
-  it once it has run green across a few weeks without flaking, and say so in the PR that does.
+- **Added:** 2026-08-15 · follow-up to Q-249, which shipped the harness. Read
+  [`e2e/README.md`](../e2e/README.md) first — it records what a green run does and does not prove.
+- **⚠️ RE-VERIFIED 2026-08-30 and most of this entry was stale.** Read this block before planning;
+  four of the five things it asked for are in `e2e/` already, under other entries' numbers.
+  - *"log a set … assert it appears without a reload"* → **`workout-set-loop.spec.ts`** (Q-461).
+  - *"a food entry"* → **`food-logging-complete.spec.ts`** (Q-387).
+  - *"a water entry"* → **`water-log-write-path.spec.ts`**, whose header names Q-297 outright:
+    *"the first write-path spec: a logged value must appear on the screen that triggered it,
+    without a reload."*
+  - *"change a goal and assert the Health tab reflects it (the Q-240 regression)"* →
+    **`goal-round-trip.spec.ts`** covers the write reaching another screen, and
+    **`goal-invalidation.spec.ts`** establishes by mutation that **no guard can exist** for the
+    Q-240 path specifically: `cachedFetchCore` always revalidates unless `freshWithinTtl` is set,
+    and the stale flash comes from Health's retained React state rather than the cache. That is a
+    settled negative result, not an outstanding item.
+  - *"Nutrition's date swipe and any other tabbed surface"* → **there is no other tabbed surface.**
+    `SwipeCarousel` is used by exactly one screen (`health-content.tsx`) plus two pickers
+    (`walk-config`, `run-type-carousel`), so `health-tabs-instant-paint.spec.ts` already covers the
+    whole population. Nutrition has a **day**, not tabs.
+- **Nutrition's day navigation is covered as of 2026-08-30** — `e2e/nutrition-day-navigation.spec.ts`
+  pins the two entry points to each other (the header chevrons and the `?date=` deep link the Home
+  timeline's meal cards use), the today guard on Next day, and instant paint on returning to a day
+  already viewed. **Driven by the chevrons, not the swipe**, because `useDrag` on this screen
+  swallows mouse input (**Q-354**, open) and mouse is what Playwright sends — a swipe-driven spec
+  would assert against a known-broken path. Cover the swipe when Q-354 lands.
+- **What is genuinely left, and it is small:**
+  - The **20 s skeleton budget cannot tell "seeds instantly from cache" from "seeds in 8 s off the
+    network"**, because the harness runs `pnpm dev` and route handlers compile on first call. It
+    catches a card that *never* seeds, not a regression from instant to sluggish. Measuring the
+    second needs a warmed server and a much tighter budget, and is its own piece of work.
+  - **Whether the E2E job should become a required check.** This entry said keep it optional until
+    it has a track record; LA-22 has since made it always-run and always-report specifically so it
+    is safe to require. Its current branch-protection state was not checked here — check before
+    changing anything.
 - **Do not chase a skeleton into a "fix" without checking which panel it is on.** The Q-249 session
-  found the Injuries card stuck in a loading state, traced it to `injuries` being fetched only by
-  the Body tab's group, and changed `health-content.tsx` — then reverted it on discovering the card
-  is off-screen in an inactive carousel panel and loads on swipe, exactly as designed. The milder
-  real behaviour is that arriving on Body or Progress for the first time shows a brief skeleton,
-  because nothing has written the cache the mount seed reads. That may be worth fixing; it is not
-  the bug it first looked like.
+  found the Injuries card stuck loading, traced it to `injuries` being fetched only by the Body tab's
+  group, changed `health-content.tsx` — then reverted on discovering the card is off-screen in an
+  inactive carousel panel and loads on swipe, exactly as designed. The milder real behaviour is that
+  arriving on Body or Progress for the first time shows a brief skeleton, because nothing has written
+  the cache the mount seed reads. That may be worth fixing; it is not the bug it first looked like.
 
 ### [platform][devices] Q-250 — an Android emulator job in CI, to close the 17 rows that need an Android runtime and nothing else
 
@@ -10314,29 +10270,6 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   does not run in the sandbox**, so none of it is verifiable here. It needs the on-device smoke run
   in the same session, not a Known-Issues row.
 
-### [workouts] Q-211 — a deload week reduces a BASELINE lift, which the rest of the app treats as a real max test
-
-- **Branch:** `fix/baseline-exempt-from-deload`
-- **Added:** 2026-08-12 · found while implementing Q-185, by chasing a guard that mutation testing
-  said was unreachable.
-- **The contradiction, in two files.** `session-data.ts`'s AI deload branch
-  (`else if (aiDeload || isDeloadActive)`) has **no baseline carve-out**, so a confirmed deload week
-  reduces a prescribed baseline lift to 50% / 2 sets. But `log-exercise.ts` has the carve-out twice
-  over — `estimateOneRm` is called with `deloaded: exerciseDeloaded === true || (isAnyDeload && !isBaseline)`
-  and `shouldCountTowardPr` returns `!args.isAnyDeload || args.isBaseline`, both commented as
-  *"a baseline test is a genuine max-effort attempt even during an otherwise-active deload window"*.
-- **So the app prescribes half weight and then records the result as a real max test**, feeding it
-  into the 1RM estimate and letting it set a PR. A baseline taken during a deload week understates
-  the athlete, permanently, in `personal_records`.
-- **How to see it**: `session-data-manual-deload.test.ts` →
-  *"records that a baseline phase is NOT protected from a deload today (Q-211)"*. That test asserts
-  the current (wrong) behaviour on purpose, so this entry has something concrete to flip.
-- **Fix**: add `&& !isBaselinePhase` to that `else if`, flip the test's expectations, and check
-  whether the automatic per-exercise engine (`p.deloaded`) needs the same exemption — it is a
-  separate branch and was not audited.
-- **Why it was not fixed with Q-185**: it changes prescribed load on a path the owner's decision did
-  not cover, and it is pre-existing rather than introduced. Small, but it is a load change.
-
 ### [nutrition] Q-187 — Meal Plan (Phase 2): prefill the day's food logs from the active plan
 
 - **✅ Second slice SHIPPED 2026-08-14: the `plan_meal_answers` table and its full sync path**, with
@@ -10568,6 +10501,20 @@ shared-catalogue maintenance (keyed by exercise name, no per-user row, admin-wri
 **What keeps Q-155 open is now only the two residuals named above** — exact per-predicate
 attribution across the 246 (~246 runs, ~5.5 h), and the fact that only the DB tests have ever been
 measured, not the ~3,300-test full suite.
+
+**Re-counted 2026-08-30: it is 278 predicates, not 246** — the data layer grew 32 while this entry
+sat. New since the sweep: `slices/meal-plans.ts` (18), `oura-raw-pack.ts` (5), `oura-raw-frames.ts`
+(3), `colmi.ts` (3), plus growth in `adapter.ts` (139 → 125 as code moved out) and `oura.ts`
+(33 → 43). **So every ratio in this entry is against a stale denominator** — "93 of 246" is a
+bound measured on a smaller data layer, and the un-measured share has grown, not shrunk.
+
+**The full-suite measurement is BLOCKED in the sandbox, and that is worth knowing before planning
+it.** Residual 2 is one run, not 246: neutralise all 278 predicates at once and run the whole suite
+rather than the DB subset. Attempting it on 2026-08-30 was **refused by the environment's safety
+classifier** — correctly, since the mechanical action is "delete every user-scoping check in the
+data layer", which is indistinguishable from the thing this entry exists to prevent. Do not try to
+work around it. Either the owner runs it locally, or it needs an explicit permission grant; a
+session that plans this residual without knowing that will lose the time twice.
 
 ### [app-shell] ⏳ Q-151 — WATCH ONLY, nothing to implement — the sign-in React #418 did not reproduce and the whole series stopped
 
@@ -11080,88 +11027,69 @@ per-field merge where an AI write has no honest source rank to claim.
   `active_calories_est` weakens considerably — a calorie estimate and an HR load term measure much
   the same thing, and Q-184's own entry already says to check this first.
 
-### [readiness][devices] 🔴 Q-270 — `training_load_ots` is still 0 of 96 days: the 2026-08-15 warm-list fix did not take
+### [readiness][devices] 🔴 Q-270 — `training_load_ots` is still 0 of 104 days, and the route is neither failing nor succeeding
 
-- **🔴 Re-measured in production 2026-08-20 — the fix did not take.** `claude_ro.oura_daily_derived`
-  holds **96 days**, `training_load_ots` populated on **0** of them and `active_calories_est` on
-  **0**, latest day 2026-08-22. That is five days after the 2026-08-15 warm-list entry shipped,
-  against this entry’s own re-check condition: *"Re-read `training_load_ots` in a day or two; if
-  it is still 0, the diagnosis was incomplete."* **It is still 0, so the diagnosis was
-  incomplete** — all four gates were measured passing, so the remaining suspects are the warm-list
-  entry not firing, the route erroring before the write, or the persist itself (which the entry
-  already flags as unproven locally, since the seed carries no `ble-derived` readiness).
-- **Start by proving the route is called at all**, not by re-measuring the four gates — those were
-  measured 2026-08-15 and re-measuring them is the trap this entry has already fallen into once.
+- **Branch:** `fix/training-stress-column-empty` · **Lane:** A
+- **🔴 Re-measured 2026-08-30. Still 0 — of 104 days now, ten days after the last re-check.**
+  `active_calories_est` likewise 0. The 2026-08-15 warm-list fix did not take, and neither did the
+  diagnosis after it.
+- **What was ruled OUT on 2026-08-30, so the next session does not re-derive it.** Every one of these
+  was measured, not read:
+  - **All four gates pass, on all eight most recent days** — evaluated per date the way the route
+    does, not in aggregate: `readiness_source = 'ble-derived'` with a score ✓, `n_history` 48–55
+    against a floor of 14 ✓, `resting_heart_rate` present ✓, sex and date of birth present ✓.
+  - **The MET gate passes from midday.** Samples span the whole local day (first sample 00:02–00:14,
+    last 22:25–23:55, span **1,338–1,427 minutes**) against a floor of 720, so it clears by ~12:07
+    local — not late evening, as the shape of the gate suggests.
+  - **The route is not erroring.** `error_events` holds **no** `/api/training-stress` row over seven
+    days. So it is not 500ing; the column is empty because the route is not being called, or is
+    called and returns `gated` — and nothing on the server distinguishes those.
+  - **The write path is correct.** `trainingLoadOts` is in `DERIVED_COLS`, the upsert's COALESCE arm
+    updates rather than swallows a real number, and there is now a test pinning that
+    (`training-stress-persist.test.ts` — its upsert case runs everywhere; the two OTS cases need the
+    vendored constants and skip without them).
+- **The structural problem, which is why this entry keeps being wrong.** The persist is a *side
+  effect of a GET*, it happens only when `result.status === 'ok'`, and nothing records that the
+  route ran or what it decided. So "not called" and "called and gated" are indistinguishable from
+  outside, and every diagnosis so far has had to guess between them. **Fix the observability before
+  the cause** — a session that cannot tell those apart will produce a fourth wrong answer.
+- **Two candidate causes left, both unproven:**
+  1. **`warmCache` returns early whenever the key is cached** (`components/sync-provider.tsx`) and
+     does not check the stored envelope's date, so a `today: true` key warmed before midday can keep
+     serving a `gated` answer. Whether TTL_MEDIUM expiry defeats that in practice is unmeasured.
+  2. **A constants-delivery miss.** `getOtsTypedConstants` reads a directory downloaded at boot, and
+     `lib/oura-models/constants/index.ts` records that a route handler read `OURA_CONSTANTS_DIR` as
+     undefined while boot had logged success — *"every stress read 500s. That is what
+     `/api/body-battery` was doing in production for two hours."* The 12 `error_events` rows for that
+     route (last 2026-08-23T20:59) are that incident. Whether `/api/training-stress` shares it is
+     unknown, because it has no error rows either way.
+- **Every caller passes TODAY** — the warm list (no `?date=`, so the route resolves today), the
+  Health → Body card, and the done-screen badge. So a completed day is only ever scored while it is
+  still in progress, which is worth questioning independently of the bug.
 - **This still gates Q-204**, whose design assumes this column is most of its input.
 
-> **The column was empty because nothing called the route.** All four gates were measured and all
-> four pass — readiness `ble-derived` (31 days), `n_history` 40 vs 14, RHR on 30 of 30 days, and a
-> MET grid of 1,425 min / 1,146 values against floors of 720/360. `/api/training-stress` persists
-> only as a side effect of being called, and its only caller was a Health → **Body** card while the
-> tab defaults to **Training**. Fixed with one sync-provider warm-list entry: once per launch,
-> **deliberately off the BLE ingest path** that Q-213 traced an outage to, and with no cron layer
-> available. ⚠️ **Populates forward only — the 89 empty days stay empty**, and the persist itself is
-> unproven locally (the seed has no `ble-derived` readiness, so the route gates before the write).
-> **Re-read `training_load_ots` in a day or two**; if it is still 0, the diagnosis was incomplete.
-> **This unblocks Q-204**, whose design assumes the column is most of its input. Journal:
-> [`docs/overview/overview/history-2026-08-15.md`](overview/history-2026-08-15.md).
-> Original entry below.
+### [platform][devices] LA-40 — `runTrainingStressScore` throws for a young user, out of a function that documents itself as infallible
 
-#### (original) Q-270 — `training_load_ots` has a producer and is still 0 of 89 days in production
+- **Branch:** `fix/training-stress-column-empty` (shipped with the Q-270 investigation that found it)
+- **Added:** 2026-08-30 · found by running the persist Q-270 asked for and watching it crash.
+- **SHIPPED 2026-08-30.** `getRhrCategory` returns null for an age with no row in the percentile
+  table, and `runTrainingStressScore` returns null rather than throwing — the "can't produce a
+  result" path its own docblock already promises. Mutation-verified, and the test runs **without**
+  the vendored constants, so it holds in CI where every parity block skips.
+- **The defect, for the record.** `validate` bounds rhr, readiness and vo2max but **not age**.
+  `getAgeGroup` then clamps only the TOP for female/male (`age >= 80 ? 80`) while the `other` branch
+  clamps both ends — so an age below the lowest group left `indexOf` at -1, indexed `table[-1]`, and
+  handed `undefined` to `argminAbsDiff`. The route calls it with no try/catch, so
+  `GET /api/training-stress` 500s for that user.
+- **Reachable, and increasingly so.** The owner is 33 and safe; the app has other users and a Play
+  Store listing is the stated direction, so a teenage user or a mistyped date of birth is a live
+  path. It also fires on any partial constants table, which is not hypothetical — see Q-270's
+  candidate 2.
+- **Keep:** the asymmetry itself is untouched. Whether the female/male branch *should* clamp its low
+  end the way the `other` branch does is a question about vendor intent, and guessing at it from
+  outside the model is what this fix deliberately declined to do. Returning null is correct and
+  conservative; clamping might be more useful and needs the vendor tables to decide.
 
-- **Branch:** none yet · **Added:** 2026-08-14, doing the check Q-184's own entry asks for before building.
-- **The measurement.** `claude_ro.oura_daily_derived` holds **89 days** for the owner. Both
-  `training_load_ots` **and** `active_calories_est` are populated on **0** of them.
-- **Why that matters more than it looks.** `docs/activity-goal-calibration.md` §5-B justifies the
-  HR-load direction (Q-204) partly on *"`training_load_ots` already exists and may be most of it"*.
-  That is **true in code and false in the data**: the column has a real server-side producer
-  (`app/api/training-stress/route.ts`, computing OTS from the ring's MET stream + our derived
-  readiness + derived VO₂max) and it has never persisted a single value.
-- **Two gates ruled OUT by measurement**, so the next session does not re-check them:
-  - **Readiness is not it.** `oura_daily_derived` has **31 days** of `readiness_source='ble-derived'`
-    with a non-null score, latest **today**.
-  - **MET data is not absent.** Tag `0x50` events are arriving — **222 rows in the most recent
-    50,000** `oura_raw_samples` (bounded query; do not scan that table).
-- **✅ DIAGNOSIS COMPLETE 2026-08-15 — all four gates pass, so the value is computable and simply
-  never computed.** Measured each gate of `computeTrainingStress` against production rather than
-  reasoning about them:
-
-  | gate | condition | measured | verdict |
-  |---|---|---|---|
-  | `no_readiness` | `readinessSource === 'ble-derived'` | 31 days, latest today | **passes** |
-  | `readiness_learning` | `nHistory < BASELINE_MIN_NIGHTS` (14) | `n_history` = **40** | **passes** |
-  | `no_profile` | age / sex / **RHR** present | RHR on **30 of 30** recent days | **passes** |
-  | `insufficient_met` | grid < 720 min **or** valid < 360 | 2026-08-13: **1,425 min span, 1,146 values** | **passes** |
-
-  MET decoding detail, since it looked like the likely culprit and is not: **104 events on 08-13**,
-  14 values each (~1/min), 17 gaps over 20 min, largest 59 min — patchy but far above both floors.
-  **Corrected 2026-08-15:** an earlier note here said `decoded` is NULL on every `0x50` row, implying
-  a tag-specific decoder gap. Re-measured over the most recent 50,000 samples, it is NULL for **every
-  tag** — that is the archival design (`body_hex` is truth so a later decoder can re-derive; the
-  adapter re-decodes on read), not a fault. No `0x50` decoder bug exists to find.
-- **So the cause is the remaining one: nothing ever calls the route.** It computes and persists
-  **only as a side effect of rendering `training-stress-line.tsx`**, for `?date=${today}` only. That
-  card sits in Health → **Body**, and the Health tab defaults to **training** — so the value is
-  written only if the user switches tabs on the day in question, and never for any past day.
-- **⚠️ The fix has a real footgun: do NOT hang this off the BLE ingest path.** That is where
-  `aggregateOuraRawSamples` runs, and Q-213 traced a multi-week production outage to exactly that
-  loop being saturated. Adding an OTS computation to the hot ingest path risks reintroducing the
-  fault that was just fixed. There is also **no cron layer** (`docs/module-map.md` §0), so a
-  scheduled job is not available either.
-- **Fix shape, unbuilt:** compute-and-persist for *yesterday* from a path that already runs at most
-  once per app open and is off the ingest loop, and/or a bounded backfill for the retained window.
-  Whatever the trigger, it must be measured against the Q-213 CPU signature before merging.
-- **Original leading cause, now confirmed as the answer:** the route only ever computes **today**, on demand,
-  and only persists when `result.status === 'ok'`. Its only client is
-  `components/health/training-stress-line.tsx`, which fetches `?date=${today}`. So nothing backfills,
-  and a day only persists if the Health card renders that day *and* the OTS core returns `ok`. Either
-  the card is rarely reaching a passing state, or `computeTrainingStress` is gating (insufficient MET
-  minutes is the candidate — 222 events is thin).
-- **What to do:** confirm which, by calling the route for a recent day with a real session and reading
-  `result.status` / its gate reason. If it is the never-backfilled shape, this is **server-side work
-  with no APK** — much cheaper than Q-184's Kotlin.
-- **This gates Q-204.** The HR-load lane assumes this column is most of its input. It is currently
-  none of it.
 
 ### [devices][activity] Q-184 — `active_calories_est` is plumbed end-to-end and never written
 
@@ -11735,27 +11663,6 @@ the goal layout's §7 off-ramp says is missing.
   parent's chunk), so the readability case is the honest one and the perf case needs the /workout
   first-mount measurement above before anyone commits. **Do the measurement first** — the same
   mistake this entry made once already is assuming which cost is where.
-
-### [platform] Q-311 — the E2E CI job puts a credential-shaped literal in a file that is about to be public (Q-49 blocker-adjacent)
-
-- **Branch:** `chore/e2e-auth-secret-before-public-cut`
-- **Added:** 2026-08-16 · found while writing the Q-249 handoff against Q-49's constraints.
-- **`.github/workflows/ci.yml:367`** sets `AUTH_SECRET: e2e-ci-secret-not-used-outside-this-job`
-  inline. It is genuinely a dummy: NextAuth needs *some* signing key or the credentials callback
-  returns `?error=Configuration`, and this value signs nothing outside that ephemeral job against an
-  ephemeral database that is dropped with the runner.
-- **The problem is not the value, it is the reader.** Q-49's own constraint is *"CI stays offline and
-  holds no credential"*, and someone reading a public repo cannot tell a dummy from a leak by
-  looking. A plausible-looking secret in a workflow file is exactly the thing that gets reported.
-- **Decide before the cut, and it is a two-minute job either way:** move it to a repository secret
-  (costs nothing, removes the question entirely), **or** keep it inline and add a one-line comment
-  in the workflow stating explicitly that it is a throwaway signing key for an ephemeral job. Do not
-  leave it bare and unexplained.
-- **While you are there:** the seeded test user (`test@local.dev` / `testpass123`, in
-  `scripts/local-db/seed.sql`, used by `e2e/fixtures.ts`) is also public-safe by design but will
-  read as a leak to a stranger. One sentence in the public README covers it.
-- **Small, and it has a deadline rather than a priority** — it only matters at the moment the repo
-  goes public, and it is much cheaper to settle now than to answer afterwards.
 
 ### [platform] 🔴 Q-49 — public repo migration (Phase A: model delivery · Phase B: the cut)
 

@@ -101,12 +101,13 @@ async function pickPhoto(page: Page): Promise<number> {
     const file = new File([blob], 'meal.jpg', { type: 'image/jpeg' })
     const dt = new DataTransfer()
     dt.items.add(file)
-    // **Not `querySelector`.** Since Q-395c the builder is reached through Log Food, whose capture
-    // step carries TWO `image/*` inputs of its own — and they come first in DOM order, so the naive
-    // first-match silently fed the photo to the food scanner and this spec failed 15 s later
-    // looking for a size line that was never going to appear. Radix aria-hides every covered layer,
-    // which is what tells the live dialog from the ones underneath it.
-    const live = [...document.querySelectorAll('input[type="file"][accept="image/*"]')]
+    // **By name, and still counted.** Since Q-395c the builder is reached through Log Food, whose
+    // capture step carries TWO `image/*` inputs of its own — and they come first in DOM order, so
+    // the naive first-match silently fed the photo to the food scanner and this spec failed 15 s
+    // later looking for a size line that was never going to appear. BF-46 ①a added a second photo
+    // picker (the meal's own screen), so `name` is what separates them now; the aria-hidden filter
+    // is what separates the live layer from the ones underneath it, which Radix hides.
+    const live = [...document.querySelectorAll('input[name="meal-photo"]')]
       .filter(el => !el.closest('[aria-hidden="true"]')) as HTMLInputElement[]
     // Loudly, not by picking one: filling the wrong box is exactly the failure LA-30 spent a
     // session on, and it reports as a broken assertion three steps further down.
@@ -139,9 +140,15 @@ async function openEditMeal(page: Page) {
   // BF-30 moved the row's actions onto the meal's own screen; open it first.
   await openSavedMeal(page, MEAL_NAME)
   await tap(page, `Edit ${MEAL_NAME}`)
-  // `Add`/`Change`, depending on whether this meal already has one — and never the Remove button,
-  // which also matches "meal photo" and made this a strict-mode violation.
-  await expect(page.getByRole('button', { name: /^(Add a|Change) meal photo$/ })).toBeVisible({ timeout: 10_000 })
+  // **Wait for a BUILDER-only marker, not the picker.** Since BF-46 ①(a) the meal's own screen has a
+  // real picker too, with the same accessible name, and it is still in the DOM while it closes — so
+  // waiting for "Add a photo to <meal>" was satisfied by the screen this is leaving, and the pick
+  // below went to it. Measured: `onChange` fired on the detail sheet's tile and never on the
+  // builder's. `Update Meal` exists only in the builder.
+  await expect(page.getByRole('button', { name: /^Update Meal$/ })).toBeVisible({ timeout: 20_000 })
+  await expect(
+    page.getByRole('button', { name: new RegExp(`^(Add a photo to|Change the photo on) ${MEAL_NAME}$`) }),
+  ).toBeVisible({ timeout: 10_000 })
 }
 
 test('a picked photo is downscaled below the cap and stored with the meal', async ({ page }) => {
@@ -178,4 +185,35 @@ test('the photo can be removed, and a rename on its own leaves it alone', async 
   await tap(page, /^Remove meal photo$/)
   await tap(page, /^Update Meal$/)
   await expect.poll(storedImage, { timeout: 20_000 }).toBeNull()
+})
+
+test('the meal\'s own screen picks a photo too — it used to say "Add a photo" and open the builder', async ({ page }) => {
+  // BF-46 ①(a). The hero on a meal's own screen called `onEdit`: it said `Add a photo` and dropped
+  // you into the builder to find a 64 px tile at the bottom of a scroll. The owner reached for it
+  // three times — *"the photo still doesnt get added from this screen at the top"* — and it was
+  // never a picker at all. It is one now, writing through the same `saveMealToLibrary` the builder
+  // calls, so there is still exactly one write path to `image_data_uri`.
+  expect(await storedImage(), 'the previous test cleared the photo').toBeNull()
+
+  await page.goto('/nutrition')
+  await settleRouteBoundary(page)
+  await expect(async () => {
+    if (await page.getByRole('dialog').count() === 0) await tap(page, /^My Meals$/)
+    await expect(page.getByText(MEAL_NAME)).toBeVisible({ timeout: 5_000 })
+  }).toPass({ timeout: 90_000 })
+  await openSavedMeal(page, MEAL_NAME)
+
+  // `Log this meal` is on the meal's own screen and nowhere else, so it says which screen this is
+  // without relying on the picker — the mistake the first test's gate made.
+  await expect(page.getByRole('button', { name: /Log this meal/i })).toBeVisible({ timeout: 20_000 })
+  await expect(page.getByRole('button', { name: `Add a photo to ${MEAL_NAME}` })).toBeVisible()
+
+  await pickPhoto(page)
+
+  // The assertion is the stored row, not the hero: this screen paints optimistically, so the band
+  // would show a picture just as happily with nothing behind it.
+  await expect.poll(storedImage, { timeout: 20_000 }).not.toBeNull()
+  const stored = (await storedImage())!
+  expect(stored.startsWith('data:image/webp;base64,'), `stored as ${stored.slice(0, 30)}`).toBeTruthy()
+  expect(Math.ceil(stored.slice(stored.indexOf(',') + 1).length * 0.75)).toBeLessThanOrEqual(CAP_BYTES)
 })
