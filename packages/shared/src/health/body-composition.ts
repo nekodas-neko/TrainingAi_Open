@@ -66,14 +66,38 @@ export function personalRmr(measured: MeasuredRmr | null | undefined, currentFfm
 }
 
 /**
- * Derive the body-composition panel from a weight (kg) and body-fat percentage (0–100).
- * Returns `null` for missing/implausible inputs (never fabricates) — callers render "needs a
- * body-fat reading" rather than a wrong number.
+ * The band a body-fat percentage must fall in to be treated as a *measurement* rather than a
+ * misread. Below the floor is under the essential-fat minimum (ACSM puts it at 2–5% for men,
+ * 10–13% for women) and outside anything a consumer bioimpedance scale should be trusted to
+ * report; the ceiling matches the scale estimator's own upper clamp.
+ *
+ * **The floor sits deliberately ABOVE `lib/scale-ble/composition.ts`'s `clamp(…, 3, 60)`.** A
+ * no-contact weigh-in (socks, dry feet) makes the scale report impedance 0, which drives the
+ * impedance term to −∞ and lands the estimate on that 3% floor — a clamped value that is
+ * indistinguishable from a measured one by the time it reaches storage. `hasValidImpedance`
+ * already refuses those at both scale routes, and has held for every reading since; this band is
+ * the last line before a stored BMR, and it covers the sources that guard cannot see —
+ * Health Connect, a manual entry, a second scale.
+ *
+ * A genuine sub-4% athlete is rejected too. That is the accepted cost and it is small: the
+ * *reading* still stands in `body_metrics`, and only the derived snapshot is withheld, so nothing
+ * is lost — the panel says "needs a body-fat reading" instead of showing a fabricated one.
+ */
+export const PLAUSIBLE_BODY_FAT_PCT = { min: 4, max: 60 } as const
+
+export function isPlausibleBodyFatPct(bodyFatPct: number): boolean {
+  return bodyFatPct >= PLAUSIBLE_BODY_FAT_PCT.min && bodyFatPct <= PLAUSIBLE_BODY_FAT_PCT.max
+}
+
+/**
+ * Derive the body-composition panel from a weight (kg) and body-fat percentage.
+ * Returns `null` for missing or implausible inputs (never fabricates) — callers render "needs a
+ * body-fat reading" rather than a wrong number. See `PLAUSIBLE_BODY_FAT_PCT` for what counts.
  */
 export function bodyComposition(weightKg: number | null | undefined, bodyFatPct: number | null | undefined): BodyComposition | null {
   if (weightKg == null || bodyFatPct == null) return null
   if (!Number.isFinite(weightKg) || !Number.isFinite(bodyFatPct)) return null
-  if (weightKg <= 0 || bodyFatPct < 0 || bodyFatPct > 100) return null
+  if (weightKg <= 0 || !isPlausibleBodyFatPct(bodyFatPct)) return null
   const fatMassKg = weightKg * (bodyFatPct / 100)
   const ffmKg = weightKg - fatMassKg
   const bmrKcal = cunninghamBmr(ffmKg)

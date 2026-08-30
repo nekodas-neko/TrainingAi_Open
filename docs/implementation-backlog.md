@@ -8872,30 +8872,56 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 ### [body][platform] Q-527 — one corrupt body-composition row, and it becomes load-bearing the moment Body Battery uses BMR
 
 - **Branch:** `fix/body-comp-plausibility-guard` · **Lane:** A
-- **Plan:** none needed — a plausibility guard at the write site. Evidence:
+- **Plan:** none needed. Evidence:
   [`docs/reviews/2026-08-19-body-battery-drain-model.md`](reviews/2026-08-19-body-battery-drain-model.md) §2.
 - **Added:** 2026-08-19 · Tuning agent, found while checking the owner's *"BMR draining should
   naturally go up too"* premise against the data.
-- **Measured.** `body_comp` holds 71 daily snapshots. **One is impossible: 2026-07-29 records body fat
-  **3.0%**, fat-free mass **70.4 kg of 72.6 kg** bodyweight, and BMR **1,890** — against ~24% body fat
-  and ~1,520 BMR on the surrounding days.** Three per cent is below the essential-fat floor for a male;
-  this is a bad scale reading propagated through `cunninghamBmr` into a stored BMR **24% above
-  baseline**. One row of 71, so ~1.4% — rare, not impossible.
-- **Why it matters now and did not before.** Nothing currently keys a user-visible number off stored
-  BMR. **Q-521's drain model makes baseline drain proportional to it** (`baseline = 25 × bmrToday /
-  bmrReference`), so this single row becomes a day that drains a quarter faster for no reason the
-  owner can see or explain.
-- **First action:** a plausibility guard at the `body_comp` write site — reject or clamp a snapshot
-  whose body fat falls outside a physiologically possible band, or whose fat-free mass exceeds a
-  plausible share of bodyweight. **Guard the input, not the output**: BMR is derived, so a BMR range
-  check would catch this case and miss the next one.
-- **Also decide what a rejected snapshot does.** Dropping the row leaves a gap; carrying the previous
-  day forward hides that the scale misread. Prefer storing it flagged over storing it silently, so a
-  future audit can see the reading happened — the same reasoning behind readiness's `provisional`
-  flags, which are the reference for this (Q-526).
-- **Do this BEFORE Q-521.** A guard added afterwards leaves already-stored bad rows driving drain.
-- **Caveats:** one athlete, one bad row, 71 snapshots — the *rate* here is not a population estimate.
-  The band itself is a published physiological range, not a fit to this data.
+- **Measured, and re-measured 2026-08-30.** `body_comp` now holds **81** daily snapshots. **One is
+  impossible: 2026-07-29 records body fat 3.0%, fat-free mass 70.4 kg of 72.6 kg bodyweight, and BMR
+  1,890** — against ~24% and ~1,520 on the surrounding days. The next-lowest reading in the entire
+  series is **22.2%**, so the outlier sits alone across a 19-point gap.
+- **⚠️ THE CAUSE IS KNOWN AND THE INPUT GUARD ALREADY SHIPPED — read this before planning.** The
+  entry was written as though nothing guarded the write. Measured 2026-08-30:
+  - **The row is the 2026-07-28 no-contact incident**, which `lib/scale-ble/composition.ts` names in
+    its own comment: socks or dry feet break the foot-plate contact BIA needs, the scale reports
+    impedance **0** rather than omitting the reading, and that drives the impedance term to −∞ and
+    lands the estimate on the estimator's own `clamp(…, 3, 60)` **floor**. `body_metrics` confirms
+    it — the 2026-07-29 row was created `2026-07-28T14:27:43`, `source = scale_ble`, body fat 3.
+  - **`hasValidImpedance` / `MIN_VALID_IMPEDANCE_OHMS = 200` was added in response**, and is called
+    at *both* scale write sites (`/api/scale-ble/samples`, `/api/scale-ble/pending/[id]/confirm`).
+  - **It has held.** `scale_ble` has since written **30** body-fat readings (2026-07-29 → 2026-08-30)
+    and **exactly one is under 10%** — the incident itself, the first of the thirty. Every reading
+    after it is 22.2–25.5%.
+- **The last-line guard shipped 2026-08-30**: `PLAUSIBLE_BODY_FAT_PCT = { min: 4, max: 60 }` in
+  `packages/shared/src/health/body-composition.ts`, applied by `bodyComposition()` and therefore by
+  `bodyCompSnapshot()`. **Its floor sits deliberately above the estimator's clamp floor of 3**, so a
+  floored value cannot walk through, and it covers the sources `hasValidImpedance` cannot see —
+  Health Connect, a manual entry, a second scale. Mutation-verified. It also improves Health's
+  lean-mass card, which shares the helper and was plotting a 17 kg spike on that day.
+- **The sibling sweep is where the real exposure was, and this entry did not name it.** A band in one
+  helper only guards callers that go through it; grepping for the *arithmetic* found **two live
+  surfaces re-deriving `weight × (1 − bf/100)` inline**, both now routed through
+  `bodyComposition()`: `lib/health/energy-balance-service.ts` (the formula baseline behind "what you
+  may eat today" — measured by mutation, a 3% reading gives **2,268 kcal against 1,991**, a
+  **277 kcal/day** inflation) and `calculateBaseline` in
+  `packages/shared/src/nutrition/goal-recommendation.ts` (calorie *and* protein targets, since
+  protein is dosed per kg of lean mass). That is also the One-Formula-One-Place fix — there were
+  three implementations. **The stored row this entry was filed about is inert until Q-521; these two
+  were not.**
+- **Keep:** two things, neither of them code this entry can write.
+  1. **The one historical row is untouched, and that is the owner's call** (same shape as Q-298's
+     ten zero-1RM rows). The guard is forward-only: `persistBodyCompFromMetrics` upserts, so a
+     re-run now *skips* 2026-07-29 rather than correcting it, and the stored snapshot survives.
+     Nulling it is a production data edit, and it is **not** reversible by re-running the backfill —
+     the guard would refuse to re-derive it. The measurement itself stays in `body_metrics` either
+     way, so nothing is lost by nulling and nothing is at risk by keeping it *until* Q-521 ships.
+  2. **Q-521 must not trust a stored snapshot blindly.** Its drain model reads `body_comp.bmr_kcal`,
+     and a write-site guard cannot reach a row already written. Apply `isPlausibleBodyFatPct` to the
+     snapshot on read, or resolve item 1 first. **This is the "do it BEFORE Q-521" line, restated as
+     something Q-521's implementer can act on** — the guard alone does not discharge it.
+- **Caveats, unchanged:** one athlete, one bad row, 81 snapshots — the *rate* here is not a
+  population estimate. The band is published physiology, not a fit to this data.
+
 
 ### [activity][heart-rate] Q-522 — the movement-per-hour contributor is saturated: it measures ring wear, not movement
 

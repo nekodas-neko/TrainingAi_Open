@@ -336,3 +336,36 @@ describe('carbsFromRemainder', () => {
     expect(carbsFromRemainder(800, 150, 60)).toBe(0)
   })
 })
+
+/**
+ * Q-527 — a scale misread must not become a calorie and protein target.
+ *
+ * `calculateBaseline` used to derive lean mass with its own inline `weight × (1 − bf/100)`, which is
+ * the same arithmetic `bodyComposition` does but **without the plausibility band**. So a no-contact
+ * weigh-in floored to 3% body fat (impedance 0 — see `lib/scale-ble/composition.ts`) put lean mass
+ * at 97% of bodyweight and drove Katch-McArdle from it, on the surface that sets what the user eats.
+ *
+ * The band lives in exactly one place now, and these pin that this function reads it.
+ */
+describe('calculateBaseline refuses an implausible body-fat reading (Q-527)', () => {
+  const person = { weightKg: 72.55, heightCm: 180, ageYears: 30, sex: 'male' as const, fitnessGoal: 'maintain' as const, activityLevel: 'sedentary' as const }
+
+  it('does not report a lean mass for the floored 3% reading', () => {
+    expect(calculateBaseline({ ...person, bodyFatPct: 3 }).leanMassKg).toBeUndefined()
+  })
+
+  it('falls through to Mifflin-St Jeor rather than Katch-McArdle from a misread', () => {
+    const misread = calculateBaseline({ ...person, bodyFatPct: 3 })
+    const noReading = calculateBaseline(person)
+    // Identical, because both take the Mifflin branch. Inline-derived lean mass gave 70.4 kg here,
+    // a Cunningham BMR of ~1,890 against Mifflin's 1,708 — a ~180 kcal error in the daily target.
+    expect(misread.bmr).toBe(noReading.bmr)
+    expect(misread.calories).toBe(noReading.calories)
+  })
+
+  it('still uses Katch-McArdle for a real reading', () => {
+    const real = calculateBaseline({ ...person, bodyFatPct: 24 })
+    expect(real.leanMassKg).toBeCloseTo(55.1, 1)
+    expect(real.bmr).not.toBe(calculateBaseline(person).bmr)
+  })
+})
