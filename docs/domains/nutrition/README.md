@@ -187,6 +187,14 @@ Live at the time of writing (2026-07-30):
 
 ## History
 
+- **[`docs/overview/entries/2026-08-30-nutrition-ui-uplift.md`](../../overview/entries/2026-08-30-nutrition-ui-uplift.md)**
+  — 🆕 **BF-45 / BF-50 / BF-51**: eight surface fixes from two device passes — the macro ring starting
+  at 9 o'clock (`from -90deg` is the SVG idiom; CSS conic gradients already start at the top, and
+  Home's ring had it too), a collapsed meal losing its macros, 4 px bottom-sheet gutters against
+  artboards that say 16, and the Log Food capture row. **⚠ Two items were built, measured and
+  deliberately held** — the meal-photo rework and the builder's back surface. Read BF-46 and BF-51
+  before rebuilding either: the photo picker acquires the image correctly and it reaches nothing,
+  which is probably BF-46 ①(b) itself.
 - **[`docs/overview/entries/2026-08-26-saved-meal-duplicate-detection.md`](../../overview/entries/2026-08-26-saved-meal-duplicate-detection.md)**
   — 🆕 **BF-11d**: saving a meal you already have **asks** instead of adding it again
   ([`meal-duplicate.ts`](../../../components/nutrition/meal-duplicate.ts)). *Close* is two
