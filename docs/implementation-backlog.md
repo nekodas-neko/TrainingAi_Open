@@ -3493,13 +3493,26 @@ bare bpm** — a change that keeps the 7-day average and merely adds a cue besid
 - **Branch:** _unassigned_ · **Added:** 2026-08-26 · owner design: *"from wakeup you start close to 100; then as time goes on it lowers unless you do all parts of what's needed"*
 - **Lane: A** — the score is computed server-side in `packages/shared/src/health/activity-score.ts`
 - **Needs: Q-524** — three step goals are live at once; a pace score makes which one is real load-bearing
-- **⚠ Gate: owner — the sign-off offered on 2026-08-30 does not fit this gate, and it is NOT applied.**
-  This one does not ask *may we change the score*; it asks **what the owner's step goal actually is**,
-  and the mechanic below is sound either way. Measured: the owner's median day is **4,649 steps** and
-  they reach the stored 7,000 on **19 of 60 days — 32%**. A pace-to-goal score against a goal missed
-  two days in three is punishing by construction, which is the entry's title.
-- **The question to put to the owner, in one line:** *is 7,000 the goal you want held to, or should
-  the goal move to something your median day can reach?* Answer that and this becomes buildable.
+- **✅ Gate: owner ANSWERED 2026-08-30 — the goal stays 7,000.** *"7000 was the goal determined by
+  science right… for me personally im happy with that number and would aim to get that."* **Build the
+  pace-to-goal mechanic against 7,000.** The entry's objection — that a goal missed two days in three
+  makes the score punishing — stands as a design constraint on *how* the score behaves, not as a
+  reason to move the goal: the owner has chosen a target they currently miss, deliberately, which is
+  what a target is for. **So the score must read as "behind pace", never as failure**, and the
+  prorated-target design below is what makes that possible.
+- **Provenance, since the owner asked where 7,000 came from: it is not a per-person calculation.** It
+  is the `sedentary` rung of `STEP_GOAL_BY_ACTIVITY` (`sedentary 7000 · light 8500 · moderate 10000 ·
+  active 12000`), keyed off a self-reported activity level. **It happens to be well-chosen anyway** —
+  the mortality curve flattens around 7,000 in the middle-aged data, and the owner's measured activity
+  factor of ≈1.38 comes from *lifting* rather than walking, so a sedentary **step** tier alongside hard
+  training is coherent rather than contradictory. Worth stating in the entry because "the app picked a
+  tier" and "the number is right for this person" are two different claims and only the second is true
+  by accident.
+- ~~**⚠ Gate: owner — the sign-off offered on 2026-08-30 does not fit this gate.**~~ *(Superseded by
+  the answer above; kept one line so the reasoning is traceable — the gate wanted a goal, not an
+  approval, and got one.)*
+  Measured, and still the design constraint: median day **4,649 steps**, reaching 7,000 on **19 of 60
+  days — 32%**.
 - **Also `Needs: Q-524`** — three step goals are live at once, so which one is real is load-bearing
   here and cannot be settled inside this entry.
 
