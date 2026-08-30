@@ -3528,3 +3528,12 @@ length on *why nothing here counts as verification* — no sandbox has a local s
 cannot even be rendered — because "8 of 8 mutations caught" reads like proof and is not proof of
 this. It also names the second smoke case (a food logged on the web, on another day), which is the
 one the filed trace did not cover and the one most likely to be skipped.
+
+## 2026-08-30 — `docs/implementation-backlog.md` 13385 → 13392 (BF-48 lane correction)
+
+Seven lines correcting one field. BF-48 was filed `Lane: A for the search wiring, B for the row`;
+Lane A took it off the queue, went looking for its half and found none. The correction carries the
+four checks that establish that — the route needs no change, the only fetch of it is in a component,
+`ingredient-search.tsx` takes `dbResults` as a prop so the piece to reuse is component state, and the
+mismatch threshold is already shared — because a bare `Lane: B` invites the next Lane A session to
+re-derive the same four greps before believing it.
