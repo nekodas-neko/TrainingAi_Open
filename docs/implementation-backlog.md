@@ -1231,6 +1231,146 @@ real".
 - **Verification:** offline and online, delete a logged food — it goes and stays gone, with no
   reappearance, and a force-close does not bring it back.
 
+### [nutrition][body] 🔵 BF-3 — track dosed substances (GLP-1s, creatine) — the supplements model cannot represent a titrating or weekly drug
+
+> **⚑ URGENT NOW, 2026-08-30 — the owner is about to start retatrutide.** *"im about to start this
+> supplement and I know it will change up my resting HR and other details; so id like it tracked well
+> to correlate."* This entry was filed on 2026-08-23 from a request that named retatrutide by name;
+> it is no longer hypothetical.
+>
+> **⚠ THE COST OF STARTING BEFORE THIS SHIPS IS UNRECOVERABLE, AND IT IS GAP 1 BELOW.** `supplements.dose`
+> is free text on the **definition**, and `supplement_logs` carries no dose at all. So logging a
+> titration with today's model means that when the dose is raised, **every past log silently re-reads
+> at the new dose.** For a drug whose whole story is the escalation schedule, the escalation is
+> exactly what gets destroyed — and it cannot be reconstructed afterwards, because nothing recorded
+> it. There is no workaround inside the app.
+>
+> **What to do in the meantime, stated plainly:** keep the dose and date somewhere outside the app
+> (a note, a spreadsheet) from the first injection. It is a few lines and it is the only copy of the
+> schedule that will survive until the log carries its own amount.
+>
+> **The correlation ask is new and is NOT covered below.** *"id like it tracked well to correlate"* —
+> against resting HR and the rest. The app already has the machinery (`getCorrelations`,
+> `packages/shared/src/health/correlation.ts`, which already correlates sleep/HRV against training),
+> but **a correlation is only as good as the exposure variable**, and the exposure here is
+> *dose on a date*. So this depends on gap 1 rather than being separate work: fix the log, and a
+> substance becomes correlatable with what already exists. Filed as part of this entry, not a new
+> number.
+>
+> **Two constraints that get sharper now, not looser.** The out-of-scope line below stands and is
+> load-bearing: **the app records what was taken and never advises on it** — no dosing guidance, no
+> titration schedules, no interaction checks. And any correlation it surfaces is an observation on
+> n=1 with a dozen confounders; it may be shown as a number the owner reads, never as a claim about
+> cause, per the rule that no LLM- or model-reported figure is presented as fact.
+
+- **Lane:** A — **classified 2026-08-30** (was `Lane: ?`, which kept it out of both runners while it
+  was the urgent item). CLAUDE.md's path rule settles it: it touches storage and a migration, so it
+  is A, engine half first. The logging surface follows as B once the log carries a dose.
+
+**Owner request, 2026-08-23 (verbatim):** *"I'd like to be able to track GLP1 such as retatrutide;
+or any susbtance such as creatine etc. whatever best way to do this would be."*
+
+**The good news first:** `supplements` + `supplement_logs` already exist and are one of the app's
+better-built domains — fully offline-first, with a local table, outbox mutations, a sync-push branch
+and reminders. `app/nutrition/nutrition-content.tsx` is the repo's *reference* offline-first read
+pattern and it reads supplements. Nothing needs inventing; the question is whether the existing model
+stretches, and traced against the schema it does not.
+
+**Three concrete gaps** (`lib/data/postgres/schema.ts:809–831`):
+
+1. **Dose is a free-text field on the *definition*, not on the *log*.** `supplements.dose` is
+   `text`, and `supplement_logs` carries only `(supplementId, logDate)`. So editing the dose
+   **rewrites history**: titrate retatrutide 2 mg → 4 mg → 8 mg and every past log retroactively
+   reads 8 mg. For a drug whose entire clinical story is the escalation schedule, that is the one
+   thing you cannot lose. Dose (amount + unit) has to be stamped on the log.
+2. **One log per day, maximum.** `unique().on(t.supplementId, t.logDate)` makes a log a daily
+   checkbox. Creatine taken morning and evening cannot be recorded twice, and there is no
+   time-of-day on the log at all.
+3. **No cadence — a weekly injection has no representation.** `reminderEnabled` + `reminderTime`
+   (a time-of-day string) is the whole scheduling model, so it is implicitly daily. A weekly GLP-1
+   would either fire a reminder every day or get none, and there is no "next dose due" concept
+   because nothing knows the interval.
+
+**Recommended shape for the planning session, stated so it is not re-derived:** keep one substance
+domain rather than building a parallel "medications" feature beside supplements — the two would
+duplicate the entire offline-first chain (local table, outbox, push branch, pull mapping, reminders)
+for what is the same act of recording that a dose was taken. Extend in place: numeric `amount` +
+`unit` on the **log**, an optional time, and a schedule (interval + anchor date) on the definition.
+Free-text `dose` stays as the display fallback for existing rows.
+
+**Whoever builds it must follow the full offline-first chain in one pass**, per CLAUDE.md — local
+table columns = server payload = `getSyncDelta` output = `pullDelta` mapping = `applyDelta` upsert
+columns, plus the `pushMutations` branch mirroring the web route. Touch points already known:
+`lib/local-store/sqlite-backend.ts:1870`, `lib/local-store/sync-engine.ts:489`,
+`app/api/supplements/route.ts`, `components/nutrition/manage-supplements-sheet.tsx`.
+
+**Out of scope until asked, and worth saying out loud:** the app should record what the owner took,
+not advise on it. No dosing guidance, no interaction checking, no titration schedule generation.
+
+**Done looks like:** a weekly injectable and a twice-daily powder can both be logged with the amount
+actually taken on the day it was taken; changing today's dose leaves last month's logs reading what
+they read before; and a weekly substance's reminder fires weekly.
+
+### [body][devices][platform] BF-58 — the partner's weigh-ins land in the owner's account and are thrown away; two people, one scale
+
+- **Lane:** A — attribution and routing; the consent surface is B.
+- **Added:** 2026-08-30 · owner: *"my partner also used this app and the same scale, how can she
+  connect so she gets her body data to her app. can we both be connected to the scale at once? (she
+  is who I am getting the readings for that are 'is this you')."*
+- **Needs:** BF-53 — the pending buttons are dead in production today, so nothing here is reachable
+  until that ships.
+
+**Two questions, and the code answers both.**
+
+**1. Can both phones connect at once? Almost certainly not, and the app is built on that assumption.**
+The reading does not come from the advertisement — `ScaleBleScanManager` uses the advertisement only
+to *wake* the app, and `ScaleBleService` then opens a **GATT connection** (`ScaleGattClient`) to read
+the frame. A consumer BLE scale of this class normally accepts one GATT connection at a time, so two
+phones would race and the loser would get nothing. **That is an assumption from the protocol shape,
+not a measurement — it needs one on-device test before any design depends on it** (pair both phones,
+step on the scale, see whether one, both or neither receives a frame).
+
+**2. Where do her readings go now? Into the owner's account, then the bin.** The scale is paired to
+one user. Every frame is attributed to that user; a weight more than `SCALE_WEIGHT_ANOMALY_PCT`
+(15%) from their last confirmed reading is staged **pending** rather than saved — and
+`composition.ts:11` says why in as many words: *"owner's partner also uses this scale"*. The `Not
+me` button then **discards** it. So the app already detects her, already asks, and already knows the
+answer — and then destroys the reading. Every weigh-in she has ever taken on it is gone.
+
+**Three ways to fix it, and they are not close.**
+
+| | Shape | Verdict |
+|---|---|---|
+| **A** | Both phones pair; whoever wins the connection gets the reading | **No.** Racy by construction, and probably impossible on one connection. Silent data loss for whoever loses. |
+| **B** | One phone owns the scale; a `Not me` reading is **offered to a linked household member** | **Recommended.** Needs no second connection, reuses the pending flow that already exists, and is the only shape where her data reliably reaches her. |
+| **C** | She uses the Renpho app | Zero work, and her data never enters this app. The honest baseline to compare against. |
+
+**Why B, in one line:** the hard part — detecting that a reading is not the owner's — is already
+built and working. What is missing is a destination for the answer.
+
+**⚠ This is the app's first cross-account data path, and it must be built as one.** Every rule in
+this repo assumes `user_id` scoping and a single owner. Requirements:
+- **Two-way consent.** A link is accepted by both accounts, and either can break it. Never inferred
+  from a shared device.
+- **The reading moves, it does not copy.** A weigh-in belongs to one person. Attribute or discard.
+- **The offer carries a weight and nothing else.** Her phone should not receive the owner's history
+  to work out which readings are hers, and nothing about her should reach his account beyond the
+  fact that a pending row was claimed.
+- **Ownership checks still apply at every write** (CLAUDE.md's write-path discipline) — a linked
+  account is not a shared account.
+- **Play Store bearing:** this makes the app genuinely multi-user with health data crossing between
+  accounts, which is exactly what the declared-use-case review looks at. Worth the owner knowing
+  before it is built, not after.
+
+- **Gate: owner** — B is a product decision (household linking) with a privacy surface, and C is a
+  legitimate answer. **Also needs the one-connection test above**, which is a device job.
+- **Interim, and worth saying:** until this ships, her readings are lost the moment they are
+  dismissed. If she wants that data, the Renpho app is the only place it currently survives.
+- **Verification:** a reading the owner marks `Not me` appears as a claimable weigh-in on the linked
+  account, with its impedance-derived composition intact; claiming it removes it from the owner's
+  pending list; neither account can see the other's history; and breaking the link stops the flow
+  both ways.
+
 ### [nutrition] BF-48 — "Single foods" searches only what you have logged, so the food database is unreachable from Log Food
 
 - **Lane:** **B — all of it.** (Corrected 2026-08-30 from *"A for the search wiring, B for the row"*.
@@ -13304,54 +13444,6 @@ intake traced it, it did not design it.
 **Done looks like:** a week-in-review page reachable from the notification and from a permanent
 Health entry point, drawing its charts from values the route returned rather than from parsed prose,
 with the recap week visibly compared against the one before it.
-
-### [nutrition][body] 🔵 BF-3 — track dosed substances (GLP-1s, creatine) — the supplements model cannot represent a titrating or weekly drug
-
-- Lane: ? — schema + sync push is A, the logging surface is B; needs a migration (**Lane A**)
-
-**Owner request, 2026-08-23 (verbatim):** *"I'd like to be able to track GLP1 such as retatrutide;
-or any susbtance such as creatine etc. whatever best way to do this would be."*
-
-**The good news first:** `supplements` + `supplement_logs` already exist and are one of the app's
-better-built domains — fully offline-first, with a local table, outbox mutations, a sync-push branch
-and reminders. `app/nutrition/nutrition-content.tsx` is the repo's *reference* offline-first read
-pattern and it reads supplements. Nothing needs inventing; the question is whether the existing model
-stretches, and traced against the schema it does not.
-
-**Three concrete gaps** (`lib/data/postgres/schema.ts:809–831`):
-
-1. **Dose is a free-text field on the *definition*, not on the *log*.** `supplements.dose` is
-   `text`, and `supplement_logs` carries only `(supplementId, logDate)`. So editing the dose
-   **rewrites history**: titrate retatrutide 2 mg → 4 mg → 8 mg and every past log retroactively
-   reads 8 mg. For a drug whose entire clinical story is the escalation schedule, that is the one
-   thing you cannot lose. Dose (amount + unit) has to be stamped on the log.
-2. **One log per day, maximum.** `unique().on(t.supplementId, t.logDate)` makes a log a daily
-   checkbox. Creatine taken morning and evening cannot be recorded twice, and there is no
-   time-of-day on the log at all.
-3. **No cadence — a weekly injection has no representation.** `reminderEnabled` + `reminderTime`
-   (a time-of-day string) is the whole scheduling model, so it is implicitly daily. A weekly GLP-1
-   would either fire a reminder every day or get none, and there is no "next dose due" concept
-   because nothing knows the interval.
-
-**Recommended shape for the planning session, stated so it is not re-derived:** keep one substance
-domain rather than building a parallel "medications" feature beside supplements — the two would
-duplicate the entire offline-first chain (local table, outbox, push branch, pull mapping, reminders)
-for what is the same act of recording that a dose was taken. Extend in place: numeric `amount` +
-`unit` on the **log**, an optional time, and a schedule (interval + anchor date) on the definition.
-Free-text `dose` stays as the display fallback for existing rows.
-
-**Whoever builds it must follow the full offline-first chain in one pass**, per CLAUDE.md — local
-table columns = server payload = `getSyncDelta` output = `pullDelta` mapping = `applyDelta` upsert
-columns, plus the `pushMutations` branch mirroring the web route. Touch points already known:
-`lib/local-store/sqlite-backend.ts:1870`, `lib/local-store/sync-engine.ts:489`,
-`app/api/supplements/route.ts`, `components/nutrition/manage-supplements-sheet.tsx`.
-
-**Out of scope until asked, and worth saying out loud:** the app should record what the owner took,
-not advise on it. No dosing guidance, no interaction checking, no titration schedule generation.
-
-**Done looks like:** a weekly injectable and a twice-daily powder can both be logged with the amount
-actually taken on the day it was taken; changing today's dose leaves last month's logs reading what
-they read before; and a weekly substance's reminder fires weekly.
 
 ### [nutrition][body] 🔵 BF-1 — import blood panel results as a nutrition baseline, de-identified
 

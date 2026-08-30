@@ -3704,3 +3704,24 @@ conclusion rather than to describe the change: that the counters start empty fro
 read in the first hours means nothing, and that BF-19 already measured the database and it is not
 where the reported slowness is. Without them the next session reads a clean `pg_stat_statements` and
 closes the slow-load question on it, which is the mistake the entry itself warned about.
+
+## 2026-08-30 — `docs/implementation-backlog.md` raised (BF-58, and BF-3 becomes urgent)
+
+Two owner asks, one new entry.
+
+**BF-3 was already the right entry for retatrutide** — filed 2026-08-23 from a request naming the
+drug — but it was `Lane: ?`, which kept it out of *both* runners while being the time-critical item.
+Classified A and promoted, with the part that matters added: the owner is about to start, and
+`supplements.dose` being free text on the definition means raising a dose **silently rewrites every
+past log**. For a titrating drug the escalation schedule is the whole record, and nothing in the app
+would preserve it. The note says to keep the dose and date outside the app until the log carries its
+own amount, because there is no in-app workaround. The correlation ask is folded in rather than given
+a number: correlation machinery already exists, and it is useless without dose-on-a-date.
+
+**BF-58** is the partner's weigh-ins. Traced: the reading arrives over a **GATT connection**, not the
+advertisement, so two phones almost certainly cannot both receive one — flagged as an assumption
+needing a device test rather than asserted. Her readings already land in the owner's account, are
+already detected as not-his by the 15% anomaly gate whose comment names her, and are then **discarded
+by `Not me`**. The hard half is built; what is missing is a destination. Recommended shape is a
+consented household link that routes a dismissed reading to her account. It would be the app's first
+cross-account data path, so the entry states the consent, move-not-copy and ownership rules up front.
