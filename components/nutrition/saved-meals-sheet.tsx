@@ -2,7 +2,7 @@
 
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useState } from 'react'
 import { useUserTimezone } from '@/components/shell/user-timezone-provider'
-import { Plus, Trash2, Loader2, CheckSquare, Camera } from 'lucide-react'
+import { Plus, Trash2, Loader2, Camera } from 'lucide-react'
 import { toast } from 'sonner'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { Button } from '@/components/ui/button'
@@ -486,10 +486,10 @@ export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate,
         {/* Title alone on the top row so the close ✕ has the corner to itself; the actions get
             their own full-width row below. Squeezing "Select" and "New Meal" in beside the title
             left them jammed against the ✕ and each button too narrow to read comfortably. */}
-        <SheetHeader className="px-1 pb-0 shrink-0">
+        <SheetHeader className="px-4 pb-0 shrink-0">
           {tab === 'meals' ? (
             <SheetTitle>
-              {selectedIds ? `${selectedIds.size} selected` : 'Log Food'}
+              {selectedIds ? `${selectedIds.size} to delete` : 'Log Food'}
             </SheetTitle>
           ) : (
             <MealBuilderHeader
@@ -511,9 +511,9 @@ export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate,
           // renders these children while idle and takes the whole screen once a capture starts, so
           // the tabs cannot be left showing behind a half-open camera.
           <CaptureActions onScanResult={onScanResult} onManual={onManual} onScannedSavedMeal={onScannedSavedMeal}>
-            <SegmentedTabs tabs={LIST_TABS} value={listTab} onValueChange={changeListTab} size="xs" className="shrink-0 px-1" />
+            <SegmentedTabs tabs={LIST_TABS} value={listTab} onValueChange={changeListTab} size="xs" className="shrink-0 px-4" />
             {listTab === 'meals' && (
-              <div className="flex shrink-0 gap-2 px-1">
+              <div className="flex shrink-0 gap-2 px-4">
                 {selectedIds ? (
                   <>
                     <Button
@@ -540,13 +540,21 @@ export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate,
                         close ✕ is `absolute top-4 right-4` and owns that corner — so the pills keep
                         their own row and take the drawing's weight instead of its position. */}
                     <span className="flex-1" />
+                    {/* BF-50 ④: *"There is a 'select' button that lets you select more than one
+                        meal; but then you cant do anything with it except delete."* Correct — the
+                        only action this mode has ever offered is Delete. The entry allowed either
+                        adding a second action or **saying what the mode is**, and this is the
+                        second: multi-log is not a smaller change wearing a label, because logging
+                        a saved meal needs a meal type and a portion per meal, and picking those
+                        for N meals is a screen rather than a button. Naming the mode is honest
+                        today and costs nothing if that screen is built later. */}
                     {meals.length > 1 && (
                       <Button
                         variant="secondary" size="sm" className="min-h-[44px] rounded-full px-4 gap-1.5"
                         onClick={() => setSelectedIds(new Set())}
                       >
-                        <CheckSquare className="w-4 h-4" />
-                        Select
+                        <Trash2 className="w-4 h-4" />
+                        Delete meals
                       </Button>
                     )}
                     <Button onClick={() => openBuild()} size="sm" className="min-h-[44px] rounded-full px-4 gap-1.5">
@@ -557,7 +565,7 @@ export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate,
                 )}
               </div>
             )}
-            <div className="flex-1 overflow-y-auto px-1 space-y-3">
+            <div className="flex-1 overflow-y-auto px-4 space-y-3">
               {confirmBulkDelete && selectedIds && (
                 <BulkDeleteConfirm
                   count={selectedIds.size}
@@ -594,7 +602,7 @@ export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate,
             {candidates ? (
               // Replaces the body AND the footer: while this is up the choice is which dishes to
               // save, so the build form's own Save button would be answering a different question.
-              <div className="flex-1 overflow-y-auto px-1 pb-2">
+              <div className="flex-1 overflow-y-auto px-4 pb-2">
                 <RecipeCandidates
                   candidates={candidates}
                   duplicateNames={candidateDuplicates}
@@ -605,7 +613,7 @@ export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate,
               </div>
             ) : (
             <>
-            <div className="flex-1 overflow-y-auto px-1 space-y-4 pb-2">
+            <div className="flex-1 overflow-y-auto px-4 space-y-4 pb-2">
               <MealBatchSize
                 servings={mealServings}
                 onChange={setMealServings}
@@ -697,7 +705,7 @@ export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate,
             </div>
 
             {duplicateOf && (
-              <div className="shrink-0 px-1 pb-2">
+              <div className="shrink-0 px-4 pb-2">
                 <DuplicateMealPrompt
                   existingName={duplicateOf.name}
                   saving={saving}

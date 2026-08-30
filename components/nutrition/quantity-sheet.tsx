@@ -46,7 +46,7 @@ export function QuantitySheet({
   return (
     <Sheet open={item != null} onOpenChange={o => { if (!o) onClose() }}>
       <SheetContent side="bottom">
-        <SheetHeader className="px-1 pb-0">
+        <SheetHeader className="px-4 pb-0">
           <p className="truncate text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
             Ingredient {index} of {total} · {mealName || 'this meal'}
           </p>

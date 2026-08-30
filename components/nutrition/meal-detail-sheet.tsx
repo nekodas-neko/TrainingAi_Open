@@ -79,7 +79,7 @@ export function MealDetailSheet({
       {/* Nothing has ever been opened yet — the very first render, before any row is tapped. */}
       {shown && (
       <SheetContent side="bottom" className="flex h-[92vh] flex-col" hideCloseButton>
-        <SheetHeader className="shrink-0 px-1 pb-0">
+        <SheetHeader className="shrink-0 px-4 pb-0">
           <div className="flex items-center gap-2">
             <button onClick={close} aria-label="Back" className="-ml-1.5 rounded-lg p-2.5 text-muted-foreground">
               <ChevronLeft className="h-5 w-5" />
@@ -94,7 +94,7 @@ export function MealDetailSheet({
           </div>
         </SheetHeader>
 
-        <div className="flex-1 overflow-y-auto px-1">
+        <div className="flex-1 overflow-y-auto px-4">
           {/* The hero. A meal with a photo shows it; one without gets the affordance that says where
               photos come from — the builder, which already owns the picker and the size cap (Q-327).
               A second picker here would be a second write path to the same column. */}

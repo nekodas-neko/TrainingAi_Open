@@ -33,10 +33,13 @@ interface Props {
 export const MealBuilderFooter = memo(function MealBuilderFooter({
   hasIngredients, batchKcal, protein, carbs, fat, servings, saving, editing, canSave, onSave,
 }: Props) {
+  // `px-4` matches the scrolling body above it (BF-45 ③): the footer is a sibling of that
+  // container, not a child, so it does not inherit the gutter — the Save button ran to the sheet's
+  // edge while the ingredients it saves sat 16px in.
   return (
-    <div className="flex shrink-0 flex-col gap-2.5 border-t border-border pt-2.5">
+    <div className="flex shrink-0 flex-col gap-2.5 border-t border-border px-4 pt-2.5">
       {hasIngredients && (
-        <div className="flex items-baseline gap-2.5 px-1">
+        <div className="flex items-baseline gap-2.5">
           <span className="text-[10px] font-semibold uppercase tracking-[0.04em] text-muted-foreground">
             Batch
           </span>
