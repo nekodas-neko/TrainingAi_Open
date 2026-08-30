@@ -3739,3 +3739,14 @@ The second is that the one real candidate, at 18 MB, is the keyset index for a m
 deliberately kept** on the stated ground that *"it costs nothing at runtime"*. Reversing part of a
 signed-off decision needs the decision quoted and the new number beside it, or the next reader is
 choosing between two sentences with no evidence attached to either.
+
+## 2026-08-30 — `projectOverview.md` 8367 → 8381, `docs/implementation-backlog.md` 13749 → 13639 (BF-53 fixed, LA-39 closed)
+
+The backlog **shrinks 110**: BF-53 collapses to a `Keep:` for the device check and LA-39 leaves
+entirely, an hour after it was filed — the owner ran the grant and the query text is live.
+
+`projectOverview.md` +14, two Current Status paragraphs. BF-53's says what the buttons did rather
+than naming the guard, because "a bigserial validated as a uuid" describes a line of code and the
+finding is that a feature was dead in production. LA-39's is five lines and closes itself in the same
+breath it opens, which is the shape a same-day resolution should take here — the alternative is a
+Known-Issues row filed and struck within the hour.
