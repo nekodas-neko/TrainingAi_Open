@@ -1119,6 +1119,7 @@ history, and a query built with an inlined literal anywhere would show it.
 - **What would count as fixed:** the same query returns real SQL text in `query`. Until then BF-21 is
   shipped-but-not-useful, and this entry is why.
 
+
 ### [nutrition] BF-48 — "Single foods" searches only what you have logged, so the food database is unreachable from Log Food
 
 - **Lane:** **B — all of it.** (Corrected 2026-08-30 from *"A for the search wiring, B for the row"*.
@@ -1984,39 +1985,6 @@ recommendations that were put to them. Do not re-open either.**
   rounding error on today's data; whether route 2 or route 3 carries the rest is the real question,
   and it is the one the next bullet says cannot be answered from the column.
 
-### [devices][platform] BF-54 — the BLE console prints planner estimates as row counts, and its bloat verdict is built on them
-
-- **Lane:** A — `lib/data/postgres/slices/oura.ts:1593` and `:1706`.
-- **Added:** 2026-08-30 · from the owner's D2/D5 screenshots, then measured against production.
-
-**The console's DB footprint reads `n_live_tup AS rows`** (`:1593`). CLAUDE.md already documents that
-counter as a planner estimate maintained by autovacuum, with `last_analyze` NULL on every table here.
-**Measured against production the same day, and the gap is not marginal:**
-
-| Table | Console / `n_live_tup` | Real `count(*)` | Under-read |
-|---|---|---|---|
-| `oura_raw_samples` | **552** (shown as 297 on the owner's screen) | **180,415** | **327×** |
-| `rr_intervals` | **0** | **87,015** | ∞ |
-| `error_events` | **1** | **6,102** | 6,102× |
-
-*(counts are `claude_ro`, so owner-scoped — they are floors, which only makes the gap worse.)*
-
-**The display is the smaller half. `:1706` uses the same counter to justify a VACUUM FULL**, and its
-own comment states the reasoning: *"A huge `before` against a handful of live rows is the signature
-of pure bloat."* Against `oura_raw_samples` that reads 67 MB against 552 rows and says *pure bloat* —
-when the table holds **180,415 real rows**. Acting on it takes an **ACCESS EXCLUSIVE lock** on a
-67 MB table, with the timeouts deliberately lifted, and reclaims nothing.
-
-- **Fix:** `count(*)` for anything presented as a row count, and for the reclaim's before/after.
-  Where an exact count is too expensive, label the number an estimate on screen — the defect is a
-  guess wearing a count's clothes.
-- **The console already has a real count on the same screen**: *"Rows still carrying decoded
-  0 / 180,160"* sits directly above a table list saying 297. One screen, two numbers, three orders of
-  magnitude apart.
-- **Sibling sweep:** grep for `n_live_tup` anywhere a number reaches a user or gates an action.
-- **Verification:** the footprint's counts match `count(*)`, and the reclaim reports a live-row figure
-  that does too.
-
 ### [platform] BF-55 — 84 MB of index against 63 MB of table, and the database is growing ~7× its expected trend
 
 - **Lane:** A
@@ -2041,6 +2009,51 @@ carries 7,333 dead tuples, which is real but small against 180,415 live rows.
 - **First move is measurement, not a VACUUM.** List the indexes on `oura_raw_samples` and
   `oura_heartrate` with their sizes and `idx_scan` from `pg_stat_user_indexes`; an index never
   scanned is a candidate to drop, and dropping one is cheaper and safer than REINDEX.
+
+**✅ THAT MEASUREMENT IS DONE — 2026-08-30, against production. It found one 18 MB answer and
+falsified the rule it was taken under.**
+
+| Table | Index | `idx_scan` | Size |
+|---|---|---|---|
+| `oura_heartrate` | **`oura_heartrate_user_updated`** | **0** | **18 MB** |
+| `oura_raw_samples` | `…_user_id_ring_timestamp_ds_tag_body_hex_key` | 3,546 | 17 MB |
+| `oura_raw_samples` | `oura_raw_samples_user_tag_ts` | 251 | 15 MB |
+| `oura_heartrate` | `oura_heartrate_user_id_timestamp_key` | 5,991 | 9.4 MB |
+| `oura_raw_samples` | `oura_raw_samples_pkey` | 3,618 | 5.3 MB |
+| `oura_heartrate` | `oura_heartrate_pkey` | 0 | 4.4 MB |
+| `rr_intervals` | `rr_intervals_user_id_at_key` | 0 | 3.5 MB |
+| `rr_intervals` | `rr_intervals_pkey` | 0 | 3.5 MB |
+
+**⚠ "Never scanned is a candidate to drop" is wrong for three of those four zeros, and this entry
+said it.** `idx_scan` counts **reads**, not constraint enforcement. `oura_heartrate_pkey`,
+`rr_intervals_pkey` and `rr_intervals_user_id_at_key` are PRIMARY KEY / UNIQUE indexes: they are
+consulted on **every insert** to reject a duplicate, and that work is invisible to this counter.
+Dropping one drops the constraint. They are not candidates.
+
+**The one real candidate is the largest index in the database, and it belongs to a decision that
+predates this measurement.** `oura_heartrate_user_updated` is
+`(user_id, updated_at, id)` from migration 130 — the keyset-pagination index for
+`getOuraTimeseriesDelta`, whose own doc comment records **Q-180 (decided 2026-08-14)**: the method
+has no production caller, and is kept deliberately because intraday HR reaches a fresh device by no
+other path, the server is the archive, and — in as many words — *"It costs nothing at runtime."*
+
+**It does not cost nothing.** It is **18 MB of the database's 84 MB of index — 21 % — for a code path
+nothing calls**, plus write amplification on every HR insert, which is the highest-volume write in
+the app (87,021 rows today). Q-180 weighed the *method*; the index was never in that accounting, and
+it is 2× the heap of the table it sits on (`oura_heartrate`: 32 MB of index on 9 MB of data).
+
+- **Gate: owner** — this reverses part of a decision the owner signed off, so it is theirs.
+  **Recommendation: drop it, and say in `getOuraTimeseriesDelta`'s comment that the restore driver
+  must recreate it.** Reversal is one `CREATE INDEX` over 9 MB of heap — seconds — and the driver
+  that needs it does not exist yet, so nothing can regress in the meantime. Keeping it costs 18 MB
+  and every insert, indefinitely, for a path with no caller.
+- **The alternative** is keeping it so the restore driver finds its index waiting, which is what
+  Q-180 chose. That is defensible if the driver is imminent; it has not been written in the two weeks
+  since, and the index is 21 % of the index budget this entry was opened about.
+
+**Sizes re-confirmed the same day: 206 MB total, 63 MB heap, 84 MB index** — the 1.33× the entry
+opened on, unchanged.
+
 - **Cost check before anyone panics:** at Railway's $0.15/GB/month this whole database is about
   **three cents a month**. The reason to act is that a 7× trend compounds, not that the bill hurts.
 - **Verification:** index total drops below the heap total, and a re-read a week later shows growth
