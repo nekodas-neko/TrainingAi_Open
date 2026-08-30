@@ -3750,3 +3750,15 @@ than naming the guard, because "a bigserial validated as a uuid" describes a lin
 finding is that a feature was dead in production. LA-39's is five lines and closes itself in the same
 breath it opens, which is the shape a same-day resolution should take here — the alternative is a
 Known-Issues row filed and struck within the hour.
+
+## 2026-08-30 — `docs/implementation-backlog.md` (nutrition to the top, re-derived from current main)
+
+Replaces an earlier attempt that had gone stale. A reordering branch carries a full copy of every
+entry it moved, so the longer it stays open the more of those copies rot — and on this repo `main`
+moves every few minutes. That branch had already come within one merge of **resurrecting BF-54 after
+it shipped and reverting BF-55 to its pre-fix text**, both caught only by diffing each moved entry
+against `main` rather than trusting the conflict resolution.
+
+Re-deriving the move from current `main` in one pass removes the whole class: nothing is carried, so
+nothing can be stale. **The lesson for the next reorder: do it in one commit against fresh `main` and
+merge it the same minute, or expect to hand-verify every moved entry.**
