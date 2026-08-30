@@ -531,12 +531,54 @@ export async function listRecentFoodItemsForMealType(db: Db, userId: string, mea
 
 // ── Saved Meals ────────────────────────────────────────────────────────────────
 
+/**
+ * Saved meals, most-recently-EATEN first (BF-39's follow-up; Q-395c filed the absence).
+ *
+ * `lastUsedAt` is **derived on read** from `max(food_logs.logged_at)`, never stored. Every stored
+ * counter in this project has drifted (CLAUDE.md, Stored Counters), and a "last used" column is the
+ * same shape: it needs a write on every log, an un-write on every delete, and it is wrong forever if
+ * either is missed. `idx_food_logs_saved_meal_recent` (migration 238) is the index this reads.
+ *
+ * The ordering is `lastUsedAt DESC NULLS LAST, createdAt DESC` — a meal never eaten falls back to
+ * where it was before this existed rather than to the bottom of nowhere, so a newly saved meal is
+ * still near the top while it waits to be used.
+ */
 export async function listSavedMeals(db: Db, userId: string): Promise<SavedMeal[]> {
-  const meals = await db.select().from(s.savedMeals)
+  const rows = await db.select().from(s.savedMeals)
     .where(eq(s.savedMeals.userId, userId))
     .orderBy(desc(s.savedMeals.createdAt))
 
-  if (meals.length === 0) return []
+  if (rows.length === 0) return []
+
+  // One grouped read rather than a correlated subquery repeated in SELECT and ORDER BY. The sort
+  // then happens in JS, so the rule that decides the order exists once — the same reason every
+  // other formula in this repo has one home.
+  //
+  // `eq(userId)` as well as the meal-id filter, deliberately: the FK does not stop a row owned by
+  // someone else naming this meal, and matching on the id alone would both mis-sort and leak when
+  // they ate.
+  const lastUsed = new Map<string, Date>()
+  for (const r of await db.select({
+    mealId: s.foodLogs.savedMealId,
+    at: sql<Date>`max(${s.foodLogs.loggedAt})`,
+  }).from(s.foodLogs)
+    .where(and(
+      eq(s.foodLogs.userId, userId),
+      inArray(s.foodLogs.savedMealId, rows.map(m => m.id)),
+      isNull(s.foodLogs.deletedAt),
+    ))
+    .groupBy(s.foodLogs.savedMealId)) {
+    if (r.mealId && r.at) lastUsed.set(r.mealId, new Date(r.at))
+  }
+
+  const meals = rows
+    .map(m => ({ ...m, lastUsedAt: lastUsed.get(m.id) ?? null }))
+    // NULLS LAST, then the createdAt order the query already applied — **which works because
+    // `Array.prototype.sort` is stable** (guaranteed since ES2019). Ties keep the order they arrived
+    // in, so the `ORDER BY created_at DESC` above IS the secondary sort and does not need repeating.
+    // A meal never eaten therefore stays where it sat before this existed, rather than dropping out
+    // of sight while it waits to be used.
+    .sort((a, b) => (b.lastUsedAt?.getTime() ?? -1) - (a.lastUsedAt?.getTime() ?? -1))
 
   const mealIds = meals.map(m => m.id)
   const itemRows = await db.select({
@@ -587,6 +629,7 @@ export async function listSavedMeals(db: Db, userId: string): Promise<SavedMeal[
     return {
       id: m.id, userId: m.userId, name: m.name, servings: m.servings,
       imageDataUri: m.imageDataUri ?? null, createdAt: m.createdAt,
+      lastUsedAt: m.lastUsedAt ?? null,
       mealTypeIds: tagRows.filter(r => r.mealId === m.id).map(r => r.typeId),
       items, totals,
     }

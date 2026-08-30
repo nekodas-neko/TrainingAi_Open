@@ -1490,8 +1490,10 @@ the match. `Gate: owner` when it is next picked up.
   changed and every existing query is untouched. What is owed:
   - **Lane B:** the diary draws one collapsed parent row per `mealGroupId`, carrying the meal's name
     and photo, expanding to the ingredients and their macro split. Both halves, per the re-report.
-  - **Lane A (small):** true MRU for My Foods — `max(logged_at)` per `saved_meal_id`, which
-    `idx_food_logs_saved_meal_recent` exists for. Derived on read, never a stored counter.
+  - ~~**Lane A (small):** true MRU for My Foods~~ — **shipped 2026-08-30.** `listSavedMeals` returns
+    `lastUsedAt` (`max(logged_at)` per `saved_meal_id`, user-scoped, deleted logs excluded) and
+    orders most-recently-eaten first, never-eaten last in their existing `createdAt` order. Derived
+    on read, never a stored counter.
   - **Nothing back-fills.** Meals logged before 2026-08-30 have both columns NULL and will keep
     rendering as loose ingredients; there is no way to recover which rows belonged together.
 - **Added:** 2026-08-26 · owner: *"the meal is a complete in 'saved meal' and it can have a picture
