@@ -3846,3 +3846,21 @@ the log now" reads as a feature the owner has to go and configure before their h
 is the opposite of what shipped. The second is the **v32** device warning: a local SQLite migration is
 the highest-risk change this repo makes, and a paragraph announcing a fix without saying it is
 unverified on the phone is how a Known-Issues row gets skipped.
+
+## 2026-08-30 — `docs/implementation-backlog.md` (gate audit: three stale owner gates)
+
+Small. Asked which entries were waiting on him, the owner turned out to be waiting on three he had
+already dealt with:
+
+- **BF-4** — the photo scan was run during the device pass (~4 s, no complaint), which is not the
+  slowdown the entry was filed about. Gate cleared, with the instruction to close it as *stopped*
+  rather than *fixed*, since no diff was traced to it.
+- **LB-18** — answered on the device the same day, and the answer was written *above* the `Gate:`
+  line while the line itself survived. **A cleared gate has to be struck in the field, not narrated
+  next to it, because the runner reads the field.**
+- **Q-388** — void rather than answered. It asked the owner to choose SpO₂ on or off; he refused the
+  question and was right to, since SpO₂ was equally on under stock firmware at a quarter the drain.
+  Re-marked as blocked on a device reading (S9), not on a decision.
+
+The LB-18 case is the reusable one: an owner gate can be answered in prose and stay closed to the
+tools, which makes it indistinguishable from an unanswered one at a glance.

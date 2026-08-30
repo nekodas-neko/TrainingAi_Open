@@ -2750,7 +2750,9 @@ place to start rendering pictures.
   7 pm and being shown what you usually eat at dinner beats a global list topped by breakfast
   coffee. What settles it is use, and the device pass is where that shows up — so this stays parked
   behind the LB-16/BF-37 device run rather than being scheduled on its own.
-- **Gate:** owner
+- **✅ Gate: owner CLEARED 2026-08-30** — answered on the device (see the note above: make `Recent`
+  global). *The field outlived its answer for a day; a cleared gate has to be struck in the field,
+  not only narrated above it, because the runner reads the field.*
 
 ### [nutrition] BF-11 — the meal creator/planner redesign: the spec every phase reads, and the final checkpoint
 
@@ -4646,7 +4648,11 @@ design decision. See the correction at the top of that entry.
 ### [nutrition][platform] 🟠 BF-4 — the photo scan feels slower; every hypothesis is measured, one scan settles it
 
 - **Lane:** A
-- **Gate:** owner — **one photo scan** (Nutrition → add food → camera, not barcode).
+- **✅ Gate: owner CLEARED 2026-08-30 — the scan was run** (device queue S8). Owner: *"took about
+  4 seconds from analysing photo"*, reported without complaint. **Four seconds is not the slowdown
+  this entry was filed about**, so close it against the measured `ai_call_log` figures rather than
+  building anything — and say in the closing note that it stopped rather than that it was fixed,
+  since no diff was ever traced to it.
 - **Branch:** `perf/scan-latency` · **Added:** 2026-08-23 from an owner report · re-measured 2026-08-25.
 - **📄 The full investigation is
   [`docs/reviews/2026-08-25-nutrition-scan-latency.md`](reviews/2026-08-25-nutrition-scan-latency.md)** —
@@ -6777,7 +6783,11 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 ### [devices][heart-rate] Q-388 — the ring runs SpO₂ permanently at ~3.5× stock drain; the decision is binary
 
 - **Lane:** A
-- **Gate:** owner — see the decision below.
+- **⚠ Gate: owner — VOID AS WRITTEN, not answered.** It asked the owner to choose SpO₂ on or off;
+  they refused the question and were right to (*"It was on on the oura ring software too and it
+  wasnt this bad"*). **There is nothing for the owner to decide until the measurement below is
+  redone on the current APK** — which is device queue **S9**. Treat this as blocked on a device
+  reading, not on a decision.
 - **Branch:** `fix/ring-measurement-power-budget` · **Added:** 2026-08-17 from an owner report
   (*"it loses about 20% over night… requires a long charge every 2 days"*).
 - **📄 The full investigation is
