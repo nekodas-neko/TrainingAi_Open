@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { fitWithin, base64FromDataUrl } from '../downscale-image'
+import { fitWithin, base64FromDataUrl, dataUrlToBlob } from '../downscale-image'
 
 describe('fitWithin (BF-4)', () => {
   /**
@@ -49,5 +49,35 @@ describe('base64FromDataUrl', () => {
     // `split(',')[1]` — the shape this replaced — would truncate at a comma inside the payload.
     // Base64 has no comma in its alphabet, but the prefix does when a charset is declared.
     expect(base64FromDataUrl('data:image/jpeg;charset=utf-8;base64,QUJD')).toBe('QUJD')
+  })
+})
+
+describe('dataUrlToBlob (BF-46 ①)', () => {
+  /**
+   * The reason this function exists at all: `await fetch(dataUrl)` is the obvious way to turn a
+   * data URL into a Blob, and a `fetch()` of a `data:` URL is governed by **`connect-src`** — which
+   * this app's CSP does not open to `data:`. `MealPhotoTile` did exactly that on the native branch
+   * and nowhere else, so every browser test passed while choosing a meal photo on the phone did
+   * nothing, three owner reports running.
+   */
+  it('decodes base64 to the right bytes, with the declared type', async () => {
+    const blob = dataUrlToBlob('data:image/webp;base64,AAECA/8=')
+    expect(blob.type).toBe('image/webp')
+    expect([...new Uint8Array(await blob.arrayBuffer())]).toEqual([0, 1, 2, 3, 255])
+  })
+
+  it('keeps a charset out of the MIME type, so the Blob is not typed "image/png;base64"', () => {
+    expect(dataUrlToBlob('data:image/png;base64,AAA=').type).toBe('image/png')
+  })
+
+  it('handles a percent-encoded, non-base64 data URL', async () => {
+    const blob = dataUrlToBlob('data:text/plain,hello%20world')
+    expect(await blob.text()).toBe('hello world')
+    expect(blob.type).toBe('text/plain')
+  })
+
+  it('refuses anything that is not a data: URL rather than returning empty bytes', () => {
+    expect(() => dataUrlToBlob('https://example.com/x.png')).toThrow(/data: URL/)
+    expect(() => dataUrlToBlob('data:image/png;base64')).toThrow(/data: URL/)
   })
 })
