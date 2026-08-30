@@ -3,103 +3,117 @@
 > **Successor sessions are titled `🚧 Implementation Agent (B) 🟢`** — exactly. A renamed successor
 > is a lost thread.
 
-**Updated:** 2026-08-30 · **By:** the sixteenth Lane B run · **Next ID:** `LB-26`
+**Updated:** 2026-08-30 · **By:** the seventeenth Lane B run · **Next ID:** `LB-30`
 
 ## Now
-Merged this run: **#587** (Q-112a, one door for the day review), **#590** (three stranded e2e
-assertions), **#592** (Q-112b, the read-through inside the wrap-up), **#595** (LB-19's premise
-replaced). Filed: **LB-23**, **LB-24**, **LB-25**. Open: the `Reference:` field PR (LB-22).
+Merged: **#628** (LB-26), **#633**, **#640** (BF-45 ⑤), **#631** (Q-392), **#641** (BF-46 ①b),
+**#642** (BF-46 ② ③). Open, queued to merge on green: **#643** (BF-46 ①a), **#644** (BF-39).
+Filed: **LB-27**, **LB-28**, **LB-29**.
 
-**Lane B's nutrition queue is finished.** The artboard-parity set (BF-24, BF-26, BF-29/30/31, LB-16)
-has shipped or sits on a device gate; the Q-112 chain hands to Lane A at **Q-112c**, which blocks
-Q-112d and Q-112e; **Q-524** is tagged `[nutrition]` and reaches four `app/api` routes, so it is
-Lane A by the path rule; **LB-25** (body temperature has no route at all) is Lane A.
+**The whole `nutrition-ui-uplift` batch is shipped** — BF-24, BF-45, BF-46, BF-51 ①②④, BF-39 — **and
+every one owes the same single thing: the on-device pass.** That is this lane's binding constraint,
+not a queue of unwritten code.
 
-**What is genuinely left for B, in order:** LB-19's remaining half (`meal-label`'s repaint race —
-the mechanism is written down, the probe it needs is not), then **Q-282**, which is blocked on a
-DECISION not on work. Q-282's linter half shipped; touch targets and contrast need a rendered page.
-Its Espresso scope needs the emulator (Q-250, unlanded), while `@axe-core/playwright` against the
-existing E2E job would do it today. **Do not decide it yourself** — put it to the owner: axe-core on
-the current harness, shrink-only baseline so existing violations record rather than block; the cost
-is one dependency and a gate that could go flaky; reversing it is deleting a CI step.
+**Three things are blocked on the owner, each with a written recommendation. Do not decide them
+yourself and do not build past them:**
+- **BF-51 ③.** The picker has ONE collection shown two ways (`Recently used` empty, `Your foods`
+  typed) plus the food database, which appears only while typing — so Log Food's three-tab strip
+  does not map onto it, and a database tab hides what BF-48 shipped to expose. **Recommended: fold
+  into BF-52's planning session**, which redesigns the top of the same screen.
+- **LB-29.** Recommended: a dirty mark that re-PATCHes the local value. Seed-if-absent cannot
+  clobber but gives up cross-device updates. **They promise different things.**
+- **The device pass.**
+
+**Almost nothing else is startable.** Past the nutrition entries `next-item.js --lane B` holds
+BF-52 (**planning**), LB-12 (Orchestrator's), and a readiness/DB cluster (Q-275, Q-272, Q-276,
+Q-279, Q-283) the path rule puts in **Lane A**. **Q-278** is the one plausible B item — an audit
+narrowed it to a one-layer addition with **one** migration site
+(`components/health/readiness-breakdown.tsx`) — but it has **no plan** and an open scope question
+(two of its five "pillars" have no score surface). Plan it before building it.
 
 ## The finding that should change how you start
-**Treat every entry as a hypothesis, including one Lane B wrote itself.** LB-19 said two flaky specs
-were a sandbox time budget and prescribed `test.setTimeout`. Measuring both showed neither is:
-`goal-invalidation` failed on a locator that never resolves because the seed's newest steps row was
-five days old, and `meal-label` fails intermittently on a canvas read that its own ink poll cannot
-guard. **The prescription would have fixed neither, and the entry told the next session not to look.**
-Ten premises were wrong or stale the run before, two of them deciding whose lane the work was.
-Check the file/line claims before writing code.
+**A precondition satisfied by the state it is meant to replace cannot fail.** Three investigations
+in one day, one of which had already cost a previous session:
+- `meal-label`'s ink gate read the **previous** style's canvas, so it passed on the wrong label.
+- `quantity-editor-option-a`'s "builder is open" marker was its `Ingredients` heading — the detail
+  sheet underneath has one too, so the gate opened before Edit was tapped.
+- `meal-photo-picker` waited for the picker's accessible name. The screen being **left** is still in
+  the DOM while it closes and carried the same name, so the file went there — which is the "the
+  picture reaches nothing" failure a previous session held BF-46 ①a for. **The app was right and the
+  harness was wrong.**
 
-## Next
-`node scripts/next-item.js --lane B` first — and it now has a **REFERENCE** section, so a map entry
-no longer heads the list. Read past position 6 and apply the path rule to each candidate yourself.
+Ask what your gate is true of *before* the thing you want. Pick a marker that exists **only** in the
+target state (`Update Meal`, `Log this meal`).
 
 ## Do not re-litigate
 - **`lib/coach/**`, `packages/shared/**`, `app/api/**`, `lib/data/**` are Lane A** whatever the edit
-  looks like. The rule is the **path**, not the nature of the edit. `lib/health/readiness-payload.ts`
-  counts: three routes consume it.
-- **`scripts/**` is not answered by the path rule.** LB-22 was taken by Lane B on the ambiguity rule
-  — B filed it and B is the tool's user. Record the claim if you take another.
-- **The day read-through has ONE implementation.** `components/health/day-detail/day-read-through.tsx`
-  is rendered by `/health/day` **and** the evening wrap-up, off the same `day-log:<date>` key. Do not
-  add a fetch to it: the two hosts need different strategies.
-- **`EndOfDayReview` is rendered unconditionally** — `open` only drives Radix. A hook in its body
-  fires on every Nutrition visit; anything that fetches goes in a child of `SheetContent`.
-- **Back-dismissal's decision logic is [`lib/hooks/sheet-back-stack.ts`](../../../lib/hooks/sheet-back-stack.ts)**,
-  with the hook reduced to React wiring. Two mechanisms, both load-bearing: **depth** and a
-  **module-level self-pop counter**. Never call `useSheetBackDismiss` at a call site. **Its
-  three-deep case is covered ONLY by those unit tests.**
-- **Log Food is one sheet per screen.** `FoodLoggerSheet` renders **no sheet of its own** at
-  `capture`; `SavedMealsSheet` is the screen.
-- **`kept` and `library` both carry a `savedMealId`.** Anything deciding provenance reads
-  `DraftMeal.source`, never the id.
+  looks like — the **path**, not the nature of the edit. `lib/health/readiness-payload.ts` counts.
+  `scripts/**` is not answered by the rule; record the claim if you take one.
+- **`hydrateUserPreferences` NEVER deletes a key the bag lacks.** The PATCH is in the background, so
+  the bag legitimately lacks a key just chosen — and offline it never arrives. The one pair the app
+  clears is brand preset / custom hue, via `EXCLUSIVE_GROUPS`. *An exclusion list is what you reach
+  for when you have mistaken a rule's failure for a single key's.*
+- **A mirror effect uses `usePersistedPreference`, never `savePreference`** — the same line is a
+  PATCH **on every mount**, and one such site stranded it and a GET behind it past sixty seconds,
+  failing nine specs that never mention preferences. **The guard compares the VALUE:** StrictMode
+  invokes an effect twice, so a first-run ref is already spent.
+- **A `fetch()` of a `data:` URL is a `connect-src` request** and the CSP forbids it. Use
+  `dataUrlToBlob` or `CameraResultType.Base64`; `no-data-url-fetch.test.ts` fails on the next one.
+- **A `SwipeActions` row owns horizontal gestures starting on it** (`[data-swipe-actions]`). The
+  nutrition container's own drag steps the DAY and is **invisible on today** — test on a past day.
+- **The diary groups on `meal_group_id`, never `saved_meal_id`.**
+- **Back-dismissal's logic is [`sheet-back-stack.ts`](../../../lib/hooks/sheet-back-stack.ts)**, the
+  hook only React wiring: **depth** and a **module-level self-pop counter**, both load-bearing.
+  Never call `useSheetBackDismiss` at a call site; its three-deep case is covered ONLY by unit tests.
+- **`EndOfDayReview` renders unconditionally** — `open` only drives Radix; fetches go in a child of
+  `SheetContent`. **Log Food is one sheet per screen** (`SavedMealsSheet` is the screen).
+  **`kept` and `library` both carry a `savedMealId`** — provenance reads `DraftMeal.source`.
 
 ## Owed (device / physical)
-**Nothing from the last two runs is device-verified**, and that is the binding constraint.
-[`device-verification-queue.md`](../../device-verification-queue.md) groups Lane B's `Gate: device`
-entries by screen — work a section, not an entry. **Start at N4**, the rebuilt Log Food screen.
-These runs add: the day review's single door (the reminders' `extra.route` is inert off Android),
-the wrap-up's taller sheet and its second footer button, meal-type tags, the planner's library
-surface, and the recipe-picture import — whose **native `Camera.getPhoto` branch is the path the
-owner will actually use and is unexercised**. Carried: Q-467, Q-499, Q-538, Q-305 at S25 width,
-Q-477 across local midnight, BF-10, LB-5, Q-328/Q-321/Q-486, Q-389, a TalkBack pass, Q-450/Q-418
-(needs a Polar H10). **Q-315 needs a DESKTOP.**
+**Nothing from the last three runs is device-verified.**
+[`device-verification-queue.md`](../../device-verification-queue.md) groups by screen — work a
+section, not an entry.
+
+**This run adds one coherent nutrition pass**, best done in a sitting: a food row **swipes** to a
+Delete that confirms **and stays gone across a screen swap and a force-close** (BF-47, reasoned not
+reproduced); the meal photo picks from **both** the meal's screen and the builder — the CSP fix runs
+the *native* branch for the first time and it now toasts instead of failing silently; **Option A**
+at 412 dp, tallest of the three and may scroll; an ingredient row reading **grams only**; a logged
+meal as **one nested row** whose name survives **offline** (that branch never ran in the sandbox).
+
+Carried: Q-467, Q-499, Q-538, Q-305 at S25 width, Q-477 across local midnight, BF-10, LB-5,
+Q-328/Q-321/Q-486, Q-389, a TalkBack pass, Q-450/Q-418 (Polar H10). **Q-315 needs a DESKTOP.**
 
 ## Claimed paths
 None held.
 
 ## Gotchas worth carrying
-- **`main` lands a PR every few minutes.** Two merges failed with `405 has merge conflicts` between
-  a clean base check and the merge call. Expect to re-merge and re-resolve; keep PRs tight.
-- **A backlog conflict is not always two deletions.** One this run was main **adding** an entry
-  directly above one this branch had **rewritten** — keep both sides would restore the old heading,
-  keep one drops the new entry. Read the headings before choosing, every time.
-- **`get_check_runs` returning `total_count: 0` has THREE causes** — a stale base, a runner backlog,
-  and a **wedged run**. A run that has not started creates no check runs, so the zero says nothing.
-- **A run can wedge in a state GitHub will neither cancel nor re-run.** `rerun` → 403, `cancel` →
-  409 is the signature. The only way out is a **new commit** with real content, never an empty one.
-- **E2E takes 15–40 min and the base WILL drift under it.** Merge on the five REQUIRED checks when
-  E2E cannot be informative — a docs/scripts change, or a re-push whose diff against an
-  already-E2E-green head is version/changelog only. Say so plainly when you do.
-- **Rebuild `package.json`/`changelog.ts` from `git show origin/main:...`; never splice a hunk.**
-  Re-check the version: `main` took the number twice while a PR of mine was open.
-- **`git fetch origin main` RE-SHALLOWS this clone.** The tell is `merge-base` returning nothing.
-  `test -f .git/shallow && git fetch --unshallow origin`.
-- **After every merge `grep -c '^### .*<your-id>'` the backlog** — the two-deletions trap auto-merges
-  with no conflict markers.
-- **`Lane:`, `Gate:`, `Keep:` and now `Reference:` are FIELDS** — each needs its own bullet at line
-  start. `check-backlog-pointers.js` fails on a `Reference:`-worthy entry that states it in prose.
-- **`projectOverview.md` sits ON its ratchet.** Delete whole lines; rewording lands line-neutral.
-  Trimming the oldest dated notes (they carry journal links) is the honest lever.
-- **Never merge `main` or edit the tree while a local e2e run is live.** The tell is
+- **`main` will land a PR under YOUR open one.** Both PRs open at the end of this run went
+  `total_count: 0` — a stale base — because a sibling merged after their last `main` merge. That
+  zero has **three** causes: stale base, runner backlog, **wedged run** (`rerun` 403 / `cancel` 409;
+  the only way out is a new commit with real content, never an empty one).
+- **E2E takes 15–40 min and it CATCHES REAL BUGS** — two on one PR this run, a third on another.
+  **Never dismiss a red E2E as flake without reading the log.** When it cannot be informative
+  (docs/scripts; a re-push whose diff against an already-green head is version/changelog only),
+  merge on the five required checks and say so.
+- **`git add -A` with two items in flight sweeps the other into your commit.** It happened: an
+  untracked spec rode onto the wrong branch and was pushed. Stage paths.
+- **`docs/doc-size-baseline-history.md` is APPEND-ONLY** — a conflict is two *additions*: keep both,
+  order them chronologically, and **correct the from→to figures to the merged reality**. Re-derive
+  the `.size` from the merged document rather than picking a side. **A backlog conflict is not
+  always two deletions** — read the headings.
+- **`projectOverview.md` sits ON its ratchet** — tighten when a compaction leaves slack, expect to
+  raise it when a sibling's paragraph lands under you. **Rebuild `package.json`/`changelog.ts` from
+  `git show origin/main:...`; never splice a hunk.** **`git fetch origin main` RE-SHALLOWS this
+  clone** — the tell is `merge-base` returning nothing.
+- **Two file inputs on one screen is a silent hazard** — name them; `input[type="file"]` takes
+  whichever is first and the wrong one fails without a sound.
+- **In a spec: centre a row before a coordinate tap** (its natural spot is under the tab bar),
+  **hide the Next.js dev overlay** near the bottom-left, **scope assertions to the sheet** (three
+  mounted layers say "Protein"), and remember **`getByText` matches SUBSTRINGS**.
+- **`deleteFoodLog` writes a tombstone.** A count ignoring `deleted_at IS NULL` would *pass* on a
+  broken delete.
+- **`SegmentedTabs` renders `role="tab"`** and takes `orientation="vertical"`; the 48 dp floor
+  applies per segment, so a stacked toggle is 96 px and its neighbour must match.
+- **Never merge `main` or edit the tree while a local e2e run is live** — the tell is
   `Parsing ecmascript source code failed` and tests at **0ms**.
-- **A red local vitest run is worth attributing before it is believed.** One this run was branch
-  staleness: another session had just fixed that exact test on `main`.
-- **`SegmentedTabs` renders `role="tab"`, not `role="button"`.**
-- **Guard every open-the-sheet retry with `if (await page.getByRole('dialog').count() === 0)`.**
-- **A shared write path is verified with the FULL e2e suite, never hand-picked specs.**
-- **Screenshot a new screen at 412 dp before shipping it.** Two accessible-name collisions on the
-  stepped wrap-up were invisible in the diff and obvious in the picture.
-- **`getByText` matches SUBSTRINGS.** A short step title sat inside a sentence one line below it.

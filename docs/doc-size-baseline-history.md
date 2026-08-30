@@ -3919,3 +3919,19 @@ Both are the kind of thing a later session would "simplify" from the code alone.
 journal entry.
 
 (Re-derived on the rebase: this branch was cut at 8425 and BF-46 ② ③'s paragraph landed under it.)
+
+## 2026-08-30 — `docs/agents/state/implementation-lane-b.md` 109 → **120** (the seventeenth Lane B run)
+
+Eleven lines after a run that merged six PRs and left two open. Two sections earn them and one was
+cut to pay for them.
+
+**Earning it:** three items are now blocked on the owner rather than on work — BF-51 ③, LB-29 and
+the device pass for the whole shipped `nutrition-ui-uplift` batch — and each carries a written
+recommendation, because a successor that re-derives them will reach a different answer and build the
+wrong thing. And *a precondition satisfied by the state it is meant to replace cannot fail*, which
+cost three separate investigations in one day and had already cost a previous session the whole of
+BF-46 ①a.
+
+**Paying for it:** the "What is genuinely left for B" heading is gone, folded into `Now` — the queue
+survey it held is one `next-item.js` call away and does not need a section. Several gotchas were
+merged into single bullets rather than dropped; nothing in the previous baton was deleted outright.
