@@ -4115,3 +4115,19 @@ which is also what breaks the offline case.
 
 The layout note is deliberate: the screenshot already cuts `SET TARGETS` off behind the action row,
 so "add a picture" is a fold decision, not a drop-in.
+
+## 2026-08-30 — `docs/implementation-backlog.md` (BF-66, a table that had to be measured)
+
+The owner asked a question — *"it heard me correctly; is that not how to use it?"* — and the answer
+is a six-row table produced by running `parseVoice` rather than reading it. `by` and `at` work while
+`for` and `times` do not, because the strip is a character denylist that keeps every letter appearing
+in `kg`/`reps`/`x`: `r` survives `for`, `es` survives `times`, and the two-numbers fallback then can
+never fire. Nobody derives that from the source at a glance, and nobody derives it from using the app
+at all, which is why the table is in the entry instead of a sentence saying the regex is fragile.
+
+It also carries the reason the seven existing tests pass: every one of them is adjacent numbers or an
+explicit keyword, so the filler-word gap is untested by construction rather than by oversight.
+
+And the second half, which is the part that generated the report: the failure message prints the
+transcript in red, so a *correct* transcript reads as the app mishearing. Fixing the parser without
+fixing that message leaves the next unparseable phrase just as confusing.
