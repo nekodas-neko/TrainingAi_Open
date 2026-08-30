@@ -3884,3 +3884,13 @@ move was DOWN — a compaction on `main` had left 20 lines of slack under the ba
 ratchet is only worth having if it sits on the file. The fourth is BF-45 ⑤'s own paragraph
 landing on `main` under the old slack, which is what tightening converts from invisible into a
 number someone has to write down. That is the trade, and it is the right one.)
+
+## 2026-08-30 — `projectOverview.md` 8413 → **8425** (BF-46 ①b, the meal photo's CSP block)
+
+Twelve lines for a paragraph that is mostly one transferable fact: **a `fetch()` of a `data:` URL is
+a `connect-src` request**, and this app's CSP does not allow one. That is not a nutrition detail —
+it is a rule any surface handling an image from a plugin can break, on the native branch only, where
+nothing in this repo runs. It cost three owner reports and a held rebuild before anyone read the CSP.
+
+The rest of the story is in the journal entry and in `docs/module-map.md`'s row, which is where an
+implementer reaching for `fetch(dataUrl)` would actually be looking.

@@ -3,7 +3,7 @@
 import { useRef, useState } from 'react'
 import { Camera, ImagePlus, Loader2, Utensils, X } from 'lucide-react'
 import { toast } from 'sonner'
-import { downscaleToDataUrl } from '@/lib/media/downscale-image'
+import { dataUrlToBlob, downscaleToDataUrl } from '@/lib/media/downscale-image'
 import { mealImageBytes, rejectMealImage, mealImageRejectionMessage } from '@trainingai/shared/nutrition/meal-image'
 
 /**
@@ -25,6 +25,16 @@ import { mealImageBytes, rejectMealImage, mealImageRejectionMessage } from '@tra
  */
 const THUMB_MAX_DIM = 128
 const THUMB_QUALITY = 0.8
+
+/**
+ * `@capacitor/camera` reports a cancelled picker by throwing, with no code to test — only a message.
+ * Matched loosely on purpose: a message this does not recognise becomes a visible error, which is
+ * the safe direction. The reverse default is what hid BF-46 ①.
+ */
+function isPickerCancellation(err: unknown): boolean {
+  const message = err instanceof Error ? err.message : String(err ?? '')
+  return /cancel/i.test(message) || /no image (picked|selected)/i.test(message)
+}
 
 interface Props {
   /** `null` means no photo. `undefined` from the parent means "not loaded yet" and renders empty. */
@@ -86,7 +96,14 @@ export function MealPhotoTile({ value, onChange, disabled, variant = 'tile', lab
     try {
       const { Camera: CapCamera, CameraResultType, CameraSource } = await import('@capacitor/camera')
       const photo = await CapCamera.getPhoto({
-        resultType: CameraResultType.DataUrl,
+        // **`Base64`, not `DataUrl`, and that is the bug this branch shipped with.** The old code
+        // took a data URL and did `await fetch(photo.dataUrl)` to get a Blob — and a `fetch()` of a
+        // `data:` URL is governed by `connect-src`, which this app's CSP does not open to `data:`.
+        // So it rejected, the catch below read that as a cancelled picker, and choosing a meal
+        // photo on the phone did nothing and said nothing (BF-46 ①, three owner reports). Web never
+        // hit it: that branch gets a `File` from an `<input>` and fetches nothing, which is why
+        // `meal-photo-picker.spec.ts` passes. `capture-actions.tsx` already asks for `Base64`.
+        resultType: CameraResultType.Base64,
         source: CameraSource.Prompt,
         quality: 80,
         // `width`/`height`, NOT `targetWidth`/`targetHeight` — the latter belong to the sibling
@@ -96,11 +113,17 @@ export function MealPhotoTile({ value, onChange, disabled, variant = 'tile', lab
         width: THUMB_MAX_DIM * 4,
         height: THUMB_MAX_DIM * 4,
       })
-      if (!photo.dataUrl) return
-      const blob = await (await fetch(photo.dataUrl)).blob()
+      if (!photo.base64String) return
+      const blob = dataUrlToBlob(`data:image/${photo.format || 'jpeg'};base64,${photo.base64String}`)
       await accept(await downscaleToDataUrl(blob, { maxDim: THUMB_MAX_DIM, quality: THUMB_QUALITY, mimeType: 'image/webp' }))
-    } catch {
-      // Cancelling the picker throws, and a cancel is not an error worth a toast.
+    } catch (err) {
+      // A cancel is not an error worth a toast — but everything else is, and swallowing both is how
+      // this stayed broken through three reports. The plugin's cancel messages are the only thing
+      // that distinguishes them; anything else the user needs to be told about.
+      if (!isPickerCancellation(err)) {
+        console.error('Meal photo pick failed:', err)
+        toast.error('That photo could not be used. Try another one.')
+      }
     } finally {
       setBusy(false)
     }
