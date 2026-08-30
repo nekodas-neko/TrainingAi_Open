@@ -10338,10 +10338,20 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   raw archive should move to the device (D4). This is reclaimable waste inside the current design and
   needs no architectural decision.
 
-### [platform] Q-214 — a tap during the sync pull queues behind the whole delta on the one SQLite connection
+### [platform] Q-214a — a tap during the sync pull queues behind the whole delta on the one SQLite connection
 
 - **Branch:** `perf/sync-pull-sqlite-connection-hold`
 - **Added:** 2026-08-13 · found while fixing the check-in saves (#1292).
+- **⚠️ RENUMBERED `Q-214` → `Q-214a` on 2026-08-30, because the number was reused and the reuse
+  was actively misleading.** `Q-214` had already shipped on 2026-08-12 — the `upsertOuraHeartrate`
+  duplicate-collapse fix that stopped a 5,771-hit `[pg 21000]` fault
+  ([journal](overview/history-2026-08-12.md)) — and its queue entry was removed on completion, so
+  the next session took the number back. `check-backlog-pointers.js` cannot see that: it fails on
+  a duplicate *within the backlog*, and there was only ever one Q-214 in the file at a time.
+  **The harm was real rather than cosmetic:** `projectOverview.md` says *"That is Q-214, fixed on
+  2026-08-13"* in three places, so a session orienting from it would conclude this entry was done —
+  and what is still open here includes silent data loss, not just latency. Per CLAUDE.md the
+  letter-suffix goes to the second claimant; the shipped work keeps `Q-214` everywhere it is cited.
 - The Capacitor SQLite plugin has a single connection, and `applyDelta` holds a native transaction
   (`beginTransaction`, `lib/local-store/sqlite-backend.ts:384/1201/2077`) across the whole delta. A
   user write landing during a pull queues behind all of it — measured as **~2 minutes** of a
