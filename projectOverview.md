@@ -24,8 +24,23 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.395.4 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Version:** v1.395.5 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-08-30.
+
+**The deleted food came back, and the filed trace was not why (BF-47).** From device pass N1:
+*"when I click delete the item vanishes then re-appears; then when you swap screens - it
+dissapears."* The entry said the loader renders the server copy unconditionally — **it does not**;
+in the happy path it hydrates through `applyDelta` and re-reads locally, and that path's
+`sync_status = 'synced'` gate holds. Two mechanisms do fit: the `catch` fallback rendering the raw
+server copy, and — the one that matters — a log created on web or another device, where
+`deleteFoodLog` matches **zero rows** so nothing is tombstoned and `applyDelta` inserts the server
+row back as `'synced'`. **That distinction decides the fix's position:** a filter applied after the
+hydrate would fix the flicker and leave the half that survives a screen swap. It now runs before
+both uses, reading the outbox through a store method that deliberately ignores retry backoff — a
+delete waiting one out is still a delete. The sibling sweep the entry demanded has a measured
+answer: `applyDelta(` has **exactly one** call site outside the sync engine. ⚠️ Reasoned, not
+reproduced, and unverified on the S25
+([journal](docs/overview/entries/2026-08-30-pending-delete-resurrection.md)).
 
 **A logged meal keeps its identity now (BF-39, engine half).** The owner's report was literal —
 *"when I add a meal from ai; it breaks it down into its components and floods the list"* — and one
@@ -561,6 +576,22 @@ order.
 > An entry only leaves when **nothing is still owed**: no open work, no pending owner or device
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
+
+### [nutrition][devices] ⚠️ The queued-delete fix is reasoned, not reproduced (BF-47, v1.395.5)
+
+The owner reported it from the device and the fix has never been seen to work there — nor has the
+bug been seen to fail in a sandbox, because there is no sandbox in which it can. `getLocalStore`
+returns null in `pnpm dev` and in Playwright, so neither mechanism has an analogue, and the hook
+itself cannot be rendered (both vitest projects are `environment: 'node'` with no
+`@testing-library/react`).
+
+What IS proven: the rule is unit-tested, its **placement** is pinned by a source-order test (before
+`applyDelta`, not after — the difference between fixing the flicker and fixing the half that
+survives a screen swap), and 8 of 8 mutations were caught.
+
+**Smoke step:** on the S25, delete a logged food — online and offline. It should go and stay gone
+across a screen swap and a force-close. Then delete a food logged on the web on a different day,
+which is the case the filed trace did not cover.
 
 ### [nutrition][devices] ⚠️ Local SQLite v31 has not been opened on the S25 (BF-39, 2026-08-30)
 

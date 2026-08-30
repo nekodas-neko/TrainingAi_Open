@@ -3511,3 +3511,20 @@ two CI checks passing is not the same as the upgrade having run, and on a smoke 
 signature (an empty Nutrition tab, not a missing day) tells the two apart. A shorter row would leave
 the next reader to re-derive that, and the obvious wrong reading — "checks are green, it is fine" —
 is the one it exists to prevent.
+
+## 2026-08-30 — `docs/implementation-backlog.md` 13373 → 13385, `projectOverview.md` 8291 → 8322 (BF-47)
+
+**Backlog, +12 net** (26 added, 14 removed). Almost all of it is BF-47 correcting its own trace. The
+entry said the loader renders the server copy unconditionally; it does not, and the two mechanisms
+that actually fit are what decide *where* the filter has to go — before `applyDelta`, not after,
+which is the difference between fixing the flicker and fixing the half that survives a screen swap.
+Leaving the original trace in place would have sent the next reader to the right file with the wrong
+model. The removal is the "sibling sweep required" paragraph, replaced by the sweep's measured
+answer: `applyDelta(` has exactly one call site outside the sync engine, so there are no siblings of
+this shape.
+
+**projectOverview, +31.** One Current Status paragraph and one Known-Issues row. The row spends its
+length on *why nothing here counts as verification* — no sandbox has a local store, and the hook
+cannot even be rendered — because "8 of 8 mutations caught" reads like proof and is not proof of
+this. It also names the second smoke case (a food logged on the web, on another day), which is the
+one the filed trace did not cover and the one most likely to be skipped.

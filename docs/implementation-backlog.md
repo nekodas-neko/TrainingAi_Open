@@ -1036,6 +1036,14 @@ overwritten.
 - **Lane:** A — `app/nutrition/use-food-logs-loader.ts`.
 - **Added:** 2026-08-30 · owner, device pass N1: *"Delete worked; when I click delete the item
   vanishes then re-appears; then when you swap screens - it dissapears."*
+- **Keep:** the DEVICE check, and only that. The fix shipped 2026-08-30 — the loader reads the
+  outbox and drops queued deletes from the server copy before hydrating from it. **It is reasoned,
+  not reproduced:** `getLocalStore` returns null in `pnpm dev` and in Playwright, so the failure has
+  no sandbox analogue and neither does the fix. Delete a logged food on the S25, online and offline,
+  and confirm it goes and stays gone across a screen swap and a force-close.
+- **⚠ The trace below was CORRECTED on implementation** — see the boxed note. The fix direction it
+  proposed was right; the mechanism it named was not the whole story, and the difference decides
+  where the filter has to go.
 - **This is CLAUDE.md's own rule being broken**, the one written after the mood-checkin re-prompt and
   the rest-day revert: *after an optimistic local write, never apply or cache a server response that
   would replace it.*
@@ -1043,16 +1051,29 @@ overwritten.
 **Traced, and the sequence matches the report exactly.** `deleteLog` in `nutrition-content.tsx:405`
 removes the row optimistically, deletes it locally, queues the mutation, then calls
 `refreshAffected()` → `loadFoodLogs(today)`. That loader renders the local copy first (row gone —
-the flicker the owner sees) and then does this, unconditionally:
+the flicker the owner sees) and then fetches the server copy, which **still has the row**, because
+the delete has only been *queued*; `pushMutations` has not run yet. When the push later lands, the
+next load returns a server copy without it — which is why swapping screens makes it disappear "for
+real".
 
-```ts
-// The server copy is authoritative and MUST render whenever we're online
-const res = await fetch(`/api/nutrition/food-logs?date=${today}`)
-```
-
-**The server still has the row**, because the delete has only been *queued*; `pushMutations` has not
-run yet. So the authoritative render puts it back. When the push later lands, the next load returns
-a server copy without it — which is why swapping screens makes it disappear "for real".
+> **⚠ CORRECTED 2026-08-30, on implementation.** The entry said the loader "renders the server copy
+> unconditionally", and it does not: in the happy path it feeds the server copy to `applyDelta` and
+> then **re-reads locally**. All three links in that path hold — `handleConfirmDelete` really does
+> call `store.deleteFoodLog(id)` before queueing, `getFoodLogsWithItems` filters
+> `deleted_at IS NULL`, and `applyDelta`'s food_logs arm is gated `WHERE sync_status = 'synced'`, so
+> a server row cannot overwrite a pending local one. **On that path the row should not come back.**
+>
+> Two mechanisms that DO fit the report, and the fix covers both:
+> 1. **The `catch` branch.** If `applyDelta` or the local re-read throws, the loader falls back to
+>    `applyLogs(server)` — the raw server copy, deleted row included.
+> 2. **The local row was never there.** A log created on web or another device and not yet pulled
+>    means `deleteFoodLog`'s UPDATE matches **zero rows**, so nothing is tombstoned or pending, and
+>    `applyDelta` inserts the server row fresh as `'synced'`. This one survives a screen swap only
+>    until the push lands, which matches the report exactly.
+>
+> **Why it matters where the filter goes:** mechanism 2 is a local re-insert, so filtering after
+> `applyDelta` would still write the row back to the device. The shipped fix filters **before**
+> both uses, and a source-order test pins that.
 
 - **⚠ Do not fix this by inverting the authority.** That line's comment records the bug it exists to
   prevent: a local read that threw left the page blank, so logged food *"vanished on reload"* even
@@ -1061,9 +1082,14 @@ a server copy without it — which is why swapping screens makes it disappear "f
   server response against pending outbox mutations for the domain, which is information the local
   store already holds, rather than choosing a winner globally. Equivalent to the `sync_status ===
   'synced'` gate `applyDelta` already applies for pulls; this read path has no such gate.
-- **Sibling sweep required.** Any local-first domain whose loader re-fetches a server aggregate right
-  after an optimistic write has this shape. Check the mood, body-metric and activity delete paths in
-  the same PR rather than fixing food alone.
+- **Sibling sweep — done, and the answer is one.** `grep -rn 'applyDelta(' app components lib packages`
+  returns exactly **one** call site outside the sync engine: this loader. It is the only screen-level
+  read that hydrates the local store from its own server fetch, which is the shape that can resurrect
+  a row. The mood, body-metric and activity deletes were checked: they read `day-log:` through
+  `cachedFetch`, a **server-assembled aggregate that never writes to the local store**, so a queued
+  delete shows briefly stale there and self-corrects on push — a flicker, not a resurrection, and a
+  different fix if it is ever worth making. `session-select-content.tsx` reads
+  `store.getActivityLogs` local-first, where the tombstone already excludes it.
 - **Verification:** offline and online, delete a logged food — it goes and stays gone, with no
   reappearance, and a force-close does not bring it back.
 

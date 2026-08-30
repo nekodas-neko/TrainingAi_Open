@@ -166,6 +166,11 @@ export interface LocalStore {
   // Outbox
   queueMutation(m: Omit<PendingMutation, 'id' | 'createdAt' | 'attempts' | 'lastError' | 'status' | 'nextRetryAt'>): Promise<void>;
   getPendingMutations(userId: string): Promise<PendingMutation[]>;
+  /** BF-47. Every queued mutation for one domain, **regardless of retry backoff or failed
+   *  status** — deliberately unlike `getPendingMutations`, which hides a mutation waiting out
+   *  a backoff. A delete the user made is still a delete they made while it waits, and a read
+   *  path that forgets it during the backoff window puts the row back on screen. */
+  getQueuedMutationsForDomain(userId: string, domain: string): Promise<PendingMutation[]>;
   getFailedMutations(userId: string): Promise<PendingMutation[]>;
   recordMutationFailures(failures: Array<{ id: string; error: string }>): Promise<void>;
   retryFailedMutation(id: string): Promise<void>;
