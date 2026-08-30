@@ -18,8 +18,9 @@ Rewrite this file **in full** — never append — before the session ends or co
 
 - **Entry IDs are `BF-<n>`, counting up forever.** Bands and the shared pointer are both gone (see
   `docs/agents/README.md` §3). Find your next number with
-  `grep -rhoE '\bBF-[0-9]+\b' docs/ | sort -t- -k2 -n | tail -1`. This role's last band entry was
-  **Q-424** (2026-08-20); everything after it is `BF-`. **Current: `BF-9` filed, next is `BF-10`.**
+  `grep -rhoE '\bBF-[0-9]+\b' docs/ | sort -t- -k2 -n | tail -1` — **run it, do not trust this line**,
+  which was four sessions stale before it was noticed. This role's last band entry was **Q-424**
+  (2026-08-20); everything after it is `BF-`. **Current: `BF-46` filed, next is `BF-47`.**
 - **No migration numbers.** Intake never claims one. If an entry needs a corrective migration or a new
   column, say so in the entry and hand the number to Lane A.
 - **Docs-only PRs, opened and merged without asking** (CLAUDE.md Standing Instructions). CI still has
@@ -142,12 +143,62 @@ a number is only as good as the enumeration of who reads it.*
 Full narrative in
 [`docs/handoff-2026-08-24-cross-bugfix-nine-entries-trainer-role-and-admin-fix.md`](../../handoff-2026-08-24-cross-bugfix-nine-entries-trainer-role-and-admin-fix.md).
 
-Filed **BF-1** (blood panels, gated), **BF-2** (DEXA filter), **BF-3** (dosed substances), **BF-4**
-(scan slowdown, dated to `#112` via the archive), **BF-5** (week-in-review page), **BF-6** (finished-
-logging unreachable — **shipped, #355**), **BF-7** (session-length slider, owner settled the anchor),
-**BF-8** (Intensity vs auto-deload — **owner-confirmed from experience, shipped, #353**), **BF-9** (a
-trainer role — design + population approved by the owner). Also merged **PR #124**, another session's
+Filed **BF-1** (blood panels), **BF-2** (DEXA filter), **BF-3** (dosed substances), **BF-4** (scan
+slowdown, dated to `#112` via the archive), **BF-5** (week-in-review), **BF-6** (finished-logging
+unreachable — shipped, #355), **BF-7** (session-length slider), **BF-8** (Intensity vs auto-deload —
+shipped, #353), **BF-9** (trainer role, design approved). Also merged **PR #124**, another session's
 stale-but-approved auth fix.
 
-**Seven entries remain queued** (`BF-1/2/3/4/5/7/9`). Nothing waiting on the owner, nothing
-mid-triage.
+### 2026-08-25 → 08-27 — the long nutrition + clinical session (BF-10 → BF-46)
+
+**Where the queue stands for this role.** Top of the nutrition cluster, in order:
+**BF-45** and **BF-46** (batched `nutrition-ui-uplift`, Lane B, both `Gate: device`), then **BF-38**,
+then **BF-39**. The clinical cluster is **BF-41** (promoted — the owner asked for upload/save first),
+then **BF-2**, then **BF-33**'s UI + **BF-42**, then **BF-44**, then **BF-43**.
+
+**Owner decisions taken this session — recorded in the entries, do not re-open:**
+
+| Decision | Where |
+|---|---|
+| Dark only; one design. Keep the light palette, do not delete it | CLAUDE.md, *Visual consistency & theme* |
+| Warning row = option A (amber triangle before the calorie column) | Q-406, journal `2026-08-26-warning-row-decision.md` |
+| Food images: barcode → OFF shot · photo → the photo · text → generate. **Store bytes, not the URL**; the image lives where its ownership does | BF-35 |
+| Store **every field** of RMR/DEXA/blood; how to use it is decided later | BF-43 |
+| Ingredients read in **weight only**; portions belong to the meal | BF-46 ② |
+| Quantity sheet = **option A** (total leads, three macro tiles) | BF-46 ③, drawn at <https://claude.ai/code/artifact/9388bd52-37e4-4986-b145-45cf96c5c3cb> |
+
+**The clinical measurements are in the repo, de-identified**, at
+[`docs/clinical-baseline-2026-08-27.md`](../../clinical-baseline-2026-08-27.md) — DEXA and RMR
+(2026-08-27) and a 58-analyte blood panel (2026-04). **The owner's name and DOB were on the RMR
+report and must never enter this repository.** Three numbers a successor should not re-derive: the
+scale under-reads body fat by **3.2 points** (DEXA 28.5 vs Renpho 25.3, same day); measured RMR
+**1325** against Cunningham's **1481** on the owner's own DEXA lean mass, so the over-estimate is not
+a composition error; and learned maintenance **1,827** lands within **5 kcal** of the provider's Mild
+projected TDEE, implying an activity factor of ≈**1.38**.
+
+**Two open threads.** BF-46's photo **save failure is unexplained** — every layer reads correct in
+source, so it is device-only; the entry names the candidates and the one check that splits a write
+bug from a render bug. And four shipped items owe a device pass: BF-34, BF-27, BF-24, BF-26.
+
+## What this session learned that the traps list did not already say
+
+- **Trace before filing, and expect the count to shrink.** Eight owner reports about the Nutrition tab
+  became fewer causes: *"adding an image doesn't show it"* and *"the photo should be at the top"* are
+  one thing, and *"an AI meal floods the list"* was **BF-39**, already filed. Filing eight numbers
+  would have buried the two real bugs among six duplicates.
+- **Ask which surface, not just what.** *"Many of the nutrition screens have thin gutters"* read as a
+  per-screen sweep; asked, the owner meant **bottom sheets** — one shared component, one change. The
+  question cost a sentence and removed most of the work.
+- **Draw a layout rather than describing it.** Twice now (the warning row, the quantity sheet) the
+  owner's answer to prose was *"can you show me"*, and a drawing settled it in one message. Record the
+  choice as a **band-by-band table with the drawing as the tiebreak** — prose is what sent BF-46 round
+  the first time.
+- **Correct a wrong diagnosis in place, out loud.** This session guessed the photo picker was never
+  found; the owner had found it and saved. The entry now says the earlier reading was wrong and why,
+  because deleting it would let the next session re-make it.
+- **Answering an owner's question is an intake activity.** *"Do exercise calories add on correctly?"*
+  was a question, not a report — and checking it found **BF-42**, a live path that never reads the
+  measurement BF-33 shipped.
+- **Say what already exists.** Most of the injury-aware coach the owner described is built
+  (`activeInjuredMusclesInSession`, the periodization swap, `injurySafeAlternatives`). **BF-44** says
+  so first, then names the one surface that is blind. Re-building it would have been the obvious move.

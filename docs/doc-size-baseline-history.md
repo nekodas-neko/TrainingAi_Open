@@ -3358,3 +3358,17 @@ so a later session does not re-open a decision the owner has made.
 It also records what A costs — the tallest of the three, two stacked result blocks, may scroll on a
 long food name — and what to do about it, which is tighten the gaps rather than merge the blocks,
 because merging them is option B and the owner did not pick option B.
+
+## 2026-08-27 — `docs/agents/state/bugfix.md` raised 161 → 204 (the baton was four sessions stale)
+
+The BugFix baton still said *"Current: BF-9 filed, next is BF-10"* while the queue held BF-46. A
+successor trusting that line would have collided on nine numbers, so the ID line now says to run the
+grep rather than trust the line — the failure was believing a hand-maintained number, and the fix is
+to stop having one.
+
+The 44 lines are the session's record: the six owner decisions taken across three days (dark-only,
+the warning row, food-image routing and storage, store-everything for the clinical results,
+weight-only ingredients, quantity-sheet option A), a pointer to the de-identified clinical baseline
+with the three numbers a successor should not re-derive, and six method notes. The sharpest is the
+first: eight owner reports about one tab became fewer causes than reports, and filing eight numbers
+would have buried the two real bugs among six duplicates.
