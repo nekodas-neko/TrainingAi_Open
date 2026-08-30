@@ -6,6 +6,16 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.404.0",
+    date: "2026-08-31",
+    changes: [
+      "Delete on a swiped row works on the first press. The row is still sliding for a fifth of a second after you let go, and a tap in that window landed on the row instead of the button \u2014 which is why waiting a moment worked and tapping straight away did not.",
+      "The meal builder can scan a barcode. Log Food could already; the screen where you actually build a meal could not, so a packet ingredient had to be typed out.",
+      "Log Food's \u201cSingle foods\u201d tab is now called \u201cSearch\u201d, because it reaches the food database and not just foods you have logged. The Meals box says \u201cFilter your meals\u201d, since that one only narrows the list you already have.",
+      "Full-height sheets leave real room under their buttons instead of sitting them on the gesture bar.",
+    ],
+  },
+  {
     version: "1.403.0",
     date: "2026-08-31",
     changes: [

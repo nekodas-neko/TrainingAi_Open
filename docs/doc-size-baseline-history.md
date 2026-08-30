@@ -4113,3 +4113,20 @@ correcting BF-39's state cost more lines than the correction saved, so the "find
 change how you start" section was compressed from a heading plus three bullets into one paragraph,
 and four gotchas were merged. **Nothing was dropped** — the fourth instance of the precondition
 finding (BF-39's own) is now in there too, and it is the one that cost the most.
+
+## 2026-08-31 — `projectOverview.md` 8450 → 8452, `docs/implementation-backlog.md` 13762 → 13486 (BF-60/61/62/63)
+
+**A rise of two, and it is a rise rather than a trade.** The nutrition batch adds one status
+paragraph and pays for none of it, because the section has no slack left that is this branch's to
+take: the two paragraphs above it are hours old and the ones below belong to other agents. Two lines
+for four owner reports, one of which corrects the fix its own entry proposed, is worth the ratchet
+moving.
+
+**The backlog falls 276.** BF-60 is removed outright — a tab rename with an e2e assertion on the
+label owes nothing further — while BF-61, BF-62 and BF-63 are rewritten to their `Keep:` residue,
+which is the **device check** in all three cases and nothing else. That is the protocol working
+rather than a compaction: an entry that shipped but is not device-verified stays in the queue,
+because that check is the outstanding thing.
+
+**Re-derive both on the merge.** This branch is stacked on #647 and cut before it landed, so the
+figures above are against its head, not against `main`.
