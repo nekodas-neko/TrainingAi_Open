@@ -3580,6 +3580,7 @@ reading that matters is not "the route stopped wasting tokens" — it is that an
 a plan the AI had nothing to do with. A status line that led with the tokens would leave the next
 reader thinking this was an optimisation, and the reproduction (no API key: pre-fix 502, post-fix
 200) is the sentence that stops it.
+
 ## 2026-08-30 — `docs/implementation-backlog.md` raised (second device pass; net +54 after a closure)
 
 68 lines added and one entry deleted. **BF-53 is most of it and it is a live production defect found
@@ -3619,3 +3620,87 @@ earlier — roughly seven times the expected trend, which CLAUDE.md says to reco
 "only allowed for making it primary" and in fact proposed the swap correctly; one line in its
 consequence list disclosed a role promotion nobody asked for, which silently undoes the owner's
 deliberate no-Primary session. The card is not at fault — disclosing the change is how it was caught.
+
+## 2026-08-30 — `docs/implementation-backlog.md` raised (third device pass; four of six reports already filed)
+
+85 lines, and the ratio is the point: **six owner reports produced one new entry.** Four landed on
+entries that already existed, which is what the dedup rule is for — the meals-in-a-nest ask is BF-39's
+*third* report in five days and got a note rather than a fourth number.
+
+**BF-45 ④ is the find.** The macro ring "starts at an odd spot" because all three call sites write
+`conic-gradient(from -90deg, …)`. In CSS a conic gradient already starts at 12 o'clock, so `-90deg`
+rotates it a quarter turn counter-clockwise to 9. The `-90` is correct for SVG and canvas, where 0°
+is at 3 o'clock, and was carried across. Home's ring is offset identically and nobody had noticed.
+
+**BF-57 is a decision rather than a defect.** A printed meal label carries a bare `saved_meals.id`
+and the scanner resolves it against the scanning user's own meals, so another person's label reports
+*"no longer exists"* — wrong twice, since the meal exists and the reason is ownership. The entry
+argues against the obvious fix: globally resolvable meal ids turn a photograph of a label into read
+access to someone's health data, on an app heading for a Play Store health declaration. The
+recommendation is a share token that **copies**, so the two users' rows stop being coupled the moment
+the scan lands.
+
+## 2026-08-30 — `docs/implementation-backlog.md` raised again (BF-57's design settled by measurement)
+
+68 further lines on BF-57. The owner rejected the share-token recommendation and proposed putting the
+whole meal in the QR. **Measured rather than argued**, because the answer was not obvious either way:
+their real 3-ingredient meal is **167 bytes** as positional JSON, needing QR version 9 at 53×53
+modules — and the binding constraint turns out to be the printed label, not the format. At the
+current 12.2–16.4 mm code that is 0.31 mm per module, too fine for a home printer; at 30 mm it is
+0.57 mm, better than the design's own current worst case.
+
+So the entry now carries a capacity table by ingredient count, a cap at ~5 ingredients with the
+instruction to refuse the print above it and say why, and one counter-intuitive measurement worth
+keeping: **compressing makes it worse** — deflate plus base64url came out 164 bytes against 146 for
+plain compact JSON, because base64's 33% tax exceeds the gain at this size.
+
+The superseded token design is kept in a collapsed block rather than deleted, with the reason it
+lost, so nobody re-proposes it. The one part of it that survives unconditionally is the security
+argument: never make `saved_meals.id` resolvable across users.
+
+## 2026-08-30 — `docs/implementation-backlog.md` raised (BF-57: how the ingredient list gets cut)
+
+25 lines. The owner settled the sizing — grow the QR, trim the list — and the entry now says *how*,
+because the two obvious ways to trim are not equal and one of them is a data bug.
+
+Measured: truncating ingredient names is cosmetic. It buys one QR version (280 → 240 bytes on a
+5-ingredient meal) and cannot rescue a 10-ingredient recipe, which stays at 0.35 mm/module and
+unprintable, while making brands unreadable. **Rolling the tail into a single remainder line carrying
+the dropped items' summed macros gets a 10-ingredient meal to 244 bytes, version 11, 0.49 mm/module**
+— printable, and the totals stay exact to the gram.
+
+Hence the rule the entry now leads with: **the totals are sacred, the detail is negotiable.** Dropping
+ingredients to save bytes silently changes the meal's calories, and the person scanning the label has
+no way to know. Only identity may be dropped, never numbers — and the printed label has to say it is
+showing four of ten, or it reads as the whole recipe.
+
+## 2026-08-30 — `docs/implementation-backlog.md` (net ~+8: a `Gate:` field removed from four entries)
+
+Found while reporting queue state: `Gate: device` **parks** an entry in `next-item.js`, and in this
+queue it means *shipped, awaiting a device check* — which is how BF-24, BF-26, BF-34 and Q-406 use
+it. BF-45, BF-46, BF-50 and BF-51 are unbuilt, so carrying it hid the whole `nutrition-ui-uplift`
+batch from Lane B's runner: four entries, the owner's most-repeated surface complaints, invisible to
+the tool an implementer is told to start from.
+
+Removed, with a note on each explaining why not to add it back. The device is still what judges these
+done — that belongs in Verification, which all four already state. **A gate parks work; a
+verification requirement does not.** The rule was in `docs/agents/README.md` the whole time; it was
+filled in from the field name rather than from the runner.
+## 2026-08-30 — `projectOverview.md` 8347 → 8357, `docs/implementation-backlog.md` 13376 → 13330 (BF-21 shipped)
+
+**Amended on the merge with `main`.** Two branches touched this number in parallel — the second
+device pass raised it to 13539 while BF-21 lowered it to 13330 — so the conflict is two PRs
+disagreeing about one document, which is the case the per-file split is meant to surface rather than
+hide. Resolved to the merged file's actual **13493**: both sides' edits are present, and the ratchet
+sits on the truth rather than on either branch's view of it. Then **again**, on a second re-merge minutes
+later: `main` had moved twice more and the number was 13731, resolved the same way to the merged
+actual. Three branches disagreeing about one line in one morning is the shape to expect while several
+agents are landing — the resolution is never to pick a side, it is to count the file.
+
+The backlog **shrinks 46** — BF-21 left the queue, and the new number is the floor.
+
+`projectOverview.md` +10, one Current Status paragraph. Two of its lines exist to stop a wrong
+conclusion rather than to describe the change: that the counters start empty from the restart, so a
+read in the first hours means nothing, and that BF-19 already measured the database and it is not
+where the reported slowness is. Without them the next session reads a clean `pg_stat_statements` and
+closes the slow-load question on it, which is the mistake the entry itself warned about.
