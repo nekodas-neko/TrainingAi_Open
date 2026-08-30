@@ -1318,12 +1318,36 @@ payload change second.
 
 - **Redesign the label to give the QR ~30 mm.** The circle-safe layout that caps it at 16.4 mm is
   what makes this impossible, not the QR format.
-- **Cap at ~5 ingredients** (0.46 mm/module at 30 mm). At 8 it is 0.39 and marginal; at 10 it is 0.34
-  and will fail on some prints. **Refuse to print a label above the cap and say why** — *"this meal
-  has too many ingredients to fit on a label"* is an honest failure; a code that scans on the author's
-  phone and not on anyone else's is not.
-- **Names dominate the payload.** ~38 bytes per ingredient, most of it the name — truncating brand
-  strings for the label buys roughly one extra ingredient per 40 characters saved.
+- **✅ OWNER, 2026-08-30: size the code to what it needs, and trim the ingredient list to fit.**
+  *"focus on the QR code making it the size it needs to be; and then the ingredient list can be cut
+  back for it if needed."* So the QR grows to the size the payload demands **and the payload is what
+  gives way**, rather than the print being refused. The recommendation above to refuse above a cap is
+  **superseded** — but *how* the list is cut decides whether this is sound or a data bug, and the two
+  obvious ways are not equal.
+
+- **⚠ THE TOTALS ARE SACRED. THE DETAIL IS NEGOTIABLE.** Dropping ingredients to save bytes changes
+  the meal's calories and macros, and the person scanning it has no way to know. **Never drop an
+  ingredient's numbers — only its identity.**
+
+- **Measured: rolling the tail beats truncating names, and it is not close.**
+
+  | Shape | Bytes | Version | mm/module @30 mm |
+  |---|---|---|---|
+  | 5 ingredients, full names | 280 | 12 | 0.46 |
+  | 5 ingredients, names cut to 12 chars | 240 | 11 | 0.49 |
+  | 10 ingredients, names cut to 12 | 460 | 17 | **0.35** ✗ |
+  | 10 ingredients, names cut to 8 | 420 | 16 | **0.37** ✗ |
+  | **4 named + one `"+6 more"` line carrying the tail's combined macros** | **244** | **11** | **0.49** ✓ |
+
+  **Truncating names is cosmetic** — it buys one QR version and cannot rescue a long recipe, while
+  making brands unreadable. **Rolling the tail into a single remainder line fits any meal at a
+  printable size and keeps the arithmetic exact**, because the dropped items' kcal/P/C/F are summed
+  into that line rather than discarded.
+
+- **So the encoder's rule:** name as many ingredients as fit, then emit one remainder entry carrying
+  the sum of everything left. The scanning user gets a meal whose totals are correct to the gram, with
+  the top ingredients named and the rest honestly labelled as a group. **Show that on the label too**
+  — a printed label that lists four of ten ingredients must say so, or it reads as the whole recipe.
 
 **Why this beats the token design it replaces:** no server round-trip, so it scans offline and for a
 user with no account; **no privacy surface at all**, because the data is on paper the owner physically
@@ -1342,7 +1366,8 @@ which is already true today. No photo can travel in the QR. And the ingredient c
   beats *"no longer exists"*, and an old-format label scanned by another user will still hit it.
 - **Verification:** a label printed from a 3-ingredient meal scans on a second phone, on a second
   account, **in airplane mode**, and creates that user's own meal with the same portions and macros.
-  A 12-ingredient meal refuses to print a label and says why. A previously-printed old-format label
+  A 12-ingredient meal prints, scans, and produces **the same total calories and macros as the
+  original** with its tail rolled into one labelled remainder. A previously-printed old-format label
   still resolves for its owner.
 
 ---

@@ -3597,3 +3597,19 @@ plain compact JSON, because base64's 33% tax exceeds the gain at this size.
 The superseded token design is kept in a collapsed block rather than deleted, with the reason it
 lost, so nobody re-proposes it. The one part of it that survives unconditionally is the security
 argument: never make `saved_meals.id` resolvable across users.
+
+## 2026-08-30 — `docs/implementation-backlog.md` raised (BF-57: how the ingredient list gets cut)
+
+25 lines. The owner settled the sizing — grow the QR, trim the list — and the entry now says *how*,
+because the two obvious ways to trim are not equal and one of them is a data bug.
+
+Measured: truncating ingredient names is cosmetic. It buys one QR version (280 → 240 bytes on a
+5-ingredient meal) and cannot rescue a 10-ingredient recipe, which stays at 0.35 mm/module and
+unprintable, while making brands unreadable. **Rolling the tail into a single remainder line carrying
+the dropped items' summed macros gets a 10-ingredient meal to 244 bytes, version 11, 0.49 mm/module**
+— printable, and the totals stay exact to the gram.
+
+Hence the rule the entry now leads with: **the totals are sacred, the detail is negotiable.** Dropping
+ingredients to save bytes silently changes the meal's calories, and the person scanning the label has
+no way to know. Only identity may be dropped, never numbers — and the printed label has to say it is
+showing four of ten, or it reads as the whole recipe.
