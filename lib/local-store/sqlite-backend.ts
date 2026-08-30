@@ -1897,11 +1897,12 @@ export class SQLiteLocalStore implements LocalStore {
         // old value on the next pull. Same shape as the injuries arm above.
         await runSQL(
           `INSERT INTO supplements
-             (id, name, dose, reminder_enabled, reminder_time, sort_order, active,
+             (id, name, dose, default_amount, unit, reminder_enabled, reminder_time, sort_order, active,
               updated_at, deleted_at, sync_status)
-           VALUES (?,?,?,?,?,?,?,?,?,'synced')
+           VALUES (?,?,?,?,?,?,?,?,?,?,?,'synced')
            ON CONFLICT(id) DO UPDATE SET
              name=excluded.name, dose=excluded.dose,
+             default_amount=excluded.default_amount, unit=excluded.unit,
              reminder_enabled=excluded.reminder_enabled,
              reminder_time=excluded.reminder_time,
              sort_order=excluded.sort_order, active=excluded.active,
@@ -1909,7 +1910,8 @@ export class SQLiteLocalStore implements LocalStore {
              sync_status='synced'
            WHERE supplements.sync_status='synced'`,
           [
-            r.id, r.name, r.dose, r.reminderEnabled ? 1 : 0, r.reminderTime,
+            r.id, r.name, r.dose, r.defaultAmount ?? null, r.unit ?? null,
+            r.reminderEnabled ? 1 : 0, r.reminderTime,
             r.sortOrder, r.active ? 1 : 0, r.updatedAt, r.deletedAt ?? null,
           ],
         );
@@ -1924,13 +1926,15 @@ export class SQLiteLocalStore implements LocalStore {
         );
       } else {
         await runSQL(
-          `INSERT INTO supplement_logs (id, supplement_id, log_date, updated_at, deleted_at, sync_status)
-           VALUES (?,?,?,?,?,'synced')
+          `INSERT INTO supplement_logs (id, supplement_id, log_date, amount, unit, dose_text, updated_at, deleted_at, sync_status)
+           VALUES (?,?,?,?,?,?,?,?,'synced')
            ON CONFLICT(supplement_id, log_date) DO UPDATE SET
-             id=excluded.id, updated_at=excluded.updated_at,
+             id=excluded.id, amount=excluded.amount, unit=excluded.unit, dose_text=excluded.dose_text,
+             updated_at=excluded.updated_at,
              deleted_at=excluded.deleted_at, sync_status='synced'
            WHERE supplement_logs.sync_status='synced'`,
-          [r.id, r.supplementId, r.logDate, r.updatedAt, r.deletedAt],
+          [r.id, r.supplementId, r.logDate, r.amount ?? null, r.unit ?? null, r.doseText ?? null,
+           r.updatedAt, r.deletedAt],
         );
       }
     }
@@ -2597,6 +2601,8 @@ export class SQLiteLocalStore implements LocalStore {
       id:              String(r.id),
       name:            String(r.name),
       dose:            r.dose ? String(r.dose) : null,
+      defaultAmount:   r.default_amount == null ? null : Number(r.default_amount),
+      unit:            r.unit ? String(r.unit) : null,
       reminderEnabled: Number(r.reminder_enabled) === 1,
       reminderTime:    r.reminder_time ? String(r.reminder_time) : null,
       sortOrder:       Number(r.sort_order),
@@ -2612,10 +2618,11 @@ export class SQLiteLocalStore implements LocalStore {
   async upsertSupplement(record: LocalSupplement): Promise<void> {
     await runSQL(
       `INSERT INTO supplements
-         (id, name, dose, reminder_enabled, reminder_time, sort_order, active, updated_at, sync_status)
-       VALUES (?,?,?,?,?,?,?,?,'pending')
+         (id, name, dose, default_amount, unit, reminder_enabled, reminder_time, sort_order, active, updated_at, sync_status)
+       VALUES (?,?,?,?,?,?,?,?,?,?,'pending')
        ON CONFLICT(id) DO UPDATE SET
          name=excluded.name, dose=excluded.dose,
+         default_amount=excluded.default_amount, unit=excluded.unit,
          reminder_enabled=excluded.reminder_enabled,
          reminder_time=excluded.reminder_time,
          sort_order=excluded.sort_order,
@@ -2623,6 +2630,7 @@ export class SQLiteLocalStore implements LocalStore {
          sync_status='pending'`,
       [
         record.id, record.name, record.dose,
+        record.defaultAmount ?? null, record.unit ?? null,
         record.reminderEnabled ? 1 : 0, record.reminderTime,
         record.sortOrder, record.active ? 1 : 0, record.updatedAt,
       ],
@@ -2642,6 +2650,9 @@ export class SQLiteLocalStore implements LocalStore {
       id:           String(r.id),
       supplementId: String(r.supplement_id),
       logDate:      String(r.log_date),
+      amount:       r.amount == null ? null : Number(r.amount),
+      unit:         r.unit ? String(r.unit) : null,
+      doseText:     r.dose_text ? String(r.dose_text) : null,
       updatedAt:    String(r.updated_at),
       deletedAt:    r.deleted_at ? String(r.deleted_at) : null,
       syncStatus:   String(r.sync_status) as 'pending' | 'synced',
@@ -2650,14 +2661,33 @@ export class SQLiteLocalStore implements LocalStore {
 
   async upsertSupplementLog(record: LocalSupplementLog): Promise<void> {
     const now = new Date().toISOString();
+    // BF-3 — stamp the dose HERE when the caller did not supply one, reading the local definition.
+    // Doing it in the store rather than at the call site is what makes today's UI freeze the dose
+    // with no change to the UI: `supplements-section.tsx` passes no dose and does not need to.
+    // A caller that DOES pass one wins, which is how the sync engine replays a log at the dose it
+    // was actually taken at rather than at whatever the definition says now.
+    let dose = { amount: record.amount ?? null, unit: record.unit ?? null, doseText: record.doseText ?? null };
+    if (dose.amount == null && dose.unit == null && dose.doseText == null) {
+      const [def] = await querySQL<Record<string, unknown>>(
+        `SELECT dose, default_amount, unit FROM supplements WHERE id = ?`, [record.supplementId]);
+      if (def) {
+        dose = {
+          amount: def.default_amount == null ? null : Number(def.default_amount),
+          unit: def.unit ? String(def.unit) : null,
+          doseText: def.dose ? String(def.dose) : null,
+        };
+      }
+    }
     await runSQL(
-      `INSERT INTO supplement_logs (id, supplement_id, log_date, updated_at, deleted_at, sync_status)
-       VALUES (?,?,?,?,?,?)
+      `INSERT INTO supplement_logs (id, supplement_id, log_date, amount, unit, dose_text, updated_at, deleted_at, sync_status)
+       VALUES (?,?,?,?,?,?,?,?,?)
        ON CONFLICT(supplement_id, log_date) DO UPDATE SET
-         id=excluded.id, updated_at=excluded.updated_at,
+         id=excluded.id, amount=excluded.amount, unit=excluded.unit, dose_text=excluded.dose_text,
+         updated_at=excluded.updated_at,
          deleted_at=excluded.deleted_at, sync_status=excluded.sync_status`,
       [
         record.id, record.supplementId, record.logDate,
+        dose.amount, dose.unit, dose.doseText,
         record.updatedAt ?? now, record.deletedAt, record.syncStatus,
       ],
     );

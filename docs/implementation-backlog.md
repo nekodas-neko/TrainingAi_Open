@@ -14,8 +14,8 @@ silently misdirecting the next session. Update them in the same PR that consumes
 
 | Pointer | Value | Source of truth |
 |---|---|---|
-| Next free Postgres migration | **243** | `lib/data/postgres/migrations/` |
-| Local SQLite schema version | **v31** | `lib/sqlite/migrations.ts`; `lib/sqlite/__tests__/migrations.test.ts` asserts the max |
+| Next free Postgres migration | **246** | `lib/data/postgres/migrations/` |
+| Local SQLite schema version | **v32** | `lib/sqlite/migrations.ts`; `lib/sqlite/__tests__/migrations.test.ts` asserts the max |
 
 > **There is no third pointer any more.** Entry IDs are not allocated from a shared counter and
 > never were safely: a next-free pointer is a *floor*, not an authority, because it cannot see an
@@ -1814,83 +1814,43 @@ recommendations that were put to them. Do not re-open either.**
 
 ### [nutrition][body] 🔵 BF-3 — track dosed substances (GLP-1s, creatine) — the supplements model cannot represent a titrating or weekly drug
 
-> **⚑ URGENT NOW, 2026-08-30 — the owner is about to start retatrutide.** *"im about to start this
-> supplement and I know it will change up my resting HR and other details; so id like it tracked well
-> to correlate."* This entry was filed on 2026-08-23 from a request that named retatrutide by name;
-> it is no longer hypothetical.
+> **✅ GAP 1 SHIPPED 2026-08-30 — the unrecoverable one is closed, and the owner can start.** The
+> dose is stamped on the LOG (`supplement_logs.amount` / `unit` / `dose_text`, migration 244, local
+> SQLite **v32**), so titrating no longer rewrites history: log at 2 mg, change to 4 mg, and last
+> month still reads 2 mg. **`dose_text` is what makes that true today** — every existing supplement
+> carries only free text, so the freeze works with no data entry and no UI change, and
+> `supplements.default_amount`/`unit` are the structured form a correlation can use. The
+> **out-of-app note is no longer needed**; the app records the schedule now.
 >
-> **⚠ THE COST OF STARTING BEFORE THIS SHIPS IS UNRECOVERABLE, AND IT IS GAP 1 BELOW.** `supplements.dose`
-> is free text on the **definition**, and `supplement_logs` carries no dose at all. So logging a
-> titration with today's model means that when the dose is raised, **every past log silently re-reads
-> at the new dose.** For a drug whose whole story is the escalation schedule, the escalation is
-> exactly what gets destroyed — and it cannot be reconstructed afterwards, because nothing recorded
-> it. There is no workaround inside the app.
->
-> **What to do in the meantime, stated plainly:** keep the dose and date somewhere outside the app
-> (a note, a spreadsheet) from the first injection. It is a few lines and it is the only copy of the
-> schedule that will survive until the log carries its own amount.
->
-> **The correlation ask is new and is NOT covered below.** *"id like it tracked well to correlate"* —
-> against resting HR and the rest. The app already has the machinery (`getCorrelations`,
-> `packages/shared/src/health/correlation.ts`, which already correlates sleep/HRV against training),
-> but **a correlation is only as good as the exposure variable**, and the exposure here is
-> *dose on a date*. So this depends on gap 1 rather than being separate work: fix the log, and a
-> substance becomes correlatable with what already exists. Filed as part of this entry, not a new
-> number.
->
-> **Two constraints that get sharper now, not looser.** The out-of-scope line below stands and is
-> load-bearing: **the app records what was taken and never advises on it** — no dosing guidance, no
-> titration schedules, no interaction checks. And any correlation it surfaces is an observation on
-> n=1 with a dozen confounders; it may be shown as a number the owner reads, never as a claim about
-> cause, per the rule that no LLM- or model-reported figure is presented as fact.
+> Whole chain in one pass: local table → `upsertSupplementLog` (stamps from the local definition when
+> the caller omits a dose, which is why today's UI needed no change) → outbox payload, enriched at
+> push time from the local row so a mutation drained after a titration replays at the dose it was
+> **taken** at → `pushMutations` → `getSyncDelta` → `pullDelta` → `applyDelta` → `listSupplements`,
+> which reports `loggedDose` beside the definition's current dose because the two are different
+> questions. `claude_ro` regenerated in 245.
 
-- **Lane:** A — **classified 2026-08-30** (was `Lane: ?`, which kept it out of both runners while it
-  was the urgent item). CLAUDE.md's path rule settles it: it touches storage and a migration, so it
-  is A, engine half first. The logging surface follows as B once the log carries a dose.
+- **Lane:** A for the remaining engine gaps; B for the surface.
+- **Keep:** three things, none of them urgent, and none of them able to destroy data the way gap 1
+  could.
+  1. **Gap 2 — one log per day, maximum.** `unique(supplement_id, log_date)` makes a log a daily
+     checkbox, so creatine morning-and-evening cannot be recorded twice and there is no time of day.
+     **Note the constraint is load-bearing today**: `logSupplement`'s upsert and `unlogSupplement`'s
+     soft delete both key on it, so removing it is a write-semantics change and not just a DDL one.
+  2. **Gap 3 — no cadence.** `reminderEnabled` + `reminderTime` is implicitly daily, so a weekly
+     injection either fires a reminder every day or gets none, and nothing knows when the next dose
+     is due. Needs an interval + anchor date on the definition.
+  3. **The surface (Lane B).** Nothing in the UI enters or shows a dose yet: the manage sheet has no
+     amount/unit fields, and `supplements-section.tsx` does not render `loggedDose`. The engine
+     freezes the right value without it — that is the point of the store-side stamp — but until the
+     UI shows it, the owner cannot see what a past log recorded.
+  4. **The correlation ask** — *"id like it tracked well to correlate"*. Now unblocked rather than
+     done: `getCorrelations` and `packages/shared/src/health/correlation.ts` exist, and the exposure
+     variable they needed (**dose on a date, as a number**) is what `amount`/`unit` now provide.
 
-**Owner request, 2026-08-23 (verbatim):** *"I'd like to be able to track GLP1 such as retatrutide;
-or any susbtance such as creatine etc. whatever best way to do this would be."*
-
-**The good news first:** `supplements` + `supplement_logs` already exist and are one of the app's
-better-built domains — fully offline-first, with a local table, outbox mutations, a sync-push branch
-and reminders. `app/nutrition/nutrition-content.tsx` is the repo's *reference* offline-first read
-pattern and it reads supplements. Nothing needs inventing; the question is whether the existing model
-stretches, and traced against the schema it does not.
-
-**Three concrete gaps** (`lib/data/postgres/schema.ts:809–831`):
-
-1. **Dose is a free-text field on the *definition*, not on the *log*.** `supplements.dose` is
-   `text`, and `supplement_logs` carries only `(supplementId, logDate)`. So editing the dose
-   **rewrites history**: titrate retatrutide 2 mg → 4 mg → 8 mg and every past log retroactively
-   reads 8 mg. For a drug whose entire clinical story is the escalation schedule, that is the one
-   thing you cannot lose. Dose (amount + unit) has to be stamped on the log.
-2. **One log per day, maximum.** `unique().on(t.supplementId, t.logDate)` makes a log a daily
-   checkbox. Creatine taken morning and evening cannot be recorded twice, and there is no
-   time-of-day on the log at all.
-3. **No cadence — a weekly injection has no representation.** `reminderEnabled` + `reminderTime`
-   (a time-of-day string) is the whole scheduling model, so it is implicitly daily. A weekly GLP-1
-   would either fire a reminder every day or get none, and there is no "next dose due" concept
-   because nothing knows the interval.
-
-**Recommended shape for the planning session, stated so it is not re-derived:** keep one substance
-domain rather than building a parallel "medications" feature beside supplements — the two would
-duplicate the entire offline-first chain (local table, outbox, push branch, pull mapping, reminders)
-for what is the same act of recording that a dose was taken. Extend in place: numeric `amount` +
-`unit` on the **log**, an optional time, and a schedule (interval + anchor date) on the definition.
-Free-text `dose` stays as the display fallback for existing rows.
-
-**Whoever builds it must follow the full offline-first chain in one pass**, per CLAUDE.md — local
-table columns = server payload = `getSyncDelta` output = `pullDelta` mapping = `applyDelta` upsert
-columns, plus the `pushMutations` branch mirroring the web route. Touch points already known:
-`lib/local-store/sqlite-backend.ts:1870`, `lib/local-store/sync-engine.ts:489`,
-`app/api/supplements/route.ts`, `components/nutrition/manage-supplements-sheet.tsx`.
-
-**Out of scope until asked, and worth saying out loud:** the app should record what the owner took,
-not advise on it. No dosing guidance, no interaction checking, no titration schedule generation.
-
-**Done looks like:** a weekly injectable and a twice-daily powder can both be logged with the amount
-actually taken on the day it was taken; changing today's dose leaves last month's logs reading what
-they read before; and a weekly substance's reminder fires weekly.
+- **Out of scope until asked, and worth saying out loud:** the app records what the owner took, not
+  advice about it. No dosing guidance, no interaction checking, no titration schedule generation. And
+  any correlation it surfaces is an observation on n=1 with a dozen confounders — shown as a number
+  the owner reads, never as a claim about cause.
 
 ### [body][devices][platform] BF-58 — the partner's weigh-ins land in the owner's account and are thrown away; two people, one scale
 
