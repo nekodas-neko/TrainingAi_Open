@@ -2,11 +2,10 @@
 
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useState } from 'react'
 import { useUserTimezone } from '@/components/shell/user-timezone-provider'
-import { Plus, Trash2, Loader2, Camera } from 'lucide-react'
+import { Plus, Camera } from 'lucide-react'
 import { toast } from 'sonner'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { useSheetBackDismiss } from '@/lib/hooks/use-sheet-back-dismiss'
-import { Button } from '@/components/ui/button'
 import type { FoodItem, SavedMeal, MealType, FoodLogWithItem, NutritionScanResult } from '@trainingai/shared/types/nutrition'
 import { todayInTz } from '@trainingai/shared/date-utils'
 import { logMealItems } from '@trainingai/shared/nutrition/log-meal'
@@ -18,6 +17,7 @@ import { getLocalStore } from '@/lib/local-store'
 import { pushThenRevalidate } from '@/lib/local-store/push-then-revalidate'
 import { FoodList } from './food-list'
 import { CaptureActions } from './capture-actions'
+import { MealListActions } from './meal-list-actions'
 import { RecentFoodsPanel } from './recent-foods-panel'
 import { SegmentedTabs } from '@/components/ui/segmented-tabs'
 import { MealDetailSheet } from './meal-detail-sheet'
@@ -552,57 +552,15 @@ export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate,
           <CaptureActions onScanResult={onScanResult} onManual={onManual} onScannedSavedMeal={onScannedSavedMeal}>
             <SegmentedTabs tabs={LIST_TABS} value={listTab} onValueChange={changeListTab} size="xs" className="shrink-0 px-4" />
             {listTab === 'meals' && (
-              <div className="flex shrink-0 gap-2 px-4">
-                {selectedIds ? (
-                  <>
-                    <Button
-                      variant="secondary" className="flex-1 min-h-[44px]"
-                      onClick={() => { setSelectedIds(null); setConfirmBulkDelete(false) }}
-                    >
-                      Cancel
-                    </Button>
-                    <Button
-                      variant="destructive" className="flex-1 min-h-[44px] gap-1.5"
-                      disabled={selectedIds.size === 0 || bulkDeleting}
-                      onClick={() => setConfirmBulkDelete(true)}
-                    >
-                      {bulkDeleting
-                        ? <Loader2 className="w-4 h-4 animate-spin" />
-                        : <Trash2 className="w-4 h-4" />}
-                      Delete
-                    </Button>
-                  </>
-                ) : (
-                  <>
-                    {/* Artboard 3 puts a single `+ New` pill in the header band, not a pair of
-                        full-width bars. It cannot literally sit beside the title here — the sheet's
-                        close ✕ is `absolute top-4 right-4` and owns that corner — so the pills keep
-                        their own row and take the drawing's weight instead of its position. */}
-                    <span className="flex-1" />
-                    {/* BF-50 ④: *"There is a 'select' button that lets you select more than one
-                        meal; but then you cant do anything with it except delete."* Correct — the
-                        only action this mode has ever offered is Delete. The entry allowed either
-                        adding a second action or **saying what the mode is**, and this is the
-                        second: multi-log is not a smaller change wearing a label, because logging
-                        a saved meal needs a meal type and a portion per meal, and picking those
-                        for N meals is a screen rather than a button. Naming the mode is honest
-                        today and costs nothing if that screen is built later. */}
-                    {meals.length > 1 && (
-                      <Button
-                        variant="secondary" size="sm" className="min-h-[44px] rounded-full px-4 gap-1.5"
-                        onClick={() => setSelectedIds(new Set())}
-                      >
-                        <Trash2 className="w-4 h-4" />
-                        Delete meals
-                      </Button>
-                    )}
-                    <Button onClick={() => openBuild()} size="sm" className="min-h-[44px] rounded-full px-4 gap-1.5">
-                      <Plus className="w-4 h-4" />
-                      New
-                    </Button>
-                  </>
-                )}
-              </div>
+              <MealListActions
+                selectedCount={selectedIds ? selectedIds.size : null}
+                canSelect={meals.length > 1}
+                deleting={bulkDeleting}
+                onStartSelecting={() => setSelectedIds(new Set())}
+                onCancelSelecting={() => { setSelectedIds(null); setConfirmBulkDelete(false) }}
+                onConfirmDelete={() => setConfirmBulkDelete(true)}
+                onNew={() => openBuild()}
+              />
             )}
             <div className="flex-1 overflow-y-auto px-4 space-y-3">
               {confirmBulkDelete && selectedIds && (
