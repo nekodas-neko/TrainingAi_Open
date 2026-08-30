@@ -24,8 +24,20 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.395.6 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Version:** v1.399.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-08-30.
+
+**The meal photo was blocked by the app's own CSP, on the branch no test runs (BF-46 ①b).** Three
+owner reports, and the entry recorded it as a save failure that *"does not reproduce in source"*.
+`MealPhotoTile`'s **native** branch did `await fetch(photo.dataUrl)` to turn the camera plugin's data
+URL into a Blob — and **a `fetch()` of a `data:` URL is governed by `connect-src`**, which
+`lib/security/csp.ts` does not open to `data:`. It rejected into a `catch {}` written for picker
+cancellations, so choosing a photo on the phone did nothing and said nothing. The web branch takes a
+`File` from an `<input>` and never fetches, which is why `meal-photo-picker.spec.ts` passed
+throughout. Now `CameraResultType.Base64` + `dataUrlToBlob`, matching the food scanner that works on
+the same device, and every non-cancellation toasts. A source scan fails on the next one. **The fix
+cannot be verified anywhere but the S25** — the failing line runs only inside the WebView
+([journal](docs/overview/entries/2026-08-30-meal-photo-data-url-fetch.md)).
 
 **Home's APK-banner link was a 33 px tap target, and the gate that hid the entry was self-inflicted (LB-26).** The link rendered **258×33** against the 48 dp floor — an `<a>`, which `globals.css` excludes on purpose so an inline prose link is not forced to 48 px. It takes the floor locally instead of widening the selector, and the reasoning moved beside the CSS rule rather than sitting in the banner's JSX, which is not where someone tempted to widen it would look. **The spec's allowlist is now empty** — an allowlist that never empties is a backlog wearing a test's clothes. Proved both ways: removing the floor fails the spec with the exact reported measurement. **The process half is the more useful one:** LB-26 carried `Gate: device` on work that had never been built, filed by the session that had read BF-45's warning about that exact mistake hours earlier — a gate parks an entry, so it hid it from `next-item.js`. The rule now sits in the backlog's protocol header where entries are written, not only inside the entry that found it ([journal](docs/overview/entries/2026-08-30-apk-banner-tap-target.md)).
 

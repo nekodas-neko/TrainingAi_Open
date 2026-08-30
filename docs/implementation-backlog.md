@@ -1202,6 +1202,26 @@ user into the builder — and the builder's real tile at `saved-meals-sheet.tsx:
 the two screens agree where a meal's photo lives and there is one control rather than two things
 wearing one label.
 
+**✅ (b)'s ROOT CAUSE IS FOUND AND FIXED (v1.399.0) — the save was never the save path.**
+`MealPhotoTile`'s **native** branch asked the camera plugin for `CameraResultType.DataUrl` and then
+did `await fetch(photo.dataUrl)` to get a Blob. **A `fetch()` of a `data:` URL is governed by
+`connect-src`**, and `lib/security/csp.ts` does not open `connect-src` to `data:` — so the call
+rejected with a bare `TypeError`, into a `catch {}` written to swallow picker cancellations. Picking
+a meal photo on the phone therefore did nothing and *said* nothing, which is exactly the owner's
+*"always the default cant add a custom picture"*. The web branch takes a `File` from an `<input>`
+and fetches nothing, which is why `meal-photo-picker.spec.ts` passed on every run. It now asks for
+`Base64` — as the working `capture-actions.tsx` already does — decodes with `dataUrlToBlob`, and
+toasts anything that is not a recognised cancellation.
+`lib/media/__tests__/no-data-url-fetch.test.ts` scans source and fails on the next one.
+
+- **⚠ NOT DEVICE-VERIFIED, and this fix in particular cannot be verified anywhere else.** The
+  failing branch only runs inside the Capacitor WebView. What is *checkable* here is the mechanism
+  (the CSP has no `data:`; the plugin call and the decode are the shape `capture-actions.tsx` runs on
+  the same device every day) — the outcome is not. **On the S25: pick a photo in Edit Meal, save,
+  reopen.** If it still fails it now fails *loudly*, which is itself the smaller half of this fix.
+- **(a), the PLACEMENT, is still owed** — one picker, at the top, at hero scale — and so is removing
+  the detail sheet's fake *Add a photo*, which calls `onEdit` rather than picking anything.
+
 **⚠ (a) WAS BUILT AND HELD, AND WHAT IT MEASURED BEARS DIRECTLY ON (b) — read this first.**
 2026-08-30, Lane B. The rework is straightforward and it did not work, in a way that looks like the
 same defect (b) describes. What was built: `useMealPhotoPicker` (`lib/hooks/`) for the acquisition —
