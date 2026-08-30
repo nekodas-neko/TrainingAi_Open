@@ -24,20 +24,30 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.399.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Version:** v1.400.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-08-30.
 
 **The meal photo was blocked by the app's own CSP, on the branch no test runs (BF-46 ①b).** Three
-owner reports, and the entry recorded it as a save failure that *"does not reproduce in source"*.
-`MealPhotoTile`'s **native** branch did `await fetch(photo.dataUrl)` to turn the camera plugin's data
-URL into a Blob — and **a `fetch()` of a `data:` URL is governed by `connect-src`**, which
-`lib/security/csp.ts` does not open to `data:`. It rejected into a `catch {}` written for picker
-cancellations, so choosing a photo on the phone did nothing and said nothing. The web branch takes a
-`File` from an `<input>` and never fetches, which is why `meal-photo-picker.spec.ts` passed
-throughout. Now `CameraResultType.Base64` + `dataUrlToBlob`, matching the food scanner that works on
-the same device, and every non-cancellation toasts. A source scan fails on the next one. **The fix
-cannot be verified anywhere but the S25** — the failing line runs only inside the WebView
+owner reports, recorded as a save failure that *"does not reproduce in source"*. `MealPhotoTile`'s
+**native** branch did `await fetch(photo.dataUrl)` — and **a `fetch()` of a `data:` URL is governed
+by `connect-src`**, which this CSP does not open to `data:`. It rejected into a `catch {}` written
+for picker cancellations, so choosing a photo on the phone did nothing and said nothing. The web
+branch takes a `File` from an `<input>` and never fetches, which is why every browser test passed.
+Now `Base64` + `dataUrlToBlob`, and non-cancellations toast. **Verifiable only on the S25**
 ([journal](docs/overview/entries/2026-08-30-meal-photo-data-url-fetch.md)).
+
+**Version:** v1.398.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Last updated:** 2026-08-30.
+
+**Settings follow the account now (Q-392).** The owner's *"when i do a new install or open on computer - it loses all the saved preferences"* was still true in full: the engine (`users.preferences`, `GET`/`PATCH /api/user/preferences`) had shipped and **no read site called it**. `lib/user/preferences-sync.ts` connects them — `hydrateUserPreferences` seeds every device key from the server bag on launch, `savePreference` writes both. Proved by `e2e/preferences-survive-reinstall.spec.ts`, which is the owner's sentence as a test: PATCH three preferences, `localStorage.clear()`, reload, and all three come back in their right encodings — and it fails with the hydration replaced by a no-op. **The rule that was wrong, and CI found it:** hydration first cleared any key the bag did not carry — right for a settled system, wrong in the window between a tap and its PATCH landing. `meal-label.spec.ts` caught it wiping a label style mid-flight, and **offline it reverts every change on the next launch**. Hydration now deletes nothing; the one thing the app clears, the mutually-exclusive brand preset / hue pair, is resolved by `EXCLUSIVE_GROUPS`. The earlier `backgroundSettings` catch was the same rule failing at its extreme, and treating it as one key needing an exclusion would have left the race in place for every other ([journal](docs/overview/entries/2026-08-30-preferences-read-sites.md)).
+
+**A logged food swipes to Delete, and the day stopped moving with it (BF-45 ⑤).** The diary reuses
+the meal list's `SwipeActions` tray, routed to the confirmation the edit sheet's bin already raises.
+What earns the index is the collision: `nutrition-content.tsx`'s scroll container owns a horizontal
+drag that steps the **day**, so one touch fed both gestures — and it is **invisible on today**, since
+that handler refuses to step past today. `SwipeActions` marks itself `[data-swipe-actions]` and the
+day handler defers, as `tab-swipe-navigator.tsx` already does for a carousel. **Not device-verified**
+([journal](docs/overview/entries/2026-08-30-food-log-swipe-delete.md)).
 
 **Home's APK-banner link was a 33 px tap target, and the gate that hid the entry was self-inflicted (LB-26).** The link rendered **258×33** against the 48 dp floor — an `<a>`, which `globals.css` excludes on purpose so an inline prose link is not forced to 48 px. It takes the floor locally instead of widening the selector, and the reasoning moved beside the CSS rule rather than sitting in the banner's JSX, which is not where someone tempted to widen it would look. **The spec's allowlist is now empty** — an allowlist that never empties is a backlog wearing a test's clothes. Proved both ways: removing the floor fails the spec with the exact reported measurement. **The process half is the more useful one:** LB-26 carried `Gate: device` on work that had never been built, filed by the session that had read BF-45's warning about that exact mistake hours earlier — a gate parks an entry, so it hid it from `next-item.js`. The rule now sits in the backlog's protocol header where entries are written, not only inside the entry that found it ([journal](docs/overview/entries/2026-08-30-apk-banner-tap-target.md)).
 

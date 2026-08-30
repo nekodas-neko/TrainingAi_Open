@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { savePreference } from '@/lib/user/preferences-sync'
 import { toast } from 'sonner'
 import { ChevronDown, KeyRound, Loader2, Settings } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -235,7 +236,7 @@ export function EditProfileSheet({ user, onSaved }: EditProfileSheetProps) {
                     key={r}
                     type="button"
                     {...regionGroup.getRadioProps(foodRegion === r, i)}
-                    onClick={() => { setFoodRegion(r); localStorage.setItem('ta_food_region', r) }}
+                    onClick={() => { setFoodRegion(r); savePreference('foodRegion', r) }}
                     className={`rounded-lg px-4 py-1.5 transition ${foodRegion === r ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground'}`}
                   >{r}</button>
                 ))}

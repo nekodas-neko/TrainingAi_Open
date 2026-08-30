@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useState, useCallback, useMemo, useRef } from "react";
+import { savePreference } from '@/lib/user/preferences-sync'
 import { useSearchParams } from "next/navigation";
 import { useTabVisibility } from "@/components/shell/tab-visibility";
 import dynamic from "next/dynamic";
@@ -190,7 +191,7 @@ export default function NutritionContent({ userId }: { userId?: string }) {
 
   const toggleMealReminders = (val: boolean) => {
     setMealRemindersEnabled(val);
-    localStorage.setItem("ta_pref_meal_reminders", String(val));
+    savePreference('mealReminders', val);
     if (val) {
       reconcileMealReminders(mealTypes, logs);
     } else {
@@ -489,8 +490,12 @@ export default function NutritionContent({ userId }: { userId?: string }) {
     : targets;
 
   const bindDateSwipe = useDrag(
-    ({ movement: [mx], last, velocity: [vx] }) => {
+    ({ movement: [mx], last, velocity: [vx], event }) => {
       if (!last) return;
+      // A drag that began on a swipe-action row belongs to that row (BF-45 ⑤). Both gestures are
+      // horizontal and both fire from one touch, so without this a thumb revealing a food's Delete
+      // also steps the diary to the next day — and the row it was reaching for is gone.
+      if ((event?.target as Element | null)?.closest?.("[data-swipe-actions]")) return;
       if (Math.abs(mx) < 60 && vx < 0.5) return;
       if (mx < 0 && selectedDate < todayStr) {
         dateChangeDirRef.current = 1;
@@ -656,6 +661,7 @@ export default function NutritionContent({ userId }: { userId?: string }) {
                     logs={logsByMealType.get(mt.id) ?? EMPTY_LOGS}
                     onAdd={openLogger}
                     onQuickEdit={openQuickEdit}
+                    onDeleteLog={requestDeleteLog}
                   />
                 ))}
               </div>

@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
+import { savePreference } from '@/lib/user/preferences-sync'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { Button } from '@/components/ui/button'
 import { Download, Loader2, Share2 } from 'lucide-react'
@@ -60,7 +61,7 @@ export function MealLabelSheet({ meal, open, onOpenChange }: Props) {
 
   const chooseStyle = useCallback((next: MealLabelStyle) => {
     setStyle(next)
-    try { localStorage.setItem(LABEL_STYLE_KEY, next) } catch { /* private mode; the pick still applies */ }
+    savePreference('mealLabelStyle', next)
   }, [])
 
   /**

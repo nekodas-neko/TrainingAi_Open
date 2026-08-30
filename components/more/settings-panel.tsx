@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from 'react'
+import { savePreference } from '@/lib/user/preferences-sync'
 import { Activity, Bell, Calendar, ChevronDown, Palette, Route, Settings, Terminal, Timer } from 'lucide-react'
 import { Switch } from '@/components/ui/switch'
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/components/ui/collapsible'
@@ -39,17 +40,17 @@ export function SettingsPanel() {
 
   const toggleCalendarSync = (val: boolean) => {
     setCalendarSync(val)
-    localStorage.setItem('ta_pref_calendar_sync', String(val))
+    savePreference('calendarSync', val)
   }
 
   const toggleDayReviewReminders = (val: boolean) => {
     setDayReviewRemindersEnabled(val)
-    localStorage.setItem('ta_pref_day_review_reminders', String(val))
+    savePreference('dayReviewReminders', val)
   }
 
   const toggleHealthAlerts = (val: boolean) => {
     setHealthAlertsEnabled(val)
-    localStorage.setItem('ta_pref_health_alerts', String(val))
+    savePreference('healthAlerts', val)
   }
 
   const toggleRestChip = (val: boolean) => {
