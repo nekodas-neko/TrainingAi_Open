@@ -805,6 +805,9 @@ app, opposite advice. **That contradiction is the defect**, not the absence of a
 
 - **Needs:** BF-43 — the clinical half of the overview cannot be wired before it is decided what the
   model may see. **The injury line does not wait on it** and should ship first, alone if need be.
+- **BF-68 is the same gap on the program builder**, where `injur` also appears zero times. Whichever
+  ships first exports the active-injury formatter (muscle, severity, days active) for the other to
+  import — two hand-written injury summaries in two prompts drift.
 - **Verification.** Ask the chat for a lower-body session with an active lower-back injury logged: it
   names the injury unprompted and does not recommend a deadlift, matching what the workout screen
   does for the same state. Resolve the injury and the constraint disappears from both.
@@ -1337,6 +1340,90 @@ opened on, unchanged.
   **three cents a month**. The reason to act is that a 7× trend compounds, not that the bill hurts.
 - **Verification:** index total drops below the heap total, and a re-read a week later shows growth
   back near trend.
+
+### [workouts][platform] BF-68 — the program builder does not know you are injured, and typing it into the chat does not make it stick
+
+- **Lane:** A — `app/api/generate-program/route.ts` and `app/api/builder-chat/route.ts`; the UI half
+  (surfacing the constraint on the wizard) is B and can follow.
+- **Added:** 2026-08-30 · owner, on building a new program with the AI coach: *"be able to put
+  somewhere or say 'i have a sore lower back, so would rather not heavily loaded lower back
+  exercises' and for it to recommend against deadlifts or something."*
+
+**Measured: `injur` appears zero times in the entire builder path** — both routes and all three
+`components/workout-builder/` files. `generate-program`'s request schema is a `.strict()` 13-field
+wizard payload with no injury data and no free-text field at all, so the generator cannot know and
+the user cannot tell it.
+
+**`builder-chat` is the trap, not the answer.** It *does* take free text (`message`, 1,000 chars), so
+typing the sentence above during the review step will often produce a sensible-looking swap. But the
+model is handed no injury record and no instruction to treat it as a hard constraint, so it is luck
+rather than a rule — and **the constraint dies when the program is saved.** The daily prescription
+engine, which already reads `repo.listInjuries()`, never learns about it. A back that stopped
+deadlifts in the builder gets deadlifts again the next time the engine writes a session.
+
+- **Recommendation: feed the existing `injuries` table into both routes, and make the free-text path
+  WRITE to it.** This is not new infrastructure. `injuries` has `muscleName`, `severity`, `notes`,
+  `startedDate`, `resolvedDate`; it already drives `activeInjuredMusclesInSession`, the mid-workout
+  injury-swap sheet via `injurySafeAlternatives`, and the prescription's re-evaluation pass. Making
+  the builder read the same rows means one place to say it, every surface obeys it, and marking it
+  resolved lifts the constraint everywhere at once.
+- **The free-text half should create a record, not a prompt line.** When the builder chat is told
+  about an injury, it should offer to log one — Coach already has a tool that does exactly this. A
+  constraint that exists only inside one generation is the failure mode above.
+- **Batch/Needs — BF-44 is the same gap on the chat surface** and proposes an always-on active-injury
+  context line. Whoever ships first exports that formatter (muscle, severity, days active) and the
+  other imports it; two hand-written injury summaries in two prompts is the drift this repo files
+  entries about. Not a `Needs:` — neither blocks the other, and either alone is an improvement.
+- **⚠ Do not have the model decide which exercises an injury rules out.** `injurySafeAlternatives`
+  is deterministic and already knows, from the muscle assignments. The prompt's job is to state the
+  injured muscles and the rule; the exercise-level exclusion should come from the same code the swap
+  sheet uses, or the builder and the swap sheet will disagree about the same injury.
+- **Verification:** log a lower-back injury, generate a program — no heavily-loaded lower-back
+  primary appears, and the model says why unprompted. Say it in the builder chat instead: an injury
+  record is offered and, once logged, the next daily prescription respects it too. Resolve the
+  injury and both constraints lift.
+
+### [workouts] BF-67 — building a new program cannot reference an old one, so every program starts from nothing
+
+- **Lane:** A for the payload and prompt, B for the picker.
+- **Planning item** — this is a design with a size question in it, not a defect. Needs a planning
+  session before implementation.
+- **Added:** 2026-08-30 · owner: *"be able to reference an old program so it knows what I did and
+  what I would like similar to."*
+
+**The generator's entire input is the wizard form.** `RequestSchema` in `generate-program` is
+`.strict()` with thirteen fields — name, equipment, sessions per week, minutes, muscles, goal,
+progression mode, phase structure, weeks, schedule shape. No program id, no history, no notes. So a
+program built after a year of training starts from the same blank slate as the first one, and the
+owner has to re-describe in a wizard what the app already knows.
+
+**"What I did" and "what I liked" are two different payloads, and conflating them is the size trap.**
+
+1. **Structure** — the old program's session names, exercises, roles and progression styles. Small
+   and bounded: a 5-session program is ~30 exercise names. This is the "similar to" half.
+2. **History** — what was actually trained under it. Unbounded if taken literally; a year of set logs
+   cannot go in a prompt. It needs a *summary*: per exercise, sessions logged, latest 1RM, and
+   whether it was dropped part-way. Adherence is the interesting signal — an exercise programmed
+   twelve times and trained twice is one the next program should probably not repeat.
+
+- **Recommendation: ship structure first, summary second.** Structure alone answers "make me another
+  one like that", is cheap to build (`listPrograms` already exists), and is verifiable. The history
+  summary is where the design work is, and it can land on top without changing the picker.
+- **Decide what "reference" means to the model, because the two readings produce different programs.**
+  A *template* to vary ("keep the split, change the accessories") is not the same instruction as
+  *context* to learn from ("here is what worked, do better"). The prompt has to say which, and the UI
+  should probably let the user pick — the owner's sentence contains both readings.
+- **⚠ Bound the payload at the schema, not by hoping.** The note above `MAX_BODY_BYTES` in
+  `generate-program` already records that `equipment` and `musclesToFocus` are unbounded arrays and
+  the byte cap is the only thing holding them. A reference program is a much larger structure; it
+  needs its own `.max()` counts rather than inheriting that situation.
+- **Send an id, not the program.** The client should pass a program id and the route should read it
+  server-side. Accepting a whole program object from the client is an ownership hole and a
+  prompt-injection surface for no benefit — and any id the client sends still needs a `user_id`-scoped
+  read, per the write-path ownership rules.
+- **Verification:** pick a previous program in the builder, generate, and the result visibly echoes
+  its split and its main lifts rather than a generic template; pick none and the output is unchanged
+  from today. A program id belonging to another user is rejected, not read.
 
 ### [workouts] BF-66 — `"60 for 6"` is heard perfectly and parsed as nothing, because the letter `r` survives the strip
 
