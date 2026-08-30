@@ -9585,39 +9585,49 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   mouse input. (Q-282 shipped as `e2e/touch-target-size.spec.ts` and does **not** — it measures
   rendered geometry from the DOM and never clicks, so it does not revive this.)
 
-### [platform] Q-297 — finish the E2E specs Q-249's first PR deliberately left, and cover more than one tab per screen
+### [platform] Q-297 — cover Nutrition's day navigation; the write-path specs it asked for have shipped
 
 - **Branch:** `feat/e2e-specs-round-2`
-- **Added:** 2026-08-15 · follow-up to Q-249, which shipped the harness
-  (`playwright.config.ts`, `e2e/`, the `E2E` CI job) plus one spec. Read
-  [`e2e/README.md`](../e2e/README.md) first — it records what a green run does and does not prove,
-  and every limitation below was measured, not guessed.
-- **DONE 2026-08-15 for Health — the multi-panel coverage gap.** `e2e/health-tabs-instant-paint.spec.ts`
-  drives `?tab=training|body|progress` and asserts the requested tab is the *selected* one before
-  checking, so the panel under test is actually in the viewport. Verified by the mutation Q-249's
-  spec could not catch: forcing Health's Body-tile skeletons to never clear now fails — and fails
-  **only** the Body case, leaving Training and Progress green.
-- **Still open for every other tabbed screen.** The `expectNoSkeleton` viewport rule is unchanged and
-  correct (an inactive `SwipeCarousel` panel is mounted but unseen, and its data loads on swipe by
-  design), so any single-URL spec still covers one tab. Nutrition's date swipe and any other tabbed
-  surface need the same treatment: drive the tab, assert which panel is selected, then check.
-- **The specs Q-249 scoped and this did not ship:** log a set, a food entry and a water entry and
-  assert each appears without a reload; change a goal and assert the Health tab reflects it (the
-  Q-240 regression, four lines of E2E for a bug this repo has already had once).
-- **A limitation worth closing separately:** the 20 s skeleton budget cannot tell "seeds instantly
-  from cache" from "seeds in 8 s off the network", because the harness runs `pnpm dev` and route
-  handlers compile on first call. It catches a card that *never* seeds, not a regression from
-  instant to sluggish. Measuring the second would need a warmed server and a much tighter budget.
-- **The E2E job is NOT a required status check** and should stay that way until it has a track
-  record — branch protection requires Lint, Tests, Build, Custom Rules and Migration Check. Promote
-  it once it has run green across a few weeks without flaking, and say so in the PR that does.
+- **Added:** 2026-08-15 · follow-up to Q-249, which shipped the harness. Read
+  [`e2e/README.md`](../e2e/README.md) first — it records what a green run does and does not prove.
+- **⚠️ RE-VERIFIED 2026-08-30 and most of this entry was stale.** Read this block before planning;
+  four of the five things it asked for are in `e2e/` already, under other entries' numbers.
+  - *"log a set … assert it appears without a reload"* → **`workout-set-loop.spec.ts`** (Q-461).
+  - *"a food entry"* → **`food-logging-complete.spec.ts`** (Q-387).
+  - *"a water entry"* → **`water-log-write-path.spec.ts`**, whose header names Q-297 outright:
+    *"the first write-path spec: a logged value must appear on the screen that triggered it,
+    without a reload."*
+  - *"change a goal and assert the Health tab reflects it (the Q-240 regression)"* →
+    **`goal-round-trip.spec.ts`** covers the write reaching another screen, and
+    **`goal-invalidation.spec.ts`** establishes by mutation that **no guard can exist** for the
+    Q-240 path specifically: `cachedFetchCore` always revalidates unless `freshWithinTtl` is set,
+    and the stale flash comes from Health's retained React state rather than the cache. That is a
+    settled negative result, not an outstanding item.
+  - *"Nutrition's date swipe and any other tabbed surface"* → **there is no other tabbed surface.**
+    `SwipeCarousel` is used by exactly one screen (`health-content.tsx`) plus two pickers
+    (`walk-config`, `run-type-carousel`), so `health-tabs-instant-paint.spec.ts` already covers the
+    whole population. Nutrition has a **day**, not tabs.
+- **Nutrition's day navigation is covered as of 2026-08-30** — `e2e/nutrition-day-navigation.spec.ts`
+  pins the two entry points to each other (the header chevrons and the `?date=` deep link the Home
+  timeline's meal cards use), the today guard on Next day, and instant paint on returning to a day
+  already viewed. **Driven by the chevrons, not the swipe**, because `useDrag` on this screen
+  swallows mouse input (**Q-354**, open) and mouse is what Playwright sends — a swipe-driven spec
+  would assert against a known-broken path. Cover the swipe when Q-354 lands.
+- **What is genuinely left, and it is small:**
+  - The **20 s skeleton budget cannot tell "seeds instantly from cache" from "seeds in 8 s off the
+    network"**, because the harness runs `pnpm dev` and route handlers compile on first call. It
+    catches a card that *never* seeds, not a regression from instant to sluggish. Measuring the
+    second needs a warmed server and a much tighter budget, and is its own piece of work.
+  - **Whether the E2E job should become a required check.** This entry said keep it optional until
+    it has a track record; LA-22 has since made it always-run and always-report specifically so it
+    is safe to require. Its current branch-protection state was not checked here — check before
+    changing anything.
 - **Do not chase a skeleton into a "fix" without checking which panel it is on.** The Q-249 session
-  found the Injuries card stuck in a loading state, traced it to `injuries` being fetched only by
-  the Body tab's group, and changed `health-content.tsx` — then reverted it on discovering the card
-  is off-screen in an inactive carousel panel and loads on swipe, exactly as designed. The milder
-  real behaviour is that arriving on Body or Progress for the first time shows a brief skeleton,
-  because nothing has written the cache the mount seed reads. That may be worth fixing; it is not
-  the bug it first looked like.
+  found the Injuries card stuck loading, traced it to `injuries` being fetched only by the Body tab's
+  group, changed `health-content.tsx` — then reverted on discovering the card is off-screen in an
+  inactive carousel panel and loads on swipe, exactly as designed. The milder real behaviour is that
+  arriving on Body or Progress for the first time shows a brief skeleton, because nothing has written
+  the cache the mount seed reads. That may be worth fixing; it is not the bug it first looked like.
 
 ### [platform][devices] Q-250 — an Android emulator job in CI, to close the 17 rows that need an Android runtime and nothing else
 
