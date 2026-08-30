@@ -36,6 +36,22 @@ It supplies its own row now, in the **user's** timezone. `meal-label` is intermi
 reason again — its ink poll cannot tell the new label style's paint from the previous one's — and
 stays open with the mechanism written down ([journal](docs/overview/entries/2026-08-30-e2e-fixture-not-time-budget.md)).
 
+**Two rings that were never compared, reported as two rings that disagree (PS-15, phase + units).**
+`/api/admin/device-comparison` returned `overlap: 0` for the rings' daytime stress. Oura's buckets
+land at **:15/:45** and the Colmi's at **:00/:30** — fifteen minutes apart, forever — and the route
+bucketed at a hardcoded five minutes, so no pair could form at any point in either ring's history.
+`lib/health/device-comparison.ts` has said *"bucket to the COARSEST cadence"* in its own header since
+the day it was written and **nothing implemented it**. The width is measured now (median
+inter-sample gap, coarsest wins) and reported three ways; `verdict` separates `out-of-phase` from
+`no-data` and from a real disagreement; and a pair in **mismatched units** (Oura stress is −1..+1,
+the Colmi's raw 0..100) suppresses every magnitude and returns rank agreement — **rho = 0.64**, the
+figure PS-15 was filed with, now reachable from the endpoint instead of by hand. Adding `spearman`
+to `packages/shared/src/health/correlation.ts` *removed* a duplicate: `averageRanks` moved out of
+`model-report-calibration.ts`. **Steps stay unbuilt on purpose** — pairing them needs the Colmi's
+buckets summed to a day and **PS-16** has not settled whether they are cumulative, so PS-15 keeps
+that half with `Needs: PS-16`. Admin JSON, no UI, no version bump
+([journal](docs/overview/entries/2026-08-30-device-comparison-phase-and-units.md)).
+
 **The Coach can ask a multi-answer question, and stopped retyping six lists (Q-407, widget half).**
 The owner's complaint was literal — *"there should be options for 'select all' as I keep clicking
 each grocery store"* — and nothing produced one: `ChoiceListSchema` had no multi flag and the
@@ -498,6 +514,23 @@ order.
 > An entry only leaves when **nothing is still owed**: no open work, no pending owner or device
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
+
+### [platform] 🟡 The module map points at `lib/` for 34 modules that live in `packages/shared/` (LA-35, 2026-08-30)
+
+Found while correcting that map for PS-15. `docs/module-map.md` names
+`lib/health/{activity-score,readiness-composite,model-report-calibration,vo2max,…}.ts` — **34 paths
+in all** — and every one of those files is `packages/shared/src/health/<same>.ts`. `lib/health/` is
+a real directory with nine other files in it, so the wrong paths look plausible.
+
+This is the Q-153 trap that `CLAUDE.md` sends readers to that map to avoid, and it survives because
+of the check: `scripts/check-index-doc-paths.js` ends `resolves()` with
+`'packages/shared/src/' + p.replace(/^lib\//, '')`, so the one error class the map exists to prevent
+is the one the check whitelists — all 34 report OK. **Note this does not contradict the 🟢 row
+further down** about the map's `path → symbol` claims: that check (`check-module-map-symbols.js`)
+verifies a symbol is attributed to the right *file*, not that the file is in the right *directory*.
+
+Nothing breaks. The failure mode is a session concluding a module is absent and writing a second
+copy. Queued as **LA-35**: move the paths, then delete the fallback so CI holds it.
 
 ### [workouts][devices] ⚠️ The corrected exercise catalogue has not been seen on the device (BF-16a, 2026-08-25)
 
