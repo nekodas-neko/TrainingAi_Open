@@ -741,6 +741,23 @@ window, then the newest `history-*.md`. The 157 dated status notes this section 
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
+### [readiness][devices] 🔴 TN-6a's temperature suspension covers the readiness ladder but not the deload banner (TN-18, 2026-08-31)
+
+**Found, not fixed.** Owner screenshot 06:43 Brisbane: *"Body temp elevated — rest or deload recommended"* while readiness scores temperature **80/100** — same night, same baseline object. [`review`](docs/reviews/2026-08-31-four-tiles-at-55.md).
+- **TN-6a shipped and works.** `readiness-payload.ts:386` gates the ladder on `isTemperatureBaselineCentred(...)`, so 2026-08-31's stored **0.519 °C** deviation carries **no** readiness penalty.
+- **The banner was never gated.** `packages/shared/src/ai-periodization/ai-dynamic.ts:184` is a bare `temperatureDeviation > TEMP_ALERT_THRESHOLD_C` (0.5), and `isTemperatureBaselineCentred` appears in **exactly one file** — though TN-6a's entry required **all three** consumers.
+- **Both halves of the broken baseline are visible in one frame.** The contributor reads `tempZ` = **0.303** (fine); the banner reads **0.519 °C** (deload). The z is small **because `temp_baseline_dev_x8` = 1.714 °C** against a true nightly sd of ~0.14 — `0.519/1.714 = 0.303`, matching the stored input to three decimals. **Q-506's inflated sd and TN-6's low mean failing in opposite directions.**
+- **⛔ Do not raise `TEMP_ALERT_THRESHOLD_C`** — Q-504's mistake. Pass the same `tempLadderTrusted` condition into the deload evaluation.
+- **This is the surface the owner actually reads** — the one behind *"its often triggering deload days"*. The protection landed on the path they never see.
+
+### [readiness][sleep][activity][heart-rate] 🟢 "Everything is 55" — the clustering is coincidence; today's score is correct (2026-08-31)
+
+**Measured, nothing to fix in the scores themselves.** [`review`](docs/reviews/2026-08-31-four-tiles-at-55.md).
+- **The three scores normally sit 20 points apart** (median 19, max 65); only **2 of 35 days** land within 3, and 2026-08-31 is one. 08-30 read 73/69/64, 08-26 read 52/15/80. **Not a collapse.** Heart Rate's "55" is **bpm**, a coincidence of units — an argument for TN-13 on its own.
+- **Today's 55 reproduces exactly** (55.3) from stored contributors, and **HRV 53 ms (vs 71–72) plus resting HR 63.7 (vs 59.0) account for 15.8 of the 18-point drop** from yesterday. Sleep duration was fine at 7.75 h. **The app is right today.**
+- **⚠ Two contributors qualify it, both queued:** `recoveryIndex` scored **100** flagged provisional after 22 and 44 on the two prior days, *lifting* readiness by 5 (**Q-509**); and `checkin` sits at the placeholder 50 until logged, so the score still moves after first open (**TN-9**).
+- **Permanent, and worth knowing: two of the five numbers are not independent.** `previousNight.input` **is** the Sleep tile and `activityBalance.input` **is** the Activity tile — **22% of readiness is the two tiles beside it** (`corr` **+0.656**, against sleep~activity **+0.139**) — and Body Battery's morning anchor **is** the readiness score (**+0.838**, n=47). The screen reads as more corroboration than it is; the fix is presentational and belongs with **TN-15**.
+
 ### [nutrition][devices] ⚠️ The queued-delete fix is reasoned, not reproduced (BF-47, v1.395.5)
 
 The owner reported it from the device and the fix has never been seen to work there — nor has the

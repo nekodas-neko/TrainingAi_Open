@@ -3970,3 +3970,35 @@ actually happened. It earns the index because the fix is not the one the entry d
 the branch Q-211 named left the behaviour unchanged, since a second branch re-applied the deload, and
 that branch carried a comment calling such a clause unreachable — true when written, false the moment
 the first exemption landed. A reader of this file should know the shipped fix has two halves.
+
+## 2026-08-31 — `projectOverview.md` raised, 8453 → 8470 (the four-tiles-at-55 screenshot)
+
+Two rows from one owner screenshot, and the pair is the point: one 🔴 defect and one 🟢 "this is
+working, here is why it looked broken".
+
+**The 🟢 row exists so the question is not re-asked.** *"Everything is 55"* looks like a scoring
+collapse and is not — the three scores normally sit 20 points apart and this was the 2nd tightest day
+in 35, while the readiness value reproduces to 55.3 from its stored contributors with HRV and resting
+HR carrying 15.8 of the 18-point drop. Without the row, the next session re-derives all of that from
+scratch. It also records the permanent fact underneath: `previousNight.input` **is** the Sleep tile
+and `activityBalance.input` **is** the Activity tile, so 22% of readiness is the two tiles beside it
+and Body Battery's anchor is readiness — the screen corroborates itself.
+
+**The 🔴 row is TN-18**, and it is short because the evidence is arithmetic: `0.519 / 1.714 = 0.303`
+matches the stored contributor input to three decimals, which is Q-506's inflated sd and TN-6's low
+mean visible in one frame, failing in opposite directions. TN-6a gated the readiness ladder and not
+the deload banner — the surface the owner actually reads.
+
+## 2026-08-31 — `docs/agents/state/tuning.md` raised, 235 → 257 (the four-tiles-at-55 traps)
+
+Five entries, four of which are things a successor would otherwise re-derive from the same screenshot.
+
+The one worth the lines: **`tempZ` and `temp_dev_c` are different units and disagreeing is expected**
+— `0.519 °C / 1.714 °C sd = 0.303 z`, matching the stored contributor input to three decimals. That
+was nearly filed as "two temperature truths, one night" before the sd was checked. The baton now says
+so outright, along with the real finding it masked: TN-6a gated the readiness ladder and left
+`ai-dynamic.ts:184` firing.
+
+The rest are cheap tests that stop a false alarm: check the **spread** before believing the scores
+have collapsed (they normally sit 20 points apart), and **reproduce readiness from its stored
+contributors** before calling it wrong (2026-08-31 came to 55.3 against a stored 55).

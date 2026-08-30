@@ -3,7 +3,7 @@
 > **Successor sessions are titled `🎶 Tuning Agent 🟢`** — exactly, both emoji. Leading emoji = role,
 > trailing = this session's status, set by the session itself. See `docs/agents/README.md` §4.
 
-**Updated:** 2026-08-26 · **By:** `session_01VVfZtbCftbwaUHtBLJoxVr` · **Next ID:** `TN-18`.
+**Updated:** 2026-08-26 · **By:** `session_01VVfZtbCftbwaUHtBLJoxVr` · **Next ID:** `TN-19`.
 Find next free: `grep -rhoE '\bTN-[0-9]+\b' docs/ | sort -t- -k2 -n | tail -1`. Legacy `Q-` numbers
 stay valid. **Rewritten in full, never appended** — narrative lives in the linked reviews.
 
@@ -41,6 +41,7 @@ Filed this session, all propose-only, all in the queue:
 | **TN-15** | Body Battery: drain ignores exercise, no recharge at all | **signed off**; `Needs: TN-2`; supersedes the old "do not redesign" line |
 | **TN-16** | prolonged-stress warning + calm-down prompt | **parked** `Needs: Q-507` — the metric points the wrong way |
 | **TN-17** | Activity as a pace-to-goal score (owner's design) | mechanic sound; `Needs: Q-524`, `Gate: owner` — the goals make it punishing |
+| **TN-18** | TN-6a gated the readiness ladder, NOT the deload banner — the surface the owner reads | one condition, Lane A, do not batch |
 
 **Owner decisions, 2026-08-24 — recorded on the entries, nothing gated on them.** TN-5 and TN-6
 signed off; **TN-6a** added (suspend the temperature penalty on a self-clearing condition, outside the
@@ -51,7 +52,7 @@ the baselines, fix the seed for all six, re-derive only what is measurably wrong
 
 **BF-14 refuted 2026-08-24** — breathing baseline is fed `rpm × 10`, so rpm = `meanX8 / 80`; corrected it is **+0.27 sd, clean**. Reasoning on the entry.
 
-Reviews: [HR tile + pacing](../../reviews/2026-08-26-hr-tile-and-activity-pacing.md) · [pillar review](../../reviews/2026-08-26-pillar-review.md) · [check-in lookback](../../reviews/2026-08-26-checkin-lookback.md) · [threshold sweep](../../reviews/2026-08-25-threshold-sweep.md) · [battery](../../reviews/2026-08-24-body-battery-charge-window-collapse.md) ·
+Reviews: [four tiles at 55](../../reviews/2026-08-31-four-tiles-at-55.md) · [HR tile + pacing](../../reviews/2026-08-26-hr-tile-and-activity-pacing.md) · [pillar review](../../reviews/2026-08-26-pillar-review.md) · [check-in lookback](../../reviews/2026-08-26-checkin-lookback.md) · [threshold sweep](../../reviews/2026-08-25-threshold-sweep.md) · [battery](../../reviews/2026-08-24-body-battery-charge-window-collapse.md) ·
 [sleep](../../reviews/2026-08-24-sleep-score-volatility.md) ·
 [temperature](../../reviews/2026-08-24-readiness-temperature-penalty.md) ·
 [handoff](../../handoff-2026-08-24-readiness-scores-owner-batch.md).
@@ -171,6 +172,27 @@ sleep ✅ · readiness ✅ · activity ✅ · body ✅ · devices ✅ · workout
   count as "the owner's, recently", never "the system's".
 - **A hardening fix can delete the evidence another open investigation needs** (TN-7). When a fix
   turns a 500 into a fallback, check what was waiting on that 500.
+- **TN-6a SHIPPED for one of its three consumers, and the queue did not notice** (TN-18, 2026-08-31).
+  `readiness-payload.ts:386` gates the ladder on `isTemperatureBaselineCentred(...)`; `grep` finds
+  that helper in **exactly one file**, so `ai-dynamic.ts:184`'s bare `> TEMP_ALERT_THRESHOLD_C` still
+  fires. **Verify a shipped fix at every consumer its own entry named** — one grep would have caught
+  this on the day it landed.
+- **The tiles are NOT four independent readings, and this is by construction.**
+  `previousNight.input` **is** the Sleep tile and `activityBalance.input` **is** the Activity tile, so
+  **22% of readiness is the two tiles beside it** (`corr(readiness, sleep)` **+0.656** against
+  `corr(sleep, activity)` **+0.139**), and Body Battery's morning anchor **is** readiness (**+0.838**,
+  n=47). **Never read agreement between those numbers as corroboration.**
+- **"All the scores are the same" is usually coincidence here — check the spread first.** They
+  normally sit **20 points apart** (median 19, max 65); only **2 of 35 days** land within 3. And
+  **the Heart Rate tile is bpm**, not a 0–100 score, so it shares a value with them by accident.
+- **Reproduce a readiness score from its stored contributors before calling it wrong.** 2026-08-31
+  came to **55.3** against a stored 55, with HRV and resting HR carrying 15.8 of an 18-point drop —
+  a correct score on a genuinely low day. Two things qualified it and both were already queued
+  (`recoveryIndex` at 100 flagged provisional, **Q-509**; `checkin` at the placeholder 50, **TN-9**).
+- **`tempZ` and `temp_dev_c` are different units and will disagree — do not file that as a bug.**
+  `0.519 °C / 1.714 °C sd = 0.303 z`, matching the stored contributor input to three decimals. The
+  small z is **Q-506's inflated sd**, not a second temperature. This was nearly filed as "two
+  temperature truths"; the real finding was the ungated banner.
 - **The HR tile's lever is RAW-vs-BASELINE-RELATIVE, not which metric.** Against `perceived_recovery`:
   waking-rest HR **+0.176 raw → +0.291 relative**, nightly resting HR **+0.129 → +0.278**. Expressing
   either as a delta from the owner's own baseline roughly doubles it; picking between them barely
