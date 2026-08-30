@@ -1,6 +1,6 @@
 export type LimitedJsonResult =
   | { ok: true; body: unknown }
-  | { ok: false; reason: 'too_large' | 'invalid_json' | 'no_body' }
+  | { ok: false; reason: 'too_large' | 'invalid_json' | 'no_body' | 'empty' }
 
 // Size-guarded JSON body read: checks Content-Length first, then streams with
 // a hard byte cap so an oversized body is cancelled instead of buffered —
@@ -24,6 +24,15 @@ export async function readJsonLimited(req: Request, maxBytes: number): Promise<L
     }
     chunks.push(value)
   }
+  // BF-3 — zero bytes is ABSENT, not malformed, and the two need different answers. A `POST` with
+  // no body still has a readable stream (`fetch(url, { method: 'POST' })` and curl's `-X POST` both
+  // send `Content-Length: 0`), so `no_body` above does not cover it and `JSON.parse('')` throws —
+  // which made an optional-body route 400 the exact request every shipped client sends. Caught on
+  // the dev server, not by a test.
+  //
+  // Additive for every existing caller: they branch on `too_large` and treat everything else as a
+  // 400, which is what an empty body already produced through `invalid_json`.
+  if (total === 0) return { ok: false, reason: 'empty' }
   try {
     return { ok: true, body: JSON.parse(Buffer.concat(chunks).toString('utf8')) }
   } catch {

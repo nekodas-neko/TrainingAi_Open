@@ -37,6 +37,8 @@ export async function POST(req: NextRequest) {
   const supplement = await repo.createSupplement(session.user.id, {
     name: body.name.trim(),
     dose: body.dose?.trim() || null,
+    defaultAmount: body.defaultAmount ?? null,
+    unit: body.unit?.trim() || null,
     reminderEnabled: body.reminderEnabled ?? false,
     reminderTime: body.reminderTime ?? null,
     sortOrder: body.sortOrder ?? 0,

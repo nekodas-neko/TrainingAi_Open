@@ -573,6 +573,8 @@ export interface LocalSupplement {
   id:              string;
   name:            string;
   dose:            string | null;
+  defaultAmount?:  number | null;
+  unit?:           string | null;
   reminderEnabled: boolean;
   reminderTime:    string | null;
   sortOrder:       number;
@@ -587,6 +589,13 @@ export interface LocalSupplementLog {
   id:           string;
   supplementId: string;
   logDate:      string;
+  // BF-3 — the dose AS IT READ when this was logged. Optional on the type because every existing
+  // writer constructs one without them; `upsertSupplementLog` fills them from the local
+  // `supplements` row when the caller omits them, so today's UI freezes the dose with no change to
+  // the UI at all. Without that, editing the definition rewrites every past log.
+  amount?:      number | null;
+  unit?:        string | null;
+  doseText?:    string | null;
   updatedAt:    string;
   deletedAt:    string | null;
   syncStatus:   'pending' | 'synced';

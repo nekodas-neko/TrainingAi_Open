@@ -971,7 +971,11 @@ export const supplements = pgTable('supplements', {
   id:              uuid('id').primaryKey().defaultRandom(),
   userId:          uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
   name:            text('name').notNull(),
+  /** Free text ("2 mg", "1 scoop"). Kept as the display fallback for rows that predate the
+   *  structured pair below — BF-3 replaces nothing here, it adds a second way to say the dose. */
   dose:            text('dose'),
+  defaultAmount:   doublePrecision('default_amount'),
+  unit:            text('unit'),
   reminderEnabled: boolean('reminder_enabled').notNull().default(false),
   reminderTime:    text('reminder_time'),
   sortOrder:       integer('sort_order').notNull().default(0),
@@ -986,6 +990,20 @@ export const supplementLogs = pgTable('supplement_logs', {
   supplementId: uuid('supplement_id').notNull().references(() => supplements.id, { onDelete: 'cascade' }),
   userId:       uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
   logDate:      date('log_date', { mode: 'string' }).notNull(),
+  /**
+   * The dose AS IT READ when this was logged (BF-3, migration 244).
+   *
+   * Without these, editing `supplements.dose` rewrites history — titrate 2 mg → 4 mg and every past
+   * log retroactively reads 4 mg, which for a drug whose story is its escalation schedule destroys
+   * the one thing that cannot be reconstructed.
+   *
+   * `doseText` is the free-text snapshot and is what makes this work for supplements that were never
+   * given a numeric amount, i.e. all of them today. `amount`/`unit` are what a correlation against
+   * resting HR needs, since an exposure variable has to be a number on a date.
+   */
+  amount:       doublePrecision('amount'),
+  unit:         text('unit'),
+  doseText:     text('dose_text'),
   createdAt:    timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt:    timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   deletedAt:    timestamp('deleted_at', { withTimezone: true }),

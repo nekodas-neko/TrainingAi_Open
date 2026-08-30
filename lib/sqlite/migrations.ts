@@ -234,6 +234,14 @@ export const RECONCILE_COLUMNS: { table: string; column: string; ddl: string }[]
   // Q-124: supplements was the one offline write domain with no clobber guard — applyDelta
   // could not gate on sync_status because the column did not exist, so a rename made offline
   // reverted to the server's old value on the next pull.
+  // BF-3 — the dose stamped on the log, and its structured form on the definition. Registered here
+  // because `reconcileSchema()` is the real schema authority after a partial upgrade, and a v32 that
+  // half-applies would otherwise leave a device whose logs cannot record what was taken.
+  { table: 'supplements',      column: 'default_amount', ddl: `ALTER TABLE supplements ADD COLUMN default_amount REAL` },
+  { table: 'supplements',      column: 'unit',       ddl: `ALTER TABLE supplements ADD COLUMN unit TEXT` },
+  { table: 'supplement_logs',  column: 'amount',     ddl: `ALTER TABLE supplement_logs ADD COLUMN amount REAL` },
+  { table: 'supplement_logs',  column: 'unit',       ddl: `ALTER TABLE supplement_logs ADD COLUMN unit TEXT` },
+  { table: 'supplement_logs',  column: 'dose_text',  ddl: `ALTER TABLE supplement_logs ADD COLUMN dose_text TEXT` },
   { table: 'supplements',      column: 'deleted_at',  ddl: `ALTER TABLE supplements ADD COLUMN deleted_at TEXT` },
   { table: 'supplements',      column: 'sync_status', ddl: `ALTER TABLE supplements ADD COLUMN sync_status TEXT NOT NULL DEFAULT 'synced'` },
   // Columns the local-store / sync inserts write but earlier migrations never added.
@@ -603,6 +611,8 @@ const CREATE_SUPPLEMENTS = `CREATE TABLE IF NOT EXISTS supplements (
   id               TEXT PRIMARY KEY,
   name             TEXT NOT NULL,
   dose             TEXT,
+  default_amount   REAL,
+  unit             TEXT,
   reminder_enabled INTEGER NOT NULL DEFAULT 0,
   reminder_time    TEXT,
   sort_order       INTEGER NOT NULL DEFAULT 0,
@@ -615,6 +625,9 @@ const CREATE_SUPPLEMENT_LOGS = `CREATE TABLE IF NOT EXISTS supplement_logs (
   id            TEXT PRIMARY KEY,
   supplement_id TEXT NOT NULL,
   log_date      TEXT NOT NULL,
+  amount        REAL,
+  unit          TEXT,
+  dose_text     TEXT,
   updated_at    TEXT NOT NULL,
   deleted_at    TEXT,
   sync_status   TEXT NOT NULL DEFAULT 'pending',
@@ -1327,6 +1340,20 @@ export const MIGRATIONS: UpgradeStatement[] = [
       // RECONCILE_COLUMNS rows are the authority if this upgrade half-applies.
       `ALTER TABLE food_logs ADD COLUMN saved_meal_id TEXT`,
       `ALTER TABLE food_logs ADD COLUMN meal_group_id TEXT`,
+    ],
+  },
+  {
+    toVersion: 32,
+    statements: [
+      // BF-3. Same shape as v30/v31, and for the same reason: both tables exist on every upgraded
+      // device, so `CREATE TABLE IF NOT EXISTS` is a no-op there and the columns added to their
+      // bodies above would reach fresh installs ONLY. These ALTERs reach everyone else; the five
+      // RECONCILE_COLUMNS rows are the authority if this upgrade half-applies.
+      `ALTER TABLE supplement_logs ADD COLUMN amount REAL`,
+      `ALTER TABLE supplement_logs ADD COLUMN unit TEXT`,
+      `ALTER TABLE supplement_logs ADD COLUMN dose_text TEXT`,
+      `ALTER TABLE supplements ADD COLUMN default_amount REAL`,
+      `ALTER TABLE supplements ADD COLUMN unit TEXT`,
     ],
   },
 ];
