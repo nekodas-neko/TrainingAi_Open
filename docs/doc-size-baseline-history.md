@@ -3426,3 +3426,21 @@ Two lines are a warning the entry did not carry: the counters start empty at the
 read proves nothing, and `pg_stat_statements.max` silently evicts the least-executed shapes once
 5,000 are tracked. Checking `dealloc` is 0 is what separates "nothing slow is happening" from "the
 slow thing was evicted".
+
+## 2026-08-30 — `docs/implementation-backlog.md` raised (the first device pass came back)
+
+185 lines: six new entries and three amendments, from the owner working the device queue.
+
+Most of it is BF-50/BF-51/BF-52 — surface findings that are cheap to state and expensive to
+rediscover. The two that earn their length are traced rather than reported. **BF-47** is CLAUDE.md's
+own rule broken: `use-food-logs-loader.ts` calls the server copy authoritative and re-fetches it
+immediately after an optimistic delete, while the delete is still queued in the outbox — so the
+server puts the row back, which is exactly the flicker the owner described. The entry carries the
+warning not to invert that authority, because the comment on that line records the opposite bug it
+was written to fix. **BF-48** is why N7 could not be run at all: the food database is reachable only
+from the meal builder's ingredient picker, so Log Food's `Single foods` searches nothing but history.
+
+Three items also came back as *questions* rather than results, which is a finding about the queue
+rather than the app — A1, A4 and W3 were written for a reader who already knew what they changed.
+They are re-worded in `device-verification-queue.md` with the actual gesture, the actual way to
+induce a failure, and where the screen is.

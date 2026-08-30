@@ -30,53 +30,36 @@ blocked behind it.
 
 Everything in this section is **JS**. Open the app fresh after a deploy; no APK needed.
 
-## N1. The delete that did nothing — BF-34
-1. Nutrition → tap a logged food row → tap the **bin**.
-2. **Pass:** the "Delete food log?" confirmation appears **and stays**, and you can tap it.
-3. **Fail:** it flashes and vanishes, leaving nothing to press — the original report.
-4. Then tap **Cancel**. **Pass:** the food is still there.
+## N1. The delete that did nothing — BF-34 · **BF-34 PASSES; a different bug found**
+**2026-08-30 — BF-34 is device-verified.** Owner: *"Delete worked."* The dialog appears and stays.
 
-*Why:* the sheet closed and the dialog opened in the same tick, and the dialog mistook the sheet's
-exit for a back press. Fixed against a state machine and e2e, never on a real gesture bar.
+**What the same tap found instead is [BF-47](implementation-backlog.md):** *"the item vanishes then
+re-appears; then when you swap screens - it dissapears."* The loader treats the server copy as
+authoritative while the delete is still queued in the outbox, so the server puts the row back.
+Traced to `use-food-logs-loader.ts`; nothing further owed from the device until that ships, when this
+becomes: delete a food offline **and** online, and confirm it never reappears.
 
-## N2. Back unwinds the nest one layer per press — LB-17 / BF-30 / LB-16
-1. Nutrition → **Log Food** → the **Meals** tab → tap a **meal**.
-2. Press back **twice** — not three times. LB-16 removed a layer: Log Food *is* the list now, so the
-   old middle step is gone. If you find yourself pressing a third time, something regressed.
-3. **Pass:** meal → the Log Food screen → the page. One layer per press, nothing skipping two.
-4. **Fail:** any press closes two layers at once, or the first press leaves the page entirely.
-5. Also: **switch tabs a few times first, then press back.** It must still take exactly two presses —
-   a tab is not a navigation and must not consume one.
 
-## N3. The swipe tray on the meal list — BF-29
-1. On the **Meals** tab, scroll the list vertically, including a diagonal thumb-flick.
-2. **Pass:** no action tray opens by accident.
-3. Drag one row **left**. **Pass:** the tray opens; a right-drag closes it; opening a second row
-   closes the first; tray **Delete** raises a confirmation rather than deleting.
+## ~~N2. Back unwinds the nest one layer per press~~ ✅ 2026-08-30
+Owner: *"Looks good."* Two presses, one layer each, and switching tabs first did not consume one.
+**This is the evidence that BF-49 and BF-51 ① are not the general back stack** — that is correct;
+those two paths are wired wrong individually.
 
-*Why:* a gesture this app has nowhere else, and the sandbox cannot prove it coexists with Samsung's
-own scroll physics.
 
-## N4. The Log Food screen, rebuilt — LB-16 / BF-37 · **the big one in this section**
-1. Nutrition → **Log Food**. There should be **no tile grid** and no "How would you like to log
-   food?" — the screen opens on a list, with **Recent · Meals · Single foods** as tabs and
-   **Photo · Barcode · Describe or enter** as a row above them.
-2. **Pass:** three tabs readable at this width without wrapping; the action row's three buttons all
-   comfortably tappable.
-3. **Meals** holds only saved meals; **Single foods** holds only single foods. Tapping a meal opens
-   its own screen; tapping a food goes to the portion step.
-4. **Recent** shows what you last logged. ⚠ It is scoped to the *current meal bucket*, so at 7 pm it
-   shows dinner foods, not everything (LB-18). **Tell us whether that reads right or wrong** — that
-   is the open question, not a defect.
-5. Tap **Describe or enter**: the description box and the "enter them yourself" way out must both be
-   visible at once, without hunting.
-6. Tap **Photo**, then **Barcode**: each should take the whole screen — the tabs must not still be
-   showing behind a half-open camera.
-7. Also look at: a meal row's photo tile rendering in a long scroller (data-URI images in a list are
-   a shape Samsung's compositor has mishandled before).
+## ~~N3. The swipe tray on the meal list~~ ✅ 2026-08-30
+Owner: *"Yes all good here."* No accidental tray on a diagonal flick; left-drag opens, right closes,
+a second row closes the first, tray Delete confirms. BF-29 is device-verified.
 
-*Why this one matters:* it is a new tab strip, a rebuilt action row and one fewer sheet in the back
-stack, and the sandbox renders none of those the way the phone does.
+
+## N4. The Log Food screen, rebuilt — **PASSED 2026-08-30, four follow-ups filed**
+The rebuild is verified: no tile grid, three tabs readable at 412 dp, Meals holds only meals, Photo
+and Barcode each take the full screen. LB-16 / BF-37 are device-verified.
+
+Filed from the same pass: **[BF-50](implementation-backlog.md)** (capture row too small, the describe
+pane wastes its space, the camera opens a chooser it does not need, multi-select can only delete),
+**BF-46** (the meal tile renders but only ever the placeholder), and **LB-18 answered** — `Recent`
+goes global rather than staying scoped to the current meal bucket.
+
 
 ## N5. The meal builder — footer, recipe links, and duplicates — BF-31 / BF-26 / BF-11c / BF-11d
 1. **Meals** tab → open a meal → **Edit** → scroll the ingredients to the end.
@@ -109,79 +92,84 @@ end to end — the multi-dish list has never seen a real page, only the shape th
 
 *Why:* BF-26 converged the two quantity sheets and its action row's inset renders 0 in the sandbox.
 
-## N6. The day screen's grouping — BF-24
-1. Nutrition, main day view.
-2. **Pass:** each meal is its own card with its name as a label above it — food rows grouped *within*
-   a meal, not meals grouped inside one container.
-3. Owner's watching brief: do the grouped-section backgrounds read well at this size?
+## ~~N6. The day screen's grouping~~ ✅ 2026-08-30 — BF-24 verified, one change wanted
+The grouping is right: each meal its own card, rows within it. **BF-24 is device-verified.**
 
-## N7. The food-database row's mismatch warning — Q-406 · **JS**
-1. Nutrition → **Log Food** → the **Meals** tab → **New** → search the food database for something
-   whose macros and calories disagree (many branded products do).
-2. **Pass:** the row shows the amber line *"Its macros and calories disagree — check before using"*,
-   with its macros still readable beside it, and a tap still adds the food.
-3. **Fail:** the sentence is missing (an icon alone has no hover on a phone), or the tap no longer
-   adds — the row lost its `+` in this conversion, deliberately, because the tap is the add.
+The owner's watching brief produced one change, folded into **BF-45 ②**: a collapsed meal must still
+show its **total calories and total macros**, on a line below the header.
 
-## N8. Water — Q-319
-1. Log water from the **Water widget**, then log a different amount again.
-2. **Pass:** the second write adds to the first rather than replacing it, and survives a force-close.
 
----
+## N7. The food-database mismatch warning — **BLOCKED, and the blocker is [BF-48](implementation-backlog.md)**
+**2026-08-30 — could not be run.** Owner: *"When I try add a food via the 'single food' section; it
+only searches saved/history food - its not checking the food data base."* Confirmed in source: the
+food database is reachable **only** from the meal builder's ingredient picker, so there is no
+food-database row on Log Food to carry the warning.
 
-# App shell and gestures — one pass clears four
+**Re-run this check once BF-48 lands**, from Log Food → Single foods. Q-406's device gate stays owed.
 
-## A1. The back gesture across surface types — BF-27
-1. Press back on: **a plain sheet**; **a confirm dialog**; **a nest** (Log Food → My Foods).
-2. **Pass:** each closes the top surface only, and the page underneath does **not** navigate away.
-3. **On the dialog specifically — it must CANCEL, never confirm.** Verify the underlying thing still
-   exists afterwards.
 
-## A2. The timeline's row taps — Q-93-followup · **JS**
-1. Home → timeline → tap a **workout** row, then a **walk** row.
-2. **Pass:** each opens `/health/day`, and back returns to Home.
-3. **Also:** does the row's tap fight `PullToSync`'s vertical gesture? A short downward drag started
-   on a row should scroll or refresh, not open the row.
+## N8. Water — Q-319 · **deferred by the owner 2026-08-30**
+*"This is not important lets leave for later."* Still owed, not withdrawn.
 
-## A3. Timezone auto-detect across local midnight — Q-477
-1. Profile → **Auto-detect timezone**.
-2. Leave the app open across **local midnight**, then bring it to the foreground.
-3. **Pass:** the day rolls over — Home shows the new day rather than yesterday's.
 
-*Why:* the rollover hangs off `visibilitychange`, which behaves differently in a WebView.
+## A1. The back gesture across surface types — BF-27 · **re-worded 2026-08-30**
+The owner asked what to do here, which means the item was written for someone who already knew what
+BF-27 changed. Concretely — the Android **back gesture** (swipe in from the screen edge), not an
+in-app arrow:
 
-## A4. A card whose fetch fails — Q-499
-1. Turn on **airplane mode**, then open a screen with self-fetching cards (Health).
-2. **Pass:** cards that cannot load say so.
-3. **Fail:** a card silently vanishes, which reads as "no data" rather than "this failed".
+1. Nutrition → tap a logged food → a **sheet** opens. Swipe back. **Pass:** the sheet closes and you
+   are still on Nutrition. **Fail:** the whole tab changes, or you leave the app.
+2. Nutrition → tap a food's **bin** → the *"Delete food log?"* **dialog**. Swipe back.
+   **Pass: the food is STILL THERE** — back must cancel, never confirm. This is the one that matters;
+   a back gesture that confirms a destructive dialog deletes data on a mis-swipe.
+3. Log Food → **Meals** → a meal (a **nest**). Swipe back twice — one layer each.
 
----
+*(3 is what N2 already passed, so if you have done N2 you have done 3 — 1 and 2 are what is left.)*
 
-# Workouts — one pass clears three
 
-## W1. Safe-area on a navless takeover
-1. Start a workout and reach a **full-screen phase** (warm-up, or an active set screen).
-2. **Pass:** the bottom action button sits clear of the gesture bar — tappable without the system's
-   back/home gesture firing first.
-3. **Fail:** flush with or under it. **Screenshot this one** if it fails.
+## A2. The timeline's row taps — **FAILED 2026-08-30, filed as [BF-49](implementation-backlog.md)**
+Owner: *"tapping workout; then back -> leads to heath training not home. Same with tapping a food
+item from timeline."* Back resolves to the tab that owns the destination rather than unwinding to the
+origin, on both routes. Nothing further owed from the device until BF-49 ships.
 
-*Why:* the sandbox renders safe-area insets as 0. This class has recurred eleven times.
 
-## W2. The set flow past set 1 — Q-461
-1. Log set 1, then set 2, then set 3 without leaving the screen.
-2. **Pass:** each logs; the 3-second countdown between the press and the warm-up behaves.
-3. **Also, one look with Android's reduce-motion ON** — the bounce is the cue that a set is ready,
-   and reduce-motion may remove it entirely.
+## A3. Timezone auto-detect across local midnight — Q-477 · **deferred by the owner 2026-08-30**
+*"lets leave this on the backburner; will be hard to test."* It is: the check needs the app open
+across local midnight. Still owed; a future run should schedule it rather than attempt it on demand.
 
-## W3. Volume landmarks at S25 width — Q-305
-1. Wherever the landmarks now render, look at them at **412 dp**.
-2. **Pass:** nothing is clipped or wrapped into unreadability.
 
----
+## A4. A card whose fetch fails — Q-499 · **inconclusive 2026-08-30, needs a re-run**
+Owner: *"Everything seems to be working; nothing is showing that it cant load."* **That reads as a
+pass and may be one, but it may also mean the failure was never induced** — a card that loads from
+cache offline is doing the right thing and proves nothing about the error state.
 
-# Devices / Oura BLE — one pass clears seven, needs the ring
+Re-run and say which happened: **turn airplane mode ON first**, then **force-close** the app (so no
+cached fetch has already run), then open **Health**. A card whose fetch fails must say so.
+**Fail:** it silently vanishes, which reads as "no data" rather than "this failed".
 
-These are the admin consoles. Several are buttons that were added but never pressed on the phone.
+
+## ~~W1. Safe-area on a navless takeover~~ ✅ 2026-08-30
+Owner: *"Seems good!"* The bottom action button on a full-screen workout phase clears the gesture
+bar. The eleven-times-recurring class is clear on this build.
+
+
+## W2. The set flow past set 1 — Q-461 · **deprioritised by the owner 2026-08-30**
+*"Not sure if I care about this?"* Fair — it verifies that sets 2 and 3 log and the countdown
+behaves, which the owner exercises every session anyway. **Treat a normal workout as the check:** if
+sets log and the rest timer behaves, it passes. Only worth a deliberate run for the reduce-motion
+half, since nothing else in the app depends on that setting.
+
+
+## W3. Volume landmarks at S25 width — Q-305 · **re-worded 2026-08-30**
+The owner asked what is needed, and the old wording (*"wherever the landmarks now render"*) did not
+say where to look — a check nobody can locate is not a check.
+
+**Volume landmarks** are the weekly set-count guides per muscle group (the MEV/MAV-style bands) shown
+in the training-volume view. Open that view on the phone and answer one question: **is anything
+clipped, wrapped mid-word, or unreadable at 412 dp?** A screenshot is the fastest answer. If you
+cannot find the landmarks on any screen, say that — "it does not render anywhere" is a more important
+answer than a layout note.
+
 
 ## D1. Devices card vs a keyless service — LB-5
 1. Open the **Devices** card with the BLE service running.
