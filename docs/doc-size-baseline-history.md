@@ -3579,3 +3579,21 @@ argues against the obvious fix: globally resolvable meal ids turn a photograph o
 access to someone's health data, on an app heading for a Play Store health declaration. The
 recommendation is a share token that **copies**, so the two users' rows stop being coupled the moment
 the scan lands.
+
+## 2026-08-30 — `docs/implementation-backlog.md` raised again (BF-57's design settled by measurement)
+
+68 further lines on BF-57. The owner rejected the share-token recommendation and proposed putting the
+whole meal in the QR. **Measured rather than argued**, because the answer was not obvious either way:
+their real 3-ingredient meal is **167 bytes** as positional JSON, needing QR version 9 at 53×53
+modules — and the binding constraint turns out to be the printed label, not the format. At the
+current 12.2–16.4 mm code that is 0.31 mm per module, too fine for a home printer; at 30 mm it is
+0.57 mm, better than the design's own current worst case.
+
+So the entry now carries a capacity table by ingredient count, a cap at ~5 ingredients with the
+instruction to refuse the print above it and say why, and one counter-intuitive measurement worth
+keeping: **compressing makes it worse** — deflate plus base64url came out 164 bytes against 146 for
+plain compact JSON, because base64's 33% tax exceeds the gain at this size.
+
+The superseded token design is kept in a collapsed block rather than deleted, with the reason it
+lost, so nobody re-proposes it. The one part of it that survives unconditionally is the security
+argument: never make `saved_meals.id` resolvable across users.
