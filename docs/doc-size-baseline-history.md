@@ -3846,3 +3846,15 @@ the log now" reads as a feature the owner has to go and configure before their h
 is the opposite of what shipped. The second is the **v32** device warning: a local SQLite migration is
 the highest-risk change this repo makes, and a paragraph announcing a fix without saying it is
 unverified on the phone is how a Known-Issues row gets skipped.
+
+## 2026-08-30 — `projectOverview.md` → 8420, `docs/implementation-backlog.md` → 13368 (TN-13 shipped)
+
+The backlog shrinks: TN-13's 5,628-character entry becomes a 2,493-character record of what was
+measured plus a device `Keep:`. Most of what left was the argument for the design — the correlation
+table, the two rejected alternatives — and that now lives in the shipped module's own comments, where
+someone changing the rule will actually be standing.
+
+`projectOverview.md` +11. The paragraph carries the re-measured numbers rather than the entry's,
+which is the point of it: TN-13 said 2.11 / 0.33 / 84 % over 50 nights and the same query over 71
+gives 2.50 / 0.58 / 77 %. Same conclusion, and restating it is cheaper than the next session
+discovering the discrepancy and wondering which figure was wrong.

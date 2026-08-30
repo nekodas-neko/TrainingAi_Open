@@ -128,8 +128,24 @@ export interface ReadinessScoreResponse {
   isLowWearToday: boolean
   baselineHrv: number | null  // 28-day low-wear-excluded average, ms rMSSD
   recentHrv: number | null    // 7-day average, ms rMSSD
-  restingHr: number | null          // recent (7-day) average resting HR, bpm — the Heart Rate card value
+  restingHr: number | null          // recent (7-day) average resting HR, bpm — the score's input
   restingHrBaseline: number | null  // 28-day low-wear-excluded average resting HR, bpm — the high/low reference
+  /**
+   * The most recent single-night resting HR, bpm, and the date it was measured (TN-13).
+   *
+   * **Not the same thing as `restingHr`, and the difference is the entry.** Re-measured against
+   * production on 2026-08-30 over **71 nights**: the nightly value moves **2.50 bpm** night to night
+   * while the 7-day mean moves **0.58**, so the mean discards **77 % of the daily movement** in the
+   * signal that best predicts how the owner feels (r = +0.557 against their own check-in, best of
+   * nine). TN-13 recorded 2.11 / 0.33 / 84 % over 50 nights; the conclusion is unchanged and the
+   * figures are restated here because a number nobody re-measures drifts.
+   *
+   * Bounded to the last 7 days: a resting HR from a month ago is not "last night", and presenting one
+   * as if it were is worse than showing nothing. `restingHrLastNightDate` is what lets a consumer say
+   * *when*, rather than implying it is today's.
+   */
+  restingHrLastNight: number | null
+  restingHrLastNightDate: string | null
   // Own baseline-relative composite (Oura BLE Phase 5 addendum A4) — only computed
   // when Oura Cloud's readiness score isn't available and we have a daily_summary
   // row for last night. null otherwise (never fabricated).
@@ -189,6 +205,33 @@ export function computeBlendedScore(
   }
 
   return { score, source }
+}
+
+/**
+ * The most recent night's resting HR from a pre-filtered window of body-metric rows (TN-13).
+ *
+ * **Picked by MAX DATE, not by position.** `bodyMetrics` arrives from the repository with no ordering
+ * this module may rely on — which is why it defines its own `asc()` helper before building any
+ * series. Taking the last element would read whatever the query happened to return last, and the
+ * failure would be invisible: a plausible bpm from the wrong night.
+ *
+ * The caller passes rows already bounded to the last 7 days, which is what stops a stale reading
+ * being presented as last night's. Low-wear days are deliberately NOT excluded, unlike the baseline:
+ * this is the reading that was taken rather than a reference average, and dropping it would silently
+ * show an older night in its place.
+ *
+ * Exported for its test — the ordering subtlety is the whole of it, and it cannot be exercised
+ * through `buildReadinessPayload` without a database.
+ */
+export function latestRestingHrRow<T extends { date: string; restingHeartRate?: number | null }>(
+  rows: readonly T[],
+): T | null {
+  let best: T | null = null
+  for (const r of rows) {
+    if (r.restingHeartRate == null || !(r.restingHeartRate > 0)) continue
+    if (best == null || r.date > best.date) best = r
+  }
+  return best
 }
 
 export async function buildReadinessPayload(userId: string, tz: string): Promise<ReadinessScoreResponse> {
@@ -274,6 +317,9 @@ export async function buildReadinessPayload(userId: string, tz: string): Promise
   const rhrScore = baselineRhr && recentRhr
     ? Math.max(0, Math.min(20, Math.round(20 * (baselineRhr / recentRhr))))
     : 0
+
+  // TN-13 — the latest single night, which is a different question from the 7-day mean above.
+  const lastNightRhrRow = latestRestingHrRow(recentRhrRows)
 
   const load = computeVolumeAcwr(
     recentSessions.map(ws => ({ startedAt: ws.startedAt, volumeKg: ws.exercises.reduce((s2, ex) => s2 + (ex.volume ?? 0), 0) })),
@@ -711,6 +757,8 @@ export async function buildReadinessPayload(userId: string, tz: string): Promise
     recentHrv,
     restingHr:                recentRhr != null ? Math.round(recentRhr) : (baselineRhr != null ? Math.round(baselineRhr) : null),
     restingHrBaseline:        baselineRhr != null ? Math.round(baselineRhr) : null,
+    restingHrLastNight:       lastNightRhrRow != null ? Math.round(lastNightRhrRow.restingHeartRate!) : null,
+    restingHrLastNightDate:   lastNightRhrRow?.date ?? null,
     illnessFlag:              illness?.flag                          ?? null,
     illnessScore:             illness?.score                         ?? null,
     illnessBiomarkers:        illness?.biomarkers                    ?? null,
