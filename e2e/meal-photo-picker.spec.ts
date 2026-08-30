@@ -101,12 +101,13 @@ async function pickPhoto(page: Page): Promise<number> {
     const file = new File([blob], 'meal.jpg', { type: 'image/jpeg' })
     const dt = new DataTransfer()
     dt.items.add(file)
-    // **Not `querySelector`.** Since Q-395c the builder is reached through Log Food, whose capture
-    // step carries TWO `image/*` inputs of its own — and they come first in DOM order, so the naive
-    // first-match silently fed the photo to the food scanner and this spec failed 15 s later
-    // looking for a size line that was never going to appear. Radix aria-hides every covered layer,
-    // which is what tells the live dialog from the ones underneath it.
-    const live = [...document.querySelectorAll('input[type="file"][accept="image/*"]')]
+    // **By name, and still counted.** Since Q-395c the builder is reached through Log Food, whose
+    // capture step carries TWO `image/*` inputs of its own — and they come first in DOM order, so
+    // the naive first-match silently fed the photo to the food scanner and this spec failed 15 s
+    // later looking for a size line that was never going to appear. BF-46 ①a added a second photo
+    // picker (the meal's own screen), so `name` is what separates them now; the aria-hidden filter
+    // is what separates the live layer from the ones underneath it, which Radix hides.
+    const live = [...document.querySelectorAll('input[name="meal-photo"]')]
       .filter(el => !el.closest('[aria-hidden="true"]')) as HTMLInputElement[]
     // Loudly, not by picking one: filling the wrong box is exactly the failure LA-30 spent a
     // session on, and it reports as a broken assertion three steps further down.

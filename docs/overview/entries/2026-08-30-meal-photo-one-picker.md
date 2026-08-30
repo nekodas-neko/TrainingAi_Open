@@ -41,6 +41,19 @@ and now this. The spec waits for `Update Meal`, which exists only in the builder
 because that entry told the next person to start from the instrumentation rather than the layout,
 and the instrumentation was measuring the wrong component.
 
+## The cost of a second file input, which CI found
+
+Moving the picker to the top of the builder put a **second `input[type="file"]`** on that screen,
+ahead of the recipe-picture button's in DOM order. `recipe-image-to-meal.spec.ts` fed its picture
+with the selector `input[type="file"]`, so the recipe went to the photo picker instead, silently,
+and its ingredient rows never appeared. Reproduced locally before fixing.
+
+Both inputs are **named** now — `meal-photo` and `recipe-picture` — and both specs select by name.
+That is the same failure `meal-photo-picker.spec.ts` already carried a note about from the other
+direction (*"the naive first-match silently fed the photo to the food scanner"*), so `name` retires
+a hazard this screen had before this change rather than one it introduced. `pickPhoto`'s "exactly
+one live input" guard stays: `name` says which control, aria-hidden says which layer.
+
 ## Verification
 
 `e2e/meal-photo-picker.spec.ts`, now three tests. The two that existed still pass unchanged in
@@ -51,6 +64,8 @@ hero's `onChange` back at `onEdit` and it fails.
 
 Its readiness gate is `Log this meal`, which exists only on that screen — the same discipline the
 first test now uses, and for the same reason.
+
+`recipe-image-to-meal.spec.ts` passes again with the named selector; both files, **7 passed**.
 
 Full unit suite **5,640 passed** / 672 files. `pnpm check:rules` — **Ran 62 of 62**. Typecheck and
 lint clean.

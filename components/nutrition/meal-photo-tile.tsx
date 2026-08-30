@@ -162,9 +162,14 @@ export function MealPhotoTile({ value, onChange, disabled, variant = 'tile', lab
     },
   }
 
+  // **Named, because this is no longer the only file input on the screens it appears on.** Since
+  // BF-46 ①a the builder carries this AND the recipe-picture button's, and a selector as broad as
+  // `input[type="file"]` reaches whichever comes first in the DOM — a recipe picture fed to the
+  // photo picker fails silently, which is what it did. `recipe-image-button.tsx` is named to match.
   const fileInput = (
     <input
       ref={fileInputRef}
+      name="meal-photo"
       type="file"
       accept="image/*"
       capture="environment"
