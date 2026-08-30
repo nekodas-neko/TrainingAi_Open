@@ -172,6 +172,8 @@ export function HealthScoreDetail({
           isLowWearToday: false,
           baselineHrv: null, recentHrv: null,
           restingHr: null, restingHrBaseline: null,
+          // TN-13 — part of the payload's shape, so this degraded literal carries them too.
+          restingHrLastNight: null, restingHrLastNightDate: null,
           illnessFlag: null, illnessScore: null, illnessBiomarkers: null,
           illnessSuppression: 0, illnessAdvisory: null,
           ownResilienceLevel: null, ownResilienceBand: null, ownResilienceConfidence: null,

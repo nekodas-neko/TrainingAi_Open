@@ -3847,6 +3847,17 @@ is the opposite of what shipped. The second is the **v32** device warning: a loc
 the highest-risk change this repo makes, and a paragraph announcing a fix without saying it is
 unverified on the phone is how a Known-Issues row gets skipped.
 
+## 2026-08-30 — `projectOverview.md` → 8420, `docs/implementation-backlog.md` → 13368 (TN-13 shipped)
+
+The backlog shrinks: TN-13's 5,628-character entry becomes a 2,493-character record of what was
+measured plus a device `Keep:`. Most of what left was the argument for the design — the correlation
+table, the two rejected alternatives — and that now lives in the shipped module's own comments, where
+someone changing the rule will actually be standing.
+
+`projectOverview.md` +11. The paragraph carries the re-measured numbers rather than the entry's,
+which is the point of it: TN-13 said 2.11 / 0.33 / 84 % over 50 nights and the same query over 71
+gives 2.50 / 0.58 / 77 %. Same conclusion, and restating it is cheaper than the next session
+discovering the discrepancy and wondering which figure was wrong.
 ## 2026-08-30 — `docs/implementation-backlog.md` (gate audit: three stale owner gates)
 
 Small. Asked which entries were waiting on him, the owner turned out to be waiting on three he had
@@ -3904,3 +3915,23 @@ approval applied to them would authorise things nobody intends:
   when Q-420 lands.
 
 Q-551 is marked **held** rather than answered, per the owner.
+
+## 2026-08-30 — `docs/implementation-backlog.md` (BF-59, and TN-17 answered)
+
+BF-59 is the largest of the two and earns it by being arithmetic rather than opinion. The owner
+completed a full training week and the screen still showed them well short, so the question was
+whether the target or the counting was wrong. **The counting is right** — 50 logged sets producing 79
+muscle-set credits is the 0.5 secondary weighting working as designed. **The target is wrong**:
+`program_volume_targets` stores a flat 14/10 large-small binary, which is precisely what
+`volume-targets.ts` opens by saying it does not do, and it ignores the `powerbuilding` ×0.8 multiplier
+on the owner's own active program. 128 displayed against ≈106 correct, and reaching 128 would need
+~81 sets — 62% more than the program prescribes.
+
+The per-muscle table is what makes it worth writing down: against goal-adjusted landmarks the owner
+**exceeded** glutes and lower back and **met** hamstrings in the same week the screen painted them
+red. A target that cannot distinguish "you are past the sweet spot" from "you are half way there" is
+worse than no target.
+
+TN-17 is a line: the owner kept 7,000 steps, and the entry now records that the number came from the
+`sedentary` rung of a tier table rather than any per-person calculation — defensible by accident, and
+worth saying so plainly.

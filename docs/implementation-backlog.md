@@ -1038,6 +1038,72 @@ app states the measured offset against the scale for the same period; corrected 
 calorie and protein goals; and history reads corrected without the raw scale values having been
 overwritten.
 
+### [workouts] BF-59 — the weekly set targets are a flat large/small binary, ignoring both the app's own landmark table and the program's goal
+
+- **Lane:** A — `packages/shared/src/ai-periodization/volume-targets.ts` is the source of truth;
+  `program_volume_targets` is what the screen reads, and it disagrees.
+- **Added:** 2026-08-30 · owner, with the Health → Training screen after a full week: *"i did the
+  full sessions for the week; and i was nowhere near hitting the reccomended amount of muscle sets.
+  are we aiming too high; is it calculating wrong? whats the issue?"*
+
+**The counting is right. The target is wrong.** Measured from the owner's screen and production:
+
+| | |
+|---|---|
+| Sessions completed | 5 — the full week, nothing skipped |
+| Sets actually logged | **50** |
+| Muscle-set credits awarded | **79** (secondary muscles at 0.5, as designed) |
+| Sum of displayed targets | **128** |
+
+Reaching 128 credits at the observed 1.58 credits-per-set ratio needs **~81 real sets a week** —
+**62% more than the program prescribed**, or ~16 sets per session across five 52-minute sessions.
+**The target is not reachable by completing the program**, which is the complaint.
+
+**Root cause: `program_volume_targets` holds a flat binary — 14 for seven "large" muscles, 10 for the
+small ones.** Every stored row read from production is one of those two numbers. That is exactly what
+the app's own landmark table says it does not do; `volume-targets.ts` opens with:
+
+> *"Landmarks are per-muscle rather than a large/small binary — muscle size alone doesn't predict
+> volume tolerance."*
+
+**Two things the stored targets throw away:**
+
+1. **The per-muscle landmarks.** Stored vs `MUSCLE_LANDMARKS` MAV: chest 14 **vs 16**, lats 14 **vs
+   16**, shoulders 14 **vs 16**, hamstrings 14 **vs 12**, glutes 14 **vs 10**, biceps 10 **vs 14**,
+   triceps 10 **vs 12**, lower back 10 **vs 8**. Only quads and upper back agree.
+2. **The goal multiplier.** The owner's active program `Shikai` is **`powerbuilding` = ×0.8**, and
+   nothing in the stored targets reflects it. Applying both fixes moves the week from **128 to ≈106**.
+
+**What that does to the owner's week — the part worth telling them:**
+
+| Muscle | Logged | Shown | Goal-adjusted MAV | Verdict |
+|---|---|---|---|---|
+| Glutes | 9 | 14 | **8** | **exceeded** |
+| Hamstrings | 10 | 14 | **10** | **met** |
+| Lower back | 7 | 10 | **6** | **exceeded** |
+| Triceps | 9 | 10 | 10 | nearly met |
+| Chest | 8 | 14 | 13 | genuinely short |
+| Lats | 6 | 14 | 13 | genuinely short |
+
+They are **not** under-training the way the screen says — on several muscles they are at or past the
+sweet spot. Real gaps remain (chest, lats, quads, upper back, shoulders, biceps); the point is the
+screen cannot currently tell the two apart.
+
+- **This is a One-Formula-One-Place violation**, the class CLAUDE.md names: two implementations of
+  weekly volume targets, and the one the user sees is the cruder one. Derive
+  `program_volume_targets` from `volumeLandmarks(trainingGoal, muscle)` instead of a binary.
+- **⚠ Seeding is not enough — these rows exist and are wrong.** `ON CONFLICT DO NOTHING` never
+  corrects a drifted row (CLAUDE.md, Postgres data migrations), so this needs an explicit idempotent
+  `UPDATE … WHERE` or every existing program keeps the flat numbers forever.
+- **Do not silently overwrite a target the owner set by hand.** If the schema cannot tell a seeded
+  target from an edited one, say so and ask before the corrective migration runs.
+- **A second question this raises, and it is the owner's:** whether the *program* prescribes enough
+  volume to reach MAV at all — 50 sets against a goal-adjusted 106 credits is still short, so either
+  the program needs more sets or the sessions need to be longer. That is a conversation, not a bug.
+- **Verification:** displayed targets match `volumeLandmarks` for the active program's goal; a
+  `strength` program (×0.65) shows visibly lower targets than a `hypertrophy` one (×1.0); and the
+  owner's completed week reads at-or-near target on the muscles the table says it should.
+
 ### [workouts] BF-56 — swapping an exercise silently changes its role, which changes the prescribed sets and percentages
 
 - **Lane:** A — the swap's write path, `lib/coach/` and the shared swap used by the in-workout path.
@@ -3409,84 +3475,41 @@ the day's move-hours total is below the goal.
 
 ### [heart-rate] TN-13 — the HR tile shows a 7-day average of the one signal that best predicts how the owner feels
 
-- **Branch:** _unassigned_ · **Added:** 2026-08-26 · owner: *"my value is 52; what is that? what would be the more useful HR value to show?"*
-- **Lane: A** — corrected 2026-08-27 by Lane B, which picked this up and found its lane premise false.
-  The tile itself is `components/oura-score-chip-row.tsx:390` and that half is Lane B's, but it
-  cannot be done alone; see the ⚑ below.
+> **✅ SHIPPED 2026-08-30, both halves together — which the entry required.** The tile reads **last
+> night's** resting HR and renders a **delta against the owner's own baseline** ("50 · −7 vs usual")
+> rather than a bare bpm. `restingHrLastNight` + `restingHrLastNightDate` are new on
+> `readiness-payload.ts`; `restingHrCue` moved to
+> `packages/shared/src/health/resting-hr-cue.ts`, where it is importable and therefore testable.
 
-> **⚑ The payload field this entry assumed does NOT exist, and that is what moves the lane.**
-> Verified against `main` at cd09c990. `lib/health/readiness-payload.ts` returns `restingHr`
-> (**the 7-day mean** — `recentRhr`, averaged over `recentRhrRows`, line 271) and `restingHrBaseline`
-> (28-day, low-wear-excluded), plus `hrCurrent`/`hrMin`/`hrAvg`/`hrMax`, which are **today's live BLE
-> readings, not a nightly resting HR**. Nothing carries last night's single-night value, under that
-> name or any other — no `lowestHeartRate`, no sleep-derived HR.
->
-> So the recommendation below needs a **new payload field**, and `readiness-payload.ts` is consumed
-> by three routes — `app/api/readiness-score`, `app/api/body-battery`, `app/api/ai/health-insight`.
-> Reached by `app/api/**` → Lane A, by the path rule in `docs/agents/README.md` §3.
->
-> **Do not split it and take the presentation half.** The pass test at the bottom of this entry rules
-> that out in as many words: *"a change that keeps the 7-day average and merely adds a cue beside it
-> fails this entry."* Rendering a delta between `restingHr` and `restingHrBaseline` is possible in
-> Lane B **today** and would look like progress while failing the entry — both halves ship together.
->
-> **Do not re-derive the nightly value on the client either.** `body_metrics.restingHeartRate` is
-> reachable from the local store, but computing a health value a second time in the client is the
-> One-Formula-One-Place violation this repo has paid for repeatedly, and it would bypass the ranked
-> per-field merge in `lib/data/health-source.ts` that decides which source owns that column.
+- **Keep:** the DEVICE check, and only that. Verify on the S25 that the Heart Rate tile shows a
+  number that moved since yesterday and a signed cue beside it, and that the cue is legible at the
+  tile's type size — **the cue text grew** from one word ("Low") to five ("−7 vs usual"), and the row
+  has 20 layout styles. Reaches the phone through a Railway deploy; no new APK.
 
-`const hr = readiness.restingHr ?? readiness.hrCurrent`, and `restingHr` is documented as
-*"recent (7-day) average resting HR"* (`readiness-payload.ts:131`).
+**Pass test, measured against production rather than asserted (71 nights, 2026-08-30):**
 
-**Measured over 50 nights:** nightly resting HR moves **2.11 bpm** night to night; the 7-day average
-moves **0.33**. **The tile discards 84% of the daily movement.** And resting HR is the **strongest
-predictor of the owner's own check-in** (r = **+0.557**, best of nine — see the
-[lookback](reviews/2026-08-26-checkin-lookback.md)). The most informative signal, shown in its least
-informative form.
+| | value |
+|---|---|
+| nights where the **nightly** value changed | **61 of 70** |
+| nights where the **rounded 7-day mean** changed | 29 of 70 |
+| nightly mean absolute night-to-night change | **2.50 bpm** |
+| 7-day mean's change | 0.58 bpm |
 
-**Recommendation: show last night's resting HR with its delta against baseline** — "52 · −2 vs
-usual". `restingHrBaseline` is already passed to `restingHrCue`, so the comparison exists; only the
-displayed number is smoothed. **Do not simply swap in HRV** — HRV is more responsive but correlates
-less with felt state here (+0.427 vs +0.557), and it is absent from Home entirely, which is a
-separate question.
+So the tile stood still on nearly six days in ten, and discarded **77 %** of the daily movement.
+**TN-13 recorded 2.11 / 0.33 / 84 % over 50 nights** — the direction is unchanged and the figures are
+restated because a number nobody re-measures drifts. Live check on `pnpm dev`: changing only last
+night moved the tile 50 → 62 (a 12 bpm swing) while the old 7-day value moved 55 → 57.
 
-**⚑ Amended 2026-08-26 — the recommendation is unchanged and now has a measured reason, and the
-owner's two alternatives were both tested.** ([review](reviews/2026-08-26-hr-tile-and-activity-pacing.md).)
-Owner: *"Maybe it needs to show the average awake resting HR? … or maybe its better to have resting
-HR comparison? not sure what could be used here?"*
+**Why a delta and not a tier word.** Against `perceived_recovery`, expressing either candidate as a
+deviation from the owner's own baseline roughly **doubles** its correlation with felt state (+0.291
+vs +0.176 for waking-rest HR; +0.278 vs +0.129 for the nightly value). Which metric you pick moves
+the number far less than raw-versus-relative does — so the defect was showing an absolute bpm at all.
+69 means nothing without knowing the usual is 63.
 
-**Against `perceived_recovery`** (scale **1 = fully recovered … 5 = wrecked**, so a **positive** r is
-the correct direction):
-
-| | r | n |
-|---|---|---|
-| waking-rest HR, **raw bpm** | +0.176 | 51 |
-| nightly resting HR, **raw bpm** | +0.129 | 46 |
-| waking-rest HR, **Δ vs its own 7-day baseline** | **+0.291** | 51 |
-| nightly resting HR, **Δ vs its own 7-day baseline** | **+0.278** | 43 |
-
-**Expressing either candidate as a deviation from the owner's own baseline roughly doubles its
-correlation with felt state.** Which metric you pick moves the number far less (+0.291 vs +0.278)
-than raw-vs-relative does. **So the defect is not the choice of metric — it is showing an absolute
-bpm at all.** 69 bpm means nothing without knowing the usual is 63.
-
-**This also reconciles the +0.557 headline** quoted in the pillar review against the +0.129 here.
-Both are correct and pair different things: the stored `readiness_contributors.restingHeartRate`
-score (0–100, baseline-relative, higher = better) against `perceived_recovery` (higher = worse)
-measures **r = −0.553, n = 35** — same magnitude, sign carried by the two scales running opposite
-ways. **Dropping the 4 `provisional: true` days (score pinned at 50) is what takes it from −0.395 to
-−0.553** — worth knowing before any future correlation against that field.
-
-**The owner's "average awake resting HR" is a real signal and belongs in a SEPARATE entry.** Computed
-as the 10th percentile of BLE HR samples 08:00–21:00 Brisbane: **70 days, mean 984 samples/day, mean
-69.5 bpm, moving 6.24 bpm night to night** — 3× the nightly resting HR and 14× the tile's current
-0.44. That makes it the better **stress** candidate the owner intuited. **But nothing in the app
-computes it** — it was derived in SQL for the review — and it does not belong on a tile labelled
-"Heart Rate". Do not fold it into this entry.
-
-**Pass test:** the tile's number changes on most days; over the stored history its night-to-night mean
-change is within 20% of 2.11 bpm rather than 0.33. **And the tile renders a baseline delta, not a
-bare bpm** — a change that keeps the 7-day average and merely adds a cue beside it fails this entry.
+**The owner's "average awake resting HR" is still a separate entry and was NOT folded in here.**
+Computed as the 10th percentile of BLE HR samples 08:00–21:00 Brisbane it moves 6.24 bpm night to
+night — 2.5× the nightly resting HR — which makes it the better **stress** candidate the owner
+intuited, but nothing in the app computes it and it does not belong on a tile labelled "Heart Rate".
 
 ### [activity] TN-17 — Activity as a pace-to-goal score: the mechanic works, the goals make it punishing
 
