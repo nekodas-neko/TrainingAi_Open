@@ -66,3 +66,10 @@ and this route measurably 503s.
 Q-406's owed device press now has a shorter path — its `Keep:` line says so. The check itself is
 still owed and stays on that entry rather than being claimed here: nothing about the amber caution
 line was seen on the S25 in this session either.
+
+## One line paid for elsewhere
+
+`projectOverview.md` sits on a shrink-only ratchet and this entry's status paragraph put it two
+lines over. Rather than raise the baseline, two lines of meta-narration came out of the section's
+closing note — it was explaining *why* 157 old status notes were archived on 2026-08-17, which is
+the archive's own business, not the index's. Net zero; baseline untouched at 8367.

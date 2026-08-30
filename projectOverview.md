@@ -29,6 +29,16 @@
 
 **Log Food could not reach the food database (BF-48).** The owner's *"it only searches saved/history food... So its not useful"* was precise: `Single foods` filtered an in-memory list, its placeholder said `Search your foods`, and its empty state said single foods land there *once you have logged them* — so the screen for adding one food could only find foods already eaten. The database search existed the whole time, reachable **only** from inside the meal builder. The query and its results section are now shared (`useFoodDatabaseSearch`, `FoodDatabaseResults`), so the macro/calorie mismatch warning has one implementation rather than two, and the **700 ms debounce travels with the hook** — OFF rate-limits to ~10 searches a minute. The foods tab's search box is unconditional now: it was hidden while the list was empty, which is the state the report was made from. Guard proved by mutation ([journal](docs/overview/entries/2026-08-30-log-food-database-search.md)).
 
+**The BLE console counted rows it had been guessing (BF-54).** Its DB footprint printed
+`n_live_tup` under a column headed *rows* — a planner estimate, and `last_analyze` is NULL on every
+table here, so it read **552** against `oura_raw_samples`' **180,415**, 0 against `rr_intervals`'
+87,015 and 1 against `error_events`' 6,102. The display was the smaller half: the reclaim button used
+the same counter to call 67 MB against 552 rows *pure bloat*, so pressing it took an ACCESS EXCLUSIVE
+lock with the timeouts lifted and reclaimed nothing. Both sites now `count(*)`. **The size columns
+were never wrong** and are untouched — only the row columns of `pg_stat_user_tables` are estimates,
+and conflating the two is what cost a session on Q-528
+([journal](docs/overview/entries/2026-08-30-fix-db-footprint-real-counts.md)).
+
 **Query timings are readable by the audit role (BF-21).** The owner enabled `pg_stat_statements` on
 production; `claude_ro` is default-deny, so it needed a view, which migration 242 adds through the
 generator rather than by hand — that file rebuilds the whole schema each run, so a hand-written view
@@ -608,10 +618,8 @@ on top:** the four migrations retried on every cold start are idempotent now, 20
 one already did. The two oldest, #6 and #10, are public-repo-migration handoffs open since 08-17.
 
 **What shipped recently is in the journal, not here.** Read `docs/overview/entries/` for the current
-window, then the newest `history-*.md`. The 157 dated status notes this section used to carry were
-archived to [`docs/overview/status-archive.md`](docs/overview/status-archive.md) on 2026-08-17 —
-they had stopped being *current* status somewhere around the fortieth one, and were never in date
-order.
+window, then the newest `history-*.md`. The 157 dated status notes this section used to carry are in
+[`docs/overview/status-archive.md`](docs/overview/status-archive.md), which records why.
 
 ---
 
