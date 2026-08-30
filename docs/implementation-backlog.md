@@ -1143,6 +1143,51 @@ carries 7,333 dead tuples, which is real but small against 180,415 live rows.
 - **First move is measurement, not a VACUUM.** List the indexes on `oura_raw_samples` and
   `oura_heartrate` with their sizes and `idx_scan` from `pg_stat_user_indexes`; an index never
   scanned is a candidate to drop, and dropping one is cheaper and safer than REINDEX.
+
+**✅ THAT MEASUREMENT IS DONE — 2026-08-30, against production. It found one 18 MB answer and
+falsified the rule it was taken under.**
+
+| Table | Index | `idx_scan` | Size |
+|---|---|---|---|
+| `oura_heartrate` | **`oura_heartrate_user_updated`** | **0** | **18 MB** |
+| `oura_raw_samples` | `…_user_id_ring_timestamp_ds_tag_body_hex_key` | 3,546 | 17 MB |
+| `oura_raw_samples` | `oura_raw_samples_user_tag_ts` | 251 | 15 MB |
+| `oura_heartrate` | `oura_heartrate_user_id_timestamp_key` | 5,991 | 9.4 MB |
+| `oura_raw_samples` | `oura_raw_samples_pkey` | 3,618 | 5.3 MB |
+| `oura_heartrate` | `oura_heartrate_pkey` | 0 | 4.4 MB |
+| `rr_intervals` | `rr_intervals_user_id_at_key` | 0 | 3.5 MB |
+| `rr_intervals` | `rr_intervals_pkey` | 0 | 3.5 MB |
+
+**⚠ "Never scanned is a candidate to drop" is wrong for three of those four zeros, and this entry
+said it.** `idx_scan` counts **reads**, not constraint enforcement. `oura_heartrate_pkey`,
+`rr_intervals_pkey` and `rr_intervals_user_id_at_key` are PRIMARY KEY / UNIQUE indexes: they are
+consulted on **every insert** to reject a duplicate, and that work is invisible to this counter.
+Dropping one drops the constraint. They are not candidates.
+
+**The one real candidate is the largest index in the database, and it belongs to a decision that
+predates this measurement.** `oura_heartrate_user_updated` is
+`(user_id, updated_at, id)` from migration 130 — the keyset-pagination index for
+`getOuraTimeseriesDelta`, whose own doc comment records **Q-180 (decided 2026-08-14)**: the method
+has no production caller, and is kept deliberately because intraday HR reaches a fresh device by no
+other path, the server is the archive, and — in as many words — *"It costs nothing at runtime."*
+
+**It does not cost nothing.** It is **18 MB of the database's 84 MB of index — 21 % — for a code path
+nothing calls**, plus write amplification on every HR insert, which is the highest-volume write in
+the app (87,021 rows today). Q-180 weighed the *method*; the index was never in that accounting, and
+it is 2× the heap of the table it sits on (`oura_heartrate`: 32 MB of index on 9 MB of data).
+
+- **Gate: owner** — this reverses part of a decision the owner signed off, so it is theirs.
+  **Recommendation: drop it, and say in `getOuraTimeseriesDelta`'s comment that the restore driver
+  must recreate it.** Reversal is one `CREATE INDEX` over 9 MB of heap — seconds — and the driver
+  that needs it does not exist yet, so nothing can regress in the meantime. Keeping it costs 18 MB
+  and every insert, indefinitely, for a path with no caller.
+- **The alternative** is keeping it so the restore driver finds its index waiting, which is what
+  Q-180 chose. That is defensible if the driver is imminent; it has not been written in the two weeks
+  since, and the index is 21 % of the index budget this entry was opened about.
+
+**Sizes re-confirmed the same day: 206 MB total, 63 MB heap, 84 MB index** — the 1.33× the entry
+opened on, unchanged.
+
 - **Cost check before anyone panics:** at Railway's $0.15/GB/month this whole database is about
   **three cents a month**. The reason to act is that a 7× trend compounds, not that the bill hurts.
 - **Verification:** index total drops below the heap total, and a re-read a week later shows growth
