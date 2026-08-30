@@ -1354,7 +1354,18 @@ connect, one wins. That is why his account is collecting her weigh-ins.
 | **A** | Both phones pair, both claim whatever they capture | **No.** This is today's behaviour and it is the bug. |
 | **B** | One phone owns the scale; a `Not me` reading is offered to a **linked household member** | **Rejected 2026-08-30.** Builds the app's first cross-account data path — consent, linking, revocation, a Play Store health-data implication — to solve a problem that does not need any of it. Kept below only so it is not re-proposed. |
 | **C** | She uses the Renpho app | Zero work. The honest baseline, and the current interim answer. |
-| **D** | **Both phones pair independently; each claims only weights inside its own owner's band and declines the rest** | **✅ RECOMMENDED.** No linking, no shared account, no server-side owner, no cross-account write. Two self-contained apps that happen to hear the same radio. |
+| **D** | **Both phones pair independently; each claims only weights inside its own owner's band and declines the rest** | **✅ CHOSEN by the owner 2026-08-30.** No linking, no shared account, no server-side owner, no cross-account write. Two self-contained apps that happen to hear the same radio. |
+
+**Scope of the build, now that D is decided:**
+1. **Each phone declines rather than asks** when a stable reading falls outside its owner's band.
+   Today the same condition raises the *"is this you"* prompt and then discards on `Not me`.
+2. **Tighten the band for this case.** 15% at 72 kg is ±10.8 kg — wide enough that two adults can sit
+   inside one band. Pick the width from the two real weights rather than a round number, and let
+   anything ambiguous fall through to the prompt instead of guessing.
+3. **The prompt stays** as the ambiguity fallback, which is why `Needs: BF-53` holds: it is dead in
+   production right now.
+4. **No server change, no schema change, no cross-account anything.** If a design step starts
+   reaching for one, it has left option D — stop and re-read this entry.
 
 **Why D, and why it is mostly already built.** The hard part — deciding a reading is not this user's —
 exists and works: `SCALE_WEIGHT_ANOMALY_PCT` (15% from the user's last confirmed weight) is what
@@ -1393,8 +1404,8 @@ them, and that is most of the argument for D. Kept because if B is ever revived 
   accounts, which is exactly what the declared-use-case review looks at. Worth the owner knowing
   before it is built, not after.
 
-- **Gate: owner** — cleared for the *shape* on 2026-08-30: the owner rejected B, and D is
-  recommended. What still wants a device answer, and both are cheap: whether two phones can hold a
+- **✅ Gate: owner CLEARED 2026-08-30** — *"D sounds like the way to go; lets go with that."* B is
+  rejected and C is the interim answer until D ships. **Build D.** What still wants a device answer, and both are cheap: whether two phones can hold a
   GATT connection at once, and **whether `REQUEST_STORED_MEASUREMENTS_CMD` gets a reply** — the
   second one decides whether the race matters at all.
 - **Do this first, before any code:** have the partner pair the scale in her own app. The pairing is

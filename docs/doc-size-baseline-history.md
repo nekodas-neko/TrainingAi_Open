@@ -3725,3 +3725,17 @@ already detected as not-his by the 15% anomaly gate whose comment names her, and
 by `Not me`**. The hard half is built; what is missing is a destination. Recommended shape is a
 consented household link that routes a dismissed reading to her account. It would be the app's first
 cross-account data path, so the entry states the consent, move-not-copy and ownership rules up front.
+
+## 2026-08-30 — `docs/implementation-backlog.md` (BF-58 settled on option D)
+
+The owner rejected the household link and chose per-phone weight-band attribution, so the entry now
+carries the build scope rather than four options. The scope is short because the decision removed
+most of the work: each phone declines a reading outside its owner's band instead of asking and then
+discarding, the band gets tightened for the two-adult case, the existing prompt stays as the
+ambiguity fallback, and **no server change, no schema change, no cross-account path**. That last line
+is written as a tripwire — if a design step reaches for one, it has left option D.
+
+What made the decision possible was a fact the first draft got wrong: `paired-scale.ts` keeps the
+pairing in `localStorage`, so there is no server-side owner of the scale and both phones can already
+pair it. The problem was never ownership; it is that whichever phone wins the GATT race claims the
+reading for its own user.

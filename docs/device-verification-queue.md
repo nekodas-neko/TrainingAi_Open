@@ -278,6 +278,32 @@ nobody asked for and which silently undoes this owner's deliberate no-Primary `L
 as **BF-56**. The card is not at fault; disclosing the change is how it was caught.
 
 
+## S10. Pair the scale on the partner's phone — BF-58 · **costs nothing, may shrink the entry**
+The scale pairing is **device-local** (`localStorage`, no server record), so a second phone pairing
+the same scale needs no permission from anything.
+
+1. On the partner's phone, in her own account: pair the same body-composition scale.
+2. She steps on it with **her phone nearby and yours out of Bluetooth range** (another room).
+3. **Pass:** the weigh-in appears in *her* account.
+4. Then repeat with **both phones nearby** and report what happens — one phone, both, or neither.
+   **That is the race BF-58 is about**, and one run answers it.
+
+## S11. Does the scale buffer readings it could not deliver? — BF-58
+**This single question decides whether the race in S10 matters at all.** If the scale stores a
+weigh-in taken while no phone was listening and replays it on the next connect, the losing phone
+catches up and nothing is lost.
+
+`ScaleProtocol.REQUEST_STORED_MEASUREMENTS_CMD` (`0x22 0x04 0x15`) and `STORED_RECORD_MARKER`
+(`0x23`) already exist in the code, and the comment is candid that they are **speculative, borrowed
+from a different firmware generation, and never tested against this hardware**.
+
+1. Weigh in with **no phone in Bluetooth range** — leave both phones in another room.
+2. Bring your phone back and let it connect.
+3. **Pass:** the earlier weigh-in arrives. **Fail:** nothing does. Either answer is useful — a "no"
+   means the race is real and the band rule has to be right.
+
+Plan: `docs/superpowers/plans/2026-07-30-scale-stored-measurement-drain-and-scan-latency.md`.
+
 ## S7. Catalogue hydration after a fresh install — BF-16a
 
 **Only if you are already reinstalling for another reason. Do not uninstall to run this.**
