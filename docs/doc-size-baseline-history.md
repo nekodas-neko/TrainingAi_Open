@@ -3884,3 +3884,14 @@ move was DOWN — a compaction on `main` had left 20 lines of slack under the ba
 ratchet is only worth having if it sits on the file. The fourth is BF-45 ⑤'s own paragraph
 landing on `main` under the old slack, which is what tightening converts from invisible into a
 number someone has to write down. That is the trade, and it is the right one.)
+
+## 2026-08-30 — `projectOverview.md` 8413 → **8424** (BF-46 ② ③, the quantity editor's Option A)
+
+Eleven lines, and the half that earns them is the **departure**: the chosen drawing puts the unit
+toggle at the stepper's height, and this app's 48 dp floor makes a stacked two-option toggle 96 px,
+so the stepper grew rather than the toggle shrinking. A session that reads only the artboard and
+only the shipped code will see a disagreement and "fix" it back — including by reaching for
+`.tap-dense`, which is what the floor exists to refuse.
+
+The rest — what was built, what the e2e asserts, why the geometry rather than the text — is in the
+journal entry.
