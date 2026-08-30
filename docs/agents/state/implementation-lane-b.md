@@ -3,19 +3,23 @@
 > **Successor sessions are titled `🚧 Implementation Agent (B) 🟢`** — exactly. A renamed successor
 > is a lost thread.
 
-**Updated:** 2026-08-30 · **By:** the seventeenth Lane B run · **Next ID:** `LB-30`
+**Updated:** 2026-08-31 · **By:** the seventeenth Lane B run · **Next ID:** `LB-31`
 
 ## Now
 Merged: **#628** (LB-26), **#633**, **#640** (BF-45 ⑤), **#631** (Q-392), **#641** (BF-46 ①b),
-**#642** (BF-46 ② ③), **#643** (BF-46 ①a). Filed: **LB-27**, **LB-28**, **LB-29**.
+**#642** (BF-46 ② ③), **#643** (BF-46 ①a), **#644** (the BF-39 hold, docs only). Filed: **LB-27**,
+**LB-28**, **LB-29**, **LB-30**.
 
-**BF-39 was built and HELD**: its render half works and its own three tests pass, and it broke the
-meal library's swipe tray deterministically. **#644 carries the docs only**, and the four-step
-measurement isolating it to the `saved-meals` invalidation subscription is on the entry.
+**BF-39 shipped: its hold was a harness race, not a defect.** `SwipeActions` mounts once, the drag
+handler is **never invoked**, and no `saved-meals` invalidation fires — `Input.dispatchTouchEvent`
+skips the stability check `locator.tap()` does, so the spec measured a row still travelling with the
+sheet's `enter` animation (read y=605, landed at y=503). `swipeRowLeft` (`e2e/fixtures.ts`) waits
+for the rect to settle and the three swipe specs share it; **LB-30** audits the other 46 reads.
 
-**The `nutrition-ui-uplift` batch is shipped apart from BF-39** — BF-24, BF-45, BF-46, BF-51 ①②④ —
-**and every one owes the same single thing: the on-device pass.** That is this lane's binding
-constraint, not a queue of unwritten code.
+**The `nutrition-ui-uplift` batch is now shipped in full** — BF-24, BF-39, BF-45, BF-46, BF-51 ①②④ —
+**and every one owes the on-device pass.** That is this lane's binding constraint, not a queue of
+unwritten code. BF-39 also has a branch **no test has ever run**: `useSavedMealSummaries`'s
+local-store read, unreachable from the web harness.
 
 **Three things are blocked on the owner, each with a written recommendation. Do not decide them
 yourself and do not build past them:**
@@ -27,26 +31,23 @@ yourself and do not build past them:**
   clobber but gives up cross-device updates. **They promise different things.**
 - **The device pass.**
 
-**Almost nothing else is startable.** Past the nutrition entries `next-item.js --lane B` holds
-BF-52 (**planning**), LB-12 (Orchestrator's), and a readiness/DB cluster (Q-275, Q-272, Q-276,
-Q-279, Q-283) the path rule puts in **Lane A**. **Q-278** is the one plausible B item — an audit
-narrowed it to a one-layer addition with **one** migration site
-(`components/health/readiness-breakdown.tsx`) — but it has **no plan** and an open scope question
-(two of its five "pillars" have no score surface). Plan it before building it.
+**Startable without the owner: LB-28 and LB-30.** LB-28's `Needs: LB-27` parks it in
+`next-item.js`, and that dependency is worth re-reading rather than obeying — LB-27 asks *why* one
+request strands a launch burst; the rule is about a helper whose network cost is invisible at the
+call site, and stands either way. Past those, `--lane B` holds BF-52 (**planning**), LB-12
+(Orchestrator's), and a readiness/DB cluster (Q-275, Q-272, Q-276, Q-279, Q-283) the path rule puts
+in **Lane A**. **Q-278** is the one plausible B item — narrowed to a one-layer addition with **one**
+migration site (`components/health/readiness-breakdown.tsx`) — but it has **no plan** and an open
+scope question (two of its five "pillars" have no score surface). Plan it before building it.
 
 ## The finding that should change how you start
-**A precondition satisfied by the state it is meant to replace cannot fail.** Three investigations
-in one day, one of which had already cost a previous session:
-- `meal-label`'s ink gate read the **previous** style's canvas, so it passed on the wrong label.
-- `quantity-editor-option-a`'s "builder is open" marker was its `Ingredients` heading — the detail
-  sheet underneath has one too, so the gate opened before Edit was tapped.
-- `meal-photo-picker` waited for the picker's accessible name. The screen being **left** is still in
-  the DOM while it closes and carried the same name, so the file went there — which is the "the
-  picture reaches nothing" failure a previous session held BF-46 ①a for. **The app was right and the
-  harness was wrong.**
-
-Ask what your gate is true of *before* the thing you want. Pick a marker that exists **only** in the
-target state (`Update Meal`, `Log this meal`).
+**A precondition satisfied by the state it is meant to replace cannot fail**, and four
+investigations in two days went to it: `meal-label`'s ink gate read the **previous** style's canvas;
+`quantity-editor-option-a`'s `Ingredients` marker is on the sheet underneath too;
+`meal-photo-picker` waited for a name the screen being **left** still carries, so the file went
+there; and BF-39's swipe measured a row the sheet had not finished moving. **Four times the app was
+right and the harness was wrong.** Ask what your gate is true of *before* the thing you want, and
+pick a marker — or a moment — that exists **only** in the target state.
 
 ## Do not re-litigate
 - **`lib/coach/**`, `packages/shared/**`, `app/api/**`, `lib/data/**` are Lane A** whatever the edit
@@ -64,10 +65,9 @@ target state (`Update Meal`, `Log this meal`).
   `dataUrlToBlob` or `CameraResultType.Base64`; `no-data-url-fetch.test.ts` fails on the next one.
 - **A `SwipeActions` row owns horizontal gestures starting on it** (`[data-swipe-actions]`). The
   nutrition container's own drag steps the DAY and is **invisible on today** — test on a past day.
-- **BF-39's grouping rule is settled and proved by mutation even though the feature is held** —
-  `meal_group_id`, never `saved_meal_id`; a group needs a resolvable meal; one row is not nested.
-  **And a subscriber re-rendering a sibling subtree can drop an in-flight `useDrag`**, which is what
-  held it and is NOT understood: establish re-render vs remount before touching `SwipeActions`.
+- **BF-39's grouping rule** — `meal_group_id`, never `saved_meal_id`; a group needs a resolvable
+  meal; one row is not nested. The "a sibling re-render drops an in-flight `useDrag`" claim that
+  held it for a week was **wrong in every part**; `SwipeActions` is not implicated at all.
 - **Back-dismissal's logic is [`sheet-back-stack.ts`](../../../lib/hooks/sheet-back-stack.ts)**, the
   hook only React wiring: **depth** and a **module-level self-pop counter**, both load-bearing.
   Never call `useSheetBackDismiss` at a call site; its three-deep case is covered ONLY by unit tests.
@@ -83,9 +83,9 @@ section, not an entry.
 **This run adds one coherent nutrition pass**, best done in a sitting: a food row **swipes** to a
 Delete that confirms **and stays gone across a screen swap and a force-close** (BF-47, reasoned not
 reproduced); the meal photo picks from **both** the meal's screen and the builder — the CSP fix runs
-the *native* branch for the first time and it now toasts instead of failing silently; **Option A**
-at 412 dp, tallest of the three and may scroll; an ingredient row reading **grams only**; a logged
-meal as **one nested row** whose name survives **offline** (that branch never ran in the sandbox).
+the *native* branch for the first time; **Option A** at 412 dp, tallest of the three and may scroll;
+an ingredient row reading **grams only**; a logged meal as **one nested row** whose name survives
+**offline** (that branch never ran in the sandbox).
 
 Carried: Q-467, Q-499, Q-538, Q-305 at S25 width, Q-477 across local midnight, BF-10, LB-5,
 Q-328/Q-321/Q-486, Q-389, a TalkBack pass, Q-450/Q-418 (Polar H10). **Q-315 needs a DESKTOP.**
@@ -94,10 +94,9 @@ Q-328/Q-321/Q-486, Q-389, a TalkBack pass, Q-450/Q-418 (Polar H10). **Q-315 need
 None held.
 
 ## Gotchas worth carrying
-- **`main` will land a PR under YOUR open one.** Both PRs open at the end of this run went
-  `total_count: 0` — a stale base — because a sibling merged after their last `main` merge. That
-  zero has **three** causes: stale base, runner backlog, **wedged run** (`rerun` 403 / `cancel` 409;
-  the only way out is a new commit with real content, never an empty one).
+- **`main` will land a PR under YOUR open one**, and `total_count: 0` follows. That zero has
+  **three** causes: stale base, runner backlog, **wedged run** (`rerun` 403 / `cancel` 409; the only
+  way out is a new commit with real content, never an empty one).
 - **E2E takes 15–40 min and it CATCHES REAL BUGS** — two on one PR this run, a third on another.
   **Never dismiss a red E2E as flake without reading the log.** When it cannot be informative
   (docs/scripts; a re-push whose diff against an already-green head is version/changelog only),
@@ -114,12 +113,14 @@ None held.
   clone** — the tell is `merge-base` returning nothing.
 - **Two file inputs on one screen is a silent hazard** — name them; `input[type="file"]` takes
   whichever is first and the wrong one fails without a sound.
-- **In a spec: centre a row before a coordinate tap** (its natural spot is under the tab bar),
-  **hide the Next.js dev overlay** near the bottom-left, **scope assertions to the sheet** (three
-  mounted layers say "Protein"), and remember **`getByText` matches SUBSTRINGS**.
-- **`deleteFoodLog` writes a tombstone.** A count ignoring `deleted_at IS NULL` would *pass* on a
+- **In a spec: a coordinate tap has no actionability check** — `boundingBox()` right after a sheet
+  opens is a position the element is still travelling through (`swipeRowLeft` waits for the rect to
+  settle; `toBeInViewport()` does not). Also **centre a row** (its natural spot is under the tab
+  bar), **hide the Next.js dev overlay**, **scope assertions to the sheet** (three mounted layers
+  say "Protein"), and remember **`getByText` matches SUBSTRINGS**.
+- **`deleteFoodLog` writes a tombstone** — a count ignoring `deleted_at IS NULL` *passes* on a
   broken delete.
-- **`SegmentedTabs` renders `role="tab"`** and takes `orientation="vertical"`; the 48 dp floor
-  applies per segment, so a stacked toggle is 96 px and its neighbour must match.
+- **`SegmentedTabs` renders `role="tab"`**, takes `orientation="vertical"`, and the 48 dp floor is
+  per segment — a stacked toggle is 96 px and its neighbour must match.
 - **Never merge `main` or edit the tree while a local e2e run is live** — the tell is
-  `Parsing ecmascript source code failed` and tests at **0ms**.
+  `Parsing ecmascript source code failed` with tests at **0ms**.

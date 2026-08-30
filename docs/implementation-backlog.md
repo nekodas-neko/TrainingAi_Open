@@ -1478,53 +1478,6 @@ sheets are at the artboards' 16 px gutter now. See BF-45 ③ for why the fix is 
   this more."* So N5's recipe-import checks (yield, multi-dish, duplicate handling) are **not
   answered** and stay owed — do not read this entry as clearing them.
 
-### [nutrition] BF-39 — a logged meal draws as one nested row (BUILT AND HELD — read the measurement first)
-
-- **Lane:** B
-- **Batch:** `nutrition-ui-uplift`
-- **Added:** 2026-08-26 · owner, re-raised 2026-08-27 with a screenshot and again 2026-08-30 — three
-  reports from three screens, the strongest priority signal in the nutrition cluster.
-
-**The engine shipped 2026-08-30** (migrations 238 + 239, local SQLite **v31**):
-`food_logs.saved_meal_id` and `food_logs.meal_group_id`, stamped by `logMealItems` on both write
-paths and carried through the outbox payload, the push branch, the sync delta, the pull mapping and
-the local read. **What is owed is the rendering, and it was built and NOT shipped.**
-
-**⚠ IT WAS BUILT, IT WORKS, AND IT BROKE A DIFFERENT SCREEN'S GESTURE. Do not rebuild it the same
-way.** The render half is straightforward and its own three e2e tests pass. What it could not do is
-coexist with the meal library's swipe tray: `meal-detail-artboard-parity` and
-`my-meals-artboard-parity`'s swipe tests failed **deterministically, on both CI attempts and
-locally**, with the tray's `Delete <meal>` button never appearing after a left-swipe.
-
-**What was measured, in order — this is the valuable part:**
-1. **It is a regression of this work, not a flake.** The same two specs pass on `main` and fail on
-   the branch, run the same way, minutes apart.
-2. **The cause is the saved-meal summaries hook**, not the grouping or the rendering. Disabling
-   `useSavedMealSummaries` alone — leaving every other line — turns both specs green.
-3. **Moving the hook out of `nutrition-content.tsx`** into a memoised `DiaryMealList` (so the map's
-   arrival cannot re-render the library sheet) fixed `my-meals-artboard-parity` and **not**
-   `meal-detail-artboard-parity`.
-4. **The trigger is the `saved-meals` invalidation subscription**, not its network fetch. Removing
-   `useInvalidationRefetch` entirely turns both green; keeping it but re-reading only from the local
-   store and the cache seed — no request — leaves both red. So something in opening a meal
-   invalidates `saved-meals`, and the resulting work lands while a `SwipeActions` row is mid-drag.
-
-**Where to start.** Find what invalidates `saved-meals` during `openSavedMeal`, and why a subscriber
-re-rendering a sibling subtree drops an in-flight `useDrag`. `SwipeActions` keeps `offset` in
-`useState` and a module-level `openRows` registry — a re-render should be harmless and a **remount**
-would not be, so establish which is happening before changing either component.
-
-**The diary needs the meal's name and photo from somewhere**, and every option has a cost: this hook
-(above), a join into the food-log read (**Lane A** — `app/api` and `lib/data`), or a seed-only read
-that goes stale (the Q-260 shape). Settle that before building again.
-
-- **The grouping rule itself is settled and was proved by mutation** — keep it: group on
-  `meal_group_id`, **never** `saved_meal_id` (two servings of one meal on one day share the meal and
-  not the group); a group needs a *resolvable* meal, so pre-BF-39 rows and a deleted meal's rows
-  render loose because **nothing back-fills**; and a one-row group is not nested.
-- **Verification when it is rebuilt:** the three tests written for it, **plus** the meal-library
-  swipe specs in the same run — the pair this attempt broke.
-
 ### [nutrition] BF-38 — logging the same food twice creates a second `food_items` row: 19 of 209 are redundant
 
 - **Lane:** A — the matching happens at creation, in the route and the shared create path.
@@ -12660,6 +12613,29 @@ path and wanting a device check before merging — so this is one entangled piec
 of work, not two. Take the `return 60` fix and the offline weight-resolution
 wiring together, with a device check, rather than building a mirror table nobody
 reads.
+
+### [platform] LB-30 — 46 e2e coordinate reads can be measuring a moving element
+
+- **Lane:** B
+- **Added:** 2026-08-31 · Lane B, from the root cause of BF-39's week-long hold.
+
+A `boundingBox()` taken right after a sheet opens is a position the element is still travelling
+through. `SheetContent` slides in over `duration-500`, and `toBeVisible()` — and `toBeInViewport()`
+— are both satisfied long before it lands. **Measured on the meal library**: the row read y=605,
+and by the time a CDP touch reached it the row sat at y=503, so every point of the gesture hit the
+scroll container beneath it and the drag handler was never invoked once. It reads as a dead gesture,
+not a mis-aimed one, which is why it cost a week: the whole investigation was a render-vs-remount
+question the defect never involved.
+
+`swipeRowLeft` (`e2e/fixtures.ts`) now waits for two reads a frame apart to agree before it
+measures, and the three swipe specs go through it. **What is owed is the same audit for the other
+reads**: 46 `boundingBox()` calls across 27 spec files, of which only the ones feeding a
+`touchscreen.tap`/CDP dispatch are exposed — `locator.tap()` does its own stability check and is
+safe. `openSavedMeal` is the pattern that already survives this by re-measuring inside a `toPass`
+retry; a single measure followed by a coordinate tap is the shape to find.
+
+- **Not urgent**, and deliberately below the feature work: it produces flakes, not wrong behaviour,
+  and every one of them is already failing loudly rather than passing silently.
 
 ### [platform] 🟡 J1 residual — CI-enforced cache/fetch hygiene gates
 

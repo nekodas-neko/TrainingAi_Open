@@ -1,6 +1,6 @@
 import { test, expect, type Page, type Locator } from '@playwright/test'
 import { Client } from 'pg'
-import { SEED_EMAIL, settleRouteBoundary } from './fixtures'
+import { SEED_EMAIL, settleRouteBoundary, swipeRowLeft } from './fixtures'
 
 /**
  * A logged food swipes left to a Delete that lands on the confirmation (BF-45 ⑤).
@@ -100,33 +100,6 @@ test.beforeEach(async ({ page }) => {
 
 const diaryRow = (page: Page) => page.getByRole('button', { name: new RegExp(`^${FOOD}`) }).first()
 
-/**
- * A leftward touch drag across the row, far enough past halfway that the tray rests open.
- *
- * **Centre the row first.** Its natural position was 32 px above the fold, under the bottom tab
- * bar, so every touch point landed on a nav icon and the tray never moved — a harness failure that
- * reads exactly like an unwired gesture, and cost an hour before the target was printed.
- */
-async function swipeLeft(page: Page, row: Locator) {
-  await row.evaluate(el => el.scrollIntoView({ block: 'center' }))
-  await page.waitForTimeout(300)
-  const box = (await row.boundingBox())!
-  const y = box.y + box.height / 2
-  const startX = box.x + box.width / 2
-  const cdp = await page.context().newCDPSession(page)
-  try {
-    await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: startX, y }] })
-    for (let step = 1; step <= 10; step++) {
-      await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: startX - 20 * step, y }] })
-      await page.waitForTimeout(16)
-    }
-    // The final point matters: the day-swipe handler reads `changedTouches[0]`, so an empty
-    // touchEnd would silently skip the very gesture the second test exists to provoke.
-    await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [{ x: startX - 200, y }] })
-  } finally {
-    await cdp.detach()
-  }
-}
 
 /**
  * A coordinate tap, not `locator.tap()`. The dev-only Next.js error overlay mounts a
@@ -170,7 +143,7 @@ test('a swipe reveals Delete, and Delete asks before it deletes', async ({ page 
 
   const row = diaryRow(page)
   await expect(row).toBeVisible({ timeout: 30_000 })
-  await swipeLeft(page, row)
+  await swipeRowLeft(page, row, { centreFirst: true, releaseWithPoint: true })
 
   await tapAt(page, page.getByRole('button', { name: `Delete ${FOOD}` }))
 
@@ -187,7 +160,7 @@ test('the drag opens the tray without also stepping the diary to the next day', 
 
   const row = diaryRow(page)
   await expect(row).toBeVisible({ timeout: 30_000 })
-  await swipeLeft(page, row)
+  await swipeRowLeft(page, row, { centreFirst: true, releaseWithPoint: true })
 
   await expect(page.getByRole('button', { name: `Delete ${FOOD}` })).toBeVisible({ timeout: 10_000 })
   await expect(page.getByText('Yesterday', { exact: true })).toBeVisible()

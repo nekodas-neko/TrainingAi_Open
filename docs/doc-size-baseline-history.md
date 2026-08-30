@@ -3943,3 +3943,19 @@ shipped would be the most expensive kind of wrong.
 
 (Re-derived twice on rebases: this branch was cut at 8425, and BF-46 ② ③'s and ①a's paragraphs
 landed under it in turn.)
+
+## 2026-08-31 — `projectOverview.md` 8449 → 8446, `docs/implementation-backlog.md` 13368 → 13260, `implementation-lane-b.md` held at 126
+
+Three baselines fall; none rises. **`projectOverview.md`** loses four lines of merge debris — its
+Current Status carried *three* duplicated `**Version:**` lines and a stray `v1.398.0` /
+`**Last updated:**` pair mid-section, all of it from parallel PRs resolving the same shared line —
+and gains one paragraph, written as a single long line in the section's current house style.
+
+**`docs/implementation-backlog.md`** falls 108 as BF-39's entry is removed on shipping and LB-30 is
+filed, which is the queue working rather than a compaction.
+
+**The baton was rewritten and then cut back to its baseline**, which is the part worth recording:
+correcting BF-39's state cost more lines than the correction saved, so the "finding that should
+change how you start" section was compressed from a heading plus three bullets into one paragraph,
+and four gotchas were merged. **Nothing was dropped** — the fourth instance of the precondition
+finding (BF-39's own) is now in there too, and it is the one that cost the most.

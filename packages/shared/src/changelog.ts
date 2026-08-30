@@ -6,6 +6,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.403.0",
+    date: "2026-08-31",
+    changes: [
+      "A meal you logged is one row in the diary again, headed by the meal's own name and picture, instead of one row per ingredient. An AI-logged breakfast used to fill the whole meal section; tap the row to open it and the ingredients are still all there.",
+      "Two helpings of the same meal on one day stay two rows \u2014 they are two helpings, and merging them would report one.",
+    ],
+  },
+  {
     version: "1.402.0",
     date: "2026-08-30",
     changes: [
