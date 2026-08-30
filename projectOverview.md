@@ -39,6 +39,17 @@
 
 **The accessibility scanner that would have passed a 12 px button (Q-282).** `@axe-core/playwright` was installed, measured and removed: WCAG 2.5.8 exempts a *spaced* undersized control, so a deliberately-shrunk **12×12** button (confirmed by `boundingBox`) came back a **pass**, and `color-contrast` cannot read this app at all — it fails to parse the `oklch` tokens (*"Could not parse color string oklab(…)"*) and **evaluated no nodes on Home**. `e2e/touch-target-size.spec.ts` ships instead: DOM geometry against **this repo's 48 dp bar**, covering the roles `globals.css`'s `button, [role="button"]` floor cannot (`<a>`, `role="tab"`, `role="radio"`). It fails on the mutation axe passed. One real finding, **LB-26**: Home's APK-banner link is 258×33 ([journal](docs/overview/entries/2026-08-30-touch-target-gate.md)).
 
+**The Heart Rate tile shows last night, as a delta (TN-13).** It read the **7-day mean** and printed
+it as a bare bpm — in the signal that best predicts how you feel (r = +0.557 against your own
+check-in, best of nine). Re-measured over 71 production nights: the nightly value changes on **61 of
+70** night-pairs, the rounded mean on **29**, so the tile stood still nearly six days in ten and
+discarded 77 % of the daily movement. And a bare number says nothing: expressing the reading as a
+deviation from your own baseline roughly **doubles** its correlation with felt state, which is why it
+now reads `50 · −7 vs usual`. Both halves shipped together because the entry required it — half a fix
+here is the one that looks like progress. **Still owed: the S25 check** — the cue grew from one word
+to five across 20 layout styles
+([journal](docs/overview/entries/2026-08-30-feat-hr-tile-nightly-resting.md)).
+
 **Changing a supplement's dose no longer rewrites every log you already made (BF-3, gap 1).** The
 dose lived on the definition and not on the log, so raising retatrutide from 2 mg to 4 mg made last
 month read 4 mg too — for a drug whose whole story is its escalation schedule, the schedule was what

@@ -3846,6 +3846,18 @@ the log now" reads as a feature the owner has to go and configure before their h
 is the opposite of what shipped. The second is the **v32** device warning: a local SQLite migration is
 the highest-risk change this repo makes, and a paragraph announcing a fix without saying it is
 unverified on the phone is how a Known-Issues row gets skipped.
+
+## 2026-08-30 — `projectOverview.md` → 8420, `docs/implementation-backlog.md` → 13368 (TN-13 shipped)
+
+The backlog shrinks: TN-13's 5,628-character entry becomes a 2,493-character record of what was
+measured plus a device `Keep:`. Most of what left was the argument for the design — the correlation
+table, the two rejected alternatives — and that now lives in the shipped module's own comments, where
+someone changing the rule will actually be standing.
+
+`projectOverview.md` +11. The paragraph carries the re-measured numbers rather than the entry's,
+which is the point of it: TN-13 said 2.11 / 0.33 / 84 % over 50 nights and the same query over 71
+gives 2.50 / 0.58 / 77 %. Same conclusion, and restating it is cheaper than the next session
+discovering the discrepancy and wondering which figure was wrong.
 ## 2026-08-30 — `projectOverview.md` +2 (LB-26, the APK banner's tap target)
 
 One Current Status paragraph plus its blank line. The defect half is small; the half that earns the
@@ -3854,6 +3866,6 @@ it happened here to a session that had read the warning about it hours earlier. 
 backlog's protocol header in the same PR, which is the durable fix; this line is what makes an
 orientation read mention it at all.
 
-**Re-derived twice as PRs landed under it; final 8409 → 8411.** The branch was cut before Q-154 landed
+**Re-derived on each rebase as PRs landed under it; final 8420 → 8422.** The branch was cut before Q-154 landed
 and two more PRs merged under it while CI ran; every paragraph is kept, so the number is set from the
 merged file each time rather than from either side of a conflict.

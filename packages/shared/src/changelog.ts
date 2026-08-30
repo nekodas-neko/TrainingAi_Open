@@ -6,10 +6,17 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: "1.397.3",
+    version: "1.397.4",
     date: "2026-08-30",
     changes: [
       "The \u201cDownload Android App\u201d link on the home screen is easier to hit \u2014 it was a third shorter than the minimum this app holds every other control to.",
+    ],
+  },
+  {
+    version: "1.397.3",
+    date: "2026-08-30",
+    changes: [
+      "The Heart Rate tile on Home now shows last night\u2019s resting heart rate and how far it is from your usual, instead of a seven-day average shown as a bare number. The average moved about half a beat a night and stood still on most days, so the tile rarely told you anything had changed; last night\u2019s value moves around two and a half. And \u201c50 \u00b7 \u22127 vs usual\u201d says something \u2014 a number on its own does not, unless you happen to remember what your usual is.",
     ],
   },
   {
