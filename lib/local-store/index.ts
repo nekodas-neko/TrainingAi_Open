@@ -37,6 +37,9 @@ export interface LocalStore {
   // Local-first food-library search: matches previously-logged/created items in the
   // local food_items table by name/brand. Empty query returns the most recent items.
   searchFoodItems(query: string): Promise<FoodItem[]>;
+  /** BF-38. Every local row at this exact calorie count — the candidate set the create-time
+   *  duplicate check runs over, mirroring the server's prefilter so the two agree. */
+  findFoodItemsByCalories(calories: number): Promise<FoodItem[]>;
   // Recent distinct food items logged to a given meal type (the logger quick-pick).
   getRecentFoodItemsForMeal(mealTypeId: string, limit: number): Promise<FoodItem[]>;
   // Saved meals (offline-first: create/edit/delete offline, read local-first).

@@ -27,6 +27,22 @@
 **Version:** v1.395.2 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-08-30.
 
+**Nine percent of My Foods was the same food, written again (BF-38, the exact-match half).**
+Measured in production: **221 `food_items`, 200 distinct name+brand, 21 redundant**, 20 of them from
+the `ai` source — and nothing had ever checked, at any layer, whether a food being created already
+existed. `foodItemIdentityKey` decides it once, on exact identity: normalised name and brand (case
+and whitespace only) plus **every number a log depends on** — serving size, calories, and the
+macros. That is 10 of the 21. **The rest are deliberately left**, because `food_logs` multiplies
+against the item's serving size: `mandarin` exists at 42 kcal/80 g and 53 kcal/100 g, so a
+density rule would not lose a row, it would change what a new log *means*; and `protein bar` reads
+**137 and 342 kcal at the same 40 g**, where merging picks a winner silently. Two of the entry's
+premises were falsified before building — **`barcode` is NULL on all 221 rows**, because
+`NutritionScanResult` carries no such field, so the "unambiguous" barcode key would have matched
+nothing; and the AI's names are usually byte-identical rather than fuzzy. Both write paths check and
+**differ on purpose**: the offline push keeps its client-minted id, because a queued `food_logs`
+mutation already references it. ⚠️ The device half is unverified on the S25
+([journal](docs/overview/entries/2026-08-30-food-item-duplicate-create.md)).
+
 **A map entry stops heading the work list (LB-22).** BF-28 and BF-11 exist to be READ, not built, and
 said so only in prose — so `next-item.js` printed BF-28 as READY #1. `Reference:` is a **field** now,
 ratcheted by `check-backlog-pointers.js`, and checked **last**, so a `Gate:`/`Needs:`/`Keep:` can never hide behind "not a work item" ([journal](docs/overview/entries/2026-08-30-queue-reference-entries.md)).
@@ -516,6 +532,27 @@ order.
 > An entry only leaves when **nothing is still owed**: no open work, no pending owner or device
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
+
+### [nutrition][devices] ⚠️ Duplicate foods stop being created; the device half has not been seen on the S25 (BF-38, v1.395.2)
+
+The web route is verified end to end — four POSTs to `/api/nutrition/food-items` on a running
+`pnpm dev` (identical, identical again, a case-and-whitespace variant, a genuinely different
+serving) produced **two** rows.
+
+**The device path is not the same code and was not exercised.** It runs in
+`packages/shared/src/nutrition/create-food-item.ts` against the local SQLite store, and
+`getLocalStore` returns null in `pnpm dev` *and* in Playwright — so unit tests with a mocked store
+are the only evidence that logging your usual lunch twice now makes one row on the phone. That path
+also carries the load-bearing half of the design: it must catch the duplicate **before** an id is
+minted, because the offline push deliberately does not de-duplicate (its id is already referenced by
+a queued `food_logs` mutation, and `food_logs.food_item_id` is `ON DELETE RESTRICT`).
+
+**Smoke step:** on the S25, log the same food by AI description twice and check My Foods holds one
+row; then log a deliberately different serving of it and check there are two.
+
+Nothing in the existing 21 duplicates was touched — collapsing those means re-pointing every log
+first, which is a separate decision. BF-38 stays queued for that, for the conflicting-estimate pairs
+that need an owner, and for the barcode chain.
 
 ### [platform] 🟡 The module map points at `lib/` for 34 modules that live in `packages/shared/` (LA-35, 2026-08-30)
 

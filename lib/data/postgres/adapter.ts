@@ -3322,7 +3322,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   async reassignAndDeleteMealType(userId: string, fromId: string, toId: string) { return n.reassignAndDeleteMealType(this.db, userId, fromId, toId) }
   async reorderMealTypes(userId: string, orderedIds: string[]) { return n.reorderMealTypes(this.db, userId, orderedIds) }
   async seedDefaultMealTypes(userId: string) { return n.seedDefaultMealTypes(this.db, userId) }
-  async createFoodItem(userId: string, data: Omit<FoodItem, 'id' | 'userId' | 'createdAt'> & { id?: string }) { return n.createFoodItem(this.db, userId, data) }
+  async createFoodItem(userId: string, data: Omit<FoodItem, 'id' | 'userId' | 'createdAt'> & { id?: string }, opts?: { reuseExisting?: boolean }) { return n.createFoodItem(this.db, userId, data, opts) }
   async searchFoodItems(userId: string, query: string) { return n.searchFoodItems(this.db, userId, query) }
   async listFoodLogs(userId: string, date: string) { return n.listFoodLogs(this.db, userId, date) }
   async createFoodLog(userId: string, data: Pick<FoodLog, 'date' | 'mealTypeId' | 'foodItemId' | 'quantityMultiplier'> & { id?: string; loggedAt?: Date }) { return n.createFoodLog(this.db, userId, data) }

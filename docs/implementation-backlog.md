@@ -1340,6 +1340,12 @@ the gaps rather than merging the two blocks back together, which would be option
 - **Added:** 2026-08-26 · BugFix, from the owner's My Foods screenshot. **Not reported** — it was
   visible in the picture sent about something else: `LOADED MAC & CHEESE / CORE POWERFOODS / 350 g /
   672 kcal` appears **twice in a 24-item list**.
+- **Keep:** the two halves a matching rule cannot settle. The **exact-identity** rule shipped
+  2026-08-30 (`packages/shared/src/nutrition/food-item-identity.ts`, both write paths) and stops the
+  10 of 21 duplicates whose rows agree on name, brand, serving size and all macros. What is owed:
+  **(a)** the 11 that differ — see the corrected AI paragraph below, which is now a data-quality
+  question with an owner in it rather than a rule; **(b)** the barcode half, which needs a
+  prerequisite nobody knew about — see the corrected barcode paragraph.
 
 **Measured against production 2026-08-26:**
 
@@ -1358,16 +1364,44 @@ the gaps rather than merging the two blocks back together, which would be option
 | `barcode` | 1 | 2 |
 | `text` (OFF name search) | 0 | — |
 
-**The `barcode` case is the unambiguous one and the place to start.** A barcode is an exact product
-identity and `food_items` carries the column — so re-scanning a product the catalogue already holds
-should reuse the row, and does not. One pair today, but it is the case with a definitively correct
-answer, and fixing it needs no judgement about what "the same food" means.
+**⚠ CORRECTED 2026-08-30 — the barcode case is not the place to start, because the column has never
+been written.** The premise above was *"`food_items` carries the column"*, which is true of the
+schema and false of the data: measured in production, **`barcode` is NULL on all 221 rows,
+including all 3 whose `source` is `'barcode'`.** Keying on it would match nothing. The chain has a
+break at the top — `NutritionScanResult` (`packages/shared/src/types/nutrition.ts`) has **no
+`barcode` field**, so `/api/nutrition/barcode` validates the code, looks the product up and returns
+a payload that does not contain it. Nothing downstream can store what it never receives.
+Q-131 fixed the push branch to pass `p.barcode` through, and `NewFoodItem` in
+`create-food-item.ts` still has no such field to fill it from.
 
-**The `ai` case needs a matching rule, and that rule is the actual design work.** A model naming the
-same food twice will not produce byte-identical strings, so exact match is too strict and fuzzy match
-risks collapsing *Greek Yogurt Plain* into *Greek Yogurt Vanilla* — which silently corrupts the
-macros of every past log pointing at the survivor. **Prefer under-merging to over-merging**, and say
-in the PR which rule was chosen and what it deliberately does not catch.
+**Making it reachable is the real barcode task**, and it is a chain change, not a one-liner: the
+field on `NutritionScanResult` and the route that sets it, `NewFoodItem` + the outbox payload, a
+local SQLite column (migration + version bump + `RECONCILE_COLUMNS`), the pull mapping, and the Lane
+B call site that carries it out of `capture-actions.tsx`. Only then is a barcode key worth writing —
+and it is worth writing, because it is the one identity with a definitively correct answer.
+Scale of the prize as things stand: **1 redundant row of 21**, rising as barcode use does.
+
+**The `ai` case — an exact rule shipped, and the residue is not a rule problem.** A model naming the
+same food twice was assumed not to produce byte-identical strings. Measured, it usually does: of the
+17 duplicate groups, **8 agree on every field** (name, brand, serving size, calories, P/C/F) once
+case and whitespace are normalised, and those 8 hold 10 of the 21 redundant rows. That is what
+shipped, and it needs no judgement about what "the same food" means.
+
+The remaining 9 groups are **not** a looser rule waiting to be written, and this is the finding to
+carry forward. They split two ways:
+
+- **Different servings of one food** — `mandarin` at 42 kcal/80 g and 53 kcal/100 g, plus capsicum,
+  edamame, mozzarella, parmesan, pizza sauce. Identical density, two servings. A calories-per-gram
+  rule would merge them, and because `food_logs` stores a multiplier **against the item's serving
+  size**, reusing the 100 g row for an 80 g entry does not lose a row — it changes what the new log
+  means. Under-merging is not caution here, it is correctness.
+- **Two estimates that disagree** — `protein bar` (Carman's) reads **137 and 342 kcal at the same
+  40 g**; `bolognese potato bake` 483 vs 528 at 350 g. One of each pair is simply wrong. Merging
+  picks a winner silently, which is the thing the entry's own warning about *Greek Yogurt Plain*
+  vs *Vanilla* is about.
+
+So closing the residue means **showing the owner the conflicting pairs and asking**, not loosening
+the match. `Gate: owner` when it is next picked up.
 
 **Why it is worth fixing rather than tolerating at 9%:**
 - **It is the visible defect in a list the owner is already unhappy with** (BF-37) — a 24-item list
@@ -1383,9 +1417,16 @@ in the PR which rule was chosen and what it deliberately does not catch.
   and if the matching rule is wrong, that rewrites what the owner ate. **Stop the creation first,
   live with the existing 19, and make de-duplicating history a separate decision** once the rule has
   been shown correct on new writes.
-- **Verification.** Scan the same barcode twice → one row. Log the same food by AI description twice
-  → one row, and a deliberately similar-but-different food → two. Then confirm past logs still
-  resolve to the right item.
+- **Verification (for what shipped).** Log the same food by AI description twice → one row; a
+  deliberately similar-but-different food → two. Both write paths are covered by tests and the
+  asymmetry between them is asserted: the interactive route reuses, the offline push does **not**,
+  because its id is already referenced by a queued `food_logs` mutation. **Still owed on the S25:**
+  the device half runs in `create-food-item.ts` against the local store, which does not exist in
+  `pnpm dev` or Playwright, so "logging your usual lunch twice makes one row" is unverified on the
+  only runtime that matters.
+- **Verification (for the barcode half, when it is built).** Scan the same barcode twice → one row —
+  and *first* confirm a non-null `barcode` actually lands in the column, per the external-field rule:
+  a wrong or missing field reads as `undefined` and fails silently.
 
 ### [nutrition] BF-39 — a logged meal stops being a meal: `food_logs` has no `saved_meal_id`, and three symptoms trace to that
 
@@ -2279,6 +2320,37 @@ whether or not anyone draws them first.
   `pnpm check:rules`. Then the **on-device smoke run** — this is pure UI on the canonical runtime,
   in both themes, so a green `pnpm dev` is not sufficient evidence and a Known-Issues row is the
   fallback if no device is available.
+
+### [nutrition][devices] LA-36 — `food_items.image_data_uri` is written to the device and read back by nothing
+
+- **Lane:** A (the engine) — the miss is in the local-store read mappers; the visible half is Lane B.
+- **Added:** 2026-08-30, found while extracting the local food-item row mapper for BF-38
+
+BF-35 stores a food's picture as bytes rather than a URL, and the reason is in its own comment:
+*"this table is read local-first and mirrored into on-device SQLite, where a URL renders nothing
+offline."* The bytes get there — `upsertFoodItem` writes `image_data_uri` on every create and the
+pull mapping keeps it. **Nothing reads it back.** All three local read paths omit the column:
+
+| read | returns the image? |
+|---|---|
+| `searchFoodItems` (Food Library, ingredient picker, food list) | no |
+| `getRecentFoodItemsForMeal` | no |
+| the item embedded in `getFoodLogs` | no |
+
+The server's `rowToFoodItem` returns it, so **`GET /api/nutrition/food-items` carries the picture and
+the local-first read that supersedes it does not** — which is the device-versus-web divergence the
+Canonical Runtime rule exists to prevent, pointing the wrong way: the canonical runtime is the one
+losing the feature. `saved_meals` is the counter-example in the same file — it stores and reads its
+image (`sqlite-backend.ts` ~2481), which is why saved meals show pictures and foods do not.
+
+**The work is three column reads**, one of them in the shared `foodItemRowToItem` helper BF-38 just
+extracted, which is where the deliberate omission is commented. Deliberately NOT folded into BF-38:
+it is a visible change on two Lane B screens with a memory cost worth stating (20 rows at the
+`FOOD_ITEM_IMAGE_MAX_BYTES` 16 KB cap is ~320 KB per search), and a de-duplication PR is the wrong
+place to start rendering pictures.
+
+- **Gate:** device — the local store does not run in `pnpm dev` or Playwright, so the only way to see
+  this fixed is on the S25.
 
 ### [platform] LA-35 — the module map points at `lib/` for 34 modules that live in `packages/shared/`, and the check that should catch it blesses the mistake
 

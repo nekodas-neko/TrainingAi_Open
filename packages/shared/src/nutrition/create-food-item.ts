@@ -1,5 +1,6 @@
 import type { FoodItem } from '@trainingai/shared/types/nutrition'
 import { sanitiseNutrition } from '@trainingai/shared/nutrition/scan-totals'
+import { findDuplicateFoodItem } from '@trainingai/shared/nutrition/food-item-identity'
 import { todayInTz } from '@trainingai/shared/date-utils'
 import { getLocalStore } from '@/lib/local-store'
 import { pushThenRevalidate } from '@/lib/local-store/push-then-revalidate'
@@ -69,6 +70,24 @@ export async function createFoodItem(input: NewFoodItem, userId?: string): Promi
   }
 
   const store = userId ? getLocalStore(userId) : null
+
+  // BF-38. The device de-duplicates HERE, before anything is written or queued — and that is the
+  // whole point. The caller logs against the id this returns and `logFoodEntries` queues a
+  // `food_logs` mutation carrying it, so the server cannot substitute a different id later without
+  // leaving that log pointing at a row it never created (`food_logs.food_item_id` is ON DELETE
+  // RESTRICT). Catching it on this side means the duplicate never enters the outbox at all, which
+  // is why `createFoodItem` in the Postgres slice leaves `reuseExisting` off for the push branch.
+  // The web fallback below has no local store and no queued log, so its half of the check runs
+  // server-side in `POST /api/nutrition/food-items`.
+  //
+  // The candidate is `item` rather than `input`: the rounding it carries is what actually gets
+  // stored, and comparing pre-rounding values against stored ones is how a check like this misses.
+  if (store) {
+    const existing = findDuplicateFoodItem(item, await store.findFoodItemsByCalories(item.calories))
+    // No local write, no mutation, no invalidation — nothing changed, so nothing to tell anyone.
+    if (existing) return existing
+  }
+
   const body = {
     id: item.id, name: item.name, brand: item.brand,
     servingSizeG: item.servingSizeG, calories: item.calories,

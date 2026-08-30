@@ -3465,3 +3465,22 @@ Three items also came back as *questions* rather than results, which is a findin
 rather than the app — A1, A4 and W3 were written for a reader who already knew what they changed.
 They are re-worded in `device-verification-queue.md` with the actual gesture, the actual way to
 induce a failure, and where the screen is.
+
+
+## 2026-08-30 — `docs/implementation-backlog.md` 13301 → 13373, `projectOverview.md` 8189 → 8226 (BF-38 / LA-36)
+
+**Backlog, +72** (re-measured twice while `main` moved underneath; both of its own raises landed first). Most of it is BF-38 correcting itself. Two of that entry's premises were falsified
+by measurement before anything was built — the "unambiguous" barcode case cannot key on a column
+that is NULL on all 221 rows, and the AI's duplicate names are usually byte-identical rather than
+fuzzy — so both paragraphs are rewritten in place rather than left to be read as true by the next
+session. The replacement is longer because the *reason* the residue cannot be closed by a looser
+rule is the finding: `food_logs` multiplies against the item's serving size, so merging two servings
+of one food changes what a log means. Deleting that paragraph would mean re-deriving it, and the
+obvious wrong move (a calories-per-gram rule) is the one it exists to stop. The rest is **LA-36**, a
+new entry: `food_items.image_data_uri` is written to the device on every create and read back by
+nothing, with the three-row table naming which reads omit it.
+
+**projectOverview, +35.** One Current Status paragraph and one Known-Issues row. The row is a
+device-verification gate, so it carries the smoke step and — the part that is not boilerplate — why
+the device path is *different code* rather than the same code untested: it de-duplicates before an
+id is minted, because the offline push deliberately does not de-duplicate at all.
