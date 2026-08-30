@@ -3286,3 +3286,22 @@ web harness.
 It also records the near-free adjacency: the day HR trace is bucketed by **mean**, so the range that
 shipped is labelled "15-min averages"; `oura_bucket.hr_min` / `hr_max` would let it say Low and High
 honestly, in the same route change.
+
+## 2026-08-30 — `docs/implementation-backlog.md` raised (LB-19's premise replaced by measurement)
+
+17 lines (12797). The entry said two flaky e2e specs were a sandbox **time budget** and prescribed
+`test.setTimeout`. Measuring both showed neither is, and the prescription would have fixed neither —
+so the replacement is longer than the claim it removes, because the two failures turn out to have
+nothing in common and each needs its own mechanism written down.
+
+`goal-invalidation` fails on a locator that never resolves, 60 s into a test with a minute of budget
+left: the seed's newest steps row was five days old and the row it asserts on cannot render without
+one. `meal-label` fails intermittently on a zxing decode returning null, and the guard before that
+read (`inkFraction > 0.01`) cannot distinguish the new style's paint from the previous style's — the
+canvas already has ink. The entry also records why the obvious fix for the second (poll the decode
+until it succeeds) is wrong: every style encodes the same meal, so a stale paint decodes to the same
+token and would pass.
+
+Kept because the class generalises: a spec that depends on the seed having run *recently* is the
+hardcoded-timestamp rule wearing a different hat, and CI's fresh database makes it invisible exactly
+where it would be caught.

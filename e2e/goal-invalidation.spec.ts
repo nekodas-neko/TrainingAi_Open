@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { settleRouteBoundary } from './fixtures'
+import { settleRouteBoundary, ensureStepsToday } from './fixtures'
 
 /**
  * A steps-goal edit reaches Health's Progress panel without a reload.
@@ -26,9 +26,15 @@ import { settleRouteBoundary } from './fixtures'
  * with no device copy, reached entirely client-side — which no other spec exercises.
  *
  * Two things it depends on, verified rather than assumed:
- *  - `seed.sql` inserts `body_metrics` for `current_date - d`, d in 0..13, so **today** carries a
- *    steps value. `goals-progress-card.tsx` filters `visibleRows` on `value != null`, so without it
- *    the row would not render and the assertion would be vacuous.
+ *  - **Today carries a steps value** — `goals-progress-card.tsx` filters `visibleRows` on
+ *    `value != null`, so without one the row does not render and the assertion is vacuous. This used
+ *    to lean on `seed.sql`, which writes fourteen days ending at *its* today — the day the seed
+ *    **ran**. Nothing back-fills, and `setup.sh` skips a non-empty `users` table, so an aged
+ *    container has no row for the current day and this spec fails with the goal locator NOT FOUND.
+ *    That was misfiled as a sandbox time budget (LB-19) until it was measured on 2026-08-30:
+ *    `max(date) WHERE steps IS NOT NULL` was `2026-08-25` against a `current_date` of `2026-08-30`,
+ *    and the failure was a 60 s locator timeout inside a test with 180 s left to run. `beforeAll`
+ *    guarantees the row now, so the spec no longer depends on when the database was seeded.
  *  - The return trip is **client-side**. `page.goto('/health?tab=progress')` is a full document load
  *    that remounts and refetches unconditionally, which would pass regardless.
  */
@@ -39,6 +45,12 @@ const FIRST_GOAL = 7000
 const SECOND_GOAL = 9000
 
 test.setTimeout(180_000)
+
+// Non-destructive: an existing steps value is left alone and `restore()` puts back exactly what was
+// there. `8000` is what `seed.sql` itself writes for today, so the goals below stay distinct from it.
+let restoreSteps: () => Promise<void> = async () => {}
+test.beforeAll(async () => { ({ restore: restoreSteps } = await ensureStepsToday()) })
+test.afterAll(async () => { await restoreSteps() })
 
 async function setStepsGoal(page: import('@playwright/test').Page, goal: number) {
   await page.getByText('Activity level, targets & AI recommendations').click()

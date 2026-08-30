@@ -133,6 +133,90 @@ export async function ensureEnergyBalanceProfile(email = SEED_EMAIL): Promise<st
 }
 
 /**
+ * Guarantee the seeded user has a `body_metrics` steps value for **their** today, and hand back a
+ * restore function.
+ *
+ * **Why a spec cannot assume the seed provides this (LB-19, corrected 2026-08-30).** `seed.sql`
+ * writes fourteen days ending at `today - 0`, but *its* today is the day the seed **ran** — and
+ * `setup.sh` skips seeding a non-empty `users` table, so nothing back-fills. A container two days
+ * old therefore has no row for the current day, `goals-progress-card.tsx` filters `visibleRows` on
+ * `value != null`, and the steps row simply does not render. Measured: a five-day-old database put
+ * `max(date) WHERE steps IS NOT NULL` at `2026-08-25` against a `current_date` of `2026-08-30`, and
+ * `goal-invalidation.spec.ts` failed with the goal locator *not found* rather than on time. CI
+ * provisions a fresh database per run, which is why this is invisible there.
+ *
+ * **The date is the USER's, not the runner's** — the same rule `suppressMorningCheckin` follows.
+ * The screens read `todayInTz(session.user.timezone)`, and the container's zone is not the seeded
+ * user's.
+ *
+ * `8000` matches what the seed itself writes for `d = 0` (`seed.sql:104`), so a spec asserting
+ * against it reads the same on a fresh database and an aged one.
+ *
+ * Non-destructive: an existing steps value is left alone, and `restore()` puts back exactly what was
+ * there — including a row that did not exist.
+ */
+export async function ensureStepsToday(
+  steps = 8000,
+  email = SEED_EMAIL,
+): Promise<{ userId: string; date: string; restore: () => Promise<void> }> {
+  const connectionString = process.env.DATABASE_URL
+  expect(connectionString, 'DATABASE_URL must be set — see e2e/README.md').toBeTruthy()
+  const { Client } = await import('pg')
+  const db = new Client({ connectionString })
+  await db.connect()
+  try {
+    const { rows: userRows } = await db.query<{ id: string; d: string }>(
+      `SELECT id, to_char(now() AT TIME ZONE coalesce(timezone, 'Australia/Brisbane'), 'YYYY-MM-DD') AS d
+         FROM users WHERE email = $1`,
+      [email],
+    )
+    const userId = userRows[0]?.id
+    const date = userRows[0]?.d
+    expect(userId, `${email} is not seeded — run pnpm db:local`).toBeTruthy()
+
+    const { rows: existing } = await db.query<{ steps: number | null }>(
+      'SELECT steps FROM body_metrics WHERE user_id = $1 AND date = $2',
+      [userId, date],
+    )
+
+    if (existing.length > 0 && existing[0].steps != null) {
+      return { userId, date, restore: async () => {} }
+    }
+
+    if (existing.length === 0) {
+      await db.query(
+        'INSERT INTO body_metrics (user_id, date, steps) VALUES ($1, $2, $3)',
+        [userId, date, steps],
+      )
+      return {
+        userId,
+        date,
+        restore: async () => {
+          const c = new Client({ connectionString })
+          await c.connect()
+          try { await c.query('DELETE FROM body_metrics WHERE user_id = $1 AND date = $2', [userId, date]) }
+          finally { await c.end() }
+        },
+      }
+    }
+
+    await db.query('UPDATE body_metrics SET steps = $3 WHERE user_id = $1 AND date = $2', [userId, date, steps])
+    return {
+      userId,
+      date,
+      restore: async () => {
+        const c = new Client({ connectionString })
+        await c.connect()
+        try { await c.query('UPDATE body_metrics SET steps = NULL WHERE user_id = $1 AND date = $2', [userId, date]) }
+        finally { await c.end() }
+      },
+    }
+  } finally {
+    await db.end()
+  }
+}
+
+/**
  * Turn Home's card widgets on for this page.
  *
  * `DEFAULT_CARD_WIDGETS` is empty (`lib/home/home-prefs.ts:104`), so a fresh browser profile renders

@@ -1847,36 +1847,53 @@ whether or not anyone draws them first.
   in both themes, so a green `pnpm dev` is not sufficient evidence and a Known-Issues row is the
   fallback if no device is available.
 
-### [platform] LB-19 — two e2e specs fail on `main` in-session, and the cause is a time budget rather than a defect
+### [platform] LB-19 — neither of the two flaky e2e specs was a time budget; one is fixed, one is a repaint race
 
 - **Lane:** B
-- **Added:** 2026-08-26, found while verifying LB-16. **Attributed before filing**: both fail
-  identically on a detached `origin/main` checkout with none of that branch's code, so they are not
-  the change that found them.
-- **The two:**
-  - `meal-label.spec.ts:111` *a saved meal renders a printable label in every style* — **exceeds its
-    own 180 s timeout**, having already reached the label sheet with the QR drawn and the style
-    selected (screenshot confirms). It then switches style **ten times**, each behind a 20 s
-    `poll`, and for four of them pulls the whole canvas into Node and runs a zxing decode.
-  - `goal-invalidation.spec.ts:57` *a steps-goal edit reaches Health without a reload* — four
-    navigations and two 60 s waits.
-- **Read them as marginal-by-construction, the shape CLAUDE.md already documents for the Oura rollup
-  tests**: work that fits comfortably on CI's runner and does not fit here. The rollup tests were
-  fixed by giving them their own vitest project with a 60 s timeout rather than by changing what they
-  assert; the same move exists here (`playwright.config.ts` takes per-file `test.setTimeout`).
-- **Do not weaken what they check.** `meal-label`'s decode loop is the closest the sandbox gets to
-  the print test that is still owed — it proves the symbol is unobstructed at every layout, which is
-  exactly the thing a layout change breaks silently.
-- **✅ CI answered, 2026-08-26: both pass there.** PR #564's E2E job went green in **16m 15s**
-  (14:16:39 → 14:32:54Z) with these two among them, on the same commit that failed them locally. So
-  this is a sandbox time budget and nothing else — the entry's title is right and there is no defect
-  behind it.
-- **What is left is a one-line fix, if it is worth doing at all.** `test.setTimeout` on the two
-  files, sized from a local run. It is deliberately unscheduled: the specs pass on the runner that
-  gates merges, so the cost of leaving them is a session occasionally re-diagnosing them — which is
-  what this entry exists to prevent — and the cost of raising a timeout is that a genuinely hung
-  test takes longer to fail. **Do not weaken what they check** either way: `meal-label`'s decode
-  loop is the closest the sandbox gets to the print test that is still owed.
+- **Added:** 2026-08-26 · **premise replaced 2026-08-30 after measuring it.** The entry used to say
+  both specs "fit comfortably on CI's runner and do not fit here", and prescribed `test.setTimeout`.
+  Both halves of that were wrong, and the prescription would have fixed neither.
+
+**`goal-invalidation.spec.ts` — FIXED here (`fix/e2e-fixture-not-time-budget`).** The failure was
+never time. It is `getByText('/ 7,000')` **element(s) not found** after 60 s, inside a test with more
+than a minute of its 180 s budget still unused — and the page snapshot shows the Steps card rendered
+with **no value line at all**. `seed.sql` writes fourteen days ending at *its* today, meaning the day
+the seed **ran**; nothing back-fills and `setup.sh` skips a non-empty `users` table, so an aged
+container has no `body_metrics` row for the current day, `goals-progress-card.tsx` filters
+`visibleRows` on `value != null`, and the row the spec asserts on cannot render. Measured 2026-08-30:
+`max(date) WHERE steps IS NOT NULL` was **2026-08-25** against a `current_date` of **2026-08-30**.
+The spec now guarantees its own row via `ensureStepsToday()` (`e2e/fixtures.ts`), which resolves the
+**user's** today rather than the runner's, leaves an existing value alone, and restores exactly what
+was there. Passes twice consecutively at **1.4 min**, and the row is gone afterwards.
+
+**`meal-label.spec.ts:111` — still open, and it is a repaint race rather than a budget.** Measured
+2026-08-30: it failed once in a whole-file run with *"Ingredients · centred's code must decode off
+the rendered label"* — a zxing decode returning **null** — then passed alone (2.8 min) and passed
+again as a full file (3.1 min), 5 of 5. So it is intermittent, and the file completes well inside
+its budget when it passes; the old "exceeds its own 180 s timeout" reading does not survive a re-run.
+
+- **The mechanism, from reading the loop rather than guessing.** Each iteration clicks the style
+  radio, waits on `expect.poll(inkFraction).toBeGreaterThan(0.01)`, then reads the canvas and
+  decodes. **That poll cannot tell the new style's paint from the previous style's** — the canvas
+  already carries ink from the last iteration, so the condition is satisfied instantly and the read
+  can land mid-repaint. Under file-level load the window widens, which is exactly the shape of an
+  intermittent null decode.
+- **Polling the decode instead is NOT the fix.** Every style encodes the same meal, so the previous
+  style's canvas decodes to the same token — a decode-until-success loop would pass on the stale
+  paint and prove nothing.
+- **What is needed is a signal that CHANGES with the style.** The canvas dimensions or the sheet's
+  reported physical size (`… mm at 25×25 modules`) are the candidates; a probe to establish which
+  differ per style needs the spec's own fixture meal, which is why this was not settled in the same
+  session that found it.
+- **Do not weaken what it checks.** The decode loop is the closest the sandbox gets to the print
+  test still owed — it proves the symbol is complete, unobstructed and resolves to this meal at
+  every layout, which is what a layout change breaks silently.
+
+**The general finding, worth more than either spec.** A spec that depends on the seed having run
+*recently* is the same class as the hardcoded-timestamp rule in `CLAUDE.md` — one side of the
+comparison is the real clock and the other is frozen. It fails only on a container old enough, and
+CI provisions a fresh database every run, so it is invisible exactly where it would be caught. The
+tell is a locator that never resolves rather than a wrong value.
 
 ### [nutrition] LB-18 — `Recent` on Log Food is scoped to a meal bucket; it may want to be global
 
