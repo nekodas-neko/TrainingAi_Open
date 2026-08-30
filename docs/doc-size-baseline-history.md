@@ -3580,3 +3580,42 @@ reading that matters is not "the route stopped wasting tokens" — it is that an
 a plan the AI had nothing to do with. A status line that led with the tokens would leave the next
 reader thinking this was an optimisation, and the reproduction (no API key: pre-fix 502, post-fix
 200) is the sentence that stops it.
+## 2026-08-30 — `docs/implementation-backlog.md` raised (second device pass; net +54 after a closure)
+
+68 lines added and one entry deleted. **BF-53 is most of it and it is a live production defect found
+in an aside.** The owner mentioned, while answering a different check, that the "Not me" button on a
+pending weigh-in does nothing. Both that route and its sibling validate a `bigserial` id with
+`invalidUuidResponse`, so every press returns 400 before the `Number.isInteger` guard written for it
+— the whole pending weigh-in triage is dead, and the client's `if (res.ok)` with no `else` is why it
+looks like a no-op instead of an error. The entry carries the sweep: any dynamic route whose key is
+an integer rather than a UUID has the same shape.
+
+The rest is device findings landing on the entries that predicted them — Q-499 confirmed as a real
+failure, Q-538 measured at 652,417 rows and 95.7 MB, Q-318's redecode reporting observed rather than
+inferred, and Q-316 re-framed, because a pack button that cannot be pressed is not "correctly
+disabled at zero" when 652k rows exist.
+
+**BF-16b was deleted rather than ticked.** The owner rejected the correction — `Shikai / Lower` has
+no Primary lift on purpose — so the finding moved to BF-15, the rule that flagged it, as a constraint:
+a live session may legitimately have no Primary, and nothing downstream may treat that as a defect.
+
+## 2026-08-30 — `docs/implementation-backlog.md` raised (three screenshots, measured against production)
+
+95 lines: BF-54, BF-55, BF-56, plus verdicts on three device checks.
+
+**The measurement is what earns the length.** The owner's console screenshot showed
+`oura_raw_samples` at 297 rows in 67 MB, which reads as pure bloat. Queried against production the
+same hour: `n_live_tup` **552**, real `count(*)` **180,415** — a 327× under-read, with `rr_intervals`
+reading 0 against 87,015 and `error_events` 1 against 6,102. The console prints that counter as a row
+count *and* uses it to justify a VACUUM FULL whose own comment says a huge size against few live rows
+means bloat. Acting on that verdict takes an ACCESS EXCLUSIVE lock and reclaims nothing. Recording
+the numbers matters because the wrong conclusion was one sentence away and looked obvious.
+
+**BF-55 is the half that survived the check**, from the size columns, which are exact: 84 MB of index
+against 63 MB of heap across the database, and 206 MB total against the 171 MB baseline of 12 days
+earlier — roughly seven times the expected trend, which CLAUDE.md says to record the same session.
+
+**BF-56 came from a screenshot that exonerated the feature.** Coach's swap card was reported as
+"only allowed for making it primary" and in fact proposed the swap correctly; one line in its
+consequence list disclosed a role promotion nobody asked for, which silently undoes the owner's
+deliberate no-Primary session. The card is not at fault — disclosing the change is how it was caught.
