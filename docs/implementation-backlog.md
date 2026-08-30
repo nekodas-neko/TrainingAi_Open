@@ -1319,6 +1319,67 @@ opened on, unchanged.
 - **Verification:** index total drops below the heap total, and a re-read a week later shows growth
   back near trend.
 
+### [workouts] BF-64 — the Full/Deload toggle can only ADD deload, never remove one, so `Full · Override` overrides nothing
+
+- **Lane:** A — the decision lives in `packages/shared/src/workout/session-data.ts` and
+  `/api/ai-periodization/session/[sessionId]/prescribe`; the surface (`deload-toggle.tsx`,
+  `use-deload-choice.ts`) is only reporting it correctly.
+- **Added:** 2026-08-30 · owner, on the Pull pre-workout screen: *"pressing full or deload doesnt
+  change the 'prescription' not sure if its over writing it."* Screenshot: `Full · Override`
+  selected, `Deload suggested` in the corner, and the card below reading `AI Prescription · Deload`.
+
+**The answer to "is it overwriting it" is: in one direction only.** In `session-data.ts:220-250`,
+`aiDeload` is read inside an `else if` — it applies `deloadOverrideForGoal` **only when the
+prescription's exercise is not already deloaded**. So:
+
+| Prescription | Toggle | What runs |
+|---|---|---|
+| full | Deload | deloaded — the override lands (Q-109/Q-175 built exactly this) |
+| deload | Deload | deloaded |
+| deload | **Full** | **still deloaded — nothing in the pipeline un-deloads it** |
+
+There is no code path where choosing Full removes a prescribed deload. The toggle is one-way.
+
+**Which makes the label a promise the engine does not keep.** `use-deload-choice.ts` derives
+`prescribedDeload` from the live prescription, so with a deload prescription the toggle renders
+`Deload · As prescribed` and `Full · Override`. The word **Override** is the app stating it will
+override the prescription. It does not. That is worse than the BF-8 bug it descends from: BF-8 was
+the toggle *disagreeing* with the card, this is the toggle *offering a control that does nothing*.
+
+**And the asymmetry with the picker directly below it is the tell.** `SessionDurationPicker` →
+`handleDurationPresetChange` POSTs `/prescribe` with the new preset, regenerates the plan and
+refetches. `DeloadToggle` → `setDeload`, which is local state that only re-keys the `workout-data`
+fetch. **The prescribe route takes no intensity input at all** (`PrescribeBodySchema` is
+`excludeSessionId` + `durationPreset`), so intensity has no server path even in principle. Two
+controls side by side, one wired to the engine and one not.
+
+- **Recommendation: reuse the per-exercise revert, do not add a second regeneration.** The
+  machinery is already built and already on the device. Every deloaded prescription exercise carries
+  a `preDeload` block, `session-data.ts` unpacks it into `preDeloadStyle`/`preDeloadSets`, and
+  `workout-store.toggleDeloadRevert` + `DeloadInfoSheet` already let the user revert **one** exercise
+  to its full numbers. Session-level `Full` is that revert applied to every deloaded exercise — no
+  LLM call, no rate limit, works offline, and it reuses a path the owner has already exercised.
+  A `/prescribe` round-trip would cost a rebuild and a 429 budget to reach numbers the prescription
+  is already carrying.
+- **⚠ It cannot be all-or-nothing: `preDeload` is optional.** `preDeloadStyle` is set only
+  `if (p.preDeload)`, so an exercise deloaded without one has no full version to return to. Decide
+  what Full means for those — leave them deloaded and say so on the card, rather than silently
+  reverting some exercises and not others with nothing on screen explaining which.
+- **⚠ PR and 1RM accounting must follow the revert, and this is the part that corrupts data if
+  missed.** `workout-screen.tsx:1204` computes `isAnyDeload = deload || phaseStatus.isDeloadActive`
+  and gates the 1RM estimate on it *and* on `ex.deloaded`. A reverted exercise runs full weights, so
+  it must count; an unreverted one must not. Getting this backwards either loses a real PR or writes
+  a PR off deloaded sets — and `fix/deload-provenance-and-previous-1rm` already fixed one bug in this
+  exact area, so it is a known-live hazard rather than a hypothetical.
+- **The card is not lying and should not be "fixed" to match the toggle.** `AI Prescription · Deload`
+  is a true statement about the prescription. Once Full actually overrides, the card needs to say the
+  override is in effect — the prescription is still a deload, the session running is not.
+- **Verification (device, AI-dynamic program, a day with a deload prescription):** pick `Full` → the
+  listed weights rise to the pre-deload numbers and the card says the override is on; pick `Deload`
+  → they drop back; complete a set under `Full` → it counts toward the 1RM/PR; complete one under
+  `Deload` → it does not. Then the reverse case, a **full** prescription with `Deload` picked, still
+  behaves as Q-109/Q-175 built it — that path works today and must not regress.
+
 ### [nutrition] BF-63 — the meal builder has no barcode scan, so a packet ingredient has to be typed
 
 - **Lane:** B — `components/nutrition/ingredient-picker.tsx` + `ingredient-search.tsx`; the scanner
@@ -10258,10 +10319,20 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   raw archive should move to the device (D4). This is reclaimable waste inside the current design and
   needs no architectural decision.
 
-### [platform] Q-214 — a tap during the sync pull queues behind the whole delta on the one SQLite connection
+### [platform] Q-214a — a tap during the sync pull queues behind the whole delta on the one SQLite connection
 
 - **Branch:** `perf/sync-pull-sqlite-connection-hold`
 - **Added:** 2026-08-13 · found while fixing the check-in saves (#1292).
+- **⚠️ RENUMBERED `Q-214` → `Q-214a` on 2026-08-30, because the number was reused and the reuse
+  was actively misleading.** `Q-214` had already shipped on 2026-08-12 — the `upsertOuraHeartrate`
+  duplicate-collapse fix that stopped a 5,771-hit `[pg 21000]` fault
+  ([journal](overview/history-2026-08-12.md)) — and its queue entry was removed on completion, so
+  the next session took the number back. `check-backlog-pointers.js` cannot see that: it fails on
+  a duplicate *within the backlog*, and there was only ever one Q-214 in the file at a time.
+  **The harm was real rather than cosmetic:** `projectOverview.md` says *"That is Q-214, fixed on
+  2026-08-13"* in three places, so a session orienting from it would conclude this entry was done —
+  and what is still open here includes silent data loss, not just latency. Per CLAUDE.md the
+  letter-suffix goes to the second claimant; the shipped work keeps `Q-214` everywhere it is cited.
 - The Capacitor SQLite plugin has a single connection, and `applyDelta` holds a native transaction
   (`beginTransaction`, `lib/local-store/sqlite-backend.ts:384/1201/2077`) across the whole delta. A
   user write landing during a pull queues behind all of it — measured as **~2 minutes** of a
