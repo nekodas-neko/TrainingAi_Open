@@ -204,3 +204,242 @@ function wrapByChars(text: string, charsPerLine: number): string[] {
   if (line) lines.push(line)
   return lines
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// BF-57 — the self-contained label: the whole meal in the QR, not a pointer to it
+// ─────────────────────────────────────────────────────────────────────────────
+//
+// The token above is a **private bookmark**. It carries a `saved_meals.id`, and the scan path
+// resolves that against the SCANNING user's own meals — local store first, then
+// `GET /api/nutrition/saved-meals`, which returns only their rows. Another person's id is never in
+// that list, so a shared label fell to *"That saved meal no longer exists"*: wrong twice over, since
+// the meal exists and the real answer is "not yours".
+//
+// **Making ids globally resolvable was rejected outright.** It would turn a photograph of a label
+// into read access to someone's meal — name, ingredients, macros — on an app heading for a Play
+// Store health-data declaration, and it couples two users' data so that the author editing theirs
+// reaches into everyone else's history.
+//
+// The owner chose the opposite: put the meal in the code. No round-trip, so it scans offline and for
+// a user with no account; no privacy surface, because the data is on paper physically handed over;
+// and it is inherently a COPY, so nothing stays coupled. What it costs is that a printed label
+// cannot be updated — already true — and that the ingredient list has a cap.
+
+/**
+ * Byte-mode capacity per QR version at error-correction level **M**, indexed by version.
+ *
+ * From the QR spec, not from the `qrcode` package: `packages/shared` stays dependency-free, and the
+ * renderer is the only place that should import a QR library. The two are checked against each other
+ * in `__tests__/label-payload.test.ts` — this table decides the payload BUDGET while the library
+ * decides the version actually drawn, and if they ever disagree the library wins and the code merely
+ * comes out bigger, which is safe rather than wrong.
+ *
+ * Index 0 is unused so the index is the version. `QR_V2_M_BYTE_CAPACITY` above is this table's [2].
+ */
+export const QR_BYTE_CAPACITY_M: readonly number[] = [
+  0, 14, 26, 42, 62, 84, 106, 122, 152, 180, 213,
+  251, 287, 331, 362, 412, 450, 504, 560, 624, 666,
+]
+
+/** The smallest version at EC M that holds `bytes`, or null past version 20. */
+export function qrVersionForBytes(bytes: number): number | null {
+  for (let v = 1; v < QR_BYTE_CAPACITY_M.length; v++) {
+    if (bytes <= QR_BYTE_CAPACITY_M[v]) return v
+  }
+  return null
+}
+
+/** Modules per side for a QR version — 21 at v1, +4 per version. */
+export function qrModulesForVersion(version: number): number {
+  return 17 + 4 * version
+}
+
+/**
+ * The payload budget: **version 11 at EC M**.
+ *
+ * The binding constraint is the LABEL, not the format. What decides whether a phone reads a code is
+ * millimetres per module, and the current circle-safe layout gives the code 12.2–16.4 mm — at which
+ * a 3-ingredient meal (167 bytes, version 9, 53 modules) lands at **0.31 mm/module**, below the
+ * 0.49–0.66 mm this design was built to and too fine for a home printer.
+ *
+ * Given the code ~30 mm of the 50 mm label, version 11 (61 modules) is **0.49 mm/module** — the
+ * bottom of that range, and the largest version that stays inside it. Version 12 is 0.46 and falls
+ * out. So 251 bytes is where the payload has to give way, which is what the roll-up below is for.
+ *
+ * **Growing the code on the label is Lane B's half and is the half that matters** — this constant is
+ * only meaningful once the layout hands the code that space.
+ */
+export const MEAL_SHARE_MAX_BYTES = QR_BYTE_CAPACITY_M[11]
+
+/** Wire format version, first element of the array. Two bytes (`1,`), and worth them: without it a
+ *  later format change is mis-parsed by an old decoder rather than refused. */
+export const MEAL_SHARE_FORMAT = 1
+
+export interface SharedMealIngredient {
+  name: string
+  /** Grams of this ingredient in the WHOLE recipe, not per serving. */
+  weightG: number
+  calories: number
+  proteinG: number
+  carbsG: number
+  fatG: number
+}
+
+export interface SharedMeal {
+  name: string
+  /** How many portions the ingredient list makes. Carried so a copy is the batch, not one plate. */
+  servings: number
+  ingredients: SharedMealIngredient[]
+  /** How many ingredients the last entry stands in for. 0 when the list is complete. */
+  rolled: number
+}
+
+const utf8Bytes = (s: string) => new TextEncoder().encode(s).length
+const r1 = (v: number) => Math.round(v * 10) / 10
+
+/** The whole recipe as shareable ingredients, before any budget is applied. */
+function recipeIngredients(meal: SavedMeal): SharedMealIngredient[] {
+  const out: SharedMealIngredient[] = []
+  for (const item of meal.items ?? []) {
+    const food = item.foodItem
+    if (!food) continue
+    const q = Number(item.quantityMultiplier) || 0
+    if (q <= 0) continue
+    out.push({
+      name: food.brand ? `${food.brand} ${food.name}` : food.name,
+      weightG: Math.round((Number(food.servingSizeG) || 0) * q),
+      calories: Math.round((Number(food.calories) || 0) * q),
+      proteinG: r1((Number(food.proteinG) || 0) * q),
+      carbsG: r1((Number(food.carbsG) || 0) * q),
+      fatG: r1((Number(food.fatG) || 0) * q),
+    })
+  }
+  return out
+}
+
+/** Positional, because the field names would be a third of the payload. */
+function toWire(meal: SharedMeal): string {
+  const rows = meal.ingredients.map(i => [i.name, i.weightG, i.calories, i.proteinG, i.carbsG, i.fatG])
+  const arr: unknown[] = [MEAL_SHARE_FORMAT, meal.name, meal.servings, rows]
+  if (meal.rolled > 0) arr.push(meal.rolled)
+  return JSON.stringify(arr)
+}
+
+/**
+ * A saved meal as a self-contained QR payload, trimmed to fit the byte budget.
+ *
+ * **The totals are sacred; the detail is negotiable.** Dropping an ingredient to save bytes would
+ * change the meal's calories and macros, and the person scanning it has no way to know — so nothing
+ * is ever dropped. Ingredients that do not fit are **rolled into one remainder entry carrying their
+ * combined weight and macros**, so the copy's figures match the original to the gram. That entry is
+ * computed as the recipe total minus what the named entries actually say, rather than by re-summing
+ * the tail: the two are equal today, and the subtraction is the one that stays correct if the named
+ * entries are ever rounded differently from the source.
+ *
+ * Rolling the tail beats truncating names and it is not close: cutting names to 12 characters buys
+ * one QR version and cannot rescue a long recipe, while making brands unreadable. A 10-ingredient
+ * meal rolled to 4 named + a remainder fits version 11; the same meal with names cut to 8 characters
+ * needs version 16.
+ */
+export function encodeSharedMeal(
+  meal: SavedMeal,
+  opts: { maxBytes?: number } = {},
+): { text: string; bytes: number; named: number; rolled: number } {
+  const maxBytes = opts.maxBytes ?? MEAL_SHARE_MAX_BYTES
+  const all = recipeIngredients(meal)
+  const servings = Number(meal.servings) > 0 ? Number(meal.servings) : 1
+  const name = meal.name
+
+  const total = all.reduce((a, i) => ({
+    weightG: a.weightG + i.weightG, calories: a.calories + i.calories,
+    proteinG: a.proteinG + i.proteinG, carbsG: a.carbsG + i.carbsG, fatG: a.fatG + i.fatG,
+  }), { weightG: 0, calories: 0, proteinG: 0, carbsG: 0, fatG: 0 })
+
+  /** `take` named, the rest as one remainder that makes the totals add up exactly. */
+  const shapeFor = (take: number): SharedMeal => {
+    const named = all.slice(0, take)
+    const rolled = all.length - take
+    if (rolled <= 0) return { name, servings, ingredients: named, rolled: 0 }
+    const sum = named.reduce((a, i) => ({
+      weightG: a.weightG + i.weightG, calories: a.calories + i.calories,
+      proteinG: a.proteinG + i.proteinG, carbsG: a.carbsG + i.carbsG, fatG: a.fatG + i.fatG,
+    }), { weightG: 0, calories: 0, proteinG: 0, carbsG: 0, fatG: 0 })
+    return {
+      name, servings, rolled,
+      ingredients: [...named, {
+        name: `+${rolled} more`,
+        weightG: total.weightG - sum.weightG,
+        calories: total.calories - sum.calories,
+        proteinG: r1(total.proteinG - sum.proteinG),
+        carbsG: r1(total.carbsG - sum.carbsG),
+        fatG: r1(total.fatG - sum.fatG),
+      }],
+    }
+  }
+
+  for (let take = all.length; take >= 0; take--) {
+    const text = toWire(shapeFor(take))
+    const bytes = utf8Bytes(text)
+    if (bytes <= maxBytes) return { text, bytes, named: take, rolled: all.length - take }
+  }
+
+  // Even one remainder line does not fit, which means the NAME is what is over budget. Trim it
+  // rather than refusing to print — a shortened title still identifies the food, and the numbers,
+  // which are the part that must not be guessed at, are untouched.
+  let shape = shapeFor(0)
+  while (utf8Bytes(toWire(shape)) > maxBytes && shape.name.length > 1) {
+    shape = { ...shape, name: shape.name.slice(0, -1) }
+  }
+  const text = toWire(shape)
+  return { text, bytes: utf8Bytes(text), named: 0, rolled: all.length }
+}
+
+/** A scanned string back to a shared meal, or null if it is not one. Never throws. */
+export function decodeSharedMeal(scanned: string): SharedMeal | null {
+  if (!scanned.startsWith('[')) return null
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(scanned)
+  } catch {
+    return null
+  }
+  if (!Array.isArray(parsed) || parsed[0] !== MEAL_SHARE_FORMAT) return null
+  const [, name, servings, rows, rolled] = parsed as [number, unknown, unknown, unknown, unknown]
+  if (typeof name !== 'string' || typeof servings !== 'number' || !Array.isArray(rows)) return null
+
+  const ingredients: SharedMealIngredient[] = []
+  for (const row of rows) {
+    if (!Array.isArray(row) || row.length < 6) return null
+    const [n, g, kcal, p, c, f] = row as unknown[]
+    if (typeof n !== 'string') return null
+    if ([g, kcal, p, c, f].some(v => typeof v !== 'number' || !Number.isFinite(v))) return null
+    ingredients.push({
+      name: n, weightG: g as number, calories: kcal as number,
+      proteinG: p as number, carbsG: c as number, fatG: f as number,
+    })
+  }
+  return {
+    name, servings: servings > 0 ? servings : 1, ingredients,
+    rolled: typeof rolled === 'number' && rolled > 0 ? rolled : 0,
+  }
+}
+
+/**
+ * The one entry point for a scanned meal label — **both formats, one decoder, indefinitely**.
+ *
+ * Labels already printed carry the 22-character id token, and they must keep working for the person
+ * who printed them. The two shapes cannot collide: the token is 22 base64url characters, a shared
+ * payload starts with `[`, and an EAN-13 is 13 digits.
+ *
+ * Returning null rather than throwing keeps the scan handler's fall-through to the barcode lookup
+ * simple, exactly as `decodeMealLabelToken` already does.
+ */
+export function decodeMealLabelScan(scanned: string):
+  | { kind: 'meal-id'; mealId: string }
+  | { kind: 'shared-meal'; meal: SharedMeal }
+  | null {
+  const mealId = decodeMealLabelToken(scanned)
+  if (mealId) return { kind: 'meal-id', mealId }
+  const meal = decodeSharedMeal(scanned)
+  return meal ? { kind: 'shared-meal', meal } : null
+}

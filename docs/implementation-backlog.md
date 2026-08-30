@@ -1650,139 +1650,38 @@ render what comes back.
 
 ### [nutrition][platform] BF-57 — a printed meal label only works for the person who printed it, and making it work for anyone is a decision, not a fix
 
-- **Lane:** A — the resolve path and whatever share mechanism is chosen.
-- **Added:** 2026-08-30 · owner: *"if another user makes meal and adds the QR code to it, another
-  user scans it and it comes up as 'meal not found' so clearly it doesnt work across users. need to
-  look at that."*
+- **Lane:** A shipped the payload; **B owns what is left.**
+- **✅ THE ENGINE HALF SHIPPED 2026-08-30.** `packages/shared/src/nutrition/label-payload.ts` gains
+  `encodeSharedMeal` / `decodeSharedMeal` / `decodeMealLabelScan` and the QR byte-capacity table.
+  The owner's design: the whole meal travels in the code — positional JSON
+  `[1, name, servings, [[name,g,kcal,p,c,f], …], rolled?]` — so a label scans offline, for a user
+  with no account, as a **copy** that never couples the two users' data. Ids are deliberately NOT
+  globally resolvable; that was rejected and stays rejected.
+  - **The totals are sacred.** Nothing is ever dropped to save bytes: the tail rolls into one
+    remainder entry carrying its combined weight and macros, so a trimmed copy's figures match the
+    original to the gram. Tested at 1, 2, 3, 5, 8, 12 and 25 ingredients.
+  - **Budget: 251 bytes — QR version 11 at EC M**, which is 61 modules and **0.49 mm/module across
+    ~30 mm**, the bottom of the 0.49–0.66 range the label design was built to. Version 12 is 0.46 and
+    falls out. The spec capacity table is checked against the real `qrcode` encoder for all 20
+    versions.
+  - **Both formats, one decoder, indefinitely** — a label printed before this still resolves for its
+    owner.
 
-**It is working as built, and the message is the misleading part.** The label's QR carries a
-`saved_meals.id` and nothing else (`encodeMealLabelToken`, 22 base64url chars — the payload is
-capped at a version-2 QR so it cannot afford a prefix or a URL). On scan,
-`food-logger-sheet.tsx:204` resolves that id **against the scanning user's own meals**: the local
-store first, then `GET /api/nutrition/saved-meals`, which returns only their rows. Another person's
-id is never in that list, so it falls to *"That saved meal no longer exists"* — which is wrong twice
-over: the meal exists, and the sentence blames deletion for what is really "not yours".
-
-Q-389 built this as a **private bookmark** — print a label for your own batch cook, scan it later to
-log it. Cross-user sharing was never in scope, and nothing about it is broken.
-
-**⚠ Do NOT fix this by making meal ids globally resolvable.** That would turn any photograph of a
-label into read access to someone's meal — its name, ingredients and macros — and this app is heading
-for a Play Store listing with a health-data declaration. It also breaks the moment the owner edits or
-deletes the meal, because every other user's future scans would follow the change or 404.
-
-**✅ DESIGN CHOSEN BY THE OWNER, 2026-08-30 — put the whole meal in the QR.** *"could we have the
-full meal details/portion etc within the QR code? so that it could be fully shareable/load up as a
-'meal'? Meals need to be shareable and simply."*
-
-**This supersedes the share-token recommendation that stood here** (mark shareable → mint a token →
-resolve server-side → copy). That design is recorded below only so it is not re-proposed. The
-owner's is better on every axis that matters here, and the measurements back it.
-
-**It fits — measured, not estimated.**
-
-The owner's real Turkey Pasta meal (3 ingredients, brand names included) encoded as positional JSON:
-
-| Encoding | Bytes |
-|---|---|
-| Verbose JSON | 262 |
-| **Positional JSON** (`[name, servings, [[name,g,kcal,p,c,f], …]]`) | **167** |
-| deflate, raw bytes | 123 |
-| deflate + base64url | **164** |
-
-**Do not compress.** At this size base64's 33% tax cancels deflate's gain — 164 bytes against 146
-for plain compact JSON of the same meal. Compression only pays past ~400 bytes, which is past where
-the physical limit bites anyway.
-
-**The real constraint is the LABEL, not the QR.**
-
-167 bytes needs QR **version 9** at EC level M — 53×53 modules. What decides whether a phone reads
-it is millimetres per module, and the current layout gives the code only 12.2–16.4 mm:
-
-| Ingredients | Bytes | QR version | Modules | mm/module @16.4 mm | **@30 mm** |
-|---|---|---|---|---|---|
-| 1 | 69 | 5 | 37 | 0.44 | **0.81** |
-| **3** | **167** | **9** | **53** | 0.31 | **0.57** |
-| 5 | 265 | 12 | 65 | 0.25 | **0.46** |
-| 8 | 412 | 15 | 77 | 0.21 | 0.39 |
-| 10 | 510 | 18 | 89 | 0.18 | 0.34 |
-
-At today's 16.4 mm a 3-ingredient meal lands at **0.31 mm/module — too fine for a home printer**,
-below the 0.49–0.66 mm the current design was built to. **Give the code ~30 mm of the 50 mm label and
-it reaches 0.57 mm, better than today's worst case.** So this is a label-layout change first and a
-payload change second.
-
-**Recommendation: self-contained QR, with a stated cap.**
-
-- **Redesign the label to give the QR ~30 mm.** The circle-safe layout that caps it at 16.4 mm is
-  what makes this impossible, not the QR format.
-- **✅ OWNER, 2026-08-30: size the code to what it needs, and trim the ingredient list to fit.**
-  *"focus on the QR code making it the size it needs to be; and then the ingredient list can be cut
-  back for it if needed."* So the QR grows to the size the payload demands **and the payload is what
-  gives way**, rather than the print being refused. The recommendation above to refuse above a cap is
-  **superseded** — but *how* the list is cut decides whether this is sound or a data bug, and the two
-  obvious ways are not equal.
-
-- **⚠ THE TOTALS ARE SACRED. THE DETAIL IS NEGOTIABLE.** Dropping ingredients to save bytes changes
-  the meal's calories and macros, and the person scanning it has no way to know. **Never drop an
-  ingredient's numbers — only its identity.**
-
-- **Measured: rolling the tail beats truncating names, and it is not close.**
-
-  | Shape | Bytes | Version | mm/module @30 mm |
-  |---|---|---|---|
-  | 5 ingredients, full names | 280 | 12 | 0.46 |
-  | 5 ingredients, names cut to 12 chars | 240 | 11 | 0.49 |
-  | 10 ingredients, names cut to 12 | 460 | 17 | **0.35** ✗ |
-  | 10 ingredients, names cut to 8 | 420 | 16 | **0.37** ✗ |
-  | **4 named + one `"+6 more"` line carrying the tail's combined macros** | **244** | **11** | **0.49** ✓ |
-
-  **Truncating names is cosmetic** — it buys one QR version and cannot rescue a long recipe, while
-  making brands unreadable. **Rolling the tail into a single remainder line fits any meal at a
-  printable size and keeps the arithmetic exact**, because the dropped items' kcal/P/C/F are summed
-  into that line rather than discarded.
-
-- **So the encoder's rule:** name as many ingredients as fit, then emit one remainder entry carrying
-  the sum of everything left. The scanning user gets a meal whose totals are correct to the gram, with
-  the top ingredients named and the rest honestly labelled as a group. **Show that on the label too**
-  — a printed label that lists four of ten ingredients must say so, or it reads as the whole recipe.
-
-**Why this beats the token design it replaces:** no server round-trip, so it scans offline and for a
-user with no account; **no privacy surface at all**, because the data is on paper the owner physically
-handed over rather than an id that unlocks a row; it is inherently a **copy**, so the two users' data
-are never coupled and the author editing theirs cannot reach into anyone else's history; and there is
-no share state, no token store and nothing to revoke.
-
-**What it costs, stated plainly:** a printed label cannot be updated — edit the meal and you reprint,
-which is already true today. No photo can travel in the QR. And the ingredient cap is real.
-
-- **Backwards compatibility is required, not optional.** Labels already printed carry the 22-character
-  id token, and decoding is **by shape**. The new payload must be distinguishable from both that and
-  an EAN-13, and `decodeMealLabelToken` must keep resolving old labels against the owner's own meals.
-  Two formats, one decoder, indefinitely.
-- **Still worth doing whatever else happens:** fix the message. *"That meal belongs to someone else"*
-  beats *"no longer exists"*, and an old-format label scanned by another user will still hit it.
-- **Verification:** a label printed from a 3-ingredient meal scans on a second phone, on a second
-  account, **in airplane mode**, and creates that user's own meal with the same portions and macros.
-  A 12-ingredient meal prints, scans, and produces **the same total calories and macros as the
-  original** with its tail rolled into one labelled remainder. A previously-printed old-format label
-  still resolves for its owner.
-
----
-
-<details><summary>Superseded 2026-08-30: the share-token design, kept so it is not re-proposed</summary>
-
-Mark a meal shareable → mint a share token distinct from the row id → scanning resolves it
-server-side and copies the meal into the scanner's library. Rejected because it needs a server round
-trip (so it cannot work offline or without an account), introduces a token store and revocation
-semantics, and creates a resolvable-id surface on an app heading for a Play Store health-data
-declaration. Its one advantage over the chosen design — no ingredient cap — is not worth the rest.
-
-**The argument against globally-resolvable raw meal ids stands and is unaffected by this change:**
-never make `saved_meals.id` resolvable across users.
-
-</details>
-
+- **Keep:** the whole surface, which is Lane B's, and none of it is built.
+  1. **Give the QR ~30 mm of the 50 mm label.** The budget above is meaningless until the layout
+     hands the code that space — at today's 12.2–16.4 mm even a 3-ingredient payload lands at
+     **0.31 mm/module**, too fine for a home printer. This is the binding constraint, not the format.
+  2. **Say on the label when the list was trimmed.** A printed label naming four of ten ingredients
+     reads as the whole recipe unless it says otherwise. `encodeSharedMeal` returns `named`/`rolled`
+     for exactly this.
+  3. **The scan path** (`food-logger-sheet.tsx`): route `decodeMealLabelScan`'s `shared-meal` branch
+     into creating the scanner's own meal, and **fix the message on the other branch** —
+     *"That meal belongs to someone else"* beats *"no longer exists"*, which is wrong twice over, and
+     an old-format label scanned by another user still lands there.
+  4. **Verification, on two phones and two accounts:** a 3-ingredient label scans **in airplane mode**
+     and creates the scanner's own meal with the same portions and macros; a 12-ingredient one
+     produces the same total calories and macros with its tail rolled into one labelled remainder;
+     and a previously-printed label still resolves for its owner.
 ### [nutrition][app-shell] BF-49 — back from a timeline row lands on Health, not where you started
 
 - **Lane:** B
