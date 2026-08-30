@@ -3545,3 +3545,18 @@ moved out to the archive. The paragraph keeps the sentence about the first imple
 the same subquery in the SELECT and the ORDER BY — the ordering worked, the selected value came back
 null — because it is a concrete argument for a rule this repo states abstractly, and the abstract
 version has not been enough on its own.
+
+## 2026-08-30 — `projectOverview.md` 8329 → 8337, `docs/implementation-backlog.md` 13392 → 13401 (BF-41, DEXA storage)
+
+`projectOverview.md` +8: one Current Status paragraph, of the same shape as its neighbours. It is
+seven lines rather than three because two of the sentences are the ones a reader would otherwise ask
+for — that no source document is stored, and that there is still **no way to enter a scan from the
+app**. The second matters more than the feature: without it "DEXA storage shipped" reads as a
+capability the owner has, and they do not.
+
+`docs/implementation-backlog.md` +9 net: BF-41 gains a shipped-so-far line and a **`Keep:`** naming
+the three things still owed (extraction, the blood panel, the Lane B upload/crop/confirm surface),
+and BF-2 gains a line saying its dependency is satisfied and what it still owes itself. Per the rule
+that a finished entry must not sit in the queue looking finished, an entry that ships half its work
+states what is left rather than being deleted — which is exactly what these lines are, so the growth
+is the mechanism working.

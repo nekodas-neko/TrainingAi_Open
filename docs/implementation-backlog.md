@@ -14,7 +14,7 @@ silently misdirecting the next session. Update them in the same PR that consumes
 
 | Pointer | Value | Source of truth |
 |---|---|---|
-| Next free Postgres migration | **240** | `lib/data/postgres/migrations/` |
+| Next free Postgres migration | **242** | `lib/data/postgres/migrations/` |
 | Local SQLite schema version | **v31** | `lib/sqlite/migrations.ts`; `lib/sqlite/__tests__/migrations.test.ts` asserts the max |
 
 > **There is no third pointer any more.** Entry IDs are not allocated from a shared counter and
@@ -909,6 +909,11 @@ bug is that it is using a prediction as the definition of BMR when a measurement
 > measured 3.2-point gap that is 53.56 vs 51.46 kg, so the residual re-scales onto **+45 kcal/day**
 > of fat-free mass the owner does not have, on the very first day. **The corrected body fat has to
 > reach `personalRmr`'s `currentFfmKg`,** not just the protein dose and the goal screen.
+
+- **⚑ The DEXA table exists as of 2026-08-30** — `dexa_scans` (migration 240) with `pct_fat`,
+  `lean_plus_bmc_g` and the rest, plus `GET/POST /api/dexa-scans`, shipped under BF-41. The scan half
+  of a stored pair now has somewhere to go; what this entry still owes is the **pairing** (which scale
+  reading a scan is compared against, keyed by source) and the correction derived from the pairs.
 
 - **⚑ The first calibration pair exists (2026-08-27): DEXA 28.5 % vs Renpho 25.3 % — the scale
   under-reads body fat by 3.2 points; weight 72.1 kg vs 71.7 kg.** Recorded with surrounding scale
@@ -1970,6 +1975,24 @@ description will silently drop the field that turns out to matter. **The owner i
 - **Sequencing.** BF-33's UI first — the table exists, so it is the smallest end-to-end slice and it
   proves the confirm step on real numbers. Then DEXA (BF-2), which BF-33's UI can be widened into and
   which unblocks the scale calibration. Then blood (BF-1), the largest field set.
+
+- **✅ DEXA STORAGE SHIPPED, 2026-08-30 (Lane A).** `dexa_scans` + `dexa_scan_regions` (migration
+  **240**, `claude_ro` views regenerated in **241**), `saveDexaScan`/`getLatestDexaScan`/`listDexaScans`
+  on the repository, and `GET`/`POST /api/dexa-scans`. Written from the real Hologic printout in
+  [`docs/clinical-baseline-2026-08-27.md`](clinical-baseline-2026-08-27.md), every field kept per
+  BF-43, no source document stored. Upsert on `(user_id, scanned_on)` so a re-entry or a replayed
+  extraction updates in place; regions are **replaced** on re-save, not merged. **This unblocks BF-2**
+  — the DEXA half of its first calibration pair now has a table to live in.
+- **Keep:** three things are still owed and this entry stays queued for them.
+  1. **DEXA extraction** (Lane A) — `generateObject` against the route's Zod schema, so a photographed
+     printout produces the same stored row as hand entry. Nothing extracts yet.
+  2. **The blood panel** (BF-1, Lane A) — parent + child analyte tables, the largest field set, and
+     the one whose real report already settles the hard shape questions.
+  3. **The upload / crop / confirm surface** (Lane B) — including the app's **own** crop-before-upload
+     step, which is still required even though the owner scrubbed the reports by hand: that was
+     redaction (1), this is redaction (2), and conflating them is the security bug this entry names.
+     Until it exists there is no way to enter a DEXA scan from the app at all — the route is reachable
+     only by a client that does not exist yet.
 - **Verification.** Each type: hand entry and document extraction produce the same stored row; a
   deliberately wrong extraction is caught at the confirm step and not stored; and no model-reported
   number is ever displayed as fact before the owner confirms it (CLAUDE.md — a model handed a score

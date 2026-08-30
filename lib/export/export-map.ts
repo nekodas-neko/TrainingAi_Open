@@ -67,6 +67,7 @@ export const EXPORTED: Record<string, ExportScope> = {
   coach_threads: { kind: 'user_id' },
   daily_zone_minutes: { kind: 'user_id' },
   day_checkins: { kind: 'user_id' },
+  dexa_scans: { kind: 'user_id' },
   exercise_estimates: { kind: 'user_id' },
   fitness_tests: { kind: 'user_id' },
   food_items: { kind: 'user_id' },
@@ -121,6 +122,7 @@ export const EXPORTED: Record<string, ExportScope> = {
 
   // ── Reachable only through a parent. Predicates mirror generate-claude-ro-views.js's `VIA`,
   //    which is where these FK paths were worked out and commented. ────────────
+  dexa_scan_regions: { kind: 'via', predicate: 'EXISTS (SELECT 1 FROM public.dexa_scans d WHERE d.id = t.scan_id AND d.user_id = $1)' },
   exercise_logs: { kind: 'via', predicate: 'EXISTS (SELECT 1 FROM public.workout_sessions p WHERE p.id = t.workout_session_id AND p.user_id = $1)' },
   set_logs: { kind: 'via', predicate: 'EXISTS (SELECT 1 FROM public.exercise_logs e JOIN public.workout_sessions p ON p.id = e.workout_session_id WHERE e.id = t.exercise_log_id AND p.user_id = $1)' },
   program_sessions: { kind: 'via', predicate: 'EXISTS (SELECT 1 FROM public.programs p WHERE p.id = t.program_id AND p.user_id = $1)' },
