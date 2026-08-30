@@ -239,19 +239,59 @@ describe('buildWorkoutExercises — a deload reduces exercises the AI does not p
     expect(ex.deloaded).toBeUndefined()
   })
 
-  it('records that a baseline phase is NOT protected from a deload today (Q-211)', () => {
-    // Not an endorsement — this locks in behaviour that is arguably wrong, so the next reader
-    // finds the finding instead of rediscovering it. The AI branch's own deload has no
-    // baseline carve-out, so a confirmed deload week reduces a prescribed baseline lift to
-    // 50%/2 sets. Meanwhile `estimateOneRm` and `shouldCountTowardPr` both special-case
-    // baseline as "a genuine max-effort attempt even during an otherwise-active deload window"
-    // — so the app prescribes half weight and then treats the result as a real max test.
-    // Pre-existing, out of scope for Q-185, filed as Q-211.
+  /**
+   * Q-211 — a baseline lift is exempt from a SESSION deload, because the logging side already
+   * treats it as a genuine max test.
+   *
+   * The app used to prescribe half weight and then record the result as a real max:
+   * `estimateOneRm` is called with `deloaded: exerciseDeloaded === true || (isAnyDeload &&
+   * !isBaseline)` and `shouldCountTowardPr` returns `!args.isAnyDeload || args.isBaseline`, both
+   * commented as "a genuine max-effort attempt even during an otherwise-active deload window".
+   * A baseline taken during a deload week therefore understated the athlete permanently, in
+   * `personal_records`.
+   *
+   * **This one case pins BOTH guards, and that is not an accident.** Two branches deload, and the
+   * entry's stated one-line fix — exempting only the prescribed branch — left the behaviour
+   * unchanged: measured, `deloaded` still came back `true`, because the un-prescribed branch
+   * (Q-185) picked the exercise straight back up. That branch carried a comment saying a
+   * `!isBaselinePhase` clause was unreachable, which was true against the code that proved it and
+   * false the moment the first exemption landed. Verified by mutation: removing **either** guard
+   * alone fails this test.
+   *
+   * A separate case for the un-prescribed branch was written and deleted — with no prescription a
+   * baseline has `progressionStyle` null, so the length check stops it and the assertion could not
+   * fail. This is the scenario that reaches both.
+   */
+  it('a baseline phase is exempt from a session deload (Q-211)', () => {
     const [ex] = buildWorkoutExercises(session, baseCtx({
       isDeloadActive: true, isBaselinePhase: true,
     }))
+    expect(ex.deloaded).toBeUndefined()
+    expect(ex.progressionStyle?.[0]?.pct).not.toBe(50)
+  })
+
+  /**
+   * The audit Q-211 asked for, answered: the PER-EXERCISE engine (`p.deloaded`) needs no
+   * exemption, and this pins why rather than leaving it to be re-derived.
+   *
+   * `shouldCountTowardPr` returns false on `exerciseDeloaded` with **no** baseline exception —
+   * its own comment says so: *"unlike the session flag it has no baseline exception, since the
+   * exercise itself was cut"* — and `estimateOneRm` takes `exerciseDeloaded === true` first. So
+   * both sides already agree for this flag: reduce the load, and keep the result out of
+   * `personal_records`. There is no contradiction to fix, and exempting it would create one —
+   * the AI cuts a specific exercise for soreness or injury, and overriding that to make someone
+   * max out on it is a safety decision, not bookkeeping.
+   */
+  it('but a per-exercise AI deload still applies during a baseline (Q-211 audit)', () => {
+    const sore = prescriptionExercise({
+      deloaded: true, deloadNote: 'Deload — chest still sore',
+      sets: 2, reps: 8, pct: 55, restSec: 120,
+    })
+    const [ex] = buildWorkoutExercises(session, baseCtx({
+      isDeloadActive: true, isBaselinePhase: true, aiPrescription: prescription([sore]),
+    }))
     expect(ex.deloaded).toBe(true)
-    expect(ex.progressionStyle?.[0]?.pct).toBe(50)
+    expect(ex.progressionStyle?.[0]?.pct).toBe(55)
   })
 
   it('does not compound with an exercise the AI already deloaded', () => {
