@@ -1307,7 +1307,8 @@ back resolving to the tab that owns the destination instead of unwinding to the 
 
 - **Lane:** B
 - **Batch:** `nutrition-ui-uplift` — same screen family as BF-45/BF-46, one device pass.
-- **Gate: device**
+- **Device-verified when built** — see Verification. **Deliberately NOT `Gate: device`:** that
+  field parks an entry, and these are unbuilt. See the note below.
 - **Added:** 2026-08-30 · owner, device pass N4. **The rebuild itself passed** — no tile grid, the
   three tabs read at 412 dp, Meals holds only meals, Photo and Barcode take the full screen. These
   are the four things they asked for on top.
@@ -1334,7 +1335,8 @@ back resolving to the tab that owns the destination instead of unwinding to the 
 
 - **Lane:** B
 - **Batch:** `nutrition-ui-uplift`
-- **Gate: device**
+- **Device-verified when built** — see Verification. **Deliberately NOT `Gate: device`:** that
+  field parks an entry, and these are unbuilt. See the note below.
 - **Added:** 2026-08-30 · owner, device pass N5.
 
 1. **Back from Edit exits to the Nutrition tab.** *"clicking edit meal then pressing back - takes you
@@ -1520,11 +1522,22 @@ never make `saved_meals.id` resolvable across users.
 
 ### [nutrition] BF-45 — the Nutrition day screen: an empty grid slot, macros that vanish when you collapse, and gutters the artboards did not ask for
 
+> **⚠ WHY THESE FOUR CARRY NO `Gate: device`, and do not add one.** In this queue `Gate: device` means
+> *shipped and awaiting a device check* — BF-24, BF-26, BF-34 and Q-406 all use it that way — and
+> `next-item.js` **parks** anything carrying it. These four are **unbuilt**, so the field was wrong:
+> it hid the entire `nutrition-ui-uplift` batch from Lane B's runner, which is where an implementer
+> starts. Filed with it on 2026-08-27/30 and corrected 2026-08-30 once the runner was actually read
+> rather than assumed.
+>
+> The device is still the judge of whether these are done — that belongs in **Verification**, which
+> every one of them states. A gate parks work; a verification requirement does not.
+
 - **Lane:** B
 - **Batch:** `nutrition-ui-uplift` — ships with BF-46. Both are surface-only and both are verified by
   the same walk through the same tab on the same device; splitting them buys two device passes for
   one screen.
-- **Gate: device**
+- **Device-verified when built** — see Verification. **Deliberately NOT `Gate: device`:** that
+  field parks an entry, and these are unbuilt. See the note below.
 - **Added:** 2026-08-27 · owner, with screenshots of the live tab (v1.383.x).
 - **Spec:** BF-28's parity rules still bind — where an artboard covers one of these, the artboard
   wins over a number invented here.
@@ -1602,7 +1615,8 @@ affordance.
 
 - **Lane:** B
 - **Batch:** `nutrition-ui-uplift` — ships with BF-45.
-- **Gate: device**
+- **Device-verified when built** — see Verification. **Deliberately NOT `Gate: device`:** that
+  field parks an entry, and these are unbuilt. See the note below.
 - **Added:** 2026-08-27 · owner, with screenshots. *"overall just a UI rework/uplift. almost there."*
 
 **① Two things, and the owner corrected the first reading of them. ⚠ THE SAVE FAILURE IS REAL AND
