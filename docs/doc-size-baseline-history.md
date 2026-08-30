@@ -3858,3 +3858,14 @@ someone changing the rule will actually be standing.
 which is the point of it: TN-13 said 2.11 / 0.33 / 84 % over 50 nights and the same query over 71
 gives 2.50 / 0.58 / 77 %. Same conclusion, and restating it is cheaper than the next session
 discovering the discrepancy and wondering which figure was wrong.
+## 2026-08-30 — `projectOverview.md` +2 (LB-26, the APK banner's tap target)
+
+One Current Status paragraph plus its blank line. The defect half is small; the half that earns the
+index is the process one — a `Gate: device` applied to unbuilt work parks it from `next-item.js`, and
+it happened here to a session that had read the warning about it hours earlier. The rule moved to the
+backlog's protocol header in the same PR, which is the durable fix; this line is what makes an
+orientation read mention it at all.
+
+**Re-derived on each rebase as PRs landed under it; final 8420 → 8422.** The branch was cut before Q-154 landed
+and two more PRs merged under it while CI ran; every paragraph is kept, so the number is set from the
+merged file each time rather than from either side of a conflict.

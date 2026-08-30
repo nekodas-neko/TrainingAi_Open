@@ -39,14 +39,15 @@ const SCREENS = ['/', '/health', '/workout', '/nutrition', '/more'] as const
  * Known undersized controls, shrink-only: an entry may be REMOVED when it is fixed, never added
  * without the reason it is acceptable. Same shape as `check-hex-literals.js`'s per-file baseline.
  */
-const ALLOWED: Record<string, { label: string; why: string }[]> = {
-  '/': [{
-    label: 'Download Android App',
-    why: 'The APK banner\'s body link renders 258×33. It is an <a>, which globals.css excludes from '
-      + 'the 48 dp floor on purpose, so nothing raises it. Filed as LB-26 — recorded rather than '
-      + 'fixed here because it is a visual change and this branch adds no UI.',
-  }],
-}
+/**
+ * Undersized controls this spec tolerates, by screen and label.
+ *
+ * **Empty, and that is the point.** It held one entry — Home's APK-banner link at 258×33 — which
+ * LB-26 fixed by giving that `<a>` its own `min-h-[48px]`. An allowlist that never empties is a
+ * backlog wearing a test's clothes; removing the row is what makes this spec fail again if the floor
+ * is lost, which is the whole reason the entry named the removal as part of its fix.
+ */
+const ALLOWED: Record<string, { label: string; why: string }[]> = {}
 
 for (const path of SCREENS) {
   test(`${path} controls meet the 48 dp touch-target floor`, async ({ page }) => {

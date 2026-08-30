@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.397.4",
+    date: "2026-08-30",
+    changes: [
+      "The \u201cDownload Android App\u201d link on the home screen is easier to hit \u2014 it was a third shorter than the minimum this app holds every other control to.",
+    ],
+  },
+  {
     version: "1.397.3",
     date: "2026-08-30",
     changes: [

@@ -181,6 +181,11 @@ Live at the time of writing (2026-07-30):
 
 ## History
 
+- **[`docs/overview/entries/2026-08-30-apk-banner-tap-target.md`](../../overview/entries/2026-08-30-apk-banner-tap-target.md)**
+  — 🆕 **LB-26**: Home's APK-banner link was 258×33 against the 48 dp floor. **⚠ The rule to carry:
+  do not raise an undersized `<a>` by adding `a` to `globals.css`'s `button, [role="button"]` floor**
+  — the exclusion is deliberate, and a link that IS a control takes `min-h-[48px]` at its own call
+  site. `e2e/touch-target-size.spec.ts`'s allowlist is empty now, so a new one fails the spec.
 - **[`docs/overview/entries/2026-08-30-sparkline-primitive-props.md`](../../overview/entries/2026-08-30-sparkline-primitive-props.md)**
   — 🆕 **Q-154**: `components/ui/sparkline.tsx` gained the six props that were blocking three callers
   from using it (`pad`, `valuePadding`, `strokeWidth`, `gridLines`, `emphasizeLast`, `valueLabel`),
