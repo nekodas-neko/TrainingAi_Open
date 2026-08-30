@@ -16,6 +16,7 @@ others (energy balance, bodyweight 1RM, readiness) and shouldn't be buried insid
 | Scale capture (border with `devices`) | `lib/scale-ble/` |
 | Ingest clock | `packages/shared/src/validation/ingest-clock.ts` — `resolveMeasuredAt` decides the day a weigh-in belongs to |
 | Tables | `body_metrics` (weight, body fat, and the rest of the daily metric row) |
+| Clinical results from a provider | `dexa_scans` + `dexa_scan_regions` (migration 240) ← `saveDexaScan`/`getLatestDexaScan`/`listDexaScans` ← `GET`/`POST /api/dexa-scans`; `measured_rmr` (225/226) ← `POST /api/measured-rmr`. Typed columns, no stored source document, **no UI on either yet** |
 
 ## Reference docs
 

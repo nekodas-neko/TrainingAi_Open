@@ -29,6 +29,14 @@
 
 **A guard that could not fail, and the class behind both of LB-19's flakes (now closed).** `meal-label` waited on `inkFraction > 0.01` before reading the canvas, and **every** style clears it (0.081 · 0.135 · 0.093 · 0.175) — so the read could land on the previous style's pixels, which decode to the same token. Breaking the repaint makes the **old** guard pass 3 of 3 and the new one fail by name. **A precondition satisfied by the state it is meant to replace cannot fail** ([journal](docs/overview/entries/2026-08-30-meal-label-repaint-guard.md)).
 
+**A DEXA scan has somewhere to land (BF-41 / BF-2).** `dexa_scans` + `dexa_scan_regions`
+(migration 240) and `GET`/`POST /api/dexa-scans` — BF-41's second slice, and what unblocks BF-2's
+scale calibration. Written from the owner's real Hologic printout rather than a description, keeping
+every field; **no source document is stored** — extract, confirm, save the fields, discard the file.
+**There is still no way to enter one from the app**: the upload/crop/confirm surface is Lane B and
+unbuilt, and nothing extracts yet
+([journal](docs/overview/entries/2026-08-30-feat-clinical-intake-storage.md)).
+
 **My Foods sorts by what you actually eat (BF-39 follow-up).** Q-395c filed it as a constraint —
 *"a saved meal has no last-used timestamp at all … True MRU needs a column that does not exist"* —
 and BF-39's migration added that column this morning. `listSavedMeals` returns `lastUsedAt` and

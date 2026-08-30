@@ -14,7 +14,7 @@ silently misdirecting the next session. Update them in the same PR that consumes
 
 | Pointer | Value | Source of truth |
 |---|---|---|
-| Next free Postgres migration | **240** | `lib/data/postgres/migrations/` |
+| Next free Postgres migration | **242** | `lib/data/postgres/migrations/` |
 | Local SQLite schema version | **v31** | `lib/sqlite/migrations.ts`; `lib/sqlite/__tests__/migrations.test.ts` asserts the max |
 
 > **There is no third pointer any more.** Entry IDs are not allocated from a shared counter and
@@ -909,6 +909,11 @@ bug is that it is using a prediction as the definition of BMR when a measurement
 > measured 3.2-point gap that is 53.56 vs 51.46 kg, so the residual re-scales onto **+45 kcal/day**
 > of fat-free mass the owner does not have, on the very first day. **The corrected body fat has to
 > reach `personalRmr`'s `currentFfmKg`,** not just the protein dose and the goal screen.
+
+- **⚑ The DEXA table exists as of 2026-08-30** — `dexa_scans` (migration 240) with `pct_fat`,
+  `lean_plus_bmc_g` and the rest, plus `GET/POST /api/dexa-scans`, shipped under BF-41. The scan half
+  of a stored pair now has somewhere to go; what this entry still owes is the **pairing** (which scale
+  reading a scan is compared against, keyed by source) and the correction derived from the pairs.
 
 - **⚑ The first calibration pair exists (2026-08-27): DEXA 28.5 % vs Renpho 25.3 % — the scale
   under-reads body fat by 3.2 points; weight 72.1 kg vs 71.7 kg.** Recorded with surrounding scale
@@ -1970,6 +1975,24 @@ description will silently drop the field that turns out to matter. **The owner i
 - **Sequencing.** BF-33's UI first — the table exists, so it is the smallest end-to-end slice and it
   proves the confirm step on real numbers. Then DEXA (BF-2), which BF-33's UI can be widened into and
   which unblocks the scale calibration. Then blood (BF-1), the largest field set.
+
+- **✅ DEXA STORAGE SHIPPED, 2026-08-30 (Lane A).** `dexa_scans` + `dexa_scan_regions` (migration
+  **240**, `claude_ro` views regenerated in **241**), `saveDexaScan`/`getLatestDexaScan`/`listDexaScans`
+  on the repository, and `GET`/`POST /api/dexa-scans`. Written from the real Hologic printout in
+  [`docs/clinical-baseline-2026-08-27.md`](clinical-baseline-2026-08-27.md), every field kept per
+  BF-43, no source document stored. Upsert on `(user_id, scanned_on)` so a re-entry or a replayed
+  extraction updates in place; regions are **replaced** on re-save, not merged. **This unblocks BF-2**
+  — the DEXA half of its first calibration pair now has a table to live in.
+- **Keep:** three things are still owed and this entry stays queued for them.
+  1. **DEXA extraction** (Lane A) — `generateObject` against the route's Zod schema, so a photographed
+     printout produces the same stored row as hand entry. Nothing extracts yet.
+  2. **The blood panel** (BF-1, Lane A) — parent + child analyte tables, the largest field set, and
+     the one whose real report already settles the hard shape questions.
+  3. **The upload / crop / confirm surface** (Lane B) — including the app's **own** crop-before-upload
+     step, which is still required even though the owner scrubbed the reports by hand: that was
+     redaction (1), this is redaction (2), and conflating them is the security bug this entry names.
+     Until it exists there is no way to enter a DEXA scan from the app at all — the route is reachable
+     only by a client that does not exist yet.
 - **Verification.** Each type: hand entry and document extraction produce the same stored row; a
   deliberately wrong extraction is caught at the confirm step and not stored; and no model-reported
   number is ever displayed as fact before the owner confirms it (CLAUDE.md — a model handed a score
@@ -2498,30 +2521,37 @@ place to start rendering pictures.
   reference drawings were never committed). Part 1 §8 has the file-by-file collision table and the
   carry-across rule. **Do not plan around that chain landing, and do not wait for it.**
 
-### [nutrition] LB-21 — `useLibrary` is reachable by users now, and no test has ever run a generation with it on
+### [nutrition][platform] LA-38 — the meal-plan generator calls the model even when it has nothing to generate
 
-- **Lane:** A — the work is in `app/api/nutrition/meal-plans/generate/route.ts`, which the path rule
-  puts in Lane A. Filed by Lane B (the letter records who found it, not who ships it).
-- **Branch:** `test/generate-with-library`
-- **Added:** 2026-08-27 · Lane B, from BF-11h's own "Not exercised" section.
-- **What is and is not covered.** `selectLibraryMeals` is well tested in
-  `packages/shared/src/nutrition/__tests__/library-match.test.ts` — the ranking, the eligibility
-  windows, untagged-suits-any-slot, no-meal-twice. **The route WIRING is not.** `grep -rl useLibrary
-  --include=*.test.ts` returns nothing: BF-11g shipped the flag with no test, BF-11h made it
-  settable from the wizard, and between them nobody has run a generation with it on.
-- **What a test should pin, none of which the shared tests can see:**
-  - `useLibrary: false` still skips both `listSavedMeals` and `listMealTypes` — the conditional
-    fetches at route.ts:132/135 are the reason the common path costs nothing, and a regression there
-    is invisible except as latency.
-  - Picks land at the slot they were matched against, **after** the pinned meals — the `kept.length`
-    offset at route.ts:203 is arithmetic nothing currently checks.
-  - `libraryMatchCount` equals the picks actually used, and `matchReason` is null on an AI slot when
-    `useLibrary` was off but a sentence when it was on. **BF-11h's UI depends on exactly that
-    distinction** — it is how the review step tells "the library had no say" from "nothing fitted".
-  - A pinned meal is never also offered by the library pass (route.ts filters it, untested).
-- **Do not reach for an AI call to test this.** The library path is the half that does NOT call the
-  model — a fully-pinned or fully-library-filled request generates nothing, which is what makes an
-  end-to-end test of this flag cheap and deterministic. That is the shape to aim for.
+- **Lane:** A — `app/api/nutrition/meal-plans/generate/route.ts`.
+- **Branch:** `perf/generate-skip-empty-model-call`
+- **Added:** 2026-08-30 · Lane A, while writing LB-21's wiring test — which found it by falsifying
+  LB-21's own premise (*"a fully-pinned or fully-library-filled request generates nothing, which is
+  what makes an end-to-end test of this flag cheap and deterministic"*). It does not.
+- **What happens.** `generateObject` is called **unconditionally**, before `generatedNeeded` is
+  computed. Pin three meals into a three-meal plan, or let the library fill all three, and the route
+  still issues a full model call whose prompt says `Meals: exactly 0.` — then slices the reply to
+  nothing. Pinned by test: *"a plan the library filled entirely still calls the model, for its name"*
+  in `app/api/nutrition/meal-plans/generate/__tests__/use-library-wiring.test.ts`.
+- **⚑ It is an AVAILABILITY bug, not just a cost one — measured 2026-08-30.** With the model made to
+  reject, a three-meal plan the library filled completely returns
+  **`502 "Could not generate a plan right now. Try again shortly."`** The `catch` around the call
+  does not know the call was unnecessary, so a plan that needed nothing from the model fails when the
+  model is down. Tokens are the smaller half of this.
+- **So the fix is to skip the call, not to make it cheaper.** The blocker is that the same call
+  supplies `planName` and `restDayAdjustment`, which the plan needs whoever chose its meals — and
+  shipping an unnamed plan is the one option that is wrong. Both are derivable when nothing is being
+  generated: every meal in hand already has a name, and the rest-day line can state the reduction the
+  code **actually applies** (`REST_DAY_CARB_REDUCTION`, 15 %) rather than model prose that may not
+  match it. Keep the derived line to the skip branch and say so — the AI path's prose is not in scope
+  here, and reconciling the two is a separate question.
+- **Worth doing because the trigger is the ordinary case, not the edge one.** BF-11h made
+  `useLibrary` settable from the wizard, so a user with a stocked library reaches a fully-filled plan
+  by design, and the full generate prompt is the most expensive one this route sends.
+- **Verification.** The fully-filled case makes **no** model call and still returns a named plan;
+  the same case with the model rejecting returns **200**, not 502 — that is the test that says the
+  bug is fixed; a partially filled plan is unchanged, name included; `libraryMatchCount`, slot
+  placement and `matchReason` all still hold — the LB-21 test file covers those and must stay green.
 
 ### [nutrition][platform] Q-407 — the meal-plan wizard is seven screens for six answers, and the one piece the Coach lacks is multi-select
 
