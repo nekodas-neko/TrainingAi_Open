@@ -7,10 +7,10 @@ import { ingredientToEntry } from '@trainingai/shared/nutrition/log-plan-meal'
 import { createFoodItem } from '@trainingai/shared/nutrition/create-food-item'
 import { getLocalStore } from '@/lib/local-store'
 import { AddFoodByHandForm, type AddFoodByHandValues } from './add-food-by-hand-form'
-import { IngredientSearch, type ExternalFood } from './ingredient-search'
+import { IngredientSearch } from './ingredient-search'
 import { hostOf } from './recipe-url'
 import type { RecipeCandidate } from './recipe-candidates'
-import type { FoodSearchResponse } from '@/app/api/nutrition/food-search/route'
+import { useFoodDatabaseSearch, type ExternalFood } from '@/lib/hooks/use-food-database-search'
 
 interface Props {
   /** Whether the picker's screen is on. Both searches idle when it is not. */
@@ -42,21 +42,24 @@ interface Props {
  * with four more features due to land in it.
  *
  * It pairs with `ingredient-search.tsx` rather than duplicating it: that file draws the results and
- * owns no state, this one owns the searches, the debounce clocks and the three add paths. Neither
- * is useful without the other and neither repeats the other's job.
+ * owns no state, this one owns the own-foods search and the three add paths. Neither is useful
+ * without the other and neither repeats the other's job. The database search left for
+ * `useFoodDatabaseSearch` in BF-48, once Log Food needed the same query.
  */
 export function IngredientPicker({ active, userId, onAdd, onImportRecipe, onRecipeCandidates }: Props) {
   const [query, setQuery] = useState('')
   const [searchResults, setSearchResults] = useState<FoodItem[]>([])
-  const [dbResults, setDbResults] = useState<ExternalFood[]>([])
-  const [dbSearching, setDbSearching] = useState(false)
-  const [dbUnavailable, setDbUnavailable] = useState(false)
+  const { results: dbResults, searching: dbSearching, unavailable: dbUnavailable } =
+    useFoodDatabaseSearch(query, active)
   const [addingExternal, setAddingExternal] = useState<string | null>(null)
   const [estimating, setEstimating] = useState(false)
   const [importing, setImporting] = useState(false)
   const [showAddFood, setShowAddFood] = useState(false)
   const [addFoodSaving, setAddFoodSaving] = useState(false)
 
+  // The database search runs on its own clock in `useFoodDatabaseSearch`, deliberately not chained
+  // behind this one: they are independent queries, and chaining them meant a slow library fetch
+  // delayed the database section while a stalled one removed it entirely.
   useEffect(() => {
     if (!active) return
     let cancelled = false
@@ -78,39 +81,6 @@ export function IngredientPicker({ active, userId, onAdd, onImportRecipe, onReci
     }, 250)
     return () => { cancelled = true; clearTimeout(t) }
   }, [query, active, userId])
-
-  /**
-   * The food database, on its own slower clock.
-   *
-   * Your own items can only ever return what you have already saved, so the library could never
-   * grow past itself; Open Food Facts is the same source the barcode scanner uses. It is a separate
-   * effect for two reasons. It must not sit behind the food-items round trip — they are independent
-   * queries and chaining them meant a slow library fetch delayed the database section and a stalled
-   * one removed it entirely. And OFF rate-limits searches to roughly ten a minute, so typing
-   * "chicken breast" at a 250 ms debounce is enough to get 503ed; a longer pause before asking is
-   * what keeps the answer coming back at all.
-   */
-  useEffect(() => {
-    if (!active) return
-    if (query.trim().length < 2) { setDbResults([]); setDbUnavailable(false); return }
-    let cancelled = false
-    const t = setTimeout(async () => {
-      setDbSearching(true)
-      try {
-        const res = await fetch(`/api/nutrition/food-search?q=${encodeURIComponent(query)}`)
-        const d = await res.json() as FoodSearchResponse
-        if (!cancelled) {
-          setDbResults(Array.isArray(d.results) ? d.results : [])
-          setDbUnavailable(!!d.unavailable)
-        }
-      } catch {
-        if (!cancelled) { setDbResults([]); setDbUnavailable(true) }
-      } finally {
-        if (!cancelled) setDbSearching(false)
-      }
-    }, 700)
-    return () => { cancelled = true; clearTimeout(t) }
-  }, [query, active])
 
   /**
    * A network-only failure, said plainly.

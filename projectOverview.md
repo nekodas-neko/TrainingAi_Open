@@ -29,6 +29,8 @@
 
 **The nutrition surface after two device passes — and two things built, measured and held (BF-45, BF-50, BF-51).** Eight shipped: the macro ring started at **9 o'clock** at all three call sites, Home's included (`from -90deg` is the SVG/canvas idiom; CSS `conic-gradient` already starts at the top); a collapsed meal kept its calories and dropped its macros, because the totals footer sits inside `CollapsibleContent`; bottom-sheet gutters were **4 px against artboards that say 16** — fixed on the nutrition sheets, **not** on `SheetContent`'s bottom variant as the entry proposed, because **26 of 48** bottom sheets set their own `px-*` and most of the rest already pad inner content at 16, so a shared gutter would have doubled theirs; plus the Log Food capture row (62 px tiles from the artboard, a describe pane that fills its sheet, the camera opening directly with the gallery kept, and `Select` renamed `Delete meals` because that is all it does). **Held:** the meal-photo rework and the builder's back surface — both built, both with a reproducible failure recorded on their entries, and neither shipped from a sandbox. **None of the eight is device-verified** ([journal](docs/overview/entries/2026-08-30-nutrition-ui-uplift.md)).
 
+**Log Food could not reach the food database (BF-48).** The owner's *"it only searches saved/history food... So its not useful"* was precise: `Single foods` filtered an in-memory list, its placeholder said `Search your foods`, and its empty state said single foods land there *once you have logged them* — so the screen for adding one food could only find foods already eaten. The database search existed the whole time, reachable **only** from inside the meal builder. The query and its results section are now shared (`useFoodDatabaseSearch`, `FoodDatabaseResults`), so the macro/calorie mismatch warning has one implementation rather than two, and the **700 ms debounce travels with the hook** — OFF rate-limits to ~10 searches a minute. The foods tab's search box is unconditional now: it was hidden while the list was empty, which is the state the report was made from. Guard proved by mutation ([journal](docs/overview/entries/2026-08-30-log-food-database-search.md)).
+
 **The accessibility scanner that would have passed a 12 px button (Q-282).** `@axe-core/playwright` was installed, measured and removed: WCAG 2.5.8 exempts a *spaced* undersized control, so a deliberately-shrunk **12×12** button (confirmed by `boundingBox`) came back a **pass**, and `color-contrast` cannot read this app at all — it fails to parse the `oklch` tokens (*"Could not parse color string oklab(…)"*) and **evaluated no nodes on Home**. `e2e/touch-target-size.spec.ts` ships instead: DOM geometry against **this repo's 48 dp bar**, covering the roles `globals.css`'s `button, [role="button"]` floor cannot (`<a>`, `role="tab"`, `role="radio"`). It fails on the mutation axe passed. One real finding, **LB-26**: Home's APK-banner link is 258×33 ([journal](docs/overview/entries/2026-08-30-touch-target-gate.md)).
 
 **A shared meal label now carries the meal, not a pointer to it (BF-57, engine half).** Scanning
@@ -645,10 +647,8 @@ on top:** the four migrations retried on every cold start are idempotent now, 20
 one already did. The two oldest, #6 and #10, are public-repo-migration handoffs open since 08-17.
 
 **What shipped recently is in the journal, not here.** Read `docs/overview/entries/` for the current
-window, then the newest `history-*.md`. The 157 dated status notes this section used to carry were
-archived to [`docs/overview/status-archive.md`](docs/overview/status-archive.md) on 2026-08-17 —
-they had stopped being *current* status somewhere around the fortieth one, and were never in date
-order.
+window, then the newest `history-*.md`. The 157 dated status notes this section used to carry are in
+[`docs/overview/status-archive.md`](docs/overview/status-archive.md), which records why.
 
 ---
 

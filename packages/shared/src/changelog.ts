@@ -6,6 +6,26 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.397.0",
+    date: "2026-08-30",
+    changes: [
+      "The macro ring on Nutrition and on Home started filling from the nine o'clock position instead of the top. Both start at twelve now.",
+      "Collapsing a meal on the Nutrition day no longer hides its protein, carbs and fat \u2014 a collapsed meal keeps a summary line with its calories and macros, which is the point of collapsing it.",
+      "\u201cMy Meals\u201d now spans the full width, instead of sitting beside an empty gap.",
+      "The sheets that slide up from the bottom \u2014 logging food, editing a meal, choosing a portion \u2014 had their contents pressed almost against the edges of the screen. They now have the same margin as the rest of the app.",
+      "On the Log Food screen: the Photo, Barcode and Describe buttons are bigger, the \u201cDescribe or enter\u201d panel fills the space it is given rather than a corner of it, and Photo opens the camera straight away instead of asking first \u2014 choosing an existing picture is still there, just below.",
+      "The \u201cSelect\u201d button on your meals is now called \u201cDelete meals\u201d, because deleting is the only thing it has ever done.",
+    ],
+  },
+  {
+    version: "1.396.0",
+    date: "2026-08-30",
+    changes: [
+      "Log Food \u2192 Single foods now searches the food database, not just foods you have already logged. Before this, adding something you had never eaten meant building a whole meal around it, because the database was only reachable from the meal builder. Database results appear under their own heading so you can tell them from your own foods, they carry the warning when a product's macros and calories disagree, and tapping one saves it to your foods and goes straight to the portion step.",
+      "The search box on that tab no longer disappears when the list is empty \u2014 which was exactly when it was most useful. A search that finds nothing now says so and offers to clear itself, instead of showing the first-run message over a query you could not see.",
+    ],
+  },
+  {
     version: "1.395.8",
     date: "2026-08-30",
     changes: [
