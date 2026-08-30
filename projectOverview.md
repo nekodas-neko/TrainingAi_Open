@@ -24,10 +24,10 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.402.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
-**Version:** v1.401.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
-**Version:** v1.401.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
-**Last updated:** 2026-08-30.
+**Version:** v1.403.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Last updated:** 2026-08-31.
+
+**A logged meal is one diary row, and the week-long hold was the spec measuring a moving element (BF-39).** The render half was built on 2026-08-30, passed its own three tests, and was held because the meal library's swipe tray then failed deterministically — recorded as *"a subscriber re-rendering a sibling subtree drops an in-flight `useDrag`"*. **It is none of that.** Sampling the row's rect every frame while the gesture ran: `SwipeActions` mounts once and the drag handler is **never invoked at all**. `toBeVisible()` passes while the sheet is still running its `enter` animation, so `boundingBox()` returned y=605 and the row was at y=503 by the time the CDP touch landed — every point hit the scroll container beneath it. BF-39 never touched the gesture; it added enough work behind the sheet that the animation had not settled. `swipeRowLeft` (`e2e/fixtures.ts`) now waits for two reads a frame apart to agree, all three swipe specs share it, and the pair that failed together passes with the grouping shipped. **The same latent race is in 46 other coordinate reads** — filed as LB-30, not swept ([journal](docs/overview/entries/2026-08-31-diary-nested-meal-rows.md)).
 
 **CI refuses `savePreference` inside a `useEffect` (LB-28).** `useEffect(() => localStorage.setItem(K, v), [v])` is a free write; the same line calling `savePreference` is a **PATCH on every mount**, and nothing at the call site says so. One such site left that PATCH and a `GET` behind it pending past sixty seconds in Health's launch burst and failed nine e2e specs, **none of which mentions preferences** — the screen such a failure names is never the screen that caused it. The scanner is a separate module driven by fixtures, and blanks comments and string literals before counting parens, because an unbalanced paren in either extends an effect's span across the rest of the file. Proved by mutation on the real file. **The entry said there were no sites to exempt; there are two** — `usePersistedPreference` itself, and Home's section-order reconciliation, which returns early unless the order changed. The grep behind that claim wanted both tokens on one line, a shape nobody writes ([journal](docs/overview/entries/2026-08-31-no-save-preference-in-effect.md)).
 
@@ -41,9 +41,6 @@ for picker cancellations, so choosing a photo on the phone did nothing and said 
 branch takes a `File` from an `<input>` and never fetches, which is why every browser test passed.
 Now `Base64` + `dataUrlToBlob`, and non-cancellations toast. **Verifiable only on the S25**
 ([journal](docs/overview/entries/2026-08-30-meal-photo-data-url-fetch.md)).
-
-**Version:** v1.398.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
-**Last updated:** 2026-08-30.
 
 **The quantity editor is the owner's Option A, and an ingredient stopped claiming servings (BF-46
 ② ③).** The unit toggle moved into a narrow column beside the stepper — which is what frees the

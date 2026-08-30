@@ -8,6 +8,9 @@ import type { MealType, FoodLogWithItem } from '@trainingai/shared/types/nutriti
 import { MACRO_COLORS } from '@trainingai/shared/nutrition/macro-colors'
 import { SwipeActions, type SwipeAction } from '@/components/ui/swipe-actions'
 import { FoodRow } from './food-row'
+import { DiaryMealGroup } from './diary-meal-group'
+import { groupDiaryEntries, sumLogs, type DiaryEntry } from './diary-groups'
+import type { SavedMealSummary } from '@/lib/hooks/use-saved-meal-summaries'
 
 interface Props {
   mealType: MealType
@@ -19,10 +22,20 @@ interface Props {
   /** Asks for the delete. The confirmation is the parent's, the same dialog the edit sheet's bin
    *  raises — a drag must never be the one route that skips it (BF-45 ⑤). */
   onDeleteLog: (logId: string) => void
+  /** The user's saved meals by id, for heading a logged meal's rows with its name and photo
+   *  (BF-39). A meal missing from here renders its rows loose, which is what pre-BF-39 logs and
+   *  deleted meals do. */
+  savedMeals: ReadonlyMap<string, SavedMealSummary>
 }
 
-export const MealCard = memo(function MealCard({ mealType, logs, onAdd, onQuickEdit, onDeleteLog }: Props) {
+export const MealCard = memo(function MealCard({ mealType, logs, onAdd, onQuickEdit, onDeleteLog, savedMeals }: Props) {
   const [expanded, setExpanded] = useState(true)
+  // BF-39: a logged meal is ONE entry that opens to its ingredients, not N siblings. The rule and
+  // its edge cases live in `diary-groups.ts`, where they can be tested in node.
+  const entries = useMemo(
+    () => groupDiaryEntries(logs, new Set(savedMeals.keys())),
+    [logs, savedMeals],
+  )
   const totals = logs.reduce(
     (acc, l) => ({ calories: acc.calories + l.calories, proteinG: acc.proteinG + l.proteinG, carbsG: acc.carbsG + l.carbsG, fatG: acc.fatG + l.fatG }),
     { calories: 0, proteinG: 0, carbsG: 0, fatG: 0 },
@@ -92,14 +105,14 @@ export const MealCard = memo(function MealCard({ mealType, logs, onAdd, onQuickE
           ) : (
             <>
               <AnimatePresence initial={false}>
-                {logs.map((log, i) => (
+                {entries.map((entry, i) => (
                   <motion.div
-                    key={log.id}
+                    key={entry.key}
                     initial={{ opacity: 0, height: 0 }}
                     animate={{ opacity: 1, height: "auto" }}
                     exit={{ opacity: 0, height: 0 }}
                     transition={{ duration: 0.18 }}
-                    className={`overflow-hidden ${i < logs.length - 1 ? 'border-b border-border/20' : ''}`}
+                    className={`overflow-hidden ${i < entries.length - 1 ? 'border-b border-border/20' : ''}`}
                   >
                     {/* Q-406: the diary row is the shared `FoodRow` — name, a grey line of what and
                         how much, calories right-aligned, chevron. The inline pencil and bin are
@@ -107,14 +120,23 @@ export const MealCard = memo(function MealCard({ mealType, logs, onAdd, onQuickE
                         lets one row component serve the diary, the library and both search lists.
                         The per-item P/C/F moved into that sheet's live preview; the meal's totals
                         footer still carries the macro split at rest. */}
-                    <DiaryRow
-                      id={log.id}
-                      name={log.foodItem.name}
-                      secondary={logAmountLabel(log)}
-                      calories={log.calories}
-                      onEdit={onQuickEdit}
-                      onDelete={onDeleteLog}
-                    />
+                    {entry.kind === 'log' ? (
+                      <DiaryRow
+                        id={entry.log.id}
+                        name={entry.log.foodItem.name}
+                        secondary={logAmountLabel(entry.log)}
+                        calories={entry.log.calories}
+                        onEdit={onQuickEdit}
+                        onDelete={onDeleteLog}
+                      />
+                    ) : (
+                      <MealGroupEntry
+                        entry={entry}
+                        summary={savedMeals.get(entry.savedMealId)!}
+                        onQuickEdit={onQuickEdit}
+                        onDeleteLog={onDeleteLog}
+                      />
+                    )}
                   </motion.div>
                 ))}
               </AnimatePresence>
@@ -137,6 +159,47 @@ function logAmountLabel(log: FoodLogWithItem): string {
   const amount = `${q} ${q === 1 ? 'serving' : 'servings'}${servingG > 0 ? ` · ${Math.round(servingG * log.quantityMultiplier)} g` : ''}`
   return log.foodItem.brand ? `${log.foodItem.brand} · ${amount}` : amount
 }
+
+/**
+ * One logged meal's rows, under the meal's own header (BF-39).
+ *
+ * A component rather than JSX inside the `.map()` above, so `DiaryMealGroup`'s scalar props are
+ * computed once per group instead of on every render of the card — and so the totals sum lives
+ * beside the rows it sums.
+ */
+const MealGroupEntry = memo(function MealGroupEntry(
+  { entry, summary, onQuickEdit, onDeleteLog }: {
+    entry: Extract<DiaryEntry, { kind: 'meal' }>
+    summary: SavedMealSummary
+    onQuickEdit: (id: string) => void
+    onDeleteLog: (id: string) => void
+  },
+) {
+  const totals = sumLogs(entry.logs)
+  return (
+    <DiaryMealGroup
+      name={summary.name}
+      imageDataUri={summary.imageDataUri}
+      itemCount={entry.logs.length}
+      calories={totals.calories}
+      proteinG={totals.proteinG}
+      carbsG={totals.carbsG}
+      fatG={totals.fatG}
+    >
+      {entry.logs.map(log => (
+        <DiaryRow
+          key={log.id}
+          id={log.id}
+          name={log.foodItem.name}
+          secondary={logAmountLabel(log)}
+          calories={log.calories}
+          onEdit={onQuickEdit}
+          onDelete={onDeleteLog}
+        />
+      ))}
+    </DiaryMealGroup>
+  )
+})
 
 /** Wrapper so the memoised row gets a stable `onPress` from inside a `.map()`, where a hook cannot
  *  live and an inline arrow would defeat `React.memo` silently (Q-490). Scalars only. */

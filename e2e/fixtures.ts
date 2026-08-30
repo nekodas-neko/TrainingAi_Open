@@ -1,5 +1,5 @@
 import { join } from 'node:path'
-import { expect, type Page } from '@playwright/test'
+import { expect, type Locator, type Page } from '@playwright/test'
 
 /** Seeded by `scripts/local-db/seed.sql`. Idempotent — `pnpm db:local` will not re-seed. */
 export const SEED_EMAIL = 'test@local.dev'
@@ -270,6 +270,79 @@ export async function openSavedMeal(page: Page, mealName: string): Promise<void>
   // 915 px viewport, where `elementFromPoint` returns nothing and a coordinate tap silently hits
   // the void. `toBeInViewport` is the assertion that waits for the animation rather than the mount.
   await expect(opened).toBeInViewport()
+}
+
+/**
+ * Drag a list row to the left, far enough that its `SwipeActions` tray rests open.
+ *
+ * Playwright's `touchscreen` can tap and nothing else, and a mouse drag proves nothing about a
+ * handler bound with `pointer: { touch: true }` — so the moves go through CDP directly. They are
+ * spaced in time on purpose: `@use-gesture` derives velocity from the interval, and a burst
+ * dispatched in one tick reads as an instant flick rather than a drag.
+ *
+ * **Measure only once the row has stopped moving, and that is the whole reason this is shared.**
+ * `Input.dispatchTouchEvent` performs none of the actionability checks `locator.tap()` does — in
+ * particular not the stability one — so a coordinate read while the sheet behind the row is still
+ * running its `enter` animation is a coordinate the row has already left. Measured 2026-08-31 with
+ * the row's rect sampled every frame: `toBeVisible()` passed, `boundingBox()` returned y=605, and
+ * by the time the touch landed the row sat at y=503 — 100 px higher — so every point in the gesture
+ * hit the sheet's scroll container beneath it and the drag handler was **never invoked once**. The
+ * failure that produces is `Delete <item>` never appearing, which reads as a broken gesture rather
+ * than a mis-aimed one, and it cost a whole implementation of BF-39 (held for a week as a
+ * render-vs-remount question it never was). `toBeInViewport()` does not catch it: it is satisfied
+ * the moment a pixel of the sheet crosses the fold, ~400 ms before it settles.
+ */
+export async function swipeRowLeft(page: Page, row: Locator, options: SwipeRowOptions = {}): Promise<void> {
+  const { distance = 200, centreFirst = false, releaseWithPoint = false } = options
+  await expect(row).toBeVisible()
+  if (centreFirst) await row.evaluate(el => el.scrollIntoView({ block: 'center' }))
+  const box = await stableBox(row)
+  const y = box.y + box.height / 2
+  const startX = box.x + box.width - 16
+  const cdp = await page.context().newCDPSession(page)
+  try {
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: startX, y }] })
+    for (let step = 1; step <= 10; step++) {
+      await cdp.send('Input.dispatchTouchEvent', {
+        type: 'touchMove',
+        touchPoints: [{ x: startX - (distance * step) / 10, y }],
+      })
+      await page.waitForTimeout(16)
+    }
+    // Some callers need the final point still in `changedTouches` — the nutrition tab's day-swipe
+    // reads `changedTouches[0]` on touchend, so an empty release skips the very gesture a spec
+    // asserting the two do not collide exists to provoke.
+    await cdp.send('Input.dispatchTouchEvent', {
+      type: 'touchEnd',
+      touchPoints: releaseWithPoint ? [{ x: startX - distance, y }] : [],
+    })
+  } finally {
+    await cdp.detach()
+  }
+}
+
+export interface SwipeRowOptions {
+  /** How far left to drag, in CSS pixels. Past half the tray's width the row rests open. */
+  distance?: number
+  /**
+   * Scroll the row to the middle of the viewport first. A diary row's natural position can be under
+   * the bottom tab bar, where every touch point lands on a nav icon instead.
+   */
+  centreFirst?: boolean
+  /** Release with the final touch point still in `changedTouches` — see the touchEnd note above. */
+  releaseWithPoint?: boolean
+}
+
+/** The row's box once two reads a frame apart agree on it — see `swipeRowLeft`. */
+async function stableBox(row: Locator): Promise<{ x: number; y: number; width: number; height: number }> {
+  let previous = await row.boundingBox()
+  for (let attempt = 0; attempt < 60; attempt++) {
+    await row.page().waitForTimeout(50)
+    const next = await row.boundingBox()
+    if (previous && next && Math.abs(previous.y - next.y) < 0.5 && Math.abs(previous.x - next.x) < 0.5) return next
+    previous = next
+  }
+  throw new Error('the row never stopped moving — something is animating it indefinitely')
 }
 
 /**

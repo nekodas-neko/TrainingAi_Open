@@ -4150,7 +4150,23 @@ structure ("similar to") is ~30 exercise names, history ("what I did") is unboun
 them as one is how a prompt gets a year of set logs in it. It also carries two constraints worth
 having before design starts: send a program id rather than a program object, and give the reference
 its own schema caps rather than inheriting the byte-limit situation the route already documents.
-## 2026-08-31 — `projectOverview.md` 8453 → 8446, `docs/implementation-backlog.md` 13776 → 13767 (LB-28)
+## 2026-08-31 — `projectOverview.md` 8453 → 8450, `docs/implementation-backlog.md` 13776 → 13762, `implementation-lane-b.md` held at 126
+
+Three baselines fall; none rises. **Re-derived on the merge**: this branch was cut at 8449, and
+Q-211's four-line paragraph landed under it. **`projectOverview.md`** loses four lines of merge debris — its
+Current Status carried *three* duplicated `**Version:**` lines and a stray `v1.398.0` /
+`**Last updated:**` pair mid-section, all of it from parallel PRs resolving the same shared line —
+and gains one paragraph, written as a single long line in the section's current house style.
+
+**`docs/implementation-backlog.md`** falls 14 as BF-39's entry is removed on shipping and LB-30 is
+filed, which is the queue working rather than a compaction.
+
+**The baton was rewritten and then cut back to its baseline**, which is the part worth recording:
+correcting BF-39's state cost more lines than the correction saved, so the "finding that should
+change how you start" section was compressed from a heading plus three bullets into one paragraph,
+and four gotchas were merged. **Nothing was dropped** — the fourth instance of the precondition
+finding (BF-39's own) is now in there too, and it is the one that cost the most.
+## 2026-08-31 — `projectOverview.md` 8446 → 8443, `docs/implementation-backlog.md` 13752 → 13743 (LB-28)
 
 Both fall, and the projectOverview one is the note worth reading: the new status entry was **paid
 for in the same section** rather than by raising the number. The BF-46 ①a paragraph from the day
