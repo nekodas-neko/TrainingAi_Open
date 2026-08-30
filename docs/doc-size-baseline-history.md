@@ -3827,6 +3827,12 @@ was not covering what its name says.
 
 ---
 
+## 2026-08-30 — `projectOverview.md` 8396 → 8398 (Q-154, the sparkline primitive's missing props)
+
+One Current Status paragraph plus its blank line. It earns the index rather than only a journal entry
+because of one sentence: `valuePadding` defaults to 0.5 and that renders a small spread at half its
+true amplitude. Anyone reaching for the primitive needs to know that from the orientation read, not
+after shipping a chart that understates its own data — which is exactly what Q-154 refused twice.
 ## 2026-08-30 — `projectOverview.md` +2 (LB-26, the APK banner's tap target)
 
 One Current Status paragraph plus its blank line. The defect half is small; the half that earns the
@@ -3835,5 +3841,6 @@ it happened here to a session that had read the warning about it hours earlier. 
 backlog's protocol header in the same PR, which is the durable fix; this line is what makes an
 orientation read mention it at all.
 
-(Number set against the base this branch was cut from; re-derived on the merge that follows, since
-`projectOverview.md` gains a paragraph from every PR landing today.)
+**Re-derived on the merge: 8398 → 8400.** The branch was cut before Q-154 landed, which took the
+file to 8398 with its own paragraph; both PRs' paragraphs are kept, so the number is set once from
+the merged file rather than from either side.

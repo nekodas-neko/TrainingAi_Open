@@ -6,10 +6,17 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: "1.397.1",
+    version: "1.397.2",
     date: "2026-08-30",
     changes: [
       "The \u201cDownload Android App\u201d link on the home screen is easier to hit \u2014 it was a third shorter than the minimum this app holds every other control to.",
+    ],
+  },
+  {
+    version: "1.397.1",
+    date: "2026-08-30",
+    changes: [
+      "The 1RM trend on an exercise's history and the trend on a health metric are drawn by the same chart component as everywhere else in the app. Small changes come with that: the ring around the newest point is gone, and the earlier points are no longer faded. Both charts now use their full height, so a small change \u2014 half a kilo of body weight, say \u2014 shows at its real size instead of being flattened.",
     ],
   },
   {

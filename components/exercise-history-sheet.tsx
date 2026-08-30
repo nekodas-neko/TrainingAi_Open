@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Sparkline } from '@/components/ui/sparkline'
 import { useUserTimezone } from "@/components/shell/user-timezone-provider";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import type { ExerciseHistoryEntry, ExerciseHistoryResponse } from "@/app/api/exercise-history/route";
@@ -89,19 +90,8 @@ export function ExerciseHistorySheet({ exerciseName, muscles = [], userId, onClo
     exerciseType,
   );
   const hasChart = rms.length >= 2;
-  const maxRm = hasChart ? Math.max(...rms) : 0;
-  const minRm = hasChart ? Math.min(...rms) : 0;
-  const range = maxRm - minRm || 1;
-  const W = 280; const H = 60; const PAD = 4;
-  const chartPoints = rms
-    .slice()
-    .reverse()
-    .map((v, i, arr) => {
-      const x = PAD + (i / Math.max(arr.length - 1, 1)) * (W - PAD * 2);
-      const y = H - PAD - ((v - minRm) / range) * (H - PAD * 2);
-      return `${x.toFixed(1)},${y.toFixed(1)}`;
-    });
-  const pointsStr = chartPoints.join(" ");
+  // Oldest first — `rms` is newest-first, and a trend reads left to right.
+  const trend = rms.slice().reverse();
 
   const best1rm = rms.length > 0 ? Math.max(...rms) : null;
   const latest1rm = rms[0] ?? null;
@@ -167,41 +157,28 @@ export function ExerciseHistorySheet({ exerciseName, muscles = [], userId, onClo
             <div>
               <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-2">1RM Trend</p>
               <div className="rounded-xl bg-muted/40 border border-border p-3">
-                <svg width="100%" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className="overflow-visible">
-                  <defs>
-                    <linearGradient id="rm-fill-grad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="var(--color-brand)" stopOpacity="0.28" />
-                      <stop offset="100%" stopColor="var(--color-brand)" stopOpacity="0" />
-                    </linearGradient>
-                  </defs>
-                  {/* Grid lines */}
-                  {[0, H / 2, H].map(y => (
-                    <line key={y} x1="0" y1={y} x2={W} y2={y} stroke="currentColor" strokeOpacity="0.04" strokeWidth="1"/>
-                  ))}
-                  <polygon
-                    points={`${PAD},${H} ${pointsStr} ${W - PAD},${H}`}
-                    fill="url(#rm-fill-grad)"
-                  />
-                  <polyline
-                    points={pointsStr}
-                    fill="none"
-                    stroke="var(--color-brand)"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                  {/* Dots */}
-                  {chartPoints.map((pt, i) => {
-                    const [x, y] = pt.split(",").map(Number);
-                    const isLast = i === chartPoints.length - 1;
-                    return (
-                      <g key={i}>
-                        <circle cx={x} cy={y} r={isLast ? 4 : 2.5} fill="var(--color-brand)" opacity={isLast ? 1 : 0.45}/>
-                        {isLast && <circle cx={x} cy={y} r="7" fill="none" stroke="var(--color-brand)" strokeOpacity="0.28" strokeWidth="1"/>}
-                      </g>
-                    );
-                  })}
-                </svg>
+                {/* Q-154: the shared `Sparkline`, not a fourth inline polyline. What kept this one
+                    inline was that the primitive could not draw it — no inset, ±0.5 value padding,
+                    a hardcoded stroke width, no grid lines and no emphasized last dot. All props
+                    now, all defaulted.
+
+                    **The halo ring is gone, and that was the owner's call (2026-08-25):** a
+                    decorative `r=7` stroke around the final dot is one caller's art, and a
+                    `haloLastDot` prop is how a primitive becomes a config object. The non-final
+                    dots also stop being dimmed to 0.45, for the same reason. */}
+                <Sparkline
+                  values={trend}
+                  width={280}
+                  height={60}
+                  responsive
+                  fill
+                  showDots
+                  pad={4}
+                  valuePadding={0}
+                  strokeWidth={2}
+                  gridLines
+                  emphasizeLast
+                />
                 <div className="flex justify-between mt-1">
                   <span className="text-[9px] text-muted-foreground">{entries[entries.length - 1]?.date?.slice(0, 10) ?? "—"}</span>
                   <span className="text-[9px] text-muted-foreground">{entries[0]?.date?.slice(0, 10) ?? "—"}</span>
