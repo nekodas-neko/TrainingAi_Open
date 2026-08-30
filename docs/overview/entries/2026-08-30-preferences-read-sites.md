@@ -117,6 +117,13 @@ asserts all three come back in the right shapes: `'30'`, `'arc'`, and the litera
 
 **Proved both ways.** With the hydration replaced by a no-op and nothing else changed, it fails.
 
+**It blocks the service worker, and that part is NOT proved.** The spec failed on CI twice with
+`page.goto: net::ERR_ABORTED` before any assertion ran, with the SW active in both attempt windows
+(`GET /sw.js 200`, `GET /offline 200`). The abort does not reproduce in the sandbox with the SW on,
+so blocking it removes the one actor the log implicates rather than a demonstrated cause — said here
+because a "fix" that cannot be reproduced is a hypothesis with a commit message. `page.reload()` is
+not the alternative: measured, it aborts the navigation on every local run.
+
 Thirteen unit tests cover each encoding, an absent key being **left alone** (the regression above,
 pinned), the exclusive partner being cleared, a `null` server response not touching the device, every
 key in the map being covered so a new preference cannot be seeded under no name, `null` meaning clear

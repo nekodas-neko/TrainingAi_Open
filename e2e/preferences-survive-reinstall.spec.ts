@@ -2,6 +2,21 @@ import { test, expect } from '@playwright/test'
 import { settleRouteBoundary } from './fixtures'
 
 /**
+ * The service worker takes no part in what this asserts — `hydrateUserPreferences` is warmed by a
+ * React component — and leaving it on cost a CI run.
+ *
+ * **What is known:** the relaunch below failed on CI, twice, with `page.goto: net::ERR_ABORTED`,
+ * before any assertion ran, and the SW was active in both attempt windows (`GET /sw.js 200`,
+ * `GET /offline 200`). **What is not known:** the abort does not reproduce in the sandbox with the
+ * SW on, so this is not proved by mutation — it removes the one actor CI's log implicates that has
+ * no business being in this test. `card-429-error-state.spec.ts` blocks it for the same class of
+ * reason. If the abort returns, the SW was not it.
+ *
+ * `page.reload()` is NOT the alternative: measured here, it aborts the navigation every run.
+ */
+test.use({ serviceWorkers: 'block' })
+
+/**
  * Preferences survive a fresh install (Q-392).
  *
  * The owner's report: *"when i do a new install or open on computer - it loses all the saved
