@@ -1,6 +1,7 @@
 import { eq, and, inArray, gte, lte, asc, desc, sql, isNull } from 'drizzle-orm'
 import { NotFoundError, UserFacingError } from '@trainingai/shared/errors'
 import { resolveEatenAt } from '@trainingai/shared/nutrition/eaten-at'
+import { findDuplicateFoodItem, identityCalories } from '@trainingai/shared/nutrition/food-item-identity'
 import { DEFAULT_TZ } from '@trainingai/shared/date-utils'
 import { randomUUID } from 'node:crypto'
 import type { getDb } from '../client'
@@ -248,7 +249,20 @@ export async function seedDefaultMealTypes(db: Db, userId: string): Promise<void
 // `id` is only passed by the offline-sync push path (SYNC-O2), which mints the id
 // client-side so it can log-reference it before the server confirms creation.
 // ON CONFLICT DO NOTHING makes a re-push of the same mutation idempotent.
-export async function createFoodItem(db: Db, userId: string, data: Omit<FoodItem, 'id' | 'userId' | 'createdAt'> & { id?: string }): Promise<FoodItem> {
+//
+// `reuseExisting` (BF-38) returns the row the user already has instead of writing a second one.
+// **It is off by default, and the default is the offline push path — deliberately.** That path
+// mints the id on the device and a `food_logs` mutation is already queued against it; handing back
+// a different id would leave that log referencing a row the server never created, and
+// `food_logs.food_item_id` is `ON DELETE RESTRICT` against a foreign key that would then not exist.
+// The offline path de-duplicates on the device instead, before the id is minted — see
+// `packages/shared/src/nutrition/create-food-item.ts`. Interactive server callers, which use
+// whatever id comes back, pass true.
+export async function createFoodItem(
+  db: Db, userId: string,
+  data: Omit<FoodItem, 'id' | 'userId' | 'createdAt'> & { id?: string },
+  opts: { reuseExisting?: boolean } = {},
+): Promise<FoodItem> {
   const { id, ...rest } = data
   if (id) {
     const [inserted] = await db.insert(s.foodItems).values({ id, userId, ...rest })
@@ -257,6 +271,17 @@ export async function createFoodItem(db: Db, userId: string, data: Omit<FoodItem
     if (inserted) return rowToFoodItem(inserted)
     const [existing] = await db.select().from(s.foodItems).where(eq(s.foodItems.id, id))
     return rowToFoodItem(existing)
+  }
+  if (opts.reuseExisting) {
+    // Prefilter on `calories` alone: an integer column, so an exact comparison with no text
+    // normalisation in SQL. Any duplicate must share it, and re-implementing the name/whitespace
+    // normalisation in SQL would be the same formula in two languages, drifting from the day it
+    // was written. `findDuplicateFoodItem` is the only thing that decides.
+    const sameCalories = await db.select().from(s.foodItems)
+      .where(and(eq(s.foodItems.userId, userId), eq(s.foodItems.calories, identityCalories(rest.calories))))
+      .orderBy(asc(s.foodItems.createdAt))
+    const duplicate = findDuplicateFoodItem(rest, sameCalories.map(rowToFoodItem))
+    if (duplicate) return duplicate
   }
   const [r] = await db.insert(s.foodItems).values({ userId, ...rest }).returning()
   return rowToFoodItem(r)
