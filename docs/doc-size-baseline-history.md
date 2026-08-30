@@ -3739,3 +3739,59 @@ The second is that the one real candidate, at 18 MB, is the keyset index for a m
 deliberately kept** on the stated ground that *"it costs nothing at runtime"*. Reversing part of a
 signed-off decision needs the decision quoted and the new number beside it, or the next reader is
 choosing between two sentences with no evidence attached to either.
+
+## 2026-08-30 — `projectOverview.md` 8367 → 8381, `docs/implementation-backlog.md` 13749 → 13639 (BF-53 fixed, LA-39 closed)
+
+The backlog **shrinks 110**: BF-53 collapses to a `Keep:` for the device check and LA-39 leaves
+entirely, an hour after it was filed — the owner ran the grant and the query text is live.
+
+`projectOverview.md` +14, two Current Status paragraphs. BF-53's says what the buttons did rather
+than naming the guard, because "a bigserial validated as a uuid" describes a line of code and the
+finding is that a feature was dead in production. LA-39's is five lines and closes itself in the same
+breath it opens, which is the shape a same-day resolution should take here — the alternative is a
+Known-Issues row filed and struck within the hour.
+
+
+## 2026-08-30 — `docs/implementation-backlog.md` (nutrition to the top, re-derived from current main)
+
+Replaces an earlier attempt that had gone stale. A reordering branch carries a full copy of every
+entry it moved, so the longer it stays open the more of those copies rot — and on this repo `main`
+moves every few minutes. That branch had already come within one merge of **resurrecting BF-54 after
+it shipped and reverting BF-55 to its pre-fix text**, both caught only by diffing each moved entry
+against `main` rather than trusting the conflict resolution.
+
+Re-deriving the move from current `main` in one pass removes the whole class: nothing is carried, so
+nothing can be stale. **The lesson for the next reorder: do it in one commit against fresh `main` and
+merge it the same minute, or expect to hand-verify every moved entry.**
+
+## 2026-08-30 — `docs/implementation-backlog.md` raised (BF-58 and BF-3, re-derived)
+
+Replaces an earlier branch for the same two entries. Same reasoning as the reorder: the branch had
+been open across several merges and its conflict region held `main`'s copies of BF-53 and BF-47,
+both of which shipped in the meantime. Re-deriving against fresh `main` and re-applying only the two
+intended changes means neither can be reverted by accident.
+
+**BF-58** is the partner's weigh-ins, settled on per-phone weight-band attribution: the scale pairing
+is device-local `localStorage`, so both phones can already pair and the problem is attribution rather
+than ownership. No cross-account path is needed, which is most of the argument. **BF-3** is dosed
+substances, promoted and classified Lane A because the owner is about to start retatrutide and dose
+lives on the definition rather than the log — so raising a dose rewrites every past entry, and the
+titration schedule is exactly what a titrating drug's record consists of.
+## 2026-08-30 — `docs/implementation-backlog.md` 13639 → 13691, `projectOverview.md` 8381 → 8392 (BF-57 engine half)
+
+**Amended on the merge with `main`.** #622 reordered the nutrition entries to the head of both lanes
+while this branch was open, so the conflict looked like two deletions and was **not** one — the five
+entries were MOVED, and taking neither side would have deleted BF-49 through BF-52 outright. Resolved
+by taking `main`'s side at the old position and then replacing its relocated BF-57 with this branch's
+`Keep:`. The check that catches the real two-deletion case cannot see this one, which is the argument
+for reading the headings before choosing rather than applying the rule by shape.
+
+The backlog **shrinks 100**. BF-57's entry was 8,244 characters of design argument — the byte
+measurements, the two encodings compared, the token design it superseded — and all of it is now
+either in the shipped module's comments or in the journal. What replaces it is 2,748 characters of
+`Keep:`, which is what Lane B still has to build.
+
+`projectOverview.md` +11. The paragraph spends its last two lines saying **no user-visible change
+yet**, and that is the point of it: "the whole meal is in the QR now" reads as a shipped feature, and
+what shipped is a module nothing calls. A status line that let the owner think labels were shareable
+would be worse than no line.

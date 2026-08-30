@@ -16,6 +16,14 @@
 // binding.** `invalidUuidResponse(x)` from `lib/api/route-errors.ts` is the shared one; a route that
 // validates its own way is fine as long as the binding is checked before use — see ACCEPTS below.
 //
+// **The rule is "guarded", not "is a UUID" — BF-53 is what happens when those are conflated.** Two
+// routes key on a `bigserial` (`scale_raw_samples.id`), and the sweep that closed Q-482 gave them
+// the UUID guard anyway. A decimal id can never match a UUID regex, so both returned `400 Invalid
+// id` to **every real request** and the pending weigh-in triage was dead in production. Their
+// correct `Number.isInteger` check sat unreachable on the next line. `numericRouteId(x)` is the
+// shared guard for that case and is accepted below; the failure message names both, because the
+// message is what the next sweep will actually read.
+//
 // This has **no baseline**, deliberately. All 39 destructures across 29 dynamic route files (every one but the NextAuth
 // catch-all) were converted in the same PR, so there is nothing to grandfather and a new route
 // cannot inherit an allowance.
@@ -28,11 +36,14 @@ const root = path.join(__dirname, '..');
 // `const { id } = await params` / `const { sessionId: programSessionId } = await params`
 const DESTRUCTURE = /const \{\s*(\w+)(?:\s*:\s*(\w+))?\s*\}\s*=\s*await params/g;
 
-// What counts as guarding `name`. The shared helper, or a route's own explicit UUID check.
+// What counts as guarding `name`: a shared helper, or a route's own explicit check. Which helper
+// depends on the COLUMN — `numericRouteId` for a `bigserial` key, the UUID ones for a `uuid` key.
+// Applying the wrong one is not a weaker guard, it is a 400 for every request (BF-53).
 const ACCEPTS = (name) => [
   new RegExp(`invalidUuidResponse\\(\\s*${name}\\s*\\)`),
   new RegExp(`isUuid\\(\\s*${name}\\s*\\)`),
   new RegExp(`uuid\\(\\)\\.safeParse\\(\\s*${name}\\s*\\)`),
+  new RegExp(`numericRouteId\\(\\s*${name}\\s*\\)`),
 ];
 
 function stripComments(src) {
@@ -84,12 +95,13 @@ function walk(dir) {
 walk(path.join(root, 'app', 'api'));
 
 if (failures.length > 0) {
-  console.error('A dynamic route uses a path param without checking it is a UUID (Q-482).');
-  console.error('Postgres rejects the cast with 22P02 and the route answers 500 for what is a 400.');
-  console.error("Add, right after the destructure:");
-  console.error("  const badId = invalidUuidResponse(<name>)");
-  console.error('  if (badId) return badId');
-  console.error("from '@/lib/api/route-errors'.");
+  console.error('A dynamic route uses a path param without guarding it (Q-482).');
+  console.error('Postgres rejects a bad cast with 22P02 and the route answers 500 for what is a 400.');
+  console.error('Add, right after the destructure — CHECK THE COLUMN FIRST (BF-53):');
+  console.error('  uuid key:      const badId = invalidUuidResponse(<name>); if (badId) return badId');
+  console.error('  bigserial key: const p = numericRouteId(<name>); if (!p.ok) return p.response');
+  console.error("both from '@/lib/api/route-errors'. The UUID guard on a numeric key is a 400 for");
+  console.error('EVERY real request, not a stricter check — that is how BF-53 shipped dead.');
   for (const f of failures) console.error(`  ${f.rel}:${f.line}  ${f.name}`);
   process.exit(1);
 }

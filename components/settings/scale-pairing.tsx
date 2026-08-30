@@ -123,19 +123,29 @@ export function ScalePairing() {
     }
   }
 
+  // BF-53 — both of these were `if (res.ok)` with no else, and that is why a route returning 400 to
+  // every press read as *"doesn't actually remove it or do anything"* rather than as an error. The
+  // route bug is fixed; this is the half that made it survive, so it stays fixed independently.
+  async function pendingActionFailed(res: Response, verb: string) {
+    const detail = await res.json().then(d => (d as { error?: string }).error).catch(() => null)
+    setError(detail ? `Could not ${verb} the reading: ${detail}` : `Could not ${verb} the reading.`)
+  }
+
   async function confirmReading(id: number) {
     setPendingBusyId(id)
+    setError(null)
     try {
       const res = await fetch(`/api/scale-ble/pending/${id}/confirm`, { method: 'POST' })
-      if (res.ok) {
-        setPending(p => p.filter(r => r.id !== id))
-        // Q-126: confirming writes weight/composition to body_metrics (confirm/route.ts →
-        // applyScaleReadingToBodyMetrics), so the same pair a manual metric log uses must fire —
-        // otherwise the weight card, Progress card and nutrition TDEE header keep the old weight.
-        // Before the refetch, per the invalidate-then-refetch ordering rule.
-        await Promise.all([invalidateBodyMetricWrite(), invalidateReadinessInputs()]).catch(() => {})
-        loadToday()
-      }
+      if (!res.ok) return pendingActionFailed(res, 'confirm')
+      setPending(p => p.filter(r => r.id !== id))
+      // Q-126: confirming writes weight/composition to body_metrics (confirm/route.ts →
+      // applyScaleReadingToBodyMetrics), so the same pair a manual metric log uses must fire —
+      // otherwise the weight card, Progress card and nutrition TDEE header keep the old weight.
+      // Before the refetch, per the invalidate-then-refetch ordering rule.
+      await Promise.all([invalidateBodyMetricWrite(), invalidateReadinessInputs()]).catch(() => {})
+      loadToday()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not confirm the reading.')
     } finally {
       setPendingBusyId(null)
     }
@@ -143,9 +153,13 @@ export function ScalePairing() {
 
   async function dismissReading(id: number) {
     setPendingBusyId(id)
+    setError(null)
     try {
       const res = await fetch(`/api/scale-ble/pending/${id}/dismiss`, { method: 'POST' })
-      if (res.ok) setPending(p => p.filter(r => r.id !== id))
+      if (!res.ok) return pendingActionFailed(res, 'dismiss')
+      setPending(p => p.filter(r => r.id !== id))
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not dismiss the reading.')
     } finally {
       setPendingBusyId(null)
     }

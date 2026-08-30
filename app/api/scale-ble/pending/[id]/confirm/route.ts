@@ -4,7 +4,7 @@ import { getRepositoryAsync } from '@/lib/data'
 import { computeBodyComposition, hasValidImpedance } from '@/lib/scale-ble/composition'
 import { ageFromDob, DEFAULT_TZ } from '@trainingai/shared/date-utils'
 import { applyScaleReadingToBodyMetrics } from '@/lib/scale-ble/apply-reading'
-import { invalidUuidResponse } from '@/lib/api/route-errors'
+import { numericRouteId } from '@/lib/api/route-errors'
 
 // Confirms a pending scale reading (staged by the anomaly check because it looked like a big
 // jump from the account's usual weight) — runs the same composition calc + body_metrics upsert
@@ -14,11 +14,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const userId = session.user.id
 
+  // BF-53 — `scale_raw_samples.id` is a `bigserial`, so the UUID guard that used to sit here
+  // rejected every real request before the numeric check written for it could run.
   const { id: idParam } = await params
-  const badId = invalidUuidResponse(idParam)
-  if (badId) return badId
-  const id = Number(idParam)
-  if (!Number.isInteger(id)) return NextResponse.json({ error: 'Invalid id' }, { status: 400 })
+  const parsedId = numericRouteId(idParam)
+  if (!parsedId.ok) return parsedId.response
+  const id = parsedId.id
 
   const repo = await getRepositoryAsync()
   const row = await repo.confirmScaleSample(userId, id)
