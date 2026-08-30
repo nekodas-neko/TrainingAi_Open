@@ -3564,3 +3564,24 @@ disabled at zero" when 652k rows exist.
 **BF-16b was deleted rather than ticked.** The owner rejected the correction — `Shikai / Lower` has
 no Primary lift on purpose — so the finding moved to BF-15, the rule that flagged it, as a constraint:
 a live session may legitimately have no Primary, and nothing downstream may treat that as a defect.
+
+## 2026-08-30 — `docs/implementation-backlog.md` raised (three screenshots, measured against production)
+
+95 lines: BF-54, BF-55, BF-56, plus verdicts on three device checks.
+
+**The measurement is what earns the length.** The owner's console screenshot showed
+`oura_raw_samples` at 297 rows in 67 MB, which reads as pure bloat. Queried against production the
+same hour: `n_live_tup` **552**, real `count(*)` **180,415** — a 327× under-read, with `rr_intervals`
+reading 0 against 87,015 and `error_events` 1 against 6,102. The console prints that counter as a row
+count *and* uses it to justify a VACUUM FULL whose own comment says a huge size against few live rows
+means bloat. Acting on that verdict takes an ACCESS EXCLUSIVE lock and reclaims nothing. Recording
+the numbers matters because the wrong conclusion was one sentence away and looked obvious.
+
+**BF-55 is the half that survived the check**, from the size columns, which are exact: 84 MB of index
+against 63 MB of heap across the database, and 206 MB total against the 171 MB baseline of 12 days
+earlier — roughly seven times the expected trend, which CLAUDE.md says to record the same session.
+
+**BF-56 came from a screenshot that exonerated the feature.** Coach's swap card was reported as
+"only allowed for making it primary" and in fact proposed the swap correctly; one line in its
+consequence list disclosed a role promotion nobody asked for, which silently undoes the owner's
+deliberate no-Primary session. The card is not at fault — disclosing the change is how it was caught.

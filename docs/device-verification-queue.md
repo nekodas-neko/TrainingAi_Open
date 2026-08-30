@@ -166,14 +166,14 @@ me' button for weigh in's doesnt actually remove it."* Both the dismiss and conf
 `bigserial` id with a UUID regex, so every press returns 400 and the client swallows it.
 
 
-## D2. The frame packer button — Q-316 · **one word needed from the owner, 2026-08-30**
-Owner: *"There is a 'pack sealed frame (lever 5)' button but I cant click it."* The check said a
-button disabled at zero rows is the pass — but D5 in the same session read **652,417 raw rows**, so
-there is plainly something to pack.
+## ~~D2. The frame packer button~~ ✅ 2026-08-30 — correctly disabled, and it says why
+The screenshot answers it: **Pack sealed frames (Lever 5)** is greyed out with the reason printed
+beside it — *"no sealed buckets to pack"*. That is the pass, and better than the check asked for,
+since it explains itself rather than just being inert. **Q-316 is device-verified.**
 
-**The one thing needed:** is the button **greyed out**, or does it **look normal and do nothing**?
-Greyed out → its enabled condition is reading a count that disagrees with the row count. Looks normal
-→ the tap is not landing. Different bugs, and that word decides which.
+The earlier worry that 652k rows meant something was pack-able was wrong: sealed *buckets* are the
+unit, not rows, and there are none. The same screenshot instead produced **BF-54** — the table list
+beside this button reports 297 rows for a table holding 180,415.
 
 
 ## D3. Declaring a re-key — Q-317 · **declined by the owner 2026-08-30, and rightly**
@@ -220,17 +220,14 @@ ask; the debug column view was the route suggested, not the requirement. **`spo2
 
 *Note:* **"Sync now"** in Data & Sync only **pulls**. Pull-to-refresh on More is the one that pushes.
 
-## S2. A score with no value renders as "—" — Q-278 / Q-281 · **JS** · *how to find one, 2026-08-30*
-The owner asked how to reach a day with no score, which the item never said.
+## ~~S2. A score with no value renders as "—"~~ ⊘ 2026-08-30 — no such day exists to test with
+Owner, after being pointed at history: *"I cant find one without."* Every day reachable in Readiness
+and Activity carries a score.
 
-**Do not try to create one.** Use history: swipe Health → **Readiness** back through past days until
-you reach a date **before the ring was re-keyed** or a night you did not wear it — those days have no
-score by construction. The same on **Activity** for a day with no movement data.
-1. **Pass:** the value reads `—`, with **no band label** beside it.
-2. **Fail:** it reads `0`, carries the previous day's number, or shows a band word next to a dash.
-
-If every day you can reach has a score, say so — *"I cannot find a day without one"* is a useful
-answer and closes the check differently.
+**Closed as un-exercisable rather than passed**, and the distinction matters: Q-278/Q-281 assert that
+a *missing* score renders `—` with no band label, and that path has still never run on the phone.
+**If a scoreless day ever appears** — a night the ring is not worn, a gap after a re-key — check it
+then. Do not re-ask for this in the meantime.
 
 
 ## ~~S3. Cold-start time to first paint~~ ✅ 2026-08-30
@@ -271,14 +268,14 @@ measured `ai_call_log` figures.
 5. **Do not turn SpO₂ off to improve this.** You already established the binary framing was wrong;
    the entry is now about finding what *we* do differently from stock.
 
-## S6. Coach changing your programme — Q-467 · **partial 2026-08-30, screenshot pending**
-Owner asked Coach to swap **Good Mornings → Jefferson Curl** and got: *"it only allowed for making it
-primary."* A screenshot is coming. **Held open deliberately** — it is not yet clear whether Coach
-proposed the wrong change or described the right one wrongly, and the screenshot decides.
+## ~~S6. Coach changing your programme~~ ✅ 2026-08-30 — Coach passes; one line in it is a bug
+The screenshot reverses the first reading. Coach proposed **Barbell Good Morning → Barbell Jefferson
+Curl** exactly as asked, with six consequences, Cancel/Apply, and Q-403's permanence warning spelled
+out. **Q-467's device gate is met.**
 
-Worth knowing while reading it: the owner has **deliberately** built `Shikai / Lower` with no Primary
-lift (BF-16b, closed on their rejection), so a Coach defaulting to "make it primary" is working
-against a choice they made on purpose.
+The report came from one line in that list — *"Sets the role to primary (was secondary)"* — which
+nobody asked for and which silently undoes this owner's deliberate no-Primary `Lower` session. Filed
+as **BF-56**. The card is not at fault; disclosing the change is how it was caught.
 
 
 ## S7. Catalogue hydration after a fresh install — BF-16a

@@ -1031,6 +1031,99 @@ app states the measured offset against the scale for the same period; corrected 
 calorie and protein goals; and history reads corrected without the raw scale values having been
 overwritten.
 
+### [workouts] BF-56 — swapping an exercise silently changes its role, which changes the prescribed sets and percentages
+
+- **Lane:** A — the swap's write path, `lib/coach/` and the shared swap used by the in-workout path.
+- **Added:** 2026-08-30 · owner, device pass S6, from the Coach swap card's own consequence list.
+- **Needs:** BF-15 — the role rules live there, and its constraint (below) is what makes this a bug
+  rather than a preference.
+
+The owner asked Coach to swap **Barbell Good Morning → Barbell Jefferson Curl** in `Shikai / Lower`.
+The confirm card listed, among the consequences: **"Sets the role to primary (was secondary) — this
+changes the prescribed sets and percentages."**
+
+**Nobody asked for that.** A swap replaces one movement with another; the *role* is a property of the
+slot in the programme, not of the exercise going into it. The likely mechanism is that the new
+exercise carries a default role from the library and the swap adopts it instead of preserving the
+slot's — worth confirming before fixing, because if the role is genuinely stored per exercise then
+this is a data-model question rather than a swap bug.
+
+**Why it matters more for this owner than it looks.** `Shikai / Lower` has **no Primary lift on
+purpose** — BF-16b was closed on their explicit rejection of "fixing" that. So a swap that promotes
+the incoming exercise to primary does not just change prescribed percentages; it silently undoes a
+deliberate choice, on a session where the absence of a Primary is the design.
+
+- **Recommendation: the swap preserves the outgoing exercise's role**, and if a role change is ever
+  wanted it is a separate, asked-for action. Say so on the card either way — *"role unchanged
+  (secondary)"* is a line worth printing, because its absence is what made this invisible.
+- **The card itself is not the problem.** It disclosed the change honestly and in plain language,
+  which is how this was caught at all. Do not "fix" this by removing the line.
+- **Verification:** swap an exercise in a session with no Primary; the incoming exercise takes the
+  outgoing one's role, the prescribed sets and percentages are unchanged, and the session still has
+  no Primary afterwards.
+
+### [devices][platform] BF-54 — the BLE console prints planner estimates as row counts, and its bloat verdict is built on them
+
+- **Lane:** A — `lib/data/postgres/slices/oura.ts:1593` and `:1706`.
+- **Added:** 2026-08-30 · from the owner's D2/D5 screenshots, then measured against production.
+
+**The console's DB footprint reads `n_live_tup AS rows`** (`:1593`). CLAUDE.md already documents that
+counter as a planner estimate maintained by autovacuum, with `last_analyze` NULL on every table here.
+**Measured against production the same day, and the gap is not marginal:**
+
+| Table | Console / `n_live_tup` | Real `count(*)` | Under-read |
+|---|---|---|---|
+| `oura_raw_samples` | **552** (shown as 297 on the owner's screen) | **180,415** | **327×** |
+| `rr_intervals` | **0** | **87,015** | ∞ |
+| `error_events` | **1** | **6,102** | 6,102× |
+
+*(counts are `claude_ro`, so owner-scoped — they are floors, which only makes the gap worse.)*
+
+**The display is the smaller half. `:1706` uses the same counter to justify a VACUUM FULL**, and its
+own comment states the reasoning: *"A huge `before` against a handful of live rows is the signature
+of pure bloat."* Against `oura_raw_samples` that reads 67 MB against 552 rows and says *pure bloat* —
+when the table holds **180,415 real rows**. Acting on it takes an **ACCESS EXCLUSIVE lock** on a
+67 MB table, with the timeouts deliberately lifted, and reclaims nothing.
+
+- **Fix:** `count(*)` for anything presented as a row count, and for the reclaim's before/after.
+  Where an exact count is too expensive, label the number an estimate on screen — the defect is a
+  guess wearing a count's clothes.
+- **The console already has a real count on the same screen**: *"Rows still carrying decoded
+  0 / 180,160"* sits directly above a table list saying 297. One screen, two numbers, three orders of
+  magnitude apart.
+- **Sibling sweep:** grep for `n_live_tup` anywhere a number reaches a user or gates an action.
+- **Verification:** the footprint's counts match `count(*)`, and the reclaim reports a live-row figure
+  that does too.
+
+### [platform] BF-55 — 84 MB of index against 63 MB of table, and the database is growing ~7× its expected trend
+
+- **Lane:** A
+- **Added:** 2026-08-30 · measured against production while checking BF-54. **These are the size
+  columns, read from the filesystem, so they are exact** — unlike the row counts BF-54 is about.
+
+**Two readings, both from `pg_stat_user_tables` on 2026-08-30:**
+
+1. **Indexes outweigh the data.** Whole database: **84 MB of index against 63 MB of heap** — 1.33×.
+   Per table it is starker: `oura_raw_samples` 38 MB index on 30 MB heap; `oura_heartrate` **32 MB
+   index on 9 MB heap**, 3.5×. An index set larger than the data it points at is either redundant
+   indexes or bloat, and both are fixable.
+2. **Growth is off trend.** Total is **206 MB**, against the **171 MB baseline of 2026-08-18** —
+   **+35 MB in 12 days, ~2.9 MB/day**, where CLAUDE.md's post-packing expectation is **~0.4 MB/day**.
+   That is roughly seven times trend, and CLAUDE.md says anything materially above it gets recorded
+   the same session. This is that record.
+
+**What this is not.** It is **not** the 0.79 GB premise of Q-549, which was falsified on 2026-08-25
+and is unrelated. And it is not, on this evidence, dead-tuple bloat in the heap: `oura_raw_samples`
+carries 7,333 dead tuples, which is real but small against 180,415 live rows.
+
+- **First move is measurement, not a VACUUM.** List the indexes on `oura_raw_samples` and
+  `oura_heartrate` with their sizes and `idx_scan` from `pg_stat_user_indexes`; an index never
+  scanned is a candidate to drop, and dropping one is cheaper and safer than REINDEX.
+- **Cost check before anyone panics:** at Railway's $0.15/GB/month this whole database is about
+  **three cents a month**. The reason to act is that a 7× trend compounds, not that the bill hurts.
+- **Verification:** index total drops below the heap total, and a re-read a week later shows growth
+  back near trend.
+
 ### [body][devices][platform] BF-53 — every pending weigh-in button is dead: both routes validate a numeric id with a UUID regex
 
 - **Lane:** A — `app/api/scale-ble/pending/[id]/dismiss/route.ts` and `.../confirm/route.ts`, plus the
@@ -5852,16 +5945,18 @@ this fits without an extraction.
 
 ### [app-shell][workouts][platform] Q-467 — the Coach can change your programme and nothing in the app can undo it
 
-> **⚑ DEVICE PASS 2026-08-30 — partial, and it surfaced a limit rather than the bug this check was
-> looking for.** The owner asked Coach to swap **Good Mornings → Jefferson Curl** and reported: *"it
-> only allowed for making it primary."* So the swap path offered a role change instead of, or
-> alongside, the substitution the user asked for. **A screenshot is coming; do not design from this
-> sentence alone** — it is not yet clear whether Coach proposed the wrong change, or proposed the
-> right one and the confirm screen described it wrongly, and those are different bugs.
+> **⚑ DEVICE PASS 2026-08-30 — ✅ Coach PASSES this check, and the screenshot says so.** The owner
+> first reported *"it only allowed for making it primary"*; the screenshot shows the opposite. The
+> Swap Exercise card proposes **Barbell Good Morning → Barbell Jefferson Curl** exactly as asked, with
+> six consequences listed, Cancel and Apply, and the permanence warning Q-403's decision required:
+> *"Changes the Lower session itself, so it applies every Lower day from now on — not just today …
+> For a one-off change today, use the swap inside the workout instead."* **That is this entry's
+> device gate met.** The confirm screen is doing its job.
 >
-> Note the interaction with BF-15: **this owner has deliberately built a session with no Primary**,
-> so a Coach that reaches for "make it primary" as its default handling of a swap is working against
-> a choice they made on purpose.
+> **What the report actually found is one line in that list, and it is a real defect — filed as
+> BF-56.** *"Sets the role to primary (was secondary) — this changes the prescribed sets and
+> percentages."* The user asked to swap an exercise, not to promote it, and the owner read that line
+> as the whole proposal precisely because it is the surprising one.
 
 > **✅ SHIPPED 2026-08-25.** `coach-history.tsx` renders an Undo on every change that is not already
 > undone; the row re-styles struck-through when it lands, and the route's 409 window ("you've trained
