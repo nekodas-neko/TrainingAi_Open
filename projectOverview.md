@@ -27,6 +27,16 @@
 **Version:** v1.395.6 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-08-30.
 
+**A meal plan the model never needed no longer fails when the model is down (LA-38).** The generate
+route called the AI unconditionally, before it knew how many meals it had to invent — so a plan with
+every slot pinned, or filled from your saved meals, still sent the full prompt asking for *exactly
+zero* meals. Tokens were the smaller half: the catch around that call cannot tell it was
+unnecessary, so an outage 502'd a plan that required nothing from it. Reproduced on `pnpm dev` with
+no API key (pre-fix 502, post-fix 200) and fixed by deriving the two things the call supplied — the
+plan's name, from meals that are all already named, and the rest-day line, from the carb shift the
+code actually applies
+([journal](docs/overview/entries/2026-08-30-perf-generate-skip-empty-model-call.md)).
+
 **A DEXA scan has somewhere to land (BF-41 / BF-2).** `dexa_scans` + `dexa_scan_regions`
 (migration 240) and `GET`/`POST /api/dexa-scans` — BF-41's second slice, and what unblocks BF-2's
 scale calibration. Written from the owner's real Hologic printout rather than a description, keeping
