@@ -29,6 +29,17 @@
 
 **The accessibility scanner that would have passed a 12 px button (Q-282).** `@axe-core/playwright` was installed, measured and removed: WCAG 2.5.8 exempts a *spaced* undersized control, so a deliberately-shrunk **12×12** button (confirmed by `boundingBox`) came back a **pass**, and `color-contrast` cannot read this app at all — it fails to parse the `oklch` tokens (*"Could not parse color string oklab(…)"*) and **evaluated no nodes on Home**. `e2e/touch-target-size.spec.ts` ships instead: DOM geometry against **this repo's 48 dp bar**, covering the roles `globals.css`'s `button, [role="button"]` floor cannot (`<a>`, `role="tab"`, `role="radio"`). It fails on the mutation axe passed. One real finding, **LB-26**: Home's APK-banner link is 258×33 ([journal](docs/overview/entries/2026-08-30-touch-target-gate.md)).
 
+**A shared meal label now carries the meal, not a pointer to it (BF-57, engine half).** Scanning
+someone else's label said *"That saved meal no longer exists"* — the QR held a `saved_meals.id` and
+the scan resolved it against the scanner's own meals, so it was never going to be found. Making ids
+globally resolvable was rejected: a photo of a label would become read access to someone's meal, on
+an app heading for a Play Store health-data declaration. The owner's design instead puts the whole
+meal in the code, so it scans offline, for a user with no account, as a copy. **Nothing is dropped to
+fit** — the tail rolls into one remainder line carrying its macros, so a trimmed copy's totals match
+the original to the gram. **No user-visible change yet:** the label layout and the scan branch are
+Lane B's and unbuilt, and the QR needs ~30 mm of the 50 mm label before any of it prints legibly
+([journal](docs/overview/entries/2026-08-30-feat-self-contained-meal-label.md)).
+
 **Both pending weigh-in buttons were dead in production (BF-53).** `scale_raw_samples.id` is a
 `bigserial` and both routes validated it with a UUID regex, so every press of "Not me" or "Yes,
 that's me" returned `400 Invalid id` before the numeric check written for it could run — a reading

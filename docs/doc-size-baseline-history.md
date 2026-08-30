@@ -3750,3 +3750,15 @@ than naming the guard, because "a bigserial validated as a uuid" describes a lin
 finding is that a feature was dead in production. LA-39's is five lines and closes itself in the same
 breath it opens, which is the shape a same-day resolution should take here — the alternative is a
 Known-Issues row filed and struck within the hour.
+
+## 2026-08-30 — `docs/implementation-backlog.md` 13639 → 13539, `projectOverview.md` 8381 → 8392 (BF-57 engine half)
+
+The backlog **shrinks 100**. BF-57's entry was 8,244 characters of design argument — the byte
+measurements, the two encodings compared, the token design it superseded — and all of it is now
+either in the shipped module's comments or in the journal. What replaces it is 2,748 characters of
+`Keep:`, which is what Lane B still has to build.
+
+`projectOverview.md` +11. The paragraph spends its last two lines saying **no user-visible change
+yet**, and that is the point of it: "the whole meal is in the QR now" reads as a shipped feature, and
+what shipped is a module nothing calls. A status line that let the owner think labels were shareable
+would be worse than no line.
