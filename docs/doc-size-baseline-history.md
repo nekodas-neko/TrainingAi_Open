@@ -3684,3 +3684,22 @@ Removed, with a note on each explaining why not to add it back. The device is st
 done — that belongs in Verification, which all four already state. **A gate parks work; a
 verification requirement does not.** The rule was in `docs/agents/README.md` the whole time; it was
 filled in from the field name rather than from the runner.
+
+## 2026-08-30 — `docs/implementation-backlog.md` (nutrition moved to the top, and two entries un-hidden)
+
+Net small; the bulk is eleven entries relocated rather than written. The owner asked for the
+nutrition and meal-creation work at the head of both lanes so they can test and feed back while the
+rest is built around it. Queue position is priority, so they moved.
+
+Two of them were not reachable at all, and both failures were the same shape — **a field meant for a
+finished entry applied to unfinished work**:
+
+- `Gate: device` on four unbuilt entries parked the whole `nutrition-ui-uplift` batch (fixed in the
+  previous PR).
+- `- **Keep:**` on **BF-39** put the owner's most-repeated nutrition ask into the runner's KEEP list
+  under *"not new work"* — correct for an owed owner or device check, wrong for a diary rendering
+  nobody has written. Lane A shipped the engine and filed the remainder as residue; it is a whole UI
+  half. Restated as a live Lane B entry inside the batch.
+
+One mechanical note worth keeping: writing `- **Lane:** ~~A~~ **B now**` parses as *no lane* and
+lands the entry in UNCLASSIFIED. State the current lane plainly and put the history in prose.
