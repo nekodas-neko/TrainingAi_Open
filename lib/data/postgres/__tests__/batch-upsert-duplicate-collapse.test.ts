@@ -15,6 +15,31 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 const canRun = !!process.env.DATABASE_URL
 const USER = '00000000-0000-4000-8000-000000280001'
 
+/**
+ * A timestamp `n` days back, derived from the clock rather than written down.
+ *
+ * **These fixtures used to be `new Date('2026-03-02T00:00:00Z')`, and that was a time bomb with a
+ * known detonation date.** `upsertOuraHeartrate` ends with
+ * `DELETE FROM oura_heartrate WHERE timestamp < now() - interval '180 days'`, fired unawaited on the
+ * first call of the day, so it races the read below. On 2026-08-29 the fixture crossed 180 days and
+ * this file began failing on every branch including `main` — the rows were written and then pruned
+ * before the SELECT.
+ *
+ * That is the rule in `CLAUDE.md` verbatim: *a test may hardcode a timestamp only when BOTH sides of
+ * the comparison are fixed; the moment one side is the real clock, an absolute date is a time bomb.*
+ * `scale-ble-day-keying.test.ts` is the previous instance, and this is the same shape against a
+ * retention window rather than an ingest tolerance.
+ *
+ * Midday, not midnight: a boundary is where an off-by-one stops being visible (Q-356). Two days back
+ * leaves 178 days of margin, so node/Postgres clock skew cannot reach it either.
+ *
+ * The other fixtures in this file stay written down on purpose — `oura_bucket`, `sleep_sessions` and
+ * `body_metrics` are compared against nothing but themselves, which is exactly when a fixed date is
+ * allowed.
+ */
+const daysAgo = (n: number, plusSeconds = 0) =>
+  new Date(Date.now() - n * 86_400_000 - (new Date().getUTCHours() - 12) * 3_600_000 + plusSeconds * 1000)
+
 describe.skipIf(!canRun)('batch upserts collapse duplicates on the conflict target (Q-280)', () => {
   let pool: import('pg').Pool
   let db: Awaited<ReturnType<typeof import('@/lib/data/postgres/client').getDb>>
@@ -42,9 +67,22 @@ describe.skipIf(!canRun)('batch upserts collapse duplicates on the conflict targ
     await pool.query(`DELETE FROM users WHERE id = $1`, [USER])
   })
 
+  // The guard that stops this file expiring again. `daysAgo` is only safe while it stays well inside
+  // the retention horizon, and that horizon is now a constant rather than a SQL literal — so the
+  // coupling that was invisible when this broke is asserted instead of remembered. It fires on every
+  // run rather than waiting for a date, which is the whole point (the previous instance of this class
+  // took `main` red for a day before anyone noticed).
+  it('keeps its heart-rate fixtures well inside the prune horizon', async () => {
+    const { HR_RETENTION_DAYS } = await import('@/lib/data/postgres/slices/oura')
+    for (const n of [2, 3]) {
+      const ageDays = (Date.now() - daysAgo(n).getTime()) / 86_400_000
+      expect(ageDays, `a ${n}-day fixture`).toBeLessThan(HR_RETENTION_DAYS / 2)
+    }
+  })
+
   // The premise. If this ever stops throwing, every collapse below is dead weight and should go.
   it('Postgres really does reject the WHOLE batch on a repeated conflict target', async () => {
-    const at = new Date('2026-03-01T00:00:00Z')
+    const at = daysAgo(3)
     await expect(pool.query(
       `INSERT INTO oura_heartrate (user_id, timestamp, bpm) VALUES ($1,$2,60), ($1,$2,61)
        ON CONFLICT (user_id, timestamp) DO UPDATE SET bpm = excluded.bpm`,
@@ -56,8 +94,8 @@ describe.skipIf(!canRun)('batch upserts collapse duplicates on the conflict targ
   })
 
   it('upsertOuraHeartrate keeps the batch and takes the last value', async () => {
-    const at = new Date('2026-03-02T00:00:00Z')
-    const other = new Date('2026-03-02T00:00:05Z')
+    const at = daysAgo(2)
+    const other = daysAgo(2, 5)
     await oura.upsertOuraHeartrate(db, USER, [
       { timestamp: at, bpm: 60, source: 'ble' },
       { timestamp: other, bpm: 99, source: 'ble' }, // the sibling a 21000 would have taken down
