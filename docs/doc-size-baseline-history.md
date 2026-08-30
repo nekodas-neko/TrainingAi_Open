@@ -3467,7 +3467,7 @@ They are re-worded in `device-verification-queue.md` with the actual gesture, th
 induce a failure, and where the screen is.
 
 
-## 2026-08-30 — `docs/implementation-backlog.md` 13301 → 13373, `projectOverview.md` 8191 → 8226 (BF-38 / LA-36)
+## 2026-08-30 — `docs/implementation-backlog.md` 13301 → 13373, `projectOverview.md` 8189 → 8226 (BF-38 / LA-36)
 
 **Backlog, +72** (re-measured twice while `main` moved underneath; both of its own raises landed first). Most of it is BF-38 correcting itself. Two of that entry's premises were falsified
 by measurement before anything was built — the "unambiguous" barcode case cannot key on a column
