@@ -181,6 +181,11 @@ Live at the time of writing (2026-07-30):
 
 ## History
 
+- **[`docs/overview/entries/2026-08-30-apk-banner-tap-target.md`](../../overview/entries/2026-08-30-apk-banner-tap-target.md)**
+  — 🆕 **LB-26**: Home's APK-banner link was 258×33 against the 48 dp floor. **⚠ The rule to carry:
+  do not raise an undersized `<a>` by adding `a` to `globals.css`'s `button, [role="button"]` floor**
+  — the exclusion is deliberate, and a link that IS a control takes `min-h-[48px]` at its own call
+  site. `e2e/touch-target-size.spec.ts`'s allowlist is empty now, so a new one fails the spec.
 - **[`docs/overview/entries/2026-08-25-back-dismiss-sweep.md`](../../overview/entries/2026-08-25-back-dismiss-sweep.md)**
   — 🆕 **BF-27**: the Android back gesture now closes the sheet or dialog on top rather than
   navigating the page underneath away. It reached 5 of 45 sheet files and 0 of 6 dialog files

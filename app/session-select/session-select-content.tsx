@@ -1159,13 +1159,13 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
           </div>
         )}
 
-        {/* ── APK Download Banner ── */}
+        {/* ── APK Download Banner ── the body link takes the 48px tap floor locally (LB-26; globals.css says why not there) ── */}
         {!apkBannerDismissed && (
           <div className="mx-4 mb-3 rounded-2xl border border-border p-3 flex items-center gap-3" style={{ background: "color-mix(in oklab, var(--color-brand) 8%, var(--color-background))", borderColor: "color-mix(in oklch, var(--color-brand) 25%, transparent)" }}>
             <div className="w-8 h-8 rounded-xl flex items-center justify-center flex-none" style={{ background: "color-mix(in oklab, var(--color-brand) 15%, var(--color-muted))" }}>
               <Download className="h-4 w-4" style={{ color: "var(--color-brand)" }} />
             </div>
-            <a href="/api/download-apk" className="flex-1 min-w-0">
+            <a href="/api/download-apk" className="flex min-h-[48px] flex-1 min-w-0 flex-col justify-center">
               <p className="text-sm font-semibold leading-tight">Download Android App</p>
               <p className="text-[10px] text-muted-foreground">Get the latest APK</p>
             </a>

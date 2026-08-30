@@ -3824,3 +3824,16 @@ was known to be checking: the decode loop had been reading the previous style's 
 iteration and passing because all six styles encode the same meal. That belongs in the index rather
 than only in a journal entry — the next person to touch the label renderer needs to know the spec
 was not covering what its name says.
+
+---
+
+## 2026-08-30 — `projectOverview.md` +2 (LB-26, the APK banner's tap target)
+
+One Current Status paragraph plus its blank line. The defect half is small; the half that earns the
+index is the process one — a `Gate: device` applied to unbuilt work parks it from `next-item.js`, and
+it happened here to a session that had read the warning about it hours earlier. The rule moved to the
+backlog's protocol header in the same PR, which is the durable fix; this line is what makes an
+orientation read mention it at all.
+
+(Number set against the base this branch was cut from; re-derived on the merge that follows, since
+`projectOverview.md` gains a paragraph from every PR landing today.)

@@ -73,6 +73,13 @@ silently misdirecting the next session. Update them in the same PR that consumes
 > - **`Gate: owner`** / **`Gate: device`** — waiting on an owner decision, or on the S25 smoke run.
 >   Only these two values; anything else fails the check. A dependency on another entry is `Needs:`,
 >   not a gate.
+>   **⚠ `Gate: device` means SHIPPED and awaiting a device check — never "will need one when built".**
+>   A gate **parks** the entry, so putting it on unbuilt work hides that work from `next-item.js`,
+>   which is where an implementer starts. A device requirement on unbuilt work is a **Verification**
+>   line, not a gate. This is not hypothetical and it is not rare: it hid the whole
+>   `nutrition-ui-uplift` batch until BF-45 caught it (2026-08-30), and **LB-26 was filed with the
+>   same mistake later the same day, by a session that had read BF-45's warning** — which is why the
+>   rule now lives here, where entries are written, rather than only inside the entry that found it.
 >
 > - **`Batch: <slug>`** — these entries ship as **one PR**, because one verification pass covers all
 >   of them. `next-item.js` groups them and the batch takes its highest member's queue position.
@@ -9379,26 +9386,6 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 - **What is LEFT here is the UI work only, and it stays held** per the sequencing above. The audit's
   own recommendation: **trend is the missing dimension, not contributors** (contributors are
   genuinely inapplicable to a chip or a timeline row; a 7-day sparkline is not).
-
-### [app-shell] LB-26 — the APK banner's link is a 33 px tap target, and the CSS floor cannot reach it
-
-- **Lane:** B · **Branch:** `fix/apk-banner-link-height`
-- **Gate: device** — it is a visual change on Home's banner; the web harness measures the box but not
-  how it reads under a thumb.
-- **Added:** 2026-08-30 · Lane B, from Q-282's measurement pass.
-- **What it is.** On Home, the *Download Android App* banner's body link renders **258×33**, below
-  this repo's 48 dp floor. It is an `<a>`, and `app/globals.css`'s floor is `button, [role="button"]`
-  — `<a>` is excluded **on purpose**, because a 48 px floor on an inline prose link would wreck
-  paragraph layout. So nothing raises it and nothing was measuring it either.
-- **It is the only one.** Measured across all five tabs: every other undersized control is a
-  `button` carrying a documented compensating hit box (`tap-target-dot` on the three 7×7 workout
-  carousel dots, `tap-target-44` on More's 32×32 photo control).
-- **Do not fix it by widening the floor to `a`.** The exclusion is deliberate and the comment says
-  why. Either give this link `min-height: 48px` where it is a banner action, or wrap the tappable
-  area in the container-div + separate-dismiss-button pattern the session-select APK banner already
-  uses (CLAUDE.md, WebView gotchas).
-- **`e2e/touch-target-size.spec.ts` allowlists it by label**, shrink-only — removing the entry from
-  `ALLOWED` is part of the fix, and the spec then fails until the size is right.
 
 ### [platform] Q-283 — ~11 MB of indexes have never served a scan, on a DB where index bloat already caused an incident
 
