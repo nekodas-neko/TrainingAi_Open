@@ -4180,3 +4180,19 @@ journal link is unchanged.
 **Re-derive both on the merge if #647 lands first** — it removes BF-39's queue entry and repairs
 four lines of duplicated `**Version:**` debris in the same section, so the merged figures will be
 lower than these. Take them from the merged documents rather than picking a side.
+
+## 2026-08-30 — `docs/implementation-backlog.md` (BF-67 gets its answer, and a reason)
+
+The owner answered the template-vs-context question — *"more like understanding what I did… ideally
+we should try keep similar exercises so we aren't changing it up too much"* — which is recorded
+verbatim because it moves the open question from *what does reference mean* to *what counts as a
+reason to change*.
+
+The two lines that grew the file are the ones that turn a preference into a constraint.
+`personal_records` and `exercise_estimates` are both unique on `(user_id, exercise_name)`, so
+**history follows the name, not the program**: continuity is what preserves the 1RM and the PR, and a
+paraphrased name silently starts from zero. And name fidelity is not enforced — `generate-program`
+looks muscles up by exact name and falls back to the model's own guess on a miss, which is the tell.
+An LLM told to keep similar exercises is exactly the thing that paraphrases, so the entry now says
+the route has to resolve generated names against the library before this feature can deliver
+continuity rather than the look of it.

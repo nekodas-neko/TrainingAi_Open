@@ -1390,10 +1390,28 @@ owner has to re-describe in a wizard what the app already knows.
 - **Recommendation: ship structure first, summary second.** Structure alone answers "make me another
   one like that", is cheap to build (`listPrograms` already exists), and is verifiable. The history
   summary is where the design work is, and it can land on top without changing the picker.
-- **Decide what "reference" means to the model, because the two readings produce different programs.**
-  A *template* to vary ("keep the split, change the accessories") is not the same instruction as
-  *context* to learn from ("here is what worked, do better"). The prompt has to say which, and the UI
-  should probably let the user pick — the owner's sentence contains both readings.
+- **ANSWERED 2026-08-30 — it is context, with continuity as a constraint.** Asked whether the old
+  program is a template to vary or context to learn from, the owner said: *"more like understanding
+  what I did and how to build the next program - ideally we should try keep similar exercises right so
+  we aren't changing it up too much?"* So the instruction is **carry the exercises forward unless
+  there is a reason not to**, and the design question is no longer *what does reference mean* but
+  *what counts as a reason to change*. Candidates for the plan to settle: a changed goal, a changed
+  muscle focus, an exercise that was programmed and never actually trained, equipment no longer
+  available, and an active injury (BF-68).
+- **⚠ Continuity is not a preference — it is what preserves the training history, and this is the
+  finding that should drive the design.** `personal_records` is `unique on (user_id,
+  exercise_name)`, and `exercise_estimates` is keyed the same way. **History follows the NAME, not
+  the program**, so an exercise carried into a new program keeps its 1RM and its PR automatically —
+  and a *renamed* one silently starts from zero. "Bent-Over Barbell Row" and "Barbell Bent-Over
+  Row" are the same lift to the owner and two different exercises to the database.
+- **⚠ And name fidelity is not enforced today.** `generate-program` hands the model the filtered
+  library list and looks muscles up by exact name — but on a miss it falls back to
+  `?? ex.mainMuscles`, the model's own guess, which is the tell that a name outside the library
+  passes through. An LLM asked to "keep similar exercises" is precisely the thing that paraphrases,
+  so **the route needs to resolve every generated name against the library and reject or repair a
+  non-match** before this feature can deliver continuity rather than the appearance of it. Worth
+  measuring first: how many of the owner's existing `personal_records` rows have no
+  `exercise_library` match already.
 - **⚠ Bound the payload at the schema, not by hoping.** The note above `MAX_BODY_BYTES` in
   `generate-program` already records that `equipment` and `musclesToFocus` are unbounded arrays and
   the byte cap is the only thing holding them. A reference program is a much larger structure; it
@@ -1404,7 +1422,10 @@ owner has to re-describe in a wizard what the app already knows.
   read, per the write-path ownership rules.
 - **Verification:** pick a previous program in the builder, generate, and the result visibly echoes
   its split and its main lifts rather than a generic template; pick none and the output is unchanged
-  from today. A program id belonging to another user is rejected, not read.
+  from today. **Every carried-forward exercise keeps its 1RM and PR on the first session** — which is
+  the check that catches a paraphrased name, since a lift that reads correctly but shows no history
+  is exactly the failure this entry is written to prevent. A program id belonging to another user is
+  rejected, not read.
 
 ### [workouts] BF-66 — `"60 for 6"` is heard perfectly and parsed as nothing, because the letter `r` survives the strip
 
