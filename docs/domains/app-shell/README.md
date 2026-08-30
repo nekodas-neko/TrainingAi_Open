@@ -181,6 +181,13 @@ Live at the time of writing (2026-07-30):
 
 ## History
 
+- **[`docs/overview/entries/2026-08-30-sparkline-primitive-props.md`](../../overview/entries/2026-08-30-sparkline-primitive-props.md)**
+  — 🆕 **Q-154**: `components/ui/sparkline.tsx` gained the six props that were blocking three callers
+  from using it (`pad`, `valuePadding`, `strokeWidth`, `gridLines`, `emphasizeLast`, `valueLabel`),
+  all defaulted. **⚠ `valuePadding` defaults to 0.5 and that changes what a chart says** — it halves
+  the amplitude of a small spread; pass `0` for exact min/max. Projection extracted to
+  `sparkline-geometry.ts` so it is testable in node. Two callers converted;
+  `workout/active-workout-screen` stays inline deliberately and is not a to-do.
 - **[`docs/overview/entries/2026-08-25-back-dismiss-sweep.md`](../../overview/entries/2026-08-25-back-dismiss-sweep.md)**
   — 🆕 **BF-27**: the Android back gesture now closes the sheet or dialog on top rather than
   navigating the page underneath away. It reached 5 of 45 sheet files and 0 of 6 dialog files
