@@ -3762,3 +3762,17 @@ against `main` rather than trusting the conflict resolution.
 Re-deriving the move from current `main` in one pass removes the whole class: nothing is carried, so
 nothing can be stale. **The lesson for the next reorder: do it in one commit against fresh `main` and
 merge it the same minute, or expect to hand-verify every moved entry.**
+
+## 2026-08-30 — `docs/implementation-backlog.md` raised (BF-58 and BF-3, re-derived)
+
+Replaces an earlier branch for the same two entries. Same reasoning as the reorder: the branch had
+been open across several merges and its conflict region held `main`'s copies of BF-53 and BF-47,
+both of which shipped in the meantime. Re-deriving against fresh `main` and re-applying only the two
+intended changes means neither can be reverted by accident.
+
+**BF-58** is the partner's weigh-ins, settled on per-phone weight-band attribution: the scale pairing
+is device-local `localStorage`, so both phones can already pair and the problem is attribution rather
+than ownership. No cross-account path is needed, which is most of the argument. **BF-3** is dosed
+substances, promoted and classified Lane A because the owner is about to start retatrutide and dose
+lives on the definition rather than the log — so raising a dose rewrites every past entry, and the
+titration schedule is exactly what a titrating drug's record consists of.
