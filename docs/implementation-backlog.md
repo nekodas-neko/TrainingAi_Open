@@ -1672,6 +1672,8 @@ recommendations that were put to them. Do not re-open either.**
 - **Lane:** B
 - **Added:** 2026-08-25, from the owner: *"I want the design to match the mockup images — that was my
   main interest, can you make sure the design/ui is made to match the mockup."*
+- **Reference:** the per-screen parity entries read this one for the map, the rules and the things
+  the drawings get wrong. There is nothing here to start.
 - **⚑ Not implementable on its own.** This is the entry the per-screen parity entries read, the same
   way Q-395 and BF-11 work. It holds the map, the rules and the things the drawings get wrong, so six
   entries do not each re-derive them.
@@ -2398,6 +2400,7 @@ tell is a locator that never resolves rather than a wrong value.
 - **Gate:** device — **all eight phases have shipped** (BF-11h merged 2026-08-27, v1.389.0). The only
   thing still owed is the S25 walk this entry defines below, so it is gated rather than READY: it
   printed at the top of the Lane B queue with nothing an implementer could do.
+- **Reference:** the spec its eight phases read. The work is in BF-11a…BF-11h, not here.
 - **Not a work item.** Split into eight phases 2026-08-24 (BF-11a…BF-11h below), the way Q-395 was.
   This entry is the spec pointer and the closing checkpoint: strike it when every phase has shipped
   *and* the whole flow has been walked once on the S25 — creating a meal from a recipe URL, from a
@@ -2724,35 +2727,6 @@ signed off by the owner in that conversation. Review:
   issue on red, so it is loud without being blocking.
 - *Lane B filed the identical finding the same day (as LB-14) after **OR-1** and **BF-23** were also
   filed independently for the same red; folded here rather than kept as a fourth duplicate.*
-
-### [platform] LB-22 — an entry that declares itself unimplementable still prints first in the queue
-
-- **Lane:** ? — `scripts/next-item.js` is the implementers' shared tool and serves both lanes, so
-  this is arguably the Orchestrator's the way LB-12's sweep is. **Decide before starting.** Lane B
-  filed it after gating two other entries and finding the third could not be gated honestly.
-- **Branch:** _unassigned_
-- **Added:** 2026-08-27 · Lane B, from a queue read where the top three READY rows were all
-  unstartable for three different reasons.
-- **What happened.** Working the Lane B queue top-down on 2026-08-27, positions 1–3 were BF-28,
-  Q-395 and BF-11. **None could be started**, and only two could be fixed:
-  - **BF-11** — every phase shipped; only the S25 walk it defines was left. Gated `device`. ✅
-  - **Q-395** — its own text says *"⚠ Wait for the LB-16/BF-37 device pass before confirming
-    parity"*, while printing as READY #2. Gated `device`. ✅
-  - **BF-28** — *"⚑ Not implementable on its own. This is the entry the per-screen parity entries
-    read"*. **This one cannot be gated honestly**: `Gate:` takes only `owner` or `device`, and it is
-    waiting on neither. It is a reference document that lives in the queue on purpose.
-- **So the gap is a missing category, not a mis-tagged entry.** Two entries carry a self-declared
-  marker today — `⚑ Not implementable on its own` (BF-28:1041) and `Not a work item` (BF-11:1673) —
-  and `next-item.js` has no notion of either, so it prints them under a header that says *"top of
-  the list is next"*.
-- **The cheap fix, if the lane call lands here:** a `REFERENCE` section beside READY/PARKED/KEEP,
-  selected on those markers, so the map entries stay findable without heading the work list. That is
-  a few lines. **The part that needs deciding first is whether the marker should be a FIELD** — the
-  protocol's argument against prose-detection is exactly why `Lane:`, `Needs:` and `Gate:` are
-  fields that `check-backlog-pointers.js` validates, and a grep for two English phrases is the thing
-  those replaced.
-- **Not LB-12.** That entry is about *lane* tagging and its remaining half is the Orchestrator's
-  sweep. This is a different category and neither blocks the other.
 
 ### [platform] LB-12 — 77 of 193 queue entries state no lane, so both implementers are served each other's work
 

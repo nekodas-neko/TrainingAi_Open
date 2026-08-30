@@ -25,6 +25,7 @@ const path = require('path');
 
 const { laneFromLines } = require('./lib/lane');
 const { keepFromLines } = require('./lib/keep');
+const { referenceFromLines } = require('./lib/reference');
 const { idPattern } = require('./lib/entry-id');
 
 const ROOT = path.resolve(__dirname, '..');
@@ -99,6 +100,7 @@ for (const line of lines.slice(queueStart)) {
 for (const e of entries) {
   e.lane = laneFromLines(e.laneLines);
   e.keep = keepFromLines(e.laneLines);
+  e.reference = referenceFromLines(e.laneLines);
 }
 
 const inQueue = new Set(entries.map((e) => e.id));
@@ -117,6 +119,7 @@ const ready = [];
 const keeps = [];
 const parked = [];
 const unclassified = [];
+const references = [];
 
 for (const e of entries) {
   if (!wantLane(e)) continue;
@@ -133,9 +136,15 @@ for (const e of entries) {
   // A Keep's own `Gate:` blocks as hard as a top-level one — the residue IS the gate there.
   if (e.keep?.gate && !e.gates.includes(e.keep.gate)) reasons.push(`Gate: ${e.keep.gate}`);
 
+  // Order matters, and this is the one judgement in the file. A `Gate:`, an unmet `Needs:` or a
+  // `Keep:` all say something is OWED; `Reference:` only says there is nothing to BUILD. So a
+  // reference entry that also owes a device walk stays visible as the thing it owes — BF-11 is
+  // exactly that, a map whose eight phases shipped and whose S25 walk did not. Reference is checked
+  // last so it can never hide an obligation.
   if (reasons.length) parked.push({ e, reasons });
   else if (e.lane === '?') unclassified.push(e);
   else if (e.keep) keeps.push(e);
+  else if (e.reference) references.push(e);
   else ready.push(e);
 }
 
@@ -188,6 +197,11 @@ if (ready.length > shown) console.log(`      … and ${ready.length - shown} mor
 if (keeps.length) {
   console.log(`\nKEEP (${keeps.length}) — shipped; only the stated residue is owed. Not new work.`);
   keeps.forEach((e) => console.log(`      ${fmt(e)}\n        Keep: ${e.keep.text.slice(0, 110)}`));
+}
+
+if (references.length) {
+  console.log(`\nREFERENCE (${references.length}) — read by other entries, not implemented. Never "next".`);
+  references.forEach((e) => console.log(`      ${fmt(e)}\n        ${e.reference.slice(0, 110)}`));
 }
 
 if (unclassified.length) {
