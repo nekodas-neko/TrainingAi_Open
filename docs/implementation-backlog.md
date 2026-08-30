@@ -1031,6 +1031,166 @@ app states the measured offset against the scale for the same period; corrected 
 calorie and protein goals; and history reads corrected without the raw scale values having been
 overwritten.
 
+### [nutrition] BF-47 — the deleted food comes back: the loader calls the server authoritative while the delete is still in the outbox
+
+- **Lane:** A — `app/nutrition/use-food-logs-loader.ts`.
+- **Added:** 2026-08-30 · owner, device pass N1: *"Delete worked; when I click delete the item
+  vanishes then re-appears; then when you swap screens - it dissapears."*
+- **This is CLAUDE.md's own rule being broken**, the one written after the mood-checkin re-prompt and
+  the rest-day revert: *after an optimistic local write, never apply or cache a server response that
+  would replace it.*
+
+**Traced, and the sequence matches the report exactly.** `deleteLog` in `nutrition-content.tsx:405`
+removes the row optimistically, deletes it locally, queues the mutation, then calls
+`refreshAffected()` → `loadFoodLogs(today)`. That loader renders the local copy first (row gone —
+the flicker the owner sees) and then does this, unconditionally:
+
+```ts
+// The server copy is authoritative and MUST render whenever we're online
+const res = await fetch(`/api/nutrition/food-logs?date=${today}`)
+```
+
+**The server still has the row**, because the delete has only been *queued*; `pushMutations` has not
+run yet. So the authoritative render puts it back. When the push later lands, the next load returns
+a server copy without it — which is why swapping screens makes it disappear "for real".
+
+- **⚠ Do not fix this by inverting the authority.** That line's comment records the bug it exists to
+  prevent: a local read that threw left the page blank, so logged food *"vanished on reload"* even
+  though the server had it. Both failures are real and a naive swap trades one for the other.
+- **Fix direction:** the loader needs to know a delete is in flight and not resurrect it — filter the
+  server response against pending outbox mutations for the domain, which is information the local
+  store already holds, rather than choosing a winner globally. Equivalent to the `sync_status ===
+  'synced'` gate `applyDelta` already applies for pulls; this read path has no such gate.
+- **Sibling sweep required.** Any local-first domain whose loader re-fetches a server aggregate right
+  after an optimistic write has this shape. Check the mood, body-metric and activity delete paths in
+  the same PR rather than fixing food alone.
+- **Verification:** offline and online, delete a logged food — it goes and stays gone, with no
+  reappearance, and a force-close does not bring it back.
+
+### [nutrition] BF-48 — "Single foods" searches only what you have logged, so the food database is unreachable from Log Food
+
+- **Lane:** A for the search wiring, B for the row.
+- **Added:** 2026-08-30 · owner, device pass N7: *"When I try add a food via the 'single food'
+  section; it only searches saved/history food - its not checking the food data base. So its not
+  useful."*
+
+**Confirmed in source.** `components/nutrition/food-list.tsx` filters an in-memory list and its own
+placeholder says so — `Search your foods`. Its empty state reads *"Single foods land here once you
+have logged them."* There is **no food-database call on this screen at all.** The database search
+exists (`app/api/nutrition/food-search/route.ts`, used by
+`components/nutrition/ingredient-search.tsx`) but is reachable **only from inside the meal builder's
+ingredient picker** — so a user wanting to log one new food must go through building a meal.
+
+**This also explains why N7's own check could not be run.** Q-406's macro-mismatch warning renders on
+food-database rows, and the owner could not reach one from Log Food. That check stays owed and should
+be re-run once this lands, from the screen it is actually reached on.
+
+- **Fix direction:** `Single foods` searches your logged foods **and** the database, with database
+  results clearly marked as not-yet-yours. Reuse `ingredient-search.tsx`'s call and its mismatch
+  warning rather than writing a second search — two implementations of one search is the duplication
+  this repo has repeatedly paid for.
+- **Verification:** search a branded product never logged before, from Log Food → Single foods; it is
+  found, it carries the mismatch line where macros and calories disagree, and tapping it goes to the
+  portion step.
+
+### [nutrition][app-shell] BF-49 — back from a timeline row lands on Health, not where you started
+
+- **Lane:** B
+- **Added:** 2026-08-30 · owner, device pass A2: *"tapping workout; then back -> leads to heath
+  training not home. Same with tapping a food item from timeline -> takes to nutrtion -> then health
+  when press back."*
+
+Home → timeline → tap a row → the detail screen. Pressing back lands on **Health**, not Home. Two
+routes reproduce it (a workout row and a food row), so it is the timeline's navigation rather than
+one destination's. The row's target (`/health/day`) is under the Health tab, so the likely cause is
+back resolving to the tab that owns the destination instead of unwinding to the origin.
+
+- **What a pass looks like:** open a row from Home, press back, arrive at **Home** with the timeline
+  where it was. Repeat from Health's own timeline and arrive at Health. The origin decides, not the
+  destination's tab.
+- **Note:** N2 passed on this same pass — the nested-sheet back stack is correct — so this is
+  specific to cross-tab navigation, not the general back handling BF-27 fixed.
+
+### [nutrition] BF-50 — the Log Food screen after its first device pass: four things, one screen
+
+- **Lane:** B
+- **Batch:** `nutrition-ui-uplift` — same screen family as BF-45/BF-46, one device pass.
+- **Gate: device**
+- **Added:** 2026-08-30 · owner, device pass N4. **The rebuild itself passed** — no tile grid, the
+  three tabs read at 412 dp, Meals holds only meals, Photo and Barcode take the full screen. These
+  are the four things they asked for on top.
+
+1. **The capture row is too small.** *"The icon/sections for Photo/Barcode/Describe or enter should
+   be bigger."* Three buttons across 412 dp; give them the height and target the artboard implies.
+2. **`Describe or enter` wastes its space.** *"There is a lot of free room; so this UI section could
+   be expanded and made bigger."* The pane fills a sheet and uses a fraction of it.
+3. **The camera takes a step it does not need.** *"The photo option first opens the screen for /From
+   photos/Take pictures - could we make it auto open the camera then have the 'from photos' button
+   within the camera? usually its just take picture."* That chooser is `CameraSource.Prompt` in the
+   Capacitor call; `CameraSource.Camera` opens the camera directly. **Keep a gallery route** — put it
+   in the camera UI, do not delete it.
+4. **`Select` on the Meals tab can only delete.** *"There is a 'select' button that lets you select
+   more than one meal; but then you cant do anything with it except delete."* Either give multi-select
+   a second action worth having (log several meals at once is the obvious one) or say plainly that it
+   is a delete mode and label it so.
+
+- **Verification:** on the S25 — every capture button clears 48 dp comfortably; the describe pane
+  fills the sheet; Photo opens straight into the camera with a reachable gallery control; multi-select
+  offers what its label promises.
+
+### [nutrition] BF-51 — the meal builder after its first device pass: back exits the tab, and the photo control the user reaches is not the one that works
+
+- **Lane:** B
+- **Batch:** `nutrition-ui-uplift`
+- **Gate: device**
+- **Added:** 2026-08-30 · owner, device pass N5.
+
+1. **Back from Edit exits to the Nutrition tab.** *"clicking edit meal then pressing back - takes you
+   all the way to the nutrition tab; rather than back to the saved meal."* One press should return to
+   the meal's own screen. Same family as BF-49 but a different surface, and N2 passed, so the nested
+   back stack is right where it is wired — this path is not.
+2. **The two photo controls, confirmed from the phone.** *"There is a photo add button at the bottom
+   of this page; but its also one screen back when you click the meal; and click the add a photo
+   button at the top; it should be able to be set from there."* This is **BF-46 ①** seen from the
+   device, and it settles the fix: the top one is the control users reach, so **that** is the one that
+   must pick a photo, not navigate. See BF-46 for the save failure, which is separate and still
+   unexplained.
+3. **`Recently used` sits in the middle of the ingredient list.** *"this should probably be a tab like
+   the other place"* — matching Log Food's `Recent · Meals · Single foods`, which is the pattern the
+   user now expects from the sibling screen.
+4. **Cramped gutters** — *"The screen is a little cramped with safe spaces"*, confirming BF-45 ③'s
+   bottom-sheet inset from the device.
+
+- **The owner asked to stop here:** *"Lets get this into the right section and UI before we deep dive
+  this more."* So N5's recipe-import checks (yield, multi-dish, duplicate handling) are **not
+  answered** and stay owed — do not read this entry as clearing them.
+
+### [nutrition] BF-52 — one AI meal builder: type it, photograph it, or paste a URL, from a single entry point
+
+- **Lane:** B for the surface; the routes exist.
+- **Added:** 2026-08-30 · owner, device pass N5: *"I dont see a URL option or does it just go into
+  the add ingredients? Id rather it just be an 'AI Meal builder' option; similar to the food logging
+  where you can write/type to it - or upload a photo; or upload a URL link etc."*
+- **Planning item** — this is a surface design, not a defect. It needs a planning session before
+  implementation.
+
+**Every input already works; none of them is findable.** Recipe-URL import is implemented and lives
+inside the ingredient *search* field (`ingredient-picker.tsx` → `importRecipe`), which is why the
+owner could not find a URL option — it is not presented as one. The photo path shipped as BF-40.
+Free-text description is the scan route's text branch.
+
+**So the ask is an entry point, not an engine.** Mirror Log Food's own capture row — the user has just
+learned `Photo · Barcode · Describe or enter` one screen away, and a meal builder offering
+`Photo · URL · Describe` reads as the same idea rather than a new one. **Recommendation: do not build
+new extraction**; route all three at the existing `/api/nutrition/scan` shapes and let the builder
+render what comes back.
+
+- **Carry BF-40's earned constraint:** a recipe page that states no yield hands up `recipeYield: null`
+  rather than defaulting to 1 — the banana-bread four-fold error. Any new entry point must preserve
+  that, and the amber "set how many portions" line with it.
+- **Verification:** each of the three inputs reaches the builder with the same populated ingredient
+  list it produces today, and the yield behaviour is unchanged.
+
 ### [nutrition] BF-45 — the Nutrition day screen: an empty grid slot, macros that vanish when you collapse, and gutters the artboards did not ask for
 
 - **Lane:** B
@@ -1056,6 +1216,12 @@ calorie break down."* In `components/nutrition/meal-card.tsx` the P/C/F footer l
 number. Collapsing exists precisely to skip the rows and keep the summary, and today it drops half of
 it. Put the macro trio in the header (compact, collapsed-only, or always), sized so a long meal-type
 name still truncates rather than pushing it off.
+
+**Confirmed on the device, 2026-08-30, and the ask is wider than this entry had it.** Owner, N6:
+*"when the food list is minimized; it should still show the total calories and total macros below
+it."* So **both** numbers, and **below** the header rather than inside it — the collapsed card keeps
+its own summary line rather than the header growing a macro trio. Build that shape; it is the owner
+looking at the real screen, and it beats the header reading above.
 
 **③ Side gutters — and the owner scoped this on 2026-08-27, which makes it a different job.**
 Asked which screens, they answered: *"Mostly when an interactive tab opens from the bottom like;
@@ -1113,6 +1279,12 @@ toast that a user mid-flow can miss, and the save then proceeds with no photo; `
 is a render bug and not a write bug, and that single check splits the two.
 
 ⚠ **Do not ship (a) and call the report closed.** Moving the control does not make a photo save.
+
+**Device pass, 2026-08-30 — the failure is confirmed and its shape is narrower than feared.** Owner,
+N4: *"Meal photo tile shows; but its always the default cant add a custom picture"*, and N5: the top
+control *"should be able to be set from there"*. So the tile renders (no compositor problem with
+data URIs in a list) and the placeholder is what persists. **BF-51 ② carries the same finding from the
+builder side** — read them together; they are one bug seen from two screens.
 
 **② A serving inside a serving.** Owner: *"I see there are serving size of each ingredient within the
 meal; so a serving size in a serving size is probably excessive; we should keep it weight/portion."*
@@ -2193,6 +2365,19 @@ CI provisions a fresh database every run, so it is invisible exactly where it wo
 tell is a locator that never resolves rather than a wrong value.
 
 ### [nutrition] LB-18 — `Recent` on Log Food is scoped to a meal bucket; it may want to be global
+
+> **✅ ANSWERED BY THE OWNER ON THE DEVICE, 2026-08-30 — make it global.** *"Recent doesnt need to be
+> scoped to current meal bracket; I think it should just be all recently entered foods/meals."* The
+> "it may want to be" in this entry's own title is now settled: **all recently entered foods and
+> meals, regardless of which meal bucket they were logged to.** The gate is cleared; this is a build
+> item.
+>
+> Two things to keep while doing it. `Recent` mixes **foods and meals**, so ordering is across both —
+> most recently logged first, not foods-then-meals. And a saved meal has **no last-used timestamp**
+> (recorded as a constraint in Q-395c's journal, and it is why `My Foods` can only order by
+> `createdAt DESC`), so a genuinely-recent ordering across both kinds needs that timestamp to exist —
+> **which is a Lane A schema change, not a Lane B sort.** Say so in the plan rather than discovering
+> it mid-PR.
 
 - **Lane:** A (the source), B (the swap)
 - **Added:** 2026-08-26, from LB-16. **Not a defect** — it is the only thing the data supports today,
