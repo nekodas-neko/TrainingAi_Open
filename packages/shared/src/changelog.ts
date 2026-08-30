@@ -14,6 +14,14 @@ export const CHANGELOG: ChangelogEntry[] = [
     ],
   },
   {
+    version: "1.400.0",
+    date: "2026-08-30",
+    changes: [
+      "Adding a photo to a meal works on the phone again. Choosing a picture did nothing at all \u2014 the app was blocking its own image data on the way from the camera, and the failure was being treated as if you had cancelled the picker, so there was never even an error to report.",
+      "And if a photo does fail now, it says so instead of quietly doing nothing.",
+    ],
+  },
+  {
     version: "1.399.0",
     date: "2026-08-30",
     changes: [

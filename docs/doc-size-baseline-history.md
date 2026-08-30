@@ -3885,7 +3885,17 @@ ratchet is only worth having if it sits on the file. The fourth is BF-45 ⑤'s o
 landing on `main` under the old slack, which is what tightening converts from invisible into a
 number someone has to write down. That is the trade, and it is the right one.)
 
-## 2026-08-30 — `projectOverview.md` 8413 → **8424** (BF-46 ② ③, the quantity editor's Option A)
+## 2026-08-30 — `projectOverview.md` 8413 → **8425** (BF-46 ①b, the meal photo's CSP block)
+
+Twelve lines for a paragraph that is mostly one transferable fact: **a `fetch()` of a `data:` URL is
+a `connect-src` request**, and this app's CSP does not allow one. That is not a nutrition detail —
+it is a rule any surface handling an image from a plugin can break, on the native branch only, where
+nothing in this repo runs. It cost three owner reports and a held rebuild before anyone read the CSP.
+
+The rest of the story is in the journal entry and in `docs/module-map.md`'s row, which is where an
+implementer reaching for `fetch(dataUrl)` would actually be looking.
+
+## 2026-08-30 — `projectOverview.md` 8425 → **8437** (BF-46 ② ③, the quantity editor's Option A)
 
 Eleven lines, and the half that earns them is the **departure**: the chosen drawing puts the unit
 toggle at the stepper's height, and this app's 48 dp floor makes a stacked two-option toggle 96 px,
@@ -3895,3 +3905,5 @@ only the shipped code will see a disagreement and "fix" it back — including by
 
 The rest — what was built, what the e2e asserts, why the geometry rather than the text — is in the
 journal entry.
+
+(Re-derived on the rebase: this branch was cut at 8413 and BF-46 ①b's paragraph landed under it.)

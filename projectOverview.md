@@ -25,6 +25,19 @@
 ## 🔖 Current Status
 
 **Version:** v1.401.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Version:** v1.401.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Last updated:** 2026-08-30.
+
+**The meal photo was blocked by the app's own CSP, on the branch no test runs (BF-46 ①b).** Three
+owner reports, recorded as a save failure that *"does not reproduce in source"*. `MealPhotoTile`'s
+**native** branch did `await fetch(photo.dataUrl)` — and **a `fetch()` of a `data:` URL is governed
+by `connect-src`**, which this CSP does not open to `data:`. It rejected into a `catch {}` written
+for picker cancellations, so choosing a photo on the phone did nothing and said nothing. The web
+branch takes a `File` from an `<input>` and never fetches, which is why every browser test passed.
+Now `Base64` + `dataUrlToBlob`, and non-cancellations toast. **Verifiable only on the S25**
+([journal](docs/overview/entries/2026-08-30-meal-photo-data-url-fetch.md)).
+
+**Version:** v1.398.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-08-30.
 
 **The quantity editor is the owner's Option A, and an ingredient stopped claiming servings (BF-46
