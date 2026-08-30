@@ -61,6 +61,20 @@ export const MealCard = memo(function MealCard({ mealType, logs, onAdd, onQuickE
           </div>
         </CollapsibleTrigger>
 
+      {/* BF-45 ②, as the owner corrected it on the device (N6): *"when the food list is minimized;
+          it should still show the total calories and total macros below it"* — both numbers, and
+          BELOW the header rather than crammed into it. Collapsing exists to skip the rows and keep
+          the summary, and the totals footer lives inside `CollapsibleContent`, so it left with
+          them and the header kept only a calorie number.
+
+          Shown from ONE log, unlike the expanded footer's two: with the card open a single row
+          already states its own macros, so a footer would repeat it — collapsed, nothing does. */}
+      {!expanded && logs.length > 0 && (
+        <div className="overflow-hidden rounded-2xl border border-border bg-muted/60">
+          <MealTotals totals={totals} />
+        </div>
+      )}
+
       <CollapsibleContent>
         <div className="overflow-hidden rounded-2xl border border-border bg-muted/60">
           {logs.length === 0 ? (
@@ -101,16 +115,7 @@ export const MealCard = memo(function MealCard({ mealType, logs, onAdd, onQuickE
               </AnimatePresence>
 
               {/* Totals footer — only shown when there are 2+ items */}
-              {logs.length > 1 && (
-                <div className="flex items-center justify-between border-t border-border/20 bg-muted/20 px-4 py-3">
-                  <div className="flex items-center gap-3">
-                    <span className="text-xs font-semibold" style={{ color: MACRO_COLORS.protein }}>P {Math.round(totals.proteinG)}g</span>
-                    <span className="text-xs font-semibold" style={{ color: MACRO_COLORS.carbs }}>C {Math.round(totals.carbsG)}g</span>
-                    <span className="text-xs font-semibold" style={{ color: MACRO_COLORS.fat }}>F {Math.round(totals.fatG)}g</span>
-                  </div>
-                  <span className="text-sm font-bold tabular-nums">{Math.round(totals.calories)} kcal</span>
-                </div>
-              )}
+              {logs.length > 1 && <MealTotals totals={totals} bordered />}
             </>
           )}
         </div>
@@ -140,3 +145,26 @@ const DiaryRow = memo(function DiaryRow(
   // the list reading as ragged once any row does have a photo.
   return <FoodRow name={name} secondary={secondary} calories={calories} showChevron showThumb thumbSrc={null} onPress={press} />
 })
+
+/**
+ * A meal's totals — the same line whether the card is open or collapsed (BF-45 ②).
+ *
+ * One component rather than two copies, because the collapsed summary and the expanded footer say
+ * exactly the same thing and drifting them is how a screen ends up reporting two different numbers
+ * for one meal. `bordered` is the only difference: inside the card the line needs a rule above it,
+ * and standing alone it does not.
+ */
+function MealTotals(
+  { totals, bordered }: { totals: { calories: number; proteinG: number; carbsG: number; fatG: number }; bordered?: boolean },
+) {
+  return (
+    <div className={`flex items-center justify-between bg-muted/20 px-4 py-3 ${bordered ? 'border-t border-border/20' : ''}`}>
+      <div className="flex items-center gap-3">
+        <span className="text-xs font-semibold" style={{ color: MACRO_COLORS.protein }}>P {Math.round(totals.proteinG)}g</span>
+        <span className="text-xs font-semibold" style={{ color: MACRO_COLORS.carbs }}>C {Math.round(totals.carbsG)}g</span>
+        <span className="text-xs font-semibold" style={{ color: MACRO_COLORS.fat }}>F {Math.round(totals.fatG)}g</span>
+      </div>
+      <span className="text-sm font-bold tabular-nums">{Math.round(totals.calories)} kcal</span>
+    </div>
+  )
+}

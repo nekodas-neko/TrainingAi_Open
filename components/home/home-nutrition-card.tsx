@@ -93,7 +93,7 @@ export function HomeNutritionCard({
           />
           <div className="absolute inset-0 rounded-full" style={{
             background: eatenPct > 0
-              ? `conic-gradient(from -90deg, ${ringColor} ${eatenPct * 3.6}deg, transparent ${eatenPct * 3.6}deg)`
+              ? `conic-gradient(${ringColor} ${eatenPct * 3.6}deg, transparent ${eatenPct * 3.6}deg)`
               : 'transparent',
             WebkitMask: ringMask,
             mask: ringMask,

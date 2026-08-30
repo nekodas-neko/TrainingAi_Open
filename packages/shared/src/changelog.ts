@@ -6,6 +6,18 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.397.0",
+    date: "2026-08-30",
+    changes: [
+      "The macro ring on Nutrition and on Home started filling from the nine o'clock position instead of the top. Both start at twelve now.",
+      "Collapsing a meal on the Nutrition day no longer hides its protein, carbs and fat \u2014 a collapsed meal keeps a summary line with its calories and macros, which is the point of collapsing it.",
+      "\u201cMy Meals\u201d now spans the full width, instead of sitting beside an empty gap.",
+      "The sheets that slide up from the bottom \u2014 logging food, editing a meal, choosing a portion \u2014 had their contents pressed almost against the edges of the screen. They now have the same margin as the rest of the app.",
+      "On the Log Food screen: the Photo, Barcode and Describe buttons are bigger, the \u201cDescribe or enter\u201d panel fills the space it is given rather than a corner of it, and Photo opens the camera straight away instead of asking first \u2014 choosing an existing picture is still there, just below.",
+      "The \u201cSelect\u201d button on your meals is now called \u201cDelete meals\u201d, because deleting is the only thing it has ever done.",
+    ],
+  },
+  {
     version: "1.396.0",
     date: "2026-08-30",
     changes: [

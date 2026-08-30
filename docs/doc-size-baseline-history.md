@@ -3795,3 +3795,22 @@ either in the shipped module's comments or in the journal. What replaces it is 2
 yet**, and that is the point of it: "the whole meal is in the QR now" reads as a shipped feature, and
 what shipped is a module nothing calls. A status line that let the owner think labels were shareable
 would be worse than no line.
+
+---
+
+## 2026-08-30 — `projectOverview.md` 8392 → 8394 (nutrition UI uplift: BF-45 / BF-50 / BF-51)
+
+One Current Status paragraph for a batch of eight shipped fixes across two device passes, plus its
+blank line. Two lines for eight items is proportionate, and a status paragraph is what this section
+is for.
+
+**A trim was looked for first and the obvious candidate was wrong.** Two ✅ Q-479 entries sit in the
+Known Issues section with near-identical headings, ~37 lines each, and they read as a merge that kept
+both sides. They are not: the second says outright that it is *Review's original finding* and that
+the Lane A row higher up carries what shipped. Body similarity is 0.09. Deleting either would have
+destroyed a deliberate pairing to save two lines — recorded here so the next session tempted by the
+same easy win does not take it.
+
+(The earlier raise this session was avoided rather than taken: BF-48's paragraph was paid for by
+cutting two lines of meta-narration from the section's closing note, which was explaining why 157
+status notes were archived on 2026-08-17 — the archive's business, not the index's.)

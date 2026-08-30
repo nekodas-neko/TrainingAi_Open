@@ -81,8 +81,12 @@ export const EnergyCard = memo(function EnergyCard({
   const carbsEnd = proteinEnd + shares.carbs * sweep
   // Degrees accumulate rather than each segment being placed independently, so rounding cannot open
   // a hairline gap between two colours.
+  // No `from` clause: CSS `conic-gradient` already starts at 12 o'clock (0deg is the top).
+  // The `from -90deg` this used to carry is the SVG/canvas idiom, where 0° is at 3 o'clock and
+  // you subtract 90° to reach the top — carried into CSS it rotated the ring a quarter turn
+  // counter-clockwise, so it started at 9 o'clock (BF-45 ④). Home's ring had it too.
   const arc = sweep > 0 && shares.protein + shares.carbs + shares.fat > 0
-    ? `conic-gradient(from -90deg,`
+    ? `conic-gradient(`
       + ` ${MACRO_COLORS.protein} 0deg ${proteinEnd}deg,`
       + ` ${MACRO_COLORS.carbs} ${proteinEnd}deg ${carbsEnd}deg,`
       + ` ${MACRO_COLORS.fat} ${carbsEnd}deg ${sweep}deg,`
@@ -90,7 +94,7 @@ export const EnergyCard = memo(function EnergyCard({
     // Calories logged but no macros: the goal-progress arc is still true, so it draws in brand
     // rather than vanishing.
     : sweep > 0
-      ? `conic-gradient(from -90deg, var(--brand) ${sweep}deg, transparent ${sweep}deg)`
+      ? `conic-gradient(var(--brand) ${sweep}deg, transparent ${sweep}deg)`
       : 'transparent'
 
   return (

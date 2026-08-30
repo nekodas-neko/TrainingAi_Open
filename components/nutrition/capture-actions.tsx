@@ -39,6 +39,7 @@ interface Props {
  */
 export function CaptureActions({ onScanResult, onManual, onScannedSavedMeal, children }: Props) {
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const galleryInputRef = useRef<HTMLInputElement>(null)
   const [describeText, setDescribeText] = useState('')
   const [showDescribe, setShowDescribe] = useState(false)
   const [showBarcode, setShowBarcode] = useState(false)
@@ -89,6 +90,18 @@ export function CaptureActions({ onScanResult, onManual, onScannedSavedMeal, chi
     }
   }
 
+  /**
+   * Taking a photo (BF-50 ③).
+   *
+   * `CameraSource.Camera`, not `Prompt`. Owner: *"the photo option first opens the screen for /From
+   * photos/Take pictures - could we make it auto open the camera then have the 'from photos' button
+   * within the camera? usually its just take picture."* `Prompt` is the chooser they are describing,
+   * and it stood between the tile and the camera on every single use.
+   *
+   * **The gallery is kept, as its own control, because it cannot go where they pictured it.** The
+   * camera that opens is Android's, and nothing here can add a button to it — so "from photos"
+   * became `pickFromGallery` below rather than being dropped, which the entry asked for explicitly.
+   */
   async function handleCapturePhoto() {
     const { Capacitor } = await import('@capacitor/core')
     if (!Capacitor.isNativePlatform()) {
@@ -99,7 +112,7 @@ export function CaptureActions({ onScanResult, onManual, onScannedSavedMeal, chi
       const { Camera, CameraResultType, CameraSource } = await import('@capacitor/camera')
       const photo = await Camera.getPhoto({
         resultType: CameraResultType.Base64,
-        source: CameraSource.Prompt,
+        source: CameraSource.Camera,
         quality: 80,
         // `width`/`height`, NOT `targetWidth`/`targetHeight` — those belong to the sibling
         // `takePhoto(TakePhotoOptions)`. Both pairs are optional, so the wrong one type-checks and is
@@ -117,6 +130,34 @@ export function CaptureActions({ onScanResult, onManual, onScannedSavedMeal, chi
       setPhotoNote('')
     } catch {
       // User cancelled the camera/gallery picker
+    }
+  }
+
+  /** The other half of BF-50 ③: the gallery, now reached deliberately rather than through a
+   *  chooser nobody wanted on the common path. Web uses a second input without `capture`, since
+   *  `capture="environment"` on the shared one is what forces the camera there. */
+  async function pickFromGallery() {
+    const { Capacitor } = await import('@capacitor/core')
+    if (!Capacitor.isNativePlatform()) {
+      galleryInputRef.current?.click()
+      return
+    }
+    try {
+      const { Camera, CameraResultType, CameraSource } = await import('@capacitor/camera')
+      const photo = await Camera.getPhoto({
+        resultType: CameraResultType.Base64,
+        source: CameraSource.Photos,
+        quality: 80,
+        width: SCAN_IMAGE_MAX_DIM,
+        height: SCAN_IMAGE_MAX_DIM,
+      })
+      if (!photo.base64String) return
+      const mimeType = `image/${photo.format}`
+      setError(null)
+      setPendingPhoto({ base64: photo.base64String, mimeType, previewUrl: `data:${mimeType};base64,${photo.base64String}` })
+      setPhotoNote('')
+    } catch {
+      // User cancelled the gallery picker
     }
   }
 
@@ -165,7 +206,12 @@ export function CaptureActions({ onScanResult, onManual, onScannedSavedMeal, chi
   }
 
   const photoInput = (
-    <input ref={fileInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handlePhoto} />
+    <>
+      <input ref={fileInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handlePhoto} />
+      {/* No `capture`: that attribute is what makes the browser open the camera, so the gallery
+          route needs an input without it. */}
+      <input ref={galleryInputRef} type="file" accept="image/*" className="hidden" onChange={handlePhoto} />
+    </>
   )
 
   if (showBarcode) {
@@ -237,14 +283,18 @@ export function CaptureActions({ onScanResult, onManual, onScannedSavedMeal, chi
 
   if (showDescribe) {
     return (
-      <div className="flex flex-col gap-3 p-4">
-        <div className="flex flex-col gap-1">
+      // BF-50 ②: *"There is a lot of free room; so this UI section could be expanded"*. This pane is
+      // a direct child of the sheet's flex column and had no `flex-1`, so an 80 px box sat at the
+      // top of a 90vh sheet with the rest empty. `min-h-0` is required beside it — without it the
+      // flex item refuses to shrink below its content and the textarea cannot scroll.
+      <div className="flex min-h-0 flex-1 flex-col gap-3 p-4">
+        <div className="flex min-h-0 flex-1 flex-col gap-1">
           <label htmlFor="capture-describe" className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
             Describe it
           </label>
           <textarea
             id="capture-describe"
-            className="w-full rounded-xl border bg-background px-4 py-3 text-sm resize-none min-h-[80px]"
+            className="w-full flex-1 rounded-xl border bg-background px-4 py-3 text-sm resize-none min-h-[80px]"
             placeholder="e.g. 200g chicken breast with white rice and broccoli"
             value={describeText}
             onChange={e => setDescribeText(e.target.value)}
@@ -280,20 +330,34 @@ export function CaptureActions({ onScanResult, onManual, onScannedSavedMeal, chi
 
   return (
     <>
-      <div className="flex shrink-0 gap-2 px-1">
+      {/* BF-50 ①: 62 px, from the artboard's capture tiles — not a number invented here (BF-28's
+          parity rule). They were `min-h-12` (48), which clears the tap floor and still read as
+          small against a full-width sheet. `min-h`, not a fixed height, because "Describe or
+          enter" wraps to two lines in a third of 412 dp and a fixed 62 would clip it. */}
+      <div className="flex shrink-0 gap-2 px-4">
         {actions.map(a => (
           <button
             key={a.label}
             type="button"
             onClick={a.action}
-            className="flex min-h-12 flex-1 flex-col items-center justify-center gap-1 rounded-2xl border border-border/60 bg-background/50 py-2.5 transition-colors active:bg-muted/40"
+            className="flex min-h-[62px] flex-1 flex-col items-center justify-center gap-1 rounded-2xl border border-border/60 bg-background/50 px-1 py-2.5 transition-colors active:bg-muted/40"
           >
             <span className="text-muted-foreground">{a.icon}</span>
             <span className="text-center text-[11px] font-medium leading-tight">{a.label}</span>
           </button>
         ))}
       </div>
-      {error && <p className="shrink-0 px-1 text-xs text-destructive text-center">{error}</p>}
+      {/* BF-50 ③'s other half. Text-weight rather than a fourth tile: taking a photo is the common
+          act and the tiles are what BF-50 ① just made bigger — a same-sized gallery tile would say
+          the two are equally likely, which is the balance `CameraSource.Prompt` had wrong. */}
+      <button
+        type="button"
+        onClick={() => void pickFromGallery()}
+        className="min-h-11 shrink-0 self-center px-4 text-xs font-medium text-muted-foreground transition-colors active:text-foreground"
+      >
+        Or choose a photo from your gallery
+      </button>
+      {error && <p className="shrink-0 px-4 text-xs text-destructive text-center">{error}</p>}
       {children}
       {photoInput}
     </>

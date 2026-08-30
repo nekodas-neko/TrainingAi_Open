@@ -1141,96 +1141,34 @@ opened on, unchanged.
 - **Verification:** index total drops below the heap total, and a re-read a week later shows growth
   back near trend.
 
-### [nutrition] BF-45 — the Nutrition day screen: an empty grid slot, macros that vanish when you collapse, and gutters the artboards did not ask for
-
-> **⚠ WHY THESE FOUR CARRY NO `Gate: device`, and do not add one.** In this queue `Gate: device` means
-> *shipped and awaiting a device check* — BF-24, BF-26, BF-34 and Q-406 all use it that way — and
-> `next-item.js` **parks** anything carrying it. These four are **unbuilt**, so the field was wrong:
-> it hid the entire `nutrition-ui-uplift` batch from Lane B's runner, which is where an implementer
-> starts. Filed with it on 2026-08-27/30 and corrected 2026-08-30 once the runner was actually read
-> rather than assumed.
->
-> The device is still the judge of whether these are done — that belongs in **Verification**, which
-> every one of them states. A gate parks work; a verification requirement does not.
+### [nutrition] BF-45 — swipe-to-delete on a logged food row (⑤; ①②④ shipped v1.397.0)
 
 - **Lane:** B
-- **Batch:** `nutrition-ui-uplift` — ships with BF-46. Both are surface-only and both are verified by
-  the same walk through the same tab on the same device; splitting them buys two device passes for
-  one screen.
-- **Device-verified when built** — see Verification. **Deliberately NOT `Gate: device`:** that
-  field parks an entry, and these are unbuilt. See the note below.
+- **Batch:** `nutrition-ui-uplift`
 - **Added:** 2026-08-27 · owner, with screenshots of the live tab (v1.383.x).
-- **Spec:** BF-28's parity rules still bind — where an artboard covers one of these, the artboard
-  wins over a number invented here.
+- **Spec:** BF-28's parity rules bind — where an artboard covers this, the artboard wins.
 
-**① `My Meals` sits in a two-column grid with nothing beside it.** *(Re-reported 2026-08-30 —
-**this entry has not shipped yet**, so it is unchanged rather than regressed. Noted because a second
-report of an unbuilt item is easy to mistake for a failed fix.)* Owner: *"id like the my meals
-button to be bigger and take up both left and right slots (as its empty for now)."* Confirmed in
-`components/nutrition/nutrition-action-row.tsx`: `grid grid-cols-2` with **three** children, so Log
-Food and Water fill row 1 and My Meals takes the left half of row 2 with dead space beside it. The
-change is `col-span-2` on the third button. **Say in the diff that this is contingent on the slot
-being empty** — a fourth action later reclaims it, and the next person should know the span was a
-consequence rather than a design.
+**①②③④ shipped (v1.397.0)** and are struck from this entry rather than left looking open:
+① `My Meals` spans both columns (`col-span-2`, contingent on the slot beside it being empty);
+② a collapsed meal keeps its calories **and** macros, on a summary line **below** the header, which
+is the shape the owner corrected to on the device in N6 — one `MealTotals` component serves it and
+the expanded footer, so the two cannot report different numbers for one meal;
+③ the bottom-sheet gutters are 16 px, matching the artboards — **and not where this entry said to
+put it.** It called for `SheetContent`'s bottom variant, which was measured and rejected: **26 of 48**
+bottom sheets set their own `px-*`/`p-0`, and of the remainder most already pad their inner content
+at 16, so a shared outer gutter would have doubled theirs. The nutrition sheets were at `px-1`
+(4 px); they are the ones that moved;
+④ both macro rings start at 12 o'clock — `from -90deg` is the SVG/canvas idiom for reaching the top
+and CSS `conic-gradient` already starts there, so all three call sites simply dropped the clause.
 
-**② Collapsing a meal hides its macro breakdown.** Owner: *"minimizing the tab doesnt show the
-calorie break down."* In `components/nutrition/meal-card.tsx` the P/C/F footer lives inside
-`<CollapsibleContent>`, so it is removed with the rows; the collapsed header keeps only the calorie
-number. Collapsing exists precisely to skip the rows and keep the summary, and today it drops half of
-it. Put the macro trio in the header (compact, collapsed-only, or always), sized so a long meal-type
-name still truncates rather than pushing it off.
-
-**Confirmed on the device, 2026-08-30, and the ask is wider than this entry had it.** Owner, N6:
-*"when the food list is minimized; it should still show the total calories and total macros below
-it."* So **both** numbers, and **below** the header rather than inside it — the collapsed card keeps
-its own summary line rather than the header growing a macro trio. Build that shape; it is the owner
-looking at the real screen, and it beats the header reading above.
-
-**③ Side gutters — and the owner scoped this on 2026-08-27, which makes it a different job.**
-Asked which screens, they answered: *"Mostly when an interactive tab opens from the bottom like;
-logging food or editing meals, those types of events."* So this is **`SheetContent side="bottom"`,
-not the day screen** — the food logger, the meal builder, the quantity sheet, the label sheet, every
-bottom sheet in the tab. That is one shared component, so **fix it once in
-`components/ui/sheet.tsx`'s bottom variant rather than per-sheet**, and the whole class moves
-together. A per-screen patch here would be the copy-paste that the pill-tab markup already taught
-this repo about (~17 drifting copies).
-
-⚠ **`SheetContent side="bottom"` owns the BOTTOM inset already** — CLAUDE.md forbids adding `pb-safe*`
-inside a bottom sheet, and `p-0` does not strip the baked padding, because tailwind-merge does not
-know the custom classes. **This is a horizontal change only.** Measure the gutter from the nutrition
-artboards rather than inventing a number.
-
-**④ The macro ring starts at 9 o'clock, and the cause is a one-word CSS mistake repeated three
-times.** Owner, 2026-08-30: *"the macro bar starts at an odd spot rather than 12 o clock."* Traced:
-
-```
-conic-gradient(from -90deg, …)
-```
-
-**In CSS, `conic-gradient` already starts at 12 o'clock — 0deg is the top.** `from -90deg` therefore
-rotates the start a quarter turn *counter-clockwise*, to 9 o'clock. The `-90` idiom is correct for
-**SVG and canvas**, where 0° is at 3 o'clock and you subtract 90° to reach the top; it was carried
-into CSS where it is not needed. The fix is `from 0deg`, or dropping the `from` clause entirely.
-
-**Three call sites, all wrong the same way** — fix them together (sibling-surface sweep):
-`components/nutrition/energy-card.tsx:85` and `:93`, and `components/home/home-nutrition-card.tsx:96`.
-So Home's ring is offset identically and nobody had reported it.
-
-**⑤ Swipe-to-delete on a logged food row.** Owner: *"for logging food; we could possibly add the
-option to swipe and delete it (with confirmation) like we do in the other screen."* The gesture
-already exists on the meal list (BF-29, device-verified 2026-08-30) — reuse that tray rather than
-writing a second one, and keep its confirmation step. **Do not remove the existing bin control in the
-edit sheet**; a swipe is a shortcut for people who know it is there, not a replacement for a visible
-affordance.
-
-- ⚠ **Blocked behind BF-47 in practice.** Deleting a logged food currently makes it reappear until
-  the outbox pushes. Adding a faster way to reach a delete that visibly fails is worse than not
-  adding it — ship BF-47 first, or ship them together.
-
-- **Verification.** On the S25: My Meals spans the row; a collapsed meal still shows P/C/F and its
-  calories; the gutter matches the artboard on the day screen and every other nutrition screen
-  touched; **both rings start at 12 o'clock**; a food row swipes to a tray whose Delete confirms. The
-  sandbox renders these at desktop width, so all of it is device-judged.
+- **Keep — ⑤ swipe-to-delete on a logged food row.** Owner: *"for logging food; we could possibly add
+  the option to swipe and delete it (with confirmation) like we do in the other screen."* The gesture
+  exists on the meal list (BF-29, device-verified 2026-08-30) — reuse that tray, keep its
+  confirmation, and **do not remove the bin in the edit sheet**: a swipe is a shortcut for people who
+  know it is there, not a replacement for a visible affordance.
+- **Verification for ⑤:** on the S25, a food row swipes to a tray whose Delete confirms. ①②④ are
+  shipped but **not device-verified** — the sandbox renders at desktop width and cannot judge a
+  gutter or a ring.
 
 ### [nutrition] BF-46 — the meal builder buries its photo picker below the fold, and the quantity sheet spends its space on the wrong things
 
@@ -1257,6 +1195,31 @@ user into the builder — and the builder's real tile at `saved-meals-sheet.tsx:
 **Move the real tile to the top of the builder at hero scale**, matching the detail sheet's band, so
 the two screens agree where a meal's photo lives and there is one control rather than two things
 wearing one label.
+
+**⚠ (a) WAS BUILT AND HELD, AND WHAT IT MEASURED BEARS DIRECTLY ON (b) — read this first.**
+2026-08-30, Lane B. The rework is straightforward and it did not work, in a way that looks like the
+same defect (b) describes. What was built: `useMealPhotoPicker` (`lib/hooks/`) for the acquisition —
+plugin call, 128 px WebP re-encode, cap check — and `MealPhotoHero` for the band, used by the builder
+at the TOP of its scroll and by the meal's own screen, whose *Add a photo* became a real picker
+writing through `setSavedMealPhoto` → the same `saveMealToLibrary` the builder uses. `MealPhotoTile`
+was deleted, since it was the second affordance this entry exists to remove.
+
+**Then `e2e/meal-photo-picker.spec.ts` failed, and instrumenting it says the picture reaches
+nothing.** In the builder, with exactly ONE `input[type=file]` in the DOM and it inside the hero:
+`handleFile` fires with `size=442985`; `accept` runs with a **4,247-char** data URI and
+`reject=null`; and the live hero's own state is untouched (`probe=none`) with `mealImage` still
+`null`. So the file arrives, the re-encode succeeds, the result passes the cap — and the component
+never receives it. A `useRef` for the callback did not fix it; neither did callback identity (a
+wrapper arrow appeared to fix it once and did not reproduce — that run was Fast-Refresh luck, and
+**every measurement here was re-taken on a cold dev server** because of it). The same spec passes on
+`main` and passes with the photo work reverted.
+
+**Why this is (b), probably.** (b) says a photo *was* attached and saved and did not appear, and that
+it does not reproduce in source. This reproduces, in the sandbox, on the web path — a picked image
+that is acquired correctly and lands nowhere. Whoever takes this has a handle (b) did not have.
+Start from the instrumentation above rather than from the layout. **The work is stashed, not
+committed, so it does not survive the container** — rebuild from this description; it is a couple of
+hours and the description is the valuable half.
 
 **(b) The save failure does not reproduce in source, so reproduce it on the device first.** Every
 layer reads correct: `openBuild` seeds `mealImage` from the meal being edited
@@ -1330,57 +1293,38 @@ the gaps rather than merging the two blocks back together, which would be option
   control clears the 48 dp floor and the action row clears the gesture bar (`pb-safe-action*`, which
   renders 0 in the sandbox).
 
-### [nutrition] BF-50 — the Log Food screen after its first device pass: four things, one screen
-
-- **Lane:** B
-- **Batch:** `nutrition-ui-uplift` — same screen family as BF-45/BF-46, one device pass.
-- **Device-verified when built** — see Verification. **Deliberately NOT `Gate: device`:** that
-  field parks an entry, and these are unbuilt. See the note below.
-- **Added:** 2026-08-30 · owner, device pass N4. **The rebuild itself passed** — no tile grid, the
-  three tabs read at 412 dp, Meals holds only meals, Photo and Barcode take the full screen. These
-  are the four things they asked for on top.
-
-1. **The capture row is too small.** *"The icon/sections for Photo/Barcode/Describe or enter should
-   be bigger."* Three buttons across 412 dp; give them the height and target the artboard implies.
-2. **`Describe or enter` wastes its space.** *"There is a lot of free room; so this UI section could
-   be expanded and made bigger."* The pane fills a sheet and uses a fraction of it.
-3. **The camera takes a step it does not need.** *"The photo option first opens the screen for /From
-   photos/Take pictures - could we make it auto open the camera then have the 'from photos' button
-   within the camera? usually its just take picture."* That chooser is `CameraSource.Prompt` in the
-   Capacitor call; `CameraSource.Camera` opens the camera directly. **Keep a gallery route** — put it
-   in the camera UI, do not delete it.
-4. **`Select` on the Meals tab can only delete.** *"There is a 'select' button that lets you select
-   more than one meal; but then you cant do anything with it except delete."* Either give multi-select
-   a second action worth having (log several meals at once is the obvious one) or say plainly that it
-   is a delete mode and label it so.
-
-- **Verification:** on the S25 — every capture button clears 48 dp comfortably; the describe pane
-  fills the sheet; Photo opens straight into the camera with a reachable gallery control; multi-select
-  offers what its label promises.
-
-### [nutrition] BF-51 — the meal builder after its first device pass: back exits the tab, and the photo control the user reaches is not the one that works
+### [nutrition][app-shell] BF-51 — back from Edit exits the tab, and `Recently used` is not a tab (④ shipped)
 
 - **Lane:** B
 - **Batch:** `nutrition-ui-uplift`
-- **Device-verified when built** — see Verification. **Deliberately NOT `Gate: device`:** that
-  field parks an entry, and these are unbuilt. See the note below.
 - **Added:** 2026-08-30 · owner, device pass N5.
 
-1. **Back from Edit exits to the Nutrition tab.** *"clicking edit meal then pressing back - takes you
-   all the way to the nutrition tab; rather than back to the saved meal."* One press should return to
-   the meal's own screen. Same family as BF-49 but a different surface, and N2 passed, so the nested
-   back stack is right where it is wired — this path is not.
-2. **The two photo controls, confirmed from the phone.** *"There is a photo add button at the bottom
-   of this page; but its also one screen back when you click the meal; and click the add a photo
-   button at the top; it should be able to be set from there."* This is **BF-46 ①** seen from the
-   device, and it settles the fix: the top one is the control users reach, so **that** is the one that
-   must pick a photo, not navigate. See BF-46 for the save failure, which is separate and still
-   unexplained.
-3. **`Recently used` sits in the middle of the ingredient list.** *"this should probably be a tab like
-   the other place"* — matching Log Food's `Recent · Meals · Single foods`, which is the pattern the
-   user now expects from the sibling screen.
-4. **Cramped gutters** — *"The screen is a little cramped with safe spaces"*, confirming BF-45 ③'s
-   bottom-sheet inset from the device.
+**④ shipped (v1.397.0)** — *"The screen is a little cramped with safe spaces"*: the nutrition bottom
+sheets are at the artboards' 16 px gutter now. See BF-45 ③ for why the fix is there and not on
+`SheetContent`'s bottom variant.
+
+- **Keep — ① back from Edit exits to the Nutrition tab.** *"clicking edit meal then pressing back -
+  takes you all the way to the nutrition tab; rather than back to the saved meal."*
+
+  **⚠ Built, measured, and DELIBERATELY NOT SHIPPED — read this before rebuilding it the same way.**
+  The obvious fix works and has a cost nobody would look for. The builder is a `tab` of the library
+  sheet rather than a surface of its own, so the sheet's single `<BackDismiss />` owns its back
+  press; registering the builder with `useSheetBackDismiss(open && tab === 'build', backToMeals)`
+  puts it above the sheet on the shared stack and gives exactly the behaviour asked for.
+  **It also makes `e2e/meal-photo-picker.spec.ts` fail at `page.goto` with `net::ERR_ABORTED`** —
+  reproducibly, four runs; the same spec passes on `main`, and passes on the branch with that one
+  line disabled. The pushed entry is popped when the builder closes, which is what every other sheet
+  already does, so the app behaviour may well be right and the spec merely first to navigate
+  straight after a button-close of a nested surface. **That is exactly why it is not shipped from a
+  sandbox:** `sheet-back-stack.ts`'s three previous bugs (LB-10, LB-17, BF-34) were every one of them
+  found on a device, and "it destabilises a spec" is not a diagnosis.
+  Next session: reproduce on the S25 first, then decide whether the pop is wrong or the spec is
+  racing — and do not resolve it by loosening the spec.
+- **Keep — ② the two photo controls.** This is **BF-46 ①(a)** seen from the device and it settles the
+  design: the top control is the one users reach, so that is the one that must pick a photo. Also
+  built and held — see BF-46 for the measurement, because the same finding blocks both.
+- **Keep — ③ `Recently used` sits in the middle of the ingredient list.** *"this should probably be a
+  tab like the other place"* — matching Log Food's `Recent · Meals · Single foods`. Untouched.
 
 - **The owner asked to stop here:** *"Lets get this into the right section and UI before we deep dive
   this more."* So N5's recipe-import checks (yield, multi-dish, duplicate handling) are **not

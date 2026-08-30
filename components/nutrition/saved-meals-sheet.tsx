@@ -2,10 +2,9 @@
 
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useState } from 'react'
 import { useUserTimezone } from '@/components/shell/user-timezone-provider'
-import { Plus, Trash2, Loader2, CheckSquare, Camera } from 'lucide-react'
+import { Plus, Camera } from 'lucide-react'
 import { toast } from 'sonner'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
-import { Button } from '@/components/ui/button'
 import type { FoodItem, SavedMeal, MealType, FoodLogWithItem, NutritionScanResult } from '@trainingai/shared/types/nutrition'
 import { todayInTz } from '@trainingai/shared/date-utils'
 import { logMealItems } from '@trainingai/shared/nutrition/log-meal'
@@ -17,6 +16,7 @@ import { getLocalStore } from '@/lib/local-store'
 import { pushThenRevalidate } from '@/lib/local-store/push-then-revalidate'
 import { FoodList } from './food-list'
 import { CaptureActions } from './capture-actions'
+import { MealListActions } from './meal-list-actions'
 import { RecentFoodsPanel } from './recent-foods-panel'
 import { SegmentedTabs } from '@/components/ui/segmented-tabs'
 import { MealDetailSheet } from './meal-detail-sheet'
@@ -226,6 +226,7 @@ export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate,
     setTab('meals')
     setEditingMeal(null)
   }
+
 
   /**
    * A recipe pasted as a link becomes this meal (BF-11c).
@@ -486,10 +487,10 @@ export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate,
         {/* Title alone on the top row so the close ✕ has the corner to itself; the actions get
             their own full-width row below. Squeezing "Select" and "New Meal" in beside the title
             left them jammed against the ✕ and each button too narrow to read comfortably. */}
-        <SheetHeader className="px-1 pb-0 shrink-0">
+        <SheetHeader className="px-4 pb-0 shrink-0">
           {tab === 'meals' ? (
             <SheetTitle>
-              {selectedIds ? `${selectedIds.size} selected` : 'Log Food'}
+              {selectedIds ? `${selectedIds.size} to delete` : 'Log Food'}
             </SheetTitle>
           ) : (
             <MealBuilderHeader
@@ -511,53 +512,19 @@ export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate,
           // renders these children while idle and takes the whole screen once a capture starts, so
           // the tabs cannot be left showing behind a half-open camera.
           <CaptureActions onScanResult={onScanResult} onManual={onManual} onScannedSavedMeal={onScannedSavedMeal}>
-            <SegmentedTabs tabs={LIST_TABS} value={listTab} onValueChange={changeListTab} size="xs" className="shrink-0 px-1" />
+            <SegmentedTabs tabs={LIST_TABS} value={listTab} onValueChange={changeListTab} size="xs" className="shrink-0 px-4" />
             {listTab === 'meals' && (
-              <div className="flex shrink-0 gap-2 px-1">
-                {selectedIds ? (
-                  <>
-                    <Button
-                      variant="secondary" className="flex-1 min-h-[44px]"
-                      onClick={() => { setSelectedIds(null); setConfirmBulkDelete(false) }}
-                    >
-                      Cancel
-                    </Button>
-                    <Button
-                      variant="destructive" className="flex-1 min-h-[44px] gap-1.5"
-                      disabled={selectedIds.size === 0 || bulkDeleting}
-                      onClick={() => setConfirmBulkDelete(true)}
-                    >
-                      {bulkDeleting
-                        ? <Loader2 className="w-4 h-4 animate-spin" />
-                        : <Trash2 className="w-4 h-4" />}
-                      Delete
-                    </Button>
-                  </>
-                ) : (
-                  <>
-                    {/* Artboard 3 puts a single `+ New` pill in the header band, not a pair of
-                        full-width bars. It cannot literally sit beside the title here — the sheet's
-                        close ✕ is `absolute top-4 right-4` and owns that corner — so the pills keep
-                        their own row and take the drawing's weight instead of its position. */}
-                    <span className="flex-1" />
-                    {meals.length > 1 && (
-                      <Button
-                        variant="secondary" size="sm" className="min-h-[44px] rounded-full px-4 gap-1.5"
-                        onClick={() => setSelectedIds(new Set())}
-                      >
-                        <CheckSquare className="w-4 h-4" />
-                        Select
-                      </Button>
-                    )}
-                    <Button onClick={() => openBuild()} size="sm" className="min-h-[44px] rounded-full px-4 gap-1.5">
-                      <Plus className="w-4 h-4" />
-                      New
-                    </Button>
-                  </>
-                )}
-              </div>
+              <MealListActions
+                selectedCount={selectedIds ? selectedIds.size : null}
+                canSelect={meals.length > 1}
+                deleting={bulkDeleting}
+                onStartSelecting={() => setSelectedIds(new Set())}
+                onCancelSelecting={() => { setSelectedIds(null); setConfirmBulkDelete(false) }}
+                onConfirmDelete={() => setConfirmBulkDelete(true)}
+                onNew={() => openBuild()}
+              />
             )}
-            <div className="flex-1 overflow-y-auto px-1 space-y-3">
+            <div className="flex-1 overflow-y-auto px-4 space-y-3">
               {confirmBulkDelete && selectedIds && (
                 <BulkDeleteConfirm
                   count={selectedIds.size}
@@ -594,7 +561,7 @@ export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate,
             {candidates ? (
               // Replaces the body AND the footer: while this is up the choice is which dishes to
               // save, so the build form's own Save button would be answering a different question.
-              <div className="flex-1 overflow-y-auto px-1 pb-2">
+              <div className="flex-1 overflow-y-auto px-4 pb-2">
                 <RecipeCandidates
                   candidates={candidates}
                   duplicateNames={candidateDuplicates}
@@ -605,7 +572,7 @@ export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate,
               </div>
             ) : (
             <>
-            <div className="flex-1 overflow-y-auto px-1 space-y-4 pb-2">
+            <div className="flex-1 overflow-y-auto px-4 space-y-4 pb-2">
               <MealBatchSize
                 servings={mealServings}
                 onChange={setMealServings}
@@ -697,7 +664,7 @@ export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate,
             </div>
 
             {duplicateOf && (
-              <div className="shrink-0 px-1 pb-2">
+              <div className="shrink-0 px-4 pb-2">
                 <DuplicateMealPrompt
                   existingName={duplicateOf.name}
                   saving={saving}
