@@ -3427,9 +3427,31 @@ read proves nothing, and `pg_stat_statements.max` silently evicts the least-exec
 5,000 are tracked. Checking `dealloc` is 0 is what separates "nothing slow is happening" from "the
 slow thing was evicted".
 
-## 2026-08-30 — `docs/implementation-backlog.md` 13099 → 13171, `projectOverview.md` 8189 → 8226 (BF-38 / LA-36)
 
-**Backlog, +72.** Most of it is BF-38 correcting itself. Two of that entry's premises were falsified
+## 2026-08-30 — `docs/implementation-backlog.md` raised (LB-19's premise replaced by measurement)
+
+17 lines (13116 after merging main four times; it raised the number three times of its own —
+two entries genuinely disagreeing about one number is the case this file conflicts on correctly). The entry said two flaky e2e specs
+were a sandbox **time budget** and prescribed
+`test.setTimeout`. Measuring both showed neither is, and the prescription would have fixed neither —
+so the replacement is longer than the claim it removes, because the two failures turn out to have
+nothing in common and each needs its own mechanism written down.
+
+`goal-invalidation` fails on a locator that never resolves, 60 s into a test with a minute of budget
+left: the seed's newest steps row was five days old and the row it asserts on cannot render without
+one. `meal-label` fails intermittently on a zxing decode returning null, and the guard before that
+read (`inkFraction > 0.01`) cannot distinguish the new style's paint from the previous style's — the
+canvas already has ink. The entry also records why the obvious fix for the second (poll the decode
+until it succeeds) is wrong: every style encodes the same meal, so a stale paint decodes to the same
+token and would pass.
+
+Kept because the class generalises: a spec that depends on the seed having run *recently* is the
+hardcoded-timestamp rule wearing a different hat, and CI's fresh database makes it invisible exactly
+where it would be caught.
+
+## 2026-08-30 — `docs/implementation-backlog.md` 13116 → 13188, `projectOverview.md` 8189 → 8224 (BF-38 / LA-36)
+
+**Backlog, +72** (re-measured after merging `main`, whose own growth landed first). Most of it is BF-38 correcting itself. Two of that entry's premises were falsified
 by measurement before anything was built — the "unambiguous" barcode case cannot key on a column
 that is NULL on all 221 rows, and the AI's duplicate names are usually byte-identical rather than
 fuzzy — so both paragraphs are rewritten in place rather than left to be read as true by the next
@@ -3440,7 +3462,7 @@ obvious wrong move (a calories-per-gram rule) is the one it exists to stop. The 
 new entry: `food_items.image_data_uri` is written to the device on every create and read back by
 nothing, with the three-row table naming which reads omit it.
 
-**projectOverview, +37.** One Current Status paragraph and one Known-Issues row. The row is a
+**projectOverview, +35.** One Current Status paragraph and one Known-Issues row. The row is a
 device-verification gate, so it carries the smoke step and — the part that is not boilerplate — why
 the device path is *different code* rather than the same code untested: it de-duplicates before an
 id is minted, because the offline push deliberately does not de-duplicate at all.
