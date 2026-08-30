@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { bucketize, computeBaselines, pctFromBaseline, correlationInsight, pearson, pValueForR, partialCorrelation, type BucketDef } from '@trainingai/shared/health/correlation'
+import { bucketize, computeBaselines, pctFromBaseline, correlationInsight, pearson, spearman, averageRanks, pValueForR, partialCorrelation, type BucketDef } from '@trainingai/shared/health/correlation'
 
 const DEFS: BucketDef[] = [
   { label: '<6h', min: 0, max: 6 },
@@ -175,5 +175,57 @@ describe('correlationInsight — gating', () => {
   it('needs five in a bucket now, not three', () => {
     const thin = [{ label: 'low', avg: 1, count: 4 }, { label: 'high', avg: 20, count: 4 }]
     expect(correlationInsight(thin, render).hasSufficientData).toBe(false)
+  })
+})
+
+// `averageRanks` moved here from model-report-calibration.ts when PS-15 needed a second caller —
+// the device-comparison endpoint, where Oura stress is normalised −1..+1 and the Colmi's is raw
+// 0..100 and rank agreement is the only statistic that survives. It arrived with its tie handling
+// untested in either home, which is the shape of thing that survives a move unnoticed.
+describe('averageRanks', () => {
+  it('ranks from 1, in value order rather than input order', () => {
+    expect(averageRanks([30, 10, 20])).toEqual([3, 1, 2])
+  })
+
+  it('gives tied values the MEAN of the positions they span', () => {
+    // Two values tied across positions 2 and 3 both take 2.5 — not 2, and not 3. Handing both the
+    // first position shifts every rank above them and quietly biases the correlation.
+    expect(averageRanks([10, 20, 20, 30])).toEqual([1, 2.5, 2.5, 4])
+  })
+
+  it('collapses an all-tied series onto one shared rank', () => {
+    expect(averageRanks([7, 7, 7])).toEqual([2, 2, 2])
+  })
+})
+
+describe('spearman', () => {
+  it('is 1 for any monotonic relationship, however curved', () => {
+    // The reason to reach for it at all: Pearson sees the curve, Spearman sees the order.
+    const pts = [1, 2, 3, 4, 5].map(x => ({ x, y: x ** 3 }))
+    expect(spearman(pts)).toBeCloseTo(1, 10)
+    expect(pearson(pts)!).toBeLessThan(1)
+  })
+
+  it('is -1 when the order is exactly reversed', () => {
+    expect(spearman([{ x: 1, y: 9 }, { x: 2, y: 5 }, { x: 3, y: 1 }])).toBeCloseTo(-1, 10)
+  })
+
+  it('is unchanged by rescaling either axis — the property PS-15 depends on', () => {
+    // Oura's stress is −1..+1 and the Colmi's 0..100; a statistic that moved under that rescale
+    // would be no more usable across them than a mean bias in mixed units.
+    const pts = [{ x: -0.4, y: 33 }, { x: 0.05, y: 40 }, { x: 0.3, y: 55 }, { x: 0.6, y: 65 }]
+    const rescaled = pts.map(p => ({ x: p.x * 50 + 50, y: p.y / 100 }))
+    expect(spearman(rescaled)).toBeCloseTo(spearman(pts)!, 12)
+  })
+
+  it('refuses two points rather than reporting the ±1 they always give', () => {
+    // Pearson over two points is ±1 by construction. Reporting that as rank agreement would be
+    // a certainty invented from nothing.
+    expect(spearman([{ x: 1, y: 2 }, { x: 2, y: 1 }])).toBeNull()
+    expect(spearman([{ x: 1, y: 2 }, { x: 2, y: 3 }, { x: 3, y: 9 }])).not.toBeNull()
+  })
+
+  it('is null when one series is constant, same as pearson', () => {
+    expect(spearman([{ x: 1, y: 5 }, { x: 2, y: 5 }, { x: 3, y: 5 }])).toBeNull()
   })
 })

@@ -3308,3 +3308,23 @@ web harness.
 It also records the near-free adjacency: the day HR trace is bucketed by **mean**, so the range that
 shipped is labelled "15-min averages"; `oura_bucket.hr_min` / `hr_max` would let it say Low and High
 honestly, in the same route change.
+
+## 2026-08-30 — `docs/implementation-backlog.md` 12796 → 12846, `projectOverview.md` 8156 → 8189 (PS-15 / LA-35)
+
+**Backlog, +50.** Two things, both queue material rather than narrative. **PS-15** shipped two of its
+three halves, so its entry had to stop describing the phase and units work as owed and start naming
+what still is — a `Needs: PS-16`, a `Keep:` for the steps half only, and, on each shipped paragraph,
+what the endpoint now returns instead. An entry that reads as fully outstanding when two thirds of it
+landed is exactly the shape `check-backlog-pointers.js` exists to prevent, so the growth is the queue
+staying true rather than the queue accreting. The rest is **LA-35**, a new entry: the module map
+points at `lib/health/…` for 34 modules that live in `packages/shared/src/health/`, and
+`check-index-doc-paths.js` whitelists precisely that error class in its `resolves()` fallback. Its
+length is the 34 filenames and the one-line diagnosis of why the check passes — both are what the
+implementer needs and neither is re-derivable.
+
+**projectOverview, +33.** One Current Status paragraph for PS-15 and one Known-Issues row for LA-35.
+The row is longer than a bare finding because it has to say what it does *not* contradict: a 🟢 row
+further down records the module map's `path → symbol` claims as holding, 110 of 110, and that check
+verifies attribution to the right *file* — not that the file is in the right *directory*. Without
+that sentence the two rows read as a contradiction and the next reader has to re-derive which is
+right.

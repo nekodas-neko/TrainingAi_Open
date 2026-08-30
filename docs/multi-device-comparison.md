@@ -42,15 +42,39 @@ grid and the two rings coincide only when their phases happen to line up, so the
 means "they were never compared"**, and it is the single easiest way to draw a wrong conclusion here.
 
 `bucketSeries(rows, minutes)` anchors windows to the epoch so every device lands on the same grid
-regardless of when it sampled. The endpoint defaults to **5 minutes** and reports `bucketMinutes`
-back, because every `overlap` is a function of it.
+regardless of when it sampled.
+
+**Until 2026-08-30 the endpoint hardcoded 5 minutes, and this section described a policy nothing
+implemented (PS-15).** The width is now measured: `coarsestCadenceMinutes` takes each series' median
+inter-sample gap — median, so one overnight gap cannot drag a 5-minute series into hours — and uses
+the coarsest. An explicit `?bucket=` still wins, and the response distinguishes the two:
+
+- `bucketMinutes` — the width actually used. Every `overlap` is a function of it.
+- `bucketSource` — `derived-from-cadence` or `requested`.
+- `derivedMinutes` — what the data would have chosen, reported even when a `bucket` was passed, so
+  a hand-set width can be compared against the measured one.
+
+**The case that proved it.** Oura's daytime-stress buckets land at **:15 and :45**; the Colmi's at
+**:00 and :30** — permanently fifteen minutes apart. On a five-minute grid the two could not share a
+bucket at any point in history, so every summary read `overlap: 0`. At the derived 30 minutes the
+same eight afternoon buckets of 2026-08-27 give **rho = 0.64**.
 
 | comparing | bucket |
 |---|---|
 | ring vs ring, resting HR | **5 min** (their native floor) |
 | ring vs strap, during a workout | 1 min — the ring is the limit, and finer shows its lag |
+| ring vs ring, daytime stress | **30 min** — anything finer and the :15/:00 phase offset wins |
 | whole-day trend | 15–30 min |
 | daily totals (steps, sleep) | the day itself, not a time grid |
+
+### Zero overlap has three causes and only one is a disagreement
+
+`overlap: 0` on its own reads as "these two never agreed". `pairs[].verdict` separates them:
+
+- **`no-data`** — one device reported nothing in the window. Nothing was compared.
+- **`out-of-phase`** — both reported, all window, and never once landed in the same bucket. **A grid
+  problem, not a device problem.** Widen and re-read before concluding anything.
+- **`compared`** — they overlapped, and the statistics mean something.
 
 ---
 
@@ -74,6 +98,20 @@ These are not the same measurement and there is no reason for their magnitudes t
 
 **Compare the trend, not the value** — do they move together night to night? A correlation is
 meaningful; a mean absolute delta in milliseconds is not.
+
+### Daytime stress — comparable by RANK only, and only at 30 minutes
+
+Both rings publish a daytime stress signal and **they are not in the same units**: Oura's is
+normalised to **−1..+1** (`oura_daytime_stress_buckets.level`), the Colmi's is raw **0..100**
+(measured range 30–65). A mean bias across those two scales is not a weak measurement, it is not one
+— and it prints exactly as confidently as a real number, which is what makes it dangerous.
+
+The endpoint now knows this. `NamedSeries.unit` declares the scale; where two units differ,
+`pairSummary` returns `unitsDiffer` naming them and sets `meanAbsDelta`, `maxAbsDelta` and `meanBias`
+to `null`. `spearman` is reported for every compared pair and is the statistic to read here.
+
+Add the phase offset above and this is the only pairing in the app that needed both halves of PS-15
+before it said anything at all.
 
 ### Steps and distance — the hand matters more than the device
 
@@ -154,13 +192,25 @@ Report `overlap` alongside every statistic. A mean absolute delta over 6 buckets
 
 ## 6. Reading the endpoint
 
-`GET /api/admin/device-comparison?from=&to=&bucket=` (admin only, ≤30 days).
+`GET /api/admin/device-comparison?from=&to=&metric=&bucket=` (admin only, ≤30 days).
 
+- `metric` — `heart_rate` (default, all three devices) or `stress` (the two rings). An unknown one is
+  a 400 naming what is accepted, rather than quietly comparing heart rate instead.
 - `coverage` — buckets each device reported. **Read this first**: it is the denominator for
   everything else, and a device with near-zero coverage was not being compared.
-- `pairs[]` — for each unordered pair: `overlap`, `meanAbsDelta`, `maxAbsDelta`, `meanBias`.
+- `bucketMinutes` / `bucketSource` / `derivedMinutes` — see §2. Read these second: an `overlap` is
+  only interpretable next to the width that produced it.
+- `units` — per device. Two that differ suppress every magnitude statistic below.
+- `pairs[]` — for each unordered pair: `overlap`, `verdict`, `meanAbsDelta`, `maxAbsDelta`,
+  `meanBias`, `spearman`, `unitsDiffer`.
 - **`meanBias` is separate from `meanAbsDelta` on purpose.** A device reading 5 bpm high all day and
   one alternating ±5 have identical mean absolute error and are different faults: the first is
   calibration and correctable, the second is noise and is not.
 - A pair that never overlapped returns `null`, not 0 — 0 would read as perfect agreement.
 - `truncated` — the row table is capped; the statistics are computed over the whole window first.
+
+**Steps are deliberately not a metric here.** Oura writes a daily scalar and the Colmi an hourly
+series, so pairing them means summing the Colmi side to a day — and backlog **PS-16** has not yet
+settled whether those buckets are cumulative. Summing a cumulative counter gives a number that is
+badly wrong and still looks plausible, which is the one output this document exists to prevent. One
+counted walk answers it; until then the metric stays absent rather than approximate.
