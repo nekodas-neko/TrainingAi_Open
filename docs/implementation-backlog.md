@@ -1338,6 +1338,51 @@ opened on, unchanged.
 - **Verification:** index total drops below the heap total, and a re-read a week later shows growth
   back near trend.
 
+### [nutrition] BF-63 — the meal builder has no barcode scan, so a packet ingredient has to be typed
+
+- **Lane:** B — `components/nutrition/ingredient-picker.tsx` + `ingredient-search.tsx`; the scanner
+  and the lookup route both already exist.
+- **Batch:** `nutrition-ui-uplift`
+- **Added:** 2026-08-30 · owner, on the meal builder: *"in the meal creator there is no scan/barcode
+  option."* Screenshot: `ADD INGREDIENTS` offering only the text field.
+
+**The capability is one file away, not missing.** `saved-meals-sheet.tsx` renders *both*
+`CaptureActions` (the Log Food screen, which has `Photo · Barcode · Describe or enter`) and
+`IngredientPicker` (the build form, which has none of it). So the owner learns barcode scanning on
+one screen of this sheet and loses it on the next. `barcode-scanner.tsx` is a standalone overlay
+taking `onResult`/`onClose`, and `/api/nutrition/barcode` is a plain GET — both are reusable as they
+stand.
+
+**But do NOT drop `CaptureActions` into the builder.** Its `onScanResult` routes a hit into the
+*food logger*, which logs the product to today. In the builder the same scan must mint a food item
+and **add it as an ingredient to the meal being built** — that is `addExternalFood`'s shape
+(`createFoodItem(…)` then `accept(item)`), fed from a `NutritionScanResult` instead of an
+`ExternalFood`. Reusing the wrong half is how a scan in the builder silently logs breakfast.
+
+- **`source: 'barcode'`, and the comment already anticipates this.** `ingredient-picker.tsx:119`
+  explains that its external-search path writes `source: 'text'` because *"a barcode identifies one
+  exact product; a name search returns a plausible near-match"*. The type has `'barcode'`; a scanned
+  ingredient must use it, or the distinction that comment protects is lost the moment this ships.
+- **⚠ Carry the code itself, per BF-38.** That entry measured production: **`barcode` is NULL on all
+  221 rows, including all 3 whose `source` is `'barcode'`** — `/api/nutrition/barcode` never returns
+  the code it looked up, so nothing downstream can store it. Adding a second scan path that writes
+  another NULL makes BF-38's job bigger. Either return `code` from the route and thread it, or say in
+  the diff that this path defers to BF-38 — a silent third NULL-writer is the outcome to avoid.
+- **Decide the saved-meal QR case rather than discovering it.** `CaptureActions.handleBarcode`
+  shape-detects a printed meal label (22 base64url chars) before falling through to the product
+  lookup. Scanned *inside a builder*, that payload means "add this saved meal as an ingredient",
+  which is meal-nesting and is not built. Simplest honest answer: recognise it and say it is not
+  supported here, rather than passing a meal token to a product lookup that will 400 it.
+- **Relationship to BF-52 — this is the smaller, buildable half.** BF-52 is a planning item about
+  *meal-level* entry points (build a whole meal from a photo, URL or description) and proposes
+  mirroring Log Food's capture row. This report is per-*ingredient* and needs no design work. Build
+  it now; when BF-52 is planned, its capture row should absorb this button rather than adding a
+  second barcode affordance beside it.
+- **Verification:** in the builder, scan a packet → it appears in the ingredient list with the
+  product's name and macros; the food item lands in the library with `source = 'barcode'`; nothing is
+  logged to today's food log; and Open Food Facts being down says so rather than reading as "no
+  match" (the distinction `/api/nutrition/barcode` already draws).
+
 ### [nutrition][app-shell] BF-62 — the meal detail sheet's action row still sits close to the gesture bar, and `92vh` is the likely reason
 
 - **Lane:** B — `components/nutrition/meal-detail-sheet.tsx:81`.
@@ -1843,6 +1888,10 @@ learned `Photo · Barcode · Describe or enter` one screen away, and a meal buil
 new extraction**; route all three at the existing `/api/nutrition/scan` shapes and let the builder
 render what comes back.
 
+- **BF-63 is the per-ingredient half and is being built without waiting on this.** It puts a barcode
+  scan on the ingredient search, which is a defect fix rather than a design. When this row is
+  designed, absorb that button into it — a builder showing a capture row *and* a separate barcode
+  affordance is the duplication this pairing exists to avoid.
 - **Carry BF-40's earned constraint:** a recipe page that states no yield hands up `recipeYield: null`
   rather than defaulting to 1 — the banana-bread four-fold error. Any new entry point must preserve
   that, and the amber "set how many portions" line with it.
