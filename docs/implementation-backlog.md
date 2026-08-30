@@ -1067,39 +1067,6 @@ deliberate choice, on a session where the absence of a Primary is the design.
   outgoing one's role, the prescribed sets and percentages are unchanged, and the session still has
   no Primary afterwards.
 
-### [devices][platform] BF-54 — the BLE console prints planner estimates as row counts, and its bloat verdict is built on them
-
-- **Lane:** A — `lib/data/postgres/slices/oura.ts:1593` and `:1706`.
-- **Added:** 2026-08-30 · from the owner's D2/D5 screenshots, then measured against production.
-
-**The console's DB footprint reads `n_live_tup AS rows`** (`:1593`). CLAUDE.md already documents that
-counter as a planner estimate maintained by autovacuum, with `last_analyze` NULL on every table here.
-**Measured against production the same day, and the gap is not marginal:**
-
-| Table | Console / `n_live_tup` | Real `count(*)` | Under-read |
-|---|---|---|---|
-| `oura_raw_samples` | **552** (shown as 297 on the owner's screen) | **180,415** | **327×** |
-| `rr_intervals` | **0** | **87,015** | ∞ |
-| `error_events` | **1** | **6,102** | 6,102× |
-
-*(counts are `claude_ro`, so owner-scoped — they are floors, which only makes the gap worse.)*
-
-**The display is the smaller half. `:1706` uses the same counter to justify a VACUUM FULL**, and its
-own comment states the reasoning: *"A huge `before` against a handful of live rows is the signature
-of pure bloat."* Against `oura_raw_samples` that reads 67 MB against 552 rows and says *pure bloat* —
-when the table holds **180,415 real rows**. Acting on it takes an **ACCESS EXCLUSIVE lock** on a
-67 MB table, with the timeouts deliberately lifted, and reclaims nothing.
-
-- **Fix:** `count(*)` for anything presented as a row count, and for the reclaim's before/after.
-  Where an exact count is too expensive, label the number an estimate on screen — the defect is a
-  guess wearing a count's clothes.
-- **The console already has a real count on the same screen**: *"Rows still carrying decoded
-  0 / 180,160"* sits directly above a table list saying 297. One screen, two numbers, three orders of
-  magnitude apart.
-- **Sibling sweep:** grep for `n_live_tup` anywhere a number reaches a user or gates an action.
-- **Verification:** the footprint's counts match `count(*)`, and the reclaim reports a live-row figure
-  that does too.
-
 ### [platform] BF-55 — 84 MB of index against 63 MB of table, and the database is growing ~7× its expected trend
 
 - **Lane:** A

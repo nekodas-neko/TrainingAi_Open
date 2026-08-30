@@ -27,6 +27,16 @@
 **Version:** v1.395.6 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-08-30.
 
+**The BLE console counted rows it had been guessing (BF-54).** Its DB footprint printed
+`n_live_tup` under a column headed *rows* — a planner estimate, and `last_analyze` is NULL on every
+table here, so it read **552** against `oura_raw_samples`' **180,415**, 0 against `rr_intervals`'
+87,015 and 1 against `error_events`' 6,102. The display was the smaller half: the reclaim button used
+the same counter to call 67 MB against 552 rows *pure bloat*, so pressing it took an ACCESS EXCLUSIVE
+lock with the timeouts lifted and reclaimed nothing. Both sites now `count(*)`. **The size columns
+were never wrong** and are untouched — only the row columns of `pg_stat_user_tables` are estimates,
+and conflating the two is what cost a session on Q-528
+([journal](docs/overview/entries/2026-08-30-fix-db-footprint-real-counts.md)).
+
 **Query timings are readable by the audit role (BF-21).** The owner enabled `pg_stat_statements` on
 production; `claude_ro` is default-deny, so it needed a view, which migration 242 adds through the
 generator rather than by hand — that file rebuilds the whole schema each run, so a hand-written view

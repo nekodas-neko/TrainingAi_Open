@@ -3704,3 +3704,14 @@ conclusion rather than to describe the change: that the counters start empty fro
 read in the first hours means nothing, and that BF-19 already measured the database and it is not
 where the reported slowness is. Without them the next session reads a clean `pg_stat_statements` and
 closes the slow-load question on it, which is the mistake the entry itself warned about.
+
+## 2026-08-30 — `projectOverview.md` 8357 → 8367, `docs/implementation-backlog.md` 13685 → 13652 (BF-54 shipped)
+
+The backlog **shrinks 33** — BF-54 left the queue, and the new number is the floor.
+
+`projectOverview.md` +10, one Current Status paragraph. Half of it is the three measured pairs
+(552/180,415 · 0/87,015 · 1/6,102), and they earn the space: without a number the entry reads as
+"the console was slightly off", and the actual finding is that a button which takes an ACCESS
+EXCLUSIVE lock was being justified by a figure three orders of magnitude wrong. The last sentence —
+that the SIZE columns were never wrong — is there because the neighbouring reflex is to distrust the
+whole readout, and Q-528 was a data-loss incident filed on exactly that over-correction.

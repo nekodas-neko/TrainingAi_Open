@@ -1573,11 +1573,22 @@ export async function getOuraDailyDerived(db: Db, userId: string, from: string, 
 // BLE-derived, so `source = 'derived'`; it never touches the BLE-derived fields on the same row.
 const BODY_COMP_MODEL_VERSION = 'atlas_2_1_0'
 
-// DB-footprint readout for the admin console (Sub-plan G-2 / culling): per-table row estimates +
-// total bytes for the Oura tables, plus the `oura_raw_samples` decoded-vs-body_hex split so the
-// owner can SEE what the culling levers reclaim (decoded is re-derivable; body_hex is archival).
-// Read-only, admin-gated. Sizes come from the planner's stats (cheap, approximate); the raw-sample
-// column split is an exact scan of the (single-user) table.
+// DB-footprint readout for the admin console (Sub-plan G-2 / culling): per-table row counts + total
+// bytes for the Oura tables, plus the `oura_raw_samples` decoded-vs-body_hex split so the owner can
+// SEE what the culling levers reclaim (decoded is re-derivable; body_hex is archival). Read-only,
+// admin-gated.
+//
+// **The row counts are COUNTED, not estimated (BF-54).** This read used `n_live_tup`, which CLAUDE.md
+// already documents as a planner estimate maintained by autovacuum — and `last_analyze` is NULL on
+// every table in this database, so it can be arbitrarily stale. Measured against production on
+// 2026-08-30 it was not marginally wrong: `oura_raw_samples` read **552** against **180,415** real
+// rows, `rr_intervals` **0** against 87,015, `error_events` **1** against 6,102. The owner's screen
+// said 297 rows directly below a line reading "0 / 180,160", three orders of magnitude apart.
+//
+// The sizes stay from `pg_total_relation_size`, which is read from the filesystem and is exact — it
+// is only the ROW columns of `pg_stat_user_tables` that are estimates. Counting 14 tables is a seq
+// scan of tens of MB on a screen pressed occasionally, and the raw-sample split below already does a
+// far more expensive full scan with `pg_column_size` on the largest table of the set.
 const OURA_FOOTPRINT_TABLES = [
   // `oura_raw_packed` (Q-541) is listed beside `oura_raw_samples` deliberately: packing is only
   // observable as the two moving in opposite directions, and this readout is where the owner watches
@@ -1590,11 +1601,21 @@ const OURA_FOOTPRINT_TABLES = [
 export async function getOuraStorageStats(db: Db): Promise<import('../../repository').OuraStorageStats> {
   const tableList = sql.join(OURA_FOOTPRINT_TABLES.map(t => sql`${t}`), sql`, `)
   const sizeRows = (await db.execute(sql`
-    SELECT relname AS table, n_live_tup AS rows, pg_total_relation_size(relid) AS bytes
+    SELECT relname AS table, pg_total_relation_size(relid) AS bytes
     FROM pg_stat_user_tables
     WHERE relname IN (${tableList})
     ORDER BY pg_total_relation_size(relid) DESC
-  `)).rows as { table: string; rows: string | number; bytes: string | number }[]
+  `)).rows as { table: string; bytes: string | number }[]
+
+  // The names come from the module constant above, never from a request — but they are interpolated
+  // as identifiers, so they are checked here too rather than trusted, the same belt-and-braces the
+  // VACUUM allowlist below applies for the same reason.
+  const bad = OURA_FOOTPRINT_TABLES.find(t => !/^[a-z_][a-z0-9_]*$/.test(t))
+  if (bad) throw new Error(`getOuraStorageStats: ${bad} is not a plain identifier`)
+  const countRows = (await db.execute(sql.raw(
+    OURA_FOOTPRINT_TABLES.map(t => `SELECT '${t}' AS table, count(*)::bigint AS rows FROM ${t}`).join(' UNION ALL '),
+  ))).rows as { table: string; rows: string | number }[]
+  const countByTable = new Map(countRows.map(r => [r.table, Number(r.rows)]))
 
   const rawRow = ((await db.execute(sql`
     SELECT count(*)::bigint AS total_rows,
@@ -1605,7 +1626,9 @@ export async function getOuraStorageStats(db: Db): Promise<import('../../reposit
   `)).rows[0] ?? {}) as Record<string, string | number>
 
   return {
-    tables: sizeRows.map(r => ({ table: r.table, rows: Number(r.rows), bytes: Number(r.bytes) })),
+    // A table absent from `pg_stat_user_tables` cannot reach here (the size query is what produces
+    // this list), so every row has a count.
+    tables: sizeRows.map(r => ({ table: r.table, rows: countByTable.get(r.table) ?? 0, bytes: Number(r.bytes) })),
     rawSamples: {
       totalRows: Number(rawRow.total_rows ?? 0),
       decodedRows: Number(rawRow.decoded_rows ?? 0),
@@ -1702,8 +1725,14 @@ export async function vacuumTableFull(table: VacuumFullTable): Promise<{
     // Reported so the reclaim can be read honestly. A huge `before` against a handful of live rows
     // is the signature of pure bloat — which is exactly Q-315's case, and is a different situation
     // from a large table that is genuinely large.
+    //
+    // **Counted, not estimated (BF-54).** That reasoning is only sound on a real number, and this
+    // read `n_live_tup`: against `oura_raw_samples` on 2026-08-30 it said 552 rows in 67 MB, i.e.
+    // *pure bloat*, on a table holding **180,415** rows. Acting on that verdict takes an ACCESS
+    // EXCLUSIVE lock with the timeouts deliberately lifted, and reclaims nothing. The count is a seq
+    // scan, which is trivial beside the VACUUM FULL it is about to justify.
     const liveRows = Number((await client.query(
-      `SELECT n_live_tup FROM pg_stat_user_tables WHERE relname = $1`, [table])).rows[0]?.n_live_tup ?? 0)
+      `SELECT count(*)::bigint AS rows FROM ${table}`)).rows[0]?.rows ?? 0)
     // VACUUM FULL can outlast the pool's 15s statement_timeout on a large table; lift both timeouts
     // for this session only, then destroy the connection (release(true)) so the pool never hands a
     // timeout-disabled client to normal query traffic.
