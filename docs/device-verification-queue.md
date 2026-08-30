@@ -17,7 +17,8 @@ marked **JS** — those need no new APK, just a fresh app open.
 
 **Coverage.** Every `Gate: device` entry in the Lane B queue is represented below (27 on
 2026-08-26). Three of them are **not** presses and are listed at the end so nobody hunts for a
-button that does not exist.
+button that does not exist. **S8 and S9 were added 2026-08-30** — they are Lane A entries whose gate
+is also a device, added here because the cost is picking the phone up and they ride along free.
 
 **Start with N4.** The Log Food screen was rebuilt on 2026-08-26 and has never been seen on the
 phone; several other items in this section are reached *through* it, so if it is wrong they are all
@@ -246,6 +247,32 @@ These are the admin consoles. Several are buttons that were added but never pres
 1. Repeat the failing scan.
 2. **Fail:** note whether the item was *not recognised* or recognised but *not loggable* — two
    different bugs the screenshot did not separate.
+
+## S8. One photo scan, timed — BF-4 · **JS**
+
+**The whole gate on BF-4 is a single scan.** Every hypothesis about *"the photo scan feels slower"*
+has already been measured against production `ai_call_log`; what is missing is one current sample to
+compare them to.
+
+1. Nutrition → add food → **camera** (a photo scan, **not** a barcode).
+2. Scan any food. Note roughly how long from shutter to the result appearing.
+3. **Pass:** it completes. Either way, say how long it felt and whether that matches your original
+   report — a scan that now feels fine is as useful an answer as a slow one, and closes the entry.
+
+## S9. Overnight ring drain on the current APK — Q-388
+
+**Must be the current `apk-latest` build.** The fast-HR trap fix shipped in
+`feat/ring-service-device-pass` and has never reached the ring; the entry says to measure its effect
+**before** anything else is attempted, and nobody can while the device runs an older build.
+
+1. Install the current APK (see CLAUDE.md → *Getting a new APK*; the rolling release upgrades in
+   place, no uninstall).
+2. Wear the ring one full night with **no charging**.
+3. Report the battery percentage at bed and on waking, and the hours between.
+4. **Pass:** drain is materially better than the measured **15–38 points over ~9.8 h**. Stock Oura
+   firmware, with SpO₂ equally on, ran ~14%/day — that is the number to beat.
+5. **Do not turn SpO₂ off to improve this.** You already established the binary framing was wrong;
+   the entry is now about finding what *we* do differently from stock.
 
 ## S6. Coach changing your programme — Q-467
 1. Ask Coach for a programme change and accept it.
