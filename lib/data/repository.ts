@@ -1022,7 +1022,10 @@ export interface WorkoutRepository {
   createSupplement(userId: string, data: Omit<import('@trainingai/shared/types/supplement').Supplement, 'id' | 'userId' | 'createdAt'> & { id?: string }): Promise<import('@trainingai/shared/types/supplement').Supplement>
   updateSupplement(id: string, userId: string, data: Partial<Omit<import('@trainingai/shared/types/supplement').Supplement, 'id' | 'userId' | 'createdAt'>>): Promise<import('@trainingai/shared/types/supplement').Supplement>
   deleteSupplement(id: string, userId: string): Promise<void>
-  logSupplement(supplementId: string, userId: string, date: string): Promise<void>
+  /** `dose` is what was actually taken (BF-3). Omit it and the definition's CURRENT dose is
+   *  stamped — right for the web route, wrong for a mutation queued offline and drained after a
+   *  titration, which is why the sync engine fills it from the local row. */
+  logSupplement(supplementId: string, userId: string, date: string, dose?: Partial<import('@trainingai/shared/types/supplement').SupplementDose>): Promise<void>
   unlogSupplement(supplementId: string, userId: string, date: string): Promise<void>
 
   // ── AI Periodization ───────────────────────────────────────────────────────

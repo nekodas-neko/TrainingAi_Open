@@ -74,7 +74,7 @@ import type {
   DietarySeverity,
 } from '@trainingai/shared/types/nutrition'
 import type { Injury } from '@trainingai/shared/types/injury'
-import type { Supplement, SupplementWithStatus } from '@trainingai/shared/types/supplement'
+import type { Supplement, SupplementWithStatus, SupplementDose } from '@trainingai/shared/types/supplement'
 import * as n from './slices/nutrition'
 import * as mp from './slices/meal-plans'
 import * as social from './slices/social'
@@ -3714,6 +3714,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
         .orderBy(asc(s.foodLogs.updatedAt)).limit(pageLimit),
       this.db.select({
         id: s.supplements.id, name: s.supplements.name, dose: s.supplements.dose,
+        defaultAmount: s.supplements.defaultAmount, unit: s.supplements.unit,
         reminderEnabled: s.supplements.reminderEnabled, reminderTime: s.supplements.reminderTime,
         sortOrder: s.supplements.sortOrder, active: s.supplements.active,
         updatedAt: s.supplements.updatedAt, deletedAt: s.supplements.deletedAt,
@@ -3721,7 +3722,10 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
         .where(and(eq(s.supplements.userId, userId), gt(s.supplements.updatedAt, effectiveSince))),
       this.db.select({
         id: s.supplementLogs.id, supplementId: s.supplementLogs.supplementId,
-        logDate: s.supplementLogs.logDate, updatedAt: s.supplementLogs.updatedAt,
+        logDate: s.supplementLogs.logDate,
+        amount: s.supplementLogs.amount, unit: s.supplementLogs.unit,
+        doseText: s.supplementLogs.doseText,
+        updatedAt: s.supplementLogs.updatedAt,
         deletedAt: s.supplementLogs.deletedAt,
       }).from(s.supplementLogs)
         .innerJoin(s.supplements, eq(s.supplementLogs.supplementId, s.supplements.id))
@@ -4325,7 +4329,15 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
           if (p.deleted) {
             await this.unlogSupplement(String(p.supplementId), userId, String(p.logDate))
           } else {
-            await this.logSupplement(String(p.supplementId), userId, String(p.logDate))
+            // BF-3 — the dose the DEVICE recorded when it was taken, not the definition's dose now.
+            // A mutation queued offline can drain days later, by which time the definition may have
+            // been titrated; stamping from the definition here would write the new dose onto an old
+            // act. Absent (an older client), `logSupplement` falls back to the definition.
+            await this.logSupplement(String(p.supplementId), userId, String(p.logDate), {
+              amount: typeof p.amount === 'number' ? p.amount : null,
+              unit: typeof p.unit === 'string' ? p.unit : null,
+              doseText: typeof p.doseText === 'string' ? p.doseText : null,
+            })
           }
           processed++
         } else if (mut.domain === 'supplements') {
@@ -4344,6 +4356,8 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
               id:              String(p.id),
               name,
               dose:            p.dose ? String(p.dose) : null,
+              defaultAmount:   typeof p.defaultAmount === 'number' ? p.defaultAmount : null,
+              unit:            typeof p.unit === 'string' ? p.unit : null,
               reminderEnabled: Boolean(p.reminderEnabled),
               reminderTime:    p.reminderTime ? String(p.reminderTime) : null,
               sortOrder:       typeof p.sortOrder === 'number' ? p.sortOrder : 0,
@@ -4814,6 +4828,8 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       userId: r.userId,
       name: r.name,
       dose: r.dose ?? null,
+      defaultAmount: r.defaultAmount ?? null,
+      unit: r.unit ?? null,
       reminderEnabled: r.reminderEnabled,
       reminderTime: r.reminderTime ?? null,
       sortOrder: r.sortOrder,
@@ -5988,15 +6004,30 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     const rows = await this.db.select().from(s.supplements)
       .where(and(eq(s.supplements.userId, userId), isNull(s.supplements.deletedAt)))
       .orderBy(asc(s.supplements.sortOrder), asc(s.supplements.createdAt))
-    const logs = await this.db.select({ supplementId: s.supplementLogs.supplementId })
+    const logs = await this.db.select({
+      supplementId: s.supplementLogs.supplementId,
+      amount: s.supplementLogs.amount, unit: s.supplementLogs.unit, doseText: s.supplementLogs.doseText,
+    })
       .from(s.supplementLogs)
       .where(and(
         eq(s.supplementLogs.userId, userId),
         eq(s.supplementLogs.logDate, date),
         isNull(s.supplementLogs.deletedAt),
       ))
-    const loggedIds = new Set(logs.map(l => l.supplementId))
-    return rows.map(r => ({ ...this.rowToSupplement(r), loggedToday: loggedIds.has(r.id) }))
+    // BF-3: the LOG's dose, never the definition's. A screen reading the definition shows what you
+    // would take now; a log has to show what you actually took, and the difference is the whole
+    // point of stamping it.
+    const byId = new Map(logs.map(l => [l.supplementId, l]))
+    return rows.map(r => {
+      const log = byId.get(r.id)
+      return {
+        ...this.rowToSupplement(r),
+        loggedToday: log != null,
+        loggedDose: log
+          ? { amount: log.amount ?? null, unit: log.unit ?? null, doseText: log.doseText ?? null }
+          : null,
+      }
+    })
   }
 
   async createSupplement(userId: string, data: Omit<Supplement, 'id' | 'userId' | 'createdAt'> & { id?: string }): Promise<Supplement> {
@@ -6027,6 +6058,8 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     const set: Record<string, unknown> = { updatedAt: new Date() }
     if (data.name !== undefined) set.name = data.name
     if (data.dose !== undefined) set.dose = data.dose
+    if (data.defaultAmount !== undefined) set.defaultAmount = data.defaultAmount
+    if (data.unit !== undefined) set.unit = data.unit
     if (data.reminderEnabled !== undefined) set.reminderEnabled = data.reminderEnabled
     if (data.reminderTime !== undefined) set.reminderTime = data.reminderTime
     if (data.sortOrder !== undefined) set.sortOrder = data.sortOrder
@@ -6049,19 +6082,45 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       .where(and(eq(s.supplements.id, id), eq(s.supplements.userId, userId)))
   }
 
-  async logSupplement(supplementId: string, userId: string, date: string): Promise<void> {
-    const [owns] = await this.db.select({ id: s.supplements.id }).from(s.supplements)
+  /**
+   * @param dose what was actually taken. **Omit it and the definition's CURRENT dose is stamped**,
+   *   which is right for the web route (the log and the stamp are the same instant) and for a
+   *   device that has not been updated to send one. A caller that logged earlier — an offline
+   *   mutation drained later — must pass what it recorded then, or the dose it was taken at is lost
+   *   in exactly the window BF-3 is about. `lib/local-store/sync-engine.ts` fills it from the local
+   *   row for that reason.
+   */
+  async logSupplement(
+    supplementId: string, userId: string, date: string,
+    dose?: Partial<SupplementDose>,
+  ): Promise<void> {
+    const [owns] = await this.db.select({
+      id: s.supplements.id, dose: s.supplements.dose,
+      defaultAmount: s.supplements.defaultAmount, unit: s.supplements.unit,
+    }).from(s.supplements)
       .where(and(eq(s.supplements.id, supplementId), eq(s.supplements.userId, userId)))
       .limit(1)
     if (!owns) throw new NotFoundError('Supplement')
+
+    // BF-3 — freeze the dose on the log. `dose_text` is the half that matters today: every existing
+    // supplement carries only free text, so this is what makes a titration survive a dose change
+    // without the owner first re-entering anything as a number.
+    const stamped = {
+      amount: dose?.amount ?? owns.defaultAmount ?? null,
+      unit: dose?.unit ?? owns.unit ?? null,
+      doseText: dose?.doseText ?? owns.dose ?? null,
+    }
+
     // onConflictDoUpdate (not DoNothing): a prior unlog on this same date soft-deleted
     // the row via the (supplement_id, log_date) unique constraint — re-logging must
     // revive it (clear deleted_at), not silently no-op.
     await this.db.insert(s.supplementLogs)
-      .values({ supplementId, userId, logDate: date })
+      .values({ supplementId, userId, logDate: date, ...stamped })
       .onConflictDoUpdate({
         target: [s.supplementLogs.supplementId, s.supplementLogs.logDate],
-        set: { deletedAt: null, updatedAt: new Date() },
+        // Re-logging the same day re-stamps: the row is one act of taking it, and if the dose was
+        // corrected between the untick and the re-tick the second value is the true one.
+        set: { deletedAt: null, updatedAt: new Date(), ...stamped },
         setWhere: eq(s.supplementLogs.userId, userId),
       })
   }

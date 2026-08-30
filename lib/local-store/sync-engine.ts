@@ -496,6 +496,8 @@ export async function pullDelta(userId: string, force = false, fullResync = fals
     id:              String(r.id),
     name:            String(r.name),
     dose:            r.dose ? String(r.dose) : null,
+    defaultAmount:   typeof r.defaultAmount === 'number' ? r.defaultAmount : null,
+    unit:            r.unit ? String(r.unit) : null,
     reminderEnabled: Boolean(r.reminderEnabled),
     reminderTime:    r.reminderTime ? String(r.reminderTime) : null,
     sortOrder:       Number(r.sortOrder),
@@ -508,6 +510,12 @@ export async function pullDelta(userId: string, force = false, fullResync = fals
     id:           String(r.id),
     supplementId: String(r.supplementId),
     logDate:      String(r.logDate),
+    // BF-3 — the pull carries the stamped dose. Dropping it here is the "chain half-done" shape:
+    // the columns exist server-side and locally, and a fresh device would still show every past log
+    // at the definition's current dose, which is the bug the columns were added to stop.
+    amount:       typeof r.amount === 'number' ? r.amount : null,
+    unit:         r.unit ? String(r.unit) : null,
+    doseText:     r.doseText ? String(r.doseText) : null,
     updatedAt:    toIso(r.updatedAt),
     deletedAt:    r.deletedAt ? toIso(r.deletedAt) : null,
     syncStatus:   'synced' as const,
@@ -748,6 +756,43 @@ export async function restoreFromCloud(
   return { synced: total, failed: false };
 }
 
+/**
+ * The dose a `supplement_logs` mutation was actually taken at (BF-3).
+ *
+ * A mutation queued offline can drain days later. `logSupplement` falls back to the definition's
+ * CURRENT dose when the payload carries none — right for the web route, where the log and the stamp
+ * are the same instant, and wrong here: after a titration it would write the new dose onto an old
+ * act, which is the exact rewrite these columns exist to stop.
+ *
+ * The local row already holds what was stamped at log time (`upsertSupplementLog` fills it from the
+ * local definition), so reading it back is what closes that window — and it closes it for the
+ * INSTALLED client, which sends no dose and does not need to change.
+ *
+ * Anything else is passed through untouched. A read that fails falls back to the original payload:
+ * a mutation pushed without its dose is worse than one not pushed at all only if it is also wrong,
+ * and the server's fallback is the definition, which is what today already does.
+ */
+async function enrichPayload(
+  store: Awaited<ReturnType<typeof getLocalStore>>,
+  m: { domain: string; date: string; payload: Record<string, unknown> },
+): Promise<Record<string, unknown>> {
+  if (m.domain !== 'supplement_logs' || m.payload.deleted) return m.payload;
+  if (typeof m.payload.supplementId !== 'string') return m.payload;
+  try {
+    const rows = await store!.getSupplementLogs(String(m.payload.logDate ?? m.date));
+    const row = rows.find(r => r.supplementId === m.payload.supplementId);
+    if (!row) return m.payload;
+    return {
+      ...m.payload,
+      amount: row.amount ?? null,
+      unit: row.unit ?? null,
+      doseText: row.doseText ?? null,
+    };
+  } catch {
+    return m.payload;
+  }
+}
+
 export async function pushMutations(userId: string): Promise<{ pushed: number } | null> {
   const store = getLocalStore(userId);
   if (!store) return null;
@@ -798,7 +843,9 @@ export async function pushMutations(userId: string): Promise<{ pushed: number } 
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          mutations: chunk.map(m => ({ id: m.id, domain: m.domain, date: m.date, payload: m.payload })),
+          mutations: await Promise.all(
+            chunk.map(async m => ({ id: m.id, domain: m.domain, date: m.date, payload: await enrichPayload(store, m) })),
+          ),
         }),
       });
     } catch {

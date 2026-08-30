@@ -37,6 +37,17 @@
 
 **The accessibility scanner that would have passed a 12 px button (Q-282).** `@axe-core/playwright` was installed, measured and removed: WCAG 2.5.8 exempts a *spaced* undersized control, so a deliberately-shrunk **12×12** button (confirmed by `boundingBox`) came back a **pass**, and `color-contrast` cannot read this app at all — it fails to parse the `oklch` tokens (*"Could not parse color string oklab(…)"*) and **evaluated no nodes on Home**. `e2e/touch-target-size.spec.ts` ships instead: DOM geometry against **this repo's 48 dp bar**, covering the roles `globals.css`'s `button, [role="button"]` floor cannot (`<a>`, `role="tab"`, `role="radio"`). It fails on the mutation axe passed. One real finding, **LB-26**: Home's APK-banner link is 258×33 ([journal](docs/overview/entries/2026-08-30-touch-target-gate.md)).
 
+**Changing a supplement's dose no longer rewrites every log you already made (BF-3, gap 1).** The
+dose lived on the definition and not on the log, so raising retatrutide from 2 mg to 4 mg made last
+month read 4 mg too — for a drug whose whole story is its escalation schedule, the schedule was what
+got erased, and nothing recorded it to reconstruct from. The dose is now stamped on the log
+(migration 244, local SQLite **v32**), including the free-text form, **so it works with the dose
+already typed in and needed no UI change**. The out-of-app note the entry advised keeping is no
+longer needed. **Not yet on the S25, and a v32 local migration is the highest-risk kind here** — an
+empty Nutrition tab is the signature of a dead local store. Gaps 2 and 3 (twice a day, weekly
+cadence) and the dose-entry UI stay queued
+([journal](docs/overview/entries/2026-08-30-feat-supplement-dose-on-log.md)).
+
 **A shared meal label now carries the meal, not a pointer to it (BF-57, engine half).** Scanning
 someone else's label said *"That saved meal no longer exists"* — the QR held a `saved_meals.id` and
 the scan resolved it against the scanner's own meals, so it was never going to be found. Making ids
