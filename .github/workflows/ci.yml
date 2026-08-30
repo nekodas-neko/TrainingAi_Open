@@ -416,6 +416,9 @@ jobs:
       - name: A learning-mode device cannot reach the scoring inputs
         run: node scripts/check-learning-mode-isolation.js
 
+      - name: No async function resolves to a Capacitor plugin proxy
+        run: node scripts/check-plugin-proxy-thenable.js
+
   migrations:
     name: Migration Check
     runs-on: ubuntu-latest

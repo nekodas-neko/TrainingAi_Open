@@ -24,8 +24,23 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.395.2 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Version:** v1.395.4 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-08-30.
+
+**The Voice button was not broken on the APK, it was absent (LA-37).** One `error_events` row from
+02:06 — `"SpeechRecognition.then()" is not implemented on android` — and behind it a completely dead
+feature. `getNativeSpeech()` returned the raw `registerPlugin()` **Proxy**, whose `get` trap answers
+every key with a callable, `then` included; resolving an async function's promise with it makes the
+runtime call `plugin.then(...)` across the bridge. **It hangs rather than rejecting** — Capacitor
+ignores the resolve/reject it was handed — so `available` stayed `null` and the button never
+rendered. `lib/oura-ble/plugin.ts` has documented this footgun since it was written and all four
+locally-registered plugins wrap because of it; the voice button escaped because its plugin comes
+from a **community package**, so no grep for `registerPlugin` ever reached the file.
+`scripts/check-plugin-proxy-thenable.js` now keys on the *shape* instead (Custom Rules is 62 steps).
+**The precision matters:** `return BleClient` at two other sites looks identical and is correct —
+that one is a plain instance, not a proxy — so the check exempts it by name with the reason.
+JS-only, so it reaches the phone on deploy with no APK rebuild. ⚠️ Unpressed on the S25
+([journal](docs/overview/entries/2026-08-30-voice-plugin-proxy-thenable.md)).
 
 **Nine percent of My Foods was the same food, written again (BF-38, the exact-match half).**
 Measured in production: **221 `food_items`, 200 distinct name+brand, 21 redundant**, 20 of them from
@@ -532,6 +547,23 @@ order.
 > An entry only leaves when **nothing is still owed**: no open work, no pending owner or device
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
+
+### [workouts][devices] ⚠️ Voice logging should render again on the APK; the button has not been pressed (LA-37, v1.395.4)
+
+Found in `error_events`, not reported — the symptom was an **absent** button, not a broken one, so
+there was nothing to report. `getNativeSpeech()` resolved to a raw `registerPlugin()` proxy, the
+promise never settled, `available` stayed `null`, and the control was never drawn.
+
+**Why no check could have caught it before:** `Capacitor.isNativePlatform()` is false in `pnpm dev`
+and in Playwright, so the native branch never runs outside a real WebView. The fix is proven by unit
+tests that reproduce Capacitor's proxy trap and by `scripts/check-plugin-proxy-thenable.js`, and
+neither of those is the device.
+
+**Smoke step:** on the S25, open a workout, confirm the **Voice** button is drawn, press it, say a
+weight and reps, and check the set fills in. A denied microphone permission should now say so rather
+than flipping silently back to "Voice".
+
+JS-only — it reaches the phone on the next Railway deploy, no APK rebuild.
 
 ### [nutrition][devices] ⚠️ Duplicate foods stop being created; the device half has not been seen on the S25 (BF-38, v1.395.2)
 

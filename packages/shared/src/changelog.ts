@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.395.4",
+    date: "2026-08-30",
+    changes: [
+      "The Voice button on the workout screen is back. It had not been broken \u2014 it was not being drawn at all on the phone, because the code that checks whether speech recognition is available never finished running. Nothing reported it: the button was simply absent, and the failure cannot happen in a browser, so every automated check passed. A new build check now looks for the same mistake anywhere else in the app.",
+    ],
+  },
+  {
     version: "1.395.3",
     date: "2026-08-30",
     changes: [

@@ -15,12 +15,29 @@ function getSR(): AnySpeechRecognition | undefined {
 
 // Guarded dynamic import, same shape as every other native module in this app: a browser (or an
 // older APK built before the plugin existed) resolves to null and falls through to the web path.
-async function getNativeSpeech() {
+//
+// **Returns `{ plugin }`, never the plugin itself** — the same wrapper, for the same reason,
+// as `getOuraBle()` in `lib/oura-ble/plugin.ts`, which documents it in full. `registerPlugin()`
+// hands back a Proxy whose `get` trap answers EVERY property with a callable, `then` included, so
+// resolving this async function's promise with it makes the promise-resolution algorithm read
+// `.then`, find a function, treat the proxy as a thenable and invoke `SpeechRecognition.then()`
+// across the bridge. **The result is a HANG, not a rejection** — Capacitor's wrapper ignores the
+// `resolve`/`reject` it was handed and returns a rejected promise instead, so nothing ever settles
+// this one and the bridge error escapes as an unhandled rejection. The `catch` here cannot see it
+// either way: the body has already returned.
+//
+// This shipped, and production `error_events` reported the escaped error verbatim on 2026-08-30:
+// `"SpeechRecognition.then()" is not implemented on android`. Because this function never settled,
+// the availability effect never continued, `available` stayed `null`, and **the Voice button did
+// not render on the APK at all**. The four locally-registered plugins all wrap; this one did not, because its plugin comes
+// from a community package and so a grep for `registerPlugin` never reached the file.
+// `scripts/check-plugin-proxy-thenable.js` now looks for the shape rather than the call.
+async function getNativeSpeech(): Promise<{ plugin: AnySpeechRecognition } | null> {
   try {
     const { Capacitor } = await import('@capacitor/core')
     if (!Capacitor.isNativePlatform()) return null
     const { SpeechRecognition } = await import('@capacitor-community/speech-recognition')
-    return SpeechRecognition
+    return { plugin: SpeechRecognition }
   } catch { return null }
 }
 
@@ -58,27 +75,28 @@ export function VoiceLogButton({ onResult }: { onResult: (weight?: number, reps?
   }, [])
 
   const runNative = useCallback(async () => {
-    const native = await getNativeSpeech()
-    if (!native) return
-    if (listening) {
-      await native.stop().catch(() => {})
-      setListening(false)
-      return
-    }
     setError(null)
     try {
-      const perm = await native.requestPermissions()
+      const native = await getNativeSpeech()
+      if (!native) return
+      const { plugin } = native
+      if (listening) {
+        await plugin.stop().catch(() => {})
+        setListening(false)
+        return
+      }
+      const perm = await plugin.requestPermissions()
       if (perm.speechRecognition !== 'granted') {
         // Fail visibly. The old behaviour — flip straight back to "Voice" with no explanation — is
         // indistinguishable from the bug this replaces.
         setError('Microphone permission denied')
         return
       }
-      const { available: ok } = await native.available()
+      const { available: ok } = await plugin.available()
       if (!ok) { setError('Speech recognition unavailable on this device'); return }
 
       setListening(true)
-      const res = await native.start({
+      const res = await plugin.start({
         language: 'en-US',
         maxResults: 1,
         partialResults: false,
