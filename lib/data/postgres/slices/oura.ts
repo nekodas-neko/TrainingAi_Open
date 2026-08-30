@@ -482,9 +482,20 @@ export async function upsertOuraSleep(db: Db, userId: string, sessions: OuraSlee
 
 // ── Heart Rate ─────────────────────────────────────────────────────────────────
 
+/**
+ * How long the raw heart-rate series is kept. Two mesocycles of workout HR detail; derived
+ * per-session stats live in `exercise_logs`/`set_logs` and are unaffected by pruning it.
+ *
+ * **Exported, and written once.** The number lived in two places — the prune's SQL literal below and
+ * `ZONE_HR_RETENTION_DAYS` further down, which exists precisely *because* of the prune. A retention
+ * window is a boundary tests place fixtures against, and an invisible one is a fixture that expires:
+ * `batch-upsert-duplicate-collapse.test.ts` hardcoded a date that crossed this horizon on
+ * 2026-08-29 and took `main` red, because the unawaited prune below deleted the rows it had just
+ * written. That test now derives its fixtures from this constant.
+ */
+export const HR_RETENTION_DAYS = 180
+
 // Throttled retention prune — fires at most once per 24h, fire-and-forget.
-// 180 days keeps two mesocycles of workout HR detail; derived per-session
-// stats live in exercise_logs/set_logs and are unaffected by pruning the raw series.
 let lastHeartrateStorePrune = 0
 const HR_PRUNE_THROTTLE_MS = 24 * 60 * 60 * 1000
 
@@ -518,7 +529,7 @@ export async function upsertOuraHeartrate(db: Db, userId: string, rows: { timest
   const now = Date.now()
   if (shouldPrune(lastHeartrateStorePrune, now, HR_PRUNE_THROTTLE_MS)) {
     lastHeartrateStorePrune = now
-    db.execute(sql`DELETE FROM oura_heartrate WHERE timestamp < now() - interval '180 days'`).catch(err => console.error('[prune] oura_heartrate failed:', err))
+    db.execute(sql`DELETE FROM oura_heartrate WHERE timestamp < now() - (${HR_RETENTION_DAYS} || ' days')::interval`).catch(err => console.error('[prune] oura_heartrate failed:', err))
   }
 }
 
@@ -792,10 +803,11 @@ function eachDay(fromDay: string, toDay: string): string[] {
   return out
 }
 
-// Days older than this can no longer be recomputed — the raw oura_heartrate series is pruned at
-// 180 days (upsertOuraHeartrate above). So a cached day past this horizon keeps its frozen split
-// even on a profile mismatch: it is the permanent record once HR thins (review H-4, Design §2).
-const ZONE_HR_RETENTION_DAYS = 180
+// Days older than this can no longer be recomputed — the raw oura_heartrate series is pruned at the
+// same horizon (`HR_RETENTION_DAYS`, upsertOuraHeartrate above), which is why this reads it rather
+// than repeating the number. So a cached day past it keeps its frozen split even on a profile
+// mismatch: it is the permanent record once HR thins (review H-4, Design §2).
+const ZONE_HR_RETENTION_DAYS = HR_RETENTION_DAYS
 
 /** Delete cached daily_zone_minutes rows for `userId` on/after `fromDay` (inclusive). Called by the
  *  BLE rollup after it delete-and-reinserts oura_heartrate across its window, so those days are
