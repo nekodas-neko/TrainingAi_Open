@@ -4,22 +4,24 @@
 > is how six concurrent sessions stay tellable apart; a renamed successor is a lost thread even with a
 > perfect baton.
 
-**Updated:** 2026-08-26 · **By:** the tenth session to run as Lane A · **Next ID:** `LA-34`
+**Updated:** 2026-08-30 · **By:** the eleventh session to run as Lane A · **Next ID:** `LA-41`
 (`grep -rhoE '\bLA-[0-9]+\b' docs/ | sort -t- -k2 -n | tail -1` is the authority, not this line)
-**Migrations:** directory head **234**, next free **235** — claim against open PRs too, not just the
-directory. Local SQLite **v30**.
+**Migrations:** directory head **246**, next free **247** — claim against open PRs too, not just the
+directory. Local SQLite **v32**.
 
 ## Now
 
-**Nothing of Lane A's is open or blocked.** Thirteen PRs this session (list below); the last, Q-519's
-engine half, is in CI as this is written. `docs/implementation-backlog.md` is **206 entries** — it
-grew while this session shrank it, because five agents are filing into it concurrently.
+**Nothing of Lane A's is open or blocked.** Six PRs on 2026-08-30 (#634, #635, #636, #637, #638,
+#639); `docs/implementation-backlog.md` is **212 entries** — it grows while a session shrinks it,
+because five agents file into it concurrently.
 
 Start with `node scripts/next-item.js --lane A` and read its real output — see the next section.
 
-**The queue's remaining Lane A work is almost entirely owner- or device-gated**, and the owner has
-said explicitly (2026-08-26) to *leave the stuff gated on me for later and continue working through
-the queue of what you can do*. So the honest state at the top of READY is:
+**⚠️ This baton used to call the remaining work "almost entirely owner- or device-gated". Wrong, and
+it propagated — a session read the ~21 scoring entries at the top of READY, called the queue blocked,
+then shipped six startable items from below them. Scroll past the scoring block.** Owner, 2026-08-26:
+*leave the stuff gated on me for later and continue working through the queue of what you can do*.
+Top of READY:
 
 - **Q-289 / Q-290 / Q-272 / Q-507 / Q-508 / Q-422 / TN-10** — scoring calibrations. *Tuning proposes
   → owner signs off → Lane A implements.* Not Lane A's to start.
@@ -62,13 +64,12 @@ work would still have been wrong.
 
 ## Shipped this session
 
-Thirteen PRs. **Q-280** (SQLSTATE 21000 on eight batch upserts, via a shared `collapseOnConflict`) ·
-**Q-528** (`replaceOuraDailySummary` — three defects, wrapped in a transaction) · **BF-19**
-(app-load telemetry, migrations **229/230**, SQLite **v30**) · **Q-403** (the Coach swap now states
-it changes the program, and only fires when asked) · **LA-22** (E2E gated on UI paths) · **LA-33**
-(the doc-size ledger split one file per doc) · **Q-501** (readiness contributors record their own
-input) · **Q-526** (the Activity score stores its six components) · **the Q-519 audit** (docs) ·
-**Q-519 engine half** (migrations **233/234**, `manual_sleep_start`).
+**2026-08-30, six PRs.** **Q-311** (CI signing keys explained; dead `SESSION_SECRET` deleted from
+four places) · **Q-225** (the sleep truncation guard finally has a test that fails without it) ·
+**Q-297** (Nutrition's day navigation; four of its five asks had already shipped) · **Q-527** (a
+body-fat plausibility band, and two live surfaces that bypassed it) · **Q-211** (a baseline lift
+exempt from a deload week — two guards, not the one the entry named) · **LA-40** (the OTS scorer no
+longer throws for an age it has no row for).
 
 Earlier sessions' PRs are in the journal entries; this list stays to the current session.
 
@@ -155,6 +156,10 @@ cluster (*"do it"*), the device run (*"it's fine — I'll run it as written"*).
   before changing anything.
 - **Q-549 / Q-551** — Railway cost and hosting decisions.
 - **The device run: 13 entries**, the owner has agreed to run the checklist as written.
+- **Null the corrupt `body_comp` snapshot (2026-07-29)?** Q-527's guard is forward-only, so the row
+  survives and Q-521 will read it. Recommended; the measurement stays in `body_metrics` either way.
+- **Drop `oura_heartrate_user_updated`?** 18 MB, zero scans; reverses part of Q-180. It is Q-283's
+  only material candidate, so that entry cannot finish without this call.
 
 ## Claimed paths
 

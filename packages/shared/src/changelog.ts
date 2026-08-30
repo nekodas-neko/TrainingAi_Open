@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.402.1",
+    date: "2026-08-30",
+    changes: [
+      "A baseline test is no longer cut to half weight during a deload week. It was being prescribed light and then recorded as a genuine max attempt \u2014 the 1RM estimate and personal records both treat a baseline that way on purpose \u2014 so every baseline taken in a deload week understated you permanently. A per-exercise deload the coach applies for soreness is unchanged: that one already keeps its result out of your records, so there was nothing to reconcile.",
+    ],
+  },
+  {
     version: "1.402.0",
     date: "2026-08-30",
     changes: [
