@@ -3725,3 +3725,17 @@ the entry has to say what was measured on production, that the redaction follows
 rather than the view's owner (which is what stops the next session trying `security_invoker`), and
 what `pg_read_all_stats` does and does not widen. Left shorter it reads as "grant this", and the one
 thing an owner-gated entry must not do is hide the trade-off it is asking about.
+
+## 2026-08-30 — `docs/implementation-backlog.md` 13704 → 13749 (BF-55's measurement landed in the entry)
+
+45 lines, and they are a table plus the two things the table alone does not say.
+
+The first is that the entry's own rule — *"an index never scanned is a candidate to drop"* — is wrong
+for three of the four zeros it turned up: `idx_scan` counts reads, not constraint enforcement, so a
+PRIMARY KEY or UNIQUE index consulted on every insert reads as never used. Deleting that paragraph to
+save lines would leave a correct-looking rule that recommends dropping constraints.
+
+The second is that the one real candidate, at 18 MB, is the keyset index for a method **Q-180
+deliberately kept** on the stated ground that *"it costs nothing at runtime"*. Reversing part of a
+signed-off decision needs the decision quoted and the new number beside it, or the next reader is
+choosing between two sentences with no evidence attached to either.
