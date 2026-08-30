@@ -10298,6 +10298,20 @@ shared-catalogue maintenance (keyed by exercise name, no per-user row, admin-wri
 attribution across the 246 (~246 runs, ~5.5 h), and the fact that only the DB tests have ever been
 measured, not the ~3,300-test full suite.
 
+**Re-counted 2026-08-30: it is 278 predicates, not 246** — the data layer grew 32 while this entry
+sat. New since the sweep: `slices/meal-plans.ts` (18), `oura-raw-pack.ts` (5), `oura-raw-frames.ts`
+(3), `colmi.ts` (3), plus growth in `adapter.ts` (139 → 125 as code moved out) and `oura.ts`
+(33 → 43). **So every ratio in this entry is against a stale denominator** — "93 of 246" is a
+bound measured on a smaller data layer, and the un-measured share has grown, not shrunk.
+
+**The full-suite measurement is BLOCKED in the sandbox, and that is worth knowing before planning
+it.** Residual 2 is one run, not 246: neutralise all 278 predicates at once and run the whole suite
+rather than the DB subset. Attempting it on 2026-08-30 was **refused by the environment's safety
+classifier** — correctly, since the mechanical action is "delete every user-scoping check in the
+data layer", which is indistinguishable from the thing this entry exists to prevent. Do not try to
+work around it. Either the owner runs it locally, or it needs an explicit permission grant; a
+session that plans this residual without knowing that will lose the time twice.
+
 ### [app-shell] ⏳ Q-151 — WATCH ONLY, nothing to implement — the sign-in React #418 did not reproduce and the whole series stopped
 
 - **Skip this when working the queue top-down.** It is a dated re-check, not a task.
