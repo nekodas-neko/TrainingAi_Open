@@ -403,6 +403,11 @@ export interface LocalFoodLog {
   date:               string;
   mealTypeId:         string;
   foodItemId:         string;
+  /** BF-39. The saved meal this row came from, when it came from one — WHAT was eaten. */
+  savedMealId?:       string | null;
+  /** BF-39. One id per logging occasion. Two servings of one meal on a day share `savedMealId`
+   *  and differ here, which is why the diary groups on this. */
+  mealGroupId?:       string | null;
   quantityMultiplier: number;
   loggedAt:           string;
   updatedAt:          string;

@@ -481,6 +481,10 @@ export async function pullDelta(userId: string, force = false, fullResync = fals
     date:               String(r.date),
     mealTypeId:         String(r.mealTypeId),
     foodItemId:         String(r.foodItemId),
+    // BF-39. Mapped rather than dropped: the delta carries the grouping, and a device that lost it
+    // here would re-render a logged meal as loose ingredients after every pull.
+    savedMealId:        r.savedMealId ? String(r.savedMealId) : null,
+    mealGroupId:        r.mealGroupId ? String(r.mealGroupId) : null,
     quantityMultiplier: Number(r.quantityMultiplier),
     loggedAt:           toIso(r.loggedAt),
     updatedAt:          toIso(r.updatedAt),

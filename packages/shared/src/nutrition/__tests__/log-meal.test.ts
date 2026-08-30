@@ -137,3 +137,62 @@ describe('savedMealItemToWithItem', () => {
     expect(wi.proteinG).toBe(5) // 3.33 * 1.5 = 4.995 -> r1 -> 5
   })
 })
+
+// BF-39 — every ingredient of one logging carries the same group, and the group is not the meal.
+//
+// This is the whole of the write half. The diary draws one row per `mealGroupId`, so if the items
+// of one logging disagreed the meal would split, and if two loggings agreed they would merge and
+// the second serving would vanish into the first.
+describe('logMealItems — meal identity (BF-39)', () => {
+  beforeEach(() => { vi.clearAllMocks() })
+
+  const twoItemMeal = (): SavedMeal => ({
+    id: 'meal-bf39', userId: 'u1', name: 'Protein Pancakes', createdAt: new Date(),
+    items: [1, 2].map(n => ({
+      id: `smi-${n}`, savedMealId: 'meal-bf39', foodItemId: `item-${n}`, quantityMultiplier: 1,
+      foodItem: {
+        id: `item-${n}`, userId: 'u1', name: `Ingredient ${n}`, servingSizeG: 100,
+        calories: 100, proteinG: 5, carbsG: 10, fatG: 2, source: 'manual', region: 'AU',
+        createdAt: new Date(),
+      },
+    })),
+    totals: { calories: 200, proteinG: 10, carbsG: 20, fatG: 4 },
+  })
+
+  const groupsFrom = (mock: { mock: { calls: unknown[][] } }) =>
+    mock.mock.calls.map(c => (c[0] as { mealGroupId?: string | null }).mealGroupId)
+
+  it('stamps every row of one logging with the SAME group, and the meal on each', async () => {
+    const logs = await logMealItems(twoItemMeal(), '2026-08-30', 'mt-1', 'u1')
+
+    expect(fakeStore.upsertFoodLog).toHaveBeenCalledTimes(2)
+    const groups = groupsFrom(fakeStore.upsertFoodLog)
+    expect(new Set(groups).size).toBe(1)
+    expect(groups[0]).toBeTruthy()
+    for (const call of fakeStore.upsertFoodLog.mock.calls) {
+      expect((call[0] as { savedMealId?: string }).savedMealId).toBe('meal-bf39')
+    }
+    // …and the optimistic rows carry it, so the caller groups without a refetch that would blank them.
+    expect(new Set(logs.map(l => l.mealGroupId)).size).toBe(1)
+    expect(logs.every(l => l.savedMealId === 'meal-bf39')).toBe(true)
+  })
+
+  it('gives a SECOND logging of the same meal a different group', async () => {
+    await logMealItems(twoItemMeal(), '2026-08-30', 'mt-1', 'u1')
+    const first = groupsFrom(fakeStore.upsertFoodLog)[0]
+    vi.clearAllMocks()
+    await logMealItems(twoItemMeal(), '2026-08-30', 'mt-1', 'u1')
+    const second = groupsFrom(fakeStore.upsertFoodLog)[0]
+
+    // Same meal, same day, same meal type — and two servings the diary must keep apart.
+    expect(second).not.toBe(first)
+  })
+
+  it('puts both on the queued mutation, or the server gets ungrouped rows', async () => {
+    await logMealItems(twoItemMeal(), '2026-08-30', 'mt-1', 'u1')
+    const payloads = fakeStore.queueMutation.mock.calls.map(c => (c[0] as { payload: Record<string, unknown> }).payload)
+    expect(payloads).toHaveLength(2)
+    for (const p of payloads) expect(p.savedMealId).toBe('meal-bf39')
+    expect(new Set(payloads.map(p => p.mealGroupId)).size).toBe(1)
+  })
+})

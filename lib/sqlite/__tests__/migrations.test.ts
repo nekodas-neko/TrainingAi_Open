@@ -5,7 +5,23 @@ describe('local schema', () => {
   // The describe and the title used to say v25 while the assertion said 27 — a stale label on a
   // guard whose whole job is to be the authority on the number. Named after what it checks now.
   it('tops out at the current version', () => {
-    expect(Math.max(...MIGRATIONS.map(m => m.toVersion))).toBe(30)
+    expect(Math.max(...MIGRATIONS.map(m => m.toVersion))).toBe(31)
+  })
+
+  // BF-39. The trap this file exists for: a column added to a `CREATE TABLE IF NOT EXISTS` body
+  // reaches FRESH INSTALLS ONLY, because the create is a no-op on a device that already has the
+  // table. Both columns need the ALTER as well, and a RECONCILE_COLUMNS row in case it half-applies.
+  it('v31 adds the meal columns by ALTER, not only in the CREATE body', () => {
+    const v31 = MIGRATIONS.find(m => m.toVersion === 31)!
+    const ddl = v31.statements.join('\n')
+    expect(ddl).toContain('ALTER TABLE food_logs ADD COLUMN saved_meal_id')
+    expect(ddl).toContain('ALTER TABLE food_logs ADD COLUMN meal_group_id')
+    for (const column of ['saved_meal_id', 'meal_group_id']) {
+      expect(
+        RECONCILE_COLUMNS.some(c => c.table === 'food_logs' && c.column === column),
+        `food_logs.${column} missing from RECONCILE_COLUMNS`,
+      ).toBe(true)
+    }
   })
 
   it('v23 creates the meal-plan tables without any ALTER', () => {

@@ -44,6 +44,7 @@ export function rowToFoodLog(r: typeof s.foodLogs.$inferSelect): FoodLog {
   return {
     id: r.id, userId: r.userId, date: r.date,
     mealTypeId: r.mealTypeId, foodItemId: r.foodItemId,
+    savedMealId: r.savedMealId ?? null, mealGroupId: r.mealGroupId ?? null,
     quantityMultiplier: r.quantityMultiplier, loggedAt: r.loggedAt,
   }
 }
@@ -309,6 +310,8 @@ export async function listFoodLogs(db: Db, userId: string, date: string): Promis
     logFoodItemId: s.foodLogs.foodItemId,
     logQty:        s.foodLogs.quantityMultiplier,
     loggedAt:      s.foodLogs.loggedAt,
+    savedMealId:   s.foodLogs.savedMealId,
+    mealGroupId:   s.foodLogs.mealGroupId,
     item:          s.foodItems,
   })
     .from(s.foodLogs)
@@ -316,11 +319,14 @@ export async function listFoodLogs(db: Db, userId: string, date: string): Promis
     .where(and(eq(s.foodLogs.userId, userId), eq(s.foodLogs.date, date), isNull(s.foodLogs.deletedAt)))
     .orderBy(asc(s.foodLogs.loggedAt))
 
-  return rows.map(({ item, logId, logUserId, logDate, logMealTypeId, logFoodItemId, logQty, loggedAt }) => {
+  return rows.map(({ item, logId, logUserId, logDate, logMealTypeId, logFoodItemId, logQty, loggedAt, savedMealId, mealGroupId }) => {
     const foodItem = rowToFoodItem(item)
     return {
       id: logId, userId: logUserId, date: logDate,
       mealTypeId: logMealTypeId, foodItemId: logFoodItemId,
+      // BF-39. The diary groups on `mealGroupId`; without it here the rows arrive as siblings and
+      // the grouping has to be re-derived from nothing.
+      savedMealId: savedMealId ?? null, mealGroupId: mealGroupId ?? null,
       quantityMultiplier: logQty, loggedAt,
       foodItem,
       ...computeLogMacros(foodItem, logQty),
@@ -376,7 +382,8 @@ async function resolveLogEatenAt(db: Db, userId: string, mealTypeId: string, dat
 export async function createFoodLog(
   db: Db,
   userId: string,
-  data: Pick<FoodLog, 'date' | 'mealTypeId' | 'foodItemId' | 'quantityMultiplier'> & { id?: string; loggedAt?: Date },
+  data: Pick<FoodLog, 'date' | 'mealTypeId' | 'foodItemId' | 'quantityMultiplier'>
+    & { id?: string; loggedAt?: Date; savedMealId?: string | null; mealGroupId?: string | null },
 ): Promise<FoodLog> {
   const { id, loggedAt, ...rest } = data
   // The client's `loggedAt` is a CANDIDATE, not an answer — an offline replay carries the instant
@@ -388,7 +395,26 @@ export async function createFoodLog(
     .values({ ...(id ? { id } : {}), loggedAt: eatenAt, userId, ...rest })
     .onConflictDoUpdate({
       target: s.foodLogs.id,
-      set: { quantityMultiplier: rest.quantityMultiplier, updatedAt: new Date() },
+      // BF-39: the meal columns are set here too — but **only when the caller supplied them**.
+      //
+      // **Measured, so it is not overclaimed:** with today's callers this arm is inert. The only
+      // id-bearing caller is the offline push, and a replay carries the same payload it carried the
+      // first time, so nothing here changes a value. It is kept for the reason CLAUDE.md gives about
+      // inert cache invalidations — it becomes load-bearing the moment a caller updates a log's
+      // grouping, and the alternative is discovering that then.
+      //
+      // The `?? null` form is NOT equivalent and is the part that is load-bearing today: it would
+      // make every id-bearing upsert that does not know about meals STRIP the grouping off a row
+      // that had one, silently. Mutation testing is what separated the two.
+      //
+      // The `setWhere` user scope is what makes the arm safe at all — an UPDATE arm is still an
+      // UPDATE (CLAUDE.md, write-path ownership).
+      set: {
+        quantityMultiplier: rest.quantityMultiplier,
+        ...(rest.savedMealId !== undefined ? { savedMealId: rest.savedMealId } : {}),
+        ...(rest.mealGroupId !== undefined ? { mealGroupId: rest.mealGroupId } : {}),
+        updatedAt: new Date(),
+      },
       setWhere: eq(s.foodLogs.userId, userId),
     })
     .returning()
@@ -397,13 +423,28 @@ export async function createFoodLog(
 
 // Confirms the meal type and food item both exist and belong to the user — used to
 // validate a food-log create request before writing.
-export async function foodLogRefsValid(db: Db, userId: string, mealTypeId: string, foodItemId: string): Promise<boolean> {
+export async function foodLogRefsValid(
+  db: Db, userId: string, mealTypeId: string, foodItemId: string,
+  savedMealId?: string | null,
+): Promise<boolean> {
   const [mt] = await db.select({ id: s.mealTypes.id }).from(s.mealTypes)
     .where(and(eq(s.mealTypes.id, mealTypeId), eq(s.mealTypes.userId, userId), isNull(s.mealTypes.deletedAt))).limit(1)
   if (!mt) return false
   const [fi] = await db.select({ id: s.foodItems.id }).from(s.foodItems)
     .where(and(eq(s.foodItems.id, foodItemId), eq(s.foodItems.userId, userId))).limit(1)
-  return !!fi
+  if (!fi) return false
+  // BF-39. `savedMealId` is a client-supplied row id like the other two, so it gets the same
+  // ownership check — otherwise a log could name someone else's meal and the diary would render
+  // its name and picture over the owner's food. Absent is fine (an ordinary single-food log);
+  // present-and-not-yours is a rejection, not a silent null.
+  if (savedMealId != null) {
+    const [sm] = await db.select({ id: s.savedMeals.id }).from(s.savedMeals)
+      // No `deletedAt` filter: `saved_meals` has no such column — a saved meal is hard-deleted, which
+      // is exactly why the FK is ON DELETE SET NULL rather than RESTRICT.
+      .where(and(eq(s.savedMeals.id, savedMealId), eq(s.savedMeals.userId, userId))).limit(1)
+    if (!sm) return false
+  }
+  return true
 }
 
 export async function updateFoodLog(db: Db, id: string, userId: string, quantityMultiplier: number): Promise<FoodLog> {

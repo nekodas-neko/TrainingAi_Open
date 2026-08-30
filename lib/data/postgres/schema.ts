@@ -595,6 +595,12 @@ export const foodLogs = pgTable('food_logs', {
   date:               text('date').notNull(),
   mealTypeId:         uuid('meal_type_id').notNull().references(() => mealTypes.id, { onDelete: 'restrict' }),
   foodItemId:         uuid('food_item_id').notNull().references(() => foodItems.id, { onDelete: 'restrict' }),
+  // BF-39 (migration 238). `savedMealId` is WHAT was eaten; `mealGroupId` is WHICH TIME. Two
+  // servings of the same meal on one day share the first and must not share the second, so the
+  // diary groups on the group and names the group from the meal. `ON DELETE SET NULL` on the FK:
+  // deleting a recipe must not erase the history of having eaten it, nor be blocked by it.
+  savedMealId:        uuid('saved_meal_id').references(() => savedMeals.id, { onDelete: 'set null' }),
+  mealGroupId:        uuid('meal_group_id'),
   quantityMultiplier: doublePrecision('quantity_multiplier').notNull().default(1.0),
   loggedAt:           timestamp('logged_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt:          timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),

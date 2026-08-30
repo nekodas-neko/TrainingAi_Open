@@ -3498,3 +3498,16 @@ know that will read "unit tests pass" as "verified". The status paragraph carrie
 the new CI check turns on (a `registerPlugin` proxy is the hazard; `BleClient`, which looks
 identical at two other call sites, is a plain instance and correct), because that is the sentence
 that stops the check being "fixed" into flagging two working files.
+
+## 2026-08-30 — `projectOverview.md` 8258 → 8291 (BF-39, engine half)
+
+One Current Status paragraph and one Known-Issues row.
+
+The row is not about the feature — nothing renders differently, because the rendering is Lane B. It
+is about the **local SQLite version bump**, which is the part with a history: the local DB has been
+silently dead twice from migration bugs, and both times every local read returned empty, which is
+where the recurring "my data disappeared" reports come from. So the row spends its length on why the
+two CI checks passing is not the same as the upgrade having run, and on a smoke step whose failure
+signature (an empty Nutrition tab, not a missing day) tells the two apart. A shorter row would leave
+the next reader to re-derive that, and the obvious wrong reading — "checks are green, it is fine" —
+is the one it exists to prevent.

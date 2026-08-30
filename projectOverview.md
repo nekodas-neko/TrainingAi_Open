@@ -27,6 +27,20 @@
 **Version:** v1.395.4 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-08-30.
 
+**A logged meal keeps its identity now (BF-39, engine half).** The owner's report was literal —
+*"when I add a meal from ai; it breaks it down into its components and floods the list"* — and one
+AI-logged breakfast really did render as **eight** diary rows. Logging a saved meal writes one
+`food_logs` row per ingredient and nothing recorded that they came from a meal. `saved_meal_id` and
+`meal_group_id` do (migration 238, `claude_ro` views regenerated in 239, local SQLite **v31**), and
+**two ids rather than one is the design**: the first is WHAT was eaten, the second WHICH TIME, so
+two servings of one meal on a day cannot merge into one row. Built as the entry recommended — one
+row per ingredient plus a grouping key, not one row per meal, which would change what a `food_logs`
+row *is* for five consumers. The full offline chain landed together, `savedMealId` is
+ownership-checked on both write paths, and the FK is `ON DELETE SET NULL` because `deleteSavedMeal`
+is a hard delete and the default would make a saved meal undeletable once eaten. ⚠️ **The rendering
+is Lane B and not built**, so nothing looks different yet, and nothing back-fills older logs
+([journal](docs/overview/entries/2026-08-30-food-log-saved-meal-id.md)).
+
 **The Voice button was not broken on the APK, it was absent (LA-37).** One `error_events` row from
 02:06 — `"SpeechRecognition.then()" is not implemented on android` — and behind it a completely dead
 feature. `getNativeSpeech()` returned the raw `registerPlugin()` **Proxy**, whose `get` trap answers
@@ -547,6 +561,25 @@ order.
 > An entry only leaves when **nothing is still owed**: no open work, no pending owner or device
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
+
+### [nutrition][devices] ⚠️ Local SQLite v31 has not been opened on the S25 (BF-39, 2026-08-30)
+
+BF-39's engine half adds two columns to the local `food_logs` table, which is a **local SQLite
+version bump** — and this project has had the local DB silently dead **twice** from migration bugs
+(a PRAGMA inside the upgrade transaction, and a non-idempotent `ADD COLUMN` rolling back the whole
+version). Both times every local read returned empty, which is the root of the recurring "my data
+disappeared" reports.
+
+The migration is written to the rules that came out of those two: the columns are in the
+`CREATE TABLE` body **and** in a v31 `ALTER` (the body alone reaches fresh installs only), and both
+carry `RECONCILE_COLUMNS` rows so a half-applied upgrade self-heals. `check-reconcile.js` and
+`check-local-column-upgrade-path.js` both pass. None of that is the device.
+
+**Smoke step:** open the app on the S25 after this deploys and confirm the Nutrition tab still shows
+today's food. An empty Nutrition tab is the signature of a dead local store, not of a lost day.
+
+Nothing renders differently by design — the diary grouping is Lane B — so this row is about the
+upgrade path, not the feature.
 
 ### [workouts][devices] ⚠️ Voice logging should render again on the APK; the button has not been pressed (LA-37, v1.395.4)
 

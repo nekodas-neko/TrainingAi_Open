@@ -14,8 +14,8 @@ silently misdirecting the next session. Update them in the same PR that consumes
 
 | Pointer | Value | Source of truth |
 |---|---|---|
-| Next free Postgres migration | **238** | `lib/data/postgres/migrations/` |
-| Local SQLite schema version | **v30** | `lib/sqlite/migrations.ts`; `lib/sqlite/__tests__/migrations.test.ts` asserts the max |
+| Next free Postgres migration | **240** | `lib/data/postgres/migrations/` |
+| Local SQLite schema version | **v31** | `lib/sqlite/migrations.ts`; `lib/sqlite/__tests__/migrations.test.ts` asserts the max |
 
 > **There is no third pointer any more.** Entry IDs are not allocated from a shared counter and
 > never were safely: a next-free pointer is a *floor*, not an authority, because it cannot see an
@@ -1449,6 +1449,18 @@ the match. `Gate: owner` when it is next picked up.
 > over"* had no good answer while the rows stayed flat.
 
 - **Lane:** A — a migration plus the write path; the diary rendering is B and follows.
+- **Keep:** the RENDERING, which is the half the owner can see, plus the MRU read. **The engine
+  shipped 2026-08-30** (migrations 238 + 239, local SQLite **v31**): `food_logs.saved_meal_id` and
+  `food_logs.meal_group_id`, stamped by `logMealItems` on both write paths, carried through the
+  outbox payload, the push branch, the sync delta, the pull mapping and the local read. **Shape (1)
+  was built, as recommended** — one row per ingredient, grouped — so nothing about a log row
+  changed and every existing query is untouched. What is owed:
+  - **Lane B:** the diary draws one collapsed parent row per `mealGroupId`, carrying the meal's name
+    and photo, expanding to the ingredients and their macro split. Both halves, per the re-report.
+  - **Lane A (small):** true MRU for My Foods — `max(logged_at)` per `saved_meal_id`, which
+    `idx_food_logs_saved_meal_recent` exists for. Derived on read, never a stored counter.
+  - **Nothing back-fills.** Meals logged before 2026-08-30 have both columns NULL and will keep
+    rendering as loose ingredients; there is no way to recover which rows belonged together.
 - **Added:** 2026-08-26 · owner: *"the meal is a complete in 'saved meal' and it can have a picture
   etc. but when adding it to the log; its broken down into its components so the image wont transfer
   over. not sure what the best way around this would be. maybe it needs to stay as a whole item."*

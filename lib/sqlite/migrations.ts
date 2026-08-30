@@ -223,6 +223,8 @@ export const RECONCILE_COLUMNS: { table: string; column: string; ddl: string }[]
   { table: 'saved_meals',     column: 'servings',       ddl: `ALTER TABLE saved_meals ADD COLUMN servings REAL NOT NULL DEFAULT 1` },
   { table: 'saved_meals',     column: 'image_data_uri',  ddl: `ALTER TABLE saved_meals ADD COLUMN image_data_uri TEXT` },
   { table: 'food_items',      column: 'image_data_uri',  ddl: `ALTER TABLE food_items ADD COLUMN image_data_uri TEXT` },
+  { table: 'food_logs',       column: 'saved_meal_id',  ddl: `ALTER TABLE food_logs ADD COLUMN saved_meal_id TEXT` },
+  { table: 'food_logs',       column: 'meal_group_id',  ddl: `ALTER TABLE food_logs ADD COLUMN meal_group_id TEXT` },
   { table: 'workout_sessions', column: 'deleted_at',  ddl: `ALTER TABLE workout_sessions ADD COLUMN deleted_at TEXT` },
   { table: 'workout_sessions', column: 'sync_status', ddl: `ALTER TABLE workout_sessions ADD COLUMN sync_status TEXT NOT NULL DEFAULT 'synced'` },
   { table: 'exercise_logs',    column: 'deleted_at',  ddl: `ALTER TABLE exercise_logs ADD COLUMN deleted_at TEXT` },
@@ -586,6 +588,11 @@ const CREATE_FOOD_LOGS = `CREATE TABLE IF NOT EXISTS food_logs (
   date                TEXT NOT NULL,
   meal_type_id        TEXT NOT NULL,
   food_item_id        TEXT NOT NULL,
+  -- BF-39. WHAT was eaten, and WHICH TIME. Two servings of one meal on a day share the first and
+  -- differ in the second, so the diary groups on meal_group_id and names the group from saved_meal_id.
+  -- On this side both are plain TEXT with no FK: the local store mirrors, it does not enforce.
+  saved_meal_id       TEXT,
+  meal_group_id       TEXT,
   quantity_multiplier REAL NOT NULL DEFAULT 1,
   logged_at           TEXT NOT NULL,
   updated_at          TEXT NOT NULL,
@@ -1309,6 +1316,17 @@ export const MIGRATIONS: UpgradeStatement[] = [
       // added to the CREATE TABLE body above reaches fresh installs ONLY — this ALTER is what
       // reaches everyone else, and the RECONCILE_COLUMNS row is the authority if it half-applies.
       `ALTER TABLE food_items ADD COLUMN image_data_uri TEXT`,
+    ],
+  },
+  {
+    toVersion: 31,
+    statements: [
+      // BF-39. Same shape again, and for the same reason: `food_logs` exists on every upgraded
+      // device, so `CREATE TABLE IF NOT EXISTS` is a no-op there and the columns added to its body
+      // above would reach fresh installs ONLY. These ALTERs reach everyone else; the two
+      // RECONCILE_COLUMNS rows are the authority if this upgrade half-applies.
+      `ALTER TABLE food_logs ADD COLUMN saved_meal_id TEXT`,
+      `ALTER TABLE food_logs ADD COLUMN meal_group_id TEXT`,
     ],
   },
 ];
