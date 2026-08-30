@@ -27,6 +27,16 @@
 **Version:** v1.395.6 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-08-30.
 
+**Query timings are readable by the audit role (BF-21).** The owner enabled `pg_stat_statements` on
+production; `claude_ro` is default-deny, so it needed a view, which migration 242 adds through the
+generator rather than by hand — that file rebuilds the whole schema each run, so a hand-written view
+would vanish at the next regeneration. **The one view here that is not row-scoped**, safely, because
+normalised query text carries shapes rather than values; five columns, and a test refuses the rest.
+Guarded on the relation existing, since the extension is production-only and an unguarded view would
+fail `ensureSchema` on cold start. **The counters start empty from the restart** — give it a day
+before drawing conclusions, and BF-19 already showed the database is not where the reported slowness
+is ([journal](docs/overview/entries/2026-08-30-feat-claude-ro-stat-statements.md)).
+
 **A meal plan the model never needed no longer fails when the model is down (LA-38).** The generate
 route called the AI unconditionally, before it knew how many meals it had to invent — so a plan with
 every slot pinned, or filled from your saved meals, still sent the full prompt asking for *exactly
