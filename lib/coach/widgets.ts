@@ -35,7 +35,18 @@ export type WidgetColorKey = (typeof WIDGET_COLOR_KEYS)[number]
  * rather than merely forbidden: the model never writes an id at all. That bug class shipped twice
  * in this feature already.
  */
-export const CHOICE_SOURCES = ['sessions', 'exercises', 'swap_candidates'] as const
+/**
+ * The lists the app can fill on the model's behalf.
+ *
+ * The first three come from the user's own program. The rest are the meal-plan flow's curated
+ * catalogues (Q-407): they were literals inside `meal-plan-setup-sheet.tsx` that the Coach would
+ * otherwise have had to type out — six store names, thirty-two staples — which is the ~554-output-
+ * token transcription this mechanism exists to stop.
+ */
+export const CHOICE_SOURCES = [
+  'sessions', 'exercises', 'swap_candidates',
+  'grocery_stores', 'proteins', 'carbs', 'fats', 'vegetables', 'dietary_restrictions',
+] as const
 export type ChoiceSource = (typeof CHOICE_SOURCES)[number]
 
 export const ChoiceListSchema = z.object({
@@ -47,6 +58,19 @@ export const ChoiceListSchema = z.object({
   /** The session id for `exercises`, the session-exercise id for `swap_candidates`. Unused by
    *  `sessions`. */
   sourceId: z.string().optional(),
+  /**
+   * Let the user pick several, not one (Q-407). The owner's complaint was literal — *"there should
+   * be options for 'select all' as I keep clicking each grocery store"* — and there was no
+   * configuration that produced it: the widget resolved one option and its callback was singular.
+   *
+   * Flat fields rather than a discriminated union of single/multi variants, for the same reason
+   * `source` is flat two lines up: Gemini's function-declaration schema is fussy about unions and
+   * this feature has already lost a day to one. Both default false, so every existing call site
+   * keeps behaving exactly as it did.
+   */
+  multi: z.boolean().optional(),
+  /** Offer a "Select all" row. Only meaningful with `multi`; ignored without it. */
+  selectAll: z.boolean().optional(),
   /** Only for a list the app cannot derive — a chart legend, a set of judgement calls. If `source`
    *  is set these are ignored. */
   options: z
@@ -178,7 +202,22 @@ export function isWidgetToolName(name: string): name is WidgetToolName {
  *  human-readable: it re-enters the model's context, so it should read like something the user
  *  said rather than a serialised event. */
 export const WidgetResultSchema = z.union([
-  z.object({ status: z.literal('chose'), id: z.string(), label: z.string() }),
+  /**
+   * One option, or several (Q-407). `label` is the readable half either way — the single option's
+   * title, or the picked titles joined — because this string re-enters the model's context and
+   * should read like something the user said.
+   *
+   * `id` and `ids` are both optional with a refine rather than `id` staying required and carrying
+   * the first of many: a field documented as "the option they chose" holding one of five is the
+   * kind of quiet lie that is true until someone reads it. Nothing consumes `id` today except the
+   * bubble, which renders `label`.
+   */
+  z.object({
+    status: z.literal('chose'),
+    id: z.string().optional(),
+    ids: z.array(z.string()).min(1).max(24).optional(),
+    label: z.string(),
+  }).refine(v => v.id != null || v.ids != null, 'chose needs id or ids'),
   z.object({ status: z.literal('applied'), summary: z.string() }),
   z.object({ status: z.literal('cancelled') }),
   z.object({ status: z.literal('stale'), detail: z.string() }),

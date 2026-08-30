@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.395.0",
+    date: "2026-08-30",
+    changes: [
+      "The Coach can now ask a question with more than one answer \u2014 tick the ones that apply and hit Continue, or tap Select all when they all do. It also knows the grocery stores, staple ingredients and dietary restrictions the app already holds, so it offers them instead of typing them out, which is a list you would otherwise be waiting on it to write.",
+    ],
+  },
+  {
     version: "1.394.1",
     date: "2026-08-28",
     changes: [
