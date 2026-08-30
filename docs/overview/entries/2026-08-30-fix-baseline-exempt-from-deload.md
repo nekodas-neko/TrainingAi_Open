@@ -53,7 +53,7 @@ Pinned as a test so the audit is not re-derived.
 - `packages/shared/src/workout/session-data.ts` — both guards, and the corrected comment.
 - `packages/shared/src/workout/__tests__/session-data-manual-deload.test.ts` — the Q-211 test flipped
   from asserting the wrong behaviour to asserting the right one, plus the per-exercise audit case.
-- `package.json` / `changelog.ts` — v1.397.6.
+- `package.json` / `changelog.ts` — v1.402.1.
 
 ## Verification
 

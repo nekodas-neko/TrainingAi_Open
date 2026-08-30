@@ -6,10 +6,50 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: "1.397.6",
+    version: "1.402.1",
     date: "2026-08-30",
     changes: [
       "A baseline test is no longer cut to half weight during a deload week. It was being prescribed light and then recorded as a genuine max attempt \u2014 the 1RM estimate and personal records both treat a baseline that way on purpose \u2014 so every baseline taken in a deload week understated you permanently. A per-exercise deload the coach applies for soreness is unchanged: that one already keeps its result out of your records, so there was nothing to reconcile.",
+    ],
+  },
+  {
+    version: "1.402.0",
+    date: "2026-08-30",
+    changes: [
+      "A meal's photo can be added from the meal itself. That screen had an \u201cAdd a photo\u201d band that was not a picker \u2014 it just opened the editor, where the real control sat as a small tile below \u201cAdd ingredient\u201d at the bottom of a scroll.",
+      "The editor's picker moved to the top of that screen and is now the same size, so the photo is in the same place whichever way you got there.",
+    ],
+  },
+  {
+    version: "1.401.0",
+    date: "2026-08-30",
+    changes: [
+      "The quantity sheet is laid out the way you picked. The srv/g toggle moved to a narrow column beside the \u2212 and + buttons, so the quick-amount buttons now span the full width; the calorie total sits on its own as the biggest number on the sheet; and the macros are three labelled tiles \u2014 Protein, Carbs, Fat \u2014 instead of P/C/F.",
+      "An ingredient inside a meal now says just its weight, like \u201c1000 g\u201d. It used to say \u201c8 servings \u00b7 1000 g\u201d, which meant \u201cserving\u201d described two different things one line apart from the meal's own portions.",
+    ],
+  },
+  {
+    version: "1.400.0",
+    date: "2026-08-30",
+    changes: [
+      "Adding a photo to a meal works on the phone again. Choosing a picture did nothing at all \u2014 the app was blocking its own image data on the way from the camera, and the failure was being treated as if you had cancelled the picker, so there was never even an error to report.",
+      "And if a photo does fail now, it says so instead of quietly doing nothing.",
+    ],
+  },
+  {
+    version: "1.399.0",
+    date: "2026-08-30",
+    changes: [
+      "Your settings follow your account. Home widgets and card colours, the section order and what you have hidden, the score-ring style, the weight window, the brand colour, the meal-label style, rest duration, food region and the reminder toggles are all saved to your account now \u2014 so a fresh install, or opening the app on another device, starts with the choices you already made instead of the defaults.",
+      "One exception, on purpose: the background and wallpaper settings still stay on the device they were chosen on.",
+    ],
+  },
+  {
+    version: "1.398.0",
+    date: "2026-08-30",
+    changes: [
+      "Swipe a logged food to the left and a Delete appears, the same way it already works on your saved meals. It still asks before it removes anything, and the bin inside the entry is unchanged \u2014 the swipe is a shortcut, not the only way.",
+      "Swiping a food row no longer changes the day underneath it. On any past day the same drag was moving the diary forward at the same time.",
     ],
   },
   {

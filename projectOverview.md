@@ -24,8 +24,54 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.395.6 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Version:** v1.402.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Version:** v1.401.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Version:** v1.401.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-08-30.
+
+**One photo picker per screen, and the held rebuild's failure was the spec (BF-46 ①a).** Two things
+said *Add a photo* and only one was a picker — the meal's own screen called `onEdit`. Both are real
+now, at the top of their own screen, and the meal screen writes through the same
+`saveMealToLibrary` the builder calls, so there is still one write path. **The interesting half:**
+rebuilt, the previous session's failure reproduced — `onChange` firing with a valid data URI and the
+component never receiving it — and instrumenting the *parent* showed the file was landing in the
+**other** picker. The meal's own screen is still in the DOM while it closes, both carried the same
+accessible name, and the spec waited for that name before picking. *A precondition satisfied by the
+state it is meant to replace cannot fail* — the third time that shape cost time in one day
+([journal](docs/overview/entries/2026-08-30-meal-photo-one-picker.md)).
+
+**The meal photo was blocked by the app's own CSP, on the branch no test runs (BF-46 ①b).** Three
+owner reports, recorded as a save failure that *"does not reproduce in source"*. `MealPhotoTile`'s
+**native** branch did `await fetch(photo.dataUrl)` — and **a `fetch()` of a `data:` URL is governed
+by `connect-src`**, which this CSP does not open to `data:`. It rejected into a `catch {}` written
+for picker cancellations, so choosing a photo on the phone did nothing and said nothing. The web
+branch takes a `File` from an `<input>` and never fetches, which is why every browser test passed.
+Now `Base64` + `dataUrlToBlob`, and non-cancellations toast. **Verifiable only on the S25**
+([journal](docs/overview/entries/2026-08-30-meal-photo-data-url-fetch.md)).
+
+**Version:** v1.398.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Last updated:** 2026-08-30.
+
+**The quantity editor is the owner's Option A, and an ingredient stopped claiming servings (BF-46
+② ③).** The unit toggle moved into a narrow column beside the stepper — which is what frees the
+width the presets now span — the calorie total stands alone, and the macros are three named tiles
+rather than `P`/`C`/`F`. **One stated departure from the drawing:** it puts that column at the
+stepper's height, and the app's 48 dp floor makes a stacked two-option toggle 96 px, so the
+*stepper* grew instead. And an ingredient row reads `1000 g`, never `8 servings · 1000 g` — a meal
+is measured in portions, so "serving" meant two different things one line apart. The e2e asserts the
+toggle's **geometry**, because "beside the stepper" is the whole request and is invisible to a
+text-only check. **Not device-verified**, and Option A is the tallest of the three drawings
+([journal](docs/overview/entries/2026-08-30-quantity-editor-option-a.md)).
+
+**Settings follow the account now (Q-392).** The owner's *"when i do a new install or open on computer - it loses all the saved preferences"* was still true in full: the engine (`users.preferences`, `GET`/`PATCH /api/user/preferences`) had shipped and **no read site called it**. `lib/user/preferences-sync.ts` connects them — `hydrateUserPreferences` seeds every device key from the server bag on launch, `savePreference` writes both. Proved by `e2e/preferences-survive-reinstall.spec.ts`, which is the owner's sentence as a test: PATCH three preferences, `localStorage.clear()`, reload, and all three come back in their right encodings — and it fails with the hydration replaced by a no-op. **The rule that was wrong, and CI found it:** hydration first cleared any key the bag did not carry — right for a settled system, wrong in the window between a tap and its PATCH landing. `meal-label.spec.ts` caught it wiping a label style mid-flight, and **offline it reverts every change on the next launch**. Hydration now deletes nothing; the one thing the app clears, the mutually-exclusive brand preset / hue pair, is resolved by `EXCLUSIVE_GROUPS`. The earlier `backgroundSettings` catch was the same rule failing at its extreme, and treating it as one key needing an exclusion would have left the race in place for every other ([journal](docs/overview/entries/2026-08-30-preferences-read-sites.md)).
+
+**A logged food swipes to Delete, and the day stopped moving with it (BF-45 ⑤).** The diary reuses
+the meal list's `SwipeActions` tray, routed to the confirmation the edit sheet's bin already raises.
+What earns the index is the collision: `nutrition-content.tsx`'s scroll container owns a horizontal
+drag that steps the **day**, so one touch fed both gestures — and it is **invisible on today**, since
+that handler refuses to step past today. `SwipeActions` marks itself `[data-swipe-actions]` and the
+day handler defers, as `tab-swipe-navigator.tsx` already does for a carousel. **Not device-verified**
+([journal](docs/overview/entries/2026-08-30-food-log-swipe-delete.md)).
 
 **Home's APK-banner link was a 33 px tap target, and the gate that hid the entry was self-inflicted (LB-26).** The link rendered **258×33** against the 48 dp floor — an `<a>`, which `globals.css` excludes on purpose so an inline prose link is not forced to 48 px. It takes the floor locally instead of widening the selector, and the reasoning moved beside the CSS rule rather than sitting in the banner's JSX, which is not where someone tempted to widen it would look. **The spec's allowlist is now empty** — an allowlist that never empties is a backlog wearing a test's clothes. Proved both ways: removing the floor fails the spec with the exact reported measurement. **The process half is the more useful one:** LB-26 carried `Gate: device` on work that had never been built, filed by the session that had read BF-45's warning about that exact mistake hours earlier — a gate parks an entry, so it hid it from `next-item.js`. The rule now sits in the backlog's protocol header where entries are written, not only inside the entry that found it ([journal](docs/overview/entries/2026-08-30-apk-banner-tap-target.md)).
 
@@ -3117,7 +3163,7 @@ smaller than production.
   prescription (covered by fixture-based unit tests instead).
 - **Related, now fixed**: **Q-211** — a deload week also reduced a *baseline* lift, which the 1RM
   and PR paths both treat as a genuine max effort, so the app prescribed half weight and recorded
-  the result as a real max. Fixed 2026-08-30 (v1.397.6), and **it took two guards, not the one the
+  the result as a real max. Fixed 2026-08-30 (v1.402.1), and **it took two guards, not the one the
   entry named**: exempting only the prescribed branch left the behaviour unchanged, because the
   un-prescribed branch re-applied it. Its comment saying such a clause was unreachable was true
   against the code that proved it and false the moment the first exemption landed.

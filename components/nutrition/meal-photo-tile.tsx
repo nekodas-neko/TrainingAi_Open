@@ -1,9 +1,9 @@
 'use client'
 
 import { useRef, useState } from 'react'
-import { Camera, ImagePlus, Loader2, X } from 'lucide-react'
+import { Camera, ImagePlus, Loader2, Utensils, X } from 'lucide-react'
 import { toast } from 'sonner'
-import { downscaleToDataUrl } from '@/lib/media/downscale-image'
+import { dataUrlToBlob, downscaleToDataUrl } from '@/lib/media/downscale-image'
 import { mealImageBytes, rejectMealImage, mealImageRejectionMessage } from '@trainingai/shared/nutrition/meal-image'
 
 /**
@@ -26,15 +26,37 @@ import { mealImageBytes, rejectMealImage, mealImageRejectionMessage } from '@tra
 const THUMB_MAX_DIM = 128
 const THUMB_QUALITY = 0.8
 
+/**
+ * `@capacitor/camera` reports a cancelled picker by throwing, with no code to test — only a message.
+ * Matched loosely on purpose: a message this does not recognise becomes a visible error, which is
+ * the safe direction. The reverse default is what hid BF-46 ①.
+ */
+function isPickerCancellation(err: unknown): boolean {
+  const message = err instanceof Error ? err.message : String(err ?? '')
+  return /cancel/i.test(message) || /no image (picked|selected)/i.test(message)
+}
+
 interface Props {
   /** `null` means no photo. `undefined` from the parent means "not loaded yet" and renders empty. */
   value: string | null | undefined
   /** `null` removes a stored photo; a data URI sets one. */
   onChange: (dataUri: string | null) => void
   disabled?: boolean
+  /**
+   * `hero` is the full-width band a meal's own screen already draws (BF-46 ①a) — the same control
+   * at the size the artboard gives a meal's photo, not a second component. `tile` is the 64 px box.
+   *
+   * **One component rather than a `MealPhotoHero`, deliberately.** A previous attempt built a
+   * separate hero with its own acquisition hook and could not make a picked image reach the
+   * component at all; this one's `<input>` path is what `meal-photo-picker.spec.ts` exercises on
+   * every run. Growing a size is a smaller change than growing a second implementation.
+   */
+  variant?: 'tile' | 'hero'
+  /** Names the meal in the control's label, so two on one screen are distinguishable to a reader. */
+  label?: string
 }
 
-export function MealPhotoTile({ value, onChange, disabled }: Props) {
+export function MealPhotoTile({ value, onChange, disabled, variant = 'tile', label }: Props) {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [busy, setBusy] = useState(false)
 
@@ -74,7 +96,14 @@ export function MealPhotoTile({ value, onChange, disabled }: Props) {
     try {
       const { Camera: CapCamera, CameraResultType, CameraSource } = await import('@capacitor/camera')
       const photo = await CapCamera.getPhoto({
-        resultType: CameraResultType.DataUrl,
+        // **`Base64`, not `DataUrl`, and that is the bug this branch shipped with.** The old code
+        // took a data URL and did `await fetch(photo.dataUrl)` to get a Blob — and a `fetch()` of a
+        // `data:` URL is governed by `connect-src`, which this app's CSP does not open to `data:`.
+        // So it rejected, the catch below read that as a cancelled picker, and choosing a meal
+        // photo on the phone did nothing and said nothing (BF-46 ①, three owner reports). Web never
+        // hit it: that branch gets a `File` from an `<input>` and fetches nothing, which is why
+        // `meal-photo-picker.spec.ts` passes. `capture-actions.tsx` already asks for `Base64`.
+        resultType: CameraResultType.Base64,
         source: CameraSource.Prompt,
         quality: 80,
         // `width`/`height`, NOT `targetWidth`/`targetHeight` — the latter belong to the sibling
@@ -84,54 +113,119 @@ export function MealPhotoTile({ value, onChange, disabled }: Props) {
         width: THUMB_MAX_DIM * 4,
         height: THUMB_MAX_DIM * 4,
       })
-      if (!photo.dataUrl) return
-      const blob = await (await fetch(photo.dataUrl)).blob()
+      if (!photo.base64String) return
+      const blob = dataUrlToBlob(`data:image/${photo.format || 'jpeg'};base64,${photo.base64String}`)
       await accept(await downscaleToDataUrl(blob, { maxDim: THUMB_MAX_DIM, quality: THUMB_QUALITY, mimeType: 'image/webp' }))
-    } catch {
-      // Cancelling the picker throws, and a cancel is not an error worth a toast.
+    } catch (err) {
+      // A cancel is not an error worth a toast — but everything else is, and swallowing both is how
+      // this stayed broken through three reports. The plugin's cancel messages are the only thing
+      // that distinguishes them; anything else the user needs to be told about.
+      if (!isPickerCancellation(err)) {
+        console.error('Meal photo pick failed:', err)
+        toast.error('That photo could not be used. Try another one.')
+      }
     } finally {
       setBusy(false)
     }
   }
 
   const bytes = mealImageBytes(value)
+  // Named where a name is given. There are two of these — the meal's own screen and the builder —
+  // and although a user only ever sees one, both are momentarily in the DOM while the first sheet
+  // closes and the second opens. An unnamed label made that window indistinguishable to a test,
+  // which fed a picked photo to the screen it was leaving (measured, BF-46 ①a).
+  const pickLabel = label
+    ? (value ? `Change the photo on ${label}` : `Add a photo to ${label}`)
+    : (value ? 'Change meal photo' : 'Add a meal photo')
+
+  const removeButton = value && !busy && (
+    <button
+      type="button"
+      onClick={e => { e.stopPropagation(); onChange(null) }}
+      aria-label="Remove meal photo"
+      className="absolute right-0 top-0 grid h-8 w-8 place-items-center rounded-bl-xl bg-background/85 text-muted-foreground active:bg-background"
+    >
+      <X className="h-4 w-4" />
+    </button>
+  )
+
+  // A control containing a second control is a div with role=button, never a nested <button> —
+  // Samsung's WebView strips the inner one.
+  const pickProps = {
+    role: 'button' as const,
+    tabIndex: disabled ? -1 : 0,
+    'aria-label': pickLabel,
+    'aria-busy': busy,
+    onClick: handlePick,
+    onKeyDown: (e: React.KeyboardEvent) => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); void handlePick() }
+    },
+  }
+
+  // **Named, because this is no longer the only file input on the screens it appears on.** Since
+  // BF-46 ①a the builder carries this AND the recipe-picture button's, and a selector as broad as
+  // `input[type="file"]` reaches whichever comes first in the DOM — a recipe picture fed to the
+  // photo picker fails silently, which is what it did. `recipe-image-button.tsx` is named to match.
+  const fileInput = (
+    <input
+      ref={fileInputRef}
+      name="meal-photo"
+      type="file"
+      accept="image/*"
+      capture="environment"
+      onChange={handleFile}
+      className="hidden"
+    />
+  )
+
+  if (variant === 'hero') {
+    return (
+      <div {...pickProps} className="relative mb-4 block h-40 w-full overflow-hidden rounded-2xl active:opacity-90">
+        {value ? (
+          // A data: URI, so next/image has nothing to fetch or optimise.
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={value} alt="" className="h-full w-full object-cover" />
+        ) : (
+          // The row placeholder's band, grown — artboard 4's hero is the tile at scale, not a
+          // second design. The gradient is an inline style because it is two CSS variables.
+          <div
+            className="flex h-full w-full flex-col items-center justify-center gap-2"
+            style={{ backgroundImage: 'linear-gradient(140deg, var(--meal-tile-from), var(--meal-tile-to))' }}
+          >
+            {busy
+              ? <Loader2 className="h-6 w-6 animate-spin text-white/70" />
+              : <Utensils className="h-8 w-8 text-white/45" strokeWidth={1.6} />}
+            <span className="text-xs font-semibold text-white/70">{busy ? 'Reading…' : 'Add a photo'}</span>
+          </div>
+        )}
+        {/* The stored size, the same tripwire the tile carries — nothing else fails loudly when the
+            cap slips. Over the image rather than under it, because the hero has no caption row. */}
+        {value && !busy && (
+          <span className="absolute bottom-0 left-0 rounded-tr-xl bg-background/80 px-1.5 py-0.5 text-[9px] tabular-nums text-muted-foreground">
+            {(bytes / 1024).toFixed(1)} KB
+          </span>
+        )}
+        {removeButton}
+        {fileInput}
+      </div>
+    )
+  }
 
   return (
     <div className="flex-none">
-      {/* A tile containing a second control is a div with role=button, never a nested <button> —
-          Samsung's WebView strips the inner one. */}
       <div
-        role="button"
-        tabIndex={disabled ? -1 : 0}
-        aria-label={value ? 'Change meal photo' : 'Add a meal photo'}
-        aria-busy={busy}
-        onClick={handlePick}
-        onKeyDown={e => {
-          if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); void handlePick() }
-        }}
+        {...pickProps}
         className="relative h-16 w-16 grid place-items-center overflow-hidden rounded-xl border border-border bg-muted/50 active:bg-muted/20 transition-colors"
       >
         {busy ? (
           <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
         ) : value ? (
-          // A data: URI, so next/image has nothing to fetch or optimise and would need a loader
-          // exemption to accept it at all.
           // eslint-disable-next-line @next/next/no-img-element
           <img src={value} alt="" className="h-full w-full object-cover" />
         ) : (
           <Camera className="h-5 w-5 text-muted-foreground" />
         )}
-
-        {value && !busy && (
-          <button
-            type="button"
-            onClick={e => { e.stopPropagation(); onChange(null) }}
-            aria-label="Remove meal photo"
-            className="absolute right-0 top-0 grid h-6 w-6 place-items-center rounded-bl-xl bg-background/85 text-muted-foreground active:bg-background"
-          >
-            <X className="h-3.5 w-3.5" />
-          </button>
-        )}
+        {removeButton}
       </div>
 
       <p className="mt-1 w-16 text-center text-[9px] leading-tight tabular-nums text-muted-foreground">
@@ -140,14 +234,7 @@ export function MealPhotoTile({ value, onChange, disabled }: Props) {
           : <span className="inline-flex items-center gap-0.5"><ImagePlus className="h-2.5 w-2.5" /> Photo</span>}
       </p>
 
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept="image/*"
-        capture="environment"
-        onChange={handleFile}
-        className="hidden"
-      />
+      {fileInput}
     </div>
   )
 }

@@ -1,12 +1,13 @@
 'use client'
 
 import { useRef } from 'react'
-import { ChevronLeft, Loader2, Pencil, QrCode, Trash2, Utensils } from 'lucide-react'
+import { ChevronLeft, Loader2, Pencil, QrCode, Trash2 } from 'lucide-react'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { Button } from '@/components/ui/button'
 import { MACRO_COLORS } from '@trainingai/shared/nutrition/macro-colors'
 import { macroKcal, macroShares } from './macro-energy'
 import { batchRows, portionRows, sumRows } from './saved-meal-totals'
+import { MealPhotoTile } from './meal-photo-tile'
 import type { SavedMeal } from '@trainingai/shared/types/nutrition'
 
 interface Props {
@@ -24,6 +25,12 @@ interface Props {
   onEdit: (meal: SavedMeal) => void
   onDelete: (meal: SavedMeal) => void
   onLabel: (meal: SavedMeal) => void
+  /**
+   * Set or clear this meal's photo (BF-46 ①a). Handled by the parent, which already holds the
+   * user, the timezone and `saveMealToLibrary` — so the photo takes the one write path the builder
+   * uses rather than a second one reaching the same column.
+   */
+  onSetPhoto: (meal: SavedMeal, dataUri: string | null) => void
 }
 
 /**
@@ -42,7 +49,7 @@ interface Props {
  * split; it is not an inconsistency waiting to be tidied.
  */
 export function MealDetailSheet({
-  meal, logging, confirmingDelete, onConfirmingDeleteChange, onOpenChange, onLog, onEdit, onDelete, onLabel,
+  meal, logging, confirmingDelete, onConfirmingDeleteChange, onOpenChange, onLog, onEdit, onDelete, onLabel, onSetPhoto,
 }: Props) {
   /**
    * The sheet is never torn out mid-open — `open` is controlled and the last meal is held through
@@ -95,27 +102,18 @@ export function MealDetailSheet({
         </SheetHeader>
 
         <div className="flex-1 overflow-y-auto px-4">
-          {/* The hero. A meal with a photo shows it; one without gets the affordance that says where
-              photos come from — the builder, which already owns the picker and the size cap (Q-327).
-              A second picker here would be a second write path to the same column. */}
-          {shown.imageDataUri ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={shown.imageDataUri} alt="" className="mb-4 h-40 w-full rounded-2xl object-cover" />
-          ) : (
-            // The same tile the rows use, at hero scale — artboard 4's band is the row's placeholder
-            // grown, not a second design. It is a button because it is also where a photo is added.
-            <button
-              onClick={() => onEdit(shown)}
-              className="mb-4 flex w-full flex-col items-center gap-2 rounded-2xl py-5"
-              style={{ backgroundImage: 'linear-gradient(140deg, var(--meal-tile-from), var(--meal-tile-to))' }}
-              aria-label={`Add a photo to ${shown.name}`}
-            >
-              {/* The glyph directly, not a nested `MealThumb` — the band already carries the
-                  gradient, and the tile's own is an inline style a class cannot strip. */}
-              <Utensils className="h-8 w-8 text-white/45" strokeWidth={1.6} />
-              <span className="text-xs font-semibold text-white/70">Add a photo</span>
-            </button>
-          )}
+          {/* The hero, and it is a REAL picker now (BF-46 ①a). It used to say *Add a photo* and
+              call `onEdit`, dropping the user into the builder to find a 64 px tile at the bottom of
+              a scroll — two affordances wearing one label, and the owner asked for the top one. The
+              old comment argued a picker here would be a second write path to the same column;
+              `onSetPhoto` is the parent's, and the parent is the one that already saves meals, so
+              there is still exactly one. */}
+          <MealPhotoTile
+            value={shown.imageDataUri ?? null}
+            onChange={dataUri => onSetPhoto(shown, dataUri)}
+            variant="hero"
+            label={shown.name}
+          />
 
           <div className="mb-4 text-center">
             <p className="text-4xl font-bold tabular-nums leading-none">{Math.round(portion.calories)}</p>

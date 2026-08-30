@@ -1074,6 +1074,96 @@ deliberate choice, on a session where the absence of a Primary is the design.
   outgoing one's role, the prescribed sets and percentages are unchanged, and the session still has
   no Primary afterwards.
 
+### [platform] LB-29 — a preference chosen and then reloaded can be overwritten by the server's older copy
+
+- **Lane:** B
+- **Added:** 2026-08-30 · Lane B, from a CI flake on `meal-label.spec.ts` in PR #643's run.
+- **Reference:** the mechanism is Q-392's, shipped the same day
+  ([journal](overview/entries/2026-08-30-preferences-read-sites.md)).
+
+**The observation.** `meal-label.spec.ts › the chosen label style is remembered` failed with
+`aria-checked="false"` for the full 10 s and passed on retry. It is an assertion failure, not
+infrastructure — and it is the same spec that caught Q-392's first rule being wrong.
+
+**The mechanism, from the code rather than a reproduction.** `savePreference` writes `localStorage`
+synchronously and PATCHes the server fire-and-forget. The spec taps a style and **reloads
+immediately**. On the new page `hydrateUserPreferences` GETs the bag and writes every key it
+carries, unconditionally — so if the PATCH has not landed, the response still holds the *previous*
+style and overwrites the choice the user just made. The sheet then reads the old value.
+
+**Offline it is not a race, it is permanent.** The PATCH never lands, so every launch re-writes the
+server's old value over the device's. That is the same reasoning that retired the first version of
+this rule; the delete case was fixed and the overwrite case was not.
+
+**Recommended fix — a dirty mark, not an outbox.** `savePreferences` records the key as unsynced in
+`localStorage` (so it survives the reload) and clears it when its PATCH resolves. Hydration skips a
+marked key and **re-PATCHes the local value instead of taking the server's**, which also self-heals
+the offline case on the next launch. ~20 lines, no queue and no table, so it does not reopen the
+"not an outbox domain" decision.
+
+- **Two alternatives, and why they lose.** *Seed-if-absent* (hydration only writes a key the device
+  lacks) cannot clobber and exactly satisfies the owner's report — *"a new install or open on
+  computer loses all the saved preferences"* — but gives up cross-device **updates**: change a
+  setting on the phone and the laptop keeps its own forever. *A session-scoped "written here" set*
+  does not work at all, because the reload is what loses the value and the set does not survive it.
+- **Keep:** whether cross-device update is wanted at all is the owner's call, and it decides between
+  the recommendation and seed-if-absent. Ask before building — the two differ in what they promise,
+  not just in how they are written.
+- **Verification:** with the PATCH stubbed to hang, pick a style, reload, and it is still chosen;
+  and with the network off, it survives a second launch.
+
+### [platform] LB-27 — one extra request during launch strands several for over a minute, and nothing explains why
+
+- **Lane:** A
+- **Added:** 2026-08-30 · Lane B, measured while fixing Q-392's own version of this.
+- **Reference:** the symptom is written up in
+  [`docs/overview/entries/2026-08-30-preferences-read-sites.md`](overview/entries/2026-08-30-preferences-read-sites.md);
+  Q-392's mirror-effect PATCH is already fixed, so this entry is the **unexplained** half only.
+
+**The measurement.** Health's launch fires ~25 API requests in the first seven seconds. Adding one
+more — a single `PATCH /api/user/preferences` from a card's mount effect — left that PATCH **and a
+`GET` behind it pending past sixty seconds**, with nothing else in flight and no further requests
+after twenty seconds. Instrumented on a cold dev server with Playwright's `requestfinished`, so
+these are genuinely unresolved connections, not slow ones. The same PATCH fired *after* the burst
+settles answers in **340 ms**, and a burst of five answers in **641 ms**. Removing that one request
+took the page from never reaching `networkidle` to reaching it in ~19 s.
+
+**Why it matters beyond a test.** Nine e2e specs failed on `waitUntil: 'networkidle'` and none of
+them mention preferences, so the next person to add a request to a launch path gets a failure that
+names someone else's screen. And if a request really can strand for a minute on the device, that is
+a launch-time hang, not a test artefact.
+
+**Where to look, in order.** `updateUserPreferences` (`lib/data/postgres/adapter.ts`) is the only
+route in that burst that opens a **transaction with `SELECT … FOR UPDATE`** on the `users` row, and
+it holds a pool client for its duration; the pool is `max: 10` (`lib/data/postgres/client.ts`) with
+`pg`'s default `connectionTimeoutMillis: 0`, which waits **forever** for a client rather than
+erroring. A `statement_timeout` cannot fire on a query that never starts. That is a hypothesis, not
+a finding — it does not by itself explain a plain `GET` hanging beside it.
+
+- **Not reproduced in production**, and it may be dev-server-specific (route compilation under
+  concurrency). Establish that first: it changes whether this is a bug or a harness note.
+- **Keep:** whatever the cause, `connectionTimeoutMillis: 0` on a pool of 10 is worth a decision of
+  its own — a bounded wait turns a hang into an error state a card can show.
+
+### [platform] LB-28 — CI should refuse `savePreference` inside a `useEffect`
+
+- **Lane:** B
+- **Added:** 2026-08-30 · Lane B, from the defect LB-27 describes.
+- **Needs:** LB-27
+
+The footgun is invisible at the call site: `useEffect(() => localStorage.setItem(K, v), [v])` is a
+free write, and the same line calling `savePreference` is a **network PATCH on every mount**.
+`usePersistedPreference` exists for the mirror case, but nothing stops the next conversion reaching
+for `savePreference` again — and the failure it produces names unrelated specs.
+
+**One check, narrow on purpose:** flag `savePreference(`/`savePreferences(` that appears inside a
+`useEffect(` block in `app/`, `components/` or `lib/`. A tap handler nested inside an effect would
+be a false positive; there are none today, and the escape hatch is the same as every other rule
+here — an entry in the script with a written reason.
+
+**Do not widen it to "no fetch in an effect"**, which is most of this codebase. The rule is about
+one helper whose cost is not visible in its name.
+
 ### [platform] BF-55 — 84 MB of index against 63 MB of table, and the database is growing ~7× its expected trend
 
 - **Lane:** A
@@ -1148,35 +1238,31 @@ opened on, unchanged.
 - **Verification:** index total drops below the heap total, and a re-read a week later shows growth
   back near trend.
 
-### [nutrition] BF-45 — swipe-to-delete on a logged food row (⑤; ①②④ shipped v1.397.0)
+### [nutrition] BF-45 — the nutrition tab's UI uplift (all five shipped; device check owed)
 
 - **Lane:** B
 - **Batch:** `nutrition-ui-uplift`
 - **Added:** 2026-08-27 · owner, with screenshots of the live tab (v1.383.x).
 - **Spec:** BF-28's parity rules bind — where an artboard covers this, the artboard wins.
 
-**①②③④ shipped (v1.397.0)**, struck here rather than left looking open — the reasoning is in the
-[journal](overview/entries/2026-08-30-nutrition-ui-uplift.md). The one worth carrying: ③'s gutter fix
-is **not** where this entry said to put it. It called for `SheetContent`'s bottom variant; measured,
-**26 of 48** bottom sheets set their own `px-*`/`p-0` and most of the rest already pad inner content
-at 16, so a shared outer gutter would have doubled theirs.
+**①②③④ shipped v1.397.0; ⑤ shipped v1.398.0.** Reasoning in the journal
+([①–④](overview/entries/2026-08-30-nutrition-ui-uplift.md) ·
+[⑤](overview/entries/2026-08-30-food-log-swipe-delete.md)). Two things worth carrying: ③'s gutter fix
+is **not** where this entry said to put it — it called for `SheetContent`'s bottom variant, and
+measured, **26 of 48** bottom sheets set their own `px-*`/`p-0` while most of the rest already pad
+inner content at 16, so a shared outer gutter would have doubled theirs. And ⑤ needed one thing the
+meal list did not: the nutrition scroll container owns a horizontal drag of its own that steps the
+day, so a row swipe fed both gestures. `SwipeActions` now marks itself `[data-swipe-actions]` and
+that handler defers, the way it already defers to a carousel.
 
-- **Keep — ⑤ swipe-to-delete on a logged food row.** Owner: *"for logging food; we could possibly add
-  the option to swipe and delete it (with confirmation) like we do in the other screen."* The gesture
-  exists on the meal list (BF-29, device-verified 2026-08-30) — reuse that tray, keep its
-  confirmation, and **do not remove the bin in the edit sheet**: a swipe is a shortcut for people who
-  know it is there, not a replacement for a visible affordance.
-- **⚠ ⑤ was gated on BF-47 and the gate moved rather than lifted** *(bullet restored 2026-08-30 —
-  it was lost when this entry was rewritten to strike ①②④, which is how a blocker goes invisible
-  while its subject stays queued)*. The reason: a swipe is a faster route to exactly the delete that
-  was reappearing, and reaching a failing delete faster is worse than not adding the gesture.
-  BF-47's fix shipped, but it is **reasoned rather than reproduced** — `getLocalStore` is null in
-  `pnpm dev` and Playwright — so confirm it on the device in the same pass as ⑤.
-- **Verification for ⑤:** on the S25, a food row swipes to a tray whose Delete confirms **and the row
-  stays gone across a screen swap and a force-close**. ①②④ are shipped but **not device-verified** —
-  the sandbox renders at desktop width and cannot judge a gutter or a ring.
+- **Keep — the device check, which is the whole of what is still owed.** On the S25: a food row
+  swipes to a tray whose Delete confirms, **and the row stays gone across a screen swap and a
+  force-close**. That last clause is BF-47's failure, whose fix is *reasoned rather than reproduced*
+  (`getLocalStore` is null in `pnpm dev` and in Playwright) — and a swipe is a faster route to
+  exactly that delete, which is why the two are checked in one pass. ①②④ are equally unverified: the
+  sandbox renders at desktop width and cannot judge a gutter or a ring.
 
-### [nutrition] BF-46 — the meal builder buries its photo picker below the fold, and the quantity sheet spends its space on the wrong things
+### [nutrition] BF-46 — the meal builder's photo picker and quantity sheet (all shipped; device check owed)
 
 - **Lane:** B
 - **Batch:** `nutrition-ui-uplift` — ships with BF-45.
@@ -1201,6 +1287,41 @@ user into the builder — and the builder's real tile at `saved-meals-sheet.tsx:
 **Move the real tile to the top of the builder at hero scale**, matching the detail sheet's band, so
 the two screens agree where a meal's photo lives and there is one control rather than two things
 wearing one label.
+
+**✅ (b)'s ROOT CAUSE IS FOUND AND FIXED (v1.399.0) — the save was never the save path.**
+`MealPhotoTile`'s **native** branch asked the camera plugin for `CameraResultType.DataUrl` and then
+did `await fetch(photo.dataUrl)` to get a Blob. **A `fetch()` of a `data:` URL is governed by
+`connect-src`**, and `lib/security/csp.ts` does not open `connect-src` to `data:` — so the call
+rejected with a bare `TypeError`, into a `catch {}` written to swallow picker cancellations. Picking
+a meal photo on the phone therefore did nothing and *said* nothing, which is exactly the owner's
+*"always the default cant add a custom picture"*. The web branch takes a `File` from an `<input>`
+and fetches nothing, which is why `meal-photo-picker.spec.ts` passed on every run. It now asks for
+`Base64` — as the working `capture-actions.tsx` already does — decodes with `dataUrlToBlob`, and
+toasts anything that is not a recognised cancellation.
+`lib/media/__tests__/no-data-url-fetch.test.ts` scans source and fails on the next one.
+
+- **⚠ NOT DEVICE-VERIFIED, and this fix in particular cannot be verified anywhere else.** The
+  failing branch only runs inside the Capacitor WebView. What is *checkable* here is the mechanism
+  (the CSP has no `data:`; the plugin call and the decode are the shape `capture-actions.tsx` runs on
+  the same device every day) — the outcome is not. **On the S25: pick a photo in Edit Meal, save,
+  reopen.** If it still fails it now fails *loudly*, which is itself the smaller half of this fix.
+- **(a), the PLACEMENT, is still owed** — one picker, at the top, at hero scale — and so is removing
+  the detail sheet's fake *Add a photo*, which calls `onEdit` rather than picking anything.
+
+**✅ (a) SHIPPED (v1.402.0), and the held rebuild's failure was the SPEC, not the app.** Both screens
+have a real picker at the top now, at the size the artboard gives a meal's photo. The meal's own
+screen writes through the parent's `saveMealToLibrary` — the same function the builder calls — so
+there is still one write path to `image_data_uri`, which is what the old comment argued for and
+achieved by having no picker there at all. `MealPhotoTile` grew a `variant="hero"` rather than a
+`MealPhotoHero` being built beside it.
+
+**And the previous session's measurement is now explained.** Rebuilt, the same failure reproduced —
+`onChange` firing with a valid data URI and the component never receiving it. The cause: the meal's
+own screen is **still in the DOM while it closes**, so its picker and the builder's are momentarily
+both mounted with the same accessible name, and the spec waited for that name before picking. It was
+already satisfied by the screen it was leaving, and the photo went to that instance. *A precondition
+satisfied by the state it is meant to replace cannot fail* — the third time this repo has hit that
+shape in a day. The spec waits for `Update Meal` now, and both pickers are named after the meal.
 
 **⚠ (a) WAS BUILT AND HELD, AND WHAT IT MEASURED BEARS DIRECTLY ON (b) — read this first.**
 2026-08-30, Lane B. The rework is straightforward and it did not work, in a way that looks like the
@@ -1251,6 +1372,27 @@ control *"should be able to be set from there"*. So the tile renders (no composi
 data URIs in a list) and the placeholder is what persists. **BF-51 ② carries the same finding from the
 builder side** — read them together; they are one bug seen from two screens.
 
+**✅ ② SHIPPED (v1.401.0).** An ingredient row reads `1000 g` and nothing else. The rule is
+`ingredientAmountLabel` in `saved-meal-qty.ts` — extracted from the hook so it is testable at all —
+and servings survive only for a food with no serving size, which has no gram equivalent to show
+instead. Display only: grams were already the stored truth, and the editor still offers both units.
+
+**✅ ③ SHIPPED (v1.401.0), Option A, with one stated departure.** The toggle sits in a narrow column
+to the right of the stepper; the presets span the width in equal columns; the calorie total stands
+alone at the largest type; the macros are three named tiles rather than `P`/`C`/`F`. **The drawing
+puts the toggle at the stepper's height and that is not buildable here** — every `button` carries a
+48 dp floor (`globals.css`), so a stacked two-option toggle is 96 px and cannot shrink to meet a
+56 px stepper; `.tap-dense` exists for inline text buttons, not for a real control. **The stepper
+grew to 96 px instead**, which the drawing's own intent supports — the value is meant to be the
+tallest, heaviest thing there. A food with no serving size has no toggle and keeps the short row.
+`SegmentedTabs` gained `orientation="vertical"`. Guarded by `e2e/quantity-editor-option-a.spec.ts`,
+which asserts the toggle's **geometry** and not merely its presence, because "beside the stepper" is
+the whole of the request and is invisible to a text-only check.
+
+- **⚠ Option A is the tallest of the three drawings and may scroll on a long food name** — that was
+  put to the owner and accepted. **If it scrolls badly on the S25, tighten the gaps**; do not merge
+  the total and the macros back into one block, which is option B and a settled question.
+
 **② A serving inside a serving.** Owner: *"I see there are serving size of each ingredient within the
 meal; so a serving size in a serving size is probably excessive; we should keep it weight/portion."*
 The builder lists `8 servings · 1000 g` per ingredient while the meal itself is measured in portions,
@@ -1294,7 +1436,7 @@ the macros are two stacked blocks rather than one. On a long food name the sheet
 put to the owner and accepted — distinctness was the goal. If it scrolls badly on the S25, tighten
 the gaps rather than merging the two blocks back together, which would be option B.
 
-- **Verification.** On the S25, in both sheets that render the editor: a photo attached in the
+- **Verification — the whole of what is still owed for ② and ③.** On the S25, in both sheets that render the editor: a photo attached in the
   builder appears in the list, the detail hero and the diary row; ingredients read in grams; every
   control clears the 48 dp floor and the action row clears the gesture bar (`pb-safe-action*`, which
   renders 0 in the sandbox).
@@ -1336,114 +1478,52 @@ sheets are at the artboards' 16 px gutter now. See BF-45 ③ for why the fix is 
   this more."* So N5's recipe-import checks (yield, multi-dish, duplicate handling) are **not
   answered** and stay owed — do not read this entry as clearing them.
 
-### [nutrition] BF-39 — a logged meal stops being a meal: `food_logs` has no `saved_meal_id`, and three symptoms trace to that
+### [nutrition] BF-39 — a logged meal draws as one nested row (BUILT AND HELD — read the measurement first)
 
-> **⚑ RAISED AGAIN 2026-08-30 — third report, and the owner reached the fix independently.** *"we
-> need to sort out meals and ingredients; in a nest. so that when you add a meal it adds the meal and
-> not every ingredient or at least nests in the meal."* **Nest** is the same shape this entry already
-> specifies: one parent row that expands to its ingredients. **No new entry** — filing a fourth
-> number for the same defect is the failure this repo has had before (Q-397).
->
-> Three reports across five days, from three different screens, is the strongest priority signal in
-> the nutrition cluster. Treat it accordingly.
+- **Lane:** B
+- **Batch:** `nutrition-ui-uplift`
+- **Added:** 2026-08-26 · owner, re-raised 2026-08-27 with a screenshot and again 2026-08-30 — three
+  reports from three screens, the strongest priority signal in the nutrition cluster.
 
-> **⚑ RE-REPORTED WITH SCREENSHOTS, 2026-08-27, and the owner's wording sharpens the requirement.**
-> *"when I add a meal from ai; it breaks it down into its components and floods the list. we need to
-> be able to create an over arching food and have the ingredients and macro break down inside of
-> it."* The screenshot is one AI-logged breakfast rendered as **eight** diary rows — flour, protein
-> powder, baking powder, salt, milk, eggs, butter, bacon — each with its own `1 serving · Ng` line
-> and chevron, filling the whole meal section.
->
-> **This is the same defect this entry already describes, not a new one**, and it is now the owner's
-> most-repeated nutrition complaint (raised on 2026-08-26 about a saved meal's photo, again here
-> about an AI meal). What the re-report adds is the shape of the fix: **one collapsed parent row
-> carrying the meal's name and total, expanding to the ingredients and their macro split** — not
-> eight siblings, and not a single opaque row that loses the breakdown. Both halves are stated, so
-> build both.
->
-> It also answers the photo question the earlier report left open: a parent row is a place a meal
-> photo can live. Decomposed siblings had nowhere to put one, which is why *"the image won't transfer
-> over"* had no good answer while the rows stayed flat.
+**The engine shipped 2026-08-30** (migrations 238 + 239, local SQLite **v31**):
+`food_logs.saved_meal_id` and `food_logs.meal_group_id`, stamped by `logMealItems` on both write
+paths and carried through the outbox payload, the push branch, the sync delta, the pull mapping and
+the local read. **What is owed is the rendering, and it was built and NOT shipped.**
 
-- **Lane:** B — the migration and write path shipped 2026-08-30 as Lane A's half; all that remains is
-  the diary rendering. *(Was `Lane: A`; a struck-through value here parses as no lane at all and lands
-  the entry in UNCLASSIFIED, so state the current lane plainly and say the rest in prose.)*
-- **Batch:** `nutrition-ui-uplift` — **added 2026-08-30 so the owed half is visible.** The runner
-  warns *"mentions a schema change — do not batch a migration"*; **that does not apply here and the
-  reason is checkable: migrations 238/239 and local SQLite v31 are already on `main`.** What remains
-  is rendering only, so there is no migration in this batch to revert. Do not split it out on the
-  warning alone — but if any part of the render turns out to need a column, that part leaves the
-  batch and goes to Lane A.
-- **⚠ NOT a `Keep:` — this is unbuilt Lane B work.** It was filed as one on 2026-08-30 when the engine
-  shipped, which parks the entry in the runner's KEEP list under *"not new work"*. That is right for
-  an owner or device check and wrong for a whole UI half nobody has written; it made the owner's
-  most-repeated nutrition ask invisible to the tool Lane B starts from. Restated as a live entry with
-  its scope shrunk to what remains. **The engine
-  shipped 2026-08-30** (migrations 238 + 239, local SQLite **v31**): `food_logs.saved_meal_id` and
-  `food_logs.meal_group_id`, stamped by `logMealItems` on both write paths, carried through the
-  outbox payload, the push branch, the sync delta, the pull mapping and the local read. **Shape (1)
-  was built, as recommended** — one row per ingredient, grouped — so nothing about a log row
-  changed and every existing query is untouched. What is owed:
-  - **Lane B:** the diary draws one collapsed parent row per `mealGroupId`, carrying the meal's name
-    and photo, expanding to the ingredients and their macro split. Both halves, per the re-report.
-  - ~~**Lane A (small):** true MRU for My Foods~~ — **shipped 2026-08-30.** `listSavedMeals` returns
-    `lastUsedAt` (`max(logged_at)` per `saved_meal_id`, user-scoped, deleted logs excluded) and
-    orders most-recently-eaten first, never-eaten last in their existing `createdAt` order. Derived
-    on read, never a stored counter.
-  - **Nothing back-fills.** Meals logged before 2026-08-30 have both columns NULL and will keep
-    rendering as loose ingredients; there is no way to recover which rows belonged together.
-- **Added:** 2026-08-26 · owner: *"the meal is a complete in 'saved meal' and it can have a picture
-  etc. but when adding it to the log; its broken down into its components so the image wont transfer
-  over. not sure what the best way around this would be. maybe it needs to stay as a whole item."*
+**⚠ IT WAS BUILT, IT WORKS, AND IT BROKE A DIFFERENT SCREEN'S GESTURE. Do not rebuild it the same
+way.** The render half is straightforward and its own three e2e tests pass. What it could not do is
+coexist with the meal library's swipe tray: `meal-detail-artboard-parity` and
+`my-meals-artboard-parity`'s swipe tests failed **deterministically, on both CI attempts and
+locally**, with the tray's `Delete <meal>` button never appearing after a left-swipe.
 
-**The owner's instinct is right, and the missing piece is already documented elsewhere as a
-different problem.** Logging a saved meal writes one `food_logs` row per ingredient and **nothing
-records that they came from a meal**. `food_logs` carries `food_item_id` and no `saved_meal_id`, so
-the moment a meal is logged its identity is gone.
+**What was measured, in order — this is the valuable part:**
+1. **It is a regression of this work, not a flake.** The same two specs pass on `main` and fail on
+   the branch, run the same way, minutes apart.
+2. **The cause is the saved-meal summaries hook**, not the grouping or the rendering. Disabling
+   `useSavedMealSummaries` alone — leaving every other line — turns both specs green.
+3. **Moving the hook out of `nutrition-content.tsx`** into a memoised `DiaryMealList` (so the map's
+   arrival cannot re-render the library sheet) fixed `my-meals-artboard-parity` and **not**
+   `meal-detail-artboard-parity`.
+4. **The trigger is the `saved-meals` invalidation subscription**, not its network fetch. Removing
+   `useInvalidationRefetch` entirely turns both green; keeping it but re-reading only from the local
+   store and the cache seed — no request — leaves both red. So something in opening a meal
+   invalidates `saved-meals`, and the resulting work lands while a `SwipeActions` row is mid-drag.
 
-**Three symptoms, one cause — which is what makes this worth fixing rather than patching:**
+**Where to start.** Find what invalidates `saved-meals` during `openSavedMeal`, and why a subscriber
+re-rendering a sibling subtree drops an in-flight `useDrag`. `SwipeActions` keeps `offset` in
+`useState` and a module-level `openRows` registry — a re-render should be harmless and a **remount**
+would not be, so establish which is happening before changing either component.
 
-| Symptom | Where it was noticed |
-|---|---|
-| The meal's photo cannot follow it into the diary | **here**, the owner's report |
-| A saved meal has **no last-used timestamp at all**, so My Foods can only order by `createdAt DESC` | Q-395c's journal, filed as a constraint rather than a defect |
-| The diary shows five ingredients where the owner ate one thing | implied by both |
+**The diary needs the meal's name and photo from somewhere**, and every option has a cost: this hook
+(above), a join into the food-log read (**Lane A** — `app/api` and `lib/data`), or a seed-only read
+that goes stale (the Q-260 shape). Settle that before building again.
 
-Q-395c's journal already says it: *"`food_logs` carries no `saved_meal_id`, so a saved meal has no
-last-used timestamp at all … True MRU needs a column that does not exist — Lane A's to add."* **That
-is this column.** Adding it for MRU alone would be under-selling it.
-
-**Two shapes, and the choice is the entry's real content:**
-
-1. **Stamp the ingredients.** Keep one row per ingredient, add a nullable `saved_meal_id` (plus a
-   per-log group id, so two servings of the same meal on one day stay distinct). The diary groups
-   rows that share it and renders the meal's name and photo over them.
-   - **Keeps** every macro total, every per-ingredient edit, and every existing query working
-     unchanged — a log row is still a log row.
-   - **Costs** grouping logic on every diary read.
-2. **Log the meal as one row.** What the owner reached for — *"maybe it needs to stay as a whole
-   item"*.
-   - **Keeps** the diary trivially correct: one thing eaten, one row, one photo.
-   - **Costs** a second shape in `food_logs`: a row that points at a meal rather than a food item,
-     which every reader, the sync delta, the local mirror and the macro sums must now handle. And
-     editing one ingredient of a logged meal stops being possible without decomposing it anyway.
-
-**Recommended: (1).** It is additive — a nullable column and a grouping pass — where (2) changes what
-a `food_logs` row *is*, and this table is read by the diary, the energy balance, the adaptive-TDEE
-window, the sync delta and the local store. **The owner's phrasing asks for the outcome, not the
-storage**: "stay as a whole item" is satisfied by the diary *showing* one grouped item, which (1)
-delivers without a second row shape.
-
-- **⚠ Sequencing against BF-35.** BF-35 fills the food tile with images; a meal's photo reaching the
-  diary needs this column first. If BF-35 lands first the meal rows simply show ingredient images —
-  correct, not broken — so this is an ordering preference, not a `Needs:`.
-- **⚠ The full offline-first chain applies**, per CLAUDE.md: local table column = server payload =
-  `getSyncDelta` output = `pullDelta` mapping = `applyDelta` upsert columns = the `pushMutations`
-  branch. A new nullable column on a synced table is exactly where that chain gets half-done.
-- **Verification.** Log a saved meal with a photo: the diary shows one grouped entry with the meal's
-  name and picture, the day's macro total is unchanged from before, and a single ingredient inside it
-  can still be edited and deleted. Then the same on a second serving of the same meal on the same
-  day — they must not merge into one.
+- **The grouping rule itself is settled and was proved by mutation** — keep it: group on
+  `meal_group_id`, **never** `saved_meal_id` (two servings of one meal on one day share the meal and
+  not the group); a group needs a *resolvable* meal, so pre-BF-39 rows and a deleted meal's rows
+  render loose because **nothing back-fills**; and a one-row group is not nested.
+- **Verification when it is rebuilt:** the three tests written for it, **plus** the meal-library
+  swipe specs in the same run — the pair this attempt broke.
 
 ### [nutrition] BF-38 — logging the same food twice creates a second `food_items` row: 19 of 209 are redundant
 
@@ -5999,87 +6079,6 @@ this fits without an extraction.
   two whose restore is hardest to express. The `stale` 409 (a later change still in effect) renders
   through the same path and was not driven separately. Plus the tap-target/wrap check at S25 width.
   `Gate: device`.
-### [platform][app-shell] Q-392 — the preference API exists; the read sites still read `localStorage`
-
-- **⚑ ABSORBS Q-393 (removed 2026-08-23). The `mealLabelStyle` row below IS that entry.** Q-393
-  was filed as *"an ingredient breakdown on the printed label, which does not fit on a round one"*
-  and everything about the label itself has since shipped: **Q-397** (v1.324.0) refuted the premise
-  by fitting the full list on a **round** label as an inline wrapping run rather than a stacked one,
-  and **Q-399** retuned the geometry to 0.401 mm per module with three wrapped lines asserted. What
-  was left of Q-393 was one sentence — the chosen style is picked at print time and forgotten —
-  which is exactly this entry's `mealLabelStyle` → `ta_meal_label_style` row. Two entries for one
-  row is what this fold removes.
-- **⛔ OWNER DECISION 2026-08-23 — Option 2, the round trimmed label, is dead. Do not re-cost it.**
-  Q-393 carried two bullets that contradicted each other for five days, one calling Option 2 an open
-  owner decision and a later one calling it moot, and that contradiction is why the entry sat parked
-  behind `Gate: owner` at the position the owner had personally moved it to. The number that settles
-  it: at 44 units its true module pitch is **0.353 mm**, below every shipped style including the
-  0.369 the old default printed. The square die is the answer to wanting the stacked list on paper.
-- **The two physical checks Q-393 owed are already tracked** — print one and scan it — by the
-  `projectOverview.md` Known-Issues row for Q-400 (*"NOT verified on device · needs: hardware + a
-  printer"*). They were never this entry's and are not lost.
-
-- **Branch:** `feat/preferences-read-sites`
-- **Lane:** B
-- **Added:** 2026-08-18 · owner: *"I would like the app/settings to remember the settings we choose
-  — when i do a new install or open on computer - it loses all the saved preferences. We need to
-  make it persist across installs/etc."* **Re-scoped 2026-08-23** to the half that is left.
-
-**The engine half shipped** (Lane A, `feat/server-backed-user-preferences`): `users.preferences`
-is a JSONB bag (migration 206), `GET`/`PATCH /api/user/preferences` read and merge it, proven
-cross-session against the local DB. Nothing user-visible changed — **no read site calls it yet**.
-
-- **What is left is entirely in Lane B's files.** Every surface in the table below still reads its
-  `localStorage` key directly and writes only there. Each needs: read the server bag once (as
-  `hydrateGoalSeeds` does for goals), seed the same `localStorage` keys from it so first paint
-  stays synchronous, and PATCH on change.
-- **The correspondence is already written down — do not re-derive it.**
-  `PREFERENCE_STORAGE` in `packages/shared/src/user/preferences.ts` maps every preference name to
-  its `localStorage` key **and its encoding**, which is the part that bites: `ta_ss_widgets` is
-  JSON, `ta_weight_lookback` is a bare number, and the reminder toggles are `String(boolean)`
-  compared against the literal `'false'`. A test asserts the map covers every schema key.
-
-| what | preference key | storage key |
-|---|---|---|
-| Home widgets / cards | `homeWidgets`, `homeCards` | `ta_ss_widgets`, `ta_ss_cards` |
-| Home section order / hidden | `homeSectionOrder`, `homeHiddenSections` | `ta_home_section_order`, `ta_home_hidden_sections` |
-| Pill & card colours | `pillColors`, `cardColors` | `ta_pill_colors`, `ta_card_colors` |
-| Score-ring style | `scoreRingStyle` | `ta_score_ring_style` |
-| Weight lookback | `weightLookback` | `ta_weight_lookback` |
-| Goals progress view | `goalsProgressView` | `ta_goals_progress_view` |
-| Brand theme / hue | `brandTheme`, `brandHue` | `ta_brand_theme`, `ta_brand_hue` |
-| Background / wallpaper | `backgroundSettings` | `ta_background_settings` (a Zustand `persist` bag) |
-| Meal label style | `mealLabelStyle` | `ta_meal_label_style` |
-| Rest duration | `restDurationSec` | `ta_rest_duration` |
-| Food region | `foodRegion` | `ta_food_region` |
-| Meal / health / day-review / calendar toggles | `mealReminders`, `healthAlerts`, `dayReviewReminders`, `calendarSync` | `ta_pref_*` |
-
-- **⚠ `backgroundSettings` is the one that is not a plain key.** It is a Zustand `persist` store
-  (`lib/stores/background-settings-store.ts`), so the value under that key is the `{ state,
-  version }` envelope, not the settings. Sync the store's `state`, not the raw string, or a
-  version bump on one device writes an unreadable bag to the other. The schema types it as an
-  opaque record on purpose — the shape belongs to that store, and a second definition here would
-  drift.
-- **⚠ `users.food_region` is a dead column** (`schema.ts`, `NOT NULL DEFAULT 'AU'`, never read or
-  written); the live value is `preferences.foodRegion`. Leave it — dropping it is a data-losing
-  migration for no gain — and do not wire a read site to it by mistake.
-- **What deliberately does NOT sync is decided and listed**, in `DEVICE_LOCAL_PREFERENCES` with a
-  reason per key: push enablement, the two Android chip toggles, the ring and scale/HR BLE pairings,
-  and light/dark. If a surface needs one of them to sync after all, move it into the schema rather
-  than writing a second path.
-- **Conflict rule, already settled:** server wins, `localStorage` is a seed written *from* the
-  server and never the reverse — the same rule Q-241 set for goals.
-- **What would count as done:** sign in on a fresh install or a different browser and the chosen
-  ring style, widgets, colours, weight lookback and food region are already applied — no
-  re-configuration; changing one on either device and reopening the other shows the new value.
-  Browser-reproducible end to end (two profiles, or one and a private window); no device needed.
-- **⚠ Related, and more urgent than it looks now that the owner has said they reinstall:** **Q-537
-  — the ring key has one copy and no way to back it up.** `CLAUDE.md` is explicit that an uninstall
-  destroys the Oura ring key irrecoverably (it lives only in Android SharedPreferences) and that
-  re-onboarding the official app to recover risks a firmware update that breaks the BLE protocol.
-  This report establishes that reinstalls are part of the owner's normal routine, which changes
-  Q-537 from a latent risk to a live one. **Not this entry's work — but worth re-prioritising.**
-
 ### [workouts][platform] Q-403 — the Coach calls an already-applied swap a "proposal", and says it after the fact
 
 - **Branch:** `fix/coach-applied-change-copy`

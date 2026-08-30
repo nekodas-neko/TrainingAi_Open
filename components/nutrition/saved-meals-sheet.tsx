@@ -2,7 +2,7 @@
 
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useState } from 'react'
 import { useUserTimezone } from '@/components/shell/user-timezone-provider'
-import { Plus, Camera } from 'lucide-react'
+import { Plus } from 'lucide-react'
 import { toast } from 'sonner'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import type { FoodItem, SavedMeal, MealType, FoodLogWithItem, NutritionScanResult } from '@trainingai/shared/types/nutrition'
@@ -27,6 +27,7 @@ import { BulkDeleteConfirm } from './bulk-delete-confirm'
 import { FoodRow } from './food-row'
 import { QuantitySheet } from './quantity-sheet'
 import { useIngredientQuantities } from './use-ingredient-quantities'
+import { ingredientAmountLabel } from './saved-meal-qty'
 import { MealTypeTags } from './meal-type-tags'
 import { IngredientPicker } from './ingredient-picker'
 import { MealBatchSize } from './meal-batch-size'
@@ -133,7 +134,7 @@ export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate,
   const [mealServings, setMealServings] = useState(1)
   const {
     ingredients, setIngredients, addIngredient, removeIngredient,
-    unitFor, setUnit, amountLabel, setDisplayQty, stepQty,
+    unitFor, setUnit, setDisplayQty, stepQty,
   } = useIngredientQuantities()
   // Which meal slots a plan may use this meal in (BF-11f). Empty = every slot, which is what
   // `mealFitsSlot` already means by an untagged meal — never "no slot".
@@ -383,6 +384,45 @@ export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate,
     }
   }
 
+  /**
+   * Set or clear a meal's photo from the meal's own screen (BF-46 ①a).
+   *
+   * **It re-saves the whole meal through `saveMealToLibrary`**, which is the function the builder
+   * calls — not a second write reaching `image_data_uri` on its own. That is what keeps the offline
+   * path, the outbox payload and the local mirror identical whichever screen the photo came from,
+   * and it is why this lives here rather than in the detail sheet: the parent already holds the
+   * user, the timezone and the list.
+   *
+   * `mealTypeIds` is sent from the meal in hand, not omitted: this screen shows the meal it is
+   * saving, so leaving them alone would be a guess where the value is known.
+   */
+  const setMealPhoto = useCallback(async (meal: SavedMeal, dataUri: string | null) => {
+    // Paint first — the picker has already produced the image and a save that waits on the network
+    // is what this app's feedback rule exists to prevent.
+    const next = { ...meal, imageDataUri: dataUri }
+    setDetailMeal(cur => cur && cur.id === meal.id ? next : cur)
+    setMeals(prev => prev.map(m => m.id === meal.id ? next : m))
+    try {
+      const fresh = await saveMealToLibrary({
+        mealId: meal.id,
+        name: meal.name,
+        items: meal.items.map(i => ({ foodItemId: i.foodItemId, quantityMultiplier: i.quantityMultiplier })),
+        servings: meal.servings > 0 ? meal.servings : 1,
+        imageDataUri: dataUri,
+        mealTypeIds: meal.mealTypeIds ?? [],
+        createdAt: meal.createdAt instanceof Date ? meal.createdAt.toISOString() : String(meal.createdAt),
+        isUpdate: true,
+        userId,
+        tz,
+      })
+      if (fresh) setMeals(fresh)
+    } catch {
+      toast.error(dataUri ? 'Failed to save that photo' : 'Failed to remove that photo')
+      setDetailMeal(cur => cur && cur.id === meal.id ? meal : cur)
+      setMeals(prev => prev.map(m => m.id === meal.id ? meal : m))
+    }
+  }, [userId, tz])
+
   const quickLog = useCallback(async (meal: SavedMeal) => {
     // Honour the bucket the user opened this sheet from; only fall back to the
     // current time-of-day bucket when the sheet was opened without one (the
@@ -573,6 +613,23 @@ export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate,
             ) : (
             <>
             <div className="flex-1 overflow-y-auto px-4 space-y-4 pb-2">
+              {/* BF-46 ①(a): the picker is the FIRST thing in the builder, at the size the meal's
+                  own screen gives a photo. It used to sit below `Add ingredient` at the bottom of
+                  this scroll — the owner found it and still said *"I only want the one at the
+                  top"*, because the meal's own screen shows a hero band there and the builder
+                  answered with a 64 px box several screens down. Both are the same control now.
+
+                  It is the picker AND the preview, so there is no separate "current photo" row, and
+                  the picture rides the save that is already here rather than needing a write of its
+                  own (Q-327). */}
+              <MealPhotoTile
+                value={mealImage}
+                onChange={setMealImage}
+                disabled={saving}
+                variant="hero"
+                label={mealName.trim() || 'this meal'}
+              />
+
               <MealBatchSize
                 servings={mealServings}
                 onChange={setMealServings}
@@ -600,7 +657,7 @@ export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate,
                         key={item.id}
                         id={item.id}
                         name={item.name}
-                        secondary={amountLabel(item, qty, unitFor(item))}
+                        secondary={ingredientAmountLabel(item.servingSizeG, qty)}
                         calories={(item.calories ?? 0) * qty}
                         highlighted={item.id === editingIngredientId}
                         onEdit={setEditingIngredientId}
@@ -631,17 +688,6 @@ export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate,
                   Add ingredient
                 </button>
               )}
-
-              {/* The tile is the picker AND the preview, so there is no separate "current photo"
-                  row, and the picture rides the save that is already here rather than needing a
-                  write of its own (Q-327). */}
-              <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
-                <MealPhotoTile value={mealImage} onChange={setMealImage} disabled={saving} />
-                <span className="inline-flex items-center gap-1.5">
-                  <Camera className="h-4 w-4" />
-                  {mealImage ? 'Change the photo' : 'Add a photo'}
-                </span>
-              </div>
 
               <QuantitySheet
                 item={editingEntry?.item ?? null}
@@ -702,6 +748,7 @@ export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate,
         onEdit={m => { setDetailMeal(null); openBuild(m) }}
         onDelete={async m => { await deleteMeal(m); setDetailMeal(null) }}
         onLabel={m => setLabelMeal(m)}
+        onSetPhoto={setMealPhoto}
       />
       <MealLabelSheet
         meal={labelMeal}
