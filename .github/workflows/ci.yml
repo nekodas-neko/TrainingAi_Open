@@ -88,8 +88,12 @@ jobs:
     runs-on: ubuntu-latest
     env:
       NODE_OPTIONS: --max-old-space-size=4096
+      # Q-311. Everything below is a throwaway literal for this ephemeral job, not a redacted
+      # secret. This repo is public, and a reader cannot tell a dummy from a leak by looking, so:
+      # the database is a service container destroyed with the runner, and the Google/Gemini/Tasker
+      # values are never sent anywhere — `next build` only needs the names to be defined. Nothing
+      # here authenticates, signs or decrypts anything outside this job.
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/ci
-      SESSION_SECRET: ci-placeholder-secret-must-be-32-chars
       GOOGLE_CLIENT_ID: placeholder
       GOOGLE_CLIENT_SECRET: placeholder
       GOOGLE_REDIRECT_URI: http://localhost:3000/api/auth/callback/google
@@ -484,6 +488,13 @@ jobs:
           - 5432:5432
     env:
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/trainingai_ci
+      # Q-311. A throwaway NextAuth signing key, deliberately inline rather than a repository
+      # secret. NextAuth needs *some* value in `auth.config.ts`'s `secret` or the credentials
+      # callback returns `?error=Configuration`; this one signs cookies for a server and a database
+      # that are both destroyed with the runner. Inline because a repository secret is not passed
+      # to a pull request from a fork, which would fail this required check for outside
+      # contributors — and because a hidden value would leave the same reader wondering whether CI
+      # depends on a real credential. It does not.
       AUTH_SECRET: e2e-ci-secret-not-used-outside-this-job
     steps:
       - uses: actions/checkout@v5

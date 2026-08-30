@@ -4338,25 +4338,6 @@ Full/Deload/Rest choice moved off Home (now Rest/Full only) onto the pre-workout
 Quick/Normal/Long duration picker, so choosing Deload happens at the point that actually determines
 the session.
 
-### [sleep][devices][platform] 🟠 A sleep session can get stuck on a stale, narrower window with no self-heal (Q-225, found 2026-08-13/14)
-
-Owner reported the previous night's displayed bedtime (1:15am) looked far too late. Not the
-anchor-lag bug (Q-71/Q-139, ≤3 min correction) — a 2h35min gap, so traced separately. **Confirmed by
-full local reproduction, not inference**: pulled all of that night's real raw samples (11,208 rows)
-and clock anchors from production, loaded them into the local dev DB under a throwaway user, and ran
-the actual `aggregateOuraRawSamples` function directly against them (both `fullHistory: true` and a
-bare incremental call). Both produced the same correct answer — sleep 22:40pm→8:05am (8.5h), onset
-10 min, with the neural stager correctly flagging a brief overheating-driven wake bout around
-00:50am as `awake` rather than delaying the start — exactly matching the owner's account ("asleep,
-woke here and there from overheating"). The live stored row does not match this and fails every
-check run against it (no >2h raw-data gap, no bedtime-event override, no stale-decoded-JSONB issue).
-Leading theory (not confirmed): the DB-pool-contention pattern amended into the `[platform]` Q-107
-row above — the timing correlates, though the causal link isn't proven. **Verified fix**: an admin
-Redecode (`fullHistory: true`) deletes the stale row (keyed by wake-day, not `oura_id`) and inserts
-the correct one — confirmed by running that exact code path locally. Backlog: **Q-225**
-(`docs/implementation-backlog.md`), which also has a reusable local-repro harness for checking
-whether other recent nights hit the same bug during the same error bursts.
-
 ### [heart-rate][workouts] ✅ Per-set HR now records which device measured it (2026-08-05, v1.260.0)
 
 From the null-rate sweep — **847 columns across 69 tables**, one `count(col)` each: **49 are 100%

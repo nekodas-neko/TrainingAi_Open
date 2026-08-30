@@ -88,9 +88,11 @@ jobs:
           - 5432:5432
 
     env:
+      # Q-311. Throwaway literals for this ephemeral job, not redacted secrets — see the same
+      # note on the E2E job in ci.yml. `AUTH_SECRET` signs cookies for a server and a database
+      # that are destroyed with the runner; the rest are never called.
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/trainingai_ci
       AUTH_SECRET: emulator-ci-secret-not-used-outside-this-job
-      SESSION_SECRET: emulator-ci-placeholder-secret-32-chars
       GOOGLE_CLIENT_ID: placeholder
       GOOGLE_CLIENT_SECRET: placeholder
       GOOGLE_REDIRECT_URI: http://localhost:3000/api/auth/callback/google

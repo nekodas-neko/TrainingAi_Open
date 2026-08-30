@@ -56,6 +56,11 @@ others (energy balance, bodyweight 1RM, readiness) and shouldn't be buried insid
   full one. Expect **less** spread than today (sd ~22.6 vs 30.1) and that is correct: today's spread
   is largely ring wear time. Also found **one corrupt `body_comp` row** (2026-07-29: 3% body fat,
   BMR 1,890) which is inert today and becomes load-bearing the moment BMR drives drain — **Q-527**.
+  **Traced 2026-08-30:** it is the 2026-07-28 no-contact weigh-in (impedance 0 → the estimator's own
+  3% clamp floor), the scale-side guard for it already shipped and has held for 30 readings since,
+  and `PLAUSIBLE_BODY_FAT_PCT` in `packages/shared/src/health/body-composition.ts` is now the
+  last line before storage. **The one stored row is still there** — nulling it is the owner's call,
+  and Q-521 must apply the same check on read rather than assume the write-site guard reached it.
 
 ## Open issues
 

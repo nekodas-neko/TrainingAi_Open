@@ -7629,12 +7629,21 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 - **Why it matters beyond the sleep card.** These rows feed `previousNight` (16% of readiness) and
   `sleepBalance` (10%). The stored readiness contributors for the affected days show `sleepBalance`
   collapsing to 0 and 9 — a saturated z-score against a baseline the fragment has poisoned.
-- **Relationship to Q-225 — sharpen it, do not replace it.** 2026-08-13 is the night Q-225 was
-  opened on, and that entry explicitly asks for *"a reusable local-repro harness for checking whether
-  other recent nights hit the same bug"*. **This is that sweep, done at the data layer, and it found
-  at least one more: 2026-08-11 shares the signature** (single row, near-zero duration). Whether
-  08-11 has the same *cause* as 08-13 is unproven — Q-225's local repro harness is the tool that
-  would settle it.
+- **⚠️ Q-225 CLOSED 2026-08-30, and it took half of this entry's evidence with it. Re-measure before
+  planning.** Q-225 was the stale-narrow-window bug this entry was sharpened against; its record is
+  now in [`docs/overview/known-issues-resolved.md`](overview/known-issues-resolved.md). Two things
+  it settled bear directly on the bullets above:
+  1. **The sweep this entry asked for is done, and 08-11 and 08-13 are not truncation.** All 67
+     BLE-era nights were checked for the clipping signature (a late start against a normal wake);
+     the only night-shaped candidate was 2026-08-19, and `oura_heartrate` has a genuine seven-hour
+     hole across it, so the ring recorded nothing to clip. Whatever produced the fragments, it was
+     not the cutoff.
+  2. **"The ONLY record for this date" no longer holds for either named date.** Both 2026-08-11 and
+     2026-08-13 now carry a full night beside the fragment (08-11: 8.50 h + 0.00 h; 08-13: 8.17 h +
+     1.42 h), re-derived since this entry was filed. Across the whole BLE era exactly **two** dates
+     have no full-night row at all — 2026-07-07 (the re-key day, 0.33 h) and 2026-08-19 (the
+     not-worn night above). **So problem 2 below does not currently reproduce anywhere**, and the
+     rows-per-date table above is stale. Problem 1 is untouched: 0.00 h rows are still being written.
 - **Two distinguishable problems, and they may need different fixes:**
   1. A **0.00 h row exists at all.** A sleep session of zero duration is not a short night, it is a
      failed rollup or a stray detection. Decide whether the rollup should refuse to write it.
@@ -8834,30 +8843,56 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 ### [body][platform] Q-527 — one corrupt body-composition row, and it becomes load-bearing the moment Body Battery uses BMR
 
 - **Branch:** `fix/body-comp-plausibility-guard` · **Lane:** A
-- **Plan:** none needed — a plausibility guard at the write site. Evidence:
+- **Plan:** none needed. Evidence:
   [`docs/reviews/2026-08-19-body-battery-drain-model.md`](reviews/2026-08-19-body-battery-drain-model.md) §2.
 - **Added:** 2026-08-19 · Tuning agent, found while checking the owner's *"BMR draining should
   naturally go up too"* premise against the data.
-- **Measured.** `body_comp` holds 71 daily snapshots. **One is impossible: 2026-07-29 records body fat
-  **3.0%**, fat-free mass **70.4 kg of 72.6 kg** bodyweight, and BMR **1,890** — against ~24% body fat
-  and ~1,520 BMR on the surrounding days.** Three per cent is below the essential-fat floor for a male;
-  this is a bad scale reading propagated through `cunninghamBmr` into a stored BMR **24% above
-  baseline**. One row of 71, so ~1.4% — rare, not impossible.
-- **Why it matters now and did not before.** Nothing currently keys a user-visible number off stored
-  BMR. **Q-521's drain model makes baseline drain proportional to it** (`baseline = 25 × bmrToday /
-  bmrReference`), so this single row becomes a day that drains a quarter faster for no reason the
-  owner can see or explain.
-- **First action:** a plausibility guard at the `body_comp` write site — reject or clamp a snapshot
-  whose body fat falls outside a physiologically possible band, or whose fat-free mass exceeds a
-  plausible share of bodyweight. **Guard the input, not the output**: BMR is derived, so a BMR range
-  check would catch this case and miss the next one.
-- **Also decide what a rejected snapshot does.** Dropping the row leaves a gap; carrying the previous
-  day forward hides that the scale misread. Prefer storing it flagged over storing it silently, so a
-  future audit can see the reading happened — the same reasoning behind readiness's `provisional`
-  flags, which are the reference for this (Q-526).
-- **Do this BEFORE Q-521.** A guard added afterwards leaves already-stored bad rows driving drain.
-- **Caveats:** one athlete, one bad row, 71 snapshots — the *rate* here is not a population estimate.
-  The band itself is a published physiological range, not a fit to this data.
+- **Measured, and re-measured 2026-08-30.** `body_comp` now holds **81** daily snapshots. **One is
+  impossible: 2026-07-29 records body fat 3.0%, fat-free mass 70.4 kg of 72.6 kg bodyweight, and BMR
+  1,890** — against ~24% and ~1,520 on the surrounding days. The next-lowest reading in the entire
+  series is **22.2%**, so the outlier sits alone across a 19-point gap.
+- **⚠️ THE CAUSE IS KNOWN AND THE INPUT GUARD ALREADY SHIPPED — read this before planning.** The
+  entry was written as though nothing guarded the write. Measured 2026-08-30:
+  - **The row is the 2026-07-28 no-contact incident**, which `lib/scale-ble/composition.ts` names in
+    its own comment: socks or dry feet break the foot-plate contact BIA needs, the scale reports
+    impedance **0** rather than omitting the reading, and that drives the impedance term to −∞ and
+    lands the estimate on the estimator's own `clamp(…, 3, 60)` **floor**. `body_metrics` confirms
+    it — the 2026-07-29 row was created `2026-07-28T14:27:43`, `source = scale_ble`, body fat 3.
+  - **`hasValidImpedance` / `MIN_VALID_IMPEDANCE_OHMS = 200` was added in response**, and is called
+    at *both* scale write sites (`/api/scale-ble/samples`, `/api/scale-ble/pending/[id]/confirm`).
+  - **It has held.** `scale_ble` has since written **30** body-fat readings (2026-07-29 → 2026-08-30)
+    and **exactly one is under 10%** — the incident itself, the first of the thirty. Every reading
+    after it is 22.2–25.5%.
+- **The last-line guard shipped 2026-08-30**: `PLAUSIBLE_BODY_FAT_PCT = { min: 4, max: 60 }` in
+  `packages/shared/src/health/body-composition.ts`, applied by `bodyComposition()` and therefore by
+  `bodyCompSnapshot()`. **Its floor sits deliberately above the estimator's clamp floor of 3**, so a
+  floored value cannot walk through, and it covers the sources `hasValidImpedance` cannot see —
+  Health Connect, a manual entry, a second scale. Mutation-verified. It also improves Health's
+  lean-mass card, which shares the helper and was plotting a 17 kg spike on that day.
+- **The sibling sweep is where the real exposure was, and this entry did not name it.** A band in one
+  helper only guards callers that go through it; grepping for the *arithmetic* found **two live
+  surfaces re-deriving `weight × (1 − bf/100)` inline**, both now routed through
+  `bodyComposition()`: `lib/health/energy-balance-service.ts` (the formula baseline behind "what you
+  may eat today" — measured by mutation, a 3% reading gives **2,268 kcal against 1,991**, a
+  **277 kcal/day** inflation) and `calculateBaseline` in
+  `packages/shared/src/nutrition/goal-recommendation.ts` (calorie *and* protein targets, since
+  protein is dosed per kg of lean mass). That is also the One-Formula-One-Place fix — there were
+  three implementations. **The stored row this entry was filed about is inert until Q-521; these two
+  were not.**
+- **Keep:** two things, neither of them code this entry can write.
+  1. **The one historical row is untouched, and that is the owner's call** (same shape as Q-298's
+     ten zero-1RM rows). The guard is forward-only: `persistBodyCompFromMetrics` upserts, so a
+     re-run now *skips* 2026-07-29 rather than correcting it, and the stored snapshot survives.
+     Nulling it is a production data edit, and it is **not** reversible by re-running the backfill —
+     the guard would refuse to re-derive it. The measurement itself stays in `body_metrics` either
+     way, so nothing is lost by nulling and nothing is at risk by keeping it *until* Q-521 ships.
+  2. **Q-521 must not trust a stored snapshot blindly.** Its drain model reads `body_comp.bmr_kcal`,
+     and a write-site guard cannot reach a row already written. Apply `isPlausibleBodyFatPct` to the
+     snapshot on read, or resolve item 1 first. **This is the "do it BEFORE Q-521" line, restated as
+     something Q-521's implementer can act on** — the guard alone does not discharge it.
+- **Caveats, unchanged:** one athlete, one bad row, 81 snapshots — the *rate* here is not a
+  population estimate. The band is published physiology, not a fit to this data.
+
 
 ### [activity][heart-rate] Q-522 — the movement-per-hour contributor is saturated: it measures ring wear, not movement
 
@@ -9333,80 +9368,6 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 - **Low priority.** No user-visible fault, no data loss. This is dead-weight removal, and it should
   not jump ahead of anything in the scoring cluster above.
 
-### [sleep][devices][platform] Q-225 — a sleep session can get stuck on a stale, narrower window that a fresh rollup would compute correctly, with no self-heal
-
-- **Added:** 2026-08-13/14 · owner reported the app's displayed bedtime for the previous night
-  (1:15am) looked way too late. Not the anchor-lag bug (Q-71/Q-139, ≤3 min correction) — this is a
-  2h35min gap between the stored value and what the ring's real data supports, so a different
-  investigation.
-- **Confirmed by full local reproduction, not inference.** Pulled all of that night's real raw
-  samples (11,208 rows, 9 tags) and clock anchors from production via the read-only endpoint,
-  loaded them into the local dev DB under a throwaway test user, and ran
-  `repo.aggregateOuraRawSamples(...)` — the actual shipped function, unmodified — directly against
-  them, twice (once with `fullHistory: true` + `debugDate`, once as a bare incremental call). **Both
-  runs produced the same, correct result: sleep 22:40pm→8:05am (8.5h), onset 10 min, with the
-  neural stager correctly flagging a brief HR-up/movement epoch around 00:50am as `awake`** — i.e.
-  the owner's account ("asleep, woke here and there from overheating") is exactly what the current
-  algorithm computes from the real data. **What's stored in production does not match this**: the
-  live row (`oura_id: ble:33100097`, `sleep_start` 1:15am, 6h05m) is stale/wrong by every check run
-  against it — no >2h gap in the raw `sleep_acm_period`/`sleep_temp` stream (biggest gap 17 min), no
-  `bedtime_period` (0x76) event to override the clustering, no persisted-`decoded` staleness (every
-  row for the night decodes fresh from `body_hex`, as expected post-Lever-1).
-- **🔻 The pool-contention lead is contradicted by measurement (2026-08-14). Do not start from it.**
-  Three facts, all from the read-only endpoint against live production:
-  1. **A rollup HAS re-run since, and reproduced the same wrong window.** Both 08-13 rows and the
-     08-14 row share `updated_at = 2026-08-14T11:13:03.720Z` to the millisecond — one range rewrite —
-     and `ble:33100097` still reads `sleep_start` 15:15 UTC / 6.08 h. The entry's "evidently none has
-     produced the correct window since" is false.
-  2. **The raw data is complete right now.** A bounded query over that night returns a dense stream
-     from **13:15 UTC** (23:15 AEST) — tag 0x60 alone has 1,036 rows before the stored start. So the
-     frames a correct window needs are present and were present for that rewrite.
-  3. **It has not self-healed** (unlike Q-228's and Q-229's symptoms, both of which had).
-  Together those make it **deterministic given the current data**, not a one-off partial read. A race
-  that has stopped racing cannot keep producing the same answer from complete data.
-- **Leading hypothesis now: an asymmetric truncation guard. NOT CONFIRMED — see below.**
-  `aggregateOuraRawSamples` reads an incremental window (`rollupCutoffDs`), and a night whose early
-  frames fall outside it is *truncated, not short*. The daily-summary fold refuses those:
-  `summaryFloorDate` (`adapter.ts` ~5824) discards any night within 2 days of the cutoff, and the
-  3-day margin on `incrementalFloorDs` exists expressly to give it room — its own comment says so.
-  **The `sleep_sessions` write (~5523) has no equivalent filter**, and it deletes by wake-day before
-  inserting, so a clipped pass replaces a previously-correct row rather than merely failing to
-  improve it. That fits every observation: front-clipped (start late, wake time right), deterministic
-  on re-run, and repaired only by `fullHistory` — which has no cutoff and therefore no filter.
-- **⚠️ Attempted and withdrawn on 2026-08-14: a one-line guard mirroring `summaryFloorDate`, plus a
-  four-case rollup test. Both reverted, unshipped, because the test never discriminated.** Three
-  fixture generations were tried and all four cases passed with the guard removed:
-  (a) a night seeded with a `bedtime_period` (0x76/118) event — that event carries an explicit
-  `bedtime_start_ds` and is stamped at the night's *end*, so it survives any narrowing and the night
-  cannot exhibit the bug at all; **the owner's night has no such event**, which is why clustering is
-  what gets cut;
-  (b) IBI-only samples — no sleep row is produced at all, so nothing to protect;
-  (c) `sleep_acm_period` (0x72) + `sleep_temp` (0x75) + IBI, which is what the clusterer actually
-  reads (`adapter.ts` ~5064) — a row is produced, but a narrowed run still does not clip it.
-  So the mechanism above remains **unreproduced**, and shipping a sleep-pipeline write change that
-  cannot be shown to fix anything was judged worse than the bug. **The next session's first job is a
-  fixture that fails without the guard** — most likely by driving the exported production samples for
-  that night through a narrowed (`sinceDs`) call rather than a synthetic night, since the synthetic
-  ones do not clip.
-- **Owner-visible state is unchanged:** the 08-12 night still displays 1:15am. A `fullHistory`
-  Redecode still repairs it (confirmed locally in the original investigation) and remains the only
-  known repair.
-- **Immediate fix, verified working:** an admin **Redecode** (`fullHistory: true`) for this user
-  would delete the stale row (keyed by wake-day, not `oura_id`/`sleep_start`, so the key mismatch
-  between the old narrow window and the new wide one is not a problem) and insert the correct one —
-  confirmed by literally running that code path locally. This is the same Redecode the Q-71 backlog
-  entry already has queued for the historical-sleep rewrite; the two can likely be done together
-  once Q-71 lands, but this row (and possibly other recent nights hit during the same pool-exhaustion
-  bursts) may need it sooner, independent of the anchor-offset fix.
-- **Not yet done:** checking whether other recent nights (not just this one) also landed a
-  stale/narrow window during the same 2026-08-12/13 error bursts — the local-repro harness this
-  entry built (raw-sample + anchor CSV export → local DB load → direct `aggregateOuraRawSamples`
-  call) is reusable for that sweep without re-deriving the method; confirming the pool-contention
-  causal link against Railway's own logs (same "not yet done" item Q-107 already carries); and
-  deciding whether the rollup needs a structural fix (e.g., don't write a sleep row from a partial
-  read, or re-validate/re-run automatically when new data for an already-written night's wake-day
-  arrives) rather than relying on someone noticing and running Redecode by hand.
-
 > **⚑ Q-232 … Q-244 are one cluster** — the 2026-08-14 UI/flow/IA + caching review, requested by the
 > owner ("a good review on the ui and flow/location mainly … alongside that have a look at caching
 > and cache busting"). Full evidence, the navigation map and the proposed target structure:
@@ -9556,39 +9517,49 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   mouse input. (Q-282 shipped as `e2e/touch-target-size.spec.ts` and does **not** — it measures
   rendered geometry from the DOM and never clicks, so it does not revive this.)
 
-### [platform] Q-297 — finish the E2E specs Q-249's first PR deliberately left, and cover more than one tab per screen
+### [platform] Q-297 — cover Nutrition's day navigation; the write-path specs it asked for have shipped
 
 - **Branch:** `feat/e2e-specs-round-2`
-- **Added:** 2026-08-15 · follow-up to Q-249, which shipped the harness
-  (`playwright.config.ts`, `e2e/`, the `E2E` CI job) plus one spec. Read
-  [`e2e/README.md`](../e2e/README.md) first — it records what a green run does and does not prove,
-  and every limitation below was measured, not guessed.
-- **DONE 2026-08-15 for Health — the multi-panel coverage gap.** `e2e/health-tabs-instant-paint.spec.ts`
-  drives `?tab=training|body|progress` and asserts the requested tab is the *selected* one before
-  checking, so the panel under test is actually in the viewport. Verified by the mutation Q-249's
-  spec could not catch: forcing Health's Body-tile skeletons to never clear now fails — and fails
-  **only** the Body case, leaving Training and Progress green.
-- **Still open for every other tabbed screen.** The `expectNoSkeleton` viewport rule is unchanged and
-  correct (an inactive `SwipeCarousel` panel is mounted but unseen, and its data loads on swipe by
-  design), so any single-URL spec still covers one tab. Nutrition's date swipe and any other tabbed
-  surface need the same treatment: drive the tab, assert which panel is selected, then check.
-- **The specs Q-249 scoped and this did not ship:** log a set, a food entry and a water entry and
-  assert each appears without a reload; change a goal and assert the Health tab reflects it (the
-  Q-240 regression, four lines of E2E for a bug this repo has already had once).
-- **A limitation worth closing separately:** the 20 s skeleton budget cannot tell "seeds instantly
-  from cache" from "seeds in 8 s off the network", because the harness runs `pnpm dev` and route
-  handlers compile on first call. It catches a card that *never* seeds, not a regression from
-  instant to sluggish. Measuring the second would need a warmed server and a much tighter budget.
-- **The E2E job is NOT a required status check** and should stay that way until it has a track
-  record — branch protection requires Lint, Tests, Build, Custom Rules and Migration Check. Promote
-  it once it has run green across a few weeks without flaking, and say so in the PR that does.
+- **Added:** 2026-08-15 · follow-up to Q-249, which shipped the harness. Read
+  [`e2e/README.md`](../e2e/README.md) first — it records what a green run does and does not prove.
+- **⚠️ RE-VERIFIED 2026-08-30 and most of this entry was stale.** Read this block before planning;
+  four of the five things it asked for are in `e2e/` already, under other entries' numbers.
+  - *"log a set … assert it appears without a reload"* → **`workout-set-loop.spec.ts`** (Q-461).
+  - *"a food entry"* → **`food-logging-complete.spec.ts`** (Q-387).
+  - *"a water entry"* → **`water-log-write-path.spec.ts`**, whose header names Q-297 outright:
+    *"the first write-path spec: a logged value must appear on the screen that triggered it,
+    without a reload."*
+  - *"change a goal and assert the Health tab reflects it (the Q-240 regression)"* →
+    **`goal-round-trip.spec.ts`** covers the write reaching another screen, and
+    **`goal-invalidation.spec.ts`** establishes by mutation that **no guard can exist** for the
+    Q-240 path specifically: `cachedFetchCore` always revalidates unless `freshWithinTtl` is set,
+    and the stale flash comes from Health's retained React state rather than the cache. That is a
+    settled negative result, not an outstanding item.
+  - *"Nutrition's date swipe and any other tabbed surface"* → **there is no other tabbed surface.**
+    `SwipeCarousel` is used by exactly one screen (`health-content.tsx`) plus two pickers
+    (`walk-config`, `run-type-carousel`), so `health-tabs-instant-paint.spec.ts` already covers the
+    whole population. Nutrition has a **day**, not tabs.
+- **Nutrition's day navigation is covered as of 2026-08-30** — `e2e/nutrition-day-navigation.spec.ts`
+  pins the two entry points to each other (the header chevrons and the `?date=` deep link the Home
+  timeline's meal cards use), the today guard on Next day, and instant paint on returning to a day
+  already viewed. **Driven by the chevrons, not the swipe**, because `useDrag` on this screen
+  swallows mouse input (**Q-354**, open) and mouse is what Playwright sends — a swipe-driven spec
+  would assert against a known-broken path. Cover the swipe when Q-354 lands.
+- **What is genuinely left, and it is small:**
+  - The **20 s skeleton budget cannot tell "seeds instantly from cache" from "seeds in 8 s off the
+    network"**, because the harness runs `pnpm dev` and route handlers compile on first call. It
+    catches a card that *never* seeds, not a regression from instant to sluggish. Measuring the
+    second needs a warmed server and a much tighter budget, and is its own piece of work.
+  - **Whether the E2E job should become a required check.** This entry said keep it optional until
+    it has a track record; LA-22 has since made it always-run and always-report specifically so it
+    is safe to require. Its current branch-protection state was not checked here — check before
+    changing anything.
 - **Do not chase a skeleton into a "fix" without checking which panel it is on.** The Q-249 session
-  found the Injuries card stuck in a loading state, traced it to `injuries` being fetched only by
-  the Body tab's group, and changed `health-content.tsx` — then reverted it on discovering the card
-  is off-screen in an inactive carousel panel and loads on swipe, exactly as designed. The milder
-  real behaviour is that arriving on Body or Progress for the first time shows a brief skeleton,
-  because nothing has written the cache the mount seed reads. That may be worth fixing; it is not
-  the bug it first looked like.
+  found the Injuries card stuck loading, traced it to `injuries` being fetched only by the Body tab's
+  group, changed `health-content.tsx` — then reverted on discovering the card is off-screen in an
+  inactive carousel panel and loads on swipe, exactly as designed. The milder real behaviour is that
+  arriving on Body or Progress for the first time shows a brief skeleton, because nothing has written
+  the cache the mount seed reads. That may be worth fixing; it is not the bug it first looked like.
 
 ### [platform][devices] Q-250 — an Android emulator job in CI, to close the 17 rows that need an Android runtime and nothing else
 
@@ -10833,88 +10804,69 @@ per-field merge where an AI write has no honest source rank to claim.
   `active_calories_est` weakens considerably — a calorie estimate and an HR load term measure much
   the same thing, and Q-184's own entry already says to check this first.
 
-### [readiness][devices] 🔴 Q-270 — `training_load_ots` is still 0 of 96 days: the 2026-08-15 warm-list fix did not take
+### [readiness][devices] 🔴 Q-270 — `training_load_ots` is still 0 of 104 days, and the route is neither failing nor succeeding
 
-- **🔴 Re-measured in production 2026-08-20 — the fix did not take.** `claude_ro.oura_daily_derived`
-  holds **96 days**, `training_load_ots` populated on **0** of them and `active_calories_est` on
-  **0**, latest day 2026-08-22. That is five days after the 2026-08-15 warm-list entry shipped,
-  against this entry’s own re-check condition: *"Re-read `training_load_ots` in a day or two; if
-  it is still 0, the diagnosis was incomplete."* **It is still 0, so the diagnosis was
-  incomplete** — all four gates were measured passing, so the remaining suspects are the warm-list
-  entry not firing, the route erroring before the write, or the persist itself (which the entry
-  already flags as unproven locally, since the seed carries no `ble-derived` readiness).
-- **Start by proving the route is called at all**, not by re-measuring the four gates — those were
-  measured 2026-08-15 and re-measuring them is the trap this entry has already fallen into once.
+- **Branch:** `fix/training-stress-column-empty` · **Lane:** A
+- **🔴 Re-measured 2026-08-30. Still 0 — of 104 days now, ten days after the last re-check.**
+  `active_calories_est` likewise 0. The 2026-08-15 warm-list fix did not take, and neither did the
+  diagnosis after it.
+- **What was ruled OUT on 2026-08-30, so the next session does not re-derive it.** Every one of these
+  was measured, not read:
+  - **All four gates pass, on all eight most recent days** — evaluated per date the way the route
+    does, not in aggregate: `readiness_source = 'ble-derived'` with a score ✓, `n_history` 48–55
+    against a floor of 14 ✓, `resting_heart_rate` present ✓, sex and date of birth present ✓.
+  - **The MET gate passes from midday.** Samples span the whole local day (first sample 00:02–00:14,
+    last 22:25–23:55, span **1,338–1,427 minutes**) against a floor of 720, so it clears by ~12:07
+    local — not late evening, as the shape of the gate suggests.
+  - **The route is not erroring.** `error_events` holds **no** `/api/training-stress` row over seven
+    days. So it is not 500ing; the column is empty because the route is not being called, or is
+    called and returns `gated` — and nothing on the server distinguishes those.
+  - **The write path is correct.** `trainingLoadOts` is in `DERIVED_COLS`, the upsert's COALESCE arm
+    updates rather than swallows a real number, and there is now a test pinning that
+    (`training-stress-persist.test.ts` — its upsert case runs everywhere; the two OTS cases need the
+    vendored constants and skip without them).
+- **The structural problem, which is why this entry keeps being wrong.** The persist is a *side
+  effect of a GET*, it happens only when `result.status === 'ok'`, and nothing records that the
+  route ran or what it decided. So "not called" and "called and gated" are indistinguishable from
+  outside, and every diagnosis so far has had to guess between them. **Fix the observability before
+  the cause** — a session that cannot tell those apart will produce a fourth wrong answer.
+- **Two candidate causes left, both unproven:**
+  1. **`warmCache` returns early whenever the key is cached** (`components/sync-provider.tsx`) and
+     does not check the stored envelope's date, so a `today: true` key warmed before midday can keep
+     serving a `gated` answer. Whether TTL_MEDIUM expiry defeats that in practice is unmeasured.
+  2. **A constants-delivery miss.** `getOtsTypedConstants` reads a directory downloaded at boot, and
+     `lib/oura-models/constants/index.ts` records that a route handler read `OURA_CONSTANTS_DIR` as
+     undefined while boot had logged success — *"every stress read 500s. That is what
+     `/api/body-battery` was doing in production for two hours."* The 12 `error_events` rows for that
+     route (last 2026-08-23T20:59) are that incident. Whether `/api/training-stress` shares it is
+     unknown, because it has no error rows either way.
+- **Every caller passes TODAY** — the warm list (no `?date=`, so the route resolves today), the
+  Health → Body card, and the done-screen badge. So a completed day is only ever scored while it is
+  still in progress, which is worth questioning independently of the bug.
 - **This still gates Q-204**, whose design assumes this column is most of its input.
 
-> **The column was empty because nothing called the route.** All four gates were measured and all
-> four pass — readiness `ble-derived` (31 days), `n_history` 40 vs 14, RHR on 30 of 30 days, and a
-> MET grid of 1,425 min / 1,146 values against floors of 720/360. `/api/training-stress` persists
-> only as a side effect of being called, and its only caller was a Health → **Body** card while the
-> tab defaults to **Training**. Fixed with one sync-provider warm-list entry: once per launch,
-> **deliberately off the BLE ingest path** that Q-213 traced an outage to, and with no cron layer
-> available. ⚠️ **Populates forward only — the 89 empty days stay empty**, and the persist itself is
-> unproven locally (the seed has no `ble-derived` readiness, so the route gates before the write).
-> **Re-read `training_load_ots` in a day or two**; if it is still 0, the diagnosis was incomplete.
-> **This unblocks Q-204**, whose design assumes the column is most of its input. Journal:
-> [`docs/overview/overview/history-2026-08-15.md`](overview/history-2026-08-15.md).
-> Original entry below.
+### [platform][devices] LA-40 — `runTrainingStressScore` throws for a young user, out of a function that documents itself as infallible
 
-#### (original) Q-270 — `training_load_ots` has a producer and is still 0 of 89 days in production
+- **Branch:** `fix/training-stress-column-empty` (shipped with the Q-270 investigation that found it)
+- **Added:** 2026-08-30 · found by running the persist Q-270 asked for and watching it crash.
+- **SHIPPED 2026-08-30.** `getRhrCategory` returns null for an age with no row in the percentile
+  table, and `runTrainingStressScore` returns null rather than throwing — the "can't produce a
+  result" path its own docblock already promises. Mutation-verified, and the test runs **without**
+  the vendored constants, so it holds in CI where every parity block skips.
+- **The defect, for the record.** `validate` bounds rhr, readiness and vo2max but **not age**.
+  `getAgeGroup` then clamps only the TOP for female/male (`age >= 80 ? 80`) while the `other` branch
+  clamps both ends — so an age below the lowest group left `indexOf` at -1, indexed `table[-1]`, and
+  handed `undefined` to `argminAbsDiff`. The route calls it with no try/catch, so
+  `GET /api/training-stress` 500s for that user.
+- **Reachable, and increasingly so.** The owner is 33 and safe; the app has other users and a Play
+  Store listing is the stated direction, so a teenage user or a mistyped date of birth is a live
+  path. It also fires on any partial constants table, which is not hypothetical — see Q-270's
+  candidate 2.
+- **Keep:** the asymmetry itself is untouched. Whether the female/male branch *should* clamp its low
+  end the way the `other` branch does is a question about vendor intent, and guessing at it from
+  outside the model is what this fix deliberately declined to do. Returning null is correct and
+  conservative; clamping might be more useful and needs the vendor tables to decide.
 
-- **Branch:** none yet · **Added:** 2026-08-14, doing the check Q-184's own entry asks for before building.
-- **The measurement.** `claude_ro.oura_daily_derived` holds **89 days** for the owner. Both
-  `training_load_ots` **and** `active_calories_est` are populated on **0** of them.
-- **Why that matters more than it looks.** `docs/activity-goal-calibration.md` §5-B justifies the
-  HR-load direction (Q-204) partly on *"`training_load_ots` already exists and may be most of it"*.
-  That is **true in code and false in the data**: the column has a real server-side producer
-  (`app/api/training-stress/route.ts`, computing OTS from the ring's MET stream + our derived
-  readiness + derived VO₂max) and it has never persisted a single value.
-- **Two gates ruled OUT by measurement**, so the next session does not re-check them:
-  - **Readiness is not it.** `oura_daily_derived` has **31 days** of `readiness_source='ble-derived'`
-    with a non-null score, latest **today**.
-  - **MET data is not absent.** Tag `0x50` events are arriving — **222 rows in the most recent
-    50,000** `oura_raw_samples` (bounded query; do not scan that table).
-- **✅ DIAGNOSIS COMPLETE 2026-08-15 — all four gates pass, so the value is computable and simply
-  never computed.** Measured each gate of `computeTrainingStress` against production rather than
-  reasoning about them:
-
-  | gate | condition | measured | verdict |
-  |---|---|---|---|
-  | `no_readiness` | `readinessSource === 'ble-derived'` | 31 days, latest today | **passes** |
-  | `readiness_learning` | `nHistory < BASELINE_MIN_NIGHTS` (14) | `n_history` = **40** | **passes** |
-  | `no_profile` | age / sex / **RHR** present | RHR on **30 of 30** recent days | **passes** |
-  | `insufficient_met` | grid < 720 min **or** valid < 360 | 2026-08-13: **1,425 min span, 1,146 values** | **passes** |
-
-  MET decoding detail, since it looked like the likely culprit and is not: **104 events on 08-13**,
-  14 values each (~1/min), 17 gaps over 20 min, largest 59 min — patchy but far above both floors.
-  **Corrected 2026-08-15:** an earlier note here said `decoded` is NULL on every `0x50` row, implying
-  a tag-specific decoder gap. Re-measured over the most recent 50,000 samples, it is NULL for **every
-  tag** — that is the archival design (`body_hex` is truth so a later decoder can re-derive; the
-  adapter re-decodes on read), not a fault. No `0x50` decoder bug exists to find.
-- **So the cause is the remaining one: nothing ever calls the route.** It computes and persists
-  **only as a side effect of rendering `training-stress-line.tsx`**, for `?date=${today}` only. That
-  card sits in Health → **Body**, and the Health tab defaults to **training** — so the value is
-  written only if the user switches tabs on the day in question, and never for any past day.
-- **⚠️ The fix has a real footgun: do NOT hang this off the BLE ingest path.** That is where
-  `aggregateOuraRawSamples` runs, and Q-213 traced a multi-week production outage to exactly that
-  loop being saturated. Adding an OTS computation to the hot ingest path risks reintroducing the
-  fault that was just fixed. There is also **no cron layer** (`docs/module-map.md` §0), so a
-  scheduled job is not available either.
-- **Fix shape, unbuilt:** compute-and-persist for *yesterday* from a path that already runs at most
-  once per app open and is off the ingest loop, and/or a bounded backfill for the retained window.
-  Whatever the trigger, it must be measured against the Q-213 CPU signature before merging.
-- **Original leading cause, now confirmed as the answer:** the route only ever computes **today**, on demand,
-  and only persists when `result.status === 'ok'`. Its only client is
-  `components/health/training-stress-line.tsx`, which fetches `?date=${today}`. So nothing backfills,
-  and a day only persists if the Health card renders that day *and* the OTS core returns `ok`. Either
-  the card is rarely reaching a passing state, or `computeTrainingStress` is gating (insufficient MET
-  minutes is the candidate — 222 events is thin).
-- **What to do:** confirm which, by calling the route for a recent day with a real session and reading
-  `result.status` / its gate reason. If it is the never-backfilled shape, this is **server-side work
-  with no APK** — much cheaper than Q-184's Kotlin.
-- **This gates Q-204.** The HR-load lane assumes this column is most of its input. It is currently
-  none of it.
 
 ### [devices][activity] Q-184 — `active_calories_est` is plumbed end-to-end and never written
 
@@ -11488,27 +11440,6 @@ the goal layout's §7 off-ramp says is missing.
   parent's chunk), so the readability case is the honest one and the perf case needs the /workout
   first-mount measurement above before anyone commits. **Do the measurement first** — the same
   mistake this entry made once already is assuming which cost is where.
-
-### [platform] Q-311 — the E2E CI job puts a credential-shaped literal in a file that is about to be public (Q-49 blocker-adjacent)
-
-- **Branch:** `chore/e2e-auth-secret-before-public-cut`
-- **Added:** 2026-08-16 · found while writing the Q-249 handoff against Q-49's constraints.
-- **`.github/workflows/ci.yml:367`** sets `AUTH_SECRET: e2e-ci-secret-not-used-outside-this-job`
-  inline. It is genuinely a dummy: NextAuth needs *some* signing key or the credentials callback
-  returns `?error=Configuration`, and this value signs nothing outside that ephemeral job against an
-  ephemeral database that is dropped with the runner.
-- **The problem is not the value, it is the reader.** Q-49's own constraint is *"CI stays offline and
-  holds no credential"*, and someone reading a public repo cannot tell a dummy from a leak by
-  looking. A plausible-looking secret in a workflow file is exactly the thing that gets reported.
-- **Decide before the cut, and it is a two-minute job either way:** move it to a repository secret
-  (costs nothing, removes the question entirely), **or** keep it inline and add a one-line comment
-  in the workflow stating explicitly that it is a throwaway signing key for an ephemeral job. Do not
-  leave it bare and unexplained.
-- **While you are there:** the seeded test user (`test@local.dev` / `testpass123`, in
-  `scripts/local-db/seed.sql`, used by `e2e/fixtures.ts`) is also public-safe by design but will
-  read as a leak to a stranger. One sentence in the public README covers it.
-- **Small, and it has a deadline rather than a priority** — it only matters at the moment the repo
-  goes public, and it is much cheaper to settle now than to answer afterwards.
 
 ### [platform] 🔴 Q-49 — public repo migration (Phase A: model delivery · Phase B: the cut)
 

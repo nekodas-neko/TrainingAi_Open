@@ -75,7 +75,7 @@ Required in Railway (see `CLAUDE.md` § Environment Variables for the authoritat
 
 ```env
 DATABASE_URL=                   # PostgreSQL connection string
-SESSION_SECRET=                 # JWT signing
+AUTH_SECRET=                    # NextAuth session-cookie signing
 GOOGLE_CLIENT_ID=               # OAuth
 GOOGLE_CLIENT_SECRET=
 GOOGLE_REDIRECT_URI=
@@ -106,6 +106,12 @@ Open [http://localhost:3000](http://localhost:3000).
 so `pnpm db:local` provisions a local Postgres 16 instance (port 5433) with all migrations applied
 and seed data. It runs automatically at session start; re-running is idempotent. Full details in
 `CLAUDE.md` § Local Development Database.
+
+**The credentials you will find in this repo are fixtures, not leaks.** The seeded local user
+(`test@local.dev` / `testpass123`, in `scripts/local-db/seed.sql` and `e2e/fixtures.ts`) exists only
+in a throwaway local or CI database, and the signing keys inline in `.github/workflows/` are
+throwaway values for jobs whose server and database are destroyed with the runner — each is
+commented as such at its definition. No value in this repository grants access to anything.
 
 ---
 
