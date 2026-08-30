@@ -6,10 +6,17 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: "1.397.1",
+    version: "1.397.2",
     date: "2026-08-30",
     changes: [
       "A supplement log now remembers the dose it was taken at. Changing a supplement\u2019s dose used to rewrite every log you had already made \u2014 raise it from 2 mg to 4 mg and last month read 4 mg too, which for anything you are titrating erases the schedule you were trying to keep. Past entries now stay at what you actually took. Nothing to set up: it works with the dose you have already typed in.",
+    ],
+  },
+  {
+    version: "1.397.1",
+    date: "2026-08-30",
+    changes: [
+      "The 1RM trend on an exercise's history and the trend on a health metric are drawn by the same chart component as everywhere else in the app. Small changes come with that: the ring around the newest point is gone, and the earlier points are no longer faded. Both charts now use their full height, so a small change \u2014 half a kilo of body weight, say \u2014 shows at its real size instead of being flattened.",
     ],
   },
   {

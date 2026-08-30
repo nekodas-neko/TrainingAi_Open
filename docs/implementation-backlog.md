@@ -3094,6 +3094,8 @@ signed off by the owner in that conversation. Review:
 - **The startable Lane B work exists; it is ~50 rows down.** Scanning the 77 unlaned entries for ones
   whose body mentions only Lane-B surfaces (`components/`, `lib/hooks`, `lib/stores`, `.tsx`) and no
   Lane-A surface gives **10**: Q-395b, Q-354, Q-254, Q-154, Q-168, Q-138, Q-112, Q-111, Q-93, Q-1b.
+  (Q-154 shipped 2026-08-30 and Q-395b/Q-93 are no longer queue headings — the list is the 2026-08-25
+  measurement, kept as it was taken rather than re-scored.)
   That is the shape of the problem — not that Lane B has nothing to do, but that fifty rows of
   someone else's work sit on top of it.
 - **A field the queue does not have, found while checking those ten:** **Q-354** ends *"Recommendation:
@@ -10293,116 +10295,6 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   real regression gets waved through as "that test again" — CLAUDE.md already records a genuine
   deterministic CI failure being nearly dismissed as noise.
 
-### [app-shell] Q-154 — three inline sparklines remain, and the primitive cannot draw any of them yet
-
-- **Branch:** `refactor/day-sections-use-sparkline-primitive`
-- **Added:** 2026-08-08 · [review §9.3](reviews/2026-08-08-claude-md-and-test-suite-review.md) ·
-  **rewritten 2026-08-09 after reading all six files**
-- **Half the list was misclassified, and converting those three would have been a bug.**
-  `components/ui/sparkline.tsx` projects x by **index** (`step = width / (values.length - 1)`).
-  Three of the six draw a **time** axis, so redrawing them through the primitive would move every
-  point that is not evenly spaced:
-  - `health/day-detail/day-sections.tsx` — `x = minute / 1440`, a fixed whole-day axis so the
-    overnight trough sits where the night was. It **already carried that reason in a comment**; the
-    "sixth copy" framing read past it.
-  - `activity/exercise-review-sheet.tsx` — `x = (timestamp - startMs) / durationMs`.
-  - `body-battery-card.tsx` — `x = (t - t0) / span`, plus a 50% guide line and wall-clock labels.
-
-  All three are now `EXEMPT` in `scripts/check-sparkline-primitive.js`, the same category
-  `live-hr-chart.tsx` already sat in for exactly this reason. **Do not "replace on touch".**
-- **The three that really are sparklines** — `exercise-history-sheet.tsx`,
-  `health-metric-sheet.tsx`, `workout/active-workout-screen.tsx` — are blocked on the primitive,
-  not on effort. Each needs something it does not have:
-
-  | need | why the primitive can't |
-  |---|---|
-  | value label on the last point | no such prop (2 of the 3 draw one) |
-  | `strokeWidth` | hardcoded `1.5`; all three draw at `2` |
-  | emphasized last dot | `showDots` renders every dot at r=2.5, full opacity |
-  | exact min/max scaling | it pads by **±0.5**, which halves the amplitude of a 0.5 kg body-weight spread |
-  | grid lines | `exercise-history-sheet` draws three |
-
-- **⚠️ RE-MEASURED 2026-08-25 against `exercise-history-sheet.tsx` — the list above is FIVE needs and
-  there are SIX, and the sixth is the one that decides the entry.** Read line by line against the
-  primitive's own geometry:
-
-  | # | difference | primitive today |
-  |---|---|---|
-  | 1 | horizontal inset `PAD = 4` (`x = PAD + …*(W-2·PAD)`) | spans `0..width`, no inset |
-  | 2 | exact min/max scaling | pads by **±0.5** |
-  | 3 | `strokeWidth` 2 | hardcoded `1.5` |
-  | 4 | three grid lines | none |
-  | 5 | last dot `r=4` opacity 1, others `r=2.5` **opacity 0.45** | all dots `r=2.5`, full opacity |
-  | 6 | **a decorative halo ring on the last point** (`r=7`, stroke at 0.28 opacity) | nothing |
-
-  **(5)'s opacity and (6) are both absent from the list above.** (6) is the problem: a `haloLastDot`
-  prop is asking the shared primitive to draw one caller's specific art, which is how a primitive
-  becomes a thin wrapper over a config object — the exact failure Q-406 named when it declined to add
-  a warning slot to `FoodRow` ("adding a slot makes it a wrapper rather than a unification").
-- **So this is a DESIGN DECISION, not a conversion, and it wants an answer before code:** either the
-  primitive absorbs six props including a decorative one, or the three callers accept small visual
-  changes (drop the halo, unify the dot treatment) and the primitive stays general. **The second is
-  the better trade and it changes how a user-facing chart looks**, which is why it is not something to
-  slip into an implementation PR unasked.
-- **✅ DECIDED BY THE OWNER 2026-08-25 — option 2. The halo goes.** *"happy to lose the halo, go with
-  option 2"*, after being shown the three states rendered at true size from the real geometry
-  ([artboard](https://claude.ai/code/artifact/7a6f774b-ee7f-47cb-8ff9-33b03543ed50)). **The gate is
-  cleared; this is now a normal conversion.** What that licenses, precisely:
-  - **Drop the halo** (`exercise-history-sheet.tsx:200`, the `r=7` ring at `strokeOpacity 0.28`) and
-    **unify dot opacity** — the non-final dots stop being dimmed to `0.45`.
-  - **Everything else is a primitive change, not a caller compromise.** The other five differences —
-    the `PAD = 4` inset, exact min/max scaling, `strokeWidth`, grid lines, an emphasized last dot —
-    are general wants that any caller could have, so they are props the primitive should gain. **Do
-    not read "option 2" as "make the three callers accept the primitive as it is today."**
-  - **⚠ The `±0.5` padding is the one that must not survive.** It halves the amplitude of a 0.5 kg
-    body-weight spread — visible in the third panel of the artboard above, and the reason a blind
-    conversion was refused in the first place.
-  - **The three time-axis charts stay EXEMPT.** `day-sections.tsx`, `exercise-review-sheet.tsx` and
-    `body-battery-card.tsx` project x by *time*; the primitive projects by *index*. Nothing here
-    changes that, and converting them would still move every unevenly-spaced point.
-- **Not blocked on effort or on the primitive — blocked on that call.** Everything else is mechanical
-  once it is made.
-
-- **`SparklineChart` is not the answer either, and the reason is load-bearing.** It already draws
-  this exact "1RM trend" shape (and `exercise-stats-sheet` + `exercise-summary-screen` use it), but
-  it is **chart.js**. `active-workout-screen.tsx` imports no chart.js today, and CLAUDE.md's own
-  performance rule forbids pulling it into a hot top-level screen. So the app has *two* sparkline
-  primitives with overlapping purpose and neither fits all three call sites — **that** is the real
-  finding, and it wants a decision before any conversion.
-- **Done 2026-08-09:** the misclassification is fixed, and `health-metric-sheet.tsx`'s local
-  component — which was **also named `Sparkline`**, so `grep -rn '<Sparkline'` counted its two call
-  sites as uses of the primitive — is renamed `MetricTrendChart`.
-- **What remains:** add the five props above to `components/ui/sparkline.tsx` (all defaulted, so
-  its 20 existing call sites are unchanged), then convert the three. **Verify the amplitude change
-  on real data** — the ±0.5 padding is the one that alters what a chart says, not just how it
-  looks.
-
-**Read all three side by side, 2026-08-10 — it is two convertible, not three, and there is a sixth
-prop the list missed.** Attempted, then backed out deliberately rather than shipped half-verified.
-
-|  | `exercise-history-sheet` | `health-metric-sheet` | `active-workout-screen` |
-|---|---|---|---|
-| padding | uniform `PAD` | uniform `PAD=10` | **asymmetric** `PAD_X`/`TOP`/`BOTTOM` |
-| fill gradient | yes (0.28) | yes (0.25) | **no** |
-| stroke | 2, opacity 1 | 2, opacity 1 | 2, **opacity 0.7** |
-| dots | last r=4 + **halo ring r=7**, rest r=2.5 @0.45 | last r=4, rest r=2.5 @0.4 | **uniform r=3**, no emphasis |
-| value label | — | anchor `middle` | anchor **`end`** |
-| grid lines | **3** | no | no |
-
-- **The first two are genuinely one component**, differing only in gradient opacity, the halo ring
-  and grid lines. **The third is not**: asymmetric padding, uniform dots, no fill, dimmed line and
-  an end-anchored label are four more props that *no other caller would use* — a pass-through
-  wearing a primitive's name, which is the abstraction CLAUDE.md tells you not to add. Convert two;
-  leave `active-workout-screen` inline with a written reason, and drop it from the to-convert list.
-- **The missed prop is vertical padding.** The primitive bakes in `height * 0.1` / `height * 0.8`
-  (10%); both convertible sites use `PAD=10` of `H=72` (~14%) with their own formula. Close, but it
-  moves every point — and it decides whether the value label at `y - 8` clips at the top of the
-  viewport when the last point is the series max. That needs a `padY` prop **and** a look at a real
-  chart, which is why this was not shipped blind.
-- **Still wants the decision the entry names above** (this primitive vs the chart.js
-  `SparklineChart`) — nothing here resolves that; it only narrows the conversion from three files
-  to two.
-
 ### [platform] 🟠 Q-155 — a cross-user data leak passes all 3,270 tests
 
 - **Branch:** `test/repository-ownership-coverage`
@@ -11363,8 +11255,11 @@ per-field merge where an AI write has no honest source rank to claim.
 - **Branch:** `feat/day-review-trends` · **Lane: B** · **Plan:** the above, §4
 - **Needs: Q-112c**
 - Resting HR, steps, session volume, weight. Composition percentages move too slowly to read as
-  anything but noise; scores already carry `scoreBand()`'s word. **Check Q-154 first** — without the
-  primitive's missing props, ship a delta chip rather than a fourth inline polyline.
+  anything but noise; scores already carry `scoreBand()`'s word. **The primitive can draw these now**
+  — Q-154 shipped its missing props on 2026-08-30 (`pad`, `valuePadding`, `strokeWidth`, `gridLines`,
+  `emphasizeLast`, `valueLabel`, all defaulted), so use `components/ui/sparkline.tsx` rather than the
+  delta chip this used to fall back to. **Pass `valuePadding={0}`** unless a padded domain is wanted:
+  the default 0.5 halves the amplitude of a small spread.
 
 ### [nutrition][app-shell] Q-112e — the weekly recap gets the same treatment
 

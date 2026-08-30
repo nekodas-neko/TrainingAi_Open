@@ -3825,7 +3825,16 @@ iteration and passing because all six styles encode the same meal. That belongs 
 than only in a journal entry — the next person to touch the label renderer needs to know the spec
 was not covering what its name says.
 
-## 2026-08-30 — `projectOverview.md` → 8407, `docs/implementation-backlog.md` → 13516 (BF-3 gap 1)
+
+---
+
+## 2026-08-30 — `projectOverview.md` 8396 → 8398 (Q-154, the sparkline primitive's missing props)
+
+One Current Status paragraph plus its blank line. It earns the index rather than only a journal entry
+because of one sentence: `valuePadding` defaults to 0.5 and that renders a small spread at half its
+true amplitude. Anyone reaching for the primitive needs to know that from the orientation read, not
+after shipping a chart that understates its own data — which is exactly what Q-154 refused twice.
+## 2026-08-30 — `projectOverview.md` → 8409, `docs/implementation-backlog.md` → 13411 (BF-3 gap 1)
 
 The backlog shrinks: BF-3's 5,846-character entry becomes a 3,177-character `Keep:`, since the three
 gaps it diagnosed are now one shipped and two queued, and the design argument for the shipped one
