@@ -11518,27 +11518,6 @@ the goal layout's §7 off-ramp says is missing.
   first-mount measurement above before anyone commits. **Do the measurement first** — the same
   mistake this entry made once already is assuming which cost is where.
 
-### [platform] Q-311 — the E2E CI job puts a credential-shaped literal in a file that is about to be public (Q-49 blocker-adjacent)
-
-- **Branch:** `chore/e2e-auth-secret-before-public-cut`
-- **Added:** 2026-08-16 · found while writing the Q-249 handoff against Q-49's constraints.
-- **`.github/workflows/ci.yml:367`** sets `AUTH_SECRET: e2e-ci-secret-not-used-outside-this-job`
-  inline. It is genuinely a dummy: NextAuth needs *some* signing key or the credentials callback
-  returns `?error=Configuration`, and this value signs nothing outside that ephemeral job against an
-  ephemeral database that is dropped with the runner.
-- **The problem is not the value, it is the reader.** Q-49's own constraint is *"CI stays offline and
-  holds no credential"*, and someone reading a public repo cannot tell a dummy from a leak by
-  looking. A plausible-looking secret in a workflow file is exactly the thing that gets reported.
-- **Decide before the cut, and it is a two-minute job either way:** move it to a repository secret
-  (costs nothing, removes the question entirely), **or** keep it inline and add a one-line comment
-  in the workflow stating explicitly that it is a throwaway signing key for an ephemeral job. Do not
-  leave it bare and unexplained.
-- **While you are there:** the seeded test user (`test@local.dev` / `testpass123`, in
-  `scripts/local-db/seed.sql`, used by `e2e/fixtures.ts`) is also public-safe by design but will
-  read as a leak to a stranger. One sentence in the public README covers it.
-- **Small, and it has a deadline rather than a priority** — it only matters at the moment the repo
-  goes public, and it is much cheaper to settle now than to answer afterwards.
-
 ### [platform] 🔴 Q-49 — public repo migration (Phase A: model delivery · Phase B: the cut)
 
 > **⚑⚑ 2026-08-10 — THE PLAN'S IP SCOPE WAS INCOMPLETE, and the gap is the most sensitive material
