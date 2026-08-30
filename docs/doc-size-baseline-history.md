@@ -3715,3 +3715,13 @@ The backlog **shrinks 33** — BF-54 left the queue, and the new number is the f
 EXCLUSIVE lock was being justified by a figure three orders of magnitude wrong. The last sentence —
 that the SIZE columns were never wrong — is there because the neighbouring reflex is to distrust the
 whole readout, and Q-528 was a data-loss incident filed on exactly that over-correction.
+
+
+## 2026-08-30 — `docs/implementation-backlog.md` 13652 → 13704 (LA-39 filed)
+
+52 lines, and they are the ones a `GRANT` decision needs rather than a description of it. BF-21
+shipped, its pass test passes, and every row's `query` still reads `<insufficient privilege>` — so
+the entry has to say what was measured on production, that the redaction follows the session role
+rather than the view's owner (which is what stops the next session trying `security_invoker`), and
+what `pg_read_all_stats` does and does not widen. Left shorter it reads as "grant this", and the one
+thing an owner-gated entry must not do is hide the trade-off it is asking about.

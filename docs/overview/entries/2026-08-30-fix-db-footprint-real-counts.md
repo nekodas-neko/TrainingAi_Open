@@ -82,3 +82,19 @@ Full suite green; `pnpm check:rules` Ran 62 of 62; `tsc --noEmit` clean.
 - **No device surface**; this is an admin console reached in a browser.
 - BF-55 — the 84 MB-index / ~7×-trend growth finding measured beside this one — is **not** addressed
   here. It stays in the queue, and its first move is measurement, not a VACUUM.
+
+
+## One thing found after the fact, and it is not about BF-54
+
+`GET /api/admin/db-query` against **production**, minutes after BF-21 deployed, confirms
+`claude_ro.pg_stat_statements` exists and returns rows — the entry's own pass test. But every row's
+`query` reads **`<insufficient privilege>`**: the extension redacts query text for anyone outside
+`pg_read_all_stats`, checked against the *session* role inside its own function, so neither the view's
+owner nor `security_invoker` affects it. Verified on production (PostgreSQL 18.6):
+`pg_has_role(current_user, 'pg_read_all_stats', 'MEMBER')` is **false** and `claude_readonly` holds no
+role memberships at all.
+
+Calls and timings are real; the column that says *which* query is not. Filed as **LA-39**, gated on
+the owner, because the fix is `GRANT pg_read_all_stats TO claude_readonly` — superuser work done out
+of band, like the role's own creation — and because it is a widening worth deciding rather than
+assuming. The entry carries the trade-off and a recommendation.
