@@ -109,3 +109,27 @@ test('the database is only asked once the query is worth asking about', async ({
     timeout: 20_000,
   }).toBeGreaterThan(0)
 })
+
+test('a query that finds nothing anywhere offers a way out, not the first-run copy', async ({ page }) => {
+  // The foods tab's search box used to be hidden while the list was empty — and a query matching
+  // nothing is what empties it, so the box vanished with the query still in it. What remained said
+  // single foods land here *once you have logged them*, over no control to clear anything.
+  await page.route('**/api/nutrition/food-search**', route => route.fulfill({
+    status: 200, contentType: 'application/json', body: JSON.stringify({ results: [] }),
+  }))
+
+  const search = await openSingleFoods(page)
+  await search.fill('zzzz no such food zzzz')
+
+  // The no-match panel, not the first-run copy — that panel is the one that says what happened and
+  // offers the way back.
+  await expect(page.getByText(/Nothing matches/)).toBeVisible({ timeout: 30_000 })
+  await expect(page.getByText('single foods land here either way')).toHaveCount(0)
+
+  // `hasText` separates the panel's button from the search box's ✕, which carries the same
+  // accessible name and no text of its own.
+  const clear = page.getByRole('button', { name: 'Clear search' }).filter({ hasText: 'Clear search' })
+
+  await tap(page, clear)
+  await expect(search).toHaveValue('')
+})

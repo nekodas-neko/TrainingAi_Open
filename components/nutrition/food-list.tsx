@@ -176,6 +176,17 @@ export function FoodList({
   const dbVisible = show === 'foods' && query.trim().length >= 2 &&
     (db.searching || db.results.length > 0 || db.unavailable)
 
+  /**
+   * "You have nothing yet" — as opposed to "your search found nothing", which is the branch below.
+   *
+   * `meals` is the whole library, so `empty` already means the first thing on that tab. `foods` is
+   * the *filtered* set, so it does not: a query matching nothing emptied it and the screen said
+   * *single foods land here once you have logged them* over a search box that was hidden by the
+   * same condition — leaving a query you could neither see nor clear. Unhiding the box is what
+   * makes that reachable, so the message has to split too.
+   */
+  const showNothingYet = show === 'meals' ? empty : (empty && !dbVisible && !query.trim())
+
   if (show === 'meals' && loadingMeals && empty) {
     return (
       <div className="flex justify-center py-8">
@@ -208,9 +219,9 @@ export function FoodList({
         </div>
       )}
 
-      {/* Both `empty` gates below defer to `dbVisible`: with database results on screen, an empty
-          state saying you have logged nothing would be sitting above the answer to the search. */}
-      {empty && !dbVisible ? (
+      {/* Both gates below defer to `dbVisible`: with database results on screen, an empty state
+          saying you have logged nothing would be sitting above the answer to the search. */}
+      {showNothingYet ? (
         <div className="flex flex-col items-center gap-3 py-12 text-center">
           {show === 'meals' ? (
             <>
