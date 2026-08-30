@@ -3426,3 +3426,21 @@ Two lines are a warning the entry did not carry: the counters start empty at the
 read proves nothing, and `pg_stat_statements.max` silently evicts the least-executed shapes once
 5,000 are tracked. Checking `dealloc` is 0 is what separates "nothing slow is happening" from "the
 slow thing was evicted".
+
+## 2026-08-30 — `docs/implementation-backlog.md` 13099 → 13171, `projectOverview.md` 8189 → 8226 (BF-38 / LA-36)
+
+**Backlog, +72.** Most of it is BF-38 correcting itself. Two of that entry's premises were falsified
+by measurement before anything was built — the "unambiguous" barcode case cannot key on a column
+that is NULL on all 221 rows, and the AI's duplicate names are usually byte-identical rather than
+fuzzy — so both paragraphs are rewritten in place rather than left to be read as true by the next
+session. The replacement is longer because the *reason* the residue cannot be closed by a looser
+rule is the finding: `food_logs` multiplies against the item's serving size, so merging two servings
+of one food changes what a log means. Deleting that paragraph would mean re-deriving it, and the
+obvious wrong move (a calories-per-gram rule) is the one it exists to stop. The rest is **LA-36**, a
+new entry: `food_items.image_data_uri` is written to the device on every create and read back by
+nothing, with the three-row table naming which reads omit it.
+
+**projectOverview, +37.** One Current Status paragraph and one Known-Issues row. The row is a
+device-verification gate, so it carries the smoke step and — the part that is not boilerplate — why
+the device path is *different code* rather than the same code untested: it de-duplicates before an
+id is minted, because the offline push deliberately does not de-duplicate at all.

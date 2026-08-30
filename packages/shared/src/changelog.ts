@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.395.2",
+    date: "2026-08-30",
+    changes: [
+      "Logging a food you have already saved now reuses the one you have instead of adding a second copy to My Foods. Nine percent of the list had become duplicates \u2014 the same ready meal appearing three times \u2014 because nothing had ever checked. It only merges rows that match exactly: the same name, brand, serving size and macros. Two entries for the same food at different serving sizes, or two that disagree about the calories, are both left alone, because guessing which one you meant would change what your past meals say.",
+    ],
+  },
+  {
     version: "1.395.1",
     date: "2026-08-30",
     changes: [
