@@ -1,6 +1,7 @@
 'use client'
 
 import { memo, useState, useEffect } from 'react'
+import { savePreference } from '@/lib/user/preferences-sync'
 import { Footprints, Flame, Droplet, Moon, Dumbbell, type LucideIcon } from 'lucide-react'
 import { accentCardStyle } from '@trainingai/shared/utils'
 import { GoalProgressBar } from './goal-progress-bar'
@@ -40,7 +41,7 @@ export const GoalsProgressCard = memo(function GoalsProgressCard({ metaToday, we
   })
 
   useEffect(() => {
-    try { localStorage.setItem(GOALS_VIEW_KEY, view) } catch { /* ignore */ }
+    savePreference('goalsProgressView', view)
   }, [view])
 
   const rows: GoalRow[] = []

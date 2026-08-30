@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useRef, useState, useCallback, useMemo } from "react";
+import { savePreference } from '@/lib/user/preferences-sync'
 import { useUserTimezone } from "@/components/shell/user-timezone-provider";
 import { useSearchParams } from "next/navigation";
 import { useTransitionRouter } from "@/lib/view-transition";
@@ -73,11 +74,10 @@ import type { MuscleRecoveryEntry } from "@/app/api/muscle-recovery/route";
 import {
   type MetaKey, type CardWidgetKey, type WidgetDef, type SectionKey,
   WIDGET_DEFS, DEFAULT_WIDGETS, DEFAULT_CARD_WIDGETS,
-  loadPillColors, loadCardColors, CARD_COLORS_KEY,
+  loadPillColors, loadCardColors,
   loadWidgets, loadCardWidgets, loadCalorieGoal, loadCalorieType, loadWeightLookback,
   loadStepsGoal, loadStepsGoalType, loadSleepGoal, loadWaterGoal, loadWaterGoalType,
   loadHiddenSections, buildDefaultOrder, loadSectionOrder,
-  SECTION_ORDER_KEY, HIDDEN_SECTIONS_KEY,
 } from "@/lib/home/home-prefs";
 import { markRestDayChosen, withRestDayOverride } from "@/lib/home/rest-day";
 import { fetchWithRetry } from "@trainingai/shared/fetch-with-retry";
@@ -415,7 +415,7 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
   const updateCardColor = useCallback((key: string, hex: string) => {
     setCardColors(prev => {
       const next = { ...prev, [key]: hex };
-      localStorage.setItem(CARD_COLORS_KEY, JSON.stringify(next));
+      savePreference('cardColors', next);
       return next;
     });
   }, []);
@@ -928,7 +928,7 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
     setHiddenSections(prev => {
       const next = new Set(prev);
       next.add(id as SectionKey);
-      localStorage.setItem(HIDDEN_SECTIONS_KEY, JSON.stringify([...next]));
+      savePreference('homeHiddenSections', [...next]);
       return next;
     });
   }, []);
@@ -937,7 +937,7 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
     setHiddenSections(prev => {
       const next = new Set(prev);
       next.delete(id);
-      localStorage.setItem(HIDDEN_SECTIONS_KEY, JSON.stringify([...next]));
+      savePreference('homeHiddenSections', [...next]);
       return next;
     });
   }, []);
@@ -957,7 +957,7 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
     const metricIdx = filtered.indexOf("metricTiles");
     const insertAt = metricIdx >= 0 ? metricIdx : filtered.length;
     const next = [...filtered.slice(0, insertAt), ...toAdd, ...filtered.slice(insertAt)];
-    localStorage.setItem(SECTION_ORDER_KEY, JSON.stringify(next));
+    savePreference('homeSectionOrder', next);
     setSectionOrder(next);
   }, [activeCardWidgets]);
 

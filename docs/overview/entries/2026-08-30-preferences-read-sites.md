@@ -1,0 +1,81 @@
+# Preferences survive a fresh install now (Q-392)
+
+**Branch:** `feat/preferences-read-sites` · **Lane B**
+
+The owner's report: *"when i do a new install or open on computer - it loses all the saved
+preferences. We need to make it persist across installs/etc."*
+
+The engine for this shipped separately — `users.preferences` as a JSONB bag, `GET`/`PATCH
+/api/user/preferences` reading and merging it — and **no read site called it**. Nothing
+user-visible had changed, so the report was still true in full. This connects them.
+
+## Shape
+
+`lib/user/preferences-sync.ts`, two functions and one rule.
+
+**`hydrateUserPreferences(bag)`** seeds every device key from the server, driven by
+`PREFERENCE_STORAGE` rather than transcribed. It is warmed in `sync-provider.tsx`'s `CACHE_TASKS`
+beside `hydrateGoalSeeds`, which is the same shape of problem solved the same way (Q-241).
+
+**`savePreference(name, value)`** / **`savePreferences(patch)`** write the device copy and PATCH the
+server. `null` clears a key, which is the route's own contract.
+
+**The conflict rule was already settled and is one-directional: the server wins.** `localStorage` is
+a seed written *from* the server, never the reverse. So hydration overwrites without comparing, and
+an **absent** key clears the device copy — absent means "never set" on the server, and leaving a
+stale local value is the "my setting came back" bug this prevents.
+
+**Seeding rather than reading through** is what keeps first paint synchronous. Every one of these
+surfaces reads its `localStorage` key during render; making them await a fetch would trade a fixed
+bug for a flash of defaults on every launch.
+
+## Three decisions worth keeping
+
+**`savePreferences` exists because of the theme picker.** A brand preset and a custom hue are
+mutually exclusive — setting one clears the other. As two `savePreference` calls that is two PATCHes
+that can land out of order and leave both set, which renders as the hue winning a choice the user
+made for the preset. One patch cannot do that.
+
+**The PATCH is fire-and-forget and deliberately not an outbox domain.** Losing one costs a toggle
+that reverts on the next device, not data, and every caller is a tap that must feel instant. Queuing
+it would add a synced domain, a local table and a push branch for a value the next write replaces
+wholesale. The local write happens first and unconditionally, so an offline change still applies
+here and is simply not carried onward.
+
+**The encodings are the part that bites**, which is why `PREFERENCE_STORAGE` drives the loop rather
+than a hand-written list: `ta_ss_widgets` is JSON, `ta_weight_lookback` a bare number, and the
+reminder toggles `String(boolean)` compared at their read sites against the literal `'false'`. A
+value seeded in the wrong shape reads as the default — the setting looks lost anyway, which is the
+same bug wearing a different hat.
+
+## Verification
+
+**`e2e/preferences-survive-reinstall.spec.ts` is the owner's sentence as a test.** It PATCHes three
+preferences of three different encodings, calls `localStorage.clear()` — which *is* a fresh install
+from the only angle that matters, since every surface reads its key during render — reloads, and
+asserts all three come back in the right shapes: `'30'`, `'arc'`, and the literal `'false'`.
+
+**Proved both ways.** With the hydration replaced by a no-op and nothing else changed, it fails.
+
+Nine unit tests on the sync module cover each encoding, an absent key clearing the device copy, a
+`null` server response *not* clearing it (a failed fetch must not wipe the device), that every key in
+the map is covered so a new preference cannot be seeded under no name, `null` meaning clear, a failed
+PATCH not throwing, the mutually-exclusive pair going out as one request, and — the one that matters
+most — that a key the server does not own is never cleared.
+
+Full unit suite **5,575 passed** / 666 files. `pnpm check:rules` — Ran 62 of 62. Typecheck and lint
+clean. `session-select-content.tsx` is **net zero lines** — it is a baselined hotspot.
+
+## Not exercised
+
+- **A second real device.** The test wipes `localStorage` in one browser, which proves hydration.
+  It does not prove two devices converge, and it cannot: the sandbox has one session.
+- **`backgroundSettings` is excluded from hydration, and finding out why was the near-miss of this
+  change.** Its key is a Zustand `persist` envelope owned by the background store, and no write site
+  sends it to the server — so the bag is permanently absent for it, and the absent-clears rule would
+  have called `removeItem` on it **every single launch**, destroying the user's wallpaper choices.
+  The rule is right; it is only safe for a key whose writes actually reach the server. It is in a
+  `NOT_SERVER_OWNED` set with that reason, and a test pins it. Connecting the store's write path
+  removes the entry; until then that key syncs on neither read nor write, exactly as before.
+- **The APK.** Nothing here is native, so it reaches the device through a Railway deploy — but no
+  preference was toggled on the S25.
