@@ -240,6 +240,35 @@ async function main() {
   out.push(') AS t(table_name, column_name);')
   out.push('')
 
+  // BF-21 — query TIMINGS, which is the one thing in this schema that is not about the owner's rows.
+  //
+  // **Not user-scoped, and that is correct rather than an omission.** `pg_stat_statements` stores
+  // NORMALISED query text: literals are replaced with `$n` placeholders, so it carries query shapes
+  // and timings and never a parameter value or a row. Every other view here is row-scoped because it
+  // exposes health data; this one has none to expose. Only five columns are emitted — there is no
+  // reason to expose `queryid`, `userid`, `dbid`, or the block-I/O counters.
+  //
+  // Emitted inside a guard because the extension is a PRODUCTION-only thing: it needs
+  // `shared_preload_libraries` plus a restart, so the local dev DB and CI's Postgres container do
+  // not have it, and an unguarded `CREATE VIEW` over a missing relation would fail every migration
+  // run and take the app down on cold start. `to_regclass` asks about the relation the view will
+  // actually reference, rather than about the extension being registered somewhere else.
+  //
+  // It lives in the GENERATOR rather than in a one-off migration because this file DROPs and
+  // rebuilds the whole schema on every run — a hand-written view would survive exactly until the
+  // next table was added, then vanish with nothing to say so.
+  out.push('DO $$')
+  out.push('BEGIN')
+  out.push("  IF to_regclass('public.pg_stat_statements') IS NOT NULL THEN")
+  out.push('    EXECUTE $v$')
+  out.push('      CREATE VIEW claude_ro.pg_stat_statements AS')
+  out.push('      SELECT query, calls, total_exec_time, mean_exec_time, rows')
+  out.push('      FROM public.pg_stat_statements')
+  out.push('    $v$;')
+  out.push('  END IF;')
+  out.push('END $$;')
+  out.push('')
+
   // The role is created out-of-band by the owner (it carries a password, which must never live in a
   // committed migration). This migration runs on every cold start via ensureSchema, so the GRANT is
   // guarded: without the guard, a database where the owner has not created the role would fail the

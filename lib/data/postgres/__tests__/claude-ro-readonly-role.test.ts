@@ -157,6 +157,30 @@ describe.skipIf(!canRun)('claude_readonly role — the read-only guarantee', () 
     expect(sql).toContain("current_setting('app.claude_ro_owner', true)")
   })
 
+  // BF-21. Two properties, and both are things a regeneration could quietly drop.
+  it('emits pg_stat_statements guarded, and with only the five safe columns', async () => {
+    const dir = join(process.cwd(), 'lib/data/postgres/migrations')
+    const newest = readdirSync(dir).filter(f => /^\d+_claude_ro_views.*\.sql$/.test(f)).sort().pop()!
+    const sql = readFileSync(join(dir, newest), 'utf8')
+
+    // Guarded: the extension is production-only (it needs `shared_preload_libraries` and a restart),
+    // so an unguarded CREATE VIEW over a missing relation fails on every cold start — this migration
+    // runs through `ensureSchema`, so that would take the app down rather than log a warning.
+    expect(sql, `${newest} creates the view unguarded`)
+      .toMatch(/IF to_regclass\('public\.pg_stat_statements'\) IS NOT NULL THEN/)
+
+    const view = sql.slice(sql.indexOf('CREATE VIEW claude_ro.pg_stat_statements'))
+    const select = view.slice(0, view.indexOf('FROM public.pg_stat_statements'))
+    // This is the ONE view here that is not row-scoped, which is only safe because normalised query
+    // text carries shapes rather than values. Widening the column list is how that stops being true:
+    // `userid` names a database role and the block-I/O counters are noise, but `queryid` is the one
+    // that would let a reader join back to something.
+    expect(select).toContain('SELECT query, calls, total_exec_time, mean_exec_time, rows')
+    for (const col of ['queryid', 'userid', 'dbid', 'shared_blks', 'wal_bytes']) {
+      expect(select, `${col} must not be exposed`).not.toContain(col)
+    }
+  })
+
   it('reads the curated views', async () => {
     const res = await exec(roUrl(), 'SELECT count(*)::int AS n FROM claude_ro.users')
     expect(res.rows[0].n).toBeGreaterThanOrEqual(0)
@@ -239,10 +263,14 @@ describe.skipIf(!canRun)('claude_readonly role — the read-only guarantee', () 
       SELECT count(*)::int AS n FROM information_schema.tables
       WHERE table_schema = 'public' AND table_type = 'BASE TABLE'`)
     // Q-530's `_meta_excluded_tables`/`_meta_withheld_columns` are synthetic drift-gate views with
-    // no corresponding base table — excluded here so this stays a 1:1 table-to-view count.
+    // no corresponding base table — excluded here so this stays a 1:1 table-to-view count. BF-21's
+    // `pg_stat_statements` is excluded for the same reason and one more: it exists only where the
+    // extension is installed, so counting it would make this assertion depend on which database it
+    // ran against.
     const views = await exec(ADMIN_URL!, `
       SELECT count(*)::int AS n FROM information_schema.tables
-      WHERE table_schema = 'claude_ro' AND table_name NOT LIKE '\\_meta\\_%'`)
+      WHERE table_schema = 'claude_ro'
+        AND table_name NOT LIKE '\\_meta\\_%' AND table_name <> 'pg_stat_statements'`)
     // Two tables are deliberately denied (invited_emails, rate_limits). Any OTHER mismatch means
     // the generator needs re-running after a schema change.
     expect(views.rows[0].n).toBe(tables.rows[0].n - 2)

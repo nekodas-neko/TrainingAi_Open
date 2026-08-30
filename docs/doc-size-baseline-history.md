@@ -3580,3 +3580,13 @@ reading that matters is not "the route stopped wasting tokens" — it is that an
 a plan the AI had nothing to do with. A status line that led with the tokens would leave the next
 reader thinking this was an optimisation, and the reproduction (no API key: pre-fix 502, post-fix
 200) is the sentence that stops it.
+
+## 2026-08-30 — `projectOverview.md` 8347 → 8357, `docs/implementation-backlog.md` 13376 → 13330 (BF-21 shipped)
+
+The backlog **shrinks 46** — BF-21 left the queue, and the new number is the floor.
+
+`projectOverview.md` +10, one Current Status paragraph. Two of its lines exist to stop a wrong
+conclusion rather than to describe the change: that the counters start empty from the restart, so a
+read in the first hours means nothing, and that BF-19 already measured the database and it is not
+where the reported slowness is. Without them the next session reads a clean `pg_stat_statements` and
+closes the slow-load question on it, which is the mistake the entry itself warned about.
