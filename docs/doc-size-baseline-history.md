@@ -3869,3 +3869,22 @@ orientation read mention it at all.
 **Re-derived on each rebase as PRs landed under it; final 8420 → 8422.** The branch was cut before Q-154 landed
 and two more PRs merged under it while CI ran; every paragraph is kept, so the number is set from the
 merged file each time rather than from either side of a conflict.
+
+## 2026-08-30 — `docs/agents/state/implementation-lane-a.md` 203 → 208 (Q-211 batch)
+
+Five lines, and they are the two things a baton exists to carry.
+
+The first is a **correction**: this baton said the remaining Lane A work was *"almost entirely owner-
+or device-gated"*, and that was wrong. It propagated — a session read the ~21 scoring entries at the
+top of READY, reported the queue blocked to the owner, then found six startable items below them and
+shipped all six. The baton is where that error lived for four days, so the warning belongs in it and
+nowhere else; a journal entry would not be read before the same mistake was made again.
+
+The second is two new rows in **Waiting on the owner**, which is the section that exists for exactly
+those: nulling the corrupt `body_comp` snapshot, and dropping `oura_heartrate_user_updated`.
+
+Paid for where it could be: the *Shipped this session* list was replaced rather than appended, and
+the correction was compressed twice (six lines to four) before raising the number. What was **not**
+done is trimming the previous session's `Traps` section to make room — it is 37 lines of durable
+knowledge under a header that says "this session", and restructuring another session's baton to buy
+five lines is a worse trade than this note.
