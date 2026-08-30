@@ -3145,7 +3145,7 @@ smaller than production.
 - **Separately**, both check-in sheets stopped blocking their close on the local write — the
   ~2 minutes of "Saving…" the owner saw was a tap queued behind the sync pull's `applyDelta`
   transaction on the plugin's single SQLite connection. That underlying hold is **not** fixed;
-  it is queued as Q-214.
+  it is queued as **Q-214a** — renumbered 2026-08-30, because the `Q-214` cited elsewhere in this file is the already-shipped `upsertOuraHeartrate` fix, a different piece of work.
 - **Not exercised**: the S25. Native SQLite does not run in the sandbox, so the init window this
   fixes cannot be reproduced here. The on-device check is a force-stop, reopen, and tap Save on
   the readiness sheet within a second or two of the app appearing.
