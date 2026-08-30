@@ -7658,12 +7658,21 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 - **Why it matters beyond the sleep card.** These rows feed `previousNight` (16% of readiness) and
   `sleepBalance` (10%). The stored readiness contributors for the affected days show `sleepBalance`
   collapsing to 0 and 9 — a saturated z-score against a baseline the fragment has poisoned.
-- **Relationship to Q-225 — sharpen it, do not replace it.** 2026-08-13 is the night Q-225 was
-  opened on, and that entry explicitly asks for *"a reusable local-repro harness for checking whether
-  other recent nights hit the same bug"*. **This is that sweep, done at the data layer, and it found
-  at least one more: 2026-08-11 shares the signature** (single row, near-zero duration). Whether
-  08-11 has the same *cause* as 08-13 is unproven — Q-225's local repro harness is the tool that
-  would settle it.
+- **⚠️ Q-225 CLOSED 2026-08-30, and it took half of this entry's evidence with it. Re-measure before
+  planning.** Q-225 was the stale-narrow-window bug this entry was sharpened against; its record is
+  now in [`docs/overview/known-issues-resolved.md`](overview/known-issues-resolved.md). Two things
+  it settled bear directly on the bullets above:
+  1. **The sweep this entry asked for is done, and 08-11 and 08-13 are not truncation.** All 67
+     BLE-era nights were checked for the clipping signature (a late start against a normal wake);
+     the only night-shaped candidate was 2026-08-19, and `oura_heartrate` has a genuine seven-hour
+     hole across it, so the ring recorded nothing to clip. Whatever produced the fragments, it was
+     not the cutoff.
+  2. **"The ONLY record for this date" no longer holds for either named date.** Both 2026-08-11 and
+     2026-08-13 now carry a full night beside the fragment (08-11: 8.50 h + 0.00 h; 08-13: 8.17 h +
+     1.42 h), re-derived since this entry was filed. Across the whole BLE era exactly **two** dates
+     have no full-night row at all — 2026-07-07 (the re-key day, 0.33 h) and 2026-08-19 (the
+     not-worn night above). **So problem 2 below does not currently reproduce anywhere**, and the
+     rows-per-date table above is stale. Problem 1 is untouched: 0.00 h rows are still being written.
 - **Two distinguishable problems, and they may need different fixes:**
   1. A **0.00 h row exists at all.** A sleep session of zero duration is not a short night, it is a
      failed rollup or a stray detection. Decide whether the rollup should refuse to write it.
@@ -9361,80 +9370,6 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   unambiguous.
 - **Low priority.** No user-visible fault, no data loss. This is dead-weight removal, and it should
   not jump ahead of anything in the scoring cluster above.
-
-### [sleep][devices][platform] Q-225 — a sleep session can get stuck on a stale, narrower window that a fresh rollup would compute correctly, with no self-heal
-
-- **Added:** 2026-08-13/14 · owner reported the app's displayed bedtime for the previous night
-  (1:15am) looked way too late. Not the anchor-lag bug (Q-71/Q-139, ≤3 min correction) — this is a
-  2h35min gap between the stored value and what the ring's real data supports, so a different
-  investigation.
-- **Confirmed by full local reproduction, not inference.** Pulled all of that night's real raw
-  samples (11,208 rows, 9 tags) and clock anchors from production via the read-only endpoint,
-  loaded them into the local dev DB under a throwaway test user, and ran
-  `repo.aggregateOuraRawSamples(...)` — the actual shipped function, unmodified — directly against
-  them, twice (once with `fullHistory: true` + `debugDate`, once as a bare incremental call). **Both
-  runs produced the same, correct result: sleep 22:40pm→8:05am (8.5h), onset 10 min, with the
-  neural stager correctly flagging a brief HR-up/movement epoch around 00:50am as `awake`** — i.e.
-  the owner's account ("asleep, woke here and there from overheating") is exactly what the current
-  algorithm computes from the real data. **What's stored in production does not match this**: the
-  live row (`oura_id: ble:33100097`, `sleep_start` 1:15am, 6h05m) is stale/wrong by every check run
-  against it — no >2h gap in the raw `sleep_acm_period`/`sleep_temp` stream (biggest gap 17 min), no
-  `bedtime_period` (0x76) event to override the clustering, no persisted-`decoded` staleness (every
-  row for the night decodes fresh from `body_hex`, as expected post-Lever-1).
-- **🔻 The pool-contention lead is contradicted by measurement (2026-08-14). Do not start from it.**
-  Three facts, all from the read-only endpoint against live production:
-  1. **A rollup HAS re-run since, and reproduced the same wrong window.** Both 08-13 rows and the
-     08-14 row share `updated_at = 2026-08-14T11:13:03.720Z` to the millisecond — one range rewrite —
-     and `ble:33100097` still reads `sleep_start` 15:15 UTC / 6.08 h. The entry's "evidently none has
-     produced the correct window since" is false.
-  2. **The raw data is complete right now.** A bounded query over that night returns a dense stream
-     from **13:15 UTC** (23:15 AEST) — tag 0x60 alone has 1,036 rows before the stored start. So the
-     frames a correct window needs are present and were present for that rewrite.
-  3. **It has not self-healed** (unlike Q-228's and Q-229's symptoms, both of which had).
-  Together those make it **deterministic given the current data**, not a one-off partial read. A race
-  that has stopped racing cannot keep producing the same answer from complete data.
-- **Leading hypothesis now: an asymmetric truncation guard. NOT CONFIRMED — see below.**
-  `aggregateOuraRawSamples` reads an incremental window (`rollupCutoffDs`), and a night whose early
-  frames fall outside it is *truncated, not short*. The daily-summary fold refuses those:
-  `summaryFloorDate` (`adapter.ts` ~5824) discards any night within 2 days of the cutoff, and the
-  3-day margin on `incrementalFloorDs` exists expressly to give it room — its own comment says so.
-  **The `sleep_sessions` write (~5523) has no equivalent filter**, and it deletes by wake-day before
-  inserting, so a clipped pass replaces a previously-correct row rather than merely failing to
-  improve it. That fits every observation: front-clipped (start late, wake time right), deterministic
-  on re-run, and repaired only by `fullHistory` — which has no cutoff and therefore no filter.
-- **⚠️ Attempted and withdrawn on 2026-08-14: a one-line guard mirroring `summaryFloorDate`, plus a
-  four-case rollup test. Both reverted, unshipped, because the test never discriminated.** Three
-  fixture generations were tried and all four cases passed with the guard removed:
-  (a) a night seeded with a `bedtime_period` (0x76/118) event — that event carries an explicit
-  `bedtime_start_ds` and is stamped at the night's *end*, so it survives any narrowing and the night
-  cannot exhibit the bug at all; **the owner's night has no such event**, which is why clustering is
-  what gets cut;
-  (b) IBI-only samples — no sleep row is produced at all, so nothing to protect;
-  (c) `sleep_acm_period` (0x72) + `sleep_temp` (0x75) + IBI, which is what the clusterer actually
-  reads (`adapter.ts` ~5064) — a row is produced, but a narrowed run still does not clip it.
-  So the mechanism above remains **unreproduced**, and shipping a sleep-pipeline write change that
-  cannot be shown to fix anything was judged worse than the bug. **The next session's first job is a
-  fixture that fails without the guard** — most likely by driving the exported production samples for
-  that night through a narrowed (`sinceDs`) call rather than a synthetic night, since the synthetic
-  ones do not clip.
-- **Owner-visible state is unchanged:** the 08-12 night still displays 1:15am. A `fullHistory`
-  Redecode still repairs it (confirmed locally in the original investigation) and remains the only
-  known repair.
-- **Immediate fix, verified working:** an admin **Redecode** (`fullHistory: true`) for this user
-  would delete the stale row (keyed by wake-day, not `oura_id`/`sleep_start`, so the key mismatch
-  between the old narrow window and the new wide one is not a problem) and insert the correct one —
-  confirmed by literally running that code path locally. This is the same Redecode the Q-71 backlog
-  entry already has queued for the historical-sleep rewrite; the two can likely be done together
-  once Q-71 lands, but this row (and possibly other recent nights hit during the same pool-exhaustion
-  bursts) may need it sooner, independent of the anchor-offset fix.
-- **Not yet done:** checking whether other recent nights (not just this one) also landed a
-  stale/narrow window during the same 2026-08-12/13 error bursts — the local-repro harness this
-  entry built (raw-sample + anchor CSV export → local DB load → direct `aggregateOuraRawSamples`
-  call) is reusable for that sweep without re-deriving the method; confirming the pool-contention
-  causal link against Railway's own logs (same "not yet done" item Q-107 already carries); and
-  deciding whether the rollup needs a structural fix (e.g., don't write a sleep row from a partial
-  read, or re-validate/re-run automatically when new data for an already-written night's wake-day
-  arrives) rather than relying on someone noticing and running Redecode by hand.
 
 > **⚑ Q-232 … Q-244 are one cluster** — the 2026-08-14 UI/flow/IA + caching review, requested by the
 > owner ("a good review on the ui and flow/location mainly … alongside that have a look at caching

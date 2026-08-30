@@ -1836,3 +1836,46 @@ shape `check-claude-md-paths.js` already used and the reason that sibling never 
 `scripts/__tests__/index-doc-paths-no-shared-fallback.test.ts` pins the absence, because restoring
 it would make the check pass *more*, which is the direction nobody investigates.
 
+
+### [sleep][devices][platform] ✅ A sleep session could get stuck on a stale, narrower window with no self-heal (Q-225, found 2026-08-13/14, closed 2026-08-30)
+
+Owner reported the previous night's displayed bedtime (1:15am) looked far too late. Not the
+anchor-lag bug (Q-71/Q-139, ≤3 min correction) — a 2h35min gap, so traced separately. **Confirmed by
+full local reproduction, not inference**: pulled all of that night's real raw samples (11,208 rows)
+and clock anchors from production, loaded them into the local dev DB under a throwaway user, and ran
+the actual `aggregateOuraRawSamples` function directly against them (both `fullHistory: true` and a
+bare incremental call). Both produced the same correct answer — sleep 22:40pm→8:05am (8.5h), onset
+10 min, with the neural stager correctly flagging a brief overheating-driven wake bout around
+00:50am as `awake` rather than delaying the start — exactly matching the owner's account ("asleep,
+woke here and there from overheating"). The live stored row does not match this and fails every
+check run against it (no >2h raw-data gap, no bedtime-event override, no stale-decoded-JSONB issue).
+Leading theory (not confirmed): the DB-pool-contention pattern amended into the `[platform]` Q-107
+row above — the timing correlates, though the causal link isn't proven. **Verified fix**: an admin
+Redecode (`fullHistory: true`) deletes the stale row (keyed by wake-day, not `oura_id`) and inserts
+the correct one — confirmed by running that exact code path locally. Backlog: **Q-225**
+(`docs/implementation-backlog.md`), which also has a reusable local-repro harness for checking
+whether other recent nights hit the same bug during the same error bursts.
+
+**Closed 2026-08-30, and the entry's own leading theory turned out to be right.** The mechanism was
+the asymmetric truncation guard it predicted: `aggregateOuraRawSamples` reads from `rollupCutoffDs`,
+so a night whose early frames sit before that cutoff comes back TRUNCATED rather than absent, the
+clusterer opens the window at the cutoff, and the sleep write — which deletes by wake-day before
+inserting — replaces the good row with the clipped one. `lib/oura-ble/rollup/run.ts` guards it by
+dropping any night whose start is not clear of the cutoff by `MAX_SLEEP_DS`, and that guard is in
+`main`. Three things settled the row:
+
+- **The production row is repaired.** 2026-08-13 now reads 22:50→08:05 (8.17 h) against the
+  1:15am / 6h05m the owner reported, and its `oura_id` changed with the re-derived window — matching
+  the 22:40→08:05 the original local reproduction computed.
+- **The guard had no test.** Neutralising it left all 23 rollup files and 68 tests green. It now has
+  `lib/data/postgres/__tests__/oura-ble-sleep-truncation-guard.test.ts`, which fails without it —
+  the fixture three earlier attempts could not produce. Under mutation it reproduces the reported
+  signature exactly: bedtime jumps forward 4 h and the night shrinks from 7.83 h to 3.83 h, while a
+  control night placed clear of the cutoff is untouched.
+- **No other night was affected.** All 67 BLE-era nights were swept: 14 windows under 6 h, of which
+  13 are daytime naps or evening fragments. The one night-shaped candidate — 2026-08-19, 04:35→08:38
+  — is not truncation: `oura_heartrate` has a genuine seven-hour hole from 21:00 to 04:00 that night,
+  so the ring recorded nothing to clip.
+
+**Not closed by this:** confirming the DB-pool-contention causal link against Railway's own logs.
+That was never Q-225's to answer — the `[platform]` Q-107 row carries it, and still does.
