@@ -3751,7 +3751,26 @@ finding is that a feature was dead in production. LA-39's is five lines and clos
 breath it opens, which is the shape a same-day resolution should take here — the alternative is a
 Known-Issues row filed and struck within the hour.
 
-## 2026-08-30 — `docs/implementation-backlog.md` 13639 → 13539, `projectOverview.md` 8381 → 8392 (BF-57 engine half)
+
+## 2026-08-30 — `docs/implementation-backlog.md` (nutrition to the top, re-derived from current main)
+
+Replaces an earlier attempt that had gone stale. A reordering branch carries a full copy of every
+entry it moved, so the longer it stays open the more of those copies rot — and on this repo `main`
+moves every few minutes. That branch had already come within one merge of **resurrecting BF-54 after
+it shipped and reverting BF-55 to its pre-fix text**, both caught only by diffing each moved entry
+against `main` rather than trusting the conflict resolution.
+
+Re-deriving the move from current `main` in one pass removes the whole class: nothing is carried, so
+nothing can be stale. **The lesson for the next reorder: do it in one commit against fresh `main` and
+merge it the same minute, or expect to hand-verify every moved entry.**
+## 2026-08-30 — `docs/implementation-backlog.md` 13639 → 13550, `projectOverview.md` 8381 → 8392 (BF-57 engine half)
+
+**Amended on the merge with `main`.** #622 reordered the nutrition entries to the head of both lanes
+while this branch was open, so the conflict looked like two deletions and was **not** one — the five
+entries were MOVED, and taking neither side would have deleted BF-49 through BF-52 outright. Resolved
+by taking `main`'s side at the old position and then replacing its relocated BF-57 with this branch's
+`Keep:`. The check that catches the real two-deletion case cannot see this one, which is the argument
+for reading the headings before choosing rather than applying the rule by shape.
 
 The backlog **shrinks 100**. BF-57's entry was 8,244 characters of design argument — the byte
 measurements, the two encodings compared, the token design it superseded — and all of it is now

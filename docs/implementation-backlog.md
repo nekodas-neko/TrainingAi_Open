@@ -1141,77 +1141,6 @@ opened on, unchanged.
 - **Verification:** index total drops below the heap total, and a re-read a week later shows growth
   back near trend.
 
-### [body][devices][platform] BF-53 — every pending weigh-in button is dead: both routes validate a numeric id with a UUID regex
-
-- **Keep:** the DEVICE check, and only that. Fixed 2026-08-30 — both routes take `numericRouteId`
-  now, and the client reports a failed press instead of swallowing it. Reproduced and re-verified on
-  `pnpm dev` against the same real pending row (pre-fix: both buttons `400 Invalid id`, row
-  untouched; post-fix: dismiss dismisses, confirm writes the weight to `body_metrics`). **On the S25:
-  a pending reading dismisses and disappears, a confirmed one reaches the weight card, and both stay
-  gone across a screen swap.** The APK reaches this through a Railway deploy — no new build.
-
-### [nutrition] BF-47 — the deleted food comes back: the loader calls the server authoritative while the delete is still in the outbox
-
-- **Lane:** A — `app/nutrition/use-food-logs-loader.ts`.
-- **Added:** 2026-08-30 · owner, device pass N1: *"Delete worked; when I click delete the item
-  vanishes then re-appears; then when you swap screens - it dissapears."*
-- **Keep:** the DEVICE check, and only that. The fix shipped 2026-08-30 — the loader reads the
-  outbox and drops queued deletes from the server copy before hydrating from it. **It is reasoned,
-  not reproduced:** `getLocalStore` returns null in `pnpm dev` and in Playwright, so the failure has
-  no sandbox analogue and neither does the fix. Delete a logged food on the S25, online and offline,
-  and confirm it goes and stays gone across a screen swap and a force-close.
-- **⚠ The trace below was CORRECTED on implementation** — see the boxed note. The fix direction it
-  proposed was right; the mechanism it named was not the whole story, and the difference decides
-  where the filter has to go.
-- **This is CLAUDE.md's own rule being broken**, the one written after the mood-checkin re-prompt and
-  the rest-day revert: *after an optimistic local write, never apply or cache a server response that
-  would replace it.*
-
-**Traced, and the sequence matches the report exactly.** `deleteLog` in `nutrition-content.tsx:405`
-removes the row optimistically, deletes it locally, queues the mutation, then calls
-`refreshAffected()` → `loadFoodLogs(today)`. That loader renders the local copy first (row gone —
-the flicker the owner sees) and then fetches the server copy, which **still has the row**, because
-the delete has only been *queued*; `pushMutations` has not run yet. When the push later lands, the
-next load returns a server copy without it — which is why swapping screens makes it disappear "for
-real".
-
-> **⚠ CORRECTED 2026-08-30, on implementation.** The entry said the loader "renders the server copy
-> unconditionally", and it does not: in the happy path it feeds the server copy to `applyDelta` and
-> then **re-reads locally**. All three links in that path hold — `handleConfirmDelete` really does
-> call `store.deleteFoodLog(id)` before queueing, `getFoodLogsWithItems` filters
-> `deleted_at IS NULL`, and `applyDelta`'s food_logs arm is gated `WHERE sync_status = 'synced'`, so
-> a server row cannot overwrite a pending local one. **On that path the row should not come back.**
->
-> Two mechanisms that DO fit the report, and the fix covers both:
-> 1. **The `catch` branch.** If `applyDelta` or the local re-read throws, the loader falls back to
->    `applyLogs(server)` — the raw server copy, deleted row included.
-> 2. **The local row was never there.** A log created on web or another device and not yet pulled
->    means `deleteFoodLog`'s UPDATE matches **zero rows**, so nothing is tombstoned or pending, and
->    `applyDelta` inserts the server row fresh as `'synced'`. This one survives a screen swap only
->    until the push lands, which matches the report exactly.
->
-> **Why it matters where the filter goes:** mechanism 2 is a local re-insert, so filtering after
-> `applyDelta` would still write the row back to the device. The shipped fix filters **before**
-> both uses, and a source-order test pins that.
-
-- **⚠ Do not fix this by inverting the authority.** That line's comment records the bug it exists to
-  prevent: a local read that threw left the page blank, so logged food *"vanished on reload"* even
-  though the server had it. Both failures are real and a naive swap trades one for the other.
-- **Fix direction:** the loader needs to know a delete is in flight and not resurrect it — filter the
-  server response against pending outbox mutations for the domain, which is information the local
-  store already holds, rather than choosing a winner globally. Equivalent to the `sync_status ===
-  'synced'` gate `applyDelta` already applies for pulls; this read path has no such gate.
-- **Sibling sweep — done, and the answer is one.** `grep -rn 'applyDelta(' app components lib packages`
-  returns exactly **one** call site outside the sync engine: this loader. It is the only screen-level
-  read that hydrates the local store from its own server fetch, which is the shape that can resurrect
-  a row. The mood, body-metric and activity deletes were checked: they read `day-log:` through
-  `cachedFetch`, a **server-assembled aggregate that never writes to the local store**, so a queued
-  delete shows briefly stale there and self-corrects on push — a flicker, not a resurrection, and a
-  different fix if it is ever worth making. `session-select-content.tsx` reads
-  `store.getActivityLogs` local-first, where the tombstone already excludes it.
-- **Verification:** offline and online, delete a logged food — it goes and stays gone, with no
-  reappearance, and a force-close does not bring it back.
-
 ### [nutrition] BF-48 — "Single foods" searches only what you have logged, so the food database is unreachable from Log Food
 
 - **Lane:** **B — all of it.** (Corrected 2026-08-30 from *"A for the search wiring, B for the row"*.
@@ -1244,162 +1173,6 @@ be re-run once this lands, from the screen it is actually reached on.
 - **Verification:** search a branded product never logged before, from Log Food → Single foods; it is
   found, it carries the mismatch line where macros and calories disagree, and tapping it goes to the
   portion step.
-
-### [nutrition][app-shell] BF-49 — back from a timeline row lands on Health, not where you started
-
-- **Lane:** B
-- **Added:** 2026-08-30 · owner, device pass A2: *"tapping workout; then back -> leads to heath
-  training not home. Same with tapping a food item from timeline -> takes to nutrtion -> then health
-  when press back."*
-
-Home → timeline → tap a row → the detail screen. Pressing back lands on **Health**, not Home. Two
-routes reproduce it (a workout row and a food row), so it is the timeline's navigation rather than
-one destination's. The row's target (`/health/day`) is under the Health tab, so the likely cause is
-back resolving to the tab that owns the destination instead of unwinding to the origin.
-
-- **What a pass looks like:** open a row from Home, press back, arrive at **Home** with the timeline
-  where it was. Repeat from Health's own timeline and arrive at Health. The origin decides, not the
-  destination's tab.
-- **Note:** N2 passed on this same pass — the nested-sheet back stack is correct — so this is
-  specific to cross-tab navigation, not the general back handling BF-27 fixed.
-
-- **Gate: device**
-- **⚠ It does not reproduce in the web harness, measured 2026-08-30 (Lane B).** Driven end to end in
-  Playwright with the seeded workout row: Home → tap the timeline row →
-  `http://localhost:3100/health/day?date=2026-08-30` → back → `http://localhost:3100/` with
-  `h1 = "Good afternoon, Test User."`. Home, not Health. **So the fix is not in the router**, and the
-  next attempt should not start there.
-- **Three things ruled out by reading, so they are not re-checked:**
-  - Both back affordances are the same call. The day screen's arrow is `router.back()`
-    (`day-detail-content.tsx`), and the Android handler is `window.history.back()`
-    (`mobile-auth-handler.tsx:50`) — Playwright's `goBack()` exercises the same history step.
-  - `useTransitionRouter.push` really pushes (`lib/view-transition.ts`). Its tab-route branch calls
-    `router.push`; only `replace()` calls `router.replace`. A push-that-replaces would have explained
-    the report exactly, which is why it was checked rather than assumed.
-  - A tab flip adds **no** history entry — `show()` uses `replaceState`, measured as `history.length`
-    staying at 2 across a Home → Health flip. So a rewritten entry is a real hazard in this shell,
-    but it is not reached by the sequence in the report.
-- **What the next attempt needs is a device repro with the surrounding steps**, since the harness
-  disagrees with the phone: what screen preceded Home, and whether "back" was the gesture, the
-  three-button key, or the on-screen arrow. The difference has to be found, not guessed — the code
-  it would touch is app-wide navigation.
-
-### [nutrition] BF-50 — the Log Food screen after its first device pass: four things, one screen
-
-- **Lane:** B
-- **Batch:** `nutrition-ui-uplift` — same screen family as BF-45/BF-46, one device pass.
-- **Device-verified when built** — see Verification. **Deliberately NOT `Gate: device`:** that
-  field parks an entry, and these are unbuilt. See the note below.
-- **Added:** 2026-08-30 · owner, device pass N4. **The rebuild itself passed** — no tile grid, the
-  three tabs read at 412 dp, Meals holds only meals, Photo and Barcode take the full screen. These
-  are the four things they asked for on top.
-
-1. **The capture row is too small.** *"The icon/sections for Photo/Barcode/Describe or enter should
-   be bigger."* Three buttons across 412 dp; give them the height and target the artboard implies.
-2. **`Describe or enter` wastes its space.** *"There is a lot of free room; so this UI section could
-   be expanded and made bigger."* The pane fills a sheet and uses a fraction of it.
-3. **The camera takes a step it does not need.** *"The photo option first opens the screen for /From
-   photos/Take pictures - could we make it auto open the camera then have the 'from photos' button
-   within the camera? usually its just take picture."* That chooser is `CameraSource.Prompt` in the
-   Capacitor call; `CameraSource.Camera` opens the camera directly. **Keep a gallery route** — put it
-   in the camera UI, do not delete it.
-4. **`Select` on the Meals tab can only delete.** *"There is a 'select' button that lets you select
-   more than one meal; but then you cant do anything with it except delete."* Either give multi-select
-   a second action worth having (log several meals at once is the obvious one) or say plainly that it
-   is a delete mode and label it so.
-
-- **Verification:** on the S25 — every capture button clears 48 dp comfortably; the describe pane
-  fills the sheet; Photo opens straight into the camera with a reachable gallery control; multi-select
-  offers what its label promises.
-
-### [nutrition] BF-51 — the meal builder after its first device pass: back exits the tab, and the photo control the user reaches is not the one that works
-
-- **Lane:** B
-- **Batch:** `nutrition-ui-uplift`
-- **Device-verified when built** — see Verification. **Deliberately NOT `Gate: device`:** that
-  field parks an entry, and these are unbuilt. See the note below.
-- **Added:** 2026-08-30 · owner, device pass N5.
-
-1. **Back from Edit exits to the Nutrition tab.** *"clicking edit meal then pressing back - takes you
-   all the way to the nutrition tab; rather than back to the saved meal."* One press should return to
-   the meal's own screen. Same family as BF-49 but a different surface, and N2 passed, so the nested
-   back stack is right where it is wired — this path is not.
-2. **The two photo controls, confirmed from the phone.** *"There is a photo add button at the bottom
-   of this page; but its also one screen back when you click the meal; and click the add a photo
-   button at the top; it should be able to be set from there."* This is **BF-46 ①** seen from the
-   device, and it settles the fix: the top one is the control users reach, so **that** is the one that
-   must pick a photo, not navigate. See BF-46 for the save failure, which is separate and still
-   unexplained.
-3. **`Recently used` sits in the middle of the ingredient list.** *"this should probably be a tab like
-   the other place"* — matching Log Food's `Recent · Meals · Single foods`, which is the pattern the
-   user now expects from the sibling screen.
-4. **Cramped gutters** — *"The screen is a little cramped with safe spaces"*, confirming BF-45 ③'s
-   bottom-sheet inset from the device.
-
-- **The owner asked to stop here:** *"Lets get this into the right section and UI before we deep dive
-  this more."* So N5's recipe-import checks (yield, multi-dish, duplicate handling) are **not
-  answered** and stay owed — do not read this entry as clearing them.
-
-### [nutrition] BF-52 — one AI meal builder: type it, photograph it, or paste a URL, from a single entry point
-
-- **Lane:** B for the surface; the routes exist.
-- **Added:** 2026-08-30 · owner, device pass N5: *"I dont see a URL option or does it just go into
-  the add ingredients? Id rather it just be an 'AI Meal builder' option; similar to the food logging
-  where you can write/type to it - or upload a photo; or upload a URL link etc."*
-- **Planning item** — this is a surface design, not a defect. It needs a planning session before
-  implementation.
-
-**Every input already works; none of them is findable.** Recipe-URL import is implemented and lives
-inside the ingredient *search* field (`ingredient-picker.tsx` → `importRecipe`), which is why the
-owner could not find a URL option — it is not presented as one. The photo path shipped as BF-40.
-Free-text description is the scan route's text branch.
-
-**So the ask is an entry point, not an engine.** Mirror Log Food's own capture row — the user has just
-learned `Photo · Barcode · Describe or enter` one screen away, and a meal builder offering
-`Photo · URL · Describe` reads as the same idea rather than a new one. **Recommendation: do not build
-new extraction**; route all three at the existing `/api/nutrition/scan` shapes and let the builder
-render what comes back.
-
-- **Carry BF-40's earned constraint:** a recipe page that states no yield hands up `recipeYield: null`
-  rather than defaulting to 1 — the banana-bread four-fold error. Any new entry point must preserve
-  that, and the amber "set how many portions" line with it.
-- **Verification:** each of the three inputs reaches the builder with the same populated ingredient
-  list it produces today, and the yield behaviour is unchanged.
-
-### [nutrition][platform] BF-57 — a printed meal label only works for the person who printed it, and making it work for anyone is a decision, not a fix
-
-- **Lane:** A shipped the payload; **B owns what is left.**
-- **✅ THE ENGINE HALF SHIPPED 2026-08-30.** `packages/shared/src/nutrition/label-payload.ts` gains
-  `encodeSharedMeal` / `decodeSharedMeal` / `decodeMealLabelScan` and the QR byte-capacity table.
-  The owner's design: the whole meal travels in the code — positional JSON
-  `[1, name, servings, [[name,g,kcal,p,c,f], …], rolled?]` — so a label scans offline, for a user
-  with no account, as a **copy** that never couples the two users' data. Ids are deliberately NOT
-  globally resolvable; that was rejected and stays rejected.
-  - **The totals are sacred.** Nothing is ever dropped to save bytes: the tail rolls into one
-    remainder entry carrying its combined weight and macros, so a trimmed copy's figures match the
-    original to the gram. Tested at 1, 2, 3, 5, 8, 12 and 25 ingredients.
-  - **Budget: 251 bytes — QR version 11 at EC M**, which is 61 modules and **0.49 mm/module across
-    ~30 mm**, the bottom of the 0.49–0.66 range the label design was built to. Version 12 is 0.46 and
-    falls out. The spec capacity table is checked against the real `qrcode` encoder for all 20
-    versions.
-  - **Both formats, one decoder, indefinitely** — a label printed before this still resolves for its
-    owner.
-
-- **Keep:** the whole surface, which is Lane B's, and none of it is built.
-  1. **Give the QR ~30 mm of the 50 mm label.** The budget above is meaningless until the layout
-     hands the code that space — at today's 12.2–16.4 mm even a 3-ingredient payload lands at
-     **0.31 mm/module**, too fine for a home printer. This is the binding constraint, not the format.
-  2. **Say on the label when the list was trimmed.** A printed label naming four of ten ingredients
-     reads as the whole recipe unless it says otherwise. `encodeSharedMeal` returns `named`/`rolled`
-     for exactly this.
-  3. **The scan path** (`food-logger-sheet.tsx`): route `decodeMealLabelScan`'s `shared-meal` branch
-     into creating the scanner's own meal, and **fix the message on the other branch** —
-     *"That meal belongs to someone else"* beats *"no longer exists"*, which is wrong twice over, and
-     an old-format label scanned by another user still lands there.
-  4. **Verification, on two phones and two accounts:** a 3-ingredient label scans **in airplane mode**
-     and creates the scanner's own meal with the same portions and macros; a 12-ingredient one
-     produces the same total calories and macros with its tail rolled into one labelled remainder;
-     and a previously-printed label still resolves for its owner.
 
 ### [nutrition] BF-45 — the Nutrition day screen: an empty grid slot, macros that vanish when you collapse, and gutters the artboards did not ask for
 
@@ -1590,6 +1363,171 @@ the gaps rather than merging the two blocks back together, which would be option
   control clears the 48 dp floor and the action row clears the gesture bar (`pb-safe-action*`, which
   renders 0 in the sandbox).
 
+### [nutrition] BF-50 — the Log Food screen after its first device pass: four things, one screen
+
+- **Lane:** B
+- **Batch:** `nutrition-ui-uplift` — same screen family as BF-45/BF-46, one device pass.
+- **Device-verified when built** — see Verification. **Deliberately NOT `Gate: device`:** that
+  field parks an entry, and these are unbuilt. See the note below.
+- **Added:** 2026-08-30 · owner, device pass N4. **The rebuild itself passed** — no tile grid, the
+  three tabs read at 412 dp, Meals holds only meals, Photo and Barcode take the full screen. These
+  are the four things they asked for on top.
+
+1. **The capture row is too small.** *"The icon/sections for Photo/Barcode/Describe or enter should
+   be bigger."* Three buttons across 412 dp; give them the height and target the artboard implies.
+2. **`Describe or enter` wastes its space.** *"There is a lot of free room; so this UI section could
+   be expanded and made bigger."* The pane fills a sheet and uses a fraction of it.
+3. **The camera takes a step it does not need.** *"The photo option first opens the screen for /From
+   photos/Take pictures - could we make it auto open the camera then have the 'from photos' button
+   within the camera? usually its just take picture."* That chooser is `CameraSource.Prompt` in the
+   Capacitor call; `CameraSource.Camera` opens the camera directly. **Keep a gallery route** — put it
+   in the camera UI, do not delete it.
+4. **`Select` on the Meals tab can only delete.** *"There is a 'select' button that lets you select
+   more than one meal; but then you cant do anything with it except delete."* Either give multi-select
+   a second action worth having (log several meals at once is the obvious one) or say plainly that it
+   is a delete mode and label it so.
+
+- **Verification:** on the S25 — every capture button clears 48 dp comfortably; the describe pane
+  fills the sheet; Photo opens straight into the camera with a reachable gallery control; multi-select
+  offers what its label promises.
+
+### [nutrition] BF-51 — the meal builder after its first device pass: back exits the tab, and the photo control the user reaches is not the one that works
+
+- **Lane:** B
+- **Batch:** `nutrition-ui-uplift`
+- **Device-verified when built** — see Verification. **Deliberately NOT `Gate: device`:** that
+  field parks an entry, and these are unbuilt. See the note below.
+- **Added:** 2026-08-30 · owner, device pass N5.
+
+1. **Back from Edit exits to the Nutrition tab.** *"clicking edit meal then pressing back - takes you
+   all the way to the nutrition tab; rather than back to the saved meal."* One press should return to
+   the meal's own screen. Same family as BF-49 but a different surface, and N2 passed, so the nested
+   back stack is right where it is wired — this path is not.
+2. **The two photo controls, confirmed from the phone.** *"There is a photo add button at the bottom
+   of this page; but its also one screen back when you click the meal; and click the add a photo
+   button at the top; it should be able to be set from there."* This is **BF-46 ①** seen from the
+   device, and it settles the fix: the top one is the control users reach, so **that** is the one that
+   must pick a photo, not navigate. See BF-46 for the save failure, which is separate and still
+   unexplained.
+3. **`Recently used` sits in the middle of the ingredient list.** *"this should probably be a tab like
+   the other place"* — matching Log Food's `Recent · Meals · Single foods`, which is the pattern the
+   user now expects from the sibling screen.
+4. **Cramped gutters** — *"The screen is a little cramped with safe spaces"*, confirming BF-45 ③'s
+   bottom-sheet inset from the device.
+
+- **The owner asked to stop here:** *"Lets get this into the right section and UI before we deep dive
+  this more."* So N5's recipe-import checks (yield, multi-dish, duplicate handling) are **not
+  answered** and stay owed — do not read this entry as clearing them.
+
+### [nutrition] BF-39 — a logged meal stops being a meal: `food_logs` has no `saved_meal_id`, and three symptoms trace to that
+
+> **⚑ RAISED AGAIN 2026-08-30 — third report, and the owner reached the fix independently.** *"we
+> need to sort out meals and ingredients; in a nest. so that when you add a meal it adds the meal and
+> not every ingredient or at least nests in the meal."* **Nest** is the same shape this entry already
+> specifies: one parent row that expands to its ingredients. **No new entry** — filing a fourth
+> number for the same defect is the failure this repo has had before (Q-397).
+>
+> Three reports across five days, from three different screens, is the strongest priority signal in
+> the nutrition cluster. Treat it accordingly.
+
+> **⚑ RE-REPORTED WITH SCREENSHOTS, 2026-08-27, and the owner's wording sharpens the requirement.**
+> *"when I add a meal from ai; it breaks it down into its components and floods the list. we need to
+> be able to create an over arching food and have the ingredients and macro break down inside of
+> it."* The screenshot is one AI-logged breakfast rendered as **eight** diary rows — flour, protein
+> powder, baking powder, salt, milk, eggs, butter, bacon — each with its own `1 serving · Ng` line
+> and chevron, filling the whole meal section.
+>
+> **This is the same defect this entry already describes, not a new one**, and it is now the owner's
+> most-repeated nutrition complaint (raised on 2026-08-26 about a saved meal's photo, again here
+> about an AI meal). What the re-report adds is the shape of the fix: **one collapsed parent row
+> carrying the meal's name and total, expanding to the ingredients and their macro split** — not
+> eight siblings, and not a single opaque row that loses the breakdown. Both halves are stated, so
+> build both.
+>
+> It also answers the photo question the earlier report left open: a parent row is a place a meal
+> photo can live. Decomposed siblings had nowhere to put one, which is why *"the image won't transfer
+> over"* had no good answer while the rows stayed flat.
+
+- **Lane:** B — the migration and write path shipped 2026-08-30 as Lane A's half; all that remains is
+  the diary rendering. *(Was `Lane: A`; a struck-through value here parses as no lane at all and lands
+  the entry in UNCLASSIFIED, so state the current lane plainly and say the rest in prose.)*
+- **Batch:** `nutrition-ui-uplift` — **added 2026-08-30 so the owed half is visible.** The runner
+  warns *"mentions a schema change — do not batch a migration"*; **that does not apply here and the
+  reason is checkable: migrations 238/239 and local SQLite v31 are already on `main`.** What remains
+  is rendering only, so there is no migration in this batch to revert. Do not split it out on the
+  warning alone — but if any part of the render turns out to need a column, that part leaves the
+  batch and goes to Lane A.
+- **⚠ NOT a `Keep:` — this is unbuilt Lane B work.** It was filed as one on 2026-08-30 when the engine
+  shipped, which parks the entry in the runner's KEEP list under *"not new work"*. That is right for
+  an owner or device check and wrong for a whole UI half nobody has written; it made the owner's
+  most-repeated nutrition ask invisible to the tool Lane B starts from. Restated as a live entry with
+  its scope shrunk to what remains. **The engine
+  shipped 2026-08-30** (migrations 238 + 239, local SQLite **v31**): `food_logs.saved_meal_id` and
+  `food_logs.meal_group_id`, stamped by `logMealItems` on both write paths, carried through the
+  outbox payload, the push branch, the sync delta, the pull mapping and the local read. **Shape (1)
+  was built, as recommended** — one row per ingredient, grouped — so nothing about a log row
+  changed and every existing query is untouched. What is owed:
+  - **Lane B:** the diary draws one collapsed parent row per `mealGroupId`, carrying the meal's name
+    and photo, expanding to the ingredients and their macro split. Both halves, per the re-report.
+  - ~~**Lane A (small):** true MRU for My Foods~~ — **shipped 2026-08-30.** `listSavedMeals` returns
+    `lastUsedAt` (`max(logged_at)` per `saved_meal_id`, user-scoped, deleted logs excluded) and
+    orders most-recently-eaten first, never-eaten last in their existing `createdAt` order. Derived
+    on read, never a stored counter.
+  - **Nothing back-fills.** Meals logged before 2026-08-30 have both columns NULL and will keep
+    rendering as loose ingredients; there is no way to recover which rows belonged together.
+- **Added:** 2026-08-26 · owner: *"the meal is a complete in 'saved meal' and it can have a picture
+  etc. but when adding it to the log; its broken down into its components so the image wont transfer
+  over. not sure what the best way around this would be. maybe it needs to stay as a whole item."*
+
+**The owner's instinct is right, and the missing piece is already documented elsewhere as a
+different problem.** Logging a saved meal writes one `food_logs` row per ingredient and **nothing
+records that they came from a meal**. `food_logs` carries `food_item_id` and no `saved_meal_id`, so
+the moment a meal is logged its identity is gone.
+
+**Three symptoms, one cause — which is what makes this worth fixing rather than patching:**
+
+| Symptom | Where it was noticed |
+|---|---|
+| The meal's photo cannot follow it into the diary | **here**, the owner's report |
+| A saved meal has **no last-used timestamp at all**, so My Foods can only order by `createdAt DESC` | Q-395c's journal, filed as a constraint rather than a defect |
+| The diary shows five ingredients where the owner ate one thing | implied by both |
+
+Q-395c's journal already says it: *"`food_logs` carries no `saved_meal_id`, so a saved meal has no
+last-used timestamp at all … True MRU needs a column that does not exist — Lane A's to add."* **That
+is this column.** Adding it for MRU alone would be under-selling it.
+
+**Two shapes, and the choice is the entry's real content:**
+
+1. **Stamp the ingredients.** Keep one row per ingredient, add a nullable `saved_meal_id` (plus a
+   per-log group id, so two servings of the same meal on one day stay distinct). The diary groups
+   rows that share it and renders the meal's name and photo over them.
+   - **Keeps** every macro total, every per-ingredient edit, and every existing query working
+     unchanged — a log row is still a log row.
+   - **Costs** grouping logic on every diary read.
+2. **Log the meal as one row.** What the owner reached for — *"maybe it needs to stay as a whole
+   item"*.
+   - **Keeps** the diary trivially correct: one thing eaten, one row, one photo.
+   - **Costs** a second shape in `food_logs`: a row that points at a meal rather than a food item,
+     which every reader, the sync delta, the local mirror and the macro sums must now handle. And
+     editing one ingredient of a logged meal stops being possible without decomposing it anyway.
+
+**Recommended: (1).** It is additive — a nullable column and a grouping pass — where (2) changes what
+a `food_logs` row *is*, and this table is read by the diary, the energy balance, the adaptive-TDEE
+window, the sync delta and the local store. **The owner's phrasing asks for the outcome, not the
+storage**: "stay as a whole item" is satisfied by the diary *showing* one grouped item, which (1)
+delivers without a second row shape.
+
+- **⚠ Sequencing against BF-35.** BF-35 fills the food tile with images; a meal's photo reaching the
+  diary needs this column first. If BF-35 lands first the meal rows simply show ingredient images —
+  correct, not broken — so this is an ordering preference, not a `Needs:`.
+- **⚠ The full offline-first chain applies**, per CLAUDE.md: local table column = server payload =
+  `getSyncDelta` output = `pullDelta` mapping = `applyDelta` upsert columns = the `pushMutations`
+  branch. A new nullable column on a synced table is exactly where that chain gets half-done.
+- **Verification.** Log a saved meal with a photo: the diary shows one grouped entry with the meal's
+  name and picture, the day's macro total is unchanged from before, and a single ingredient inside it
+  can still be edited and deleted. Then the same on a second serving of the same meal on the same
+  day — they must not merge into one.
+
 ### [nutrition] BF-38 — logging the same food twice creates a second `food_items` row: 19 of 209 are redundant
 
 - **Lane:** A — the matching happens at creation, in the route and the shared create path.
@@ -1684,128 +1622,104 @@ the match. `Gate: owner` when it is next picked up.
   and *first* confirm a non-null `barcode` actually lands in the column, per the external-field rule:
   a wrong or missing field reads as `undefined` and fails silently.
 
-### [nutrition] BF-39 — a logged meal stops being a meal: `food_logs` has no `saved_meal_id`, and three symptoms trace to that
+### [nutrition] BF-52 — one AI meal builder: type it, photograph it, or paste a URL, from a single entry point
 
-> **⚑ RAISED AGAIN 2026-08-30 — third report, and the owner reached the fix independently.** *"we
-> need to sort out meals and ingredients; in a nest. so that when you add a meal it adds the meal and
-> not every ingredient or at least nests in the meal."* **Nest** is the same shape this entry already
-> specifies: one parent row that expands to its ingredients. **No new entry** — filing a fourth
-> number for the same defect is the failure this repo has had before (Q-397).
->
-> Three reports across five days, from three different screens, is the strongest priority signal in
-> the nutrition cluster. Treat it accordingly.
+- **Lane:** B for the surface; the routes exist.
+- **Added:** 2026-08-30 · owner, device pass N5: *"I dont see a URL option or does it just go into
+  the add ingredients? Id rather it just be an 'AI Meal builder' option; similar to the food logging
+  where you can write/type to it - or upload a photo; or upload a URL link etc."*
+- **Planning item** — this is a surface design, not a defect. It needs a planning session before
+  implementation.
 
-> **⚑ RE-REPORTED WITH SCREENSHOTS, 2026-08-27, and the owner's wording sharpens the requirement.**
-> *"when I add a meal from ai; it breaks it down into its components and floods the list. we need to
-> be able to create an over arching food and have the ingredients and macro break down inside of
-> it."* The screenshot is one AI-logged breakfast rendered as **eight** diary rows — flour, protein
-> powder, baking powder, salt, milk, eggs, butter, bacon — each with its own `1 serving · Ng` line
-> and chevron, filling the whole meal section.
->
-> **This is the same defect this entry already describes, not a new one**, and it is now the owner's
-> most-repeated nutrition complaint (raised on 2026-08-26 about a saved meal's photo, again here
-> about an AI meal). What the re-report adds is the shape of the fix: **one collapsed parent row
-> carrying the meal's name and total, expanding to the ingredients and their macro split** — not
-> eight siblings, and not a single opaque row that loses the breakdown. Both halves are stated, so
-> build both.
->
-> It also answers the photo question the earlier report left open: a parent row is a place a meal
-> photo can live. Decomposed siblings had nowhere to put one, which is why *"the image won't transfer
-> over"* had no good answer while the rows stayed flat.
+**Every input already works; none of them is findable.** Recipe-URL import is implemented and lives
+inside the ingredient *search* field (`ingredient-picker.tsx` → `importRecipe`), which is why the
+owner could not find a URL option — it is not presented as one. The photo path shipped as BF-40.
+Free-text description is the scan route's text branch.
 
-- **Lane:** A — a migration plus the write path; the diary rendering is B and follows.
-- **Keep:** the RENDERING, which is the half the owner can see, plus the MRU read. **The engine
-  shipped 2026-08-30** (migrations 238 + 239, local SQLite **v31**): `food_logs.saved_meal_id` and
-  `food_logs.meal_group_id`, stamped by `logMealItems` on both write paths, carried through the
-  outbox payload, the push branch, the sync delta, the pull mapping and the local read. **Shape (1)
-  was built, as recommended** — one row per ingredient, grouped — so nothing about a log row
-  changed and every existing query is untouched. What is owed:
-  - **Lane B:** the diary draws one collapsed parent row per `mealGroupId`, carrying the meal's name
-    and photo, expanding to the ingredients and their macro split. Both halves, per the re-report.
-  - ~~**Lane A (small):** true MRU for My Foods~~ — **shipped 2026-08-30.** `listSavedMeals` returns
-    `lastUsedAt` (`max(logged_at)` per `saved_meal_id`, user-scoped, deleted logs excluded) and
-    orders most-recently-eaten first, never-eaten last in their existing `createdAt` order. Derived
-    on read, never a stored counter.
-  - **Nothing back-fills.** Meals logged before 2026-08-30 have both columns NULL and will keep
-    rendering as loose ingredients; there is no way to recover which rows belonged together.
-- **Added:** 2026-08-26 · owner: *"the meal is a complete in 'saved meal' and it can have a picture
-  etc. but when adding it to the log; its broken down into its components so the image wont transfer
-  over. not sure what the best way around this would be. maybe it needs to stay as a whole item."*
+**So the ask is an entry point, not an engine.** Mirror Log Food's own capture row — the user has just
+learned `Photo · Barcode · Describe or enter` one screen away, and a meal builder offering
+`Photo · URL · Describe` reads as the same idea rather than a new one. **Recommendation: do not build
+new extraction**; route all three at the existing `/api/nutrition/scan` shapes and let the builder
+render what comes back.
 
-**The owner's instinct is right, and the missing piece is already documented elsewhere as a
-different problem.** Logging a saved meal writes one `food_logs` row per ingredient and **nothing
-records that they came from a meal**. `food_logs` carries `food_item_id` and no `saved_meal_id`, so
-the moment a meal is logged its identity is gone.
+- **Carry BF-40's earned constraint:** a recipe page that states no yield hands up `recipeYield: null`
+  rather than defaulting to 1 — the banana-bread four-fold error. Any new entry point must preserve
+  that, and the amber "set how many portions" line with it.
+- **Verification:** each of the three inputs reaches the builder with the same populated ingredient
+  list it produces today, and the yield behaviour is unchanged.
 
-**Three symptoms, one cause — which is what makes this worth fixing rather than patching:**
+### [nutrition][platform] BF-57 — a printed meal label only works for the person who printed it, and making it work for anyone is a decision, not a fix
 
-| Symptom | Where it was noticed |
-|---|---|
-| The meal's photo cannot follow it into the diary | **here**, the owner's report |
-| A saved meal has **no last-used timestamp at all**, so My Foods can only order by `createdAt DESC` | Q-395c's journal, filed as a constraint rather than a defect |
-| The diary shows five ingredients where the owner ate one thing | implied by both |
+- **Lane:** A shipped the payload; **B owns what is left.**
+- **✅ THE ENGINE HALF SHIPPED 2026-08-30.** `packages/shared/src/nutrition/label-payload.ts` gains
+  `encodeSharedMeal` / `decodeSharedMeal` / `decodeMealLabelScan` and the QR byte-capacity table.
+  The owner's design: the whole meal travels in the code — positional JSON
+  `[1, name, servings, [[name,g,kcal,p,c,f], …], rolled?]` — so a label scans offline, for a user
+  with no account, as a **copy** that never couples the two users' data. Ids are deliberately NOT
+  globally resolvable; that was rejected and stays rejected.
+  - **The totals are sacred.** Nothing is ever dropped to save bytes: the tail rolls into one
+    remainder entry carrying its combined weight and macros, so a trimmed copy's figures match the
+    original to the gram. Tested at 1, 2, 3, 5, 8, 12 and 25 ingredients.
+  - **Budget: 251 bytes — QR version 11 at EC M**, which is 61 modules and **0.49 mm/module across
+    ~30 mm**, the bottom of the 0.49–0.66 range the label design was built to. Version 12 is 0.46 and
+    falls out. The spec capacity table is checked against the real `qrcode` encoder for all 20
+    versions.
+  - **Both formats, one decoder, indefinitely** — a label printed before this still resolves for its
+    owner.
 
-Q-395c's journal already says it: *"`food_logs` carries no `saved_meal_id`, so a saved meal has no
-last-used timestamp at all … True MRU needs a column that does not exist — Lane A's to add."* **That
-is this column.** Adding it for MRU alone would be under-selling it.
-
-**Two shapes, and the choice is the entry's real content:**
-
-1. **Stamp the ingredients.** Keep one row per ingredient, add a nullable `saved_meal_id` (plus a
-   per-log group id, so two servings of the same meal on one day stay distinct). The diary groups
-   rows that share it and renders the meal's name and photo over them.
-   - **Keeps** every macro total, every per-ingredient edit, and every existing query working
-     unchanged — a log row is still a log row.
-   - **Costs** grouping logic on every diary read.
-2. **Log the meal as one row.** What the owner reached for — *"maybe it needs to stay as a whole
-   item"*.
-   - **Keeps** the diary trivially correct: one thing eaten, one row, one photo.
-   - **Costs** a second shape in `food_logs`: a row that points at a meal rather than a food item,
-     which every reader, the sync delta, the local mirror and the macro sums must now handle. And
-     editing one ingredient of a logged meal stops being possible without decomposing it anyway.
-
-**Recommended: (1).** It is additive — a nullable column and a grouping pass — where (2) changes what
-a `food_logs` row *is*, and this table is read by the diary, the energy balance, the adaptive-TDEE
-window, the sync delta and the local store. **The owner's phrasing asks for the outcome, not the
-storage**: "stay as a whole item" is satisfied by the diary *showing* one grouped item, which (1)
-delivers without a second row shape.
-
-- **⚠ Sequencing against BF-35.** BF-35 fills the food tile with images; a meal's photo reaching the
-  diary needs this column first. If BF-35 lands first the meal rows simply show ingredient images —
-  correct, not broken — so this is an ordering preference, not a `Needs:`.
-- **⚠ The full offline-first chain applies**, per CLAUDE.md: local table column = server payload =
-  `getSyncDelta` output = `pullDelta` mapping = `applyDelta` upsert columns = the `pushMutations`
-  branch. A new nullable column on a synced table is exactly where that chain gets half-done.
-- **Verification.** Log a saved meal with a photo: the diary shows one grouped entry with the meal's
-  name and picture, the day's macro total is unchanged from before, and a single ingredient inside it
-  can still be edited and deleted. Then the same on a second serving of the same meal on the same
-  day — they must not merge into one.
-
-### [app-shell][nutrition] BF-34 — the dialog that closed on the frame it opened (shipped v1.383.1)
+- **Keep:** the whole surface, which is Lane B's, and none of it is built.
+  1. **Give the QR ~30 mm of the 50 mm label.** The budget above is meaningless until the layout
+     hands the code that space — at today's 12.2–16.4 mm even a 3-ingredient payload lands at
+     **0.31 mm/module**, too fine for a home printer. This is the binding constraint, not the format.
+  2. **Say on the label when the list was trimmed.** A printed label naming four of ten ingredients
+     reads as the whole recipe unless it says otherwise. `encodeSharedMeal` returns `named`/`rolled`
+     for exactly this.
+  3. **The scan path** (`food-logger-sheet.tsx`): route `decodeMealLabelScan`'s `shared-meal` branch
+     into creating the scanner's own meal, and **fix the message on the other branch** —
+     *"That meal belongs to someone else"* beats *"no longer exists"*, which is wrong twice over, and
+     an old-format label scanned by another user still lands there.
+  4. **Verification, on two phones and two accounts:** a 3-ingredient label scans **in airplane mode**
+     and creates the scanner's own meal with the same portions and macros; a 12-ingredient one
+     produces the same total calories and macros with its tail rolled into one labelled remainder;
+     and a previously-printed label still resolves for its owner.
+### [nutrition][app-shell] BF-49 — back from a timeline row lands on Health, not where you started
 
 - **Lane:** B
-- **Gate:** device
-- **Shipped 2026-08-26.** The cause was the one the entry root-caused: `useSheetBackDismiss` marked
-  an in-flight `history.back()` **per instance**, so a sheet closing and a dialog opening in the same
-  tick could not see each other's flag and the dialog read the sheet's pop as a real back gesture.
-  It is a module-level counter now, consumed by whichever surface receives the pop, and one listener
-  owns the stack instead of one per instance. Logic extracted to `lib/hooks/sheet-back-stack.ts` with
-  seven tests; reverting to the per-instance flag fails both sibling tests and the StrictMode one.
-- **⚠ Two corrections to this entry's own analysis, both worth carrying:**
-  - **The prescribed fix — "share the flag" — has an ordering trap the entry could not see.** The
-    `absorb` listener is registered by the *closing* sheet, so it runs **before** the newly-mounted
-    dialog's handler and would clear a shared boolean too early. Consuming it needs one listener that
-    always exists, which is why this became a small rewrite rather than a one-word change.
-  - **LB-17 (v1.382.0) did NOT fix this**, though it touched the same guard. That was the *nested*
-    case — a back landing on the middle sheet's entry. This is the *sibling* case. They are different
-    failures through the same line, and the fix keeps both mechanisms.
-- **Keep: the device press.** Everything here is verified against the state machine and against the
-  nested/StrictMode e2e specs, **not on the S25**. The sibling sequence cannot be staged through the
-  web UI at all — the bin that triggers it is not even actionable in Chromium (`locator.tap()` times
-  out on it), so an attempt to reproduce it there produced a mis-aimed tap that closed the sheet
-  without ever opening the dialog. On device: tap a diary row, tap the bin, and the confirm dialog
-  must **stay** open and be tappable; Cancel must cancel. Then the nest from LB-17 (Log Food →
-  My Foods → a meal) must still unwind one layer per press.
+- **Added:** 2026-08-30 · owner, device pass A2: *"tapping workout; then back -> leads to heath
+  training not home. Same with tapping a food item from timeline -> takes to nutrtion -> then health
+  when press back."*
+
+Home → timeline → tap a row → the detail screen. Pressing back lands on **Health**, not Home. Two
+routes reproduce it (a workout row and a food row), so it is the timeline's navigation rather than
+one destination's. The row's target (`/health/day`) is under the Health tab, so the likely cause is
+back resolving to the tab that owns the destination instead of unwinding to the origin.
+
+- **What a pass looks like:** open a row from Home, press back, arrive at **Home** with the timeline
+  where it was. Repeat from Health's own timeline and arrive at Health. The origin decides, not the
+  destination's tab.
+- **Note:** N2 passed on this same pass — the nested-sheet back stack is correct — so this is
+  specific to cross-tab navigation, not the general back handling BF-27 fixed.
+
+- **Gate: device**
+- **⚠ It does not reproduce in the web harness, measured 2026-08-30 (Lane B).** Driven end to end in
+  Playwright with the seeded workout row: Home → tap the timeline row →
+  `http://localhost:3100/health/day?date=2026-08-30` → back → `http://localhost:3100/` with
+  `h1 = "Good afternoon, Test User."`. Home, not Health. **So the fix is not in the router**, and the
+  next attempt should not start there.
+- **Three things ruled out by reading, so they are not re-checked:**
+  - Both back affordances are the same call. The day screen's arrow is `router.back()`
+    (`day-detail-content.tsx`), and the Android handler is `window.history.back()`
+    (`mobile-auth-handler.tsx:50`) — Playwright's `goBack()` exercises the same history step.
+  - `useTransitionRouter.push` really pushes (`lib/view-transition.ts`). Its tab-route branch calls
+    `router.push`; only `replace()` calls `router.replace`. A push-that-replaces would have explained
+    the report exactly, which is why it was checked rather than assumed.
+  - A tab flip adds **no** history entry — `show()` uses `replaceState`, measured as `history.length`
+    staying at 2 across a Home → Health flip. So a rewritten entry is a real hazard in this shell,
+    but it is not reached by the sequence in the report.
+- **What the next attempt needs is a device repro with the surrounding steps**, since the harness
+  disagrees with the phone: what screen preceded Home, and whether "back" was the gesture, the
+  three-button key, or the on-screen arrow. The difference has to be found, not guessed — the code
+  it would touch is app-wide navigation.
 
 ### [nutrition] BF-35 — fill the food placeholder: two of the three sources are already free
 
@@ -1986,6 +1900,103 @@ recommendations that were put to them. Do not re-open either.**
   OFF name search) is 3 — six items, 3%.** The other **203 are `source: 'ai'`**. Route 1 is a
   rounding error on today's data; whether route 2 or route 3 carries the rest is the real question,
   and it is the one the next bullet says cannot be answered from the column.
+
+### [body][devices][platform] BF-53 — every pending weigh-in button is dead: both routes validate a numeric id with a UUID regex
+
+- **Keep:** the DEVICE check, and only that. Fixed 2026-08-30 — both routes take `numericRouteId`
+  now, and the client reports a failed press instead of swallowing it. Reproduced and re-verified on
+  `pnpm dev` against the same real pending row (pre-fix: both buttons `400 Invalid id`, row
+  untouched; post-fix: dismiss dismisses, confirm writes the weight to `body_metrics`). **On the S25:
+  a pending reading dismisses and disappears, a confirmed one reaches the weight card, and both stay
+  gone across a screen swap.** The APK reaches this through a Railway deploy — no new build.
+
+### [nutrition] BF-47 — the deleted food comes back: the loader calls the server authoritative while the delete is still in the outbox
+
+- **Lane:** A — `app/nutrition/use-food-logs-loader.ts`.
+- **Added:** 2026-08-30 · owner, device pass N1: *"Delete worked; when I click delete the item
+  vanishes then re-appears; then when you swap screens - it dissapears."*
+- **Keep:** the DEVICE check, and only that. The fix shipped 2026-08-30 — the loader reads the
+  outbox and drops queued deletes from the server copy before hydrating from it. **It is reasoned,
+  not reproduced:** `getLocalStore` returns null in `pnpm dev` and in Playwright, so the failure has
+  no sandbox analogue and neither does the fix. Delete a logged food on the S25, online and offline,
+  and confirm it goes and stays gone across a screen swap and a force-close.
+- **⚠ The trace below was CORRECTED on implementation** — see the boxed note. The fix direction it
+  proposed was right; the mechanism it named was not the whole story, and the difference decides
+  where the filter has to go.
+- **This is CLAUDE.md's own rule being broken**, the one written after the mood-checkin re-prompt and
+  the rest-day revert: *after an optimistic local write, never apply or cache a server response that
+  would replace it.*
+
+**Traced, and the sequence matches the report exactly.** `deleteLog` in `nutrition-content.tsx:405`
+removes the row optimistically, deletes it locally, queues the mutation, then calls
+`refreshAffected()` → `loadFoodLogs(today)`. That loader renders the local copy first (row gone —
+the flicker the owner sees) and then fetches the server copy, which **still has the row**, because
+the delete has only been *queued*; `pushMutations` has not run yet. When the push later lands, the
+next load returns a server copy without it — which is why swapping screens makes it disappear "for
+real".
+
+> **⚠ CORRECTED 2026-08-30, on implementation.** The entry said the loader "renders the server copy
+> unconditionally", and it does not: in the happy path it feeds the server copy to `applyDelta` and
+> then **re-reads locally**. All three links in that path hold — `handleConfirmDelete` really does
+> call `store.deleteFoodLog(id)` before queueing, `getFoodLogsWithItems` filters
+> `deleted_at IS NULL`, and `applyDelta`'s food_logs arm is gated `WHERE sync_status = 'synced'`, so
+> a server row cannot overwrite a pending local one. **On that path the row should not come back.**
+>
+> Two mechanisms that DO fit the report, and the fix covers both:
+> 1. **The `catch` branch.** If `applyDelta` or the local re-read throws, the loader falls back to
+>    `applyLogs(server)` — the raw server copy, deleted row included.
+> 2. **The local row was never there.** A log created on web or another device and not yet pulled
+>    means `deleteFoodLog`'s UPDATE matches **zero rows**, so nothing is tombstoned or pending, and
+>    `applyDelta` inserts the server row fresh as `'synced'`. This one survives a screen swap only
+>    until the push lands, which matches the report exactly.
+>
+> **Why it matters where the filter goes:** mechanism 2 is a local re-insert, so filtering after
+> `applyDelta` would still write the row back to the device. The shipped fix filters **before**
+> both uses, and a source-order test pins that.
+
+- **⚠ Do not fix this by inverting the authority.** That line's comment records the bug it exists to
+  prevent: a local read that threw left the page blank, so logged food *"vanished on reload"* even
+  though the server had it. Both failures are real and a naive swap trades one for the other.
+- **Fix direction:** the loader needs to know a delete is in flight and not resurrect it — filter the
+  server response against pending outbox mutations for the domain, which is information the local
+  store already holds, rather than choosing a winner globally. Equivalent to the `sync_status ===
+  'synced'` gate `applyDelta` already applies for pulls; this read path has no such gate.
+- **Sibling sweep — done, and the answer is one.** `grep -rn 'applyDelta(' app components lib packages`
+  returns exactly **one** call site outside the sync engine: this loader. It is the only screen-level
+  read that hydrates the local store from its own server fetch, which is the shape that can resurrect
+  a row. The mood, body-metric and activity deletes were checked: they read `day-log:` through
+  `cachedFetch`, a **server-assembled aggregate that never writes to the local store**, so a queued
+  delete shows briefly stale there and self-corrects on push — a flicker, not a resurrection, and a
+  different fix if it is ever worth making. `session-select-content.tsx` reads
+  `store.getActivityLogs` local-first, where the tombstone already excludes it.
+- **Verification:** offline and online, delete a logged food — it goes and stays gone, with no
+  reappearance, and a force-close does not bring it back.
+
+### [app-shell][nutrition] BF-34 — the dialog that closed on the frame it opened (shipped v1.383.1)
+
+- **Lane:** B
+- **Gate:** device
+- **Shipped 2026-08-26.** The cause was the one the entry root-caused: `useSheetBackDismiss` marked
+  an in-flight `history.back()` **per instance**, so a sheet closing and a dialog opening in the same
+  tick could not see each other's flag and the dialog read the sheet's pop as a real back gesture.
+  It is a module-level counter now, consumed by whichever surface receives the pop, and one listener
+  owns the stack instead of one per instance. Logic extracted to `lib/hooks/sheet-back-stack.ts` with
+  seven tests; reverting to the per-instance flag fails both sibling tests and the StrictMode one.
+- **⚠ Two corrections to this entry's own analysis, both worth carrying:**
+  - **The prescribed fix — "share the flag" — has an ordering trap the entry could not see.** The
+    `absorb` listener is registered by the *closing* sheet, so it runs **before** the newly-mounted
+    dialog's handler and would clear a shared boolean too early. Consuming it needs one listener that
+    always exists, which is why this became a small rewrite rather than a one-word change.
+  - **LB-17 (v1.382.0) did NOT fix this**, though it touched the same guard. That was the *nested*
+    case — a back landing on the middle sheet's entry. This is the *sibling* case. They are different
+    failures through the same line, and the fix keeps both mechanisms.
+- **Keep: the device press.** Everything here is verified against the state machine and against the
+  nested/StrictMode e2e specs, **not on the S25**. The sibling sequence cannot be staged through the
+  web UI at all — the bin that triggers it is not even actionable in Chromium (`locator.tap()` times
+  out on it), so an attempt to reproduce it there produced a mis-aimed tap that closed the sheet
+  without ever opening the dialog. On device: tap a diary row, tap the bin, and the confirm dialog
+  must **stay** open and be tappable; Cancel must cancel. Then the nest from LB-17 (Log Food →
+  My Foods → a meal) must still unwind one layer per press.
 
 ### [nutrition][app-shell] BF-28 — mockup parity: the artboards are the spec, and this is the map
 
