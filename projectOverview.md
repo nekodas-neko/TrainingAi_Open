@@ -24,8 +24,16 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.395.6 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Version:** v1.398.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-08-30.
+
+**A logged food swipes to Delete, and the day stopped moving with it (BF-45 ⑤).** The diary reuses
+the meal list's `SwipeActions` tray, routed to the confirmation the edit sheet's bin already raises.
+What earns the index is the collision: `nutrition-content.tsx`'s scroll container owns a horizontal
+drag that steps the **day**, so one touch fed both gestures — and it is **invisible on today**, since
+that handler refuses to step past today. `SwipeActions` marks itself `[data-swipe-actions]` and the
+day handler defers, as `tab-swipe-navigator.tsx` already does for a carousel. **Not device-verified**
+([journal](docs/overview/entries/2026-08-30-food-log-swipe-delete.md)).
 
 **Home's APK-banner link was a 33 px tap target, and the gate that hid the entry was self-inflicted (LB-26).** The link rendered **258×33** against the 48 dp floor — an `<a>`, which `globals.css` excludes on purpose so an inline prose link is not forced to 48 px. It takes the floor locally instead of widening the selector, and the reasoning moved beside the CSS rule rather than sitting in the banner's JSX, which is not where someone tempted to widen it would look. **The spec's allowlist is now empty** — an allowlist that never empties is a backlog wearing a test's clothes. Proved both ways: removing the floor fails the spec with the exact reported measurement. **The process half is the more useful one:** LB-26 carried `Gate: device` on work that had never been built, filed by the session that had read BF-45's warning about that exact mistake hours earlier — a gate parks an entry, so it hid it from `next-item.js`. The rule now sits in the backlog's protocol header where entries are written, not only inside the entry that found it ([journal](docs/overview/entries/2026-08-30-apk-banner-tap-target.md)).
 
