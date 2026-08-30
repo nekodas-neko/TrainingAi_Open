@@ -3372,3 +3372,15 @@ weight-only ingredients, quantity-sheet option A), a pointer to the de-identifie
 with the three numbers a successor should not re-derive, and six method notes. The sharpest is the
 first: eight owner reports about one tab became fewer causes than reports, and filing eight numbers
 would have buried the two real bugs among six duplicates.
+
+## 2026-08-30 — `docs/implementation-backlog.md` raised (BF-21's owner gate cleared)
+
+6 lines. The owner enabled `pg_stat_statements` on Railway and verified it in the console, so the
+gate is struck with the evidence rather than a bare tick — `SHOW shared_preload_libraries` and the
+`pg_extension` count, both quoted, because a later session should be able to tell a cleared gate from
+an assumed one.
+
+Two lines are a warning the entry did not carry: the counters start empty at the restart, so an early
+read proves nothing, and `pg_stat_statements.max` silently evicts the least-executed shapes once
+5,000 are tracked. Checking `dealloc` is 0 is what separates "nothing slow is happening" from "the
+slow thing was evicted".

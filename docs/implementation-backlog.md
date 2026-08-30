@@ -3903,9 +3903,15 @@ lived context.
 - **Added:** 2026-08-25 · owner approved enabling it after BF-19's investigation
 - **Lane: A** — **this entry exists because it needs a migration number, which BugFix may not take.**
   One `claude_ro` view + grant, at the next free number.
-- **Gate: owner** — the extension must be enabled on Railway first (owner action, needs a Postgres
-  restart). Clears when `SELECT count(*) FROM pg_extension WHERE extname='pg_stat_statements'`
-  returns 1 in production.
+- **✅ OWNER GATE CLEARED 2026-08-30.** Verified by the owner in the Railway Postgres console:
+  `SHOW shared_preload_libraries` returns `pg_stat_statements`, and
+  `SELECT count(*) FROM pg_extension WHERE extname='pg_stat_statements'` returns **1**. The owner's
+  half below is done; **only this entry's half remains** — the `claude_ro` view plus grant, at the
+  next free migration number, which is why this is Lane A's and not intake's.
+- **The counters start empty and fill from that restart onward.** A read in the first minutes is not
+  evidence of anything. Give it a day of normal use before drawing a conclusion, and note that
+  `pg_stat_statements.max` (default 5,000 statements) silently evicts the least-executed shapes —
+  check `pg_stat_statements_info.dealloc` is 0 before treating the table as complete.
 
 **The owner's half, in order.** `shared_preload_libraries` must include `pg_stat_statements` before
 the extension can work; it is a start-time parameter, so it needs a Postgres **restart**, not a
