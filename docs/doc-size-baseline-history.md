@@ -4097,3 +4097,24 @@ than a caution.
 The recommendation is to reuse `toggleDeloadRevert` rather than teach `/prescribe` an intensity
 input: the full numbers are already carried on the prescription, so the cheap path costs no LLM
 call, no rate-limit budget, and works offline.
+
+## 2026-08-31 — backlog 13585 → 13602 and `docs/agents/state/tuning.md` 235 → 256 (the HRV tile question)
+
+**No new entry — the growth is entirely a closed question and four traps.** The owner asked whether
+HRV should replace resting HR on the Home tile. Measured, it should not: **restingHeartRate −0.491
+against hrvBalance −0.331** vs the check-in, and the two contributors correlate **+0.751 with each
+other**, so it is barely a choice between two signals at all. That goes on **TN-13** as a
+do-not-re-open notice, because "try HRV instead" is the obvious next idea and re-running it costs a
+session.
+
+The baton lines are worth more than the entry. **HRV is the one baseline object in this codebase that
+is roughly right** (stored sd 0.82× true, where temperature's is ~12×), which matters because every
+other baseline finding this month has been a defect and a successor will assume this one is too. And
+**it lags for a good reason** — the owner's HRV is up 6.21 ms while resting HR is down 2.87 bpm, so
+77% of recent nights sit above baseline and a naive out-of-band alert would fire high-side.
+
+Two of the lines are near-misses caught before publishing: **"% of nights above" measures the trend
+on a trending metric** (HRV was nearly filed at +0.62 sd against BF-13, which stands at −0.01 sd by
+its own method), and **the RHR baseline is fed `rhrLowBpm`, not `rhr_avg_bpm`** — the wrong column
+reads +2.66 sd, a phantom temperature-scale defect in a second consumer. Third column/unit near-miss
+in two days, which is why it is now a rule rather than a story.

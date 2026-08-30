@@ -171,6 +171,27 @@ sleep ✅ · readiness ✅ · activity ✅ · body ✅ · devices ✅ · workout
   count as "the owner's, recently", never "the system's".
 - **A hardening fix can delete the evidence another open investigation needs** (TN-7). When a fix
   turns a 500 into a fallback, check what was waiting on that 500.
+- **⛔ "Show HRV on the tile instead of HR?" — ASKED AND ANSWERED 2026-08-31. No.** In contributor
+  form against the check-in: **restingHeartRate −0.491**, **hrvBalance −0.331**, and the two
+  correlate **+0.751 with each other (56% shared variance)**. Swapping loses a third of the
+  correlation and buys almost no new information. HRV belongs on a detail screen.
+  [`review`](../../reviews/2026-08-31-hrv-as-a-tile-metric.md).
+- **HRV is the noisiest vital here but it IS signal** — CV **17.2%** against resting HR's **5.6%**,
+  night-to-night 7.42 ms (13% of mean), yet lag-1 autocorrelation **+0.439** and |Δ|/sd **0.77**
+  against 1.13 for white noise. Do not dismiss it as noise; do not read one night of it as an event.
+- **The HRV baseline is the one baseline object that is roughly RIGHT** — stored sd 7.13 against a
+  true 8.66 (**0.82×**, where temperature's is ~12×). Usable band ≈ **47–64 ms**. **But it lags**: the
+  owner's HRV is genuinely rising (**+6.21 ms** across the window while resting-HR-low falls
+  **2.87 bpm** — both healthy, together), so **77% of recent nights sit above it** and a naive
+  out-of-band alert fires high-side. Any band UI needs a trend-aware baseline.
+- **"% of nights above the baseline" measures the TREND on a trending metric, not an error.** This
+  rule was already in this baton and HRV was still nearly re-filed as a defect at +0.62 sd. BF-13's
+  method — today's baseline against the whole-history mean — gives HRV **−0.01 sd**. **BF-13 stands.**
+- **⚠ The RHR baseline is fed `rhrLowBpm`, NOT `rhr_avg_bpm`** (`daily-summary.ts:103`). Compared
+  against the average it reads 100% of nights above, **+2.66 sd** — a phantom temperature-scale
+  defect. Against the right column: **+0.16 sd, centred.** Third near-miss of this class in two days
+  (`tempZ` vs `temp_dev_c`, sleep ×60, now this): **read which column feeds a baseline before
+  comparing anything to it.**
 - **The HR tile's lever is RAW-vs-BASELINE-RELATIVE, not which metric.** Against `perceived_recovery`:
   waking-rest HR **+0.176 raw → +0.291 relative**, nightly resting HR **+0.129 → +0.278**. Expressing
   either as a delta from the owner's own baseline roughly doubles it; picking between them barely
