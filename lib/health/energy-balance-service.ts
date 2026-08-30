@@ -7,7 +7,7 @@ import { shiftDateStr, ageFromDob } from '@trainingai/shared/date-utils'
 import { computeActiveEnergy, SEDENTARY_MULTIPLIER } from '@trainingai/shared/health/daily-energy'
 import { type Sex } from '@trainingai/shared/health/workout-energy'
 import { mifflinStJeorBmr } from '@trainingai/shared/nutrition/goal-recommendation'
-import { cunninghamBmr } from '@trainingai/shared/health/body-composition'
+import { bodyComposition } from '@trainingai/shared/health/body-composition'
 import {
   computeCalorieBalance, targetFromMaintenance, GOAL_DAILY_DELTA, scaleMacrosForEarnedKcal,
 } from '@trainingai/shared/nutrition/calorie-balance'
@@ -187,10 +187,16 @@ export async function computeEnergyBalance(
     }
   }
 
-  // Katch-McArdle when body fat is known (it beats Mifflin away from average composition),
-  // Mifflin-St Jeor otherwise — matching calculateBaseline's choice.
-  const bmr = latestBodyFatPct != null
-    ? cunninghamBmr(latestWeightKg! * (1 - latestBodyFatPct / 100))
+  // Katch-McArdle when body fat is known and plausible (it beats Mifflin away from average
+  // composition), Mifflin-St Jeor otherwise — matching calculateBaseline's choice.
+  //
+  // Routed through `bodyComposition` rather than re-deriving lean mass inline. That is the one
+  // place the body-fat plausibility band lives (Q-527), so an inline `weight × (1 − bf/100)`
+  // silently opts out of it — and this is a live surface: a floored 3% reading would put lean mass
+  // at 97% of bodyweight and hand the owner an energy budget ~24% too high.
+  const comp = bodyComposition(latestWeightKg, latestBodyFatPct)
+  const bmr = comp != null
+    ? comp.bmrKcal
     : mifflinStJeorBmr(latestWeightKg!, heightCm!, ageYears!, sex!)
   // Sedentary base only — measured movement is added explicitly, so a higher activity multiplier
   // here would double-count it. See daily-energy.ts.

@@ -181,6 +181,43 @@ describe.skipIf(!canRun)('energy balance — calibration window', () => {
     expect(r.maintenance!.kcal).toBeGreaterThan(1200)
   })
 
+  /**
+   * Q-527 — a scale misread must not inflate the energy budget.
+   *
+   * This service used to derive lean mass with its own inline `weight × (1 − bf/100)` and feed it
+   * to Cunningham, bypassing the body-fat plausibility band that lives in `bodyComposition`. A
+   * no-contact weigh-in floors the scale's estimate at 3% (impedance 0 — see
+   * `lib/scale-ble/composition.ts`), which puts lean mass at 97% of bodyweight and raises the
+   * formula baseline by roughly a quarter, on the number the owner is told they may eat.
+   *
+   * Asserted as an equality against the no-reading case rather than a threshold: the point is that
+   * an implausible reading takes the *same* branch as no reading at all.
+   */
+  it('ignores an implausible body-fat reading rather than inflating the baseline (Q-527)', async () => {
+    await pool.query(
+      `INSERT INTO body_metrics (user_id, date, weight_kg) VALUES ($1, $2::date, 72.55)`,
+      [TEST_USER_ID, TODAY],
+    )
+    const withoutReading = await computeEnergyBalance(repo, TEST_USER_ID, TZ, TODAY)
+
+    await pool.query(
+      `UPDATE body_metrics SET body_fat_pct = 3 WHERE user_id = $1 AND date = $2::date`,
+      [TEST_USER_ID, TODAY],
+    )
+    const withMisread = await computeEnergyBalance(repo, TEST_USER_ID, TZ, TODAY)
+
+    expect(withMisread.maintenance?.kcal).toBe(withoutReading.maintenance?.kcal)
+
+    // And a real reading still moves it — otherwise this would pass with the body-fat branch
+    // deleted outright rather than guarded.
+    await pool.query(
+      `UPDATE body_metrics SET body_fat_pct = 24 WHERE user_id = $1 AND date = $2::date`,
+      [TEST_USER_ID, TODAY],
+    )
+    const withRealReading = await computeEnergyBalance(repo, TEST_USER_ID, TZ, TODAY)
+    expect(withRealReading.maintenance?.kcal).not.toBe(withoutReading.maintenance?.kcal)
+  })
+
   it('bands the day against the goal deficit, not against zero', async () => {
     await seedCalibratableHistory()
     const r0 = await computeEnergyBalance(repo, TEST_USER_ID, TZ, TODAY)

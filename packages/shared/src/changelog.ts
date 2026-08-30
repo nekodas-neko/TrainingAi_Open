@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.397.5",
+    date: "2026-08-30",
+    changes: [
+      "A weigh-in taken in socks no longer skews your numbers. When the scale cannot get skin contact it reports no impedance at all, and the body-fat estimate falls to its lowest possible value \u2014 3%, which is below what a human body can be. One such reading is in your history, and it was being treated as real: it put lean mass at 97% of bodyweight, added a 17\u00a0kg spike to the lean-mass chart, and would have inflated the day\u2019s calorie budget by roughly 277\u00a0kcal. Readings outside a physiologically possible range are now ignored everywhere a body-fat percentage is used, rather than at the scale alone.",
+    ],
+  },
+  {
     version: "1.397.4",
     date: "2026-08-30",
     changes: [
