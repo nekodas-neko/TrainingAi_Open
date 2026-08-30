@@ -1337,19 +1337,50 @@ one user. Every frame is attributed to that user; a weight more than `SCALE_WEIG
 me` button then **discards** it. So the app already detects her, already asks, and already knows the
 answer — and then destroys the reading. Every weigh-in she has ever taken on it is gone.
 
-**Three ways to fix it, and they are not close.**
+**⚠ THE PAIRING IS `localStorage` ON THE DEVICE — there is no server-side owner, and this changes
+the design.** `lib/scale-ble/paired-scale.ts` stores `{deviceId, name}` under `ta_paired_scale_v1` in
+`localStorage`. No `user_id`, no table, no uniqueness constraint. **So nothing stops the partner's
+phone pairing the same scale today** — the first draft of this entry treated the scale as owned by
+one account, and it is not. What is actually shared is the *radio*, not a record.
+
+**So the problem is narrower than "two people, one scale". It is: whichever phone wins the GATT
+connection attributes the reading to ITS owner.** Both phones wake on the advertisement, both try to
+connect, one wins. That is why his account is collecting her weigh-ins.
+
+**Four ways to fix it.**
 
 | | Shape | Verdict |
 |---|---|---|
-| **A** | Both phones pair; whoever wins the connection gets the reading | **No.** Racy by construction, and probably impossible on one connection. Silent data loss for whoever loses. |
-| **B** | One phone owns the scale; a `Not me` reading is **offered to a linked household member** | **Recommended.** Needs no second connection, reuses the pending flow that already exists, and is the only shape where her data reliably reaches her. |
-| **C** | She uses the Renpho app | Zero work, and her data never enters this app. The honest baseline to compare against. |
+| **A** | Both phones pair, both claim whatever they capture | **No.** This is today's behaviour and it is the bug. |
+| **B** | One phone owns the scale; a `Not me` reading is offered to a **linked household member** | **Rejected 2026-08-30.** Builds the app's first cross-account data path — consent, linking, revocation, a Play Store health-data implication — to solve a problem that does not need any of it. Kept below only so it is not re-proposed. |
+| **C** | She uses the Renpho app | Zero work. The honest baseline, and the current interim answer. |
+| **D** | **Both phones pair independently; each claims only weights inside its own owner's band and declines the rest** | **✅ RECOMMENDED.** No linking, no shared account, no server-side owner, no cross-account write. Two self-contained apps that happen to hear the same radio. |
 
-**Why B, in one line:** the hard part — detecting that a reading is not the owner's — is already
-built and working. What is missing is a destination for the answer.
+**Why D, and why it is mostly already built.** The hard part — deciding a reading is not this user's —
+exists and works: `SCALE_WEIGHT_ANOMALY_PCT` (15% from the user's last confirmed weight) is what
+raises the *"is this you"* prompt today. **D changes what happens next: instead of asking and then
+discarding, a phone simply does not claim a weight outside its owner's band.** Her phone, running the
+same rule against her band, claims it. Neither app learns anything about the other person.
 
-**⚠ This is the app's first cross-account data path, and it must be built as one.** Every rule in
-this repo assumes `user_id` scoping and a single owner. Requirements:
+**The residual risk, stated rather than hidden.** Both phones race for one GATT connection, so if his
+wins and declines, and her phone was not in range, **that weigh-in is lost**. Two mitigations, in
+order:
+1. **Drain the scale's stored measurements** — `ScaleProtocol.REQUEST_STORED_MEASUREMENTS_CMD`
+   (`0x22 0x04 0x15`) and `STORED_RECORD_MARKER` already exist in the code, and the comment is candid
+   that they are **speculative and never verified against this hardware**, borrowed from a different
+   firmware generation. **Test it — it is one command and a look at what comes back.** If the scale
+   buffers, the losing phone catches up on its next connect and the race stops mattering at all.
+   There is already a plan: `docs/superpowers/plans/2026-07-30-scale-stored-measurement-drain-and-scan-latency.md`.
+2. Failing that, weighing in with your own phone nearby is a habit, not a feature.
+
+**Where D breaks, and it is worth knowing up front:** weight-band attribution is identity by proxy.
+If the two users' weights converge into one band it stops discriminating, and a 15% band is wide —
+at 72 kg that is ±10.8 kg. **Tighten the band for the multi-user case and let an ambiguous reading
+fall through to the existing prompt rather than guessing.** The prompt is the right fallback; it is
+being asked too often today, not too rarely.
+
+**⚠ The cross-account requirements below apply to option B ONLY, which is rejected.** D needs none of
+them, and that is most of the argument for D. Kept because if B is ever revived these are its terms:
 - **Two-way consent.** A link is accepted by both accounts, and either can break it. Never inferred
   from a shared device.
 - **The reading moves, it does not copy.** A weigh-in belongs to one person. Attribute or discard.
@@ -1362,8 +1393,13 @@ this repo assumes `user_id` scoping and a single owner. Requirements:
   accounts, which is exactly what the declared-use-case review looks at. Worth the owner knowing
   before it is built, not after.
 
-- **Gate: owner** — B is a product decision (household linking) with a privacy surface, and C is a
-  legitimate answer. **Also needs the one-connection test above**, which is a device job.
+- **Gate: owner** — cleared for the *shape* on 2026-08-30: the owner rejected B, and D is
+  recommended. What still wants a device answer, and both are cheap: whether two phones can hold a
+  GATT connection at once, and **whether `REQUEST_STORED_MEASUREMENTS_CMD` gets a reply** — the
+  second one decides whether the race matters at all.
+- **Do this first, before any code:** have the partner pair the scale in her own app. The pairing is
+  device-local, so it costs nothing and may reveal that both phones already receive readings — which
+  would shrink this entry to "each phone declines what is not its owner's".
 - **Interim, and worth saying:** until this ships, her readings are lost the moment they are
   dismissed. If she wants that data, the Renpho app is the only place it currently survives.
 - **Verification:** a reading the owner marks `Not me` appears as a claimable weigh-in on the linked
