@@ -24,8 +24,17 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.395.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Version:** v1.395.2 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-08-30.
+
+**The e2e flake blamed on a slow sandbox was a stale fixture (LB-19).** The entry said two specs
+"fit comfortably on CI's runner and do not fit here" and prescribed a longer timeout. **Neither half
+held.** `goal-invalidation` fails on a locator that never resolves 60 s into a test with a minute
+spare — `seed.sql` ends at the day it *ran*, nothing back-fills, and the steps row cannot render
+without one (measured: newest steps row **2026-08-25** against a `current_date` of **2026-08-30**).
+It supplies its own row now, in the **user's** timezone. `meal-label` is intermittent for a different
+reason again — its ink poll cannot tell the new label style's paint from the previous one's — and
+stays open with the mechanism written down ([journal](docs/overview/entries/2026-08-30-e2e-fixture-not-time-budget.md)).
 
 **Two rings that were never compared, reported as two rings that disagree (PS-15, phase + units).**
 `/api/admin/device-comparison` returned `overlap: 0` for the rings' daytime stress. Oura's buckets
@@ -396,17 +405,6 @@ Three GET routes answered a parameter or configuration question before establish
 
 **Three ring-service fixes, none verified on the ring (Q-537, Q-533, Q-388 item 2).** Key backup
 (`/admin/oura-ble` → **Show key for backup**), a re-sync completion notification, and a connect sequence that resets the live-HR levers a killed session left on. **All native — inert until a new APK is installed, and until then the ring key has one copy.** `Gate: device`. **Item (3) needed no work:** 6,346 battery polls measure the drain the entry called unmeasurable (−22/−24/−22/−38/−15 overnight), confirming the owner's report; the SpO₂ A/B is wear, not code.
-
-**The memo-stability baseline is empty (Q-357, v1.349.0).** All four defeated call sites cleared, so a
-new one is a regression. The expensive one sat inside `visibleMeals.map(...)`, where a hook cannot
-live — its callbacks take the meal and hand it back, so the parent shares one per action.
-
-**The meal plan can be written to again, and it now produces saved meals (Q-398, v1.340.0).** Five
-write routes validated a variable nothing had assigned, so every one answered `400 Invalid input:
-expected object, received undefined` to a valid request — the whole meal-plan write surface was dead
-on `main`, confirmed at runtime. `check-json-body-parsed.js` holds the class. Each plan meal now
-carries **Save to My Meals** with a **Save all**, idempotent on the existing `saved_meal_id` column
-([`journal`](docs/overview/entries/2026-08-24-meal-plan-to-saved-meals.md)).
 
 **Preferences have a server home; nothing reads it yet (Q-392, engine half).** `users.preferences`
 JSONB (mig 206) behind `GET`/`PATCH /api/user/preferences`, merging under a row lock — the unlocked version demonstrably drops the other device's key mid-merge. **Nothing the owner can see changed:** the read sites are `components/**`, so Q-392 was re-scoped to Lane B, not closed.
