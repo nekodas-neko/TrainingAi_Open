@@ -165,12 +165,44 @@ test('a saved meal renders a printable label in every style', async ({ page }) =
     return dark / (data.length / 4)
   })
 
+  /**
+   * Pick a style and wait for THAT style's paint — not merely for ink.
+   *
+   * **LB-19.** The loops below used `poll(inkFraction) > 0.01`, which every style satisfies: measured
+   * 2026-08-30, the four decoded styles paint **0.081, 0.135, 0.093 and 0.175**. So after the first
+   * one the canvas is always already over the threshold, the poll returns on its first call, and the
+   * read that follows can land on the PREVIOUS style's pixels — a guard that cannot fail. That is
+   * the shape behind an intermittent "code must decode off the rendered label" against a canvas that
+   * has plenty of ink.
+   *
+   * Waiting for the fraction to **change** is what proves the repaint happened. A style already
+   * selected repaints nothing, so that case returns without waiting — which is why this reads
+   * `aria-checked` rather than clicking blind.
+   *
+   * If two styles ever paint the same fraction this times out rather than passing silently, and the
+   * message says so: equal ink means this metric cannot tell them apart and the guard needs a richer
+   * signature, not a longer timeout.
+   */
+  const selectStyle = async (style: string) => {
+    const radio = page.getByRole('radio', { name: new RegExp(escapeRe(style), 'i') })
+    if (await radio.getAttribute('aria-checked') === 'true') return
+    const before = await inkFraction()
+    await radio.click()
+    await expect
+      .poll(inkFraction, {
+        message: `${style} should repaint the canvas — if its ink fraction equals the previous ` +
+          `style's (${before.toFixed(5)}), this metric cannot tell the two apart`,
+        timeout: 20_000,
+      })
+      .not.toBe(before)
+  }
+
   // Every style must paint. Black band is the default and is checked first because it is also the
   // one whose code is tightest, so a regression there matters most. "Square" is Q-393's ingredient
   // layout, which takes a different draw path entirely — it would be the easiest one to break
   // silently, since it is the only style that renders from a second data source.
   for (const style of ['Ingredients · centred', 'Black band', 'Editorial', 'Deli ticket', 'Plaque', 'Big code']) {
-    await page.getByRole('radio', { name: new RegExp(escapeRe(style), 'i') }).click()
+    await selectStyle(style)
     await expect
       .poll(inkFraction, { message: `${style} should paint ink onto the canvas`, timeout: 20_000 })
       .toBeGreaterThan(0.01)
@@ -184,8 +216,7 @@ test('a saved meal renders a printable label in every style', async ({ page }) =
   // the code — an earlier version of the centred layout ran the list into it, and a covered code
   // still looks like a code.
   for (const style of ['Ingredients · centred', 'Black band', 'Plaque', 'Big code']) {
-    await page.getByRole('radio', { name: new RegExp(escapeRe(style), 'i') }).click()
-    await expect.poll(inkFraction, { timeout: 20_000 }).toBeGreaterThan(0.01)
+    await selectStyle(style)
 
     const shot = await canvas.evaluate((el: HTMLCanvasElement) => {
       const ctx = el.getContext('2d')!

@@ -6,18 +6,19 @@
 **Updated:** 2026-08-30 · **By:** the sixteenth Lane B run · **Next ID:** `LB-26`
 
 ## Now
-Merged this run: **#587** (Q-112a, one door for the day review), **#590** (three stranded e2e
-assertions), **#592** (Q-112b, the read-through inside the wrap-up), **#595** (LB-19's premise
-replaced). Filed: **LB-23**, **LB-24**, **LB-25**. Open: the `Reference:` field PR (LB-22).
+Merged this run: **#587** (Q-112a), **#590** (three stranded e2e assertions), **#592** (Q-112b),
+**#595** (LB-19's premise replaced, `goal-invalidation` fixed), **#599** (LB-22, the `Reference:`
+field), **#600** (BF-49 gated `device` — it does not reproduce on web). Filed: **LB-23**, **LB-24**,
+**LB-25**. Open: `meal-label`'s repaint guard, which closes LB-19.
 
 **Lane B's nutrition queue is finished.** The artboard-parity set (BF-24, BF-26, BF-29/30/31, LB-16)
 has shipped or sits on a device gate; the Q-112 chain hands to Lane A at **Q-112c**, which blocks
 Q-112d and Q-112e; **Q-524** is tagged `[nutrition]` and reaches four `app/api` routes, so it is
 Lane A by the path rule; **LB-25** (body temperature has no route at all) is Lane A.
 
-**What is genuinely left for B, in order:** LB-19's remaining half (`meal-label`'s repaint race —
-the mechanism is written down, the probe it needs is not), then **Q-282**, which is blocked on a
-DECISION not on work. Q-282's linter half shipped; touch targets and contrast need a rendered page.
+**What is genuinely left for B is Q-282, and it is blocked on a DECISION, not on work.** The queue's
+top rows are otherwise a reference (BF-28), a planning item no implementer can start (**BF-52** — its
+own text says it needs a planning session), and device gates. Q-282's linter half shipped; touch targets and contrast need a rendered page.
 Its Espresso scope needs the emulator (Q-250, unlanded), while `@axe-core/playwright` against the
 existing E2E job would do it today. **Do not decide it yourself** — put it to the owner: axe-core on
 the current harness, shrink-only baseline so existing violations record rather than block; the cost
@@ -80,9 +81,8 @@ None held.
   and a **wedged run**. A run that has not started creates no check runs, so the zero says nothing.
 - **A run can wedge in a state GitHub will neither cancel nor re-run.** `rerun` → 403, `cancel` →
   409 is the signature. The only way out is a **new commit** with real content, never an empty one.
-- **E2E takes 15–40 min and the base WILL drift under it.** Merge on the five REQUIRED checks when
-  E2E cannot be informative — a docs/scripts change, or a re-push whose diff against an
-  already-E2E-green head is version/changelog only. Say so plainly when you do.
+- **E2E takes 15–40 min and the base WILL drift under it**, though a docs/scripts-only change skips
+  it in ~35 s (it is path-gated). Merge on the five REQUIRED checks when E2E cannot be informative.
 - **Rebuild `package.json`/`changelog.ts` from `git show origin/main:...`; never splice a hunk.**
   Re-check the version: `main` took the number twice while a PR of mine was open.
 - **`git fetch origin main` RE-SHALLOWS this clone.** The tell is `merge-base` returning nothing.
@@ -97,6 +97,9 @@ None held.
   `Parsing ecmascript source code failed` and tests at **0ms**.
 - **A red local vitest run is worth attributing before it is believed.** One this run was branch
   staleness: another session had just fixed that exact test on `main`.
+- **A precondition satisfied by the state it is meant to replace cannot fail.** Both of LB-19's
+  flakes were this, not timing: `inkFraction > 0.01` was true of the canvas being overwritten, and a
+  seed check was true of a date that was not today. Ask what your guard is false for.
 - **`SegmentedTabs` renders `role="tab"`, not `role="button"`.**
 - **Guard every open-the-sheet retry with `if (await page.getByRole('dialog').count() === 0)`.**
 - **A shared write path is verified with the FULL e2e suite, never hand-picked specs.**
