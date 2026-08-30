@@ -29,6 +29,20 @@
 
 **The accessibility scanner that would have passed a 12 px button (Q-282).** `@axe-core/playwright` was installed, measured and removed: WCAG 2.5.8 exempts a *spaced* undersized control, so a deliberately-shrunk **12×12** button (confirmed by `boundingBox`) came back a **pass**, and `color-contrast` cannot read this app at all — it fails to parse the `oklch` tokens (*"Could not parse color string oklab(…)"*) and **evaluated no nodes on Home**. `e2e/touch-target-size.spec.ts` ships instead: DOM geometry against **this repo's 48 dp bar**, covering the roles `globals.css`'s `button, [role="button"]` floor cannot (`<a>`, `role="tab"`, `role="radio"`). It fails on the mutation axe passed. One real finding, **LB-26**: Home's APK-banner link is 258×33 ([journal](docs/overview/entries/2026-08-30-touch-target-gate.md)).
 
+**Both pending weigh-in buttons were dead in production (BF-53).** `scale_raw_samples.id` is a
+`bigserial` and both routes validated it with a UUID regex, so every press of "Not me" or "Yes,
+that's me" returned `400 Invalid id` before the numeric check written for it could run — a reading
+that was not yours could not be dismissed, and one that was could not be filed. The client's
+`if (res.ok)` with no `else` is why it read as *"doesn't do anything"* rather than as an error, and
+that half is fixed too. Reproduced and re-verified on `pnpm dev` against the same real row. **Still
+owed: the S25 check** ([journal](docs/overview/entries/2026-08-30-fix-pending-weighin-numeric-id.md)).
+
+**Query text reaches the audit role (LA-39, closed the day it was filed).** BF-21's view shipped
+returning real timings with every `query` reading `<insufficient privilege>` — `pg_stat_statements`
+redacts text outside `pg_read_all_stats`, checked against the session role. The owner ran
+`GRANT pg_read_all_stats TO claude_readonly` and it is live; the returned SQL carries `$1`
+placeholders, which is the normalisation the safety argument rested on.
+
 **The BLE console counted rows it had been guessing (BF-54).** Its DB footprint printed
 `n_live_tup` under a column headed *rows* — a planner estimate, and `last_analyze` is NULL on every
 table here, so it read **552** against `oura_raw_samples`' **180,415**, 0 against `rr_intervals`'

@@ -82,3 +82,31 @@ export { isUuid }
 export function invalidUuidResponse(id: unknown): NextResponse | null {
   return isUuid(id) ? null : NextResponse.json({ error: 'Invalid id' }, { status: 400 })
 }
+
+/**
+ * The same guard for a route whose key is a `bigserial`, not a uuid (BF-53).
+ *
+ * **This exists because the sweep that added `invalidUuidResponse` across the 30 dynamic routes
+ * applied it to two whose ids are integers**, and a decimal id can never match a UUID regex — so
+ * `/api/scale-ble/pending/[id]/{confirm,dismiss}` returned `400 Invalid id` for **every real
+ * request**, and the whole pending weigh-in triage was dead in production. A reading that was not
+ * the owner's could not be dismissed and one that was could not be confirmed. Both routes already
+ * carried the correct `Number.isInteger` check on the next line, unreachable underneath the wrong
+ * one — which is the tell that someone knew the key was numeric.
+ *
+ * So the point of this helper is not the four lines it saves. It is that the next sweep over
+ * `[id]` routes finds a numeric key already guarded, and by a name that says so.
+ *
+ * Returns `{ ok: true, id }` so the caller cannot forget to parse, or the 400 to send.
+ * `/^\d+$/` rather than `Number.isInteger(Number(x))`: the latter accepts `'1e3'`, `'0x10'` and
+ * `' 41 '` as ids, which a `bigserial` column never produces. Same 400-not-404 reasoning as
+ * `invalidUuidResponse` above — a malformed id is a malformed request, and integer syntax discloses
+ * nothing.
+ */
+export function numericRouteId(id: unknown): { ok: true; id: number } | { ok: false; response: NextResponse } {
+  if (typeof id === 'string' && /^\d+$/.test(id)) {
+    const parsed = Number(id)
+    if (Number.isSafeInteger(parsed) && parsed > 0) return { ok: true, id: parsed }
+  }
+  return { ok: false, response: NextResponse.json({ error: 'Invalid id' }, { status: 400 }) }
+}

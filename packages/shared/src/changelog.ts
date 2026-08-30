@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.395.8",
+    date: "2026-08-30",
+    changes: [
+      "The buttons on a pending weigh-in work again. When the scale staged a reading because it looked unlike you, neither \u201cNot me\u201d nor confirming it did anything at all \u2014 both were rejected before they reached anything, and the screen said nothing, so it looked like a dead button rather than an error. Dismissing now removes the reading and confirming now files the weight, and a failure says so instead of staying silent.",
+    ],
+  },
+  {
     version: "1.395.7",
     date: "2026-08-30",
     changes: [

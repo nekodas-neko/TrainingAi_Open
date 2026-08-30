@@ -1067,58 +1067,6 @@ deliberate choice, on a session where the absence of a Primary is the design.
   outgoing one's role, the prescribed sets and percentages are unchanged, and the session still has
   no Primary afterwards.
 
-### [platform] LA-39 — `claude_ro.pg_stat_statements` returns timings but redacts every query, and only the owner can fix it
-
-- **Lane:** A — to verify it once the grant lands.
-- **Gate:** owner — the fix is a role GRANT, superuser work done out of band, exactly like the role's
-  own creation.
-- **Branch:** _unassigned_
-- **Added:** 2026-08-30 · Lane A, measured against production minutes after BF-21 deployed.
-
-**BF-21 shipped and half-works.** The view exists on production and returns rows — the entry's own
-pass test. But `query` reads **`<insufficient privilege>`** on every row:
-
-```
-   553 x     22.0 ms  <insufficient privilege>
-    30 x     31.4 ms  <insufficient privilege>
-     1 x    760.4 ms  <insufficient privilege>
-```
-
-Calls, `mean_exec_time` and `rows` are all real. **The one column that says which query is not.**
-
-**Root cause, verified rather than inferred.** `pg_stat_statements` redacts query text for anyone who
-is not the statement's own role and not a member of **`pg_read_all_stats`**; the check reads the
-*session* role inside the extension's own function, so it is unaffected by who owns the view or by
-`security_invoker`. Measured on production (PostgreSQL 18.6):
-`pg_has_role(current_user, 'pg_read_all_stats', 'MEMBER')` → **false**, and `claude_readonly` has no
-role memberships at all.
-
-**The fix is one statement and it is not ours to run:**
-
-```sql
-GRANT pg_read_all_stats TO claude_readonly;
-```
-
-**The trade-off, stated plainly, because this is a widening and the owner should decide it.**
-`pg_read_all_stats` grants **no table data** — it cannot read a row of anyone's health history, and
-every `claude_ro` view stays row-scoped exactly as it is. What it does grant is every *statistics*
-view cluster-wide, and the one worth thinking about is `pg_stat_activity`, whose `query` column would
-become readable for **other sessions**. The app's queries are parameterised through `pg`/Drizzle, so
-that text carries `$1` placeholders rather than values — the same property that makes
-`pg_stat_statements` safe in the first place — but it is a live window rather than a normalised
-history, and a query built with an inlined literal anywhere would show it.
-
-- **Recommendation: grant it.** Timings without query text cannot answer the question BF-21 exists
-  for — "which query is slow" — so the view as it stands is a table of anonymous numbers. The
-  exposure added is query *shapes* on a second surface, on a database whose row data stays
-  unreachable either way. Reversal is one `REVOKE`, immediate, no deploy.
-- **The alternative, if the answer is no:** leave the grant off and **say so in the view's own
-  comment**, so the next session reading `<insufficient privilege>` does not spend a session
-  rediscovering this. That is strictly worse than granting, but it is better than the current state,
-  where the redaction looks like a bug.
-- **What would count as fixed:** the same query returns real SQL text in `query`. Until then BF-21 is
-  shipped-but-not-useful, and this entry is why.
-
 ### [platform] BF-55 — 84 MB of index against 63 MB of table, and the database is growing ~7× its expected trend
 
 - **Lane:** A
@@ -1195,43 +1143,12 @@ opened on, unchanged.
 
 ### [body][devices][platform] BF-53 — every pending weigh-in button is dead: both routes validate a numeric id with a UUID regex
 
-- **Lane:** A — `app/api/scale-ble/pending/[id]/dismiss/route.ts` and `.../confirm/route.ts`, plus the
-  swallowed error in `components/settings/scale-pairing.tsx`.
-- **Added:** 2026-08-30 · owner, in passing during the device pass D1: *"noting that that the 'not
-  me' button for weigh in's doesnt actually remove it or do anything."*
-- **⚠ This is worse than reported and it is live in production.** The owner named one button. **Both
-  are broken**, so the entire pending weigh-in triage is dead: a reading that is not yours cannot be
-  dismissed, and one that is yours cannot be confirmed into `body_metrics`.
-
-**Root cause, and it is exact.** `scale_raw_samples.id` is `bigserial('id', { mode: 'number' })`
-(`schema.ts:1180`) and `/api/scale-ble/pending` returns it as a number. Both routes then do:
-
-```ts
-const badId = invalidUuidResponse(idParam)   // ← id is "41", not a UUID
-if (badId) return badId
-const id = Number(idParam)                   // ← unreachable
-if (!Number.isInteger(id)) return …
-```
-
-`invalidUuidResponse` tests `/^[0-9a-f]{8}-…$/`, which a decimal id can never match, so **every**
-press returns `400 Invalid id` before the numeric check that was written for it. The numeric guard on
-the next line is the tell: someone knew the id was a number and the UUID guard was applied over the
-top of it, most likely by the sweep that added `invalidUuidResponse` across the 30 dynamic routes.
-
-**The client hides it.** `dismissReading` is `if (res.ok) setPending(…)` with no `else` — no toast,
-no log, nothing. A 400 is indistinguishable from a no-op, which is why this reads as *"doesn't do
-anything"* rather than as an error, and why it has survived.
-
-- **Fix:** drop `invalidUuidResponse` from both routes; the `Number.isInteger` check underneath is the
-  correct guard and is already there. Then give the client an error path — a failed dismiss must say
-  so rather than silently leaving the row.
-- **⚠ Sweep the sibling routes in the same PR.** Any other route whose id is a `bigserial` rather
-  than a `uuid` has this shape. Grep the dynamic routes for `invalidUuidResponse` and check each
-  against its table's id type; a UUID guard on an integer key is always a 400 for every real request.
-- **Add a test that would have caught it:** a route test posting a real numeric id and asserting 2xx.
-  The existing coverage cannot have exercised these routes with a realistic id at all.
-- **Verification:** on the device, a pending reading dismisses and disappears; a confirmed one reaches
-  `body_metrics`; and a genuinely bad id still 400s.
+- **Keep:** the DEVICE check, and only that. Fixed 2026-08-30 — both routes take `numericRouteId`
+  now, and the client reports a failed press instead of swallowing it. Reproduced and re-verified on
+  `pnpm dev` against the same real pending row (pre-fix: both buttons `400 Invalid id`, row
+  untouched; post-fix: dismiss dismisses, confirm writes the weight to `body_metrics`). **On the S25:
+  a pending reading dismisses and disappears, a confirmed one reaches the weight card, and both stay
+  gone across a screen swap.** The APK reaches this through a Railway deploy — no new build.
 
 ### [nutrition] BF-47 — the deleted food comes back: the loader calls the server authoritative while the delete is still in the outbox
 
