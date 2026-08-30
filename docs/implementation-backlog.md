@@ -1241,6 +1241,70 @@ opened on, unchanged.
 - **Verification:** index total drops below the heap total, and a re-read a week later shows growth
   back near trend.
 
+### [nutrition][app-shell] BF-62 — the meal detail sheet's action row still sits close to the gesture bar, and `92vh` is the likely reason
+
+- **Lane:** B — `components/nutrition/meal-detail-sheet.tsx:81`.
+- **Batch:** `nutrition-ui-uplift`
+- **Added:** 2026-08-30 · owner, on the meal detail sheet: *"the safe space is still a little off
+  here."* Screenshot: `Log this meal` plus three icon buttons sitting close to the gesture bar.
+
+**This is NOT the gutter fix that shipped.** BF-45 ③ moved the nutrition sheets from `px-1` to 16 px
+**horizontal** gutters in v1.397.0. This is **vertical** clearance on a bottom-anchored action row —
+a different axis and a different fix, reported in the same breath as the old one and easy to mistake
+for a regression of it.
+
+**And it is not a missing `pb-safe`.** CLAUDE.md is explicit that `SheetContent side="bottom"` owns
+the bottom inset, that `p-0` does not strip the baked padding, and that tailwind-merge cannot see the
+custom classes. The action row here is `pt-2` with no bottom padding, which is correct by that rule.
+**Do not "fix" this by adding one** — that is the mistake the rule exists to prevent.
+
+**Hypothesis, and it is specific: `h-[92vh]`.** The sheet is `className="flex h-[92vh] flex-col"`. On
+Android gesture navigation a WebView's `vh` is computed against a viewport that **includes** the
+gesture inset, so 92% of it can extend under the bar — and the baked bottom padding is then measured
+inside a box whose height already overshoots. The padding is present and still lands short.
+**Unverified: the sandbox renders the inset as 0, which is exactly why this class recurs.**
+
+- **If confirmed, the fix is the height, not the padding** — `dvh` rather than `vh`, or a height that
+  subtracts the inset, so the baked padding has real space to sit in.
+- **Sweep the siblings in the same pass.** Any sheet with a `vh` height has this shape;
+  `grep -rn 'h-\[[0-9]*vh\]' components/` is the search, and fixing this one sheet alone is the
+  half-done kind the sibling-surface rule is about.
+- **Verification:** on the S25 with gesture navigation **and** with 3-button navigation — the inset
+  differs by mode, and checking one mode is what lets this class through.
+
+### [nutrition][app-shell] BF-61 — the swipe tray's Delete needs two presses, and the transition is the likely reason
+
+- **Lane:** B — `components/ui/swipe-actions.tsx`.
+- **Batch:** `nutrition-ui-uplift` — same screen, same device pass.
+- **Added:** 2026-08-30 · owner, on the shipped swipe tray: *"when sliding and pressing delete it
+  requires 2 presses before the confirmation comes up."*
+
+**What I ruled out by reading the component**, so nobody re-checks these first: the tray buttons are
+not overlapped by the row (the row translates to exactly the tray's left edge, and the parent clips);
+`aria-hidden`/`tabIndex` flip on `isOpen`, which is true the moment `open()` sets the offset, so the
+button is focusable and hit-testable immediately; and `useDrag`'s `filterTaps` is bound to the **row**
+div while the tray is a sibling — a tap on Delete never reaches the drag handler.
+
+**Hypothesis, and it fits "two presses" exactly: the first tap lands on a moving target.** The row
+carries `transition: transform 0.22s cubic-bezier(…)`. Release the swipe and the tray is revealed
+*over 220 ms*; a tap inside that window can be dispatched against the layout as it stood at
+pointer-down — the row, not the button. The second tap lands after the animation settles and works.
+**This is reasoned from the source, not reproduced** — the sandbox has no touch and no Samsung
+WebView.
+
+- **The check that confirms or kills it, one swipe each:** swipe, **wait a second**, tap Delete —
+  one press? Then swipe and tap Delete **immediately** — two? If waiting fixes it, it is the
+  transition. If both need two, strike this hypothesis rather than working around it.
+- **If confirmed, do not fix it by shortening the animation.** The tray should accept a tap while it
+  is opening — settle the offset before the transition ends, or hit-test against the final position.
+  A window that swallows input at 0.22 s still swallows it at 0.1 s.
+- **⚠ BF-29 passed on the device on 2026-08-30** (*"Yes all good here"*) — on the **meal** list. This
+  report is the **food-row** tray from BF-45 ⑤, shipped since. Either the two trays differ or the
+  earlier pass did not tap fast enough; both are worth knowing, and it argues for re-running BF-29's
+  check with the deliberate fast tap above.
+- **Verification:** one tap on Delete raises the confirmation, tapped immediately after the swipe
+  releases, on both the meal list and the food rows.
+
 ### [nutrition] BF-60 — the `Single foods` tab is the search surface now, so call it `Search`
 
 - **Batch:** `nutrition-ui-uplift` — a one-word rename that should ride the batch already touching this
