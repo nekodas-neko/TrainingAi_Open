@@ -4151,6 +4151,7 @@ them as one is how a prompt gets a year of set logs in it. It also carries two c
 having before design starts: send a program id rather than a program object, and give the reference
 its own schema caps rather than inheriting the byte-limit situation the route already documents.
 ## 2026-08-31 — `projectOverview.md` 8453 → 8450, `docs/implementation-backlog.md` 13776 → 13762, `implementation-lane-b.md` held at 126
+## 2026-08-31 — `projectOverview.md` 8453 → 8450, `docs/implementation-backlog.md` 13585 → 13571, `implementation-lane-b.md` held at 126
 
 Three baselines fall; none rises. **Re-derived on the merge**: this branch was cut at 8449, and
 Q-211's four-line paragraph landed under it. **`projectOverview.md`** loses four lines of merge debris — its
@@ -4196,3 +4197,19 @@ looks muscles up by exact name and falls back to the model's own guess on a miss
 An LLM told to keep similar exercises is exactly the thing that paraphrases, so the entry now says
 the route has to resolve generated names against the library before this feature can deliver
 continuity rather than the look of it.
+## 2026-08-31 — `projectOverview.md` 8443 → 8445, `docs/implementation-backlog.md` 13745 → 13679 (BF-60/61/62/63)
+
+**A rise of two, and it is a rise rather than a trade.** The nutrition batch adds one status
+paragraph and pays for none of it, because the section has no slack left that is this branch's to
+take: the two paragraphs above it are hours old and the ones below belong to other agents. Two lines
+for four owner reports, one of which corrects the fix its own entry proposed, is worth the ratchet
+moving.
+
+**The backlog falls 66.** BF-60 is removed outright — a tab rename with an e2e assertion on the
+label owes nothing further — while BF-61, BF-62 and BF-63 are rewritten to their `Keep:` residue,
+which is the **device check** in all three cases and nothing else. That is the protocol working
+rather than a compaction: an entry that shipped but is not device-verified stays in the queue,
+because that check is the outstanding thing.
+
+(Re-derived on the merge: this branch was cut on top of #647 before it landed, so its first
+figures were against that head rather than against `main`.)

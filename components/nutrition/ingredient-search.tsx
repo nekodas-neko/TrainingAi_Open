@@ -1,7 +1,7 @@
 'use client'
 
 import { memo, useCallback } from 'react'
-import { Search, X, Loader2, Sparkles, Link2 } from 'lucide-react'
+import { Search, X, Loader2, Sparkles, Link2, ScanBarcode } from 'lucide-react'
 import { asHttpsUrl, hostOf } from './recipe-url'
 import { RecipeImageButton } from './recipe-image-button'
 import type { FoodItem } from '@trainingai/shared/types/nutrition'
@@ -29,6 +29,14 @@ interface Props {
   onAddExternal: (food: ExternalFood) => void
   showAddFood: boolean
   onAddByHand: () => void
+  /**
+   * Open the barcode scanner (BF-63). Log Food has had `Photo · Barcode · Describe` since it
+   * shipped, and the builder — one screen further into the same sheet — offered only the text
+   * field, so a packet ingredient had to be typed out.
+   */
+  onScan: () => void
+  /** A scan is being looked up. Its result arrives as an ingredient, so there is nothing else to show. */
+  lookingUpBarcode: boolean
 }
 
 /**
@@ -47,7 +55,7 @@ export function IngredientSearch({
   query, onQueryChange, searchResults, onAdd,
   estimating, onEstimate, importing, onImportRecipe, onImportRecipeImage,
   dbResults, dbSearching, dbUnavailable, addingExternal, onAddExternal,
-  showAddFood, onAddByHand,
+  showAddFood, onAddByHand, onScan, lookingUpBarcode,
 }: Props) {
   const recipeUrl = asHttpsUrl(query.trim())
   return (
@@ -73,6 +81,16 @@ export function IngredientSearch({
               <X className="w-4 h-4" />
             </button>
           )}
+          {/* Inside the field, not a fourth button under it: this is another way to fill the same
+              box, and the row already carries the clear button at that scale. */}
+          <button
+            onClick={onScan}
+            disabled={lookingUpBarcode}
+            aria-label="Scan a barcode"
+            className="-mr-1 flex h-11 w-11 flex-none items-center justify-center text-muted-foreground disabled:opacity-60"
+          >
+            {lookingUpBarcode ? <Loader2 className="w-4 h-4 animate-spin" /> : <ScanBarcode className="w-4 h-4" />}
+          </button>
         </div>
       </div>
 

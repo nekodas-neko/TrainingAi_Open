@@ -293,7 +293,7 @@ export async function openSavedMeal(page: Page, mealName: string): Promise<void>
  * the moment a pixel of the sheet crosses the fold, ~400 ms before it settles.
  */
 export async function swipeRowLeft(page: Page, row: Locator, options: SwipeRowOptions = {}): Promise<void> {
-  const { distance = 200, centreFirst = false, releaseWithPoint = false } = options
+  const { distance = 200, steps = 10, centreFirst = false, releaseWithPoint = false } = options
   await expect(row).toBeVisible()
   if (centreFirst) await row.evaluate(el => el.scrollIntoView({ block: 'center' }))
   const box = await stableBox(row)
@@ -302,10 +302,10 @@ export async function swipeRowLeft(page: Page, row: Locator, options: SwipeRowOp
   const cdp = await page.context().newCDPSession(page)
   try {
     await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: startX, y }] })
-    for (let step = 1; step <= 10; step++) {
+    for (let step = 1; step <= steps; step++) {
       await cdp.send('Input.dispatchTouchEvent', {
         type: 'touchMove',
-        touchPoints: [{ x: startX - (distance * step) / 10, y }],
+        touchPoints: [{ x: startX - (distance * step) / steps, y }],
       })
       await page.waitForTimeout(16)
     }
@@ -331,6 +331,13 @@ export interface SwipeRowOptions {
   centreFirst?: boolean
   /** Release with the final touch point still in `changedTouches` — see the touchEnd note above. */
   releaseWithPoint?: boolean
+  /**
+   * How many moves the drag is split into. Fewer, over the same 16 ms spacing, means a faster
+   * gesture: `@use-gesture` derives velocity from the interval, and past `FLICK_VELOCITY` a drag
+   * commits open on direction alone rather than on distance. A short flick is the only way to
+   * leave the row **short** of its resting offset, which is the state BF-61 is about.
+   */
+  steps?: number
 }
 
 /** The row's box once two reads a frame apart agree on it — see `swipeRowLeft`. */

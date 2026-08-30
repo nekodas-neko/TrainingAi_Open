@@ -3,7 +3,8 @@ import { Client } from 'pg'
 import { settleRouteBoundary } from './fixtures'
 
 /**
- * Log Food → Single foods reaches the food database (BF-48).
+ * Log Food → Search reaches the food database (BF-48; the tab was called `Single foods` until
+ * BF-60 renamed it, once reaching outside your own data made the old label untrue).
  *
  * The owner's report, device pass N7: *"When I try add a food via the 'single food' section; it
  * only searches saved/history food - its not checking the food data base. So its not useful."* It
@@ -53,13 +54,13 @@ async function openSingleFoods(page: Page) {
   await tap(page, page.getByRole('button', { name: 'Log Food' }))
   // `role: tab`, not `role: button` — `SegmentedTabs` sets the ARIA role and a `button` query
   // silently finds nothing.
-  await tap(page, page.getByRole('tab', { name: 'Single foods' }))
+  await tap(page, page.getByRole('tab', { name: 'Search' }))
   const search = page.getByRole('textbox', { name: /search your foods or the food database/i })
   await expect(search).toBeVisible({ timeout: 30_000 })
   return search
 }
 
-test('a food never logged before is findable from Single foods, and carries its mismatch warning', async ({ page }) => {
+test('a food never logged before is findable from Search, and carries its mismatch warning', async ({ page }) => {
   // Deliberately inconsistent: 96 kcal against macros that come to ~122. That is the real shape the
   // warning exists for — a database filled in field by field by different contributors.
   await page.route('**/api/nutrition/food-search**', route => route.fulfill({

@@ -87,7 +87,7 @@ test('the meal library is artboard 3: a count line, one grouped list, and per-po
 
   // The search field no longer waits for a fifth meal to appear. It says which list it searches
   // since BF-37 split them back apart.
-  await expect(page.getByPlaceholder('Search your meals')).toBeVisible()
+  await expect(page.getByPlaceholder('Filter your meals')).toBeVisible()
 
   // The count line, which replaced the `· N` that used to ride on the sheet's title. Still "items"
   // rather than "meals": the word survived the split because the row count is what it describes,

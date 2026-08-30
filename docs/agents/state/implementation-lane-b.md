@@ -6,39 +6,41 @@
 **Updated:** 2026-08-31 · **By:** the seventeenth Lane B run · **Next ID:** `LB-31`
 
 ## Now
-Merged: **#628** (LB-26), **#633**, **#640** (BF-45 ⑤), **#631** (Q-392), **#641** (BF-46 ①b),
-**#642** (BF-46 ② ③), **#643** (BF-46 ①a), **#644** (the BF-39 hold, docs only). Filed: **LB-27**,
-**LB-28**, **LB-29**, **LB-30**.
+Merged: **#628** (LB-26), **#633**, **#640** (BF-45 ⑤), **#631** (Q-392), **#641**, **#642**,
+**#643** (BF-46 ①b ② ③ ①a), **#644**, **#647** (BF-39 + LB-30), **#653** (LB-28). **Open: #659** —
+BF-60/61/62/63, v1.404.0. Filed: **LB-27**, **LB-29**, **LB-30**.
 
-**BF-39 shipped: its hold was a harness race, not a defect.** `SwipeActions` mounts once, the drag
-handler is **never invoked**, and no `saved-meals` invalidation fires — `Input.dispatchTouchEvent`
-skips the stability check `locator.tap()` does, so the spec measured a row still travelling with the
-sheet's `enter` animation (read y=605, landed at y=503). `swipeRowLeft` (`e2e/fixtures.ts`) waits
-for the rect to settle and the three swipe specs share it; **LB-30** audits the other 46 reads.
+**BF-39's hold was a harness race and its recorded conclusion was wrong in every part.**
+`SwipeActions` mounts once, the drag handler is **never invoked**, and no `saved-meals` invalidation
+fires — `Input.dispatchTouchEvent` skips the stability check `locator.tap()` does, so the spec
+measured a row still travelling with the sheet's `enter` animation (read y=605, landed at y=503).
+`swipeRowLeft` (`e2e/fixtures.ts`) now waits for the rect to settle; **LB-30** audits the other 46
+coordinate reads. Then #659: BF-61 (the tray stacks above the row), BF-62 (**not** the `92vh` its
+entry proposed — the sheet bakes `.pb-safe-action`, whose floor loses to an inset reporting the nav
+bar's own height), BF-60, BF-63.
 
-**The `nutrition-ui-uplift` batch is now shipped in full** — BF-24, BF-39, BF-45, BF-46, BF-51 ①②④ —
-**and every one owes the on-device pass.** That is this lane's binding constraint, not a queue of
-unwritten code. BF-39 also has a branch **no test has ever run**: `useSavedMealSummaries`'s
-local-store read, unreachable from the web harness.
+**The whole `nutrition-ui-uplift` batch now owes exactly one thing: the on-device pass** — BF-24,
+BF-45, BF-46, BF-51 ①②④, BF-61, BF-62, BF-63 — and that is this lane's binding constraint, not a
+queue of unwritten code. **BF-62 needs BOTH navigation modes** (the inset differs, and checking one
+is what lets this class through); **BF-61 needs the fast tap on BOTH trays** (BF-29's pass was the
+meal list, tapped slowly); `useSavedMealSummaries`'s local-store read has **never run in any test**.
 
 **Three things are blocked on the owner, each with a written recommendation. Do not decide them
 yourself and do not build past them:**
 - **BF-51 ③.** The picker has ONE collection shown two ways (`Recently used` empty, `Your foods`
-  typed) plus the food database, which appears only while typing — so Log Food's three-tab strip
-  does not map onto it, and a database tab hides what BF-48 shipped to expose. **Recommended: fold
-  into BF-52's planning session**, which redesigns the top of the same screen.
+  typed) plus the food database, which appears only while typing — so Log Food's three-tab strip does
+  not map onto it, and a database tab hides what BF-48 shipped to expose. **Recommended: fold into
+  BF-52's planning session**, which redesigns the top of the same screen.
 - **LB-29.** Recommended: a dirty mark that re-PATCHes the local value. Seed-if-absent cannot
   clobber but gives up cross-device updates. **They promise different things.**
 - **The device pass.**
 
-**Startable without the owner: LB-28 and LB-30.** LB-28's `Needs: LB-27` parks it in
-`next-item.js`, and that dependency is worth re-reading rather than obeying — LB-27 asks *why* one
-request strands a launch burst; the rule is about a helper whose network cost is invisible at the
-call site, and stands either way. Past those, `--lane B` holds BF-52 (**planning**), LB-12
-(Orchestrator's), and a readiness/DB cluster (Q-275, Q-272, Q-276, Q-279, Q-283) the path rule puts
-in **Lane A**. **Q-278** is the one plausible B item — narrowed to a one-layer addition with **one**
-migration site (`components/health/readiness-breakdown.tsx`) — but it has **no plan** and an open
-scope question (two of its five "pillars" have no score surface). Plan it before building it.
+**Start from `node scripts/next-item.js --lane B`, never a hand-scan — and re-run it after every
+merge**: BF-60/61/62/63 were all filed into the top of this lane mid-session. Past the nutrition
+entries it holds BF-52 (**planning**), LB-12 (Orchestrator's), and a readiness/DB cluster (Q-275,
+Q-272, Q-276, Q-279, Q-283) the path rule puts in **Lane A**. **Q-278** is the one plausible B item —
+one layer, **one** migration site (`components/health/readiness-breakdown.tsx`) — but it has **no
+plan** and an open scope question (two of its five "pillars" have no score surface).
 
 ## The finding that should change how you start
 **A precondition satisfied by the state it is meant to replace cannot fail**, and four
@@ -76,19 +78,17 @@ pick a marker — or a moment — that exists **only** in the target state.
   **`kept` and `library` both carry a `savedMealId`** — provenance reads `DraftMeal.source`.
 
 ## Owed (device / physical)
-**Nothing from the last three runs is device-verified.**
-[`device-verification-queue.md`](../../device-verification-queue.md) groups by screen — work a
-section, not an entry.
+**Nothing from the last four runs is device-verified.** [`device-verification-queue.md`](../../device-verification-queue.md)
+groups by screen — work a section, not an entry.
 
 **This run adds one coherent nutrition pass**, best done in a sitting: a food row **swipes** to a
-Delete that confirms **and stays gone across a screen swap and a force-close** (BF-47, reasoned not
-reproduced); the meal photo picks from **both** the meal's screen and the builder — the CSP fix runs
-the *native* branch for the first time; **Option A** at 412 dp, tallest of the three and may scroll;
-an ingredient row reading **grams only**; a logged meal as **one nested row** whose name survives
-**offline** (that branch never ran in the sandbox).
+Delete that opens on the **first** tap and stays gone across a screen swap and a force-close (BF-47
+reasoned, not reproduced); the meal photo from **both** the meal's screen and the builder — the CSP
+fix runs the *native* branch for the first time; a **barcode scan** in the builder; **Option A** at
+412 dp; an ingredient row reading **grams only**; a logged meal as **one nested row** whose name
+survives **offline**; and the takeover sheets' bottom clearance in **both** navigation modes.
 
-Carried: Q-467, Q-499, Q-538, Q-305 at S25 width, Q-477 across local midnight, BF-10, LB-5,
-Q-328/Q-321/Q-486, Q-389, a TalkBack pass, Q-450/Q-418 (Polar H10). **Q-315 needs a DESKTOP.**
+Carried: Q-467, Q-499, Q-538, Q-305 at S25 width, Q-477 across local midnight, BF-10, LB-5, Q-328/Q-321/Q-486, Q-389, a TalkBack pass, Q-450/Q-418 (Polar H10). **Q-315 needs a DESKTOP.**
 
 ## Claimed paths
 None held.

@@ -1592,154 +1592,69 @@ controls side by side, one wired to the engine and one not.
   `Deload` → it does not. Then the reverse case, a **full** prescription with `Deload` picked, still
   behaves as Q-109/Q-175 built it — that path works today and must not regress.
 
-### [nutrition] BF-63 — the meal builder has no barcode scan, so a packet ingredient has to be typed
+### [nutrition] BF-63 — barcode scan in the meal builder (shipped; the scan itself needs the device)
 
-- **Lane:** B — `components/nutrition/ingredient-picker.tsx` + `ingredient-search.tsx`; the scanner
-  and the lookup route both already exist.
+- **Lane:** B
 - **Batch:** `nutrition-ui-uplift`
-- **Added:** 2026-08-30 · owner, on the meal builder: *"in the meal creator there is no scan/barcode
-  option."* Screenshot: `ADD INGREDIENTS` offering only the text field.
+- **Added:** 2026-08-30 · owner
+- **Shipped 2026-08-31** — `ingredient-picker.tsx` opens `BarcodeScanner` and mints the hit with
+  `source: 'barcode'`, added as an ingredient rather than logged to today. A printed meal label is
+  recognised and refused with a reason (nesting a meal is not built). The route's
+  unavailable/not-found split is carried through.
+- **Keep:** the **device check**, and only that. The scan needs a camera — the Capacitor plugin on
+  device, `getUserMedia` on web — so no harness in this repo can drive it, which is why there was no
+  barcode e2e before this and still is none for the scan itself. On the S25: scan a packet in the
+  builder → it appears in the ingredient list with the product's name and macros, the food item
+  lands in the library, **nothing is logged to today's diary**, and a down database says so rather
+  than reading as "no match".
+- **Keep:** the **code is still not stored**, deliberately. `barcode` is NULL on every `food_items`
+  row including the three already marked `'barcode'`; `/api/nutrition/barcode` does not return what
+  it looked up and `NewFoodItem` has no field for it. That chain is **Lane A** and is BF-38's, and
+  this path defers to it rather than adding a fourth writer of NULL.
 
-**The capability is one file away, not missing.** `saved-meals-sheet.tsx` renders *both*
-`CaptureActions` (the Log Food screen, which has `Photo · Barcode · Describe or enter`) and
-`IngredientPicker` (the build form, which has none of it). So the owner learns barcode scanning on
-one screen of this sheet and loses it on the next. `barcode-scanner.tsx` is a standalone overlay
-taking `onResult`/`onClose`, and `/api/nutrition/barcode` is a plain GET — both are reusable as they
-stand.
+### [nutrition][app-shell] BF-62 — the meal detail sheet's action row sits close to the gesture bar (fixed, NOT the way this entry proposed)
 
-**But do NOT drop `CaptureActions` into the builder.** Its `onScanResult` routes a hit into the
-*food logger*, which logs the product to today. In the builder the same scan must mint a food item
-and **add it as an ingredient to the meal being built** — that is `addExternalFood`'s shape
-(`createFoodItem(…)` then `accept(item)`), fed from a `NutritionScanResult` instead of an
-`ExternalFood`. Reusing the wrong half is how a scan in the builder silently logs breakfast.
-
-- **`source: 'barcode'`, and the comment already anticipates this.** `ingredient-picker.tsx:119`
-  explains that its external-search path writes `source: 'text'` because *"a barcode identifies one
-  exact product; a name search returns a plausible near-match"*. The type has `'barcode'`; a scanned
-  ingredient must use it, or the distinction that comment protects is lost the moment this ships.
-- **⚠ Carry the code itself, per BF-38.** That entry measured production: **`barcode` is NULL on all
-  221 rows, including all 3 whose `source` is `'barcode'`** — `/api/nutrition/barcode` never returns
-  the code it looked up, so nothing downstream can store it. Adding a second scan path that writes
-  another NULL makes BF-38's job bigger. Either return `code` from the route and thread it, or say in
-  the diff that this path defers to BF-38 — a silent third NULL-writer is the outcome to avoid.
-- **Decide the saved-meal QR case rather than discovering it.** `CaptureActions.handleBarcode`
-  shape-detects a printed meal label (22 base64url chars) before falling through to the product
-  lookup. Scanned *inside a builder*, that payload means "add this saved meal as an ingredient",
-  which is meal-nesting and is not built. Simplest honest answer: recognise it and say it is not
-  supported here, rather than passing a meal token to a product lookup that will 400 it.
-- **Relationship to BF-52 — this is the smaller, buildable half.** BF-52 is a planning item about
-  *meal-level* entry points (build a whole meal from a photo, URL or description) and proposes
-  mirroring Log Food's capture row. This report is per-*ingredient* and needs no design work. Build
-  it now; when BF-52 is planned, its capture row should absorb this button rather than adding a
-  second barcode affordance beside it.
-- **Verification:** in the builder, scan a packet → it appears in the ingredient list with the
-  product's name and macros; the food item lands in the library with `source = 'barcode'`; nothing is
-  logged to today's food log; and Open Food Facts being down says so rather than reading as "no
-  match" (the distinction `/api/nutrition/barcode` already draws).
-
-### [nutrition][app-shell] BF-62 — the meal detail sheet's action row still sits close to the gesture bar, and `92vh` is the likely reason
-
-- **Lane:** B — `components/nutrition/meal-detail-sheet.tsx:81`.
+- **Lane:** B
 - **Batch:** `nutrition-ui-uplift`
-- **Added:** 2026-08-30 · owner, on the meal detail sheet: *"the safe space is still a little off
-  here."* Screenshot: `Log this meal` plus three icon buttons sitting close to the gesture bar.
+- **Added:** 2026-08-30 · owner
+- **⚠ The `92vh` hypothesis was wrong, and the reason is worth carrying.** `SheetContent
+  side="bottom"` bakes `.pb-safe-action` — the inset against a **0.75rem** floor — and `globals.css`
+  records the measurement beside its larger sibling: under Capacitor's edge-to-edge the WebView is
+  drawn behind the nav bar, so the inset reports **the bar's own height**. Padding by
+  `max(inset, 0.75rem)` therefore pads by exactly the bar and leaves a primary button flush on it.
+  That is the report. The height was never involved.
+- **Shipped 2026-08-31** — `SheetContent` and `SheetFooter` both take `bottomInset="takeover"`,
+  which swaps in `.pb-safe-action-lg` (inset + a real gap, with a floor). The class is **chosen, not
+  appended**: tailwind-merge cannot see these custom classes and the two would stack. Five
+  takeover-height nutrition sheets pass it — meal detail, saved meals, and the three meal-plan
+  sheets.
+- **Keep:** the **device check**, and only that. On the S25 with **gesture** navigation *and* with
+  **3-button** navigation — the inset differs by mode, and checking one mode is what lets this class
+  through. The sandbox renders the inset as 0, so none of this is verified.
+- **Keep:** `components/activity/exercise-review-sheet.tsx` (`h-[85vh]`) was **not** changed. It has
+  no bottom-anchored action row to be flush against, it is another domain, and nothing was reported
+  on it — re-judge it if one is.
 
-**This is NOT the gutter fix that shipped.** BF-45 ③ moved the nutrition sheets from `px-1` to 16 px
-**horizontal** gutters in v1.397.0. This is **vertical** clearance on a bottom-anchored action row —
-a different axis and a different fix, reported in the same breath as the old one and easy to mistake
-for a regression of it.
+### [nutrition][app-shell] BF-61 — the swipe tray's Delete needs two presses (fixed; device check owed)
 
-**And it is not a missing `pb-safe`.** CLAUDE.md is explicit that `SheetContent side="bottom"` owns
-the bottom inset, that `p-0` does not strip the baked padding, and that tailwind-merge cannot see the
-custom classes. The action row here is `pt-2` with no bottom padding, which is correct by that rule.
-**Do not "fix" this by adding one** — that is the mistake the rule exists to prevent.
+- **Lane:** B
+- **Batch:** `nutrition-ui-uplift`
+- **Added:** 2026-08-30 · owner, confirmed on device the same day: *"if I wait a second it works."*
+- **Shipped 2026-08-31** — the tray stacks above the row while open. Hit-testing follows the
+  *animated* transform, so for the 220 ms the row spends sliding out it is still over part of the
+  tray and swallows the tap.
+- **The regression test is the part to read before touching this again** (`e2e/food-log-swipe-delete.spec.ts`).
+  Three shapes do **not** reproduce it: a long drag overshoots the resting offset and animates back
+  **rightwards**, never covering the tray; a short flick through CDP falls under `FLICK_VELOCITY` so
+  the row snaps closed; and a tap at the tray's **centre** is uncovered almost at once, because the
+  tray uncovers from its right edge first. What works is a 36 px drag (rests open on distance,
+  leaving the row short of its offset), a tap 52 px into the tray, and the transition stretched to
+  6 s so the window is wider than a protocol round-trip. Mutation-proved both ways.
+- **Keep:** the **device check**, and only that. On the S25, swipe and tap Delete **immediately** —
+  the confirmation must appear on the first press, on **both** the meal list and the food rows, and
+  the slow tap must keep working. **BF-29's 2026-08-30 pass is not evidence**: it was the meal list,
+  tapped slowly.
 
-**Hypothesis, and it is specific: `h-[92vh]`.** The sheet is `className="flex h-[92vh] flex-col"`. On
-Android gesture navigation a WebView's `vh` is computed against a viewport that **includes** the
-gesture inset, so 92% of it can extend under the bar — and the baked bottom padding is then measured
-inside a box whose height already overshoots. The padding is present and still lands short.
-**Unverified: the sandbox renders the inset as 0, which is exactly why this class recurs.**
-
-- **If confirmed, the fix is the height, not the padding** — `dvh` rather than `vh`, or a height that
-  subtracts the inset, so the baked padding has real space to sit in.
-- **Sweep the siblings in the same pass.** Any sheet with a `vh` height has this shape;
-  `grep -rn 'h-\[[0-9]*vh\]' components/` is the search, and fixing this one sheet alone is the
-  half-done kind the sibling-surface rule is about.
-- **Verification:** on the S25 with gesture navigation **and** with 3-button navigation — the inset
-  differs by mode, and checking one mode is what lets this class through.
-
-### [nutrition][app-shell] BF-61 — the swipe tray's Delete needs two presses, and the transition is the cause (owner-confirmed)
-
-- **Lane:** B — `components/ui/swipe-actions.tsx`.
-- **Batch:** `nutrition-ui-uplift` — same screen, same device pass.
-- **Added:** 2026-08-30 · owner, on the shipped swipe tray: *"when sliding and pressing delete it
-  requires 2 presses before the confirmation comes up."*
-- **Confirmed on device 2026-08-30** · owner, running the timing check below: *"if I wait a second
-  it works."* So this is a **cause, not a hypothesis** — do not re-diagnose it.
-
-**What I ruled out by reading the component**, so nobody re-checks these first: the tray buttons are
-not overlapped by the row once it has settled (the row translates to exactly the tray's left edge,
-and the parent clips); `aria-hidden`/`tabIndex` flip on `isOpen`, which is true the moment `open()`
-sets the offset, so the button is focusable and hit-testable immediately; and `useDrag`'s
-`filterTaps` is bound to the **row** div while the tray is a sibling — a tap on Delete never reaches
-the drag handler.
-
-**The mechanism.** The row carries `transition: transform 0.22s cubic-bezier(…)`. Hit-testing follows
-the *animated* transform, so for those 220 ms the row is still physically covering part of the tray:
-a tap in that window lands on the row, not on Delete. The row swallows it, the animation finishes,
-and the second tap hits the button. Waiting a second — which is what the owner did — puts the tap
-after the settle, and one press works. That is the whole bug.
-
-- **Do NOT fix it by shortening the animation.** A window that swallows input at 0.22 s still
-  swallows it at 0.1 s; it just makes the bug rarer and harder to report.
-- **Leading candidate: raise the tray above the row in stacking order while `isOpen`.** The tray is
-  already a sibling with `absolute inset-y-0 right-0`; giving it a `z-` above the row when open means
-  a tap inside the tray's rect reaches the button even while the row is still sliding across it. The
-  row is translating *away* from that rect anyway, so nothing the row owns becomes unreachable — and
-  when closed the tray keeps its current stacking, so a tap anywhere on a closed row is unaffected.
-- **Second option if that misbehaves:** settle `offset` to its final value at release and let the
-  transition be purely visual — but that is the same "animate something the hit-test disagrees with"
-  shape, so prefer the stacking fix.
-- **One fix covers both trays.** `SwipeActions` has exactly two call sites — `meal-card.tsx` and
-  `saved-meal-card.tsx` — so this is one component change, not a sweep. That also settles the BF-29
-  question below: the two trays are the same component, so the earlier pass simply did not tap fast
-  enough rather than the trays differing.
-- **⚠ Re-run BF-29's check with the deliberate fast tap.** BF-29 passed on the device on 2026-08-30
-  (*"Yes all good here"*) on the **meal** list, while this report came from the **food-row** tray from
-  BF-45 ⑤. Same component, so BF-29's pass is not evidence the meal list is clear.
-- **Verification:** on the S25, swipe and tap Delete **immediately** — the confirmation must appear on
-  the first press, on both the meal list and the food rows. The slow tap must keep working too; a fix
-  that trades one for the other is not a fix.
-
-### [nutrition] BF-60 — the `Single foods` tab is the search surface now, so call it `Search`
-
-- **Batch:** `nutrition-ui-uplift` — a one-word rename that should ride the batch already touching this
-  screen rather than costing its own PR and its own device look.
-- **Lane:** B — `components/nutrition/saved-meals-sheet.tsx:64` (`LIST_TABS`).
-- **Added:** 2026-08-30 · owner, with the Log Food screen: *"single foods here should be → Search. I
-  think that would represent it better."*
-
-**The label was right when it was written and BF-48 made it wrong.** `Single foods` was chosen to
-name a *composition against one thing* — the code carries a comment saying so, and it was a good
-label for a tab listing the single foods you had logged. **BF-48 then gave that tab the food
-database**, and the screen now says it out loud: the placeholder reads *"Search your foods or the
-food database…"*. A tab that reaches outside your own data is not "your single foods" any more.
-
-- **Rename to `Search`, and update the comment above `LIST_TABS` in the same change.** That comment
-  is the recorded reasoning for the old label; leaving it in place would have the file defending a
-  name it no longer uses, which is how a later session talks itself into reverting this.
-
-**⚠ One wrinkle, worth deciding rather than discovering.** `Meals` has a search box too — `FoodList`
-renders one with placeholder *"Search your meals"*. So `Search` as a tab name is not strictly
-exclusive. The distinction that makes it honest: **Meals *filters* a list you already own; this tab
-*searches* beyond it.** Make the two read differently — filter placeholder on Meals, search
-placeholder here — or the rename swaps one ambiguity for another.
-
-- **Alternatives considered, in case this comes back:** `All foods` (accurate, but reads as a bigger
-  list of yours rather than a lookup), `Database` (jargon), `Find food` (parallel with the other tabs
-  as an action but wordier at 412 dp). **`Search` is the owner's pick and the shortest true one.**
-- **Verification:** the tab reads `Search`, the `LIST_TABS` comment describes the current labels, and
-  the two search inputs are worded so a filter and a lookup do not read the same.
 
 ### [nutrition] BF-45 — the nutrition tab's UI uplift (all five shipped; device check owed)
 

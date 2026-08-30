@@ -394,7 +394,7 @@ export function MealPlanSetupSheet({ open, onOpenChange, onSaved, userId }: Prop
           )}
         </div>
 
-        <SheetFooter className="flex-row gap-2">
+        <SheetFooter className="flex-row gap-2" bottomInset="takeover">
           {step > 0 && (
             <Button variant="secondary" className="flex-1" onClick={() => setStep(s => (s - 1) as StepIndex)}>
               Back

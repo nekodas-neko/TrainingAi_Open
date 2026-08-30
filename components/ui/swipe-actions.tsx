@@ -90,7 +90,15 @@ export function SwipeActions({ actions, itemLabel, children, className, surfaceC
     // nutrition tab changes the DAY on one — otherwise runs both from the same touch, and a thumb
     // opening a tray also moves the list out from under itself.
     <div data-swipe-actions className={cn('relative overflow-hidden', className)}>
-      <div className="absolute inset-y-0 right-0 flex" aria-hidden={!isOpen}>
+      {/*
+        `z-10` while open is what makes the FIRST tap land on Delete (BF-61). The row is a later
+        sibling, so it paints above the tray, and hit-testing follows the *animated* transform —
+        for the 220 ms the row spends sliding out it is still physically over part of the tray, so
+        a tap in that window hits the row, which swallows it. The owner reported it as needing two
+        presses and confirmed the cause by waiting a second, at which point one press works.
+        Shortening the animation would only make the window rarer to hit, not close it.
+      */}
+      <div className={cn('absolute inset-y-0 right-0 flex', isOpen && 'z-10')} aria-hidden={!isOpen}>
         {actions.map(a => (
           <button
             key={a.key}

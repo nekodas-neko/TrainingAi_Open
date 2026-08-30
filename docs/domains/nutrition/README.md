@@ -187,6 +187,11 @@ Live at the time of writing (2026-07-30):
 
 ## History
 
+- **[`docs/handoff-2026-08-31-nutrition-diary-and-swipe-tray.md`](../../handoff-2026-08-31-nutrition-diary-and-swipe-tray.md)**
+  — 🆕 the session that shipped BF-39, BF-60/61/62/63, LB-28 and LB-30. **Read its gotchas before
+  writing an e2e that taps a coordinate**: `Input.dispatchTouchEvent` performs none of
+  `locator.tap()`'s actionability checks, and the three gestures that do *not* reproduce BF-61 are
+  written down there.
 - **[`docs/overview/entries/2026-08-31-diary-nested-meal-rows.md`](../../overview/entries/2026-08-31-diary-nested-meal-rows.md)**
   — 🆕 **BF-39**: a logged meal draws as **one** diary row, headed by the meal's name and photo, and
   opens to its ingredients. Grouped on `meal_group_id`, never `saved_meal_id`; the name and photo
