@@ -55,14 +55,19 @@ type SheetTab = 'meals' | 'build'
  *
  * **The tab labels drop the possessive deliberately.** `My Foods` against `My Meals` is the pair the
  * owner could not tell apart, and two labels that differ only in their last word are hard to tell
- * apart wherever they appear. `Meals` against `Single foods` names the actual distinction — a
- * composition against one thing. (`My Meals` survives on the page's own button, where it names one
+ * apart wherever they appear. (`My Meals` survives on the page's own button, where it names one
  * list rather than one of two lookalikes.)
+ *
+ * **`Search`, not `Single foods` (BF-60).** The old label named a composition against one thing, and
+ * it was right until BF-48 gave that tab the food database — a tab reaching outside your own data is
+ * not "your single foods" any more. `Meals` has a search box too, so the two are worded to keep the
+ * distinction the label rests on: Meals **filters** a list you already own, this tab **searches**
+ * beyond it.
  */
 const LIST_TABS = [
   { value: 'recent' as const, label: 'Recent' },
   { value: 'meals' as const, label: 'Meals' },
-  { value: 'foods' as const, label: 'Single foods' },
+  { value: 'foods' as const, label: 'Search' },
 ]
 type ListTab = (typeof LIST_TABS)[number]['value']
 
@@ -523,7 +528,7 @@ export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate,
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="bottom" className="h-[90vh] flex flex-col">
+      <SheetContent side="bottom" className="h-[90vh] flex flex-col" bottomInset="takeover">
         {/* Title alone on the top row so the close ✕ has the corner to itself; the actions get
             their own full-width row below. Squeezing "Select" and "New Meal" in beside the title
             left them jammed against the ✕ and each button too narrow to read comfortably. */}
