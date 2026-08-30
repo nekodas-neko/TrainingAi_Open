@@ -80,6 +80,48 @@ export function pearson(points: Array<{ x: number; y: number }>): number | null 
   return sxy / Math.sqrt(sxx * syy)
 }
 
+/**
+ * Average ranks (1-based), ties sharing the mean of the positions they span.
+ *
+ * Lives here rather than beside its one caller because rank correlation is the only statistic that
+ * survives a comparison across **different units**, and that turned out to be needed twice — the
+ * model-report calibration and the device-comparison endpoint, where Oura stress is normalised
+ * −1..+1 and the Colmi's is raw 0..100 (PS-15).
+ */
+export function averageRanks(values: readonly number[]): number[] {
+  const order = values.map((_, i) => i).sort((a, b) => values[a] - values[b])
+  const ranks = new Array<number>(values.length)
+  let i = 0
+  while (i < order.length) {
+    let j = i
+    while (j + 1 < order.length && values[order[j + 1]] === values[order[i]]) j++
+    const shared = (i + j) / 2 + 1
+    for (let k = i; k <= j; k++) ranks[order[k]] = shared
+    i = j + 1
+  }
+  return ranks
+}
+
+/**
+ * Spearman rank correlation — Pearson over the ranks.
+ *
+ * **The statistic to reach for when the two series are not in the same units.** A mean bias between
+ * a −1..+1 scale and a 0..100 one is a number in mixed units, which is worse than no number: it
+ * prints, it looks like a measurement, and it means nothing. Rank agreement asks the only question
+ * that survives the mismatch — do the two move together — and it is what the hand comparison behind
+ * PS-15 actually used (rho = 0.64 over eight afternoon buckets).
+ *
+ * Null on the same terms as `pearson`, which it delegates to: under 3 pairs, or when either series
+ * is constant. **Deliberately no guard of its own** — an `if (points.length < 3) return null` here
+ * was written first and mutation testing found it could not change an outcome, because `pearson`
+ * already refuses under 3. Two copies of one threshold is how the two drift apart later.
+ */
+export function spearman(points: Array<{ x: number; y: number }>): number | null {
+  const xr = averageRanks(points.map(p => p.x))
+  const yr = averageRanks(points.map(p => p.y))
+  return pearson(xr.map((x, i) => ({ x, y: yr[i] })))
+}
+
 /** Standard normal CDF (Abramowitz & Stegun 7.1.26 erf approximation, |error| < 1.5e-7). */
 function normalCdf(z: number): number {
   const sign = z < 0 ? -1 : 1
