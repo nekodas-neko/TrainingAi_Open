@@ -3537,3 +3537,11 @@ four checks that establish that — the route needs no change, the only fetch of
 `ingredient-search.tsx` takes `dbResults` as a prop so the piece to reuse is component state, and the
 mismatch threshold is already shared — because a bare `Lane: B` invites the next Lane A session to
 re-derive the same four greps before believing it.
+
+## 2026-08-30 — `projectOverview.md` 8322 → 8329 (BF-39 follow-up, MRU)
+
+Net +7: one Current Status paragraph, against the LA-35 Known-Issues row this branch's predecessor
+moved out to the archive. The paragraph keeps the sentence about the first implementation putting
+the same subquery in the SELECT and the ORDER BY — the ordering worked, the selected value came back
+null — because it is a concrete argument for a rule this repo states abstractly, and the abstract
+version has not been enough on its own.

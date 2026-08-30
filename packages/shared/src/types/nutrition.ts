@@ -84,6 +84,15 @@ export interface SavedMeal {
   imageDataUri: string | null
   createdAt: Date
   /**
+   * When this meal was last EATEN — `max(food_logs.logged_at)` for it, or null if never.
+   *
+   * Derived on read, never stored: a "last used" column needs a write on every log and an un-write
+   * on every delete, and it is wrong forever the first time either is missed (CLAUDE.md, Stored
+   * Counters). Absent from a payload that predates BF-39, so treat `undefined` as unknown rather
+   * than as never-used.
+   */
+  lastUsedAt?: Date | null
+  /**
    * Meal types this meal is eligible for (BF-11e), so a planner does not put pancakes at dinner.
    *
    * Soft-deleted meal types are filtered out on read, not deleted from the join table — restoring a

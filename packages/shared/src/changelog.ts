@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.395.6",
+    date: "2026-08-30",
+    changes: [
+      "Your saved meals are now listed by what you have eaten most recently, rather than by when you created them. Meals you have never eaten stay where they were, near the top if you saved them recently, so a new one does not disappear before you have used it once.",
+    ],
+  },
+  {
     version: "1.395.5",
     date: "2026-08-30",
     changes: [

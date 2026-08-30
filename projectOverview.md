@@ -24,8 +24,19 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.395.5 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Version:** v1.395.6 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-08-30.
+
+**My Foods sorts by what you actually eat (BF-39 follow-up).** Q-395c filed it as a constraint —
+*"a saved meal has no last-used timestamp at all … True MRU needs a column that does not exist"* —
+and BF-39's migration added that column this morning. `listSavedMeals` returns `lastUsedAt` and
+orders most-recently-eaten first; a meal never eaten sorts last, keeping the `createdAt` order it
+had, so saving one does not drop it out of sight before it is used once. **Derived on read**, never
+a stored counter: a `last_used_at` column needs a write on every log and an un-write on every
+delete, and is wrong forever the first time either is missed. The first version put the same
+subquery in the SELECT and the ORDER BY — the ordering worked and the selected value came back
+null, which is a neat argument against one formula in two places even when both are the same SQL
+([journal](docs/overview/entries/2026-08-30-saved-meal-last-used.md)).
 
 **The map that stops you re-implementing things was wrong 108 times (LA-35, filed and fixed the same
 day).** `CLAUDE.md` sends readers to `docs/module-map.md` *because* the monorepo extraction moved
