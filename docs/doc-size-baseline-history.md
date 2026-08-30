@@ -3814,3 +3814,13 @@ same easy win does not take it.
 (The earlier raise this session was avoided rather than taken: BF-48's paragraph was paid for by
 cutting two lines of meta-narration from the section's closing note, which was explaining why 157
 status notes were archived on 2026-08-17 — the archive's business, not the index's.)
+
+---
+
+## 2026-08-30 — `projectOverview.md` 8394 → 8396 (LB-19, the meal-label style gate)
+
+One Current Status paragraph plus its blank line, for a finding that changes what an existing spec
+was known to be checking: the decode loop had been reading the previous style's canvas on every
+iteration and passing because all six styles encode the same meal. That belongs in the index rather
+than only in a journal entry — the next person to touch the label renderer needs to know the spec
+was not covering what its name says.

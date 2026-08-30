@@ -246,6 +246,13 @@ Live at the time of writing (2026-07-30):
 
 ## History
 
+- **[`docs/overview/entries/2026-08-30-meal-label-style-gate.md`](../../overview/entries/2026-08-30-meal-label-style-gate.md)**
+  — 🆕 **LB-19**: the meal-label spec's style gate was releasing on the **previous** style's canvas,
+  4 of 4 measured, so its decode loop had effectively never checked three of its four layouts — and
+  passed anyway, because every style encodes the same meal. **⚠ The general shape is the one to carry
+  away: a gate whose condition is satisfied by the state it is waiting to replace.** Both specs in
+  that entry were it. Fixed with a style-derived signal (the `mm at N×N modules` figure) plus a
+  *settled* canvas read; canvas dimensions are identical across styles and are not usable.
 - **[`docs/handoff-2026-08-20-platform-migration-gate-and-energy-weight.md`](../../handoff-2026-08-20-platform-migration-gate-and-energy-weight.md)**
   — the CI job named **Migration Check** could not fail on a broken migration: `migrate.js` exited 0
   whatever happened, and it had no error classifier, so it also called four already-applied
