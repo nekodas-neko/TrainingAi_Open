@@ -8,10 +8,8 @@ import { ScreenHeader } from "@/components/shell/screen-header";
 import { useTransitionRouter } from "@/lib/view-transition";
 import { cachedFetch, readCacheSync } from "@/lib/sqlite/cache";
 import { DAY_LOG_TTL, ENERGY_BALANCE_TTL, HR_PROFILE_TTL, TTL_LONG } from "@trainingai/shared/cache-ttl";
-import { todayInTz, shiftDateStr, dateStrMidnightInTz } from "@trainingai/shared/date-utils";
-import {
-  TrainingSection, ActivitySection, EnergySection, SleepSection, BodySection, DayHrTrace, SectionLabel,
-} from "@/components/health/day-detail/day-sections";
+import { todayInTz, shiftDateStr } from "@trainingai/shared/date-utils";
+import { DayReadThrough } from "@/components/health/day-detail/day-read-through";
 import type { DayLogResult } from "@/app/api/day-log/route";
 import type { EnergyBalanceResponse } from "@/app/api/nutrition/energy-balance/route";
 import type { FoodLogWithItem } from "@trainingai/shared/types/nutrition";
@@ -21,8 +19,6 @@ import { useDayEntryMutations } from "@/lib/hooks/use-day-entry-mutations";
 import { DayOverlayDialogs } from "@/components/health/day-overlay-dialogs";
 import { ExerciseHistorySheet } from "@/components/exercise-history-sheet";
 import { ActivityDetailSheet } from "@/components/activity/activity-detail-sheet";
-import { EnergyTimelineChart } from "@/components/health/energy-timeline-chart";
-import { workoutKcalBySession } from "@/components/health/day-detail/energy-summary";
 
 /** Cache key per day — the whole point of this screen is swiping between days, so each day's
  *  payload is seeded synchronously from cache and revalidated, never shown as a skeleton twice. */
@@ -32,8 +28,6 @@ const keyFor = (date: string) => `day-log:${date}`;
 const energyKeyFor = (date: string) => `energy-balance:${date}`;
 /** Q-414. Its own key rather than reusing `day-log:` — the day payload has no meal times. */
 const foodKeyFor = (date: string) => `food-logs:${date}`;
-/** Module-level so the empty fallback keeps one identity — it feeds a memoised chart. */
-const EMPTY_HR: DayLogResult['hr'] = [];
 
 function ScoreCell({ Icon, label, value, accent, first }: {
   Icon: typeof Zap; label: string; value: number | null; accent: string; first: boolean;
@@ -104,17 +98,6 @@ export function DayDetailContent({ initialDate, tz, userId }: { initialDate: str
   const activityTypes = useCachedValue<{ activityTypes: ActivityType[] }>(
     'activity-types', '/api/activity-types', TTL_LONG,
   );
-  // `loggedAt` means when the food was EATEN, not when the row was written — that is Q-413, and it
-  // is the whole reason this chart can exist. Before it, every back-filled day spiked at whatever
-  // hour the user reached for their phone.
-  // Q-391: the per-session addends of the Energy section's "Workouts" row, so a session card and
-  // the day total on the same screen cannot disagree — they are the same numbers.
-  const kcalBySession = useMemo(() => workoutKcalBySession(energy), [energy]);
-
-  const intakeEvents = useMemo(
-    () => (foodLogs ?? []).map(l => ({ atMs: new Date(l.loggedAt).getTime(), kcal: l.calories })),
-    [foodLogs],
-  );
   const dirRef = useRef(0);
   /** Mirrors selectedDate for the async guard below — a ref, not state, so an in-flight response
    *  reads the CURRENT day rather than the one captured when its fetch started. */
@@ -177,6 +160,17 @@ export function DayDetailContent({ initialDate, tz, userId }: { initialDate: str
     { axis: "x", filterTaps: true, pointer: { touch: true } },
   );
 
+  // A stable identity, not an inline literal: `DayReadThrough` hands these straight to memoised
+  // sections, and a fresh object each render would defeat every one of them (Q-490).
+  const readThroughControls = useMemo(() => ({
+    onEditExercise: mut.setEditEx,
+    onDeleteExercise: mut.setDeleteEx,
+    onDeleteSession: mut.setDeleteSession,
+    onExerciseTap: setHistoryExercise,
+    onDeleteActivity: mut.setDeleteActivity,
+    onSelectActivity: setSelectedActivity,
+  }), [mut.setEditEx, mut.setDeleteEx, mut.setDeleteSession, mut.setDeleteActivity]);
+
   const closeDeleteEx = useCallback(() => setDeleteEx(null), [setDeleteEx]);
   const closeDeleteSession = useCallback(() => setDeleteSession(null), [setDeleteSession]);
   const closeDeleteActivity = useCallback(() => setDeleteActivity(null), [setDeleteActivity]);
@@ -187,9 +181,6 @@ export function DayDetailContent({ initialDate, tz, userId }: { initialDate: str
   }, [selectedDate]);
 
   const s = data?.scores;
-  const hasAnything = !!data && (
-    data.exercises.length > 0 || data.activityLogs.length > 0 || !!data.sleep || !!data.bodyMeta || data.hr.length > 0
-  );
 
   return (
     <div className="flex flex-col bg-page pb-nav-safe" style={{ height: "100dvh" }}>
@@ -243,49 +234,15 @@ export function DayDetailContent({ initialDate, tz, userId }: { initialDate: str
             transition={{ duration: 0.16 }}
             className="space-y-4"
           >
-            {data && (
-              <TrainingSection
-                data={data}
-                kcalBySession={kcalBySession}
-                onEditExercise={mut.setEditEx}
-                onDeleteExercise={mut.setDeleteEx}
-                onDeleteSession={mut.setDeleteSession}
-                onExerciseTap={setHistoryExercise}
-              />
-            )}
-            {data && (
-              <ActivitySection
-                data={data}
-                onDeleteActivity={mut.setDeleteActivity}
-                onSelectActivity={setSelectedActivity}
-              />
-            )}
-            <EnergySection energy={energy} />
-            {energy?.balance && (
-              <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-3.5">
-                <EnergyTimelineChart
-                  dayStartMs={dateStrMidnightInTz(selectedDate, tz).getTime()}
-                  restingHr={hrProfile?.restingHr ?? null}
-                  restingBaseKcal={energy.balance.restingBaseKcal}
-                  activeKcal={energy.balance.activeKcal}
-                  hr={data?.hr ?? EMPTY_HR}
-                  intake={intakeEvents}
-                />
-              </div>
-            )}
-            <SleepSection sleep={data?.sleep ?? null} tz={tz} />
-            {data && data.hr.length > 1 && (
-              <div>
-                <SectionLabel>Heart rate through the day</SectionLabel>
-                <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-3.5">
-                  <DayHrTrace points={data.hr} />
-                </div>
-              </div>
-            )}
-            <BodySection body={data?.bodyMeta ?? null} />
-            {data && !hasAnything && (
-              <p className="py-16 text-center text-sm text-muted-foreground">Nothing logged on this day.</p>
-            )}
+            <DayReadThrough
+              date={selectedDate}
+              data={data}
+              energy={energy}
+              foodLogs={foodLogs}
+              restingHr={hrProfile?.restingHr ?? null}
+              tz={tz}
+              controls={readThroughControls}
+            />
           </motion.div>
         </AnimatePresence>
       </div>

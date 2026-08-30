@@ -170,6 +170,17 @@ export function ColmiPairing() {
                     .map(([tag, n]) => `${tag}×${n}`)
                     .join('  ')}
                 </div>
+                {Object.keys(outcome.diagnostics.hrSubTypes ?? {}).length > 0 && (
+                  <div>
+                    Heart-rate packets:
+                    <div className="mt-0.5 break-all font-mono">
+                      {Object.entries(outcome.diagnostics.hrSubTypes)
+                        .sort(([a], [b]) => Number(a.slice(1)) - Number(b.slice(1)))
+                        .map(([k, v]) => `${k}:${v.packets}p/${v.samples}s`)
+                        .join('  ')}
+                    </div>
+                  </div>
+                )}
                 {outcome.diagnostics.unmapped > 0 && (
                   <div>
                     {outcome.diagnostics.unmapped} frame(s) not understood:
@@ -187,6 +198,10 @@ export function ColmiPairing() {
               {/* Both numbers on purpose: a repeat sync storing 0 of 400 is deduping, not failing,
                   and without the pair those look identical. */}
               Read {outcome.readings} samples
+              {/* Three numbers, because two cannot tell a filter from a de-dup: read minus kept is
+                  what the server rejected as implausible or out of window, kept minus new is what
+                  it already had. */}
+              {outcome.accepted ? `, kept ${outcome.accepted.readings}` : ''}
               {outcome.stored ? `, stored ${outcome.stored.readings} new` : ''}
               {outcome.sleepSegments > 0 ? ` · ${outcome.sleepSegments} sleep segments` : ''}
               {outcome.battery ? ` · battery ${outcome.battery.percent}%` : ''}

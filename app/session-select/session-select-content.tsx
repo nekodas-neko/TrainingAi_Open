@@ -2,6 +2,7 @@
 
 import { useEffect, useLayoutEffect, useRef, useState, useCallback, useMemo } from "react";
 import { useUserTimezone } from "@/components/shell/user-timezone-provider";
+import { useSearchParams } from "next/navigation";
 import { useTransitionRouter } from "@/lib/view-transition";
 import type { ProgramSession, Program, NextSessionRecommendation } from "@trainingai/shared/types/program";
 import { getScheduledSessionsPerWeek } from "@trainingai/shared/schedule-utils";
@@ -25,7 +26,6 @@ const MoodCheckInSheet = dynamic(() => import("@/components/mood-checkin-sheet")
 const MorningCheckinSheet = dynamic(() => import("@/components/morning-checkin-sheet").then(x => ({ default: x.MorningCheckinSheet })), { ssr: false });
 const ExerciseHistorySheet = dynamic(() => import("@/components/exercise-history-sheet").then(x => ({ default: x.ExerciseHistorySheet })), { ssr: false });
 const WaterLogSheet = dynamic(() => import("@/components/profile/water-log-sheet").then(x => ({ default: x.WaterLogSheet })), { ssr: false });
-const DayReviewSheet = dynamic(() => import("@/components/day-review-sheet").then(x => ({ default: x.DayReviewSheet })), { ssr: false });
 const WeekDaySheet = dynamic(() => import("./components/week-day-sheet").then(x => ({ default: x.WeekDaySheet })), { ssr: false });
 const LogValueSheet = dynamic(() => import("./components/log-value-sheet").then(x => ({ default: x.LogValueSheet })), { ssr: false });
 import { cn } from "@trainingai/shared/utils";
@@ -115,6 +115,8 @@ function markMorningCheckinPromptDone(tz: string): void {
 
 export default function SessionSelectContent({ userId, isAdmin }: { userId?: string; isAdmin?: boolean }) {
   const router = useTransitionRouter();
+  // Q-112a: the weekly reminder deep-links straight to the recap instead of landing on bare Home.
+  const weekReviewRequested = useSearchParams().get("review") === "week";
   const { epoch: tabEpoch } = useTabVisibility();
 
   const [metaToday, setMetaToday]           = useState<BodyMetaRow | null>(null);
@@ -189,7 +191,6 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
   const [goalsCheckinDismissed, setGoalsCheckinDismissed] = useState(false);
   const [goalsRecommendation, setGoalsRecommendation] = useState<GoalRecommendationData | null>(null);
   const [goalsSheetOpen, setGoalsSheetOpen] = useState(false);
-  const [dayReviewOpen, setDayReviewOpen] = useState(false);
   const [dayReviewDismissed, setDayReviewDismissed] = useState(true);
 
   // useLayoutEffect fires before paint — prevents layout shift on hard load
@@ -1190,17 +1191,18 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
         {!dayReviewDismissed && (
           <DismissibleBanner
             title="Your day in review is ready"
-            onActivate={() => setDayReviewOpen(true)}
+            // Q-112a — one door. This opened a second, thinner review only Home had; the real one
+            // lives on Nutrition, with the meal types, logs and targets it needs.
+            onActivate={() => navigateToTab(router, "/nutrition?review=day")}
             onDismiss={() => {
               localStorage.setItem(`ta_day_review_dismissed_${todayInTz(tz)}`, '1');
               setDayReviewDismissed(true);
             }}
           />
         )}
-        <DayReviewSheet open={dayReviewOpen} onOpenChange={setDayReviewOpen} />
 
         {/* ── Weekly recap notification (self-hides once dismissed or generated) ── */}
-        <WeeklyRecapBanner />
+        <WeeklyRecapBanner forceOpen={weekReviewRequested} />
 
         {/* ── Sections ── */}
         {!showHomeSkeleton && <div className="content-fade-in">

@@ -1013,6 +1013,8 @@ export interface WorkoutRepository {
   // source protects writes, and every scoring read is source-blind, so isolation has to come from
   // the data never entering those tables.
   insertColmiReadings(userId: string, rows: import('./postgres/slices/colmi').ColmiReadingInput[]): Promise<number>
+  /** The archival write — raw frames before decoding. Never pruned; see the table's comment. */
+  insertColmiRawFrames(userId: string, rows: import('./postgres/slices/colmi').ColmiRawFrameInput[]): Promise<number>
   insertColmiSleepSegments(userId: string, rows: import('./postgres/slices/colmi').ColmiSleepSegmentInput[]): Promise<number>
   getColmiReadings(userId: string, kinds: import('./postgres/slices/colmi').ColmiReadingKind[], from: Date, to: Date): Promise<{ kind: string; measuredAt: Date; localDate: string; value: number; valueHigh: number | null }[]>
   getColmiSleepSegments(userId: string, fromDate: string, toDate: string): Promise<{ localDate: string; startedAt: Date; endedAt: Date; stage: number; minutes: number }[]>

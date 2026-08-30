@@ -7,7 +7,6 @@ import dynamic from "next/dynamic";
 import { useDrag } from "@use-gesture/react";
 import { AnimatePresence, motion } from "motion/react";
 import { Settings, ChevronLeft, ChevronRight } from "lucide-react";
-import { MacroRing } from "@/components/nutrition/macro-ring";
 import { DayToolsSection } from "@/components/nutrition/day-tools-section";
 import { MIN_LOGGED_DAYS } from "@trainingai/shared/nutrition/adaptive-tdee";
 import { budgetProvenance } from "@trainingai/shared/nutrition/calorie-balance";
@@ -40,7 +39,7 @@ import type { NutritionAdherenceResponse } from "@/app/api/nutrition/adherence/r
 import { getLocalStore } from "@/lib/local-store";
 import { pushThenRevalidate } from "@/lib/local-store/push-then-revalidate";
 import { TdeeAdaptationCard } from "@/components/nutrition/tdee-adaptation-card";
-import { CalorieBalanceBar } from "@/components/nutrition/calorie-balance-bar";
+import { EnergyCard } from "@/components/nutrition/energy-card";
 import { MealPlanSection } from "@/components/nutrition/meal-plan-section";
 import { usePlanMealLogging } from "./use-plan-meal-logging";
 import { usePlanMealSaving } from "./use-plan-meal-saving";
@@ -135,7 +134,10 @@ export default function NutritionContent({ userId }: { userId?: string }) {
   const [savedMealsOpen, setSavedMealsOpen] = useState(false);
   const [confirmDeleteLogId, setConfirmDeleteLogId] = useState<string | null>(null);
   const [mealRemindersEnabled, setMealRemindersEnabled] = useState(true);
-  const [chatOpen, setChatOpen] = useState(false);
+  // Q-112a: named for what it opens. It was `chatOpen`, a leftover from a chat surface that no
+  // longer exists, so the call site read `onEndOfDay={() => setChatOpen(true)}` and every reader had
+  // to already know those were the same thing.
+  const [reviewOpen, setReviewOpen] = useState(false);
   const [supplements, setSupplements] = useState<SupplementWithStatus[]>([])
   const [supplementsLoading, setSupplementsLoading] = useState(true)
 
@@ -171,7 +173,11 @@ export default function NutritionContent({ userId }: { userId?: string }) {
   }, []);
 
   useEffect(() => {
-    if (searchParams.get("chat") === "backfill") setChatOpen(true);
+    // Two params, one destination. `?review=day` is the day review's own deep link (Q-112a — the
+    // evening reminder and Home's banner both use it). `?chat=backfill` is the MEAL reminder's, and
+    // it is still accepted because notifications already scheduled on the phone carry it: changing
+    // `lib/meal-reminders.ts` only changes the ones scheduled from here on.
+    if (searchParams.get("review") === "day" || searchParams.get("chat") === "backfill") setReviewOpen(true);
   }, [searchParams]);
 
   // Deep-link from the home/health timeline's meal card (Q-93) — jump straight to that day's
@@ -561,28 +567,25 @@ export default function NutritionContent({ userId }: { userId?: string }) {
             transition={{ duration: 0.18 }}
             className="space-y-5"
           >
-            {/* Q-395b: today's energy is ONE section — the balance bar and the ring are two views of
-                the same number, and a gap between them read as two unrelated cards. */}
-            <div className="divide-y divide-border/50 overflow-hidden rounded-2xl border border-border">
-              {/* Guarded on the payload's own date: the swipe re-renders before the new date's
-                  fetch resolves, and showing the previous day's balance is worse than a skeleton. */}
-              <CalorieBalanceBar
-                data={energyBalance?.date === selectedDate ? energyBalance : null}
-                isToday={selectedDate === todayStr}
-                loading={loading}
-                grouped
-              />
+            {/* Artboard 1's energy block (BF-24 ②). Q-395b had already made the balance bar and the
+                ring ONE section, two rows apart — the drawing makes them one card, and merging them
+                surfaced that the two rows carried two different "left" numbers against two
+                different budgets. `EnergyCard` keeps the burn-aware one; see its own comment.
 
-              <MacroRing
-                calories={totals.calories}
-                proteinG={totals.proteinG}
-                carbsG={totals.carbsG}
-                fatG={totals.fatG}
-                targets={effectiveTargets}
-                earnedKcal={earnedForSelectedDate}
-                grouped
-              />
-            </div>
+                Guarded on the payload's own date: the swipe re-renders before the new date's fetch
+                resolves, and showing the previous day's balance is worse than a skeleton. */}
+            <EnergyCard
+              data={energyBalance?.date === selectedDate ? energyBalance : null}
+              isToday={selectedDate === todayStr}
+              loading={loading}
+              calories={totals.calories}
+              proteinG={totals.proteinG}
+              carbsG={totals.carbsG}
+              fatG={totals.fatG}
+              goalCalories={effectiveCalorieGoal}
+              earnedKcal={earnedForSelectedDate}
+              targets={effectiveTargets}
+            />
 
             {/* Actions sit here, directly under the ring, rather than being reached by scroll depth
                 (Q-237). My Foods is a library, not an action, and it used to be reachable only
@@ -682,7 +685,7 @@ export default function NutritionContent({ userId }: { userId?: string }) {
           supplementsLoading={supplementsLoading}
           onSupplementsChanged={setSupplements}
           userId={userId}
-          onEndOfDay={() => setChatOpen(true)}
+          onEndOfDay={() => setReviewOpen(true)}
         />
       </div>
 
@@ -768,8 +771,8 @@ export default function NutritionContent({ userId }: { userId?: string }) {
       </Dialog>
 
       <EndOfDayReview
-        open={chatOpen}
-        onClose={() => setChatOpen(false)}
+        open={reviewOpen}
+        onClose={() => setReviewOpen(false)}
         mealTypes={mealTypes}
         logs={logs}
         date={selectedDate}

@@ -9,7 +9,7 @@
 // the Oura's continuous capture. That is why the WebView path's suspension while backgrounded does
 // not matter here.
 import { decodeV1, decodeBigData, bigDataPayloadLength, type ColmiFrame } from '@/lib/colmi-ble/decode'
-import { resolveRelative, resolveSleepWindow, resolveActivityBucket, localDayStartSeconds } from '@/lib/colmi-ble/resolve-time'
+import { resolveRelative, resolveSleepWindow, resolveActivityBucket, localDayStartSeconds, wallClockSecondsToEpochMs } from '@/lib/colmi-ble/resolve-time'
 import {
   V1_SERVICE, V1_WRITE, V1_NOTIFY, V2_SERVICE, V2_WRITE, V2_NOTIFY, NAME_PREFIX,
   cmdBattery, cmdSetDateTime, cmdPhoneName, cmdSyncActivity, cmdSyncHeartRate,
@@ -41,6 +41,10 @@ export interface ColmiSyncOutcome {
   readings: number
   sleepSegments: number
   stored?: { readings: number; sleep: number }
+  /** What the route kept after its per-sample window and range filters, before the de-dup insert.
+   *  `readings` sent minus this is what the FILTERS dropped; this minus `stored` is what the unique
+   *  key deduped. Without both, 223 sent reaching 17 rows has two explanations and no way to pick. */
+  accepted?: { readings: number; sleep: number }
   battery?: { percent: number; charging: boolean }
   /**
    * Every frame the ring sent, tallied by its command byte (`'0x73'`, `'0x43'`, …), plus how many
@@ -56,6 +60,12 @@ export interface ColmiSyncOutcome {
     unmapped: number
     /** A few raw frames we could not use, newest last — the input to a decoder fix. */
     unmappedHex: string[]
+    /** How many heart-rate packets arrived carrying each sub-type byte, and how many samples each
+     *  produced. `framesToPayload` reads that byte as a packet NUMBER and spaces the series by it;
+     *  if the ring repeats a value instead of counting up, every packet lands on the same
+     *  timestamps and all but one is discarded on the unique key. 122 samples reaching 7 rows is
+     *  what that looks like from the database, and only this tally tells the two apart. */
+    hrSubTypes: Record<string, { packets: number; samples: number }>
   }
   /** Which automatic measurements the ring reports as ON, read back AFTER we tried to enable them.
    *  A metric missing here recorded nothing, which is why an empty history is not proof of a
@@ -134,20 +144,28 @@ export async function syncColmiRing(opts: SyncOptions): Promise<ColmiSyncOutcome
 
   const autoPrefs: NonNullable<ColmiSyncOutcome['autoPrefs']> = {}
   const frameTags: Record<string, number> = {}
+  // The archival copy. Every frame, before any decoding — including the ones the decoders read
+  // fine, because "read fine" is a claim the bytes are what checks.
+  const rawFrames: { channel: 'v1' | 'v2'; tag: number | null; hex: string }[] = []
+  const hrSubTypes: Record<string, { packets: number; samples: number }> = {}
   const unmappedHex: string[] = []
   let unmapped = 0
-  /** Answers that ARE understood, and mean "nothing to send". They decode to `unknown` because they
- *  carry no sample, and counting them as not-understood made a healthy sync report frames it could
- *  not read — which is the opposite of what the panel is for. */
-const SENTINEL_REASONS = new Set(['no activity history'])
-
-const MAX_UNMAPPED_HEX = 8
-
   const toHex = (b: Uint8Array) => Array.from(b).map(x => x.toString(16).padStart(2, '0')).join('')
 
-  const note = (bytes: Uint8Array, frame: ColmiFrame) => {
+  const note = (bytes: Uint8Array, frame: ColmiFrame, channel: 'v1' | 'v2' = 'v1') => {
     const tag = `0x${(bytes[0] ?? 0).toString(16).padStart(2, '0')}`
+    if (rawFrames.length < MAX_RAW_FRAMES) {
+      rawFrames.push({ channel, tag: bytes[0] ?? null, hex: toHex(bytes) })
+    }
     frameTags[tag] = (frameTags[tag] ?? 0) + 1
+    if (frame.kind === 'heartRateLog') {
+      const key = `s${frame.subType}`
+      const seen = hrSubTypes[key] ?? { packets: 0, samples: 0 }
+      hrSubTypes[key] = {
+        packets: seen.packets + 1,
+        samples: seen.samples + frame.values.filter(v => v > 0).length,
+      }
+    }
     if (frame.kind === 'unknown' && !SENTINEL_REASONS.has(frame.reason)) {
       unmapped++
       if (unmappedHex.length < MAX_UNMAPPED_HEX) unmappedHex.push(toHex(bytes))
@@ -173,7 +191,7 @@ const MAX_UNMAPPED_HEX = 8
     if (bigDataBuffer.length < declared + 6) return                 // more to come
     const whole = Uint8Array.from(bigDataBuffer)
     const decoded = decodeBigData(whole)
-    note(whole, decoded)
+    note(whole, decoded, 'v2')
     frames.push(decoded)
     bigDataBuffer = []
   }
@@ -235,7 +253,7 @@ const MAX_UNMAPPED_HEX = 8
     try { await Ble.disconnect(paired.deviceId) } catch { /* closing */ }
   }
 
-  const diagnostics = { frameTags, unmapped, unmappedHex }
+  const diagnostics = { frameTags, unmapped, unmappedHex, hrSubTypes }
 
   if (framesSeen === 0) {
     // The ring's application processor sleeps when it has been still, and a sleeping ring is
@@ -250,7 +268,7 @@ const MAX_UNMAPPED_HEX = 8
     const res = await fetch('/api/colmi/samples', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
+      body: JSON.stringify({ ...payload, rawFrames }),
       cache: 'no-store',
     })
     if (!res.ok) {
@@ -258,9 +276,13 @@ const MAX_UNMAPPED_HEX = 8
                readings: payload.readings.length, sleepSegments: payload.sleep.length,
                message: `Upload failed (${res.status}).` }
     }
-    const body = await res.json() as { stored?: { readings: number; sleep: number } }
+    const body = await res.json() as {
+      stored?: { readings: number; sleep: number }
+      accepted?: { readings: number; sleep: number }
+    }
     return { ok: true, framesSeen, battery, autoPrefs, diagnostics,
-             readings: payload.readings.length, sleepSegments: payload.sleep.length, stored: body.stored }
+             readings: payload.readings.length, sleepSegments: payload.sleep.length,
+             stored: body.stored, accepted: body.accepted }
   } catch (e) {
     return { ok: false, framesSeen, reason: 'post-failed', battery, autoPrefs, diagnostics,
              readings: payload.readings.length, sleepSegments: payload.sleep.length, message: describe(e) }
@@ -275,6 +297,17 @@ const HR_ANCHOR_SAMPLES = 9
 const HR_CONTINUATION_SAMPLES = 13
 /** Used only until the header names the real one — the ring's own default is 5 minutes. */
 const HR_DEFAULT_INTERVAL_MINUTES = 5
+
+/** Answers that ARE understood, and mean "nothing to send". They decode to `unknown` because they
+ *  carry no sample, and counting them as not-understood made a healthy sync report frames it could
+ *  not read — which is the opposite of what the panel is for. */
+const SENTINEL_REASONS = new Set(['no activity history'])
+
+/** The route caps the array at 500; stop before it so an oversized sync loses the samples' own
+ *  request rather than being rejected whole. A sync sends about 66. */
+const MAX_RAW_FRAMES = 480
+
+const MAX_UNMAPPED_HEX = 8
 
 export interface ColmiPayload {
   readings: { kind: string; at: number; value: number; valueHigh?: number }[]
@@ -344,7 +377,8 @@ export function framesToPayload(frames: ColmiFrame[], opts: Pick<SyncOptions, 't
         f.values.forEach((bpm, i) => {
           // A zero is "not measured", not a reading of zero — the ring stores a slot for every
           // interval whether or not it sampled one.
-          if (bpm > 0) readings.push({ kind: 'heart_rate', at: hrAnchorSec! * 1000 + (index + i) * stepMs, value: bpm })
+          // The anchor is the local-wall-clock-as-UTC value we sent, echoed back — not an epoch.
+          if (bpm > 0) readings.push({ kind: 'heart_rate', at: wallClockSecondsToEpochMs(hrAnchorSec!, tz) + (index + i) * stepMs, value: bpm })
         })
         break
       }

@@ -88,11 +88,16 @@ test('the bar fills toward the goal notch, not around a centred marker', async (
 
   await page.goto('/nutrition')
   await settleRouteBoundary(page)
-  await expect(page.getByText('Energy Balance')).toBeVisible({ timeout: 30_000 })
 
+  // Anchored on the bar, not on an "Energy Balance" eyebrow. That label belonged to
+  // `CalorieBalanceBar`, which the day screen stopped rendering when BF-24 ② merged it and the
+  // macro ring into one artboard-1 card — the drawing has no eyebrow there, and Home still shows
+  // one because Home is a different card. Nothing this test actually asserts moved: the fill and
+  // notch percentages below are unchanged, which is what says the bar itself is intact rather than
+  // the anchor being loosened until it passed.
   const scale = budget + OUTER_KCAL
   const bar = page.locator('[data-calorie-bar]').first()
-  await expect(bar).toBeVisible()
+  await expect(bar).toBeVisible({ timeout: 30_000 })
 
   await expect.poll(async () => Number(await bar.getAttribute('data-fill-pct')), { timeout: 15_000 })
     .toBeCloseTo((intake / scale) * 100, 1)
