@@ -121,6 +121,9 @@ const VIA = {
   session_exercises:      t => `EXISTS (SELECT 1 FROM public.program_sessions ps JOIN public.programs p ON p.id = ps.program_id WHERE ps.id = ${t}.session_id AND p.user_id = $OWNER)`,
   style_sets:             t => `EXISTS (SELECT 1 FROM public.progression_styles ps WHERE ps.id = ${t}.style_id AND ps.user_id = $OWNER)`,
   saved_meal_items:       t => `EXISTS (SELECT 1 FROM public.saved_meals sm WHERE sm.id = ${t}.saved_meal_id AND sm.user_id = $OWNER)`,
+  // BF-41. The region rows hang off the scan and have no user of their own — the same shape as
+  // `saved_meal_items` above.
+  dexa_scan_regions:      t => `EXISTS (SELECT 1 FROM public.dexa_scans d WHERE d.id = ${t}.scan_id AND d.user_id = $OWNER)`,
   // BF-11e. Scoped through the MEAL, not the meal type — both FKs lead to a user and either would
   // scope correctly, but a row is a fact about the meal, and matching `saved_meal_items` above keeps
   // one rule for the two tables that hang off `saved_meals`.

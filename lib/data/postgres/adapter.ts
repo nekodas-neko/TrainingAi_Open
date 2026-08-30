@@ -3438,6 +3438,134 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       .orderBy(s.aiHealthInsights.section)
   }
 
+  /**
+   * BF-41 / BF-2. One transaction: upsert the scan, then replace its region rows.
+   *
+   * Same date = a correction, not a second scan — nobody has two DEXA scans in a day, and the unique
+   * index is what lets a re-entry (or a replayed extraction) land in place. The same shape
+   * `saveMeasuredRmr` uses below.
+   *
+   * **Regions are replaced wholesale, not merged.** A correction that reports nine regions must not
+   * leave the previous scan's other two sitting beside them, silently mixing two readings. The
+   * delete-and-reinsert CLAUDE.md warns about is only a hazard where another table FKs onto the rows
+   * — nothing FKs onto `dexa_scan_regions`, and it is inside the transaction either way.
+   */
+  async saveDexaScan(userId: string, input: import('../repository').DexaScanInput): Promise<void> {
+    const { regions, ...scan } = input
+    const values = {
+      manufacturer: scan.manufacturer ?? null,
+      model: scan.model ?? null,
+      serialNumber: scan.serialNumber ?? null,
+      scanType: scan.scanType ?? null,
+      analysisVersion: scan.analysisVersion ?? null,
+      providerScanId: scan.providerScanId ?? null,
+      heightCm: scan.heightCm ?? null,
+      weightKg: scan.weightKg ?? null,
+      ageYears: scan.ageYears ?? null,
+      bmi: scan.bmi ?? null,
+      totalBmd: scan.totalBmd ?? null,
+      tScore: scan.tScore ?? null,
+      zScore: scan.zScore ?? null,
+      totalBmcG: scan.totalBmcG ?? null,
+      bmdPrecisionCvPct: scan.bmdPrecisionCvPct ?? null,
+      fatG: scan.fatG ?? null,
+      leanG: scan.leanG ?? null,
+      leanPlusBmcG: scan.leanPlusBmcG ?? null,
+      totalMassG: scan.totalMassG ?? null,
+      pctFat: scan.pctFat ?? null,
+      pctFatYoungNormal: scan.pctFatYoungNormal ?? null,
+      pctFatAgeMatched: scan.pctFatAgeMatched ?? null,
+      androidPctFat: scan.androidPctFat ?? null,
+      gynoidPctFat: scan.gynoidPctFat ?? null,
+      fatMassHeight2: scan.fatMassHeight2 ?? null,
+      androidGynoidRatio: scan.androidGynoidRatio ?? null,
+      pctFatTrunkLegs: scan.pctFatTrunkLegs ?? null,
+      trunkLimbFatMassRatio: scan.trunkLimbFatMassRatio ?? null,
+      vatMassG: scan.vatMassG ?? null,
+      vatVolumeCm3: scan.vatVolumeCm3 ?? null,
+      vatAreaCm2: scan.vatAreaCm2 ?? null,
+      leanHeight2: scan.leanHeight2 ?? null,
+      appendicularLeanHeight2: scan.appendicularLeanHeight2 ?? null,
+      boneReference: scan.boneReference ?? null,
+      bodyCompReference: scan.bodyCompReference ?? null,
+      source: scan.source ?? 'manual',
+      notes: scan.notes ?? null,
+    }
+    await this.db.transaction(async tx => {
+      const [row] = await tx.insert(s.dexaScans)
+        .values({ userId, scannedOn: scan.scannedOn, ...values })
+        .onConflictDoUpdate({
+          target: [s.dexaScans.userId, s.dexaScans.scannedOn],
+          set: { ...values, updatedAt: new Date() },
+        })
+        .returning({ id: s.dexaScans.id })
+      await tx.delete(s.dexaScanRegions).where(eq(s.dexaScanRegions.scanId, row.id))
+      if (regions && regions.length > 0) {
+        await tx.insert(s.dexaScanRegions).values(regions.map(r => ({
+          scanId: row.id,
+          region: r.region,
+          bmd: r.bmd ?? null,
+          bmcG: r.bmcG ?? null,
+          areaCm2: r.areaCm2 ?? null,
+        })))
+      }
+    })
+  }
+
+  async getLatestDexaScan(userId: string): Promise<import('../repository').DexaScanRow | null> {
+    const [row] = await this.db.select().from(s.dexaScans)
+      .where(eq(s.dexaScans.userId, userId))
+      .orderBy(desc(s.dexaScans.scannedOn))
+      .limit(1)
+    return row ? { ...this.rowToDexaScan(row), regions: await this.dexaRegions(row.id) } : null
+  }
+
+  async listDexaScans(userId: string): Promise<import('../repository').DexaScanRow[]> {
+    const rows = await this.db.select().from(s.dexaScans)
+      .where(eq(s.dexaScans.userId, userId))
+      .orderBy(desc(s.dexaScans.scannedOn))
+    if (rows.length === 0) return []
+    // One read for every scan's regions rather than one per scan.
+    const regionRows = await this.db.select().from(s.dexaScanRegions)
+      .where(inArray(s.dexaScanRegions.scanId, rows.map(r => r.id)))
+      .orderBy(asc(s.dexaScanRegions.region))
+    const byScan = new Map<string, import('../repository').DexaScanRegion[]>()
+    for (const r of regionRows) {
+      const list = byScan.get(r.scanId) ?? []
+      list.push({ region: r.region, bmd: r.bmd, bmcG: r.bmcG, areaCm2: r.areaCm2 })
+      byScan.set(r.scanId, list)
+    }
+    return rows.map(r => ({ ...this.rowToDexaScan(r), regions: byScan.get(r.id) ?? [] }))
+  }
+
+  private async dexaRegions(scanId: string): Promise<import('../repository').DexaScanRegion[]> {
+    const rows = await this.db.select().from(s.dexaScanRegions)
+      .where(eq(s.dexaScanRegions.scanId, scanId))
+      .orderBy(asc(s.dexaScanRegions.region))
+    return rows.map(r => ({ region: r.region, bmd: r.bmd, bmcG: r.bmcG, areaCm2: r.areaCm2 }))
+  }
+
+  private rowToDexaScan(r: typeof s.dexaScans.$inferSelect): import('../repository').DexaScanRow {
+    return {
+      id: r.id, scannedOn: r.scannedOn,
+      manufacturer: r.manufacturer, model: r.model, serialNumber: r.serialNumber,
+      scanType: r.scanType, analysisVersion: r.analysisVersion, providerScanId: r.providerScanId,
+      heightCm: r.heightCm, weightKg: r.weightKg, ageYears: r.ageYears, bmi: r.bmi,
+      totalBmd: r.totalBmd, tScore: r.tScore, zScore: r.zScore,
+      totalBmcG: r.totalBmcG, bmdPrecisionCvPct: r.bmdPrecisionCvPct,
+      fatG: r.fatG, leanG: r.leanG, leanPlusBmcG: r.leanPlusBmcG, totalMassG: r.totalMassG,
+      pctFat: r.pctFat, pctFatYoungNormal: r.pctFatYoungNormal, pctFatAgeMatched: r.pctFatAgeMatched,
+      androidPctFat: r.androidPctFat, gynoidPctFat: r.gynoidPctFat,
+      fatMassHeight2: r.fatMassHeight2, androidGynoidRatio: r.androidGynoidRatio,
+      pctFatTrunkLegs: r.pctFatTrunkLegs, trunkLimbFatMassRatio: r.trunkLimbFatMassRatio,
+      vatMassG: r.vatMassG, vatVolumeCm3: r.vatVolumeCm3, vatAreaCm2: r.vatAreaCm2,
+      leanHeight2: r.leanHeight2, appendicularLeanHeight2: r.appendicularLeanHeight2,
+      boneReference: r.boneReference, bodyCompReference: r.bodyCompReference,
+      source: r.source, notes: r.notes,
+      regions: [],
+    }
+  }
+
   async saveMeasuredRmr(userId: string, input: import('../repository').MeasuredRmrInput): Promise<void> {
     await this.db.insert(s.measuredRmr)
       .values({
