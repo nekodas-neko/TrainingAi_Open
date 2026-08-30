@@ -9157,53 +9157,25 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   own recommendation: **trend is the missing dimension, not contributors** (contributors are
   genuinely inapplicable to a chip or a timeline row; a 7-day sparkline is not).
 
-### [platform][app-shell] Q-282 — the accessibility checks CI cannot make: touch targets and contrast
+### [app-shell] LB-26 — the APK banner's link is a 33 px tap target, and the CSS floor cannot reach it
 
-- **Branch:** `feat/ci-accessibility-scan`
-- **Plan:** none yet
-- **Added:** 2026-08-15 · from the comprehensive review §5
-- **Lane: B.** `eslint.config.mjs` + CI; no schema, no route.
-- **⚠️ THE ORIGINAL HEADLINE WAS FALSE, corrected 2026-08-25 — a check DOES exist.**
-  `eslint-plugin-jsx-a11y` rides in through `next/core-web-vitals` and has been running in the Lint
-  job all along. Verified by probe, not by reading: an unlabelled `<img>` reports
-  `jsx-a11y/alt-text`. **What was true is that it could not fail anything** — it reported at
-  *warning*, so `pnpm lint` exited 0 with violations present and a new one would land silently.
-  That is exactly how the hex-literal count grew by 41 in five days unnoticed.
-  - **✅ FIXED 2026-08-25 (Lane B).** Seven statically-decidable rules promoted to `error`:
-    `alt-text`, `anchor-has-content`, `aria-props`, `aria-proptypes`, `aria-unsupported-elements`,
-    `role-has-required-aria-props`, `role-supports-aria-props`. **The whole app measured at zero**
-    across `app/`, `components/` and `lib/`, so this cost nothing and froze the ground — a
-    shrink-only baseline whose baseline is empty. `pnpm lint`: **0 errors, 124 pre-existing
-    warnings**, and a probe file with three violations now fails.
-    [`journal`](overview/entries/2026-08-25-a11y-rules-can-fail.md).
-- **What is left is the half a linter cannot do, and it is the half this entry actually named.**
-  **Touch-target size** and **contrast** need a rendered page; no static rule can measure either.
-  That is still unbuilt.
-- **The gap, stated precisely.** The owner-directed testing cluster (Q-249 E2E · Q-250 emulator ·
-  Q-251 staging · Q-252 error tracking · Q-253 device farm · Q-254 unverified-row sweep) is
-  well-scoped and correctly prioritised, and this entry does **not** re-raise any of it. Standard
-  Android QA practice covers one thing none of the six touches: **automated accessibility scanning
-  of a running app.**
-- **Why it is the right gap to close next.** It targets exactly the class this project keeps
-  rediscovering by hand and cannot currently measure. The 2026-08-08 mobile-UI sweep found 7×7 px
-  tap targets by manual inspection, and its **contrast finding could not be measured at all** — it
-  is recorded in `projectOverview.md` as "contrast that could NOT be measured". Accessibility
-  Scanner / Espresso accessibility checks catch missing labels, undersized touch targets and
-  insufficient contrast automatically.
-- **⚠️ THE Q-250 DEPENDENCY HAS EXPIRED, and whoever takes this should not wait for it.** This was
-  written 2026-08-15, before the Playwright E2E harness grew into a real running app in CI. A
-  scanner needs a rendered page, not an emulator — `@axe-core/playwright` against the existing E2E
-  job would measure touch targets and contrast on the same DOM the WebView renders, with no
-  emulator and no second harness. **Not done here deliberately:** it adds a dependency and a new
-  failing-check surface, a flaky a11y gate would block every PR, and re-scoping an entry's approach
-  *and* implementing it in one pass is a decision that wants the owner or the Orchestrator, not an
-  implementer at the end of a session. The Espresso route below stays valid if the emulator lands
-  first.
-- **Scope:** Espresso accessibility checks enabled in the emulator run, failing on the touch-target
-  and contrast rules only at first (the label rules will produce a large initial backlog). Use the
-  **shrink-only baseline** pattern the repo already uses for `check-component-size.js` and
-  `check-hex-literals.js`, so the existing violations are recorded rather than blocking, and the
-  count can only go down.
+- **Lane:** B · **Branch:** `fix/apk-banner-link-height`
+- **Gate: device** — it is a visual change on Home's banner; the web harness measures the box but not
+  how it reads under a thumb.
+- **Added:** 2026-08-30 · Lane B, from Q-282's measurement pass.
+- **What it is.** On Home, the *Download Android App* banner's body link renders **258×33**, below
+  this repo's 48 dp floor. It is an `<a>`, and `app/globals.css`'s floor is `button, [role="button"]`
+  — `<a>` is excluded **on purpose**, because a 48 px floor on an inline prose link would wreck
+  paragraph layout. So nothing raises it and nothing was measuring it either.
+- **It is the only one.** Measured across all five tabs: every other undersized control is a
+  `button` carrying a documented compensating hit box (`tap-target-dot` on the three 7×7 workout
+  carousel dots, `tap-target-44` on More's 32×32 photo control).
+- **Do not fix it by widening the floor to `a`.** The exclusion is deliberate and the comment says
+  why. Either give this link `min-height: 48px` where it is a banner action, or wrap the tappable
+  area in the container-div + separate-dismiss-button pattern the session-select APK banner already
+  uses (CLAUDE.md, WebView gotchas).
+- **`e2e/touch-target-size.spec.ts` allowlists it by label**, shrink-only — removing the entry from
+  `ALLOWED` is part of the fix, and the spec then fails until the size is right.
 
 ### [platform] Q-283 — ~11 MB of indexes have never served a scan, on a DB where index bloat already caused an incident
 
@@ -9481,8 +9453,9 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   means going into use-gesture's tap/click-suppression behaviour or restructuring the binding.
 - **Recommendation: do not pursue without a reason.** The only working path is the one that matters,
   a rewrite risks it, and there is no user on the supported runtime who benefits. Revisit if the app
-  ever gets genuine desktop use, or if an automated accessibility/interaction scanner (Q-282) starts
-  driving mouse input.
+  ever gets genuine desktop use, or if an automated accessibility/interaction scanner starts driving
+  mouse input. (Q-282 shipped as `e2e/touch-target-size.spec.ts` and does **not** — it measures
+  rendered geometry from the DOM and never clicks, so it does not revive this.)
 
 ### [platform] Q-297 — finish the E2E specs Q-249's first PR deliberately left, and cover more than one tab per screen
 
