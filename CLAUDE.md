@@ -1141,7 +1141,7 @@ hash) for credentials-login testing.
 
 Required in Railway:
 - `DATABASE_URL` — PostgreSQL connection string
-- `SESSION_SECRET` — JWT signing
+- `AUTH_SECRET` — NextAuth session-cookie signing (`auth.config.ts`'s `secret`); without it the credentials callback returns `?error=Configuration` and nobody can log in. **It was missing from this list until Q-311 (2026-08-30) while ~~`SESSION_SECRET`~~ — read by nothing — sat in it**: `SESSION_SECRET` was `auth.config.ts`'s fallback until that fallback was deleted, and it outlived the deletion here, in the README, and in two CI workflow env blocks, where it read as a credential in a public repo. Safe to remove from Railway; `grep -rn SESSION_SECRET` now finds only prose.
 - `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` / `GOOGLE_REDIRECT_URI` — OAuth
 - `GOOGLE_GENERATIVE_AI_API_KEY` — Gemini (used by every `@ai-sdk/google` route)
 - ~~`GEMINI_API_KEY`~~ — **no longer used by any code (Q-189, 2026-08-12).** Its only consumer was the text-to-speech route, which was deleted with the unreachable legacy chat surface. Safe to remove from Railway; the app never reads it. The `@google/genai` package stays — `lib/exercise-image-gen.ts` still uses it, but on `GOOGLE_GENERATIVE_AI_API_KEY`, so nothing reads `GEMINI_API_KEY` any more.
