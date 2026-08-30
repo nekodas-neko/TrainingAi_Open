@@ -4167,8 +4167,22 @@ correcting BF-39's state cost more lines than the correction saved, so the "find
 change how you start" section was compressed from a heading plus three bullets into one paragraph,
 and four gotchas were merged. **Nothing was dropped** — the fourth instance of the precondition
 finding (BF-39's own) is now in there too, and it is the one that cost the most.
+## 2026-08-31 — `projectOverview.md` 8446 → 8443, `docs/implementation-backlog.md` 13752 → 13743 (LB-28)
 
-## 2026-08-31 — `projectOverview.md` 8450 → 8452, `docs/implementation-backlog.md` 13743 → 13677 (BF-60/61/62/63)
+Both fall, and the projectOverview one is the note worth reading: the new status entry was **paid
+for in the same section** rather than by raising the number. The BF-46 ①a paragraph from the day
+before was rewritten as one long line in the style the rest of the section has moved to, which
+freed nine — so the index gained an entry and lost seven lines.
+
+Nothing was cut from that paragraph except restatement: the picker count, the shared write path, the
+reproduction, the parent instrumentation and the precondition finding are all still in it, and its
+journal link is unchanged.
+
+**Re-derive both on the merge if #647 lands first** — it removes BF-39's queue entry and repairs
+four lines of duplicated `**Version:**` debris in the same section, so the merged figures will be
+lower than these. Take them from the merged documents rather than picking a side.
+
+## 2026-08-31 — `projectOverview.md` 8443 → 8445, `docs/implementation-backlog.md` 13724 → 13658 (BF-60/61/62/63)
 
 **A rise of two, and it is a rise rather than a trade.** The nutrition batch adds one status
 paragraph and pays for none of it, because the section has no slack left that is this branch's to
