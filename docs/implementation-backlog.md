@@ -1036,6 +1036,139 @@ app states the measured offset against the scale for the same period; corrected 
 calorie and protein goals; and history reads corrected without the raw scale values having been
 overwritten.
 
+### [workouts] BF-56 — swapping an exercise silently changes its role, which changes the prescribed sets and percentages
+
+- **Lane:** A — the swap's write path, `lib/coach/` and the shared swap used by the in-workout path.
+- **Added:** 2026-08-30 · owner, device pass S6, from the Coach swap card's own consequence list.
+- **Needs:** BF-15 — the role rules live there, and its constraint (below) is what makes this a bug
+  rather than a preference.
+
+The owner asked Coach to swap **Barbell Good Morning → Barbell Jefferson Curl** in `Shikai / Lower`.
+The confirm card listed, among the consequences: **"Sets the role to primary (was secondary) — this
+changes the prescribed sets and percentages."**
+
+**Nobody asked for that.** A swap replaces one movement with another; the *role* is a property of the
+slot in the programme, not of the exercise going into it. The likely mechanism is that the new
+exercise carries a default role from the library and the swap adopts it instead of preserving the
+slot's — worth confirming before fixing, because if the role is genuinely stored per exercise then
+this is a data-model question rather than a swap bug.
+
+**Why it matters more for this owner than it looks.** `Shikai / Lower` has **no Primary lift on
+purpose** — BF-16b was closed on their explicit rejection of "fixing" that. So a swap that promotes
+the incoming exercise to primary does not just change prescribed percentages; it silently undoes a
+deliberate choice, on a session where the absence of a Primary is the design.
+
+- **Recommendation: the swap preserves the outgoing exercise's role**, and if a role change is ever
+  wanted it is a separate, asked-for action. Say so on the card either way — *"role unchanged
+  (secondary)"* is a line worth printing, because its absence is what made this invisible.
+- **The card itself is not the problem.** It disclosed the change honestly and in plain language,
+  which is how this was caught at all. Do not "fix" this by removing the line.
+- **Verification:** swap an exercise in a session with no Primary; the incoming exercise takes the
+  outgoing one's role, the prescribed sets and percentages are unchanged, and the session still has
+  no Primary afterwards.
+
+### [devices][platform] BF-54 — the BLE console prints planner estimates as row counts, and its bloat verdict is built on them
+
+- **Lane:** A — `lib/data/postgres/slices/oura.ts:1593` and `:1706`.
+- **Added:** 2026-08-30 · from the owner's D2/D5 screenshots, then measured against production.
+
+**The console's DB footprint reads `n_live_tup AS rows`** (`:1593`). CLAUDE.md already documents that
+counter as a planner estimate maintained by autovacuum, with `last_analyze` NULL on every table here.
+**Measured against production the same day, and the gap is not marginal:**
+
+| Table | Console / `n_live_tup` | Real `count(*)` | Under-read |
+|---|---|---|---|
+| `oura_raw_samples` | **552** (shown as 297 on the owner's screen) | **180,415** | **327×** |
+| `rr_intervals` | **0** | **87,015** | ∞ |
+| `error_events` | **1** | **6,102** | 6,102× |
+
+*(counts are `claude_ro`, so owner-scoped — they are floors, which only makes the gap worse.)*
+
+**The display is the smaller half. `:1706` uses the same counter to justify a VACUUM FULL**, and its
+own comment states the reasoning: *"A huge `before` against a handful of live rows is the signature
+of pure bloat."* Against `oura_raw_samples` that reads 67 MB against 552 rows and says *pure bloat* —
+when the table holds **180,415 real rows**. Acting on it takes an **ACCESS EXCLUSIVE lock** on a
+67 MB table, with the timeouts deliberately lifted, and reclaims nothing.
+
+- **Fix:** `count(*)` for anything presented as a row count, and for the reclaim's before/after.
+  Where an exact count is too expensive, label the number an estimate on screen — the defect is a
+  guess wearing a count's clothes.
+- **The console already has a real count on the same screen**: *"Rows still carrying decoded
+  0 / 180,160"* sits directly above a table list saying 297. One screen, two numbers, three orders of
+  magnitude apart.
+- **Sibling sweep:** grep for `n_live_tup` anywhere a number reaches a user or gates an action.
+- **Verification:** the footprint's counts match `count(*)`, and the reclaim reports a live-row figure
+  that does too.
+
+### [platform] BF-55 — 84 MB of index against 63 MB of table, and the database is growing ~7× its expected trend
+
+- **Lane:** A
+- **Added:** 2026-08-30 · measured against production while checking BF-54. **These are the size
+  columns, read from the filesystem, so they are exact** — unlike the row counts BF-54 is about.
+
+**Two readings, both from `pg_stat_user_tables` on 2026-08-30:**
+
+1. **Indexes outweigh the data.** Whole database: **84 MB of index against 63 MB of heap** — 1.33×.
+   Per table it is starker: `oura_raw_samples` 38 MB index on 30 MB heap; `oura_heartrate` **32 MB
+   index on 9 MB heap**, 3.5×. An index set larger than the data it points at is either redundant
+   indexes or bloat, and both are fixable.
+2. **Growth is off trend.** Total is **206 MB**, against the **171 MB baseline of 2026-08-18** —
+   **+35 MB in 12 days, ~2.9 MB/day**, where CLAUDE.md's post-packing expectation is **~0.4 MB/day**.
+   That is roughly seven times trend, and CLAUDE.md says anything materially above it gets recorded
+   the same session. This is that record.
+
+**What this is not.** It is **not** the 0.79 GB premise of Q-549, which was falsified on 2026-08-25
+and is unrelated. And it is not, on this evidence, dead-tuple bloat in the heap: `oura_raw_samples`
+carries 7,333 dead tuples, which is real but small against 180,415 live rows.
+
+- **First move is measurement, not a VACUUM.** List the indexes on `oura_raw_samples` and
+  `oura_heartrate` with their sizes and `idx_scan` from `pg_stat_user_indexes`; an index never
+  scanned is a candidate to drop, and dropping one is cheaper and safer than REINDEX.
+- **Cost check before anyone panics:** at Railway's $0.15/GB/month this whole database is about
+  **three cents a month**. The reason to act is that a 7× trend compounds, not that the bill hurts.
+- **Verification:** index total drops below the heap total, and a re-read a week later shows growth
+  back near trend.
+
+### [body][devices][platform] BF-53 — every pending weigh-in button is dead: both routes validate a numeric id with a UUID regex
+
+- **Lane:** A — `app/api/scale-ble/pending/[id]/dismiss/route.ts` and `.../confirm/route.ts`, plus the
+  swallowed error in `components/settings/scale-pairing.tsx`.
+- **Added:** 2026-08-30 · owner, in passing during the device pass D1: *"noting that that the 'not
+  me' button for weigh in's doesnt actually remove it or do anything."*
+- **⚠ This is worse than reported and it is live in production.** The owner named one button. **Both
+  are broken**, so the entire pending weigh-in triage is dead: a reading that is not yours cannot be
+  dismissed, and one that is yours cannot be confirmed into `body_metrics`.
+
+**Root cause, and it is exact.** `scale_raw_samples.id` is `bigserial('id', { mode: 'number' })`
+(`schema.ts:1180`) and `/api/scale-ble/pending` returns it as a number. Both routes then do:
+
+```ts
+const badId = invalidUuidResponse(idParam)   // ← id is "41", not a UUID
+if (badId) return badId
+const id = Number(idParam)                   // ← unreachable
+if (!Number.isInteger(id)) return …
+```
+
+`invalidUuidResponse` tests `/^[0-9a-f]{8}-…$/`, which a decimal id can never match, so **every**
+press returns `400 Invalid id` before the numeric check that was written for it. The numeric guard on
+the next line is the tell: someone knew the id was a number and the UUID guard was applied over the
+top of it, most likely by the sweep that added `invalidUuidResponse` across the 30 dynamic routes.
+
+**The client hides it.** `dismissReading` is `if (res.ok) setPending(…)` with no `else` — no toast,
+no log, nothing. A 400 is indistinguishable from a no-op, which is why this reads as *"doesn't do
+anything"* rather than as an error, and why it has survived.
+
+- **Fix:** drop `invalidUuidResponse` from both routes; the `Number.isInteger` check underneath is the
+  correct guard and is already there. Then give the client an error path — a failed dismiss must say
+  so rather than silently leaving the row.
+- **⚠ Sweep the sibling routes in the same PR.** Any other route whose id is a `bigserial` rather
+  than a `uuid` has this shape. Grep the dynamic routes for `invalidUuidResponse` and check each
+  against its table's id type; a UUID guard on an integer key is always a 400 for every real request.
+- **Add a test that would have caught it:** a route test posting a real numeric id and asserting 2xx.
+  The existing coverage cannot have exercised these routes with a realistic id at all.
+- **Verification:** on the device, a pending reading dismisses and disappears; a confirmed one reaches
+  `body_metrics`; and a genuinely bad id still 400s.
+
 ### [nutrition] BF-47 — the deleted food comes back: the loader calls the server authoritative while the delete is still in the outbox
 
 - **Lane:** A — `app/nutrition/use-food-logs-loader.ts`.
@@ -2747,31 +2880,6 @@ tell is a locator that never resolves rather than a wrong value.
   reference drawings were never committed). Part 1 §8 has the file-by-file collision table and the
   carry-across rule. **Do not plan around that chain landing, and do not wait for it.**
 
-### [nutrition] LB-21 — `useLibrary` is reachable by users now, and no test has ever run a generation with it on
-
-- **Lane:** A — the work is in `app/api/nutrition/meal-plans/generate/route.ts`, which the path rule
-  puts in Lane A. Filed by Lane B (the letter records who found it, not who ships it).
-- **Branch:** `test/generate-with-library`
-- **Added:** 2026-08-27 · Lane B, from BF-11h's own "Not exercised" section.
-- **What is and is not covered.** `selectLibraryMeals` is well tested in
-  `packages/shared/src/nutrition/__tests__/library-match.test.ts` — the ranking, the eligibility
-  windows, untagged-suits-any-slot, no-meal-twice. **The route WIRING is not.** `grep -rl useLibrary
-  --include=*.test.ts` returns nothing: BF-11g shipped the flag with no test, BF-11h made it
-  settable from the wizard, and between them nobody has run a generation with it on.
-- **What a test should pin, none of which the shared tests can see:**
-  - `useLibrary: false` still skips both `listSavedMeals` and `listMealTypes` — the conditional
-    fetches at route.ts:132/135 are the reason the common path costs nothing, and a regression there
-    is invisible except as latency.
-  - Picks land at the slot they were matched against, **after** the pinned meals — the `kept.length`
-    offset at route.ts:203 is arithmetic nothing currently checks.
-  - `libraryMatchCount` equals the picks actually used, and `matchReason` is null on an AI slot when
-    `useLibrary` was off but a sentence when it was on. **BF-11h's UI depends on exactly that
-    distinction** — it is how the review step tells "the library had no say" from "nothing fitted".
-  - A pinned meal is never also offered by the library pass (route.ts filters it, untested).
-- **Do not reach for an AI call to test this.** The library path is the half that does NOT call the
-  model — a fully-pinned or fully-library-filled request generates nothing, which is what makes an
-  end-to-end test of this flag cheap and deterministic. That is the shape to aim for.
-
 ### [nutrition][platform] Q-407 — the meal-plan wizard is seven screens for six answers, and the one piece the Coach lacks is multi-select
 
 - **Branch:** `feat/nutrition-coach-meal-plan`
@@ -4267,6 +4375,16 @@ breath_avg_rpm:   9.1     9.7    10.0     9.8      9.8     <- the value it is co
 
 ### [workouts] BF-15 — the exercise-role fallback is `primary`, so unclassified work is prescribed like a main lift
 
+> **⚑ OWNER DECISION 2026-08-30 — a live session with NO Primary is legitimate, and this rule must
+> not treat it as a defect.** BF-16b found `Shikai / Lower` carrying three Secondary and two
+> Accessory and no Primary, and this rule would have nominated Barbell Good Morning. Put to the
+> owner, who declined: *"Reject; I wanted it made that way on purpose."* BF-16b is closed and
+> removed.
+>
+> **What that changes here:** the nomination rule is a *suggestion*, never a correction to apply, and
+> nothing downstream — a validator, a Coach prompt, a data-quality sweep — may flag "no Primary" as
+> wrong. If this rule is implemented, it offers and the user decides.
+
 - **Branch:** _unassigned_
 - **Added:** 2026-08-24 · owner report — *"some 'isolation' type work will increase to a main level when it should be accessory sort of — like bicep curls... but what about cable dips?"*
 - **Lane: A** — `lib/data/postgres/schema.ts`, one Postgres migration, `lib/sqlite/migrations.ts` (local schema version), `packages/shared/src/workout/exercise-role.ts`, and the read fallbacks below.
@@ -4329,29 +4447,6 @@ budget-aware rule and wire it into those creation paths.
   session's *configured* budget, which BF-7's owner decision confirms is the anchor.
 - **Surface: server/shared + local SQLite.** The local-schema half is **not** web-reproducible
   (`getLocalStore` returns null in the sandbox), so it needs the device check or a Known-Issues row.
-
-### [workouts] BF-16b — the retired all-primary program, and the one live session with no Primary
-
-- **Branch:** _unassigned_
-- **Added:** 2026-08-24 · found while tracing BF-15, from production
-- **Lane: A** — data correction, no schema.
-- **Needs:** BF-15
-- **Gate: owner** — any role change alters a prescribed percentage. An advisory list approved row by
-  row, never a silent sweep.
-
-**The owner's ACTIVE program needs no role corrections** — Shikai carries 1 Primary in four of its
-five sessions. An earlier count of "11 isolation movements at `primary`" was real but unsplit: almost
-all of it sits inside the retired `Strength + Hypertrophy`, where **every** exercise is `primary` —
-the old column default doing exactly what BF-15 describes. Correcting a program nobody trains on may
-not be worth doing at all; present it and let the owner decide.
-
-**`Shikai / Lower` has no Primary at all** — three Secondary and two Accessory, the only live-program
-anomaly. BF-15's rule would nominate Barbell Good Morning.
-
-Detail in [`docs/superpowers/plans/2026-08-24-exercise-roles.md`](superpowers/plans/2026-08-24-exercise-roles.md) §6.
-
-- **What would count as fixed:** each corrected row is one the owner approved.
-- **Surface: production data.**
 
 ### [workouts][platform] BF-17 — `main` and `primary` are two axes wearing the same word, and the UI labels them backwards
 
@@ -5358,6 +5453,11 @@ this fits without an extraction.
 
 ### [app-shell] Q-499 — self-fetching cards cannot tell "no data" from "the fetch failed"
 
+> **⚑ CONFIRMED ON THE DEVICE 2026-08-30 — this is a real failure, not a theory.** The owner ran it
+> properly (airplane mode, then reopen) and reported: *"nothing said it couldnt load."* So a card
+> whose fetch fails renders as absence, exactly as this entry predicted, and the user cannot tell "no
+> data" from "this broke". The gate is cleared as **failed**; it is now a build item.
+
 > **The two verified instances shipped 2026-08-24, plus a deeper bug the fix uncovered.**
 > `hr-recovery-profile-card.tsx` and `strength-progress-card.tsx` now pass `onError` to
 > `useCachedValue` and render a compact "Couldn't load… — pull to refresh" state instead of a bare
@@ -6021,6 +6121,19 @@ this fits without an extraction.
 
 ### [app-shell][workouts][platform] Q-467 — the Coach can change your programme and nothing in the app can undo it
 
+> **⚑ DEVICE PASS 2026-08-30 — ✅ Coach PASSES this check, and the screenshot says so.** The owner
+> first reported *"it only allowed for making it primary"*; the screenshot shows the opposite. The
+> Swap Exercise card proposes **Barbell Good Morning → Barbell Jefferson Curl** exactly as asked, with
+> six consequences listed, Cancel and Apply, and the permanence warning Q-403's decision required:
+> *"Changes the Lower session itself, so it applies every Lower day from now on — not just today …
+> For a one-off change today, use the swap inside the workout instead."* **That is this entry's
+> device gate met.** The confirm screen is doing its job.
+>
+> **What the report actually found is one line in that list, and it is a real defect — filed as
+> BF-56.** *"Sets the role to primary (was secondary) — this changes the prescribed sets and
+> percentages."* The user asked to swap an exercise, not to promote it, and the owner read that line
+> as the whole proposal precisely because it is the surprising one.
+
 > **✅ SHIPPED 2026-08-25.** `coach-history.tsx` renders an Undo on every change that is not already
 > undone; the row re-styles struck-through when it lands, and the route's 409 window ("you've trained
 > since this change") renders as a sentence on the row rather than an error, replacing the button.
@@ -6352,6 +6465,12 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 
 ### [app-shell][devices] Q-318 — poll the redecode job, and stop the two consoles reporting "done" for work that has started
 
+> **⚑ DEVICE PASS 2026-08-30 — partial, and it fails the half this entry is about.** Owner pressed
+> Redecode and got one line: *"redecode job 1 started - this can take minutes"*, and **nothing
+> after** — no progress, no completion, no outcome. That is precisely the reporting gap this entry
+> and Q-535 describe, now confirmed from the device rather than inferred. The job may well have
+> succeeded; the console has no way to say so, which is the defect.
+
 > **✅ THE CLIENT HALF SHIPPED 2026-08-24 (Lane B, v1.363.1).** `components/oura-ble/redecode-job.ts`
 > POSTs `?async=1` and polls `GET ?jobId=…` every 3s until the server reports `done`/`failed`, then
 > hands back the same phases payload the synchronous route returned. Both consoles use it;
@@ -6404,6 +6523,16 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   client only.
 
 ### [app-shell][devices] Q-316 — the frame packer has no button: `POST /api/oura-ble/samples/pack` can only be driven by curl
+
+> **⚑ DEVICE PASS 2026-08-30 — the button could not be pressed, and that is probably a defect rather
+> than the pass.** Owner: *"There is a 'pack sealed frame (lever 5)' button but I cant click it."*
+> The check as written says a disabled button at zero rows **is** the pass — but Q-538's reading from
+> the same session shows **652,417 raw rows on disk**, so there is plainly something to pack.
+>
+> **Two possibilities and they need separating before anything is built:** the button's enabled
+> condition reads a count that is zero or missing while the rows exist, or it is enabled and the tap
+> is not landing. Have the owner report whether it looks greyed out or looks normal and does nothing
+> — that one word decides which.
 
 > **✅ SHIPPED 2026-08-24 (Lane B, v1.363.3).** A third control in `db-footprint-card.tsx`'s ① Data
 > section. The `GET` count renders beside the button (*"N bucket(s) packable"* / *"no sealed buckets
@@ -6498,6 +6627,15 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   levers have, beside them in the footprint card.
 
 ### [devices][platform] Q-538 — `oura_raw.db` grows without bound on the phone: `pruneRaw` has no caller, and `rolled_up` is never set
+
+> **⚑ MEASURED ON THE DEVICE 2026-08-30, and it is bigger than the entry assumed.** Owner, via the
+> console's Read stats: **652,417 total rows, 95.7 MB on disk.** That is the local `oura_raw.db`
+> with `pruneRaw` still having no caller. For scale: the owner's whole production Postgres was
+> 171 MB at the 2026-08-18 baseline, so the phone is carrying more than half a server's worth of raw
+> frames that the 14-day retention decision says it should not hold at all.
+>
+> **This also re-frames D2's finding below.** With 652k raw rows present, a pack button that cannot
+> be pressed is not "correctly disabled at zero" — see the note on Q-316.
 
 - **Plan:** [`docs/superpowers/plans/2026-08-17-db-storage-raw-samples-retention.md`](superpowers/plans/2026-08-17-db-storage-raw-samples-retention.md) §3
 - **Branch:** `fix/oura-raw-device-store-visibility`

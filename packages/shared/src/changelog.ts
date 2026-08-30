@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.395.7",
+    date: "2026-08-30",
+    changes: [
+      "A meal plan built entirely from meals you had already chosen \u2014 whether you pinned them yourself or they came from your saved meals \u2014 no longer fails when the recipe generator is unavailable. It was still asking for a plan it did not need, so an outage broke a plan that required nothing from it. Plans like that are now named after their own meals and put together instantly.",
+    ],
+  },
+  {
     version: "1.395.6",
     date: "2026-08-30",
     changes: [
