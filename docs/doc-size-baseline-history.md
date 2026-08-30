@@ -4097,3 +4097,21 @@ than a caution.
 The recommendation is to reuse `toggleDeloadRevert` rather than teach `/prescribe` an intensity
 input: the full numbers are already carried on the prescription, so the cheap path costs no LLM
 call, no rate-limit budget, and works offline.
+
+## 2026-08-30 — `docs/implementation-backlog.md` (BF-65, a feature request that is mostly a cleanup)
+
+The owner asked for one picture on one screen. Most of the entry is what reading the code turned up
+around it: the same `/api/exercise-gif` fetch is hand-rolled in **four** files, so satisfying the
+request naively writes a fifth and walks past the repo's own extract-before-the-third-copy rule.
+Saying that in the entry is what makes the extraction part of the work rather than a follow-up
+nobody files.
+
+Two things are written down because they fail *quietly*. `next/image` silently converts a GIF to a
+static image without `unoptimized`, so the feature would ship looking finished and never move — the
+warm-up screen already carries the correct condition to copy. And the warm-up screen fetches every
+exercise's media moments earlier and prefetches the binaries for the service worker, then unmounts
+and drops the map; without a shared cache key the ready screen re-downloads what the app already has,
+which is also what breaks the offline case.
+
+The layout note is deliberate: the screenshot already cuts `SET TARGETS` off behind the action row,
+so "add a picture" is a fold decision, not a drop-in.
