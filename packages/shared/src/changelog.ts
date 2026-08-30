@@ -14,6 +14,14 @@ export const CHANGELOG: ChangelogEntry[] = [
     ],
   },
   {
+    version: "1.401.0",
+    date: "2026-08-30",
+    changes: [
+      "The quantity sheet is laid out the way you picked. The srv/g toggle moved to a narrow column beside the \u2212 and + buttons, so the quick-amount buttons now span the full width; the calorie total sits on its own as the biggest number on the sheet; and the macros are three labelled tiles \u2014 Protein, Carbs, Fat \u2014 instead of P/C/F.",
+      "An ingredient inside a meal now says just its weight, like \u201c1000 g\u201d. It used to say \u201c8 servings \u00b7 1000 g\u201d, which meant \u201cserving\u201d described two different things one line apart from the meal's own portions.",
+    ],
+  },
+  {
     version: "1.400.0",
     date: "2026-08-30",
     changes: [

@@ -44,3 +44,26 @@ export function steppedQty(
   const next = Math.min(MAX_QTY, round2(current + delta))
   return next <= 0 ? null : next
 }
+
+/**
+ * How much of one ingredient a collapsed builder row shows: **grams**, whichever unit its editor is
+ * set to (BF-46 ②).
+ *
+ * A row used to read `8 servings · 1000 g` while the meal it belongs to is measured in *portions*,
+ * so "serving" meant two different things one line apart. The owner settled it: *"just the weight
+ * would be fine for the meals. Only portions are really needed when making serving sizes for the
+ * meals."*
+ *
+ * Grams are already the stored truth — the quantity is a serving multiplier and this is a second
+ * view of it — so this is display only and the editor still offers both units. **Servings survive
+ * as the fallback for a food with no serving size**, which has no gram equivalent to show instead;
+ * that is the one case where the word is the only thing available rather than a competing unit.
+ *
+ * It takes no unit, on purpose: a parameter it ignored would read as a switch that still works.
+ */
+export function ingredientAmountLabel(servingSizeG: number | null | undefined, qty: number): string {
+  const serving = servingSizeG ?? 0
+  if (serving > 0) return `${Math.round(serving * qty)} g`
+  const servings = round2(qty)
+  return `${servings} ${servings === 1 ? 'serving' : 'servings'}`
+}

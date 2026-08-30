@@ -6,7 +6,7 @@
 // a rewrite. The two null returns are the load-bearing part — they mean different things ("leave the
 // row alone" vs "remove the row") and the component branches on that difference.
 import { describe, it, expect } from 'vitest'
-import { qtyFromInput, steppedQty } from '@/components/nutrition/saved-meal-qty'
+import { ingredientAmountLabel, qtyFromInput, steppedQty } from '@/components/nutrition/saved-meal-qty'
 
 describe('qtyFromInput — typed value converted to servings', () => {
   it('passes a serving figure straight through, rounded to two decimals', () => {
@@ -65,5 +65,28 @@ describe('steppedQty — one ± press', () => {
 
   it('caps at 100 servings', () => {
     expect(steppedQty(100, 'serving', 1, 40)).toBe(100)
+  })
+})
+
+describe('ingredientAmountLabel (BF-46 ②)', () => {
+  /**
+   * A serving inside a serving. The row read `8 servings · 1000 g` while the meal it belongs to is
+   * measured in *portions*, so "serving" meant two different things one line apart. The owner:
+   * *"just the weight would be fine for the meals. Only portions are really needed when making
+   * serving sizes for the meals."*
+   */
+  it('says grams and nothing else when the food has a serving size', () => {
+    expect(ingredientAmountLabel(125, 8)).toBe('1000 g')
+    expect(ingredientAmountLabel(125, 1)).toBe('125 g')
+  })
+
+  it('says grams even for a fractional quantity — the word "serving" is what is being removed', () => {
+    expect(ingredientAmountLabel(65, 0.5)).toBe('33 g')
+  })
+
+  it('falls back to servings ONLY when there is no gram equivalent to show', () => {
+    expect(ingredientAmountLabel(0, 2)).toBe('2 servings')
+    expect(ingredientAmountLabel(null, 1)).toBe('1 serving')
+    expect(ingredientAmountLabel(undefined, 1.5)).toBe('1.5 servings')
   })
 })

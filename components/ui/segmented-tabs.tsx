@@ -7,6 +7,13 @@ interface SegmentedTabsProps<T extends string> {
   value: T;
   onValueChange: (value: T) => void;
   size?: "sm" | "xs";
+  /**
+   * `vertical` stacks the segments in a column, for a toggle that sits beside a taller control
+   * rather than above one (BF-46 ③). The 48 dp floor applies per segment either way, so a
+   * two-option vertical toggle is 96 px tall and its neighbour has to be built to match — it does
+   * not shrink to fit.
+   */
+  orientation?: "horizontal" | "vertical";
   className?: string;
 }
 
@@ -15,10 +22,15 @@ export function SegmentedTabs<T extends string>({
   value,
   onValueChange,
   size = "sm",
+  orientation = "horizontal",
   className,
 }: SegmentedTabsProps<T>) {
   return (
-    <div role="tablist" className={cn("flex gap-1", className)}>
+    <div
+      role="tablist"
+      aria-orientation={orientation}
+      className={cn("flex gap-1", orientation === "vertical" && "flex-col", className)}
+    >
       {tabs.map(t => (
         <button
           key={t.value}
