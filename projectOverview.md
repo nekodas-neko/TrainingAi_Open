@@ -25,6 +25,7 @@
 ## 🔖 Current Status
 
 **Version:** v1.403.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Version:** v1.402.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Version:** v1.401.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Version:** v1.401.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-08-30.
@@ -39,6 +40,17 @@ app does not have. The name and photo come from `useSavedMealSummaries`, local-f
 `saved_meals` is a local-first domain. **Not device-verified** — and the local-first branch never
 ran, since the sandbox has no local store
 ([journal](docs/overview/entries/2026-08-30-diary-nested-meal-rows.md)).
+
+**One photo picker per screen, and the held rebuild's failure was the spec (BF-46 ①a).** Two things
+said *Add a photo* and only one was a picker — the meal's own screen called `onEdit`. Both are real
+now, at the top of their own screen, and the meal screen writes through the same
+`saveMealToLibrary` the builder calls, so there is still one write path. **The interesting half:**
+rebuilt, the previous session's failure reproduced — `onChange` firing with a valid data URI and the
+component never receiving it — and instrumenting the *parent* showed the file was landing in the
+**other** picker. The meal's own screen is still in the DOM while it closes, both carried the same
+accessible name, and the spec waited for that name before picking. *A precondition satisfied by the
+state it is meant to replace cannot fail* — the third time that shape cost time in one day
+([journal](docs/overview/entries/2026-08-30-meal-photo-one-picker.md)).
 
 **The meal photo was blocked by the app's own CSP, on the branch no test runs (BF-46 ①b).** Three
 owner reports, recorded as a save failure that *"does not reproduce in source"*. `MealPhotoTile`'s
