@@ -6,10 +6,8 @@ import { asHttpsUrl, hostOf } from './recipe-url'
 import { RecipeImageButton } from './recipe-image-button'
 import type { FoodItem } from '@trainingai/shared/types/nutrition'
 import { FoodRow } from '@/components/nutrition/food-row'
-import type { FoodSearchResponse } from '@/app/api/nutrition/food-search/route'
-import { macroCalorieDisagreement, MACRO_MISMATCH_VISIBLE_LIMIT } from '@trainingai/shared/nutrition/scan-totals'
-
-export type ExternalFood = FoodSearchResponse['results'][number]
+import { FoodDatabaseResults } from './food-database-results'
+import type { ExternalFood } from '@/lib/hooks/use-food-database-search'
 
 interface Props {
   query: string
@@ -145,34 +143,14 @@ export function IngredientSearch({
       )}
 
       {!recipeUrl && query.trim().length >= 2 && (dbSearching || dbResults.length > 0 || dbUnavailable) && (
-        <div className="space-y-1.5">
-          <p className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
-            Food database
-            {dbSearching && <Loader2 className="w-3 h-3 animate-spin" />}
-          </p>
-          {dbUnavailable ? (
-            <p className="text-[11px] leading-snug text-muted-foreground">
-              The food database is not responding right now. Use the estimate above, or add
-              the food by hand below.
-            </p>
-          ) : dbResults.map(food => {
-            // Food-database entries are filled in field by field by different contributors, so a
-            // product can state 96 kcal beside macros that come to 122. Below the sanitiser's
-            // rewrite threshold it lands as-is, so say so rather than let the row look verified.
-            const off = macroCalorieDisagreement(food)
-            const mismatched = off != null && off > MACRO_MISMATCH_VISIBLE_LIMIT
-            return (
-              <ExternalFoodRow
-                key={food.externalId}
-                food={food}
-                mismatched={mismatched}
-                adding={addingExternal != null}
-                pending={addingExternal === food.externalId}
-                onAdd={onAddExternal}
-              />
-            )
-          })}
-        </div>
+        <FoodDatabaseResults
+          results={dbResults}
+          searching={dbSearching}
+          unavailable={dbUnavailable}
+          addingId={addingExternal}
+          onAdd={onAddExternal}
+          unavailableHint="The food database is not responding right now. Use the estimate above, or add the food by hand below."
+        />
       )}
 
       {!recipeUrl && query.trim() && searchResults.length === 0 && dbResults.length === 0 && !dbSearching && !showAddFood && (
@@ -203,37 +181,6 @@ const SearchResultRow = memo(function SearchResultRow(
       secondary={`${Math.round(item.proteinG ?? 0)}g P per ${serving}`}
       calories={item.calories}
       onPress={press}
-    />
-  )
-})
-
-/**
- * The external food-database result, as the shared row (Q-406's last call site).
- *
- * **It loses its trailing `+` and per-row spinner deliberately.** `SearchResultRow` above — the
- * sibling that has been `FoodRow` since v1.338.0 — has neither: the tap adds the food, and an add
- * affordance on top of that is a per-screen difference, which is what converting these rows exists
- * to end. The tapped row still says so, through `highlighted`, so nothing about *which* row is being
- * added is lost.
- *
- * A wrapper rather than an inline arrow, because the row is memoised and an inline `onPress` inside
- * `.map()` defeats that silently (Q-490).
- */
-const ExternalFoodRow = memo(function ExternalFoodRow(
-  { food, mismatched, adding, pending, onAdd }:
-  { food: ExternalFood; mismatched: boolean; adding: boolean; pending: boolean; onAdd: (f: ExternalFood) => void },
-) {
-  const press = useCallback(() => onAdd(food), [food, onAdd])
-  const secondary = `${Math.round(food.proteinG ?? 0)}P · ${Math.round(food.carbsG ?? 0)}C · ${Math.round(food.fatG ?? 0)}F per ${Math.round(food.servingSizeG)} g`
-  return (
-    <FoodRow
-      name={food.brand ? `${food.brand} — ${food.name}` : food.name}
-      secondary={secondary}
-      calories={food.calories}
-      warning={mismatched ? 'Its macros and calories disagree — check before using' : null}
-      highlighted={pending}
-      onPress={press}
-      disabled={adding}
     />
   )
 })

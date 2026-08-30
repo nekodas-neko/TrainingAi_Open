@@ -2,12 +2,16 @@
 
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useState } from 'react'
 import { Loader2, Search, X } from 'lucide-react'
+import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { FoodRow } from './food-row'
 import { SavedMealCard } from './saved-meal-card'
+import { FoodDatabaseResults } from './food-database-results'
 import { cachedFetch, readCacheSync } from '@/lib/sqlite/cache'
 import { TTL_MEDIUM } from '@trainingai/shared/cache-ttl'
 import { getLocalStore } from '@/lib/local-store'
+import { createFoodItem } from '@trainingai/shared/nutrition/create-food-item'
+import { useFoodDatabaseSearch, type ExternalFood } from '@/lib/hooks/use-food-database-search'
 import type { FoodItem, SavedMeal } from '@trainingai/shared/types/nutrition'
 
 const ALL_ITEMS_KEY = 'nutrition-food-items-all'
@@ -71,6 +75,15 @@ export function FoodList({
   onBuildFirst, onSelectFood, userId,
 }: Props) {
   const [foods, setFoods] = useState<FoodItem[]>([])
+  const [addingExternal, setAddingExternal] = useState<string | null>(null)
+
+  /**
+   * BF-48: the foods tab searches the food database too, not only what you have already logged.
+   *
+   * Idle on the meals tab — `show` is the `active` flag — because the two tabs share this component
+   * instance and a database query for a meal name would be answering a question nobody asked.
+   */
+  const db = useFoodDatabaseSearch(query, show === 'foods')
 
   // Seed synchronously so a repeat open paints the last-known list instead of an empty panel.
   useLayoutEffect(() => {
@@ -107,6 +120,37 @@ export function FoodList({
     return () => { cancelled = true; clearTimeout(t) }
   }, [show, query, userId])
 
+  /**
+   * A database hit is not one of your foods yet. Mint it, then hand it to the assign step — the
+   * same two moves the meal builder makes, so a food found here and the same food found there are
+   * the same row afterwards. `createFoodItem` writes locally and queues the outbox, so it is in
+   * your library (and searchable offline) from the moment it is tapped.
+   *
+   * `useCallback` because `FoodDatabaseResults` memoises its rows and an unstable handler defeats
+   * that silently (Q-490).
+   */
+  const addExternalFood = useCallback((food: ExternalFood) => { void (async () => {
+    setAddingExternal(food.externalId)
+    try {
+      onSelectFood(await createFoodItem({
+        name: food.name,
+        brand: food.brand,
+        servingSizeG: food.servingSizeG,
+        calories: food.calories,
+        proteinG: food.proteinG ?? 0,
+        carbsG: food.carbsG ?? 0,
+        fatG: food.fatG ?? 0,
+        // Picked off a name search, not scanned. A barcode identifies one exact product; this is a
+        // plausible near-match the user chose, and the two deserve telling apart in the data.
+        source: 'text',
+      }, userId))
+    } catch {
+      toast.error(`Could not add "${food.name}"`)
+    } finally {
+      setAddingExternal(null)
+    }
+  })() }, [onSelectFood, userId])
+
   // Matches the meal name and its ingredients, so "oats" finds a breakfast that contains oats even
   // when the meal is called something else. Foods are filtered by the route/store, not here.
   const visibleMeals = useMemo(() => {
@@ -128,6 +172,20 @@ export function FoodList({
   }, [show, visibleMeals, foods])
 
   const empty = show === 'meals' ? meals.length === 0 : foods.length === 0
+  /** Below two characters the database returns the world index, so it is not asked. */
+  const dbVisible = show === 'foods' && query.trim().length >= 2 &&
+    (db.searching || db.results.length > 0 || db.unavailable)
+
+  /**
+   * "You have nothing yet" — as opposed to "your search found nothing", which is the branch below.
+   *
+   * `meals` is the whole library, so `empty` already means the first thing on that tab. `foods` is
+   * the *filtered* set, so it does not: a query matching nothing emptied it and the screen said
+   * *single foods land here once you have logged them* over a search box that was hidden by the
+   * same condition — leaving a query you could neither see nor clear. Unhiding the box is what
+   * makes that reachable, so the message has to split too.
+   */
+  const showNothingYet = show === 'meals' ? empty : (empty && !dbVisible && !query.trim())
 
   if (show === 'meals' && loadingMeals && empty) {
     return (
@@ -140,15 +198,17 @@ export function FoodList({
   return (
     <>
       {/* Search earns its place once the library grows — generated plan meals land here too, so this
-          list gets long faster than a hand-built one would. */}
-      {!empty && (
+          list gets long faster than a hand-built one would. It is unconditional on the foods tab:
+          since BF-48 it also reaches the food database, which is the one search that is *most*
+          useful when you have logged nothing yet. */}
+      {(show === 'foods' || !empty) && (
         <div className="flex min-h-[44px] items-center gap-2 rounded-xl border border-border bg-muted/50 px-3 py-2.5">
           <Search className="w-3.5 h-3.5 text-muted-foreground flex-none" />
           <input
             value={query}
             onChange={e => onQueryChange(e.target.value)}
-            placeholder={show === 'meals' ? 'Search your meals' : 'Search your foods'}
-            aria-label={show === 'meals' ? 'Search your meals' : 'Search your foods'}
+            placeholder={show === 'meals' ? 'Search your meals' : 'Search your foods or the food database…'}
+            aria-label={show === 'meals' ? 'Search your meals' : 'Search your foods or the food database'}
             className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
           />
           {query && (
@@ -159,7 +219,9 @@ export function FoodList({
         </div>
       )}
 
-      {empty ? (
+      {/* Both gates below defer to `dbVisible`: with database results on screen, an empty state
+          saying you have logged nothing would be sitting above the answer to the search. */}
+      {showNothingYet ? (
         <div className="flex flex-col items-center gap-3 py-12 text-center">
           {show === 'meals' ? (
             <>
@@ -171,15 +233,16 @@ export function FoodList({
               <Button onClick={() => onBuildFirst()}>Build your first meal</Button>
             </>
           ) : (
-            // No action offered: this list fills itself. Every food you log is added to it, so the
-            // useful instruction is "go log something", not a button that would only reach the
-            // meal builder — a different thing entirely, which is the confusion BF-37 is undoing.
+            // Still no button: the two ways to fill this list are logging a food and searching the
+            // database, and the search box above is now both of them. A button here could only
+            // reach the meal builder — a different thing entirely, which is the confusion BF-37 is
+            // undoing.
             <p className="text-sm text-muted-foreground">
-              Single foods land here once you have logged them.
+              Search above to find a food, or log one — single foods land here either way.
             </p>
           )}
         </div>
-      ) : rows.length === 0 ? (
+      ) : rows.length === 0 && !dbVisible ? (
         // Non-empty above, so this is a search that matched nothing — say so rather than rendering
         // an empty panel that reads as "your food vanished".
         <div className="flex flex-col items-center gap-2 py-10 text-center">
@@ -188,28 +251,46 @@ export function FoodList({
         </div>
       ) : (
         <>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.05em] text-muted-foreground">
-            {rows.length} item{rows.length === 1 ? '' : 's'}
-          </p>
-          {/* One grouped card, not a stack of them (artboard 3). Separate cards gave every row its
-              own border and the list stopped reading as a list. */}
-          <div className="divide-y divide-border/50 overflow-hidden rounded-2xl border border-border">
-            {rows.map(row => row.kind === 'meal' ? (
-              <SavedMealCard
-                key={row.meal.id}
-                meal={row.meal}
-                selected={selectedIds ? selectedIds.has(row.meal.id) : null}
-                onToggleSelected={onToggleSelected}
-                onOpen={onOpenMeal}
-                onEdit={onEditMeal}
-                onRequestDelete={onRequestDeleteMeal}
-                onLabel={onLabelMeal}
-                fromPlan={planSavedMealIds.has(row.meal.id)}
-              />
-            ) : (
-              <FoodListRow key={row.food.id} item={row.food} onSelect={onSelectFood} />
-            ))}
-          </div>
+          {rows.length > 0 && (
+            <>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.05em] text-muted-foreground">
+                {/* Headed "Your foods" once the database section can sit under it, because two
+                    unlabelled lists on one screen is the thing BF-37 already had to undo once. */}
+                {show === 'foods' && dbVisible ? 'Your foods' : `${rows.length} item${rows.length === 1 ? '' : 's'}`}
+              </p>
+              {/* One grouped card, not a stack of them (artboard 3). Separate cards gave every row
+                  its own border and the list stopped reading as a list. */}
+              <div className="divide-y divide-border/50 overflow-hidden rounded-2xl border border-border">
+                {rows.map(row => row.kind === 'meal' ? (
+                  <SavedMealCard
+                    key={row.meal.id}
+                    meal={row.meal}
+                    selected={selectedIds ? selectedIds.has(row.meal.id) : null}
+                    onToggleSelected={onToggleSelected}
+                    onOpen={onOpenMeal}
+                    onEdit={onEditMeal}
+                    onRequestDelete={onRequestDeleteMeal}
+                    onLabel={onLabelMeal}
+                    fromPlan={planSavedMealIds.has(row.meal.id)}
+                  />
+                ) : (
+                  <FoodListRow key={row.food.id} item={row.food} onSelect={onSelectFood} />
+                ))}
+              </div>
+            </>
+          )}
+          {dbVisible && (
+            <FoodDatabaseResults
+              results={db.results}
+              searching={db.searching}
+              unavailable={db.unavailable}
+              addingId={addingExternal}
+              onAdd={addExternalFood}
+              // No AI estimate or add-by-hand form on this screen, unlike the meal builder — so the
+              // fallback offered is the one that exists here.
+              unavailableHint="The food database is not responding right now. Your own foods still search normally."
+            />
+          )}
           {/* Both halves are load-bearing: a meal's figure is one portion of what may be a batch,
               and label/edit/delete have a gesture that nothing else announces. Neither is true of a
               food row, which is why this does not follow the list into the other tab. */}

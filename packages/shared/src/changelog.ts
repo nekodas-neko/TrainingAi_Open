@@ -6,6 +6,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.396.0",
+    date: "2026-08-30",
+    changes: [
+      "Log Food \u2192 Single foods now searches the food database, not just foods you have already logged. Before this, adding something you had never eaten meant building a whole meal around it, because the database was only reachable from the meal builder. Database results appear under their own heading so you can tell them from your own foods, they carry the warning when a product's macros and calories disagree, and tapping one saves it to your foods and goes straight to the portion step.",
+      "The search box on that tab no longer disappears when the list is empty \u2014 which was exactly when it was most useful. A search that finds nothing now says so and offers to clear itself, instead of showing the first-run message over a query you could not see.",
+    ],
+  },
+  {
     version: "1.395.8",
     date: "2026-08-30",
     changes: [

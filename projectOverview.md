@@ -27,6 +27,8 @@
 **Version:** v1.395.6 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-08-30.
 
+**Log Food could not reach the food database (BF-48).** The owner's *"it only searches saved/history food... So its not useful"* was precise: `Single foods` filtered an in-memory list, its placeholder said `Search your foods`, and its empty state said single foods land there *once you have logged them* — so the screen for adding one food could only find foods already eaten. The database search existed the whole time, reachable **only** from inside the meal builder. The query and its results section are now shared (`useFoodDatabaseSearch`, `FoodDatabaseResults`), so the macro/calorie mismatch warning has one implementation rather than two, and the **700 ms debounce travels with the hook** — OFF rate-limits to ~10 searches a minute. The foods tab's search box is unconditional now: it was hidden while the list was empty, which is the state the report was made from. Guard proved by mutation ([journal](docs/overview/entries/2026-08-30-log-food-database-search.md)).
+
 **The accessibility scanner that would have passed a 12 px button (Q-282).** `@axe-core/playwright` was installed, measured and removed: WCAG 2.5.8 exempts a *spaced* undersized control, so a deliberately-shrunk **12×12** button (confirmed by `boundingBox`) came back a **pass**, and `color-contrast` cannot read this app at all — it fails to parse the `oklch` tokens (*"Could not parse color string oklab(…)"*) and **evaluated no nodes on Home**. `e2e/touch-target-size.spec.ts` ships instead: DOM geometry against **this repo's 48 dp bar**, covering the roles `globals.css`'s `button, [role="button"]` floor cannot (`<a>`, `role="tab"`, `role="radio"`). It fails on the mutation axe passed. One real finding, **LB-26**: Home's APK-banner link is 258×33 ([journal](docs/overview/entries/2026-08-30-touch-target-gate.md)).
 
 **A shared meal label now carries the meal, not a pointer to it (BF-57, engine half).** Scanning
@@ -643,10 +645,8 @@ on top:** the four migrations retried on every cold start are idempotent now, 20
 one already did. The two oldest, #6 and #10, are public-repo-migration handoffs open since 08-17.
 
 **What shipped recently is in the journal, not here.** Read `docs/overview/entries/` for the current
-window, then the newest `history-*.md`. The 157 dated status notes this section used to carry were
-archived to [`docs/overview/status-archive.md`](docs/overview/status-archive.md) on 2026-08-17 —
-they had stopped being *current* status somewhere around the fortieth one, and were never in date
-order.
+window, then the newest `history-*.md`. The 157 dated status notes this section used to carry are in
+[`docs/overview/status-archive.md`](docs/overview/status-archive.md), which records why.
 
 ---
 

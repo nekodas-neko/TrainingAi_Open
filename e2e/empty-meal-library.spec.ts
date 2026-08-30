@@ -68,7 +68,7 @@ test('the empty library offers the builder, and the builder opens', async ({ pag
   expect(pageErrors, 'the click handler threw').toEqual([])
 })
 
-test('the single-foods empty state offers no builder — that list fills itself', async ({ page }) => {
+test('the single-foods empty state offers search, and still no builder', async ({ page }) => {
   await page.route('**/api/nutrition/food-items**', async route => {
     if (route.request().method() !== 'GET') return route.fallback()
     await route.fulfill({ status: 200, contentType: 'application/json', body: '[]' })
@@ -76,7 +76,16 @@ test('the single-foods empty state offers no builder — that list fills itself'
   await openEmptyMealsTab(page)
 
   await page.getByRole('tab', { name: 'Single foods', exact: true }).tap()
-  await expect(page.getByText('Single foods land here once you have logged them.')).toBeVisible({ timeout: 30_000 })
-  // BF-37's distinction: a button here would reach the meal builder, which is a different thing.
+  await expect(page.getByText('Search above to find a food, or log one')).toBeVisible({ timeout: 30_000 })
+
+  // BF-48 changed what this state is FOR. The copy used to read *"Single foods land here once you
+  // have logged them"* over no control at all — the search box was gated on the list being
+  // non-empty, so the one screen that could now reach the food database hid its search in exactly
+  // the state where nothing else was on offer. `Search above` is a promise, so assert the thing.
+  await expect(page.getByRole('textbox', { name: /search your foods or the food database/i }))
+    .toBeVisible({ timeout: 30_000 })
+
+  // Unchanged, and still BF-37's distinction: a button here would reach the meal builder, which is
+  // a different thing. Searching the database is not that — it stays on this tab.
   await expect(page.getByRole('button', { name: 'Build your first meal' })).toHaveCount(0)
 })
