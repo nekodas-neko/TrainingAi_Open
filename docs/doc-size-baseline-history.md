@@ -3907,3 +3907,17 @@ The rest — what was built, what the e2e asserts, why the geometry rather than 
 journal entry.
 
 (Re-derived on the rebase: this branch was cut at 8413 and BF-46 ①b's paragraph landed under it.)
+
+## 2026-08-30 — `projectOverview.md` 8437 → **8449** (BF-46 ①a, one picker per screen)
+
+Eleven lines, and nine of them are the *failure*, not the feature. Moving a picker is a paragraph
+nobody needs; what the index owes the next session is why a previous one built this, measured a
+picked photo reaching nothing, and held it — the file was landing in the **other** instance of the
+same component, because the screen being left is still mounted while it closes and both carried the
+same accessible name.
+
+That is the third time in one day a check was satisfied by the state it was meant to replace (the
+meal-label ink gate, the builder's `Ingredients` marker, this). It is worth the lines until it stops
+happening.
+
+(Re-derived on the rebase: this branch was cut at 8425 and BF-46 ② ③'s paragraph landed under it.)

@@ -73,8 +73,14 @@ export function RecipeImageButton({ importing, onPick }: Props) {
 
   return (
     <>
+      {/* **Named, because it is no longer the only file input on this screen.** BF-46 ①a put the
+          meal's photo picker at the top of the builder, so a selector as broad as
+          `input[type="file"]` now reaches that one first — and a recipe picture fed to the photo
+          picker fails silently, which is what it did. `meal-photo-tile.tsx` carries the same note
+          and the matching name. */}
       <input
         ref={fileInputRef}
+        name="recipe-picture"
         type="file"
         accept="image/*"
         className="hidden"
