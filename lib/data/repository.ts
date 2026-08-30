@@ -451,6 +451,75 @@ export interface MeasuredRmrRow extends MeasuredRmrInput {
   notes: string | null
 }
 
+/**
+ * One DEXA scan (BF-41 / BF-2). Every field the Hologic printout carries — see
+ * `docs/clinical-baseline-2026-08-27.md`, which is the real report the schema was written from.
+ * All optional but the date: a provider may report a subset, and a hand entry usually will.
+ *
+ * **No patient identity here, by design** — the printout has a name, a date of birth and a patient
+ * reference, and none of them has a home in this app.
+ */
+export interface DexaScanInput {
+  scannedOn: string
+  manufacturer?: string | null
+  model?: string | null
+  serialNumber?: string | null
+  scanType?: string | null
+  analysisVersion?: string | null
+  providerScanId?: string | null
+  heightCm?: number | null
+  weightKg?: number | null
+  ageYears?: number | null
+  bmi?: number | null
+  totalBmd?: number | null
+  tScore?: number | null
+  zScore?: number | null
+  totalBmcG?: number | null
+  bmdPrecisionCvPct?: number | null
+  fatG?: number | null
+  leanG?: number | null
+  /** Lean + BMC. The FFM BF-33's Cunningham comparison needs. */
+  leanPlusBmcG?: number | null
+  totalMassG?: number | null
+  /** BF-2 pairs this with the same day's scale reading. */
+  pctFat?: number | null
+  /** Percentiles, not percentages. */
+  pctFatYoungNormal?: number | null
+  pctFatAgeMatched?: number | null
+  androidPctFat?: number | null
+  gynoidPctFat?: number | null
+  fatMassHeight2?: number | null
+  androidGynoidRatio?: number | null
+  pctFatTrunkLegs?: number | null
+  trunkLimbFatMassRatio?: number | null
+  vatMassG?: number | null
+  vatVolumeCm3?: number | null
+  vatAreaCm2?: number | null
+  leanHeight2?: number | null
+  appendicularLeanHeight2?: number | null
+  boneReference?: string | null
+  bodyCompReference?: string | null
+  /** How it got here. Never a model's unconfirmed output — the confirm step makes it 'extracted'. */
+  source?: 'manual' | 'extracted'
+  notes?: string | null
+  /** The per-region rows. Replaced wholesale on a re-save, never merged: a partial region set from a
+   *  correction must not leave the previous scan's rows sitting beside it. */
+  regions?: DexaScanRegion[]
+}
+
+/** One row of the printout's region table. `subtotal` and `total` are AGGREGATES, not body parts. */
+export interface DexaScanRegion {
+  region: string
+  bmd?: number | null
+  bmcG?: number | null
+  areaCm2?: number | null
+}
+
+export interface DexaScanRow extends DexaScanInput {
+  id: string
+  regions: DexaScanRegion[]
+}
+
 export interface WorkoutRepository {
   // ── Users ──────────────────────────────────────────────────────────────────
   upsertUser(user: Omit<User, 'id' | 'createdAt' | 'isActive' | 'isAdmin'>, forceActive?: boolean): Promise<User>
@@ -815,6 +884,12 @@ export interface WorkoutRepository {
   // serve the cache when it matches — see NUT-7 (daily-digest staleness).
   getAiHealthInsightWithHash(userId: string, section: string, date: string): Promise<{ insight: string; contextHash: string | null } | null>
   listAiHealthInsightsForDate(userId: string, date: string): Promise<{ section: string; insight: string }[]>
+
+  /** BF-41 / BF-2: a DEXA scan. Upserts on `(userId, scannedOn)` — the same day is a correction,
+   *  not a second scan — and replaces the region rows wholesale in the same transaction. */
+  saveDexaScan(userId: string, input: DexaScanInput): Promise<void>
+  getLatestDexaScan(userId: string): Promise<DexaScanRow | null>
+  listDexaScans(userId: string): Promise<DexaScanRow[]>
 
   /** BF-33: clinically measured RMR. `saveMeasuredRmr` upserts on (user, date) so re-entering a
    *  test corrects it, while a later test is a new row beside the first. */

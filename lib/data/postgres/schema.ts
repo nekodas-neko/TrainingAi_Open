@@ -799,6 +799,100 @@ export const measuredRmr = pgTable('measured_rmr', {
   updatedAt:      timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 }, t => [unique().on(t.userId, t.measuredOn)])
 
+/**
+ * A DEXA scan (BF-41 / BF-2, migration 240).
+ *
+ * Written from the real Hologic Horizon A printout recorded, de-identified, in
+ * `docs/clinical-baseline-2026-08-27.md` — BF-41's own rule is that a schema invented from a
+ * description silently drops the field that turns out to matter. **Every field is kept** (BF-43),
+ * including the indices and reference populations nothing reads yet.
+ *
+ * Typed columns, not JSONB, following `measuredRmr`: BF-2's calibration and BF-33's precedence rule
+ * both do arithmetic on named columns.
+ *
+ * **No source document is stored, deliberately.** The report carries a name, a date of birth and a
+ * patient reference; none of that has a column here and none should be added.
+ */
+export const dexaScans = pgTable('dexa_scans', {
+  id:                     uuid('id').primaryKey().defaultRandom(),
+  userId:                 uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  scannedOn:              date('scanned_on', { mode: 'string' }).notNull(),
+
+  // Two scans are only comparable on the same machine and analysis version.
+  manufacturer:           text('manufacturer'),
+  model:                  text('model'),
+  serialNumber:           text('serial_number'),
+  scanType:               text('scan_type'),
+  analysisVersion:        text('analysis_version'),
+  providerScanId:         text('provider_scan_id'),
+
+  // The subject as the scan measured them, not as the app knows them today.
+  heightCm:               doublePrecision('height_cm'),
+  weightKg:               doublePrecision('weight_kg'),
+  ageYears:               integer('age_years'),
+  bmi:                    doublePrecision('bmi'),
+
+  totalBmd:               doublePrecision('total_bmd'),
+  tScore:                 doublePrecision('t_score'),
+  zScore:                 doublePrecision('z_score'),
+  totalBmcG:              doublePrecision('total_bmc_g'),
+  bmdPrecisionCvPct:      doublePrecision('bmd_precision_cv_pct'),
+
+  // Masses in GRAMS, as the report prints them.
+  fatG:                   doublePrecision('fat_g'),
+  leanG:                  doublePrecision('lean_g'),
+  /** Lean + BMC — the FFM BF-33's Cunningham comparison needs. */
+  leanPlusBmcG:           doublePrecision('lean_plus_bmc_g'),
+  totalMassG:             doublePrecision('total_mass_g'),
+  /** BF-2 pairs this with the same day's scale reading. */
+  pctFat:                 doublePrecision('pct_fat'),
+  /** Percentiles, not percentages. */
+  pctFatYoungNormal:      integer('pct_fat_young_normal'),
+  pctFatAgeMatched:       integer('pct_fat_age_matched'),
+  androidPctFat:          doublePrecision('android_pct_fat'),
+  gynoidPctFat:           doublePrecision('gynoid_pct_fat'),
+
+  fatMassHeight2:         doublePrecision('fat_mass_height2'),
+  androidGynoidRatio:     doublePrecision('android_gynoid_ratio'),
+  pctFatTrunkLegs:        doublePrecision('pct_fat_trunk_legs'),
+  trunkLimbFatMassRatio:  doublePrecision('trunk_limb_fat_mass_ratio'),
+  vatMassG:               doublePrecision('vat_mass_g'),
+  vatVolumeCm3:           doublePrecision('vat_volume_cm3'),
+  vatAreaCm2:             doublePrecision('vat_area_cm2'),
+
+  leanHeight2:            doublePrecision('lean_height2'),
+  appendicularLeanHeight2: doublePrecision('appendicular_lean_height2'),
+
+  /** A score without its reference population is not comparable to anything. */
+  boneReference:          text('bone_reference'),
+  bodyCompReference:      text('body_comp_reference'),
+
+  /** 'manual' typed by hand, or 'extracted' read off a document AND confirmed. Never a model's
+   *  unconfirmed output — the confirm step is what makes it one of these two. */
+  source:                 text('source').notNull().default('manual').$type<'manual' | 'extracted'>(),
+  notes:                  text('notes'),
+
+  createdAt:              timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt:              timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+}, t => [unique().on(t.userId, t.scannedOn)])
+
+/**
+ * The per-region rows the printout carries — a child table because a region set is N ROWS and not
+ * N columns, the same reasoning BF-41 gives for a blood panel's analytes, and the reason a twelfth
+ * region later is a data change rather than a migration.
+ *
+ * **`subtotal` and `total` are AGGREGATES**, printed alongside the regions rather than being further
+ * body parts. Anything summing this table must exclude them.
+ */
+export const dexaScanRegions = pgTable('dexa_scan_regions', {
+  id:       uuid('id').primaryKey().defaultRandom(),
+  scanId:   uuid('scan_id').notNull().references(() => dexaScans.id, { onDelete: 'cascade' }),
+  region:   text('region').notNull(),
+  bmd:      doublePrecision('bmd'),
+  bmcG:     doublePrecision('bmc_g'),
+  areaCm2:  doublePrecision('area_cm2'),
+}, t => [unique().on(t.scanId, t.region)])
+
 export const errorEvents = pgTable('error_events', {
   id:        uuid('id').primaryKey().defaultRandom(),
   userId:    uuid('user_id').references(() => users.id, { onDelete: 'set null' }),
