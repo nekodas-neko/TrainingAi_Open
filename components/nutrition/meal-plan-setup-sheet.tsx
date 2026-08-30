@@ -17,18 +17,21 @@ import { MealCountReductionPrompt } from './meal-count-reduction-prompt'
 import { reductionNeeded, applyReduction, type Pin, type ReductionDecision } from './meal-count-reduction'
 import type { Draft } from './meal-plan-draft'
 import { MEAL_COUNT_MIN, MEAL_COUNT_MAX } from '@trainingai/shared/nutrition/meal-split'
+import {
+  GROCERY_STORES, PROTEIN_STAPLES, CARB_STAPLES, FAT_STAPLES, VEG_STAPLES,
+} from '@trainingai/shared/nutrition/grocery-catalogue'
 import type { DietaryRestriction, MealPlan, SavedMeal } from '@trainingai/shared/types/nutrition'
 import { readCacheSync } from '@/lib/sqlite/cache'
 import type { DietaryRestrictionsResponse } from '@/app/api/nutrition/dietary-restrictions/route'
 
-/** AU chains. A curated list, not geolocation: the store names only bias what the model suggests,
- *  and a location permission buys nothing without per-store stock data. */
-const STORES = ['Coles', 'Woolworths', 'Aldi', 'IGA', 'Costco', 'Local grocer']
-
-const PROTEINS = ['Chicken', 'Beef', 'Pork', 'Lamb', 'Salmon', 'White fish', 'Prawns', 'Eggs', 'Tofu', 'Greek yoghurt']
-const CARBS = ['Rice', 'Pasta', 'Potato', 'Sweet potato', 'Oats', 'Bread', 'Quinoa', 'Couscous']
-const FATS = ['Olive oil', 'Avocado', 'Nuts', 'Cheese', 'Butter', 'Seeds']
-const VEG = ['Broccoli', 'Spinach', 'Capsicum', 'Mushroom', 'Carrot', 'Green beans', 'Tomato', 'Zucchini']
+// The five lists moved to `@trainingai/shared/nutrition/grocery-catalogue` when `/api/coach/options`
+// became a second reader (Q-407). Same strings, one copy: the Coach serves them from there rather
+// than typing them out, which is the whole point of a choice source.
+const STORES = GROCERY_STORES
+const PROTEINS = PROTEIN_STAPLES
+const CARBS = CARB_STAPLES
+const FATS = FAT_STAPLES
+const VEG = VEG_STAPLES
 
 const STEPS = ['Stores', 'Avoid', 'Skip', 'Meals', 'Yours', 'Training', 'Review'] as const
 type StepIndex = 0 | 1 | 2 | 3 | 4 | 5 | 6
