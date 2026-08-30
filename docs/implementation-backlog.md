@@ -805,6 +805,9 @@ app, opposite advice. **That contradiction is the defect**, not the absence of a
 
 - **Needs:** BF-43 — the clinical half of the overview cannot be wired before it is decided what the
   model may see. **The injury line does not wait on it** and should ship first, alone if need be.
+- **BF-68 is the same gap on the program builder**, where `injur` also appears zero times. Whichever
+  ships first exports the active-injury formatter (muscle, severity, days active) for the other to
+  import — two hand-written injury summaries in two prompts drift.
 - **Verification.** Ask the chat for a lower-body session with an active lower-back injury logged: it
   names the injury unprompted and does not recommend a deadlift, matching what the workout screen
   does for the same state. Resolve the injury and the constraint disappears from both.
@@ -1318,6 +1321,194 @@ opened on, unchanged.
   **three cents a month**. The reason to act is that a 7× trend compounds, not that the bill hurts.
 - **Verification:** index total drops below the heap total, and a re-read a week later shows growth
   back near trend.
+
+### [workouts][platform] BF-68 — the program builder does not know you are injured, and typing it into the chat does not make it stick
+
+- **Lane:** A — `app/api/generate-program/route.ts` and `app/api/builder-chat/route.ts`; the UI half
+  (surfacing the constraint on the wizard) is B and can follow.
+- **Added:** 2026-08-30 · owner, on building a new program with the AI coach: *"be able to put
+  somewhere or say 'i have a sore lower back, so would rather not heavily loaded lower back
+  exercises' and for it to recommend against deadlifts or something."*
+
+**Measured: `injur` appears zero times in the entire builder path** — both routes and all three
+`components/workout-builder/` files. `generate-program`'s request schema is a `.strict()` 13-field
+wizard payload with no injury data and no free-text field at all, so the generator cannot know and
+the user cannot tell it.
+
+**`builder-chat` is the trap, not the answer.** It *does* take free text (`message`, 1,000 chars), so
+typing the sentence above during the review step will often produce a sensible-looking swap. But the
+model is handed no injury record and no instruction to treat it as a hard constraint, so it is luck
+rather than a rule — and **the constraint dies when the program is saved.** The daily prescription
+engine, which already reads `repo.listInjuries()`, never learns about it. A back that stopped
+deadlifts in the builder gets deadlifts again the next time the engine writes a session.
+
+- **Recommendation: feed the existing `injuries` table into both routes, and make the free-text path
+  WRITE to it.** This is not new infrastructure. `injuries` has `muscleName`, `severity`, `notes`,
+  `startedDate`, `resolvedDate`; it already drives `activeInjuredMusclesInSession`, the mid-workout
+  injury-swap sheet via `injurySafeAlternatives`, and the prescription's re-evaluation pass. Making
+  the builder read the same rows means one place to say it, every surface obeys it, and marking it
+  resolved lifts the constraint everywhere at once.
+- **The free-text half should create a record, not a prompt line.** When the builder chat is told
+  about an injury, it should offer to log one — Coach already has a tool that does exactly this. A
+  constraint that exists only inside one generation is the failure mode above.
+- **Batch/Needs — BF-44 is the same gap on the chat surface** and proposes an always-on active-injury
+  context line. Whoever ships first exports that formatter (muscle, severity, days active) and the
+  other imports it; two hand-written injury summaries in two prompts is the drift this repo files
+  entries about. Not a `Needs:` — neither blocks the other, and either alone is an improvement.
+- **⚠ Do not have the model decide which exercises an injury rules out.** `injurySafeAlternatives`
+  is deterministic and already knows, from the muscle assignments. The prompt's job is to state the
+  injured muscles and the rule; the exercise-level exclusion should come from the same code the swap
+  sheet uses, or the builder and the swap sheet will disagree about the same injury.
+- **Verification:** log a lower-back injury, generate a program — no heavily-loaded lower-back
+  primary appears, and the model says why unprompted. Say it in the builder chat instead: an injury
+  record is offered and, once logged, the next daily prescription respects it too. Resolve the
+  injury and both constraints lift.
+
+### [workouts] BF-67 — building a new program cannot reference an old one, so every program starts from nothing
+
+- **Lane:** A for the payload and prompt, B for the picker.
+- **Planning item** — this is a design with a size question in it, not a defect. Needs a planning
+  session before implementation.
+- **Added:** 2026-08-30 · owner: *"be able to reference an old program so it knows what I did and
+  what I would like similar to."*
+
+**The generator's entire input is the wizard form.** `RequestSchema` in `generate-program` is
+`.strict()` with thirteen fields — name, equipment, sessions per week, minutes, muscles, goal,
+progression mode, phase structure, weeks, schedule shape. No program id, no history, no notes. So a
+program built after a year of training starts from the same blank slate as the first one, and the
+owner has to re-describe in a wizard what the app already knows.
+
+**"What I did" and "what I liked" are two different payloads, and conflating them is the size trap.**
+
+1. **Structure** — the old program's session names, exercises, roles and progression styles. Small
+   and bounded: a 5-session program is ~30 exercise names. This is the "similar to" half.
+2. **History** — what was actually trained under it. Unbounded if taken literally; a year of set logs
+   cannot go in a prompt. It needs a *summary*: per exercise, sessions logged, latest 1RM, and
+   whether it was dropped part-way. Adherence is the interesting signal — an exercise programmed
+   twelve times and trained twice is one the next program should probably not repeat.
+
+- **Recommendation: ship structure first, summary second.** Structure alone answers "make me another
+  one like that", is cheap to build (`listPrograms` already exists), and is verifiable. The history
+  summary is where the design work is, and it can land on top without changing the picker.
+- **Decide what "reference" means to the model, because the two readings produce different programs.**
+  A *template* to vary ("keep the split, change the accessories") is not the same instruction as
+  *context* to learn from ("here is what worked, do better"). The prompt has to say which, and the UI
+  should probably let the user pick — the owner's sentence contains both readings.
+- **⚠ Bound the payload at the schema, not by hoping.** The note above `MAX_BODY_BYTES` in
+  `generate-program` already records that `equipment` and `musclesToFocus` are unbounded arrays and
+  the byte cap is the only thing holding them. A reference program is a much larger structure; it
+  needs its own `.max()` counts rather than inheriting that situation.
+- **Send an id, not the program.** The client should pass a program id and the route should read it
+  server-side. Accepting a whole program object from the client is an ownership hole and a
+  prompt-injection surface for no benefit — and any id the client sends still needs a `user_id`-scoped
+  read, per the write-path ownership rules.
+- **Verification:** pick a previous program in the builder, generate, and the result visibly echoes
+  its split and its main lifts rather than a generic template; pick none and the output is unchanged
+  from today. A program id belonging to another user is rejected, not read.
+
+### [workouts] BF-66 — `"60 for 6"` is heard perfectly and parsed as nothing, because the letter `r` survives the strip
+
+- **Lane:** B — `components/workout/utils.ts` (`parseVoice`) and `components/workout/voice-log-button.tsx`.
+- **Added:** 2026-08-30 · owner, mid-set on Sumo Deadlift: *"it heard me correctly; is that not how
+  to use it?"* Screenshot: red `Heard "60 for 6"` under the Voice button, dial unchanged at 65 kg.
+
+**Recognition worked. The parser threw it away.** That red line is not a mis-hear message — it is
+`voice-log-button.tsx`'s *parse failure* branch, printed only when `parseVoice` returns neither a
+weight nor a reps. So the app is displaying a perfect transcript as if it were the problem.
+
+**The cause is one character class.** `parseVoice` strips with `[^0-9.\s kgreps×x]` — a denylist
+that keeps every letter appearing in `kg`, `reps` and `x`. `f` and `o` are dropped; **`r` is kept**,
+because `reps` contains it. Measured, with the stripped string in the middle:
+
+| Said | After strip | Parsed |
+|---|---|---|
+| `60 for 6` | `60 r 6` | **nothing** |
+| `60 kg for 6` | `60 kg r 6` | **nothing** |
+| `60 times 6` | `60 es 6` | **nothing** |
+| `60 by 6` | `60 6` | 60 × 6 ✓ |
+| `60 at 6` | `60 6` | 60 × 6 ✓ |
+| `60 x 6` | `60 x 6` | 60 × 6 ✓ |
+
+The final fallback pattern is `(\d+)\s+(\d+)` — two numbers separated by whitespace *and nothing
+else*. Any filler word whose letters are entirely outside `kgrepsx` vanishes and the fallback fires;
+any word leaving a letter behind blocks it. **`by` and `at` work, `for` and `times` do not**, and no
+user could derive that rule. `60 kg for 6` — the most natural phrasing on the list — is among the
+failures.
+
+- **Fix the strip, not the patterns.** Replace the denylist with a positive tokenizer: pull the
+  numbers and the unit/rep keywords out and ignore everything between them. Adding `for` to a list of
+  stripped filler words fixes this one report and leaves `times`, `pounds`, `press`, `set` and every
+  future phrasing behind the same wall.
+- **The existing tests all pass and none of them would have caught it.** `voice-log-parse.test.ts`
+  covers `80 kilos 5 reps`, `5 reps 80`, `80 x 5`, `82.5 × 3`, `5 reps`, `80 kg`, `62.5 kilograms 8
+  repetitions` — every case is either adjacent numbers or an explicit keyword, so the filler-word
+  gap is untested by construction. Add the table above as cases in the same PR.
+- **Second half: the failure message is misleading and it is what produced this report.** `Heard
+  "60 for 6"` in red states the transcript and nothing else, so a correct transcript reads as the
+  app disagreeing with the user's ears. Say what actually failed and what to say instead — *"Didn't
+  understand that — try '60 kg 6 reps'"* — with a real example rather than a grammar.
+- **⚠ There is no discoverable syntax anywhere in the app.** Nothing on the button, no hint, no
+  first-run text; the owner's question is literally *"is that not how to use it?"* Even with the
+  parser fixed, a control whose accepted phrasing can only be learned by failing needs a one-line
+  example on or near the button.
+- **Verification:** every row of the table above logs 60 kg × 6 — including `60 kg for 6` and
+  `60 times 6` — and the existing seven test cases still pass unchanged. On the device, a genuinely
+  unparseable utterance shows the new message with its example, not a bare transcript.
+
+### [workouts] BF-65 — show the exercise GIF on the per-exercise ready screen, and extract the fetch while doing it
+
+- **Lane:** B — `components/workout/active-workout-screen.tsx` (the ready branch at :240) plus a new
+  shared hook; the route and the media both already exist.
+- **Added:** 2026-08-30 · owner, with the ready screen and the warm-up screen side by side: *"id like
+  the exercise gif in the pre session screen so it shows you what movement you will be doing."*
+
+**The media is real and it is genuinely animated.** `/api/exercise-gif?name=` returns
+`{ gifUrl, imageUrl }`, and for a generated exercise the gif is `/exercise-media/gifs/male/<slug>.gif`
+with a matching start frame at `…/frames/male/<slug>-start.png`. The warm-up screen renders it at
+40 px today; the ready screen — the one screenshotted, `active-workout-screen.tsx`'s ready branch —
+shows the name, last session, bar load, ramp-up and set targets, and no picture at all. There is also
+no route to one from there: `ExerciseStatsSheet` carries the gif but is mounted only on
+`pre-workout-screen.tsx`.
+
+**Do not add a fifth copy of the fetch — extract it.** The same
+`fetch('/api/exercise-gif?name=…')` → `{gifUrl, imageUrl}` is hand-rolled in **four** places already:
+`warmup-screen.tsx:39`, `exercise-stats-sheet.tsx:71`, `config/exercise-preview-sheet.tsx:33` and
+`workout-builder/builder-review.tsx:154`. The repo's rule is that a pattern at ≥2 sites is extracted
+before a third copy; this is the fifth, so the extraction is part of the work rather than a follow-up.
+
+- **Reuse the warm-up screen's fetch rather than repeating it.** `WarmupScreen` already fetches media
+  for **every** exercise in the session moments earlier, and deliberately re-fetches each binary so
+  the service worker caches it offline. Then it unmounts on the mode change and the map is lost. The
+  ready screen wants exactly one entry of that map. Put the results behind a shared cache key so the
+  second screen paints instantly from what the first already fetched — per the instant-paint rule, a
+  spinner on the ready screen for a file the app downloaded 60 seconds ago is the outcome to avoid.
+- **⚠ `unoptimized` is mandatory on a GIF through `next/image`, and forgetting it fails silently.**
+  The optimizer turns a GIF into a static image, so the picture appears, looks correct, and simply
+  never moves — which reads as "the gif is broken" rather than as a missing prop. `warmup-screen.tsx`
+  gets this right with `unoptimized={thumbSrc.endsWith('.gif')}`; copy that condition.
+- **Put it in a memoised child, not inline.** The ready screen sits behind a 1 Hz session pill and
+  the rest ring, and CLAUDE.md's render rules put repeated/hot-parent widgets in `React.memo` with
+  stable props. `active-workout-screen.tsx` is 626 lines against the ~800 ceiling, and the hotspot
+  rule says new features go into a `components/` child rather than being appended.
+- **Layout is a real decision, not a drop-in.** The screenshot already cuts `SET TARGETS` off behind
+  the action row, so a full-width media block pushes the bar-load number — the thing the user is
+  actually reading — further below the fold. Options worth weighing: a compact thumbnail beside the
+  exercise name that expands on tap (cheapest, keeps the fold), or a modest fixed-height strip under
+  the name. The owner's stated purpose is *"so it shows you what movement you will be doing"*, which
+  argues for it being visible without a tap.
+- **Alternative considered — carry the media on `/api/workout-data`.** That kills N round-trips
+  outright, since the route already returns the exercise list. Rejected as the first move: it makes
+  this a Lane A change to a payload four surfaces read, for a saving the shared cache above already
+  gets. Worth revisiting if the per-exercise fetch turns out to be slow on the device.
+- **Bodyweight and unmatched exercises need a defined empty state.** `/api/exercise-gif` returns
+  `{ gifUrl: null, imageUrl: null }` for anything it cannot match, and the warm-up list falls back to
+  a dumbbell icon. The ready screen needs the same fallback decided up front, or a missing match
+  leaves a hole where the layout expects a picture.
+- **Verification (device, APK):** open a session, and each exercise's ready screen shows its
+  animation — *moving*, not a frozen first frame — including the second and later exercises, which
+  is where a fetch-once effect keyed wrongly would show the first exercise's clip. An exercise with
+  no match shows the fallback rather than a gap. Then airplane mode: the clip still plays, because
+  the warm-up screen's prefetch put it in the service worker.
 
 ### [workouts] BF-64 — the Full/Deload toggle can only ADD deload, never remove one, so `Full · Override` overrides nothing
 

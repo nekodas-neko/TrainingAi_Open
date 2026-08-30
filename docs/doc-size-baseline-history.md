@@ -4097,7 +4097,60 @@ than a caution.
 The recommendation is to reuse `toggleDeloadRevert` rather than teach `/prescribe` an intensity
 input: the full numbers are already carried on the prescription, so the cheap path costs no LLM
 call, no rate-limit budget, and works offline.
-## 2026-08-31 — `projectOverview.md` 8453 → 8446, `docs/implementation-backlog.md` 13585 → 13576 (LB-28)
+
+## 2026-08-30 — `docs/implementation-backlog.md` (BF-65, a feature request that is mostly a cleanup)
+
+The owner asked for one picture on one screen. Most of the entry is what reading the code turned up
+around it: the same `/api/exercise-gif` fetch is hand-rolled in **four** files, so satisfying the
+request naively writes a fifth and walks past the repo's own extract-before-the-third-copy rule.
+Saying that in the entry is what makes the extraction part of the work rather than a follow-up
+nobody files.
+
+Two things are written down because they fail *quietly*. `next/image` silently converts a GIF to a
+static image without `unoptimized`, so the feature would ship looking finished and never move — the
+warm-up screen already carries the correct condition to copy. And the warm-up screen fetches every
+exercise's media moments earlier and prefetches the binaries for the service worker, then unmounts
+and drops the map; without a shared cache key the ready screen re-downloads what the app already has,
+which is also what breaks the offline case.
+
+The layout note is deliberate: the screenshot already cuts `SET TARGETS` off behind the action row,
+so "add a picture" is a fold decision, not a drop-in.
+
+## 2026-08-30 — `docs/implementation-backlog.md` (BF-66, a table that had to be measured)
+
+The owner asked a question — *"it heard me correctly; is that not how to use it?"* — and the answer
+is a six-row table produced by running `parseVoice` rather than reading it. `by` and `at` work while
+`for` and `times` do not, because the strip is a character denylist that keeps every letter appearing
+in `kg`/`reps`/`x`: `r` survives `for`, `es` survives `times`, and the two-numbers fallback then can
+never fire. Nobody derives that from the source at a glance, and nobody derives it from using the app
+at all, which is why the table is in the entry instead of a sentence saying the regex is fragile.
+
+It also carries the reason the seven existing tests pass: every one of them is adjacent numbers or an
+explicit keyword, so the filler-word gap is untested by construction rather than by oversight.
+
+And the second half, which is the part that generated the report: the failure message prints the
+transcript in red, so a *correct* transcript reads as the app mishearing. Fixing the parser without
+fixing that message leaves the next unparseable phrase just as confusing.
+
+## 2026-08-30 — `docs/implementation-backlog.md` (BF-67 and BF-68, the program builder's two blind spots)
+
+Two owner requests about the AI program builder, filed separately because one is buildable and one
+is a design.
+
+BF-68 is measured: `injur` appears **zero times** across both builder routes and all three builder
+components, and `generate-program`'s schema is a strict thirteen-field wizard payload with no
+free-text field at all. The entry's real content is the trap — `builder-chat` *does* take free text,
+so typing "I have a sore lower back" often works by luck, and then the constraint dies when the
+program is saved while the daily engine, which already reads the injuries table, never hears about
+it. That argues for feeding the existing records in rather than adding a field, and for the free-text
+path writing a record instead of a prompt line.
+
+BF-67 is flagged as a planning item because the owner's one sentence contains two payloads —
+structure ("similar to") is ~30 exercise names, history ("what I did") is unbounded — and treating
+them as one is how a prompt gets a year of set logs in it. It also carries two constraints worth
+having before design starts: send a program id rather than a program object, and give the reference
+its own schema caps rather than inheriting the byte-limit situation the route already documents.
+## 2026-08-31 — `projectOverview.md` 8453 → 8446, `docs/implementation-backlog.md` 13776 → 13767 (LB-28)
 
 Both fall, and the projectOverview one is the note worth reading: the new status entry was **paid
 for in the same section** rather than by raising the number. The BF-46 ①a paragraph from the day
