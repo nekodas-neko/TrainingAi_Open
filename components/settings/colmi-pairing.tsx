@@ -10,6 +10,8 @@ import { useUserTimezone } from '@/components/shell/user-timezone-provider'
 import { formatTimeOfDay } from '@trainingai/shared/date-utils'
 import { pairColmiRing, forgetColmiRing, syncColmiRing, type ColmiSyncOutcome } from '@/lib/colmi-ble/ble'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
+import { nowPartsInTz } from '@/lib/colmi-ble/resolve-time'
+import { isColmiSyncInFlight } from '@/lib/colmi-ble/auto-sync'
 import { getPairedRing, type PairedRing } from '@/lib/colmi-ble/paired-ring'
 import type { AutoMetric } from '@/lib/colmi-ble/protocol'
 
@@ -21,14 +23,6 @@ const AUTO_METRIC_LABELS: [AutoMetric, string][] = [
   ['stress', 'Stress'],
   ['temperature', 'Temperature'],
 ]
-
-/** Wall-clock parts in the USER's zone — the ring's clock is set from these, never from the
- *  device's own locale, so a phone in another zone cannot mis-stamp the ring's history. */
-function nowPartsInTz(tz: string) {
-  const [year, month, day, hour, minute, second] =
-    formatInTimeZone(new Date(), tz, 'yyyy-MM-dd-HH-mm-ss').split('-').map(Number)
-  return { year, month, day, hour, minute, second }
-}
 
 export function ColmiPairing() {
   const tz = useUserTimezone()
@@ -71,6 +65,13 @@ export function ColmiPairing() {
   }
 
   async function runSync() {
+    // The shell syncs on its own now, so a hand-pressed Sync can land on top of one. The radio
+    // takes one conversation at a time and the second reads as "ring not found", which is the
+    // report the owner already made after the scale held it.
+    if (isColmiSyncInFlight()) {
+      setError('A sync is already running — give it a moment.')
+      return
+    }
     setError(null); setOutcome(null); setSyncing(true)
     try {
       const result = await syncColmiRing({
