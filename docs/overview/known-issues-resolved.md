@@ -1810,3 +1810,29 @@ doubt.
   is present while the suite passes, so it is noise for this purpose rather than a finding — but
   nobody has explained it, and it should not be re-chased as an E2E failure cause.
 - Context: [`docs/handoff-2026-08-16-platform-e2e-harness-and-backlog-run.md`](../handoff-2026-08-16-platform-e2e-harness-and-backlog-run.md).
+
+### [platform] ✅ RESOLVED 2026-08-30 — the module map points at `lib/` for modules that live in `packages/shared/` (LA-35)
+
+Found while correcting that map for PS-15. `docs/module-map.md` names
+`lib/health/{activity-score,readiness-composite,model-report-calibration,vo2max,…}.ts` — **34 paths
+in all** — and every one of those files is `packages/shared/src/health/<same>.ts`. `lib/health/` is
+a real directory with nine other files in it, so the wrong paths look plausible.
+
+This is the Q-153 trap that `CLAUDE.md` sends readers to that map to avoid, and it survives because
+of the check: `scripts/check-index-doc-paths.js` ends `resolves()` with
+`'packages/shared/src/' + p.replace(/^lib\//, '')`, so the one error class the map exists to prevent
+is the one the check whitelists — all 34 report OK. **Note this does not contradict the 🟢 row
+further down** about the map's `path → symbol` claims: that check (`check-module-map-symbols.js`)
+verifies a symbol is attributed to the right *file*, not that the file is in the right *directory*.
+
+Nothing breaks. The failure mode is a session concluding a module is absent and writing a second
+copy. Queued as **LA-35**: move the paths, then delete the fallback so CI holds it.
+
+**Fixed the same day it was filed.** **108** paths across **8** orientation documents were corrected
+(92 files, 16 directories — the filed figure of 34 counted only distinct `lib/health/*.ts`), and the
+`packages/shared/src/` fallback is gone from `check-index-doc-paths.js`'s `resolves()`, so CI holds
+it. The fallback survives as an error *hint* — `-> moved to packages/shared/src/…` — which is the
+shape `check-claude-md-paths.js` already used and the reason that sibling never had this bug.
+`scripts/__tests__/index-doc-paths-no-shared-fallback.test.ts` pins the absence, because restoring
+it would make the check pass *more*, which is the direction nobody investigates.
+

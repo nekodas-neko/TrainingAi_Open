@@ -12,7 +12,7 @@ totals and hourly movement, and activity auto-detection (the "activity detected"
 | Area | Where |
 |---|---|
 | Detection | `lib/activity/auto-detection-service.ts`, `detection-thresholds.ts`, `motion-detection.ts`, `motion-gate.ts`, `blend-activity.ts` |
-| Metrics | `packages/shared/src/health/activity-score.ts`, `hourly-movement.ts`, `zone-minutes.ts`, `daily-goals.ts`; `lib/health/step-estimate.ts`, `daily-summary.ts`, `daily-medians.ts` |
+| Metrics | `packages/shared/src/health/activity-score.ts`, `hourly-movement.ts`, `zone-minutes.ts`, `daily-goals.ts`; `packages/shared/src/health/step-estimate.ts`, `daily-summary.ts`, `daily-medians.ts` |
 | Step capture (border with `devices`) | `lib/oura-ble/step-counter-pipeline.ts`, `step-orchestrator.ts`, `step-orchestrator-core.ts`, `step-day-buckets.ts`, `step-features.ts`, `gait-step-count.ts` |
 | UI | `app/activity/`, `components/activity/` |
 | Tables | `body_metrics` (steps), `oura_daily` (activity score, active calories, activity times) |

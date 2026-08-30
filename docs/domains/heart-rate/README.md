@@ -12,10 +12,10 @@ precedence — which are [`devices`](../devices/README.md). Zone-based pacing of
 | Area | Where |
 |---|---|
 | Live HR | `lib/live-hr/` |
-| Zones & max HR | `lib/health/hr-zones.ts`, `zone-minutes.ts`, `zone-quota.ts` |
-| Smoothing & windows | `lib/health/hr-smoothing.ts`, `hr-window-merge.ts`, `observed-hr.ts`, `hr-episode-detection.ts`, `hr-change-display.ts` |
-| HRV | `lib/health/rmssd.ts`, `hrv-5min.ts`, `hrv-frequency.ts`, `tachogram.ts`, `daytime-hrv.ts`, `daytime-hrv-model.ts` |
-| Recovery profiles | `lib/health/hr-recovery-profile.ts`, `compute-hr-recovery-profile.ts`, `hr-recovery-by-exercise.ts`, `hr-recovery-trend.ts`, `hr-profile.ts` |
+| Zones & max HR | `packages/shared/src/health/hr-zones.ts`, `zone-minutes.ts`, `zone-quota.ts` |
+| Smoothing & windows | `packages/shared/src/health/hr-smoothing.ts`, `hr-window-merge.ts`, `observed-hr.ts`, `hr-episode-detection.ts`, `hr-change-display.ts` |
+| HRV | `packages/shared/src/health/rmssd.ts`, `hrv-5min.ts`, `hrv-frequency.ts`, `tachogram.ts`, `daytime-hrv.ts`, `daytime-hrv-model.ts` |
+| Recovery profiles | `packages/shared/src/health/hr-recovery-profile.ts`, `compute-hr-recovery-profile.ts`, `hr-recovery-by-exercise.ts`, `hr-recovery-trend.ts`, `hr-profile.ts` |
 | Tables | `body_metrics` (hrv_ms, resting_heart_rate), `set_hr_stats`, `workout_hr_stats` |
 
 **Max HR resolves in exactly one place** — the resolver was consolidated in v1.226.3; don't add a
@@ -103,5 +103,5 @@ Live at the time of writing (2026-08-05):
   the column.
 - **The ring's PPG sleeps when worn-idle.** No live HR at a desk is firmware power-gating, not a
   bug.
-- **RR intervals and bpm must agree** — `rrContradictsBpm` in `lib/validation/plausibility.ts`
+- **RR intervals and bpm must agree** — `rrContradictsBpm` in `packages/shared/src/validation/plausibility.ts`
   exists because they didn't.

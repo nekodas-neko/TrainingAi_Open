@@ -15,9 +15,9 @@ the DB id, never the name. See CLAUDE.md, "No Hardcoded Session Names or Trainin
 | Area | Where |
 |---|---|
 | Orchestrator + children | `components/workout-screen.tsx`, `components/workout/`, `components/workout-builder/`, `components/exercises/` |
-| Write path (one function per domain) | `lib/workout/log-exercise.ts` — used by both the API route *and* the `pushMutations` branch |
-| Formulas | `lib/1rm.ts`, `lib/health/soreness-volume.ts`, `workout-density.ts`, `workout-energy.ts`, `strength-progress.ts`, `strength-projection.ts`, `workout-activities.ts` |
-| Prescription / AI | `lib/ai-periodization/`, `lib/session-explain/` |
+| Write path (one function per domain) | `packages/shared/src/workout/log-exercise.ts` — used by both the API route *and* the `pushMutations` branch |
+| Formulas | `packages/shared/src/1rm.ts`, `packages/shared/src/health/soreness-volume.ts`, `workout-density.ts`, `workout-energy.ts`, `strength-progress.ts`, `strength-projection.ts`, `workout-activities.ts` |
+| Prescription / AI | `packages/shared/src/ai-periodization/`, `packages/shared/src/session-explain/` |
 | UI routes | `app/workout/`, `app/workout-select/`, `app/session-select/`, `app/config/`, `app/stats/` |
 | Past-workout surfaces | No `app/history/` route exists (removed; the row listing it was stale until 2026-08-18). History is rendered in place — `components/exercise-history-sheet.tsx`, opened from `app/session-select/session-select-content.tsx` and `app/stats/`. |
 | Tables | `programs`, `program_sessions`, `session_exercises`, `progression_styles`, `style_sets`, `schedules`, `workout_sessions`, `exercise_logs`, `set_logs`, `personal_records`, `exercise_library` |
