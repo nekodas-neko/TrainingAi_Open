@@ -3569,3 +3569,14 @@ which turned it into an availability bug — a plan the library filled completel
 model is down, having needed nothing from it. That reversed the recommended fix (skip the call, not
 make it cheaper), so the lines are the difference between an entry the next session would implement
 wrongly and one it would not.
+
+## 2026-08-30 — `projectOverview.md` 8337 → 8347, `docs/implementation-backlog.md` 13408 → 13376 (LA-38 shipped)
+
+The backlog **shrinks 32**: LA-38 left the queue the same day it was filed, so the ratchet moves the
+right way and the new number is the floor.
+
+`projectOverview.md` +10, one Current Status paragraph. It is ten lines rather than four because the
+reading that matters is not "the route stopped wasting tokens" — it is that an AI outage was breaking
+a plan the AI had nothing to do with. A status line that led with the tokens would leave the next
+reader thinking this was an optimisation, and the reproduction (no API key: pre-fix 502, post-fix
+200) is the sentence that stops it.

@@ -17,6 +17,7 @@ import { sumIngredients } from '@trainingai/shared/nutrition/scan-totals'
 import { scaleWithTopUp } from '@/lib/nutrition/meal-top-up'
 import { savedMealToIngredients } from '@trainingai/shared/nutrition/saved-meal-ingredients'
 import { selectLibraryMeals } from '@trainingai/shared/nutrition/library-match'
+import { planNameFromMeals, restDayCarbLine } from '@trainingai/shared/nutrition/plan-naming'
 import { NutritionIngredientsSchema } from '@trainingai/shared/validators/nutrition-ingredient'
 import { readJsonLimited } from '@trainingai/shared/http/request-guards'
 
@@ -217,8 +218,18 @@ export async function POST(req: Request) {
     : []
   const pickBySlot = new Map(libraryPicks.map(p => [p.slotIndex, p]))
 
-  let draft: z.infer<typeof DraftSchema>
-  try {
+  // LA-38 — nothing to generate, so nothing to ask for.
+  //
+  // This count used to be taken AFTER the model call, and the call ran unconditionally: pin three
+  // meals into a three-meal plan, or let the library fill all three, and the route still sent the
+  // full generate prompt saying `Meals: exactly 0.` The tokens were the smaller half — the catch
+  // below cannot tell that the call was unnecessary, so a plan needing nothing from the model
+  // returned 502 whenever the model was down.
+  //
+  // Kept meals take the first slots so their position is stable across a reroll of the rest.
+  const generatedNeeded = Math.max(0, mealCount - kept.length - libraryPicks.length)
+
+  const askModel = async (): Promise<z.infer<typeof DraftSchema>> => {
     const result = await loggedGenerateObject(
       {
         section: 'meal-plan-generate',
@@ -275,17 +286,33 @@ export async function POST(req: Request) {
             : '- Return "" for "restDayAdjustment".',
         ].filter(Boolean).join('\n'),
       }))
-    draft = result.object
-  } catch {
-    // Every generateText/generateObject call is wrapped and returns a JSON error, never a throw
-    // that reaches the client as an opaque 500.
-    return NextResponse.json({ error: 'Could not generate a plan right now. Try again shortly.' }, { status: 502 })
+    return result.object
+  }
+
+  let draft: z.infer<typeof DraftSchema>
+  if (generatedNeeded === 0) {
+    // The call was unconditional because the plan's NAME came out of it. With nothing to generate
+    // every meal is in hand and already named, so both fields it supplied are derivable — which is
+    // what makes skipping the call possible rather than merely cheaper.
+    draft = {
+      planName: planNameFromMeals([...kept.map(k => k.name), ...libraryPicks.map(p => p.meal.name)]),
+      meals: [],
+      restDayAdjustment: input.splitTrainingRest
+        ? restDayCarbLine(dailyCarbs * REST_DAY_CARB_REDUCTION)
+        : '',
+    }
+  } else {
+    try {
+      draft = await askModel()
+    } catch {
+      // Every generateText/generateObject call is wrapped and returns a JSON error, never a throw
+      // that reaches the client as an opaque 500.
+      return NextResponse.json({ error: 'Could not generate a plan right now. Try again shortly.' }, { status: 502 })
+    }
   }
 
   // The model may return the wrong number of meals however firmly it was asked. Pad or trim rather
   // than failing — a plan with one meal missing is recoverable, a 500 is not.
-  // Kept meals take the first slots so their position is stable across a reroll of the rest.
-  const generatedNeeded = Math.max(0, mealCount - kept.length - libraryPicks.length)
   const generated = draft.meals.slice(0, generatedNeeded)
   while (generated.length < generatedNeeded) {
     generated.push({ name: `Meal ${kept.length + generated.length + 1}`, ingredients: [], notes: '' })
