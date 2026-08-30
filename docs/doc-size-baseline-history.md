@@ -4079,3 +4079,21 @@ And the wrinkle: `Meals` has a search box too, so `Search` is not strictly exclu
 that makes the rename honest is that Meals *filters* a list you own while this tab *searches* beyond
 it — which means the two placeholders have to read differently, or the rename swaps one ambiguity for
 another. Batched into `nutrition-ui-uplift` rather than given its own PR and its own device look.
+
+## 2026-08-30 — `docs/implementation-backlog.md` (BF-64, a one-way toggle)
+
+Sixty lines for one owner sentence, and the length is the table. *"Pressing full or deload doesnt
+change the prescription"* has a precise answer — `aiDeload` is read in an `else if` that only fires
+when the exercise is **not** already deloaded — and stating it as a four-row grid of
+prescription × toggle is what makes "the toggle is one-way" checkable rather than asserted.
+
+The rest is the two hazards that would otherwise be found during implementation. `preDeload` is
+optional, so a session-level revert cannot be all-or-nothing and the entry says to decide what Full
+means for an exercise with nothing to revert to. And the 1RM/PR gate reads `isAnyDeload` **and**
+`ex.deloaded`, so a revert that misses one of them either loses a real PR or writes one off deloaded
+sets — an area that has already had a fix land, which is why it is written as a live hazard rather
+than a caution.
+
+The recommendation is to reuse `toggleDeloadRevert` rather than teach `/prescribe` an intensity
+input: the full numbers are already carried on the prescription, so the cheap path costs no LLM
+call, no rate-limit budget, and works offline.
