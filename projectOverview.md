@@ -29,6 +29,16 @@
 
 **The accessibility scanner that would have passed a 12 px button (Q-282).** `@axe-core/playwright` was installed, measured and removed: WCAG 2.5.8 exempts a *spaced* undersized control, so a deliberately-shrunk **12×12** button (confirmed by `boundingBox`) came back a **pass**, and `color-contrast` cannot read this app at all — it fails to parse the `oklch` tokens (*"Could not parse color string oklab(…)"*) and **evaluated no nodes on Home**. `e2e/touch-target-size.spec.ts` ships instead: DOM geometry against **this repo's 48 dp bar**, covering the roles `globals.css`'s `button, [role="button"]` floor cannot (`<a>`, `role="tab"`, `role="radio"`). It fails on the mutation axe passed. One real finding, **LB-26**: Home's APK-banner link is 258×33 ([journal](docs/overview/entries/2026-08-30-touch-target-gate.md)).
 
+**The BLE console counted rows it had been guessing (BF-54).** Its DB footprint printed
+`n_live_tup` under a column headed *rows* — a planner estimate, and `last_analyze` is NULL on every
+table here, so it read **552** against `oura_raw_samples`' **180,415**, 0 against `rr_intervals`'
+87,015 and 1 against `error_events`' 6,102. The display was the smaller half: the reclaim button used
+the same counter to call 67 MB against 552 rows *pure bloat*, so pressing it took an ACCESS EXCLUSIVE
+lock with the timeouts lifted and reclaimed nothing. Both sites now `count(*)`. **The size columns
+were never wrong** and are untouched — only the row columns of `pg_stat_user_tables` are estimates,
+and conflating the two is what cost a session on Q-528
+([journal](docs/overview/entries/2026-08-30-fix-db-footprint-real-counts.md)).
+
 **Query timings are readable by the audit role (BF-21).** The owner enabled `pg_stat_statements` on
 production; `claude_ro` is default-deny, so it needed a view, which migration 242 adds through the
 generator rather than by hand — that file rebuilds the whole schema each run, so a hand-written view
