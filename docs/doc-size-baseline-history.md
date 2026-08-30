@@ -4079,3 +4079,18 @@ And the wrinkle: `Meals` has a search box too, so `Search` is not strictly exclu
 that makes the rename honest is that Meals *filters* a list you own while this tab *searches* beyond
 it — which means the two placeholders have to read differently, or the rename swaps one ambiguity for
 another. Batched into `nutrition-ui-uplift` rather than given its own PR and its own device look.
+
+## 2026-08-31 — `projectOverview.md` 8453 → 8446, `docs/implementation-backlog.md` 13576 → 13505 (LB-28)
+
+Both fall, and the projectOverview one is the note worth reading: the new status entry was **paid
+for in the same section** rather than by raising the number. The BF-46 ①a paragraph from the day
+before was rewritten as one long line in the style the rest of the section has moved to, which
+freed nine — so the index gained an entry and lost seven lines.
+
+Nothing was cut from that paragraph except restatement: the picker count, the shared write path, the
+reproduction, the parent instrumentation and the precondition finding are all still in it, and its
+journal link is unchanged.
+
+**Re-derive both on the merge if #647 lands first** — it removes BF-39's queue entry and repairs
+four lines of duplicated `**Version:**` debris in the same section, so the merged figures will be
+lower than these. Take them from the merged documents rather than picking a side.
