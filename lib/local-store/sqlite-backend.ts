@@ -44,6 +44,29 @@ function parseZoneIds(raw: unknown): number[] {
   } catch { return []; }
 }
 
+// One `food_items` row -> a FoodItem. Two `SELECT *` readers share it (search, and the BF-38
+// duplicate lookup) so a column added to one is not missed by the other.
+// `userId`/`region` are '' because the local table stores neither: the store is one user's, and no
+// local read has ever needed the region.
+function foodItemRowToItem(r: Record<string, unknown>): FoodItem {
+  return {
+    id: String(r.id), userId: '', name: String(r.name),
+    brand: r.brand ? String(r.brand) : undefined,
+    servingSizeG: Number(r.serving_size_g), calories: Number(r.calories),
+    proteinG: Number(r.protein_g), carbsG: Number(r.carbs_g), fatG: Number(r.fat_g),
+    fiberG: r.fiber_g != null ? Number(r.fiber_g) : undefined,
+    sugarG: r.sugar_g != null ? Number(r.sugar_g) : undefined,
+    sodiumMg: r.sodium_mg != null ? Number(r.sodium_mg) : undefined,
+    satFatG: r.sat_fat_g != null ? Number(r.sat_fat_g) : undefined,
+    source: (r.source ? String(r.source) : 'manual') as FoodItem['source'],
+    // `image_data_uri` is deliberately NOT read here — see LA-36. It is stored locally and the
+    // server's own searchFoodItems returns it, so the device's local-first read is the one surface
+    // that loses the picture. Fixing that is a visible change on two Lane B screens and wants its
+    // own entry rather than riding a de-duplication PR.
+    region: '', createdAt: new Date(String(r.updated_at)),
+  };
+}
+
 export class SQLiteLocalStore implements LocalStore {
   async getBodyMetrics(cutoffDate: string): Promise<LocalBodyMetric[]> {
     const rows = await querySQL<Record<string, unknown>>(
@@ -2225,18 +2248,24 @@ export class SQLiteLocalStore implements LocalStore {
           `SELECT * FROM food_items ORDER BY updated_at DESC LIMIT 20`,
           [],
         );
-    return rows.map(r => ({
-      id: String(r.id), userId: '', name: String(r.name),
-      brand: r.brand ? String(r.brand) : undefined,
-      servingSizeG: Number(r.serving_size_g), calories: Number(r.calories),
-      proteinG: Number(r.protein_g), carbsG: Number(r.carbs_g), fatG: Number(r.fat_g),
-      fiberG: r.fiber_g != null ? Number(r.fiber_g) : undefined,
-      sugarG: r.sugar_g != null ? Number(r.sugar_g) : undefined,
-      sodiumMg: r.sodium_mg != null ? Number(r.sodium_mg) : undefined,
-      satFatG: r.sat_fat_g != null ? Number(r.sat_fat_g) : undefined,
-      source: (r.source ? String(r.source) : 'manual') as FoodItem['source'],
-      region: '', createdAt: new Date(String(r.updated_at)),
-    } satisfies FoodItem));
+    return rows.map(foodItemRowToItem);
+  }
+
+  // BF-38. Every row the user already has at this exact calorie count — the candidate set the
+  // duplicate check runs over, and the same prefilter the server uses
+  // (`slices/nutrition.ts` createFoodItem). Calories is the one column that is exact on both sides
+  // and needs no text normalisation, so the two paths cannot disagree about which rows to consider.
+  //
+  // NOT `searchFoodItems(name)`, which is capped at 20 and ordered newest-first: a short name like
+  // "Rice" fills that cap with substring matches and can push the real duplicate out of the window,
+  // which would make the check silently weaker on the device than on the web. Unbounded here on
+  // purpose — the whole table is a few hundred rows and a calorie match is a handful of them.
+  async findFoodItemsByCalories(calories: number): Promise<FoodItem[]> {
+    const rows = await querySQL<Record<string, unknown>>(
+      `SELECT * FROM food_items WHERE calories = ? ORDER BY updated_at ASC`,
+      [Math.round(calories)],
+    );
+    return rows.map(foodItemRowToItem);
   }
 
   // Recent distinct food items logged to a meal type — mirrors the server route

@@ -728,7 +728,10 @@ export interface WorkoutRepository {
   reorderMealTypes(userId: string, orderedIds: string[]): Promise<void>
   seedDefaultMealTypes(userId: string): Promise<void>
 
-  createFoodItem(userId: string, data: Omit<FoodItem, 'id' | 'userId' | 'createdAt'> & { id?: string }): Promise<FoodItem>
+  /** `reuseExisting` (BF-38) returns the user's existing identical row instead of writing a
+   *  second one. Off by default because the default caller is the offline push, whose
+   *  client-minted id is already referenced by a queued food_log — see the slice. */
+  createFoodItem(userId: string, data: Omit<FoodItem, 'id' | 'userId' | 'createdAt'> & { id?: string }, opts?: { reuseExisting?: boolean }): Promise<FoodItem>
   searchFoodItems(userId: string, query: string): Promise<FoodItem[]>
 
   listFoodLogs(userId: string, date: string): Promise<FoodLogWithItem[]>

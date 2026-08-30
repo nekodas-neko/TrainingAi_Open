@@ -72,6 +72,12 @@ export async function POST(req: Request) {
     source: body.source ?? 'manual',
     barcode: body.barcode, region: body.region ?? 'AU',
     imageDataUri: body.imageDataUri ?? null,
+  }, {
+    // BF-38. An interactive create returns whatever id it is given, so handing back the row the
+    // user already has is safe here in a way it is not on the offline push path (see the slice).
+    // The rule is exact on name, brand, serving size and macros — it catches the repeat, never the
+    // near-miss.
+    reuseExisting: true,
   })
   return NextResponse.json(item, { status: 201 })
 }
