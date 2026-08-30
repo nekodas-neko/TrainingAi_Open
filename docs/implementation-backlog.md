@@ -766,6 +766,95 @@ permanently).
 
 **Do not flash the circulating `…FasterRawValuesMOD.bin`.** Only step in the arc that can brick the
 device, and it would be taken before knowing the sensor is worth streaming from.
+### [workouts][platform] BF-44 — the chat AI has no idea you are injured; the workout engine has known all along
+
+- **Lane:** A — `lib/ai-chat/tools.ts` and `lib/ai-chat/context.ts`.
+- **Added:** 2026-08-27 · owner: *"I'd like to flag somewhere I have a sore lower back or something;
+  and have it keep that in mind to not do overloading on the lower back like deadlift
+  excercise reccomendations etc. A real - intuitive type of system."*
+
+**Most of what the owner is describing already exists, and saying so is the point of this entry.**
+Log an injury and the app already: derives `activeInjuredMusclesInSession`
+(`packages/shared/src/ai-periodization/signals.ts`), lets the periodization prompt return
+`session_swap_recommended` or `deload_recommended`, offers per-exercise substitutions through
+`injurySafeAlternatives` and the injury-swap sheet, and lets **Coach** log an injury
+conversationally. Deadlifts really would stop being recommended for a flagged lower back. **Nothing
+here needs building.**
+
+**The gap is one surface, and it is the one the owner was talking to.** `lib/ai-chat/tools.ts` and
+`lib/ai-chat/context.ts` contain the string `injur` **zero times**. Sixteen tools, none of them
+injury-aware, and no injury line in the always-on context. So the chat will happily talk you through
+a deadlift progression while the workout screen is substituting the movement out — two surfaces, one
+app, opposite advice. **That contradiction is the defect**, not the absence of a feature.
+
+**Fix, smallest first:**
+1. **An always-on line in `context.ts`** — active injuries as muscle, severity and days active. It
+   belongs in context rather than a tool because a tool only fires when the model thinks to call it,
+   and an injury has to constrain an answer the model did not realise was about injury. This is the
+   half that delivers the owner's *"keep it in mind"*.
+2. **A `getHealthOverview` tool** for the deliberate question — active injuries, latest composition,
+   measured RMR, and (once BF-41 lands and exposure is decided) the clinical results. Depends on
+   BF-43 for what may be exposed.
+
+- **Needs:** BF-43 — the clinical half of the overview cannot be wired before it is decided what the
+  model may see. **The injury line does not wait on it** and should ship first, alone if need be.
+- **Verification.** Ask the chat for a lower-body session with an active lower-back injury logged: it
+  names the injury unprompted and does not recommend a deadlift, matching what the workout screen
+  does for the same state. Resolve the injury and the constraint disappears from both.
+
+### [body][nutrition][platform] BF-43 — the clinical results the app stores are invisible to every AI surface, and one of them must stay that way
+
+- **Lane:** A — `lib/ai-chat/tools.ts`, `lib/ai-chat/context.ts`, `lib/ai/prompt-guards.ts`.
+- **Added:** 2026-08-27 · owner: *"will the AI be able to see data? what could it use it for."*
+- **Needs:** BF-41 — DEXA and blood have no table yet; only the RMR does.
+
+**Measured, not assumed.** The chat AI has **16 tools**. None of them reaches `measured_rmr`, and
+`getRecoveryData` — the only tool carrying body data at all — returns `weightKg` and **no body-fat
+percentage**. `lib/ai-chat/context.ts` adds 1RMs, sleep and HRV, and nothing about composition. So
+today the owner can ask *"what should I eat"* and the model answers without knowing their measured
+resting rate, their real body fat, or their lean mass. It is not filtered out; it was never wired in.
+
+**✅ STORAGE DECIDED, 2026-08-27 — owner: *"I'd rather it all documented in the app and database
+for now; we can choose how to use it later."*** Store **every** field of all three results, in full,
+including the analytes nothing reads yet. The cost is kilobytes; the cost of a field dropped at
+ingest is a re-scan of a document that no longer exists. **Exposure is a separate, later decision**
+and the table below is the recommendation waiting for it, not a settled permission.
+
+**The three results are not one permission, and treating them as one is the mistake to avoid.**
+
+| Result | Give the AI? | Why |
+|---|---|---|
+| **RMR** | **Yes** | It is a calorie number the app already reasons in. The model quoting 1325 instead of a formula's 1481 makes every nutrition answer more correct. |
+| **DEXA composition** | **Yes** — fat %, lean mass, VAT, the indices | Body composition drives protein dosing and every recomposition question the owner actually asks. |
+| **Blood panel** | **Values yes. Interpretation no.** | See below. It is the entry's whole safety argument. |
+
+**Blood work is where a general-purpose model is at its most confident and least qualified.** Handed
+`ALT 46, ref 0-45` it will volunteer liver advice; handed `LDL 3.57, ref <2.5` it will prescribe. The
+repo already has the rule this needs — a model handed a score of 80 called it *"perfect"* (Q-292),
+which is why no LLM-reported number may be shown as fact. Blood is that failure with a health
+consequence attached. **Recommended: expose the panel as values, ranges and the PROVIDER's own flag,
+and extend `PROSE_GUARDS` to forbid diagnosis, causation and any change to medication or
+supplementation.** The provider already wrote *"High (likely protein intake)"* — the model's job is
+to repeat that attribution, not to invent one.
+
+**What it is genuinely good for, once it can see all three:**
+
+- **Nutrition answers anchored on a measured base** rather than a formula that runs 156 kcal high for
+  this person.
+- **Protein dosed on real lean mass** — the DEXA-corrected 51.5 kg, not the scale's 53.6 kg.
+- **Explaining its own recommendation** — *"your target is 1,327 because your measured RMR is 1325
+  and you average 240 kcal of movement"* is a sentence the model cannot currently say.
+- **Noticing a trend across tests**, once there are two of anything: fat % moving while weight does
+  not, or a re-tested analyte moving toward its range.
+- **Connecting a flag to logged behaviour, as a question rather than a claim** — urea high and
+  protein intake logged daily is an observation the app uniquely can make, and it must be phrased as
+  *"worth asking your doctor about"*, never as a finding.
+
+- **Verification.** With a stored RMR the model quotes the measurement, not Cunningham, and says
+  which it used. With a stored panel it will repeat a value and its provider flag and **refuse** to
+  say what caused it or what to take — test that refusal explicitly, with a leading prompt, because a
+  guard that has never been attacked has not been tested.
+
 ### [body][nutrition] BF-42 — the daily energy model computes its own BMR and never reads the measured RMR
 
 - **Lane:** A — `lib/health/energy-balance-service.ts`.
@@ -942,6 +1031,137 @@ app states the measured offset against the scale for the same period; corrected 
 calorie and protein goals; and history reads corrected without the raw scale values having been
 overwritten.
 
+### [nutrition] BF-45 — the Nutrition day screen: an empty grid slot, macros that vanish when you collapse, and gutters the artboards did not ask for
+
+- **Lane:** B
+- **Batch:** `nutrition-ui-uplift` — ships with BF-46. Both are surface-only and both are verified by
+  the same walk through the same tab on the same device; splitting them buys two device passes for
+  one screen.
+- **Gate: device**
+- **Added:** 2026-08-27 · owner, with screenshots of the live tab (v1.383.x).
+- **Spec:** BF-28's parity rules still bind — where an artboard covers one of these, the artboard
+  wins over a number invented here.
+
+**① `My Meals` sits in a two-column grid with nothing beside it.** Owner: *"id like the my meals
+button to be bigger and take up both left and right slots (as its empty for now)."* Confirmed in
+`components/nutrition/nutrition-action-row.tsx`: `grid grid-cols-2` with **three** children, so Log
+Food and Water fill row 1 and My Meals takes the left half of row 2 with dead space beside it. The
+change is `col-span-2` on the third button. **Say in the diff that this is contingent on the slot
+being empty** — a fourth action later reclaims it, and the next person should know the span was a
+consequence rather than a design.
+
+**② Collapsing a meal hides its macro breakdown.** Owner: *"minimizing the tab doesnt show the
+calorie break down."* In `components/nutrition/meal-card.tsx` the P/C/F footer lives inside
+`<CollapsibleContent>`, so it is removed with the rows; the collapsed header keeps only the calorie
+number. Collapsing exists precisely to skip the rows and keep the summary, and today it drops half of
+it. Put the macro trio in the header (compact, collapsed-only, or always), sized so a long meal-type
+name still truncates rather than pushing it off.
+
+**③ Side gutters — and the owner scoped this on 2026-08-27, which makes it a different job.**
+Asked which screens, they answered: *"Mostly when an interactive tab opens from the bottom like;
+logging food or editing meals, those types of events."* So this is **`SheetContent side="bottom"`,
+not the day screen** — the food logger, the meal builder, the quantity sheet, the label sheet, every
+bottom sheet in the tab. That is one shared component, so **fix it once in
+`components/ui/sheet.tsx`'s bottom variant rather than per-sheet**, and the whole class moves
+together. A per-screen patch here would be the copy-paste that the pill-tab markup already taught
+this repo about (~17 drifting copies).
+
+⚠ **`SheetContent side="bottom"` owns the BOTTOM inset already** — CLAUDE.md forbids adding `pb-safe*`
+inside a bottom sheet, and `p-0` does not strip the baked padding, because tailwind-merge does not
+know the custom classes. **This is a horizontal change only.** Measure the gutter from the nutrition
+artboards rather than inventing a number.
+
+- **Verification.** On the S25: My Meals spans the row; a collapsed meal still shows P/C/F and its
+  calories; the gutter matches the artboard on the day screen and every other nutrition screen
+  touched. The sandbox renders these at desktop width, so all three are device-judged.
+
+### [nutrition] BF-46 — the meal builder buries its photo picker below the fold, and the quantity sheet spends its space on the wrong things
+
+- **Lane:** B
+- **Batch:** `nutrition-ui-uplift` — ships with BF-45.
+- **Gate: device**
+- **Added:** 2026-08-27 · owner, with screenshots. *"overall just a UI rework/uplift. almost there."*
+
+**① Two things, and the owner corrected the first reading of them. ⚠ THE SAVE FAILURE IS REAL AND
+UNEXPLAINED — do not treat this as a layout ticket.**
+
+Asked whether they had ever found the picker, the owner answered: *"Yes I found the photo picker;
+its in two locations; once at the top of the page and once at the bottom. I only want the one at the
+top; I saved it; and it didnt show."* So a photo **was** attached and saved, and did not appear. The
+earlier guess in this entry — that the control was simply never found — is **wrong and is corrected
+here** rather than quietly deleted, because a session that reads only the fix would go looking for
+the wrong thing.
+
+**(a) One picker, at the top.** Two affordances say *Add a photo*: the detail sheet's hero
+(`meal-detail-sheet.tsx:107`), which **is not a picker at all** — it calls `onEdit` and drops the
+user into the builder — and the builder's real tile at `saved-meals-sheet.tsx:672`, rendered
+**below `Add ingredient`** at the bottom of a scroll. Owner wants the top one and only the top one.
+**Move the real tile to the top of the builder at hero scale**, matching the detail sheet's band, so
+the two screens agree where a meal's photo lives and there is one control rather than two things
+wearing one label.
+
+**(b) The save failure does not reproduce in source, so reproduce it on the device first.** Every
+layer reads correct: `openBuild` seeds `mealImage` from the meal being edited
+(`saved-meals-sheet.tsx:200`), the save sends it explicitly rather than omitting it (`:361`, the
+Q-396 rule), and the column, route, `getSyncDelta` mapping and local table all carry `imageDataUri`.
+**Candidates, in the order worth checking:** the Capacitor path re-encodes to WebP on Samsung's
+WebView and a failed encode returns a PNG data URI far over the 16 KB cap — `accept()` rejects with a
+toast that a user mid-flow can miss, and the save then proceeds with no photo; `width`/`height` on
+`CapCamera.getPhoto` are a first pass only, as the file's own comment says; or the write lands and a
+**read** path renders the placeholder anyway. Distinguish them by reading the row back
+(`/api/nutrition/saved-meals`) after a save that appeared to succeed — if the column holds a URI, it
+is a render bug and not a write bug, and that single check splits the two.
+
+⚠ **Do not ship (a) and call the report closed.** Moving the control does not make a photo save.
+
+**② A serving inside a serving.** Owner: *"I see there are serving size of each ingredient within the
+meal; so a serving size in a serving size is probably excessive; we should keep it weight/portion."*
+The builder lists `8 servings · 1000 g` per ingredient while the meal itself is measured in portions,
+so "serving" means two different things one line apart. **Settled by the owner, 2026-08-27:
+*"just the weight would be fine for the meals. Only portions are really needed when making serving
+sizes for the meals."*** So an ingredient row reads `1000 g` and nothing else — **not** a per-portion
+gram figure alongside it, which is what started the doubling. Portions stay the meal's own unit.
+Grams are already the stored truth, so this is display only.
+
+**③ The quantity sheet's layout.** Owner: *"the grams/serve could be smaller and to the right of the
+− x + button then the other buttons could be enlarged and spread to match the width it has: more
+distinct macro and total calorie buttons."* One component to change —
+`components/nutrition/quantity-editor.tsx`, which BF-26 converged both sheets onto, so this lands
+everywhere at once. The srv/g toggle currently takes a full-width row of its own; the presets are a
+cramped four; the macro line is small text under them. Rework so the toggle is secondary and beside
+the stepper, the presets span the width, and the calorie total and macros read as the result they
+are. **Keep BF-26's earned constraints:** the macro colours stay (four uncoloured columns were the
+*"everything looks the same"* complaint), and the grams chip is still hidden when there is no serving
+size to divide by, since a chip that cannot apply is worse than no chip.
+
+**✅ LAYOUT CHOSEN — OPTION A, owner, 2026-08-27: *"option A looks the best lets go with that."***
+Drawing: <https://claude.ai/code/artifact/9388bd52-37e4-4986-b145-45cf96c5c3cb> (three options at
+412 dp on the app's real dark tokens; A is the left one). **Build A. Do not re-derive it from the
+prose above** — where the two disagree, the drawing wins, and B and C are recorded only so nobody
+re-opens a settled question.
+
+**Option A, top to bottom:**
+
+| Band | What it is |
+|---|---|
+| Title | Food name, and `1 serving = 65 g` beneath it. Close ✕ at the right. |
+| **Stepper** | `−` · the value · `+`, the value tallest and heaviest — it is what the sheet exists to set. |
+| **Unit toggle** | `srv` / `g` **stacked vertically in a narrow column to the RIGHT of the stepper**, same height as it. This is the owner's *"smaller and to the right of the − x + button"* and it is what frees the width below. |
+| **Presets** | Four equal chips spanning the full width — `1 srv` `2 srv` `3 srv` `100 g`. Three wide when the food has no serving size (see below). |
+| **Calorie total** | The number alone, centred, largest type on the sheet, with a small `KCAL` label under it. It leads; nothing sits beside it. |
+| **Macro tiles** | Three equal tiles — Protein · Carbs · Fat — each a bordered surface with the value in its macro colour and the name spelled out beneath. Not `P`/`C`/`F`. |
+| Footer | Delete at the left, `Save` filling the rest. |
+
+**What A costs, so it is not discovered late:** it is the tallest of the three, because the total and
+the macros are two stacked blocks rather than one. On a long food name the sheet may scroll. That was
+put to the owner and accepted — distinctness was the goal. If it scrolls badly on the S25, tighten
+the gaps rather than merging the two blocks back together, which would be option B.
+
+- **Verification.** On the S25, in both sheets that render the editor: a photo attached in the
+  builder appears in the list, the detail hero and the diary row; ingredients read in grams; every
+  control clears the 48 dp floor and the action row clears the gesture bar (`pb-safe-action*`, which
+  renders 0 in the sandbox).
+
 ### [nutrition] BF-38 — logging the same food twice creates a second `food_items` row: 19 of 209 are redundant
 
 - **Lane:** A — the matching happens at creation, in the route and the shared create path.
@@ -996,6 +1216,24 @@ in the PR which rule was chosen and what it deliberately does not catch.
   resolve to the right item.
 
 ### [nutrition] BF-39 — a logged meal stops being a meal: `food_logs` has no `saved_meal_id`, and three symptoms trace to that
+
+> **⚑ RE-REPORTED WITH SCREENSHOTS, 2026-08-27, and the owner's wording sharpens the requirement.**
+> *"when I add a meal from ai; it breaks it down into its components and floods the list. we need to
+> be able to create an over arching food and have the ingredients and macro break down inside of
+> it."* The screenshot is one AI-logged breakfast rendered as **eight** diary rows — flour, protein
+> powder, baking powder, salt, milk, eggs, butter, bacon — each with its own `1 serving · Ng` line
+> and chevron, filling the whole meal section.
+>
+> **This is the same defect this entry already describes, not a new one**, and it is now the owner's
+> most-repeated nutrition complaint (raised on 2026-08-26 about a saved meal's photo, again here
+> about an AI meal). What the re-report adds is the shape of the fix: **one collapsed parent row
+> carrying the meal's name and total, expanding to the ingredients and their macro split** — not
+> eight siblings, and not a single opaque row that loses the breakdown. Both halves are stated, so
+> build both.
+>
+> It also answers the photo question the earlier report left open: a parent row is a place a meal
+> photo can live. Decomposed siblings had nowhere to put one, which is why *"the image won't transfer
+> over"* had no good answer while the rows stayed flat.
 
 - **Lane:** A — a migration plus the write path; the diary rendering is B and follows.
 - **Added:** 2026-08-26 · owner: *"the meal is a complete in 'saved meal' and it can have a picture
@@ -1227,14 +1465,16 @@ The server has no cleanup job. The phone mirrors what `getSyncDelta` sends (`foo
 no `DELETE FROM food_items` at all. The 14-day window the owner is thinking of is the *local Oura
 raw* store, which is a different table and a different decision.
 
-**Two decisions to make and write down, not settle by accident:**
-1. **Store the bytes, or store the OFF URL?** A URL is free and always current but breaks offline —
-   and the row it decorates is read local-first. A stored data URI matches how `saved_meals` already
-   does it and works on a plane. **Recommended: store bytes**, for consistency with the meal photo
-   and because offline-first is the app's premise; note the licence line below.
-2. **`food_items` is shared, not per-user** — decide whether the image lives on the item (one copy,
-   everyone benefits) or per log. Item-level is right for OFF product shots; a scan photo is the
-   user's own and belongs to the log or to a user-scoped column.
+**✅ Both decisions taken by the owner, 2026-08-27 — *"yes lets go with that"*, on the
+recommendations that were put to them. Do not re-open either.**
+1. **Store the bytes, not the OFF URL.** A URL is free and always current and breaks the moment the
+   phone is offline — and the row it decorates is read local-first, so the failure lands exactly
+   where this app promises it will not. A stored data URI matches how `saved_meals` already carries
+   its photo. The licence line below still applies.
+2. **The image goes where its ownership goes.** `food_items` is shared across users, so an Open Food
+   Facts product shot lives **on the item** — one copy, and every user of that barcode gets it. A
+   photo the user took is **theirs** and belongs to the log or to a user-scoped column; it must never
+   be written onto a shared item row, where it would decorate a stranger's diary.
 
 - **Licence, and it is a real constraint rather than a formality.** Open Food Facts product images
   are **CC-BY-SA**. Displaying them in-app is fine; the obligation is attribution. Decide where that
@@ -1377,6 +1617,13 @@ will hit it.
   measurement.
 
 ### [body][nutrition][platform] BF-41 — RMR, DEXA and blood are one intake shape; build the pipeline once
+
+> **⚑ PROMOTED, 2026-08-27 — owner: *"So lets prioritize getting this data saved and uploaded."***
+> This entry is now the pipeline's own priority, not a note attached to three others. The reports
+> exist de-identified in [`docs/clinical-baseline-2026-08-27.md`](clinical-baseline-2026-08-27.md),
+> so every schema can be written from a real one today. **Storage is decided: keep every field**
+> (BF-43), which means the DEXA table carries all 11 regions and both index blocks, and the analyte
+> table carries the raw range string and the printed result text, not just what a screen renders.
 
 - **⚑ The real reports have arrived and are recorded, de-identified, in [`docs/clinical-baseline-2026-08-27.md`](clinical-baseline-2026-08-27.md)** — DEXA and RMR
   (2026-08-27) and a 58-analyte blood panel (2026-04). Write each schema from that file, not from a
@@ -3722,9 +3969,15 @@ lived context.
 - **Added:** 2026-08-25 · owner approved enabling it after BF-19's investigation
 - **Lane: A** — **this entry exists because it needs a migration number, which BugFix may not take.**
   One `claude_ro` view + grant, at the next free number.
-- **Gate: owner** — the extension must be enabled on Railway first (owner action, needs a Postgres
-  restart). Clears when `SELECT count(*) FROM pg_extension WHERE extname='pg_stat_statements'`
-  returns 1 in production.
+- **✅ OWNER GATE CLEARED 2026-08-30.** Verified by the owner in the Railway Postgres console:
+  `SHOW shared_preload_libraries` returns `pg_stat_statements`, and
+  `SELECT count(*) FROM pg_extension WHERE extname='pg_stat_statements'` returns **1**. The owner's
+  half below is done; **only this entry's half remains** — the `claude_ro` view plus grant, at the
+  next free migration number, which is why this is Lane A's and not intake's.
+- **The counters start empty and fill from that restart onward.** A read in the first minutes is not
+  evidence of anything. Give it a day of normal use before drawing a conclusion, and note that
+  `pg_stat_statements.max` (default 5,000 statements) silently evicts the least-executed shapes —
+  check `pg_stat_statements_info.dealloc` is 0 before treating the table as complete.
 
 **The owner's half, in order.** `shared_preload_libraries` must include `pg_stat_statements` before
 the extension can work; it is a start-time parameter, so it needs a Postgres **restart**, not a
