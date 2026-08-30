@@ -3847,11 +3847,36 @@ is the opposite of what shipped. The second is the **v32** device warning: a loc
 the highest-risk change this repo makes, and a paragraph announcing a fix without saying it is
 unverified on the phone is how a Known-Issues row gets skipped.
 
+## 2026-08-30 — `projectOverview.md` → 8420, `docs/implementation-backlog.md` → 13368 (TN-13 shipped)
+
+The backlog shrinks: TN-13's 5,628-character entry becomes a 2,493-character record of what was
+measured plus a device `Keep:`. Most of what left was the argument for the design — the correlation
+table, the two rejected alternatives — and that now lives in the shipped module's own comments, where
+someone changing the rule will actually be standing.
+
+`projectOverview.md` +11. The paragraph carries the re-measured numbers rather than the entry's,
+which is the point of it: TN-13 said 2.11 / 0.33 / 84 % over 50 nights and the same query over 71
+gives 2.50 / 0.58 / 77 %. Same conclusion, and restating it is cheaper than the next session
+discovering the discrepancy and wondering which figure was wrong.
+## 2026-08-30 — `projectOverview.md` +2 (LB-26, the APK banner's tap target)
+
+One Current Status paragraph plus its blank line. The defect half is small; the half that earns the
+index is the process one — a `Gate: device` applied to unbuilt work parks it from `next-item.js`, and
+it happened here to a session that had read the warning about it hours earlier. The rule moved to the
+backlog's protocol header in the same PR, which is the durable fix; this line is what makes an
+orientation read mention it at all.
+
+**Re-derived on each rebase as PRs landed under it; final 8422 → 8424.** The branch was cut before Q-154 landed
+and two more PRs merged under it while CI ran; every paragraph is kept, so the number is set from the
+merged file each time rather than from either side of a conflict.
 ---
 
-## 2026-08-30 — `projectOverview.md` 8409 → 8411 (Q-392, settings follow the account)
+## 2026-08-30 — `projectOverview.md` 8422 → 8424 (Q-392, settings follow the account)
 
 One Current Status paragraph plus its blank line, for the owner's own report finally being answered.
-The half that earns the index is the near-miss: the server-wins rule clears a device key the bag does
-not carry, which is correct — and destructive for a key whose writes never reach the server. That is
-the kind of thing an orientation read should surface before someone adds the next preference.
+The half that earns the index is the rule that was wrong: hydration cleared any key the server bag
+did not carry, which is right for a settled system and wrong in the window between a tap and its
+PATCH landing — and offline it reverts every change on the next launch. CI caught it. That is the
+kind of thing an orientation read should surface before someone adds the next preference.
+
+(The number moved twice while this sat in CI; set from the merged file each time.)

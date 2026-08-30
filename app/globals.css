@@ -543,7 +543,13 @@ body {
      Moving it into the variants would shrink coverage, not tidy it. `[role="button"]` is included
      because the WebView nested-control pattern (a tappable card containing other controls) cannot
      use a real <button> — see CLAUDE.md. `<a>` is deliberately excluded: an inline text link in
-     prose is not a tap target and a 48px floor would wreck paragraph layout. */
+     prose is not a tap target and a 48px floor would wreck paragraph layout.
+
+     **Do not "fix" an undersized link by adding `a` here (LB-26).** A link that IS a tap target — a
+     banner action, a card that navigates — takes `min-h-[48px]` at its own call site instead, which
+     is what Home's APK-download banner does. Widening this selector would reach every prose link in
+     the app to raise the handful that are actually controls. `e2e/touch-target-size.spec.ts` is what
+     finds them; its allowlist is empty, so a new one fails the spec rather than needing this rule. */
   button,
   [role="button"] {
     min-height: 48px;

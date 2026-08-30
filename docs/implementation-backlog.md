@@ -73,6 +73,13 @@ silently misdirecting the next session. Update them in the same PR that consumes
 > - **`Gate: owner`** / **`Gate: device`** — waiting on an owner decision, or on the S25 smoke run.
 >   Only these two values; anything else fails the check. A dependency on another entry is `Needs:`,
 >   not a gate.
+>   **⚠ `Gate: device` means SHIPPED and awaiting a device check — never "will need one when built".**
+>   A gate **parks** the entry, so putting it on unbuilt work hides that work from `next-item.js`,
+>   which is where an implementer starts. A device requirement on unbuilt work is a **Verification**
+>   line, not a gate. This is not hypothetical and it is not rare: it hid the whole
+>   `nutrition-ui-uplift` batch until BF-45 caught it (2026-08-30), and **LB-26 was filed with the
+>   same mistake later the same day, by a session that had read BF-45's warning** — which is why the
+>   rule now lives here, where entries are written, rather than only inside the entry that found it.
 >
 > - **`Batch: <slug>`** — these entries ship as **one PR**, because one verification pass covers all
 >   of them. `next-item.js` groups them and the batch takes its highest member's queue position.
@@ -1148,27 +1155,26 @@ opened on, unchanged.
 - **Added:** 2026-08-27 · owner, with screenshots of the live tab (v1.383.x).
 - **Spec:** BF-28's parity rules bind — where an artboard covers this, the artboard wins.
 
-**①②③④ shipped (v1.397.0)** and are struck from this entry rather than left looking open:
-① `My Meals` spans both columns (`col-span-2`, contingent on the slot beside it being empty);
-② a collapsed meal keeps its calories **and** macros, on a summary line **below** the header, which
-is the shape the owner corrected to on the device in N6 — one `MealTotals` component serves it and
-the expanded footer, so the two cannot report different numbers for one meal;
-③ the bottom-sheet gutters are 16 px, matching the artboards — **and not where this entry said to
-put it.** It called for `SheetContent`'s bottom variant, which was measured and rejected: **26 of 48**
-bottom sheets set their own `px-*`/`p-0`, and of the remainder most already pad their inner content
-at 16, so a shared outer gutter would have doubled theirs. The nutrition sheets were at `px-1`
-(4 px); they are the ones that moved;
-④ both macro rings start at 12 o'clock — `from -90deg` is the SVG/canvas idiom for reaching the top
-and CSS `conic-gradient` already starts there, so all three call sites simply dropped the clause.
+**①②③④ shipped (v1.397.0)**, struck here rather than left looking open — the reasoning is in the
+[journal](overview/entries/2026-08-30-nutrition-ui-uplift.md). The one worth carrying: ③'s gutter fix
+is **not** where this entry said to put it. It called for `SheetContent`'s bottom variant; measured,
+**26 of 48** bottom sheets set their own `px-*`/`p-0` and most of the rest already pad inner content
+at 16, so a shared outer gutter would have doubled theirs.
 
 - **Keep — ⑤ swipe-to-delete on a logged food row.** Owner: *"for logging food; we could possibly add
   the option to swipe and delete it (with confirmation) like we do in the other screen."* The gesture
   exists on the meal list (BF-29, device-verified 2026-08-30) — reuse that tray, keep its
   confirmation, and **do not remove the bin in the edit sheet**: a swipe is a shortcut for people who
   know it is there, not a replacement for a visible affordance.
-- **Verification for ⑤:** on the S25, a food row swipes to a tray whose Delete confirms. ①②④ are
-  shipped but **not device-verified** — the sandbox renders at desktop width and cannot judge a
-  gutter or a ring.
+- **⚠ ⑤ was gated on BF-47 and the gate moved rather than lifted** *(bullet restored 2026-08-30 —
+  it was lost when this entry was rewritten to strike ①②④, which is how a blocker goes invisible
+  while its subject stays queued)*. The reason: a swipe is a faster route to exactly the delete that
+  was reappearing, and reaching a failing delete faster is worse than not adding the gesture.
+  BF-47's fix shipped, but it is **reasoned rather than reproduced** — `getLocalStore` is null in
+  `pnpm dev` and Playwright — so confirm it on the device in the same pass as ⑤.
+- **Verification for ⑤:** on the S25, a food row swipes to a tray whose Delete confirms **and the row
+  stays gone across a screen swap and a force-close**. ①②④ are shipped but **not device-verified** —
+  the sandbox renders at desktop width and cannot judge a gutter or a ring.
 
 ### [nutrition] BF-46 — the meal builder buries its photo picker below the fold, and the quantity sheet spends its space on the wrong things
 
@@ -3402,84 +3408,41 @@ the day's move-hours total is below the goal.
 
 ### [heart-rate] TN-13 — the HR tile shows a 7-day average of the one signal that best predicts how the owner feels
 
-- **Branch:** _unassigned_ · **Added:** 2026-08-26 · owner: *"my value is 52; what is that? what would be the more useful HR value to show?"*
-- **Lane: A** — corrected 2026-08-27 by Lane B, which picked this up and found its lane premise false.
-  The tile itself is `components/oura-score-chip-row.tsx:390` and that half is Lane B's, but it
-  cannot be done alone; see the ⚑ below.
+> **✅ SHIPPED 2026-08-30, both halves together — which the entry required.** The tile reads **last
+> night's** resting HR and renders a **delta against the owner's own baseline** ("50 · −7 vs usual")
+> rather than a bare bpm. `restingHrLastNight` + `restingHrLastNightDate` are new on
+> `readiness-payload.ts`; `restingHrCue` moved to
+> `packages/shared/src/health/resting-hr-cue.ts`, where it is importable and therefore testable.
 
-> **⚑ The payload field this entry assumed does NOT exist, and that is what moves the lane.**
-> Verified against `main` at cd09c990. `lib/health/readiness-payload.ts` returns `restingHr`
-> (**the 7-day mean** — `recentRhr`, averaged over `recentRhrRows`, line 271) and `restingHrBaseline`
-> (28-day, low-wear-excluded), plus `hrCurrent`/`hrMin`/`hrAvg`/`hrMax`, which are **today's live BLE
-> readings, not a nightly resting HR**. Nothing carries last night's single-night value, under that
-> name or any other — no `lowestHeartRate`, no sleep-derived HR.
->
-> So the recommendation below needs a **new payload field**, and `readiness-payload.ts` is consumed
-> by three routes — `app/api/readiness-score`, `app/api/body-battery`, `app/api/ai/health-insight`.
-> Reached by `app/api/**` → Lane A, by the path rule in `docs/agents/README.md` §3.
->
-> **Do not split it and take the presentation half.** The pass test at the bottom of this entry rules
-> that out in as many words: *"a change that keeps the 7-day average and merely adds a cue beside it
-> fails this entry."* Rendering a delta between `restingHr` and `restingHrBaseline` is possible in
-> Lane B **today** and would look like progress while failing the entry — both halves ship together.
->
-> **Do not re-derive the nightly value on the client either.** `body_metrics.restingHeartRate` is
-> reachable from the local store, but computing a health value a second time in the client is the
-> One-Formula-One-Place violation this repo has paid for repeatedly, and it would bypass the ranked
-> per-field merge in `lib/data/health-source.ts` that decides which source owns that column.
+- **Keep:** the DEVICE check, and only that. Verify on the S25 that the Heart Rate tile shows a
+  number that moved since yesterday and a signed cue beside it, and that the cue is legible at the
+  tile's type size — **the cue text grew** from one word ("Low") to five ("−7 vs usual"), and the row
+  has 20 layout styles. Reaches the phone through a Railway deploy; no new APK.
 
-`const hr = readiness.restingHr ?? readiness.hrCurrent`, and `restingHr` is documented as
-*"recent (7-day) average resting HR"* (`readiness-payload.ts:131`).
+**Pass test, measured against production rather than asserted (71 nights, 2026-08-30):**
 
-**Measured over 50 nights:** nightly resting HR moves **2.11 bpm** night to night; the 7-day average
-moves **0.33**. **The tile discards 84% of the daily movement.** And resting HR is the **strongest
-predictor of the owner's own check-in** (r = **+0.557**, best of nine — see the
-[lookback](reviews/2026-08-26-checkin-lookback.md)). The most informative signal, shown in its least
-informative form.
+| | value |
+|---|---|
+| nights where the **nightly** value changed | **61 of 70** |
+| nights where the **rounded 7-day mean** changed | 29 of 70 |
+| nightly mean absolute night-to-night change | **2.50 bpm** |
+| 7-day mean's change | 0.58 bpm |
 
-**Recommendation: show last night's resting HR with its delta against baseline** — "52 · −2 vs
-usual". `restingHrBaseline` is already passed to `restingHrCue`, so the comparison exists; only the
-displayed number is smoothed. **Do not simply swap in HRV** — HRV is more responsive but correlates
-less with felt state here (+0.427 vs +0.557), and it is absent from Home entirely, which is a
-separate question.
+So the tile stood still on nearly six days in ten, and discarded **77 %** of the daily movement.
+**TN-13 recorded 2.11 / 0.33 / 84 % over 50 nights** — the direction is unchanged and the figures are
+restated because a number nobody re-measures drifts. Live check on `pnpm dev`: changing only last
+night moved the tile 50 → 62 (a 12 bpm swing) while the old 7-day value moved 55 → 57.
 
-**⚑ Amended 2026-08-26 — the recommendation is unchanged and now has a measured reason, and the
-owner's two alternatives were both tested.** ([review](reviews/2026-08-26-hr-tile-and-activity-pacing.md).)
-Owner: *"Maybe it needs to show the average awake resting HR? … or maybe its better to have resting
-HR comparison? not sure what could be used here?"*
+**Why a delta and not a tier word.** Against `perceived_recovery`, expressing either candidate as a
+deviation from the owner's own baseline roughly **doubles** its correlation with felt state (+0.291
+vs +0.176 for waking-rest HR; +0.278 vs +0.129 for the nightly value). Which metric you pick moves
+the number far less than raw-versus-relative does — so the defect was showing an absolute bpm at all.
+69 means nothing without knowing the usual is 63.
 
-**Against `perceived_recovery`** (scale **1 = fully recovered … 5 = wrecked**, so a **positive** r is
-the correct direction):
-
-| | r | n |
-|---|---|---|
-| waking-rest HR, **raw bpm** | +0.176 | 51 |
-| nightly resting HR, **raw bpm** | +0.129 | 46 |
-| waking-rest HR, **Δ vs its own 7-day baseline** | **+0.291** | 51 |
-| nightly resting HR, **Δ vs its own 7-day baseline** | **+0.278** | 43 |
-
-**Expressing either candidate as a deviation from the owner's own baseline roughly doubles its
-correlation with felt state.** Which metric you pick moves the number far less (+0.291 vs +0.278)
-than raw-vs-relative does. **So the defect is not the choice of metric — it is showing an absolute
-bpm at all.** 69 bpm means nothing without knowing the usual is 63.
-
-**This also reconciles the +0.557 headline** quoted in the pillar review against the +0.129 here.
-Both are correct and pair different things: the stored `readiness_contributors.restingHeartRate`
-score (0–100, baseline-relative, higher = better) against `perceived_recovery` (higher = worse)
-measures **r = −0.553, n = 35** — same magnitude, sign carried by the two scales running opposite
-ways. **Dropping the 4 `provisional: true` days (score pinned at 50) is what takes it from −0.395 to
-−0.553** — worth knowing before any future correlation against that field.
-
-**The owner's "average awake resting HR" is a real signal and belongs in a SEPARATE entry.** Computed
-as the 10th percentile of BLE HR samples 08:00–21:00 Brisbane: **70 days, mean 984 samples/day, mean
-69.5 bpm, moving 6.24 bpm night to night** — 3× the nightly resting HR and 14× the tile's current
-0.44. That makes it the better **stress** candidate the owner intuited. **But nothing in the app
-computes it** — it was derived in SQL for the review — and it does not belong on a tile labelled
-"Heart Rate". Do not fold it into this entry.
-
-**Pass test:** the tile's number changes on most days; over the stored history its night-to-night mean
-change is within 20% of 2.11 bpm rather than 0.33. **And the tile renders a baseline delta, not a
-bare bpm** — a change that keeps the 7-day average and merely adds a cue beside it fails this entry.
+**The owner's "average awake resting HR" is still a separate entry and was NOT folded in here.**
+Computed as the 10th percentile of BLE HR samples 08:00–21:00 Brisbane it moves 6.24 bpm night to
+night — 2.5× the nightly resting HR — which makes it the better **stress** candidate the owner
+intuited, but nothing in the app computes it and it does not belong on a tile labelled "Heart Rate".
 
 ### [activity] TN-17 — Activity as a pace-to-goal score: the mechanic works, the goals make it punishing
 
@@ -9260,26 +9223,6 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 - **What is LEFT here is the UI work only, and it stays held** per the sequencing above. The audit's
   own recommendation: **trend is the missing dimension, not contributors** (contributors are
   genuinely inapplicable to a chip or a timeline row; a 7-day sparkline is not).
-
-### [app-shell] LB-26 — the APK banner's link is a 33 px tap target, and the CSS floor cannot reach it
-
-- **Lane:** B · **Branch:** `fix/apk-banner-link-height`
-- **Gate: device** — it is a visual change on Home's banner; the web harness measures the box but not
-  how it reads under a thumb.
-- **Added:** 2026-08-30 · Lane B, from Q-282's measurement pass.
-- **What it is.** On Home, the *Download Android App* banner's body link renders **258×33**, below
-  this repo's 48 dp floor. It is an `<a>`, and `app/globals.css`'s floor is `button, [role="button"]`
-  — `<a>` is excluded **on purpose**, because a 48 px floor on an inline prose link would wreck
-  paragraph layout. So nothing raises it and nothing was measuring it either.
-- **It is the only one.** Measured across all five tabs: every other undersized control is a
-  `button` carrying a documented compensating hit box (`tap-target-dot` on the three 7×7 workout
-  carousel dots, `tap-target-44` on More's 32×32 photo control).
-- **Do not fix it by widening the floor to `a`.** The exclusion is deliberate and the comment says
-  why. Either give this link `min-height: 48px` where it is a banner action, or wrap the tappable
-  area in the container-div + separate-dismiss-button pattern the session-select APK banner already
-  uses (CLAUDE.md, WebView gotchas).
-- **`e2e/touch-target-size.spec.ts` allowlists it by label**, shrink-only — removing the entry from
-  `ALLOWED` is part of the fix, and the spec then fails until the size is right.
 
 ### [platform] Q-283 — ~11 MB of indexes have never served a scan, on a DB where index bloat already caused an incident
 
