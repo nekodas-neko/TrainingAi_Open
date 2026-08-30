@@ -3943,15 +3943,43 @@ shipped would be the most expensive kind of wrong.
 
 (Re-derived twice on rebases: this branch was cut at 8425, and BF-46 ② ③'s and ①a's paragraphs
 landed under it in turn.)
+## 2026-08-30 — `docs/agents/state/implementation-lane-a.md` 203 → 208 (Q-211 batch)
 
-## 2026-08-31 — `projectOverview.md` 8449 → 8446, `docs/implementation-backlog.md` 13368 → 13260, `implementation-lane-b.md` held at 126
+Five lines, and they are the two things a baton exists to carry. (`wc -l` reads 207 and the
+check reads 208 — it counts a final line with no trailing newline, so trust the check.)
 
-Three baselines fall; none rises. **`projectOverview.md`** loses four lines of merge debris — its
+The first is a **correction**: this baton said the remaining Lane A work was *"almost entirely owner-
+or device-gated"*, and that was wrong. It propagated — a session read the ~21 scoring entries at the
+top of READY, reported the queue blocked to the owner, then found six startable items below them and
+shipped all six. The baton is where that error lived for four days, so the warning belongs in it and
+nowhere else; a journal entry would not be read before the same mistake was made again.
+
+The second is two new rows in **Waiting on the owner**, which is the section that exists for exactly
+those: nulling the corrupt `body_comp` snapshot, and dropping `oura_heartrate_user_updated`.
+
+Paid for where it could be: the *Shipped this session* list was replaced rather than appended, and
+the correction was compressed twice (six lines to four) before raising the number. What was **not**
+done is trimming the previous session's `Traps` section to make room — it is 37 lines of durable
+knowledge under a header that says "this session", and restructuring another session's baton to buy
+five lines is a worse trade than this note.
+
+## 2026-08-30 — `projectOverview.md` 8449 → 8453 (Q-211, the baseline deload exemption)
+
+Four lines on the existing Q-185 status block, turning its *"related open issue"* pointer into what
+actually happened. It earns the index because the fix is not the one the entry described: exempting
+the branch Q-211 named left the behaviour unchanged, since a second branch re-applied the deload, and
+that branch carried a comment calling such a clause unreachable — true when written, false the moment
+the first exemption landed. A reader of this file should know the shipped fix has two halves.
+
+## 2026-08-31 — `projectOverview.md` 8453 → 8450, `docs/implementation-backlog.md` 13368 → 13251, `implementation-lane-b.md` held at 126
+
+Three baselines fall; none rises. **Re-derived on the merge**: this branch was cut at 8449, and
+Q-211's four-line paragraph landed under it. **`projectOverview.md`** loses four lines of merge debris — its
 Current Status carried *three* duplicated `**Version:**` lines and a stray `v1.398.0` /
 `**Last updated:**` pair mid-section, all of it from parallel PRs resolving the same shared line —
 and gains one paragraph, written as a single long line in the section's current house style.
 
-**`docs/implementation-backlog.md`** falls 108 as BF-39's entry is removed on shipping and LB-30 is
+**`docs/implementation-backlog.md`** falls 117 as BF-39's entry is removed on shipping and LB-30 is
 filed, which is the queue working rather than a compaction.
 
 **The baton was rewritten and then cut back to its baseline**, which is the part worth recording:

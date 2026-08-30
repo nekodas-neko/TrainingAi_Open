@@ -3158,8 +3158,12 @@ smaller than production.
   this build returns 50% / 2 sets, `deloaded: true`.
 - **Not exercised**: the S25, and the partially-covered case against a *real* model-generated
   prescription (covered by fixture-based unit tests instead).
-- **Related open issue**: **Q-211** — a deload week also reduces a *baseline* lift, which the 1RM
-  and PR paths both treat as a genuine max effort. Pre-existing, filed not fixed.
+- **Related, now fixed**: **Q-211** — a deload week also reduced a *baseline* lift, which the 1RM
+  and PR paths both treat as a genuine max effort, so the app prescribed half weight and recorded
+  the result as a real max. Fixed 2026-08-30 (v1.402.1), and **it took two guards, not the one the
+  entry named**: exempting only the prescribed branch left the behaviour unchanged, because the
+  un-prescribed branch re-applied it. Its comment saying such a clause was unreachable was true
+  against the code that proved it and false the moment the first exemption landed.
 ### [workouts] Prescription basis changed to the last non-deload session (v1.300.0, 2026-08-12) — NOT verified on device · needs: browser
 
 - **What changed**: `resolveWorkingBasis` returns the last non-deload 1RM outright instead of

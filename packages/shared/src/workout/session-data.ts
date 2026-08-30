@@ -231,7 +231,7 @@ export function buildWorkoutExercises(
               preDeloadStyle = prescriptionStyleForExercise({ ...p, ...p.preDeload })
               preDeloadSets = p.preDeload.sets
             }
-          } else if (aiDeload || isDeloadActive) {
+          } else if ((aiDeload || isDeloadActive) && !isBaselinePhase) {
             // Manual Home "Deload" choice (Q-109) — `aiDeload` previously only set cosmetic
             // phase-status/logging metadata and never touched the actual prescribed load once
             // an AI-dynamic prescription was driving it, so picking Deload from Home produced
@@ -271,14 +271,21 @@ export function buildWorkoutExercises(
       // reducing again here would compound the two. An ai_dynamic program has no phase rows and
       // therefore nothing to swap to — which is exactly why only it needs this.
       //
-      // No `!isBaselinePhase` clause here, deliberately: it is unreachable. A baseline phase
-      // sets `progressionStyle` to null, so an un-prescribed exercise is stopped by the length
-      // check; and a PRESCRIBED one has already been deloaded by the AI branch above, so
-      // `!deloaded` stops it. Verified by mutation — deleting such a clause failed zero tests.
-      // (That the AI branch deloads a baseline lift at all contradicts the baseline carve-out
-      // `estimateOneRm`/`shouldCountTowardPr` apply — filed as Q-211, pre-existing.)
+      // `!isBaselinePhase` is LOAD-BEARING here, and this comment used to say the opposite.
+      //
+      // It said the clause was unreachable, and it was right at the time: an un-prescribed
+      // baseline has `progressionStyle` null and is stopped by the length check, and a PRESCRIBED
+      // one had always been deloaded by the AI branch above, so `!deloaded` stopped it. Q-211
+      // removed that second guarantee — the branch above now exempts a baseline, which is the
+      // whole fix — and this branch immediately picked the exercise up and deloaded it anyway.
+      // Measured: with only the branch-above fix applied, `deloaded` still came back `true`.
+      //
+      // So the mutation result the old comment cited was true and is now stale, which is the
+      // trap worth naming: a clause proven unreachable is only unreachable against the code that
+      // proved it. Anyone deleting this one should re-run that mutation rather than trust either
+      // comment.
       if (
-        !deloaded && isAiDynamic &&
+        !deloaded && isAiDynamic && !isBaselinePhase &&
         (aiDeload || isDeloadActive) &&
         progressionStyle && progressionStyle.length > 0
       ) {

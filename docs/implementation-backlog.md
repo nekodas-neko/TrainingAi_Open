@@ -10019,29 +10019,6 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   does not run in the sandbox**, so none of it is verifiable here. It needs the on-device smoke run
   in the same session, not a Known-Issues row.
 
-### [workouts] Q-211 — a deload week reduces a BASELINE lift, which the rest of the app treats as a real max test
-
-- **Branch:** `fix/baseline-exempt-from-deload`
-- **Added:** 2026-08-12 · found while implementing Q-185, by chasing a guard that mutation testing
-  said was unreachable.
-- **The contradiction, in two files.** `session-data.ts`'s AI deload branch
-  (`else if (aiDeload || isDeloadActive)`) has **no baseline carve-out**, so a confirmed deload week
-  reduces a prescribed baseline lift to 50% / 2 sets. But `log-exercise.ts` has the carve-out twice
-  over — `estimateOneRm` is called with `deloaded: exerciseDeloaded === true || (isAnyDeload && !isBaseline)`
-  and `shouldCountTowardPr` returns `!args.isAnyDeload || args.isBaseline`, both commented as
-  *"a baseline test is a genuine max-effort attempt even during an otherwise-active deload window"*.
-- **So the app prescribes half weight and then records the result as a real max test**, feeding it
-  into the 1RM estimate and letting it set a PR. A baseline taken during a deload week understates
-  the athlete, permanently, in `personal_records`.
-- **How to see it**: `session-data-manual-deload.test.ts` →
-  *"records that a baseline phase is NOT protected from a deload today (Q-211)"*. That test asserts
-  the current (wrong) behaviour on purpose, so this entry has something concrete to flip.
-- **Fix**: add `&& !isBaselinePhase` to that `else if`, flip the test's expectations, and check
-  whether the automatic per-exercise engine (`p.deloaded`) needs the same exemption — it is a
-  separate branch and was not audited.
-- **Why it was not fixed with Q-185**: it changes prescribed load on a path the owner's decision did
-  not cover, and it is pre-existing rather than introduced. Small, but it is a load change.
-
 ### [nutrition] Q-187 — Meal Plan (Phase 2): prefill the day's food logs from the active plan
 
 - **✅ Second slice SHIPPED 2026-08-14: the `plan_meal_answers` table and its full sync path**, with
@@ -10273,6 +10250,20 @@ shared-catalogue maintenance (keyed by exercise name, no per-user row, admin-wri
 **What keeps Q-155 open is now only the two residuals named above** — exact per-predicate
 attribution across the 246 (~246 runs, ~5.5 h), and the fact that only the DB tests have ever been
 measured, not the ~3,300-test full suite.
+
+**Re-counted 2026-08-30: it is 278 predicates, not 246** — the data layer grew 32 while this entry
+sat. New since the sweep: `slices/meal-plans.ts` (18), `oura-raw-pack.ts` (5), `oura-raw-frames.ts`
+(3), `colmi.ts` (3), plus growth in `adapter.ts` (139 → 125 as code moved out) and `oura.ts`
+(33 → 43). **So every ratio in this entry is against a stale denominator** — "93 of 246" is a
+bound measured on a smaller data layer, and the un-measured share has grown, not shrunk.
+
+**The full-suite measurement is BLOCKED in the sandbox, and that is worth knowing before planning
+it.** Residual 2 is one run, not 246: neutralise all 278 predicates at once and run the whole suite
+rather than the DB subset. Attempting it on 2026-08-30 was **refused by the environment's safety
+classifier** — correctly, since the mechanical action is "delete every user-scoping check in the
+data layer", which is indistinguishable from the thing this entry exists to prevent. Do not try to
+work around it. Either the owner runs it locally, or it needs an explicit permission grant; a
+session that plans this residual without knowing that will lose the time twice.
 
 ### [app-shell] ⏳ Q-151 — WATCH ONLY, nothing to implement — the sign-in React #418 did not reproduce and the whole series stopped
 
