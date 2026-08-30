@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { getRepository } from "@/lib/data";
-import { fmtAest, DEFAULT_TZ, normalizeDateParam, dateStrMidnightInTz } from "@trainingai/shared/date-utils";
+import { fmtAest, DEFAULT_TZ, normalizeDateParam, dateStrMidnightInTz, shiftDateStr } from "@trainingai/shared/date-utils";
+import { isTemperatureBaselineCentred } from '@trainingai/shared/health/temperature-baseline-health'
 import { toZonedTime } from "date-fns-tz";
 import type { ActivityLog } from "@trainingai/shared/types";
 import { nightSessions } from '@trainingai/shared/health/sleep-night'
@@ -82,6 +83,20 @@ export interface WorkoutDuration {
   minutes: number;
 }
 
+/**
+ * LB-25 — body temperature for the day.
+ *
+ * `meanC` is a measurement and is always given when the ring recorded one. **`devC` is not**: it is
+ * a deviation from a baseline the app has demonstrably not centred, so it is gated on the same
+ * condition the readiness ladder uses (see below) and reads `null` while that gate is shut.
+ */
+export interface DayBodyTemp {
+  /** Mean skin temperature for the night, °C. */
+  meanC: number | null;
+  /** Deviation from the rolling baseline, °C. Null while the baseline is uncentred — see TN-6a. */
+  devC: number | null;
+}
+
 export interface DayLogResult {
   date: string;
   exercises: DayExercise[];
@@ -91,6 +106,7 @@ export interface DayLogResult {
   activityLogs: ActivityLog[];
   sleep: DaySleep | null;
   scores: DayScores | null;
+  bodyTemp: DayBodyTemp | null;
   /** Whole-day HR, bucketed. Empty when the day has no HR samples. */
   hr: DayHrPoint[];
 }
@@ -280,6 +296,39 @@ export async function GET(req: NextRequest) {
 
   const activityLogs = await repo.listActivityLogs(userId, pgDate, pgDate);
 
-  const result: DayLogResult = { date, exercises, bodyMeta, workoutDurationsById, activityLogs, sleep, scores, hr };
+  // LB-25 — body temperature, from `oura_daily_summary` (the live BLE-derived values), never from
+  // `oura_daily.temperature_deviation`: that Cloud column froze at the 2026-07-07 re-key and would
+  // print a months-old figure as today's.
+  //
+  // **`devC` is gated, and the gate is not this route's invention.** The stored deviations are
+  // positive on every night measured (39 of 39, min +0.14 °C) because the baseline sits ~0.36 °C
+  // low, which is why TN-6a suspends the readiness temperature ladder over the same values. A
+  // screen showing "+0.5 °C vs baseline" from a number the scoring engine refuses to score would
+  // be the app contradicting itself, so this reuses `isTemperatureBaselineCentred` rather than
+  // inventing a second notion of when the figure can be trusted. It self-clears: when TN-6 centres
+  // the baseline, this field starts carrying `devC` with no further change here.
+  //
+  // `meanC` is NOT gated — an absolute skin temperature is a measurement, not a derivation from
+  // the bad baseline, so nothing about the centring problem makes it wrong.
+  //
+  // One query, anchored on the REQUESTED day rather than today: the window that decides whether
+  // the deviation was trustworthy is the one around the day being shown, and the day's own row is
+  // inside it, so the window read serves both purposes.
+  // **`date` here is the SLASH form.** `normalizeDateParam` returns `YYYY/MM/DD`, while
+  // `oura_daily_summary` rows are dash-keyed and `shiftDateStr` splits on `-`. Feeding the slash
+  // form to either is how zone-minutes and training-stress went feature-dead (J-8/J-9), and `tsc`
+  // cannot catch it — both forms are `string`, so the `find` just never matches and the field is
+  // silently always null. The helper's own comment in `date-utils.ts` says to use the ISO form for
+  // exactly these two consumers.
+  const dateIso = date.replace(/\//g, '-');
+  const tempWindow = await repo.getOuraDailySummary(userId, shiftDateStr(dateIso, -27), dateIso);
+  const daySummary = tempWindow.find(r => r.date === dateIso) ?? null;
+  const tempTrusted = isTemperatureBaselineCentred(tempWindow.map(r => r.tempDevC));
+  const bodyTemp: DayBodyTemp | null =
+    daySummary == null || (daySummary.tempMeanC == null && daySummary.tempDevC == null)
+      ? null
+      : { meanC: daySummary.tempMeanC ?? null, devC: tempTrusted ? daySummary.tempDevC ?? null : null };
+
+  const result: DayLogResult = { date, exercises, bodyMeta, workoutDurationsById, activityLogs, sleep, scores, hr, bodyTemp };
   return NextResponse.json(result, { headers: { "Cache-Control": "private, no-store" } });
 }
