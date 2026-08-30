@@ -3,6 +3,7 @@
 import { CoachWidgetSchema, type WidgetResult } from "@/lib/coach/widgets";
 import { DOMAIN_TIER } from "@/lib/coach/patch";
 import { ChoiceList } from "./choice-list";
+import { joinChoiceLabels } from "@/lib/coach/choice-label";
 import { ChangePreview } from "./change-preview";
 import { Tier3Card } from "./tier3-card";
 import { HandoffCard } from "./handoff-card";
@@ -47,7 +48,23 @@ export function CoachWidgetView({ input, toolCallId, onResult }: CoachWidgetView
     return (
       <ChoiceList
         args={widget}
-        onChoose={onResult ? o => onResult({ status: "chose", id: o.id, label: o.label }) : undefined}
+        onChoose={
+          onResult
+            ? opts =>
+                onResult(
+                  opts.length === 1
+                    ? { status: "chose", id: opts[0].id, label: opts[0].label }
+                    // Joined as speech, not as a JSON array: this string goes back into the
+                    // model's context as the user's answer. `joinChoiceLabels` is a .ts so the
+                    // join can actually be tested — vitest cannot parse JSX here.
+                    : {
+                        status: "chose",
+                        ids: opts.map(o => o.id),
+                        label: joinChoiceLabels(opts.map(o => o.label)),
+                      },
+                )
+            : undefined
+        }
       />
     );
   }

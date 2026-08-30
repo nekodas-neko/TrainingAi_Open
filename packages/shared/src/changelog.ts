@@ -6,10 +6,17 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: "1.395.0",
+    version: "1.395.1",
     date: "2026-08-30",
     changes: [
       "The Colmi ring now syncs itself while the app is open \u2014 on opening it, when you come back to it, and every half hour \u2014 so a day no longer depends on remembering to press the button. Four of its measurements are only ever offered for the day you ask on, so an evening that was never synced lost them for good. Pressing Sync by hand still works and now says so if one is already running.",
+    ],
+  },
+  {
+    version: "1.395.0",
+    date: "2026-08-30",
+    changes: [
+      "The Coach can now ask a question with more than one answer \u2014 tick the ones that apply and hit Continue, or tap Select all when they all do. It also knows the grocery stores, staple ingredients and dietary restrictions the app already holds, so it offers them instead of typing them out, which is a list you would otherwise be waiting on it to write.",
     ],
   },
   {
