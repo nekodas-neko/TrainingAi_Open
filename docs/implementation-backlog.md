@@ -1031,6 +1031,46 @@ app states the measured offset against the scale for the same period; corrected 
 calorie and protein goals; and history reads corrected without the raw scale values having been
 overwritten.
 
+### [body][devices][platform] BF-53 — every pending weigh-in button is dead: both routes validate a numeric id with a UUID regex
+
+- **Lane:** A — `app/api/scale-ble/pending/[id]/dismiss/route.ts` and `.../confirm/route.ts`, plus the
+  swallowed error in `components/settings/scale-pairing.tsx`.
+- **Added:** 2026-08-30 · owner, in passing during the device pass D1: *"noting that that the 'not
+  me' button for weigh in's doesnt actually remove it or do anything."*
+- **⚠ This is worse than reported and it is live in production.** The owner named one button. **Both
+  are broken**, so the entire pending weigh-in triage is dead: a reading that is not yours cannot be
+  dismissed, and one that is yours cannot be confirmed into `body_metrics`.
+
+**Root cause, and it is exact.** `scale_raw_samples.id` is `bigserial('id', { mode: 'number' })`
+(`schema.ts:1180`) and `/api/scale-ble/pending` returns it as a number. Both routes then do:
+
+```ts
+const badId = invalidUuidResponse(idParam)   // ← id is "41", not a UUID
+if (badId) return badId
+const id = Number(idParam)                   // ← unreachable
+if (!Number.isInteger(id)) return …
+```
+
+`invalidUuidResponse` tests `/^[0-9a-f]{8}-…$/`, which a decimal id can never match, so **every**
+press returns `400 Invalid id` before the numeric check that was written for it. The numeric guard on
+the next line is the tell: someone knew the id was a number and the UUID guard was applied over the
+top of it, most likely by the sweep that added `invalidUuidResponse` across the 30 dynamic routes.
+
+**The client hides it.** `dismissReading` is `if (res.ok) setPending(…)` with no `else` — no toast,
+no log, nothing. A 400 is indistinguishable from a no-op, which is why this reads as *"doesn't do
+anything"* rather than as an error, and why it has survived.
+
+- **Fix:** drop `invalidUuidResponse` from both routes; the `Number.isInteger` check underneath is the
+  correct guard and is already there. Then give the client an error path — a failed dismiss must say
+  so rather than silently leaving the row.
+- **⚠ Sweep the sibling routes in the same PR.** Any other route whose id is a `bigserial` rather
+  than a `uuid` has this shape. Grep the dynamic routes for `invalidUuidResponse` and check each
+  against its table's id type; a UUID guard on an integer key is always a 400 for every real request.
+- **Add a test that would have caught it:** a route test posting a real numeric id and asserting 2xx.
+  The existing coverage cannot have exercised these routes with a realistic id at all.
+- **Verification:** on the device, a pending reading dismisses and disappears; a confirmed one reaches
+  `body_metrics`; and a genuinely bad id still 400s.
+
 ### [nutrition] BF-47 — the deleted food comes back: the loader calls the server authoritative while the delete is still in the outbox
 
 - **Lane:** A — `app/nutrition/use-food-logs-loader.ts`.
@@ -4066,6 +4106,16 @@ breath_avg_rpm:   9.1     9.7    10.0     9.8      9.8     <- the value it is co
 
 ### [workouts] BF-15 — the exercise-role fallback is `primary`, so unclassified work is prescribed like a main lift
 
+> **⚑ OWNER DECISION 2026-08-30 — a live session with NO Primary is legitimate, and this rule must
+> not treat it as a defect.** BF-16b found `Shikai / Lower` carrying three Secondary and two
+> Accessory and no Primary, and this rule would have nominated Barbell Good Morning. Put to the
+> owner, who declined: *"Reject; I wanted it made that way on purpose."* BF-16b is closed and
+> removed.
+>
+> **What that changes here:** the nomination rule is a *suggestion*, never a correction to apply, and
+> nothing downstream — a validator, a Coach prompt, a data-quality sweep — may flag "no Primary" as
+> wrong. If this rule is implemented, it offers and the user decides.
+
 - **Branch:** _unassigned_
 - **Added:** 2026-08-24 · owner report — *"some 'isolation' type work will increase to a main level when it should be accessory sort of — like bicep curls... but what about cable dips?"*
 - **Lane: A** — `lib/data/postgres/schema.ts`, one Postgres migration, `lib/sqlite/migrations.ts` (local schema version), `packages/shared/src/workout/exercise-role.ts`, and the read fallbacks below.
@@ -4128,29 +4178,6 @@ budget-aware rule and wire it into those creation paths.
   session's *configured* budget, which BF-7's owner decision confirms is the anchor.
 - **Surface: server/shared + local SQLite.** The local-schema half is **not** web-reproducible
   (`getLocalStore` returns null in the sandbox), so it needs the device check or a Known-Issues row.
-
-### [workouts] BF-16b — the retired all-primary program, and the one live session with no Primary
-
-- **Branch:** _unassigned_
-- **Added:** 2026-08-24 · found while tracing BF-15, from production
-- **Lane: A** — data correction, no schema.
-- **Needs:** BF-15
-- **Gate: owner** — any role change alters a prescribed percentage. An advisory list approved row by
-  row, never a silent sweep.
-
-**The owner's ACTIVE program needs no role corrections** — Shikai carries 1 Primary in four of its
-five sessions. An earlier count of "11 isolation movements at `primary`" was real but unsplit: almost
-all of it sits inside the retired `Strength + Hypertrophy`, where **every** exercise is `primary` —
-the old column default doing exactly what BF-15 describes. Correcting a program nobody trains on may
-not be worth doing at all; present it and let the owner decide.
-
-**`Shikai / Lower` has no Primary at all** — three Secondary and two Accessory, the only live-program
-anomaly. BF-15's rule would nominate Barbell Good Morning.
-
-Detail in [`docs/superpowers/plans/2026-08-24-exercise-roles.md`](superpowers/plans/2026-08-24-exercise-roles.md) §6.
-
-- **What would count as fixed:** each corrected row is one the owner approved.
-- **Surface: production data.**
 
 ### [workouts][platform] BF-17 — `main` and `primary` are two axes wearing the same word, and the UI labels them backwards
 
@@ -5157,6 +5184,11 @@ this fits without an extraction.
 
 ### [app-shell] Q-499 — self-fetching cards cannot tell "no data" from "the fetch failed"
 
+> **⚑ CONFIRMED ON THE DEVICE 2026-08-30 — this is a real failure, not a theory.** The owner ran it
+> properly (airplane mode, then reopen) and reported: *"nothing said it couldnt load."* So a card
+> whose fetch fails renders as absence, exactly as this entry predicted, and the user cannot tell "no
+> data" from "this broke". The gate is cleared as **failed**; it is now a build item.
+
 > **The two verified instances shipped 2026-08-24, plus a deeper bug the fix uncovered.**
 > `hr-recovery-profile-card.tsx` and `strength-progress-card.tsx` now pass `onError` to
 > `useCachedValue` and render a compact "Couldn't load… — pull to refresh" state instead of a bare
@@ -5820,6 +5852,17 @@ this fits without an extraction.
 
 ### [app-shell][workouts][platform] Q-467 — the Coach can change your programme and nothing in the app can undo it
 
+> **⚑ DEVICE PASS 2026-08-30 — partial, and it surfaced a limit rather than the bug this check was
+> looking for.** The owner asked Coach to swap **Good Mornings → Jefferson Curl** and reported: *"it
+> only allowed for making it primary."* So the swap path offered a role change instead of, or
+> alongside, the substitution the user asked for. **A screenshot is coming; do not design from this
+> sentence alone** — it is not yet clear whether Coach proposed the wrong change, or proposed the
+> right one and the confirm screen described it wrongly, and those are different bugs.
+>
+> Note the interaction with BF-15: **this owner has deliberately built a session with no Primary**,
+> so a Coach that reaches for "make it primary" as its default handling of a swap is working against
+> a choice they made on purpose.
+
 > **✅ SHIPPED 2026-08-25.** `coach-history.tsx` renders an Undo on every change that is not already
 > undone; the row re-styles struck-through when it lands, and the route's 409 window ("you've trained
 > since this change") renders as a sentence on the row rather than an error, replacing the button.
@@ -6151,6 +6194,12 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 
 ### [app-shell][devices] Q-318 — poll the redecode job, and stop the two consoles reporting "done" for work that has started
 
+> **⚑ DEVICE PASS 2026-08-30 — partial, and it fails the half this entry is about.** Owner pressed
+> Redecode and got one line: *"redecode job 1 started - this can take minutes"*, and **nothing
+> after** — no progress, no completion, no outcome. That is precisely the reporting gap this entry
+> and Q-535 describe, now confirmed from the device rather than inferred. The job may well have
+> succeeded; the console has no way to say so, which is the defect.
+
 > **✅ THE CLIENT HALF SHIPPED 2026-08-24 (Lane B, v1.363.1).** `components/oura-ble/redecode-job.ts`
 > POSTs `?async=1` and polls `GET ?jobId=…` every 3s until the server reports `done`/`failed`, then
 > hands back the same phases payload the synchronous route returned. Both consoles use it;
@@ -6203,6 +6252,16 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   client only.
 
 ### [app-shell][devices] Q-316 — the frame packer has no button: `POST /api/oura-ble/samples/pack` can only be driven by curl
+
+> **⚑ DEVICE PASS 2026-08-30 — the button could not be pressed, and that is probably a defect rather
+> than the pass.** Owner: *"There is a 'pack sealed frame (lever 5)' button but I cant click it."*
+> The check as written says a disabled button at zero rows **is** the pass — but Q-538's reading from
+> the same session shows **652,417 raw rows on disk**, so there is plainly something to pack.
+>
+> **Two possibilities and they need separating before anything is built:** the button's enabled
+> condition reads a count that is zero or missing while the rows exist, or it is enabled and the tap
+> is not landing. Have the owner report whether it looks greyed out or looks normal and does nothing
+> — that one word decides which.
 
 > **✅ SHIPPED 2026-08-24 (Lane B, v1.363.3).** A third control in `db-footprint-card.tsx`'s ① Data
 > section. The `GET` count renders beside the button (*"N bucket(s) packable"* / *"no sealed buckets
@@ -6297,6 +6356,15 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   levers have, beside them in the footprint card.
 
 ### [devices][platform] Q-538 — `oura_raw.db` grows without bound on the phone: `pruneRaw` has no caller, and `rolled_up` is never set
+
+> **⚑ MEASURED ON THE DEVICE 2026-08-30, and it is bigger than the entry assumed.** Owner, via the
+> console's Read stats: **652,417 total rows, 95.7 MB on disk.** That is the local `oura_raw.db`
+> with `pruneRaw` still having no caller. For scale: the owner's whole production Postgres was
+> 171 MB at the 2026-08-18 baseline, so the phone is carrying more than half a server's worth of raw
+> frames that the 14-day retention decision says it should not hold at all.
+>
+> **This also re-frames D2's finding below.** With 652k raw rows present, a pack button that cannot
+> be pressed is not "correctly disabled at zero" — see the note on Q-316.
 
 - **Plan:** [`docs/superpowers/plans/2026-08-17-db-storage-raw-samples-retention.md`](superpowers/plans/2026-08-17-db-storage-raw-samples-retention.md) §3
 - **Branch:** `fix/oura-raw-device-store-visibility`

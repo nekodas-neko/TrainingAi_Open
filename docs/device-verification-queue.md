@@ -16,7 +16,8 @@ in the PR that acts on the answer.
 marked **JS** — those need no new APK, just a fresh app open.
 
 **Coverage.** Every `Gate: device` entry in the Lane B queue is represented below (27 on
-2026-08-26). Three of them are **not** presses and are listed at the end so nobody hunts for a
+2026-08-26). **A first full pass ran 2026-08-29/30** — struck items carry the owner's own words and
+the date. Three of them are **not** presses and are listed at the end so nobody hunts for a
 button that does not exist. **S8 and S9 were added 2026-08-30** — they are Lane A entries whose gate
 is also a device, added here because the cost is picking the phone up and they ride along free.
 
@@ -112,19 +113,10 @@ food-database row on Log Food to carry the warning.
 *"This is not important lets leave for later."* Still owed, not withdrawn.
 
 
-## A1. The back gesture across surface types — BF-27 · **re-worded 2026-08-30**
-The owner asked what to do here, which means the item was written for someone who already knew what
-BF-27 changed. Concretely — the Android **back gesture** (swipe in from the screen edge), not an
-in-app arrow:
-
-1. Nutrition → tap a logged food → a **sheet** opens. Swipe back. **Pass:** the sheet closes and you
-   are still on Nutrition. **Fail:** the whole tab changes, or you leave the app.
-2. Nutrition → tap a food's **bin** → the *"Delete food log?"* **dialog**. Swipe back.
-   **Pass: the food is STILL THERE** — back must cancel, never confirm. This is the one that matters;
-   a back gesture that confirms a destructive dialog deletes data on a mis-swipe.
-3. Log Food → **Meals** → a meal (a **nest**). Swipe back twice — one layer each.
-
-*(3 is what N2 already passed, so if you have done N2 you have done 3 — 1 and 2 are what is left.)*
+## ~~A1. The back gesture across surface types~~ ✅ 2026-08-30
+Owner: *"Confirm this works."* Sheet closes without leaving the tab; the delete dialog **cancels**
+rather than confirms; the nest unwinds one layer per press (N2). **BF-27 is device-verified across
+all three surface types.**
 
 
 ## A2. The timeline's row taps — **FAILED 2026-08-30, filed as [BF-49](implementation-backlog.md)**
@@ -138,14 +130,10 @@ origin, on both routes. Nothing further owed from the device until BF-49 ships.
 across local midnight. Still owed; a future run should schedule it rather than attempt it on demand.
 
 
-## A4. A card whose fetch fails — Q-499 · **inconclusive 2026-08-30, needs a re-run**
-Owner: *"Everything seems to be working; nothing is showing that it cant load."* **That reads as a
-pass and may be one, but it may also mean the failure was never induced** — a card that loads from
-cache offline is doing the right thing and proves nothing about the error state.
-
-Re-run and say which happened: **turn airplane mode ON first**, then **force-close** the app (so no
-cached fetch has already run), then open **Health**. A card whose fetch fails must say so.
-**Fail:** it silently vanishes, which reads as "no data" rather than "this failed".
+## ~~A4. A card whose fetch fails~~ ❌ FAILED 2026-08-30 — Q-499 confirmed
+Owner re-ran it properly (airplane mode, then reopen): *"nothing said it couldnt load."* A card whose
+fetch fails renders as absence. **Q-499's gate is cleared as a failure** and it is now a build item;
+nothing further owed from the device until it ships.
 
 
 ## ~~W1. Safe-area on a navless takeover~~ ✅ 2026-08-30
@@ -160,53 +148,69 @@ sets log and the rest timer behaves, it passes. Only worth a deliberate run for 
 half, since nothing else in the app depends on that setting.
 
 
-## W3. Volume landmarks at S25 width — Q-305 · **re-worded 2026-08-30**
-The owner asked what is needed, and the old wording (*"wherever the landmarks now render"*) did not
-say where to look — a check nobody can locate is not a check.
-
-**Volume landmarks** are the weekly set-count guides per muscle group (the MEV/MAV-style bands) shown
-in the training-volume view. Open that view on the phone and answer one question: **is anything
-clipped, wrapped mid-word, or unreadable at 412 dp?** A screenshot is the fastest answer. If you
-cannot find the landmarks on any screen, say that — "it does not render anywhere" is a more important
-answer than a layout note.
+## ~~W3. Volume landmarks at S25 width~~ ✅ 2026-08-30
+Owner: *"Looks good."* Nothing clipped or wrapped at 412 dp. **Q-305 is device-verified.**
 
 
-## D1. Devices card vs a keyless service — LB-5
-1. Open the **Devices** card with the BLE service running.
-2. **Pass:** if the service has no ring key stored, the card says so rather than reporting the ring
-   healthy. (`getOuraBle()` returns `null` in the web sandbox, so this branch is device-only.)
+## D1. Devices card vs a keyless service — LB-5 · **not safely testable, 2026-08-30**
+Owner: *"Not sure what to look for; everything is always connected."* Correct, and the item was
+badly written: it asks what the card does **when no ring key is stored**, and the only way to reach
+that state is to remove the key — which is the one thing that must never be done, since the key lives
+only in Android SharedPreferences.
 
-## D2. The frame packer button — Q-316
-1. `/admin/oura-ble` → the **pack** button.
-2. **Pass:** it is disabled at zero, and after a press the footprint reloads and the raw count drops.
+**Reclassified as not-a-press.** LB-5 should be verified in code or with a test double, not by
+breaking the device. Moved to the "gated on a device but NOT a press" list below.
 
-## D3. Declaring a re-key — Q-317
-1. The **re-key** button in the same console.
-2. **Pass:** it acknowledges immediately rather than looking inert — an inert-looking button invites a
-   second press, which is the failure this guards.
+**What the owner found instead is [BF-53](implementation-backlog.md), and it is live:** *"the 'not
+me' button for weigh in's doesnt actually remove it."* Both the dismiss and confirm routes validate a
+`bigserial` id with a UUID regex, so every press returns 400 and the client swallows it.
 
-## D4. Redecode reporting — Q-318 / Q-535
-1. Press **Redecode** and watch the console.
-2. **Pass:** it reports progress and a real outcome. **Fail:** it says "done" while work is still in
-   flight, or reports "failed: 502" for work that actually succeeded.
 
-## D5. Read stats and the raw DB footprint — Q-538
-1. Press **Read stats**.
-2. **Pass:** it returns real numbers. Note the `oura_raw.db` size — it grows without bound today
-   because `pruneRaw` has no caller.
+## D2. The frame packer button — Q-316 · **one word needed from the owner, 2026-08-30**
+Owner: *"There is a 'pack sealed frame (lever 5)' button but I cant click it."* The check said a
+button disabled at zero rows is the pass — but D5 in the same session read **652,417 raw rows**, so
+there is plainly something to pack.
 
-## D6. The sparkline axis — BF-10
-1. `/admin/oura-ble` → **Device Metrics**, with ring data spanning an idle gap.
-2. **Pass:** the sparkline plots by **time**, so a gap in sampling shows as a gap.
-3. **Fail:** evenly-spaced points regardless of when they were taken.
+**The one thing needed:** is the button **greyed out**, or does it **look normal and do nothing**?
+Greyed out → its enabled condition is reading a count that disagrees with the row count. Looks normal
+→ the tap is not landing. Different bugs, and that word decides which.
 
-## D7. Is `spo2V` populated? — Q-34
-1. In the debug column view, check whether **`spo2V`** has values at all.
-2. This is a yes/no that unblocks a verdict; no pass/fail beyond reporting what you see.
 
----
+## D3. Declaring a re-key — Q-317 · **declined by the owner 2026-08-30, and rightly**
+Owner: *"Dont wanna press a rekey button."* Good instinct — the button only *declares* a re-key to
+the server, but nothing on screen says that, and a control the owner is afraid to press near the ring
+key is itself a finding.
 
-# Standalone
+**Do not ask again.** Q-317's acknowledgement behaviour should be verified without pressing it in
+production — a staging user, or a test. Reclassified as not-a-press.
+
+
+## ~~D4. Redecode reporting~~ ❌ 2026-08-30 — fails the half it was checking
+Owner: *"clicking redecode gave the message 'redecode job 1 started - this can take minutes'; thats
+all I can really see."* One line, then nothing — no progress, no completion, no outcome. **That is
+exactly the gap Q-318 and Q-535 describe**, now observed rather than inferred. The job may have
+succeeded; the console cannot say. Nothing further owed from the device until the polling ships.
+
+
+## ~~D5. Read stats and the raw DB footprint~~ ✅ 2026-08-30 — measured
+Owner: **652,417 total rows, 95.7 MB on disk.** Read stats returns real numbers, so the button
+passes — and the figure is the point. For scale, production Postgres was 171 MB at its 2026-08-18
+baseline, so the phone is holding more than half a server's worth of raw frames under a retention
+decision that says it should keep 14 days. Recorded on **Q-538**, whose `pruneRaw` still has no
+caller.
+
+
+## ~~D6. The sparkline axis~~ ⚠️ 2026-08-30 — soft pass
+Owner: *"sure I think this is fine."* Taken as a pass, and flagged as a soft one: the check needs
+data spanning an **idle gap** to distinguish index-plotting from time-plotting, and it is not clear
+that condition was met. **If BF-10's symptom is ever seen again, disbelieve this line and re-run it**
+against a period with a known gap.
+
+
+## ~~D7. Is `spo2V` populated?~~ ✅ 2026-08-30 — yes
+Owner: *"in the device metrics I see values for it."* That answers the question the item existed to
+ask; the debug column view was the route suggested, not the requirement. **`spo2V` is populated.**
+
 
 ## S1. Outbox flush on pull-to-refresh — offline-first
 1. **Airplane mode.** Log something (a set, a food item, a mood check-in).
@@ -216,36 +220,41 @@ answer than a layout note.
 
 *Note:* **"Sync now"** in Data & Sync only **pulls**. Pull-to-refresh on More is the one that pushes.
 
-## S2. A score with no value renders as "—" — Q-278 / Q-281 · **JS**
-1. Health → Readiness, and Health → Activity. Find a day with **no score**.
-2. **Pass:** the value reads `—`, with no band label attached.
-3. **Fail:** it reads `0`, carries yesterday's number, or shows a band label beside a dash.
+## S2. A score with no value renders as "—" — Q-278 / Q-281 · **JS** · *how to find one, 2026-08-30*
+The owner asked how to reach a day with no score, which the item never said.
 
-## S3. Cold-start time to first paint — BF-19 / Q-147
-1. Force-close. Open, and **count seconds** until Home shows real numbers, not skeletons.
-2. Repeat twice; a rough range is enough — "about 4 seconds, maybe 6 the first time" is usable.
+**Do not try to create one.** Use history: swipe Health → **Readiness** back through past days until
+you reach a date **before the ring was re-keyed** or a night you did not wear it — those days have no
+score by construction. The same on **Activity** for a day with no movement data.
+1. **Pass:** the value reads `—`, with **no band label** beside it.
+2. **Fail:** it reads `0`, carries the previous day's number, or shows a band word next to a dash.
 
-*Why:* nothing in the app measures this, so there is no baseline to improve against.
+If every day you can reach has a score, say so — *"I cannot find a day without one"* is a useful
+answer and closes the check differently.
 
-## S4. Barcode scan of a zero-calorie product — **JS** · LB-15 / LA-30
-1. Nutrition → scan a barcode for something with **0 kcal**.
-2. **Pass:** found, and **Save** is enabled. **Fail:** "not found", or Save stays greyed out.
 
-## S5. Photo/pill scan that would not log — **JS** · owner report 2026-08-25
-1. Repeat the failing scan.
-2. **Fail:** note whether the item was *not recognised* or recognised but *not loggable* — two
-   different bugs the screenshot did not separate.
+## ~~S3. Cold-start time to first paint~~ ✅ 2026-08-30
+Owner: *"loads fast."* No number captured, which is fine for a first reading — **the baseline this
+was meant to establish is "fast enough not to notice"**, and BF-19's client-side reporter is what
+will produce a figure when one is needed. Not worth re-asking for a stopwatch.
 
-## S8. One photo scan, timed — BF-4 · **JS**
 
-**The whole gate on BF-4 is a single scan.** Every hypothesis about *"the photo scan feels slower"*
-has already been measured against production `ai_call_log`; what is missing is one current sample to
-compare them to.
+## ~~S4. Barcode scan of a zero-calorie product~~ ✅ 2026-08-30
+Owner: *"it did the 0 cal supplement."* Found, and Save enabled. **LB-15 / LA-30 are
+device-verified** — a zero-calorie product is no longer refused.
 
-1. Nutrition → add food → **camera** (a photo scan, **not** a barcode).
-2. Scan any food. Note roughly how long from shutter to the result appearing.
-3. **Pass:** it completes. Either way, say how long it felt and whether that matches your original
-   report — a scan that now feels fine is as useful an answer as a slow one, and closes the entry.
+
+## ~~S5. Photo/pill scan that would not log~~ ✅ 2026-08-30 — no longer reproduces
+The owner re-ran the failing scan as part of S4/S8 and it logged. **The 2026-08-25 report does not
+reproduce on this build.** Recorded as *stopped*, not *fixed* — nothing in a diff was traced to it,
+so if it returns it is a fresh report and not a regression of a known fix.
+
+
+## ~~S8. One photo scan, timed~~ ✅ 2026-08-30 — BF-4's gate cleared
+Owner: *"took about 4 seconds from analysing photo."* **Four seconds is not the slowdown BF-4 was
+filed about**, and the owner ran it without complaint. BF-4 can close on this reading against its
+measured `ai_call_log` figures.
+
 
 ## S9. Overnight ring drain on the current APK — Q-388
 
@@ -262,9 +271,15 @@ compare them to.
 5. **Do not turn SpO₂ off to improve this.** You already established the binary framing was wrong;
    the entry is now about finding what *we* do differently from stock.
 
-## S6. Coach changing your programme — Q-467
-1. Ask Coach for a programme change and accept it.
-2. **Pass:** the app reflects it, and a stale/conflicting change is refused rather than applied twice.
+## S6. Coach changing your programme — Q-467 · **partial 2026-08-30, screenshot pending**
+Owner asked Coach to swap **Good Mornings → Jefferson Curl** and got: *"it only allowed for making it
+primary."* A screenshot is coming. **Held open deliberately** — it is not yet clear whether Coach
+proposed the wrong change or described the right one wrongly, and the screenshot decides.
+
+Worth knowing while reading it: the owner has **deliberately** built `Shikai / Lower` with no Primary
+lift (BF-16b, closed on their rejection), so a Coach defaulting to "make it primary" is working
+against a choice they made on purpose.
+
 
 ## S7. Catalogue hydration after a fresh install — BF-16a
 
@@ -296,3 +311,10 @@ Listed so nobody goes looking for a button. These need a device to *exist*, not 
 - **Q-7b** — ten device-owned `oura_daily_derived` columns have no producer. A missing writer, not a
   check.
 - **Q-168** — AI Coach follow-ups. A feature, not a verification.
+- **LB-5** — the Devices card against a keyless BLE service. Reaching that state means removing the
+  ring key, which is the one action that must never be taken (it lives only in SharedPreferences).
+  Verify in code or against a test double. *Moved here 2026-08-30.*
+- **Q-317** — declaring a re-key. The owner declined to press it and was right to: nothing on screen
+  says the button only *declares* a re-key to the server rather than re-keying the ring, and asking
+  someone to press it near the one irreplaceable credential is a bad check. Verify off production.
+  *Moved here 2026-08-30.* **The unclear labelling is itself worth fixing** — see Q-317.

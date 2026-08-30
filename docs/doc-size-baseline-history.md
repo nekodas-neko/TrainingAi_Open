@@ -3545,3 +3545,22 @@ moved out to the archive. The paragraph keeps the sentence about the first imple
 the same subquery in the SELECT and the ORDER BY — the ordering worked, the selected value came back
 null — because it is a concrete argument for a rule this repo states abstractly, and the abstract
 version has not been enough on its own.
+
+## 2026-08-30 — `docs/implementation-backlog.md` raised (second device pass; net +54 after a closure)
+
+68 lines added and one entry deleted. **BF-53 is most of it and it is a live production defect found
+in an aside.** The owner mentioned, while answering a different check, that the "Not me" button on a
+pending weigh-in does nothing. Both that route and its sibling validate a `bigserial` id with
+`invalidUuidResponse`, so every press returns 400 before the `Number.isInteger` guard written for it
+— the whole pending weigh-in triage is dead, and the client's `if (res.ok)` with no `else` is why it
+looks like a no-op instead of an error. The entry carries the sweep: any dynamic route whose key is
+an integer rather than a UUID has the same shape.
+
+The rest is device findings landing on the entries that predicted them — Q-499 confirmed as a real
+failure, Q-538 measured at 652,417 rows and 95.7 MB, Q-318's redecode reporting observed rather than
+inferred, and Q-316 re-framed, because a pack button that cannot be pressed is not "correctly
+disabled at zero" when 652k rows exist.
+
+**BF-16b was deleted rather than ticked.** The owner rejected the correction — `Shikai / Lower` has
+no Primary lift on purpose — so the finding moved to BF-15, the rule that flagged it, as a constraint:
+a live session may legitimately have no Primary, and nothing downstream may treat that as a defect.
