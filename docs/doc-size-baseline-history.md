@@ -3251,6 +3251,28 @@ moment a screen composed its own, Q-323's earned-scaled macro targets). A first 
 called `budgetProvenance` internally and would have been the fourth; recording only "the energy block
 now matches the mockup" leaves the next person free to do exactly that.
 
+## 2026-08-27 — `docs/implementation-backlog.md` 12713 → 12728 (+15), Q-407's widget half
+
+Fifteen lines on one entry, and they buy two things a successor cannot re-derive. First, **which half
+of Q-407 shipped**: the entry describes a conversational redesign and a multi-select widget as one
+item, and only the widget exists — a reader seeing "✅" against the heading would skip the larger
+half. Second, **the catch**: `/api/coach/options` returns an empty list when there is no active
+program, which is correct for the three program-backed sources and would have made a grocery picker
+come back empty for a user who has not built a program yet. That is a nutrition question failing on a
+training precondition, it was invisible until the new branches were placed, and the placement is the
+whole fix.
+
+## 2026-08-27 — `projectOverview.md` 8147 → 8156 (+9), Q-407's widget half
+
+Nine lines, and the ⚠ is the one that has to be there: **Q-407's conversational half is untouched**.
+The entry describes a seven-step wizard becoming a conversation *and* a multi-select widget as one
+item; only the widget exists. A status line reading "Q-407 shipped" would have the next session skip
+the larger half entirely.
+
+The rest is the measurement that makes the change worth understanding rather than just noting — a
+nine-option picker the model types out costs ~554 output tokens, and output is essentially all of
+Coach's latency, which is why six curated lists became choice sources rather than staying literals
+in a component.
 ## 2026-08-27 — `docs/implementation-backlog.md` raised (LB-23, LB-24 filed by Q-112a)
 
 48 net lines (12760 after merging main twice, which added 36 of its own without needing a raise):
@@ -3289,7 +3311,9 @@ honestly, in the same route change.
 
 ## 2026-08-30 — `docs/implementation-backlog.md` raised (LB-19's premise replaced by measurement)
 
-17 lines (12797). The entry said two flaky e2e specs were a sandbox **time budget** and prescribed
+17 lines (12813 after merging main, which raised it too — two entries genuinely disagreeing
+about one number is the case this file conflicts on correctly). The entry said two flaky e2e specs
+were a sandbox **time budget** and prescribed
 `test.setTimeout`. Measuring both showed neither is, and the prescription would have fixed neither —
 so the replacement is longer than the claim it removes, because the two failures turn out to have
 nothing in common and each needs its own mechanism written down.

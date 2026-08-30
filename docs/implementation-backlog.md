@@ -2019,7 +2019,23 @@ tell is a locator that never resolves rather than a wrong value.
   - `HandoffSchema` routes to real screens (`destination: 'program_builder' | 'log_activity' |
     'profile' | 'nutrition'`), so a conversation that must hand off to a full screen has a route.
 
-- **The one genuine gap: `choice_list` is single-select, and that is exactly the owner's complaint.**
+- **✅ THE WIDGET HALF SHIPPED 2026-08-27** ([journal](overview/entries/2026-08-27-coach-multi-select.md)).
+  `ChoiceListSchema` gained flat `multi` / `selectAll` (both optional, so every existing call site is
+  byte-identical); `ChoiceList` gained checkbox rows, a Select-all row with an `n of m` count and a
+  Continue button below the scroll region; `WidgetResultSchema`'s `chose` now carries `ids` with a
+  spoken `label` ("Coles, Aldi and IGA"). And the six catalogues the model would otherwise type out —
+  `grocery_stores`, `proteins`, `carbs`, `fats`, `vegetables`, `dietary_restrictions` — are
+  `CHOICE_SOURCES` served from `/api/coach/options`, with the five staple lists moved out of
+  `meal-plan-setup-sheet.tsx` into `@trainingai/shared/nutrition/grocery-catalogue`.
+  **The catch worth keeping:** the route returns early with an empty list when there is no active
+  program, which is right for `sessions` and would have made a grocery picker come back empty for a
+  user who has not built one — a nutrition question failing on a training precondition. The catalogue
+  branches sit above that gate and a test pins it.
+- **Still owed: the conversation itself.** The seven-step sheet is untouched; what shipped is the
+  widget it needs. The remaining work is the three-part shape below — answers as widgets with the
+  coach stating what it already knows, the plan arriving as a widget rather than prose, and the
+  nutrition scope as a named record of prompt section + tool subset + patch domains + widget sources.
+- **The gap this closed, recorded because the entry's diagnosis was exactly right:**
   `ChoiceListSchema` (lib/coach/widgets.ts) has `prompt`, `source`, `sourceId`, `options[]` — **no
   multi flag** — and `ChoiceList`'s callback is `onChoose?: (option: { id, label }) => void`, one
   option, singular. There is no configuration that makes it multi-select. So "I keep clicking each
