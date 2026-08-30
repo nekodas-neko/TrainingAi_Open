@@ -6,10 +6,17 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: "1.395.1",
+    version: "1.395.2",
     date: "2026-08-30",
     changes: [
       "Internal: a check on the step-goal screen had been failing for days on a stale test database, and was recorded as simply being too slow to finish. It was not \u2014 the row it looks for could not appear at all, because the sample data stops on the day it was created. The check now supplies what it needs, and the note explaining the failure has been corrected rather than left to mislead the next person.",
+    ],
+  },
+  {
+    version: "1.395.1",
+    date: "2026-08-30",
+    changes: [
+      "The Colmi ring now syncs itself while the app is open \u2014 on opening it, when you come back to it, and every half hour \u2014 so a day no longer depends on remembering to press the button. Four of its measurements are only ever offered for the day you ask on, so an evening that was never synced lost them for good. Pressing Sync by hand still works and now says so if one is already running.",
     ],
   },
   {

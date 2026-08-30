@@ -24,7 +24,7 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.395.1 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Version:** v1.395.2 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-08-30.
 
 **The e2e flake blamed on a slow sandbox was a stale fixture (LB-19).** The entry said two specs

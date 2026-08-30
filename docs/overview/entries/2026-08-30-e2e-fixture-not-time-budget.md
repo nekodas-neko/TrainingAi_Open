@@ -1,6 +1,6 @@
 # 2026-08-30 — `fix/e2e-fixture-not-time-budget` (LB-19) — the flake was the fixture, not the clock
 
-**Lane B · v1.395.1 · test-only.** No product file changes. LB-19's premise is replaced by
+**Lane B · v1.395.2 · test-only.** No product file changes. LB-19's premise is replaced by
 measurement; half of it is fixed, half is re-scoped with a mechanism.
 
 LB-19 said two e2e specs fail in-session because they "fit comfortably on CI's runner and do not fit
