@@ -1369,38 +1369,48 @@ inside a box whose height already overshoots. The padding is present and still l
 - **Verification:** on the S25 with gesture navigation **and** with 3-button navigation — the inset
   differs by mode, and checking one mode is what lets this class through.
 
-### [nutrition][app-shell] BF-61 — the swipe tray's Delete needs two presses, and the transition is the likely reason
+### [nutrition][app-shell] BF-61 — the swipe tray's Delete needs two presses, and the transition is the cause (owner-confirmed)
 
 - **Lane:** B — `components/ui/swipe-actions.tsx`.
 - **Batch:** `nutrition-ui-uplift` — same screen, same device pass.
 - **Added:** 2026-08-30 · owner, on the shipped swipe tray: *"when sliding and pressing delete it
   requires 2 presses before the confirmation comes up."*
+- **Confirmed on device 2026-08-30** · owner, running the timing check below: *"if I wait a second
+  it works."* So this is a **cause, not a hypothesis** — do not re-diagnose it.
 
 **What I ruled out by reading the component**, so nobody re-checks these first: the tray buttons are
-not overlapped by the row (the row translates to exactly the tray's left edge, and the parent clips);
-`aria-hidden`/`tabIndex` flip on `isOpen`, which is true the moment `open()` sets the offset, so the
-button is focusable and hit-testable immediately; and `useDrag`'s `filterTaps` is bound to the **row**
-div while the tray is a sibling — a tap on Delete never reaches the drag handler.
+not overlapped by the row once it has settled (the row translates to exactly the tray's left edge,
+and the parent clips); `aria-hidden`/`tabIndex` flip on `isOpen`, which is true the moment `open()`
+sets the offset, so the button is focusable and hit-testable immediately; and `useDrag`'s
+`filterTaps` is bound to the **row** div while the tray is a sibling — a tap on Delete never reaches
+the drag handler.
 
-**Hypothesis, and it fits "two presses" exactly: the first tap lands on a moving target.** The row
-carries `transition: transform 0.22s cubic-bezier(…)`. Release the swipe and the tray is revealed
-*over 220 ms*; a tap inside that window can be dispatched against the layout as it stood at
-pointer-down — the row, not the button. The second tap lands after the animation settles and works.
-**This is reasoned from the source, not reproduced** — the sandbox has no touch and no Samsung
-WebView.
+**The mechanism.** The row carries `transition: transform 0.22s cubic-bezier(…)`. Hit-testing follows
+the *animated* transform, so for those 220 ms the row is still physically covering part of the tray:
+a tap in that window lands on the row, not on Delete. The row swallows it, the animation finishes,
+and the second tap hits the button. Waiting a second — which is what the owner did — puts the tap
+after the settle, and one press works. That is the whole bug.
 
-- **The check that confirms or kills it, one swipe each:** swipe, **wait a second**, tap Delete —
-  one press? Then swipe and tap Delete **immediately** — two? If waiting fixes it, it is the
-  transition. If both need two, strike this hypothesis rather than working around it.
-- **If confirmed, do not fix it by shortening the animation.** The tray should accept a tap while it
-  is opening — settle the offset before the transition ends, or hit-test against the final position.
-  A window that swallows input at 0.22 s still swallows it at 0.1 s.
-- **⚠ BF-29 passed on the device on 2026-08-30** (*"Yes all good here"*) — on the **meal** list. This
-  report is the **food-row** tray from BF-45 ⑤, shipped since. Either the two trays differ or the
-  earlier pass did not tap fast enough; both are worth knowing, and it argues for re-running BF-29's
-  check with the deliberate fast tap above.
-- **Verification:** one tap on Delete raises the confirmation, tapped immediately after the swipe
-  releases, on both the meal list and the food rows.
+- **Do NOT fix it by shortening the animation.** A window that swallows input at 0.22 s still
+  swallows it at 0.1 s; it just makes the bug rarer and harder to report.
+- **Leading candidate: raise the tray above the row in stacking order while `isOpen`.** The tray is
+  already a sibling with `absolute inset-y-0 right-0`; giving it a `z-` above the row when open means
+  a tap inside the tray's rect reaches the button even while the row is still sliding across it. The
+  row is translating *away* from that rect anyway, so nothing the row owns becomes unreachable — and
+  when closed the tray keeps its current stacking, so a tap anywhere on a closed row is unaffected.
+- **Second option if that misbehaves:** settle `offset` to its final value at release and let the
+  transition be purely visual — but that is the same "animate something the hit-test disagrees with"
+  shape, so prefer the stacking fix.
+- **One fix covers both trays.** `SwipeActions` has exactly two call sites — `meal-card.tsx` and
+  `saved-meal-card.tsx` — so this is one component change, not a sweep. That also settles the BF-29
+  question below: the two trays are the same component, so the earlier pass simply did not tap fast
+  enough rather than the trays differing.
+- **⚠ Re-run BF-29's check with the deliberate fast tap.** BF-29 passed on the device on 2026-08-30
+  (*"Yes all good here"*) on the **meal** list, while this report came from the **food-row** tray from
+  BF-45 ⑤. Same component, so BF-29's pass is not evidence the meal list is clear.
+- **Verification:** on the S25, swipe and tap Delete **immediately** — the confirmation must appear on
+  the first press, on both the meal list and the food rows. The slow tap must keep working too; a fix
+  that trades one for the other is not a fix.
 
 ### [nutrition] BF-60 — the `Single foods` tab is the search surface now, so call it `Search`
 
