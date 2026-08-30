@@ -4131,3 +4131,22 @@ explicit keyword, so the filler-word gap is untested by construction rather than
 And the second half, which is the part that generated the report: the failure message prints the
 transcript in red, so a *correct* transcript reads as the app mishearing. Fixing the parser without
 fixing that message leaves the next unparseable phrase just as confusing.
+
+## 2026-08-30 — `docs/implementation-backlog.md` (BF-67 and BF-68, the program builder's two blind spots)
+
+Two owner requests about the AI program builder, filed separately because one is buildable and one
+is a design.
+
+BF-68 is measured: `injur` appears **zero times** across both builder routes and all three builder
+components, and `generate-program`'s schema is a strict thirteen-field wizard payload with no
+free-text field at all. The entry's real content is the trap — `builder-chat` *does* take free text,
+so typing "I have a sore lower back" often works by luck, and then the constraint dies when the
+program is saved while the daily engine, which already reads the injuries table, never hears about
+it. That argues for feeding the existing records in rather than adding a field, and for the free-text
+path writing a record instead of a prompt line.
+
+BF-67 is flagged as a planning item because the owner's one sentence contains two payloads —
+structure ("similar to") is ~30 exercise names, history ("what I did") is unbounded — and treating
+them as one is how a prompt gets a year of set logs in it. It also carries two constraints worth
+having before design starts: send a program id rather than a program object, and give the reference
+its own schema caps rather than inheriting the byte-limit situation the route already documents.
