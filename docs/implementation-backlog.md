@@ -1231,39 +1231,6 @@ real".
 - **Verification:** offline and online, delete a logged food — it goes and stays gone, with no
   reappearance, and a force-close does not bring it back.
 
-### [nutrition] BF-48 — "Single foods" searches only what you have logged, so the food database is unreachable from Log Food
-
-- **Lane:** **B — all of it.** (Corrected 2026-08-30 from *"A for the search wiring, B for the row"*.
-  Lane A took the entry off the queue, looked for its half, and there is not one: the route
-  `app/api/nutrition/food-search` already exists and needs no change; the only fetch of it is
-  `components/nutrition/ingredient-picker.tsx:100`, a component; `ingredient-search.tsx` is
-  presentational and takes `dbResults` as a prop, so the piece to reuse is that component's own
-  state, and extracting it lands in `lib/hooks/` — Lane B by the path rule. The mismatch threshold is
-  already shared, in `packages/shared/src/nutrition/goal-recommendation.ts`. Nothing here reaches
-  `app/api/**`, storage or `packages/shared/**`.)
-- **Added:** 2026-08-30 · owner, device pass N7: *"When I try add a food via the 'single food'
-  section; it only searches saved/history food - its not checking the food data base. So its not
-  useful."*
-
-**Confirmed in source.** `components/nutrition/food-list.tsx` filters an in-memory list and its own
-placeholder says so — `Search your foods`. Its empty state reads *"Single foods land here once you
-have logged them."* There is **no food-database call on this screen at all.** The database search
-exists (`app/api/nutrition/food-search/route.ts`, used by
-`components/nutrition/ingredient-search.tsx`) but is reachable **only from inside the meal builder's
-ingredient picker** — so a user wanting to log one new food must go through building a meal.
-
-**This also explains why N7's own check could not be run.** Q-406's macro-mismatch warning renders on
-food-database rows, and the owner could not reach one from Log Food. That check stays owed and should
-be re-run once this lands, from the screen it is actually reached on.
-
-- **Fix direction:** `Single foods` searches your logged foods **and** the database, with database
-  results clearly marked as not-yet-yours. Reuse `ingredient-search.tsx`'s call and its mismatch
-  warning rather than writing a second search — two implementations of one search is the duplication
-  this repo has repeatedly paid for.
-- **Verification:** search a branded product never logged before, from Log Food → Single foods; it is
-  found, it carries the mismatch line where macros and calories disagree, and tapping it goes to the
-  portion step.
-
 ### [nutrition][app-shell] BF-49 — back from a timeline row lands on Health, not where you started
 
 - **Lane:** B
@@ -2434,8 +2401,10 @@ That number is more valuable than either input on its own.
   asserts the shared shape (calories in their own column), the sentence, and that the macros stay
   readable beside it.
 - **Keep:** the device press. Not seen on the S25 — the amber caution line is new markup in a list,
-  and the row lost an affordance. On device: search the food database in the meal builder for
-  something with disagreeing macros; the row must show the sentence, and a tap must still add it.
+  and the row lost an affordance. On device: search the food database for something with disagreeing
+  macros; the row must show the sentence, and a tap must still add it. **Reachable from Log Food →
+  Single foods since BF-48** (v1.396.0), which is where the owner tried and could not get to it —
+  the meal builder still works and is the same row either way.
 
 ### [nutrition][app-shell] Q-395 — the nutrition rework: the spec every phase reads, and the final checkpoint
 

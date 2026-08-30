@@ -187,6 +187,15 @@ Live at the time of writing (2026-07-30):
 
 ## History
 
+- **[`docs/overview/entries/2026-08-30-log-food-database-search.md`](../../overview/entries/2026-08-30-log-food-database-search.md)**
+  — 🆕 **BF-48**: Log Food → Single foods searches the **food database**, not only foods you have
+  already logged. The query and its results section are shared with the meal builder
+  ([`use-food-database-search.ts`](../../../lib/hooks/use-food-database-search.ts),
+  [`food-database-results.tsx`](../../../components/nutrition/food-database-results.tsx)) so the
+  macro/calorie mismatch warning has one implementation. **The 700 ms debounce travels with the
+  hook** — Open Food Facts rate-limits to roughly ten searches a minute, so the own-foods search's
+  250 ms clock gets 503ed. The foods tab's search box is now unconditional: it had been hidden while
+  the list was empty, which is the state the report was made from.
 - **[`docs/overview/entries/2026-08-26-saved-meal-duplicate-detection.md`](../../overview/entries/2026-08-26-saved-meal-duplicate-detection.md)**
   — 🆕 **BF-11d**: saving a meal you already have **asks** instead of adding it again
   ([`meal-duplicate.ts`](../../../components/nutrition/meal-duplicate.ts)). *Close* is two
