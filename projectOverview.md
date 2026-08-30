@@ -27,6 +27,18 @@
 **Version:** v1.395.5 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-08-30.
 
+**The map that stops you re-implementing things was wrong 108 times (LA-35, filed and fixed the same
+day).** `CLAUDE.md` sends readers to `docs/module-map.md` *because* the monorepo extraction moved
+code out of `lib/` and the docs kept saying `lib/` (Q-153) — and the map was wrong the same way, for
+**108 paths across 8 orientation documents**. It survived because
+`scripts/check-index-doc-paths.js`, written to catch exactly this, ended its `resolves()` with
+`'packages/shared/src/' + p.replace(/^lib\//, '')`: **the one error class the map exists to prevent,
+whitelisted inside its own guard.** The sibling `check-claude-md-paths.js` never had the bug and the
+difference is one line — it uses that string to build an error *hint* and fails anyway. The
+corrections are applied, the fallback is gone, the hint is ported, and a test pins the absence,
+because restoring it makes the check pass *more*
+([journal](docs/overview/entries/2026-08-30-module-map-shared-paths.md)).
+
 **The deleted food came back, and the filed trace was not why (BF-47).** From device pass N1:
 *"when I click delete the item vanishes then re-appears; then when you swap screens - it
 dissapears."* The entry said the loader renders the server copy unconditionally — **it does not**;
@@ -650,22 +662,6 @@ Nothing in the existing 21 duplicates was touched — collapsing those means re-
 first, which is a separate decision. BF-38 stays queued for that, for the conflicting-estimate pairs
 that need an owner, and for the barcode chain.
 
-### [platform] 🟡 The module map points at `lib/` for 34 modules that live in `packages/shared/` (LA-35, 2026-08-30)
-
-Found while correcting that map for PS-15. `docs/module-map.md` names
-`lib/health/{activity-score,readiness-composite,model-report-calibration,vo2max,…}.ts` — **34 paths
-in all** — and every one of those files is `packages/shared/src/health/<same>.ts`. `lib/health/` is
-a real directory with nine other files in it, so the wrong paths look plausible.
-
-This is the Q-153 trap that `CLAUDE.md` sends readers to that map to avoid, and it survives because
-of the check: `scripts/check-index-doc-paths.js` ends `resolves()` with
-`'packages/shared/src/' + p.replace(/^lib\//, '')`, so the one error class the map exists to prevent
-is the one the check whitelists — all 34 report OK. **Note this does not contradict the 🟢 row
-further down** about the map's `path → symbol` claims: that check (`check-module-map-symbols.js`)
-verifies a symbol is attributed to the right *file*, not that the file is in the right *directory*.
-
-Nothing breaks. The failure mode is a session concluding a module is absent and writing a second
-copy. Queued as **LA-35**: move the paths, then delete the fallback so CI holds it.
 
 ### [workouts][devices] ⚠️ The corrected exercise catalogue has not been seen on the device (BF-16a, 2026-08-25)
 

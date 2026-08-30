@@ -2397,43 +2397,6 @@ place to start rendering pictures.
 - **Gate:** device — the local store does not run in `pnpm dev` or Playwright, so the only way to see
   this fixed is on the S25.
 
-### [platform] LA-35 — the module map points at `lib/` for 34 modules that live in `packages/shared/`, and the check that should catch it blesses the mistake
-
-- **Lane:** A (the engine)
-- **Added:** 2026-08-30, found while updating the map for PS-15
-
-`CLAUDE.md` names this exact trap under **One Formula, One Place**: *"Most of it is in
-`packages/shared/src/`, not `lib/` — the monorepo extraction moved it and this rule kept saying
-`lib/` for months (Q-153). Check `docs/module-map.md` for where a given formula actually is rather
-than guessing a directory."* The map it sends you to is wrong the same way, for **34 paths**:
-
-```
-lib/health/{activity-score,body-composition,cadence,chronic-stress-assembly,daily-medians,
-daily-summary,daytime-hrv,daytime-hrv-model,fitness-tests,gait-classifier,hr-recovery-by-exercise,
-hr-smoothing,hr-zones,hrv-5min,hrv-frequency,illness-radar,intraday-spo2,intraday-temp,metric-trend,
-model-report-calibration,personal-baseline,readiness-composite,recovery-band,sleep-night,sleep-score,
-sleep-staging,sleep-trend,step-estimate,tachogram,temperature-baseline,training-stress,vo2max,
-wear-confidence,zone-minutes}.ts
-```
-
-Every one is `packages/shared/src/health/<same>.ts`. `lib/health/` is a real directory with nine
-other files in it, so the wrong paths look plausible and resolve to nothing.
-
-**The reason it has survived is the check.** `scripts/check-index-doc-paths.js` was written (Q-554)
-precisely so an orientation doc cannot name a path that does not exist — and its `resolves()` ends
-with `'packages/shared/src/' + p.replace(/^lib\//, '')`. That fallback accepts a `lib/` path whenever
-the file exists under `packages/shared/src/`, which is not a lenient edge case: **it is the single
-error class the map exists to prevent, whitelisted.** The check reports OK on all 34.
-
-**The work:** move the paths to where the files are (mechanical, docs-only, verify each with
-`ls`), then delete the `packages/shared/src/` fallback from `resolves()` so the check holds it. Run
-the whole thing in that order — the fallback deletion turns the sweep into a CI-enforced fact rather
-than a state the next edit can undo. Expect the deletion to surface a handful outside
-`lib/health/` too (`lib/1rm.ts`, `lib/date-utils.ts` and similar), which is the point.
-
-**Not urgent, and not cosmetic.** Nothing breaks, but the failure mode is a session concluding a
-module is absent and writing a second copy — which is what `docs/module-map.md` is read to prevent,
-and what the One Formula rule calls "a bug by definition".
 
 ### [platform] LB-19 — neither of the two flaky e2e specs was a time budget; one is fixed, one is a repaint race
 

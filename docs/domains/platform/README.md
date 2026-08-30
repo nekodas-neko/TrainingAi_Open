@@ -13,10 +13,10 @@ sleep score is not.
 
 | Area | Where |
 |---|---|
-| Sync & outbox | `lib/sync/`, `lib/local-store/`, `lib/data/postgres/adapter.ts` (`pushMutations`) |
-| Cache | `lib/sqlite/cache.ts`, `lib/cache-groups.ts`, `lib/cache-ttl.ts` |
+| Sync & outbox | `packages/shared/src/sync/`, `lib/local-store/`, `lib/data/postgres/adapter.ts` (`pushMutations`) |
+| Cache | `lib/sqlite/cache.ts`, `lib/cache-groups.ts`, `packages/shared/src/cache-ttl.ts` |
 | Data access | `lib/data/repository.ts`, `lib/data/postgres/` (schema, migrations, client) |
-| Auth & security | `auth.ts`, `lib/security/`, `lib/validation/`, `lib/validators/` |
+| Auth & security | `auth.ts`, `lib/security/`, `packages/shared/src/validation/`, `packages/shared/src/validators/` |
 | AI | `lib/ai/`, `lib/ai-chat/` |
 | Background & SW | `lib/background/`, `lib/sw/`, `app/sw.js/route.ts` |
 | Admin & ops | `lib/admin/`, `app/admin/`, `lib/export/`, `scripts/` |

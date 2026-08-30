@@ -71,9 +71,16 @@ function candidates(text) {
   return out
 }
 
+/**
+ * **No `packages/shared/src/` fallback, deliberately (LA-35).** It used to end this list, so a doc
+ * naming `lib/health/vo2max.ts` resolved against `packages/shared/src/health/vo2max.ts` and passed.
+ * That is not a lenient edge case: it is the ONE error class this map exists to prevent — CLAUDE.md
+ * sends readers here precisely because the monorepo extraction moved that code and the docs kept
+ * saying `lib/` (Q-153). **92 paths across 8 orientation docs were wrong that way and all reported
+ * OK.** With the fallback gone the check says what it claims to say.
+ */
 const resolves = (p) =>
-  [p, `${p}.ts`, `${p}.tsx`, `${p}/route.ts`, `${p}/index.ts`,
-   'packages/shared/src/' + p.replace(/^lib\//, '')].some((v) => existsSync(join(ROOT, v)))
+  [p, `${p}.ts`, `${p}.tsx`, `${p}/route.ts`, `${p}/index.ts`].some((v) => existsSync(join(ROOT, v)))
 
 let checked = 0
 const missing = []
@@ -87,7 +94,13 @@ for (const doc of DOCS) {
 
 if (missing.length > 0) {
   console.error('Orientation index(es) name repo paths that do not exist:\n')
-  for (const m of missing) console.error(`  • ${m.doc}:${m.line}  ${m.p}`)
+  for (const m of missing) {
+    // The hint, not the resolution — the shape `check-claude-md-paths.js` already uses. Saying
+    // "moved to X" makes the failure actionable; ACCEPTING X is what let 108 wrong paths pass.
+    const shared = 'packages/shared/src/' + m.p.replace(/^lib\//, '')
+    const hint = m.p.startsWith('lib/') && existsSync(join(ROOT, shared)) ? `  -> moved to ${shared}` : ''
+    console.error(`  • ${m.doc}:${m.line}  ${m.p}${hint}`)
+  }
   console.error(
     '\nThese documents are read as "what exists and where" before work starts, so a wrong path sends' +
       '\nthe next session looking in the wrong place — or re-implementing what it concludes is absent.' +

@@ -14,7 +14,7 @@ split is "does it feel slow" vs "is it actually slow at the source".
 | Shell & nav | `components/shell/`, `app/(home)/`, `app/more/`, `components/more/` |
 | Home widgets | `components/home/`, `lib/home/` |
 | Primitives | `components/ui/` — **grep here before writing any tab strip, dialog, empty state, collapsible or sparkline** |
-| Theme & background | `components/dynamic-background/`, `app/globals.css`, `lib/ui/` |
+| Theme & background | `components/dynamic-background/`, `app/globals.css`, `packages/shared/src/ui/` |
 | Health surfaces | `components/health/`, `app/health/` — there is no `app/overview/` route (the row named one until 2026-08-18) |
 
 ## Reference docs

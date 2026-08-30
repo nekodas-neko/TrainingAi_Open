@@ -12,10 +12,10 @@ prescription coach, the cardio hub/trends/picker surfaces, and guided walk.
 
 | Area | Where |
 |---|---|
-| Running & walking | `lib/running/`, `lib/walk/` |
+| Running & walking | `packages/shared/src/running/`, `lib/walk/` |
 | GPS & routes | `lib/activity/gps-tracking.ts`, `gps-watchdog.ts`, `route-encoding.ts`, `route-hr-zones.ts`, `scrub.ts`, `treadmill-utils.ts` |
-| Cadence & gait | `lib/activity/cadence-tracker.ts`, `use-cadence-tracking.ts`, `gait-confirm.ts`, `lib/health/cadence.ts`, `gait-classifier.ts` |
-| Fitness & load | `lib/health/vo2max.ts`, `vdot.ts`, `training-stress.ts`, `cardio-trends.ts`, `session-picker.ts`, `fitness-tests.ts`, `lib/fitness-tests/` |
+| Cadence & gait | `lib/activity/cadence-tracker.ts`, `use-cadence-tracking.ts`, `gait-confirm.ts`, `packages/shared/src/health/cadence.ts`, `gait-classifier.ts` |
+| Fitness & load | `packages/shared/src/health/vo2max.ts`, `vdot.ts`, `training-stress.ts`, `cardio-trends.ts`, `session-picker.ts`, `fitness-tests.ts`, `packages/shared/src/fitness-tests/` |
 | UI | `app/cardio/`, `app/running/`, `app/baselines/`, `components/cardio/`, `components/running/`, `components/guided-walk/`, `components/cadence/` |
 
 **ACWR has exactly one implementation** (`computeVolumeAcwr`) and clients render the route's

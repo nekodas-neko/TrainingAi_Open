@@ -11,10 +11,10 @@ inputs — a bug in an input belongs to that input's pillar.
 
 | Area | Where |
 |---|---|
-| Composite & bands | `lib/health/readiness-composite.ts`, `live-readiness.ts`, `recovery-band.ts`, `recovery-index.ts`, `score-band.ts` |
+| Composite & bands | `packages/shared/src/health/readiness-composite.ts`, `live-readiness.ts`, `recovery-band.ts`, `recovery-index.ts`, `score-band.ts` |
 | Stress | `lib/health/daytime-stress.ts`, `daytime-stress-thresholds.ts`, `stress-resilience.ts`, `chronic-stress-assembly.ts` |
-| Temperature | `lib/health/temperature-baseline.ts`, `intraday-temp.ts` |
-| Illness & baselines | `lib/health/illness-radar.ts`, `personal-baseline.ts`, `wear-confidence.ts` |
+| Temperature | `packages/shared/src/health/temperature-baseline.ts`, `intraday-temp.ts` |
+| Illness & baselines | `packages/shared/src/health/illness-radar.ts`, `personal-baseline.ts`, `wear-confidence.ts` |
 | Source availability | `lib/health/score-availability.ts` — which readiness inputs a user has for a day, the confidence band that follows, and `trailingBaselineZ` for building a baseline from a generic series |
 | Body Battery UI | `components/body-battery/`, `components/body-battery-card.tsx` |
 | Body Battery inputs | `packages/shared/src/health/body-battery-inputs.ts` — `resolveBatteryHrMax` (reserve ceiling from observed daily peaks, **not** `resolveMaxHr`) and `batteryConfidence` (is the day's HR series dense enough to mean anything) |
