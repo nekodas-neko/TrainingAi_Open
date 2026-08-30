@@ -1074,6 +1074,44 @@ deliberate choice, on a session where the absence of a Primary is the design.
   outgoing one's role, the prescribed sets and percentages are unchanged, and the session still has
   no Primary afterwards.
 
+### [platform] LB-29 — a preference chosen and then reloaded can be overwritten by the server's older copy
+
+- **Lane:** B
+- **Added:** 2026-08-30 · Lane B, from a CI flake on `meal-label.spec.ts` in PR #643's run.
+- **Reference:** the mechanism is Q-392's, shipped the same day
+  ([journal](overview/entries/2026-08-30-preferences-read-sites.md)).
+
+**The observation.** `meal-label.spec.ts › the chosen label style is remembered` failed with
+`aria-checked="false"` for the full 10 s and passed on retry. It is an assertion failure, not
+infrastructure — and it is the same spec that caught Q-392's first rule being wrong.
+
+**The mechanism, from the code rather than a reproduction.** `savePreference` writes `localStorage`
+synchronously and PATCHes the server fire-and-forget. The spec taps a style and **reloads
+immediately**. On the new page `hydrateUserPreferences` GETs the bag and writes every key it
+carries, unconditionally — so if the PATCH has not landed, the response still holds the *previous*
+style and overwrites the choice the user just made. The sheet then reads the old value.
+
+**Offline it is not a race, it is permanent.** The PATCH never lands, so every launch re-writes the
+server's old value over the device's. That is the same reasoning that retired the first version of
+this rule; the delete case was fixed and the overwrite case was not.
+
+**Recommended fix — a dirty mark, not an outbox.** `savePreferences` records the key as unsynced in
+`localStorage` (so it survives the reload) and clears it when its PATCH resolves. Hydration skips a
+marked key and **re-PATCHes the local value instead of taking the server's**, which also self-heals
+the offline case on the next launch. ~20 lines, no queue and no table, so it does not reopen the
+"not an outbox domain" decision.
+
+- **Two alternatives, and why they lose.** *Seed-if-absent* (hydration only writes a key the device
+  lacks) cannot clobber and exactly satisfies the owner's report — *"a new install or open on
+  computer loses all the saved preferences"* — but gives up cross-device **updates**: change a
+  setting on the phone and the laptop keeps its own forever. *A session-scoped "written here" set*
+  does not work at all, because the reload is what loses the value and the set does not survive it.
+- **Keep:** whether cross-device update is wanted at all is the owner's call, and it decides between
+  the recommendation and seed-if-absent. Ask before building — the two differ in what they promise,
+  not just in how they are written.
+- **Verification:** with the PATCH stubbed to hang, pick a style, reload, and it is still chosen;
+  and with the network off, it survives a second launch.
+
 ### [platform] LB-27 — one extra request during launch strands several for over a minute, and nothing explains why
 
 - **Lane:** A
