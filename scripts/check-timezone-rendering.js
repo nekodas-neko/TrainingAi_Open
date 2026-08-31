@@ -33,7 +33,6 @@ const REVIEWED_BENIGN = new Set([
   'app/session-select/components/week-day-sheet.tsx',      // new Date(y, m - 1, d)
   'components/calendar-widget.tsx',                 // new Date(viewYear, viewMonth - 1, 1) — month label
   'components/nutrition/weekly-nutrition-chart.tsx',// new Date(date + 'T12:00:00') — local noon
-  'components/profile/goals-section.tsx',           // new Date(`${date}T00:00:00`) — no Z, so local
 ]);
 
 // REAL but BLOCKED — this list is now EMPTY, and that is the finished state of Q-148, not an
