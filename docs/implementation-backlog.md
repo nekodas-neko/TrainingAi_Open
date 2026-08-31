@@ -1325,8 +1325,9 @@ opened on, unchanged.
 ### [nutrition][platform] BF-69 — dosed substances are stored but nothing reads them; make exposure an analysable variable
 
 - **Lane:** A for the read model and any schema; B for the supplements-page UI and the trends surface.
-- **Planning item** — a design with one decision in it that invalidates everything downstream if
-  taken wrongly. Needs a planning session.
+- **Planning item — but narrower now.** The storage model is DECIDED (see *Decisions* below);
+  what still needs a planning session is the presence model (unknown vs zero), the trends overlay
+  and the supplements-page UI.
 - **Added:** 2026-08-30 · owner, on starting retatrutide: *"I'd like it to be a value that can be
   correlated to all data… this week I will put it as Reta = 0 so it has a baseline - then next week
   add a dosage; so all that data is compared against its associated value… So I could see periods
@@ -1379,15 +1380,53 @@ log becomes a second *store* of exposure rather than a second *entry point*, the
   logging" — which is exactly the owner's *"selection first to choose dosage"* and is a boolean on
   the attachment rather than a separate feature.
 
-**⚠ Two collisions, read out of `adapter.ts` — both must be settled before this is built.**
+**DECIDED 2026-08-30 (owner) — the storage model, which settles both collisions below with one
+change.**
 
-1. **`logSupplement` re-stamps; it does not add.** The table is `unique(supplement_id, log_date)` and
+- **A day's exposure is an AMOUNT, derived from CONTRIBUTIONS — not a tick, and not a stored total.**
+  Each act of taking something is its own row carrying its amount/unit and **where it came from**
+  (`manual`, or `meal:<food_log_id>`). The day's figure is the sum of the live contributions for that
+  substance, computed on read.
+- **Why amount rather than a tick:** the feature exists for a titrating drug, whose whole story is
+  the dose changing week to week, and a boolean cannot tell it. Amount also *subsumes* the tick —
+  adherence is `amount > 0` — so nothing is lost. The decider was reversal cost, which is badly
+  asymmetric: amount → tick later is trivial, tick → amount later means back-filling doses that were
+  never recorded, which is unrecoverable.
+- **Why contributions rather than provenance on the existing daily row:** a `source` column on one
+  shared row does not help, because two writers still share it and neither can remove only its own
+  half — which is the deletion bug. Separate rows make *delete the meal, keep the hand-logged dose*
+  fall out for free, and make a meal logged twice count twice, correctly.
+- **`source_map` was considered and rejected as the wrong fit.** The ranked per-field merge in
+  `lib/data/health-source.ts` resolves **competing claims about one truth** (which scale is right).
+  Two doses are **independent events that add**, not rivals — so a rank ladder would discard one of
+  them. This is worth stating, because `source_map` is the reflex answer to "multiple writers" in
+  this codebase and it is wrong here.
+- **This is also what keeps the stored-counter rule satisfied:** the daily amount is derived on read,
+  never a number edited by add-on-log and subtract-on-delete.
+
+**Consequences for whoever builds it, none of them optional:**
+- **Lane A, and it is a schema change to a SYNCED domain.** `supplement_logs` is unique on
+  `(supplement_id, log_date)` and that constraint is what has to go. The full chain moves with it —
+  local SQLite table + version, `RECONCILE_TABLES`/`RECONCILE_COLUMNS`, `getSyncDelta`, `pullDelta`,
+  `applyDelta`, the outbox payload, and the `pushMutations` branch — per the offline-sync rules, in
+  the same PR. **Never batch this one.**
+- **Existing rows migrate forward cleanly** as a single `manual` contribution each, preserving the
+  BF-3 dose snapshot. No data is lost and no history is rewritten.
+- **`logSupplement`/`unlogSupplement` become contribution-scoped.** Unlogging from the supplements
+  page removes the `manual` contribution only; deleting a meal removes that meal's contribution only.
+  Neither may soft-delete a day wholesale again.
+
+**⚠ The two collisions the decision above resolves, kept because they are what a reviewer should
+check the implementation against — read out of `adapter.ts`.**
+
+1. **`logSupplement` re-stamps; it does not add** *(resolved by contributions)*. The table is `unique(supplement_id, log_date)` and
    the upsert's own comment says *"the row is one act of taking it"*, re-stamping the dose on a
    second write. So a meal carrying creatine plus a hand-tick on the supplements page the same day
    leaves **one** value, last writer wins — and a meal logged twice records one dose, not two. Decide
    what a day means: *did I take it* (today's model, and fine for adherence) or *how much did I take*
    (what a titration needs, and not representable as things stand).
-2. **`unlogSupplement` soft-deletes the whole day's row**, with no notion of who wrote it. Deleting a
+2. **`unlogSupplement` soft-deletes the whole day's row**, with no notion of who wrote it *(resolved
+   by contributions)*. Deleting a
    meal that carried creatine would wipe a dose the owner also logged by hand. That is silent data
    loss, and it is why **provenance has to exist before a second writer does.**
 
@@ -1429,7 +1468,8 @@ log becomes a second *store* of exposure rather than a second *entry point*, the
   recommend, adjust or comment on dosing, and no LLM-authored line should read as titration advice.
   The existing `PROSE_GUARDS` rule (quote the given numbers, no superlatives) is the closest thing
   to precedent and should bind any generated text about this.
-- **Staging that keeps each step verifiable:** (1) the presence model — `started_on`/`stopped_on`
+- **Staging that keeps each step verifiable:** (0) the contributions migration decided above, which
+  is Lane A and ships alone; (1) the presence model — `started_on`/`stopped_on`
   and an unknown-vs-zero rule, plus the supplements-page UI to set it; (2) a read model exposing one
   daily series per substance; (3) the trends overlay; (4) coach visibility; (5) only then, if it is
   still wanted, any computed statistic.
