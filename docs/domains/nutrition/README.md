@@ -192,6 +192,11 @@ Live at the time of writing (2026-07-30):
   writing an e2e that taps a coordinate**: `Input.dispatchTouchEvent` performs none of
   `locator.tap()`'s actionability checks, and the three gestures that do *not* reproduce BF-61 are
   written down there.
+- **[`docs/overview/entries/2026-08-31-bf-71-clinical-entry.md`](../../overview/entries/2026-08-31-bf-71-clinical-entry.md)**
+  — 🆕 **BF-71**: a measured RMR can now be stored, and it replaces the predicted one in the calorie
+  target — **BMR 1328 / TDEE 1594 against 1485 / 1782 predicted, a 188 kcal/day difference** on the
+  owner's own test. Relevant here because `nutrition-goals/recommend` was already reading
+  `getLatestMeasuredRmr` and getting null every time.
 - **[`docs/overview/entries/2026-08-31-diary-nested-meal-rows.md`](../../overview/entries/2026-08-31-diary-nested-meal-rows.md)**
   — 🆕 **BF-39**: a logged meal draws as **one** diary row, headed by the meal's name and photo, and
   opens to its ingredients. Grouped on `meal_group_id`, never `saved_meal_id`; the name and photo

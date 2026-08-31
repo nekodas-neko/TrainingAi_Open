@@ -10,7 +10,7 @@ import { TTL_MEDIUM, TTL_SHORT } from '@trainingai/shared/cache-ttl'
 import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
 import {
-  Bluetooth, Camera, Check, CloudDownload, Copy, Dumbbell, Info, LogOut, Settings, Shield, Sparkles,
+  Bluetooth, Camera, Check, CloudDownload, Copy, Dumbbell, Info, LogOut, Scan, Settings, Shield, Sparkles,
 } from 'lucide-react'
 import { signOutAndClearDevice } from '@/lib/sign-out'
 import type { AchievementResult } from '@/components/profile/achievements-grid'
@@ -379,6 +379,18 @@ export function ProfileTab({ user, seasons, equippedTitle, friendCode, onUserSav
           icon={Dumbbell}
           label="Sessions, progression &amp; schedule"
           onClick={() => router.push('/program')}
+        />
+      </MoreRowGroup>
+
+      {/* ── Health ────────────────────────────────────────────────────────── */}
+      {/* BF-71: /api/measured-rmr and /api/dexa-scans shipped, and were reachable from nowhere in
+          the app — both tables sat empty in production while every resting rate the app quoted was
+          predicted. This row is the missing half. */}
+      <MoreRowGroup label="Health">
+        <MoreRow
+          icon={Scan}
+          label="DEXA &amp; RMR results"
+          onClick={() => router.push('/more/clinical')}
         />
       </MoreRowGroup>
 

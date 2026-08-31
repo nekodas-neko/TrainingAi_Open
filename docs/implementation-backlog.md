@@ -865,42 +865,37 @@ to repeat that attribution, not to invent one.
   say what caused it or what to take — test that refusal explicitly, with a leading prompt, because a
   guard that has never been attacked has not been tested.
 
-### [body][nutrition] BF-71 — the RMR and DEXA routes shipped without a screen, so both tables are empty
+### [body][nutrition] BF-71 — DEXA and RMR entry (shipped; device check owed)
 
-- **Lane:** B — the entry UI; the API, the schema and the read paths all exist.
+- **Lane:** B
+- **Gate:** device
+- **Keep:** the **device check**, and only that. The screen is built and both tables fill —
+  `More → Health → DEXA & RMR results`, verified end-to-end against the local database with the real
+  2026-08-27 values. What is unverified is how it behaves on the S25: the whole form hangs off
+  `<input type="date">`, whose picker is the control most likely to render differently in Samsung's
+  WebView, and every number field asks for `inputMode="decimal"` because several values are
+  fractional (BMD 1.046, T-score −1.6) — a keypad without a decimal point would make them
+  untypeable. Open the screen, enter a date and a fractional number, and save.
 - **Added:** 2026-08-31 · found answering the owner's question *"is it using the value from the RMR
-  scan + our sedentary level?"* The answer is no, and this is why.
+  scan + our sedentary level?"* The answer was no, because nothing could store one.
 
-**Measured in production, not inferred:** `claude_ro.measured_rmr` returns **0 rows** and
-`claude_ro.dexa_scans` returns **0 rows**. The owner's DEXA and RMR results have been sitting in
-`docs/clinical-baseline-2026-08-27.md` since 2026-08-27 and have never entered the database.
+**What shipped.** `app/more/clinical/` plus the two forms under `components/more/clinical/`, reached
+from a new Health row in More. Both routes, both repository reads and the `nutrition-goals/recommend`
+path that consumes them already existed — the missing piece was only ever the way in, which is why
+this is UI and no schema moved.
 
-**The cause is a missing surface, not a missing feature.** `app/api/measured-rmr/route.ts` and
-`app/api/dexa-scans/route.ts` both exist; `repo.getLatestMeasuredRmr` exists and is already read by
-`app/api/nutrition-goals/recommend/route.ts`. But
-`grep -rn "api/measured-rmr\|api/dexa-scans"` outside `app/api/` returns **nothing** — no client
-code calls either route. The storage half shipped and the way in did not.
+**The cost is now measured rather than predicted.** With the owner's 1,325 kcal and 51.46 kg
+fat-free mass stored, `calculateBaseline` returns **BMR 1328 / TDEE 1594** against **1485 / 1782**
+predicted — a **188 kcal/day** difference, which is exactly what this entry's own arithmetic
+forecast before the feature existed.
 
-**What it costs today, computed rather than estimated.** The owner's measured RMR is **1,325**;
-Cunningham predicts **1,481** for the fat-free mass he was scanned at, so his residual is
-**−156 kcal**. Carried to today's lean mass (71.45 kg at 25.2% → 53.4 kg FFM, Cunningham 1,524),
-`personalRmr` would return **≈1,368** rather than 1,524. Through the same ×1.2 and −200 the app
-already applies, the daily budget would read **≈1,442** instead of the **1,629** on screen —
-**~188 kcal/day**. The app is not wrong about the arithmetic; it is being fed a prediction that runs
-12% above the calorimetry.
+**Deliberately not built:** the twelve per-region bone rows (36 hand-typed fields for data nothing
+reads — BF-41's extraction path fills them), and any photo/upload path, because BF-1's decided rule
+is crop-before-upload and a typed form has no such exposure at all.
 
-- **This is what makes BF-42 unverifiable rather than merely unbuilt.** That entry's verification is
-  *"with a measurement stored, the Energy Balance card and the goal wizard agree"* — which cannot be
-  run at all today. Ship this first.
-- **Recommendation: the smallest honest surface, not a clinical import.** Two forms behind More →
-  a number, a date, and the fat-free mass at test for RMR; the DEXA fields the schema already names.
-  BF-41's extraction-from-a-document path is the larger idea and should not gate the owner being able
-  to type 1,325 in.
-- **⚠ Carry BF-1's decided rule: crop before upload.** If the entry form ever grows a photo path,
-  the document goes to a model — *"redacting after extraction is too late."* A typed form has no such
-  exposure, which is a second reason to ship the typed one first.
-- **Verification:** enter the 2026-08-27 RMR and the DEXA from the clinical baseline doc; both tables
-  hold one row; the goal wizard's BMR changes to the measured value; and BF-42 becomes runnable.
+**Still true and still blocking:** there is no outbox domain behind either route, so an offline save
+fails visibly rather than queueing. Adding one is a local-store table and a sync domain, which is
+Lane A's.
 
 ### [body][nutrition] BF-42 — the daily energy model computes its own BMR and never reads the measured RMR
 

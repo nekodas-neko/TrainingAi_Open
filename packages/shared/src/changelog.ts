@@ -6,6 +6,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.406.0",
+    date: "2026-08-31",
+    changes: [
+      "You can now enter a DEXA scan or an RMR test \u2014 More \u203a Health \u203a DEXA & RMR results. Until now the app had nowhere to put either, so it was estimating your resting metabolic rate even if you had had it measured.",
+      "A measured resting rate replaces the estimate in your calorie target. On the owner's own test that is 1328 rather than 1485, and a daily budget about 188 kcal lower \u2014 the app was not doing the arithmetic wrong, it was being handed a prediction that ran high.",
+      "A scan's body-fat percentage is what your scale gets calibrated against, so entering one makes every later weigh-in read closer to the truth.",
+    ],
+  },
+  {
     version: "1.405.1",
     date: "2026-08-31",
     changes: [

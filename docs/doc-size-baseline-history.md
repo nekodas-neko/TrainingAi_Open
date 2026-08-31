@@ -4696,3 +4696,20 @@ default.
 The decision is reduced to a single question — *when your partner changes a shared meal, should your
 copy change too?* — because that is the one answer that separates finished work plus a code from a
 project with a membership model.
+
+## 2026-08-31 — `projectOverview.md` 8516 → 8519 (BF-71)
+
+**Three lines for one status paragraph, and the length inside them is the point.** BF-71 is the case
+where the code was already right — routes, bounds, repository reads and a consumer that read them —
+and the defect was that nothing called any of it, so two tables sat empty in production and no test
+could fail for it. A shorter paragraph would say "DEXA and RMR entry shipped" and lose the part a
+future session needs: that an empty table is a valid state, so this class does not surface on its
+own. It also carries the measured 188 kcal/day, which is what turns the entry's forecast into a
+result.
+
+**No slack was available to pay for it.** The paragraphs above belong to other branches and are hours
+old; the neighbouring ⚠️ rows are all still owed their own device passes.
+
+**The backlog is re-derived rather than claimed.** BF-71 is rewritten down to its `Keep:` residue —
+the device check, and only that — but two other PRs landed while this one was built, so the file's
+size is theirs more than this branch's.
