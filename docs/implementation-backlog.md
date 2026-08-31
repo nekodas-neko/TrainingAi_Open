@@ -13956,8 +13956,8 @@ reads.
 - **⚠ A SECOND hypothesis is now also falsified — measured 2026-08-31, and this is the useful
   result.** The guess was that `getImageData` returns a **degenerate** buffer under pressure, making
   the ink fraction 0 or 1 so the gate passes on a canvas that was never drawn. The spec now reports
-  the ink at the failing attempt, and a captured failure reads **0.1735** — inside the normal
-  0.172–0.179 band. **The canvas is drawn correctly and the pixels arrive intact.** Capture is
+  the ink at the failing attempt, and two captured failures read **0.1735** and **0.1775** — both
+  inside the normal 0.172–0.179 band, on separate runs and separate commits. **The canvas is drawn correctly and the pixels arrive intact.** Capture is
   eliminated; the fault is in the **decode**.
 - **What that leaves.** ZXing is handed a correct image and returns null. The next step is to keep
   the *failing* canvas rather than measure it: dump the buffer on failure and decode it offline
@@ -13965,6 +13965,10 @@ reads.
   (which decoded under all four, so a passing image is not the one to test). If the failing buffer
   also decodes offline, the fault is in how the decode is invoked in-run rather than in the image or
   the reader.
+- **The geometry split (LB-33) did not touch it, verified against `main` at 59603ba9:** the file's
+  other three tests — *renders a printable label in every style* (all seven), *Save to gallery hands
+  over a PNG*, and *the chosen label style is remembered* — all pass while this one fails. So a red
+  here is this flake and never a regression in the label renderer.
 - **Reproduction, now understood well enough to trigger:** it passes **every** time in isolation and
   fails intermittently when the whole file runs — roughly one run in two. Measured across eleven
   runs. So run the file, not the test.
