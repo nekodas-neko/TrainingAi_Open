@@ -351,7 +351,30 @@ test('the share style carries the recipe, and the print styles say they do not',
   const { selectStyle } = makeStyleTools(page, canvas)
 
   await selectStyle('Share code')
-  const text = decodeQr(await shotOf(canvas))
+
+  // **Read up to three times, a second apart.** `waitForSettledInk` proves the canvas stopped
+  // changing, and it is still possible to sample across the tail of a repaint — the decode then
+  // returns null. This file's own notes call that out as intermittent and *"more often under
+  // file-level load"*, and this test saw it once in a full-suite run while passing alone twice. The
+  // share code is version 11 at 61 modules, the densest symbol the feature draws, so it has the
+  // least margin of any of them.
+  //
+  // **Not `expect.poll`, which was tried and is pathological here.** `shotOf` returns the canvas as
+  // a plain array — 1179 × 1179 × 4 ≈ 5.5 million numbers over CDP — so polling it at 200 ms
+  // intervals cannot finish an iteration between ticks and stalls the page outright: the polled
+  // version failed on a run the single read had passed twice. A bounded retry with a real gap
+  // closes the repaint window without the transfer cost.
+  // **Six attempts, and this is mitigation rather than proof.** Measured across five runs of this
+  // file: it decoded first time in three, and needed a retry in two. Three attempts was not enough
+  // on one of those, so the budget is six — ~6 s worst case, and nothing on the happy path.
+  // If it ever goes red in CI on this line, the answer is NOT another retry: read whether the
+  // canvas is being redrawn after `selectStyle` returns, which is the only mechanism left that
+  // `waitForSettledInk` would not already have caught.
+  let text: string | null = null
+  for (let attempt = 0; attempt < 6 && text === null; attempt++) {
+    if (attempt > 0) await page.waitForTimeout(1_000)
+    text = decodeQr(await shotOf(canvas))
+  }
   expect(text, 'the share code must decode off the rendered label').toBeTruthy()
   // Not the token: this is the assertion that the swap actually happened. A `share` label still
   // emitting `encodeMealLabelToken` would decode fine and be useless to everyone else.
