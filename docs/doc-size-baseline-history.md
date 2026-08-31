@@ -4589,3 +4589,37 @@ them.
 stale while the run that produced it is still finishing: E2E takes about twenty minutes here, and
 two PRs landed inside that window. Re-confirming green on the *updated* head is therefore not a
 formality on this repo — the base can move twice between opening a PR and merging it, and it did.
+
+## 2026-08-31 — `docs/implementation-backlog.md` (BF-71, and BF-42's numbers re-measured)
+
+The owner asked which calorie estimate the budget uses. Answering it required production, not the
+source: `measured_rmr` and `dexa_scans` both hold **0 rows**, and a grep shows no client code calls
+either route — the storage and the API shipped without a way in. That is BF-71, and it is why BF-42
+cannot even be verified today, which re-points BF-42's `Needs:` from BF-33 (shipped) to this.
+
+The arithmetic is written out because it reproduces the screen exactly and that is what makes the
+claim checkable: 71.45 kg at 25.2% → 53.4 kg FFM → Cunningham 1,524 → ×1.2 → −200 = **1,629**, the
+number on the card. With the measurement stored, `personalRmr` would return ≈1,368 and the base would
+read ≈1,442 — a **188 kcal/day** difference.
+
+BF-42's own figures were amended rather than replaced: its 1,481 was Cunningham at the *test-day*
+FFM and is still the right basis for the −156 residual, but its implied live gap was four days stale.
+A prediction that tracks the scale is exactly what a stored figure in a backlog entry cannot do,
+which is now said in the entry.
+
+## 2026-08-31 — third re-merge: `docs/implementation-backlog.md` → 14056, `projectOverview.md` → 8516
+
+**`main` moved a third time inside this PR's CI window** — #675 (the RMR clinical-entry entry),
+docs-only. Both figures re-derived again from the merged documents; `projectOverview.md` is unchanged
+at 8516 because #675 did not touch it, and the backlog still lands under main's baseline (14063 →
+14056) for the same reason as the previous two rounds.
+
+**The pattern is now worth naming, because it is not bad luck.** E2E takes about twenty minutes here
+and docs PRs land every few minutes, so a green result is routinely stale before it can be used —
+three times over, on one PR. Strictly re-merging and re-running the whole gate each time terminates
+only because the landing PRs happened to be small; against a busier hour it would not. **What made
+each round safe to keep short was checking what actually landed**: #675 changed no code, so the
+green on `716cf0b3` was not semantically invalidated and only the mechanical checks — the backlog
+ratchet and the resurrection check — could have been broken by the merge. That is the question to
+ask before deciding how much of the gate to re-run, rather than treating every base move as
+equivalent.
