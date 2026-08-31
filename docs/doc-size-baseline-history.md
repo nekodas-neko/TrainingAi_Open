@@ -4230,3 +4230,25 @@ their own device passes, so there was nothing here this branch could honestly st
 **The backlog falls by BF-66's whole entry.** Nothing is owed past the device check the row above
 now carries, so the entry is removed rather than rewritten to a `Keep:` — the residue lives in
 `projectOverview.md`, and duplicating it in the queue would make an entry that reads as open work.
+
+## 2026-08-31 — backlog 13602 → 13648 and `docs/agents/state/tuning.md` 235 → 256 (the step-goal re-raise)
+
+**No new entry — Q-524 gains an amendment, because the owner re-raised a decision they had already
+made.** That is the first thing the lines buy: a predecessor recommended *"just set it to 7,000"*
+without checking, and 7,000 is `STEP_GOAL_BY_ACTIVITY.sedentary`, a population constant specific to
+nobody. Q-524 has carried the real decision since 2026-08-19. The amendment says so, and the baton
+now carries the procedural rule.
+
+The rest is the two requirements the 2026-08-19 decision does not cover, and both are the kind that
+get rediscovered expensively. **Provenance:** the manual editor and
+`/api/nutrition-goals/recommend:326` write the *same column*, so *"if manual is set, it wins"* is not
+evaluable and an AI review can silently overwrite a deliberate choice — recorded as a code shape, not
+an incident, since the timestamps show they have not collided. **Personalisation:** a step is not
+equal work across people (at 160 cm, 10,000 steps is 6.6 km against ~7.5 at 180), and the arithmetic
+showing the whole 7k-vs-10k argument is worth **~55 kcal/day** is what keeps the decision at its real
+scale.
+
+Two ⛔ traps are worth their length because both are load-bearing and neither is obvious: a step goal
+built to satisfy the whole `activeEnergyGoal` would demand ~20,000 steps/day, and an energy-derived
+step goal makes the Activity Score's `steps` and `activeEnergy` contributors count the same walking
+twice.

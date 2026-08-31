@@ -9004,6 +9004,59 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   feature. **Sequencing note:** once `getDailyGoals` reads the profile, the Activity Score's steps
   contributor changes for every historical day it is recomputed on — expected, and worth stating in
   the changelog because the owner reads that number daily.
+- **⚑ AMENDED 2026-08-31 — the owner re-raised this, and the re-raise adds TWO requirements the
+  decision above does not cover.** *"Ideally there is a setting that either 1. lets you set your own
+  step goal — if 1 is on, that should be the truth — or 2. the AI or logic driven decision to use
+  user data."* That is the 2026-08-19 decision restated, so **the design is settled and the work is
+  simply unbuilt**. What is new:
+
+  **(a) PROVENANCE — manual and AI write the SAME column, so "if 1 is on" cannot currently be
+  evaluated.** `/api/nutrition-goals/recommend:326` writes `stepsGoal: clamped.recommendedStepsGoal`
+  into `users.steps_goal`, and the manual editor writes the manual value into the same column.
+  Nothing records which wrote it. So a later AI review **silently overwrites a deliberate manual
+  choice**, and no surface can tell the owner whether the 7,000 on file is their decision or a stale
+  recommendation. Q-524's *"the AI half already exists and needs no new work"* is true for
+  *computing* the number and **false for the precedence the owner is asking for.** This needs a
+  provenance column (e.g. `steps_goal_source: 'manual' | 'derived'`) — **Lane A, a schema change** —
+  and the AI path must refuse to overwrite a `manual` value, offering it as a suggestion instead.
+  **Not an observed loss:** `last_goal_review_at` is 2026-08-25 while the newest
+  `goal_recommendations` row is 2026-08-11, so the two have not collided in a way this query can see.
+  It is a code shape, not an incident.
+
+  **(b) THE DERIVED NUMBER SHOULD COME FROM ENERGY, NOT A POPULATION BAND.** Owner: *"is that
+  specific to me? if it was someone else would it be higher/lower?"* Today it is **not** specific —
+  `STEP_GOAL_BY_ACTIVITY` is five constants, so two people at the same activity level get the same
+  goal regardless of size. **A step is not equal work across people.** Measured for the owner
+  (71.3 kg, 160 cm, 33 M; Mifflin-St Jeor BMR **1,553 kcal**; stride ≈ 0.66 m, so 1,000 steps ≈
+  **0.66 km**):
+
+  | steps | km | net kcal |
+  |---|---|---|
+  | 4,649 (their median day) | 3.09 | **86** |
+  | 7,000 (`users.steps_goal`) | 4.65 | **129** |
+  | 8,000 (`DEFAULT_STEP_GOAL`) | 5.31 | 147 |
+  | 10,000 (derived from `moderate`) | 6.64 | **184** |
+
+  **At 160 cm a 10,000-step goal is 6.6 km; at 180 cm it is ~7.5 km — the same "goal", ~14% more
+  work.** And the whole 7,000 vs 10,000 argument is worth **~55 kcal/day** to this owner, which is
+  the right scale to hold the decision at: it is small.
+
+  **Recommended shape for the derived path:** express the goal as *the steps needed to contribute a
+  target net walking energy*, with that target a fraction of BMR — the same construction
+  `activeEnergyGoal` already uses (`BMR × 0.24`). That scales with **weight** (energy per km) and
+  **height** (stride → km per step), which is exactly the personalisation asked for, and it reuses an
+  existing formula rather than inventing one.
+
+  **⛔ Two traps for whoever builds (b).** First, **do not target the whole `activeEnergyGoal` with
+  steps**: it is **373 kcal** for this owner and even 12,000 steps yields **221**, so a step goal
+  built to satisfy it would demand **~20,000 steps/day**. The walking target must be a *fraction* of
+  active energy, with training carrying the rest. Second, the Activity Score already scores `steps`
+  (weight 18) **and** `activeEnergy` (weight 15) separately — deriving the step goal from an energy
+  target makes those two contributors measure the same walking twice. **Decide the double-count
+  before shipping**, not after.
+
+  **Sequencing is unchanged:** the single-source read is still the first change and is independent of
+  the formula. Ship precedence first, then provenance, then the formula.
 - **Superseded — the three options as originally posed.** Kept for the reasoning, not the choice:
   (1) the profile value wins everywhere — the owner set it, and it matches Paluch; (2) the derived
   value wins everywhere and the profile field becomes display-only or is removed — but then the

@@ -185,6 +185,27 @@ sleep ✅ · readiness ✅ · activity ✅ · body ✅ · devices ✅ · workout
 - **⛔ `step_live_windows` is effectively empty — 8 rows across 6 days, 7,745 steps total.** It is the
   obvious intraday step source and it reads a flat zero. `body_metrics.steps` is a **running daily
   total** (`updated_at` moves through the day), which is what any intraday step question should use.
+- **⛔ The step-goal design was DECIDED on 2026-08-19 and is unbuilt — do not re-open it, and do not
+  recommend a number.** Q-524 carries the owner's words: *"we need to use 1 number here. The AI
+  should be able to define the number and allow for manual entry."* `users.steps_goal` becomes the
+  single source; `getDailyGoals()` reads it with the derived value as fallback. **A predecessor
+  recommended "just set it to 7,000" and the owner rightly pushed back** — 7,000 is
+  `STEP_GOAL_BY_ACTIVITY.sedentary`, a population constant from Paluch 2022, specific to nobody.
+  **Check the entry for an existing owner decision before recommending anything.**
+- **Manual and AI step goals write the SAME column, so "manual wins" cannot be evaluated today.**
+  `/api/nutrition-goals/recommend:326` and the manual editor both write `users.steps_goal` with no
+  provenance, so an AI review can silently overwrite a deliberate choice. Needs a
+  `steps_goal_source` column — Lane A. **Not an observed loss** (`last_goal_review_at` 2026-08-25 vs
+  newest `goal_recommendations` 2026-08-11); a code shape, not an incident.
+- **A step is not equal work across people, which is the real argument for personalising the goal.**
+  Owner is 160 cm → stride ≈ 0.66 m, so 10,000 steps is **6.6 km** for them and ~7.5 km at 180 cm —
+  the same "goal", ~14% more work. Their numbers: BMR **1,553**, median day 4,649 steps ≈ **86 kcal
+  net**, 7,000 ≈ **129**, 10,000 ≈ **184**. **The whole 7k-vs-10k argument is ~55 kcal/day** — hold
+  the decision at that scale.
+- **⛔ Do not derive a step goal that targets the whole `activeEnergyGoal`** (BMR × 0.24 = **373 kcal**
+  here): 12,000 steps yields 221, so it would demand ~20,000 steps/day. And the Activity Score
+  already scores `steps` (18) **and** `activeEnergy` (15) separately — an energy-derived step goal
+  makes them count the same walking twice. Decide the double-count first.
 - **The owner's step goals are not calibrated to the owner.** Median day **4,649**; 7,000 reached on
   **32%** of days, 10,000 on **15%**. Any change that makes the Activity score stricter (TN-17's
   pacing) turns that from invisible into a tile that reads red most days — which is why TN-17 is
