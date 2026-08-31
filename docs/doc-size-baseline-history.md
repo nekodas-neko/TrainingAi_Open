@@ -5096,3 +5096,25 @@ branch needs a camera, so nothing here has ever scanned a real label. It is guar
 and by unit tests, mutation-checked, and never executed from a scan — which is exactly the kind of
 claim a session has to be able to read before it trusts the feature. The build detail is in the
 journal entry.
+
+## 2026-09-01 — `docs/implementation-backlog.md` (BF-83 and BF-84)
+
+**BF-83** is two screenshots of the same night four minutes apart, and the table is the entry: every
+number moved, *including the 30-night average it is compared against*. Production holds the later
+version. Two mechanisms fit — a still-draining night, or a stale client cache — and `updated_at`
+cannot separate them because all four rows share one bulk-pass timestamp and this repo has already
+recorded that a bulk job bumps that column without rewriting a value. So the entry names the
+one-morning measurement that does separate them rather than picking.
+
+The recommendation holds under either: revalidate on open, and mark the night provisional until the
+ring reports a wake. That is the repo's own partial-day rule — the one written from the Oura
+`wornHours` mistake — arriving on a new surface, and the moving baseline in the table is it happening
+in front of the owner.
+
+**BF-84** looks like a button and is a persistence decision. `lib/home/rest-day.ts`'s own comment
+says `/api/log-rest-day` persists nothing and rest is inferred from gaps, so today's choice is a
+date-stamped `localStorage` flag: invisible to the other device, to a reinstall, and to every
+server-side consumer that might act on it. The owner asking for it in a second place is the signal it
+is deliberate, which argues for storing it — and that turns a Lane B control into a Lane A row. The
+"per session" wording is also flagged as ambiguous, because Home shows one session and the request
+only parses on a list.
