@@ -7,6 +7,7 @@ import { aiModel, loggedGenerateObject } from '@/lib/ai/instrument'
 import { z } from 'zod'
 import type { GeneratedProgram, GeneratedExercise } from '@trainingai/shared/types/builder'
 import { KNOWN_STYLES, GOAL_STYLE_RULES } from '@trainingai/shared/workout/known-styles'
+import { buildExerciseNameResolver, resolveAgainstLibrary } from '@trainingai/shared/workout/exercise-name-resolver'
 import {
   styleWorkSec, workingBudgetMin,
   TRANSITION_SEC_BARBELL, TRANSITION_SEC_STANDARD, TRANSITION_SEC_BODYWEIGHT,
@@ -128,15 +129,10 @@ export async function POST(req: Request) {
     `${ex.name}|${ex.muscles.map(m => `${m.muscle}(${m.role})`).join(',')}|${ex.equipment.map(e => EQUIPMENT_LABEL[e.toLowerCase()] ?? e).join(',')}`)
     .join('\n')
 
-  // Authoritative muscle assignments from the DB — used to override whatever the AI returns.
-  // The AI regularly misattributes muscles (e.g. lists Glutes as main for squats), so we
-  // never trust its mainMuscles/secondaryMuscles output.
-  const exerciseMuscleLookup = new Map(
-    filteredExercises.map(ex => [ex.name, {
-      mainMuscles: ex.muscles.filter(m => m.role === 'main').map(m => m.muscle),
-      secondaryMuscles: ex.muscles.filter(m => m.role === 'secondary').map(m => m.muscle),
-    }])
-  )
+  // The AI regularly misattributes muscles (e.g. lists Glutes as main for squats), so its
+  // mainMuscles/secondaryMuscles output is never read — the library's assignments are written over
+  // it at resolution time below, which is also where the name is repaired to the library's spelling.
+  const nameResolver = buildExerciseNameResolver(filteredExercises)
 
   // Filter style menu to styles the user actually has
   const userStyleNames = new Set(userStyles.map(s => s.name))
@@ -265,9 +261,38 @@ ${exerciseList}`
       }),
     )
 
-    const validNames = new Set(filteredExercises.map(e => e.name))
+    // Rule 2 of the prompt asks for exact names from the list; the model paraphrases anyway. An
+    // exact-match filter used to DROP every paraphrase silently, so a session came back short of
+    // the volume target the time budget was computed from, with nothing saying why. Resolving
+    // first means "Barbell Bench Press" is recognised as the library's "Bench Press" and the
+    // exercise is kept — under the LIBRARY's name, because `personal_records` and
+    // `exercise_estimates` are unique on `(user_id, exercise_name)`, so a paraphrase that survived
+    // would start that lift's history from zero.
+    const unresolved: string[] = []
     for (const sess of raw.sessions) {
-      sess.exercises = sess.exercises.filter(ex => validNames.has(ex.name))
+      const outcome = resolveAgainstLibrary(sess.exercises, nameResolver)
+      sess.exercises = outcome.resolved
+      unresolved.push(...outcome.unresolved)
+    }
+
+    if (unresolved.length > 0) {
+      // Dropping is still the right call for a name the library genuinely does not hold — one lost
+      // accessory should not cost a whole generation — but it must not be silent, or a model that
+      // starts inventing names degrades the programs with no trace anywhere.
+      reportServerError(
+        new Error(`generate-program dropped ${unresolved.length} unresolvable exercise name(s): ${unresolved.slice(0, 10).join(', ')}`),
+        { userId, url: '/api/generate-program' },
+      )
+    }
+
+    const emptySessions = raw.sessions.filter(s => s.exercises.length === 0).map(s => s.name)
+    if (emptySessions.length > 0 || raw.sessions.length === 0) {
+      // A session with no exercises is not a program the user can start — it is a broken artefact
+      // they have to notice and repair by hand. Fail loudly instead of returning it.
+      return NextResponse.json(
+        { error: `The generated program had ${emptySessions.length > 0 ? `no usable exercises for: ${emptySessions.join(', ')}` : 'no sessions'}. Please try again.` },
+        { status: 502 },
+      )
     }
 
     // Map progressionStyleName → progressionStyleId using the user's actual styles
@@ -321,14 +346,13 @@ ${exerciseList}`
               }
             }
             const styleId = styleByName.get(styleName)
-            const libraryMuscles = exerciseMuscleLookup.get(ex.name)
             return {
               name: ex.name,
               exerciseRole: role,
               progressionStyleName: styleName || undefined,
               progressionStyleId: styleId,
-              mainMuscles: libraryMuscles?.mainMuscles ?? ex.mainMuscles ?? [],
-              secondaryMuscles: libraryMuscles?.secondaryMuscles ?? ex.secondaryMuscles ?? [],
+              mainMuscles: ex.mainMuscles,
+              secondaryMuscles: ex.secondaryMuscles,
             }
           }),
         }
