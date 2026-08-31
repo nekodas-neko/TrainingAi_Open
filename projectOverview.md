@@ -24,11 +24,23 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.413.2 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Version:** v1.414.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-08-31.
 
-**Version:** v1.406.1 · **Branch:** `main` · Railway auto-deploys on push to `main`.
-**Last updated:** 2026-08-31.
+**A night that is still filling now says so, and the program builder knows you are injured
+(BF-83, BF-68).** The owner sent two screenshots of the **same night four minutes apart** — 6 h 15 m
+then 7 h 40 m, with the 30-night average it was compared against moving too. The entry offered two
+mechanisms; the answer was a third. Production shows the batch covering the missing 82 minutes was
+**recorded at 6:42**, two minutes before the earlier screenshot: the raw data was there and the
+*row* was stale. So the measure is the **rollup watermark**, which only advances when a run
+completes — a test against the newest ingested sample would have called that night settled four
+minutes before it grew. `/api/sleep-sessions` returns `provisional` per row; the badge and
+excluding a provisional night from its own average are Lane B's. Separately, `injur` appeared
+**zero times** in the whole program-builder path. Both builder routes now filter the **candidate
+list** — not the prompt — with the predicate the mid-workout swap sheet already substitutes by, so
+the builder cannot program an exercise the swap sheet would offer to replace, and a Good Morning
+(a hamstring exercise that loads the back in a secondary role) is excluded where an instruction
+would have missed it ([journal](docs/overview/entries/2026-08-31-lane-a-sleep-provisional.md)).
 
 **A logged meal stops breaking apart, and two nutrition controls stop meaning the wrong thing (BF-72/73/74/76).** The owner's *"it starts as the meal with the image, then breaks into its ingredients"* was the diary hydrating from the server and **omitting `savedMealId`/`mealGroupId`** — a local upsert overwrites every column it is given, so the screen stripped its own grouping and then rendered the stripped copy. There are exactly two `applyDelta` callers and the sync engine's was already correct, so this was the one site BF-39's audit did not reach. The meal photo's ✕ **sat where the sheet's close button would be** — and the sheet passes `hideCloseButton`, so it was the only ✕ on screen: a reach for dismiss deleted the photo. It is a bin at the bottom-right now, with undo. Capture tiles went **60 px → 79 px** and `New` now outranks a small delete bin. **Two findings came out of it that outlive the batch.** `min-h-[Npx]` **does nothing on a `<button>`** — a bare `button { min-height: 48px }` in `globals.css` beats the utility (measured: 48 px on a button, 84 px on a div), so BF-50's documented "62 px" tile actually measured 60; filed as LB-32. And **BF-76's safe-area sweep found the opposite of what it expected** — nothing in nutrition is under-padded, three sheets are *over*-padded by declaring the inset on both the content and the footer, and the `vh`→`dvh` hypothesis is not the mechanism at all, since a bottom sheet is `fixed bottom-0` and its height moves only its top edge. No padding changed: every available fix costs more than the 12–24 px it saves ([journal](docs/overview/entries/2026-08-31-nutrition-uplift.md)).
 

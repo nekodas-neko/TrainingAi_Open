@@ -24,7 +24,7 @@ import { measuredAtMs, dsFromMeasuredAtMs, cadenceSecFromDs, decodeEventBody, he
  *  (812k rows). Exported so callers size their own lookback against it rather than asking for more
  *  and being silently clamped, which is what `maybeRefitDaytimeHrvModel` was doing at 60 days. */
 export const MAX_RAW_SAMPLE_WINDOW_DAYS = 31
-import { classifyClockRegression, resolveDsToMs, resolveMsToDs, type ClockAnchor } from '@/lib/oura-ble/clock'
+import { classifyClockRegression, currentEpoch, resolveDsToMs, resolveMsToDs, type ClockAnchor } from '@/lib/oura-ble/clock'
 import { spo2PctFromR } from '@/lib/oura-ble/spo2'
 import { STEP_FEATURE_TAGS, STEP_MOTION_TAG } from '@/lib/oura-ble/rollup-consumed-tags'
 import { mergeStepCounterWithLive, type StepCountWindow } from '@trainingai/shared/health/step-estimate'
@@ -5235,6 +5235,24 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       rawByTag,
       hasAnchor: !!anchor,
     }
+  }
+
+  /** How far the BLE rollup's derivation has reached, in wall-clock time.
+   *
+   *  The watermark is `anchor.anchorDs` written by a run that COMPLETED, which is what makes it
+   *  the right measure for BF-83's provisional badge: `max(oura_raw_samples.measured_at)` says
+   *  what has been ingested, and on 2026-09-01 that was already 6:38 while the sleep row still
+   *  ended at 4:46, because the rollup had not re-derived from the batch yet. Resolved through
+   *  `resolveDsToMs` rather than a stored timestamp so it cannot go stale when the clock model
+   *  changes — the same reason `getOuraRawSamples` stopped reading `measured_at`. */
+  async getSleepCoverageEnd(userId: string): Promise<Date | null> {
+    const anchors = await this.getOuraClockAnchors(userId)
+    const epoch = currentEpoch(anchors)
+    if (epoch == null) return null
+    const ds = await oura.getOuraRollupWatermark(this.db, userId, epoch)
+    if (ds == null) return null
+    const ms = resolveDsToMs(ds, anchors, epoch)
+    return ms == null ? null : new Date(ms)
   }
 
   async getDaytimeTagCoverage(userId: string, tz: string, days: number): Promise<import('../repository').DaytimeTagCoverage> {
