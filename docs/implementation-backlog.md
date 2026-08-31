@@ -388,6 +388,21 @@ has already recorded that a bulk job bumps `updated_at` without rewriting a valu
   then query `sleep_sessions` for that date immediately. Row already final → (2). Row still short →
   (1).
 
+- **⚑ (2) IS RULED OUT FROM CODE, 2026-08-31 — no waiting for a morning, and this settles the lane.**
+  `app/health/sleep/sleep-content.tsx` seeds from cache and then calls `cachedFetch(...)` **without**
+  `freshWithinTtl`. `lib/sqlite/cache.ts` only short-circuits on a fresh TTL when that flag is
+  passed, so this screen always revalidates over the network on mount — and it carries a
+  `useInvalidationRefetch('sleep-sessions')` listener on top. It is a route, not a persistent tab, so
+  opening it mounts it. **The client cannot have painted a stale row.** The reading changed because
+  the row changed: mechanism (1), the night was still draining at 6:44.
+- **⚑ So the lane is A, and the deliverable is the PROVISIONAL concept, not a refresh.** The
+  recommendation's refresh half is already in place and did not help — a revalidate returns the
+  newest number, which is exactly what made a growing number look final twice. What is missing is
+  the engine knowing whether the ring has reported the wake, so a night can be *labelled* incomplete
+  and **excluded from its own 30-night comparison** (the moving baseline in the table above is that
+  omission, and it is the repo's own partial-day rule). The label is B's; deciding what "complete"
+  means is A's, and nothing can be built until that definition exists.
+
 - **Recommendation, and it holds either way: force a revalidate when the detail opens, and mark the
   night provisional until the ring has reported the wake.** The owner asks for "the final result on
   open", and the honest version of that is *don't call a growing number final* — the app cannot know
