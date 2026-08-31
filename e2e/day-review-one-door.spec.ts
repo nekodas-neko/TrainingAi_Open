@@ -17,11 +17,15 @@ test('the day-review deep link opens the review', async ({ page }) => {
   await page.goto('/nutrition?review=day')
   await settleRouteBoundary(page)
 
-  // Matched on the dialog rather than the heading: the review carries TWO nodes reading "End of
-  // Day" — Radix's sr-only `SheetTitle` and the visible `<h2>` — so a heading query is ambiguous.
-  // That duplication is a real accessibility defect and is filed as LB-23, not fixed here.
   const review = page.getByRole('dialog')
   await expect(review).toBeVisible({ timeout: 60_000 })
+
+  // LB-23: the review used to carry TWO nodes reading "End of Day" — Radix's sr-only `SheetTitle`
+  // and the visible `<h2>` — so a screen reader announced the name twice and a heading query was
+  // ambiguous. `SheetTitle asChild` makes the visible heading *be* the dialog's name, and the count
+  // is the assertion, because one node reading "End of Day" is exactly what was wrong before.
+  await expect(page.getByRole('heading', { name: 'End of Day' })).toHaveCount(1)
+  await expect(review).toHaveAccessibleName(/End of Day/)
   // `Next`, not `Save`: Q-112b made this a stepped sheet and step 1 is the read-through. `Save`
   // lives on the last step, which is what `day-review-read-through.spec.ts` walks to.
   await expect(review.getByRole('button', { name: 'Next' })).toBeVisible()

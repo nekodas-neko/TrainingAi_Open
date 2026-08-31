@@ -1,6 +1,6 @@
 import { test, expect, type Page } from '@playwright/test'
 import { Client } from 'pg'
-import { SEED_EMAIL, settleRouteBoundary } from './fixtures'
+import { SEED_EMAIL, settleRouteBoundary, stableBox, tapCentre } from './fixtures'
 
 /**
  * The quantity editor's Option A layout, and the ingredient row that stopped saying "serving"
@@ -84,8 +84,7 @@ async function tap(page: Page, target: ReturnType<Page['getByRole']>) {
   await expect(target).toBeVisible({ timeout: 30_000 })
   await target.evaluate(el => el.scrollIntoView({ block: 'center' }))
   await page.waitForTimeout(250)
-  const box = (await target.boundingBox())!
-  await page.touchscreen.tap(box.x + box.width / 2, box.y + box.height / 2)
+  await tapCentre(page, target)
 }
 
 /**
@@ -156,8 +155,8 @@ test('the editor is Option A: named macros, the calories alone, the toggle besid
   // vertically overlapping it, not in a row of its own underneath.
   const srv = sheet.getByRole('tab', { name: 'srv' })
   await expect(srv).toBeVisible()
-  const stepperBox = (await stepper.boundingBox())!
-  const srvBox = (await srv.boundingBox())!
+  const stepperBox = await stableBox(stepper)
+  const srvBox = await stableBox(srv)
   expect(srvBox.x, 'the toggle sits to the right of the stepper').toBeGreaterThan(stepperBox.x + stepperBox.width)
   expect(srvBox.y, 'and beside it, not below').toBeLessThan(stepperBox.y + stepperBox.height)
 

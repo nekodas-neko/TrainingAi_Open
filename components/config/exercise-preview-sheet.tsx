@@ -1,21 +1,17 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useMemo } from "react";
 import Image from "next/image";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Loader2, Dumbbell } from "lucide-react";
 import type { ExerciseLibraryEntry } from "@trainingai/shared/types/program";
+import { useExerciseMediaFor } from "@/lib/hooks/use-exercise-media";
 
 const EQUIPMENT_LABELS: Record<string, string> = {
   barbell: "Barbell", dumbbell: "Dumbbell", cable: "Cable",
   machine: "Machine", kettlebell: "Kettlebell", bodyweight: "Bodyweight",
 };
-
-interface GifState {
-  gifUrl: string | null;
-  loading: boolean;
-}
 
 interface ExercisePreviewSheetProps {
   open: boolean;
@@ -25,16 +21,9 @@ interface ExercisePreviewSheetProps {
 }
 
 export function ExercisePreviewSheet({ open, onOpenChange, exercise, onSelect }: ExercisePreviewSheetProps) {
-  const [gif, setGif] = useState<GifState>({ gifUrl: null, loading: false });
-
-  useEffect(() => {
-    if (!open || !exercise) { setGif({ gifUrl: null, loading: false }); return; }
-    setGif({ gifUrl: null, loading: true });
-    fetch(`/api/exercise-gif?name=${encodeURIComponent(exercise.name)}`)
-      .then(r => r.ok ? r.json() : null)
-      .then(d => setGif({ gifUrl: d?.gifUrl ?? null, loading: false }))
-      .catch(() => setGif({ gifUrl: null, loading: false }));
-  }, [open, exercise?.name]);
+  // Nothing to fetch while the sheet is shut — the name it would fetch is the one behind it.
+  const previewName = useMemo(() => (open ? exercise?.name ?? null : null), [open, exercise?.name]);
+  const gif = useExerciseMediaFor(previewName);
 
   if (!exercise) return null;
 
@@ -58,15 +47,15 @@ export function ExercisePreviewSheet({ open, onOpenChange, exercise, onSelect }:
         <div className="flex-1 overflow-y-auto">
           {/* GIF */}
           <div className="relative bg-muted flex items-center justify-center" style={{ minHeight: 220 }}>
-            {gif.loading ? (
+            {gif.loading && !gif.media.gifUrl ? (
               <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-            ) : gif.gifUrl ? (
+            ) : gif.media.gifUrl ? (
               <Image
-                src={gif.gifUrl}
+                src={gif.media.gifUrl}
                 alt={exercise.name}
                 fill
                 sizes="100vw"
-                unoptimized={gif.gifUrl.endsWith('.gif')}
+                unoptimized={gif.media.gifUrl.endsWith('.gif')}
                 className="object-contain"
               />
             ) : (

@@ -4485,6 +4485,71 @@ rather than left to conflict.
 
 Also note the batch checker earned its keep here: `nutrition-ui-uplift` is Lane B and BF-70 is Lane
 A, and it refused the mix rather than letting a batch become a PR that cannot ship as one.
+
+## 2026-08-31 — `projectOverview.md` 8468 → 8493, `docs/implementation-backlog.md` 13754 → 13726 (BF-65)
+
+**Twenty-five lines: a status paragraph and a Known-Issues row, and the row is the one that had to
+be written long.** BF-65 is JS-only, so it reaches the phone on the next deploy and is
+device-*unverified* rather than device-*blocked* — the case the Canonical Runtime rule says must buy
+a row. What the row spends its length on is the thing a shorter version would drop: **the dataset
+host is dropped by the sandbox's egress proxy, so every clip renders blank here**, and the way that
+was established as the environment rather than the change was seeing the warm-up screen's own
+untouched thumbnails fail identically. A row saying only "not device-verified" would leave the next
+session to re-derive that, and the obvious first guess — that the new component is broken — is
+wrong.
+
+**No slack was available.** The status paragraphs above it are hours old and belong to other
+branches, and the neighbouring ⚠️ rows are all still owed their own device passes.
+
+**The backlog falls despite BF-65 staying.** The entry is rewritten to its `Keep:` residue — the
+device check, and only that — which is shorter than the plan it replaces. It stays queued rather
+than being removed because a clip that has never been seen moving is not finished.
+
+(Backlog figures re-derived on the merge: four PRs landed while this branch's E2E ran, so the
+branch's own 13602 → 13574 was against a base that no longer exists. The drop is the same 28 lines
+either way.)
+
+
+## 2026-08-31 — `projectOverview.md` 8493 → 8497 (LB-23, LB-30)
+
+**Four lines for two status paragraphs, because one of them is a finding rather than a shipping
+note.** CI went red on the exact test LB-30 was filed to describe, on the line the fix was already
+written for — and the thing worth recording is that the same test **passes three times over
+locally**. A session that reads only "flaky, fixed" will re-dismiss the next one; the paragraph
+exists to say that a local pass is not evidence against a race that only a slow runner opens.
+
+The backlog is not listed here: LB-23 and LB-30 were removed and BF-46 was rewritten to its `Keep:`
+residue, but four PRs landed in parallel and the file's size is theirs more than this branch's, so
+the number is re-derived on the merge rather than claimed as a delta.
+
+**The baton was trimmed rather than raised.** The LB-30 gotcha earns a line; two older ones were
+reflowed to pay for it, so the file sits back on 126.
+
+## 2026-08-31 — `docs/implementation-backlog.md` 13762 → 13819 (LB-31)
+
+**Fifty-six lines for one entry, and the length is the point.** LB-31 records a red `Tests` check
+that took an hour to place, and most of that hour went into two hypotheses that turned out to be
+wrong — a stale local fixture, then the fresh-CI-database difference. Both were tested and both are
+dead, and the entry says so explicitly, because the next session's instinct will be to try exactly
+those two first.
+
+It carries two findings. The narrow one is a test whose precondition is destroyed by a persisting
+side effect of the route it tests. The durable one is that `ci.yml` has no `push: [main]` trigger
+— correctly, and for reasons written into the workflow — so nothing verifies the *combination* after
+several independently-green PRs land together. Five merged during this PR's own CI runs. That
+defect first appears on the next contributor's PR, on code they never touched.
+
+## 2026-08-31 — no baseline change; LB-31 corrected in place after the re-run
+
+The failed `Tests` job was re-run on the identical commit and **passed**, so the body-battery
+failure is a flaky test rather than the red `main` the first reading of it suggested. LB-31 and the
+`projectOverview.md` paragraph are corrected to say the weaker true thing, and the correction is
+recorded here rather than made silently — the earlier framing went into a commit message and a PR
+comment, and a session reading only those would go looking for a defect on `main` that is not there.
+
+Both files came out roughly even (`projectOverview.md` 8497 → 8495, under its baseline), so nothing
+is raised.
+
 ## 2026-08-31 — final figures after batching three Tuning PRs into one: backlog → 13974, `docs/agents/state/tuning.md` → 316, `projectOverview.md` → 8485
 
 **The three notes above (TN-18 / four-tiles-at-55, the HRV tile question, the step-goal re-raise and
@@ -4498,3 +4563,75 @@ and each lost the rebase race in turn — three attempts, three conflicts, no me
 (LA-33) removed the conflict between PRs touching *different* documents; it cannot help PRs touching
 the *same* one. **A run of same-file docs PRs from one agent should be batched from the start** rather
 than opened separately and rebased serially.
+
+## 2026-08-31 — `projectOverview.md` → 8512, `docs/implementation-backlog.md` → 13967 (BF-65/LB-23/LB-30/LB-31 re-merged onto the Tuning batch)
+
+**Neither number is this branch's delta; both are re-derived from the merged documents.** The two
+sides each raised `projectOverview.md` and the raises are additive — this branch's four status
+paragraphs (BF-65's clip, LB-23/LB-30, and LB-31's filing plus its correction) against the Tuning
+batch's own — so the merged file is above both sides' baselines rather than either one's.
+
+**The backlog falls on the same merge (13974 → 13967) even though the Tuning batch raised it**,
+because this branch removes LB-23 and LB-30 outright and rewrites BF-65 and BF-46 down to their
+`Keep:` residue. Two PRs moving one file in opposite directions is exactly the case a re-derivation
+answers and a resolved-to-one-side hunk does not.
+
+**The re-merge itself was not optional and not a CI trigger.** GitHub created no workflow run
+repo-wide between 03:26 and 06:11, which swallowed this PR's third push: a run for that commit will
+never appear, because Actions does not create one retroactively. The standing rule already requires
+re-merging `main` immediately before a merge and re-confirming green on the *updated* head, and
+`main` had genuinely moved by one commit (#670), so the merge is the work the rule asks for and the
+run is a consequence of it. An empty commit would not have been.
+
+## 2026-08-31 — second re-merge, final figures: `projectOverview.md` → 8516, `docs/implementation-backlog.md` → 14010
+
+**Supersedes the 8512 / 13967 figures in the note above.** Those were correct for the merge against
+`main` at #670; `main` then took #673 and #674 (the DEXA plan and the body-fat calibration) while
+this PR's E2E job ran, so the numbers were re-derived a second time against the newer base. Nothing
+about the resolution changed — both are still counted from the merged documents rather than resolved
+to a side.
+
+**The backlog still falls (14017 → 14010) and `projectOverview.md` still rises (8485 → 8516)**, for
+the same reason as before: this branch removes two entries and cuts two more to their `Keep:`
+residue, while its four status paragraphs are additive against the DEXA ones landing beside them.
+The status section is newest-first and this branch merges after #674, so its paragraphs sit above
+them.
+
+**The durable note is about the re-merge treadmill, not the arithmetic.** A green CI result goes
+stale while the run that produced it is still finishing: E2E takes about twenty minutes here, and
+two PRs landed inside that window. Re-confirming green on the *updated* head is therefore not a
+formality on this repo — the base can move twice between opening a PR and merging it, and it did.
+
+## 2026-08-31 — `docs/implementation-backlog.md` (BF-71, and BF-42's numbers re-measured)
+
+The owner asked which calorie estimate the budget uses. Answering it required production, not the
+source: `measured_rmr` and `dexa_scans` both hold **0 rows**, and a grep shows no client code calls
+either route — the storage and the API shipped without a way in. That is BF-71, and it is why BF-42
+cannot even be verified today, which re-points BF-42's `Needs:` from BF-33 (shipped) to this.
+
+The arithmetic is written out because it reproduces the screen exactly and that is what makes the
+claim checkable: 71.45 kg at 25.2% → 53.4 kg FFM → Cunningham 1,524 → ×1.2 → −200 = **1,629**, the
+number on the card. With the measurement stored, `personalRmr` would return ≈1,368 and the base would
+read ≈1,442 — a **188 kcal/day** difference.
+
+BF-42's own figures were amended rather than replaced: its 1,481 was Cunningham at the *test-day*
+FFM and is still the right basis for the −156 residual, but its implied live gap was four days stale.
+A prediction that tracks the scale is exactly what a stored figure in a backlog entry cannot do,
+which is now said in the entry.
+
+## 2026-08-31 — third re-merge: `docs/implementation-backlog.md` → 14056, `projectOverview.md` → 8516
+
+**`main` moved a third time inside this PR's CI window** — #675 (the RMR clinical-entry entry),
+docs-only. Both figures re-derived again from the merged documents; `projectOverview.md` is unchanged
+at 8516 because #675 did not touch it, and the backlog still lands under main's baseline (14063 →
+14056) for the same reason as the previous two rounds.
+
+**The pattern is now worth naming, because it is not bad luck.** E2E takes about twenty minutes here
+and docs PRs land every few minutes, so a green result is routinely stale before it can be used —
+three times over, on one PR. Strictly re-merging and re-running the whole gate each time terminates
+only because the landing PRs happened to be small; against a busier hour it would not. **What made
+each round safe to keep short was checking what actually landed**: #675 changed no code, so the
+green on `716cf0b3` was not semantically invalidated and only the mechanical checks — the backlog
+ratchet and the resurrection check — could have been broken by the merge. That is the question to
+ask before deciding how much of the gate to re-run, rather than treating every base move as
+equivalent.

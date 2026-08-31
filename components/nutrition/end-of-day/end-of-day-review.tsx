@@ -225,11 +225,10 @@ export function EndOfDayReview({ open, onClose, mealTypes, logs, date, userId, t
         style={{ background: pageGradient }}
         hideCloseButton
       >
-        <SheetTitle className="sr-only">End of Day</SheetTitle>
         <div className="flex items-center justify-between px-4 pt-4 pb-3 shrink-0">
           <div className="flex items-center gap-2">
             <Moon className="w-4 h-4 text-brand" />
-            <h2 className="text-base font-semibold">End of Day</h2>
+            <SheetTitle asChild><h2 className="text-base font-semibold">End of Day</h2></SheetTitle>
             <span className="text-xs text-muted-foreground">· {STEP_TITLES[step]}</span>
           </div>
           <button onClick={onClose} aria-label="Close" className="min-w-[48px] min-h-[48px] flex items-center justify-center text-muted-foreground hover:text-foreground">

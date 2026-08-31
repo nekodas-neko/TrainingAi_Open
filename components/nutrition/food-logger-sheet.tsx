@@ -244,9 +244,8 @@ export function FoodLoggerSheet({ open, preselectedMealTypeId = null, onClose, o
           one too would stack an empty shell behind it and cost a back press to get through. */}
       <Sheet open={open && step !== 'capture'} onOpenChange={o => !o && handleClose()}>
         <SheetContent side="bottom" className="rounded-t-2xl max-h-[90vh] flex flex-col p-0 bg-secondary border-t border-border/70" hideCloseButton>
-          <SheetTitle className="sr-only">{STEP_LABELS[step]}</SheetTitle>
           <div className="flex items-center justify-between px-4 pt-4 pb-2 shrink-0">
-            <h2 className="text-base font-semibold">{STEP_LABELS[step]}</h2>
+            <SheetTitle asChild><h2 className="text-base font-semibold">{STEP_LABELS[step]}</h2></SheetTitle>
             <button onClick={handleClose} aria-label="Close" className="p-2.5 text-muted-foreground hover:text-foreground">
               <X className="w-5 h-5" />
             </button>

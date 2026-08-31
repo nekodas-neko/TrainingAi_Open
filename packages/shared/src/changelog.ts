@@ -6,12 +6,27 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: "1.405.0",
+    version: "1.405.2",
     date: "2026-08-31",
     changes: [
       "Your calorie and protein goals, energy balance and body-composition panel now use a body fat corrected against your DEXA scan instead of the scale's own estimate — worth about 59 kcal/day at the measured 3.2-point gap",
       "The scale's raw reading is never overwritten: the correction is applied when a number is derived, so entering a second scan later re-corrects your whole history",
       "Readings from a scale the DEXA has not been compared against are left alone rather than corrected on a guess",
+    ],
+  },
+  {
+    version: "1.405.1",
+    date: "2026-08-31",
+    changes: [
+      "Sheets that open over a screen \u2014 End of Day, the morning check-in, Log Food \u2014 no longer announce their own title twice to a screen reader. Nothing looks different; it was being said once as the panel's name and again as its heading.",
+    ],
+  },
+  {
+    version: "1.405.0",
+    date: "2026-08-31",
+    changes: [
+      "The ready screen before each exercise now shows the movement. The clip plays beside the exercise name, and tapping it opens a bigger one \u2014 the warm-up screen has already downloaded it, so it appears straight away and still plays with no signal.",
+      "It costs nothing on screen: the set targets that used to be cut off behind the buttons now fit.",
     ],
   },
   {
