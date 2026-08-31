@@ -4395,7 +4395,10 @@ intuited, but nothing in the app computes it and it does not belong on a tile la
 
 - **Branch:** _unassigned_ · **Added:** 2026-08-26 · owner design: *"from wakeup you start close to 100; then as time goes on it lowers unless you do all parts of what's needed"*
 - **Lane: A** — the score is computed server-side in `packages/shared/src/health/activity-score.ts`
-- **Needs: Q-524** — three step goals are live at once; a pace score makes which one is real load-bearing
+- **Needs: Q-524** — three step goals are live at once; a pace score makes which one is real load-bearing.
+  **Q-524's last open half closed 2026-08-31: MANUAL WINS** (owner signed off there), so the goal this
+  paces against is whatever the owner has set by hand — 7,000 today — and an AI review cannot move it
+  underneath the pacing. **Nothing on this entry is gated on the owner any more.**
 - **✅ Gate: owner ANSWERED 2026-08-30 — the goal stays 7,000.** *"7000 was the goal determined by
   science right… for me personally im happy with that number and would aim to get that."* **Build the
   pace-to-goal mechanic against 7,000.** The entry's objection — that a goal missed two days in three
@@ -9587,6 +9590,19 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   step goal — if 1 is on, that should be the truth — or 2. the AI or logic driven decision to use
   user data."* That is the 2026-08-19 decision restated, so **the design is settled and the work is
   simply unbuilt**. What is new:
+
+  **✅ OWNER SIGNED OFF 2026-08-31 — MANUAL WINS.** Asked plainly and answered: *"yes, manual wins —
+  record that as my decision."* This is the half the 2026-08-19 decision left unstated, and it is now
+  a decision rather than an inference from conversation. **What it binds:**
+  - A step goal the owner set by hand is **authoritative** and no automated path may overwrite it.
+  - The AI/derived path may **offer** a number — a suggestion the owner can accept — and may **fill**
+    the goal only while no manual value has been set.
+  - Accepting a suggestion makes it **manual** from that point on; it does not stay derived.
+  - Clearing the manual value returns the goal to the derived path. **There must be a way back** —
+    a one-way door here means a bad hand-entered number can never be replaced by a better computed
+    one, which is the failure this precedence otherwise invites.
+
+  **Lane A has everything it needs; nothing further is gated on the owner.**
 
   **(a) PROVENANCE — manual and AI write the SAME column, so "if 1 is on" cannot currently be
   evaluated.** `/api/nutrition-goals/recommend:326` writes `stepsGoal: clamped.recommendedStepsGoal`
