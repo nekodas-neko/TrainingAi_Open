@@ -4252,3 +4252,22 @@ log already contains supplement rows, so the "picked up from the nutrition log" 
 double-count risk; and the "like a total calorie value" analogy needs adjusting, because doses do not
 sum across substances — what transfers is the shape (one number per substance per day), not the
 total.
+
+## 2026-08-30 — `docs/implementation-backlog.md` (BF-69 gets the owner's join, and two collisions)
+
+The owner answered how the food log should reach the exposure series: attach supplements to a meal or
+saved meal, and logging the meal logs the dose. Recorded verbatim, because it dissolves the
+double-count by construction — one table, two entry points — and the rule that makes it work is worth
+stating outright: a supplement attached to a meal writes a `supplement_logs` row and never a
+`food_items` row.
+
+What grew the entry is two collisions read out of `adapter.ts` rather than guessed. `logSupplement`
+**re-stamps** rather than adds — its own comment says the row is one act of taking it — so a
+meal-carried dose plus a hand-tick is one value, last writer wins. And `unlogSupplement` soft-deletes
+the whole day with no notion of who wrote it, so deleting a meal would wipe a hand-logged dose. Both
+are silent, and both are only visible from the adapter, which is the argument for putting them in the
+entry rather than leaving them for the implementer.
+
+Two in-repo rules are cited because they answer the obvious fixes: stored counters have all drifted
+here, so the day's amount must be derived rather than accumulated; and the ranked per-field merge with
+`source_map` is the existing multi-writer provenance pattern that `supplement_logs` lacks.
