@@ -1,6 +1,6 @@
 # 2026-09-01 — the quantity box centres, and the reset it needed has one definition
 
-**Branch:** `fix/bf-85-quantity-box-centring` · **Entry:** BF-85 · **Lane:** B · **Version:** v1.413.3
+**Branch:** `fix/bf-85-quantity-box-centring` · **Entry:** BF-85 · **Lane:** B · **Version:** v1.414.2
 
 ## The report
 
@@ -48,9 +48,9 @@ rules are still generated with the change in place.
 
 ## Verification
 
-- `pnpm check:rules` — **Ran 66 of 66 Custom Rules steps** (the count moved from 65 while this was in
-  progress; it is read from the runner for exactly that reason). `tsc`, ESLint and the backlog check
-  all exit 0.
+- `pnpm check:rules` — **Ran 67 of 67 Custom Rules steps** (the count moved 65 → 66 → 67 while this
+  was in progress, twice from other agents' merges; it is read from the runner for exactly that
+  reason). Full unit suite green, `tsc`, ESLint and the backlog check all exit 0.
 - **Four source guards, all five mutations killed** — dropping the reset at either site, re-inlining
   the classes instead of importing them, dropping the `!` from `!text-sm`, and trimming the constant
   to `appearance:textfield` without the pseudo-element.
