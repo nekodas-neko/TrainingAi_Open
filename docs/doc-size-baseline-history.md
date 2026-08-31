@@ -5187,3 +5187,14 @@ outright would have deleted the Lane B obligations with them.
 
 `projectOverview.md` is a net +9 against +12 added: the status section carried **two** `**Version:**`
 lines, v1.413.2 and a stale v1.406.1 below it, and the second was removed.
+
+## 2026-08-31 — `docs/implementation-backlog.md` 14506 → 14528, `projectOverview.md` 8557 → 8572
+
+`lane-a/renderer-recovery` (BF-80). BF-80's entry traded its "deliberately not batched" paragraph
+for a `Keep:` describing what shipped, so the backlog's growth is Q-220 gaining a measurement: the
+`projectOverview.md` **Current Status** section is a 740-line log of **142 dated blurbs**, which
+none of that entry's three levers touch and which the file's own header tells sessions not to write.
+
+`projectOverview.md` grew by exactly the blurb this session added to that section — i.e. it is an
+instance of what the note above describes, raised rather than hidden. Trimming it is Orchestrator's
+sweep, not a native-fix PR's.

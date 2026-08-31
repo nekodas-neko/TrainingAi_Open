@@ -331,6 +331,18 @@ Live at the time of writing (2026-07-30):
 
 ## Gotchas specific to this domain
 
+- **A dead WebView render process is FATAL by default, not silent (BF-80).** Capacitor's
+  `BridgeWebViewClient` already forwards `onRenderProcessGone` to its `WebViewListener`s, and
+  `WebViewListener`'s own default returns `false` — which the platform reads as "kill the app". So
+  grepping `android/` for `RenderProcess` finding nothing does **not** mean the event is unhandled
+  plumbing waiting to be added; it means the default answer is in force.
+  `RenderProcessRecovery.java` is the listener that changes it: `return true`, record the death,
+  and **post** `activity.recreate()` — posted because the callback runs on the UI thread with the
+  dying WebView on the stack, and `recreate()` rather than `reload()` because a WebView whose
+  renderer has gone is permanently unusable. Anything that reports a fault has to record it
+  natively: the JS reporter dies with the renderer, which is why a repeatedly-reported blank screen
+  had never produced a single `error_events` row.
+
 - **A bare `toLocaleDateString`/`toLocaleTimeString` call with no `timeZone` option is a hydration
   mismatch waiting to happen, not just a wrong-answer bug** — Railway sets no `TZ` env var, so the
   Node server renders in **UTC** while the S25 renders in the app's real timezone
