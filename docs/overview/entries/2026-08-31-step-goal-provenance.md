@@ -30,12 +30,23 @@ at 180 cm it is ~7.5 km — the same goal, ~14% more work.
 
 | steps | km | net kcal |
 |---|---|---|
-| 4,649 (median day) | 3.09 | **86** |
-| 7,000 | 4.65 | **129** |
-| 10,000 | 6.64 | **184** |
+| 4,649 (median day) | 3.43 | **95** |
+| 7,000 | 5.17 | **143** |
+| 10,000 | 7.39 | **205** |
 
-**The entire 7k-vs-10k argument is worth ~55 kcal/day** to this owner, which is the right scale to
-hold it at. Recommended shape: derive the goal from a *target net walking energy expressed as a
+**The entire 7k-vs-10k argument is worth ~62 kcal/day** to this owner, which is the right scale to
+hold it at.
+
+**⚑ Those figures use the owner's MEASURED stride, which was derived later the same day** after they
+asked whether strap cadence could give a real one. It can: **0.739 m against the `0.415 × height`
+estimate's 0.664 — the estimate was 10.1% short**, so a first version of this entry understated every
+distance and calorie by that much. Working:
+[`2026-08-31-measured-stride-from-cadence.md`](../../reviews/2026-08-31-measured-stride-from-cadence.md).
+Two independent extractions agree to 0.3% (3 sessions, 16 segments), and `cadence × duration`
+reproduces recorded steps to +0.13%. **But stride correlates with pace at r = −0.885** — 0.83 m at
+10:00/km against 0.62 m at 14:00/km — and the tracked walk is only **27–94% of a day's steps**
+(median ~48%), so the rest of the day sits at an unknown, slower stride that nothing stored can
+measure. Recommended shape: derive the goal from a *target net walking energy expressed as a
 fraction of BMR* — the construction `activeEnergyGoal` already uses — so it scales with weight and
 height and reuses an existing formula.
 
@@ -50,4 +61,5 @@ same walking twice.
 them.** No code ran — SQL against production plus source reading; no `pnpm dev`, no device, no APK.
 **The calorie figures are textbook walking-economy arithmetic (~0.57 kcal/kg/km, net of resting), not
 a measurement of this owner** — `active_calories` is present on only 8 of 51 days, so they could not
-be validated against observation.
+be validated against observation. **The stride behind them IS measured**, but from 3 sessions and 16
+segments (2 sessions for the pace relation), on GPS distance that is itself unvalidated.

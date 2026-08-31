@@ -185,6 +185,23 @@ sleep ✅ · readiness ✅ · activity ✅ · body ✅ · devices ✅ · workout
 - **⛔ `step_live_windows` is effectively empty — 8 rows across 6 days, 7,745 steps total.** It is the
   obvious intraday step source and it reads a flat zero. `body_metrics.steps` is a **running daily
   total** (`updated_at` moves through the day), which is what any intraday step question should use.
+- **The owner's stride is MEASURED, 0.739 m — do not use `0.415 × height` (0.664), it is 10.1% short.**
+  `activity_logs` stores `distance_km` + `steps` + `cadence_spm` + `duration_min` on one row and
+  `segments` carries `distanceKm` + `avgCadenceSpm` per interval. Two extractions agree to **0.3%**
+  (3 sessions, 16 segments) and `cadence × duration` reproduces recorded steps to **+0.13%**, so the
+  cadence path is trustworthy where `steps` is null.
+  [`review`](../../reviews/2026-08-31-measured-stride-from-cadence.md).
+- **⛔ But one stride constant is still wrong: stride vs pace is r = −0.885**, −0.052 m per min/km —
+  **0.83 m at 10:00/km, 0.62 m at 14:00/km**, a 33% spread. The measured sessions are deliberate
+  walks (10–15 min/km); **incidental steps are slower and shorter**, so 0.739 over a whole day
+  overstates distance. **The tracked walk is only 27–94% of a day's steps (median ~48%)** and nothing
+  stored can measure the rest — `step_live_windows` and `body_metrics.steps` carry steps with no
+  distance. State that half as an assumption; do not derive false precision from the walk data.
+- **A stride estimate needs a freshness rule** — it is leg length *and* habitual pace, so it drifts
+  with fitness. Same trap as `HR_REST_THRESHOLD` (Q-515). Trailing window, never stored once.
+- **⚠ `activity_logs` 2026-07-01 is CORRUPT** — 4,970 steps over 3.30 km in **0.2 minutes**, and more
+  steps than `body_metrics` holds for the whole day (1,358). Excluded from every stride figure. Any
+  per-user derivation needs a sanity gate (plausible cadence, walk steps ≤ day steps).
 - **⛔ The step-goal design was DECIDED on 2026-08-19 and is unbuilt — do not re-open it, and do not
   recommend a number.** Q-524 carries the owner's words: *"we need to use 1 number here. The AI
   should be able to define the number and allow for manual entry."* `users.steps_goal` becomes the
