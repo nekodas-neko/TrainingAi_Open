@@ -5087,3 +5087,12 @@ stops at the current hour on purpose (and why that is the design rather than a n
 device write path has not run because `getLocalStore` is null on web, and that Q-354 silently
 swallows `locator.click()` on this screen — which is a trap for the next spec author, not a
 user-facing bug. The build detail is in the journal entry and `docs/module-map.md`.
+
+## 2026-08-31 — projectOverview.md 8543 → 8548 (+5)
+
+LB-34's Known-Issues row, on `fix/shared-label-rescan-duplicate`. A re-scanned shared label no
+longer duplicates the meal, and the row exists for what the fix could not be shown to do: the
+branch needs a camera, so nothing here has ever scanned a real label. It is guarded at the source
+and by unit tests, mutation-checked, and never executed from a scan — which is exactly the kind of
+claim a session has to be able to read before it trusts the feature. The build detail is in the
+journal entry.

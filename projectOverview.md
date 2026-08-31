@@ -970,6 +970,11 @@ that need an owner, and for the barcode chain.
 - **⛔ Flattening the curve does NOT reduce volatility — tested.** Night-to-night |Δ| goes **13.53 → 13.75**; a calibration curve's total rise is conserved, so flattening one segment steepens another. The baton's old advice to do exactly that has been replaced. TN-5 is filed as an **interpretability** fix and must not be sold as a jitter fix.
 - **Owner signed off 2026-08-24**, told plainly that it does not reduce the jumpiness. Proposed curve holds the displayed mean (87.0 → 85.5, not a lift) and the `LOW_SLEEP_SCORE` firing rate (2/41 either way) — **re-verify both against the shipped TypeScript**, not the Python replay. **History policy: leave stored days alone, stamp the new model.**
 
+### [nutrition][devices] ⚠️ A re-scanned meal label stops duplicating; no camera has scanned one (LB-34, v1.413.1)
+
+**Fixed.** A shared label is a physical object and gets scanned by whoever picks it up — the same one scanned twice used to mint a second identical meal with nothing marking either as the copy. The scan now asks `findDuplicateMeal` first (normalised name **and** macros within `DUPLICATE_MAX_FIT_DISTANCE`, both required, so two different recipes sharing a name still both save) and offers **Save a copy** rather than writing ([`journal`](docs/overview/entries/2026-08-31-shared-label-rescan-duplicate.md)). The library read is local-first and makes no network call — a shared label's whole point is working with no signal.
+- **Keep: nothing has scanned a real label.** The branch needs a camera (Capacitor on device, `getUserMedia` on web), so it is guarded at the source and by unit tests only — mutation-checked eight ways between them, but never executed from a scan. `getLocalStore` is null off-device too, so the local-store read took its cache-seed fallback on every run.
+
 ### [nutrition] ⚠️ The meal plan can fill the day in one tap; the device write path has not run (Q-187, v1.412.0)
 
 **Shipped — and this closes all four steps of Q-187.** The plan card offers **"Log the N meals so far"**, which writes every planned meal you have not already logged or declined, through the same path the per-meal button uses ([`journal`](docs/overview/entries/2026-08-31-meal-plan-day-fill.md)).

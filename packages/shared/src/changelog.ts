@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.413.1",
+    date: "2026-08-31",
+    changes: [
+      "Scanning the same shared meal label twice no longer adds a second copy \u2014 it tells you the meal is already saved, with a Save a copy button if you want one anyway.",
+    ],
+  },
+  {
     version: "1.413.0",
     date: "2026-08-31",
     changes: [
