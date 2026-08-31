@@ -13,6 +13,7 @@ import { WalkSegmentStatsCard } from './walk-segment-stats-card'
 import type { KindAggregate } from '@/lib/walk/segment-stats'
 import { DEFAULT_WALK_CONFIG } from '@/lib/walk/interval-plan'
 import { CarouselDots } from '@/components/ui/carousel-dots'
+import { resolveCadenceTargets } from '@/lib/walk/walk-pacer'
 
 const PRESETS = [
   { label: 'Long', blurb: 'The classic method, repeated', sets: 5, fastSec: 180, slowSec: 180 },
@@ -36,6 +37,9 @@ export function WalkConfig({ onStart }: { onStart: () => void }) {
   const customConfig = useGuidedWalkStore(s => s.customConfig)
   const setCustomConfig = useGuidedWalkStore(s => s.setCustomConfig)
   const totalMin = Math.round(buildIntervalPlan(config).totalSec / 60)
+  // Read through the resolver, never off `config` — a config persisted before Q-410 rehydrates
+  // with neither field, and a stepper bound to `undefined` renders blank and steps to NaN.
+  const cadenceTargets = resolveCadenceTargets(config)
 
   // All-time fast/slow block stats across past interval walks — not date-scoped (like
   // running-bests), so the plain (non-today) cache variant.
@@ -148,6 +152,24 @@ export function WalkConfig({ onStart }: { onStart: () => void }) {
         <NumberField label="Cool-down (min)" value={config.cooldownSec / 60} min={0} max={10} onChange={v => setConfig({ cooldownSec: v * 60 })} />
       </div>
 
+      {/* The pacing targets. A pair rather than one number, because a slow block is not an unpaced
+          rest — walking it too hard is what stops the fast block being fast (owner, Q-410). */}
+      <div className="space-y-2 rounded-2xl border border-[color:var(--border)] bg-[color:var(--card)] p-3.5">
+        <p className="font-mono text-[10px] uppercase tracking-widest text-[color:var(--muted-foreground)]">
+          Step-rate targets
+        </p>
+        <div className="grid grid-cols-2 gap-2">
+          <NumberField label="Fast spm ≥" value={cadenceTargets.fast} min={60} max={200} step={5}
+            onChange={v => setConfig({ fastCadenceSpm: v })} />
+          <NumberField label="Slow spm ≤" value={cadenceTargets.slow} min={40} max={160} step={5}
+            onChange={v => setConfig({ slowCadenceSpm: v })} />
+        </div>
+        <p className="text-xs text-muted-foreground">
+          The walk paces you against these. Needs a chest strap for step rate — without one it paces
+          by speed, and by heart rate indoors.
+        </p>
+      </div>
+
       {/* Treadmill mode. Indoor GPS is multipath noise, so it is skipped entirely rather than
           recorded and thrown away — a walk carrying a fabricated distance would drag pace
           aggregates around. `=== true` on purpose: a config persisted before this field existed
@@ -175,18 +197,18 @@ export function WalkConfig({ onStart }: { onStart: () => void }) {
   )
 }
 
-function NumberField({ label, value, min, max, onChange }: {
-  label: string; value: number; min: number; max: number; onChange: (v: number) => void
+function NumberField({ label, value, min, max, step = 1, onChange }: {
+  label: string; value: number; min: number; max: number; step?: number; onChange: (v: number) => void
 }) {
   return (
     <label className="flex flex-col gap-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
       {label}
       <div className="flex items-center gap-1">
         <button type="button" aria-label={`decrease ${label}`} className="h-12 w-12 rounded-lg border border-border text-lg"
-          onClick={() => onChange(Math.max(min, value - 1))}>−</button>
+          onClick={() => onChange(Math.max(min, value - step))}>−</button>
         <span className="flex-1 text-center text-base font-bold tabular-nums text-foreground">{value}</span>
         <button type="button" aria-label={`increase ${label}`} className="h-12 w-12 rounded-lg border border-border text-lg"
-          onClick={() => onChange(Math.min(max, value + 1))}>+</button>
+          onClick={() => onChange(Math.min(max, value + step))}>+</button>
       </div>
     </label>
   )

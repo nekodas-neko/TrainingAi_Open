@@ -5068,3 +5068,13 @@ Orchestrator's — it says so — and it heads Lane B's queue anyway, because `l
 `- **Reference:**` bullet pointing at Q-407, which claims a FIELD meaning *"there is nothing to build
 here"*. It printed under `REFERENCE (1) — read by other entries, not implemented. Never "next".`
 The pointer is prose now. A backlog edit is worth running `next-item.js` over.
+
+## 2026-08-31 — projectOverview.md 8526 → 8535 (+9)
+
+Q-410's Known-Issues row, on `feat/walk-cadence-pacer`. The guided walk's pacer shipped and only
+one of its three signal rungs has ever executed — the other two need a Polar H10 over BLE, which
+the sandbox does not have. The row states what was checked, what was read rather than run, and
+which two entries hold the remainder (LB-36 for the device pass, LA-48 for the per-segment
+storage). That is index material by the file's own definition: it is the thing a session needs to
+know before it believes the pacer works. The build detail lives in the journal entry and
+`docs/module-map.md`, not here.
