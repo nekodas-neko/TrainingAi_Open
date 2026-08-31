@@ -418,37 +418,6 @@ reasons, and the first is that this repo just wrote the rule down:
   spinner**. Resume it again ten minutes later and nothing re-prompts. Do the same having force-
   closed the app first: identical result, which is the point.
 
-### [nutrition][app-shell] BF-85 — the quantity box is a bare `type="number"`, so its spinner pushes the text off-centre
-
-- **Lane:** B — `components/nutrition/assign-step.tsx:117-122`.
-- **Batch:** `nutrition-ui-uplift`
-- **Added:** 2026-09-01 · owner, on the Assign to Meal step: *"the text for quantity doesn't look
-  centered."*
-
-**It carries `text-center` and still is not centred, which is the tell.** The input is
-`type="number"` with no appearance reset, so Chromium renders the inner spin button inside the box
-and the text centres in what is left — visibly left of the true centre in a `w-20` field.
-
-**The fix already exists in a sibling and is one class pair.** `components/nutrition/quantity-editor.tsx:104`
-— the app's *other* quantity control — carries
-`[appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none`, precisely for this. Copy it.
-That is the sibling-surface rule: two controls for the same job, one fixed and one not.
-
-- **⚠ Second inconsistency in the same element, worth fixing while there.** `assign-step` styles the
-  input `text-sm`, but `globals.css:536` sets `input { font-size: 16px !important }` under
-  `max-width: 640px` to stop iOS zooming on focus — so on the S25 the class is overridden and the
-  text renders 16 px. `quantity-editor.tsx` documents this in a comment and works around it with
-  `!text-3xl`. The size class here is silently doing nothing, which is also why the box looks
-  differently proportioned from its neighbours.
-- **⚠ 38 other `type="number"` inputs across `components/` and `app/` have no spinner reset.** Do
-  not sweep them blind — some are in admin/debug consoles where a spinner is harmless — but the
-  count belongs in the entry, because a second report of this shape is likely and the next person
-  should know it is a class of one-line fixes rather than a one-off.
-- **Recommendation: put the pair on the shared input primitive rather than a third copy.** Two files
-  now carry the same workaround by hand; a third is the point at which it should move to
-  `components/ui/`. Decide that in the PR rather than pasting.
-- **Verification:** on the S25, the value sits centred in the box with no spinner visible, and the
-  box matches the preset chips' height and text size.
 
 ### [sleep] BF-83 — last night's sleep grows while you look at it, and nothing says it is still filling
 
