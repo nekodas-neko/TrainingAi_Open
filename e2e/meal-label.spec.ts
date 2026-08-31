@@ -373,7 +373,11 @@ test('the share style carries the recipe, and the print styles say they do not',
   let text: string | null = null
   for (let attempt = 0; attempt < 6 && text === null; attempt++) {
     if (attempt > 0) await page.waitForTimeout(1_000)
-    text = decodeQr(await shotOf(canvas))
+    const shot = await shotOf(canvas)
+    let dark = 0
+    for (let i = 0; i < shot.data.length; i += 4) if (shot.data[i] < 128) dark++
+    console.log(`PROBE attempt=${attempt} ink=${(dark / (shot.data.length / 4)).toFixed(4)}`)
+    text = decodeQr(shot)
   }
   expect(text, 'the share code must decode off the rendered label').toBeTruthy()
   // Not the token: this is the assertion that the swap actually happened. A `share` label still
