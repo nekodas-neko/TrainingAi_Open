@@ -13854,39 +13854,33 @@ reads.
   (`QRCode.create` at `meal-label-render.ts:907` is a sync call, and `drawShareLabel` calls
   `drawCode` immediately after `fillText`), so text and code land in the same pass and a text-only
   canvas cannot exist.
-- **Current hypothesis, unverified:** `getImageData` returns a **degenerate** buffer under memory
-  pressure. All-zero data makes `inkFraction` **1.0** — stable and above the floor, so the gate
-  passes — while the decoder sees a uniform image and returns null every time. It also fits the
-  timing: six slow `shotOf` calls each shipping ~5.5 M numbers over CDP.
-- **How to test it:** log the ink fraction at each decode attempt and reproduce under load. A
-  reading of `1.0000` or `0.0000` on a failure confirms it; a reading near 0.174 refutes it and the
-  image is being read correctly, which would point somewhere else entirely. Instrumentation is
-  parked on the branch `debug/share-code-ink-probe` (SCRATCH — never merge it).
+- **⚠ A SECOND hypothesis is now also falsified — measured 2026-08-31, and this is the useful
+  result.** The guess was that `getImageData` returns a **degenerate** buffer under pressure, making
+  the ink fraction 0 or 1 so the gate passes on a canvas that was never drawn. The spec now reports
+  the ink at the failing attempt, and a captured failure reads **0.1735** — inside the normal
+  0.172–0.179 band. **The canvas is drawn correctly and the pixels arrive intact.** Capture is
+  eliminated; the fault is in the **decode**.
+- **What that leaves.** ZXing is handed a correct image and returns null. The next step is to keep
+  the *failing* canvas rather than measure it: dump the buffer on failure and decode it offline
+  against several binarizer/`TRY_HARDER` combinations, as was already done for a **passing** canvas
+  (which decoded under all four, so a passing image is not the one to test). If the failing buffer
+  also decodes offline, the fault is in how the decode is invoked in-run rather than in the image or
+  the reader.
+- **Reproduction, now understood well enough to trigger:** it passes **every** time in isolation and
+  fails intermittently when the whole file runs — roughly one run in two. Measured across eleven
+  runs. So run the file, not the test.
+- **The instrumentation now SHIPS, and that is the point.** `e2e/meal-label.spec.ts` measures the
+  ink at the last attempt and puts it in the assertion message, so **the next failure — in CI or
+  anywhere — carries its own diagnosis** instead of needing to be reproduced first. That is what
+  turned this entry from two guesses into one eliminated cause. A reading near 0.17 means the image
+  is intact; ~0 or ~1 would mean the buffer came back degenerate.
+- **Piping a run through `grep` hides its output until it exits** — `grep` block-buffers, so a
+  watched file stays empty for the whole run and a slow run is indistinguishable from a hung one.
+  Use `grep --line-buffered`. This cost two attempts before it was noticed.
 - **If confirmed the fix is to reject a degenerate canvas in the gate** — ink strictly between
   bounds rather than merely above a floor — **not another retry.** The retry is already at six
   attempts and the file's own comment says another one is the wrong answer.
 
-### [nutrition][platform] LB-33 — `meal-label-render.ts` is 1,049 lines, and its pure half is what everything imports
-
-- **Lane:** B — `components/nutrition/meal-label-render.ts`.
-- **Added:** 2026-08-31 · noted while BF-57 took the file from 825 to 1,049 lines.
-
-`scripts/check-component-size.js` did not catch it because the file is `.ts` rather than `.tsx`, so
-the ~800-line guidance applies by spirit and not by CI. It was not split inside BF-57 deliberately: a
-mechanical move of that size would have buried the change it was riding with, which is the harder
-thing to review.
-
-**The split is already visible in the file.** Two halves live in it — the pure geometry (`SPECS`,
-`MEAL_LABEL_STYLES`, `mealLabelCodeMetrics`, `mealLabelShareBudget`, `mealLabelCarriesRecipe`,
-`centredStackLineBudget`, `centredStackOffset`) and the canvas painters. Every test imports only the
-first, and the second is the half that needs a `CanvasRenderingContext2D` and therefore cannot be
-asserted in either `environment: 'node'` vitest project. Moving the pure half to
-`meal-label-geometry.ts` makes that boundary structural instead of conventional.
-
-- Pure move, no behaviour: re-export from the old path or update the four importers
-  (`meal-label-sheet.tsx` and three test files) in the same PR.
-- **Verification:** `meal-label-code-size.test.ts` and `meal-label-centring.test.ts` pass unchanged,
-  and `e2e/meal-label.spec.ts` still renders every style.
 
 ## Owner feature notes, filed 2026-08-23 — each needs a planning session before implementation
 

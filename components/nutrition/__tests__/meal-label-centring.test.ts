@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   centredStackOffset, centredStackLineBudget, mealLabelStyleSpec, DEFAULT_MEAL_LABEL_STYLE,
-} from '../meal-label-render'
+} from '../meal-label-geometry'
 
 /** The renderer's own units: 189 per 50 mm sheet. */
 const UNITS_PER_MM = 189 / 50
