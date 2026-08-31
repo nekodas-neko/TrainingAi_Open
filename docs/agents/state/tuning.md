@@ -3,7 +3,7 @@
 > **Successor sessions are titled `🎶 Tuning Agent 🟢`** — exactly, both emoji. Leading emoji = role,
 > trailing = this session's status, set by the session itself. See `docs/agents/README.md` §4.
 
-**Updated:** 2026-08-26 · **By:** `session_01VVfZtbCftbwaUHtBLJoxVr` · **Next ID:** `TN-19`.
+**Updated:** 2026-08-26 · **By:** `session_01VVfZtbCftbwaUHtBLJoxVr` · **Next ID:** `TN-20`.
 Find next free: `grep -rhoE '\bTN-[0-9]+\b' docs/ | sort -t- -k2 -n | tail -1`. Legacy `Q-` numbers
 stay valid. **Rewritten in full, never appended** — narrative lives in the linked reviews.
 
@@ -42,6 +42,7 @@ Filed this session, all propose-only, all in the queue:
 | **TN-16** | prolonged-stress warning + calm-down prompt | **parked** `Needs: Q-507` — the metric points the wrong way |
 | **TN-17** | Activity as a pace-to-goal score (owner's design) | mechanic sound; `Needs: Q-524`, `Gate: owner` — the goals make it punishing |
 | **TN-18** | TN-6a gated the readiness ladder, NOT the deload banner — the surface the owner reads | one condition, Lane A, do not batch |
+| **TN-19** | the HOW IT MOVES card promises 5 mechanisms; **4 inert or backwards** | `Needs: TN-15`; ⛔ do not reword the card |
 
 **Owner decisions, 2026-08-24 — recorded on the entries, nothing gated on them.** TN-5 and TN-6
 signed off; **TN-6a** added (suspend the temperature penalty on a self-clearing condition, outside the
@@ -228,6 +229,22 @@ sleep ✅ · readiness ✅ · activity ✅ · body ✅ · devices ✅ · workout
 - **⛔ `step_live_windows` is effectively empty — 8 rows across 6 days, 7,745 steps total.** It is the
   obvious intraday step source and it reads a flat zero. `body_metrics.steps` is a **running daily
   total** (`updated_at` moves through the day), which is what any intraday step question should use.
+- **⚠ THE BATTERY CHAIN HAS SHIPPED NOTHING, and the owner has now reported it twice** (2026-08-26,
+  2026-08-31 *"still not very usable"*). Verified on `main` 2026-08-31: TN-15/18/6a/6/2 all still
+  queued, at **positions 75–83 of 235**. Nothing is blocked — TN-6a, TN-18 and TN-15 all carry owner
+  sign-off. **Priority is queue position, so this is a prioritisation question and only the owner
+  can answer it.** Say so plainly rather than re-measuring the pillar a third time.
+- **The HOW IT MOVES card made the pillar read WORSE without changing a number** (TN-19). It states
+  five testable claims beside the value; four are inert. **A wrong number the app explains is worse
+  than a wrong number it does not** — the explanation converts a vague doubt into a demonstrated one.
+  **⛔ Do not propose rewording the card**: it is TN-15's spec rendered, and softening it documents
+  the defect instead of repairing it.
+- **2026-08-26 is the cleanest Q-521 demonstration in the data** — **0 HR samples → 0 drained,
+  0 charged, ends exactly at its anchor.** No wear, no change. Reach for that day rather than
+  re-deriving the correlation when someone doubts that drain integrates wear time.
+- **The recharge half produced 6 points across 8 days** (charged 0/1/0/3/0/0/1/1 against drained
+  113/52/47/70/13/0/76/79; five of eight days end at 0 or 2). That is the `+0 charged` line on the
+  owner's screenshot, and it is TN-2's charge window, not a new finding.
 - **The owner's stride is MEASURED, 0.739 m — do not use `0.415 × height` (0.664), it is 10.1% short.**
   `activity_logs` stores `distance_km` + `steps` + `cadence_spm` + `duration_min` on one row and
   `segments` carries `distanceKm` + `avgCadenceSpm` per interval. Two extractions agree to **0.3%**

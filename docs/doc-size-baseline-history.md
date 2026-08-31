@@ -4904,3 +4904,16 @@ instant-paint behaviour — and that whatever the cause turns out to be, it must
 results mid-session and both tables now hold them, so BF-71's device check is closed (the date picker
 and decimal keypads work in Samsung's WebView, which was the entire risk) and BF-42 is verifiable for
 the first time.
+
+## 2026-08-31 — backlog raised to 14551 , `docs/agents/state/tuning.md` to 338 and `projectOverview.md` to 8524 (TN-19, the battery explainer)
+
+One entry, from the owner's second report on this pillar in six days. The length is the five-row
+table, and the table is the entry: the card names five mechanisms and **four are inert or backwards**
+— `Deep sleep` cannot fire at all, `Calm rest` produced 6 points in 8 days, `Training` moves the
+number 0.6 points, `Daytime stress` rises on good days. Naming them one at a time is what stops the
+fix being "reword the card", which would document the defect rather than repair it.
+
+The entry also carries the distinction that makes it worth filing separately from TN-15: **a wrong
+number the app explains is worse than a wrong number it does not**, because the explanation converts
+a vague doubt into a demonstrated one. That is why this pillar reads as unusable rather than merely
+miscalibrated, and it is not something TN-15's own text says.
