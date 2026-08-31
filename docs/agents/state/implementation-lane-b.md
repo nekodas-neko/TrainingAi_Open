@@ -6,27 +6,27 @@
 **Updated:** 2026-08-31 · **By:** the eighteenth Lane B run · **Next ID:** `LB-31`
 
 ## Now
-**#659 merged; the lane started clean.** This run took **BF-66** (v1.404.2), the top READY item and
-the only one at the top of the queue that is Lane B by path.
+**Merged this run: BF-66 (#662, v1.404.2) and BF-65 (v1.405.0)** — both workout-screen, both JS-only, **neither near a device**.
 
-**`parseVoice` was a character denylist and is now a tokenizer — never put a strip back.**
-`[^0-9.\s kgreps×x]` keeps whichever letters happen to spell the keywords, so the `r` of `for` and
-the `es` of `times` survived and blocked the fallback while `by` and `at` vanished and worked. The
-owner's `60 for 6` was heard perfectly and shown back in red, because that red line is the
-*parse-failure* branch. Its rules, before you change it again: a keyword claims the number *before*
-it; loose numbers fill what is left, weight first; a number followed by `sets` is discarded; **a lone
-bare number parses to nothing on purpose**. `VOICE_LOG_EXAMPLE` is exported and used twice — the
-error and the hint — and two literals is how a hint starts promising a phrasing the parser dropped.
-([journal](../../overview/entries/2026-08-31-voice-filler-words.md))
+**`parseVoice` was a character denylist and is now a tokenizer — never put a strip back.** Its rules:
+a keyword claims the number *before* it; loose numbers fill what is left, weight first; a number
+before `sets` is discarded; **a lone bare number parses to nothing on purpose**. `VOICE_LOG_EXAMPLE`
+is exported and used twice — the error and the button's hint — and two literals is how a hint starts
+promising a phrasing the parser dropped.
 
-**Nothing here has been near a microphone** — `isNativePlatform()` is false in `pnpm dev` and in
-Playwright, so no test has ever produced a transcript. The press is **W4**, written to share a sitting
-with **LA-37** (the button was *absent* on the APK until then): doing one without the other is half a check.
+**`useExerciseMedia` is now the ONLY fetch of `/api/exercise-gif`** — it replaced four hand-rolled
+copies rather than becoming a fifth. **The shared `exercise-media:<name>` key is the feature, not
+plumbing:** the warm-up screen fetches the whole session then unmounts, so the ready screen paints
+from its cache. `unoptimized` on a `.gif` fails **silently** — the picture appears, looks right, and
+never moves.
+
+**The sandbox cannot render any exercise clip** — the dataset is on `raw.githubusercontent.com`,
+which the egress proxy drops, so clips are blank boxes **including the warm-up screen's own,
+untouched for months**. That is how it was pinned to the environment, not the new component (CSP was
+ruled out). Verify with same-origin substitutes in `exercise_gif_cache`, asserting `naturalWidth > 0`.
 
 **Start from `node scripts/next-item.js --lane B`, never a hand-scan — re-run after every merge.**
-Next is **BF-65** (exercise GIF on the ready screen; its entry makes extracting the fourfold-copied
-`/api/exercise-gif` fetch *part of* the work), then the `nutrition-ui-uplift` residue, **BF-52**
-(planning), **Q-407**, **LB-12**; past those the path rule says Lane A.
+Next: the `nutrition-ui-uplift` residue, **BF-52** (planning), **Q-407**, **LB-12**; then Lane A.
 
 **Three things are blocked on the owner, each with a written recommendation. Do not decide them
 yourself and do not build past them:**
@@ -39,14 +39,16 @@ yourself and do not build past them:**
 - **The device pass.**
 
 ## The finding that should change how you start
-**A test suite can be complete and incapable of failing.** `voice-log-parse.test.ts` had seven cases,
-all passing, against a parser that dropped the most natural phrasing in the app — every case was
-adjacent numbers or an explicit keyword, so **the gap was untested by construction** and the file
-did not look thin. Same shape as the previous run's four harness findings, where a gate was satisfied
-by the state it was meant to replace. Ask what your tests are true of, and whether an input a *user*
-would produce falls outside it.
+**A test suite can be complete and incapable of failing.** `voice-log-parse.test.ts` had seven passing
+cases against a parser that dropped the most natural phrasing in the app: every case was adjacent
+numbers or an explicit keyword, so **the gap was untested by construction** and the file did not look
+thin. The same day, a spec asserting a clip's `src` passed against a picture that never loaded. Ask
+what your tests are true of, and whether an input a user would produce — or a pixel they would see —
+falls outside it.
 
 ## Do not re-litigate
+- **`useExerciseMedia` is the only `/api/exercise-gif` fetch** and `unoptimized` is mandatory on a
+  `.gif`; both held by `lib/hooks/__tests__/use-exercise-media.test.ts`.
 - **`parseVoice` is a tokenizer, not a strip** — never re-add a character denylist to it. A denylist
   keeps whichever letters happen to spell the keywords, which is a rule no user can derive and no
   test would notice; the tokenizer's whole point is that a new filler word costs nothing.
@@ -79,15 +81,13 @@ would produce falls outside it.
 **Nothing from the last five runs is device-verified.** [`device-verification-queue.md`](../../device-verification-queue.md)
 groups by screen — work a section, not an entry.
 
-**This run adds W4, a workout press.** Mid-set say `60 for 6`, `60 kg for 6`, `60 times 6`, `60 by 6`,
+**This run adds W4 and W5, both workout presses.** Mid-set say `60 for 6`, `60 kg for 6`, `60 times 6`, `60 by 6`,
 `60 x 6` — all five must give 60 kg × 6 — then something unparseable, which must offer an example.
+**W5:** each ready screen's clip is **moving**, exercise 2's is its own, and it plays in airplane
+mode. Nothing animated has been rendered anywhere in this work.
 
-**The previous run's nutrition pass is still owed**, best done in a sitting: a food row **swipes** to a
-Delete that opens on the **first** tap and stays gone across a screen swap and a force-close (BF-47
-reasoned, not reproduced); the meal photo from **both** the meal's screen and the builder — the CSP
-fix runs the *native* branch for the first time; a **barcode scan** in the builder; **Option A** at
-412 dp; an ingredient row reading **grams only**; a logged meal as **one nested row** whose name
-survives **offline**; and the takeover sheets' bottom clearance in **both** navigation modes.
+**The previous run's nutrition pass is still owed** — the queue's whole **Nutrition** section, best
+done in one sitting. It is enumerated there, per screen; a second copy here is one that drifts.
 
 Carried: Q-467, Q-499, Q-538, Q-305 at S25 width, Q-477 across local midnight, BF-10, LB-5, Q-328/Q-321/Q-486, Q-389, a TalkBack pass, Q-450/Q-418 (Polar H10). **Q-315 needs a DESKTOP.**
 

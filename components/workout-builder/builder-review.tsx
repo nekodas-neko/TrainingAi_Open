@@ -13,6 +13,7 @@ import { WeeklyMuscleSetsCard } from '@/components/health/weekly-muscle-sets-car
 import { goalRange, formatGoalRange } from '@trainingai/shared/ai-periodization/goal-ranges'
 import { Switch } from '@/components/ui/switch'
 import { useScrollToBottom } from '@/lib/hooks/use-scroll-to-bottom'
+import { useExerciseMedia } from '@/lib/hooks/use-exercise-media'
 import type { MuscleSetsEntry } from '@/app/api/weekly-muscle-sets/route'
 
 interface Props {
@@ -138,29 +139,18 @@ export default function BuilderReview({ program, inputs, onBack, onSaved, onProg
     return Object.fromEntries(phases.map((_, i) => [i, scaled[i]]))
   })
   const chatScrollRef = useScrollToBottom<HTMLDivElement>(chatMessages)
-  const [exerciseMedia, setExerciseMedia] = useState<Record<string, { gif: string | null; img: string | null }>>({})
   const [failedSrcs, setFailedSrcs] = useState<Set<string>>(new Set())
 
-  const exerciseNamesKey = useMemo(
-    () => [...new Set(program.sessions.flatMap(s => s.exercises.map(e => e.name)))].sort().join('\n'),
+  const exerciseNames = useMemo(
+    () => [...new Set(program.sessions.flatMap(s => s.exercises.map(e => e.name)))],
     [program]
   )
+  const { media: exerciseMedia } = useExerciseMedia(exerciseNames)
 
-  useEffect(() => {
-    const names = exerciseNamesKey ? exerciseNamesKey.split('\n') : []
-    if (names.length === 0) return
-    Promise.all(
-      names.map(name =>
-        fetch(`/api/exercise-gif?name=${encodeURIComponent(name)}`)
-          .then(r => r.ok ? r.json() : null)
-          .then(d => [name, { gif: d?.gifUrl ?? null, img: d?.imageUrl ?? null }] as [string, { gif: string | null; img: string | null }])
-          .catch(() => [name, { gif: null, img: null }] as [string, { gif: string | null; img: string | null }])
-      )
-    ).then(pairs => {
-      setExerciseMedia(Object.fromEntries(pairs))
-      setFailedSrcs(new Set())
-    })
-  }, [exerciseNamesKey])
+  // A name that resolves to a different clip deserves a fresh chance at rendering it; the failed
+  // set is keyed by src, so clearing it when the roster changes is what un-hides a replaced URL.
+  const exerciseNamesKey = exerciseNames.join('\n')
+  useEffect(() => { setFailedSrcs(new Set()) }, [exerciseNamesKey])
 
   useEffect(() => {
     fetch('/api/exercise-library', { cache: 'no-store' })
@@ -520,7 +510,7 @@ export default function BuilderReview({ program, inputs, onBack, onSaved, onProg
                     <div className="flex items-center justify-between gap-2">
                       {(() => {
                         const media = exerciseMedia[ex.name]
-                        const src = media?.gif ?? media?.img ?? null
+                        const src = media?.gifUrl ?? media?.imageUrl ?? null
                         const usableSrc = src && !failedSrcs.has(src) ? src : null
                         return usableSrc ? (
                           <div className="relative h-11 w-11 flex-none rounded-lg overflow-hidden" style={{ background: '#fff' }}>

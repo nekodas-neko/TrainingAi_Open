@@ -24,8 +24,10 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.404.2 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Version:** v1.405.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-08-31.
+
+**The exercise clip reaches the ready screen, and the fetch behind it stopped multiplying (BF-65).** The owner wanted the movement shown on the screen where they are about to do it. The work was the *fetch*: the same `/api/exercise-gif` call was hand-rolled in **four** places, so this would have been the fifth — `lib/hooks/use-exercise-media.ts` is now the only one and all four are converted. **The shared `exercise-media:<name>` key is the feature**, not plumbing: the warm-up screen fetches every exercise in the session and then unmounts, so the ready screen paints from its cache instead of showing a spinner for a file downloaded sixty seconds ago. The layout question the entry flagged answered itself — at 64 px beside the name, **`SET TARGETS` is now fully visible**, where the owner's screenshot had it cut off behind the action row. **Nothing animated was rendered at any point:** the dataset host is dropped by the sandbox proxy, so every clip here is blank — including the warm-up screen's own untouched thumbnails, which is how that was established as the environment rather than the change ([journal](docs/overview/entries/2026-08-31-exercise-clip-ready-screen.md)).
 
 **Voice logging heard the owner correctly and threw it away (BF-66).** *"60 for 6"*, mid-set, transcribed perfectly and printed in red — because that red line is the *parse-failure* branch, not a mis-hear message. `parseVoice` stripped every character outside `[0-9.\s kgreps×x]`, a denylist that keeps the `r` of `for` and the `es` of `times`: **`60 by 6` and `60 at 6` worked and `60 for 6` and `60 times 6` did not**, and nothing in the app stated that rule. A positive tokenizer replaces it — take the numbers and the unit/rep keywords, ignore every word between — so a phrasing works by construction rather than one stripped filler at a time. The seven existing tests all passed and none of them *could* have failed: every case was adjacent numbers or an explicit keyword. The failure message now names an example and the button carries it, since the accepted phrasing was previously learnable only by failing at it. **Proven on strings, not on speech** ([journal](docs/overview/entries/2026-08-31-voice-filler-words.md)).
 
@@ -784,6 +786,29 @@ neither of those is the device.
 **Smoke step:** on the S25, open a workout, confirm the **Voice** button is drawn, press it, say a
 weight and reps, and check the set fills in. A denied microphone permission should now say so rather
 than flipping silently back to "Voice".
+
+JS-only — it reaches the phone on the next Railway deploy, no APK rebuild.
+
+### [workouts][devices] ⚠️ The exercise clip is on the ready screen; nobody has seen it move (BF-65, v1.405.0)
+
+The clip renders at 64 px beside the exercise name, tapping it opens a full-width strip, and an
+exercise the route cannot match shows the warm-up screen's dumbbell rather than a gap. `unoptimized`
+is what decides whether a GIF animates or renders as a still — and forgetting it fails **silently**,
+because the picture appears and looks correct. A guard test holds the prop on every exercise-media
+`<Image>`, which is not the same as having seen one move.
+
+**Nothing animated was rendered anywhere in this work.** The dataset's clips live on
+`raw.githubusercontent.com`, which the sandbox's egress proxy drops, so every clip is a blank white
+box there — **including the warm-up screen's own thumbnails, which this change does not touch**.
+That is how the blankness was established as the environment rather than the code; CSP was ruled out
+separately. Verification used same-origin substitutes, asserting `naturalWidth > 0` rather than a
+`src` attribute.
+
+**Smoke step:** on the S25, open a session and reach each exercise's ready screen. The clip must be
+**moving**, not a frozen frame; **exercise 2 must show its own clip, not exercise 1's**; a bodyweight
+or unmatched movement shows the dumbbell. Then airplane mode — it should still play, because the
+warm-up screen prefetched it into the service worker. That last one is the only part of this the app
+cannot self-check.
 
 JS-only — it reaches the phone on the next Railway deploy, no APK rebuild.
 

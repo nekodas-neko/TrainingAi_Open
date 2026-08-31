@@ -170,6 +170,26 @@ Open a workout, reach a set card, and:
 Only step 2 needs care about *what* is said; the rest are one press each.
 
 
+## W5. The exercise clip on the ready screen — BF-65 · **JS**
+
+New on the per-exercise ready screen: the clip beside the exercise name. **The one thing that
+matters here is whether it MOVES** — a GIF through `next/image` without `unoptimized` renders as a
+still, which looks correct and is why a screenshot cannot answer this. Nothing animated was rendered
+anywhere in the sandbox (the dataset host is proxy-blocked there, so even the warm-up screen's
+existing thumbnails are blank), so this is entirely unverified.
+
+Open a session and go through it:
+
+1. Each exercise's ready screen shows a small picture beside the name, and it is **animating**.
+2. **Exercise 2 shows its own movement, not exercise 1's.** Worth checking deliberately — a
+   wrongly-keyed fetch looks fine on the first exercise and wrong on every one after it.
+3. Tap the picture: a bigger version opens below. Tap again to close.
+4. A bodyweight or unusual movement shows a dumbbell icon rather than a blank gap.
+5. `SET TARGETS` should be readable without scrolling — it was cut off behind the buttons before.
+6. Airplane mode, then open a session: the clip still plays, because the warm-up screen downloaded
+   it. **This is the step no test here can stand in for.**
+
+
 ## ~~W3. Volume landmarks at S25 width~~ ✅ 2026-08-30
 Owner: *"Looks good."* Nothing clipped or wrapped at 412 dp. **Q-305 is device-verified.**
 

@@ -21,6 +21,7 @@ import { getLocalStore } from "@/lib/local-store";
 import { todayInTz, shiftDateStr } from "@trainingai/shared/date-utils";
 import { SessionRing, SessionPill, ExerciseClock, WarmupRampProgress, RestTimer } from "./workout-clocks";
 import { useWorkoutStore } from "@/lib/stores/workout-store";
+import { ExerciseMediaPanel } from "./exercise-media-panel";
 import { warmupRampSectionSec } from "@trainingai/shared/workout/duration-model";
 
 interface ActiveWorkoutScreenProps {
@@ -249,8 +250,10 @@ export function ActiveWorkoutScreen({
               <SessionPill startMs={workoutStartMs} />
             </div>
 
-            {/* Exercise name */}
-            <h2 className="text-3xl font-bold text-center w-full leading-tight">{exercise?.name}</h2>
+            {/* Exercise name + its clip */}
+            {exercise?.name
+              ? <ExerciseMediaPanel name={exercise.name} />
+              : <h2 className="text-3xl font-bold text-center w-full leading-tight" />}
 
             {/* Last session */}
             {exercise?.lastDate && exercise.lastReps.length > 0 && (

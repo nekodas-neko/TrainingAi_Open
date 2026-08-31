@@ -1427,60 +1427,32 @@ owner has to re-describe in a wizard what the app already knows.
   is exactly the failure this entry is written to prevent. A program id belonging to another user is
   rejected, not read.
 
-### [workouts] BF-65 — show the exercise GIF on the per-exercise ready screen, and extract the fetch while doing it
+### [workouts] BF-65 — the exercise clip on the ready screen (shipped; it must be seen *moving*)
 
-- **Lane:** B — `components/workout/active-workout-screen.tsx` (the ready branch at :240) plus a new
-  shared hook; the route and the media both already exist.
-- **Added:** 2026-08-30 · owner, with the ready screen and the warm-up screen side by side: *"id like
-  the exercise gif in the pre session screen so it shows you what movement you will be doing."*
+- **Lane:** B
+- **Gate:** device
+- **Added:** 2026-08-30 · owner: *"id like the exercise gif in the pre session screen so it shows you
+  what movement you will be doing."*
+- **Shipped 2026-08-31** — `exercise-media-panel.tsx` renders the clip at 64 px beside the exercise
+  name, tappable into a full-width strip, with the warm-up screen's dumbbell fallback for anything
+  the route cannot match. `useExerciseMedia` (`lib/hooks/use-exercise-media.ts`) is now the only
+  place `/api/exercise-gif` is fetched — it replaced the four hand-rolled copies rather than
+  becoming a fifth — and the shared `exercise-media:<name>` key is what lets the ready screen paint
+  from what the warm-up screen fetched a minute earlier.
+- **The layout question in the original entry is decided:** the collapsed thumbnail costs so little
+  height that `SET TARGETS`, which was cut off behind the action row in the owner's screenshot, is
+  now fully visible. The expand exists for a proper look and is not needed to see the movement.
+- **Keep:** the **device check**, and only that — and it is the half no harness here can reach. The
+  clip must be **moving** rather than a frozen first frame, which is what `unoptimized` decides and
+  what a screenshot cannot tell you; a guard test holds the prop on every exercise-media `<Image>`,
+  but a passing prop is not a moving picture. **The dataset host is unreachable from the sandbox**
+  (`raw.githubusercontent.com` is dropped by the egress proxy, so the warm-up screen's own
+  long-standing thumbnails are blank there too), so every clip this was verified against was a
+  substituted same-origin file. On the S25: each exercise's ready screen shows **its own** clip and
+  it animates; an unmatched or bodyweight movement shows the dumbbell rather than a gap; and in
+  airplane mode the clip still plays, because the warm-up screen's prefetch put it in the service
+  worker.
 
-**The media is real and it is genuinely animated.** `/api/exercise-gif?name=` returns
-`{ gifUrl, imageUrl }`, and for a generated exercise the gif is `/exercise-media/gifs/male/<slug>.gif`
-with a matching start frame at `…/frames/male/<slug>-start.png`. The warm-up screen renders it at
-40 px today; the ready screen — the one screenshotted, `active-workout-screen.tsx`'s ready branch —
-shows the name, last session, bar load, ramp-up and set targets, and no picture at all. There is also
-no route to one from there: `ExerciseStatsSheet` carries the gif but is mounted only on
-`pre-workout-screen.tsx`.
-
-**Do not add a fifth copy of the fetch — extract it.** The same
-`fetch('/api/exercise-gif?name=…')` → `{gifUrl, imageUrl}` is hand-rolled in **four** places already:
-`warmup-screen.tsx:39`, `exercise-stats-sheet.tsx:71`, `config/exercise-preview-sheet.tsx:33` and
-`workout-builder/builder-review.tsx:154`. The repo's rule is that a pattern at ≥2 sites is extracted
-before a third copy; this is the fifth, so the extraction is part of the work rather than a follow-up.
-
-- **Reuse the warm-up screen's fetch rather than repeating it.** `WarmupScreen` already fetches media
-  for **every** exercise in the session moments earlier, and deliberately re-fetches each binary so
-  the service worker caches it offline. Then it unmounts on the mode change and the map is lost. The
-  ready screen wants exactly one entry of that map. Put the results behind a shared cache key so the
-  second screen paints instantly from what the first already fetched — per the instant-paint rule, a
-  spinner on the ready screen for a file the app downloaded 60 seconds ago is the outcome to avoid.
-- **⚠ `unoptimized` is mandatory on a GIF through `next/image`, and forgetting it fails silently.**
-  The optimizer turns a GIF into a static image, so the picture appears, looks correct, and simply
-  never moves — which reads as "the gif is broken" rather than as a missing prop. `warmup-screen.tsx`
-  gets this right with `unoptimized={thumbSrc.endsWith('.gif')}`; copy that condition.
-- **Put it in a memoised child, not inline.** The ready screen sits behind a 1 Hz session pill and
-  the rest ring, and CLAUDE.md's render rules put repeated/hot-parent widgets in `React.memo` with
-  stable props. `active-workout-screen.tsx` is 626 lines against the ~800 ceiling, and the hotspot
-  rule says new features go into a `components/` child rather than being appended.
-- **Layout is a real decision, not a drop-in.** The screenshot already cuts `SET TARGETS` off behind
-  the action row, so a full-width media block pushes the bar-load number — the thing the user is
-  actually reading — further below the fold. Options worth weighing: a compact thumbnail beside the
-  exercise name that expands on tap (cheapest, keeps the fold), or a modest fixed-height strip under
-  the name. The owner's stated purpose is *"so it shows you what movement you will be doing"*, which
-  argues for it being visible without a tap.
-- **Alternative considered — carry the media on `/api/workout-data`.** That kills N round-trips
-  outright, since the route already returns the exercise list. Rejected as the first move: it makes
-  this a Lane A change to a payload four surfaces read, for a saving the shared cache above already
-  gets. Worth revisiting if the per-exercise fetch turns out to be slow on the device.
-- **Bodyweight and unmatched exercises need a defined empty state.** `/api/exercise-gif` returns
-  `{ gifUrl: null, imageUrl: null }` for anything it cannot match, and the warm-up list falls back to
-  a dumbbell icon. The ready screen needs the same fallback decided up front, or a missing match
-  leaves a hole where the layout expects a picture.
-- **Verification (device, APK):** open a session, and each exercise's ready screen shows its
-  animation — *moving*, not a frozen first frame — including the second and later exercises, which
-  is where a fetch-once effect keyed wrongly would show the first exercise's clip. An exercise with
-  no match shows the fallback rather than a gap. Then airplane mode: the clip still plays, because
-  the warm-up screen's prefetch put it in the service worker.
 
 ### [workouts] BF-64 — the Full/Deload toggle can only ADD deload, never remove one, so `Full · Override` overrides nothing
 

@@ -6,6 +6,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.405.0",
+    date: "2026-08-31",
+    changes: [
+      "The ready screen before each exercise now shows the movement. The clip plays beside the exercise name, and tapping it opens a bigger one \u2014 the warm-up screen has already downloaded it, so it appears straight away and still plays with no signal.",
+      "It costs nothing on screen: the set targets that used to be cut off behind the buttons now fit.",
+    ],
+  },
+  {
     version: "1.404.2",
     date: "2026-08-31",
     changes: [

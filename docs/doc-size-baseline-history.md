@@ -4230,3 +4230,22 @@ their own device passes, so there was nothing here this branch could honestly st
 **The backlog falls by BF-66's whole entry.** Nothing is owed past the device check the row above
 now carries, so the entry is removed rather than rewritten to a `Keep:` — the residue lives in
 `projectOverview.md`, and duplicating it in the queue would make an entry that reads as open work.
+
+## 2026-08-31 — `projectOverview.md` 8468 → 8493, `docs/implementation-backlog.md` 13602 → 13574 (BF-65)
+
+**Twenty-five lines: a status paragraph and a Known-Issues row, and the row is the one that had to
+be written long.** BF-65 is JS-only, so it reaches the phone on the next deploy and is
+device-*unverified* rather than device-*blocked* — the case the Canonical Runtime rule says must buy
+a row. What the row spends its length on is the thing a shorter version would drop: **the dataset
+host is dropped by the sandbox's egress proxy, so every clip renders blank here**, and the way that
+was established as the environment rather than the change was seeing the warm-up screen's own
+untouched thumbnails fail identically. A row saying only "not device-verified" would leave the next
+session to re-derive that, and the obvious first guess — that the new component is broken — is
+wrong.
+
+**No slack was available.** The status paragraphs above it are hours old and belong to other
+branches, and the neighbouring ⚠️ rows are all still owed their own device passes.
+
+**The backlog falls despite BF-65 staying.** The entry is rewritten to its `Keep:` residue — the
+device check, and only that — which is shorter than the plan it replaces. It stays queued rather
+than being removed because a clip that has never been seen moving is not finished.
