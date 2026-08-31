@@ -3,41 +3,41 @@
 > **Successor sessions are titled `🚧 Implementation Agent (B) 🟢`** — exactly. A renamed successor
 > is a lost thread.
 
-**Updated:** 2026-08-31 · **By:** the eighteenth Lane B run · **Next ID:** `LB-32`
+**Updated:** 2026-08-31 · **By:** the eighteenth Lane B run · **Next ID:** `LB-33`
 
 ## Now
-**Merged: BF-66 (#662, v1.404.2) and BF-65/LB-23/LB-30/LB-31 (#664, v1.405.1). Open: BF-71 (v1.406.0). Nothing has been near a device.**
+**Merged: BF-66 (#662), BF-65/LB-23/LB-30/LB-31 (#664), BF-71 (#681). Open: the nutrition uplift
+batch BF-72/73/74/76 (v1.407.0). Nothing has been near a device.**
 
-**BF-71: a route with no caller fails no test.** Both clinical routes shipped complete — schema,
-repo reads, a live consumer — and nothing called either, so two tables were empty in production
-while every resting rate stayed predicted. An empty table is a valid state; nothing surfaces it.
-**When an entry says a storage half shipped, grep for a client caller before believing the feature
-exists.** Only `scannedOn` and `pctFat` are read by anything (`getBodyFatCalibration` selects exactly
-those); the 12 per-region bone rows are deliberately absent, being 36 typed fields nothing reads.
+**Two findings from that batch outlive it.** `min-h-[Npx]` **does nothing on a `<button>` or a
+`role="button"`** — `globals.css` sets a bare `button { min-height: 48px }` that beats the utility
+(measured: 48 px on a button, 84 px on a div with the same class). BF-50's comment claiming a 62 px
+tile describes one that measured 60. Drive height with padding; LB-32 holds the general case. And
+**a bottom sheet is `fixed bottom-0`, so its height moves only its TOP edge** — `vh`→`dvh` cannot
+fix bottom clearance, which is entirely the baked `pb-safe-*` class. Nothing in nutrition is
+under-padded; three sheets are over-padded by declaring the inset on the content *and* the footer,
+and the primitive cannot express the fix without a worse footgun.
 
-**When Lane B work wants a Lane A file, check whether it actually needs one.** BF-71 wanted an
-invalidation group (`lib/cache-groups.ts`) and a TTL constant (`packages/shared/**`). Neither key
-needs invalidating: `cachedFetch` always revalidates, neither passes `freshWithinTtl`, neither is
-seed-only — so both are first-paint accelerators and clearing one buys a blank paint.
+**BF-71: a route with no caller fails no test.** Both clinical routes shipped complete and nothing
+called either, so two tables sat empty in production while every resting rate stayed predicted — an
+empty table is a valid state and nothing surfaces it. **When an entry says a storage half shipped,
+grep for a client caller before believing the feature exists.** Only `scannedOn`/`pctFat` are read
+by anything. **And when Lane B work wants a Lane A file, check whether it needs one**: BF-71 wanted
+an invalidation group and a TTL constant, and neither key needs invalidating (`cachedFetch` always
+revalidates; neither passes `freshWithinTtl` nor is seed-only, so both are first-paint
+accelerators).
 
-**`parseVoice` is a tokenizer, never a character denylist again** — a keyword claims the number
-before it, loose numbers fill what is left weight-first, a lone bare number parses to nothing on
-purpose. **`useExerciseMedia` is the ONLY fetch of `/api/exercise-gif`** (it replaced four copies);
-its shared `exercise-media:<name>` key is what makes the ready screen instant, and `unoptimized` on
-a `.gif` fails **silently** — the picture appears, looks right, never moves.
-
-**The sandbox cannot render any exercise clip**: the dataset is on `raw.githubusercontent.com`, which
-the egress proxy drops, so clips are blank **including the warm-up screen's own, untouched for
+**The sandbox cannot render any exercise clip**: the dataset is on `raw.githubusercontent.com`,
+which the egress proxy drops, so clips are blank **including the warm-up screen's own, untouched for
 months** — that is how it was pinned to the environment rather than the component. Verify with
-same-origin substitutes asserting `naturalWidth > 0`.
+same-origin substitutes asserting `naturalWidth > 0`. (`parseVoice` and `useExerciseMedia`'s rules
+are under **Do not re-litigate**.)
 
 **Start from `node scripts/next-item.js --lane B`, never a hand-scan — re-run after every merge.**
-Next: **BF-52** (planning), **Q-407**, **LB-12**, and the `nutrition-ui-uplift` residue — all of
-which are nutrition/body UI in the area whose device pass is still outstanding, so expect to ship
-them unverified or wait for the owner.
+Next: **BF-75**, **BF-52** (planning), **Q-407**, **LB-12** — all nutrition/body UI in the area whose
+device pass is outstanding, so expect to ship unverified or wait for the owner.
 
-**Three things are blocked on the owner, each with a written recommendation. Do not decide them
-yourself and do not build past them:**
+**Three things are blocked on the owner, each with a written recommendation — do not decide or build past them:**
 - **BF-51 ③.** The picker has ONE collection shown two ways (`Recently used` empty, `Your foods`
   typed) plus the food database, which appears only while typing — so Log Food's three-tab strip does
   not map onto it, and a database tab hides what BF-48 shipped to expose. **Recommended: fold into

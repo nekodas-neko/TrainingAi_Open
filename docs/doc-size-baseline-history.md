@@ -4803,6 +4803,37 @@ Both lanes now lead with nutrition. Each moved entry was diffed against `main` b
 six of six byte-identical, BF-57 the one deliberate edit — because a reorder branch that has gone
 stale is how shipped entries get restored.
 
+## 2026-08-31 — `projectOverview.md` 8519 → 8522, `docs/implementation-backlog.md` re-derived (nutrition uplift batch)
+
+**Three lines for one paragraph covering four entries, and the length goes on the two findings that
+outlive them** rather than on what shipped. `min-h-[Npx]` being inert on a `<button>` explains a
+comment already in the tree that describes a size which never applied, and BF-76's sweep concluding
+the *opposite* of its own hypothesis is the kind of result a future session would otherwise re-derive
+from scratch — including the reason no padding changed.
+
+**No slack was available**: the paragraphs above belong to other branches and are hours old, and the
+neighbouring ⚠️ rows are all still owed their own device passes.
+
+**The backlog is re-derived rather than claimed, and the merge is why.** #682 moved the nutrition
+entries to the head of the queue while this branch rewrote four of them, so the conflict was a MOVE
+against an EDIT — my side held the updated entries and main's side of the hunk was empty because they
+had gone elsewhere. Resolved by placing this branch's content in #682's positions and then
+de-duplicating: BF-70 and BF-75 arrived twice, byte-identical. **Nothing differed between any pair**,
+which is what makes the de-duplication safe to state rather than hope.
+
+## 2026-08-31 — re-derived against #676: `projectOverview.md` → 8514, `docs/implementation-backlog.md` → 14336
+
+**Both come in UNDER main's baselines**, and the reason is worth stating because it is not this
+branch being small. #676 compacted the status section — it deleted BF-71's paragraph along with the
+older BF-2 and BF-46 ones — while this branch was adding its own. The conflict was therefore a
+COMPACTION against an ADDITION: keeping this side whole would have restored three paragraphs main
+had just removed, on the one file whose entire problem is unbounded growth. Only the new paragraph
+was kept.
+
+**The backlog was the move-against-edit case again** (#682's relocation), and after resolution every
+one of BF-70/71/72/73/74/75/76 and LB-32 appears exactly once, with the four rewritten entries
+carrying this branch's headings rather than the pre-fix ones.
+
 ## 2026-08-31 — `docs/implementation-backlog.md` (BF-78/79, and BF-41 re-asked)
 
 The owner asked to gather the personal-detail fields into one section. Tracing where they live found

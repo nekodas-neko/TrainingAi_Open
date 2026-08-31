@@ -718,154 +718,118 @@ description will silently drop the field that turns out to matter. **The owner i
   the rest unchanged (which is BF-78's test, run through the UI); weight and body fat read as
   measurements with their date, not as inputs.
 
-### [nutrition] BF-72 — the diary's own hydration wipes the meal grouping it just drew
+### [nutrition] BF-72 — the diary's hydration wiped its own meal grouping (fixed; device check owed)
 
-- **Lane:** B — `app/nutrition/use-food-logs-loader.ts:104`.
-- **Batch:** `nutrition-ui-uplift`
+- **Lane:** B · **Batch:** `nutrition-ui-uplift`
+- **Gate:** device
+- **Keep:** the **device check**, and only that — and here it is not a formality. The whole defect
+  lives in `getLocalStore`, which **returns null in the web sandbox**, so the repaired path cannot
+  execute off-device at all. What is proven is the mapping (`app/nutrition/food-log-hydration.ts`,
+  six tests, mutation-checked against the exact omission). What is unproven is the owner's own
+  report: log a saved meal, wait for the refetch, and it must stay ONE row with its name and photo
+  rather than breaking into ingredients. Then reload the tab — still grouped, because the local copy
+  kept its ids.
 - **Added:** 2026-08-31 · owner: *"when I add my saved meal it starts as the meal with the image,
-  then breaks into its ingredients."* That sequence is the whole diagnosis — the optimistic write is
-  right and something after it is wrong.
+  then breaks into its ingredients."*
 
-**One line. `applyDelta`'s `foodLogs` payload omits `savedMealId` and `mealGroupId`:**
+**Cause, as filed:** `applyDelta`'s `foodLogs` payload omitted `savedMealId` and `mealGroupId`, and
+a local upsert overwrites every column it is given — so the omission wrote NULL over correct values,
+and the next line re-read and rendered the stripped copy.
 
-```ts
-foodLogs: server.map(l => ({
-  id: l.id, date: today, mealTypeId: l.mealTypeId, foodItemId: l.foodItemId,
-  quantityMultiplier: l.quantityMultiplier, loggedAt: …,
-  updatedAt: nowIso, deletedAt: null, syncStatus: 'synced' as const,
-})),
-```
+**The sweep the entry demanded came back with one site, and that is now evidence rather than an
+assumption.** There are exactly two `applyDelta` callers: this one and the sync engine's, and the
+engine's mapping already carries both ids under a BF-39 comment explaining why it must. The mapping
+is extracted to a named function because the defect was a *missing field in an object literal* —
+the one shape no type error catches, since every field is optional going in.
 
-CLAUDE.md's rule is that **a local upsert overwrites all columns by default**, and
-`sqlite-backend.ts:2036` writes `record.savedMealId ?? null, record.mealGroupId ?? null` — so an
-omitted field is written as NULL. The very next line re-reads
-`store.getFoodLogsWithItems(today)` and renders it. The screen strips its own grouping and then
-draws the stripped copy.
+**The entry's second finding was measured and is inert — decided, not inherited.** `applyDelta`'s
+food-logs arm hardcodes `'synced'` in both its VALUES and its SET and never reads the payload's
+`syncStatus`, then gates the upsert on `WHERE food_logs.sync_status='synced'`. So a row with a
+mutation still in the outbox is protected by its *stored* status regardless of what the screen
+passes. Changing the field would have looked like a fix and been none.
 
-**Confirmed against production, so no part of this is inferred.** Today's `food_logs` hold
-**11 rows carrying both ids**, resolving to six real meals — `Cruskit + PB` (2 rows) and
-`Protein Shake` (3) are exactly the five loose rows in the owner's breakfast screenshot. The server
-is correct; the device clobbers its own copy.
+### [nutrition][app-shell] BF-74 — the meal photo's ✕ sat in the dismiss corner (fixed; device check owed)
 
-- **Fix:** carry both fields in that payload. The sibling paths already do —
-  `log-meal.ts`'s local upsert, the outbox payload and the `pushMutations` branch all pass them, and
-  the local read at `sqlite-backend.ts:2235` selects them. This one site was missed.
-- **⚠ Sweep every other `applyDelta`/hydrate payload in the same PR.** This is a screen-level
-  hydration that predates the columns; BF-39's chain audit covered the sync engine and not this. Any
-  other place that rebuilds a local row from a server response has the same exposure — a partial
-  object silently nulls what it omits.
-- **⚠ Second, smaller finding at the same line: `syncStatus: 'synced'`** is stamped on every row,
-  including one whose own mutation may still be in the outbox. `applyDelta` gates on
-  `sync_status === 'synced'` before overwriting precisely so a pull cannot revert a pending local
-  edit; stamping it here from a screen-level hydrate hands that guard a value it did not earn.
-  Worth a look, not necessarily a change — but decide it rather than inherit it.
-- **Verification:** log a saved meal, wait for the refetch, and it stays one row with its name and
-  photo — the owner's report is the test. Then reload the tab: still grouped, because the local copy
-  kept its ids. Production already shows the rows are correct, so a failure after this fix is a
-  render bug, not a data one.
+- **Lane:** B · **Batch:** `nutrition-ui-uplift`
+- **Gate:** device
+- **Keep:** the **device check**. On the S25: tapping the top-right of the meal photo must no longer
+  discard it, the bin must read as removal, and the undo toast must be reachable before it dismisses
+  — that last one is the part a desktop browser cannot judge, because the toast timeout against a
+  thumb is the whole question.
+- **Added:** 2026-08-31 · owner: *"the delete image button is easy to hit with no confirmation."*
 
-### [nutrition][app-shell] BF-74 — the meal photo's ✕ sits where a sheet's close button lives and deletes on one tap
+**Three things were wrong and only one was size.** `meal-detail-sheet` passes `hideCloseButton`, so
+this ✕ at `right-0 top-0` was the **only** ✕ on the screen, in the corner a reach for "close" lands
+on — a wrong-meaning problem, which is why making it bigger would have made it easier to hit by
+accident. It is a **bin at the bottom-right** now, at 44 dp (48 after the global floor), and removal
+is **undoable** rather than confirmed: re-picking is already one tap, so a toast spares the gallery
+round-trip without putting a dialog in front of the common case.
 
-- **Lane:** B — `components/nutrition/meal-photo-tile.tsx:141-149`.
-- **Batch:** `nutrition-ui-uplift`
-- **Added:** 2026-08-31 · owner, on the meal detail sheet: *"the delete image button is easy to hit
-  with no confirmation."*
+**The sibling sweep found one shape, not two.** `MealPhotoTile` has a `tile` variant as well as
+`hero`, but **both call sites pass `hero`** — `tile` has no callers. The shared control is fixed for
+both regardless.
 
-**Two separate things make it easy to hit, and the second is the real one.**
+### [nutrition][app-shell] BF-76 — the nutrition safe-area sweep: enumerated, and the hypothesis was wrong
 
-1. **It fires immediately.** `onClick={e => { e.stopPropagation(); onChange(null) }}` — no confirm,
-   no undo. The parent saves straight away, so the photo is gone from the meal.
-2. **⚠ It sits exactly where the sheet's CLOSE button would be.** `meal-detail-sheet.tsx` passes
-   `hideCloseButton`, so this ✕ — `absolute right-0 top-0` on the hero image — is the **only** ✕ on
-   the screen, in the top-right corner, which is the one position a user reads as "close this". A
-   reach for dismiss lands on delete. That is not a small target problem; it is a *wrong meaning*
-   problem, and it explains "easy to hit" better than the size does.
-
-- **It is also under the tap floor**, at `h-8 w-8` (32 dp) against the repo's 44/48 dp minimum —
-  worth fixing, but do not treat that as the fix. Making a mislabelled control *bigger* makes it
-  easier to hit by accident.
-- **Recommendation, in order:** move it off the close corner (bottom-right of the hero, or into the
-  picker's own menu), keep it ≥44 dp, and make it recoverable. A confirm is the crude option; the
-  better one is that re-adding is already one tap — the tile is a real picker (BF-46 ①a) — so an
-  undo toast is enough and costs no dialog.
-- **Sibling sweep:** `MealPhotoTile` renders in the builder as well as this hero. The `variant`
-  differs; the ✕ does not. Fix both, and check no other tile puts a destructive control in a
-  dismiss corner.
-- **Verification:** on the S25, tapping the top-right corner of the meal photo does not silently
-  discard it; the remove control is ≥44 dp, reads as removal rather than dismissal, and the removal
-  can be undone without re-picking from the gallery.
-
-### [nutrition][app-shell] BF-76 — sweep the nutrition sheets for safe-area clearance rather than fixing them one report at a time
-
-- **Lane:** B
-- **Batch:** `nutrition-ui-uplift`
+- **Lane:** B · **Batch:** `nutrition-ui-uplift`
+- **Gate:** device
+- **Keep:** **the device pass itself, which is now the only way forward on this** — and the reason is
+  the finding below. All twelve sheets are enumerated with their computed clearance; nothing in
+  nutrition is under-padded; and no code changed, because every available change would have made
+  something worse. On the S25 in **both** navigation modes, walk the twelve and report which (if any)
+  actually sits wrong — a real measurement now replaces a hypothesis rather than a guess replacing it.
 - **Added:** 2026-08-31 · owner, after BF-62: *"safe spacing off in this place — need to do a review
   cause lots of nutrition screens are wrong."*
 
-**This is the owner asking for the sweep instead of the third individual report, and they are right
-to.** BF-62 was the meal detail sheet's action row; this screenshot is the same class on another
-screen. The repo's own rule already says a fix applied to one surface and not its siblings is half
-done, and safe-area regressions are the single most repeated UI class here (10+ incidents).
+**The `vh` hypothesis is not the mechanism.** A bottom sheet is `fixed inset-x-0 bottom-0`, so its
+height moves only its TOP edge; the bottom clearance is entirely the baked `pb-safe-*` class.
+`h-[92vh]` → `dvh` would change where a sheet is clipped at the top and nothing about the gesture
+bar. The suggested `grep` for `vh` finds 11 sheets and none of them for this reason.
 
-- **What the sweep covers:** every `SheetContent side="bottom"` under `components/nutrition/` and
-  `app/nutrition/`, plus any full-screen takeover they open. For each, record the bottom-inset story:
-  the sheet primitive bakes it, so a screen that adds `pb-safe*` inside is *double*-padding and one
-  that fights the baked padding with a `vh` height is BF-62's shape.
-- **⚠ Start from BF-62's hypothesis, because it generalises.** `h-[92vh]`/`h-[90vh]` on a WebView
-  whose `vh` includes the gesture inset overshoots the viewport, so the baked padding lands under the
-  bar. `grep -rn 'h-\[[0-9]*vh\]' components/nutrition app/nutrition` is the first pass, and `dvh`
-  is the likely fix — one change, many screens.
-- **Both navigation modes.** The inset differs between gesture nav and 3-button nav, and checking one
-  is how this class keeps shipping. The sandbox renders insets as 0, so none of this is verifiable
-  off-device.
-- **Output is a list, then one PR.** Enumerate every sheet with its measured clearance before
-  changing anything — a sweep that fixes as it goes cannot say what it covered, which is what makes
-  the next report a fourth individual entry.
-- **Verification:** every nutrition sheet's bottom control clears the gesture bar on the S25 in both
-  navigation modes, and the PR body lists each sheet checked with what it needed.
+**Measured, in a browser, with the real class strings** (sandbox reports the inset as 0):
+`pb-safe-action` = 12 px, `pb-safe-action-lg` = 64 px, and `p-0` does **not** strip either — both
+`p-0` sheets compute 12 px, so the repo's standing claim about tailwind-merge holds.
 
-### [nutrition] BF-73 — the Log Food screen: bigger capture tiles, and `New` should outrank `Delete meals`
+| clearance below the bottom control | sheets |
+|---|---|
+| 64 px — the BF-62 reference | `meal-detail`, `saved-meals` (inset declared once, on the content) |
+| **76 px web / 88 px device — declared twice** | `meal-plan-setup`, `meal-plan-manage`, `meal-plan-edit` |
+| 12 px web / 24 px device, content-sized, no bottom control | the other seven |
 
-- **Lane:** B — `components/nutrition/capture-actions.tsx` and `components/nutrition/meal-list-actions.tsx`.
-- **Batch:** `nutrition-ui-uplift`
-- **Added:** 2026-08-31 · owner, on the Log Food sheet: *"don't like this UI from this screen — the
-  icons/sections for photo/barcode/describe should be larger. Delete meals + New should be
-  different. Maybe a big 'New' button + a small delete bin."*
+**Nothing is under-padded — three are OVER-padded**, which is the opposite of what the entry
+expected, and it is why no code changed. Those three put the inset on the `SheetContent` (default
+`action`) *and* on a `SheetFooter` (`takeover`), and the two add. **The primitive cannot express the
+fix**: `SheetContent side="bottom"` and `SheetFooter` each always emit a `pb-safe-*` class, so the
+options are 76 px (today), 80 px (move it to the content), or adding a `"none"` escape hatch whose
+failure mode is a sheet with no bottom inset at all. Trading a 12–24 px cosmetic gap for that footgun
+is a bad deal, and every candidate is within ~24 px of the reference anyway.
 
-**① The capture tiles have already been enlarged once, which is the thing to know before doing it
-again.** BF-50 ① took them from `min-h-12` (48 dp) to `min-h-[62px]`, and the comment records where
-62 came from: *"from the artboard's capture tiles — not a number invented here (BF-28's parity
-rule)"*. The owner is now asking for bigger than the drawing.
+### [nutrition] BF-73 — bigger capture tiles, and `New` outranks `Delete meals` (shipped; device check owed)
 
-- **That is allowed, and BF-28 rule 2 is why:** a later owner decision beats the artboard, and this
-  is one. Record it as an owner override rather than a parity fix, so the next parity sweep does not
-  "correct" the tiles back to 62 and re-open this.
-- **Keep `min-h`, never a fixed height.** The existing comment earned that: *"Describe or enter"*
-  wraps to two lines in a third of 412 dp and a fixed height clips it. Growing the tile means raising
-  the floor and letting the label breathe — more vertical padding and a larger icon (`h-5 w-5` today)
-  — not pinning a height.
-- The icon and the 11 px label should scale with the tile; a bigger box around the same small glyph
-  is what makes a control read as empty rather than prominent.
+- **Lane:** B · **Batch:** `nutrition-ui-uplift`
+- **Gate:** device
+- **Keep:** the **device check**. Measured at 412 dp in a browser: tiles **60 px → 79 px**, `New`
+  324×48 filling the row, the bin 48×48 beside it. What the phone decides is whether that reads as
+  *prominent* rather than merely bigger, and whether the bin still feels reachable at 48 dp in the
+  corner of a sheet.
+- **Added:** 2026-08-31 · owner: *"the icons/sections for photo/barcode/describe should be larger.
+  Delete meals + New should be different. Maybe a big 'New' button + a small delete bin."*
 
-**② The action pair is deliberately equal-weight today, and the owner wants a hierarchy.** Both are
-`size="sm"` pills with `min-h-[44px]`: `Delete meals` in `secondary`, `New` in the default accent.
-The owner's ask — a big `New`, a small bin — is the better shape and worth stating why: **`New` is
-the frequent act and deleting meals is rare and destructive**, so equal visual weight overstates the
-destructive one.
+**① is an owner override of the artboard, recorded as one** so the next parity sweep does not
+correct it back to 62 (BF-28 rule 2).
 
-- **The bin must stay a real 44 dp target while looking small.** Shrinking the *label* to an icon is
-  the ask; shrinking the *hit box* is a tap-target regression the repo already has a floor for.
-- **⚠ It needs an `aria-label`, and it is losing the one thing that made it clear.** BF-50 ④ renamed
-  this control from `Select` to `Delete meals` precisely because *"there is a 'select' button… but
-  you can't do anything with it except delete"* — the words are the fix that entry shipped. An
-  icon-only bin throws them away visually, so the accessible name has to carry them: `aria-label="Delete meals"`, not `"Delete"`.
-- **The risk is low and worth saying so:** the bin opens *selection mode*, it does not delete
-  anything, and the destructive confirm sits behind it. So an icon-only entry point is defensible
-  here in a way it would not be if it deleted on tap.
-- **Verification:** on the S25, the three capture tiles read as the screen's primary controls and
-  *"Describe or enter"* still fits on two lines without clipping; `New` is visibly the primary action
-  and the bin visibly secondary; the bin still measures ≥44 dp and a screen reader announces it as
-  "Delete meals".
+**The mechanism turned out not to be the one the entry assumed, and this is the durable part:
+`min-h-[Npx]` does nothing on a `<button>` in this app.** `globals.css` sets a bare
+`button, [role="button"] { min-height: 48px }` and it beats the utility — measured, a button with
+`min-h-[84px]` computes `48px` while the same class on a `<div>` computes `84px`. So **BF-50 ①'s
+`min-h-[62px]` never applied either**: that tile measured **60 px**, its content's own height, not
+the 62 its comment claimed. The height here is padding- and icon-driven instead, and the inert class
+was removed rather than left to imply otherwise. Filed as **LB-32**.
+
+**② keeps BF-50 ④'s words where they still count.** The bin is icon-only but its accessible name is
+`Delete meals`, not `Delete` — those words are the fix BF-50 shipped for *"you cant do anything with
+it except delete"*, and only the accessible name still carries them. It opens selection mode and
+deletes nothing on tap, which is what makes an icon-only entry point defensible here.
 
 ### [nutrition] BF-70 — the barcode scan fetches the product image and three layers throw it away
 
@@ -2424,6 +2388,34 @@ controls side by side, one wired to the engine and one not.
   → they drop back; complete a set under `Full` → it counts toward the 1RM/PR; complete one under
   `Deload` → it does not. Then the reverse case, a **full** prescription with `Deload` picked, still
   behaves as Q-109/Q-175 built it — that path works today and must not regress.
+
+### [platform][app-shell] LB-32 — `min-h-[Npx]` is inert on every button in the app, and one comment already describes a size that never applied
+
+- **Lane:** B
+- **Added:** 2026-08-31 · found while sizing BF-73's capture tiles.
+
+**Measured in a browser, not inferred:** a `<button class="min-h-[84px]">` computes
+`min-height: 48px`; the identical class on a `<div>` computes `84px`. `globals.css` sets a bare
+`button, [role="button"] { min-height: 48px }` inside `@layer utilities`, and it wins over the
+Tailwind utility — so on a button or a `role="button"`, `min-h-[Npx]` does nothing at all.
+
+**Mostly this is harmless, and the count says why.** Of the `min-h-[Npx]` uses, 46 are `44px` and 26
+are `48px` — at or below the floor, so they are over-satisfied rather than defeated. Only a value
+**above 48** can be silently lost.
+
+**Two places lose one today.** `components/coach/coach-history.tsx` carries `min-h-[56px]` on a
+`role="button"` row and renders 48. And `capture-actions.tsx` carried `min-h-[62px]` from BF-50 ①
+with a comment stating the tile was 62 px "from the artboard" — **it measured 60**, the content's own
+height. BF-73 removed that class rather than leave it implying a floor it does not set.
+
+- **Why this is filed rather than fixed:** the fix is a judgement about the global rule, whose own
+  comment argues at length for staying a bare element selector (it reaches hand-rolled buttons a
+  variant would not). Options: leave it and treat `min-h` on a button as a no-op (documenting it
+  where it bites); add `!` to the call sites that need a taller floor; or move the floor behind a
+  `:where()` so any utility outranks it — that last one is the real fix and the riskiest, because the
+  floor currently wins against *everything* and that is what has kept tap targets honest.
+- **Reference:** the measurement method is in
+  [`2026-08-31-nutrition-uplift.md`](overview/entries/2026-08-31-nutrition-uplift.md).
 
 ### [nutrition] BF-63 — barcode scan in the meal builder (shipped; the scan itself needs the device)
 
