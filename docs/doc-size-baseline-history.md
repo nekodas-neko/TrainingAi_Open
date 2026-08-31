@@ -5047,3 +5047,24 @@ even while gaining three items, and one gotcha was retired into the new block.
 
 The rule this obeys is CLAUDE.md's: **rewrite the baton in full, never append.** The ratchet is what
 turns that from an intention into a thing that happens.
+
+## 2026-08-31 — `docs/implementation-backlog.md` 14442 → 14509 (LA-47 filed, Q-407 parked behind it, LB-12's second missing field)
+
+**Net +67, and none of it is new work discovered — it is one entry's halves being separated so the
+queue can serve them.** Q-407 said in prose that `lib/coach/**` is Lane A and that *"the schema
+change lands first"*, and was nonetheless row 1 of Lane B's READY list. Verified against main rather
+than taken from the entry: `CoachWidgetSchema` is a union of five widgets with **no plan card**, and
+`grep -rn scope lib/coach/*.ts` finds **no named scope record**, so Lane B's half had nothing to
+render. LA-47 is that engine half as an entry someone can pick up; Q-407 now carries `Needs: LA-47`.
+Same defect as BF-82 two entries earlier, and the same fix: **a field, not a paragraph.**
+
+**LB-12 gained the finding that it is itself an instance of.** Its remaining half is the
+Orchestrator's — it says so — and it heads Lane B's queue anyway, because `laneFromLines` reads
+`**Lane:** B filed it; the sweep is the Orchestrator's` as a plain `B`. The queue's vocabulary is
+`A`/`B`/`?`/unstated and **none means "classified, and not an implementer's"**. Recommended a
+`Role:` field; not built, because `scripts/**` is the Orchestrator's own tooling.
+
+**One thing caught by running the tool rather than reading the diff:** LA-47 was drafted with a
+`- **Reference:**` bullet pointing at Q-407, which claims a FIELD meaning *"there is nothing to build
+here"*. It printed under `REFERENCE (1) — read by other entries, not implemented. Never "next".`
+The pointer is prose now. A backlog edit is worth running `next-item.js` over.

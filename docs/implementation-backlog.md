@@ -3966,9 +3966,61 @@ place to start rendering pictures.
   reference drawings were never committed). Part 1 §8 has the file-by-file collision table and the
   carry-across rule. **Do not plan around that chain landing, and do not wait for it.**
 
+### [nutrition][platform] LA-47 — the meal-plan coach's engine half: a plan widget and a named nutrition scope
+
+- **Lane:** A — `lib/coach/widgets.ts`, `lib/coach/` (the scope record), `app/api/coach/route.ts`
+  (the SYSTEM prompt's widget rules, lines 27–59), `app/api/coach/options/route.ts`.
+- **Added:** 2026-08-31 · split out of **Q-407** rather than newly discovered. Q-407's own Lane
+  bullet already says `lib/coach/**` is Lane A and that *"the schema change lands first"*; this is
+  that half as an entry someone can pick up, so Q-407 can carry a `Needs:` instead of a paragraph.
+- **Read Q-407 first** — it holds the design, the owner's words and the mockup; this entry is the
+  engine it names, not a second opinion about it. Written as prose deliberately: a `- **Reference:**`
+  bullet claims a FIELD that means *"there is nothing to build here"*, and this entry was drafted
+  with one — it printed under `REFERENCE (1) — read by other entries, not implemented. Never "next".`
+  A pointer to another entry is not the same as being one.
+
+**Measured against main on 2026-08-31, so the scope is evidence rather than a plan's memory:**
+`CoachWidgetSchema` is a discriminated union of `ChoiceList · ChangePreview · Handoff · NumberDial ·
+Chart` — **no plan card** — and `grep -rn scope lib/coach/*.ts` returns nothing, so **no named scope
+record exists**. Q-407's multi-select half *did* ship on 2026-08-27 (`multi`/`selectAll` are on
+`ChoiceListSchema` at lines 71–73, and `CHOICE_SOURCES` serves the six catalogues), which is exactly
+why what remains is the two pieces below.
+
+1. **A plan widget.** A card listing each meal with its calories and item count, plus **Save all as
+   meals** and **Redo**. The button calls Q-398's write path (shipped 2026-08-24), which is keyed on
+   `(plan id, plan item id)` so a repeat save is a no-op. **The owner's review is the acceptance
+   test and it is not polish:** *"I want it to make the meal plan; then add each item to the saved
+   meals/my foods"* — the conversation is finished when every meal is a row in `My Foods`,
+   indistinguishable from one built by hand. Add a member to the union and a row in
+   `WIDGET_TOOL_NAMES`; the registry row and the component are Lane B's half.
+2. **A named scope record** — prompt section + tool subset + patch domains + widget sources — so
+   entering from the Nutrition tab starts inside the nutrition scope. **Scope by withholding tools,
+   not by instructing:** a prompt saying "do not read workout data" is a request the model will
+   occasionally ignore; a tool it never receives is a boundary it cannot cross. A named record
+   rather than an inline filter, so a second coach costs no refactor. **This one line is all that
+   survives of Q-408** — do not re-derive that architecture; Q-407 records why it was removed.
+
+- **Flat fields, never a discriminated union of variants**, wherever a widget gains options.
+  `widgets.ts`'s own comment: *"Gemini's function-declaration schema is fussy about unions, and this
+  feature has already lost a day to one (`z.literal(false)`)."*
+- **`/api/coach/options` returns early with an empty list when there is no active program.** That is
+  right for `sessions` and wrong for a catalogue — a nutrition question must not fail on a training
+  precondition. The catalogue branches sit **above** that gate and a test pins it; keep them there.
+- **Verification.** The schema and the scope record are unit-testable. The conversation is not — it
+  needs a real Gemini turn, so run one plan end-to-end against `pnpm dev` and say plainly that the
+  on-device pass was not exercised unless it was.
+
 ### [nutrition][platform] Q-407 — the meal-plan wizard is seven screens for six answers, and the one piece the Coach lacks is multi-select
 
 - **Branch:** `feat/nutrition-coach-meal-plan`
+- **Needs:** LA-47 — **added 2026-08-31, and the entry already said so in prose.** Its Lane bullet
+  ends *"the schema change lands first — the component cannot render a flag the schema does not
+  carry"*, and every one of the three remaining parts starts in `lib/coach/**` or
+  `app/api/coach/**`, which are Lane A. Verified against current main the same day:
+  `CoachWidgetSchema` is a union of `ChoiceList · ChangePreview · Handoff · NumberDial · Chart` with
+  **no plan card**, and `grep -rn scope lib/coach/*.ts` finds **no named scope record**. So Lane B's
+  half has nothing to render yet. Stated as prose this served the item to Lane B at the head of its
+  queue — the same defect BF-82 had, and the reason `Needs:` is a field.
 - **Added:** 2026-08-19 · BugFix Intake, from the owner · mockup rendered in-session
 - **Lane:** B — classified 2026-08-30 by CLAUDE.md's path rule (*reached only from `app/**` and `components/**` → B*; this is a wizard's screens and a multi-select control, with no storage or route change).
 - **Placement:** in the nutrition cluster, after Q-398 — **which shipped 2026-08-24**, so the
@@ -4268,6 +4320,21 @@ signed off by the owner in that conversation. Review:
   do not pursue without a reason"* — understood, deliberately declined, and waiting on a named
   trigger. That is neither `Gate: owner` nor `Gate: device`, so it reads as startable forever. Worth
   settling during the sweep.
+- **⚑ A SECOND missing field, and THIS ENTRY is an instance of it (2026-08-31).** LB-12's own
+  remaining half is the Orchestrator's — it says so above — and it was nonetheless **row 1 of Lane
+  B's READY list**, because `laneFromLines` reads `**Lane:** B filed it; the sweep is the
+  Orchestrator's` as a plain `B`. The queue's vocabulary is `A` · `B` · `?` · unstated, and **none of
+  those means "classified, and not an implementer's"**. `?` is wrong (it is not unclassified),
+  unstated is worse (it shows to both lanes), and `Reference:` is a stretch that also means "nothing
+  to build".
+  **Recommendation: add a `Role:` field** — `orchestrator` · `tuning` · `owner` — read alongside
+  `Lane:` and filtered out of an implementer's READY list the way `Gate:` already is. It is a small
+  change to `scripts/lib/lane.js` and `next-item.js`, and it is what stops the sweep entry itself
+  from occupying the slot the sweep is meant to free.
+  **Not built 2026-08-31** because `scripts/**` is not answered by the lane rule and this is the
+  Orchestrator's own tooling; filed here so the sweep decides it with the rest.
+  ⚠ **Until then this entry keeps heading Lane B's queue**, which a reader should treat as the
+  symptom rather than the assignment.
 
 ### [readiness][devices] TN-8 — the chronic-stress fever mask is a FOURTH consumer of the broken temperature baseline
 
