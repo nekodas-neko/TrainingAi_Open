@@ -5118,3 +5118,13 @@ server-side consumer that might act on it. The owner asking for it in a second p
 is deliberate, which argues for storing it — and that turns a Lane B control into a Lane A row. The
 "per session" wording is also flagged as ambiguous, because Home shows one session and the request
 only parses on a list.
+
+## 2026-08-31 — implementation-lane-b.md 159 → 154 (−5, TIGHTENED)
+
+The twentieth Lane B run's baton rewrite. It gained this run's material — `tsc` typechecking nothing
+under `__tests__`, LB-38's two falsified hypotheses and the ship-the-instrument lesson, the queue
+head being exhausted of Lane B work, and five new gotchas — and still came out five lines shorter,
+because the rule is rewrite rather than append. The four-tests-that-could-not-fail block compressed
+to its principle now the habit is established, and the re-litigate list lost detail that had aged
+into background. Tightened rather than banked: slack left in a shrink-only ratchet is room the next
+append takes without noticing.
