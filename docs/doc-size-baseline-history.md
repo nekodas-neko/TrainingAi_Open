@@ -5198,3 +5198,39 @@ none of that entry's three levers touch and which the file's own header tells se
 `projectOverview.md` grew by exactly the blurb this session added to that section — i.e. it is an
 instance of what the note above describes, raised rather than hidden. Trimming it is Orchestrator's
 sweep, not a native-fix PR's.
+
+## 2026-09-01 — `docs/implementation-backlog.md` (BF-86, and the fix is three lines above the bug)
+
+The owner asked for the app to reset itself on the first open of a new day, and gave the symptom that
+explains why: the morning check-in does not appear on a resume. That half has an exact cause —
+`session-select-content.tsx:784` prompts from an effect with deps `[userId, tz]`, neither of which
+changes, in a tab shell that never unmounts. It runs once per launch. The same file already solves
+this at `:774` with `tabEpoch`, and the check-in guard is already date-stamped, so re-running is
+idempotent: the state is right and only the trigger is missing.
+
+The entry spends its length refusing the requested implementation and saying why, because "close and
+reset the app" is the kind of instruction that gets built literally. BF-80 — filed hours earlier —
+says outright not to fix a resume problem with a reload, and a scheduled reload would give a blank
+screen two candidate causes just as that one is being diagnosed. The recommendation is the mechanism
+the repo already has in miniature: `workout-day-rollover.tsx` is a correct date-change signal wired to
+exactly one consumer, and generalising it delivers the owner's ask with no reload at all.
+
+Also records the scale (56 `cachedFetchToday` sites) and the boundary-test rule, because a rollover
+bug is only visible across local midnight and this repo has repeatedly shipped date logic that works
+all day and fails in a two-hour band.
+
+## 2026-09-01 — `projectOverview.md` 8572 → 8593, `docs/implementation-backlog.md` 14557 → 14584 (BF-79)
+
+**`projectOverview.md` (+21).** Two shipped changes had to be recorded and only one of them was
+this PR's: BF-85 merged in #711 **without a status block**, so its paragraph lands here alongside
+BF-79's. Both were tightened before the raise — the BF-85 block came down from seven lines to five
+and BF-79's from ten to nine — and what is left is the two features plus the three findings BF-79
+turned up and filed (LB-40, LB-41, LB-42), one of which is a live bug on `main`.
+
+**`docs/implementation-backlog.md` (+27).** Net of removing the shipped BF-79 entry (43 lines) and
+adding those three (76). LB-42 is the long one deliberately: it has to say which column each reader
+uses before anyone can choose which survives, and that is the whole of the decision it is asking
+for.
+
+Nothing was banked. The alternative to raising was leaving a shipped feature unrecorded in the file
+every session reads first, which is the failure the ratchet is not for.

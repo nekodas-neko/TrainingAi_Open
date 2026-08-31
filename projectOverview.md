@@ -24,7 +24,7 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.414.3 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Version:** v1.415.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-09-01.
 
 **The personal details are one screen, and one writer (BF-79).** Owner: *"can we combine all the
@@ -32,24 +32,21 @@ personal information fields into 1 section in the more/details."* They were spli
 Profile sheet (display name) and the Goals accordion (height, birth year, biological sex) — and
 until BF-78 each editor resent the other's fields from a possibly stale copy. `More → Profile
 details` (`app/more/details/`) now holds all four, with **weight and body fat read-only** beside a
-link to where they are logged: an input there would open a second write path into `body_metrics`.
-Targets and activity level stayed in Goals on purpose, so the split closed rather than moved, and
-Goals gained an *Open Profile details* button because it can no longer edit the fields it still
-demands. Reading the same two components turned up three findings filed rather than fixed —
-**LB-40**, a user who already has a password *cannot change it* (the form never renders the Current
-password field the route requires); **LB-42**, `weight_goal_kg` and `target_weight_kg` are two
-columns for one goal with different readers, so the number the user sees and the number the AI is
-told can differ (Lane A, it is a schema decision); and **LB-41**, a Weight Units toggle with no
-consumer anywhere in the app. **Not device-verified**
+link to where they are logged — an input there would open a second write path into `body_metrics`.
+Targets and activity level stayed in Goals, so the split closed rather than moved, and Goals gained
+an *Open Profile details* button because it still demands fields it can no longer edit. Reading the
+same two components filed three findings rather than fixing them: **LB-40**, a user who already has
+a password *cannot change it* (the form never renders the Current password field the route
+requires); **LB-42**, `weight_goal_kg` and `target_weight_kg` are two columns for one goal with
+different readers, so the number the user sees and the one the AI is told can differ (Lane A — a
+schema decision); **LB-41**, a Weight Units toggle with no consumer. **Not device-verified**
 ([journal](docs/overview/entries/2026-09-01-personal-details-consolidation.md)).
 
-**The quantity box on Assign to Meal centres, and its spinner reset has one definition (BF-85).**
-Chromium draws the inner spin button inside the box, so a `text-center` value sat left of centre;
-and `text-sm` was silently inert under `globals.css`'s `input { font-size: 16px !important }`, so
-the value rendered a size larger than the chips beside it. The entry's own recommendation — put it
-on the shared `Input` primitive — was wrong and checking took two minutes: **1 of 28** `type=
-"number"` inputs uses the primitive, and neither quantity control does. **Not device-verified**
-([journal](docs/overview/entries/2026-09-01-quantity-box-spinner-reset.md)).
+**The quantity box on Assign to Meal centres (BF-85).** Chromium draws the spin button inside the
+box, so `text-center` sat left of centre; and `text-sm` was inert under `globals.css`'s
+`input { font-size: 16px !important }`. The entry's own fix — use the shared `Input` primitive —
+was wrong: **1 of 28** `type="number"` inputs uses it, and neither quantity control does. **Not
+device-verified** ([journal](docs/overview/entries/2026-09-01-quantity-box-spinner-reset.md)).
 
 **A dead WebView renderer is handled instead of fatal, and it now leaves evidence (BF-80).** The
 owner's *"tab back into the app and the pages often crash and display a blank page"* had **nothing**
