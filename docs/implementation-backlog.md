@@ -4113,6 +4113,48 @@ same caveat — a coloured stress line that brightens after good sleep is an ant
 data density — was **tested and refuted** (r = −0.128 vs HR sample count). No replacement mechanism is
 established. Until one is, this stays parked.
 
+### [readiness] TN-18 — TN-6a's suspension covers the readiness ladder but NOT the deload banner, which is the one the owner sees
+
+- **Branch:** _unassigned_ · **Added:** 2026-08-31 · owner screenshot, 2026-08-31 06:43 Brisbane
+- **Lane: A** — `packages/shared/src/ai-periodization/ai-dynamic.ts:184`
+- **Do not batch** — it is one condition, and it un-does a daily false alarm the owner has reported twice.
+
+**TN-6a shipped and works.** `readiness-payload.ts:386` computes `tempLadderTrusted` from
+`isTemperatureBaselineCentred(...)`, and `computeBlendedScore` nulls the deviation when it is false,
+making every arm of the ladder unreachable. Verified on 2026-08-31: stored `temp_dev_c` = **0.519 °C**
+and readiness carries **no** temperature penalty.
+
+**The deload banner was never gated.** `ai-dynamic.ts:184` is still a bare
+`temperatureDeviation != null && temperatureDeviation > TEMP_ALERT_THRESHOLD_C` (0.5). `grep` finds
+`isTemperatureBaselineCentred` in **exactly one file**. TN-6a's own entry said it *"must cover all
+three consumers"*; it covers one.
+
+**The owner's screenshot holds both halves of the broken baseline at once**, for the same night:
+
+| path | value | verdict |
+|---|---|---|
+| readiness contributor | `tempZ` = **0.303** | **80/100** — temperature is fine |
+| deload banner | `temp_dev_c` = **0.519 °C** | **"Body temp elevated — rest or deload recommended"** |
+
+The z is small **because the baseline sd is inflated**: `temp_baseline_dev_x8` reads **1.714 °C**
+against a true nightly sd of ~0.14 °C, and `0.519 / 1.714 = 0.303` matches the stored contributor
+input to three decimals. **Q-506's inflated sd and TN-6's low mean, visible in one frame, failing in
+opposite directions.**
+
+**Why this one matters more than its size.** The banner is the surface behind the owner's original
+report — *"its often triggering deload days. its not trustable yet."* TN-6a's protection landed on
+the path they never read and skipped the path they do.
+
+**Fix: pass the same `tempLadderTrusted` condition into the deload evaluation and skip `tempAlert`
+when it is false.** Do **not** raise `TEMP_ALERT_THRESHOLD_C` — that is the Q-504 mistake and the
+fourth "the threshold is right, the input is wrong" in this pillar. The third consumer (`tempZ` /
+the illness radar) needs checking in the same pass: it is not *firing* wrongly, but it is reading the
+same object and cannot fire at all while the sd is 12× too wide.
+
+**Pass test:** on the owner's stored history the banner raises **0** temperature alerts while
+`isTemperatureBaselineCentred` is false, and the count matches the readiness ladder's suppressed-arm
+count night for night.
+
 ### [readiness] TN-6a — suspend the temperature penalty until its baseline is centred
 
 - **Branch:** _unassigned_
