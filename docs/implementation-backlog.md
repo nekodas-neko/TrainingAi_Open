@@ -2069,11 +2069,26 @@ nothing calls**, plus write amplification on every HR insert, which is the highe
 the app (87,021 rows today). Q-180 weighed the *method*; the index was never in that accounting, and
 it is 2× the heap of the table it sits on (`oura_heartrate`: 32 MB of index on 9 MB of data).
 
-- **Gate: owner** — this reverses part of a decision the owner signed off, so it is theirs.
-  **Recommendation: drop it, and say in `getOuraTimeseriesDelta`'s comment that the restore driver
-  must recreate it.** Reversal is one `CREATE INDEX` over 9 MB of heap — seconds — and the driver
-  that needs it does not exist yet, so nothing can regress in the meantime. Keeping it costs 18 MB
-  and every insert, indefinitely, for a path with no caller.
+- **✅ THE OWNER GATE IS CLEARED, 2026-09-01 — the field is removed above, deliberately.** The owner
+  approved the drop: *"yes if we are not using it and you are sure its reversible then get rid of
+  it."* Both conditions were re-verified
+  against production before recording this, rather than resting on the 2026-08-30 table above:
+  - **Unused, and the reading is now stronger.** `oura_heartrate_user_updated` reads
+    **`idx_scan` 0 and `idx_tup_read` 0**, and it has grown to **20 MB**. On the *same table*,
+    `oura_heartrate_user_id_timestamp_key` shows **40,195 scans / 18.6 M tuples read** — so this is
+    not a quiet table, it is an index the planner never chooses.
+  - **No caller.** `getOuraTimeseriesDelta` exists in `slices/oura.ts:700`, `adapter.ts:6293` and the
+    `repository.ts:1203` interface, and **nothing invokes it**; the only other mention is
+    `sync-engine.ts:729` recording that the driver "never was" written.
+  - **Reversible.** A plain btree from `130_oura_heartrate_updated_at.sql` — one `CREATE INDEX` over
+    9.6 MB of heap.
+  - **⚠️ And the entry's own warning held up.** `rr_intervals_pkey` read `idx_scan` 0 on 2026-08-30
+    and reads **5,034** now. Had "never scanned" been treated as a drop rule, that constraint would
+    have gone. **Drop `oura_heartrate_user_updated` and nothing else from that table.**
+- **Lane A takes it from here — this is a migration and the Orchestrator may not number one.** What
+  it owes: the `DROP INDEX`, and a line in `getOuraTimeseriesDelta`'s doc comment saying the restore
+  driver must recreate the index, since Q-180's "it costs nothing at runtime" is what this narrows.
+  **Q-180's decision to keep the *method* stands; only its index goes.**
 - **The alternative** is keeping it so the restore driver finds its index waiting, which is what
   Q-180 chose. That is defensible if the driver is imminent; it has not been written in the two weeks
   since, and the index is 21 % of the index budget this entry was opened about.

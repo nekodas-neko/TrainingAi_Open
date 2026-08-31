@@ -18,6 +18,23 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
+## 2026-09-01 — `docs/implementation-backlog.md` 14506 → 14521 (BF-55's owner gate cleared)
+
+Fifteen lines recording the owner's approval to drop `oura_heartrate_user_updated`, and the
+re-verification it was conditioned on — *"if we are not using it and you are sure its reversible"*.
+Both conditions were checked against production rather than taken from the entry's 2026-08-30 table,
+which is the point of the length: `idx_scan` and `idx_tup_read` are still 0 while the sibling index
+on the same table shows 40,195 scans, and `getOuraTimeseriesDelta` has no caller in any of the three
+places it is defined.
+
+**The check caught a real mistake while this was written, and it is worth recording.** The cleared
+gate was first written as a struck-through `~~**Gate: owner**~~` at the head of its bullet, and
+`check-backlog-pointers.js` failed it: a `Gate:` in field position is read as a field whatever
+decoration is around it, so the strike-through would have left the entry parked while reading as
+cleared. The field is now removed and the clearance narrated in prose that does not begin with the
+word. That is the inverse of LB-18's lesson — there a cleared gate was narrated but never struck;
+here striking it in place would have been just as wrong.
+
 ## 2026-08-26 — `docs/implementation-backlog.md` 11882 → 11903 (Q-406 blocked at `Gate: owner`)
 
 Q-406's warning-row decision was taken to be built and turned out not to be buildable. Option A moves
