@@ -358,6 +358,66 @@ below threshold and left in place for next time.
 > BF-29 (My meals), BF-30 (Meal detail), BF-31 (Edit meal) and BF-26 (Quantity). Two artboards need
 > no entry — `Tap targets` and the `srv/g` studies both shipped in Q-395a.
 
+### [app-shell][platform] BF-86 — the morning check-in never re-prompts, because its effect runs once per app launch
+
+- **Lane:** B for the check-in and the rollover signal; A only if a day-scoped server read turns out
+  to need it too.
+- **Added:** 2026-09-01 · owner: *"when the app is opened first thing in the morning or after 12 at
+  night, I'd like it to close/do a full reset so I open the fresh app… when I open the app in the
+  morning and it just resumes, it doesn't give me the morning check-in."*
+
+**The check-in half has an exact cause.** `session-select-content.tsx:784` prompts the morning
+check-in from a `useEffect` with deps `[userId, tz]`. Neither changes while the app is running, and
+**the tab shell is persistent — it does not unmount** — so the effect runs **once per app launch**
+and never again. Leave the app open overnight, resume it at 6 am, and nothing re-evaluates whether
+today's check-in is owed. That is the `check-fetch-once-effects` class CLAUDE.md already names:
+*"anything in the persistent tab shell holds its first payload until the app is killed."*
+
+**The fix pattern is three lines above the bug.** At `:774` the same file already carries:
+
+```ts
+// The persistent shell re-shows this tab without remounting it — re-run the
+// mount refresh pass (same cachedFetch-backed reads a remount used to run).
+useEffect(() => { … }, [tabEpoch, fetchMeta, fetchWorkoutData, loadTodayMood])
+```
+
+The check-in effect does not use `tabEpoch`. **And re-running it is already safe**: the guard
+`isMorningCheckinPromptDone(tz)` compares a `localStorage` marker against `todayInTz(tz)`, so it is
+date-stamped and idempotent — re-running on a resume prompts once on a new day and no-ops on the
+same day. The state is right; only the trigger is missing.
+
+**⚠ On the "close / full reset" half — do not implement it as a reload or a process kill.** Three
+reasons, and the first is that this repo just wrote the rule down:
+  1. **BF-80** (the app returning blank after backgrounding) says explicitly not to fix a resume
+     problem by reloading on `visibilitychange` — it costs the instant-paint behaviour and hides real
+     faults. A scheduled reload would make BF-80 much harder to diagnose, because a blank screen
+     would then have two candidate causes.
+  2. **The instant-paint rules** exist so a repeat open shows last-known data immediately. A hard
+     reset trades the owner's stated want (a correct fresh view) for a spinner.
+  3. An unsynced outbox and an in-progress workout both survive a restart today, but neither is a
+     thing to test on a schedule for cosmetic reasons.
+
+- **Recommendation: one "the local date changed" signal, and every day-scoped consumer subscribes.**
+  That signal already exists in miniature: `components/shell/workout-day-rollover.tsx` sits in the
+  root layout and fires on mount + `visibilitychange`, comparing `todayInTz(tz)` against a stored
+  date. It is exactly the right mechanism and it is wired to exactly one consumer — the workout
+  store's `todayLogged`. Generalise it (a context or a small event) and the owner's ask becomes
+  true without a reload: on the first resume of a new day the app re-prompts, re-reads and
+  re-paints, and on any other resume it does nothing.
+- **What is day-scoped and would subscribe** — enumerate before building, do not guess: the morning
+  check-in prompt, the mood prompt, the rest-day marker (`ta_rest_day`, BF-84), `todayLogged`, and
+  **56 `cachedFetchToday` call sites**. `cachedFetchToday` already embeds the date in its key, so
+  those may need nothing beyond a re-read — confirm rather than assume, because a key that rotates
+  and a component that never re-reads is the Q-402 shape.
+- **⚠ Test the boundary, not the feature.** A rollover bug only appears across local midnight, and
+  this repo has a documented history of date logic that works all day and fails in a two-hour band.
+  Any test drives the clock or an `Etc/GMT±N` timezone across the boundary rather than waiting for
+  it.
+- **Verification:** leave the app open overnight and resume it after midnight — the morning check-in
+  prompts once, yesterday's ticks are gone, and today's date is on screen, **with no reload and no
+  spinner**. Resume it again ten minutes later and nothing re-prompts. Do the same having force-
+  closed the app first: identical result, which is the point.
+
 
 ### [sleep] BF-83 — last night's sleep grows while you look at it, and nothing says it is still filling
 
