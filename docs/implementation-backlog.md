@@ -358,6 +358,88 @@ below threshold and left in place for next time.
 > BF-29 (My meals), BF-30 (Meal detail), BF-31 (Edit meal) and BF-26 (Quantity). Two artboards need
 > no entry — `Tap targets` and the `srv/g` studies both shipped in Q-395a.
 
+### [platform][body] BF-78 — a partial PATCH to `/api/user/profile` wipes four columns, and one caller already sends one
+
+- **Lane:** A — `lib/data/postgres/adapter.ts:655` (`updateUserProfile`) and
+  `app/api/user/profile/route.ts`.
+- **Added:** 2026-08-31 · found while tracing the owner's request to gather the personal-detail
+  fields into one place. Not reported — nothing has visibly broken yet.
+
+**`updateUserProfile` writes four columns unconditionally as `?? null`:**
+
+```ts
+const set: Record<string, unknown> = {
+  displayName:  profile.displayName  ?? null,
+  heightCm:     profile.heightCm     ?? null,
+  dateOfBirth:  profile.dateOfBirth  ?? null,
+  weightGoalKg: profile.weightGoalKg ?? null,
+}
+if (profile.timezone) set.timezone = profile.timezone
+if ('sex' in profile) set.sex = profile.sex ?? null
+```
+
+The last four are guarded by a presence check. **The first four are not**, so any PATCH that omits
+them **nulls them**. It is a PATCH by name and a PUT by behaviour.
+
+**⚠ One caller already sends a one-field body.**
+`components/profile/goal-recommendation-sheet.tsx:148` PATCHes
+`{ activityLevel: rec.recommended.activityLevel }` when the owner accepts an activity-level
+recommendation — so accepting a recommendation should erase **display name, height, date of birth
+and weight goal** in the same request. Height feeds the BMR fallback, so the damage is not only
+cosmetic: it would silently degrade the calorie model.
+
+- **Measured 2026-08-31: it has NOT fired.** The owner's row still reads height 160, a date of birth,
+  weight goal 60 and a display name. So this is latent, one tap away, not an incident — which is the
+  best moment to fix it and the reason it is at the head of the queue rather than in a Known-Issues
+  row.
+- **`edit-profile-sheet.tsx` is the workaround, and its comment says so** — *"Height, sex, date of
+  birth, activity level and fitness goal are edited from the Goals section — `/api/user/profile`
+  isn't a true partial update, so they must be resent here to avoid wiping them out."* That comment
+  is correct and load-bearing. Every editor of this route has to know every other editor's fields.
+- **Fix: make the four conditional, the same way the other four already are** (`'heightCm' in profile
+  ? …`). Then delete the defensive resend in `edit-profile-sheet.tsx` in the same PR, or the
+  workaround outlives the bug and the next reader re-derives it.
+- **⚠ Check the other two callers before changing the shape:** `goals-section.tsx:141` and
+  `goal-recommendation-sheet.tsx:148`. One of them relies on the resend today.
+- **Verification:** PATCH `{ activityLevel: 'moderate' }` alone and every other column is unchanged;
+  PATCH `{ heightCm: null }` explicitly and height clears, because *omitted* and *sent as null* must
+  stop meaning the same thing.
+
+### [platform][body] BF-79 — the personal details are split across two editors that each resend the other's fields
+
+- **Lane:** B — `components/profile/edit-profile-sheet.tsx`, `goals-section.tsx`,
+  `required-info-section.tsx`, and the More profile tab that mounts them.
+- **Needs:** BF-78 — consolidating on top of a route that nulls omitted columns just moves the
+  hazard.
+- **Added:** 2026-08-31 · owner: *"can we combine all the personal information fields into 1 section
+  in the more/details. Like height/weight/bodyfat etc."*
+
+**Where they live today, which is the argument for the request:**
+
+| Field | Edited in |
+|---|---|
+| Display name, weight goal, timezone | `EditProfileSheet` |
+| Height, birth year, biological sex, body fat % | `GoalsSection` → `RequiredInfoSection` |
+| Weight, body fat (latest reading) | read-only in `GoalsSection`, logged elsewhere |
+| DEXA, measured RMR | `More → Health → DEXA & RMR results` (BF-71) |
+
+- **The split is not only untidy — it is what makes BF-78 dangerous.** Two editors of the same row
+  means each must resend the other's values, and `EditProfileSheet` carries a comment doing exactly
+  that. One section that owns every profile column removes the class, not just the mess.
+- **Decide what belongs, because "personal information" has an edge.** *Identity and body facts*
+  (name, sex, date of birth, height) are stable and belong together. *Weight and body fat* are
+  **measurements with a history** — they are logged daily and the profile only shows the latest, so
+  they should appear read-only with a link to logging, never as editable profile fields. Making them
+  editable here would create a second write path to `body_metrics`, which is the shape the
+  offline-first rules exist to prevent.
+- **Goals are a third thing** — a step goal or a calorie target is not a personal detail. Keep them
+  in Goals or the split just moves.
+- **Where:** the owner said More → details. `BF-71` put the clinical screen at `More → Health`, so a
+  sibling `More → Profile details` is consistent and leaves the tab itself uncluttered.
+- **Verification:** every profile column is editable in exactly one place; saving one field leaves
+  the rest unchanged (which is BF-78's test, run through the UI); weight and body fat read as
+  measurements with their date, not as inputs.
+
 ### [nutrition] BF-72 — the diary's hydration wiped its own meal grouping (fixed; device check owed)
 
 - **Lane:** B · **Batch:** `nutrition-ui-uplift`
@@ -3143,6 +3225,28 @@ will hit it.
   measurement.
 
 ### [body][nutrition][platform] BF-41 — RMR, DEXA and blood are one intake shape; build the pipeline once
+
+> **⚑ RE-ASKED 2026-08-31 — owner, on the screen BF-71 just shipped: *"can we add the option to
+> upload an image of the results like I did and have it fill it in?"*** This entry is that request.
+> Two things changed since it was written and both shrink it:
+> - **The confirm step is no longer new UI.** BF-71 shipped typed forms for DEXA and RMR that already
+>   validate and save. Extraction's job is to **prefill those forms**, not to build a review screen —
+>   so the shape is: pick an image → extract → the existing form opens populated → the owner corrects
+>   anything wrong → save. `source` is already `'manual' | 'extracted'`, with no third value for a
+>   model's unconfirmed output, which is the schema saying the confirm step is mandatory.
+> - **The blood panel is the case that actually needs it.** DEXA is ~10 load-bearing fields and RMR
+>   is 3; both are typable in a minute. A 58-analyte panel is not, so if this is built for one report
+>   first, build it for blood.
+>
+> **⚠ The owner's own rule binds here and it is the reason this was deferred, not an obstacle to
+> route around: CROP BEFORE UPLOAD (BF-1).** The owner said it first — *"I will scrub it of my PII
+> first"* — and the extraction call sends the image to Google, so *redacting after extraction is too
+> late*. The upload surface must therefore make cropping the **default path**, not a suggestion: show
+> the crop step before the image can be sent, and never auto-send a freshly-picked photo. The RMR
+> printouts in particular carry a name and a date of birth in the header, which is exactly the band a
+> crop removes.
+> **And still no source document is stored** — extract, confirm, save the fields, discard the file.
+> That is recorded in the module map and reversing it is its own decision.
 
 > **⚑ PROMOTED, 2026-08-27 — owner: *"So lets prioritize getting this data saved and uploaded."***
 > This entry is now the pipeline's own priority, not a note attached to three others. The reports
