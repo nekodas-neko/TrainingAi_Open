@@ -3320,6 +3320,7 @@ them, and that is most of the argument for D. Kept because if B is ever revived 
 
 ### [body][devices][platform] BF-53 — every pending weigh-in button is dead: both routes validate a numeric id with a UUID regex
 
+- **Gate:** device
 - **Keep:** the DEVICE check, and only that. Fixed 2026-08-30 — both routes take `numericRouteId`
   now, and the client reports a failed press instead of swallowing it. Reproduced and re-verified on
   `pnpm dev` against the same real pending row (pre-fix: both buttons `400 Invalid id`, row
@@ -4377,64 +4378,6 @@ signed off by the owner in that conversation. Review:
 - *Lane B filed the identical finding the same day (as LB-14) after **OR-1** and **BF-23** were also
   filed independently for the same red; folded here rather than kept as a fourth duplicate.*
 
-### [platform] LB-12 — 77 of 193 queue entries state no lane, so both implementers are served each other's work
-
-- **Branch:** _unassigned_ · **Lane:** B filed it; **the sweep is the Orchestrator's** (it owns lane
-  resolution, `docs/agents/README.md`).
-- **Added:** 2026-08-25 · Lane B, after correcting four entries' lanes one at a time in one session
-  (Q-403, Q-289, Q-290, Q-291) and hitting a fifth and sixth immediately after.
-- **Measured on `main`, 2026-08-25:**
-
-  | | |
-  |---|---:|
-  | queue entries | 193 |
-  | lane stated | 116 |
-  | **lane UNSTATED** | **77 (40%)** |
-  | of Lane B's 55 READY rows, how many state no lane | **53** |
-
-  So **two** of the fifty-five rows the tool offers Lane B are rows the queue actually knows are
-  Lane B's. The rest are unclassified and shown to both lanes.
-- **The tool is not wrong; the data is incomplete.** `next-item.js` shows an unlaned entry to both
-  lanes deliberately — the path rule in §3 is supposed to answer it, and hiding it from the lane that
-  might own it would be worse. **What was wrong is that it was silent**, so a reader could not tell a
-  row the queue knows is theirs from one nobody has classified. Fixed 2026-08-25: those rows now
-  print `⟨lane unstated⟩` and the header counts them. That is the visibility half and it is done.
-- **What is left is the sweep**, which is not an implementer's to do: 77 entries want a `Lane:` field
-  applied from the path rule (reached by `app/api/**` or storage → A; reached only from
-  `app/**`/`components/**` → B; both → A). A large fraction are `readiness`/`platform` scoring work
-  in `packages/shared`, which is Lane A's, and **several are scoring changes that are no
-  implementer's at all** — Tuning proposes, the owner signs off, Lane A implements.
-- **Worth deciding while sweeping:** entries that are *notes rather than work* should leave READY.
-  **Q-294** says of itself *"this is a note against Q-249, not independent work"* and *"no branch of
-  its own"*, and it is currently row 2 of Lane B's queue. **Q-504** is titled *"REFUTED: readiness
-  should NOT get a range calibration"* and is row 8.
-- **The startable Lane B work exists; it is ~50 rows down.** Scanning the 77 unlaned entries for ones
-  whose body mentions only Lane-B surfaces (`components/`, `lib/hooks`, `lib/stores`, `.tsx`) and no
-  Lane-A surface gives **10**: Q-395b, Q-354, Q-254, Q-154, Q-168, Q-138, Q-112, Q-111, Q-93, Q-1b.
-  (Q-154 shipped 2026-08-30 and Q-395b/Q-93 are no longer queue headings — the list is the 2026-08-25
-  measurement, kept as it was taken rather than re-scored.)
-  That is the shape of the problem — not that Lane B has nothing to do, but that fifty rows of
-  someone else's work sit on top of it.
-- **A field the queue does not have, found while checking those ten:** **Q-354** ends *"Recommendation:
-  do not pursue without a reason"* — understood, deliberately declined, and waiting on a named
-  trigger. That is neither `Gate: owner` nor `Gate: device`, so it reads as startable forever. Worth
-  settling during the sweep.
-- **⚑ A SECOND missing field, and THIS ENTRY is an instance of it (2026-08-31).** LB-12's own
-  remaining half is the Orchestrator's — it says so above — and it was nonetheless **row 1 of Lane
-  B's READY list**, because `laneFromLines` reads `**Lane:** B filed it; the sweep is the
-  Orchestrator's` as a plain `B`. The queue's vocabulary is `A` · `B` · `?` · unstated, and **none of
-  those means "classified, and not an implementer's"**. `?` is wrong (it is not unclassified),
-  unstated is worse (it shows to both lanes), and `Reference:` is a stretch that also means "nothing
-  to build".
-  **Recommendation: add a `Role:` field** — `orchestrator` · `tuning` · `owner` — read alongside
-  `Lane:` and filtered out of an implementer's READY list the way `Gate:` already is. It is a small
-  change to `scripts/lib/lane.js` and `next-item.js`, and it is what stops the sweep entry itself
-  from occupying the slot the sweep is meant to free.
-  **Not built 2026-08-31** because `scripts/**` is not answered by the lane rule and this is the
-  Orchestrator's own tooling; filed here so the sweep decides it with the rest.
-  ⚠ **Until then this entry keeps heading Lane B's queue**, which a reader should treat as the
-  symptom rather than the assignment.
-
 ### [readiness][devices] TN-8 — the chronic-stress fever mask is a FOURTH consumer of the broken temperature baseline
 
 - **Branch:** _unassigned_
@@ -4737,6 +4680,7 @@ the day's move-hours total is below the goal.
 
 ### [heart-rate] TN-13 — the HR tile shows a 7-day average of the one signal that best predicts how the owner feels
 
+- **Gate:** device
 > **✅ SHIPPED 2026-08-30, both halves together — which the entry required.** The tile reads **last
 > night's** resting HR and renders a **delta against the owner's own baseline** ("50 · −7 vs usual")
 > rather than a bare bpm. `restingHrLastNight` + `restingHrLastNightDate` are new on
@@ -4907,6 +4851,7 @@ the bar to beat, not to assume).
 
 ### [readiness] TN-16 — a prolonged-stress warning and a calm-down prompt, blocked on the metric's sign
 
+- **Gate:** owner
 - **Branch:** _unassigned_ · **Added:** 2026-08-26 · owner request
 - **Lane: B**
 - **Needs: Q-507** — deliberately. Read the next paragraph before starting.
@@ -7070,6 +7015,7 @@ screenshot is a **1:39** walk with the screen on, which exercises none of it.
 
 ### [platform] Q-547 — ANSWERED 2026-08-18: the app CPU is spiky (so Q-545 fixes it), and much of it is deploy churn
 
+- **Lane:** A
 - **Gate: owner — a READING, not a decision.** What is owed is the CPU/RAM baseline during a
   genuinely quiet window; a sandbox cannot read Railway metrics and every sample so far landed on a
   shipping day. **It feeds Q-551 (the one Railway decision) rather than asking its own question** —
@@ -8149,6 +8095,7 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 
 ### [workouts] Q-306 — the emergency-deload RPE trigger sits 0.07 inside a known measurement error
 
+- **Lane:** A
 - **Needs:** Q-289
 - **Branch:** `fix/deload-trigger-thresholds`
 - **Plan:** none yet
@@ -8467,6 +8414,7 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 
 ### [platform] Q-292 — the AI stated a score that is false, and gave an imperial measurement to a metric user
 
+- **Lane:** A
 - **Branch:** `fix/ai-numeric-grounding`
 - **Plan:** none needed
 - **Added:** 2026-08-15 · from the uncovered-lenses review §2.3
@@ -8525,6 +8473,7 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 
 ### [platform] Q-293 — `ai_health_insights.context_hash` is NULL on 109 of 117 rows
 
+- **Lane:** A
 - **Branch:** `fix/insight-context-hash`
 - **Plan:** none needed
 - **Added:** 2026-08-15 · from the uncovered-lenses review §2.4
@@ -8699,6 +8648,7 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 
 ### [platform] Q-295 — Coach's prompt is mostly a static prefix; the latency that motivated caching it is already gone
 
+- **Lane:** A
 - **Branch:** `perf/coach-prompt-caching`
 - **Plan:** none needed
 - **Added:** 2026-08-15 · from the uncovered-lenses review §5
@@ -8748,6 +8698,7 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 
 ### [platform] Q-296 — the docs say Coach runs `gemini-3.6-flash`; production says otherwise
 
+- **Lane:** A
 - **Branch:** `fix/coach-model-discrepancy`
 - **Plan:** none needed
 - **Added:** 2026-08-15 · from the uncovered-lenses review §5
@@ -8821,6 +8772,7 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 
 ### [sleep][devices] Q-274 — fragment "nights" reach the sleep score, and on two dates the fragment is the ONLY record
 
+- **Lane:** A
 > **Fresh evidence, 2026-08-17.** After Q-536's clock repair the sleep table is clean apart from
 > exactly **10 rows**, and all ten are this: daytime fragments of 0.0–1.4 h stored as sleep sessions
 > (14:39–14:59 · 0.1 h; 11:03–11:33 · 0.0 h; 09:33–11:11 · 0.1 h; 16:47–18:32 · 1.4 h; …). They are
@@ -8930,6 +8882,7 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 
 ### [readiness][platform] Q-273 — five scoring pillars, one `model_version`, no backfill: the history is not comparable to itself
 
+- **Lane:** A
 - **Branch:** `feat/score-model-versioning`
 - **Plan:** none yet
 - **Added:** 2026-08-15 · from the comprehensive review §1.6
@@ -9142,6 +9095,7 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 
 ### [readiness][platform] Q-501 — historical derived rows still carry no inputs
 
+- **Lane:** A
 - **Branch:** `fix/readiness-contributor-inputs`
 - **Added:** 2026-08-17 · Tuning agent · found while measuring Q-500 ·
   [`docs/reviews/2026-08-17-readiness-calibration.md`](reviews/2026-08-17-readiness-calibration.md) §6
@@ -9797,6 +9751,7 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 
 ### [sleep] Q-520 — a partial-night flag, so an unworn night stops distorting the scores
 
+- **Lane:** A
 - **Branch:** `feat/partial-night-flag`
 - **Needs:** Q-519
 - **Plan:** none yet. **Do Q-519 first** — it removes the timing noise, and whether this is worth
@@ -10757,6 +10712,7 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 
 ### [app-shell] Q-354 — the date-swipe `useDrag` swallows MOUSE clicks on Nutrition (touch is fine)
 
+- **Lane:** B
 - **Branch:** `fix/nutrition-mouse-click-swallowed`
 - **Added:** 2026-08-17 as the residue of Q-309 · **cause located and proven 2026-08-17**
 - **Priority: low, and that is a considered position rather than a shrug.** The supported target is
@@ -10798,6 +10754,7 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 
 ### [platform] Q-297 — cover Nutrition's day navigation; the write-path specs it asked for have shipped
 
+- **Lane:** B
 - **Branch:** `feat/e2e-specs-round-2`
 - **Added:** 2026-08-15 · follow-up to Q-249, which shipped the harness. Read
   [`e2e/README.md`](../e2e/README.md) first — it records what a green run does and does not prove.
@@ -10842,6 +10799,7 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 
 ### [platform][devices] Q-250 — an Android emulator job in CI, to close the 17 rows that need an Android runtime and nothing else
 
+- **Lane:** A
 - **Gate:** device
 
 > **⛔ THE JOB IS DISABLED AND THE ASSERTION NEVER PASSED — read this before anything below.**
@@ -10998,6 +10956,7 @@ reason it took an hour is that there is no signal that would have answered it di
 
 ### [platform] Q-251 — a staging environment, so a migration's first real run is not production
 
+- **Lane:** A
 - **Branch:** `feat/staging-environment`
 - **Added:** 2026-08-14 · same owner ask
 - **✅ Shape (a) shipped as Q-530** (planned 2026-08-17, implemented 2026-08-24) — an admin snapshot
@@ -11046,6 +11005,7 @@ reason it took an hour is that there is no signal that would have answered it di
 
 ### [platform] Q-252 — error tracking with session replay, for the bug class that cannot be reproduced from source
 
+- **Lane:** A
 - **Branch:** `feat/error-tracking-session-replay`
 - **Added:** 2026-08-14 · same owner ask (they named the Railway key as the model — this is the same
   kind of win: observability an agent can query)
@@ -11066,6 +11026,7 @@ reason it took an hour is that there is no signal that would have answered it di
 
 ### [platform][app-shell] Q-253 — a real-hardware device-farm run, for the Samsung-specific rendering and safe-area rows
 
+- **Gate:** owner
 - **Branch:** `feat/device-farm-smoke`
 - **Added:** 2026-08-14 · same owner ask
 - **This is the lowest-value item in the cluster and is filed to be decided, possibly declined.**
@@ -11151,6 +11112,7 @@ reason it took an hour is that there is no signal that would have answered it di
 
 ### [activity][devices] Q-231 — the "Exercise detected" card can never show anything again; its only writer was the Oura Cloud sync
 
+- **Lane:** A
 - **Branch:** `fix/detected-activity-has-no-source`
 - **Added:** 2026-08-14 · found while removing the Oura Cloud integration (Q-224), by checking which
   repository methods lost their last caller rather than only which ones lost their compile target.
@@ -11173,6 +11135,7 @@ reason it took an hour is that there is no signal that would have answered it di
 
 ### [activity][devices] Q-222 — auto activity-detection false positives trace to a classifier the codebase already flags as unvalidated
 
+- **Lane:** A
 - **Branch:** `feat/gait-classifier-calibration-capture`
 - **Plan:** [`docs/superpowers/plans/2026-08-05-owner-ui-bug-batch.md`](../docs/superpowers/plans/2026-08-05-owner-ui-bug-batch.md) Task 41
 - **Added:** 2026-08-14 · owner: "the auto activity detection is still really bad and triggers for
@@ -11226,6 +11189,7 @@ reason it took an hour is that there is no signal that would have answered it di
 
 ### [platform] Q-220 — every session pays ~194,000 tokens of orientation before it starts
 
+- **Lane:** A
 - **Branch:** none yet · **Added:** 2026-08-10, raised by the owner during the public-repo migration.
 - **Plan:** [`2026-08-10-orientation-cost.md`](superpowers/plans/2026-08-10-orientation-cost.md)
 - **The measurement:** `CLAUDE.md` is 918 lines (~27k tokens) and loads automatically; its first
@@ -11279,6 +11243,7 @@ reason it took an hour is that there is no signal that would have answered it di
 
 ### [platform] Q-219 — re-measure `oura_raw_samples`’s 183 MB of indexes (the `oura_heartrate` REINDEX is behind us)
 
+- **Lane:** A
 - **Needs:** Q-30
 - **The REINDEX half is behind us** — the owner ran it 2026-08-13 and it returned 49 MB. **Only
   the re-measure remains**, and it is deliberately parked: D4 (Q-30) may move the raw archive off
@@ -11332,6 +11297,7 @@ reason it took an hour is that there is no signal that would have answered it di
 
 ### [platform] Q-214a — a tap during the sync pull queues behind the whole delta on the one SQLite connection
 
+- **Lane:** A
 - **Branch:** `perf/sync-pull-sqlite-connection-hold`
 - **Added:** 2026-08-13 · found while fixing the check-in saves (#1292).
 - **⚠️ RENUMBERED `Q-214` → `Q-214a` on 2026-08-30, because the number was reused and the reuse
@@ -11429,6 +11395,7 @@ reason it took an hour is that there is no signal that would have answered it di
 
 ### [platform] ⏳ Q-181 — a schema per vitest worker: WATCH ONLY, deferral re-confirmed by measurement
 
+- **Lane:** A
 - **Branch:** `test/db-per-worker-schema` (unclaimed)
 - **Added:** 2026-08-10 · what Q-177 concluded rather than what it left undone
 - **The open question is unchanged:** every DB test shares one `trainingai_dev` (CI: `trainingai_ci`),
@@ -11487,6 +11454,7 @@ reason it took an hour is that there is no signal that would have answered it di
 
 ### [platform] 🟠 Q-155 — a cross-user data leak passes all 3,270 tests
 
+- **Lane:** A
 - **Branch:** `test/repository-ownership-coverage`
 - **Added:** 2026-08-08 · [review §11](reviews/2026-08-08-claude-md-and-test-suite-review.md)
 - **Measured by mutation, not inferred.** Removing the `user_id` scope from
@@ -11614,6 +11582,7 @@ session that plans this residual without knowing that will lose the time twice.
 
 ### [app-shell] ⏳ Q-151 — WATCH ONLY, nothing to implement — the sign-in React #418 did not reproduce and the whole series stopped
 
+- **Lane:** A
 - **Skip this when working the queue top-down.** It is a dated re-check, not a task.
 - **Added:** 2026-08-08 · [review §2](reviews/2026-08-08-running-app-review.md) ·
   **investigated and refuted 2026-08-08**, see
@@ -11647,6 +11616,7 @@ session that plans this residual without knowing that will lose the time twice.
 
 ### [devices][platform][sleep] 🟡 Q-71 — the historical redecode that rewrites stored ring history has not been run
 
+- **Lane:** A
 - **Keep:** the historical redecode. The 2026-08-12 code fix corrects **future** rollups only;
   already-stored `sleep_sessions` rows still carry the single-anchor times. Closing this means
   running `POST /api/oura-ble/samples/redecode` with no `date` param (forcing `fullHistory: true`)
@@ -11950,6 +11920,7 @@ each other. The score has ~18 points of dynamic range and spends all of it above
 
 ### [platform][workouts][nutrition] Q-168 — AI Coach follow-ups (Q-157 is complete)
 
+- **Lane:** B
 - **Gate:** device
 
 - **Added:** 2026-08-09 · Q-157 shipped across four PRs (#1191, #1195, #1197, and phase 3b) and its
@@ -12077,6 +12048,7 @@ per-field merge where an AI write has no honest source rank to claim.
 
 ### [activity][readiness][heart-rate] Q-204 — the HR-derived load lane (Q-137 direction B), gates now measured
 
+- **Lane:** A
 - **Needs:** Q-270
 - **Gate 1's failure is Q-270, and it has not moved.** The `training_load_ots` count read "0 of 42
   days" when this was filed; **re-measured 2026-08-20 it is 0 of 96**, and Q-270 has since been
@@ -12166,6 +12138,7 @@ per-field merge where an AI write has no honest source rank to claim.
 
 ### [platform][devices] LA-40 — `runTrainingStressScore` throws for a young user, out of a function that documents itself as infallible
 
+- **Lane:** A
 - **Branch:** `fix/training-stress-column-empty` (shipped with the Q-270 investigation that found it)
 - **Added:** 2026-08-30 · found by running the persist Q-270 asked for and watching it crash.
 - **SHIPPED 2026-08-30.** `getRhrCategory` returns null for an age with no row in the percentile
@@ -12189,6 +12162,7 @@ per-field merge where an AI write has no honest source rank to claim.
 
 ### [devices][activity] Q-184 — `active_calories_est` is plumbed end-to-end and never written
 
+- **Lane:** A
 - **Needs:** Q-204
 - **The hold recommended below is now a field rather than prose.** This entry said *"hold Q-184
   behind Q-270 and Q-204"* in a paragraph, so `next-item.js` listed it READY and an implementer
@@ -12455,6 +12429,7 @@ per-field merge where an AI write has no honest source rank to claim.
 
 ### [devices][app-shell] Q-111 — Home header device-battery chips (ring/strap/scale); question whether the manual refresh button is still needed
 
+- **Lane:** B
 - **Branch:** `feat/home-device-battery-chips`
 - **Plan:** [`docs/superpowers/plans/2026-08-05-owner-ui-bug-batch.md`](../docs/superpowers/plans/2026-08-05-owner-ui-bug-batch.md) Task 26
 - **Added:** 2026-08-06 · owner wants small icon+battery chips on Home for the ring, chest strap,
@@ -12547,6 +12522,7 @@ per-field merge where an AI write has no honest source rank to claim.
 
 ### [sleep] Q-91-followup — decide whether the BLE ingest rollup should emit its own invalidation signal
 
+- **Lane:** A
 - **Added:** 2026-08-06 · deferred decision point from Q-91 (see
   `docs/overview/entries/2026-08-06-sleep-screen-oura-sync-refetch.md`), not a bug.
 - **Context:** Q-91 fixed the reactivity gap for the two signals that already existed (a manual
@@ -12688,6 +12664,7 @@ the goal layout's §7 off-ramp says is missing.
 
 ### [platform] 🔴 Q-49 — public repo migration (Phase A: model delivery · Phase B: the cut)
 
+- **Lane:** A
 > **⚑⚑ 2026-08-10 — THE PLAN'S IP SCOPE WAS INCOMPLETE, and the gap is the most sensitive material
 > in the repo.** A full audit of what is tracked (`scripts/check-private-paths.js`, shipped with this
 > finding) measures **81.2 MB** of Oura-extracted material across **seven** directories. Everything
@@ -12914,6 +12891,7 @@ the goal layout's §7 off-ramp says is missing.
 
 ### [platform] 🟡 Q-50 — two vendored-model deletion decisions the dormancy sweep could not make
 
+- **Lane:** A
 - **Branch:** none yet · **Added:** 2026-08-02 by Q-49 Phase A0 (the sweep itself shipped; these are
   what it deliberately did not act on).
 - **Why filed rather than done:** both are one-way deletions of extracted Oura assets that cannot be
@@ -12947,6 +12925,7 @@ passes and the inventory is explicit rather than forgotten.
 
 ### [platform][app-shell] 🟠 Q-48 — roadmap gaps found by the 2026-08-02 native-convergence review
 
+- **Gate:** owner
 - **Branch:** `docs/native-roadmap-corrections` (docs-only; each sub-item may spawn its own build entry)
 - **Review:** [`docs/reviews/2026-08-02-native-convergence-roadmap-review.md`](reviews/2026-08-02-native-convergence-roadmap-review.md)
 - **Added:** 2026-08-02 · **renumbered from Q-46**, which run-1 claimed the same day (#1003)
@@ -12969,6 +12948,7 @@ passes and the inventory is explicit rather than forgotten.
 
 ### [app-shell][platform] 🟢 Q-44 — remove vendor naming: Phases 2 and 3 only
 
+- **Lane:** A
 > **⚑ Owner answered 2026-08-04: Phase 3 IS the goal, not optional.** *"yes your choice; but I want
 > the end goal of moving from your example of oura_daily -> sensor_daily."* So Phase 2 proceeds as a
 > plain refactor, and **Phase 3 gets a written migration plan rather than being quietly dropped** —
@@ -13004,6 +12984,7 @@ passes and the inventory is explicit rather than forgotten.
 
 ### [app-shell] 🟢 Q-1a — client bearer auth + `apiUrl()` (SPLIT OUT 2026-08-03 — startable now)
 
+- **Lane:** A
 - **Branch:** `feat/client-bearer-auth`
 - **Split from Q-1 on the owner's approval, 2026-08-03** (review finding F1) — *"I dont see an issue
   in splitting it. go for it."*
@@ -13023,6 +13004,7 @@ passes and the inventory is explicit rather than forgotten.
 
 ### [app-shell] ⛔ Q-1b — native ("Swift-like") feel: Phase 3 (bundle the shell into the APK) — measurement says drop it, the owner has not said so
 
+- **Lane:** A
 - **Keep:** the two halves of this entry contradict each other and only the owner can resolve it.
   **2026-08-02:** the owner deferred Phase 3 explicitly *"not cancelled"* — *"we can push it till
   we HAVE to do it"* — and said not to retire the entry. **2026-08-04:** the gating measurement
@@ -13192,6 +13174,7 @@ millisecond count talk a future session out of it.
 
 ### [devices][readiness][app-shell] 🟠 Q-29 — Oura on-device rollup migration — Task 4 built, Task 5 next
 
+- **Lane:** A
 **Not a new planning item — this corrects a duplicate entry a different 2026-07-30 session
 nearly created.** [`docs/offline-first-target-architecture.md`](offline-first-target-architecture.md)
 names `aggregateOuraRawSamples` (`lib/data/postgres/adapter.ts:4658–~5764`) as the load-bearing
@@ -13267,6 +13250,7 @@ D4's durability precondition and can happen in the same device session as future
 
 ### [platform] 🟠 Q-30 — DB volume: finish the diagnosed fix, and resolve the O1 tension with D4's raw-drop-vs-bytea decision
 
+- **Lane:** A
 **✅ OWNER DECISION 2026-08-13 — D4 is confirmed as the direction, and the reason is multi-user.**
 Owner, verbatim: *"I believe that was my goal; to have majority of data on my phone - and only
 summary/daily rollups or the minimum needed on railway. This architecture currently does not support
@@ -13356,6 +13340,7 @@ before the public-repo release, alongside Phase 3.
 
 ### [devices][platform] ➡️ Q-31 — own resilience weights & own workout-energy MET table — RE-SCOPED by #999, gates released
 
+- **Lane:** A
 > **🆕 2026-08-02 — no longer blocked, and no longer the public-repo blocker.** Two changes: (1)
 > #999 re-scoped this against the real seven-module import graph — read
 > [`2026-08-02-oura-ip-triage.md`](superpowers/plans/2026-08-02-oura-ip-triage.md), not the narrative
@@ -13439,6 +13424,7 @@ repo's production path is unaffected until then.
 
 ### [readiness] 🟡 Q-3b — awakenings-calibrated restfulness + the chronic-stress two-scale column
 
+- **Lane:** A
 > **⚑ The data gate is CLEARED (2026-08-04).** This entry says *"No code without that data. ⛔
 > owner/data-gated"* — the data exists: **32 rated nights** in `day_checkins.sleep_quality_feel`,
 > collected automatically by the morning check-in since 2026-07-03. See **Q-72** for the analysis of
@@ -13469,6 +13455,7 @@ Two independent findings, both low-urgency:
 
 ### [sleep] 🟠 Q-4 — `respiratory_rate` is persisted from an estimator its own docs call uncalibrated
 
+- **Lane:** A
 - **Gate:** owner
 
 > **⚑ Owner answered 2026-08-04: willing to wear the Polar H10 overnight for ground truth — *"yes but
@@ -13481,6 +13468,7 @@ against yet. Blocked on real-data capture, not code.
 
 ### [devices][readiness] 🟠 Q-7b — the **ten** device-owned `oura_daily_derived` columns have no producer
 
+- **Lane:** A
 - **Gate:** device
 
 > **⚑ Re-measured 2026-08-08 — it is ten, not eight, and here is the exact list.** Machine-counted
@@ -13526,6 +13514,7 @@ that returns nothing but `non_wear_time_sec` no longer writes a false-positive
 
 ### [sleep] 🟡 Q-10 — degenerate sleep rows are stored; no session `type`
 
+- **Lane:** A
 **Downgraded** — originally filed as a prerequisite for classifying naps vs nights,
 but `lib/health/sleep-night.ts` already classifies by circadian position, no stored
 `type` needed. Persisting Oura's `type` / the ring's bedtime-period tag is now a
@@ -13548,6 +13537,7 @@ What is left of Q-10 is only the nice-to-have above: persisting Oura's session
 
 ### [sleep] 🟢 Q-34 — sleep-staging Phase 1b: items 2 and 4 remain
 
+- **Lane:** A
 - **Gate:** device
 
 Plan: [`docs/superpowers/plans/2026-07-11-oura-ble-sleep-staging-phase1b-signal-upgrades.md`](superpowers/plans/2026-07-11-oura-ble-sleep-staging-phase1b-signal-upgrades.md).
@@ -13575,6 +13565,7 @@ the `lfhf` epoch field and `W_LFHF = 0.5` are all on `main`.
 
 ### [workouts] 🟡 Q-52 — per-exercise phase hold: a stalled compound stays behind while the session moves on
 
+- **Lane:** A
 Plan: [`docs/superpowers/plans/2026-08-02-per-exercise-phase-hold.md`](superpowers/plans/2026-08-02-per-exercise-phase-hold.md).
 Branch: `feat/exercise-phase-hold`. Added 2026-08-02 from an owner design question.
 
@@ -13648,6 +13639,7 @@ indefinitely.
 
 ### [sleep][platform] 🟢 Q-156 — `sleep_sessions.sleep_score` is NULL in all 69 rows — TRACED, dead column, no fix warranted
 
+- **Lane:** A
 - **Added:** 2026-08-08 · found by the production data-vs-code audit that produced Q-149 and the
   Year Review deload bug.
 - **The measurement:** `sleep_sessions.sleep_score` is **0 non-null of 69 rows** (2026-05-26 →
@@ -13686,6 +13678,7 @@ indefinitely.
 
 ### [heart-rate][workouts] Q-149 — is 15 bpm the right HRR bar for this user?
 
+- **Gate:** owner
 - **The shipped half is verified in source** (`hr-analysis.ts:94` — `adequate = hrr1 != null ?
   hrr1 >= ADEQUATE_HRR1_BPM : null`; the `bpmAtLog < 120` shortcut is gone, checked 2026-08-20).
   **What is left is the calibration question the fix deliberately left open:** 15 bpm of
@@ -13713,6 +13706,7 @@ indefinitely.
 
 ### [heart-rate][workouts] 🟡 Q-11 — 22 of 78 completed sessions still hold no per-set HR attribution, and only the owner can backfill them
 
+- **Lane:** A
 - **Keep:** the one-off backfill over pre-fix sessions. Measured 2026-08-20: **56 of 78 completed
   workout sessions have `set_hr_stats` rows, so 22 have none**, and no bulk `computed_at` batch
   has landed since the 2026-07-22 run — the Defect B fix prevents *new* gaps and does not close
@@ -13815,6 +13809,7 @@ degenerate.
 
 ### [platform] 🟢 Q-28 — `applyDelta` crosses the Capacitor bridge once per row (measured 2026-08-02 — deprioritised, not dead)
 
+- **Lane:** A
 Plan: [`docs/superpowers/plans/2026-07-29-prefetch-remainder-and-applydelta-batching.md`](superpowers/plans/2026-07-29-prefetch-remainder-and-applydelta-batching.md),
 Gap 2. Found 2026-07-29 while auditing what Q-1 does not already cover; the sibling finding (prefetch
 remainder) shipped as v1.242.1.
