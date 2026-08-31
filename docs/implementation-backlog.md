@@ -407,7 +407,12 @@ has already recorded that a bulk job bumps `updated_at` without rewriting a valu
 
 ### [workouts] BF-84 — a per-session Rest button on the training card, and rest is not stored anywhere
 
-- **Lane:** B for the control; **A if rest is to persist**, which is the decision below.
+- **Lane: A** — derived 2026-09-01, so the next reader does not re-derive it. The entry's own
+  conclusion is *"ship the button and the storage together"*; the storage half is a row, a sync
+  domain and the inference path; and CLAUDE.md sends a both-lanes item to **Lane A, engine first**.
+  Lane B cannot take the surface alone — the same sentence forbids it. **Still open and the
+  owner's: fact or hint?** If "a hint", this collapses to a rendering condition and returns to
+  Lane B, so settle it before scheduling.
 - **Added:** 2026-09-01 · owner, on Home's Recommended Today card: *"for the training card, I'd like
   a small button for each session to choose 'rest'."*
 
