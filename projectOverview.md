@@ -24,8 +24,23 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.414.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Version:** v1.414.1 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-08-31.
+
+**A dead WebView renderer is handled instead of fatal, and it now leaves evidence (BF-80).** The
+owner's *"tab back into the app and the pages often crash and display a blank page"* had **nothing**
+in `error_events`, and that silence is the finding: `app/error.tsx` would have painted a fallback
+and filed a row for a JS exception. Reading the pinned Capacitor source settled the rest — its
+`BridgeWebViewClient` **already** forwards `onRenderProcessGone`, so the app was never missing a
+`WebViewClient` (which is why grepping `android/` for `RenderProcess` came back empty while the
+behaviour persisted); what was missing was a listener, and the default answer it left in place is
+the documented *"kill the app"* one. The handler now returns `true`, records the death with
+`didCrash`, and posts `recreate()` — posted, because the callback runs with the dying WebView on
+the stack, and `reload()` cannot work on a WebView whose renderer is gone. The recorded death
+becomes an `error_events` row on the next boot. **Not verified: this needs an APK on the S25**, and
+until that first row appears the diagnosis is still a hypothesis — but the behaviour it replaces is
+process termination, so the handler is right either way
+([journal](docs/overview/entries/2026-08-31-renderer-recovery.md)).
 
 **A night that is still filling now says so, and the program builder knows you are injured
 (BF-83, BF-68).** The owner sent two screenshots of the **same night four minutes apart** — 6 h 15 m

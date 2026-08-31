@@ -6,6 +6,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.414.1",
+    date: "2026-08-31",
+    changes: [
+      "The blank page after tabbing back into the app should now reload itself instead of staying blank. Android had been ending the app's display process to free memory, and nothing was set up to bring it back — the app is also now told to survive that rather than be shut down.",
+      "And when it does happen it gets recorded, so there is finally something to look at. Nothing was being logged before, which is why the cause could only be guessed at.",
+    ],
+  },
+  {
     version: "1.414.0",
     date: "2026-08-31",
     changes: [

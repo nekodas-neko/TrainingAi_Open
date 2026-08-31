@@ -736,6 +736,21 @@ labelling of stressful days, or agreement between our two producers once they ar
 
 ### [app-shell][platform] BF-80 — the app comes back blank after backgrounding, and nothing is recorded when it does
 
+- **Keep — THE HANDLER SHIPPED 2026-08-31; what is owed is the device check and the first row.**
+  `RenderProcessRecovery` (a Capacitor `WebViewListener`) now handles `onRenderProcessGone`:
+  returns `true`, records the death in SharedPreferences with `didCrash`, and posts
+  `activity.recreate()` — posted, not called, because the callback runs on the UI thread with the
+  dying WebView on the stack. The next JS boot collects the record through
+  `window.AndroidRenderer` and files an `error_events` row
+  (`lib/renderer-recovery.ts`, mounted on `ErrorReporter`).
+  `scripts/check-render-process-recovery.js` fails CI if the listener, its `return true`, its
+  `recreate` call, or the registration goes — losing any one of them silently restores the platform
+  default, which is process termination.
+  **`Gate: device`** — the whole thing is unverifiable in the sandbox: it needs the APK on the S25,
+  and the confirmation is behavioural (the app comes back instead of showing nothing) plus the
+  first `error_events` row saying `renderer reclaimed by the system`. **Until that row exists the
+  hypothesis is still a hypothesis** — but the handler is correct either way, since the behaviour
+  it replaces is the app being killed.
 - **Lane:** A — `android/app/src/main/java/com/trainingai/app/MainActivity.java` is where the fix
   most likely lives, and it needs an APK.
 - **Added:** 2026-08-31 · owner: *"I notice when I tab out and tab back into the app the pages often
@@ -778,9 +793,6 @@ brings it back.** It fits every part of the report:
   ring key) and lets the next JS boot file an `error_events` row turns "we think the renderer is
   being killed" into a row that says so — without needing the owner to hold a cable. Ship that with
   the reload, not after it.
-- **⚠ Deliberately NOT batched with the JS work of 2026-08-31.** It is an `android/**` change, so
-  it needs an APK cycle and the install risk that carries; the batch it belongs in is the next
-  native one. Per CLAUDE.md's rule, native is batched hardest.
 - **⚠ Do not fix this by reloading on every `visibilitychange`.** That would re-fetch the whole shell
   on every alt-tab, cost the instant-paint behaviour the cache-seeding rules exist to protect, and
   hide the real fault rather than handling it. The fix is to detect the renderer's death and recover
@@ -11363,6 +11375,16 @@ reason it took an hour is that there is no signal that would have answered it di
 - **The thing not to misread:** archiving everything already fixed removes 1,338 lines — **17%**.
   The other 4,626 are genuinely-open issues. *The file is big because the backlog is big*, so a
   tidy-up is not the fix and should not be sold as one.
+- **⚑ A FOURTH SOURCE, measured 2026-08-31 and not covered by the three levers below: Current
+  Status is a 740-line LOG.** The section holds **142 dated blurbs**, one per shipped batch, and
+  the file's own header tells sessions the opposite — *"If you are about to append a dated summary
+  of what you just shipped, that belongs in your journal entry, not here."* Every session follows
+  the wrap-up rule that says to update current status and appends rather than replaces, this one
+  included (twice in one evening). It is ~9% of the file and it grows monotonically, unlike Known
+  Issues, which at least shrinks when something is fixed. The fix is a retention rule of the same
+  shape as lever 1's: **Current Status keeps the most recent N and the rest are already in
+  `docs/overview/entries/`**, which is where they were written first. Docs reconciliation is
+  Orchestrator's, so this is recorded rather than swept here.
 - **Three levers, in order:** (1) archive the resolved entries **and add the retention rule** to
   the wrap-up ritual, or it regrows; (2) move open entries into `docs/domains/<pillar>/known-issues.md`,
   which is the lever that changes the number and where the multi-tag visibility risk lives;
