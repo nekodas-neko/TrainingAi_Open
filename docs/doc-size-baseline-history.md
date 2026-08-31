@@ -4231,7 +4231,8 @@ their own device passes, so there was nothing here this branch could honestly st
 now carries, so the entry is removed rather than rewritten to a `Keep:` — the residue lives in
 `projectOverview.md`, and duplicating it in the queue would make an entry that reads as open work.
 
-## 2026-08-31 — `docs/implementation-backlog.md` 13602 → 13625 (BF-67's planning session)
+<<<<<<< HEAD
+## 2026-08-31 — `docs/implementation-backlog.md` 13602 → 13625 → **13696** (BF-67's planning session)
 
 Twenty-three lines, and all of them are one new queue entry: **LA-43**, the program generator
 trusting the model's muscle guess on any name the library does not contain. That is what the backlog
@@ -4246,3 +4247,31 @@ get by following the link.
 What was **not** done is compressing LA-43 itself. It has to carry why the fallback contradicts the
 comment three lines above it, and why a latent hole is still worth filing — a shorter version would
 read as a style nit rather than as the silent history reset it actually is.
+=======
+## 2026-08-30 — `docs/implementation-backlog.md` (BF-69, exposure as a variable)
+
+Long because the request arrives on top of storage that already exists and one decision that
+invalidates everything after it.
+
+BF-3 shipped the per-log `amount`/`unit`/`doseText` snapshot, and its own comment says it was built
+so a dose could be correlated against resting HR. What the entry adds is that **nothing reads it** —
+`supplementLogs` is absent from `health-trends`, `sleep-performance-correlation` and both ai-chat
+analysis files — so this is a reader, not a schema.
+
+The decision written at the top is that **a missing row is not a zero**. The owner's baseline week is
+a request to record a real zero, and today "didn't take it" and "forgot to log" are the same absence.
+Three options are laid out with the one that manufactures effects named as such. The repo has already
+published a false coefficient from a data-shape mistake and left it standing for eleven days, which
+is why this is a blocker rather than a caveat.
+
+Two findings the request did not know about: `food_items` has no supplement link and the owner's food
+log already contains supplement rows, so the "picked up from the nutrition log" hope is also a
+double-count risk; and the "like a total calorie value" analogy needs adjusting, because doses do not
+sum across substances — what transfers is the shape (one number per substance per day), not the
+total.
+>>>>>>> origin/main
+
+**Re-derived on the merge, and the conflict was the right kind.** Another PR raised the same number
+to 13673 while this one was open, so git surfaced a genuine disagreement about one value rather than
+two unrelated edits — the case the entries README says should conflict. Resolved by counting the
+merged file (13696) instead of taking either side, which is the only number that is true of it.
