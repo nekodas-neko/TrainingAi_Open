@@ -358,6 +358,295 @@ below threshold and left in place for next time.
 > BF-29 (My meals), BF-30 (Meal detail), BF-31 (Edit meal) and BF-26 (Quantity). Two artboards need
 > no entry — `Tap targets` and the `srv/g` studies both shipped in Q-395a.
 
+### [nutrition] BF-72 — the diary's own hydration wipes the meal grouping it just drew
+
+- **Lane:** B — `app/nutrition/use-food-logs-loader.ts:104`.
+- **Batch:** `nutrition-ui-uplift`
+- **Added:** 2026-08-31 · owner: *"when I add my saved meal it starts as the meal with the image,
+  then breaks into its ingredients."* That sequence is the whole diagnosis — the optimistic write is
+  right and something after it is wrong.
+
+**One line. `applyDelta`'s `foodLogs` payload omits `savedMealId` and `mealGroupId`:**
+
+```ts
+foodLogs: server.map(l => ({
+  id: l.id, date: today, mealTypeId: l.mealTypeId, foodItemId: l.foodItemId,
+  quantityMultiplier: l.quantityMultiplier, loggedAt: …,
+  updatedAt: nowIso, deletedAt: null, syncStatus: 'synced' as const,
+})),
+```
+
+CLAUDE.md's rule is that **a local upsert overwrites all columns by default**, and
+`sqlite-backend.ts:2036` writes `record.savedMealId ?? null, record.mealGroupId ?? null` — so an
+omitted field is written as NULL. The very next line re-reads
+`store.getFoodLogsWithItems(today)` and renders it. The screen strips its own grouping and then
+draws the stripped copy.
+
+**Confirmed against production, so no part of this is inferred.** Today's `food_logs` hold
+**11 rows carrying both ids**, resolving to six real meals — `Cruskit + PB` (2 rows) and
+`Protein Shake` (3) are exactly the five loose rows in the owner's breakfast screenshot. The server
+is correct; the device clobbers its own copy.
+
+- **Fix:** carry both fields in that payload. The sibling paths already do —
+  `log-meal.ts`'s local upsert, the outbox payload and the `pushMutations` branch all pass them, and
+  the local read at `sqlite-backend.ts:2235` selects them. This one site was missed.
+- **⚠ Sweep every other `applyDelta`/hydrate payload in the same PR.** This is a screen-level
+  hydration that predates the columns; BF-39's chain audit covered the sync engine and not this. Any
+  other place that rebuilds a local row from a server response has the same exposure — a partial
+  object silently nulls what it omits.
+- **⚠ Second, smaller finding at the same line: `syncStatus: 'synced'`** is stamped on every row,
+  including one whose own mutation may still be in the outbox. `applyDelta` gates on
+  `sync_status === 'synced'` before overwriting precisely so a pull cannot revert a pending local
+  edit; stamping it here from a screen-level hydrate hands that guard a value it did not earn.
+  Worth a look, not necessarily a change — but decide it rather than inherit it.
+- **Verification:** log a saved meal, wait for the refetch, and it stays one row with its name and
+  photo — the owner's report is the test. Then reload the tab: still grouped, because the local copy
+  kept its ids. Production already shows the rows are correct, so a failure after this fix is a
+  render bug, not a data one.
+
+### [nutrition][app-shell] BF-74 — the meal photo's ✕ sits where a sheet's close button lives and deletes on one tap
+
+- **Lane:** B — `components/nutrition/meal-photo-tile.tsx:141-149`.
+- **Batch:** `nutrition-ui-uplift`
+- **Added:** 2026-08-31 · owner, on the meal detail sheet: *"the delete image button is easy to hit
+  with no confirmation."*
+
+**Two separate things make it easy to hit, and the second is the real one.**
+
+1. **It fires immediately.** `onClick={e => { e.stopPropagation(); onChange(null) }}` — no confirm,
+   no undo. The parent saves straight away, so the photo is gone from the meal.
+2. **⚠ It sits exactly where the sheet's CLOSE button would be.** `meal-detail-sheet.tsx` passes
+   `hideCloseButton`, so this ✕ — `absolute right-0 top-0` on the hero image — is the **only** ✕ on
+   the screen, in the top-right corner, which is the one position a user reads as "close this". A
+   reach for dismiss lands on delete. That is not a small target problem; it is a *wrong meaning*
+   problem, and it explains "easy to hit" better than the size does.
+
+- **It is also under the tap floor**, at `h-8 w-8` (32 dp) against the repo's 44/48 dp minimum —
+  worth fixing, but do not treat that as the fix. Making a mislabelled control *bigger* makes it
+  easier to hit by accident.
+- **Recommendation, in order:** move it off the close corner (bottom-right of the hero, or into the
+  picker's own menu), keep it ≥44 dp, and make it recoverable. A confirm is the crude option; the
+  better one is that re-adding is already one tap — the tile is a real picker (BF-46 ①a) — so an
+  undo toast is enough and costs no dialog.
+- **Sibling sweep:** `MealPhotoTile` renders in the builder as well as this hero. The `variant`
+  differs; the ✕ does not. Fix both, and check no other tile puts a destructive control in a
+  dismiss corner.
+- **Verification:** on the S25, tapping the top-right corner of the meal photo does not silently
+  discard it; the remove control is ≥44 dp, reads as removal rather than dismissal, and the removal
+  can be undone without re-picking from the gallery.
+
+### [nutrition][app-shell] BF-76 — sweep the nutrition sheets for safe-area clearance rather than fixing them one report at a time
+
+- **Lane:** B
+- **Batch:** `nutrition-ui-uplift`
+- **Added:** 2026-08-31 · owner, after BF-62: *"safe spacing off in this place — need to do a review
+  cause lots of nutrition screens are wrong."*
+
+**This is the owner asking for the sweep instead of the third individual report, and they are right
+to.** BF-62 was the meal detail sheet's action row; this screenshot is the same class on another
+screen. The repo's own rule already says a fix applied to one surface and not its siblings is half
+done, and safe-area regressions are the single most repeated UI class here (10+ incidents).
+
+- **What the sweep covers:** every `SheetContent side="bottom"` under `components/nutrition/` and
+  `app/nutrition/`, plus any full-screen takeover they open. For each, record the bottom-inset story:
+  the sheet primitive bakes it, so a screen that adds `pb-safe*` inside is *double*-padding and one
+  that fights the baked padding with a `vh` height is BF-62's shape.
+- **⚠ Start from BF-62's hypothesis, because it generalises.** `h-[92vh]`/`h-[90vh]` on a WebView
+  whose `vh` includes the gesture inset overshoots the viewport, so the baked padding lands under the
+  bar. `grep -rn 'h-\[[0-9]*vh\]' components/nutrition app/nutrition` is the first pass, and `dvh`
+  is the likely fix — one change, many screens.
+- **Both navigation modes.** The inset differs between gesture nav and 3-button nav, and checking one
+  is how this class keeps shipping. The sandbox renders insets as 0, so none of this is verifiable
+  off-device.
+- **Output is a list, then one PR.** Enumerate every sheet with its measured clearance before
+  changing anything — a sweep that fixes as it goes cannot say what it covered, which is what makes
+  the next report a fourth individual entry.
+- **Verification:** every nutrition sheet's bottom control clears the gesture bar on the S25 in both
+  navigation modes, and the PR body lists each sheet checked with what it needed.
+
+### [nutrition] BF-73 — the Log Food screen: bigger capture tiles, and `New` should outrank `Delete meals`
+
+- **Lane:** B — `components/nutrition/capture-actions.tsx` and `components/nutrition/meal-list-actions.tsx`.
+- **Batch:** `nutrition-ui-uplift`
+- **Added:** 2026-08-31 · owner, on the Log Food sheet: *"don't like this UI from this screen — the
+  icons/sections for photo/barcode/describe should be larger. Delete meals + New should be
+  different. Maybe a big 'New' button + a small delete bin."*
+
+**① The capture tiles have already been enlarged once, which is the thing to know before doing it
+again.** BF-50 ① took them from `min-h-12` (48 dp) to `min-h-[62px]`, and the comment records where
+62 came from: *"from the artboard's capture tiles — not a number invented here (BF-28's parity
+rule)"*. The owner is now asking for bigger than the drawing.
+
+- **That is allowed, and BF-28 rule 2 is why:** a later owner decision beats the artboard, and this
+  is one. Record it as an owner override rather than a parity fix, so the next parity sweep does not
+  "correct" the tiles back to 62 and re-open this.
+- **Keep `min-h`, never a fixed height.** The existing comment earned that: *"Describe or enter"*
+  wraps to two lines in a third of 412 dp and a fixed height clips it. Growing the tile means raising
+  the floor and letting the label breathe — more vertical padding and a larger icon (`h-5 w-5` today)
+  — not pinning a height.
+- The icon and the 11 px label should scale with the tile; a bigger box around the same small glyph
+  is what makes a control read as empty rather than prominent.
+
+**② The action pair is deliberately equal-weight today, and the owner wants a hierarchy.** Both are
+`size="sm"` pills with `min-h-[44px]`: `Delete meals` in `secondary`, `New` in the default accent.
+The owner's ask — a big `New`, a small bin — is the better shape and worth stating why: **`New` is
+the frequent act and deleting meals is rare and destructive**, so equal visual weight overstates the
+destructive one.
+
+- **The bin must stay a real 44 dp target while looking small.** Shrinking the *label* to an icon is
+  the ask; shrinking the *hit box* is a tap-target regression the repo already has a floor for.
+- **⚠ It needs an `aria-label`, and it is losing the one thing that made it clear.** BF-50 ④ renamed
+  this control from `Select` to `Delete meals` precisely because *"there is a 'select' button… but
+  you can't do anything with it except delete"* — the words are the fix that entry shipped. An
+  icon-only bin throws them away visually, so the accessible name has to carry them: `aria-label="Delete meals"`, not `"Delete"`.
+- **The risk is low and worth saying so:** the bin opens *selection mode*, it does not delete
+  anything, and the destructive confirm sits behind it. So an icon-only entry point is defensible
+  here in a way it would not be if it deleted on tap.
+- **Verification:** on the S25, the three capture tiles read as the screen's primary controls and
+  *"Describe or enter"* still fits on two lines without clipping; `New` is visibly the primary action
+  and the bin visibly secondary; the bin still measures ≥44 dp and a screen reader announces it as
+  "Delete meals".
+
+### [nutrition] BF-70 — the barcode scan fetches the product image and three layers throw it away
+
+- **Lane:** A — `packages/shared/src/nutrition/log-food.ts` and the `NewFoodEntry` contract; the
+  form-model half is B but lands in the same change.
+- **Batch:** `barcode-chain` — with BF-38, which is also Lane A and touches the same call site.
+- **Added:** 2026-08-31 · owner, reviewing the tab: *"barcode scanning did not add the image of the
+  food from the db as its item picture."* Screenshot: `LOADED MAC & CHEESE / CORE POWERFOODS`,
+  90% confidence, *"From Open Food Facts barcode database"* — logged with a placeholder tile.
+
+**The picture is fetched successfully and then dropped, three times.** BF-35 already did the hard
+half: `OFF_FIELDS` requests `image_front_thumb_url`, and `/api/nutrition/barcode` awaits
+`fetchOffThumbDataUri(...)` and returns it as `result.imageDataUri`. The API that stores it exists
+too — `/api/nutrition/food-items` accepts `imageDataUri` and validates it against
+`FOOD_ITEM_IMAGE_MAX_BYTES`. Everything between the two discards it:
+
+1. **`EditableNutrition`** (`review-step.tsx:10`) has no `imageDataUri` field, and
+   `scanToEditable()` (`food-logger-sheet.tsx:41`) maps eleven fields and not that one — so the
+   image is gone the moment the Review sheet opens.
+2. **`NewFoodEntry`** (`packages/shared/src/nutrition/log-food.ts`) has no `imageDataUri` either, so
+   `handleConfirm` could not pass one even if the form held it.
+3. **`log-food.ts:214` writes `imageDataUri: null` literally** into the local food item.
+4. **`create-food-item.ts:68` looks like the fix and is inert.** It reads
+   `imageDataUri: s.imageDataUri ?? null` — but `s` is the return of
+   `sanitiseNutrition({ calories, proteinG, carbsG, fatG, servingSizeG, fiberG, sugarG, sodiumMg,
+   satFatG })`, whose `RawNutrition` type is numeric-only. **`s.imageDataUri` is always
+   `undefined`**, so that line is always `null`, and `NewFoodItem` has no image field for a caller to
+   supply one. Its comment — *"Present when the scan came from a barcode/search lookup whose Open
+   Food Facts product carried a thumbnail"* — asserts the opposite of what the code can do, and is
+   the reason nobody has caught this: the file reads as the place BF-35 route 1 was implemented.
+
+So this is a **contract gap along one chain**, not a bug in one place — fixing any single layer
+changes nothing, which is the thing to know before starting. Site 4 is the one to fix first: it is
+the shared creator, and giving `NewFoodItem` the field is what lets the other three carry a value
+worth passing.
+
+**⚠ Second finding in the same line, and it explains a measurement BF-38 already published.**
+`handleConfirm` sets `source: scanResult?.confidence ? 'ai' : 'manual'`. A barcode scan **has** a
+confidence (90% in the screenshot), so every barcode-scanned food is stored as **`source: 'ai'`** —
+the `'barcode'` value is in the type and is essentially never written from this path. That is why
+BF-38 measured only **3** rows with `source = 'barcode'` out of 221. The scan result knows which
+route produced it (the barcode branch stamps
+`notes: 'From Open Food Facts barcode database'`); the source should follow it.
+
+- **Fix the chain in one PR, per the sibling-surface rule** — the form model, the entry contract, the
+  `null` literal, and the same drop on the **photo-scan** path if it has one. Half of this chain
+  fixed is a picture that still never arrives.
+- **Ride BF-38's barcode work if it is in flight.** That entry already says the real barcode task is
+  making the code reachable end-to-end (*"the barcode column is NULL on all 221 rows"*), and the
+  `source` mislabel above is the same call site. Two PRs touching that line will conflict; one should
+  carry both.
+- **Nothing back-fills.** Foods already scanned keep their placeholder — the data URI was never
+  stored and OFF would have to be re-queried per item to recover it. Worth deciding whether a
+  one-off re-fetch for items that have a `barcode` is wanted, which is only possible for the rows
+  that actually have one (see the finding above — most do not).
+- **Verification:** scan a barcode for a product Open Food Facts has a thumbnail for → the logged
+  row shows the product picture, not the fork-and-knife placeholder; the stored item's `source` reads
+  `barcode`; and a product OFF has **no** image for still logs cleanly with the placeholder.
+
+### [nutrition][platform] BF-57 — a printed meal label only works for the person who printed it, and making it work for anyone is a decision, not a fix
+
+- **Lane:** B — the payload is Lane A's and it already shipped; everything outstanding is surface.
+- **✅ THE ENGINE HALF SHIPPED 2026-08-30.** `packages/shared/src/nutrition/label-payload.ts` gains
+  `encodeSharedMeal` / `decodeSharedMeal` / `decodeMealLabelScan` and the QR byte-capacity table.
+  The owner's design: the whole meal travels in the code — positional JSON
+  `[1, name, servings, [[name,g,kcal,p,c,f], …], rolled?]` — so a label scans offline, for a user
+  with no account, as a **copy** that never couples the two users' data. Ids are deliberately NOT
+  globally resolvable; that was rejected and stays rejected.
+  - **The totals are sacred.** Nothing is ever dropped to save bytes: the tail rolls into one
+    remainder entry carrying its combined weight and macros, so a trimmed copy's figures match the
+    original to the gram. Tested at 1, 2, 3, 5, 8, 12 and 25 ingredients.
+  - **Budget: 251 bytes — QR version 11 at EC M**, which is 61 modules and **0.49 mm/module across
+    ~30 mm**, the bottom of the 0.49–0.66 range the label design was built to. Version 12 is 0.46 and
+    falls out. The spec capacity table is checked against the real `qrcode` encoder for all 20
+    versions.
+  - **Both formats, one decoder, indefinitely** — a label printed before this still resolves for its
+    owner.
+
+- **⚑ RAISED 2026-08-31 — this IS the sharing feature the owner just asked for.** BF-77 records the
+  request (*"I would like to be able to share meals with my partner/friend"*) and its recommendation
+  is to finish this entry rather than build anything new. Two things to add to the surface work
+  below:
+  - **The renderer still emits the OLD token.** `meal-label-render.ts:694` calls
+    `encodeMealLabelToken(mealId)`, not `encodeSharedMeal`. So the shipped payload reaches nothing
+    and today's labels remain owner-only — swapping that call is the single change that makes every
+    other item here worth doing.
+  - **Screen-to-screen, not only print.** The label sheet already hands a PNG to the system share
+    sheet, so a partner can be sent the label and scan it off their screen. Once the payload is the
+    self-contained one, that path works with no further work — say so in the UI, because a control
+    labelled *Label* does not read as *share this meal with someone*.
+- **⚑ NO LONGER A `Keep:` — 2026-08-31.** It was one, and that was wrong: a `Keep:` means *shipped,
+  only residue owed, not new work*, and this entry owes an entire unbuilt surface. Classified that
+  way it never headed Lane B's work list, which is how the owner's most-wanted feature sat idle
+  while the payload it needs was already merged. **This is live work.** What follows is the scope:
+  1. **Give the QR ~30 mm of the 50 mm label.** The budget above is meaningless until the layout
+     hands the code that space — at today's 12.2–16.4 mm even a 3-ingredient payload lands at
+     **0.31 mm/module**, too fine for a home printer. This is the binding constraint, not the format.
+  2. **Say on the label when the list was trimmed.** A printed label naming four of ten ingredients
+     reads as the whole recipe unless it says otherwise. `encodeSharedMeal` returns `named`/`rolled`
+     for exactly this.
+  3. **The scan path** (`food-logger-sheet.tsx`): route `decodeMealLabelScan`'s `shared-meal` branch
+     into creating the scanner's own meal, and **fix the message on the other branch** —
+     *"That meal belongs to someone else"* beats *"no longer exists"*, which is wrong twice over, and
+     an old-format label scanned by another user still lands there.
+  4. **Verification, on two phones and two accounts:** a 3-ingredient label scans **in airplane mode**
+     and creates the scanner's own meal with the same portions and macros; a 12-ingredient one
+     produces the same total calories and macros with its tail rolled into one labelled remainder;
+     and a previously-printed label still resolves for its owner.
+### [nutrition][app-shell] BF-75 — every nutrition sheet paints opaque, so the tab's wallpaper stops at the sheet edge
+
+- **Lane:** B — `components/ui/sheet.tsx:85`, and whichever nutrition sheets opt in.
+- **Added:** 2026-08-31 · owner: *"just the fact that it's a plain black screen on every nutrition
+  pull-up screen; if we could have a good background for these pages it would be good. Maybe we need
+  a theme for nutrition of sorts."*
+
+**A nutrition theme already exists — the sheets opt out of it.** `lib/background/screen-palettes.ts`
+defines a `'nutrition'` `ScreenPaletteKey`, and its gradient lives in `globals.css` as
+`--screen-palette-nutrition`; the tab itself renders it (the warm brown behind the day screen in the
+owner's own screenshots). What is plain black is every **sheet**, because `SheetContent`'s base class
+list starts with **`bg-background`** — an opaque paint over the wallpaper layer. This is precisely
+the case CLAUDE.md's background rule names: *"a `bg-background` root silently hides any wallpaper
+layer."*
+
+- **⚠ Do NOT just make `SheetContent` translucent.** That class is the app-wide sheet primitive —
+  every sheet in every tab renders through it, and a global change is the *"no global
+  element-selector styling"* hazard wearing a component's clothes. The shape that is safe: an opt-in
+  variant or prop (`surface="page"`), applied to the nutrition sheets named in this entry, so a
+  regression is scoped to the screens that asked for it.
+- **Legibility is the constraint that decides the design.** These sheets are dense — macro numbers,
+  ingredient rows, small grey secondary text — and body text must stay ≥4.5:1. So the wallpaper
+  needs the `ScrimLayer` treatment the DetailHero pattern already uses, not a raw gradient behind
+  live text. A scrim is what makes this shippable rather than pretty.
+- **Dark only** — the app is pinned dark (owner, 2026-08-25), so design and verify one theme, and
+  take colours from the existing `--screen-palette-*` tokens rather than new literals
+  (`check-hex-literals.js` ratchets that and a parity PR may not raise its files' counts).
+- **Scope it in the entry, not at build time:** name which sheets change (Log Food, meal detail, the
+  builder, quantity, quick-edit) so "every nutrition sheet" does not quietly become every sheet.
+- **Verification:** the nutrition sheets show the tab's palette behind their content with a scrim;
+  body and secondary text still measure ≥4.5:1 on the S25; and a sheet in Health, Workout and More
+  is unchanged.
+
 ### [devices] PS-11 — FIRST OVERNIGHT SYNC: prove every metric actually landed ⭐ TOMORROW'S JOB
 
 - **Lane:** A
@@ -930,10 +1219,16 @@ bug is that it is using a prediction as the definition of BMR when a measurement
   repository method already exists (`repo.getLatestMeasuredRmr`, used by
   `app/api/nutrition-goals/recommend/route.ts:212`), so this is a read plus one substitution, not new
   infrastructure.
-- **Needs:** BF-71 — pointless to wire up before there is a way to enter a measurement, and
-  unverifiable before then. **(Re-pointed 2026-08-31: this said BF-33, which shipped the API and the
-  storage — but no client calls it, so there is still no way in. `measured_rmr` holds 0 rows in
-  production.)**
+- **✅ UNBLOCKED 2026-08-31 — the `Needs:` is cleared and deliberately not replaced.** It pointed at
+  BF-33, then at BF-71; **BF-71 shipped the entry screen the same day** (`More → Health → DEXA & RMR
+  results`, both tables verified filling). BF-71 stays in the queue only for a device check, and a
+  `Needs:` on it would park this entry behind a check it does not depend on — reading a stored value
+  needs the value to be storable, which it now is. Enter the 2026-08-27 results and this is
+  immediately verifiable.
+- **BF-71 measured the prize this entry predicted.** With 1,325 kcal and 51.46 kg FFM stored,
+  `calculateBaseline` returns **BMR 1328 / TDEE 1594** against **1485 / 1782** predicted. The
+  **188 kcal/day** below is confirmed, not forecast — and the Energy Balance card is still showing
+  the prediction, which is exactly what this entry fixes.
 - **⚠ The numbers above are from 2026-08-27 and the formula BMR has since moved — re-measure before
   trusting them.** On 2026-08-31 the owner's latest reading is 71.45 kg at 25.2% → 53.4 kg FFM →
   Cunningham **1,524**, not 1,481 (that figure was Cunningham at the *test-day* FFM, which is where
@@ -1770,246 +2065,6 @@ controls side by side, one wired to the engine and one not.
   `Deload` → it does not. Then the reverse case, a **full** prescription with `Deload` picked, still
   behaves as Q-109/Q-175 built it — that path works today and must not regress.
 
-### [nutrition][app-shell] BF-74 — the meal photo's ✕ sits where a sheet's close button lives and deletes on one tap
-
-- **Lane:** B — `components/nutrition/meal-photo-tile.tsx:141-149`.
-- **Batch:** `nutrition-ui-uplift`
-- **Added:** 2026-08-31 · owner, on the meal detail sheet: *"the delete image button is easy to hit
-  with no confirmation."*
-
-**Two separate things make it easy to hit, and the second is the real one.**
-
-1. **It fires immediately.** `onClick={e => { e.stopPropagation(); onChange(null) }}` — no confirm,
-   no undo. The parent saves straight away, so the photo is gone from the meal.
-2. **⚠ It sits exactly where the sheet's CLOSE button would be.** `meal-detail-sheet.tsx` passes
-   `hideCloseButton`, so this ✕ — `absolute right-0 top-0` on the hero image — is the **only** ✕ on
-   the screen, in the top-right corner, which is the one position a user reads as "close this". A
-   reach for dismiss lands on delete. That is not a small target problem; it is a *wrong meaning*
-   problem, and it explains "easy to hit" better than the size does.
-
-- **It is also under the tap floor**, at `h-8 w-8` (32 dp) against the repo's 44/48 dp minimum —
-  worth fixing, but do not treat that as the fix. Making a mislabelled control *bigger* makes it
-  easier to hit by accident.
-- **Recommendation, in order:** move it off the close corner (bottom-right of the hero, or into the
-  picker's own menu), keep it ≥44 dp, and make it recoverable. A confirm is the crude option; the
-  better one is that re-adding is already one tap — the tile is a real picker (BF-46 ①a) — so an
-  undo toast is enough and costs no dialog.
-- **Sibling sweep:** `MealPhotoTile` renders in the builder as well as this hero. The `variant`
-  differs; the ✕ does not. Fix both, and check no other tile puts a destructive control in a
-  dismiss corner.
-- **Verification:** on the S25, tapping the top-right corner of the meal photo does not silently
-  discard it; the remove control is ≥44 dp, reads as removal rather than dismissal, and the removal
-  can be undone without re-picking from the gallery.
-
-### [nutrition][app-shell] BF-75 — every nutrition sheet paints opaque, so the tab's wallpaper stops at the sheet edge
-
-- **Lane:** B — `components/ui/sheet.tsx:85`, and whichever nutrition sheets opt in.
-- **Added:** 2026-08-31 · owner: *"just the fact that it's a plain black screen on every nutrition
-  pull-up screen; if we could have a good background for these pages it would be good. Maybe we need
-  a theme for nutrition of sorts."*
-
-**A nutrition theme already exists — the sheets opt out of it.** `lib/background/screen-palettes.ts`
-defines a `'nutrition'` `ScreenPaletteKey`, and its gradient lives in `globals.css` as
-`--screen-palette-nutrition`; the tab itself renders it (the warm brown behind the day screen in the
-owner's own screenshots). What is plain black is every **sheet**, because `SheetContent`'s base class
-list starts with **`bg-background`** — an opaque paint over the wallpaper layer. This is precisely
-the case CLAUDE.md's background rule names: *"a `bg-background` root silently hides any wallpaper
-layer."*
-
-- **⚠ Do NOT just make `SheetContent` translucent.** That class is the app-wide sheet primitive —
-  every sheet in every tab renders through it, and a global change is the *"no global
-  element-selector styling"* hazard wearing a component's clothes. The shape that is safe: an opt-in
-  variant or prop (`surface="page"`), applied to the nutrition sheets named in this entry, so a
-  regression is scoped to the screens that asked for it.
-- **Legibility is the constraint that decides the design.** These sheets are dense — macro numbers,
-  ingredient rows, small grey secondary text — and body text must stay ≥4.5:1. So the wallpaper
-  needs the `ScrimLayer` treatment the DetailHero pattern already uses, not a raw gradient behind
-  live text. A scrim is what makes this shippable rather than pretty.
-- **Dark only** — the app is pinned dark (owner, 2026-08-25), so design and verify one theme, and
-  take colours from the existing `--screen-palette-*` tokens rather than new literals
-  (`check-hex-literals.js` ratchets that and a parity PR may not raise its files' counts).
-- **Scope it in the entry, not at build time:** name which sheets change (Log Food, meal detail, the
-  builder, quantity, quick-edit) so "every nutrition sheet" does not quietly become every sheet.
-- **Verification:** the nutrition sheets show the tab's palette behind their content with a scrim;
-  body and secondary text still measure ≥4.5:1 on the S25; and a sheet in Health, Workout and More
-  is unchanged.
-
-### [nutrition][app-shell] BF-76 — sweep the nutrition sheets for safe-area clearance rather than fixing them one report at a time
-
-- **Lane:** B
-- **Batch:** `nutrition-ui-uplift`
-- **Added:** 2026-08-31 · owner, after BF-62: *"safe spacing off in this place — need to do a review
-  cause lots of nutrition screens are wrong."*
-
-**This is the owner asking for the sweep instead of the third individual report, and they are right
-to.** BF-62 was the meal detail sheet's action row; this screenshot is the same class on another
-screen. The repo's own rule already says a fix applied to one surface and not its siblings is half
-done, and safe-area regressions are the single most repeated UI class here (10+ incidents).
-
-- **What the sweep covers:** every `SheetContent side="bottom"` under `components/nutrition/` and
-  `app/nutrition/`, plus any full-screen takeover they open. For each, record the bottom-inset story:
-  the sheet primitive bakes it, so a screen that adds `pb-safe*` inside is *double*-padding and one
-  that fights the baked padding with a `vh` height is BF-62's shape.
-- **⚠ Start from BF-62's hypothesis, because it generalises.** `h-[92vh]`/`h-[90vh]` on a WebView
-  whose `vh` includes the gesture inset overshoots the viewport, so the baked padding lands under the
-  bar. `grep -rn 'h-\[[0-9]*vh\]' components/nutrition app/nutrition` is the first pass, and `dvh`
-  is the likely fix — one change, many screens.
-- **Both navigation modes.** The inset differs between gesture nav and 3-button nav, and checking one
-  is how this class keeps shipping. The sandbox renders insets as 0, so none of this is verifiable
-  off-device.
-- **Output is a list, then one PR.** Enumerate every sheet with its measured clearance before
-  changing anything — a sweep that fixes as it goes cannot say what it covered, which is what makes
-  the next report a fourth individual entry.
-- **Verification:** every nutrition sheet's bottom control clears the gesture bar on the S25 in both
-  navigation modes, and the PR body lists each sheet checked with what it needed.
-
-### [nutrition] BF-73 — the Log Food screen: bigger capture tiles, and `New` should outrank `Delete meals`
-
-- **Lane:** B — `components/nutrition/capture-actions.tsx` and `components/nutrition/meal-list-actions.tsx`.
-- **Batch:** `nutrition-ui-uplift`
-- **Added:** 2026-08-31 · owner, on the Log Food sheet: *"don't like this UI from this screen — the
-  icons/sections for photo/barcode/describe should be larger. Delete meals + New should be
-  different. Maybe a big 'New' button + a small delete bin."*
-
-**① The capture tiles have already been enlarged once, which is the thing to know before doing it
-again.** BF-50 ① took them from `min-h-12` (48 dp) to `min-h-[62px]`, and the comment records where
-62 came from: *"from the artboard's capture tiles — not a number invented here (BF-28's parity
-rule)"*. The owner is now asking for bigger than the drawing.
-
-- **That is allowed, and BF-28 rule 2 is why:** a later owner decision beats the artboard, and this
-  is one. Record it as an owner override rather than a parity fix, so the next parity sweep does not
-  "correct" the tiles back to 62 and re-open this.
-- **Keep `min-h`, never a fixed height.** The existing comment earned that: *"Describe or enter"*
-  wraps to two lines in a third of 412 dp and a fixed height clips it. Growing the tile means raising
-  the floor and letting the label breathe — more vertical padding and a larger icon (`h-5 w-5` today)
-  — not pinning a height.
-- The icon and the 11 px label should scale with the tile; a bigger box around the same small glyph
-  is what makes a control read as empty rather than prominent.
-
-**② The action pair is deliberately equal-weight today, and the owner wants a hierarchy.** Both are
-`size="sm"` pills with `min-h-[44px]`: `Delete meals` in `secondary`, `New` in the default accent.
-The owner's ask — a big `New`, a small bin — is the better shape and worth stating why: **`New` is
-the frequent act and deleting meals is rare and destructive**, so equal visual weight overstates the
-destructive one.
-
-- **The bin must stay a real 44 dp target while looking small.** Shrinking the *label* to an icon is
-  the ask; shrinking the *hit box* is a tap-target regression the repo already has a floor for.
-- **⚠ It needs an `aria-label`, and it is losing the one thing that made it clear.** BF-50 ④ renamed
-  this control from `Select` to `Delete meals` precisely because *"there is a 'select' button… but
-  you can't do anything with it except delete"* — the words are the fix that entry shipped. An
-  icon-only bin throws them away visually, so the accessible name has to carry them: `aria-label="Delete meals"`, not `"Delete"`.
-- **The risk is low and worth saying so:** the bin opens *selection mode*, it does not delete
-  anything, and the destructive confirm sits behind it. So an icon-only entry point is defensible
-  here in a way it would not be if it deleted on tap.
-- **Verification:** on the S25, the three capture tiles read as the screen's primary controls and
-  *"Describe or enter"* still fits on two lines without clipping; `New` is visibly the primary action
-  and the bin visibly secondary; the bin still measures ≥44 dp and a screen reader announces it as
-  "Delete meals".
-
-### [nutrition] BF-72 — the diary's own hydration wipes the meal grouping it just drew
-
-- **Lane:** B — `app/nutrition/use-food-logs-loader.ts:104`.
-- **Batch:** `nutrition-ui-uplift`
-- **Added:** 2026-08-31 · owner: *"when I add my saved meal it starts as the meal with the image,
-  then breaks into its ingredients."* That sequence is the whole diagnosis — the optimistic write is
-  right and something after it is wrong.
-
-**One line. `applyDelta`'s `foodLogs` payload omits `savedMealId` and `mealGroupId`:**
-
-```ts
-foodLogs: server.map(l => ({
-  id: l.id, date: today, mealTypeId: l.mealTypeId, foodItemId: l.foodItemId,
-  quantityMultiplier: l.quantityMultiplier, loggedAt: …,
-  updatedAt: nowIso, deletedAt: null, syncStatus: 'synced' as const,
-})),
-```
-
-CLAUDE.md's rule is that **a local upsert overwrites all columns by default**, and
-`sqlite-backend.ts:2036` writes `record.savedMealId ?? null, record.mealGroupId ?? null` — so an
-omitted field is written as NULL. The very next line re-reads
-`store.getFoodLogsWithItems(today)` and renders it. The screen strips its own grouping and then
-draws the stripped copy.
-
-**Confirmed against production, so no part of this is inferred.** Today's `food_logs` hold
-**11 rows carrying both ids**, resolving to six real meals — `Cruskit + PB` (2 rows) and
-`Protein Shake` (3) are exactly the five loose rows in the owner's breakfast screenshot. The server
-is correct; the device clobbers its own copy.
-
-- **Fix:** carry both fields in that payload. The sibling paths already do —
-  `log-meal.ts`'s local upsert, the outbox payload and the `pushMutations` branch all pass them, and
-  the local read at `sqlite-backend.ts:2235` selects them. This one site was missed.
-- **⚠ Sweep every other `applyDelta`/hydrate payload in the same PR.** This is a screen-level
-  hydration that predates the columns; BF-39's chain audit covered the sync engine and not this. Any
-  other place that rebuilds a local row from a server response has the same exposure — a partial
-  object silently nulls what it omits.
-- **⚠ Second, smaller finding at the same line: `syncStatus: 'synced'`** is stamped on every row,
-  including one whose own mutation may still be in the outbox. `applyDelta` gates on
-  `sync_status === 'synced'` before overwriting precisely so a pull cannot revert a pending local
-  edit; stamping it here from a screen-level hydrate hands that guard a value it did not earn.
-  Worth a look, not necessarily a change — but decide it rather than inherit it.
-- **Verification:** log a saved meal, wait for the refetch, and it stays one row with its name and
-  photo — the owner's report is the test. Then reload the tab: still grouped, because the local copy
-  kept its ids. Production already shows the rows are correct, so a failure after this fix is a
-  render bug, not a data one.
-
-### [nutrition] BF-70 — the barcode scan fetches the product image and three layers throw it away
-
-- **Lane:** A — `packages/shared/src/nutrition/log-food.ts` and the `NewFoodEntry` contract; the
-  form-model half is B but lands in the same change.
-- **Batch:** `barcode-chain` — with BF-38, which is also Lane A and touches the same call site.
-- **Added:** 2026-08-31 · owner, reviewing the tab: *"barcode scanning did not add the image of the
-  food from the db as its item picture."* Screenshot: `LOADED MAC & CHEESE / CORE POWERFOODS`,
-  90% confidence, *"From Open Food Facts barcode database"* — logged with a placeholder tile.
-
-**The picture is fetched successfully and then dropped, three times.** BF-35 already did the hard
-half: `OFF_FIELDS` requests `image_front_thumb_url`, and `/api/nutrition/barcode` awaits
-`fetchOffThumbDataUri(...)` and returns it as `result.imageDataUri`. The API that stores it exists
-too — `/api/nutrition/food-items` accepts `imageDataUri` and validates it against
-`FOOD_ITEM_IMAGE_MAX_BYTES`. Everything between the two discards it:
-
-1. **`EditableNutrition`** (`review-step.tsx:10`) has no `imageDataUri` field, and
-   `scanToEditable()` (`food-logger-sheet.tsx:41`) maps eleven fields and not that one — so the
-   image is gone the moment the Review sheet opens.
-2. **`NewFoodEntry`** (`packages/shared/src/nutrition/log-food.ts`) has no `imageDataUri` either, so
-   `handleConfirm` could not pass one even if the form held it.
-3. **`log-food.ts:214` writes `imageDataUri: null` literally** into the local food item.
-4. **`create-food-item.ts:68` looks like the fix and is inert.** It reads
-   `imageDataUri: s.imageDataUri ?? null` — but `s` is the return of
-   `sanitiseNutrition({ calories, proteinG, carbsG, fatG, servingSizeG, fiberG, sugarG, sodiumMg,
-   satFatG })`, whose `RawNutrition` type is numeric-only. **`s.imageDataUri` is always
-   `undefined`**, so that line is always `null`, and `NewFoodItem` has no image field for a caller to
-   supply one. Its comment — *"Present when the scan came from a barcode/search lookup whose Open
-   Food Facts product carried a thumbnail"* — asserts the opposite of what the code can do, and is
-   the reason nobody has caught this: the file reads as the place BF-35 route 1 was implemented.
-
-So this is a **contract gap along one chain**, not a bug in one place — fixing any single layer
-changes nothing, which is the thing to know before starting. Site 4 is the one to fix first: it is
-the shared creator, and giving `NewFoodItem` the field is what lets the other three carry a value
-worth passing.
-
-**⚠ Second finding in the same line, and it explains a measurement BF-38 already published.**
-`handleConfirm` sets `source: scanResult?.confidence ? 'ai' : 'manual'`. A barcode scan **has** a
-confidence (90% in the screenshot), so every barcode-scanned food is stored as **`source: 'ai'`** —
-the `'barcode'` value is in the type and is essentially never written from this path. That is why
-BF-38 measured only **3** rows with `source = 'barcode'` out of 221. The scan result knows which
-route produced it (the barcode branch stamps
-`notes: 'From Open Food Facts barcode database'`); the source should follow it.
-
-- **Fix the chain in one PR, per the sibling-surface rule** — the form model, the entry contract, the
-  `null` literal, and the same drop on the **photo-scan** path if it has one. Half of this chain
-  fixed is a picture that still never arrives.
-- **Ride BF-38's barcode work if it is in flight.** That entry already says the real barcode task is
-  making the code reachable end-to-end (*"the barcode column is NULL on all 221 rows"*), and the
-  `source` mislabel above is the same call site. Two PRs touching that line will conflict; one should
-  carry both.
-- **Nothing back-fills.** Foods already scanned keep their placeholder — the data URI was never
-  stored and OFF would have to be re-queried per item to recover it. Worth deciding whether a
-  one-off re-fetch for items that have a `barcode` is wanted, which is only possible for the rows
-  that actually have one (see the finding above — most do not).
-- **Verification:** scan a barcode for a product Open Food Facts has a thumbnail for → the logged
-  row shows the product picture, not the fork-and-knife placeholder; the stored item's `source` reads
-  `barcode`; and a product OFF has **no** image for still logs cleanly with the placeholder.
-
 ### [nutrition] BF-63 — barcode scan in the meal builder (shipped; the scan itself needs the device)
 
 - **Lane:** B
@@ -2500,52 +2555,6 @@ produces a label **only its author can scan** — which is the exact complaint B
   with the same ingredients and the same total macros — verified in airplane mode, and with a
   12-ingredient meal whose tail rolls into one remainder.
 
-### [nutrition][platform] BF-57 — a printed meal label only works for the person who printed it, and making it work for anyone is a decision, not a fix
-
-- **Lane:** A shipped the payload; **B owns what is left.**
-- **✅ THE ENGINE HALF SHIPPED 2026-08-30.** `packages/shared/src/nutrition/label-payload.ts` gains
-  `encodeSharedMeal` / `decodeSharedMeal` / `decodeMealLabelScan` and the QR byte-capacity table.
-  The owner's design: the whole meal travels in the code — positional JSON
-  `[1, name, servings, [[name,g,kcal,p,c,f], …], rolled?]` — so a label scans offline, for a user
-  with no account, as a **copy** that never couples the two users' data. Ids are deliberately NOT
-  globally resolvable; that was rejected and stays rejected.
-  - **The totals are sacred.** Nothing is ever dropped to save bytes: the tail rolls into one
-    remainder entry carrying its combined weight and macros, so a trimmed copy's figures match the
-    original to the gram. Tested at 1, 2, 3, 5, 8, 12 and 25 ingredients.
-  - **Budget: 251 bytes — QR version 11 at EC M**, which is 61 modules and **0.49 mm/module across
-    ~30 mm**, the bottom of the 0.49–0.66 range the label design was built to. Version 12 is 0.46 and
-    falls out. The spec capacity table is checked against the real `qrcode` encoder for all 20
-    versions.
-  - **Both formats, one decoder, indefinitely** — a label printed before this still resolves for its
-    owner.
-
-- **⚑ RAISED 2026-08-31 — this IS the sharing feature the owner just asked for.** BF-77 records the
-  request (*"I would like to be able to share meals with my partner/friend"*) and its recommendation
-  is to finish this entry rather than build anything new. Two things to add to the surface work
-  below:
-  - **The renderer still emits the OLD token.** `meal-label-render.ts:694` calls
-    `encodeMealLabelToken(mealId)`, not `encodeSharedMeal`. So the shipped payload reaches nothing
-    and today's labels remain owner-only — swapping that call is the single change that makes every
-    other item here worth doing.
-  - **Screen-to-screen, not only print.** The label sheet already hands a PNG to the system share
-    sheet, so a partner can be sent the label and scan it off their screen. Once the payload is the
-    self-contained one, that path works with no further work — say so in the UI, because a control
-    labelled *Label* does not read as *share this meal with someone*.
-- **Keep:** the whole surface, which is Lane B's, and none of it is built.
-  1. **Give the QR ~30 mm of the 50 mm label.** The budget above is meaningless until the layout
-     hands the code that space — at today's 12.2–16.4 mm even a 3-ingredient payload lands at
-     **0.31 mm/module**, too fine for a home printer. This is the binding constraint, not the format.
-  2. **Say on the label when the list was trimmed.** A printed label naming four of ten ingredients
-     reads as the whole recipe unless it says otherwise. `encodeSharedMeal` returns `named`/`rolled`
-     for exactly this.
-  3. **The scan path** (`food-logger-sheet.tsx`): route `decodeMealLabelScan`'s `shared-meal` branch
-     into creating the scanner's own meal, and **fix the message on the other branch** —
-     *"That meal belongs to someone else"* beats *"no longer exists"*, which is wrong twice over, and
-     an old-format label scanned by another user still lands there.
-  4. **Verification, on two phones and two accounts:** a 3-ingredient label scans **in airplane mode**
-     and creates the scanner's own meal with the same portions and macros; a 12-ingredient one
-     produces the same total calories and macros with its tail rolled into one labelled remainder;
-     and a previously-printed label still resolves for its owner.
 ### [nutrition][app-shell] BF-49 — back from a timeline row lands on Health, not where you started
 
 - **Lane:** B
