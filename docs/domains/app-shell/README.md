@@ -58,7 +58,20 @@ split is "does it feel slow" vs "is it actually slow at the source".
   **Fully implemented 2026-08-15** — `/more/{devices,settings,data,about}`, `/program`, and
   Settings → Developer. `components/more/sub-screen.tsx` is the navless takeover shell every More
   sub-route uses, and `components/more/more-row.tsx` is the grouped-list row. `profile-tab.tsx` went
-  845 → 465 lines and is off the `check-component-size.js` baseline.
+  845 → 465 lines and is off the `check-component-size.js` baseline. **Its 2026-08-16 owner decision
+  is still binding and is the one people re-open by accident:** `GoalsSection`, `StatsGrid`,
+  `TrophyCase`, `AchievementsSection`, "Your Year" and the season badges **stay inline on More**, and
+  `/more/goals` and `/more/achievements` were never built and are not going to be.
+- **[`docs/superpowers/plans/2026-08-31-more-page-grouping-and-interaction-model.md`](../../superpowers/plans/2026-08-31-more-page-grouping-and-interaction-model.md)**
+  — **BF-82: what that migration left behind.** The rows are right; the container around them is
+  degenerate — **eight `MoreRowGroup`s wrap exactly one row each**, and the only two that group
+  anything are on the Developer sub-screen. Proposes seven headings → two, each covering three or
+  more rows, and one interaction model. Carries three corrections to the entry's premises: the
+  navigate-vs-expand affordance already exists (`ChevronRight` vs a rotating `ChevronDown`); the real
+  defect is that `goals-section.tsx` **re-implements** `MoreRowGroup` rather than using it; and there
+  are no sliders on the screen — five `Switch`es, all booleans, all correct — so the control question
+  is the owner's and the plan decides none of it. **The build is parked behind BF-79 → BF-78 (Lane
+  A)**; §3–§4 are separable if the screen needs fixing sooner.
 - Reviews: [`docs/reviews/2026-08-14-app-ui-flow-ia-review.md`](../../reviews/2026-08-14-app-ui-flow-ia-review.md) — **UI / flow / information-architecture + caching review, 2026-08-14** (owner-requested; the full navigation map with a reachability count for all 39 page routes, the proposed target structure for More/Settings/Devices/Program/Admin, and 13 findings queued as Q-232…Q-244). Its prompt is [`2026-08-14-app-ui-flow-ia-review-prompt.md`](../../reviews/2026-08-14-app-ui-flow-ia-review-prompt.md). **§7 is the separate testing-capability measurement** — the 81 "NOT verified on device" rows split into five gates, only 25 of which need the device, queued as Q-249…Q-254.
 - Handoff: [`docs/handoff-2026-08-14-app-shell-ui-flow-ia-review-and-testing-capability.md`](../../handoff-2026-08-14-app-shell-ui-flow-ia-review-and-testing-capability.md) — **2026-08-14**, both halves of that session: the IA/caching review and the agent-testing cluster, with the decisions (why Q-232 is an umbrella, why Q-249 sits above it, why the whole cluster precedes Q-49) and the traps.
 - Reviews: [`docs/reviews/2026-08-07-full-app-review.md`](../../reviews/2026-08-07-full-app-review.md) — **full-app deep review, 2026-08-07** (saving/caching/performance/logic across all 201 routes and 40 pages; 53 findings queued as Q-117…Q-138, plus root cause for Q-73 and mechanisms for Q-72/Q-107)

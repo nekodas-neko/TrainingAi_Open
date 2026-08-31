@@ -4973,3 +4973,17 @@ addition was ~30 lines; the net is 15.
 The rule this obeys is CLAUDE.md's: *"**rewrite** `docs/agents/state/<agent>.md` in full. Never
 append; a baton that is half last week's is worse than none."* The ratchet is what makes that
 rewrite happen instead of being intended.
+
+## 2026-08-31 — `docs/implementation-backlog.md` 14438 → 14456 (BF-82's plan pointer and the corrections that go with it)
+
+**All 18 lines are inside BF-82**, and they are the two fields the protocol says belong there rather
+than in prose. `Needs: BF-79` is the sequencing the entry already stated in a paragraph — which is
+exactly why `next-item.js` offered BF-82 as READY at the head of Lane B while the content half it
+depends on sat PARKED behind a Lane A item. `Plan:` points at the document, so the planning half is
+visibly done and the next implementer reads the plan instead of re-deriving it.
+
+The rest is three corrections written **into** the entry rather than left only in the plan, because
+the entry is what a hand-scan finds: the navigate-vs-expand affordance already exists, the real
+defect is `goals-section.tsx` re-implementing `MoreRowGroup`, and Goals staying inline is a
+2026-08-16 owner decision rather than an oversight. An entry whose premises are wrong is a work order
+for the wrong work.
