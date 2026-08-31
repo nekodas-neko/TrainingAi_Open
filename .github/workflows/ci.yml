@@ -331,6 +331,9 @@ jobs:
       - name: API routes do not authorise from the stale isAdmin claim
         run: node scripts/check-admin-claim-in-api.js
 
+      - name: Body composition is derived from a DEXA-corrected body fat
+        run: node scripts/check-body-fat-correction.js
+
       - name: One canonical TTL per cache key
         run: node scripts/check-cache-ttl-divergence.js
 

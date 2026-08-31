@@ -33,6 +33,17 @@ export interface BodyMetrics {
   bmrKcal?: number
   metabolicAge?: number
   createdAt: Date
+  /**
+   * READ-ONLY provenance for `bodyFatPct` — `source_map->>'body_fat_pct'`, undefined for every row
+   * written before provenance was recorded. It exists so a consumer can apply the DEXA calibration
+   * (BF-2), which is per instrument: a reading from an uncalibrated or unknown scale must be left
+   * alone rather than corrected on a guess.
+   *
+   * **Never written.** `upsertBodyMetrics` maps an explicit column list
+   * (`BODY_METRICS_SOURCE_COLS`) and takes its provenance from its own `source` argument, so a
+   * value set here is ignored rather than persisted.
+   */
+  bodyFatSource?: string
 }
 
 export interface ActivityLog {

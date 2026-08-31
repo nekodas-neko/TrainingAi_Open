@@ -4338,6 +4338,18 @@ The rest are cheap tests that stop a false alarm: check the **spread** before be
 have collapsed (they normally sit 20 points apart), and **reproduce readiness from its stored
 contributors** before calling it wrong (2026-08-31 came to 55.3 against a stored 55).
 
+## 2026-08-31 — `docs/implementation-backlog.md` 14017 → **14025** (BF-2 step 3 ships)
+
+Eight lines, and they buy one thing: a standing "do not simplify this back" on the step-3 design.
+Correcting inside `listBodyMetrics` looks obviously right — one place, no consumer can be missed —
+and it is wrong for a reason nothing in the code says out loud, because the path runs through a
+client edit sheet and a source rank. A future session that reads the per-consumer sweep as
+duplication will refactor it and quietly destroy the raw archive. The entry now carries the reason
+rather than the conclusion.
+
+The step-1/2 block it replaces is gone, not appended to: it existed to say "nothing consumes this
+yet", which stopped being true today, and leaving it would have had the entry contradict itself.
+
 ## 2026-08-31 — `docs/implementation-backlog.md` 14007 → **14017** (BF-2 steps 1–2 ship)
 
 Ten lines on BF-2, and they are the ones that stop the next session mis-reading a half-built entry:

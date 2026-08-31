@@ -1888,6 +1888,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     return rows.map(r => ({
       id: r.id, userId: r.userId, date: r.date,
       weightKg: r.weightKg ?? undefined, bodyFatPct: r.bodyFatPct ?? undefined,
+      bodyFatSource: r.sourceMap?.body_fat_pct ?? undefined,
       calories: r.calories ?? undefined, proteinG: r.proteinG ?? undefined,
       carbsG: r.carbsG ?? undefined, fatG: r.fatG ?? undefined,
       steps: r.steps ?? undefined, distanceKm: r.distanceKm ?? undefined,
@@ -5595,6 +5596,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       getOuraClockAnchor: id => this.getOuraClockAnchor(id),
       getOuraClockAnchors: id => this.getOuraClockAnchors(id),
       upsertBodyMetrics: (id, rows, source) => this.upsertBodyMetrics(id, rows, source),
+      getBodyFatCalibration: id => this.getBodyFatCalibration(id),
       refitDaytimeHrvModel: (id, tz) => this.maybeRefitDaytimeHrvModel(id, tz),
     }), nodeModelRuntime, timezone, opts)
   }
@@ -6262,5 +6264,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   async countPackableBuckets(userId: string) { return countPackableBuckets(this.db, userId) }
   async getOuraTimeseriesDelta(userId: string, opts: { heartrate?: oura.TimeseriesCursor | null; bucket?: oura.TimeseriesCursor | null; budget?: number }) { return oura.getOuraTimeseriesDelta(userId, opts) }
   async getOuraDailyDerived(userId: string, from: string, to: string) { return oura.getOuraDailyDerived(this.db, userId, from, to) }
-  async persistBodyCompFromMetrics(userId: string) { return oura.persistBodyCompFromMetrics(this.db, userId) }
+  async persistBodyCompFromMetrics(userId: string) {
+    return oura.persistBodyCompFromMetrics(this.db, userId, await this.getBodyFatCalibration(userId).catch(() => null))
+  }
 }

@@ -9,6 +9,7 @@ import { aestMidnight, todayInTz, DEFAULT_TZ, shiftDateStr } from '@trainingai/s
 import { shouldPrune } from '../retention-throttle'
 import { collapseOnConflict, keepLatestNonNull } from '../collapse-conflicts'
 import { bodyCompSnapshot } from '@trainingai/shared/health/body-composition'
+import { correctBodyFatPct, type BodyFatCalibration } from '@trainingai/shared/health/body-fat-calibration'
 import { mergeSet, initialSourceMap, type HealthSource, type SourceColumn } from '@/lib/data/health-source'
 import { resolveDsToMs, type ClockAnchor } from '@/lib/oura-ble/clock'
 
@@ -1757,14 +1758,28 @@ export async function vacuumOuraRawSamples(): Promise<{
   return { beforeBytes, afterBytes, reclaimedBytes, ms }
 }
 
-export async function persistBodyCompFromMetrics(db: Db, userId: string): Promise<number> {
+export async function persistBodyCompFromMetrics(
+  db: Db,
+  userId: string,
+  // Required, not defaulted: a default here would be a silent no-op — the backfill would run,
+  // report a write count, and quietly persist uncorrected snapshots. Both callers must decide.
+  bodyFatCalibration: BodyFatCalibration | null,
+): Promise<number> {
   const rows = await db
-    .select({ date: s.bodyMetrics.date, weightKg: s.bodyMetrics.weightKg, bodyFatPct: s.bodyMetrics.bodyFatPct })
+    .select({
+      date: s.bodyMetrics.date,
+      weightKg: s.bodyMetrics.weightKg,
+      bodyFatPct: s.bodyMetrics.bodyFatPct,
+      sourceMap: s.bodyMetrics.sourceMap,
+    })
     .from(s.bodyMetrics)
     .where(and(eq(s.bodyMetrics.userId, userId), isNotNull(s.bodyMetrics.weightKg), isNotNull(s.bodyMetrics.bodyFatPct)))
   let written = 0
   for (const r of rows) {
-    const snap = bodyCompSnapshot(r.weightKg, r.bodyFatPct)
+    // BF-2: per row, not per user — the calibration belongs to one instrument, and this backfill
+    // walks the whole history, most of which was written by an instrument it does not cover.
+    const corrected = correctBodyFatPct(r.bodyFatPct, r.sourceMap?.body_fat_pct ?? null, bodyFatCalibration)
+    const snap = bodyCompSnapshot(r.weightKg, corrected?.pct ?? r.bodyFatPct)
     if (snap == null) continue
     await upsertOuraDailyDerived(db, userId, r.date, {
       source: 'derived',

@@ -905,15 +905,23 @@ bug is that it is using a prediction as the definition of BMR when a measurement
 
 ### [body][nutrition] 🔵 BF-2 — the "DEXA filter": calibrate the scale's body-fat estimate against a real DEXA, and correct history
 
-> **⚑ STEPS 1 AND 2 SHIPPED 2026-08-31 — `packages/shared/src/health/body-fat-calibration.ts` and
-> `repo.getBodyFatCalibration()`.** The calibration derives, the pairing works against
-> production-shaped rows (+3.2 from the one 2026-08-27 pair, 3 of 11 readings corrected, the rest
-> untouched), and **nothing consumes it yet** — no goal, no RMR, no panel has changed. **What is
-> owed is steps 3 and 4:** the sweep of the read sites, and the payload field. Step 3 has a design
-> question the plan did not settle and this session did not have the measurement for —
-> `listBodyMetrics` has **22 call sites**, so correcting *inside* that read makes a missed site
-> impossible but risks a read-then-write path persisting a corrected value into the raw column.
-> Measure which callers write back before choosing.
+> **⚑ STEPS 1–3 SHIPPED 2026-08-31. Only step 4 is owed, and it is Lane B's to consume.**
+> The correction is live: measured on the dev server with the owner's real pair, resting burn moved
+> **1832 → 1773 kcal/day** and the calorie goal **1961 → 1889**, with `body_metrics.body_fat_pct` and
+> `/api/body-metadata` both still returning the raw 25.3.
+>
+> **The step-3 design question is settled, and the answer is the opposite of the safe-looking one.**
+> Correcting inside `listBodyMetrics` would make a missed consumer impossible — but the health
+> screen seeds its body-fat log field from `/api/body-metadata` and POSTs it back at source
+> `manual`, a rank that **outranks `scale_ble`**, so a corrected value there lets the user overwrite
+> their own raw reading by saving an untouched field and collapses the next calibration toward zero.
+> The correction is therefore **per consumer**, and `scripts/check-body-fat-correction.js` is what
+> stops one being forgotten. Do not "simplify" it back into the shared read.
+>
+> **Step 4 is the per-reading `corrected` flag in the payload**, which the display surfaces need
+> before they can show a corrected number honestly — two-thirds of the history is on instruments the
+> calibration does not cover, so a chart must mark where the calibrated span begins rather than draw
+> a ~3.2-point step it cannot explain.
 >
 > **⚑ PLANNED 2026-08-31 — [`2026-08-31-dexa-filter.md`](superpowers/plans/2026-08-31-dexa-filter.md).**
 > This is an implementation item now, not a planning one. **Two decisions in the plan reverse what
