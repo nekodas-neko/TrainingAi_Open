@@ -9182,6 +9182,109 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   feature. **Sequencing note:** once `getDailyGoals` reads the profile, the Activity Score's steps
   contributor changes for every historical day it is recomputed on — expected, and worth stating in
   the changelog because the owner reads that number daily.
+- **⚑ AMENDED 2026-08-31 — the owner re-raised this, and the re-raise adds TWO requirements the
+  decision above does not cover.** *"Ideally there is a setting that either 1. lets you set your own
+  step goal — if 1 is on, that should be the truth — or 2. the AI or logic driven decision to use
+  user data."* That is the 2026-08-19 decision restated, so **the design is settled and the work is
+  simply unbuilt**. What is new:
+
+  **(a) PROVENANCE — manual and AI write the SAME column, so "if 1 is on" cannot currently be
+  evaluated.** `/api/nutrition-goals/recommend:326` writes `stepsGoal: clamped.recommendedStepsGoal`
+  into `users.steps_goal`, and the manual editor writes the manual value into the same column.
+  Nothing records which wrote it. So a later AI review **silently overwrites a deliberate manual
+  choice**, and no surface can tell the owner whether the 7,000 on file is their decision or a stale
+  recommendation. Q-524's *"the AI half already exists and needs no new work"* is true for
+  *computing* the number and **false for the precedence the owner is asking for.** This needs a
+  provenance column (e.g. `steps_goal_source: 'manual' | 'derived'`) — **Lane A, a schema change** —
+  and the AI path must refuse to overwrite a `manual` value, offering it as a suggestion instead.
+  **Not an observed loss:** `last_goal_review_at` is 2026-08-25 while the newest
+  `goal_recommendations` row is 2026-08-11, so the two have not collided in a way this query can see.
+  It is a code shape, not an incident.
+
+  **(b) THE DERIVED NUMBER SHOULD COME FROM ENERGY, NOT A POPULATION BAND.** Owner: *"is that
+  specific to me? if it was someone else would it be higher/lower?"* Today it is **not** specific —
+  `STEP_GOAL_BY_ACTIVITY` is five constants, so two people at the same activity level get the same
+  goal regardless of size. **A step is not equal work across people.** Measured for the owner
+  (71.3 kg, 160 cm, 33 M; Mifflin-St Jeor BMR **1,553 kcal**; stride ≈ 0.66 m, so 1,000 steps ≈
+  **0.66 km**):
+
+  | steps | km | net kcal |
+  |---|---|---|
+  | 4,649 (their median day) | 3.09 | **86** |
+  | 7,000 (`users.steps_goal`) | 4.65 | **129** |
+  | 8,000 (`DEFAULT_STEP_GOAL`) | 5.31 | 147 |
+  | 10,000 (derived from `moderate`) | 6.64 | **184** |
+
+  **At 160 cm a 10,000-step goal is 6.6 km; at 180 cm it is ~7.5 km — the same "goal", ~14% more
+  work.** And the whole 7,000 vs 10,000 argument is worth **~55 kcal/day** to this owner, which is
+  the right scale to hold the decision at: it is small.
+
+  **⚑ CORRECTION 2026-08-31, same day — the table above uses an ESTIMATED stride and is ~10% low.**
+  The owner asked whether their real stride could be derived from strap cadence plus distance. **It
+  can, and it is already stored.** `activity_logs` carries `distance_km`, `steps`, `cadence_spm` and
+  `duration_min` on the same row, and `segments` carries `distanceKm` + `avgCadenceSpm` per interval.
+  Measured stride is **0.739 m**, not the 0.664 m the `0.415 × height` rule gives — **the estimate is
+  10.1% short**, so every distance and calorie figure above is understated by that much. Corrected:
+
+  | steps | km (measured) | net kcal (measured) | net kcal (estimated, wrong) |
+  |---|---|---|---|
+  | 4,649 (median day) | 3.43 | **95** | 86 |
+  | 7,000 | 5.17 | **143** | 129 |
+  | 10,000 | 7.39 | **205** | 184 |
+
+  **Two independent extractions agree to 0.3%** — session-level `distance ÷ steps` gives 0.739 m over
+  3 sessions, per-segment `distanceKm ÷ (avgCadenceSpm × secs)` gives **0.737 m over 16 segments**.
+  And on the one row carrying both, `cadence × duration` reproduces the **recorded** step count to
+  **+0.13%** (3,203 derived against 3,199 stored), so the cadence path is trustworthy where steps are
+  absent.
+
+  **⛔ But a single stride constant is still wrong, and the segment data says so loudly: stride
+  correlates with pace at r = −0.885** (n = 16), slope **−0.052 m per min/km slower**. Fitted, that is
+  **0.83 m at 10:00/km** and **0.62 m at 14:00/km** — a **33% spread** across ordinary walking speeds.
+  Deliberate walks here run 10–15 min/km; **incidental daily steps are slower than that and therefore
+  shorter**, so applying the walk-derived 0.739 m to a whole day overestimates distance.
+
+  **How much of the day this governs, measured:** the tracked walk is **27–94% of that day's total
+  steps** (n = 6; 84% and 94% on low-step days, 27–29% on high-step days, median ~48%). So the
+  measured stride is load-bearing for roughly half the daily total and the remainder sits at an
+  unknown, slower stride. **Nothing stored can measure incidental stride** — `step_live_windows`
+  (8 rows) and `body_metrics.steps` carry steps with no distance — so that half is an assumption
+  whichever way it is set.
+
+  **Recommended shape for the derived path:** express the goal as *the steps needed to contribute a
+  target net walking energy*, with that target a fraction of BMR — the same construction
+  `activeEnergyGoal` already uses (`BMR × 0.24`). That scales with **weight** (energy per km) and
+  **stride** (km per step), which is exactly the personalisation asked for, and it reuses an existing
+  formula rather than inventing one. **Use the measured stride, not `0.415 × height`** — and derive it
+  per user from `activity_logs`, falling back to the height rule only when a user has no cadence data.
+  Net cost is **27.7 kcal/km** at this owner's weight, so at the measured stride:
+
+  | target net walking energy | steps |
+  |---|---|
+  | 100 kcal | **4,886** |
+  | 150 kcal | **7,329** |
+  | 200 kcal | **9,773** |
+
+  **A stride estimate needs a freshness rule.** It is a function of leg length *and habitual pace*,
+  so it drifts with fitness — the same trap as `HR_REST_THRESHOLD` in Q-515. Recompute it on a
+  trailing window rather than storing it once.
+
+  **⚠ Data-quality note found while doing this: the `activity_logs` row for 2026-07-01 is corrupt.**
+  It records **4,970 steps over 3.30 km in 0.2 minutes** — a physically impossible cadence — and
+  **more steps than `body_metrics` recorded for the entire day (1,358)**. It is excluded from every
+  figure above. Any per-user stride derivation needs a sanity gate (plausible cadence, walk steps ≤
+  day steps) or this row alone will skew it.
+
+  **⛔ Two traps for whoever builds (b).** First, **do not target the whole `activeEnergyGoal` with
+  steps**: it is **373 kcal** for this owner and even 12,000 steps yields **221**, so a step goal
+  built to satisfy it would demand **~20,000 steps/day**. The walking target must be a *fraction* of
+  active energy, with training carrying the rest. Second, the Activity Score already scores `steps`
+  (weight 18) **and** `activeEnergy` (weight 15) separately — deriving the step goal from an energy
+  target makes those two contributors measure the same walking twice. **Decide the double-count
+  before shipping**, not after.
+
+  **Sequencing is unchanged:** the single-source read is still the first change and is independent of
+  the formula. Ship precedence first, then provenance, then the formula.
 - **Superseded — the three options as originally posed.** Kept for the reasoning, not the choice:
   (1) the profile value wins everywhere — the owner set it, and it matches Paluch; (2) the derived
   value wins everywhere and the profile field becomes display-only or is removed — but then the

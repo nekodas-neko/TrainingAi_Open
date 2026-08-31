@@ -231,6 +231,44 @@ sleep ✅ · readiness ✅ · activity ✅ · body ✅ · devices ✅ · workout
 - **⛔ `step_live_windows` is effectively empty — 8 rows across 6 days, 7,745 steps total.** It is the
   obvious intraday step source and it reads a flat zero. `body_metrics.steps` is a **running daily
   total** (`updated_at` moves through the day), which is what any intraday step question should use.
+- **The owner's stride is MEASURED, 0.739 m — do not use `0.415 × height` (0.664), it is 10.1% short.**
+  `activity_logs` stores `distance_km` + `steps` + `cadence_spm` + `duration_min` on one row and
+  `segments` carries `distanceKm` + `avgCadenceSpm` per interval. Two extractions agree to **0.3%**
+  (3 sessions, 16 segments) and `cadence × duration` reproduces recorded steps to **+0.13%**, so the
+  cadence path is trustworthy where `steps` is null.
+  [`review`](../../reviews/2026-08-31-measured-stride-from-cadence.md).
+- **⛔ But one stride constant is still wrong: stride vs pace is r = −0.885**, −0.052 m per min/km —
+  **0.83 m at 10:00/km, 0.62 m at 14:00/km**, a 33% spread. The measured sessions are deliberate
+  walks (10–15 min/km); **incidental steps are slower and shorter**, so 0.739 over a whole day
+  overstates distance. **The tracked walk is only 27–94% of a day's steps (median ~48%)** and nothing
+  stored can measure the rest — `step_live_windows` and `body_metrics.steps` carry steps with no
+  distance. State that half as an assumption; do not derive false precision from the walk data.
+- **A stride estimate needs a freshness rule** — it is leg length *and* habitual pace, so it drifts
+  with fitness. Same trap as `HR_REST_THRESHOLD` (Q-515). Trailing window, never stored once.
+- **⚠ `activity_logs` 2026-07-01 is CORRUPT** — 4,970 steps over 3.30 km in **0.2 minutes**, and more
+  steps than `body_metrics` holds for the whole day (1,358). Excluded from every stride figure. Any
+  per-user derivation needs a sanity gate (plausible cadence, walk steps ≤ day steps).
+- **⛔ The step-goal design was DECIDED on 2026-08-19 and is unbuilt — do not re-open it, and do not
+  recommend a number.** Q-524 carries the owner's words: *"we need to use 1 number here. The AI
+  should be able to define the number and allow for manual entry."* `users.steps_goal` becomes the
+  single source; `getDailyGoals()` reads it with the derived value as fallback. **A predecessor
+  recommended "just set it to 7,000" and the owner rightly pushed back** — 7,000 is
+  `STEP_GOAL_BY_ACTIVITY.sedentary`, a population constant from Paluch 2022, specific to nobody.
+  **Check the entry for an existing owner decision before recommending anything.**
+- **Manual and AI step goals write the SAME column, so "manual wins" cannot be evaluated today.**
+  `/api/nutrition-goals/recommend:326` and the manual editor both write `users.steps_goal` with no
+  provenance, so an AI review can silently overwrite a deliberate choice. Needs a
+  `steps_goal_source` column — Lane A. **Not an observed loss** (`last_goal_review_at` 2026-08-25 vs
+  newest `goal_recommendations` 2026-08-11); a code shape, not an incident.
+- **A step is not equal work across people, which is the real argument for personalising the goal.**
+  Owner is 160 cm → stride ≈ 0.66 m, so 10,000 steps is **6.6 km** for them and ~7.5 km at 180 cm —
+  the same "goal", ~14% more work. Their numbers: BMR **1,553**, median day 4,649 steps ≈ **86 kcal
+  net**, 7,000 ≈ **129**, 10,000 ≈ **184**. **The whole 7k-vs-10k argument is ~55 kcal/day** — hold
+  the decision at that scale.
+- **⛔ Do not derive a step goal that targets the whole `activeEnergyGoal`** (BMR × 0.24 = **373 kcal**
+  here): 12,000 steps yields 221, so it would demand ~20,000 steps/day. And the Activity Score
+  already scores `steps` (18) **and** `activeEnergy` (15) separately — an energy-derived step goal
+  makes them count the same walking twice. Decide the double-count first.
 - **The owner's step goals are not calibrated to the owner.** Median day **4,649**; 7,000 reached on
   **32%** of days, 10,000 on **15%**. Any change that makes the Activity score stricter (TN-17's
   pacing) turns that from invisible into a tile that reads red most days — which is why TN-17 is

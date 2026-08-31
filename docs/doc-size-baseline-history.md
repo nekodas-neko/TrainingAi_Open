@@ -4231,6 +4231,36 @@ their own device passes, so there was nothing here this branch could honestly st
 now carries, so the entry is removed rather than rewritten to a `Keep:` — the residue lives in
 `projectOverview.md`, and duplicating it in the queue would make an entry that reads as open work.
 
+## 2026-08-31 — backlog 13602 → 13698 and `docs/agents/state/tuning.md` 235 → 273 (the step-goal re-raise, and the measured stride)
+
+**No new entry — Q-524 gains an amendment, because the owner re-raised a decision they had already
+made.** That is the first thing the lines buy: a predecessor recommended *"just set it to 7,000"*
+without checking, and 7,000 is `STEP_GOAL_BY_ACTIVITY.sedentary`, a population constant specific to
+nobody. Q-524 has carried the real decision since 2026-08-19. The amendment says so, and the baton
+now carries the procedural rule.
+
+The rest is the two requirements the 2026-08-19 decision does not cover, and both are the kind that
+get rediscovered expensively. **Provenance:** the manual editor and
+`/api/nutrition-goals/recommend:326` write the *same column*, so *"if manual is set, it wins"* is not
+evaluable and an AI review can silently overwrite a deliberate choice — recorded as a code shape, not
+an incident, since the timestamps show they have not collided. **Personalisation:** a step is not
+equal work across people (at 160 cm, 10,000 steps is 6.6 km against ~7.5 at 180), and the arithmetic
+showing the whole 7k-vs-10k argument is worth **~55 kcal/day** is what keeps the decision at its real
+scale.
+
+Two ⛔ traps are worth their length because both are load-bearing and neither is obvious: a step goal
+built to satisfy the whole `activeEnergyGoal` would demand ~19,000 steps/day, and an energy-derived
+step goal makes the Activity Score's `steps` and `activeEnergy` contributors count the same walking
+twice.
+
+**Then the owner asked whether strap cadence could give their REAL stride, and it corrected the
+amendment written hours earlier.** It can — `activity_logs` already stores distance, steps, cadence
+and duration on one row — and the answer is **0.739 m against the height rule's 0.664, so the
+estimate was 10.1% short and every figure above was understated.** A correction that replaces its own
+numbers has to show its working or it reads as a contradiction, which is most of the added length:
+two independent extractions agreeing to 0.3%, cadence reproducing recorded steps to +0.13%, and the
+**r = −0.885 stride-vs-pace relation** that says a single constant is still wrong. The
+**27–94% walk share** of daily steps is what bounds how much any of it matters.
 ## 2026-08-30 — `docs/implementation-backlog.md` (BF-69, exposure as a variable)
 
 Long because the request arrives on top of storage that already exists and one decision that
