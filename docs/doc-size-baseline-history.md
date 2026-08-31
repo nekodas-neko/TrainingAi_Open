@@ -4486,3 +4486,20 @@ and each lost the rebase race in turn — three attempts, three conflicts, no me
 (LA-33) removed the conflict between PRs touching *different* documents; it cannot help PRs touching
 the *same* one. **A run of same-file docs PRs from one agent should be batched from the start** rather
 than opened separately and rebased serially.
+
+## 2026-08-31 — `docs/implementation-backlog.md` (BF-71, and BF-42's numbers re-measured)
+
+The owner asked which calorie estimate the budget uses. Answering it required production, not the
+source: `measured_rmr` and `dexa_scans` both hold **0 rows**, and a grep shows no client code calls
+either route — the storage and the API shipped without a way in. That is BF-71, and it is why BF-42
+cannot even be verified today, which re-points BF-42's `Needs:` from BF-33 (shipped) to this.
+
+The arithmetic is written out because it reproduces the screen exactly and that is what makes the
+claim checkable: 71.45 kg at 25.2% → 53.4 kg FFM → Cunningham 1,524 → ×1.2 → −200 = **1,629**, the
+number on the card. With the measurement stored, `personalRmr` would return ≈1,368 and the base would
+read ≈1,442 — a **188 kcal/day** difference.
+
+BF-42's own figures were amended rather than replaced: its 1,481 was Cunningham at the *test-day*
+FFM and is still the right basis for the −156 residual, but its implied live gap was four days stale.
+A prediction that tracks the scale is exactly what a stored figure in a backlog entry cannot do,
+which is now said in the entry.

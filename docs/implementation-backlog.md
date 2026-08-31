@@ -865,6 +865,43 @@ to repeat that attribution, not to invent one.
   say what caused it or what to take — test that refusal explicitly, with a leading prompt, because a
   guard that has never been attacked has not been tested.
 
+### [body][nutrition] BF-71 — the RMR and DEXA routes shipped without a screen, so both tables are empty
+
+- **Lane:** B — the entry UI; the API, the schema and the read paths all exist.
+- **Added:** 2026-08-31 · found answering the owner's question *"is it using the value from the RMR
+  scan + our sedentary level?"* The answer is no, and this is why.
+
+**Measured in production, not inferred:** `claude_ro.measured_rmr` returns **0 rows** and
+`claude_ro.dexa_scans` returns **0 rows**. The owner's DEXA and RMR results have been sitting in
+`docs/clinical-baseline-2026-08-27.md` since 2026-08-27 and have never entered the database.
+
+**The cause is a missing surface, not a missing feature.** `app/api/measured-rmr/route.ts` and
+`app/api/dexa-scans/route.ts` both exist; `repo.getLatestMeasuredRmr` exists and is already read by
+`app/api/nutrition-goals/recommend/route.ts`. But
+`grep -rn "api/measured-rmr\|api/dexa-scans"` outside `app/api/` returns **nothing** — no client
+code calls either route. The storage half shipped and the way in did not.
+
+**What it costs today, computed rather than estimated.** The owner's measured RMR is **1,325**;
+Cunningham predicts **1,481** for the fat-free mass he was scanned at, so his residual is
+**−156 kcal**. Carried to today's lean mass (71.45 kg at 25.2% → 53.4 kg FFM, Cunningham 1,524),
+`personalRmr` would return **≈1,368** rather than 1,524. Through the same ×1.2 and −200 the app
+already applies, the daily budget would read **≈1,442** instead of the **1,629** on screen —
+**~188 kcal/day**. The app is not wrong about the arithmetic; it is being fed a prediction that runs
+12% above the calorimetry.
+
+- **This is what makes BF-42 unverifiable rather than merely unbuilt.** That entry's verification is
+  *"with a measurement stored, the Energy Balance card and the goal wizard agree"* — which cannot be
+  run at all today. Ship this first.
+- **Recommendation: the smallest honest surface, not a clinical import.** Two forms behind More →
+  a number, a date, and the fat-free mass at test for RMR; the DEXA fields the schema already names.
+  BF-41's extraction-from-a-document path is the larger idea and should not gate the owner being able
+  to type 1,325 in.
+- **⚠ Carry BF-1's decided rule: crop before upload.** If the entry form ever grows a photo path,
+  the document goes to a model — *"redacting after extraction is too late."* A typed form has no such
+  exposure, which is a second reason to ship the typed one first.
+- **Verification:** enter the 2026-08-27 RMR and the DEXA from the clinical baseline doc; both tables
+  hold one row; the goal wizard's BMR changes to the measured value; and BF-42 becomes runnable.
+
 ### [body][nutrition] BF-42 — the daily energy model computes its own BMR and never reads the measured RMR
 
 - **Lane:** A — `lib/health/energy-balance-service.ts`.
@@ -898,8 +935,17 @@ bug is that it is using a prediction as the definition of BMR when a measurement
   repository method already exists (`repo.getLatestMeasuredRmr`, used by
   `app/api/nutrition-goals/recommend/route.ts:212`), so this is a read plus one substitution, not new
   infrastructure.
-- **Needs:** BF-33 — pointless to wire up before there is a way to enter a measurement, and unverifiable
-  before then.
+- **Needs:** BF-71 — pointless to wire up before there is a way to enter a measurement, and
+  unverifiable before then. **(Re-pointed 2026-08-31: this said BF-33, which shipped the API and the
+  storage — but no client calls it, so there is still no way in. `measured_rmr` holds 0 rows in
+  production.)**
+- **⚠ The numbers above are from 2026-08-27 and the formula BMR has since moved — re-measure before
+  trusting them.** On 2026-08-31 the owner's latest reading is 71.45 kg at 25.2% → 53.4 kg FFM →
+  Cunningham **1,524**, not 1,481 (that figure was Cunningham at the *test-day* FFM, which is where
+  the −156 residual comes from and is still correct). The live gap: the Energy Balance card shows a
+  **1,629** base — `1,524 × 1.2 − 200`, reproducing to within a kcal — where the measurement would
+  give **≈1,442**. So the cost is **~188 kcal/day**, and it tracks the scale rather than staying
+  fixed, which is the argument for reading the measurement rather than tuning the prediction.
 - **Verification:** with a measurement stored, the Energy Balance card's resting base and the goal
   wizard's BMR agree; with none stored, both fall back to the same prediction and nothing moves.
 
