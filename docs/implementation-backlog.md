@@ -445,10 +445,9 @@ owner is asking for it on Home. Adding a second client-side caller would make tw
   deliberately and often, and it still writes to `localStorage` alone. Ship the button and the
   storage together, or the first thing the owner does with the new button is lose the choice on his
   other device.
-- **Use a Lucide icon, not an emoji.** The owner asked for "rest + emoji"; CLAUDE.md's convention is
-  Lucide for chrome, with emoji reserved for content that carries its own `emoji` field (mood faces,
-  meal types). `Moon` or `BedDouble` beside the label is the same idea in the app's own vocabulary.
-  Worth one line back to the owner rather than a silent substitution.
+- **✅ Lucide icon, not an emoji — confirmed by the owner 2026-09-01** (*"yes use icons not emoji"*),
+  after the request originally said "rest + emoji". `Moon` or `BedDouble` beside the label. Recorded
+  as decided so nobody re-opens it from the original wording.
 - **Greyed, per the request, and that is also correct** — Start Workout is the primary action and
   rest is the secondary one. `variant="secondary"` on the shared `Button` gets it without a new
   colour.
