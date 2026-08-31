@@ -1771,6 +1771,99 @@ controls side by side, one wired to the engine and one not.
   `Deload` → it does not. Then the reverse case, a **full** prescription with `Deload` picked, still
   behaves as Q-109/Q-175 built it — that path works today and must not regress.
 
+### [nutrition][app-shell] BF-74 — the meal photo's ✕ sits where a sheet's close button lives and deletes on one tap
+
+- **Lane:** B — `components/nutrition/meal-photo-tile.tsx:141-149`.
+- **Batch:** `nutrition-ui-uplift`
+- **Added:** 2026-08-31 · owner, on the meal detail sheet: *"the delete image button is easy to hit
+  with no confirmation."*
+
+**Two separate things make it easy to hit, and the second is the real one.**
+
+1. **It fires immediately.** `onClick={e => { e.stopPropagation(); onChange(null) }}` — no confirm,
+   no undo. The parent saves straight away, so the photo is gone from the meal.
+2. **⚠ It sits exactly where the sheet's CLOSE button would be.** `meal-detail-sheet.tsx` passes
+   `hideCloseButton`, so this ✕ — `absolute right-0 top-0` on the hero image — is the **only** ✕ on
+   the screen, in the top-right corner, which is the one position a user reads as "close this". A
+   reach for dismiss lands on delete. That is not a small target problem; it is a *wrong meaning*
+   problem, and it explains "easy to hit" better than the size does.
+
+- **It is also under the tap floor**, at `h-8 w-8` (32 dp) against the repo's 44/48 dp minimum —
+  worth fixing, but do not treat that as the fix. Making a mislabelled control *bigger* makes it
+  easier to hit by accident.
+- **Recommendation, in order:** move it off the close corner (bottom-right of the hero, or into the
+  picker's own menu), keep it ≥44 dp, and make it recoverable. A confirm is the crude option; the
+  better one is that re-adding is already one tap — the tile is a real picker (BF-46 ①a) — so an
+  undo toast is enough and costs no dialog.
+- **Sibling sweep:** `MealPhotoTile` renders in the builder as well as this hero. The `variant`
+  differs; the ✕ does not. Fix both, and check no other tile puts a destructive control in a
+  dismiss corner.
+- **Verification:** on the S25, tapping the top-right corner of the meal photo does not silently
+  discard it; the remove control is ≥44 dp, reads as removal rather than dismissal, and the removal
+  can be undone without re-picking from the gallery.
+
+### [nutrition][app-shell] BF-75 — every nutrition sheet paints opaque, so the tab's wallpaper stops at the sheet edge
+
+- **Lane:** B — `components/ui/sheet.tsx:85`, and whichever nutrition sheets opt in.
+- **Added:** 2026-08-31 · owner: *"just the fact that it's a plain black screen on every nutrition
+  pull-up screen; if we could have a good background for these pages it would be good. Maybe we need
+  a theme for nutrition of sorts."*
+
+**A nutrition theme already exists — the sheets opt out of it.** `lib/background/screen-palettes.ts`
+defines a `'nutrition'` `ScreenPaletteKey`, and its gradient lives in `globals.css` as
+`--screen-palette-nutrition`; the tab itself renders it (the warm brown behind the day screen in the
+owner's own screenshots). What is plain black is every **sheet**, because `SheetContent`'s base class
+list starts with **`bg-background`** — an opaque paint over the wallpaper layer. This is precisely
+the case CLAUDE.md's background rule names: *"a `bg-background` root silently hides any wallpaper
+layer."*
+
+- **⚠ Do NOT just make `SheetContent` translucent.** That class is the app-wide sheet primitive —
+  every sheet in every tab renders through it, and a global change is the *"no global
+  element-selector styling"* hazard wearing a component's clothes. The shape that is safe: an opt-in
+  variant or prop (`surface="page"`), applied to the nutrition sheets named in this entry, so a
+  regression is scoped to the screens that asked for it.
+- **Legibility is the constraint that decides the design.** These sheets are dense — macro numbers,
+  ingredient rows, small grey secondary text — and body text must stay ≥4.5:1. So the wallpaper
+  needs the `ScrimLayer` treatment the DetailHero pattern already uses, not a raw gradient behind
+  live text. A scrim is what makes this shippable rather than pretty.
+- **Dark only** — the app is pinned dark (owner, 2026-08-25), so design and verify one theme, and
+  take colours from the existing `--screen-palette-*` tokens rather than new literals
+  (`check-hex-literals.js` ratchets that and a parity PR may not raise its files' counts).
+- **Scope it in the entry, not at build time:** name which sheets change (Log Food, meal detail, the
+  builder, quantity, quick-edit) so "every nutrition sheet" does not quietly become every sheet.
+- **Verification:** the nutrition sheets show the tab's palette behind their content with a scrim;
+  body and secondary text still measure ≥4.5:1 on the S25; and a sheet in Health, Workout and More
+  is unchanged.
+
+### [nutrition][app-shell] BF-76 — sweep the nutrition sheets for safe-area clearance rather than fixing them one report at a time
+
+- **Lane:** B
+- **Batch:** `nutrition-ui-uplift`
+- **Added:** 2026-08-31 · owner, after BF-62: *"safe spacing off in this place — need to do a review
+  cause lots of nutrition screens are wrong."*
+
+**This is the owner asking for the sweep instead of the third individual report, and they are right
+to.** BF-62 was the meal detail sheet's action row; this screenshot is the same class on another
+screen. The repo's own rule already says a fix applied to one surface and not its siblings is half
+done, and safe-area regressions are the single most repeated UI class here (10+ incidents).
+
+- **What the sweep covers:** every `SheetContent side="bottom"` under `components/nutrition/` and
+  `app/nutrition/`, plus any full-screen takeover they open. For each, record the bottom-inset story:
+  the sheet primitive bakes it, so a screen that adds `pb-safe*` inside is *double*-padding and one
+  that fights the baked padding with a `vh` height is BF-62's shape.
+- **⚠ Start from BF-62's hypothesis, because it generalises.** `h-[92vh]`/`h-[90vh]` on a WebView
+  whose `vh` includes the gesture inset overshoots the viewport, so the baked padding lands under the
+  bar. `grep -rn 'h-\[[0-9]*vh\]' components/nutrition app/nutrition` is the first pass, and `dvh`
+  is the likely fix — one change, many screens.
+- **Both navigation modes.** The inset differs between gesture nav and 3-button nav, and checking one
+  is how this class keeps shipping. The sandbox renders insets as 0, so none of this is verifiable
+  off-device.
+- **Output is a list, then one PR.** Enumerate every sheet with its measured clearance before
+  changing anything — a sweep that fixes as it goes cannot say what it covered, which is what makes
+  the next report a fourth individual entry.
+- **Verification:** every nutrition sheet's bottom control clears the gesture bar on the S25 in both
+  navigation modes, and the PR body lists each sheet checked with what it needed.
+
 ### [nutrition] BF-73 — the Log Food screen: bigger capture tiles, and `New` should outrank `Delete meals`
 
 - **Lane:** B — `components/nutrition/capture-actions.tsx` and `components/nutrition/meal-list-actions.tsx`.
@@ -1939,6 +2032,10 @@ route produced it (the barcode branch stamps
   this path defers to it rather than adding a fourth writer of NULL.
 
 ### [nutrition][app-shell] BF-62 — the meal detail sheet's action row sits close to the gesture bar (fixed, NOT the way this entry proposed)
+
+- **➜ The sweep this asked for is BF-76** (added 2026-08-31, from the owner: *"lots of nutrition
+  screens are wrong"*). Its first pass is this entry's `vh` hypothesis applied across every nutrition
+  sheet, so do not re-derive it here.
 
 - **Lane:** B
 - **Batch:** `nutrition-ui-uplift`
