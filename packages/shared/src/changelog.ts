@@ -6,6 +6,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.410.0",
+    date: "2026-08-31",
+    changes: [
+      "The meal builder now starts with Recipe photo \u00b7 Recipe link \u00b7 Describe it, above the ingredient list. All three already worked \u2014 they were hidden inside the ingredient search box, so the URL option only appeared once you had already pasted a link.",
+      "Describe it is new here: type what is in the meal and it works out the ingredients.",
+      "The barcode scanner stays with the ingredient search, where it belongs \u2014 it adds one product, not a whole meal.",
+    ],
+  },
+  {
     version: "1.409.0",
     date: "2026-08-31",
     changes: [

@@ -3,7 +3,6 @@
 import { memo, useCallback } from 'react'
 import { Search, X, Loader2, Sparkles, Link2, ScanBarcode } from 'lucide-react'
 import { asHttpsUrl, hostOf } from './recipe-url'
-import { RecipeImageButton } from './recipe-image-button'
 import type { FoodItem } from '@trainingai/shared/types/nutrition'
 import { FoodRow } from '@/components/nutrition/food-row'
 import { FoodDatabaseResults } from './food-database-results'
@@ -20,8 +19,6 @@ interface Props {
   /** Importing a pasted recipe link (BF-11c). Runs instead of the estimate, never beside it. */
   importing: boolean
   onImportRecipe: (url: string) => void
-  /** BF-40: the same import, from a picture, for content that has no URL to paste. */
-  onImportRecipeImage: (image: string, mimeType: string) => void
   dbResults: ExternalFood[]
   dbSearching: boolean
   dbUnavailable: boolean
@@ -53,7 +50,7 @@ interface Props {
  */
 export function IngredientSearch({
   query, onQueryChange, searchResults, onAdd,
-  estimating, onEstimate, importing, onImportRecipe, onImportRecipeImage,
+  estimating, onEstimate, importing, onImportRecipe,
   dbResults, dbSearching, dbUnavailable, addingExternal, onAddExternal,
   showAddFood, onAddByHand, onScan, lookingUpBarcode,
 }: Props) {
@@ -114,6 +111,14 @@ export function IngredientSearch({
         </div>
       )}
 
+      {/* **The recipe-photo button used to live in this slot and moved to the builder's source row
+          with BF-52.** It was rendered only on an EMPTY search, and the URL offer only on a pasted
+          one, so the two were mutually exclusive renders of one place — which is why neither was
+          findable without already knowing.
+
+          **The URL branch STAYS, and not only for convenience.** Without it a pasted link falls
+          through to the estimate below, and running an AI estimate over the text of a URL produces a
+          food called "https" with invented macros. It is a guard as much as an affordance. */}
       {recipeUrl ? (
         // A pasted link is unambiguous, so it REPLACES the estimate rather than sitting beside it:
         // running an AI estimate over the text of a URL produces a food called "https" with
@@ -135,12 +140,7 @@ export function IngredientSearch({
             </span>
           </span>
         </button>
-      ) : query.trim().length < 2 ? (
-        // Offered only on an EMPTY search, where nothing else is: a typed query means the estimate
-        // row below, and a pasted link means the row above. Neither competes with a picture, and a
-        // third permanent button would crowd the one control that matters here — the search itself.
-        <RecipeImageButton importing={importing} onPick={onImportRecipeImage} />
-      ) : (
+      ) : query.trim().length < 2 ? null : (
         <button
           onClick={onEstimate}
           disabled={estimating}

@@ -123,6 +123,13 @@ an opt-in `surface="page"` five nutrition sheets pass and nothing else does. **�
 `enabled: false`**, so it is invisible until switched on; the owner has them on. **Still owed: the
 ≥4.5:1 contrast check on the S25** ([journal](docs/overview/entries/2026-08-31-nutrition-sheet-surface.md)).
 
+**The meal builder's three whole-meal inputs are findable (BF-52).** *"I dont see a URL option"* — it
+did not exist until you had pasted the URL: the recipe photo, the URL import and the AI estimate were
+mutually exclusive renders of one slot inside a search field. A `Recipe photo · Recipe link ·
+Describe it` row sits above the collapsed picker now. The barcode is **not** in it, against the
+entry's own instruction: those three build a whole ingredient list, a barcode names one product
+([journal](docs/overview/entries/2026-08-31-meal-builder-entry-point.md)).
+
 **Both pending weigh-in buttons were dead in production (BF-53).** `scale_raw_samples.id` is a
 `bigserial` and both routes validated it with a UUID regex, so every press of "Not me" or "Yes,
 that's me" returned `400 Invalid id` before the numeric check written for it could run — a reading
