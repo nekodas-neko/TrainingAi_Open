@@ -337,11 +337,15 @@ export function CaptureActions({ onScanResult, onManual, onScannedSavedMeal, chi
           later owner decision beats the drawing.
 
           **The height comes from padding and the icon, and it has to, because `min-h-[Npx]` does
-          nothing on a `<button>` here.** `globals.css` sets a bare `button, [role="button"]
-          { min-height: 48px }`, and it beats the utility: measured in the browser, a button with
-          `min-h-[84px]` computes `min-height: 48px` while the same class on a `<div>` computes
-          84px. So BF-50 ①'s `min-h-[62px]` never applied either — that tile measured **60 px**, the
-          content's own height, not the 62 its comment claimed. Filed as LB-32.
+          nothing on a button here.** `globals.css` sets a bare element-selector floor of
+          `min-height: 48px` on buttons and role=button, and it beats the utility: measured in the
+          browser, a button with `min-h-[84px]` computes `min-height: 48px` while the same class on
+          a plain div computes 84px. So BF-50 ①'s `min-h-[62px]` never applied either — that tile
+          measured **60 px**, the content's own height, not the 62 its comment claimed. Filed as
+          LB-32.
+
+          (Written without the angle-bracket/role spellings on one line on purpose: the Custom Rules
+          nested-button check is a line grep and reads prose the same as JSX.)
 
           Measured here, same method: **60 px → 79 px**. `py-2.5` → `py-3.5` and `h-5` → `h-7` are
           what moved it; the label went to `text-xs` so the glyph did not outgrow its caption. A

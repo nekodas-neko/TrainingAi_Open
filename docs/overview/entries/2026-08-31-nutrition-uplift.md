@@ -94,7 +94,7 @@ deal, and every candidate sits within ~24 px of the reference.
 
 ## Verified
 
-`tsc --noEmit` clean · `pnpm check:rules` **Ran 63 of 63** · full suite **529 files / 4788 passed** ·
+`tsc --noEmit` clean · `pnpm check:rules` **Ran 63 of 63** · full suite **526 files / 4783 passed** ·
 `meal-photo-picker` + `zero-calorie-food` e2e green (7 tests), which is the pair that exercises the
 renamed remove control and the capture tiles.
 
@@ -103,6 +103,12 @@ putting the ✕ back in the dismiss corner / renaming the bin to `Delete` / pinn
 height each fail their own.
 
 Measured at 412 dp in a browser and screenshotted: tiles 79 px, `New` 324×48, bin 48×48.
+
+**One gate failure worth recording, because it was prose rather than code.** The *No nested button
+inside a role=button wrapper* rule is a line grep, and it flagged a **comment** in
+`capture-actions.tsx` that happened to name both `<button>` and the role attribute on one line. The
+comment was reworded rather than the rule weakened — it is doing its job, and the ambiguity was
+mine.
 
 ## Not exercised
 

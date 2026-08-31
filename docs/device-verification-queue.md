@@ -214,6 +214,30 @@ seen there.
    the alternative to a visible failure is a save that silently never happened.
 
 
+## N9. The nutrition uplift batch — BF-72 / BF-73 / BF-74 / BF-76 · **JS**
+
+Four entries, one pass over two screens. **BF-72 is the one that cannot be checked any other way:**
+its whole repaired path lives in `getLocalStore`, which returns null in the web sandbox, so nothing
+off-device executes it at all.
+
+1. **BF-72.** Log a saved meal from the diary. It must appear as **one row** with its name and photo
+   and **stay that way** through the refetch a moment later — the failure was that it broke into its
+   loose ingredients. Then reload the tab: still one row, because the local copy kept its ids.
+2. **BF-74.** Open a meal's detail sheet and tap the **top-right of the photo** — the corner a close
+   button lives in. Nothing should be deleted. The bin is at the bottom-right; tap it, and the
+   **Undo** toast must be reachable with a thumb before it dismisses. That timing is the one thing a
+   desktop browser cannot judge.
+3. **BF-73 ①.** The Photo / Barcode / Describe tiles should read as the screen's primary controls
+   (79 px, up from 60). *"Describe or enter"* must not clip.
+4. **BF-73 ②.** On Meals with two or more saved meals: `New` is visibly primary, the bin visibly
+   secondary, and the bin still takes a comfortable tap at 48 dp.
+5. **BF-76 — this one is a survey, not a fix.** Nothing changed, because the measurement found
+   nothing under-padded. Walk the nutrition sheets in **both** navigation modes (gesture and
+   3-button) and report any whose bottom control actually sits wrong. Three of them
+   (`meal-plan-setup`, `meal-plan-manage`, `meal-plan-edit`) carry ~24 px MORE clearance than the
+   rest — worth a glance for whether that reads as a gap.
+
+
 ## ~~W3. Volume landmarks at S25 width~~ ✅ 2026-08-30
 Owner: *"Looks good."* Nothing clipped or wrapped at 412 dp. **Q-305 is device-verified.**
 
