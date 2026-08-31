@@ -11,7 +11,7 @@ import type { NutritionScanResult, NutritionIngredient, FoodItem, FoodLogWithIte
 import { todayInTz } from '@trainingai/shared/date-utils'
 import { mealTypeForHour } from '@trainingai/shared/nutrition/log-plan-meal'
 import { logMealItems } from '@trainingai/shared/nutrition/log-meal'
-import { logFoodEntries, ingredientsToEntries, type NewFoodEntry } from '@trainingai/shared/nutrition/log-food'
+import { scanOriginToSource, logFoodEntries, ingredientsToEntries, type NewFoodEntry } from '@trainingai/shared/nutrition/log-food'
 import { readCacheSync } from '@/lib/sqlite/cache'
 import { getLocalStore } from '@/lib/local-store'
 import { hapticLight } from '@/lib/haptics'
@@ -51,6 +51,7 @@ function scanToEditable(s: NutritionScanResult): EditableNutrition {
     sugarG: s.sugarG ?? 0,
     sodiumMg: s.sodiumMg ?? 0,
     satFatG: s.satFatG ?? 0,
+    imageDataUri: s.imageDataUri ?? null,
   }
 }
 
@@ -173,7 +174,9 @@ export function FoodLoggerSheet({ open, preselectedMealTypeId = null, onClose, o
           servingSizeG: form.servingSizeG, calories: form.calories,
           proteinG: form.proteinG, carbsG: form.carbsG, fatG: form.fatG,
           fiberG: form.fiberG, sugarG: form.sugarG, sodiumMg: form.sodiumMg, satFatG: form.satFatG,
-          source: scanResult?.confidence ? 'ai' : 'manual', quantityMultiplier: quantity,
+          source: scanOriginToSource(scanResult?.origin, scanResult?.confidence),
+          quantityMultiplier: quantity,
+          imageDataUri: form.imageDataUri ?? null,
         }]
       }
 

@@ -66,8 +66,14 @@ export interface RawNutrition {
   confidence?: string
   notes?: string
   ingredients?: NutritionIngredient[]
-  /** BF-35. Carried from a barcode/search lookup's Open Food Facts thumbnail. */
-  imageDataUri?: string | null
+  // NO `imageDataUri` here, deliberately (BF-70). `sanitiseNutrition` spreads its input, so it
+  // would carry one — but every caller builds its argument from numeric fields alone, so
+  // `s.imageDataUri` was `undefined` on every call. Declaring the field is what made that read
+  // TYPECHECK, and `create-food-item.ts` did exactly that: `imageDataUri: s.imageDataUri ?? null`,
+  // silently null, for as long as the barcode thumbnail feature had existed. The picture travels on
+  // `NutritionScanResult` and is passed explicitly. `scripts/check-sanitiser-no-image-field.js`
+  // keeps it off — a `@ts-expect-error` in a test cannot, because `tsconfig.json` excludes
+  // `**/__tests__/**` from tsc entirely.
 }
 
 function clamp(v: number, min: number, max: number) { return Math.max(min, Math.min(max, v)) }
