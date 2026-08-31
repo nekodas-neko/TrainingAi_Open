@@ -3,7 +3,7 @@ import {
   mealLabelCodeMetrics, MEAL_LABEL_STYLES, DEFAULT_MEAL_LABEL_STYLE,
   centredStackLineBudget, mealLabelStyleSpec, mealLabelShareBudget, mealLabelCarriesRecipe,
   MIN_MM_PER_MODULE,
-} from '../meal-label-render'
+} from '../meal-label-geometry'
 
 /**
  * Q-397 asks for the printed code size to be asserted rather than trusted: *"the preview's own size

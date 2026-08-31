@@ -24,7 +24,7 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.413.3 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Version:** v1.413.2 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-08-31.
 
 **Version:** v1.406.1 · **Branch:** `main` · Railway auto-deploys on push to `main`.
@@ -966,6 +966,11 @@ that need an owner, and for the barcode chain.
 **Measured, nothing to fix in the volatility.** Owner: *"the scores have been very varied lately"*. Stored day-to-day |Δ| went **9.2 → 21.2** at the recalibration — but the **pre-calibration blend moved 9.15 → 9.27, unchanged**, so the sleep is genuinely that variable and the model reads it correctly. Two things landed together on 2026-08-19: the calibration began applying at all (before it the stored score *is* the raw blend), and the blend mean fell 87.1 → 71.1 into the curve's steep zone. **The real defect is `SCORE_CALIBRATION`'s gain spread** — 4.00× display points per blend point at blend 79 against 0.50× at 92, so the same improvement is worth eight times as much in one place as another. [`review`](docs/reviews/2026-08-24-sleep-score-volatility.md).
 - **⛔ Flattening the curve does NOT reduce volatility — tested.** Night-to-night |Δ| goes **13.53 → 13.75**; a calibration curve's total rise is conserved, so flattening one segment steepens another. The baton's old advice to do exactly that has been replaced. TN-5 is filed as an **interpretability** fix and must not be sold as a jitter fix.
 - **Owner signed off 2026-08-24**, told plainly that it does not reduce the jumpiness. Proposed curve holds the displayed mean (87.0 → 85.5, not a lift) and the `LOW_SLEEP_SCORE` firing rate (2/41 either way) — **re-verify both against the shipped TypeScript**, not the Python replay. **History policy: leave stored days alone, stamp the new model.**
+
+### [nutrition][devices] ⚠️ A re-scanned meal label stops duplicating; no camera has scanned one (LB-34, v1.413.1)
+
+**Fixed.** A shared label is a physical object and gets scanned by whoever picks it up — the same one scanned twice used to mint a second identical meal with nothing marking either as the copy. The scan now asks `findDuplicateMeal` first (normalised name **and** macros within `DUPLICATE_MAX_FIT_DISTANCE`, both required, so two different recipes sharing a name still both save) and offers **Save a copy** rather than writing ([`journal`](docs/overview/entries/2026-08-31-shared-label-rescan-duplicate.md)). The library read is local-first and makes no network call — a shared label's whole point is working with no signal.
+- **Keep: nothing has scanned a real label.** The branch needs a camera (Capacitor on device, `getUserMedia` on web), so it is guarded at the source and by unit tests only — mutation-checked eight ways between them, but never executed from a scan. `getLocalStore` is null off-device too, so the local-store read took its cache-seed fallback on every run.
 
 ### [nutrition] ⚠️ The meal plan can fill the day in one tap; the device write path has not run (Q-187, v1.412.0)
 

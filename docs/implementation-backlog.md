@@ -358,6 +358,105 @@ below threshold and left in place for next time.
 > BF-29 (My meals), BF-30 (Meal detail), BF-31 (Edit meal) and BF-26 (Quantity). Two artboards need
 > no entry — `Tap targets` and the `srv/g` studies both shipped in Q-395a.
 
+### [sleep] BF-83 — last night's sleep grows while you look at it, and nothing says it is still filling
+
+- **Lane:** A if the answer is the freshness/refresh path; B if it is only the label. Settle which
+  with the measurement below before starting.
+- **Added:** 2026-09-01 · owner, with two screenshots of the **same night** four minutes apart:
+  *"sleep changes depending what time you open it. I'd like it to be the final result on open."*
+
+| Opened | Window shown | Time asleep | Efficiency | HRV | Restless | 30-night avg |
+|---|---|---|---|---|---|---|
+| **6:44** | 10:03 pm – **4:46 am** | **6 h 15 m** | 93 % | 61 ms | 1 | 7 h 46 m |
+| **6:48** | 10:03 pm – **6:08 am** | **7 h 40 m** | 95 % | 65 ms | 2 | 7 h 49 m |
+
+**Every number moved, including the baseline it is compared against.** That last part matters: the
+"vs your recent nights" average shifted too, so the *context* changed under the reading as well as
+the reading.
+
+**Production says the stored row is the 6:48 version:** `sleep_sessions` for 2026-09-01 holds
+`12:03 → 20:08 UTC` (10:03 pm → 6:08 am Brisbane), 7.67 h, efficiency 95.
+
+**⚠ Two mechanisms fit, they have different fixes, and `updated_at` cannot separate them here.** All
+four recent rows share `updated_at = 20:43:44 UTC` — the signature of one bulk pass — and this repo
+has already recorded that a bulk job bumps `updated_at` without rewriting a value (Q-501). So:
+  1. **The night was still draining** — the ring had not delivered the last 80 minutes at 6:44, and
+     the row genuinely grew. Fix: do not present an incomplete night as a finished one.
+  2. **The row was already final and the client painted a stale cache** — 20:43:44 UTC is
+     06:43:44 Brisbane, *before* the 6:44 screenshot. Fix: revalidate the sleep detail on open.
+  **The check that separates them:** on the next morning, open the sleep detail, note the end time,
+  then query `sleep_sessions` for that date immediately. Row already final → (2). Row still short →
+  (1).
+
+- **Recommendation, and it holds either way: force a revalidate when the detail opens, and mark the
+  night provisional until the ring has reported the wake.** The owner asks for "the final result on
+  open", and the honest version of that is *don't call a growing number final* — the app cannot know
+  a wake happened before the ring says so. A provisional badge plus a refresh gives him the newest
+  truth and stops the older one reading as settled.
+- **This is the repo's own partial-day rule, on a new surface.** CLAUDE.md already says a cumulative
+  per-day field from an external source must treat today as a partial day, citing the Oura
+  `wornHours` mistake — *"a partial-day cumulative reads as an anomaly if compared against
+  completed-day values"*. A part-drained night compared against a 30-night average is exactly that,
+  and the moving baseline in the table above is it happening.
+- **⚠ Whatever the cause, do not fix it by shortening a TTL.** The instant-paint rules make a cached
+  first paint deliberate; the fix is invalidating or revalidating on open, not making every read
+  slower.
+- **Verification:** open the sleep detail before and after the morning drain completes — the earlier
+  view says it is provisional, the later one does not, and neither silently contradicts the other.
+  The 30-night comparison must exclude a provisional night from its own average.
+
+### [workouts] BF-84 — a per-session Rest button on the training card, and rest is not stored anywhere
+
+- **Lane:** B for the control; **A if rest is to persist**, which is the decision below.
+- **Added:** 2026-09-01 · owner, on Home's Recommended Today card: *"for the training card, I'd like
+  a small button for each session to choose 'rest'."*
+
+**⚠ Rest already exists and is weaker than it looks.** `lib/home/rest-day.ts` is the whole feature: a
+`localStorage` key stamped with today's date, applied client-side by `withRestDayOverride`. Its own
+comment is the finding — ***"`/api/log-rest-day` persists nothing (rest days are inferred from gaps
+in workout history), so refetching `/api/next-session` after choosing rest just recomputes the prompt
+and reverts the selection."*** So today's rest choice:
+- does not reach the server, so **the other device never sees it**;
+- does not survive clearing app data or a reinstall;
+- is invisible to every server-side consumer — the AI prescription, readiness, the weekly cadence
+  math — all of which infer rest from *absence of a workout*, not from the choice.
+
+**And it is reachable from exactly one screen** (`session-select-content.tsx:984`), which is why the
+owner is asking for it on Home. Adding a second client-side caller would make two buttons over one
+`localStorage` flag.
+
+- **The question to settle first, because it decides the lane:** *should choosing rest be a fact the
+  app knows, or a hint for today's screen?* **Recommendation: a fact.** The owner is asking for it in
+  a second place, which is the signal it is being used deliberately rather than as a one-off dismiss
+  — and a deliberate rest day is exactly the kind of thing readiness and the deload logic should see
+  rather than infer from a gap two days later. That makes it Lane A: a stored row, a sync domain, and
+  the inference path taught to prefer it.
+- **✅ SURFACE SETTLED 2026-09-01 — owner: *"a small greyed button that says rest + emoji, on the
+  training card on home screen."*** One secondary button on Home's Recommended Today card, beside
+  Start Workout. Not per-session and not the week strip.
+- **⚑ And the button already exists — it is just conditional.** `recommendation-card.tsx:269` renders
+  `onRestDay` today, inside the `recommendation?.deloadOrRestRecommended` branch, as one of a
+  two-button grid. So the handler, the `markRestDayChosen()` write and the `withRestDayOverride`
+  re-application are all built and working. **What the owner is asking for is for it to be available
+  when the app has NOT suggested rest** — his choice rather than only the app's — which is a
+  rendering condition, not a new control.
+- **That makes the surface work small and the persistence question the whole entry.** A control that
+  only appeared when the app volunteered it was used rarely; one that is always there will be used
+  deliberately and often, and it still writes to `localStorage` alone. Ship the button and the
+  storage together, or the first thing the owner does with the new button is lose the choice on his
+  other device.
+- **✅ Lucide icon, not an emoji — confirmed by the owner 2026-09-01** (*"yes use icons not emoji"*),
+  after the request originally said "rest + emoji". `Moon` or `BedDouble` beside the label. Recorded
+  as decided so nobody re-opens it from the original wording.
+- **Greyed, per the request, and that is also correct** — Start Workout is the primary action and
+  rest is the secondary one. `variant="secondary"` on the shared `Button` gets it without a new
+  colour.
+- **If it stays client-only, say so on screen.** A rest choice that silently evaporates on the other
+  device is worse than no button, and today it does exactly that without telling anyone.
+- **Verification:** choosing rest survives an app restart and appears on a second device; the AI
+  prescription and the weekly cadence read the stored rest day rather than inferring it; and the
+  existing session-select control and the new one are the same write, not two.
+
 ### [app-shell] BF-82 — the More page is seven groups of one row each, with one of them behaving differently
 
 - **Lane:** B — `components/more/profile-tab.tsx`, `components/more/settings-panel.tsx`,
@@ -13742,51 +13841,79 @@ reads.
   of this file still stands** (claim a number against the directory *and* open PRs/plan docs): this
   closes the four that exist, it does not make future collisions safe.
 
-### [nutrition] LB-34 — scanning the same shared label twice makes a second copy of the meal
 
-- **Lane:** B — `components/nutrition/save-shared-meal.ts`, `components/nutrition/meal-duplicate.ts`.
-- **Added:** 2026-08-31 · found while building BF-57, filed rather than folded in because the fix is
-  a product question and BF-57 was already a large PR.
+### [platform] LB-37 — `tsc` typechecks nothing under `__tests__`, so "TSC_OK" has never covered a spec
 
-`saveSharedMealToLibrary` mints a new `saved_meals` row on every scan. A label is a physical object
-that gets scanned by whoever picks it up — a partner scanning the fridge on Tuesday and again on
-Friday ends up with two identical meals, and neither is marked as the duplicate.
+- **Lane:** ? — the one-line `tsconfig.json` change is trivial; what it uncovers is not, and the
+  decision of whether to take that on is a platform call rather than an implementer's.
+- **Added:** 2026-08-31 · found while adding tests for LB-34, by noticing a spec that used two types
+  it had never imported and still passed `tsc`.
+- **Measured, not inferred.** `tsconfig.json` carries
+  `exclude: ["node_modules", ".claude", "**/__tests__/**"]`. Appending
+  `const deliberateTypeError: number = "not a number"` to
+  `components/nutrition/__tests__/shared-meal-round-trip.test.ts` and running
+  `npx tsc --noEmit -p tsconfig.json` produced **zero** errors mentioning that file.
+- **Why it matters more than it looks.** Every session in this repo treats a clean `tsc` as the
+  first gate, and CI's Build job runs the same project. So across ~700 unit-test files, a spec may
+  reference a type that does not exist, call a function with the wrong arity, or assert against an
+  interface that has since changed shape, and nothing says so — the test simply keeps passing on
+  whatever the runtime happens to do. That is the same class as a guard that cannot fail: a check
+  whose silence carries no information.
+- **`e2e/` is NOT excluded** and is typechecked normally. The gap is unit tests only.
+- **Do not just delete the exclude line without measuring first.** It is there deliberately enough
+  that someone wrote it, and no comment says why. The first step is to find out what it is hiding:
+  run `tsc` with the exclusion removed and count the errors before deciding whether this is a
+  one-PR fix, a ratchet like the hex-literal baseline, or something to leave alone with a written
+  reason. **Report that count in the entry either way** — a session that measures it and does not
+  record the number leaves the next one to measure it again.
 
-**The machinery already exists and is the reason this is small.** `findDuplicateMeal`
-(`meal-duplicate.ts`) answers exactly this question, with two independent tests that must both pass
-— a normalised name match *and* `fitDistance` under `DUPLICATE_MAX_FIT_DISTANCE` — and BF-11d already
-uses it to offer "update the existing one?" on a save. The scan path is a third caller.
+### [platform][nutrition] LB-38 — the share-code e2e decode fails intermittently on `main`, and the mechanism is not yet known
 
-- **Prefer under-matching, per BF-38's guidance the duplicate helper already carries.** Two similar
-  meals from two friends are a nuisance; silently overwriting one person's recipe with another's is
-  data loss.
-- **Decide what the offer says.** A save dialog can ask; a scan is a one-tap flow in a kitchen, so
-  the likely answer is a toast with an Undo rather than a modal — the same shape BF-74 chose for the
-  photo remove, and for the same reason.
-- **Verification:** scan one shared label twice; the second scan says the meal is already saved and
-  does not add a row. A genuinely different meal with a similar name still saves.
+- **Lane:** B — `e2e/meal-label.spec.ts`.
+- **Added:** 2026-08-31 · red on CI run 1334 (PR #700) and reproduced on clean `main` locally.
+- **It is not the PR it fails on.** It went red on a nutrition PR that does not touch the label
+  renderer, and reproduces on a clean checkout of `main`, so treat a red here as pre-existing until
+  shown otherwise. Required checks are unaffected — E2E is not one.
+- **What is established:**
+  - The failing assertion is `the share code must decode off the rendered label` —
+    `decodeQr` returns null on all **six** attempts, one second apart.
+  - **Failing runs take ~2.8 min; passing ones ~50 s.** Same signature locally and in CI.
+  - The canvas from a *passing* run decodes under all four decoder configurations tried
+    (Hybrid/GlobalHistogram binarizer × with/without `TRY_HARDER`), so decoder configuration is
+    **not** the cause.
+  - A drawn share-code canvas measures **0.174** ink fraction.
+- **⚠ One hypothesis is already falsified — do not re-derive it.** *"`waitForSettledInk`'s
+  `> 0.01` floor lets a text-only canvas through"* is wrong: `renderMealLabel` is fully synchronous
+  (`QRCode.create` at `meal-label-render.ts:907` is a sync call, and `drawShareLabel` calls
+  `drawCode` immediately after `fillText`), so text and code land in the same pass and a text-only
+  canvas cannot exist.
+- **⚠ A SECOND hypothesis is now also falsified — measured 2026-08-31, and this is the useful
+  result.** The guess was that `getImageData` returns a **degenerate** buffer under pressure, making
+  the ink fraction 0 or 1 so the gate passes on a canvas that was never drawn. The spec now reports
+  the ink at the failing attempt, and a captured failure reads **0.1735** — inside the normal
+  0.172–0.179 band. **The canvas is drawn correctly and the pixels arrive intact.** Capture is
+  eliminated; the fault is in the **decode**.
+- **What that leaves.** ZXing is handed a correct image and returns null. The next step is to keep
+  the *failing* canvas rather than measure it: dump the buffer on failure and decode it offline
+  against several binarizer/`TRY_HARDER` combinations, as was already done for a **passing** canvas
+  (which decoded under all four, so a passing image is not the one to test). If the failing buffer
+  also decodes offline, the fault is in how the decode is invoked in-run rather than in the image or
+  the reader.
+- **Reproduction, now understood well enough to trigger:** it passes **every** time in isolation and
+  fails intermittently when the whole file runs — roughly one run in two. Measured across eleven
+  runs. So run the file, not the test.
+- **The instrumentation now SHIPS, and that is the point.** `e2e/meal-label.spec.ts` measures the
+  ink at the last attempt and puts it in the assertion message, so **the next failure — in CI or
+  anywhere — carries its own diagnosis** instead of needing to be reproduced first. That is what
+  turned this entry from two guesses into one eliminated cause. A reading near 0.17 means the image
+  is intact; ~0 or ~1 would mean the buffer came back degenerate.
+- **Piping a run through `grep` hides its output until it exits** — `grep` block-buffers, so a
+  watched file stays empty for the whole run and a slow run is indistinguishable from a hung one.
+  Use `grep --line-buffered`. This cost two attempts before it was noticed.
+- **If confirmed the fix is to reject a degenerate canvas in the gate** — ink strictly between
+  bounds rather than merely above a floor — **not another retry.** The retry is already at six
+  attempts and the file's own comment says another one is the wrong answer.
 
-### [nutrition][platform] LB-33 — `meal-label-render.ts` is 1,049 lines, and its pure half is what everything imports
-
-- **Lane:** B — `components/nutrition/meal-label-render.ts`.
-- **Added:** 2026-08-31 · noted while BF-57 took the file from 825 to 1,049 lines.
-
-`scripts/check-component-size.js` did not catch it because the file is `.ts` rather than `.tsx`, so
-the ~800-line guidance applies by spirit and not by CI. It was not split inside BF-57 deliberately: a
-mechanical move of that size would have buried the change it was riding with, which is the harder
-thing to review.
-
-**The split is already visible in the file.** Two halves live in it — the pure geometry (`SPECS`,
-`MEAL_LABEL_STYLES`, `mealLabelCodeMetrics`, `mealLabelShareBudget`, `mealLabelCarriesRecipe`,
-`centredStackLineBudget`, `centredStackOffset`) and the canvas painters. Every test imports only the
-first, and the second is the half that needs a `CanvasRenderingContext2D` and therefore cannot be
-asserted in either `environment: 'node'` vitest project. Moving the pure half to
-`meal-label-geometry.ts` makes that boundary structural instead of conventional.
-
-- Pure move, no behaviour: re-export from the old path or update the four importers
-  (`meal-label-sheet.tsx` and three test files) in the same PR.
-- **Verification:** `meal-label-code-size.test.ts` and `meal-label-centring.test.ts` pass unchanged,
-  and `e2e/meal-label.spec.ts` still renders every style.
 
 ## Owner feature notes, filed 2026-08-23 — each needs a planning session before implementation
 

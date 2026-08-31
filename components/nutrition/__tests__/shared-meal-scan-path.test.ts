@@ -48,6 +48,33 @@ describe('shared-meal scan path', () => {
     expect(handler, 'a scanned label must not log the meal').not.toMatch(/logMealItems/)
   })
 
+  it('a re-scanned label is recognised instead of copied again (LB-34)', () => {
+    const src = read('components/nutrition/food-logger-sheet.tsx')
+    const handler = src.slice(
+      src.indexOf('async function handleScannedSharedMeal'),
+      src.indexOf('return (\n    <>'),
+    )
+    // Comments stripped before matching. The handler explains the check in prose naming both
+    // helpers, and a bare-word assertion would pass on the comment documenting its own fix — the
+    // shape that has slipped through three times in this repo.
+    const code = handler.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*/g, '')
+
+    expect(code, 'the scan must ask whether this meal is already saved').toMatch(/findDuplicateMeal\s*\(/)
+    expect(code, 'and ask it with the payload\'s own totals').toMatch(/sharedMealTotals\s*\(/)
+    // The property the whole entry is about: on a match it returns WITHOUT writing. A check that
+    // found the duplicate and saved anyway is the bug with extra steps.
+    const branch = code.slice(code.indexOf('findDuplicateMeal'))
+    const dupBranch = branch.slice(0, branch.indexOf('saveSharedMealToLibrary'))
+    expect(dupBranch, 'a duplicate must return before the save').toMatch(/return\b/)
+    // Local-first, and no fetch: a shared label\'s whole point is that it works with no signal, so
+    // the duplicate check must never be the thing that needs the network.
+    expect(code, 'the library read must be local-first').toMatch(/getSavedMeals\s*\(/)
+    expect(code, 'the duplicate check must not add a network round-trip').not.toMatch(/fetch\s*\(/)
+    // An escape hatch, because two friends can genuinely cook the same-named dish and the user is
+    // the one who knows.
+    expect(code, 'the user must be able to keep the copy anyway').toMatch(/Save a copy/)
+  })
+
   it('an unresolvable id no longer asserts the meal was deleted', () => {
     const src = read('components/nutrition/food-logger-sheet.tsx')
     // This branch resolves an id against the SCANNING user's own meals, so it is reached both when
