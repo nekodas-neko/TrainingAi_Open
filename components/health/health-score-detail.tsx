@@ -87,6 +87,17 @@ export interface HealthScoreDetailProps {
   userId?: string;
   theme: "readiness" | "sleep" | "activity";
   title: string;
+  /**
+   * One line naming the QUESTION this score answers, under the hero.
+   *
+   * Q-276 measured Readiness and Body Battery at r = +0.12 by end of day and the owner settled it:
+   * they are different questions, not one question answered twice. *"Body battery should be more
+   * like 'how much energy I have left'. Readiness should just be a starting number based on your
+   * previous day + sleep."* Two headline numbers a reader takes for the same thing, sharing no
+   * variance, is a presentation problem — so each says what it is for, at the top, before the
+   * number.
+   */
+  subtitle?: string;
   aiSection: "readiness" | "sleep" | "activity";
   scoreField: ScoreField;
   // HealthTrendsResponse names the readiness trend field "readinessScore", distinct
@@ -124,7 +135,7 @@ function averageChip(trends: HealthTrendDay[] | undefined, field: HealthScoreDet
 }
 
 export function HealthScoreDetail({
-  userId, theme, title, aiSection, scoreField, trendField, contributorsField, sparklineColor, contributorsTitle, extraCards,
+  userId, theme, title, subtitle, aiSection, scoreField, trendField, contributorsField, sparklineColor, contributorsTitle, extraCards,
   breakdown, contributorChart, averageContext, hideContributors,
 }: HealthScoreDetailProps) {
   const today = todayInTz(DEFAULT_TZ);
@@ -207,6 +218,9 @@ export function HealthScoreDetail({
       </DetailHero>
 
       <div className="px-4 py-5 space-y-5">
+        {subtitle && (
+          <p className="-mt-1 text-center text-[12px] leading-snug text-muted-foreground">{subtitle}</p>
+        )}
         {avg && (
           <div className="-mt-1 flex justify-center">
             <span className="rounded-full border border-border bg-muted/40 px-3 py-1 text-[11px] font-medium text-muted-foreground">

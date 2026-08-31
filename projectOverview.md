@@ -2820,10 +2820,10 @@ one backlog entry per finding, **Q-271 … Q-284**.
   ceiling-pinning and overshot: charge 10.5/day vs drain 52.4/day, **ends at its daily minimum on 10
   of 12 days**, hits 0 on 3. Across all 40 days it never rises above its waking value on a third of
   them. Garmin's equivalent recovers during waking rest — that is the feature's headline behaviour.
-- **🟠 Readiness and Body Battery share no variance (Q-276).** Readiness ↔ battery *anchor* r = +0.93
-  (the anchor **is** readiness); readiness ↔ *end value* r = **+0.12**. Two headline numbers both read
-  as "how recovered am I", sharing nothing. Needs an owner decision on whether they are different
-  questions or one is wrong.
+- **✅ Readiness and Body Battery share no variance (Q-276) — resolved 2026-08-31 (v1.413.0).**
+  Anchor r = +0.93 (it **is** readiness), end-of-day r = +0.12. Owner settled them as two different
+  questions, so it was presentation: each now names its own where it is read — the battery card's
+  explainer rendered only in the *no-data* state, so nobody saw it on an ordinary day. No model change ([`journal`](docs/overview/entries/2026-08-31-recovery-scores-name-their-question.md)).
 
 **And one correction to a claim already in this file.** The Body Battery v5 row below records
 end-of-day battery vs next-day readiness at **r = −0.06** as evidence the model has no outcome
