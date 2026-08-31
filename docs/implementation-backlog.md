@@ -431,10 +431,26 @@ owner is asking for it on Home. Adding a second client-side caller would make tw
   — and a deliberate rest day is exactly the kind of thing readiness and the deload logic should see
   rather than infer from a gap two days later. That makes it Lane A: a stored row, a sync domain, and
   the inference path taught to prefer it.
-- **⚠ "A button for each session" is ambiguous and worth one clarification.** Home's card shows
-  **one** recommended session, so per-session buttons only make sense on the session-select list or
-  the week strip. Ask which surface before designing: a Rest control beside every session in the list
-  is a different feature from one Rest button on today's card.
+- **✅ SURFACE SETTLED 2026-09-01 — owner: *"a small greyed button that says rest + emoji, on the
+  training card on home screen."*** One secondary button on Home's Recommended Today card, beside
+  Start Workout. Not per-session and not the week strip.
+- **⚑ And the button already exists — it is just conditional.** `recommendation-card.tsx:269` renders
+  `onRestDay` today, inside the `recommendation?.deloadOrRestRecommended` branch, as one of a
+  two-button grid. So the handler, the `markRestDayChosen()` write and the `withRestDayOverride`
+  re-application are all built and working. **What the owner is asking for is for it to be available
+  when the app has NOT suggested rest** — his choice rather than only the app's — which is a
+  rendering condition, not a new control.
+- **That makes the surface work small and the persistence question the whole entry.** A control that
+  only appeared when the app volunteered it was used rarely; one that is always there will be used
+  deliberately and often, and it still writes to `localStorage` alone. Ship the button and the
+  storage together, or the first thing the owner does with the new button is lose the choice on his
+  other device.
+- **✅ Lucide icon, not an emoji — confirmed by the owner 2026-09-01** (*"yes use icons not emoji"*),
+  after the request originally said "rest + emoji". `Moon` or `BedDouble` beside the label. Recorded
+  as decided so nobody re-opens it from the original wording.
+- **Greyed, per the request, and that is also correct** — Start Workout is the primary action and
+  rest is the secondary one. `variant="secondary"` on the shared `Button` gets it without a new
+  colour.
 - **If it stays client-only, say so on screen.** A rest choice that silently evaporates on the other
   device is worse than no button, and today it does exactly that without telling anyone.
 - **Verification:** choosing rest survives an app restart and appears on a second device; the AI
