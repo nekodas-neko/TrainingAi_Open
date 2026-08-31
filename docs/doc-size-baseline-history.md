@@ -4937,3 +4937,39 @@ row each, plus one entry (Goals) that expands inline while the other six navigat
 corrects the request's premise — there are no sliders on that screen, only five `Switch` toggles that
 are correct for booleans, and what is probably meant is the goal-value boxes in the Goals accordion.
 Saying so prevents a swap made for the wrong reason.
+
+## 2026-08-31 — `docs/implementation-backlog.md` 14415 → 14438 (BF-57 shipped, LB-33 and LB-34 filed)
+
+**Net +23, and it is two additions against one large deletion.** BF-57's 49-line work order — four
+numbered scope items, the payload history, the raised-2026-08-31 note — collapses to a 22-line `Keep:`
+entry now that the surface is built: what survives is the two-phone verification that is genuinely
+owed, plus the measurement that reversed the entry's own item 1, kept because it is the answer to
+*"why not just make every label shareable?"* and that question will be asked again.
+
+Against that, two new entries. **LB-34** — a shared label scanned twice makes two copies of the meal;
+found while building BF-57 and filed rather than folded in, because `findDuplicateMeal` already
+answers the question and what the *offer* should say in a one-tap kitchen flow is a product decision.
+**LB-33** — `meal-label-render.ts` reached 1,049 lines and `check-component-size.js` cannot see it,
+because the file is `.ts` rather than `.tsx`. Both are the "no orphaned findings" rule doing its job:
+each was noticed inside a diff that had no business absorbing it.
+
+`projectOverview.md` stays at **8514** and is not raised. Its BF-57 paragraph was written at five
+lines and cut to four, and the engine-half paragraph gave back an orphaned link line — the index
+carries the fact and the pointer, and the reasoning lives in the journal entry where it belongs.
+
+## 2026-08-31 — `docs/agents/state/implementation-lane-b.md` 126 → 141 (BF-57's state, minus most of the last run's)
+
+**A baton is the one document where content is the deliverable**, so it grows when a run produces
+state — and this one produced a whole feature area plus four gotchas that each cost real time (the
+`DATABASE_URL` Playwright prefix, a source guard matching a comment that documents its own fix, and
+a default argument quietly turning an assertion into a tautology).
+
+**Most of it was paid for rather than added.** The previous run's three narrative paragraphs — the
+`min-h` finding, BF-71's caller gap, the exercise-clip proxy — were rewritten at roughly half their
+length, and the device section's per-screen enumeration was cut because
+[`device-verification-queue.md`](device-verification-queue.md) is the document that holds it. Raw
+addition was ~30 lines; the net is 15.
+
+The rule this obeys is CLAUDE.md's: *"**rewrite** `docs/agents/state/<agent>.md` in full. Never
+append; a baton that is half last week's is worse than none."* The ratchet is what makes that
+rewrite happen instead of being intended.

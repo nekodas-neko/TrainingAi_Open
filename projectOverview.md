@@ -110,9 +110,13 @@ globally resolvable was rejected: a photo of a label would become read access to
 an app heading for a Play Store health-data declaration. The owner's design instead puts the whole
 meal in the code, so it scans offline, for a user with no account, as a copy. **Nothing is dropped to
 fit** — the tail rolls into one remainder line carrying its macros, so a trimmed copy's totals match
-the original to the gram. **No user-visible change yet:** the label layout and the scan branch are
-Lane B's and unbuilt, and the QR needs ~30 mm of the 50 mm label before any of it prints legibly
-([journal](docs/overview/entries/2026-08-30-feat-self-contained-meal-label.md)).
+the original to the gram ([journal](docs/overview/entries/2026-08-30-feat-self-contained-meal-label.md)).
+
+**And the label now emits it, via a new style — the ~30 mm the entry asked for is not available on the
+others (BF-57, surface half).** Four of the five print styles cannot hold 62 bytes, below which the
+encoder trims the meal's **name**, so they keep the private bookmark while a new **Share code** style
+spends the label on a 34.4 mm code. A scan saves a copy, never logs it. **Still owed: the two-phone
+check, and a printer** ([journal](docs/overview/entries/2026-08-31-shared-meal-labels.md)).
 
 **Both pending weigh-in buttons were dead in production (BF-53).** `scale_raw_samples.id` is a
 `bigserial` and both routes validated it with a UUID regex, so every press of "Not me" or "Yes,

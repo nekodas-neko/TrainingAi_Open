@@ -14,7 +14,7 @@ import { saveImageToGallery } from '@/lib/media/save-to-gallery'
 import { withPngDensity } from '@trainingai/shared/nutrition/png-density'
 import {
   renderMealLabel, MEAL_LABEL_STYLES, DEFAULT_MEAL_LABEL_STYLE, mealLabelStyleSpec, labelPrintDpi,
-  type MealLabelStyle,
+  type MealLabelStyle, type RenderedMealLabel,
 } from './meal-label-render'
 
 /** One key, no schema — see the note on style persistence below. */
@@ -47,7 +47,7 @@ export function MealLabelSheet({ meal, open, onOpenChange }: Props) {
   // this: the sheet opened, the canvas was in the accessibility tree, and nothing was ever painted.
   const [canvas, setCanvas] = useState<HTMLCanvasElement | null>(null)
   const [style, setStyle] = useState<MealLabelStyle>(DEFAULT_MEAL_LABEL_STYLE)
-  const [metrics, setMetrics] = useState<{ moduleCount: number; codeMm: number; ingredientLines: number; ingredientOverflow: number } | null>(null)
+  const [metrics, setMetrics] = useState<RenderedMealLabel | null>(null)
   const styleClaimsIngredients = mealLabelStyleSpec(style).ingredients === true
   const [busy, setBusy] = useState(false)
   const { groupProps, getRadioProps } = useRovingRadioGroup(true)
@@ -85,7 +85,8 @@ export function MealLabelSheet({ meal, open, onOpenChange }: Props) {
     if (!open || !meal || !canvas) return
     let cancelled = false
     renderMealLabel(canvas, {
-      mealId: meal.id,
+      // The meal, not its id (BF-57) — the code carries the recipe now, so the renderer encodes it.
+      meal,
       figures: mealLabelFigures(meal),
       // Per SERVING, same as the figures — `savedMealToIngredients` goes through `oneServingItems`
       // too, so "200 g mince" is the amount behind the calories printed next to it. Feeding it the
@@ -192,6 +193,33 @@ export function MealLabelSheet({ meal, open, onOpenChange }: Props) {
                   the quiet zone INSIDE that box — so this is the pitch actually printed. Dividing by
                   the module count alone (which the backlog's figures do) overstates it by ~24%. */}
               <span className="block">Test-print and scan before relying on it; ink spread merges fine modules.</span>
+            </p>
+          )}
+
+          {/* BF-57. The code stopped being a private bookmark and became the meal, so the sheet has
+              to say how much of the meal is in it — a label handed to someone else is only as good
+              as its payload, and the payload is the one thing the preview cannot show. */}
+          {metrics && (
+            <p className="text-center text-[11px] leading-snug text-muted-foreground">
+              {metrics.carriesRecipe
+                ? <>
+                    The code carries{' '}
+                    {metrics.rolledInCode === 0
+                      ? <span className="font-semibold text-foreground">the whole recipe</span>
+                      : <>
+                          <span className="font-semibold text-foreground">{metrics.namedInCode} ingredient{metrics.namedInCode === 1 ? '' : 's'} by name</span>
+                          {' '}and groups the other {metrics.rolledInCode} into one entry
+                        </>}
+                    {' — '}anyone can scan it to add this meal, with no account and no signal.
+                    {metrics.rolledInCode > 0 && (
+                      <span className="block">The calories and macros are exact either way, and the label says the list was grouped.</span>
+                    )}
+                  </>
+                : <>
+                    This code is a <span className="font-semibold text-foreground">private bookmark</span> — it logs the
+                    meal on your own phone and does nothing on anyone else&rsquo;s.
+                    {' '}Pick <span className="font-semibold text-foreground">Share code</span> for a label you can give away.
+                  </>}
             </p>
           )}
 

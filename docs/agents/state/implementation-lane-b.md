@@ -3,39 +3,44 @@
 > **Successor sessions are titled `🚧 Implementation Agent (B) 🟢`** — exactly. A renamed successor
 > is a lost thread.
 
-**Updated:** 2026-08-31 · **By:** the eighteenth Lane B run · **Next ID:** `LB-33`
+**Updated:** 2026-08-31 · **By:** the eighteenth Lane B run · **Next ID:** `LB-35`
 
 ## Now
-**Merged: BF-66 (#662), BF-65/LB-23/LB-30/LB-31 (#664), BF-71 (#681). Open: the nutrition uplift
-batch BF-72/73/74/76 (v1.407.0). Nothing has been near a device.**
+**Merged: BF-66 (#662), BF-65/LB-23/LB-30/LB-31 (#664), BF-71 (#681), the nutrition uplift batch
+BF-72/73/74/76 (#683, v1.407.0). Open: BF-57 (#692, v1.408.0). Nothing has been near a device.**
 
-**Two findings from that batch outlive it.** `min-h-[Npx]` **does nothing on a `<button>` or a
-`role="button"`** — `globals.css` sets a bare `button { min-height: 48px }` that beats the utility
-(measured: 48 px on a button, 84 px on a div with the same class). BF-50's comment claiming a 62 px
-tile describes one that measured 60. Drive height with padding; LB-32 holds the general case. And
-**a bottom sheet is `fixed bottom-0`, so its height moves only its TOP edge** — `vh`→`dvh` cannot
-fix bottom clearance, which is entirely the baked `pb-safe-*` class. Nothing in nutrition is
-under-padded; three sheets are over-padded by declaring the inset on the content *and* the footer,
-and the primitive cannot express the fix without a worse footgun.
+**BF-57's lesson: an entry's binding constraint can be arithmetically impossible, and the
+measurement is then the deliverable.** It asked for the meal-label QR to be given ~30 mm, reasoning
+from a code of 12.2–16.4 mm — a **pre-Q-411 figure**. On the square canvas the five print styles run
+16.4–20.9 mm and each is *already* the largest `codeUnits` clearing its content by 6 units; 30 mm is
+128 of the 171 usable units, and four of six cannot hold 62 bytes, below which `encodeSharedMeal`
+trims the meal's **name**. A new `share` style carries the recipe; the rest keep the private token.
+**Re-derive a plan's numbers against the current file before building to them.**
 
-**BF-71: a route with no caller fails no test.** Both clinical routes shipped complete and nothing
-called either, so two tables sat empty in production while every resting rate stayed predicted — an
-empty table is a valid state and nothing surfaces it. **When an entry says a storage half shipped,
-grep for a client caller before believing the feature exists.** Only `scannedOn`/`pctFat` are read
-by anything. **And when Lane B work wants a Lane A file, check whether it needs one**: BF-71 wanted
-an invalidation group and a TTL constant, and neither key needs invalidating (`cachedFetch` always
-revalidates; neither passes `freshWithinTtl` nor is seed-only, so both are first-paint
-accelerators).
+**`min-h-[Npx]` does nothing on a `<button>` or a `role="button"`** — `globals.css` sets a bare
+`button { min-height: 48px }` that beats the utility (measured 48 px on a button, 84 px on a div).
+Drive height with padding; LB-32 holds the general case. **A bottom sheet is `fixed bottom-0`, so its
+height moves only its TOP edge** — `vh`→`dvh` cannot fix bottom clearance, which is entirely the
+baked `pb-safe-*` class. Nothing in nutrition is under-padded; three sheets are *over*-padded by
+declaring the inset on the content *and* the footer.
 
-**The sandbox cannot render any exercise clip**: the dataset is on `raw.githubusercontent.com`,
-which the egress proxy drops, so clips are blank **including the warm-up screen's own, untouched for
+**A route with no caller fails no test** (BF-71): both clinical routes shipped complete, nothing
+called either, and two production tables sat empty while every resting rate stayed predicted. **When
+an entry says a storage half shipped, grep for a client caller before believing the feature exists.**
+And when Lane B work wants a Lane A file, check whether it needs one — BF-71 wanted an invalidation
+group and a TTL constant and needed neither.
+
+**The sandbox cannot render any exercise clip**: the dataset is on `raw.githubusercontent.com`, which
+the egress proxy drops, so clips are blank **including the warm-up screen's own, untouched for
 months** — that is how it was pinned to the environment rather than the component. Verify with
-same-origin substitutes asserting `naturalWidth > 0`. (`parseVoice` and `useExerciseMedia`'s rules
-are under **Do not re-litigate**.)
+same-origin substitutes asserting `naturalWidth > 0`.
 
 **Start from `node scripts/next-item.js --lane B`, never a hand-scan — re-run after every merge.**
-Next: **BF-75**, **BF-52** (planning), **Q-407**, **LB-12** — all nutrition/body UI in the area whose
-device pass is outstanding, so expect to ship unverified or wait for the owner.
+BF-57 headed the list only because #684/#686 reclassified it from a `Keep:` to live work the same
+day; a plan formed before a merge is stale by definition. Next: **BF-75**, **BF-52** (planning),
+**Q-407**, **LB-12** — all nutrition/body UI in the area whose device pass is outstanding, so expect
+to ship unverified or wait for the owner. **LB-33** (split the 1,049-line `meal-label-render.ts`) and
+**LB-34** (a re-scanned label makes a second copy of the meal) are this run's own findings, filed low.
 
 **Three things are blocked on the owner, each with a written recommendation — do not decide or build past them:**
 - **BF-51 ③.** The picker has ONE collection shown two ways (`Recently used` empty, `Your foods`
@@ -85,10 +90,14 @@ tests are true of — and **mutate them**, because none of those three showed up
 **Nothing from the last five runs is device-verified.** [`device-verification-queue.md`](../../device-verification-queue.md)
 groups by screen — work a section, not an entry.
 
-**W4/W5 (voice logging, exercise clips) and now BF-71's form are all enumerated in that queue** —
-per screen, which is where they stay. **Nothing animated has been rendered anywhere in this work**,
-and BF-71's `<input type="date">` and decimal keypads have never been on the phone. The previous
-run's whole **Nutrition** section is still owed, best done in one sitting.
+**W4/W5 and BF-71's form are enumerated there per screen, which is where they stay.** The whole
+**Nutrition** section is still owed and is best done in one sitting.
+
+**BF-57 needs TWO PHONES AND TWO ACCOUNTS, which nothing else here does** — a `Share code` label
+scanned in airplane mode from the second account must produce a copy with the same portions and
+macros. Its **print** test is older than the entry and now load-bearing: no label of any style has
+been through a printer, so `MIN_MM_PER_MODULE` (0.49) is a convention and the whole payload budget
+derives from it. If a real print disagrees, that one constant is what moves.
 
 Carried: Q-467, Q-499, Q-538, Q-305 at S25 width, Q-477 across local midnight, BF-10, LB-5, Q-328/Q-321/Q-486, Q-389, a TalkBack pass, Q-450/Q-418 (Polar H10). **Q-315 needs a DESKTOP.**
 
@@ -99,9 +108,9 @@ None held.
 - **`main` will land a PR under YOUR open one**, and `total_count: 0` follows. That zero has
   **three** causes: stale base, runner backlog, **wedged run** (`rerun` 403 / `cancel` 409; the only
   way out is a new commit with real content, never an empty one).
-- **E2E takes 15–40 min and CATCHES REAL BUGS** — three across two PRs one run. **Never dismiss a
-  red E2E as flake without reading the log.** When it cannot be informative (docs/scripts; a re-push
-  whose diff against an already-green head is version/changelog only), merge on the five and say so.
+- **E2E takes 15–40 min and CATCHES REAL BUGS** — three across two PRs in one run. **Never dismiss a
+  red E2E as flake without reading the log.** When it cannot be informative (docs; a re-push whose
+  diff against an already-green head is version/changelog only), merge on the five and say so.
 - **`git add -A` with two items in flight sweeps the other into your commit.** It happened: an
   untracked spec rode onto the wrong branch and was pushed. Stage paths.
 - **`docs/doc-size-baseline-history.md` is APPEND-ONLY** — a conflict is two *additions*: keep both,
@@ -115,12 +124,18 @@ None held.
 - **Two file inputs on one screen is a silent hazard** — name them; `input[type="file"]` takes
   whichever is first and the wrong one fails without a sound.
 - **In a spec: a coordinate tap has no actionability check** — `boundingBox()` right after a sheet
-  opens is a position the element is still travelling through (`swipeRowLeft` waits for the rect to
-  settle; `toBeInViewport()` does not). Also **centre a row** (its natural spot is under the tab bar),
-  **hide the dev overlay**, **scope assertions to the sheet** (three mounted layers say "Protein"),
-  and **`getByText` matches SUBSTRINGS**.
+  opens is a position still being travelled through (`swipeRowLeft` waits for the rect;
+  `toBeInViewport()` does not). Also **centre a row**, **hide the dev overlay**, **scope assertions to
+  the sheet** (three layers say "Protein"), and **`getByText` matches SUBSTRINGS**.
 - **`deleteFoodLog` writes a tombstone** — a count ignoring `deleted_at IS NULL` *passes* on a broken delete.
 - **`SegmentedTabs` renders `role="tab"`**, takes `orientation="vertical"`, and the 48 dp floor is
   per segment — a stacked toggle is 96 px and its neighbour must match.
 - **Never merge `main` or edit the tree while a local e2e run is live** — the tell is
   `Parsing ecmascript source code failed` with tests at **0ms**.
+- **Playwright needs `DATABASE_URL` prefixed in** — the session-start hook unsets it, and the failure
+  surfaces in `zero-data.setup.ts` while your spec reports `did not run`.
+  `DATABASE_URL='postgresql://postgres:postgres@localhost:5433/trainingai_dev' npx playwright test …`
+- **A source-level guard must match the CALL, not the name** — `not.toMatch(/decodeMealLabelToken/)`
+  fails on the comment documenting its own replacement. Assert `/name\s*\(/`.
+- **Changing a DEFAULT argument silently changes what existing tests assert** — `mealLabelCodeMetrics`
+  defaulting to a derived budget turned a 0.49 mm floor into a tautology. Pin the old value there.

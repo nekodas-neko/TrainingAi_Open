@@ -12,7 +12,7 @@ import { hostOf } from './recipe-url'
 import type { RecipeCandidate } from './recipe-candidates'
 import { useFoodDatabaseSearch, type ExternalFood } from '@/lib/hooks/use-food-database-search'
 import { BarcodeScanner } from './barcode-scanner'
-import { decodeMealLabelToken } from '@trainingai/shared/nutrition/label-payload'
+import { decodeMealLabelScan } from '@trainingai/shared/nutrition/label-payload'
 
 interface Props {
   /** Whether the picker's screen is on. Both searches idle when it is not. */
@@ -153,9 +153,14 @@ export function IngredientPicker({ active, userId, onAdd, onImportRecipe, onReci
   async function addScannedFood(code: string) {
     setScanning(false)
     // A printed meal label is a saved meal, not a product, and scanned inside a builder it would
-    // mean "nest this meal as an ingredient" — which does not exist. Say so, rather than handing a
-    // 22-character token to a product lookup that can only 400 it.
-    if (decodeMealLabelToken(code)) {
+    // mean "nest this meal as an ingredient" — which does not exist. Say so, rather than handing the
+    // payload to a product lookup that can only 400 it.
+    //
+    // `decodeMealLabelScan`, not `decodeMealLabelToken` (BF-57): labels now carry the whole recipe,
+    // which is a ~250-character string that the token check does not recognise — so without this the
+    // newer labels are the ones that fall through to the barcode route. Sibling surface to the same
+    // swap in `capture-actions.tsx`; the two are the only places a camera reaches a meal label.
+    if (decodeMealLabelScan(code)) {
       toast.error('That is a meal label. Scan a product barcode to add it as an ingredient.')
       return
     }

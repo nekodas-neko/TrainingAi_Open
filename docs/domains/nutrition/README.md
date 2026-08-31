@@ -105,6 +105,21 @@ fallback) are what every offline-first domain should copy. See CLAUDE.md, "Offli
   ([`journal`](../../overview/entries/2026-08-19-square-label-canvas.md)). ⚠ That gain holds only if
   the owner's circle template **crops**; if it **scales**, the default lands at 0.397 — worse than
   what it replaced. Unresolved until one test print — [`journal`](../../overview/entries/2026-08-19-label-line-budget.md).
+- [`docs/overview/entries/2026-08-30-feat-self-contained-meal-label.md`](../../overview/entries/2026-08-30-feat-self-contained-meal-label.md)
+  — **BF-57 engine half: the meal travels IN the code, not as a pointer to it.** Positional JSON, so
+  a label scans offline for a user with no account, as a copy. Ids were deliberately **not** made
+  globally resolvable — a photo of a label would become read access to someone's meal. **The totals
+  are sacred:** the tail rolls into one remainder entry carrying its combined macros rather than
+  anything being dropped.
+- [`docs/overview/entries/2026-08-31-shared-meal-labels.md`](../../overview/entries/2026-08-31-shared-meal-labels.md)
+  — **BF-57 surface half, and the measurement that reversed its plan.** The entry asked for the code
+  to be given ~30 mm so version 11 fits every style; the five print styles are each **already** at
+  the largest code that clears their content by 6 units, and four of the six cannot hold 62 bytes —
+  below which the encoder trims the meal's **name**. Two payloads ship instead: the print styles keep
+  the private bookmark, and a new **`share`** style spends the label on a 34.4 mm code. Read it
+  before changing any `codeUnits`: `mealLabelShareBudget` derives the payload budget from the
+  geometry, so shrinking a code silently shrinks what its label can carry. ⚠ **0.49 mm per module is
+  a convention, not a measurement** — no label of any style has been through a printer.
 - No standalone system reference exists for this pillar yet; the offline-first section of
   [`CLAUDE.md`](../../../CLAUDE.md) and [`docs/module-map.md`](../../module-map.md) §3 carry the
   load-bearing rules.

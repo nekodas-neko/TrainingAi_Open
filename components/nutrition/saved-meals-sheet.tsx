@@ -15,6 +15,7 @@ import { TTL_MEDIUM, TTL_LONG } from '@trainingai/shared/cache-ttl'
 import { getLocalStore } from '@/lib/local-store'
 import { pushThenRevalidate } from '@/lib/local-store/push-then-revalidate'
 import { FoodList } from './food-list'
+import type { SharedMeal } from '@trainingai/shared/nutrition/label-payload'
 import { CaptureActions } from './capture-actions'
 import { MealListActions } from './meal-list-actions'
 import { RecentFoodsPanel } from './recent-foods-panel'
@@ -92,11 +93,12 @@ interface Props {
   onManual: () => void
   /** A scanned saved-meal label (Q-389); the parent owns the logging. */
   onScannedSavedMeal?: (mealId: string) => void
+  onScannedSharedMeal?: (meal: SharedMeal) => void
   /** Open on `Meals` rather than `Recent` — set when the entry point was the page's My Meals button. */
   openOnMeals?: boolean
 }
 
-export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate, preselectedMealTypeId, onSelectFood, onScanResult, onManual, onScannedSavedMeal, openOnMeals }: Props) {
+export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate, preselectedMealTypeId, onSelectFood, onScanResult, onManual, onScannedSavedMeal, onScannedSharedMeal, openOnMeals }: Props) {
   const planSavedMealIds = usePlanSavedMealIds()
   // Q-413: the eaten-at resolution happens in the USER's zone, not the device's.
   const tz = useUserTimezone()
@@ -556,7 +558,7 @@ export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate,
           // LB-16: this IS the Log Food screen now, not a list stacked on one. `CaptureActions`
           // renders these children while idle and takes the whole screen once a capture starts, so
           // the tabs cannot be left showing behind a half-open camera.
-          <CaptureActions onScanResult={onScanResult} onManual={onManual} onScannedSavedMeal={onScannedSavedMeal}>
+          <CaptureActions onScanResult={onScanResult} onManual={onManual} onScannedSavedMeal={onScannedSavedMeal} onScannedSharedMeal={onScannedSharedMeal}>
             <SegmentedTabs tabs={LIST_TABS} value={listTab} onValueChange={changeListTab} size="xs" className="shrink-0 px-4" />
             {listTab === 'meals' && (
               <MealListActions
