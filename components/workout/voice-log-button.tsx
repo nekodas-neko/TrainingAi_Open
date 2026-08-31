@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { MicIcon, MicOffIcon } from "lucide-react";
-import { parseVoice } from "./utils";
+import { VOICE_LOG_EXAMPLE, parseVoice } from "./utils";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnySpeechRecognition = any
@@ -105,7 +105,13 @@ export function VoiceLogButton({ onResult }: { onResult: (weight?: number, reps?
       const transcript = res.matches?.[0]
       if (!transcript) { setError('Did not catch that'); return }
       const { weight, reps } = parseVoice(transcript)
-      if (weight === undefined && reps === undefined) { setError(`Heard "${transcript}"`); return }
+      // Naming the transcript alone read as the app disagreeing with the user's ears — the report
+      // that produced BF-66 was a *correct* transcript the parser then threw away. Say what failed
+      // and what to say instead.
+      if (weight === undefined && reps === undefined) {
+        setError(`Didn't understand "${transcript}" — try "${VOICE_LOG_EXAMPLE}"`)
+        return
+      }
       onResult(weight, reps)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Voice logging failed')
@@ -150,7 +156,7 @@ export function VoiceLogButton({ onResult }: { onResult: (weight?: number, reps?
   if (available === null) return null
 
   return (
-    <div className="flex flex-col items-start gap-0.5">
+    <div className="flex flex-col items-center gap-0.5">
       <button
         onClick={toggle}
         aria-label={listening ? 'Stop listening' : 'Log by voice'}
@@ -166,7 +172,12 @@ export function VoiceLogButton({ onResult }: { onResult: (weight?: number, reps?
         {listening ? <MicOffIcon className="w-3.5 h-3.5" /> : <MicIcon className="w-3.5 h-3.5" />}
         {listening ? 'Listening…' : 'Voice'}
       </button>
-      {error && <p className="text-[10px] text-red-600 dark:text-red-400">{error}</p>}
+      {/* The accepted phrasing was learnable only by failing at it — nothing on the button, no
+          hint, no first-run text. One example, always on the line the error uses, so the layout
+          does not shift when a parse fails. */}
+      {error
+        ? <p className="text-[10px] text-red-600 dark:text-red-400">{error}</p>
+        : <p className="text-[10px] text-muted-foreground">{listening ? 'Say the weight and reps' : `Say "${VOICE_LOG_EXAMPLE}"`}</p>}
     </div>
   )
 }

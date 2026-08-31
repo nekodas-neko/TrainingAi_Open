@@ -3970,8 +3970,270 @@ actually happened. It earns the index because the fix is not the one the entry d
 the branch Q-211 named left the behaviour unchanged, since a second branch re-applied the deload, and
 that branch carried a comment calling such a clause unreachable — true when written, false the moment
 the first exemption landed. A reader of this file should know the shipped fix has two halves.
+## 2026-08-30 — `docs/implementation-backlog.md` (gate audit: three stale owner gates)
 
-## 2026-08-31 — `projectOverview.md` raised, 8453 → 8470 (the four-tiles-at-55 screenshot)
+Small. Asked which entries were waiting on him, the owner turned out to be waiting on three he had
+already dealt with:
+
+- **BF-4** — the photo scan was run during the device pass (~4 s, no complaint), which is not the
+  slowdown the entry was filed about. Gate cleared, with the instruction to close it as *stopped*
+  rather than *fixed*, since no diff was traced to it.
+- **LB-18** — answered on the device the same day, and the answer was written *above* the `Gate:`
+  line while the line itself survived. **A cleared gate has to be struck in the field, not narrated
+  next to it, because the runner reads the field.**
+- **Q-388** — void rather than answered. It asked the owner to choose SpO₂ on or off; he refused the
+  question and was right to, since SpO₂ was equally on under stock firmware at a quarter the drain.
+  Re-marked as blocked on a device reading (S9), not on a decision.
+
+The LB-18 case is the reusable one: an owner gate can be answered in prose and stay closed to the
+tools, which makes it indistinguishable from an unanswered one at a glance.
+
+## 2026-08-30 — `docs/implementation-backlog.md` (lane classification and the Railway aggregation)
+
+Net negative on entries: 216 → 215, with Q-549 removed.
+
+**Nine entries carried `Lane: ?` and were therefore offered by neither runner** — including BF-1, BF-2
+and BF-9. Every one of them already described its own split ("engine is A, the surface is B"), so
+none of them was actually undecided; the field simply never got the answer the prose already had.
+Classified by CLAUDE.md's path rule, with the rule cited in each so the reasoning is checkable rather
+than asserted. Eight resolved to a lane; **PS-4 stays `Lane: ?` on purpose** and now says so, because
+the runner accepts only A or B and rewriting a baton is not implementer work — recorded so the next
+audit does not try again.
+
+**Three entries were asking the owner the same hosting question three ways.** Q-549's headline premise
+was falsified on 2026-08-25 (423 MB flat at 0.0 vCPU, not 0.79 GB) and its only live residue was one
+console setting, so it is folded into Q-551 and removed. Q-547's remaining half is re-framed as what
+it is — a *reading* taken during a quiet window, feeding Q-551 rather than competing with it. **The
+owner now has one Railway question instead of three.**
+
+## 2026-08-30 — `docs/implementation-backlog.md` (the tuning sign-off, applied to one of four)
+
+The owner signed off "the four tuning tasks". Checked against CLAUDE.md's bar for a scoring change —
+*a proposal is incomplete until it states how many other days the change moves* — and **only TN-10
+met it**, so only TN-10 carries the sign-off.
+
+The other three are recorded as explicitly **not** signed, with the reason on each, because a blanket
+approval applied to them would authorise things nobody intends:
+
+- **TN-16** is a stop sign, not a request. Its own measurement (n = 33) is that stress-high minutes
+  correlate the *wrong way*, so the warning it proposes **would fire on the owner's best days** — the
+  entry calls that worse than no warning. Approving it approves a known-broken feature. Q-507 clears
+  it.
+- **TN-17** does not ask *may we change the score*; it asks **what the owner's step goal is**. Median
+  day 4,649 steps against a stored goal of 7,000 reached on 19 of 60 days. The entry now carries the
+  one-line question to put to them instead.
+- **Q-422** is a legitimate sign-off blocked on `Needs: Q-420`, which sets the intensity scale it
+  multiplies. Approving the multiplier before its input is fixed approves an unknown. Re-offer it
+  when Q-420 lands.
+
+Q-551 is marked **held** rather than answered, per the owner.
+
+## 2026-08-30 — `docs/implementation-backlog.md` (BF-59, and TN-17 answered)
+
+BF-59 is the largest of the two and earns it by being arithmetic rather than opinion. The owner
+completed a full training week and the screen still showed them well short, so the question was
+whether the target or the counting was wrong. **The counting is right** — 50 logged sets producing 79
+muscle-set credits is the 0.5 secondary weighting working as designed. **The target is wrong**:
+`program_volume_targets` stores a flat 14/10 large-small binary, which is precisely what
+`volume-targets.ts` opens by saying it does not do, and it ignores the `powerbuilding` ×0.8 multiplier
+on the owner's own active program. 128 displayed against ≈106 correct, and reaching 128 would need
+~81 sets — 62% more than the program prescribes.
+
+The per-muscle table is what makes it worth writing down: against goal-adjusted landmarks the owner
+**exceeded** glutes and lower back and **met** hamstrings in the same week the screen painted them
+red. A target that cannot distinguish "you are past the sweet spot" from "you are half way there" is
+worse than no target.
+
+TN-17 is a line: the owner kept 7,000 steps, and the entry now records that the number came from the
+`sedentary` rung of a tier table rather than any per-person calculation — defensible by accident, and
+worth saying so plainly.
+
+## 2026-08-30 — `docs/implementation-backlog.md` (BF-59 reframed by one remark from the owner)
+
+The entry was written as "flat binary plus a missing goal multiplier". The owner then said *"oh yes
+cause its realization phase its been less sets"* — and that is the actual cause, with the original
+two demoted to second-order. In a peaking block low volume **is** the prescription; the app's own
+`explain.ts` calls realisation *"peak strength — heaviest load, lowest reps"* and `autoregulation.ts`
+refuses rep pushes in it. So the screen painted correct training red.
+
+Two things worth keeping from the trace. **MAV is an accumulation target**, so displaying it during a
+peak is measuring the wrong thing rather than measuring it wrongly. And **phase is per program
+session, not per week** — production shows the owner's sessions spanning `accumulation`,
+`intensification` and `realisation` simultaneously — so a weekly target is a computation over the
+phases the week contains, not a number that can be stored at all.
+
+A question the entry had raised — *does the program prescribe enough volume to reach MAV?* — is
+struck rather than deleted, because it was reasonable on the data available and the next person
+looking at 50-against-106 without the phase would ask it again. That is itself the argument for
+putting the phase on the screen.
+
+## 2026-08-30 — `docs/implementation-backlog.md` (BF-60, a one-word rename with a reason)
+
+Small, and it would be smaller still except for two things worth writing down. **The old label was
+correct when written** — the file carries a comment explaining that `Single foods` names a
+composition against one thing — and **BF-48 is what made it wrong** by giving that tab the food
+database. So the entry says to update the comment in the same change, because a file defending a name
+it no longer uses is how a later session talks itself into reverting.
+
+And the wrinkle: `Meals` has a search box too, so `Search` is not strictly exclusive. The distinction
+that makes the rename honest is that Meals *filters* a list you own while this tab *searches* beyond
+it — which means the two placeholders have to read differently, or the rename swaps one ambiguity for
+another. Batched into `nutrition-ui-uplift` rather than given its own PR and its own device look.
+
+## 2026-08-30 — `docs/implementation-backlog.md` (BF-64, a one-way toggle)
+
+Sixty lines for one owner sentence, and the length is the table. *"Pressing full or deload doesnt
+change the prescription"* has a precise answer — `aiDeload` is read in an `else if` that only fires
+when the exercise is **not** already deloaded — and stating it as a four-row grid of
+prescription × toggle is what makes "the toggle is one-way" checkable rather than asserted.
+
+The rest is the two hazards that would otherwise be found during implementation. `preDeload` is
+optional, so a session-level revert cannot be all-or-nothing and the entry says to decide what Full
+means for an exercise with nothing to revert to. And the 1RM/PR gate reads `isAnyDeload` **and**
+`ex.deloaded`, so a revert that misses one of them either loses a real PR or writes one off deloaded
+sets — an area that has already had a fix land, which is why it is written as a live hazard rather
+than a caution.
+
+The recommendation is to reuse `toggleDeloadRevert` rather than teach `/prescribe` an intensity
+input: the full numbers are already carried on the prescription, so the cheap path costs no LLM
+call, no rate-limit budget, and works offline.
+
+## 2026-08-30 — `docs/implementation-backlog.md` (BF-65, a feature request that is mostly a cleanup)
+
+The owner asked for one picture on one screen. Most of the entry is what reading the code turned up
+around it: the same `/api/exercise-gif` fetch is hand-rolled in **four** files, so satisfying the
+request naively writes a fifth and walks past the repo's own extract-before-the-third-copy rule.
+Saying that in the entry is what makes the extraction part of the work rather than a follow-up
+nobody files.
+
+Two things are written down because they fail *quietly*. `next/image` silently converts a GIF to a
+static image without `unoptimized`, so the feature would ship looking finished and never move — the
+warm-up screen already carries the correct condition to copy. And the warm-up screen fetches every
+exercise's media moments earlier and prefetches the binaries for the service worker, then unmounts
+and drops the map; without a shared cache key the ready screen re-downloads what the app already has,
+which is also what breaks the offline case.
+
+The layout note is deliberate: the screenshot already cuts `SET TARGETS` off behind the action row,
+so "add a picture" is a fold decision, not a drop-in.
+
+## 2026-08-30 — `docs/implementation-backlog.md` (BF-66, a table that had to be measured)
+
+The owner asked a question — *"it heard me correctly; is that not how to use it?"* — and the answer
+is a six-row table produced by running `parseVoice` rather than reading it. `by` and `at` work while
+`for` and `times` do not, because the strip is a character denylist that keeps every letter appearing
+in `kg`/`reps`/`x`: `r` survives `for`, `es` survives `times`, and the two-numbers fallback then can
+never fire. Nobody derives that from the source at a glance, and nobody derives it from using the app
+at all, which is why the table is in the entry instead of a sentence saying the regex is fragile.
+
+It also carries the reason the seven existing tests pass: every one of them is adjacent numbers or an
+explicit keyword, so the filler-word gap is untested by construction rather than by oversight.
+
+And the second half, which is the part that generated the report: the failure message prints the
+transcript in red, so a *correct* transcript reads as the app mishearing. Fixing the parser without
+fixing that message leaves the next unparseable phrase just as confusing.
+
+## 2026-08-30 — `docs/implementation-backlog.md` (BF-67 and BF-68, the program builder's two blind spots)
+
+Two owner requests about the AI program builder, filed separately because one is buildable and one
+is a design.
+
+BF-68 is measured: `injur` appears **zero times** across both builder routes and all three builder
+components, and `generate-program`'s schema is a strict thirteen-field wizard payload with no
+free-text field at all. The entry's real content is the trap — `builder-chat` *does* take free text,
+so typing "I have a sore lower back" often works by luck, and then the constraint dies when the
+program is saved while the daily engine, which already reads the injuries table, never hears about
+it. That argues for feeding the existing records in rather than adding a field, and for the free-text
+path writing a record instead of a prompt line.
+
+BF-67 is flagged as a planning item because the owner's one sentence contains two payloads —
+structure ("similar to") is ~30 exercise names, history ("what I did") is unbounded — and treating
+them as one is how a prompt gets a year of set logs in it. It also carries two constraints worth
+having before design starts: send a program id rather than a program object, and give the reference
+its own schema caps rather than inheriting the byte-limit situation the route already documents.
+## 2026-08-31 — `projectOverview.md` 8453 → 8450, `docs/implementation-backlog.md` 13776 → 13762, `implementation-lane-b.md` held at 126
+## 2026-08-31 — `projectOverview.md` 8453 → 8450, `docs/implementation-backlog.md` 13585 → 13571, `implementation-lane-b.md` held at 126
+
+Three baselines fall; none rises. **Re-derived on the merge**: this branch was cut at 8449, and
+Q-211's four-line paragraph landed under it. **`projectOverview.md`** loses four lines of merge debris — its
+Current Status carried *three* duplicated `**Version:**` lines and a stray `v1.398.0` /
+`**Last updated:**` pair mid-section, all of it from parallel PRs resolving the same shared line —
+and gains one paragraph, written as a single long line in the section's current house style.
+
+**`docs/implementation-backlog.md`** falls 14 as BF-39's entry is removed on shipping and LB-30 is
+filed, which is the queue working rather than a compaction.
+
+**The baton was rewritten and then cut back to its baseline**, which is the part worth recording:
+correcting BF-39's state cost more lines than the correction saved, so the "finding that should
+change how you start" section was compressed from a heading plus three bullets into one paragraph,
+and four gotchas were merged. **Nothing was dropped** — the fourth instance of the precondition
+finding (BF-39's own) is now in there too, and it is the one that cost the most.
+## 2026-08-31 — `projectOverview.md` 8446 → 8443, `docs/implementation-backlog.md` 13752 → 13743 (LB-28)
+
+Both fall, and the projectOverview one is the note worth reading: the new status entry was **paid
+for in the same section** rather than by raising the number. The BF-46 ①a paragraph from the day
+before was rewritten as one long line in the style the rest of the section has moved to, which
+freed nine — so the index gained an entry and lost seven lines.
+
+Nothing was cut from that paragraph except restatement: the picker count, the shared write path, the
+reproduction, the parent instrumentation and the precondition finding are all still in it, and its
+journal link is unchanged.
+
+**Re-derive both on the merge if #647 lands first** — it removes BF-39's queue entry and repairs
+four lines of duplicated `**Version:**` debris in the same section, so the merged figures will be
+lower than these. Take them from the merged documents rather than picking a side.
+
+## 2026-08-30 — `docs/implementation-backlog.md` (BF-67 gets its answer, and a reason)
+
+The owner answered the template-vs-context question — *"more like understanding what I did… ideally
+we should try keep similar exercises so we aren't changing it up too much"* — which is recorded
+verbatim because it moves the open question from *what does reference mean* to *what counts as a
+reason to change*.
+
+The two lines that grew the file are the ones that turn a preference into a constraint.
+`personal_records` and `exercise_estimates` are both unique on `(user_id, exercise_name)`, so
+**history follows the name, not the program**: continuity is what preserves the 1RM and the PR, and a
+paraphrased name silently starts from zero. And name fidelity is not enforced — `generate-program`
+looks muscles up by exact name and falls back to the model's own guess on a miss, which is the tell.
+An LLM told to keep similar exercises is exactly the thing that paraphrases, so the entry now says
+the route has to resolve generated names against the library before this feature can deliver
+continuity rather than the look of it.
+## 2026-08-31 — `projectOverview.md` 8443 → 8445, `docs/implementation-backlog.md` 13745 → 13679 (BF-60/61/62/63)
+
+**A rise of two, and it is a rise rather than a trade.** The nutrition batch adds one status
+paragraph and pays for none of it, because the section has no slack left that is this branch's to
+take: the two paragraphs above it are hours old and the ones below belong to other agents. Two lines
+for four owner reports, one of which corrects the fix its own entry proposed, is worth the ratchet
+moving.
+
+**The backlog falls 66.** BF-60 is removed outright — a tab rename with an e2e assertion on the
+label owes nothing further — while BF-61, BF-62 and BF-63 are rewritten to their `Keep:` residue,
+which is the **device check** in all three cases and nothing else. That is the protocol working
+rather than a compaction: an entry that shipped but is not device-verified stays in the queue,
+because that check is the outstanding thing.
+
+(Re-derived on the merge: this branch was cut on top of #647 before it landed, so its first
+figures were against that head rather than against `main`.)
+
+## 2026-08-31 — `projectOverview.md` 8445 → 8468, `docs/implementation-backlog.md` 13679 → 13602 (BF-66)
+
+**Twenty-three lines, and twenty of them are one Known-Issues row.** The voice fix is JS-only and
+reaches the phone on the next deploy, so it is device-*unverified* rather than device-*blocked* —
+which under the Canonical Runtime rule is exactly the case that has to buy a row rather than a
+queue entry. The row names the five phrasings to say into the button and points at LA-37's row four
+paragraphs above it, because they are the same button and want the same sitting; a reader who does
+one and not the other has done half a check. The remaining three lines are the status paragraph.
+
+**No slack was available to pay for it.** The three paragraphs under the status heading are hours
+old and belong to other branches, and the Known-Issues section's nearest ⚠️ rows are all still owed
+their own device passes, so there was nothing here this branch could honestly strike.
+
+**The backlog falls by BF-66's whole entry.** Nothing is owed past the device check the row above
+now carries, so the entry is removed rather than rewritten to a `Keep:` — the residue lives in
+`projectOverview.md`, and duplicating it in the queue would make an entry that reads as open work.
+
+## 2026-08-31 — `projectOverview.md` → 8485 and the backlog → 13644 (the four-tiles-at-55 screenshot)
+
+*(Absolute figures are from the final rebase — other PRs raised the same two files while this branch was open. This branch's own deltas are +17 on `projectOverview.md` and +42 on the backlog.)*
 
 Two rows from one owner screenshot, and the pair is the point: one 🔴 defect and one 🟢 "this is
 working, here is why it looked broken".

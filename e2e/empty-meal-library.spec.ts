@@ -75,7 +75,7 @@ test('the single-foods empty state offers search, and still no builder', async (
   })
   await openEmptyMealsTab(page)
 
-  await page.getByRole('tab', { name: 'Single foods', exact: true }).tap()
+  await page.getByRole('tab', { name: 'Search', exact: true }).tap()
   await expect(page.getByText('Search above to find a food, or log one')).toBeVisible({ timeout: 30_000 })
 
   // BF-48 changed what this state is FOR. The copy used to read *"Single foods land here once you

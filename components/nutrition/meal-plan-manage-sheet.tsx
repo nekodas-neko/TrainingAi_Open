@@ -266,7 +266,7 @@ export function MealPlanManageSheet({ plan, onOpenChange, onChanged, onRebuild, 
           )}
         </div>
 
-        <SheetFooter className="flex-row gap-2">
+        <SheetFooter className="flex-row gap-2" bottomInset="takeover">
           <Button variant="secondary" className="flex-1" onClick={() => onOpenChange(false)} disabled={busy}>
             Close
           </Button>

@@ -207,8 +207,11 @@ export function FoodList({
           <input
             value={query}
             onChange={e => onQueryChange(e.target.value)}
-            placeholder={show === 'meals' ? 'Search your meals' : 'Search your foods or the food database…'}
-            aria-label={show === 'meals' ? 'Search your meals' : 'Search your foods or the food database'}
+            // Filter versus lookup, and the wording carries it (BF-60): the meals box narrows a list
+            // you already own, this one reaches the food database as well. With the tab now called
+            // `Search`, two identically-worded boxes would put the ambiguity straight back.
+            placeholder={show === 'meals' ? 'Filter your meals' : 'Search your foods or the food database…'}
+            aria-label={show === 'meals' ? 'Filter your meals' : 'Search your foods or the food database'}
             className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
           />
           {query && (
