@@ -1,10 +1,11 @@
 'use client'
 
 import { memo, useState, type CSSProperties } from 'react'
-import { ChevronDown, UtensilsCrossed, BookmarkPlus, Loader2 } from 'lucide-react'
+import { ChevronDown, UtensilsCrossed, BookmarkPlus, Loader2, CheckCheck } from 'lucide-react'
 import { cn } from '@trainingai/shared/utils'
 import { MACRO_COLORS } from '@trainingai/shared/nutrition/macro-colors'
-import type { MealPlan, MealPlanVariant, MealPlanMeal, MealPlanDayType } from '@trainingai/shared/types/nutrition'
+import type { MealPlan, MealPlanVariant, MealPlanMeal, MealPlanDayType, MealType } from '@trainingai/shared/types/nutrition'
+import { fillableMeals } from './plan-day-fill'
 import { PlanMealRow } from './plan-meal-row'
 
 interface Props {
@@ -26,6 +27,26 @@ interface Props {
   declinedMealIds?: Set<string>
   /** Record or undo "I didn't eat this". Absent while meal types are still loading. */
   onSetDeclined?: (meal: MealPlanMeal, declined: boolean) => void
+  /**
+   * Log every meal a one-tap "log the day" would write, in one action (Q-187 step 4). Absent while
+   * meal types are still loading.
+   *
+   * **Which meals those are is worked out here rather than by the caller**, from the same `variant`
+   * this card renders. Deriving it outside would let the button offer a meal the list below is not
+   * showing, because a split plan has two variants and `pickVariant` decides between them.
+   */
+  onLogAll?: (meals: MealPlanMeal[]) => void
+  /** Buckets, for resolving when an untimed meal is meant to happen. */
+  mealTypes?: MealType[]
+  /** The day being shown, `YYYY-MM-DD`. */
+  logDate?: string
+  /** Today in the USER's timezone. */
+  today?: string
+  /** The current hour in the user's timezone. Null means it could not be read — which stops the
+   *  offer on today rather than guessing, since guessing logs food nobody ate. */
+  nowHour?: number | null
+  /** A bulk log is running, so no other logging control should be live. */
+  bulkLogging?: boolean
   /** Copy a planned meal into My Meals (Q-398). */
   onSaveMeal?: (meal: MealPlanMeal) => void
   /** Copy every meal that is not already saved, in one action. */
@@ -66,6 +87,7 @@ const brandCardStyle: CSSProperties = {
 export const MealPlanSection = memo(function MealPlanSection({
   plan, loading, eaten, isTrainingDay, onCreate, onViewPlan,
   onLogMeal, loggingPosition, loggedPositions, declinedMealIds, onSetDeclined,
+  onLogAll, mealTypes, logDate, today, nowHour, bulkLogging,
   onSaveMeal, onSaveAllMeals, savingPositions,
 }: Props) {
   const [expanded, setExpanded] = useState(false)
@@ -96,6 +118,16 @@ export const MealPlanSection = memo(function MealPlanSection({
   // and macros, and a saved meal built from those would be an empty recipe.
   const unsaved = variant.meals.filter(m => m.savedMealId == null && m.ingredients.length > 0)
   const busySaving = (savingPositions?.size ?? 0) > 0
+  const fillable = onLogAll && mealTypes && logDate && today
+    ? fillableMeals({
+        meals: variant.meals, mealTypes, selectedDate: logDate, today,
+        // -1 is "no hour has come yet": an unreadable clock must offer nothing on today, not
+        // everything.
+        nowHour: nowHour ?? -1,
+        loggedPositions: loggedPositions ?? new Set(),
+        declinedMealIds: declinedMealIds ?? new Set(),
+      })
+    : []
   const dayLabel = variant.dayType === 'all' ? null
     : variant.dayType === 'training' ? 'Training day' : 'Rest day'
 
@@ -138,6 +170,28 @@ export const MealPlanSection = memo(function MealPlanSection({
         <MacroRow label="Fat" eaten={eaten?.fatG} target={variant.targetFatG} color={MACRO_COLORS.fat} />
       </div>
 
+      {/* Q-187 step 4: the plan's automatic half, as an explicit action rather than a prefill on
+          day open — a prefill that guesses wrong trains you to ignore it. It sits in the collapsed
+          card because not having to expand first is the entire value; it is hidden when there is
+          nothing to log, rather than sitting there disabled. */}
+      {onLogAll && fillable.length > 0 && (
+        <button
+          onClick={() => onLogAll(fillable)}
+          disabled={bulkLogging}
+          className="mt-3 w-full min-h-[44px] flex items-center justify-center gap-1.5 rounded-xl text-xs font-semibold active:opacity-80 transition-opacity disabled:opacity-60"
+          style={{ backgroundColor: brandTint(22), color: BRAND }}
+        >
+          {bulkLogging
+            ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Logging…</>
+            : <>
+                <CheckCheck className="w-3.5 h-3.5" />
+                {logDate === today
+                  ? `Log the ${fillable.length} ${fillable.length === 1 ? 'meal' : 'meals'} so far`
+                  : `Log all ${fillable.length} ${fillable.length === 1 ? 'meal' : 'meals'}`}
+              </>}
+        </button>
+      )}
+
       <button
         onClick={() => setExpanded(v => !v)}
         aria-expanded={expanded}
@@ -156,7 +210,7 @@ export const MealPlanSection = memo(function MealPlanSection({
                 meal={meal}
                 accent={BRAND}
                 logging={loggingPosition === meal.position}
-                busyLogging={loggingPosition != null}
+                busyLogging={loggingPosition != null || bulkLogging === true}
                 logged={loggedPositions?.has(meal.position) ?? false}
                 declined={declinedMealIds?.has(meal.id) ?? false}
                 onLog={onLogMeal}

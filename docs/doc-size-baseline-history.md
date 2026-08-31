@@ -5078,3 +5078,12 @@ which two entries hold the remainder (LB-36 for the device pass, LA-48 for the p
 storage). That is index material by the file's own definition: it is the thing a session needs to
 know before it believes the pacer works. The build detail lives in the journal entry and
 `docs/module-map.md`, not here.
+
+## 2026-08-31 — projectOverview.md 8535 → 8543 (+8)
+
+Q-187's Known-Issues row, on `feat/meal-plan-day-fill`. The plan card can now fill the day in one
+tap, and the row states the three things a session has to know before trusting it: that the offer
+stops at the current hour on purpose (and why that is the design rather than a nicety), that the
+device write path has not run because `getLocalStore` is null on web, and that Q-354 silently
+swallows `locator.click()` on this screen — which is a trap for the next spec author, not a
+user-facing bug. The build detail is in the journal entry and `docs/module-map.md`.

@@ -320,11 +320,16 @@ Live at the time of writing (2026-07-30):
 - **[`docs/handoff-2026-08-13-nutrition-meal-plan-build-out.md`](../../handoff-2026-08-13-nutrition-meal-plan-build-out.md)**
   — 🆕 the Meal Plan build-out, Phase 1 through one-tap "I ate this" (v1.282.0 → v1.299.0, fifteen
   merged PRs, migrations 177–183, local SQLite v23–v25). **Start here for anything meal-plan.**
-  What it leaves: **Q-187** (prefill the day from the plan — the owner's actual ask, and fully
-  unblocked, **plan written 2026-08-13**:
-  [`plans/2026-08-13-meal-plan-prefill-and-confirmation.md`](../../superpowers/plans/2026-08-13-meal-plan-prefill-and-confirmation.md)
-  — keep unconfirmed prefills out of `food_logs` rather than filtering a column across its 24 readers)
-  and ~~**Q-201**~~ (meal times schedule nothing — **decided 2026-08-24: they stay labels and
+  What it left: **Q-187**, whose four steps have now all shipped — the last on 2026-08-31 (v1.412.0),
+  a one-tap **"Log the N meals so far"** on the plan card, **bounded by the clock** so pressing it at
+  9am cannot log a dinner that has not happened. Selector:
+  [`components/nutrition/plan-day-fill.ts`](../../../components/nutrition/plan-day-fill.ts); outcome:
+  [`journal`](../../overview/entries/2026-08-31-meal-plan-day-fill.md). The design that made it cheap
+  is in the plan
+  ([`plans/2026-08-13-meal-plan-prefill-and-confirmation.md`](../../superpowers/plans/2026-08-13-meal-plan-prefill-and-confirmation.md))
+  — keep unconfirmed prefills out of `food_logs` rather than filtering a column across its 24 readers.
+  **Q-187 is re-scoped to the owner's second sentence** (the day re-calculating against what was
+  actually eaten), which has no design yet and is `Lane: ?` until one exists. Also left: ~~**Q-201**~~ (meal times schedule nothing — **decided 2026-08-24: they stay labels and
   schedule nothing.** See *Decided, and deliberately not built* below; the entry is out of the queue).
   Carry-forwards worth more than the features: portion sizing is arithmetic, never the model's job;
   an OFF **503** is usually our own rate limiting, but a **502 is a real outage** (measured

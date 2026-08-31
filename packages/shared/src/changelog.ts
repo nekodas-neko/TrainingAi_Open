@@ -15,6 +15,15 @@ export const CHANGELOG: ChangelogEntry[] = [
     ],
   },
   {
+    version: "1.412.0",
+    date: "2026-08-31",
+    changes: [
+      "Your meal plan can now log the day for you: one tap on the plan card records every planned meal you haven't already logged or said no to.",
+      "It only offers the meals whose time has come \u2014 press it at 9am and it logs breakfast, not tonight's dinner. On an earlier day it offers the lot.",
+      "Meals you already logged, and ones you declined, are left alone.",
+    ],
+  },
+  {
     version: "1.411.0",
     date: "2026-08-31",
     changes: [
