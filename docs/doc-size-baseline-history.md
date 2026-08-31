@@ -4403,3 +4403,14 @@ side effect of the route it tests. The durable one is that `ci.yml` has no `push
 — correctly, and for reasons written into the workflow — so nothing verifies the *combination* after
 several independently-green PRs land together. Five merged during this PR's own CI runs. That
 defect first appears on the next contributor's PR, on code they never touched.
+
+## 2026-08-31 — no baseline change; LB-31 corrected in place after the re-run
+
+The failed `Tests` job was re-run on the identical commit and **passed**, so the body-battery
+failure is a flaky test rather than the red `main` the first reading of it suggested. LB-31 and the
+`projectOverview.md` paragraph are corrected to say the weaker true thing, and the correction is
+recorded here rather than made silently — the earlier framing went into a commit message and a PR
+comment, and a session reading only those would go looking for a defect on `main` that is not there.
+
+Both files came out roughly even (`projectOverview.md` 8497 → 8495, under its baseline), so nothing
+is raised.

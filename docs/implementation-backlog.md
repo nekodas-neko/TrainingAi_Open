@@ -10229,8 +10229,12 @@ Whether that fires depends on whether the builder judges the composite real enou
 fixture with almost no history — and **#663 retired the Oura activity blend, which changes what goes
 into that composite.** Look there first.
 
-- **⚠ It does NOT reproduce outside CI, and the negative results are the useful part.** Green in
-  isolation; green across the whole `app` suite; and green running the **full** suite
+- **✅ It did not reproduce, and that is now measured rather than assumed.** The failed `Tests` job
+  was re-run on the identical commit and **passed** (run 33352464055, attempt 2). So the test is
+  **flaky**, not a standing defect — which retires the first reading of this, that `main` was red and
+  nobody could see it. It is not red. Say the weaker true thing.
+- **⚠ It does NOT reproduce outside CI either, and the negative results are the useful part.** Green
+  in isolation; green across the whole `app` suite; and green running the **full** suite
   (`npx vitest run`, 677 files / 5,683 tests — CI's shape is 680) against a **freshly migrated
   database created for the probe**. So the two obvious explanations are both dead: it is not a stale
   local fixture, and it is not the fresh-CI-database difference. Do not spend the hour re-deriving
@@ -10247,10 +10251,14 @@ already produced. **The gap it leaves is the one that bit here:** a PR is green 
 was cut from, and nothing re-checks the *combination* after several land together. Five PRs merged
 during this one's CI runs.
 
-So a defect introduced by an interaction between two independently-green PRs is invisible until the
-next PR merges `main` — where it surfaces as **that** PR's red check, on code its author never
-touched, with every incentive to be read as their own and re-diagnosed from scratch. That is an hour
-per occurrence, paid by whoever is unlucky.
+So a defect introduced by an interaction between two independently-green PRs would be invisible until
+the next PR merges `main` — where it surfaces as **that** PR's red check, on code its author never
+touched, with every incentive to be read as their own and re-diagnosed from scratch.
+
+**That is not what happened here** — ① turned out to be flaky, and the re-run proved it. The gap is
+still real, but this entry is evidence of the *cost of not being able to tell the two apart*, not of
+a defect on `main`. An hour went into distinguishing "flaky test" from "main is broken", and the only
+reason it took an hour is that there is no signal that would have answered it directly.
 
 - **Options, cheapest first.** A scheduled nightly run of `Tests` on `main` (no `push` trigger, so
   no per-merge cost, and it names the merge window when something breaks). Or a merge-queue, which
