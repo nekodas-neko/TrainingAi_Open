@@ -45,15 +45,36 @@ function SheetOverlay({
   );
 }
 
+/**
+ * How much room a bottom sheet leaves under its own content, in one of two documented shapes.
+ *
+ * `action` uses `.pb-safe-action` — the inset against a 0.75rem floor, right for a short sheet over
+ * a screen that still has the bottom nav.
+ *
+ * `takeover` uses `.pb-safe-action-lg`, and a sheet tall enough to BE the screen wants it. Under
+ * Capacitor's edge-to-edge the WebView is drawn behind the nav bar, so the inset reports the bar's
+ * own height — which means `action` pads by exactly the bar and leaves a primary button sitting
+ * flush on it. That measurement is recorded beside the class in `globals.css`, and it is what the
+ * owner reported on the meal detail sheet as *"the safe space is still a little off"* (BF-62). The
+ * larger class adds a real gap on top of the inset, with a floor that keeps the no-inset look (web
+ * QA, gesture nav reporting 0) unchanged.
+ *
+ * Set it HERE rather than adding `pb-safe*` inside the sheet: the sheet owns its bottom inset, and
+ * an inner utility stacks on top of this one rather than replacing it.
+ */
+type BottomInset = "action" | "takeover";
+
 function SheetContent({
   className,
   children,
   side = "right",
   hideCloseButton = false,
+  bottomInset = "action",
   ...props
 }: React.ComponentProps<typeof SheetPrimitive.Content> & {
   side?: "top" | "right" | "bottom" | "left";
   hideCloseButton?: boolean;
+  bottomInset?: BottomInset;
 }) {
   return (
     <SheetPortal>
@@ -68,8 +89,12 @@ function SheetContent({
             "data-[state=closed]:slide-out-to-left data-[state=open]:slide-in-from-left inset-y-0 left-0 h-full w-3/4 border-r sm:max-w-sm",
           side === "top" &&
             "data-[state=closed]:slide-out-to-top data-[state=open]:slide-in-from-top inset-x-0 top-0 h-auto border-b",
-          side === "bottom" &&
-            "data-[state=closed]:slide-out-to-bottom data-[state=open]:slide-in-from-bottom inset-x-0 bottom-0 h-auto border-t pb-safe-action",
+          side === "bottom" && [
+            "data-[state=closed]:slide-out-to-bottom data-[state=open]:slide-in-from-bottom inset-x-0 bottom-0 h-auto border-t",
+            // Chosen, never appended: tailwind-merge does not know these custom classes, so a later
+            // `pb-safe-action-lg` would sit BESIDE `pb-safe-action` and the two would stack.
+            bottomInset === "takeover" ? "pb-safe-action-lg" : "pb-safe-action",
+          ],
           className,
         )}
         {...props}
@@ -104,11 +129,19 @@ function SheetHeader({ className, children, ...props }: React.ComponentProps<"di
   );
 }
 
-function SheetFooter({ className, ...props }: React.ComponentProps<"div">) {
+function SheetFooter({
+  className,
+  bottomInset = "action",
+  ...props
+}: React.ComponentProps<"div"> & { bottomInset?: BottomInset }) {
   return (
     <div
       data-slot="sheet-footer"
-      className={cn("mt-auto flex flex-col gap-2 p-4 pb-safe-action", className)}
+      className={cn(
+        "mt-auto flex flex-col gap-2 p-4",
+        bottomInset === "takeover" ? "pb-safe-action-lg" : "pb-safe-action",
+        className,
+      )}
       {...props}
     />
   );

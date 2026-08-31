@@ -439,7 +439,7 @@ export function MealPlanEditSheet({ plan, onOpenChange, onChanged }: Props) {
           </ul>
         </div>
 
-        <SheetFooter>
+        <SheetFooter bottomInset="takeover">
           <Button className="w-full" onClick={() => onOpenChange(false)} disabled={busyPosition != null}>
             Done
           </Button>

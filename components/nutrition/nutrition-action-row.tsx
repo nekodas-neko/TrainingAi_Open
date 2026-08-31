@@ -57,8 +57,8 @@ export function NutritionActionRow({
       >
         <UtensilsCrossed className="w-4 h-4 text-muted-foreground flex-none" />
         {/* `My Meals`, not `My Foods` (BF-37). It lands on the Meals tab, and the old label named
-            the other one — the pair the owner could not tell apart. Single foods are one tab across
-            from wherever this opens, so nothing became unreachable. */}
+            the other one — the pair the owner could not tell apart. `Search` is one tab across from
+            wherever this opens, so nothing became unreachable. */}
         <span className="text-sm font-semibold flex-1 text-left">My Meals</span>
       </button>
     </div>

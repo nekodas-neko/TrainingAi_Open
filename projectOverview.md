@@ -24,21 +24,16 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.402.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
-**Version:** v1.401.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
-**Version:** v1.401.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
-**Last updated:** 2026-08-30.
+**Version:** v1.403.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Last updated:** 2026-08-31.
 
-**One photo picker per screen, and the held rebuild's failure was the spec (BF-46 ①a).** Two things
-said *Add a photo* and only one was a picker — the meal's own screen called `onEdit`. Both are real
-now, at the top of their own screen, and the meal screen writes through the same
-`saveMealToLibrary` the builder calls, so there is still one write path. **The interesting half:**
-rebuilt, the previous session's failure reproduced — `onChange` firing with a valid data URI and the
-component never receiving it — and instrumenting the *parent* showed the file was landing in the
-**other** picker. The meal's own screen is still in the DOM while it closes, both carried the same
-accessible name, and the spec waited for that name before picking. *A precondition satisfied by the
-state it is meant to replace cannot fail* — the third time that shape cost time in one day
-([journal](docs/overview/entries/2026-08-30-meal-photo-one-picker.md)).
+**Four nutrition reports from one device pass, and the interesting one is a fix that is not what its entry proposed (BF-60/61/62/63).** **BF-61:** Delete needed two presses because hit-testing follows the *animated* transform — for the 220 ms the row spends sliding out it is still over the tray and swallows the tap, which is why the owner's *"if I wait a second it works"* was the diagnosis. The tray now stacks above the row while open. **Its test took three attempts and the failures are the value:** a long drag overshoots and animates back *rightwards*, never covering the tray; a CDP-paced flick falls under `FLICK_VELOCITY` and snaps closed instead; and a tap at the tray's *centre* is uncovered within a frame, because the tray uncovers from its right edge first. The first version passed with the fix removed. **BF-62 was NOT `92vh`** — `SheetContent side="bottom"` bakes `.pb-safe-action`, and this repo's own measurement says the inset reports the nav bar's height under edge-to-edge, so `max(inset, 0.75rem)` pads by exactly the bar; five takeover sheets now take `bottomInset="takeover"`. **BF-63** scans a packet into the builder without logging it to today, and **deliberately does not store the code** — that chain is Lane A's and BF-38's. **BF-60** renames the tab to `Search`. **Nothing is device-verified; three of the four stay queued for exactly that** ([journal](docs/overview/entries/2026-08-31-nutrition-batch-bf60-63.md)).
+
+**A logged meal is one diary row, and the week-long hold was the spec measuring a moving element (BF-39).** The render half was built on 2026-08-30, passed its own three tests, and was held because the meal library's swipe tray then failed deterministically — recorded as *"a subscriber re-rendering a sibling subtree drops an in-flight `useDrag`"*. **It is none of that.** Sampling the row's rect every frame while the gesture ran: `SwipeActions` mounts once and the drag handler is **never invoked at all**. `toBeVisible()` passes while the sheet is still running its `enter` animation, so `boundingBox()` returned y=605 and the row was at y=503 by the time the CDP touch landed — every point hit the scroll container beneath it. BF-39 never touched the gesture; it added enough work behind the sheet that the animation had not settled. `swipeRowLeft` (`e2e/fixtures.ts`) now waits for two reads a frame apart to agree, all three swipe specs share it, and the pair that failed together passes with the grouping shipped. **The same latent race is in 46 other coordinate reads** — filed as LB-30, not swept ([journal](docs/overview/entries/2026-08-31-diary-nested-meal-rows.md)).
+
+**CI refuses `savePreference` inside a `useEffect` (LB-28).** `useEffect(() => localStorage.setItem(K, v), [v])` is a free write; the same line calling `savePreference` is a **PATCH on every mount**, and nothing at the call site says so. One such site left that PATCH and a `GET` behind it pending past sixty seconds in Health's launch burst and failed nine e2e specs, **none of which mentions preferences** — the screen such a failure names is never the screen that caused it. The scanner is a separate module driven by fixtures, and blanks comments and string literals before counting parens, because an unbalanced paren in either extends an effect's span across the rest of the file. Proved by mutation on the real file. **The entry said there were no sites to exempt; there are two** — `usePersistedPreference` itself, and Home's section-order reconciliation, which returns early unless the order changed. The grep behind that claim wanted both tokens on one line, a shape nobody writes ([journal](docs/overview/entries/2026-08-31-no-save-preference-in-effect.md)).
+
+**One photo picker per screen, and the held rebuild's failure was the spec (BF-46 ①a).** Two things said *Add a photo* and only one was a picker — the meal's own screen called `onEdit`. Both are real now, at the top of their own screen, writing through the same `saveMealToLibrary`, so there is still one write path. **The interesting half:** rebuilt, the previous session's failure reproduced — `onChange` firing with a valid data URI and the component never receiving it — and instrumenting the *parent* showed the file landing in the **other** picker, because the screen being left is still in the DOM while it closes and carried the same accessible name the spec waited for. *A precondition satisfied by the state it is meant to replace cannot fail* ([journal](docs/overview/entries/2026-08-30-meal-photo-one-picker.md)).
 
 **The meal photo was blocked by the app's own CSP, on the branch no test runs (BF-46 ①b).** Three
 owner reports, recorded as a save failure that *"does not reproduce in source"*. `MealPhotoTile`'s
@@ -48,9 +43,6 @@ for picker cancellations, so choosing a photo on the phone did nothing and said 
 branch takes a `File` from an `<input>` and never fetches, which is why every browser test passed.
 Now `Base64` + `dataUrlToBlob`, and non-cancellations toast. **Verifiable only on the S25**
 ([journal](docs/overview/entries/2026-08-30-meal-photo-data-url-fetch.md)).
-
-**Version:** v1.398.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
-**Last updated:** 2026-08-30.
 
 **The quantity editor is the owner's Option A, and an ingredient stopped claiming servings (BF-46
 ② ③).** The unit toggle moved into a narrow column beside the stepper — which is what frees the
