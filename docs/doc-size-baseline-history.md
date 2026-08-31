@@ -4816,6 +4816,37 @@ Both lanes now lead with nutrition. Each moved entry was diffed against `main` b
 six of six byte-identical, BF-57 the one deliberate edit — because a reorder branch that has gone
 stale is how shipped entries get restored.
 
+## 2026-08-31 — `projectOverview.md` 8519 → 8522, `docs/implementation-backlog.md` re-derived (nutrition uplift batch)
+
+**Three lines for one paragraph covering four entries, and the length goes on the two findings that
+outlive them** rather than on what shipped. `min-h-[Npx]` being inert on a `<button>` explains a
+comment already in the tree that describes a size which never applied, and BF-76's sweep concluding
+the *opposite* of its own hypothesis is the kind of result a future session would otherwise re-derive
+from scratch — including the reason no padding changed.
+
+**No slack was available**: the paragraphs above belong to other branches and are hours old, and the
+neighbouring ⚠️ rows are all still owed their own device passes.
+
+**The backlog is re-derived rather than claimed, and the merge is why.** #682 moved the nutrition
+entries to the head of the queue while this branch rewrote four of them, so the conflict was a MOVE
+against an EDIT — my side held the updated entries and main's side of the hunk was empty because they
+had gone elsewhere. Resolved by placing this branch's content in #682's positions and then
+de-duplicating: BF-70 and BF-75 arrived twice, byte-identical. **Nothing differed between any pair**,
+which is what makes the de-duplication safe to state rather than hope.
+
+## 2026-08-31 — re-derived against #676: `projectOverview.md` → 8514, `docs/implementation-backlog.md` → 14336
+
+**Both come in UNDER main's baselines**, and the reason is worth stating because it is not this
+branch being small. #676 compacted the status section — it deleted BF-71's paragraph along with the
+older BF-2 and BF-46 ones — while this branch was adding its own. The conflict was therefore a
+COMPACTION against an ADDITION: keeping this side whole would have restored three paragraphs main
+had just removed, on the one file whose entire problem is unbounded growth. Only the new paragraph
+was kept.
+
+**The backlog was the move-against-edit case again** (#682's relocation), and after resolution every
+one of BF-70/71/72/73/74/75/76 and LB-32 appears exactly once, with the four rewritten entries
+carrying this branch's headings rather than the pre-fix ones.
+
 ## 2026-08-31 — `docs/implementation-backlog.md` (BF-78/79, and BF-41 re-asked)
 
 The owner asked to gather the personal-detail fields into one section. Tracing where they live found
@@ -4856,3 +4887,33 @@ It also records the sequencing argument that BF-71 settled by shipping: typed fo
 DEXA (~10 fields) and RMR (3), and are obviously wrong for 58 analytes. So this is the report that
 justifies BF-41's extraction path, and if that path is built for one report first, it should be built
 for this one.
+
+## 2026-08-31 — `docs/implementation-backlog.md` (BF-41 moved beside BF-1)
+
+The owner declined typing twice in a row, in consecutive messages, after BF-71 shipped the forms. The
+note records both quotes because the pair is the point: one request is a preference, two in a row is
+the feature. It also states the relationship plainly — the forms are the confirm step the extraction
+lands in, not an alternative to it — so nobody reads BF-71 as having satisfied this.
+
+Moved to sit directly after BF-1, which needs the same pipeline for 58 analytes and is the report
+that justifies building it.
+
+## 2026-08-31 — `docs/implementation-backlog.md` (BF-80, and the clinical values landed)
+
+**BF-80** is the session's most severe report and the entry is mostly about the silence around it.
+`error_events` holds three rows for the owner across three days and none of them is a blank screen,
+while `app/error.tsx` exists — so a JS exception would have painted a fallback and filed a row, and
+neither happened. That absence is what points at the WebView's render process rather than at the
+app's own code, and `MainActivity.java` has no `WebViewClient`, no `onRenderProcessGone` and no
+reload path: grepped, zero hits for `RenderProcess` anywhere under `android/`.
+
+The entry ranks three causes and gives the two behavioural tells that separate them without a cable,
+because "reproduce it with logcat" is not a thing the owner will do at 10% battery. It also says
+outright not to fix it by reloading on `visibilitychange` — that hides the fault and costs the
+instant-paint behaviour — and that whatever the cause turns out to be, it must file an
+`error_events` row, since a total failure leaving no trace is why this went unreported for so long.
+
+**BF-71 and BF-42** are updated from production rather than from intent: the owner entered the
+results mid-session and both tables now hold them, so BF-71's device check is closed (the date picker
+and decimal keypads work in Samsung's WebView, which was the entire risk) and BF-42 is verifiable for
+the first time.

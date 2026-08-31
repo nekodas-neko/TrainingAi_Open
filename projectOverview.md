@@ -24,11 +24,13 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.407.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Version:** v1.407.1 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-08-31.
 
 **Version:** v1.406.1 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-08-31.
+
+**A logged meal stops breaking apart, and two nutrition controls stop meaning the wrong thing (BF-72/73/74/76).** The owner's *"it starts as the meal with the image, then breaks into its ingredients"* was the diary hydrating from the server and **omitting `savedMealId`/`mealGroupId`** — a local upsert overwrites every column it is given, so the screen stripped its own grouping and then rendered the stripped copy. There are exactly two `applyDelta` callers and the sync engine's was already correct, so this was the one site BF-39's audit did not reach. The meal photo's ✕ **sat where the sheet's close button would be** — and the sheet passes `hideCloseButton`, so it was the only ✕ on screen: a reach for dismiss deleted the photo. It is a bin at the bottom-right now, with undo. Capture tiles went **60 px → 79 px** and `New` now outranks a small delete bin. **Two findings came out of it that outlive the batch.** `min-h-[Npx]` **does nothing on a `<button>`** — a bare `button { min-height: 48px }` in `globals.css` beats the utility (measured: 48 px on a button, 84 px on a div), so BF-50's documented "62 px" tile actually measured 60; filed as LB-32. And **BF-76's safe-area sweep found the opposite of what it expected** — nothing in nutrition is under-padded, three sheets are *over*-padded by declaring the inset on both the content and the footer, and the `vh`→`dvh` hypothesis is not the mechanism at all, since a bottom sheet is `fixed bottom-0` and its height moves only its top edge. No padding changed: every available fix costs more than the 12–24 px it saves ([journal](docs/overview/entries/2026-08-31-nutrition-uplift.md)).
 
 
 
@@ -65,13 +67,7 @@
 
 **Settings follow the account now (Q-392).** The owner's *"when i do a new install or open on computer - it loses all the saved preferences"* was still true in full: the engine (`users.preferences`, `GET`/`PATCH /api/user/preferences`) had shipped and **no read site called it**. `lib/user/preferences-sync.ts` connects them — `hydrateUserPreferences` seeds every device key from the server bag on launch, `savePreference` writes both. Proved by `e2e/preferences-survive-reinstall.spec.ts`, which is the owner's sentence as a test: PATCH three preferences, `localStorage.clear()`, reload, and all three come back in their right encodings — and it fails with the hydration replaced by a no-op. **The rule that was wrong, and CI found it:** hydration first cleared any key the bag did not carry — right for a settled system, wrong in the window between a tap and its PATCH landing. `meal-label.spec.ts` caught it wiping a label style mid-flight, and **offline it reverts every change on the next launch**. Hydration now deletes nothing; the one thing the app clears, the mutually-exclusive brand preset / hue pair, is resolved by `EXCLUSIVE_GROUPS`. The earlier `backgroundSettings` catch was the same rule failing at its extreme, and treating it as one key needing an exclusion would have left the race in place for every other ([journal](docs/overview/entries/2026-08-30-preferences-read-sites.md)).
 
-**A logged food swipes to Delete, and the day stopped moving with it (BF-45 ⑤).** The diary reuses
-the meal list's `SwipeActions` tray, routed to the confirmation the edit sheet's bin already raises.
-What earns the index is the collision: `nutrition-content.tsx`'s scroll container owns a horizontal
-drag that steps the **day**, so one touch fed both gestures — and it is **invisible on today**, since
-that handler refuses to step past today. `SwipeActions` marks itself `[data-swipe-actions]` and the
-day handler defers, as `tab-swipe-navigator.tsx` already does for a carousel. **Not device-verified**
-([journal](docs/overview/entries/2026-08-30-food-log-swipe-delete.md)).
+**A logged food swipes to Delete, and the day stopped moving with it (BF-45 ⑤).** The diary reuses the meal list's `SwipeActions` tray, routed to the confirmation the edit sheet's bin already raises. What earns the index is the collision: `nutrition-content.tsx`'s scroll container owns a horizontal drag that steps the **day**, so one touch fed both gestures — and it is **invisible on today**, since that handler refuses to step past today. `SwipeActions` marks itself `[data-swipe-actions]` and the day handler defers, as `tab-swipe-navigator.tsx` already does for a carousel. **Not device-verified** ([journal](docs/overview/entries/2026-08-30-food-log-swipe-delete.md)).
 
 **Home's APK-banner link was a 33 px tap target, and the gate that hid the entry was self-inflicted (LB-26).** The link rendered **258×33** against the 48 dp floor — an `<a>`, which `globals.css` excludes on purpose so an inline prose link is not forced to 48 px. It takes the floor locally instead of widening the selector, and the reasoning moved beside the CSS rule rather than sitting in the banner's JSX, which is not where someone tempted to widen it would look. **The spec's allowlist is now empty** — an allowlist that never empties is a backlog wearing a test's clothes. Proved both ways: removing the floor fails the spec with the exact reported measurement. **The process half is the more useful one:** LB-26 carried `Gate: device` on work that had never been built, filed by the session that had read BF-45's warning about that exact mistake hours earlier — a gate parks an entry, so it hid it from `next-item.js`. The rule now sits in the backlog's protocol header where entries are written, not only inside the entry that found it ([journal](docs/overview/entries/2026-08-30-apk-banner-tap-target.md)).
 

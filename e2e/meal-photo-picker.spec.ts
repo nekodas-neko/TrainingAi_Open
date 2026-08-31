@@ -181,7 +181,11 @@ test('the photo can be removed, and a rename on its own leaves it alone', async 
   expect(await storedImage(), 'a save that never touched the tile must keep the photo').not.toBeNull()
 
   await openEditMeal(page)
-  await tap(page, /^Remove meal photo$/)
+  // BF-74 renamed this control. It is a bin at the BOTTOM-right now, not an ✕ at the top-right
+  // where the sheet's close button would be, and its accessible name carries the meal so the two
+  // tiles that are briefly mounted together cannot be confused — the same reason the pick label
+  // was named. The bare fallback only applies when no `label` is passed, and both call sites do.
+  await tap(page, /^Remove the photo from /)
   await tap(page, /^Update Meal$/)
   await expect.poll(storedImage, { timeout: 20_000 }).toBeNull()
 })

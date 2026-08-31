@@ -6,11 +6,21 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: "1.407.0",
+    version: "1.407.1",
     date: "2026-08-31",
     changes: [
       "A barcode-scanned food now keeps the product picture from the barcode database instead of falling back to a placeholder tile. The picture was always being fetched — five layers between the scan and the saved food were dropping it.",
       "A barcode-scanned food is also recorded as scanned by barcode rather than by AI, which is what it had been labelled since the feature shipped.",
+    ],
+  },
+  {
+    version: "1.407.0",
+    date: "2026-08-31",
+    changes: [
+      "A saved meal logged from the diary stays one row with its name and photo. It used to appear correctly and then break apart into its ingredients a moment later \u2014 the screen was overwriting its own grouping while refreshing.",
+      "The Photo, Barcode and Describe buttons on Log Food are noticeably bigger, with larger icons.",
+      "New is now the big button on the Meals list and deleting several meals is a small bin beside it, rather than the two competing for attention.",
+      "The remove button on a meal photo moved out of the top-right corner \u2014 where it sat exactly where a close button would, so reaching to dismiss the sheet deleted the picture instead. It is a bin at the bottom now, and removing a photo can be undone.",
     ],
   },
   {

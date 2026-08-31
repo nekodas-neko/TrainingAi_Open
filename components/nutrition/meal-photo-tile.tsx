@@ -1,8 +1,9 @@
 'use client'
 
 import { useRef, useState } from 'react'
-import { Camera, ImagePlus, Loader2, Utensils, X } from 'lucide-react'
+import { Camera, ImagePlus, Loader2, Trash2, Utensils } from 'lucide-react'
 import { toast } from 'sonner'
+import { cn } from '@trainingai/shared/utils'
 import { dataUrlToBlob, downscaleToDataUrl } from '@/lib/media/downscale-image'
 import { mealImageBytes, rejectMealImage, mealImageRejectionMessage } from '@trainingai/shared/nutrition/meal-image'
 
@@ -138,14 +139,38 @@ export function MealPhotoTile({ value, onChange, disabled, variant = 'tile', lab
     ? (value ? `Change the photo on ${label}` : `Add a photo to ${label}`)
     : (value ? 'Change meal photo' : 'Add a meal photo')
 
+  // BF-74. Three things were wrong here and only one of them was size.
+  //
+  // **The position meant the wrong thing.** `meal-detail-sheet` passes `hideCloseButton`, so this
+  // was the ONLY ✕ on the screen and it sat `right-0 top-0` — the one corner a user reads as
+  // "close this". A reach for dismiss deleted the photo. Moving it to the bottom-right is the fix
+  // that matters; making a mislabelled control bigger would only have made it easier to hit by
+  // accident. The size badge is bottom-LEFT, so nothing overlaps.
+  //
+  // **The glyph meant the wrong thing too.** An ✕ is dismissal; a bin is removal. Changing it is
+  // half of why the control now reads as what it does, and it costs nothing.
+  //
+  // **And it was unrecoverable.** The parent saves immediately, so a mis-tap lost the photo. A
+  // confirm dialog is the crude answer; undo is the better one, because re-picking is already one
+  // tap — the tile is a real picker — so the toast just spares the gallery round-trip.
   const removeButton = value && !busy && (
     <button
       type="button"
-      onClick={e => { e.stopPropagation(); onChange(null) }}
-      aria-label="Remove meal photo"
-      className="absolute right-0 top-0 grid h-8 w-8 place-items-center rounded-bl-xl bg-background/85 text-muted-foreground active:bg-background"
+      onClick={e => {
+        e.stopPropagation()
+        const previous = value
+        onChange(null)
+        toast('Photo removed', { action: { label: 'Undo', onClick: () => onChange(previous) } })
+      }}
+      aria-label={label ? `Remove the photo from ${label}` : 'Remove meal photo'}
+      className={cn(
+        'absolute bottom-0 right-0 grid place-items-center rounded-tl-xl bg-background/85 text-muted-foreground active:bg-background',
+        // 44 dp on the hero, which is the only variant with call sites. The compact size is kept
+        // for `tile` because a 44 dp control on a 64 px thumbnail would cover most of it.
+        variant === 'hero' ? 'h-11 w-11' : 'h-8 w-8',
+      )}
     >
-      <X className="h-4 w-4" />
+      <Trash2 className={variant === 'hero' ? 'h-[18px] w-[18px]' : 'h-4 w-4'} />
     </button>
   )
 

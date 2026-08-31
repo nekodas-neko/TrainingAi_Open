@@ -192,6 +192,13 @@ Live at the time of writing (2026-07-30):
   writing an e2e that taps a coordinate**: `Input.dispatchTouchEvent` performs none of
   `locator.tap()`'s actionability checks, and the three gestures that do *not* reproduce BF-61 are
   written down there.
+- **[`docs/overview/entries/2026-08-31-nutrition-uplift.md`](../../overview/entries/2026-08-31-nutrition-uplift.md)**
+  — 🆕 **BF-72/73/74/76**. Read it before touching a nutrition sheet's padding or a button's height:
+  **`min-h-[Npx]` does nothing on a `<button>`** here (a bare `button { min-height: 48px }` in
+  `globals.css` beats the utility — measured), and **BF-76's safe-area sweep found the opposite of
+  what it expected** — nothing under-padded, three sheets over-padded, and the `vh`→`dvh` fix is not
+  the mechanism because a bottom sheet is `fixed bottom-0`. Also the one-line BF-72 cause: an
+  `applyDelta` payload that omits a column writes NULL over it.
 - **[`docs/overview/entries/2026-08-31-bf-71-clinical-entry.md`](../../overview/entries/2026-08-31-bf-71-clinical-entry.md)**
   — 🆕 **BF-71**: a measured RMR can now be stored, and it replaces the predicted one in the calorie
   target — **BMR 1328 / TDEE 1594 against 1485 / 1782 predicted, a 188 kcal/day difference** on the

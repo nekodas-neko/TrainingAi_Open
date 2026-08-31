@@ -47,28 +47,35 @@ export function MealListActions({
         </>
       ) : (
         <>
-          {/* Artboard 3 puts a single `+ New` pill in the header band, not a pair of full-width
-              bars. It cannot literally sit beside the title — the sheet's close ✕ is
-              `absolute top-4 right-4` and owns that corner — so the pills keep their own row and
-              take the drawing's weight instead of its position. */}
-          <span className="flex-1" />
-          {/* BF-50 ④: *"There is a 'select' button that lets you select more than one meal; but then
-              you cant do anything with it except delete."* Correct — Delete is the only action this
-              mode has ever offered. The entry allowed either adding a second action or **saying what
-              the mode is**, and this is the second: logging several saved meals needs a meal type
-              and a portion for each, which is a screen rather than a button. Naming the mode is
-              honest today and costs nothing if that screen is built later. */}
+          {/* BF-73 ②. These were two equal-weight pills, which overstated the destructive one:
+              creating a meal is the frequent act and deleting several is rare. The owner asked for
+              *"a big 'New' button + a small delete bin"*, and the hierarchy is the point.
+
+              **The bin keeps a full 44 dp hit box while reading as small.** Shrinking the label to
+              an icon is the request; shrinking the target is a tap-floor regression, and this repo
+              has a floor for exactly that reason.
+
+              **Its accessible name still says `Delete meals`, and that wording is load-bearing.**
+              BF-50 ④ renamed this control from `Select` *because* the owner could not tell what the
+              mode was for — *"you cant do anything with it except delete"* — so the words are the
+              fix that entry shipped. Dropping them visually is only safe while the accessible name
+              carries them; `aria-label="Delete"` would quietly undo it.
+
+              An icon-only entry point is defensible here specifically because the bin opens
+              **selection mode** and deletes nothing on tap — the destructive confirm is still two
+              steps away. */}
           {canSelect && (
             <Button
-              variant="secondary" size="sm" className="min-h-[44px] rounded-full px-4 gap-1.5"
+              variant="secondary" size="icon"
+              className="h-11 w-11 shrink-0 rounded-full"
+              aria-label="Delete meals"
               onClick={onStartSelecting}
             >
-              <Trash2 className="w-4 h-4" />
-              Delete meals
+              <Trash2 className="w-[18px] h-[18px]" />
             </Button>
           )}
-          <Button onClick={onNew} size="sm" className="min-h-[44px] rounded-full px-4 gap-1.5">
-            <Plus className="w-4 h-4" />
+          <Button onClick={onNew} className="h-11 flex-1 rounded-full gap-1.5 text-[15px] font-semibold">
+            <Plus className="w-[18px] h-[18px]" />
             New
           </Button>
         </>
