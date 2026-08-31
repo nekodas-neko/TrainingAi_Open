@@ -6,10 +6,27 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: "1.413.3",
+    version: "1.414.2",
     date: "2026-09-01",
     changes: [
       "The quantity box on Assign to Meal is centred properly. It was pushed off-centre by the number spinner Chromium draws inside the box, and its text was rendering a size larger than the \u00d71/\u00d72 chips beside it.",
+    ],
+  },
+  {
+    version: "1.414.1",
+    date: "2026-08-31",
+    changes: [
+      "The blank page after tabbing back into the app should now reload itself instead of staying blank. Android had been ending the app's display process to free memory, and nothing was set up to bring it back — the app is also now told to survive that rather than be shut down.",
+      "And when it does happen it gets recorded, so there is finally something to look at. Nothing was being logged before, which is why the cause could only be guessed at.",
+    ],
+  },
+  {
+    version: "1.414.0",
+    date: "2026-08-31",
+    changes: [
+      "Last night's sleep no longer looks final while it is still filling in. The ring delivers a night in batches, so the same night read 6 h 15 m and then 7 h 40 m four minutes later, with the 30-night average moving under it too. The app now knows which nights are still settling.",
+      "Building a program takes your logged injuries into account. Every exercise that loads an injured area is removed before the coach sees the list, so it cannot pick one — and it says which area it worked around. The same applies when you ask the builder chat for a swap.",
+      "If you mention an injury in the builder chat and none is logged, it now tells you to log it — otherwise the constraint only lasts for that conversation and your daily workout keeps prescribing the same movement.",
     ],
   },
   {

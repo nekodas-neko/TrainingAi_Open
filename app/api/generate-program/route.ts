@@ -8,6 +8,9 @@ import { z } from 'zod'
 import type { GeneratedProgram, GeneratedExercise } from '@trainingai/shared/types/builder'
 import { KNOWN_STYLES, GOAL_STYLE_RULES } from '@trainingai/shared/workout/known-styles'
 import { buildExerciseNameResolver, resolveAgainstLibrary } from '@trainingai/shared/workout/exercise-name-resolver'
+import { activeInjuries, activeInjuredMuscles, formatInjuryContext } from '@trainingai/shared/workout/injury-context'
+import { excludeInjuredExercises } from '@trainingai/shared/workout/injury-substitution'
+import { todayInTz, DEFAULT_TZ } from '@trainingai/shared/date-utils'
 import {
   styleWorkSec, workingBudgetMin,
   TRANSITION_SEC_BARBELL, TRANSITION_SEC_STANDARD, TRANSITION_SEC_BODYWEIGHT,
@@ -119,9 +122,10 @@ export async function POST(req: Request) {
   const inputs = parsed.data
   const repo = await getRepository()
 
-  const [allExercises, userStyles, referenceProgram] = await Promise.all([
+  const [allExercises, userStyles, injuries, referenceProgram] = await Promise.all([
     repo.listExerciseLibrary(),
     repo.listProgressionStyles(userId),
+    repo.listInjuries(userId),
     // BF-67. `listPrograms` is already user-scoped, and the id is matched against what it returns
     // rather than fetched directly — so a referenced program the caller does not own is simply
     // absent, with no separate not-found branch to distinguish the two cases from outside.
@@ -133,16 +137,37 @@ export async function POST(req: Request) {
   const equipmentSet = buildEquipmentSet(inputs.equipment)
   const focusSet = new Set(inputs.musclesToFocus.map(m => m.toLowerCase()))
 
-  const filteredExercises = allExercises.filter(ex => {
+  const eligibleExercises = allExercises.filter(ex => {
     const hasEquipment = ex.equipment.length === 0 || ex.equipment.some(e => equipmentSet.has(e.toLowerCase()))
     const muscleNames = ex.muscles.map(m => m.muscle.toLowerCase())
     const relevant = muscleNames.some(m => focusSet.has(m)) || focusSet.has('full body')
     return hasEquipment && relevant
   })
 
-  if (filteredExercises.length === 0) {
+  if (eligibleExercises.length === 0) {
     return NextResponse.json(
       { error: 'No exercises found for your selected equipment and muscles. Try adding more equipment or broader muscle targets.' },
+      { status: 400 },
+    )
+  }
+
+  // BF-68. The injury exclusion happens HERE, on the candidate list, not in the prompt: an exercise
+  // that is not in the list is one the model cannot return, whereas an instruction not to program
+  // deadlifts is advice. It also uses the predicate the mid-workout swap sheet substitutes by, so
+  // the builder cannot put an exercise into the program that the swap sheet then offers to replace.
+  const injuredMuscles = activeInjuredMuscles(injuries)
+  const filteredExercises = excludeInjuredExercises(eligibleExercises, injuredMuscles)
+
+  // Everything the equipment and focus allowed touches an injured muscle. Generating anyway would
+  // mean programming through the injury, and silently dropping the constraint is worse than saying
+  // the two requests cannot both be honoured.
+  if (filteredExercises.length === 0) {
+    return NextResponse.json(
+      {
+        // The injuries' own spelling, not the lowercased set the filter runs on: this string is
+        // read by a person, and "chest" where the app everywhere else says "Chest" reads as a bug.
+        error: `Every exercise for your selected equipment and muscles involves an area you have logged as injured (${activeInjuries(injuries).map(i => i.muscleName).join(', ')}). Broaden the muscle targets, or mark the injury resolved if it has healed.`,
+      },
       { status: 400 },
     )
   }
@@ -211,6 +236,20 @@ ${referenceProgram.sessions
     return `- ${sess.name}: ${names}`
   })
   .join('\n')}`
+    : ''
+
+  // BF-68. The exclusion above already guarantees no injured-muscle exercise is offerable, so this
+  // block exists for the other half of what the owner asked for — the coach saying why, unprompted,
+  // rather than silently returning a program with no deadlifts in it. It states the injuries and
+  // the rule; it does not ask the model to work out which exercises they rule out.
+  const injuryContext = formatInjuryContext(injuries, todayInTz(session.user.timezone ?? DEFAULT_TZ))
+  const injuryBlock = injuryContext
+    ? `
+
+ACTIVE INJURIES — the exercise list below has ALREADY had everything involving these areas removed,
+so nothing you can pick will load them. Say in \`notes\` which area you worked around and what you
+chose instead, so the user can see the program accounts for it:
+${injuryContext}`
     : ''
 
   const systemPrompt = `You are an expert strength and conditioning coach designing programs for optimal muscle growth and strength.`
@@ -297,7 +336,7 @@ Rules:
 13. Before finalising: tally sets per large muscle across all sessions. Confirm each large muscle hits its target. Confirm time budget is met. Confirm no consecutive sessions share primary muscles.
 
 Available exercises (name|muscles|equipment):
-${exerciseList}${referenceBlock}`
+${exerciseList}${injuryBlock}${referenceBlock}`
 
   try {
     const { object: raw } = await loggedGenerateObject(

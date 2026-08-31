@@ -19,6 +19,13 @@
 
 /** The Keep residue for one entry's lines, or null if it states none. */
 function keepFromLines(lines) {
+  // An entry that has shipped often opens with a blockquote banner and states its residue inside
+  // it, so the `- **Keep:**` bullet arrives prefixed with `> `. Neither the match below nor the
+  // continuation loop (which BREAKS on a `>`) could see through that, so BF-67 and BF-81 read as
+  // unstarted work at the top of Lane A's READY list the day after they shipped — the exact
+  // failure this file was written to end. Stripping the marker first fixes both halves at once:
+  // the bullet matches, and the wrapped lines under it are no longer their own quote block.
+  lines = lines.map((l) => l.replace(/^\s*>+\s?/, ''));
   for (let i = 0; i < lines.length; i++) {
     // `Keep` must be followed by a colon or a dash. Without that punctuation this matched prose
     // beginning with the word — Q-420's "**Keep the stored field on 1–10**" was reported as its

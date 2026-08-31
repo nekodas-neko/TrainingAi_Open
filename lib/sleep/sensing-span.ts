@@ -27,7 +27,7 @@
 // When nothing substantial is dense (no real sleep signal), the window is returned unchanged so a
 // real night is never trimmed to nothing.
 
-const DEFAULT_EPOCH_DS = 5 * 60 * 10; // one 5-min epoch in deciseconds
+export const DEFAULT_EPOCH_DS = 5 * 60 * 10; // one 5-min epoch in deciseconds
 // Dense = beats ≥ FRACTION × the night's peak epoch. Calibrated against the dumps: sparse
 // spot-readings top out ~160 beats while real sleep runs ≥250; 0.3×peak (≈190–210) sits cleanly
 // between them, with margin.
@@ -50,7 +50,7 @@ const DEFAULT_MIN_NEIGHBOR_RATIO = 0.5;
 // must not be dropped just because it fails the comparable-length check (08-03/08-04: a 130-min real
 // sleep bout, 15-min phone-call gap, then a 6h40m bout — 130/400 ≈ 0.33 fails minNeighborRatio, but
 // the 15-min gap is unambiguous proof it's one interrupted night, not a distant evening burst).
-const DEFAULT_MAX_BRIDGE_GAP_EPOCHS = 12;
+export const DEFAULT_MAX_BRIDGE_GAP_EPOCHS = 12;
 
 export function clampToDenseSensing(
   window: { startDs: number; endDs: number },

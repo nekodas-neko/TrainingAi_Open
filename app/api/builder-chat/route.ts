@@ -9,6 +9,9 @@ import { GeneratedProgramSchema } from '@trainingai/shared/validation/generated-
 import type { GeneratedProgram, ChatMessage } from '@trainingai/shared/types/builder'
 import { KNOWN_STYLES, GOAL_STYLE_RULES } from '@trainingai/shared/workout/known-styles'
 import { styleWorkSec, workingBudgetMin, TRANSITION_SEC_BARBELL, TRANSITION_SEC_STANDARD } from '@trainingai/shared/workout/duration-model'
+import { activeInjuredMuscles, formatInjuryContext } from '@trainingai/shared/workout/injury-context'
+import { excludeInjuredExercises } from '@trainingai/shared/workout/injury-substitution'
+import { todayInTz, DEFAULT_TZ } from '@trainingai/shared/date-utils'
 import { reportServerError } from '@/lib/observability'
 import { readJsonLimited } from '@trainingai/shared/http/request-guards'
 
@@ -89,13 +92,22 @@ export async function POST(req: Request) {
   const { message, program, chatHistory, equipment, goal, timePerSessionMinutes } = parsed.data
   const repo = await getRepository()
 
-  const [allExercises, userStyles] = await Promise.all([
+  const [allExercises, userStyles, injuries] = await Promise.all([
     repo.listExerciseLibrary(),
     repo.listProgressionStyles(userId),
+    repo.listInjuries(userId),
   ])
   const equipmentSet = buildEquipmentSet(equipment)
-  const availableExercises = allExercises
-    .filter(ex => ex.equipment.length === 0 || ex.equipment.some(e => equipmentSet.has(e.toLowerCase())))
+  // BF-68. Same exclusion as generate-program, and for the same reason: this route already took
+  // free text, so asking it about a sore back often produced a sensible-looking swap — from luck,
+  // not a rule, because the model was handed no injury record. Removing the exercises makes it a
+  // rule. Note the swap can still be asked for explicitly and will now fail to find the exercise,
+  // which is the correct outcome while the injury is unresolved.
+  const injuredMuscles = activeInjuredMuscles(injuries)
+  const availableExercises = excludeInjuredExercises(
+    allExercises.filter(ex => ex.equipment.length === 0 || ex.equipment.some(e => equipmentSet.has(e.toLowerCase()))),
+    injuredMuscles,
+  )
     .map(ex =>
       `${ex.name}|${ex.muscles.map(m => `${m.muscle}(${m.role})`).join(',')}|${ex.equipment.map(e => EQUIPMENT_LABEL[e.toLowerCase()] ?? e).join(',')}`)
     .join('\n')
@@ -128,6 +140,24 @@ export async function POST(req: Request) {
     exerciseCountNote = `\nSESSION TIME BUDGET: ${timePerSessionMinutes} minutes → minimum ${minExercises} exercises per session. NEVER reduce any session below ${minExercises} exercises when recalculating. Use ${Math.ceil(minExercises * 0.6)} compounds + ${minExercises - Math.ceil(minExercises * 0.6)} accessories as the baseline.`
   }
 
+  // BF-68. Stating the injuries is the half the exclusion cannot do: the user should hear that the
+  // program worked around a sore back, not just find no deadlifts in it. The route returns a
+  // `generateObject` result and has no tools, so it CANNOT log an injury itself — pointing at the
+  // surface that can is the honest version, and it is also the one that makes the constraint
+  // outlive this generation, which is the entry's actual complaint.
+  const injuryContext = formatInjuryContext(injuries, todayInTz(session.user.timezone ?? DEFAULT_TZ))
+  const injuryNote = injuryContext
+    ? `
+
+ACTIVE INJURIES — every exercise involving these areas has already been removed from the list below,
+so nothing you can pick will load them. Say which area you worked around when it affects a change:
+${injuryContext}`
+    : `
+
+The user has no injuries logged. If they describe one in their message, work around it in this
+reply AND tell them to log it under Health → Injuries — otherwise the constraint applies only to
+this conversation, and the daily workout prescription will keep programming the same movement.`
+
   const systemPrompt = `You are a fitness coach helping a user refine their workout program with science-backed volume targets. The user may ask to swap exercises, add/remove exercises, change sessions, or adjust volume.
 
 CRITICAL — PROGRESSION STYLES:
@@ -139,7 +169,7 @@ IMPORTANT VOLUME CONSTRAINTS:
 - Strength: Each muscle should get 15–25 sets per week (optimal: 20–25)
 - Powerbuilding / Strength+Hypertrophy: 15–20 sets per muscle at high intensity
 
-When making changes, verify the program still distributes volume appropriately across the week. If a user asks to remove exercises, warn them if muscle volume will drop below 10 sets/week for that muscle.`
+When making changes, verify the program still distributes volume appropriately across the week. If a user asks to remove exercises, warn them if muscle volume will drop below 10 sets/week for that muscle.${injuryNote}`
 
   const userPrompt = `Current program (${program.sessions.length} sessions/week):
 ${JSON.stringify(program)}

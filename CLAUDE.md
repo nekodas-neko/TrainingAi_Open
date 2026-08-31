@@ -775,10 +775,10 @@ Paste the output into **Settings → Secrets and variables → Actions → New r
 it), and never reuse it as a release/Play Store key. **Changing it invalidates in-place upgrades
 once more**, so a device carrying an APK signed by the old key has to uninstall one final time.
 
-Note the workflow is **path-gated** on `android/**`, `capacitor.config.ts`, `package.json`,
-`pnpm-lock.yaml` — a JS-only PR produces no Android run at all, which is correct and not a
-failure. It is deliberately **not** a required status check, so a filtered-out run leaves no
-pending check on branch protection.
+Note the workflow is **path-gated** on `android/**`, `capacitor.config.ts`, `pnpm-lock.yaml` and its
+own file — **not** `package.json` (this line claimed it until 2026-08-31): a version bump must not
+mint an APK the WebView already has. A JS-only PR produces no Android run, which is correct and not
+a failure, and it is deliberately **not** a required check, so a filtered-out run leaves none pending.
 
 **Local build — only if CI is unavailable or you need an unpushed working tree.** Sessions can't
 do this (no Android SDK in the sandbox; the Gradle download is proxy-blocked), so it is yours to

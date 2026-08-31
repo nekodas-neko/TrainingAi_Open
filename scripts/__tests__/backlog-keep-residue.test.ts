@@ -92,4 +92,34 @@ describe('backlog keep residue', () => {
     expect(keepFromLines(['- **Keep:** the **surfacing** itself is unbuilt.'])?.text)
       .toBe('the surfacing itself is unbuilt.')
   })
+
+  // An entry that has shipped often opens with a blockquote banner and puts its residue inside it.
+  // Both halves of the parser were blind to that: the match anchored past `^\s*` straight into an
+  // optional bullet, and the continuation loop treated the NEXT quoted line as a new block. BF-67
+  // and BF-81 wrote their Keeps that way and read as unstarted work at the top of Lane A's READY
+  // list the day after they shipped.
+  it('reads a Keep stated inside a blockquote banner', () => {
+    const k = keepFromLines([
+      '> **⚑ THE DIVERGENCE IS FIXED. What remains is one owner decision.**',
+      '>',
+      '> - **Keep — the history recompute is the owner\'s call.** 38 rows carry the column and only',
+      '>   8 can be re-derived, so recomputing those 8 leaves it MORE mixed. `Gate: owner`',
+      '> - **Keep — `chronic_stress_score` is NULL on all 106 rows.**',
+    ])
+    expect(k?.text).toBe(
+      "the history recompute is the owner's call. 38 rows carry the column and only 8 can be re-derived, so recomputing those 8 leaves it MORE mixed. `Gate: owner`",
+    )
+    expect(k?.gate).toBe('owner')
+  })
+
+  // Stripping the marker must not glue a quoted Keep to the unrelated quoted paragraph under it —
+  // the continuation loop still has to see the blank quote line as the end of the residue.
+  it('stops a quoted Keep at the blank quote line under it', () => {
+    const k = keepFromLines([
+      '> - **Keep:** the device run on the S25.',
+      '>',
+      '> Everything else shipped and was measured in production.',
+    ])
+    expect(k?.text).toBe('the device run on the S25.')
+  })
 })
