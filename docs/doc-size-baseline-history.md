@@ -4918,7 +4918,27 @@ results mid-session and both tables now hold them, so BF-71's device check is cl
 and decimal keypads work in Samsung's WebView, which was the entire risk) and BF-42 is verifiable for
 the first time.
 
-## 2026-08-31 — `docs/implementation-backlog.md` 14303 → 14326 (BF-57 shipped, LB-33 and LB-34 filed)
+## 2026-08-31 — `docs/implementation-backlog.md` (BF-81 and BF-82)
+
+**BF-81** answers a question — *is the stress indicator working?* — with production rather than
+reading. It runs: 18–29 buckets a day, levels using the full [−1,+1] range. But two producers write
+the same metric and disagree on **8 of 8 days measured**, with the sign flipping on five and
+high-stress minutes differing 4–9× (120–270 vs 0–60). The rollup's own comment claims this hazard was
+settled by writing from one place; `body-battery/route.ts:349` still writes the other value. A
+documented invariant that the code violates is worth a table, which is why the entry carries one.
+
+It also records the thing that cannot be fixed: Oura's own `stress_high` exists on 10 days ending
+2026-07-07, the re-key date, and our derived stress starts after it — **zero overlap days**. The
+comparison the owner asked for is not available and never will be, so validation has to come from
+somewhere else.
+
+**BF-82** is the More page. The structural finding is countable: seven `MoreRowGroup`s holding one
+row each, plus one entry (Goals) that expands inline while the other six navigate. The entry also
+corrects the request's premise — there are no sliders on that screen, only five `Switch` toggles that
+are correct for booleans, and what is probably meant is the goal-value boxes in the Goals accordion.
+Saying so prevents a swap made for the wrong reason.
+
+## 2026-08-31 — `docs/implementation-backlog.md` 14415 → 14438 (BF-57 shipped, LB-33 and LB-34 filed)
 
 **Net +23, and it is two additions against one large deletion.** BF-57's 49-line work order — four
 numbered scope items, the payload history, the raised-2026-08-31 note — collapses to a 22-line `Keep:`
