@@ -2355,6 +2355,55 @@ render what comes back.
 - **Verification:** each of the three inputs reaches the builder with the same populated ingredient
   list it produces today, and the yield behaviour is unchanged.
 
+### [nutrition][platform] BF-77 — sharing meals with a partner: copies work today, a shared library is a different product
+
+- **Lane:** A if a server path is chosen; B for anything built on the QR payload.
+- **Planning item** — the request contains two products and they resolve differently. Needs a
+  decision from the owner before implementation.
+- **Added:** 2026-08-31 · owner, with a library of eight meals: *"I've made a lot of meals now and I
+  will continue to make meals. I would like to be able to share meals with my partner/friend. So some
+  sort of way to share meals DB entries. Or sync between a group so you all have the same meals."*
+
+**⚠ Most of this is already designed and half-built — start there, not from scratch.** BF-57's engine
+shipped 2026-08-30: `encodeSharedMeal` puts the **whole meal** in the code — name, servings, every
+ingredient's grams and macros — so it resolves for a stranger, offline, with no account, as a copy.
+The owner chose that design over a resolvable share id, explicitly. **What is not built is the
+surface**, and one line proves it: `meal-label-render.ts:694` still calls
+`encodeMealLabelToken(mealId)`, the old owner-only token. So the Label button works today and
+produces a label **only its author can scan** — which is the exact complaint BF-57 was filed for.
+
+**The two products, because "share a meal" and "have the same meals" are not the same ask:**
+
+| | What it does | What it costs |
+|---|---|---|
+| **A · Finish BF-57** | Any meal becomes a code anyone can scan into their own library. Works offline, no accounts, no server. The label sheet **already has a system share button** that hands over a PNG, so a meal can be texted to a partner who scans it off their screen. | Lane B work already in the queue. Near-free relative to the rest. |
+| **B · A share code or link** | Send a short code; the recipient's app fetches the snapshot and copies it. Works without an image and without both phones present. | A server-stored snapshot, a route, a code space, expiry, and a rate limit. Medium. |
+| **C · A group library** | Everyone in a group sees the same meals, and an edit reaches all of them. | Large: membership, invites, who may add/edit/delete, what an edit does to a meal someone else already logged, what happens when a member leaves. Genuinely multi-user. |
+
+- **Recommendation: A now, B only if remote sharing turns out to matter, and C only if the owner
+  wants a *living* library rather than copies.** A is the smallest change that satisfies the
+  sentence as written — and it is mostly finished. It also fails safe: a copy that diverges is a
+  copy, whereas a shared library that diverges is a bug.
+- **⚠ C reverses a principle the owner has chosen twice.** BF-57 rejected globally-resolvable meal
+  ids so that two users' data never couples; BF-58 rejected a household link for the scale for the
+  same reason and settled on per-phone attribution instead. C is that coupling, deliberately. That
+  is a legitimate change of mind — but it should be made knowingly, not arrived at.
+- **The question that decides it, and it is one question:** *when your partner changes a shared meal,
+  should your copy change too?* **No** → A or B, and this is finished work plus a code. **Yes** → C,
+  and it is a project with a membership model.
+- **⚠ C carries a consent surface the app does not have yet.** Sharing a meal shares what someone
+  eats. A group library means one person's food library is visible to others by default, which needs
+  a Play-Store-grade answer (the Canonical Runtime amendment already flags the privacy policy and
+  data-safety declarations as gating real multi-user support). A and B have no such surface — the
+  sender chooses each meal, each time.
+- **Whichever is built, `savedMealToIngredients` and the label payload are the one conversion.** A
+  second serialiser for "a meal as data" is how the printed label and the shared copy would drift on
+  rounding, which is exactly what the payload's *totals are sacred* rule exists to prevent.
+- **Verification (for A, which is the recommended first step):** the owner shares a meal from the
+  label sheet, the partner scans it on a different account, and the meal lands in **their** library
+  with the same ingredients and the same total macros — verified in airplane mode, and with a
+  12-ingredient meal whose tail rolls into one remainder.
+
 ### [nutrition][platform] BF-57 — a printed meal label only works for the person who printed it, and making it work for anyone is a decision, not a fix
 
 - **Lane:** A shipped the payload; **B owns what is left.**
@@ -2374,6 +2423,18 @@ render what comes back.
   - **Both formats, one decoder, indefinitely** — a label printed before this still resolves for its
     owner.
 
+- **⚑ RAISED 2026-08-31 — this IS the sharing feature the owner just asked for.** BF-77 records the
+  request (*"I would like to be able to share meals with my partner/friend"*) and its recommendation
+  is to finish this entry rather than build anything new. Two things to add to the surface work
+  below:
+  - **The renderer still emits the OLD token.** `meal-label-render.ts:694` calls
+    `encodeMealLabelToken(mealId)`, not `encodeSharedMeal`. So the shipped payload reaches nothing
+    and today's labels remain owner-only — swapping that call is the single change that makes every
+    other item here worth doing.
+  - **Screen-to-screen, not only print.** The label sheet already hands a PNG to the system share
+    sheet, so a partner can be sent the label and scan it off their screen. Once the payload is the
+    self-contained one, that path works with no further work — say so in the UI, because a control
+    labelled *Label* does not read as *share this meal with someone*.
 - **Keep:** the whole surface, which is Lane B's, and none of it is built.
   1. **Give the QR ~30 mm of the 50 mm label.** The budget above is meaningless until the layout
      hands the code that space — at today's 12.2–16.4 mm even a 3-ingredient payload lands at

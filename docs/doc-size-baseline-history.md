@@ -4657,3 +4657,22 @@ The action pair is the same shape: BF-50 ④ renamed `Select` to `Delete meals` 
 the fix, and the owner now wants that control reduced to an icon. So the entry says the accessible
 name has to carry what the label was carrying, and that the hit box stays 44 dp while the label
 shrinks — the two ways this ships as a regression while looking like the request.
+
+## 2026-08-31 — `docs/implementation-backlog.md` (BF-77, and BF-57 raised)
+
+The owner asked to share meals with a partner. The entry's job was to notice that the feature is
+already designed, half-built, and inert — `meal-label-render.ts:694` still calls
+`encodeMealLabelToken(mealId)`, the owner-only token, so BF-57's shipped self-contained payload
+reaches nothing and today's labels still only scan for their author. One line is the difference
+between "not built" and "built and unreachable", which is why it is quoted in both entries.
+
+The rest is the fork: *share a meal* and *have the same meals* are different products, and the
+three-row table exists so the owner can pick on cost rather than on wording. Two things are written
+down because they would otherwise be discovered late — a group library reverses the
+copies-not-coupling principle the owner chose in BF-57 and again in BF-58, and it is the only option
+of the three that carries a consent surface, since one person's food library becomes visible by
+default.
+
+The decision is reduced to a single question — *when your partner changes a shared meal, should your
+copy change too?* — because that is the one answer that separates finished work plus a code from a
+project with a membership model.
