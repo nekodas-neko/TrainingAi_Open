@@ -884,55 +884,32 @@ was removed rather than left to imply otherwise. Filed as **LB-32**.
 it except delete"*, and only the accessible name still carries them. It opens selection mode and
 deletes nothing on tap, which is what makes an icon-only entry point defensible here.
 
-### [nutrition][platform] BF-57 — a printed meal label only works for the person who printed it, and making it work for anyone is a decision, not a fix
+### [nutrition][platform] BF-57 — a meal label anyone can scan (shipped; the two-phone print test needs the device)
 
-- **Lane:** B — the payload is Lane A's and it already shipped; everything outstanding is surface.
-- **✅ THE ENGINE HALF SHIPPED 2026-08-30.** `packages/shared/src/nutrition/label-payload.ts` gains
-  `encodeSharedMeal` / `decodeSharedMeal` / `decodeMealLabelScan` and the QR byte-capacity table.
-  The owner's design: the whole meal travels in the code — positional JSON
-  `[1, name, servings, [[name,g,kcal,p,c,f], …], rolled?]` — so a label scans offline, for a user
-  with no account, as a **copy** that never couples the two users' data. Ids are deliberately NOT
-  globally resolvable; that was rejected and stays rejected.
-  - **The totals are sacred.** Nothing is ever dropped to save bytes: the tail rolls into one
-    remainder entry carrying its combined weight and macros, so a trimmed copy's figures match the
-    original to the gram. Tested at 1, 2, 3, 5, 8, 12 and 25 ingredients.
-  - **Budget: 251 bytes — QR version 11 at EC M**, which is 61 modules and **0.49 mm/module across
-    ~30 mm**, the bottom of the 0.49–0.66 range the label design was built to. Version 12 is 0.46 and
-    falls out. The spec capacity table is checked against the real `qrcode` encoder for all 20
-    versions.
-  - **Both formats, one decoder, indefinitely** — a label printed before this still resolves for its
-    owner.
+- **Lane:** B
+- **Gate:** device
+- **Shipped 2026-08-31**, branch `feat/shared-meal-labels-bf57`. The engine half landed 2026-08-30
+  (`packages/shared/src/nutrition/label-payload.ts`); this is the surface that finally emits it.
+  Journal: [`2026-08-31-shared-meal-labels.md`](overview/entries/2026-08-31-shared-meal-labels.md).
+- **The entry's item 1 was reconciled rather than implemented, and that is the durable part.** It
+  asked for the code to be given ~30 mm so version 11 fits *every* label, reasoning from a code of
+  12.2–16.4 mm — a pre-Q-411 figure. Measured against the square canvas the five print styles run
+  16.4–20.9 mm and each is **already** the largest value that clears its own content by 6 units, so
+  none can grow; 30 mm is 128 of the 171 usable units. Four of the six cannot hold even 62 bytes, at
+  which point `encodeSharedMeal` starts trimming the meal's **name**. So two payloads ship: the
+  print styles keep the private id token, and a new `share` style spends the whole label on a
+  34.4 mm code. `mealLabelShareBudget` derives the budget from each style's geometry and
+  `meal-label-code-size.test.ts` holds the finding, so "why not just share from every style?" is
+  answered by CI rather than re-argued.
+- **Keep:** the two-phone, two-account verification in item 4, and only that. On the S25 and a second
+  device: print or share a `Share code` label for a 3-ingredient meal, scan it **in airplane mode**
+  from the second account, and confirm the copy carries the same portions and macros; repeat with a
+  12-ingredient meal and confirm the totals match with the tail grouped into one labelled remainder;
+  and confirm a label printed before 2026-08-31 still resolves for its owner. The scan path runs
+  through `getLocalStore`, which returns null in the web sandbox, so none of it executes off-device.
+  The **print** half is owed separately and is older than this entry: no label of any style has been
+  put through a real printer, so 0.49 mm per module remains a convention rather than a measurement.
 
-- **⚑ RAISED 2026-08-31 — this IS the sharing feature the owner just asked for.** BF-77 records the
-  request (*"I would like to be able to share meals with my partner/friend"*) and its recommendation
-  is to finish this entry rather than build anything new. Two things to add to the surface work
-  below:
-  - **The renderer still emits the OLD token.** `meal-label-render.ts:694` calls
-    `encodeMealLabelToken(mealId)`, not `encodeSharedMeal`. So the shipped payload reaches nothing
-    and today's labels remain owner-only — swapping that call is the single change that makes every
-    other item here worth doing.
-  - **Screen-to-screen, not only print.** The label sheet already hands a PNG to the system share
-    sheet, so a partner can be sent the label and scan it off their screen. Once the payload is the
-    self-contained one, that path works with no further work — say so in the UI, because a control
-    labelled *Label* does not read as *share this meal with someone*.
-- **⚑ NO LONGER A `Keep:` — 2026-08-31.** It was one, and that was wrong: a `Keep:` means *shipped,
-  only residue owed, not new work*, and this entry owes an entire unbuilt surface. Classified that
-  way it never headed Lane B's work list, which is how the owner's most-wanted feature sat idle
-  while the payload it needs was already merged. **This is live work.** What follows is the scope:
-  1. **Give the QR ~30 mm of the 50 mm label.** The budget above is meaningless until the layout
-     hands the code that space — at today's 12.2–16.4 mm even a 3-ingredient payload lands at
-     **0.31 mm/module**, too fine for a home printer. This is the binding constraint, not the format.
-  2. **Say on the label when the list was trimmed.** A printed label naming four of ten ingredients
-     reads as the whole recipe unless it says otherwise. `encodeSharedMeal` returns `named`/`rolled`
-     for exactly this.
-  3. **The scan path** (`food-logger-sheet.tsx`): route `decodeMealLabelScan`'s `shared-meal` branch
-     into creating the scanner's own meal, and **fix the message on the other branch** —
-     *"That meal belongs to someone else"* beats *"no longer exists"*, which is wrong twice over, and
-     an old-format label scanned by another user still lands there.
-  4. **Verification, on two phones and two accounts:** a 3-ingredient label scans **in airplane mode**
-     and creates the scanner's own meal with the same portions and macros; a 12-ingredient one
-     produces the same total calories and macros with its tail rolled into one labelled remainder;
-     and a previously-printed label still resolves for its owner.
 ### [nutrition][app-shell] BF-75 — every nutrition sheet paints opaque, so the tab's wallpaper stops at the sheet edge
 
 - **Lane:** B — `components/ui/sheet.tsx:85`, and whichever nutrition sheets opt in.
@@ -13847,6 +13824,52 @@ reads.
   specifically" caveat is now answered — it is fine, as are the other three. **The rule at the top
   of this file still stands** (claim a number against the directory *and* open PRs/plan docs): this
   closes the four that exist, it does not make future collisions safe.
+
+### [nutrition] LB-34 — scanning the same shared label twice makes a second copy of the meal
+
+- **Lane:** B — `components/nutrition/save-shared-meal.ts`, `components/nutrition/meal-duplicate.ts`.
+- **Added:** 2026-08-31 · found while building BF-57, filed rather than folded in because the fix is
+  a product question and BF-57 was already a large PR.
+
+`saveSharedMealToLibrary` mints a new `saved_meals` row on every scan. A label is a physical object
+that gets scanned by whoever picks it up — a partner scanning the fridge on Tuesday and again on
+Friday ends up with two identical meals, and neither is marked as the duplicate.
+
+**The machinery already exists and is the reason this is small.** `findDuplicateMeal`
+(`meal-duplicate.ts`) answers exactly this question, with two independent tests that must both pass
+— a normalised name match *and* `fitDistance` under `DUPLICATE_MAX_FIT_DISTANCE` — and BF-11d already
+uses it to offer "update the existing one?" on a save. The scan path is a third caller.
+
+- **Prefer under-matching, per BF-38's guidance the duplicate helper already carries.** Two similar
+  meals from two friends are a nuisance; silently overwriting one person's recipe with another's is
+  data loss.
+- **Decide what the offer says.** A save dialog can ask; a scan is a one-tap flow in a kitchen, so
+  the likely answer is a toast with an Undo rather than a modal — the same shape BF-74 chose for the
+  photo remove, and for the same reason.
+- **Verification:** scan one shared label twice; the second scan says the meal is already saved and
+  does not add a row. A genuinely different meal with a similar name still saves.
+
+### [nutrition][platform] LB-33 — `meal-label-render.ts` is 1,049 lines, and its pure half is what everything imports
+
+- **Lane:** B — `components/nutrition/meal-label-render.ts`.
+- **Added:** 2026-08-31 · noted while BF-57 took the file from 825 to 1,049 lines.
+
+`scripts/check-component-size.js` did not catch it because the file is `.ts` rather than `.tsx`, so
+the ~800-line guidance applies by spirit and not by CI. It was not split inside BF-57 deliberately: a
+mechanical move of that size would have buried the change it was riding with, which is the harder
+thing to review.
+
+**The split is already visible in the file.** Two halves live in it — the pure geometry (`SPECS`,
+`MEAL_LABEL_STYLES`, `mealLabelCodeMetrics`, `mealLabelShareBudget`, `mealLabelCarriesRecipe`,
+`centredStackLineBudget`, `centredStackOffset`) and the canvas painters. Every test imports only the
+first, and the second is the half that needs a `CanvasRenderingContext2D` and therefore cannot be
+asserted in either `environment: 'node'` vitest project. Moving the pure half to
+`meal-label-geometry.ts` makes that boundary structural instead of conventional.
+
+- Pure move, no behaviour: re-export from the old path or update the four importers
+  (`meal-label-sheet.tsx` and three test files) in the same PR.
+- **Verification:** `meal-label-code-size.test.ts` and `meal-label-centring.test.ts` pass unchanged,
+  and `e2e/meal-label.spec.ts` still renders every style.
 
 ## Owner feature notes, filed 2026-08-23 — each needs a planning session before implementation
 

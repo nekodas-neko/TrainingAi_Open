@@ -4917,3 +4917,22 @@ instant-paint behaviour — and that whatever the cause turns out to be, it must
 results mid-session and both tables now hold them, so BF-71's device check is closed (the date picker
 and decimal keypads work in Samsung's WebView, which was the entire risk) and BF-42 is verifiable for
 the first time.
+
+## 2026-08-31 — `docs/implementation-backlog.md` 14303 → 14326 (BF-57 shipped, LB-33 and LB-34 filed)
+
+**Net +23, and it is two additions against one large deletion.** BF-57's 49-line work order — four
+numbered scope items, the payload history, the raised-2026-08-31 note — collapses to a 22-line `Keep:`
+entry now that the surface is built: what survives is the two-phone verification that is genuinely
+owed, plus the measurement that reversed the entry's own item 1, kept because it is the answer to
+*"why not just make every label shareable?"* and that question will be asked again.
+
+Against that, two new entries. **LB-34** — a shared label scanned twice makes two copies of the meal;
+found while building BF-57 and filed rather than folded in, because `findDuplicateMeal` already
+answers the question and what the *offer* should say in a one-tap kitchen flow is a product decision.
+**LB-33** — `meal-label-render.ts` reached 1,049 lines and `check-component-size.js` cannot see it,
+because the file is `.ts` rather than `.tsx`. Both are the "no orphaned findings" rule doing its job:
+each was noticed inside a diff that had no business absorbing it.
+
+`projectOverview.md` stays at **8514** and is not raised. Its BF-57 paragraph was written at five
+lines and cut to four, and the engine-half paragraph gave back an orphaned link line — the index
+carries the fact and the pointer, and the reasoning lives in the journal entry where it belongs.

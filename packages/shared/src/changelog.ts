@@ -6,6 +6,17 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.408.0",
+    date: "2026-08-31",
+    changes: [
+      "A meal label can now be shared with someone. Pick the new Share code style and the whole recipe travels in the code \u2014 whoever scans it gets the meal added to their own app, with no account and no signal needed.",
+      "Scanning a shared label saves the meal to your library rather than logging it, so it is there to cook again.",
+      "The other label styles are unchanged and still print the ingredient list. Their code is a private bookmark that logs the meal on your own phone, and the label screen now says so \u2014 handing one of those to a friend never worked.",
+      "Scanning a label that is not yours used to say the meal no longer exists, which was wrong. It now says it is not in your library and points at the shareable kind.",
+      "Where a long recipe does not fit the code, the label says how many ingredients were grouped together. The calories and macros are always exact.",
+    ],
+  },
+  {
     version: "1.407.1",
     date: "2026-08-31",
     changes: [
