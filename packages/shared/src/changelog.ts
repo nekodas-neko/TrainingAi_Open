@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.404.1",
+    date: "2026-08-30",
+    changes: [
+      "The day view now shows the night\u2019s body temperature. The deviation from your usual sits beside it only once that baseline is trustworthy \u2014 right now every night reads warm because the baseline is about 0.36\u00a0\u00b0C low, which is the same reason readiness stopped scoring temperature at all, so showing it would mean printing a number the app itself will not use.",
+    ],
+  },
+  {
     version: "1.404.0",
     date: "2026-08-31",
     changes: [

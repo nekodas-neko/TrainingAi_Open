@@ -100,6 +100,7 @@ export function DayReadThrough({
         </div>
       )}
       <SleepSection sleep={data?.sleep ?? null} tz={tz} />
+      <BodyTempRow temp={data?.bodyTemp ?? null} />
       {data && data.hr.length > 1 && (
         <div>
           <SectionLabel>Heart rate through the day</SectionLabel>
@@ -145,6 +146,38 @@ function HrRange({ points }: { points: DayLogResult['hr'] }) {
         High <span className="text-[15px] font-bold tabular-nums text-foreground">{high}</span> bpm
       </span>
       <span className="text-[10px] text-muted-foreground/80">15-min averages</span>
+    </div>
+  )
+}
+
+/**
+ * Body temperature for the night (LB-25).
+ *
+ * **The deviation is rendered only when the route sends one, and it often will not.** `/api/day-log`
+ * withholds `devC` while the temperature baseline is uncentred — the same condition that suspends
+ * the readiness temperature ladder (TN-6a), because the stored deviations are positive on every
+ * night measured. Nothing is drawn in its place: an empty slot or a "—" would read as missing data,
+ * when the truth is that the app has a number and does not trust it. The mean is unaffected — an
+ * absolute skin temperature is a measurement, not a derivation from the bad baseline.
+ */
+function BodyTempRow({ temp }: { temp: DayLogResult['bodyTemp'] }) {
+  if (!temp || temp.meanC == null) return null
+  return (
+    <div className="flex items-baseline justify-center gap-6 rounded-2xl border border-white/10 bg-white/[0.04] px-3.5 py-3">
+      <span className="text-[11px] text-muted-foreground">
+        Body temp{' '}
+        <span className="text-[15px] font-bold tabular-nums text-foreground">{temp.meanC.toFixed(1)}</span>
+        {' '}°C
+      </span>
+      {temp.devC != null && (
+        <span className="text-[11px] text-muted-foreground">
+          vs usual{' '}
+          <span className="text-[15px] font-bold tabular-nums text-foreground">
+            {temp.devC > 0 ? '+' : ''}{temp.devC.toFixed(2)}
+          </span>
+          {' '}°C
+        </span>
+      )}
     </div>
   )
 }
