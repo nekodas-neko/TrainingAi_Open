@@ -358,6 +358,59 @@ below threshold and left in place for next time.
 > BF-29 (My meals), BF-30 (Meal detail), BF-31 (Edit meal) and BF-26 (Quantity). Two artboards need
 > no entry — `Tap targets` and the `srv/g` studies both shipped in Q-395a.
 
+### [app-shell][platform] BF-80 — the app comes back blank after backgrounding, and nothing is recorded when it does
+
+- **Lane:** A — `android/app/src/main/java/com/trainingai/app/MainActivity.java` is where the fix
+  most likely lives, and it needs an APK.
+- **Added:** 2026-08-31 · owner: *"I notice when I tab out and tab back into the app the pages often
+  crash and display a blank page."* Screenshot: the status bar and the Android nav bar, and nothing
+  between them — **battery 10%**, Messenger running.
+
+**⚠ This is the highest-severity report of the session: the app is unusable when it happens, and the
+app does not know it happened.**
+
+**Checked in production, and the silence is the evidence.** `error_events` holds **three** rows for
+the owner across three days — two `SpeechRecognition.then()` (known, BF-66's neighbour, both older
+than this) and one aborted `POST /api/oura-ble/samples`. **Nothing from a blank screen.** `app/error.tsx`
+exists, so a JS exception during render would paint a fallback rather than nothing, and the client
+reporter would file a row. Neither happened.
+
+**Leading hypothesis: the WebView's render process is being killed while backgrounded, and nothing
+brings it back.** It fits every part of the report:
+- **Blank rather than an error screen** — there is no JS left to throw, so no boundary fires.
+- **Nothing in `error_events`** — the reporter died with the context it was reporting from.
+- **On return from another app** — Android reclaims a backgrounded renderer first.
+- **At 10% battery with another app active** — power saving makes reclamation far more aggressive,
+  which also explains *"often"* rather than *always*.
+
+**And the handler that would deal with it does not exist.** `MainActivity.java` overrides
+`onResume`, `onNewIntent`, PiP and sensors, and contains **no `WebViewClient`, no
+`onRenderProcessGone`, and no reload path**. Grepped: zero hits for `RenderProcess` anywhere under
+`android/`.
+
+- **⚠ Do not fix this by reloading on every `visibilitychange`.** That would re-fetch the whole shell
+  on every alt-tab, cost the instant-paint behaviour the cache-seeding rules exist to protect, and
+  hide the real fault rather than handling it. The fix is to detect the renderer's death and recover
+  from *that*.
+- **The diagnostic that confirms or kills the hypothesis, and it is cheap:** reproduce it, then
+  `adb logcat | grep -i "render process\|RENDER_PROCESS_GONE\|Chromium"`. A `Render process died`
+  line settles it. Two behavioural tells, no cable needed: after a blank screen, does **pull-to-refresh
+  do nothing** (a dead renderer cannot respond to touch) and does **backing out and re-entering fix
+  it**? A dead renderer needs a reload; a JS fault would not survive one either, but would have left
+  a row.
+- **Rule out the cheaper causes first, in this order:** (1) the service worker serving an empty shell
+  — the cache name is build-stamped, so a deploy mid-session is a candidate; (2) a route that renders
+  null while a cache read resolves; (3) the renderer death above. (1) and (2) would both leave
+  evidence — a row, or a screen that recovers on navigation.
+- **⚠ It costs an APK.** Anything in `MainActivity.java` is native, so it ships through the Android
+  workflow, not a Railway deploy. Confirm the owner holds `key.hex` before any suggestion that
+  touches installation — an uninstall destroys the Oura ring key. (Confirmed held 2026-08-25; ask
+  again rather than assuming.)
+- **Verification:** background the app under memory pressure (low battery, several apps open, a
+  camera session helps), return, and it paints its last screen rather than nothing — repeated ten
+  times. And whatever the cause turns out to be, **it must file an `error_events` row**: a failure
+  this total that leaves no trace is the part that let it go unreported until now.
+
 ### [platform][body] BF-78 — a partial PATCH to `/api/user/profile` wipes four columns, and one caller already sends one
 
 - **Lane:** A — `lib/data/postgres/adapter.ts:655` (`updateUserProfile`) and
@@ -1506,8 +1559,8 @@ forecast before the feature existed.
 reads — BF-41's extraction path fills them), and any photo/upload path, because BF-1's decided rule
 is crop-before-upload and a typed form has no such exposure at all.
 
-**Still true and still blocking:** there is no outbox domain behind either route, so an offline save
-fails visibly rather than queueing. Adding one is a local-store table and a sync domain, which is
+**Still true:** there is no outbox domain behind either route, so an offline save fails visibly
+rather than queueing. Adding one is a local-store table and a sync domain, which is
 Lane A's.
 
 ### [body][nutrition] BF-42 — the daily energy model computes its own BMR and never reads the measured RMR
@@ -1543,6 +1596,11 @@ bug is that it is using a prediction as the definition of BMR when a measurement
   repository method already exists (`repo.getLatestMeasuredRmr`, used by
   `app/api/nutrition-goals/recommend/route.ts:212`), so this is a read plus one substitution, not new
   infrastructure.
+- **✅ MEASUREMENT NOW STORED, 2026-08-31 — this entry is fully verifiable and nothing gates it.**
+  The owner entered the results on the S25: `measured_rmr` = **1325 kcal at 51.5 kg FFM**,
+  `dexa_scans` = **28.5 %**, both dated 2026-08-27, both confirmed in production. So the check this
+  entry asks for — *the Energy Balance card and the goal wizard agree* — can be run today, and they
+  currently do not.
 - **✅ UNBLOCKED 2026-08-31 — the `Needs:` is cleared and deliberately not replaced.** It pointed at
   BF-33, then at BF-71; **BF-71 shipped the entry screen the same day** (`More → Health → DEXA & RMR
   results`, both tables verified filling). BF-71 stays in the queue only for a device check, and a
