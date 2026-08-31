@@ -358,6 +358,89 @@ below threshold and left in place for next time.
 > BF-29 (My meals), BF-30 (Meal detail), BF-31 (Edit meal) and BF-26 (Quantity). Two artboards need
 > no entry — `Tap targets` and the `srv/g` studies both shipped in Q-395a.
 
+### [sleep] BF-83 — last night's sleep grows while you look at it, and nothing says it is still filling
+
+- **Lane:** A if the answer is the freshness/refresh path; B if it is only the label. Settle which
+  with the measurement below before starting.
+- **Added:** 2026-09-01 · owner, with two screenshots of the **same night** four minutes apart:
+  *"sleep changes depending what time you open it. I'd like it to be the final result on open."*
+
+| Opened | Window shown | Time asleep | Efficiency | HRV | Restless | 30-night avg |
+|---|---|---|---|---|---|---|
+| **6:44** | 10:03 pm – **4:46 am** | **6 h 15 m** | 93 % | 61 ms | 1 | 7 h 46 m |
+| **6:48** | 10:03 pm – **6:08 am** | **7 h 40 m** | 95 % | 65 ms | 2 | 7 h 49 m |
+
+**Every number moved, including the baseline it is compared against.** That last part matters: the
+"vs your recent nights" average shifted too, so the *context* changed under the reading as well as
+the reading.
+
+**Production says the stored row is the 6:48 version:** `sleep_sessions` for 2026-09-01 holds
+`12:03 → 20:08 UTC` (10:03 pm → 6:08 am Brisbane), 7.67 h, efficiency 95.
+
+**⚠ Two mechanisms fit, they have different fixes, and `updated_at` cannot separate them here.** All
+four recent rows share `updated_at = 20:43:44 UTC` — the signature of one bulk pass — and this repo
+has already recorded that a bulk job bumps `updated_at` without rewriting a value (Q-501). So:
+  1. **The night was still draining** — the ring had not delivered the last 80 minutes at 6:44, and
+     the row genuinely grew. Fix: do not present an incomplete night as a finished one.
+  2. **The row was already final and the client painted a stale cache** — 20:43:44 UTC is
+     06:43:44 Brisbane, *before* the 6:44 screenshot. Fix: revalidate the sleep detail on open.
+  **The check that separates them:** on the next morning, open the sleep detail, note the end time,
+  then query `sleep_sessions` for that date immediately. Row already final → (2). Row still short →
+  (1).
+
+- **Recommendation, and it holds either way: force a revalidate when the detail opens, and mark the
+  night provisional until the ring has reported the wake.** The owner asks for "the final result on
+  open", and the honest version of that is *don't call a growing number final* — the app cannot know
+  a wake happened before the ring says so. A provisional badge plus a refresh gives him the newest
+  truth and stops the older one reading as settled.
+- **This is the repo's own partial-day rule, on a new surface.** CLAUDE.md already says a cumulative
+  per-day field from an external source must treat today as a partial day, citing the Oura
+  `wornHours` mistake — *"a partial-day cumulative reads as an anomaly if compared against
+  completed-day values"*. A part-drained night compared against a 30-night average is exactly that,
+  and the moving baseline in the table above is it happening.
+- **⚠ Whatever the cause, do not fix it by shortening a TTL.** The instant-paint rules make a cached
+  first paint deliberate; the fix is invalidating or revalidating on open, not making every read
+  slower.
+- **Verification:** open the sleep detail before and after the morning drain completes — the earlier
+  view says it is provisional, the later one does not, and neither silently contradicts the other.
+  The 30-night comparison must exclude a provisional night from its own average.
+
+### [workouts] BF-84 — a per-session Rest button on the training card, and rest is not stored anywhere
+
+- **Lane:** B for the control; **A if rest is to persist**, which is the decision below.
+- **Added:** 2026-09-01 · owner, on Home's Recommended Today card: *"for the training card, I'd like
+  a small button for each session to choose 'rest'."*
+
+**⚠ Rest already exists and is weaker than it looks.** `lib/home/rest-day.ts` is the whole feature: a
+`localStorage` key stamped with today's date, applied client-side by `withRestDayOverride`. Its own
+comment is the finding — ***"`/api/log-rest-day` persists nothing (rest days are inferred from gaps
+in workout history), so refetching `/api/next-session` after choosing rest just recomputes the prompt
+and reverts the selection."*** So today's rest choice:
+- does not reach the server, so **the other device never sees it**;
+- does not survive clearing app data or a reinstall;
+- is invisible to every server-side consumer — the AI prescription, readiness, the weekly cadence
+  math — all of which infer rest from *absence of a workout*, not from the choice.
+
+**And it is reachable from exactly one screen** (`session-select-content.tsx:984`), which is why the
+owner is asking for it on Home. Adding a second client-side caller would make two buttons over one
+`localStorage` flag.
+
+- **The question to settle first, because it decides the lane:** *should choosing rest be a fact the
+  app knows, or a hint for today's screen?* **Recommendation: a fact.** The owner is asking for it in
+  a second place, which is the signal it is being used deliberately rather than as a one-off dismiss
+  — and a deliberate rest day is exactly the kind of thing readiness and the deload logic should see
+  rather than infer from a gap two days later. That makes it Lane A: a stored row, a sync domain, and
+  the inference path taught to prefer it.
+- **⚠ "A button for each session" is ambiguous and worth one clarification.** Home's card shows
+  **one** recommended session, so per-session buttons only make sense on the session-select list or
+  the week strip. Ask which surface before designing: a Rest control beside every session in the list
+  is a different feature from one Rest button on today's card.
+- **If it stays client-only, say so on screen.** A rest choice that silently evaporates on the other
+  device is worse than no button, and today it does exactly that without telling anyone.
+- **Verification:** choosing rest survives an app restart and appears on a second device; the AI
+  prescription and the weekly cadence read the stored rest day rather than inferring it; and the
+  existing session-select control and the new one are the same write, not two.
+
 ### [app-shell] BF-82 — the More page is seven groups of one row each, with one of them behaving differently
 
 - **Lane:** B — `components/more/profile-tab.tsx`, `components/more/settings-panel.tsx`,
