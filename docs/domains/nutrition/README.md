@@ -127,6 +127,15 @@ fallback) are what every offline-first domain should copy. See CLAUDE.md, "Offli
   an opt-in `surface="page"` prop. ⚠ **Wallpapers ship `enabled: false`**, so the sandbox shows
   nothing by default and the e2e has to switch them on before it can assert anything — the
   passes-because-the-feature-is-off trap. The contrast check on the S25 is still owed.
+- [`docs/superpowers/plans/2026-08-31-ai-meal-builder-entry-point.md`](../../superpowers/plans/2026-08-31-ai-meal-builder-entry-point.md)
+  — **BF-52: the meal builder's inputs all work and three share one slot.** Read before touching
+  `ingredient-search.tsx`: the recipe-photo button, the URL import and the AI estimate are **mutually
+  exclusive renders of the same slot**, chosen by what is typed into a field labelled *"Search your
+  foods or the food database…"* — so the field advertises search and behaves as a mode switch, which
+  is the whole of *"I dont see a URL option"*. `/api/nutrition/scan` already takes all three shapes
+  (`image`+`mimeType`, `url`, `text`) in one handler, so the fix is an entry point and not an engine.
+  The plan **declines** BF-52's instruction to absorb BF-63's barcode into the new row, and says why:
+  photo and URL produce a whole ingredient list, the barcode and the estimate produce one ingredient.
 - No standalone system reference exists for this pillar yet; the offline-first section of
   [`CLAUDE.md`](../../../CLAUDE.md) and [`docs/module-map.md`](../../module-map.md) §3 carry the
   load-bearing rules.

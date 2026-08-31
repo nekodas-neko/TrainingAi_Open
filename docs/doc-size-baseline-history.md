@@ -5004,3 +5004,17 @@ user-visible change is an index that stops being read.
 The two findings in it are there because they are the ones a future session would otherwise
 rediscover the hard way: the z-order that makes transparency impossible, and the default that makes
 the whole feature invisible in the sandbox.
+
+## 2026-08-31 — `docs/implementation-backlog.md` 14448 → 14464 (BF-52's plan pointer, and the instruction it declines)
+
+**All 16 lines are inside BF-52**, and they are there rather than only in the plan because the entry
+is what a hand-scan finds. Two of them are the `Plan:` field. The rest are a sharpening and a
+reversal, both of which a future implementer would otherwise take at face value:
+
+The photo and URL affordances are **mutually exclusive renders of one slot**, not two separate
+discoverability problems — so making either findable means taking both out of it. And BF-52 instructs
+the implementer to absorb BF-63's barcode button into the new capture row; the plan declines, because
+photo and URL produce a whole ingredient list while the barcode and the estimate produce one
+ingredient, and a barcode under *"start this meal from"* promises something it cannot do. **An
+instruction that is quietly not followed is worse than one that is argued with in writing**, which is
+why the strike-through and the reason live in the entry.
