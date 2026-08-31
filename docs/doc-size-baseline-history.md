@@ -4253,6 +4253,29 @@ double-count risk; and the "like a total calorie value" analogy needs adjusting,
 sum across substances — what transfers is the shape (one number per substance per day), not the
 total.
 
+## 2026-08-31 — `docs/implementation-backlog.md` 13602 → 13625 → **13784** (BF-67's planning session)
+
+Twenty-three lines, and all of them are one new queue entry: **LA-43**, the program generator
+trusting the model's muscle guess on any name the library does not contain. That is what the backlog
+is for, so the growth is the mechanism working rather than drift — a finding that stayed in a plan
+document instead of the queue would be a dropped finding.
+
+Paid for where it could be. BF-67's own block was cut back to a `Needs:` line and a sentence: the
+plan holds the measurement (0 unmatched of 31 PRs and 39 programmed names, against a 149-row
+library) and the build order, and restating either in the queue entry buys nothing a reader cannot
+get by following the link.
+
+What was **not** done is compressing LA-43 itself. It has to carry why the fallback contradicts the
+comment three lines above it, and why a latent hole is still worth filing — a shorter version would
+read as a style nit rather than as the silent history reset it actually is.
+
+**Re-derived on the merge — three times — and every conflict was the right kind.** Three other PRs
+raised the same number while this one was open (13673, 13714, 13754), so git surfaced a genuine
+disagreement about one value rather than two unrelated edits — the case the entries README says
+should conflict. Resolved each time by counting the merged file rather than taking either side, which
+is the only number true of it: **13784** at the last resolution. The doc-size baselines also split
+per file (LA-33), which is what kept a busy day's worth of concurrent PRs to the one document that
+actually disagreed.
 ## 2026-08-30 — `docs/implementation-backlog.md` (BF-69 gets the owner's join, and two collisions)
 
 The owner answered how the food log should reach the exposure series: attach supplements to a meal or
