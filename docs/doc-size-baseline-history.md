@@ -4230,3 +4230,25 @@ their own device passes, so there was nothing here this branch could honestly st
 **The backlog falls by BF-66's whole entry.** Nothing is owed past the device check the row above
 now carries, so the entry is removed rather than rewritten to a `Keep:` — the residue lives in
 `projectOverview.md`, and duplicating it in the queue would make an entry that reads as open work.
+
+## 2026-08-30 — `docs/implementation-backlog.md` (BF-69, exposure as a variable)
+
+Long because the request arrives on top of storage that already exists and one decision that
+invalidates everything after it.
+
+BF-3 shipped the per-log `amount`/`unit`/`doseText` snapshot, and its own comment says it was built
+so a dose could be correlated against resting HR. What the entry adds is that **nothing reads it** —
+`supplementLogs` is absent from `health-trends`, `sleep-performance-correlation` and both ai-chat
+analysis files — so this is a reader, not a schema.
+
+The decision written at the top is that **a missing row is not a zero**. The owner's baseline week is
+a request to record a real zero, and today "didn't take it" and "forgot to log" are the same absence.
+Three options are laid out with the one that manufactures effects named as such. The repo has already
+published a false coefficient from a data-shape mistake and left it standing for eleven days, which
+is why this is a blocker rather than a caveat.
+
+Two findings the request did not know about: `food_items` has no supplement link and the owner's food
+log already contains supplement rows, so the "picked up from the nutrition log" hope is also a
+double-count risk; and the "like a total calorie value" analogy needs adjusting, because doses do not
+sum across substances — what transfers is the shape (one number per substance per day), not the
+total.

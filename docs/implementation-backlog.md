@@ -1322,6 +1322,77 @@ opened on, unchanged.
 - **Verification:** index total drops below the heap total, and a re-read a week later shows growth
   back near trend.
 
+### [nutrition][platform] BF-69 — dosed substances are stored but nothing reads them; make exposure an analysable variable
+
+- **Lane:** A for the read model and any schema; B for the supplements-page UI and the trends surface.
+- **Planning item** — a design with one decision in it that invalidates everything downstream if
+  taken wrongly. Needs a planning session.
+- **Added:** 2026-08-30 · owner, on starting retatrutide: *"I'd like it to be a value that can be
+  correlated to all data… this week I will put it as Reta = 0 so it has a baseline - then next week
+  add a dosage; so all that data is compared against its associated value… So I could see periods
+  where I did take fish oil every day or creatine vs HR."*
+
+**Half of this shipped as BF-3 (migration 244), and it was built for exactly this.**
+`supplement_logs` already carries `amount`, `unit` and `doseText` snapshotted per log, unique on
+`(supplement_id, log_date)`, and its own comment says why: *"`amount`/`unit` are what a correlation
+against resting HR needs, since an exposure variable has to be a number on a date"*, for *"a drug
+whose story is its escalation schedule"*. **The storage is done. There is no reader.** `supplementLogs`
+appears in the local store, the sync engine, the adapter and the schema — and in **none** of
+`health-trends`, `sleep-performance-correlation`, `lib/ai-chat/analytics.ts` or `lib/ai-chat/tools.ts`.
+
+**⚠ The decision that has to come first: a missing row is not a zero.** Today a `supplement_logs`
+row exists only on days something was logged, so "did not take it" and "forgot to log it" are the
+same absence. The owner's baseline week is precisely a request to record a real zero. Every
+correlation downstream is only as good as this: a run of unlogged days read as zeros will invent an
+effect, and this repo has already published a false coefficient from a data-shape mistake and left it
+standing for eleven days (see **A Correlation Across a Model Change Is Not Evidence**). Options for
+the plan:
+  1. a per-substance **`started_on` / `stopped_on` window**, so days outside it are true zeros and
+     days inside it with no row are *unknown*, not zero — cheapest and probably right;
+  2. an explicit "not today" log (a zero-amount row), which is honest but needs daily discipline;
+  3. treat unlogged-inside-window as zero — simplest, and the one that manufactures effects.
+  Whatever is chosen, **unknown must be representable and must be excluded from a correlation rather
+  than counted as zero.**
+
+**⚠ Creatine is already being logged somewhere else, and the two do not know about each other.**
+`food_items` has no supplement link, and the owner's food log already contains supplement rows (a
+`ZMA Complex Supplement` sits in Recently Used). So the owner's *"hopefully this can get picked up
+from the nutrition log"* is a real gap and a real double-count risk: the same creatine could be a
+`supplement_log` and a `food_log` on the same day. Decide one of — link a supplement to a
+`food_items` row, merge the two sources on read with a de-dup rule, or state that dosed substances
+are logged in one place only. Not deciding is how the series ends up double-counting the days the
+owner was most diligent.
+
+- **The "like a total calorie value" analogy is the one thing to adjust.** Doses do not sum across
+  substances — 2 mg of retatrutide, 5 g of creatine and 1,000 mg of fish oil have no meaningful
+  total, and an aggregate exposure number would be a metric that cannot be interpreted. What
+  transfers from nutrition is the *shape*, not the sum: **one number per substance per day**, which
+  is the same shape as steps or calories and is exactly what makes it correlatable. So the model is
+  N parallel series, each selectable, not one column.
+- **Location: log where the owner said, analyse where the other analyses live.** The supplements
+  section of Nutrition is right for entry — it is where the substance is already defined and logged.
+  The comparison belongs on the health/trends surface beside the metrics it is being compared
+  against, with a substance pickable as an overlay series. Building a bespoke chart inside the
+  supplements page would put a second correlation surface in the app.
+- **Recommendation: ship the overlay before the coefficient.** A dose series drawn against resting
+  HR, weight or sleep is immediately useful, honest about gaps, and cannot be wrong the way a number
+  can. A correlation coefficient computed over ~20 self-selected days with a titration confounded by
+  every other change in the owner's life reads as authoritative and is not; if one is ever shown it
+  must carry **n and the window**, exclude unknown days, and never be phrased causally.
+- **⚠ Retatrutide is a prescribed drug, so keep the app descriptive.** Record it, chart it, let the
+  coach *see* it (BF-44's health overview is the natural carrier) — but nothing here should
+  recommend, adjust or comment on dosing, and no LLM-authored line should read as titration advice.
+  The existing `PROSE_GUARDS` rule (quote the given numbers, no superlatives) is the closest thing
+  to precedent and should bind any generated text about this.
+- **Staging that keeps each step verifiable:** (1) the presence model — `started_on`/`stopped_on`
+  and an unknown-vs-zero rule, plus the supplements-page UI to set it; (2) a read model exposing one
+  daily series per substance; (3) the trends overlay; (4) coach visibility; (5) only then, if it is
+  still wanted, any computed statistic.
+- **Verification:** a baseline week with no dose and a following week at a dose produce two visibly
+  different series with no gap between them; a week where logging was simply missed reads as
+  *unknown* on the chart rather than as zero; and a supplement logged through the food log is
+  either counted once or excluded by a stated rule, never twice.
+
 ### [workouts][platform] BF-68 — the program builder does not know you are injured, and typing it into the chat does not make it stick
 
 - **Lane:** A — `app/api/generate-program/route.ts` and `app/api/builder-chat/route.ts`; the UI half
