@@ -4230,3 +4230,19 @@ their own device passes, so there was nothing here this branch could honestly st
 **The backlog falls by BF-66's whole entry.** Nothing is owed past the device check the row above
 now carries, so the entry is removed rather than rewritten to a `Keep:` — the residue lives in
 `projectOverview.md`, and duplicating it in the queue would make an entry that reads as open work.
+
+## 2026-08-31 — `docs/implementation-backlog.md` 13602 → 13625 (BF-67's planning session)
+
+Twenty-three lines, and all of them are one new queue entry: **LA-43**, the program generator
+trusting the model's muscle guess on any name the library does not contain. That is what the backlog
+is for, so the growth is the mechanism working rather than drift — a finding that stayed in a plan
+document instead of the queue would be a dropped finding.
+
+Paid for where it could be. BF-67's own block was cut back to a `Needs:` line and a sentence: the
+plan holds the measurement (0 unmatched of 31 PRs and 39 programmed names, against a 149-row
+library) and the build order, and restating either in the queue entry buys nothing a reader cannot
+get by following the link.
+
+What was **not** done is compressing LA-43 itself. It has to carry why the fallback contradicts the
+comment three lines above it, and why a latent hole is still worth filing — a shorter version would
+read as a style nit rather than as the silent history reset it actually is.
