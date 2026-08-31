@@ -6,6 +6,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.404.3",
+    date: "2026-08-31",
+    changes: [
+      "AI program generation no longer silently drops exercises whose name it phrased differently — \"Barbell Deadlifts\" now matches the library's \"Barbell Deadlift\" instead of vanishing from the session",
+      "Generated exercises are saved under the library's own name, so a lift keeps its 1RM and PR history",
+    ],
+  },
+  {
     version: "1.404.2",
     date: "2026-08-31",
     changes: [

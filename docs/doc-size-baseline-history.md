@@ -4253,6 +4253,25 @@ double-count risk; and the "like a total calorie value" analogy needs adjusting,
 sum across substances — what transfers is the shape (one number per substance per day), not the
 total.
 
+## 2026-08-31 — `docs/implementation-backlog.md` 13784 → 13762 → **13812** on the merge (LA-43 ships)
+
+The queue gives back the twenty-three lines it took this morning: LA-43's entry is removed on
+shipping, which is the protocol working rather than a compaction. **The baseline is lowered rather
+than left with the headroom**, because unclaimed headroom is exactly how the next entry gets added
+for free and the ratchet stops ratcheting.
+
+**Re-derived once more on the merge**: another PR raised the same number to 13834 while this was
+open, so the lowered figure and the raised one had to be reconciled against the merged file rather
+than either side — 13812, which is the raise minus this branch's 22-line removal. A lowered baseline
+conflicts with every concurrent raise by construction; that is the ratchet working, not friction to
+avoid.
+
+BF-67's `Needs: LA-43` bullet is rewritten rather than deleted. An absent target counts as shipped,
+so the pointer would have cleared on its own — but the plan it links to reasons about a hole that is
+now closed, and one thing genuinely changed for it: the resolver deliberately does **not** match a
+subset, so a referenced "Barbell Back Squat" still will not reach "Back Squat". Leaving the bullet as
+a bare dependency would have dropped that.
+
 ## 2026-08-31 — `docs/implementation-backlog.md` 13602 → 13625 → **13784** (BF-67's planning session)
 
 Twenty-three lines, and all of them are one new queue entry: **LA-43**, the program generator

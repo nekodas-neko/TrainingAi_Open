@@ -4,16 +4,17 @@
 > is how six concurrent sessions stay tellable apart; a renamed successor is a lost thread even with a
 > perfect baton.
 
-**Updated:** 2026-08-30 · **By:** the eleventh session to run as Lane A · **Next ID:** `LA-41`
+**Updated:** 2026-08-31 · **By:** the twelfth session to run as Lane A · **Next ID:** `LA-44`
 (`grep -rhoE '\bLA-[0-9]+\b' docs/ | sort -t- -k2 -n | tail -1` is the authority, not this line)
 **Migrations:** directory head **246**, next free **247** — claim against open PRs too, not just the
 directory. Local SQLite **v32**.
 
 ## Now
 
-**Nothing of Lane A's is open or blocked.** Six PRs on 2026-08-30 (#634, #635, #636, #637, #638,
-#639); `docs/implementation-backlog.md` is **212 entries** — it grows while a session shrinks it,
-because five agents file into it concurrently.
+**Nothing of Lane A's is open or blocked** once #672 lands. `docs/implementation-backlog.md` is
+**220 entries** — it grows while a session shrinks it, because five agents file into it concurrently.
+
+**This session told the owner the Lane A queue was nearly exhausted; it was not** — re-running `next-item.js` showed **69 READY** with an entirely different top. The queue is scanned, never remembered.
 
 Start with `node scripts/next-item.js --lane A` and read its real output — see the next section.
 
@@ -53,30 +54,28 @@ The earlier session's six were Q-540 (sizing), Q-403 (tier), Q-295 (latency), Q-
 blast radius), BF-4 (hypotheses already answered), and the "add an admin button" request (the buttons
 had shipped two days earlier).
 
-Two shapes: *the evidence is stale*, and *the evidence was never true*. Q-295 is the one to remember
-— a review doc had carried the corrected number for a week while claiming it *"corroborates Q-295
-exactly"*, and nobody propagated it.
+Two shapes: *the evidence is stale*, and *the evidence was never true*. Q-295 is the one to remember — a review doc had carried the corrected number for a week while claiming it *"corroborates Q-295 exactly"*, and nobody propagated it.
 
-**Q-304b is the sharpest case.** The owner authorised recomputing 30 rows; measuring first found the
-specified method moves **zero** rows by construction, the real blast radius is **277**, and **76 of
-those** would silently substitute a since-edited prescription. The authorisation was real and the
-work would still have been wrong.
+**Q-304b is the sharpest case.** The owner authorised recomputing 30 rows; measuring first found the specified method moves **zero** rows by construction, the real blast radius is **277**, and **76 of those** would silently substitute a since-edited prescription. The authorisation was real and the work would still have been wrong.
 
 ## Shipped this session
 
-**2026-08-30, six PRs.** **Q-311** (CI signing keys explained; dead `SESSION_SECRET` deleted from
-four places) · **Q-225** (the sleep truncation guard finally has a test that fails without it) ·
-**Q-297** (Nutrition's day navigation; four of its five asks had already shipped) · **Q-527** (a
-body-fat plausibility band, and two live surfaces that bypassed it) · **Q-211** (a baseline lift
-exempt from a deload week — two guards, not the one the entry named) · **LA-40** (the OTS scorer no
-longer throws for an age it has no row for).
+**2026-08-30/31, twelve PRs:** Q-311, Q-225, Q-297, Q-527, Q-211, LA-40, LB-14, Q-214, Q-284,
+LB-25, BF-67's plan (#666, which filed LA-43), LA-43 (#672). What each one turned out to be is in
+`docs/overview/entries/2026-08-3{0,1}-*.md` — this line is only so a successor knows the span.
+
+**LA-43 is the ninth moved premise this session** — filed against an unreachable `??` fallback; the
+live defect was the exact-name filter above it silently deleting every paraphrase. **Two guards in
+the fix were written and then measured away**: both survived every mutation and changed nothing
+against the real catalogue, because the transform is symmetric. A clause that reads as protection
+while providing none is worse than its absence.
 
 Earlier sessions' PRs are in the journal entries; this list stays to the current session.
 
 ## Standing constraints
 
-- **The local gate is `pnpm check:rules`** — quote its `Ran N of N`, never the word "pass". **60 of
-  60** now. Never hardcode it; the runner reads it from `ci.yml`, which is the point.
+- **The local gate is `pnpm check:rules`** — quote its `Ran N of N`, never the word "pass". **63 of
+  63** now. Never hardcode it; the runner reads it from `ci.yml`, which is the point.
 - **The clone is depth 1.** `git fetch --deepen=300 origin main` before any `git merge origin/main`,
   or it refuses as "unrelated histories". Hit repeatedly; it is not optional.
 - **`get_check_runs` at `total_count: 0`** right after a push is registration lag, not a stale base
