@@ -4231,6 +4231,36 @@ their own device passes, so there was nothing here this branch could honestly st
 now carries, so the entry is removed rather than rewritten to a `Keep:` — the residue lives in
 `projectOverview.md`, and duplicating it in the queue would make an entry that reads as open work.
 
+## 2026-08-31 — backlog 13602 → 13698 and `docs/agents/state/tuning.md` 235 → 273 (the step-goal re-raise, and the measured stride)
+
+**No new entry — Q-524 gains an amendment, because the owner re-raised a decision they had already
+made.** That is the first thing the lines buy: a predecessor recommended *"just set it to 7,000"*
+without checking, and 7,000 is `STEP_GOAL_BY_ACTIVITY.sedentary`, a population constant specific to
+nobody. Q-524 has carried the real decision since 2026-08-19. The amendment says so, and the baton
+now carries the procedural rule.
+
+The rest is the two requirements the 2026-08-19 decision does not cover, and both are the kind that
+get rediscovered expensively. **Provenance:** the manual editor and
+`/api/nutrition-goals/recommend:326` write the *same column*, so *"if manual is set, it wins"* is not
+evaluable and an AI review can silently overwrite a deliberate choice — recorded as a code shape, not
+an incident, since the timestamps show they have not collided. **Personalisation:** a step is not
+equal work across people (at 160 cm, 10,000 steps is 6.6 km against ~7.5 at 180), and the arithmetic
+showing the whole 7k-vs-10k argument is worth **~55 kcal/day** is what keeps the decision at its real
+scale.
+
+Two ⛔ traps are worth their length because both are load-bearing and neither is obvious: a step goal
+built to satisfy the whole `activeEnergyGoal` would demand ~19,000 steps/day, and an energy-derived
+step goal makes the Activity Score's `steps` and `activeEnergy` contributors count the same walking
+twice.
+
+**Then the owner asked whether strap cadence could give their REAL stride, and it corrected the
+amendment written hours earlier.** It can — `activity_logs` already stores distance, steps, cadence
+and duration on one row — and the answer is **0.739 m against the height rule's 0.664, so the
+estimate was 10.1% short and every figure above was understated.** A correction that replaces its own
+numbers has to show its working or it reads as a contradiction, which is most of the added length:
+two independent extractions agreeing to 0.3%, cadence reproducing recorded steps to +0.13%, and the
+**r = −0.885 stride-vs-pace relation** that says a single constant is still wrong. The
+**27–94% walk share** of daily steps is what bounds how much any of it matters.
 ## 2026-08-30 — `docs/implementation-backlog.md` (BF-69, exposure as a variable)
 
 Long because the request arrives on top of storage that already exists and one decision that
@@ -4252,8 +4282,63 @@ log already contains supplement rows, so the "picked up from the nutrition log" 
 double-count risk; and the "like a total calorie value" analogy needs adjusting, because doses do not
 sum across substances — what transfers is the shape (one number per substance per day), not the
 total.
+## 2026-08-31 — backlog → 13683 and `docs/agents/state/tuning.md` 235 → 256 (the HRV tile question)
 
-## 2026-08-31 — `docs/implementation-backlog.md` 13812 → **13845** (BF-2 gets its plan, and LA-44 is filed)
+*(Backlog figure is from the final rebase — other PRs raised it while this branch was open. This branch's own delta is +17.)*
+
+**No new entry — the growth is entirely a closed question and four traps.** The owner asked whether
+HRV should replace resting HR on the Home tile. Measured, it should not: **restingHeartRate −0.491
+against hrvBalance −0.331** vs the check-in, and the two contributors correlate **+0.751 with each
+other**, so it is barely a choice between two signals at all. That goes on **TN-13** as a
+do-not-re-open notice, because "try HRV instead" is the obvious next idea and re-running it costs a
+session.
+
+The baton lines are worth more than the entry. **HRV is the one baseline object in this codebase that
+is roughly right** (stored sd 0.82× true, where temperature's is ~12×), which matters because every
+other baseline finding this month has been a defect and a successor will assume this one is too. And
+**it lags for a good reason** — the owner's HRV is up 6.21 ms while resting HR is down 2.87 bpm, so
+77% of recent nights sit above baseline and a naive out-of-band alert would fire high-side.
+
+Two of the lines are near-misses caught before publishing: **"% of nights above" measures the trend
+on a trending metric** (HRV was nearly filed at +0.62 sd against BF-13, which stands at −0.01 sd by
+its own method), and **the RHR baseline is fed `rhrLowBpm`, not `rhr_avg_bpm`** — the wrong column
+reads +2.66 sd, a phantom temperature-scale defect in a second consumer. Third column/unit near-miss
+in two days, which is why it is now a rule rather than a story.
+## 2026-08-31 — `projectOverview.md` → 8485 and the backlog → 13708 (the four-tiles-at-55 screenshot)
+
+*(Absolute figures are from the final rebase — other PRs raised the same two files while this branch was open. This branch's own deltas are +17 on `projectOverview.md` and +42 on the backlog.)*
+
+Two rows from one owner screenshot, and the pair is the point: one 🔴 defect and one 🟢 "this is
+working, here is why it looked broken".
+
+**The 🟢 row exists so the question is not re-asked.** *"Everything is 55"* looks like a scoring
+collapse and is not — the three scores normally sit 20 points apart and this was the 2nd tightest day
+in 35, while the readiness value reproduces to 55.3 from its stored contributors with HRV and resting
+HR carrying 15.8 of the 18-point drop. Without the row, the next session re-derives all of that from
+scratch. It also records the permanent fact underneath: `previousNight.input` **is** the Sleep tile
+and `activityBalance.input` **is** the Activity tile, so 22% of readiness is the two tiles beside it
+and Body Battery's anchor is readiness — the screen corroborates itself.
+
+**The 🔴 row is TN-18**, and it is short because the evidence is arithmetic: `0.519 / 1.714 = 0.303`
+matches the stored contributor input to three decimals, which is Q-506's inflated sd and TN-6's low
+mean visible in one frame, failing in opposite directions. TN-6a gated the readiness ladder and not
+the deload banner — the surface the owner actually reads.
+
+## 2026-08-31 — `docs/agents/state/tuning.md` raised, 235 → 257 (the four-tiles-at-55 traps)
+
+Five entries, four of which are things a successor would otherwise re-derive from the same screenshot.
+
+The one worth the lines: **`tempZ` and `temp_dev_c` are different units and disagreeing is expected**
+— `0.519 °C / 1.714 °C sd = 0.303 z`, matching the stored contributor input to three decimals. That
+was nearly filed as "two temperature truths, one night" before the sd was checked. The baton now says
+so outright, along with the real finding it masked: TN-6a gated the readiness ladder and left
+`ai-dynamic.ts:184` firing.
+
+The rest are cheap tests that stop a false alarm: check the **spread** before believing the scores
+have collapsed (they normally sit 20 points apart), and **reproduce readiness from its stored
+contributors** before calling it wrong (2026-08-31 came to 55.3 against a stored 55).
+
+## 2026-08-31 — `docs/implementation-backlog.md` 13812 → 13845 → **14007** on the merge (BF-2 gets its plan, and LA-44 is filed)
 
 Thirty-three lines net, and the whole of it is **LA-44** — two shipped engines (`dexa_scans`,
 `measured_rmr`) with no entry surface, both tables empty in production, discovered while re-verifying
@@ -4268,6 +4353,10 @@ weigh-in booked with it. The *"still needs a planning session"* line is supersed
 existing. And the offset-vs-ratio argument was stated **three** times over — banner, bullet, trap —
 which was right while it was open and is noise now the plan settles it; one statement is kept and the
 other two point at §2.3.
+
+**Re-derived on the merge**, as every raise on this file has been today — another PR had taken it to
+13974 while this was open, so the merged figure is that plus this branch's net. Counting the merged
+document is the only resolution that is true of it; picking a side would silently drop one PR's work.
 
 **What was NOT compacted is LA-44's own body.** It has to carry the measurement (0 rows in each
 table, and a grep that finds no client caller), the reason an engine-first split hides this class of
@@ -4371,3 +4460,16 @@ rather than left to conflict.
 
 Also note the batch checker earned its keep here: `nutrition-ui-uplift` is Lane B and BF-70 is Lane
 A, and it refused the mix rather than letting a batch become a PR that cannot ship as one.
+## 2026-08-31 — final figures after batching three Tuning PRs into one: backlog → 13974, `docs/agents/state/tuning.md` → 316, `projectOverview.md` → 8485
+
+**The three notes above (TN-18 / four-tiles-at-55, the HRV tile question, the step-goal re-raise and
+measured stride) were written as three separate PRs and landed as one.** Each raise stands on its own
+reasoning; this line only reconciles the arithmetic, because each PR's stated "before" number was the
+baseline at the time it was opened and `main` moved between them.
+
+**Why they were batched, which is the durable part:** all three touched
+`docs/implementation-backlog.md` and its per-file size baseline, so every merge staled the next one
+and each lost the rebase race in turn — three attempts, three conflicts, no merges. The per-file split
+(LA-33) removed the conflict between PRs touching *different* documents; it cannot help PRs touching
+the *same* one. **A run of same-file docs PRs from one agent should be batched from the start** rather
+than opened separately and rebased serially.

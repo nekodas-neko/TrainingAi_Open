@@ -3,7 +3,7 @@
 > **Successor sessions are titled `🎶 Tuning Agent 🟢`** — exactly, both emoji. Leading emoji = role,
 > trailing = this session's status, set by the session itself. See `docs/agents/README.md` §4.
 
-**Updated:** 2026-08-26 · **By:** `session_01VVfZtbCftbwaUHtBLJoxVr` · **Next ID:** `TN-18`.
+**Updated:** 2026-08-26 · **By:** `session_01VVfZtbCftbwaUHtBLJoxVr` · **Next ID:** `TN-19`.
 Find next free: `grep -rhoE '\bTN-[0-9]+\b' docs/ | sort -t- -k2 -n | tail -1`. Legacy `Q-` numbers
 stay valid. **Rewritten in full, never appended** — narrative lives in the linked reviews.
 
@@ -41,6 +41,7 @@ Filed this session, all propose-only, all in the queue:
 | **TN-15** | Body Battery: drain ignores exercise, no recharge at all | **signed off**; `Needs: TN-2`; supersedes the old "do not redesign" line |
 | **TN-16** | prolonged-stress warning + calm-down prompt | **parked** `Needs: Q-507` — the metric points the wrong way |
 | **TN-17** | Activity as a pace-to-goal score (owner's design) | mechanic sound; `Needs: Q-524`, `Gate: owner` — the goals make it punishing |
+| **TN-18** | TN-6a gated the readiness ladder, NOT the deload banner — the surface the owner reads | one condition, Lane A, do not batch |
 
 **Owner decisions, 2026-08-24 — recorded on the entries, nothing gated on them.** TN-5 and TN-6
 signed off; **TN-6a** added (suspend the temperature penalty on a self-clearing condition, outside the
@@ -51,7 +52,7 @@ the baselines, fix the seed for all six, re-derive only what is measurably wrong
 
 **BF-14 refuted 2026-08-24** — breathing baseline is fed `rpm × 10`, so rpm = `meanX8 / 80`; corrected it is **+0.27 sd, clean**. Reasoning on the entry.
 
-Reviews: [HR tile + pacing](../../reviews/2026-08-26-hr-tile-and-activity-pacing.md) · [pillar review](../../reviews/2026-08-26-pillar-review.md) · [check-in lookback](../../reviews/2026-08-26-checkin-lookback.md) · [threshold sweep](../../reviews/2026-08-25-threshold-sweep.md) · [battery](../../reviews/2026-08-24-body-battery-charge-window-collapse.md) ·
+Reviews: [four tiles at 55](../../reviews/2026-08-31-four-tiles-at-55.md) · [HR tile + pacing](../../reviews/2026-08-26-hr-tile-and-activity-pacing.md) · [pillar review](../../reviews/2026-08-26-pillar-review.md) · [check-in lookback](../../reviews/2026-08-26-checkin-lookback.md) · [threshold sweep](../../reviews/2026-08-25-threshold-sweep.md) · [battery](../../reviews/2026-08-24-body-battery-charge-window-collapse.md) ·
 [sleep](../../reviews/2026-08-24-sleep-score-volatility.md) ·
 [temperature](../../reviews/2026-08-24-readiness-temperature-penalty.md) ·
 [handoff](../../handoff-2026-08-24-readiness-scores-owner-batch.md).
@@ -171,6 +172,48 @@ sleep ✅ · readiness ✅ · activity ✅ · body ✅ · devices ✅ · workout
   count as "the owner's, recently", never "the system's".
 - **A hardening fix can delete the evidence another open investigation needs** (TN-7). When a fix
   turns a 500 into a fallback, check what was waiting on that 500.
+- **TN-6a SHIPPED for one of its three consumers, and the queue did not notice** (TN-18, 2026-08-31).
+  `readiness-payload.ts:386` gates the ladder on `isTemperatureBaselineCentred(...)`; `grep` finds
+  that helper in **exactly one file**, so `ai-dynamic.ts:184`'s bare `> TEMP_ALERT_THRESHOLD_C` still
+  fires. **Verify a shipped fix at every consumer its own entry named** — one grep would have caught
+  this on the day it landed.
+- **The tiles are NOT four independent readings, and this is by construction.**
+  `previousNight.input` **is** the Sleep tile and `activityBalance.input` **is** the Activity tile, so
+  **22% of readiness is the two tiles beside it** (`corr(readiness, sleep)` **+0.656** against
+  `corr(sleep, activity)` **+0.139**), and Body Battery's morning anchor **is** readiness (**+0.838**,
+  n=47). **Never read agreement between those numbers as corroboration.**
+- **"All the scores are the same" is usually coincidence here — check the spread first.** They
+  normally sit **20 points apart** (median 19, max 65); only **2 of 35 days** land within 3. And
+  **the Heart Rate tile is bpm**, not a 0–100 score, so it shares a value with them by accident.
+- **Reproduce a readiness score from its stored contributors before calling it wrong.** 2026-08-31
+  came to **55.3** against a stored 55, with HRV and resting HR carrying 15.8 of an 18-point drop —
+  a correct score on a genuinely low day. Two things qualified it and both were already queued
+  (`recoveryIndex` at 100 flagged provisional, **Q-509**; `checkin` at the placeholder 50, **TN-9**).
+- **`tempZ` and `temp_dev_c` are different units and will disagree — do not file that as a bug.**
+  `0.519 °C / 1.714 °C sd = 0.303 z`, matching the stored contributor input to three decimals. The
+  small z is **Q-506's inflated sd**, not a second temperature. This was nearly filed as "two
+  temperature truths"; the real finding was the ungated banner.
+- **⛔ "Show HRV on the tile instead of HR?" — ASKED AND ANSWERED 2026-08-31. No.** In contributor
+  form against the check-in: **restingHeartRate −0.491**, **hrvBalance −0.331**, and the two
+  correlate **+0.751 with each other (56% shared variance)**. Swapping loses a third of the
+  correlation and buys almost no new information. HRV belongs on a detail screen.
+  [`review`](../../reviews/2026-08-31-hrv-as-a-tile-metric.md).
+- **HRV is the noisiest vital here but it IS signal** — CV **17.2%** against resting HR's **5.6%**,
+  night-to-night 7.42 ms (13% of mean), yet lag-1 autocorrelation **+0.439** and |Δ|/sd **0.77**
+  against 1.13 for white noise. Do not dismiss it as noise; do not read one night of it as an event.
+- **The HRV baseline is the one baseline object that is roughly RIGHT** — stored sd 7.13 against a
+  true 8.66 (**0.82×**, where temperature's is ~12×). Usable band ≈ **47–64 ms**. **But it lags**: the
+  owner's HRV is genuinely rising (**+6.21 ms** across the window while resting-HR-low falls
+  **2.87 bpm** — both healthy, together), so **77% of recent nights sit above it** and a naive
+  out-of-band alert fires high-side. Any band UI needs a trend-aware baseline.
+- **"% of nights above the baseline" measures the TREND on a trending metric, not an error.** This
+  rule was already in this baton and HRV was still nearly re-filed as a defect at +0.62 sd. BF-13's
+  method — today's baseline against the whole-history mean — gives HRV **−0.01 sd**. **BF-13 stands.**
+- **⚠ The RHR baseline is fed `rhrLowBpm`, NOT `rhr_avg_bpm`** (`daily-summary.ts:103`). Compared
+  against the average it reads 100% of nights above, **+2.66 sd** — a phantom temperature-scale
+  defect. Against the right column: **+0.16 sd, centred.** Third near-miss of this class in two days
+  (`tempZ` vs `temp_dev_c`, sleep ×60, now this): **read which column feeds a baseline before
+  comparing anything to it.**
 - **The HR tile's lever is RAW-vs-BASELINE-RELATIVE, not which metric.** Against `perceived_recovery`:
   waking-rest HR **+0.176 raw → +0.291 relative**, nightly resting HR **+0.129 → +0.278**. Expressing
   either as a delta from the owner's own baseline roughly doubles it; picking between them barely
@@ -185,6 +228,44 @@ sleep ✅ · readiness ✅ · activity ✅ · body ✅ · devices ✅ · workout
 - **⛔ `step_live_windows` is effectively empty — 8 rows across 6 days, 7,745 steps total.** It is the
   obvious intraday step source and it reads a flat zero. `body_metrics.steps` is a **running daily
   total** (`updated_at` moves through the day), which is what any intraday step question should use.
+- **The owner's stride is MEASURED, 0.739 m — do not use `0.415 × height` (0.664), it is 10.1% short.**
+  `activity_logs` stores `distance_km` + `steps` + `cadence_spm` + `duration_min` on one row and
+  `segments` carries `distanceKm` + `avgCadenceSpm` per interval. Two extractions agree to **0.3%**
+  (3 sessions, 16 segments) and `cadence × duration` reproduces recorded steps to **+0.13%**, so the
+  cadence path is trustworthy where `steps` is null.
+  [`review`](../../reviews/2026-08-31-measured-stride-from-cadence.md).
+- **⛔ But one stride constant is still wrong: stride vs pace is r = −0.885**, −0.052 m per min/km —
+  **0.83 m at 10:00/km, 0.62 m at 14:00/km**, a 33% spread. The measured sessions are deliberate
+  walks (10–15 min/km); **incidental steps are slower and shorter**, so 0.739 over a whole day
+  overstates distance. **The tracked walk is only 27–94% of a day's steps (median ~48%)** and nothing
+  stored can measure the rest — `step_live_windows` and `body_metrics.steps` carry steps with no
+  distance. State that half as an assumption; do not derive false precision from the walk data.
+- **A stride estimate needs a freshness rule** — it is leg length *and* habitual pace, so it drifts
+  with fitness. Same trap as `HR_REST_THRESHOLD` (Q-515). Trailing window, never stored once.
+- **⚠ `activity_logs` 2026-07-01 is CORRUPT** — 4,970 steps over 3.30 km in **0.2 minutes**, and more
+  steps than `body_metrics` holds for the whole day (1,358). Excluded from every stride figure. Any
+  per-user derivation needs a sanity gate (plausible cadence, walk steps ≤ day steps).
+- **⛔ The step-goal design was DECIDED on 2026-08-19 and is unbuilt — do not re-open it, and do not
+  recommend a number.** Q-524 carries the owner's words: *"we need to use 1 number here. The AI
+  should be able to define the number and allow for manual entry."* `users.steps_goal` becomes the
+  single source; `getDailyGoals()` reads it with the derived value as fallback. **A predecessor
+  recommended "just set it to 7,000" and the owner rightly pushed back** — 7,000 is
+  `STEP_GOAL_BY_ACTIVITY.sedentary`, a population constant from Paluch 2022, specific to nobody.
+  **Check the entry for an existing owner decision before recommending anything.**
+- **Manual and AI step goals write the SAME column, so "manual wins" cannot be evaluated today.**
+  `/api/nutrition-goals/recommend:326` and the manual editor both write `users.steps_goal` with no
+  provenance, so an AI review can silently overwrite a deliberate choice. Needs a
+  `steps_goal_source` column — Lane A. **Not an observed loss** (`last_goal_review_at` 2026-08-25 vs
+  newest `goal_recommendations` 2026-08-11); a code shape, not an incident.
+- **A step is not equal work across people, which is the real argument for personalising the goal.**
+  Owner is 160 cm → stride ≈ 0.66 m, so 10,000 steps is **6.6 km** for them and ~7.5 km at 180 cm —
+  the same "goal", ~14% more work. Their numbers: BMR **1,553**, median day 4,649 steps ≈ **86 kcal
+  net**, 7,000 ≈ **129**, 10,000 ≈ **184**. **The whole 7k-vs-10k argument is ~55 kcal/day** — hold
+  the decision at that scale.
+- **⛔ Do not derive a step goal that targets the whole `activeEnergyGoal`** (BMR × 0.24 = **373 kcal**
+  here): 12,000 steps yields 221, so it would demand ~20,000 steps/day. And the Activity Score
+  already scores `steps` (18) **and** `activeEnergy` (15) separately — an energy-derived step goal
+  makes them count the same walking twice. Decide the double-count first.
 - **The owner's step goals are not calibrated to the owner.** Median day **4,649**; 7,000 reached on
   **32%** of days, 10,000 on **15%**. Any change that makes the Activity score stricter (TN-17's
   pacing) turns that from invisible into a tile that reads red most days — which is why TN-17 is
