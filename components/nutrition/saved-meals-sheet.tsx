@@ -530,7 +530,7 @@ export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate,
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="bottom" className="h-[90vh] flex flex-col" bottomInset="takeover">
+      <SheetContent side="bottom" surface="page" className="h-[90vh] flex flex-col" bottomInset="takeover">
         {/* Title alone on the top row so the close ✕ has the corner to itself; the actions get
             their own full-width row below. Squeezing "Select" and "New Meal" in beside the title
             left them jammed against the ✕ and each button too narrow to read comfortably. */}

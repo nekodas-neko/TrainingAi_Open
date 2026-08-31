@@ -120,6 +120,13 @@ fallback) are what every offline-first domain should copy. See CLAUDE.md, "Offli
   before changing any `codeUnits`: `mealLabelShareBudget` derives the payload budget from the
   geometry, so shrinking a code silently shrinks what its label can carry. ⚠ **0.49 mm per module is
   a convention, not a measurement** — no label of any style has been through a printer.
+- [`docs/overview/entries/2026-08-31-nutrition-sheet-surface.md`](../../overview/entries/2026-08-31-nutrition-sheet-surface.md)
+  — **BF-75: the sheets carry the tab's palette.** Read before making any sheet translucent: the
+  wallpaper is `z-[-1]` while `SheetOverlay` and `SheetContent` are both `z-50`, so transparency
+  reveals the overlay's `bg-black/50`, not the tab. The palette is painted *inside* the sheet behind
+  an opt-in `surface="page"` prop. ⚠ **Wallpapers ship `enabled: false`**, so the sandbox shows
+  nothing by default and the e2e has to switch them on before it can assert anything — the
+  passes-because-the-feature-is-off trap. The contrast check on the S25 is still owed.
 - No standalone system reference exists for this pillar yet; the offline-first section of
   [`CLAUDE.md`](../../../CLAUDE.md) and [`docs/module-map.md`](../../module-map.md) §3 carry the
   load-bearing rules.

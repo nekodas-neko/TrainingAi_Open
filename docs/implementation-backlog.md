@@ -1040,38 +1040,30 @@ deletes nothing on tap, which is what makes an icon-only entry point defensible 
   The **print** half is owed separately and is older than this entry: no label of any style has been
   put through a real printer, so 0.49 mm per module remains a convention rather than a measurement.
 
-### [nutrition][app-shell] BF-75 — every nutrition sheet paints opaque, so the tab's wallpaper stops at the sheet edge
+### [nutrition][app-shell] BF-75 — the nutrition sheets carry the tab's palette (shipped; the contrast check needs the device)
 
-- **Lane:** B — `components/ui/sheet.tsx:85`, and whichever nutrition sheets opt in.
-- **Added:** 2026-08-31 · owner: *"just the fact that it's a plain black screen on every nutrition
-  pull-up screen; if we could have a good background for these pages it would be good. Maybe we need
-  a theme for nutrition of sorts."*
-
-**A nutrition theme already exists — the sheets opt out of it.** `lib/background/screen-palettes.ts`
-defines a `'nutrition'` `ScreenPaletteKey`, and its gradient lives in `globals.css` as
-`--screen-palette-nutrition`; the tab itself renders it (the warm brown behind the day screen in the
-owner's own screenshots). What is plain black is every **sheet**, because `SheetContent`'s base class
-list starts with **`bg-background`** — an opaque paint over the wallpaper layer. This is precisely
-the case CLAUDE.md's background rule names: *"a `bg-background` root silently hides any wallpaper
-layer."*
-
-- **⚠ Do NOT just make `SheetContent` translucent.** That class is the app-wide sheet primitive —
-  every sheet in every tab renders through it, and a global change is the *"no global
-  element-selector styling"* hazard wearing a component's clothes. The shape that is safe: an opt-in
-  variant or prop (`surface="page"`), applied to the nutrition sheets named in this entry, so a
-  regression is scoped to the screens that asked for it.
-- **Legibility is the constraint that decides the design.** These sheets are dense — macro numbers,
-  ingredient rows, small grey secondary text — and body text must stay ≥4.5:1. So the wallpaper
-  needs the `ScrimLayer` treatment the DetailHero pattern already uses, not a raw gradient behind
-  live text. A scrim is what makes this shippable rather than pretty.
-- **Dark only** — the app is pinned dark (owner, 2026-08-25), so design and verify one theme, and
-  take colours from the existing `--screen-palette-*` tokens rather than new literals
-  (`check-hex-literals.js` ratchets that and a parity PR may not raise its files' counts).
-- **Scope it in the entry, not at build time:** name which sheets change (Log Food, meal detail, the
-  builder, quantity, quick-edit) so "every nutrition sheet" does not quietly become every sheet.
-- **Verification:** the nutrition sheets show the tab's palette behind their content with a scrim;
-  body and secondary text still measure ≥4.5:1 on the S25; and a sheet in Health, Workout and More
-  is unchanged.
+- **Lane:** B
+- **Gate:** device
+- **Shipped 2026-08-31**, branch `feat/nutrition-sheet-surface-bf75`.
+  Journal: [`2026-08-31-nutrition-sheet-surface.md`](overview/entries/2026-08-31-nutrition-sheet-surface.md).
+  `SheetContent` gained an opt-in `surface="page"`; the five nutrition sheets named in the entry pass
+  it and nothing else in the app does.
+- **⚠ TWO THINGS THE ENTRY DID NOT KNOW, and the first one changes what "fixed" means here.**
+  **(1) The dynamic background ships `enabled: false`**, so a viewer with wallpapers off sees no
+  change at all — by design, since a sheet painting a gradient over a plain page is worse than the
+  opaque sheet it replaced. The owner's own screenshots show the warm brown behind the day screen, so
+  they have it on and will see this; anyone else has to turn it on first.
+  **(2) Making the sheet translucent could never have worked.** The wallpaper is `fixed inset-0
+  z-[-1]` while `SheetOverlay` and `SheetContent` are both `z-50`, so transparency reveals the
+  overlay's `bg-black/50`, not the tab. The palette is *painted inside* the sheet instead.
+- **Keep:** the contrast check, and only that. On the S25 with wallpapers on: open Log Food, the meal
+  builder, meal detail, quantity and quick-edit, and confirm body and secondary text still measure
+  ≥4.5:1 over the gradient plus `ScrimLayer` — the dense sheets (macro numbers, ingredient rows,
+  small grey secondary text) are where it will fail if it does. Also confirm a Health, Workout and
+  More sheet is visually unchanged; that they do not opt in is held by a test, but how they *look*
+  beside a changed nutrition sheet is not. **Nothing about the wallpaper can be judged in the
+  sandbox** — the feature is off by default there, so the e2e has to switch it on to assert anything
+  at all.
 
 ### [devices] PS-11 — FIRST OVERNIGHT SYNC: prove every metric actually landed ⭐ TOMORROW'S JOB
 

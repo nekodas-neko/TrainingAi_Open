@@ -62,6 +62,13 @@ split is "does it feel slow" vs "is it actually slow at the source".
   is still binding and is the one people re-open by accident:** `GoalsSection`, `StatsGrid`,
   `TrophyCase`, `AchievementsSection`, "Your Year" and the season badges **stay inline on More**, and
   `/more/goals` and `/more/achievements` were never built and are not going to be.
+- [`docs/overview/entries/2026-08-31-nutrition-sheet-surface.md`](../../overview/entries/2026-08-31-nutrition-sheet-surface.md)
+  — **BF-75: `SheetContent` gained an opt-in `surface="page"`.** The app-wide sheet primitive changed,
+  so this is app-shell's as much as nutrition's. Two things bind any future work on it: the layer is
+  `-z-10` because `SheetContent` is `fixed z-50` and therefore a stacking context — without it the
+  gradient paints over every row of the sheet — and **a hit test cannot detect that**, because the
+  layer is `pointer-events-none` and `elementFromPoint` skips it whatever its paint order. Assert the
+  computed z-index. Five nutrition sheets opt in; a test holds that nothing else does.
 - **[`docs/superpowers/plans/2026-08-31-more-page-grouping-and-interaction-model.md`](../../superpowers/plans/2026-08-31-more-page-grouping-and-interaction-model.md)**
   — **BF-82: what that migration left behind.** The rows are right; the container around them is
   degenerate — **eight `MoreRowGroup`s wrap exactly one row each**, and the only two that group

@@ -6,6 +6,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.409.0",
+    date: "2026-08-31",
+    changes: [
+      "The Log Food, meal builder, meal detail, quantity and quick-edit pull-ups now carry the Nutrition tab's own background instead of a plain dark panel.",
+      "This only shows if you have wallpapers turned on \u2014 More \u203a Settings \u203a Appearance. With them off the sheets look exactly as before, on purpose: a coloured sheet over a plain page would look worse than the plain one.",
+      "Sheets in Health, Workout and More are unchanged.",
+    ],
+  },
+  {
     version: "1.408.0",
     date: "2026-08-31",
     changes: [
