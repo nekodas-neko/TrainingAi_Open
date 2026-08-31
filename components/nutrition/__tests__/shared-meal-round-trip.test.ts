@@ -8,8 +8,9 @@ vi.mock('@trainingai/shared/nutrition/create-food-item', () => ({ createFoodItem
 vi.mock('../save-meal', () => ({ saveMealToLibrary: saveMealToLibraryMock }))
 
 import { encodeSharedMeal, decodeSharedMeal } from '@trainingai/shared/nutrition/label-payload'
+import type { SharedMeal, SharedMealIngredient } from '@trainingai/shared/nutrition/label-payload'
 import type { SavedMeal } from '@trainingai/shared/types/nutrition'
-import { saveSharedMealToLibrary, sharedIngredientToEntry } from '../save-shared-meal'
+import { saveSharedMealToLibrary, sharedIngredientToEntry, sharedMealTotals } from '../save-shared-meal'
 
 function food(name: string, servingSizeG: number, calories: number, p: number, c: number, f: number) {
   return { id: `f-${name}`, name, servingSizeG, calories, proteinG: p, carbsG: c, fatG: f, source: 'manual' }
@@ -140,5 +141,48 @@ describe('shared meal round trip', () => {
     await expect(saveSharedMealToLibrary(
       { name: 'Empty', servings: 1, ingredients: [], rolled: 0 }, 'u1', 'Australia/Brisbane',
     )).rejects.toThrow()
+  })
+})
+
+describe('sharedMealTotals — the figures the duplicate check compares (LB-34)', () => {
+  const ing = (over: Partial<SharedMealIngredient> = {}): SharedMealIngredient =>
+    ({ name: 'Oats', weightG: 100, calories: 380, proteinG: 13, carbsG: 66, fatG: 7, ...over })
+
+  it('sums the whole recipe, not one serving', () => {
+    // `servings` is carried by the payload and must NOT divide these: `SavedMeal.totals` is the
+    // whole recipe, and that is what these get compared against.
+    const shared: SharedMeal = {
+      name: 'Batch', servings: 4, rolled: 0,
+      ingredients: [ing(), ing({ name: 'Rice', calories: 130, proteinG: 2.7, carbsG: 28, fatG: 0.3 })],
+    }
+    expect(sharedMealTotals(shared)).toEqual({ calories: 510, proteinG: 15.7, carbsG: 94, fatG: 7.3 })
+  })
+
+  it('is unaffected by servings', () => {
+    const base: SharedMeal = { name: 'X', servings: 1, rolled: 0, ingredients: [ing()] }
+    expect(sharedMealTotals(base)).toEqual(sharedMealTotals({ ...base, servings: 8 }))
+  })
+
+  it('rounds calories whole and macros to 1dp, as a saved meal stores them', () => {
+    const shared: SharedMeal = {
+      name: 'X', servings: 1, rolled: 0,
+      ingredients: [ing({ calories: 100.4, proteinG: 1.26, carbsG: 2.24, fatG: 0.05 })],
+    }
+    expect(sharedMealTotals(shared)).toEqual({ calories: 100, proteinG: 1.3, carbsG: 2.2, fatG: 0.1 })
+  })
+
+  it('treats an unparseable macro as zero rather than poisoning the total with NaN', () => {
+    // NaN compares false against everything, so a duplicate would never be found and the bug this
+    // exists to fix would be silently back.
+    const shared = {
+      name: 'X', servings: 1, rolled: 0,
+      ingredients: [{ name: 'Odd', weightG: 50, calories: undefined, proteinG: 5, carbsG: 5, fatG: 1 }],
+    } as unknown as SharedMeal
+    expect(sharedMealTotals(shared)).toEqual({ calories: 0, proteinG: 5, carbsG: 5, fatG: 1 })
+  })
+
+  it('is zero for an empty list rather than throwing', () => {
+    expect(sharedMealTotals({ name: 'X', servings: 1, rolled: 0, ingredients: [] }))
+      .toEqual({ calories: 0, proteinG: 0, carbsG: 0, fatG: 0 })
   })
 })

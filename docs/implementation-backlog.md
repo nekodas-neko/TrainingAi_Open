@@ -13808,29 +13808,63 @@ reads.
   of this file still stands** (claim a number against the directory *and* open PRs/plan docs): this
   closes the four that exist, it does not make future collisions safe.
 
-### [nutrition] LB-34 — scanning the same shared label twice makes a second copy of the meal
 
-- **Lane:** B — `components/nutrition/save-shared-meal.ts`, `components/nutrition/meal-duplicate.ts`.
-- **Added:** 2026-08-31 · found while building BF-57, filed rather than folded in because the fix is
-  a product question and BF-57 was already a large PR.
+### [platform] LB-37 — `tsc` typechecks nothing under `__tests__`, so "TSC_OK" has never covered a spec
 
-`saveSharedMealToLibrary` mints a new `saved_meals` row on every scan. A label is a physical object
-that gets scanned by whoever picks it up — a partner scanning the fridge on Tuesday and again on
-Friday ends up with two identical meals, and neither is marked as the duplicate.
+- **Lane:** ? — the one-line `tsconfig.json` change is trivial; what it uncovers is not, and the
+  decision of whether to take that on is a platform call rather than an implementer's.
+- **Added:** 2026-08-31 · found while adding tests for LB-34, by noticing a spec that used two types
+  it had never imported and still passed `tsc`.
+- **Measured, not inferred.** `tsconfig.json` carries
+  `exclude: ["node_modules", ".claude", "**/__tests__/**"]`. Appending
+  `const deliberateTypeError: number = "not a number"` to
+  `components/nutrition/__tests__/shared-meal-round-trip.test.ts` and running
+  `npx tsc --noEmit -p tsconfig.json` produced **zero** errors mentioning that file.
+- **Why it matters more than it looks.** Every session in this repo treats a clean `tsc` as the
+  first gate, and CI's Build job runs the same project. So across ~700 unit-test files, a spec may
+  reference a type that does not exist, call a function with the wrong arity, or assert against an
+  interface that has since changed shape, and nothing says so — the test simply keeps passing on
+  whatever the runtime happens to do. That is the same class as a guard that cannot fail: a check
+  whose silence carries no information.
+- **`e2e/` is NOT excluded** and is typechecked normally. The gap is unit tests only.
+- **Do not just delete the exclude line without measuring first.** It is there deliberately enough
+  that someone wrote it, and no comment says why. The first step is to find out what it is hiding:
+  run `tsc` with the exclusion removed and count the errors before deciding whether this is a
+  one-PR fix, a ratchet like the hex-literal baseline, or something to leave alone with a written
+  reason. **Report that count in the entry either way** — a session that measures it and does not
+  record the number leaves the next one to measure it again.
 
-**The machinery already exists and is the reason this is small.** `findDuplicateMeal`
-(`meal-duplicate.ts`) answers exactly this question, with two independent tests that must both pass
-— a normalised name match *and* `fitDistance` under `DUPLICATE_MAX_FIT_DISTANCE` — and BF-11d already
-uses it to offer "update the existing one?" on a save. The scan path is a third caller.
+### [platform][nutrition] LB-38 — the share-code e2e decode fails intermittently on `main`, and the mechanism is not yet known
 
-- **Prefer under-matching, per BF-38's guidance the duplicate helper already carries.** Two similar
-  meals from two friends are a nuisance; silently overwriting one person's recipe with another's is
-  data loss.
-- **Decide what the offer says.** A save dialog can ask; a scan is a one-tap flow in a kitchen, so
-  the likely answer is a toast with an Undo rather than a modal — the same shape BF-74 chose for the
-  photo remove, and for the same reason.
-- **Verification:** scan one shared label twice; the second scan says the meal is already saved and
-  does not add a row. A genuinely different meal with a similar name still saves.
+- **Lane:** B — `e2e/meal-label.spec.ts`.
+- **Added:** 2026-08-31 · red on CI run 1334 (PR #700) and reproduced on clean `main` locally.
+- **It is not the PR it fails on.** It went red on a nutrition PR that does not touch the label
+  renderer, and reproduces on a clean checkout of `main`, so treat a red here as pre-existing until
+  shown otherwise. Required checks are unaffected — E2E is not one.
+- **What is established:**
+  - The failing assertion is `the share code must decode off the rendered label` —
+    `decodeQr` returns null on all **six** attempts, one second apart.
+  - **Failing runs take ~2.8 min; passing ones ~50 s.** Same signature locally and in CI.
+  - The canvas from a *passing* run decodes under all four decoder configurations tried
+    (Hybrid/GlobalHistogram binarizer × with/without `TRY_HARDER`), so decoder configuration is
+    **not** the cause.
+  - A drawn share-code canvas measures **0.174** ink fraction.
+- **⚠ One hypothesis is already falsified — do not re-derive it.** *"`waitForSettledInk`'s
+  `> 0.01` floor lets a text-only canvas through"* is wrong: `renderMealLabel` is fully synchronous
+  (`QRCode.create` at `meal-label-render.ts:907` is a sync call, and `drawShareLabel` calls
+  `drawCode` immediately after `fillText`), so text and code land in the same pass and a text-only
+  canvas cannot exist.
+- **Current hypothesis, unverified:** `getImageData` returns a **degenerate** buffer under memory
+  pressure. All-zero data makes `inkFraction` **1.0** — stable and above the floor, so the gate
+  passes — while the decoder sees a uniform image and returns null every time. It also fits the
+  timing: six slow `shotOf` calls each shipping ~5.5 M numbers over CDP.
+- **How to test it:** log the ink fraction at each decode attempt and reproduce under load. A
+  reading of `1.0000` or `0.0000` on a failure confirms it; a reading near 0.174 refutes it and the
+  image is being read correctly, which would point somewhere else entirely. Instrumentation is
+  parked on the branch `debug/share-code-ink-probe` (SCRATCH — never merge it).
+- **If confirmed the fix is to reject a degenerate canvas in the gate** — ink strictly between
+  bounds rather than merely above a floor — **not another retry.** The retry is already at six
+  attempts and the file's own comment says another one is the wrong answer.
 
 ### [nutrition][platform] LB-33 — `meal-label-render.ts` is 1,049 lines, and its pure half is what everything imports
 

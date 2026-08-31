@@ -1,6 +1,39 @@
+import type { MacroTotals } from '@trainingai/shared/nutrition/meal-macro-fit'
 import type { SharedMeal, SharedMealIngredient } from '@trainingai/shared/nutrition/label-payload'
 import { createFoodItem } from '@trainingai/shared/nutrition/create-food-item'
 import { saveMealToLibrary } from './save-meal'
+
+/**
+ * A scanned payload's whole-recipe macros, for the duplicate check (LB-34).
+ *
+ * **A label is a physical object and gets scanned by whoever picks it up** — a partner scanning the
+ * fridge on Tuesday and again on Friday used to end up with two identical meals and no sign that
+ * either was a copy. `findDuplicateMeal` already answers "do you have this?", and it wants totals;
+ * this is the one line of arithmetic that lets the scan path ask it.
+ *
+ * Summed directly rather than through `sumIngredients`, which takes the per-100 g
+ * `NutritionIngredient` shape — a `SharedMealIngredient` already carries its macros for its own
+ * weight, so routing them through a per-100 g helper would mean converting twice to get back where
+ * they started.
+ *
+ * These are WHOLE-recipe figures, matching `SavedMeal.totals`, which is what they are compared
+ * against. `servings` is carried separately by the payload and must not divide them here.
+ */
+export function sharedMealTotals(shared: SharedMeal): MacroTotals {
+  let calories = 0, proteinG = 0, carbsG = 0, fatG = 0
+  for (const ing of shared.ingredients) {
+    calories += Number(ing.calories) || 0
+    proteinG += Number(ing.proteinG) || 0
+    carbsG += Number(ing.carbsG) || 0
+    fatG += Number(ing.fatG) || 0
+  }
+  return {
+    calories: Math.round(calories),
+    proteinG: Math.round(proteinG * 10) / 10,
+    carbsG: Math.round(carbsG * 10) / 10,
+    fatG: Math.round(fatG * 10) / 10,
+  }
+}
 
 /**
  * A scanned label turned into the scanner's OWN saved meal (BF-57).

@@ -7,9 +7,10 @@ import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet'
 import { ReviewStep, type EditableNutrition } from './review-step'
 import { AssignStep } from './assign-step'
 import { SavedMealsSheet } from './saved-meals-sheet'
+import { findDuplicateMeal } from './meal-duplicate'
 import type { NutritionScanResult, NutritionIngredient, FoodItem, FoodLogWithItem, SavedMeal, MealType } from '@trainingai/shared/types/nutrition'
 import type { SharedMeal } from '@trainingai/shared/nutrition/label-payload'
-import { saveSharedMealToLibrary } from './save-shared-meal'
+import { saveSharedMealToLibrary, sharedMealTotals } from './save-shared-meal'
 import { todayInTz } from '@trainingai/shared/date-utils'
 import { mealTypeForHour } from '@trainingai/shared/nutrition/log-plan-meal'
 import { logMealItems } from '@trainingai/shared/nutrition/log-meal'
@@ -261,8 +262,39 @@ export function FoodLoggerSheet({ open, preselectedMealTypeId = null, onClose, o
    * — a shared recipe is something you keep and cook again, and logging it immediately would put a
    * meal in today's diary that nobody said they had eaten.
    */
-  async function handleScannedSharedMeal(shared: SharedMeal) {
+  async function handleScannedSharedMeal(shared: SharedMeal, force = false) {
     try {
+      // **A label is a physical object, so the same one gets scanned more than once** (LB-34) — a
+      // partner checking the fridge on Tuesday and again on Friday used to get two identical meals
+      // with nothing marking either as the copy. `findDuplicateMeal` is the same test a save
+      // already uses: a normalised name match AND macros within `DUPLICATE_MAX_FIT_DISTANCE`, both
+      // required, so two genuinely different recipes that share a name still both save.
+      //
+      // **Read local-first and never block on the network.** The whole point of a shared label is
+      // that it works in a kitchen with no signal; a duplicate check that needed a fetch would
+      // trade the feature's main property for a nicety. With no local store and no warm cache the
+      // scan just saves — under-matching is the documented preference here, because a duplicate is
+      // a nuisance and a wrongly-suppressed save is a lost recipe.
+      if (!force) {
+        const store = userId ? getLocalStore(userId) : null
+        const library = store
+          ? await store.getSavedMeals().catch(() => [] as SavedMeal[])
+          : readCacheSync<SavedMeal[]>('saved-meals') ?? []
+        const dup = findDuplicateMeal({ name: shared.name, totals: sharedMealTotals(shared) }, library)
+        if (dup) {
+          hapticLight()
+          // An action, not an Undo. LB-34 guessed Undo by analogy with the photo remove, but that
+          // shape fits an action that already happened — nothing has been written here, so the
+          // honest offer is the one the user might still want.
+          toast(`${dup.name} is already in your meals`, {
+            description: 'Scanned before, or someone shared the same recipe.',
+            action: { label: 'Save a copy', onClick: () => { void handleScannedSharedMeal(shared, true) } },
+          })
+          reset()
+          onClose()
+          return
+        }
+      }
       const { name } = await saveSharedMealToLibrary(shared, userId, tz)
       hapticLight()
       toast.success(`${name} saved to your meals`, {
