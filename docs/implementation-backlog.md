@@ -358,6 +358,115 @@ below threshold and left in place for next time.
 > BF-29 (My meals), BF-30 (Meal detail), BF-31 (Edit meal) and BF-26 (Quantity). Two artboards need
 > no entry — `Tap targets` and the `srv/g` studies both shipped in Q-395a.
 
+### [app-shell] BF-82 — the More page is seven groups of one row each, with one of them behaving differently
+
+- **Lane:** B — `components/more/profile-tab.tsx`, `components/more/settings-panel.tsx`,
+  `components/more/more-row.tsx`, and the sub-screens under `app/more/`.
+- **Added:** 2026-08-31 · owner: *"a review of all the pages/chevrons in the More page and
+  reorganize/group things together that can be. It's very messy and not very organized. Some items
+  could be changed from sliders to text or buttons etc. All needs to be reviewed."*
+- **Planning item** — this is an information-architecture pass, and doing it row-by-row is what
+  produced the current shape.
+
+**The structural problem, from the source rather than the impression.** `profile-tab.tsx` renders
+**seven `MoreRowGroup`s — Program, Health, Devices, Settings, Data, About, Admin — and each holds
+exactly ONE row.** A group heading exists to group things; a heading per row is pure vertical
+overhead, and it is most of why the screen reads as long and empty at the same time.
+
+**⚠ And `Goals` is not like the others.** Every other entry is a chevron to a sub-screen. Goals is an
+**inline accordion** that expands into `Required Information` — weight, body fat, height, biological
+sex — right on the page. So one control on the screen behaves differently from the other six, which
+is the specific inconsistency behind *"messy"*: the user cannot predict whether tapping navigates or
+expands.
+
+- **⚠ Overlaps BF-79 and should be sequenced with it, not against it.** BF-79 gathers the personal
+  details into one section; this entry decides where that section *lives* and how it is reached. If
+  both are built independently they will disagree about where height and sex belong. **Recommendation:
+  BF-79 decides the content, this decides the placement, and they ship in that order or together.**
+- **On the "sliders" — there are none on this screen, and the real answer is better.** The settings
+  sub-screen uses **five `Switch` toggles** (calendar sync, day-review reminders, health alerts, rest
+  chip, run chip) and those are correct for booleans. What the owner is reacting to is more likely
+  the **goal fields in the Goals accordion**, where a target is typed into a small box beside the
+  current value (`71.5 kg · Today → [60] kg`). Confirm which controls are meant before changing any:
+  a switch is right for on/off and wrong for a value, and swapping either way for the wrong reason is
+  a regression.
+- **What the pass should produce, in this order:** (1) an inventory — every row, its destination, and
+  what it actually controls; (2) a grouping proposal where a heading covers **two or more** rows or
+  is dropped; (3) one interaction model — everything navigates, or the one that expands earns its
+  exception in writing. Enumerate before changing anything, as BF-76 requires of its sweep, or the
+  PR cannot say what it covered.
+- **Do not delete the About or Admin rows to tidy up.** `About` carries the version string, which is
+  how a stale-bundle question gets answered (it was needed twice this session), and `Admin` is
+  gated on `isAdmin`.
+- **Verification:** no group heading covers a single row; every row on the page responds the same way
+  to a tap or states why it does not; and every destination reachable before the change is still
+  reachable after it — enumerated in the PR body, per the parity rule.
+
+### [readiness][devices] BF-81 — two producers write the daytime-stress metric and they disagree on every day measured
+
+- **Lane:** A — `lib/oura-ble/rollup/run.ts` and `app/api/body-battery/route.ts`.
+- **Added:** 2026-08-31 · owner: *"what is happening with our stress indicator? Is this working? What
+  are the issues… what is different from our records vs our calculated model."* Measured in
+  production rather than reasoned about.
+
+**Is it working? The pipeline runs.** `oura_daytime_stress_buckets` gains **18–29 buckets a day**
+(9–14.5 h of 30-minute coverage), current to today, and `level` uses the full **[−1, +1]** range
+(observed −1.00 … +1.00). Negative is stressed, positive is recovered —
+`STRESS_HIGH_LEVEL = -0.5`, `RECOVERY_HIGH_LEVEL = +0.5`.
+
+**⚠ But the strip and the number come from different computations, and the code says this was already
+settled.** `rollup/run.ts:1040` states it outright: *"Writing from one place also settles the
+two-baselines hazard… the live route builds the same series from `restingHr` + a 28-day HRV mean,
+this one from `latest.rhrLowBpm` + `nightHrvMs`. Persisting both would put two numbers behind one
+metric."* **Both are still persisted.** `app/api/body-battery/route.ts:349` writes
+`daytimeStressScaled` and `stressHighMinutes` onto `oura_daily_derived` from its own series, while
+the rollup writes the buckets from a different one.
+
+**Measured over the eight most recent days with both — every one disagrees:**
+
+| Day | mean, buckets / stored | high-stress min, buckets / stored |
+|---|---|---|
+| 08-31 | −0.13 / **+0.01** | 180 / **30** |
+| 08-30 | −0.04 / −0.02 | 240 / **30** |
+| 08-29 | −0.01 / **+0.08** | 210 / **0** |
+| 08-28 | +0.04 / **−0.10** | 120 / 60 |
+| 08-27 | +0.05 / **−0.03** | 270 / **0** |
+| 08-26 | −0.01 / **+0.07** | 210 / **0** |
+| 08-25 | −0.08 / −0.06 | 270 / **30** |
+| 08-24 | −0.12 / **+0.22** | 240 / **0** |
+
+**The sign flips on five of eight**, and high-stress minutes differ by **4–9×** — the buckets say
+2–4.5 hours of high stress a day where the stored scalar says 0–60 minutes. Whichever is right, a
+user reading the strip and the number is reading two different days.
+
+- **Recommendation: delete the write at `body-battery/route.ts:349`, not the route's computation.**
+  The rollup's comment already argues why it should own persistence — it is the only path that can
+  back-fill from the packed raw tier. The live route can keep computing a series for today's display;
+  it must stop *storing* a second answer. That is one deletion plus a recompute of the affected days.
+- **⚠ Then re-derive `daytime_stress_scaled` for the stored history**, or the column keeps mixing two
+  producers' values and any trend drawn over it is an artefact — the same class as the model-version
+  pooling that produced a documented false correlation here.
+
+**Two further gaps, both measured:**
+- **`chronic_stress_score` is NULL on every row.** The model needs **21 complete nights** of granular
+  BLE signals *within a single rollup pass* (`CHRONIC_STRESS_MIN_DAYS`), and the score is skipped
+  entirely below that. So the metric has never once been produced. Either a wide back-fill pass has
+  never run over ≥21 nights, or the assembly returns null — **check which before treating this as a
+  data problem**, because the two have different fixes.
+- **`resilience_daily_stress` is present on 4 of the last 14 days.** Sparse rather than absent;
+  worth knowing whether that is the model gating or missing inputs.
+
+**And the comparison the owner asked for cannot be made — this is the important part.** Oura's own
+`stress_high` exists on **10 days, ending 2026-07-07**, which is the re-key date. Our derived stress
+begins after it. **The overlap is zero days.** So there is no day on which Oura's recorded stress and
+our computed stress can be compared, and there never will be — validating this model against Oura's
+output is not an option that exists. Validation has to come from something else: the owner's own
+labelling of stressful days, or agreement between our two producers once they are one.
+
+- **Verification:** one producer writes `daytime_stress_scaled`/`stress_high_minutes`; the day's
+  stored scalar equals the mean of that day's stored buckets, and the stored high-minutes equal the
+  bucket count at `level ≤ −0.5` × 30, on every day — which is the check that would have caught this.
+
 ### [app-shell][platform] BF-80 — the app comes back blank after backgrounding, and nothing is recorded when it does
 
 - **Lane:** A — `android/app/src/main/java/com/trainingai/app/MainActivity.java` is where the fix
@@ -767,6 +876,9 @@ description will silently drop the field that turns out to matter. **The owner i
   in Goals or the split just moves.
 - **Where:** the owner said More → details. `BF-71` put the clinical screen at `More → Health`, so a
   sibling `More → Profile details` is consistent and leaves the tab itself uncluttered.
+- **➜ BF-82 decides where this section lives** — it is the More page's information-architecture
+  pass, and the two will disagree about where height and sex belong if built independently. This
+  entry owns the content; that one owns the placement.
 - **Verification:** every profile column is editable in exactly one place; saving one field leaves
   the rest unchanged (which is BF-78's test, run through the UI); weight and body fat read as
   measurements with their date, not as inputs.
