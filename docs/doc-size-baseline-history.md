@@ -4658,6 +4658,26 @@ the fix, and the owner now wants that control reduced to an icon. So the entry s
 name has to carry what the label was carrying, and that the hit box stays 44 dp while the label
 shrinks — the two ways this ships as a regression while looking like the request.
 
+## 2026-08-31 — `docs/implementation-backlog.md` (BF-74/75/76, the nutrition review's second batch)
+
+Three entries where the code changed what the report meant.
+
+**BF-74** looked like a tap-target complaint and is not. `meal-detail-sheet.tsx` passes
+`hideCloseButton`, so the photo's remove ✕ — `absolute right-0 top-0` — is the only ✕ on the screen,
+in the corner every user reads as "close". That is a wrong-meaning problem, and the entry says so
+explicitly because the obvious fix (make it bigger) makes an accidental hit *more* likely.
+
+**BF-75** asked for a nutrition theme, and one already exists: `screen-palettes.ts` defines a
+`nutrition` key and the tab renders it. What is black is every sheet, because `SheetContent` starts
+with `bg-background` — the exact case CLAUDE.md's background rule names. The entry's weight is spent
+on the hazard: that class is the app-wide primitive, so this must be an opt-in variant, and dense
+sheets need the scrim treatment or the wallpaper eats the 4.5:1 floor.
+
+**BF-76** is the owner asking for a sweep rather than a third individual safe-area report, which the
+sibling-surface rule already wanted. It inherits BF-62's `vh`-includes-the-inset hypothesis as its
+first pass, because that generalises to every sheet at once, and it requires the enumeration to be
+produced *before* any fix — a sweep that fixes as it goes cannot say what it covered, which is how
+the fourth report happens.
 ## 2026-08-31 — `docs/implementation-backlog.md` (BF-77, and BF-57 raised)
 
 The owner asked to share meals with a partner. The entry's job was to notice that the feature is
