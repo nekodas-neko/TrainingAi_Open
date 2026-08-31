@@ -4623,3 +4623,18 @@ green on `716cf0b3` was not semantically invalidated and only the mechanical che
 ratchet and the resurrection check — could have been broken by the merge. That is the question to
 ask before deciding how much of the gate to re-run, rather than treating every base move as
 equivalent.
+
+## 2026-08-31 — backlog raised to 14072 and `docs/agents/state/tuning.md` to 321 (manual-wins signed off on Q-524)
+
+One owner decision, recorded where the work will look for it. *"Yes, manual wins — record that as my
+decision."* That closes the half the 2026-08-19 decision left unstated: a hand-set step goal is
+authoritative and no automated path may overwrite it.
+
+The lines beyond the sign-off line are the four consequences, and they are there because a bare
+"manual wins" under-specifies the build: the AI path may **offer** and may **fill** only while unset,
+accepting a suggestion converts it to manual, and **clearing must return the goal to the derived
+path**. That last one is the reason for the length — a one-way door would mean a bad hand-entered
+number could never be replaced by a computed one, which is the failure this precedence otherwise
+invites.
+
+TN-17 gains a cross-reference saying its own gate is now fully clear, so nobody re-asks the owner.
