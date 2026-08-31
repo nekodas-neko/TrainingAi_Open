@@ -4727,3 +4727,29 @@ number could never be replaced by a computed one, which is the failure this prec
 invites.
 
 TN-17 gains a cross-reference saying its own gate is now fully clear, so nobody re-asks the owner.
+
+## 2026-08-31 — `docs/implementation-backlog.md` (the nutrition cluster to the head, and three misclassifications)
+
+The owner asked for the review's output organised and pushed up the queue. The reorder is the small
+part; three findings came out of doing it.
+
+**LA-44 was struck as a duplicate.** Lane A and BugFix filed the same finding within hours — no UI
+for the DEXA and RMR tables — and BF-71 shipped the screen the same day, so LA-44's premise was
+already false. Its two durable points do not die with it: the no-`bytea` rule belongs to BF-41's
+extraction path, and the general shape it named (an engine-first split leaves the entry surface for
+"later", and nothing fails when later does not come — no test breaks, no check goes red, the table
+just stays empty) is worth more than the entry was.
+
+**BF-42's `Needs:` was parking it behind a device check.** It pointed at BF-71, which shipped and now
+sits in the queue only to be looked at on the phone — so the pointer blocked reading a stored value
+behind verifying a form. Cleared, not re-pointed, and the entry now carries BF-71's measurement:
+BMR 1328 / TDEE 1594 against 1485 / 1782 predicted, so the 188 kcal/day it forecast is confirmed.
+
+**BF-57 was a `Keep:` and should never have been.** A `Keep:` means shipped, residue only, not new
+work — and this entry owes an entire unbuilt surface. Classified that way it never headed Lane B's
+work list, which is how the owner's most-wanted feature sat idle while the payload it needs was
+already merged.
+
+Both lanes now lead with nutrition. Each moved entry was diffed against `main` before the commit —
+six of six byte-identical, BF-57 the one deliberate edit — because a reorder branch that has gone
+stale is how shipped entries get restored.
