@@ -9705,32 +9705,25 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   deliberate archival policy and is explicitly **out of scope** here (see
   `docs/db-volume-cleanup-handover.md`).
 
-### [activity][devices] Q-284 — decide the fate of the Oura activity blend, which now fires on 1 day in 40
+### [app-shell][activity] LA-42 — `trainingBoostFrom` can never be non-null, now structurally
 
-- **Branch:** `chore/retire-oura-activity-blend`
-- **Plan:** none needed
-- **Added:** 2026-08-15 · from the comprehensive review (a finding that was **softened** during
-  verification — see below)
-- **What it is.** `blendActivityScore` (`lib/activity/blend-activity.ts`) exists to credit gym
-  training that Oura's Cloud activity score under-counted. It returns early unless
-  `ouraActivityScore != null`, and `lib/health/readiness-payload.ts:347` only calls it when
-  `ouraToday?.activityScore != null`, falling through to our own score otherwise.
-- **Measured, and this corrects the first reading.** The initial finding was "dead code — the Cloud
-  is gone, so `oura_daily.activity_score` is always null". **That is not what production says:**
-  `count(activity_score)` over post-re-key days is **1 of 40** (16 of 55 across all history). So the
-  branch is **nearly inert, not dead**, and it is filed on those terms rather than as a deletion.
-- **Why it is still worth an entry.** A branch that fires on one day in forty is a branch nobody can
-  reason about and no test exercises meaningfully. Its constants (`TRAIN_CREDIT_BASE = 6`,
-  `TRAIN_CREDIT_VOL = 8`, `MAX_ADJ = 14`) are described in their own comment as *"heuristic and
-  intentionally bounded; tune against real data over time"* — and there is now no path by which
-  real data will accrue, because the Cloud integration was removed on 2026-08-13.
-- **Decide, in one small PR:** either (a) retire it and let our own Activity Score stand alone —
-  the fallback branch already handles 39 of 40 days and folds in training credit itself — or
-  (b) keep it and document why one day in forty takes a different code path. **Check first whether
-  that single non-null day is real Cloud data or a stray write**; if it is a stray, (a) is
-  unambiguous.
-- **Low priority.** No user-visible fault, no data loss. This is dead-weight removal, and it should
-  not jump ahead of anything in the scoring cluster above.
+- **Branch:** _unassigned_ · **Lane: B** — `components/health/health-score-detail.tsx`
+- **Added:** 2026-08-30 · Lane A, from Q-284's removal.
+- `health-score-detail.tsx:205` computes
+  `trainingBoostFrom={… data.activityBlend.adjustment > 0 ? data.activityBlend.base : null}`.
+  Q-284 deleted `blendActivityScore`, so `adjustment` is now a literal `0` in
+  `readiness-payload.ts` and that ternary can only ever take its null arm.
+- **Not a regression, and that distinction matters for how urgent this is.** The prop was already
+  dead in practice — the blend last had an Oura score to adjust on **2026-07-07**, the re-key day —
+  so nothing changes for a user. Q-284 turned "dead in practice" into "dead by construction", which
+  is what makes it safe to delete rather than merely unused today.
+- **The fix is a deletion**, in Lane B's file: drop the prop and whatever `ScoreRing` does with it,
+  unless that path has another caller. The sibling banner this pairs with (`activity-content.tsx`'s
+  *"Oura 56 · +10 training → 66"*, named in the 2026-07-02 plan) is **already gone** — a grep for
+  `.adjustment` across `app/` and `components/` returns this one line and nothing else.
+- **Low priority.** No user-visible fault; it is dead-weight removal on a surface that already
+  renders correctly.
+
 
 > **⚑ Q-232 … Q-244 are one cluster** — the 2026-08-14 UI/flow/IA + caching review, requested by the
 > owner ("a good review on the ui and flow/location mainly … alongside that have a look at caching

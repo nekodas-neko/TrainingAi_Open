@@ -15,7 +15,6 @@
 import { getRepository } from '@/lib/data'
 import { todayInTz, todayMidnightUtc, toAestDay, ageFromDob } from '@trainingai/shared/date-utils'
 import { getCurrentPhase } from '@trainingai/shared/phase-engine'
-import { blendActivityScore, type ActivityBlendResult } from '@/lib/activity/blend-activity'
 import { computeVolumeAcwr, ACWR_THRESHOLDS } from '@trainingai/shared/ai-periodization/acwr'
 import { scoreBand } from '@trainingai/shared/health/score-band'
 import { computeSleepScore, sleepComponentsToContributors, sleepScoreBaselines } from '@trainingai/shared/health/sleep-score'
@@ -56,6 +55,21 @@ export interface EarlyDeloadReason {
   acwr: number
   scoreThreshold: number
   acwrThreshold: number
+}
+
+/**
+ * The activity figure this payload reports, and how it was reached.
+ *
+ * Moved here from `lib/activity/blend-activity.ts` when that module was deleted (Q-284). `base` and
+ * `final` are now always the same number and `adjustment` is always 0 — the shape survives because
+ * it is this payload's published contract, not because anything still blends.
+ */
+export interface ActivityBlendResult {
+  base: number | null
+  adjustment: number
+  final: number | null
+  /** A gym session was logged today. */
+  trained: boolean
 }
 
 export interface ReadinessScoreResponse {
@@ -398,17 +412,21 @@ export async function buildReadinessPayload(userId: string, tz: string): Promise
     goals,
   })?.preTaperScore ?? null) : null
 
-  // Oura's blend only ever *adjusts* its own base score — on days without an Oura activity row,
-  // pass our own base straight through instead (it already folds in training credit, so calling
-  // blendActivityScore on top would double-count logged volume).
-  const activityBlend: ActivityBlendResult = ouraToday?.activityScore != null
-    ? blendActivityScore({
-        ouraActivityScore: ouraToday.activityScore,
-        trainingVolumeContrib: (ouraToday.activityContributors?.training_volume as number | null | undefined) ?? null,
-        todayWorkoutVolumeKg,
-        typicalSessionVolumeKg,
-      })
-    : { base: activityDisplayScore, adjustment: 0, final: activityDisplayScore, trained: todayWorkoutVolumeKg > 0 }
+  // Q-284 — our own Activity Score, always. `blendActivityScore` used to adjust an Oura Cloud
+  // activity score on the days one existed; it is deleted, because no such day can occur again.
+  // `oura_daily.activity_score` has had no value since **2026-07-07, the BLE re-key date itself**,
+  // and that table's only remaining writer is the rollup's wear-time step, which sets
+  // `nonWearTimeSec` and nothing else. The entry recorded the branch as "1 day in 40" and was filed
+  // as a decision on that basis; that one day was the re-key boundary, counted inclusively.
+  //
+  // The shape is kept rather than collapsed: it is part of this payload's contract and
+  // `health-score-detail.tsx` reads it. `adjustment` is now structurally 0.
+  const activityBlend: ActivityBlendResult = {
+    base: activityDisplayScore,
+    adjustment: 0,
+    final: activityDisplayScore,
+    trained: todayWorkoutVolumeKg > 0,
+  }
 
   const loadScore = acwr != null
     ? acwr >= ACWR_THRESHOLDS.lowMax && acwr <= ACWR_THRESHOLDS.optimalMax ? 10
