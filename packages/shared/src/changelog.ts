@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.413.3",
+    date: "2026-08-31",
+    changes: [
+      "Energy Balance now uses your measured resting rate instead of estimating one. It was predicting 1481 where your test says 1325, and that estimate was also the floor under the calibrated maintenance — so the calibration could not report a lower number even when your own data said so.",
+    ],
+  },
+  {
     version: "1.413.2",
     date: "2026-08-31",
     changes: [

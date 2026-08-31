@@ -547,10 +547,22 @@ brings it back.** It fits every part of the report:
   do nothing** (a dead renderer cannot respond to touch) and does **backing out and re-entering fix
   it**? A dead renderer needs a reload; a JS fault would not survive one either, but would have left
   a row.
-- **Rule out the cheaper causes first, in this order:** (1) the service worker serving an empty shell
-  — the cache name is build-stamped, so a deploy mid-session is a candidate; (2) a route that renders
-  null while a cache read resolves; (3) the renderer death above. (1) and (2) would both leave
-  evidence — a row, or a screen that recovers on navigation.
+- **Rule out the cheaper causes first, in this order:** (1) the service worker serving an empty shell;
+  (2) a route that renders null while a cache read resolves; (3) the renderer death above.
+- **⚑ (1) IS RULED OUT from code, 2026-08-31 — no device needed.** `public/sw-template.js`'s
+  navigation branch is **network-first**: it fetches, caches only on `res.ok`, and falls back to a
+  cached document *only* in the `catch`, i.e. when the network failed. It cannot serve an empty
+  shell. And it is not even reached by this symptom — returning from the background resumes the
+  existing document rather than navigating, so the service worker is not consulted at all.
+- **⚑ The entry's own reasoning about (2) is wrong, and it matters.** It says (1) and (2) "would
+  both leave evidence — a row, or a screen that recovers on navigation". **A route rendering null
+  leaves no row**: a null render is not an exception, so `app/error.tsx` never fires and the client
+  reporter is never called. So the absence of an `error_events` row does **not** distinguish (2)
+  from renderer death — only the recovery behaviour does. Test it that way: after a blank screen,
+  does navigating (not reloading) restore it? Yes → (2). No → (3).
+- **A JS-side detector cannot see (3), which is why one was not built here.** If the renderer is
+  dead there is no JS left to notice or report, exactly as the entry says. Instrumentation would
+  only ever catch (2) — worth adding once (2) is not already excluded by the navigation test above.
 - **⚠ It costs an APK.** Anything in `MainActivity.java` is native, so it ships through the Android
   workflow, not a Railway deploy. Confirm the owner holds `key.hex` before any suggestion that
   touches installation — an uninstall destroys the Oura ring key. (Confirmed held 2026-08-25; ask
@@ -1583,64 +1595,6 @@ is crop-before-upload and a typed form has no such exposure at all.
 **Still true:** there is no outbox domain behind either route, so an offline save fails visibly
 rather than queueing. Adding one is a local-store table and a sync domain, which is
 Lane A's.
-
-### [body][nutrition] BF-42 — the daily energy model computes its own BMR and never reads the measured RMR
-
-- **Lane:** A — `lib/health/energy-balance-service.ts`.
-- **Added:** 2026-08-27 · found while answering the owner's question *"are we able to make sure that
-  our excercise calculations add on to the base correctly."* The adding-on is correct. The **base**
-  is not going to be.
-
-**BF-33 wired the measurement into `calculateBaseline`, which is the goal wizard. The live daily
-model is a third path and it was missed.** `energy-balance-service.ts:191-197` computes its own BMR:
-
-```ts
-const bmr = latestBodyFatPct != null
-  ? cunninghamBmr(latestWeightKg! * (1 - latestBodyFatPct / 100))
-  : mifflinStJeorBmr(...)
-const formulaBaseline = Math.round(bmr * SEDENTARY_MULTIPLIER)
-```
-
-No `personalRmr`, no `getLatestMeasuredRmr`. So the moment the owner types 1325 into BF-33's UI, the
-goal wizard will use it and the **Energy Balance card will not** — two numbers for one person's
-resting rate, on two screens, which is the same failure Q-401 fixed for activity multipliers.
-
-**It is worse than a missed read, because that BMR is also a floor.** `restingBaseKcal` is
-`Math.max(Math.round(bmr), maintenanceKcal - avgActiveKcal)`. For this owner the formula BMR is
-**1481** and the measured RMR is **1325**, so the floor sits **156 kcal above the measured resting
-rate** and clamps the calibrated maintenance up to it — the calibration cannot report the truth even
-when the data says so. The floor's comment (*"resting burn can never fall below BMR"*) is sound; the
-bug is that it is using a prediction as the definition of BMR when a measurement is available.
-
-- **Fix:** read the measurement in the service, run it through `personalRmr(measured, leanMassKg)`
-  the same way `calculateBaseline` does, and use the result as both the base and the floor. The
-  repository method already exists (`repo.getLatestMeasuredRmr`, used by
-  `app/api/nutrition-goals/recommend/route.ts:212`), so this is a read plus one substitution, not new
-  infrastructure.
-- **✅ MEASUREMENT NOW STORED, 2026-08-31 — this entry is fully verifiable and nothing gates it.**
-  The owner entered the results on the S25: `measured_rmr` = **1325 kcal at 51.5 kg FFM**,
-  `dexa_scans` = **28.5 %**, both dated 2026-08-27, both confirmed in production. So the check this
-  entry asks for — *the Energy Balance card and the goal wizard agree* — can be run today, and they
-  currently do not.
-- **✅ UNBLOCKED 2026-08-31 — the `Needs:` is cleared and deliberately not replaced.** It pointed at
-  BF-33, then at BF-71; **BF-71 shipped the entry screen the same day** (`More → Health → DEXA & RMR
-  results`, both tables verified filling). BF-71 stays in the queue only for a device check, and a
-  `Needs:` on it would park this entry behind a check it does not depend on — reading a stored value
-  needs the value to be storable, which it now is. Enter the 2026-08-27 results and this is
-  immediately verifiable.
-- **BF-71 measured the prize this entry predicted.** With 1,325 kcal and 51.46 kg FFM stored,
-  `calculateBaseline` returns **BMR 1328 / TDEE 1594** against **1485 / 1782** predicted. The
-  **188 kcal/day** below is confirmed, not forecast — and the Energy Balance card is still showing
-  the prediction, which is exactly what this entry fixes.
-- **⚠ The numbers above are from 2026-08-27 and the formula BMR has since moved — re-measure before
-  trusting them.** On 2026-08-31 the owner's latest reading is 71.45 kg at 25.2% → 53.4 kg FFM →
-  Cunningham **1,524**, not 1,481 (that figure was Cunningham at the *test-day* FFM, which is where
-  the −156 residual comes from and is still correct). The live gap: the Energy Balance card shows a
-  **1,629** base — `1,524 × 1.2 − 200`, reproducing to within a kcal — where the measurement would
-  give **≈1,442**. So the cost is **~188 kcal/day**, and it tracks the scale rather than staying
-  fixed, which is the argument for reading the measurement rather than tuning the prediction.
-- **Verification:** with a measurement stored, the Energy Balance card's resting base and the goal
-  wizard's BMR agree; with none stored, both fall back to the same prediction and nothing moves.
 
 ### [body][app-shell] LA-45 — the DEXA-corrected body fat is in the payload and no screen reads it
 
