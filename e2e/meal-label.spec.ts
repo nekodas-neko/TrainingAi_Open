@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test'
 import { Client } from 'pg'
 import { SEED_EMAIL, openSavedMeal, settleRouteBoundary } from './fixtures'
-import { encodeMealLabelToken } from '@trainingai/shared/nutrition/label-payload'
+import { encodeMealLabelToken, decodeSharedMeal } from '@trainingai/shared/nutrition/label-payload'
 import { readPngDensity } from '@trainingai/shared/nutrition/png-density'
 import { readFileSync } from 'node:fs'
 
@@ -227,7 +227,7 @@ test('a saved meal renders a printable label in every style', async ({ page }) =
   // one whose code is tightest, so a regression there matters most. "Square" is Q-393's ingredient
   // layout, which takes a different draw path entirely — it would be the easiest one to break
   // silently, since it is the only style that renders from a second data source.
-  for (const style of ['Ingredients · centred', 'Black band', 'Editorial', 'Deli ticket', 'Plaque', 'Big code']) {
+  for (const style of ['Ingredients · centred', 'Black band', 'Editorial', 'Deli ticket', 'Plaque', 'Big code', 'Share code']) {
     await selectStyle(style)
   }
 
@@ -251,6 +251,68 @@ test('a saved meal renders a printable label in every style', async ({ page }) =
     expect(text, `${style}'s code must decode off the rendered label`).toBeTruthy()
     expect(text, `${style}'s code must resolve to this meal`).toBe(expectedToken)
   }
+
+  /**
+   * **BF-57 — the label a stranger can use.** Everything above proves the code resolves to THIS
+   * meal for the person who printed it. That is a private bookmark: another account's scan of it
+   * finds nothing, which is exactly why a shared label needed a different payload.
+   *
+   * This decodes the `share` style's code back into a meal and checks the numbers, through the real
+   * renderer and a real QR decode. The fixture is eight ingredients against a 251-byte budget, so it
+   * takes the ROLLED path — five named plus one remainder — and the assertion that matters is that
+   * the totals still add up to the recipe **exactly**. That is the guarantee `encodeSharedMeal` is
+   * built around and the one a scanner cannot check for themselves: a copy with plausible-looking
+   * numbers that are quietly wrong is indistinguishable from a correct one.
+   */
+  await selectStyle('Share code')
+  {
+    const shot = await canvas.evaluate((el: HTMLCanvasElement) => {
+      const ctx = el.getContext('2d')!
+      const d = ctx.getImageData(0, 0, el.width, el.height)
+      return { w: el.width, h: el.height, data: Array.from(d.data) }
+    })
+    const text = decodeQr(shot)
+    expect(text, 'the share code must decode off the rendered label').toBeTruthy()
+    // Not the token: this is the assertion that the swap actually happened. A `share` label still
+    // emitting `encodeMealLabelToken` would decode fine and be useless to everyone else.
+    expect(text).not.toBe(expectedToken)
+
+    const shared = decodeSharedMeal(text!)
+    expect(shared, 'the share code must decode as a meal, not a bookmark').not.toBeNull()
+    expect(shared!.name).toBe(MEAL_NAME)
+    // servings = 2, so a scanner's copy is the same batch rather than one plate.
+    expect(shared!.servings).toBe(2)
+    expect(shared!.rolled, 'eight ingredients cannot fit 251 bytes — this is the rolled path').toBeGreaterThan(0)
+    expect(shared!.ingredients.length).toBeLessThan(8)
+
+    // 8 × (60 g, 240 kcal, 50 P, 4 C, 2 F) at quantity 2 — exact, including across the remainder.
+    const sum = (k: 'weightG' | 'calories' | 'proteinG' | 'carbsG' | 'fatG') =>
+      shared!.ingredients.reduce((a, i) => a + i[k], 0)
+    expect(sum('weightG')).toBe(480)
+    expect(sum('calories')).toBe(1920)
+    expect(sum('proteinG')).toBeCloseTo(400, 6)
+    expect(sum('carbsG')).toBeCloseTo(32, 6)
+    expect(sum('fatG')).toBeCloseTo(16, 6)
+  }
+
+  // BF-57 item 2: a copy that arrives with fewer rows than the author's must say so where the person
+  // holding the paper can read it, not only inside the payload.
+  await expect(
+    page.getByText(/groups the other \d+ into one entry/),
+    'the sheet must say what the share code could not name',
+  ).toBeVisible({ timeout: 20_000 })
+
+  // And the print styles must say the opposite, plainly — the confusion BF-57 exists to end is
+  // someone handing over a jar label and it doing nothing.
+  //
+  // Back to `Big code` specifically, not to any token style: the assertions below are about THAT
+  // style's ingredient breakdown, and the decode loop left it selected before this block was
+  // inserted. Restoring a different one would silently move them onto the wrong layout.
+  await selectStyle('Big code')
+  await expect(
+    page.getByText(/private bookmark/i),
+    'a token-carrying style must not read as shareable',
+  ).toBeVisible({ timeout: 20_000 })
 
   // Q-393. The square style is the only one that prints the ingredient breakdown, and it is the
   // only one that renders from a second data source — so it is the easiest to break silently. This

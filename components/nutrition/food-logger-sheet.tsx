@@ -8,6 +8,8 @@ import { ReviewStep, type EditableNutrition } from './review-step'
 import { AssignStep } from './assign-step'
 import { SavedMealsSheet } from './saved-meals-sheet'
 import type { NutritionScanResult, NutritionIngredient, FoodItem, FoodLogWithItem, SavedMeal, MealType } from '@trainingai/shared/types/nutrition'
+import type { SharedMeal } from '@trainingai/shared/nutrition/label-payload'
+import { saveSharedMealToLibrary } from './save-shared-meal'
 import { todayInTz } from '@trainingai/shared/date-utils'
 import { mealTypeForHour } from '@trainingai/shared/nutrition/log-plan-meal'
 import { logMealItems } from '@trainingai/shared/nutrition/log-meal'
@@ -212,9 +214,18 @@ export function FoodLoggerSheet({ open, preselectedMealTypeId = null, onClose, o
           meal = list.find(m => m.id === mealId) ?? null
         }
       }
-      // A physical label outlives the row behind it. Say so, rather than falling through to a
-      // barcode "not found" that names the wrong thing.
-      if (!meal) { toast.error('That saved meal no longer exists'); return }
+      // **Two different things land here and the old copy asserted the wrong one** (BF-57). This
+      // branch resolves an id against the SCANNING user's own meals, so it is reached both when the
+      // owner deleted their meal and when someone else's pre-BF-57 label is scanned — where the meal
+      // exists perfectly well and simply is not theirs. "No longer exists" is false in the second
+      // case, and it is the case that matters now that labels get handed to people. Name both, and
+      // point at the fix: a re-printed label carries the meal itself and needs no account at all.
+      if (!meal) {
+        toast.error('That meal is not in your library', {
+          description: 'It was deleted, or the label was printed by someone else. Newer labels carry the whole meal — ask them to share a fresh one.',
+        })
+        return
+      }
 
       // The same cache key the nutrition screens fill (TTL_LONG), so this is warm offline. The
       // local store's own getMealTypes returns a narrower row type than mealTypeForHour wants.
@@ -235,6 +246,35 @@ export function FoodLoggerSheet({ open, preselectedMealTypeId = null, onClose, o
     } catch (err) {
       console.error('Scanned meal log failed:', err)
       toast.error('Failed to log that meal')
+    }
+  }
+
+  /**
+   * A scanned label that carries the whole recipe (BF-57).
+   *
+   * Nothing is fetched and nothing is resolved: the payload *is* the meal, which is what makes this
+   * work in a kitchen with no signal and for someone who has never had an account here. It saves a
+   * COPY into the scanner's own library rather than logging it, because the two are different asks
+   * — a shared recipe is something you keep and cook again, and logging it immediately would put a
+   * meal in today's diary that nobody said they had eaten.
+   */
+  async function handleScannedSharedMeal(shared: SharedMeal) {
+    try {
+      const { name } = await saveSharedMealToLibrary(shared, userId, tz)
+      hapticLight()
+      toast.success(`${name} saved to your meals`, {
+        description: shared.rolled > 0
+          // Said out loud rather than buried: the numbers are exact, but a scanner who later opens
+          // the meal will find fewer ingredient rows than the author's, and finding that out by
+          // surprise reads as data loss.
+          ? `Calories and macros are exact. ${shared.rolled} ingredient${shared.rolled === 1 ? '' : 's'} arrived grouped into one entry.`
+          : undefined,
+      })
+      reset()
+      onClose()
+    } catch (err) {
+      console.error('Shared meal save failed:', err)
+      toast.error('Could not save that meal')
     }
   }
 
@@ -304,6 +344,7 @@ export function FoodLoggerSheet({ open, preselectedMealTypeId = null, onClose, o
         onScanResult={handleScanResult}
         onManual={handleManual}
         onScannedSavedMeal={handleScannedSavedMeal}
+        onScannedSharedMeal={handleScannedSharedMeal}
         openOnMeals={openLibrary}
       />
     </>
