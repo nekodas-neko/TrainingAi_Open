@@ -5216,6 +5216,19 @@ none of that entry's three levers touch and which the file's own header tells se
 instance of what the note above describes, raised rather than hidden. Trimming it is Orchestrator's
 sweep, not a native-fix PR's.
 
+## 2026-08-31 — `docs/implementation-backlog.md` 14528 → 14730, `projectOverview.md` 8572 → 8586
+
+`lane-a/coach-nutrition-scope` (LA-47 piece 2). The backlog growth is LA-47 recording that its own
+proposed lane split for the plan widget **does not compile** — a new `CoachWidgetSchema` member is
+a type error until `widget-registry.tsx` handles it, and a branch rendering `null` wedges the
+thread — together with the settled widget design, so whoever pairs on it does not re-derive it.
+Cheaper here than a second entry. Re-derived twice while the branch was open, in both directions:
+LB-12 and BF-85 landing on `main` took more lines away than LA-47 added, and BF-86 then put more
+back. Which is the argument for re-deriving from the merged file rather than splicing a number.
+
+`projectOverview.md` is again the Current Status blurb, which is the growth the note added to Q-220
+earlier today describes. Third raise of the evening from the same cause; the retention rule is
+Orchestrator's sweep.
 ## 2026-09-01 — `docs/implementation-backlog.md` 14528 → 14507 (shrink)
 
 `docs/bf55-owner-decision`. Two independent raises collided in this file and both are now moot. The
