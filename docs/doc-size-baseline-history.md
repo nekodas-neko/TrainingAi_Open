@@ -4623,3 +4623,37 @@ green on `716cf0b3` was not semantically invalidated and only the mechanical che
 ratchet and the resurrection check — could have been broken by the merge. That is the question to
 ask before deciding how much of the gate to re-run, rather than treating every base move as
 equivalent.
+
+## 2026-08-31 — `docs/implementation-backlog.md` (BF-72, and BF-35/BF-70 corrected)
+
+Three edits from one review session, all about a value that exists and does not arrive.
+
+**BF-72** is a one-line root cause found from the owner's own phrasing — *"it starts as the meal with
+the image, then breaks into its ingredients"* says the optimistic write is right and something after
+it is wrong. The diary's hydration rebuilds each local row from the server response and omits
+`savedMealId`/`mealGroupId`; a local upsert overwrites all columns, so the omission writes NULL, and
+the next line re-reads and renders the stripped copy. Confirmed in production rather than argued:
+11 rows carry both ids and resolve to six real meals, two of which are exactly the five loose rows in
+the screenshot.
+
+**BF-70** gains a fourth drop site, and it is the important one: `create-food-item.ts:68` reads
+`s.imageDataUri` where `s` is `sanitiseNutrition(...)`'s numeric-only return, so the line is always
+null while its comment asserts the value is present. That comment is why nobody caught it — the file
+reads as the place the feature was implemented.
+
+**BF-35's `Keep:` said the images were "stored and unseen"** and that was wrong; nothing stores them,
+so the render it lists as owed would show the same placeholder. Corrected in place with BF-70 named
+as the prerequisite, because building the render first is the wasted PR that line would have caused.
+
+## 2026-08-31 — `docs/implementation-backlog.md` (BF-73, a second pass over BF-50's work)
+
+Both halves of this report are re-reports of controls BF-50 already built, and saying so is most of
+the entry's value. The capture tiles were raised 48 → 62 dp with the number taken from the artboard
+under BF-28's parity rule, so "make them bigger" now means overriding the drawing — legitimate under
+rule 2 (a later owner decision beats the artboard) but it has to be *recorded* as an override, or the
+next parity sweep corrects them back and the owner reports it a third time.
+
+The action pair is the same shape: BF-50 ④ renamed `Select` to `Delete meals` because the words were
+the fix, and the owner now wants that control reduced to an icon. So the entry says the accessible
+name has to carry what the label was carrying, and that the hit box stays 44 dp while the label
+shrinks — the two ways this ships as a regression while looking like the request.
