@@ -6400,190 +6400,61 @@ screenshot is a **1:39** walk with the screen on, which exercises none of it.
 - **Verification.** HR live on-device with the strap paired, and the stale guard exercised by walking
   out of range. The notification half is **APK-only** and cannot be checked in `pnpm dev` at all.
 
-### [cardio][devices] Q-410 — the guided walk should show speed and steps and pace itself by cadence, but the cadence signal is gated and reads `--`
+### [cardio][devices] LA-48 — a walk's pacer creates an adherence number and nothing stores it
 
-> **⚠ The step-total readout this entry lists shipped 2026-08-23 (v1.339.0)** with Q-418 —
-> both walk screens now show it via `ActivitySecondaryMetrics`. What is left here is the speed
-> readout and pacing by cadence.
-
-- **Branch:** `feat/walk-step-goal`
-- **Added:** 2026-08-19 · owner, mid-session, with a screenshot of a live walk
-- **Lane:** B — classified 2026-08-30 by CLAUDE.md's path rule (*reached only from `app/**` and `components/**` → B*; the speed readout and cadence pacing are surface — the gated cadence signal it depends on is already produced).
-- **Owner's words:** *"for the walking section I'd it to show the speed and total step count.
-  rather than a HR goal we should be looking at a step goal; we should enough data on how to do
-  this."*
-- **Placement:** medium, and **read the blocker below before scheduling it** — one third of this is
-  a display change that can ship next session, and two thirds depend on a measurement problem that
-  is open.
-
-**What the screen shows today.** `components/guided-walk/walk-active.tsx` (224 lines) renders the
-segment name, the countdown, live **bpm**, `distanceKm` when a route exists (`:189-190`), a cadence
-readout, and a verdict line built from HR targets: `In zone (target ≤99 bpm)` / `Push harder` /
-`Ease off` (`:201-204`). The owner's screenshot is a slow segment reading **96 bpm, in zone**, with
-cadence showing **`--`**.
-
-**Split this into three pieces, because they are not equally ready.**
-
-**1 — Speed. ⚠ CORRECTED 2026-08-19 — pace IS already rendered, and the earlier wording here was
-misleading.** `walk-active.tsx:167-176` renders pace as **min/km** whenever `currentPaceSecPerKm`
-is non-null, and drops to an HR-primary layout when it is null (no GPS lock — indoor or treadmill).
-**The owner's screenshot was that fallback**, which is why no pace appeared; it is a GPS-lock
-situation, not a missing feature. An implementer reading the old sentence would have gone looking
-for an absent line and found it already there.
-**What is genuinely missing is the unit the owner asked for — km/h — and a step total.** That
-layout also carries a prior owner decision, recorded in its own comment: *"pace is the real
-fast/slow signal, HR drifts set-over-set and is only a secondary confirmation."* So the screen
-already has a primary-metric hierarchy, and cadence slots into it rather than replacing it. **Decide the unit deliberately**: pace (`min/km`) is the
-convention for running and is what the summary already computes (`computeAvgPaceSecPerKm`), while
-speed (`km/h`) is the more natural reading for a walk and is what the owner asked for by name.
-Recommendation: show **km/h** on the live screen, keep min/km in the summary where it sits beside
-splits and best efforts, and derive both from the one pace series rather than adding a second
-computation — the One Formula rule applies.
-
-**2 — Total step count. Ready only when a strap is worn.** `stepsEstimate` exists and is already
-saved (`walk-summary.tsx:150,167`), and it comes from **integrating the strap's cadence series over
-the walk** (Q-230 replaced a hardcoded `null` with it). So a running total can be shown live from
-the same tracker with no new plumbing — but it is a strap-only number today, and it must be
-labelled as an estimate rather than a count, because it is integrated cadence and not counted
-steps.
-
-**3 — ⚠ Replacing the HR goal with a step goal. BLOCKED on a measurement problem, and this is the
-finding that matters.** The premise *"we should have enough data on how to do this"* is the part to
-check before building: **we do not, yet, and the screenshot is the evidence.**
-- Cadence is fused from two sources (`lib/activity/cadence-tracker.ts`): the **strap** at ~1
-  reading/second, and the **ring** at one gait window per ~30 s. The `--` in the screenshot means
-  neither was live — no H10 that walk, and the ring had delivered nothing usable.
-- The ring path is **explicitly gated**: `RING_CADENCE_VALIDATED = false`
-  (`packages/shared/src/health/cadence.ts:218`). Its docstring is worth reading in full before
-  planning this — the signal is not broken, it is **octave-ambiguous**. Three counted captures land
-  on opposite sides of an octave split (64 spm → 0.98 Hz reads as step rate; 114 spm → 1.02 Hz reads
-  as *stride* rate), and a metronome-referenced capture agreed with the strap to **0.4 spm**. The
-  comment is explicit that shipping it uncorrected gives a number **wrong by 2×**, which is worse
-  than showing none.
-- **So a step goal built on today's cadence would be paced by a signal that is absent without a
-  strap and can be double or half with one.** An HR goal, whatever its faults, is at least always
-  present — the ring gives HR continuously. **Do not swap the target over until the ring path is
-  octave-corrected and re-validated across counted cadences**, which is the concrete next step that
-  docstring already names.
-- **Recommendation:** ship pieces 1 and 2 now as *additional* readouts, keep the HR verdict as the
-  pacing target, and treat the swap as a follow-up gated on ring validation. That gives the owner
-  the two numbers asked for on the next deploy without keying the workout to a signal that reads
-  `--`.
-
-**ANSWERED BY THE OWNER, 2026-08-19 — it is a cadence target.** *"Yes a cadence target- like a SPM
-to indicate a 'walk faster' option to get the most out of the work screen"*. So the verdict line
-becomes an **spm** target, not a step total: `Walk faster (aim ≥120 spm)` where it currently reads
-`Push harder (aim ≥140 bpm)`. The daily/session step-total reading is **not** what was wanted and
-should not be built.
-- **This is the right instinct for a reason worth stating: cadence responds and heart rate lags.**
-  HR takes 30–60 s to catch up with a pace change, so a prompt driven by it arrives after the
-  moment it is about. Cadence changes the instant the legs do — which is exactly what makes it
-  useful as a *"walk faster"* cue rather than a report.
-- **The pacer runs in BOTH directions — owner, 2026-08-19:** *"Should also be able to say to
-  slowdown during the slow part. so pacer for speed/steps both ways"*. A slow segment is not an
-  unpaced rest; walking it too hard is what stops the fast set from being fast. So a fast segment
-  reads against a **floor** (`Walk faster — aim ≥120 spm`) and a slow segment against a **ceiling**
-  (`Ease off — aim ≤95 spm`), from the same control and the same bar.
-- Keep `classifyZone`'s three-state shape (`push` / `in` / `ease`) and swap what it reads — **it is
-  already symmetric**, which is why this costs nothing structurally: `push` and `ease` exist today
-  and are chosen by `kind === 'fast'`. The copy and the thresholds change; the shape does not.
-- **So `walk-config.tsx` needs a cadence PAIR, not a single target** — a fast floor and a slow
-  ceiling, mirroring the two HR targets it already stores. A single cadence number cannot express
-  the slow half.
-- **The fast/slow interval targets become cadence numbers**, so `walk-config.tsx`'s target model
-  needs a cadence pair beside the HR pair rather than in place of it — see the fallback below,
-  which needs both.
-
-**⚠ It still cannot be the ONLY target, and this is the part to design rather than discover.**
-The blocker above has not moved: cadence is **absent** without a strap and **octave-ambiguous** from
-the ring. A verdict line keyed solely to cadence shows nothing at all on a walk where the owner left
-the H10 at home — which is the walk in the screenshot that started this.
-- **Recommendation: the verdict follows whichever source is live, and says which.** Cadence when a
-  cadence source is live (strap, or the ring once validated); the existing HR verdict when it is
-  not. One line, two possible drivers, labelled — `Walk faster (aim ≥120 spm)` or
-  `Push harder (aim ≥140 bpm)`. That ships the owner's decision **today** for strap walks without
-  regressing strapless ones to a blank line, and it needs no ring work to be useful.
-- The alternative — cadence-only, gated on finishing the ring octave correction first — is cleaner
-  but delivers nothing until Lane A lands a decoder fix, and leaves strapless walks unpaced
-  forever. Not recommended.
-- **Do not silently fall back.** A user who thinks they are being paced by cadence and is actually
-  being paced by HR will not understand why the prompt is late. The unit on the line is the tell,
-  and it is already there.
-
-**REVISED 2026-08-19 after the owner reviewed the drawing — three changes, all of them load-bearing.**
-
-**(a) The bar is banded, and "the right direction" is never an error.** *"color code the bar based on
-whether its in the right direction of the pacer; i.e slower than expected = green … green for in
-range: orange for slightly out; and red for way off."* So the band is chosen by **signed** distance
-from the target, not absolute:
-- **Fast** segment, floor `F` — `spm ≥ F` **green** (and it stays green however far above; on a fast
-  set, faster is the point) · `F − 10% ≤ spm < F` **amber** · below that **red**.
-- **Slow** segment, ceiling `C` — `spm ≤ C` **green** · `C < spm ≤ C + 10%` **amber** · above that
-  **red**.
-- **10% of the target is the proposed band width**, not a measured one. It is a starting value and
-  should be a named constant next to the thresholds so it can be tuned after a few real walks — do
-  not scatter it inline.
-- **Colour never travels alone** — CLAUDE.md forbids it, and the drawn version pairs each band with
-  a mark and a sentence (`✓ On pace`, `▲ Walk faster — aim ≥120`, `▼ Way over — ease off to ≤95`).
-  A red bar with no words is a rule violation, not a style choice.
-- **⚠ One consequence worth deciding rather than discovering: standing still scores green.** On a
-  slow set, "slower is always better" means stopping is perfect. Recommend a **stopped** state below
-  roughly 40 spm that renders **neutral rather than green** — not scolding, but not congratulating a
-  walk that has stopped being a walk. Flagged, not decided.
-
-**(b) When cadence is absent the pacer falls to SPEED, not heart rate.** *"when no source detected
-for cadence it still shouldn't be BPM; probably speed would be good there."* That gives a precedence
-ladder of **cadence → speed → heart rate**, and it is consistent with the decision already recorded
-in `walk-active.tsx`'s own comment (*"pace is the real fast/slow signal, HR drifts set-over-set and
-is only a secondary confirmation"*). HR becomes the last resort, reached only when GPS is out too —
-which is the treadmill case.
-- **This needs a speed target pair**, the same way cadence does. **Do not add a third manual config
-  block**: `walk-config.tsx` would then ask for HR, cadence *and* speed targets for one walk, which
-  is three ways to say the same intent. Recommend **deriving the speed pair from the user's own
-  recent fast/slow segments** — `segments` already stores `avgPaceSecPerKm` per segment, so the data
-  to seed it is in the table today — and letting the cadence pair stay the thing the user sets.
-
-**(c) Storage — mostly already done, and the entry should say so rather than asking for "store
-everything".** *"make sure all these values get stored so we can do data analysis on it later like
-steps x distance x time."* Measured against `schema.ts` and `walk-summary.tsx`:
-- **Already persisted per walk:** `steps` (Q-230, integrated from strap cadence), `distanceKm`,
-  `durationMin`, `paceSeries`, `avgPaceSecPerKm`, `splits`, `bestEfforts`, elevation gain/loss/profile,
-  `cadenceSpm`, `cadenceSeries`, `cadenceSource`, `avgHr`/`maxHr`.
-- **Already persisted per segment** (`activity_logs.segments` JSONB): `index`, `setNumber`, `kind`,
-  `startSec`, `endSec`, `avgHr`, `maxHr`, `hrAtStart`, `avgPaceSecPerKm`, `distanceKm`,
-  `avgCadenceSpm`.
-- **So steps × distance × time is already answerable at the walk level.** What is genuinely missing
-  is small and specific, and all three are additions to the existing `segments` object rather than
-  new columns:
+- **Branch:** none yet
+- **Added:** 2026-08-31 · Lane B, splitting the storage half out of Q-410 when the surface half shipped
+- **Lane:** A — `activity_logs.segments` is a schema edit (`lib/data/postgres/schema.ts`), and per the
+  offline-sync rule the local SQLite mirror, the outbox payload, `getSyncDelta` and `applyDelta` all
+  move in the same PR. Nothing here is reachable from Lane B.
+- **Why this exists separately.** Q-410's surface half shipped 2026-08-31: `lib/walk/walk-pacer.ts`
+  now decides, once a second, which signal is pacing a segment and which band the walker is in. That
+  is a *new* measurement — it did not exist before, so nothing records it — and the owner's ask was
+  explicit: *"make sure all these values get stored so we can do data analysis on it later like steps
+  x distance x time."*
+- **Three additions to the existing `segments` JSONB, not new columns.** Measured against
+  `lib/walk/segment-stats.ts`, which already stores `index`, `setNumber`, `kind`, `startSec`,
+  `endSec`, `avgHr`, `maxHr`, `hrAtStart`, `avgPaceSecPerKm`, `distanceKm`, `avgCadenceSpm`:
   1. **`steps` per segment** — derivable from `avgCadenceSpm × duration`, but derived-at-read-time
-     means every consumer re-derives it differently. Store it.
+     means every consumer re-derives it slightly differently. Store it.
   2. **Adherence per segment** — the fraction of the segment spent in each band. This is the number
-     the pacer *creates* and the most interesting thing to analyse later ("did I actually hit the
-     targets, or just see the prompt"). Nothing records it today because nothing computed it before.
-  3. **Which signal paced the segment** (`cadence` | `speed` | `hr`). With the ladder in (b) an
-     adherence figure is uninterpretable without it — 60% in-range against a cadence target and
-     against an HR target are not the same measurement.
-- **Adding a key to the `segments` JSONB type is a schema edit** (`lib/data/postgres/schema.ts:344`)
-  and therefore **Lane A**, and per the offline-sync rule the local SQLite mirror, the outbox
-  payload, `getSyncDelta` and `applyDelta` all move in the same PR.
+     the pacer creates and the most interesting thing to analyse later: *did I hit the target, or
+     just see the prompt.*
+  3. **Which signal paced the segment** (`cadence` | `speed` | `hr`). With Q-410's precedence ladder
+     an adherence figure is **uninterpretable without it** — 60% in range against a cadence target
+     and against a heart-rate target are not the same measurement, and the ladder can change rung
+     mid-segment when a strap drops.
+- **The producer is already there and is pure.** `readPacer()` returns the band per tick; the
+  aggregation is "count ticks per band over the segment window", which is the same shape
+  `computeWalkSegmentStats` already runs for HR and pace. Lane B holds the live readings; what is
+  missing is somewhere to put the roll-up.
+- **Verification.** Needs a real walk with the H10 paired to produce a cadence-paced segment at all —
+  a browser only ever reaches the speed rung.
 
-**Drawn 2026-08-19, redrawn after the review — five states, and the layout follows from the fallback rule above.** Speed
-leads at 40 px; cadence and HR sit beneath it as a pair; the step total joins distance on one grey
-line; and the verdict gains a **progress bar against the cadence target**, so *"walk faster"* is a
-reading rather than a sentence. The slow panel shows the bar reading against a
-ceiling rather than a floor, so both directions use one control. The degraded panel is the important
-one: cadence dims to `--`, HR takes the verdict back, and a single line says which signal is pacing
-and how to change it — *"No cadence source — pacing by heart rate. Wear the strap for step pacing."*
-Without that line the screen silently changes what it means. **`walk-active.tsx` is 224 lines**, so
-this fits without an extraction.
+### [cardio][devices] LB-36 — the guided walk's cadence pacer has never run on a device
 
-- **Lane.** `components/guided-walk/**` is Lane B. Any ring octave correction is
-  `packages/shared/src/health/cadence.ts` + the decoder, which is **Lane A**, and it is the harder
-  half by a distance.
-- **Verification.** Speed is checkable in `pnpm dev` against a mocked pace series. **Steps and
-  cadence are not** — they need a real walk with the H10 paired, and the ring half needs a counted
-  capture against a metronome, which is the procedure that produced the numbers in the docstring.
-  State plainly that no device pass was run if none was.
+- **Branch:** none yet
+- **Added:** 2026-08-31 · Lane B, on shipping Q-410's surface half
+- **Lane:** B
+- **Gate:** device
+- **What shipped and what it rests on.** Q-410's pacer went in on 2026-08-31 (v1.411.0). Its **speed
+  rung** is covered end-to-end by `e2e/walk-pacer-speed-rung.spec.ts` against a driven geolocation
+  series, and every guard in `lib/walk/walk-pacer.ts` is mutation-checked. **Neither the cadence rung
+  nor the heart-rate rung has ever executed**, because both need a Polar H10 over BLE and there is no
+  BLE in the sandbox or in `pnpm dev`.
+- **What a device pass has to establish**, in one walk with the strap paired:
+  1. the cadence rung is *reached* — the bar reads `spm`, not `km/h`, and the fallback note is absent;
+  2. the bands move with the legs, and a deliberate slow-down on a fast block goes green → amber → red
+     rather than jumping;
+  3. stopping at a crossing reads **Stopped**, not a green slow block — the one behaviour the
+     `STOPPED_SPM` constant exists for;
+  4. dropping the strap mid-walk falls to the speed rung *and says so*, rather than freezing on the
+     last cadence value;
+  5. the band colours clear 4.5:1 against the walk screen at arm's length in daylight.
+- **The band width is a proposal, not a measurement.** `BAND_TOLERANCE = 0.10` was chosen because the
+  owner's brief said "slightly out" without a number. Whether ±10% is the right amber ring is a
+  question only a real walk answers; it is a single named constant so the answer is a one-line change.
+
 
 ### [workouts][devices] Q-486 — the outbox enqueue for a workout is the only write in the app that fails silently, and it is the last line of defence
 

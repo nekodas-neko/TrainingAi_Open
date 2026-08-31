@@ -6,6 +6,17 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.411.0",
+    date: "2026-08-31",
+    changes: [
+      "The interval walk now shows your speed in km/h, with the min/km pace beside it.",
+      "It also paces you: a bar under the timer tells you to walk faster on a fast block or ease off on a slow one, with green for on pace, amber for slightly out and red for well off.",
+      "Set your own step-rate targets in the walk setup \u2014 a floor for the fast blocks and a ceiling for the slow ones.",
+      "It paces by step rate when the chest strap is on, by speed when it isn't, and by heart rate indoors \u2014 and it always says which one it is using, so a late prompt is never a mystery.",
+      "Stopping at a crossing now reads Stopped rather than counting as a perfect slow block.",
+    ],
+  },
+  {
     version: "1.410.0",
     date: "2026-08-31",
     changes: [

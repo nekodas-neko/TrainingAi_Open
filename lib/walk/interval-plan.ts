@@ -13,6 +13,13 @@ export interface WalkConfig {
    *  Indoor GPS is multipath noise, and a walk carrying a fabricated distance would drag pace
    *  aggregates around. Persisted with the rest of the config so the choice sticks between walks. */
   treadmill: boolean
+  /** Cadence floor for a fast block, in steps per minute — the pacer's "walk faster" target.
+   *  Optional because a config persisted before Q-410 rehydrates without it; read it through
+   *  `resolveCadenceTargets` (lib/walk/walk-pacer.ts) rather than directly. */
+  fastCadenceSpm?: number
+  /** Cadence ceiling for a slow block. A single cadence number cannot express both halves of an
+   *  interval walk — walking the slow block too hard is what stops the fast block being fast. */
+  slowCadenceSpm?: number
 }
 
 export interface Segment {
@@ -56,4 +63,7 @@ export function segmentAt(plan: IntervalPlan, elapsedSec: number): ActiveSegment
   return null
 }
 
+// The cadence pair is deliberately absent here rather than defaulted: every device already
+// carries a persisted config that predates it, so `resolveCadenceTargets` has to supply the
+// default anyway, and a second copy of the numbers here would be the one that drifts.
 export const DEFAULT_WALK_CONFIG: WalkConfig = { sets: 5, fastSec: 180, slowSec: 180, warmupSec: 0, cooldownSec: 0, treadmill: false }

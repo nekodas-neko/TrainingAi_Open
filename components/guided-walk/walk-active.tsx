@@ -7,7 +7,7 @@ import { useGuidedWalkStore } from '@/lib/stores/guided-walk-store'
 import { buildIntervalPlan, segmentAt } from '@/lib/walk/interval-plan'
 import { scheduleWalkCues, cancelWalkCues } from '@/lib/walk/walk-cues'
 import { getLiveHrManager } from '@/lib/live-hr/manager'
-import { hrReserveTarget, classifyZone } from '@trainingai/shared/health/hr-zones'
+import { hrReserveTarget } from '@trainingai/shared/health/hr-zones'
 import { hapticSuccess } from '@/lib/haptics'
 import type { LiveHrSample } from '@/lib/live-hr/types'
 import { LeaveWalkDialog } from './leave-walk-dialog'
@@ -17,6 +17,11 @@ import { ActivitySecondaryMetrics } from '@/components/activity/activity-seconda
 import type { CadenceSummary } from '@trainingai/shared/health/cadence'
 import { startGpsWatcher, type GpsWatcher } from '@/lib/activity/gps-tracking'
 import { startRunClockChip, stopRunChip } from '@/lib/native/run-status-chip'
+import { useCachedValue } from '@/lib/hooks/use-cached-value'
+import { WALK_SEGMENT_STATS_TTL } from '@trainingai/shared/cache-ttl'
+import type { KindAggregate } from '@/lib/walk/segment-stats'
+import { WalkPacerBar } from './walk-pacer-bar'
+import { resolveCadenceTargets, speedTargetsFromHistory, kmhFromPace } from '@/lib/walk/walk-pacer'
 
 const ActivityRouteMap = dynamic(
   () => import('@/components/activity/activity-route-map').then(m => m.ActivityRouteMap),
@@ -55,6 +60,16 @@ export function WalkActive({ userProfile, onFinish }: {
     fast: hrReserveTarget(0.70, userProfile.restingHr, hrMax),
     slow: hrReserveTarget(0.40, userProfile.restingHr, hrMax),
   }), [userProfile.restingHr, hrMax])
+  const cadenceTargets = useMemo(() => resolveCadenceTargets(config), [config])
+
+  // The speed rung's targets are the walker's own past fast/slow blocks, not a third thing to
+  // configure — `walk-config.tsx` already reads this exact key for its history card, so this is a
+  // cache hit rather than a second request on the walk screen.
+  const segmentStats = useCachedValue<{ fast: KindAggregate; slow: KindAggregate }>(
+    'walk-segment-stats', '/api/guided-walk/segment-stats', WALK_SEGMENT_STATS_TTL,
+  )
+  const speedTargets = useMemo(() => speedTargetsFromHistory(segmentStats), [segmentStats])
+  const speedKmh = kmhFromPace(currentPaceSecPerKm)
 
   // Live-HR lifecycle + sample collection. This screen owns start()/stop().
   useEffect(() => {
@@ -125,7 +140,6 @@ export function WalkActive({ userProfile, onFinish }: {
   const kind = active?.segment.kind
   const isWork = kind === 'fast' || kind === 'slow'
   const hrLive = liveBpm != null && lastBeatAt != null && Date.now() - lastBeatAt < STALE_MS
-  const verdict = liveBpm != null && isWork ? classifyZone(liveBpm, kind as 'fast' | 'slow', targets) : null
   const phaseColor = kind === 'fast' ? 'var(--color-brand)' : 'var(--color-muted-foreground)'
   const mm = active ? Math.floor(active.remainingSec / 60) : 0
   const ss = active ? active.remainingSec % 60 : 0
@@ -165,13 +179,17 @@ export function WalkActive({ userProfile, onFinish }: {
       {/* Pace-primary once GPS pace exists (owner decision: pace is the real fast/slow
        *  signal, HR drifts set-over-set and is only a secondary confirmation). Degrades
        *  to today's HR-primary layout when no GPS lock exists (indoor/treadmill walk). */}
-      {currentPaceSecPerKm != null ? (
+      {currentPaceSecPerKm != null && speedKmh != null ? (
         <>
+          {/* km/h leads (owner asked for speed by name, and it is the natural reading for a walk);
+              min/km stays beside it because that is the unit the summary's splits and best efforts
+              are in. Both come off the one pace series — there is no second computation. */}
           <div className="flex items-baseline gap-2">
-            <span className="text-3xl font-bold tabular-nums">
-              {Math.floor(currentPaceSecPerKm / 60)}:{String(Math.round(currentPaceSecPerKm % 60)).padStart(2, '0')}
+            <span className="text-3xl font-bold tabular-nums">{speedKmh.toFixed(1)}</span>
+            <span className="text-sm text-muted-foreground">km/h</span>
+            <span className="text-sm tabular-nums text-muted-foreground">
+              · {Math.floor(currentPaceSecPerKm / 60)}:{String(Math.round(currentPaceSecPerKm % 60)).padStart(2, '0')} /km
             </span>
-            <span className="text-sm text-muted-foreground">/km</span>
           </div>
           <div className="flex items-baseline gap-2" style={{ opacity: hrLive ? 1 : 0.5 }}>
             <span className="text-base font-semibold tabular-nums">{liveBpm ?? '—'}</span>
@@ -200,14 +218,15 @@ export function WalkActive({ userProfile, onFinish }: {
       )}
 
       {isWork && (
-        <p className="text-sm font-semibold" style={{
-          color: verdict === 'in' ? 'var(--color-brand)' : verdict ? '#eab308' : 'var(--color-muted-foreground)',
-        }}>
-          {verdict === 'in' ? `In zone (target ${kind === 'fast' ? `≥${targets.fast}` : `≤${targets.slow}`} bpm)`
-            : verdict === 'push' ? `Push harder (aim ≥${targets.fast} bpm)`
-            : verdict === 'ease' ? `Ease off (aim ≤${targets.slow} bpm)`
-            : `Target ${kind === 'fast' ? `≥${targets.fast}` : `≤${targets.slow}`} bpm`}
-        </p>
+        <WalkPacerBar
+          tracker={cadenceTracker}
+          kind={kind as 'fast' | 'slow'}
+          speedKmh={speedKmh}
+          bpm={hrLive ? liveBpm : null}
+          cadenceTargets={cadenceTargets}
+          speedTargets={speedTargets}
+          hrTargets={targets}
+        />
       )}
 
       <Button variant="outline" className="mt-2 h-12 w-full max-w-xs" onClick={() => setConfirmEndOpen(true)}>
