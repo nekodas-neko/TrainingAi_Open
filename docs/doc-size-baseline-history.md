@@ -5187,3 +5187,20 @@ outright would have deleted the Lane B obligations with them.
 
 `projectOverview.md` is a net +9 against +12 added: the status section carried **two** `**Version:**`
 lines, v1.413.2 and a stale v1.406.1 below it, and the second was removed.
+
+## 2026-09-01 — `docs/implementation-backlog.md` (BF-87, a correct number nobody can explain)
+
+The owner asked whether steps count toward calorie burn, and his own screenshot holds both halves:
+1,196 steps beside "nothing earned from movement yet today". Both true, because `STEP_BASELINE` is
+3,000 and only steps above it convert — the sedentary base is BMR × 1.2 and a desk day's incidental
+stepping is already inside that multiplier.
+
+So the entry is a copy fix, and its length is spent on the two ways it could be built wrong. Showing
+the *shortfall* without the *threshold* leaves the same question one step later — the owner's goal is
+7,000 steps, of which only 4,000 convert, and someone expecting all 7,000 to count will read the burn
+as broken. And "fix" by lowering or deleting the constant is the tempting wrong move: it is the guard
+against double-counting, and changing it silently re-scores every historical day, which is a Tuning
+proposal with a stated blast radius rather than an implementation detail.
+
+Also notes that `activeBreakdown` already returns all three addends separately, so a one-line
+breakdown needs no new data.
