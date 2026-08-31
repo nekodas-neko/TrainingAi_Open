@@ -9,6 +9,11 @@ export function ReadinessContent({ userId }: { userId?: string }) {
       userId={userId}
       theme="readiness"
       title="Readiness"
+      // Q-276, owner-decided: a morning starting number, and explicitly NOT a live one. All nine
+      // `READINESS_WEIGHTS` contributors are overnight or previous-day measures — nothing reads
+      // today's activity — so "it does not move as you use energy" is a checked property of the
+      // model, not a simplification for the reader.
+      subtitle="How your day is likely to go, set this morning from last night's sleep and yesterday. It does not move as you use energy — that is Body Battery."
       aiSection="readiness"
       scoreField="readinessDisplayScore"
       trendField="readinessScore"

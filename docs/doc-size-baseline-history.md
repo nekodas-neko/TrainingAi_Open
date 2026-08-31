@@ -4917,3 +4917,173 @@ instant-paint behaviour — and that whatever the cause turns out to be, it must
 results mid-session and both tables now hold them, so BF-71's device check is closed (the date picker
 and decimal keypads work in Samsung's WebView, which was the entire risk) and BF-42 is verifiable for
 the first time.
+
+## 2026-08-31 — `docs/implementation-backlog.md` (BF-81 and BF-82)
+
+**BF-81** answers a question — *is the stress indicator working?* — with production rather than
+reading. It runs: 18–29 buckets a day, levels using the full [−1,+1] range. But two producers write
+the same metric and disagree on **8 of 8 days measured**, with the sign flipping on five and
+high-stress minutes differing 4–9× (120–270 vs 0–60). The rollup's own comment claims this hazard was
+settled by writing from one place; `body-battery/route.ts:349` still writes the other value. A
+documented invariant that the code violates is worth a table, which is why the entry carries one.
+
+It also records the thing that cannot be fixed: Oura's own `stress_high` exists on 10 days ending
+2026-07-07, the re-key date, and our derived stress starts after it — **zero overlap days**. The
+comparison the owner asked for is not available and never will be, so validation has to come from
+somewhere else.
+
+**BF-82** is the More page. The structural finding is countable: seven `MoreRowGroup`s holding one
+row each, plus one entry (Goals) that expands inline while the other six navigate. The entry also
+corrects the request's premise — there are no sliders on that screen, only five `Switch` toggles that
+are correct for booleans, and what is probably meant is the goal-value boxes in the Goals accordion.
+Saying so prevents a swap made for the wrong reason.
+
+## 2026-08-31 — `docs/implementation-backlog.md` 14415 → 14438 (BF-57 shipped, LB-33 and LB-34 filed)
+
+**Net +23, and it is two additions against one large deletion.** BF-57's 49-line work order — four
+numbered scope items, the payload history, the raised-2026-08-31 note — collapses to a 22-line `Keep:`
+entry now that the surface is built: what survives is the two-phone verification that is genuinely
+owed, plus the measurement that reversed the entry's own item 1, kept because it is the answer to
+*"why not just make every label shareable?"* and that question will be asked again.
+
+Against that, two new entries. **LB-34** — a shared label scanned twice makes two copies of the meal;
+found while building BF-57 and filed rather than folded in, because `findDuplicateMeal` already
+answers the question and what the *offer* should say in a one-tap kitchen flow is a product decision.
+**LB-33** — `meal-label-render.ts` reached 1,049 lines and `check-component-size.js` cannot see it,
+because the file is `.ts` rather than `.tsx`. Both are the "no orphaned findings" rule doing its job:
+each was noticed inside a diff that had no business absorbing it.
+
+`projectOverview.md` stays at **8514** and is not raised. Its BF-57 paragraph was written at five
+lines and cut to four, and the engine-half paragraph gave back an orphaned link line — the index
+carries the fact and the pointer, and the reasoning lives in the journal entry where it belongs.
+
+## 2026-08-31 — `docs/agents/state/implementation-lane-b.md` 126 → 141 (BF-57's state, minus most of the last run's)
+
+**A baton is the one document where content is the deliverable**, so it grows when a run produces
+state — and this one produced a whole feature area plus four gotchas that each cost real time (the
+`DATABASE_URL` Playwright prefix, a source guard matching a comment that documents its own fix, and
+a default argument quietly turning an assertion into a tautology).
+
+**Most of it was paid for rather than added.** The previous run's three narrative paragraphs — the
+`min-h` finding, BF-71's caller gap, the exercise-clip proxy — were rewritten at roughly half their
+length, and the device section's per-screen enumeration was cut because
+[`device-verification-queue.md`](device-verification-queue.md) is the document that holds it. Raw
+addition was ~30 lines; the net is 15.
+
+The rule this obeys is CLAUDE.md's: *"**rewrite** `docs/agents/state/<agent>.md` in full. Never
+append; a baton that is half last week's is worse than none."* The ratchet is what makes that
+rewrite happen instead of being intended.
+
+## 2026-08-31 — `docs/implementation-backlog.md` 14438 → 14456 (BF-82's plan pointer and the corrections that go with it)
+
+**All 18 lines are inside BF-82**, and they are the two fields the protocol says belong there rather
+than in prose. `Needs: BF-79` is the sequencing the entry already stated in a paragraph — which is
+exactly why `next-item.js` offered BF-82 as READY at the head of Lane B while the content half it
+depends on sat PARKED behind a Lane A item. `Plan:` points at the document, so the planning half is
+visibly done and the next implementer reads the plan instead of re-deriving it.
+
+The rest is three corrections written **into** the entry rather than left only in the plan, because
+the entry is what a hand-scan finds: the navigate-vs-expand affordance already exists, the real
+defect is `goals-section.tsx` re-implementing `MoreRowGroup`, and Goals staying inline is a
+2026-08-16 owner decision rather than an oversight. An entry whose premises are wrong is a work order
+for the wrong work.
+
+## 2026-08-31 — `projectOverview.md` 8514 → 8519, `docs/implementation-backlog.md` 14456 → 14448 (BF-75)
+
+**The backlog SHRANK by 8** and the ratchet took it, which is the mechanism working: BF-75's 33-line
+work order became a 25-line `Keep:` once the surface shipped, carrying the contrast check that is
+genuinely owed plus the two things the entry did not know — wallpapers ship `enabled: false`, and a
+translucent sheet reveals the overlay rather than the tab.
+
+**`projectOverview.md` goes up 5, and most of the new paragraph was paid for rather than added.**
+BF-57 had two paragraphs, one per half, which was the right shape while the surface was missing and
+is not now that both have shipped — they are one paragraph with two journal links, which gave back
+two lines. The remaining five are BF-75's own, and an index that cannot afford a line for a shipped
+user-visible change is an index that stops being read.
+
+The two findings in it are there because they are the ones a future session would otherwise
+rediscover the hard way: the z-order that makes transparency impossible, and the default that makes
+the whole feature invisible in the sandbox.
+
+## 2026-08-31 — `docs/implementation-backlog.md` 14448 → 14464 (BF-52's plan pointer, and the instruction it declines)
+
+**All 16 lines are inside BF-52**, and they are there rather than only in the plan because the entry
+is what a hand-scan finds. Two of them are the `Plan:` field. The rest are a sharpening and a
+reversal, both of which a future implementer would otherwise take at face value:
+
+The photo and URL affordances are **mutually exclusive renders of one slot**, not two separate
+discoverability problems — so making either findable means taking both out of it. And BF-52 instructs
+the implementer to absorb BF-63's barcode button into the new capture row; the plan declines, because
+photo and URL produce a whole ingredient list while the barcode and the estimate produce one
+ingredient, and a barcode under *"start this meal from"* promises something it cannot do. **An
+instruction that is quietly not followed is worse than one that is argued with in writing**, which is
+why the strike-through and the reason live in the entry.
+
+## 2026-08-31 — `projectOverview.md` 8519 → 8526, `docs/implementation-backlog.md` 14464 → 14442 (BF-52)
+
+**The backlog shrank again** — BF-52's 46-line work order became a 25-line `Keep:` once the surface
+shipped. What survives is the device check that is genuinely owed, the instruction the plan declined
+(so nobody re-adds the barcode believing it was an oversight), and the two things found while
+building: the URL branch is a **guard** rather than a convenience, and `runRecipeImport` became
+testable only because two callers forced it out of a component.
+
+**`projectOverview.md` goes up 7**, which is one paragraph for a shipped user-visible change. Nothing
+was compacted to pay for it this time; the two BF-57 paragraphs were already merged earlier today and
+there is no other slack in that section that is not load-bearing.
+
+## 2026-08-31 — `docs/agents/state/implementation-lane-b.md` 141 → 159 (the nineteenth Lane B run)
+
+Five PRs merged under this baton (#692–#696), and the run produced more transferable finding than
+code. The block that grew is the one worth the lines: **seven tests across two runs that could not
+fail as first written**, each named with its mechanism — a hit-test defeated by
+`pointer-events-none`, a floor test using a weight where the floor was a no-op, three source greps
+matching their own explanatory comments, and two from the run before. A successor who reads only that block and mutates
+their guards has taken the whole lesson.
+
+**Paid for where it could be.** The standalone *"finding that should change how you start"* section
+was folded into it — it made the same point with three of the same examples, which is exactly the
+duplication a rewrite is supposed to remove. The device narrative was compressed to a bulleted list
+even while gaining three items, and one gotcha was retired into the new block.
+
+The rule this obeys is CLAUDE.md's: **rewrite the baton in full, never append.** The ratchet is what
+turns that from an intention into a thing that happens.
+
+## 2026-08-31 — `docs/implementation-backlog.md` 14442 → 14509 (LA-47 filed, Q-407 parked behind it, LB-12's second missing field)
+
+**Net +67, and none of it is new work discovered — it is one entry's halves being separated so the
+queue can serve them.** Q-407 said in prose that `lib/coach/**` is Lane A and that *"the schema
+change lands first"*, and was nonetheless row 1 of Lane B's READY list. Verified against main rather
+than taken from the entry: `CoachWidgetSchema` is a union of five widgets with **no plan card**, and
+`grep -rn scope lib/coach/*.ts` finds **no named scope record**, so Lane B's half had nothing to
+render. LA-47 is that engine half as an entry someone can pick up; Q-407 now carries `Needs: LA-47`.
+Same defect as BF-82 two entries earlier, and the same fix: **a field, not a paragraph.**
+
+**LB-12 gained the finding that it is itself an instance of.** Its remaining half is the
+Orchestrator's — it says so — and it heads Lane B's queue anyway, because `laneFromLines` reads
+`**Lane:** B filed it; the sweep is the Orchestrator's` as a plain `B`. The queue's vocabulary is
+`A`/`B`/`?`/unstated and **none means "classified, and not an implementer's"**. Recommended a
+`Role:` field; not built, because `scripts/**` is the Orchestrator's own tooling.
+
+**One thing caught by running the tool rather than reading the diff:** LA-47 was drafted with a
+`- **Reference:**` bullet pointing at Q-407, which claims a FIELD meaning *"there is nothing to build
+here"*. It printed under `REFERENCE (1) — read by other entries, not implemented. Never "next".`
+The pointer is prose now. A backlog edit is worth running `next-item.js` over.
+
+## 2026-08-31 — projectOverview.md 8526 → 8535 (+9)
+
+Q-410's Known-Issues row, on `feat/walk-cadence-pacer`. The guided walk's pacer shipped and only
+one of its three signal rungs has ever executed — the other two need a Polar H10 over BLE, which
+the sandbox does not have. The row states what was checked, what was read rather than run, and
+which two entries hold the remainder (LB-36 for the device pass, LA-48 for the per-segment
+storage). That is index material by the file's own definition: it is the thing a session needs to
+know before it believes the pacer works. The build detail lives in the journal entry and
+`docs/module-map.md`, not here.
+
+## 2026-08-31 — projectOverview.md 8535 → 8543 (+8)
+
+Q-187's Known-Issues row, on `feat/meal-plan-day-fill`. The plan card can now fill the day in one
+tap, and the row states the three things a session has to know before trusting it: that the offer
+stops at the current hour on purpose (and why that is the design rather than a nicety), that the
+device write path has not run because `getLocalStore` is null on web, and that Q-354 silently
+swallows `locator.click()` on this screen — which is a trap for the next spec author, not a
+user-facing bug. The build detail is in the journal entry and `docs/module-map.md`.

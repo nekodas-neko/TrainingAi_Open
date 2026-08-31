@@ -131,6 +131,15 @@ export function BodyBatteryCard({ battery }: { battery: BodyBatteryResponse }) {
             style={{ transform: expanded ? 'rotate(180deg)' : undefined }}
           />
         </div>
+        {/* Q-276 — what question this number answers, always visible.
+            Readiness and Body Battery correlate at r = +0.12 by end of day and sit one above the
+            other on Home, so a reader takes them for the same thing. The owner settled it: they are
+            different questions. The explainer below says this well and only renders in the NO-DATA
+            state, which means on any ordinary day nobody ever reads it. */}
+        <p className="mb-2 text-[10px] leading-snug text-muted-foreground">
+          Energy left right now — opens at your readiness and drains as you use it.
+        </p>
+
         {/* progress bar — fill anchored right so the tank empties from the left */}
         <div className="h-2 rounded-full overflow-hidden bg-muted/60 flex justify-end">
           <div

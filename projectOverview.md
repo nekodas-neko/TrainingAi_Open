@@ -24,7 +24,7 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.407.2 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Version:** v1.413.1 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-08-31.
 
 **Version:** v1.406.1 · **Branch:** `main` · Railway auto-deploys on push to `main`.
@@ -83,16 +83,7 @@
 
 **The accessibility scanner that would have passed a 12 px button (Q-282).** `@axe-core/playwright` was installed, measured and removed: WCAG 2.5.8 exempts a *spaced* undersized control, so a deliberately-shrunk **12×12** button (confirmed by `boundingBox`) came back a **pass**, and `color-contrast` cannot read this app at all — it fails to parse the `oklch` tokens (*"Could not parse color string oklab(…)"*) and **evaluated no nodes on Home**. `e2e/touch-target-size.spec.ts` ships instead: DOM geometry against **this repo's 48 dp bar**, covering the roles `globals.css`'s `button, [role="button"]` floor cannot (`<a>`, `role="tab"`, `role="radio"`). It fails on the mutation axe passed. One real finding, **LB-26**: Home's APK-banner link is 258×33 ([journal](docs/overview/entries/2026-08-30-touch-target-gate.md)).
 
-**The Heart Rate tile shows last night, as a delta (TN-13).** It read the **7-day mean** and printed
-it as a bare bpm — in the signal that best predicts how you feel (r = +0.557 against your own
-check-in, best of nine). Re-measured over 71 production nights: the nightly value changes on **61 of
-70** night-pairs, the rounded mean on **29**, so the tile stood still nearly six days in ten and
-discarded 77 % of the daily movement. And a bare number says nothing: expressing the reading as a
-deviation from your own baseline roughly **doubles** its correlation with felt state, which is why it
-now reads `50 · −7 vs usual`. Both halves shipped together because the entry required it — half a fix
-here is the one that looks like progress. **Still owed: the S25 check** — the cue grew from one word
-to five across 20 layout styles
-([journal](docs/overview/entries/2026-08-30-feat-hr-tile-nightly-resting.md)).
+**The Heart Rate tile shows last night, as a delta (TN-13).** It read the **7-day mean** and printed it as a bare bpm — in the signal that best predicts how you feel (r = +0.557 against your own check-in, best of nine). Re-measured over 71 production nights: the nightly value changes on **61 of 70** night-pairs, the rounded mean on **29**, so the tile stood still nearly six days in ten and discarded 77 % of the daily movement. And a bare number says nothing: expressing the reading as a deviation from your own baseline roughly **doubles** its correlation with felt state, which is why it now reads `50 · −7 vs usual`. Both halves shipped together because the entry required it — half a fix here is the one that looks like progress. **Still owed: the S25 check** — the cue grew from one word to five across 20 layout styles ([journal](docs/overview/entries/2026-08-30-feat-hr-tile-nightly-resting.md)).
 
 **Changing a supplement's dose no longer rewrites every log you already made (BF-3, gap 1).** The
 dose lived on the definition and not on the log, so raising retatrutide from 2 mg to 4 mg made last
@@ -105,16 +96,32 @@ empty Nutrition tab is the signature of a dead local store. Gaps 2 and 3 (twice 
 cadence) and the dose-entry UI stay queued
 ([journal](docs/overview/entries/2026-08-30-feat-supplement-dose-on-log.md)).
 
-**A shared meal label now carries the meal, not a pointer to it (BF-57, engine half).** Scanning
-someone else's label said *"That saved meal no longer exists"* — the QR held a `saved_meals.id` and
-the scan resolved it against the scanner's own meals, so it was never going to be found. Making ids
-globally resolvable was rejected: a photo of a label would become read access to someone's meal, on
-an app heading for a Play Store health-data declaration. The owner's design instead puts the whole
-meal in the code, so it scans offline, for a user with no account, as a copy. **Nothing is dropped to
-fit** — the tail rolls into one remainder line carrying its macros, so a trimmed copy's totals match
-the original to the gram. **No user-visible change yet:** the label layout and the scan branch are
-Lane B's and unbuilt, and the QR needs ~30 mm of the 50 mm label before any of it prints legibly
-([journal](docs/overview/entries/2026-08-30-feat-self-contained-meal-label.md)).
+**A meal label can be handed to someone now (BF-57, both halves).** Scanning someone else's said
+*"That saved meal no longer exists"* — the QR held a `saved_meals.id` resolved against the scanner's
+own meals. Making ids globally resolvable was rejected (a photo of a label would become read access
+to someone's meal, on an app heading for a Play Store health-data declaration); the meal travels in
+the code instead, so it scans offline, for a user with no account, as a copy, and **nothing is
+dropped to fit** — the tail rolls into one remainder carrying its macros, exact to the gram. The
+~30 mm the entry asked for is **not available** on the five print styles: four cannot hold 62 bytes,
+below which the encoder trims the meal's **name**, so they keep the private bookmark and a new
+**Share code** style spends the label on a 34.4 mm code. A scan saves a copy, never logs it.
+**Still owed: the two-phone check, and a printer**
+([engine](docs/overview/entries/2026-08-30-feat-self-contained-meal-label.md) ·
+[surface](docs/overview/entries/2026-08-31-shared-meal-labels.md)).
+
+**The nutrition sheets carry the tab's palette, and the obvious fix could never have worked (BF-75).**
+A translucent sheet reveals `SheetOverlay`'s `bg-black/50`, not the wallpaper — that sits at `z-[-1]`
+while the sheet and its overlay are both `z-50` — so the palette is painted *inside* the sheet, behind
+an opt-in `surface="page"` five nutrition sheets pass and nothing else does. **⚠ Wallpapers ship
+`enabled: false`**, so it is invisible until switched on; the owner has them on. **Still owed: the
+≥4.5:1 contrast check on the S25** ([journal](docs/overview/entries/2026-08-31-nutrition-sheet-surface.md)).
+
+**The meal builder's three whole-meal inputs are findable (BF-52).** *"I dont see a URL option"* — it
+did not exist until you had pasted the URL: the recipe photo, the URL import and the AI estimate were
+mutually exclusive renders of one slot inside a search field. A `Recipe photo · Recipe link ·
+Describe it` row sits above the collapsed picker now. The barcode is **not** in it, against the
+entry's own instruction: those three build a whole ingredient list, a barcode names one product
+([journal](docs/overview/entries/2026-08-31-meal-builder-entry-point.md)).
 
 **Both pending weigh-in buttons were dead in production (BF-53).** `scale_raw_samples.id` is a
 `bigserial` and both routes validated it with a UUID regex, so every press of "Not me" or "Yes,
@@ -955,6 +962,23 @@ that need an owner, and for the barcode chain.
 **Measured, nothing to fix in the volatility.** Owner: *"the scores have been very varied lately"*. Stored day-to-day |Δ| went **9.2 → 21.2** at the recalibration — but the **pre-calibration blend moved 9.15 → 9.27, unchanged**, so the sleep is genuinely that variable and the model reads it correctly. Two things landed together on 2026-08-19: the calibration began applying at all (before it the stored score *is* the raw blend), and the blend mean fell 87.1 → 71.1 into the curve's steep zone. **The real defect is `SCORE_CALIBRATION`'s gain spread** — 4.00× display points per blend point at blend 79 against 0.50× at 92, so the same improvement is worth eight times as much in one place as another. [`review`](docs/reviews/2026-08-24-sleep-score-volatility.md).
 - **⛔ Flattening the curve does NOT reduce volatility — tested.** Night-to-night |Δ| goes **13.53 → 13.75**; a calibration curve's total rise is conserved, so flattening one segment steepens another. The baton's old advice to do exactly that has been replaced. TN-5 is filed as an **interpretability** fix and must not be sold as a jitter fix.
 - **Owner signed off 2026-08-24**, told plainly that it does not reduce the jumpiness. Proposed curve holds the displayed mean (87.0 → 85.5, not a lift) and the `LOW_SLEEP_SCORE` firing rate (2/41 either way) — **re-verify both against the shipped TypeScript**, not the Python replay. **History policy: leave stored days alone, stamp the new model.**
+
+### [nutrition] ⚠️ The meal plan can fill the day in one tap; the device write path has not run (Q-187, v1.412.0)
+
+**Shipped — and this closes all four steps of Q-187.** The plan card offers **"Log the N meals so far"**, which writes every planned meal you have not already logged or declined, through the same path the per-meal button uses ([`journal`](docs/overview/entries/2026-08-31-meal-plan-day-fill.md)).
+- **It stops at the current hour, and that is the design rather than a nicety.** What the earlier phases protect is that the day's totals never count food nobody ate — which is why unconfirmed prefills stay out of `food_logs` entirely instead of being filtered out of its 24 readers. A button that logged the *whole* day would hand that back: press it at 9am and the macro bars report a dinner that has not happened. A past day offers everything, which is the retrospective case; a future day offers nothing; a meal whose time cannot be resolved is not offered on today, because guessing costs food nobody ate.
+- **Keep: the device write path has not run.** `getLocalStore` returns null on web, so every exercised path — including the `plan_meal_answers` decline that suppresses a meal from the offer — took the `/api/nutrition/food-logs` fallback rather than the SQLite write plus outbox a real tap takes. `e2e/plan-day-fill.spec.ts` covers the selection and the write end to end, and all ten guards in the selector are mutation-checked, but on the web path only. The button has not been seen on the S25.
+- **Q-354 is a live trap for spec authors, not just a curiosity.** The new spec's `locator.click()` did nothing at all — no toast, no request, no error — because the Nutrition scroll container's date-swipe `useDrag` swallows mouse input, which is what Playwright sends. `tap()` works and is the faithful input anyway. Every future e2e assertion that presses something on this screen has to know this first, and the failure gives no clue.
+- **Q-187 is re-scoped, not struck.** What remains is the owner's second sentence — the day re-calculating remaining meals against what was actually eaten — which has no design and three open questions (what gets re-scaled, whether a floor exists, what to say when the remaining macros are unreachable).
+
+### [cardio][devices] ⚠️ The guided walk paces you by cadence now; no strap has ever driven it (Q-410, v1.411.0)
+
+**Shipped.** The interval walk leads with **km/h** (the unit the owner asked for by name, with min/km beside it off the same pace series) and its verdict line became a **banded pacer**: a bar, a mark and a sentence against a **cadence pair** you set in the walk config — a floor for the fast blocks, a ceiling for the slow ones, because a slow block walked too hard is what stops the fast one being fast. The band is chosen by **signed** distance, so on a fast block faster than the floor stays green however far above; ±10% out is amber, beyond that red ([`journal`](docs/overview/entries/2026-08-31-walk-cadence-pacer.md)).
+- **The signal is a ladder — cadence → speed → heart rate — and the screen says which rung it is on.** Cadence responds the instant the legs do; heart rate takes 30–60 s, so a prompt driven by it arrives after the moment it is about. But cadence needs a strap, so when there is none the pacer falls to speed against a pair **derived from your own past fast/slow blocks** (`/api/guided-walk/segment-stats`, ~3 years) rather than asking for a third target to configure, and to heart rate indoors. A user paced by heart rate while believing it is cadence cannot understand why the prompt is late, so the note naming the rung is not optional.
+- **Standing still no longer scores a perfect slow block.** "Under the ceiling" would make 0 spm the best possible slow segment; below `STOPPED_SPM` the pacer reads **Stopped** in neutral — it does not scold a pause at a crossing and it does not congratulate one.
+- **Keep: only the speed rung has ever executed.** `e2e/walk-pacer-speed-rung.spec.ts` drives a real geolocation series and is mutation-checked, and every guard in `lib/walk/walk-pacer.ts` is too — but **the cadence and heart-rate rungs both need a Polar H10 over BLE**, which does not exist in the sandbox or in `pnpm dev`. So the bands moving with the legs, the Stopped state, the strap-drop fallback and the band colours' contrast at arm's length are all verified by reading. **LB-36** holds the device pass; `BAND_TOLERANCE = 0.10` is a proposal, not a measurement, and is one named constant so a real walk can move it.
+- **The ring cannot pace this and must not be made to.** `RING_CADENCE_VALIDATED = false` still holds (`packages/shared/src/health/cadence.ts`) — the ring signal is octave-ambiguous, not broken, and shipping it uncorrected gives a number wrong by 2×, which is worse than showing none. That correction is Lane A's.
+- **The number the pacer creates is not stored yet.** Per-segment adherence, steps and which signal paced the segment are additions to `activity_logs.segments`, which is a schema edit — filed as **LA-48**.
 
 ### [cardio][devices] ⚠️ The free walk shows heart rate at last, but no device has seen it (Q-418, 2026-08-23)
 
@@ -2797,10 +2821,10 @@ one backlog entry per finding, **Q-271 … Q-284**.
   ceiling-pinning and overshot: charge 10.5/day vs drain 52.4/day, **ends at its daily minimum on 10
   of 12 days**, hits 0 on 3. Across all 40 days it never rises above its waking value on a third of
   them. Garmin's equivalent recovers during waking rest — that is the feature's headline behaviour.
-- **🟠 Readiness and Body Battery share no variance (Q-276).** Readiness ↔ battery *anchor* r = +0.93
-  (the anchor **is** readiness); readiness ↔ *end value* r = **+0.12**. Two headline numbers both read
-  as "how recovered am I", sharing nothing. Needs an owner decision on whether they are different
-  questions or one is wrong.
+- **✅ Readiness and Body Battery share no variance (Q-276) — resolved 2026-08-31 (v1.413.0).**
+  Anchor r = +0.93 (it **is** readiness), end-of-day r = +0.12. Owner settled them as two different
+  questions, so it was presentation: each now names its own where it is read — the battery card's
+  explainer rendered only in the *no-data* state, so nobody saw it on an ordinary day. No model change ([`journal`](docs/overview/entries/2026-08-31-recovery-scores-name-their-question.md)).
 
 **And one correction to a claim already in this file.** The Body Battery v5 row below records
 end-of-day battery vs next-day readiness at **r = −0.06** as evidence the model has no outcome

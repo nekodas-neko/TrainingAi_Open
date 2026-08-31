@@ -5,7 +5,7 @@ import { Camera as CameraIcon, Hash, PenLine, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { BarcodeScanner } from './barcode-scanner'
 import type { NutritionScanResult } from '@trainingai/shared/types/nutrition'
-import { decodeMealLabelToken } from '@trainingai/shared/nutrition/label-payload'
+import { decodeMealLabelScan, type SharedMeal } from '@trainingai/shared/nutrition/label-payload'
 import { downscaleToJpegDataUrl, base64FromDataUrl, SCAN_IMAGE_MAX_DIM } from '@/lib/media/downscale-image'
 
 interface Props {
@@ -14,6 +14,8 @@ interface Props {
   /** A scanned saved-meal label (Q-389). The parent owns the logging, since it already holds the
    *  date, the meal-type bucket and the onLogged callback. */
   onScannedSavedMeal?: (mealId: string) => void
+  /** A label carrying the whole recipe (BF-57), rather than a pointer to one of the scanner's own. */
+  onScannedSharedMeal?: (meal: SharedMeal) => void
   /**
    * What the screen shows when no capture is in progress — the search, the tabs and the list.
    *
@@ -37,7 +39,7 @@ interface Props {
  * is not a decision anyone can make before seeing the fields. The owner's decided action row calls
  * the pair `Describe or enter` for the same reason.
  */
-export function CaptureActions({ onScanResult, onManual, onScannedSavedMeal, children }: Props) {
+export function CaptureActions({ onScanResult, onManual, onScannedSavedMeal, onScannedSharedMeal, children }: Props) {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const galleryInputRef = useRef<HTMLInputElement>(null)
   const [describeText, setDescribeText] = useState('')
@@ -178,13 +180,21 @@ export function CaptureActions({ onScanResult, onManual, onScannedSavedMeal, chi
   async function handleBarcode(code: string) {
     setShowBarcode(false)
 
-    // A printed saved-meal label (Q-389), recognised by SHAPE rather than a prefix: the QR payload
-    // is 22 base64url characters and cannot afford one, because anything longer pushes the code from
-    // 25×25 to 29×29 and the printed modules below the size a phone reads. An EAN-13 is 13 digits
-    // and cannot collide, so a non-match falls straight through to the barcode lookup below.
-    const scannedMealId = decodeMealLabelToken(code)
-    if (scannedMealId && onScannedSavedMeal) {
-      onScannedSavedMeal(scannedMealId)
+    // A printed saved-meal label, recognised by SHAPE rather than a prefix: the old token is 22
+    // base64url characters and could not afford one, a shared payload opens with `[`, and an EAN-13
+    // is 13 digits — three shapes that cannot collide, so a non-match falls straight through to the
+    // barcode lookup below.
+    //
+    // BF-57 added the second shape and kept the first **indefinitely**: a label printed before this
+    // is a physical object that still works for the person who printed it, and there is no upgrade
+    // path for something already on a jar.
+    const scanned = decodeMealLabelScan(code)
+    if (scanned?.kind === 'shared-meal' && onScannedSharedMeal) {
+      onScannedSharedMeal(scanned.meal)
+      return
+    }
+    if (scanned?.kind === 'meal-id' && onScannedSavedMeal) {
+      onScannedSavedMeal(scanned.mealId)
       return
     }
 

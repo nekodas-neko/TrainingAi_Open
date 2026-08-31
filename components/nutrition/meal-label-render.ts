@@ -1,5 +1,11 @@
 import QRCode from 'qrcode'
-import { encodeMealLabelToken, fitIngredientLines, wrapIngredientRun, type MealLabelFigures } from '@trainingai/shared/nutrition/label-payload'
+import {
+  encodeMealLabelToken, encodeSharedMeal, fitIngredientLines, wrapIngredientRun,
+  qrModulesForVersion, QR_BYTE_CAPACITY_M, MEAL_SHARE_MAX_BYTES, qrVersionForBytes,
+  MEAL_LABEL_TOKEN_LENGTH,
+  type MealLabelFigures,
+} from '@trainingai/shared/nutrition/label-payload'
+import type { SavedMeal } from '@trainingai/shared/types/nutrition'
 
 /**
  * Draws a saved meal's printable 50 × 50 mm label (Q-389).
@@ -75,7 +81,7 @@ export function labelPrintDpi(canvasPx: number): number {
 const USABLE_W = SQUARE_W
 const USABLE_H = SQUARE_W
 
-export type MealLabelStyle = 'inlineCentred' | 'band' | 'editorial' | 'ticket' | 'plaque' | 'square'
+export type MealLabelStyle = 'inlineCentred' | 'band' | 'editorial' | 'ticket' | 'plaque' | 'square' | 'share'
 
 export const MEAL_LABEL_STYLES: { value: MealLabelStyle; label: string; note: string }[] = [
   // B2 (Q-397), and the DEFAULT. Carries the ingredient list because the run wraps inline instead of
@@ -99,6 +105,10 @@ export const MEAL_LABEL_STYLES: { value: MealLabelStyle; label: string; note: st
   // Q-393, and since Q-411 it is no longer a special case — every style draws square, so this one is
   // simply the layout that puts the code beside the calories rather than under them.
   { value: 'square', label: 'Big code', note: 'The code sits beside the calories rather than under them, so it stays large while the label still prints the ingredient list.' },
+  // BF-57. The only style whose code carries the whole recipe, because it is the only one that gives
+  // the code the ~30 mm that needs. Everything it drops — calories, macros, the ingredient list — is
+  // inside the code, so a scan shows all of it; what is lost is what a human can read off the paper.
+  { value: 'share', label: 'Share code', note: 'Name and a full-size code, nothing else. The only style whose code carries the whole recipe — send it to someone and they get the meal, not a link.' },
 ]
 
 // B2, per the owner's decision (Q-397): "Yes have B2 as the default". It is not merely a nicer
@@ -113,14 +123,115 @@ export const MEAL_LABEL_STYLES: { value: MealLabelStyle; label: string; note: st
  * wrong once already (v1.323.0), and Q-397 asks for a test precisely because a number nobody checks
  * is a number that drifts.
  */
-export function mealLabelCodeMetrics(style: MealLabelStyle): {
+export function mealLabelCodeMetrics(
+  style: MealLabelStyle,
+  /**
+   * Modules per side of the symbol actually drawn.
+   *
+   * **This used to be the constant 25, and BF-57 is why it cannot be one any more.** The old payload
+   * was a fixed-length token, so every label of every style drew version 2 and the pitch was a
+   * property of the layout alone. The payload is now the recipe, so the version — and therefore the
+   * pitch — varies with the meal in hand.
+   *
+   * The default is the version this style *budgets* for, which is its worst case: the code can come
+   * out smaller for a short recipe, never larger. Pass an explicit count to ask about the layout
+   * rather than about a particular meal.
+   */
+  modules: number = mealLabelCarriesRecipe(style) ? mealLabelShareBudget(style).modules : 25,
+): {
   boxMm: number; symbolMm: number; mmPerModule: number
 } {
-  const MODULES = 25          // a 22-char token is always QR version 2
   const QUIET = 4
   const boxMm = (SPECS[style].codeUnits / SHEET) * 50
-  const mmPerModule = boxMm / (MODULES + QUIET * 2)
-  return { boxMm, symbolMm: mmPerModule * MODULES, mmPerModule }
+  const mmPerModule = boxMm / (modules + QUIET * 2)
+  return { boxMm, symbolMm: mmPerModule * modules, mmPerModule }
+}
+
+/**
+ * The finest module a home printer is trusted to hold, in millimetres (BF-57).
+ *
+ * The label design was built to 0.49–0.66 mm per module and this is its floor. It is a **print**
+ * constraint: ink spread merges adjacent modules on paper, which is the failure this whole feature
+ * risks. Nothing stops a phone reading a finer code off a screen — and the share path hands out a
+ * PNG that is displayed far larger than 50 mm — so sizing to the printed floor is the strict case
+ * and the screen case comes free.
+ */
+export const MIN_MM_PER_MODULE = 0.49
+
+/**
+ * The smallest payload that is worth calling a shared meal: a real name plus the exact totals.
+ *
+ * `[1,"Beef Pasta Bake",4,[["+5 more",600,1200,80,120,40]],5]` is 58 bytes, so version 4's 62 is
+ * the floor. Below it `encodeSharedMeal` starts **trimming the name** — its documented last resort,
+ * and the right one, since the numbers must never be guessed at. But a label whose title has been
+ * eaten to fit a code is not a label, which is why this is a threshold rather than a preference.
+ */
+const MIN_SHAREABLE_VERSION = 4
+
+/**
+ * How many payload bytes a style's code can carry and still print legibly (BF-57).
+ *
+ * **This inverts the dependency the backlog entry assumed, and the reason is measurement.** The
+ * entry asked for the code to be given ~30 mm so version 11's 251 bytes would fit, reasoning from
+ * a code of 12.2–16.4 mm. That range is pre-Q-411: on the square canvas the five print styles
+ * already run 16.4–20.9 mm, and every one of them is *already* the largest value that leaves the
+ * 6 units of clearance their own comment requires. **They cannot grow.** 30 mm needs 128 units of
+ * a 171-unit box, which is the whole label — there is no arrangement of a name, a calorie figure,
+ * a macro line and an ingredient list that leaves it.
+ *
+ * So the layout cannot be made to serve a fixed budget; the budget is read off the layout instead.
+ * And the answer that comes back is the finding: **at 0.49 mm per module, four of the six print
+ * styles cannot hold even 62 bytes**, so "make every label shareable" is not available at 50 mm.
+ * Forcing it would have shipped labels with trimmed titles — a change that renders, scans, and is
+ * quietly wrong, which is the worst shape a change can have here.
+ *
+ * Hence `share`: a style that drops the calorie block and the ingredient list — both of which the
+ * code itself carries — and spends the whole label on the code. It is the only one that reaches
+ * version 11, and it is what the entry's ~30 mm actually buys.
+ *
+ * Capped at `MEAL_SHARE_MAX_BYTES` because the encoder will not emit more, so a larger version
+ * would be drawn empty-handed.
+ */
+export function mealLabelShareBudget(style: MealLabelStyle): {
+  version: number; modules: number; maxBytes: number; mmPerModule: number
+  /** Can this style's code hold a shareable meal at all? See `MIN_SHAREABLE_VERSION`. */
+  shareable: boolean
+} {
+  const boxMm = (SPECS[style].codeUnits / SHEET) * 50
+  const ceiling = qrVersionForBytes(MEAL_SHARE_MAX_BYTES) ?? 1
+  let version = 1
+  for (let v = ceiling; v >= 1; v--) {
+    if (boxMm / (qrModulesForVersion(v) + 8) >= MIN_MM_PER_MODULE) { version = v; break }
+  }
+  const modules = qrModulesForVersion(version)
+  return {
+    version,
+    modules,
+    maxBytes: QR_BYTE_CAPACITY_M[version],
+    mmPerModule: boxMm / (modules + 8),
+    shareable: version >= MIN_SHAREABLE_VERSION,
+  }
+}
+
+/**
+ * Does this style's code carry the meal itself, or a private bookmark to it? (BF-57)
+ *
+ * **Two payloads ship, and that is the reconciliation rather than a hedge.** The five print styles
+ * exist to go on a jar in your own kitchen: their job is *scan this to log it*, they have the
+ * tightest codes in the feature, and `encodeMealLabelToken`'s 22 characters fit them with room to
+ * spare. The `share` style exists to be handed to a person, and carries the recipe.
+ *
+ * Driving it off `layout === 'code'` rather than off `shareable` is deliberate: `plaque` and
+ * `square` are geometrically large enough to hold 62 bytes, but a 62-byte payload names about two
+ * ingredients and rolls the rest — so those two would *look* shareable, produce a visibly poorer
+ * copy than `share`, and give nobody a reason to pick the style that does it properly. One clearly
+ * labelled answer beats three partial ones.
+ *
+ * Old labels keep working either way: `decodeMealLabelScan` reads both shapes, indefinitely, because
+ * a label already stuck to a jar has no upgrade path.
+ */
+export function mealLabelCarriesRecipe(style: MealLabelStyle): boolean {
+  return SPECS[style].layout === 'code'
 }
 
 export const DEFAULT_MEAL_LABEL_STYLE: MealLabelStyle = 'inlineCentred'
@@ -236,7 +347,7 @@ interface StyleSpec {
    * that `beside` spends on the code, so its code is smaller; it is still larger than every round
    * style. Both ship because the trade is a matter of taste on paper, not of correctness.
    */
-  layout?: 'beside' | 'stack'
+  layout?: 'beside' | 'stack' | 'code'
 }
 
 const SPECS: Record<MealLabelStyle, StyleSpec> = {
@@ -305,6 +416,21 @@ const SPECS: Record<MealLabelStyle, StyleSpec> = {
     reversedHeader: false, rule: 'solid', nameSize: 12, caloriesSize: 18, macroSize: 7.5,
     stackGaps: [5, 4, 4, 6],
     nameTracking: 0.02, uppercaseName: false, ingredients: true, layout: 'stack',
+  },
+  // **130 units — 34.4 mm — is the number BF-57 is actually about**, and it is why this is a new
+  // style rather than a change to the six above. Version 11 is 61 modules; with the 4-module quiet
+  // zone on each side that is 69 across, and 0.49 mm apiece needs 33.8 mm. The other five print
+  // styles top out at 20.9 mm and each is *already* at the largest value that clears its content by
+  // 6 units, so none of them can reach it — the room has to come from dropping content, and the
+  // content this drops is exactly the content the code already carries.
+  //
+  // Vertically: 13 for the top margin and lead-in, ~13 of name, an 8 gap, 130 of code, then the
+  // caption. That lands at 175 against a 180 bottom margin, so the 5 units of slack are real rather
+  // than assumed. Raising `codeUnits` past 132 puts the caption through the margin.
+  share: {
+    fontVar: '--font-geist-sans', fallback: 'sans-serif', codeUnits: 130, writeOnLine: false,
+    reversedHeader: false, rule: 'none', nameSize: 13, caloriesSize: 0, macroSize: 7,
+    nameTracking: 0.02, uppercaseName: false, layout: 'code',
   },
 }
 
@@ -663,8 +789,73 @@ function drawSquareCentredLabel(
   return { ingredientLines: shown, ingredientOverflow: overflow }
 }
 
+/**
+ * The share layout (BF-57): a name, a full-size code, and a line telling the finder what to do with
+ * it.
+ *
+ * **Everything this style omits is inside the code**, which is what makes the omission a trade
+ * rather than a loss: calories, macros and every ingredient travel in the payload and appear the
+ * moment it is scanned. What it gives up is what a person can read off the paper without a phone —
+ * which is the right thing to give up on a label whose purpose is to be handed to someone.
+ *
+ * It is the only style that reaches version 11, and that is the entire reason it exists. See the
+ * `share` entry in `SPECS` for the arithmetic; the short version is that 0.49 mm per module at 69
+ * modules across needs 33.8 mm, and no layout carrying a calorie block has 33.8 mm to give.
+ */
+function drawShareLabel(
+  ctx: CanvasRenderingContext2D,
+  { spec, family, figures, qr, INK, PAPER, rolled }: {
+    spec: StyleSpec
+    family: string
+    figures: MealLabelFigures
+    qr: { modules: { size: number; data: ArrayLike<number> } }
+    INK: string
+    PAPER: string
+    /** Ingredients the code folded into its one exact remainder entry. */
+    rolled: number
+  },
+): void {
+  const cx = SHEET / 2
+  let y = SQUARE_MARGIN + 4
+
+  const name = spec.uppercaseName ? figures.name.toUpperCase() : figures.name
+  const nameSize = fitText(ctx, name, family, '700', spec.nameSize, SQUARE_W)
+  ctx.fillStyle = INK
+  ctx.textAlign = 'center'
+  ctx.font = `700 ${nameSize}px ${family}`
+  ctx.letterSpacing = `${spec.nameTracking}em`
+  ctx.fillText(name, cx, y + nameSize)
+  ctx.letterSpacing = '0em'
+  y += nameSize + 8
+
+  drawCode(ctx, qr, cx - spec.codeUnits / 2, y, spec.codeUnits, INK, PAPER)
+  y += spec.codeUnits + 7
+
+  // Not decoration. A label with no calories on it and no explanation is a mystery sticker; this is
+  // the one line that says the code is the meal rather than a link to a shop.
+  //
+  // **And when the recipe did not fit, it says so here** (BF-57 item 2). A 20-ingredient meal is
+  // rolled into named entries plus one exact remainder, so the copy the scanner receives has right
+  // numbers and fewer rows — true, but a surprise if they find out by counting. `fitText` rather
+  // than a fixed size because the sentence grows with the count and the slack below the code is
+  // 5 units, not a margin to gamble with.
+  const caption = rolled > 0
+    ? `Scan to add this meal · ${rolled} ingredient${rolled === 1 ? '' : 's'} grouped`
+    : 'Scan to add this meal'
+  ctx.font = `400 ${fitText(ctx, caption, family, '400', spec.macroSize, SQUARE_W)}px ${family}`
+  ctx.fillText(caption, cx, y)
+}
+
 export interface RenderMealLabelOptions {
-  mealId: string
+  /**
+   * The meal itself, not its id (BF-57).
+   *
+   * The code used to carry `encodeMealLabelToken(meal.id)` — 22 characters that resolve only inside
+   * the account that printed them, so a label handed to anyone else scanned as *"that saved meal no
+   * longer exists"*. It now carries `encodeSharedMeal`, which is the whole recipe, so the renderer
+   * needs the recipe.
+   */
+  meal: SavedMeal
   figures: MealLabelFigures
   style: MealLabelStyle
   /**
@@ -677,22 +868,50 @@ export interface RenderMealLabelOptions {
   scale?: number
 }
 
+export interface RenderedMealLabel {
+  moduleCount: number
+  codeMm: number
+  ingredientLines: number
+  ingredientOverflow: number
+  /** True when the code holds the meal itself rather than a private id (BF-57). */
+  carriesRecipe: boolean
+  /** Ingredients named individually inside the code. Meaningless when `carriesRecipe` is false. */
+  namedInCode: number
+  /** Ingredients folded into the code's single exact remainder entry. 0 when the recipe fits whole. */
+  rolledInCode: number
+  payloadBytes: number
+}
+
 /**
  * Draw the label onto `canvas`. Returns the QR's module count, which is what the print-size maths
  * in Q-389 is expressed against — the caller surfaces it so the physical pitch is visible rather
- * than assumed.
+ * than assumed — plus how much of the recipe the code names outright (BF-57).
  */
 export async function renderMealLabel(
   canvas: HTMLCanvasElement,
-  { mealId, figures, style, ingredients, scale = DEFAULT_RENDER_SCALE }: RenderMealLabelOptions,
-): Promise<{ moduleCount: number; codeMm: number; ingredientLines: number; ingredientOverflow: number }> {
+  { meal, figures, style, ingredients, scale = DEFAULT_RENDER_SCALE }: RenderMealLabelOptions,
+): Promise<RenderedMealLabel> {
   const spec = SPECS[style]
 
-  // Level M, not L: the code is 12.2–16.4 mm on these layouts, so ink spread on a home printer is
-  // the expected failure and M is the level that survives it. The 22-character token still fits
-  // version 2 (25×25) at M — anything longer would not.
-  const qr = QRCode.create(encodeMealLabelToken(mealId), { errorCorrectionLevel: 'M' })
+  // Level M, not L: ink spread on a home printer is the expected failure and M is the level that
+  // survives it. `mealLabelShareBudget` picks the payload budget from THIS style's printed geometry
+  // at the same level, so the version the encoder aims at and the version drawn agree.
+  const budget = mealLabelShareBudget(style)
+  const shared = mealLabelCarriesRecipe(style)
+    ? encodeSharedMeal(meal, { maxBytes: budget.maxBytes })
+    // The private bookmark, unchanged since Q-389, and still the right payload for a jar in your own
+    // kitchen: 22 characters is version 2, which is what lets these layouts print the finest codes
+    // in the feature while also carrying the ingredient list. It resolves only inside the account
+    // that printed it — see `mealLabelCarriesRecipe` for why that is a choice and not a gap.
+    : { text: encodeMealLabelToken(meal.id), bytes: MEAL_LABEL_TOKEN_LENGTH, named: 0, rolled: 0 }
+  const qr = QRCode.create(shared.text, { errorCorrectionLevel: 'M' })
   const moduleCount = qr.modules.size
+  // The library decides the version actually drawn and it wins, exactly as the capacity table's own
+  // note says — so the reported pitch is measured off the symbol, never off the budget.
+  const code = {
+    carriesRecipe: mealLabelCarriesRecipe(style),
+    namedInCode: shared.named, rolledInCode: shared.rolled, payloadBytes: shared.bytes,
+  }
 
   // Without this the first draw uses a fallback face and the layout reflows on the second — the
   // exact silent substitution the spec warns about.
@@ -719,11 +938,16 @@ export async function renderMealLabel(
 
   const cx = SHEET / 2
 
+  if (spec.layout === 'code') {
+    drawShareLabel(ctx, { spec, family, figures, qr, INK, PAPER, rolled: shared.rolled })
+    return { moduleCount, codeMm: (spec.codeUnits / SHEET) * 50, ingredientLines: 0, ingredientOverflow: 0, ...code }
+  }
+
   if (spec.ingredients) {
     const codeMm = (spec.codeUnits / SHEET) * 50
     const args = { spec, family, figures, ingredients: ingredients ?? [], qr, INK, PAPER }
     const drawn = spec.layout === 'stack' ? drawSquareCentredLabel(ctx, args) : drawSquareLabel(ctx, args)
-    return { moduleCount, codeMm, ...drawn }
+    return { moduleCount, codeMm, ...drawn, ...code }
   }
 
   const top = (SHEET - USABLE_H) / 2
@@ -821,5 +1045,5 @@ export async function renderMealLabel(
   const codeMm = (codeW / SHEET) * 50
   // The round layouts print no list — the box has 7 units of slack, which is zero lines. Reported as
   // 0 rather than omitted so the caller never has to know which style it asked for.
-  return { moduleCount, codeMm, ingredientLines: 0, ingredientOverflow: 0 }
+  return { moduleCount, codeMm, ingredientLines: 0, ingredientOverflow: 0, ...code }
 }

@@ -42,9 +42,7 @@ import { getLocalStore } from "@/lib/local-store";
 import { pushThenRevalidate } from "@/lib/local-store/push-then-revalidate";
 import { TdeeAdaptationCard } from "@/components/nutrition/tdee-adaptation-card";
 import { EnergyCard } from "@/components/nutrition/energy-card";
-import { MealPlanSection } from "@/components/nutrition/meal-plan-section";
-import { usePlanMealLogging } from "./use-plan-meal-logging";
-import { usePlanMealSaving } from "./use-plan-meal-saving";
+import { ActivePlanCard } from "@/components/nutrition/active-plan-card";
 import { MealPlanReviewCard } from "@/components/nutrition/meal-plan-review-card";
 const MealPlanEditSheet = dynamic(
   () => import("@/components/nutrition/meal-plan-edit-sheet").then(m => m.MealPlanEditSheet),
@@ -119,7 +117,8 @@ export default function NutritionContent({ userId }: { userId?: string }) {
   const [planSetupOpen, setPlanSetupOpen] = useState(false);
   const [planReviewDismissed, setPlanReviewDismissed] = useState(false);
   const [planManageOpen, setPlanManageOpen] = useState(false);
-  // Q-357: `MealPlanReviewCard` and `MealPlanSection` are both `memo()`, and four inline arrows
+  // Q-357: `MealPlanReviewCard` and `MealPlanSection` (now reached through `ActivePlanCard`)
+  // are both `memo()`, and four inline arrows
   // here gave them a new identity every render, so both re-rendered on every keystroke elsewhere on
   // the screen while still reading as optimised. Setters only, so `[]` is stable by React's
   // guarantee.
@@ -296,15 +295,6 @@ export default function NutritionContent({ userId }: { userId?: string }) {
       fetchData(selectedDateRef.current)
     }
   }, [fetchData])
-
-  const {
-    logMeal: handleLogPlanMeal, loggingPosition: loggingPlanPosition,
-    loggedPositions: loggedPlanPositions, declinedMealIds, setDeclined: handleSetPlanMealDeclined,
-  } = usePlanMealLogging({ mealPlan, mealTypes, logs, userId, dateRef: selectedDateRef, onLogged: handleFoodLogged })
-
-  const {
-    saveMeal: handleSavePlanMeal, saveMeals: handleSavePlanMeals, savingPositions: savingPlanPositions,
-  } = usePlanMealSaving({ mealPlan, userId, onPlanChanged: setMealPlan })
 
   const handleQuickEditSaved = useCallback((updated: FoodLogWithItem) => {
     setLogs(prev => prev.map(l => l.id === updated.id ? updated : l))
@@ -628,18 +618,19 @@ export default function NutritionContent({ userId }: { userId?: string }) {
             )}
 
             {selectedDate === todayStr && (
-              <MealPlanSection
+              <ActivePlanCard
                 plan={mealPlan}
+                onPlanChanged={setMealPlan}
                 loading={loading && mealPlan === null}
+                mealTypes={mealTypes}
+                logs={logs}
+                userId={userId}
+                tz={tz}
+                logDate={selectedDate}
+                today={todayStr}
+                dateRef={selectedDateRef}
                 eaten={logs.length > 0 ? totals : undefined}
-                onLogMeal={mealTypes.length > 0 ? handleLogPlanMeal : undefined}
-                loggingPosition={loggingPlanPosition}
-                loggedPositions={loggedPlanPositions}
-                declinedMealIds={declinedMealIds}
-                onSetDeclined={mealTypes.length > 0 ? handleSetPlanMealDeclined : undefined}
-                onSaveMeal={handleSavePlanMeal}
-                onSaveAllMeals={handleSavePlanMeals}
-                savingPositions={savingPlanPositions}
+                onLogged={handleFoodLogged}
                 onCreate={openPlanSetup}
                 onViewPlan={openPlanManage}
               />

@@ -7,6 +7,21 @@ import { downscaleToJpegDataUrl, base64FromDataUrl, SCAN_IMAGE_MAX_DIM } from '@
 interface Props {
   importing: boolean
   onPick: (image: string, mimeType: string) => void
+  /**
+   * `'tile'` draws it as one third of the builder's source row (BF-52) instead of a full-width
+   * descriptive button.
+   *
+   * A prop rather than a second component, because everything worth having here is the *picking* —
+   * the Capacitor `CameraSource.Prompt` branch, the downscale, and the named file input that stops
+   * the meal-photo picker swallowing the pick. Re-implementing that chrome-first would re-implement
+   * all of it.
+   *
+   * The tile is labelled **Recipe photo**, never just "Photo". BF-40's own note is that *"a
+   * screenshot of a recipe and a photograph of your dinner are different acts with different
+   * outputs, and one tile that guesses between them will guess wrong"* — in a row of three tiles the
+   * label is the only thing left carrying that distinction.
+   */
+  variant?: 'row' | 'tile'
 }
 
 /**
@@ -24,7 +39,7 @@ interface Props {
  * unreachable. Prompt covers both things people mean by an image of ingredients: a written list, and
  * the raw ingredients laid out.
  */
-export function RecipeImageButton({ importing, onPick }: Props) {
+export function RecipeImageButton({ importing, onPick, variant = 'row' }: Props) {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -86,25 +101,46 @@ export function RecipeImageButton({ importing, onPick }: Props) {
         className="hidden"
         onChange={e => void handleFile(e)}
       />
-      <button
-        onClick={() => void pick()}
-        disabled={importing}
-        className="w-full min-h-[48px] flex items-center gap-2 rounded-xl border border-border bg-muted/50 px-3 py-2 text-left active:bg-muted/30 disabled:opacity-50"
-      >
-        {importing
-          ? <Loader2 className="h-4 w-4 animate-spin flex-none text-brand" />
-          : <ImagePlus className="h-4 w-4 flex-none text-muted-foreground" />}
-        <span className="min-w-0 flex-1">
-          <span className="block text-sm font-medium">
-            {importing ? 'Reading that recipe…' : 'Build from a recipe picture'}
+      {variant === 'tile' ? (
+        // Wrapped in its own column, because the parent is a `flex` row of three tiles and a bare
+        // error paragraph would become a fourth item in it.
+        <div className="flex flex-1 flex-col gap-1">
+        <button
+          onClick={() => void pick()}
+          disabled={importing}
+          // Padding-driven height, matching the Log Food capture tiles BF-73 measured at 79 px. No
+          // `min-h-[Npx]`: it is inert on a button here, because `globals.css` sets a bare
+          // element-selector floor that beats the utility.
+          className="flex flex-1 flex-col items-center justify-center gap-1.5 rounded-2xl border border-border/60 bg-background/50 px-1 py-3.5 active:bg-muted/40 disabled:opacity-50"
+        >
+          {importing
+            ? <Loader2 className="h-7 w-7 animate-spin text-brand" />
+            : <ImagePlus className="h-7 w-7 text-muted-foreground" />}
+          <span className="text-xs font-medium">Recipe photo</span>
+        </button>
+        {error && <p className="text-[11px] leading-snug" style={{ color: 'var(--accent-amber)' }}>{error}</p>}
+        </div>
+      ) : (
+        <button
+          onClick={() => void pick()}
+          disabled={importing}
+          className="w-full min-h-[48px] flex items-center gap-2 rounded-xl border border-border bg-muted/50 px-3 py-2 text-left active:bg-muted/30 disabled:opacity-50"
+        >
+          {importing
+            ? <Loader2 className="h-4 w-4 animate-spin flex-none text-brand" />
+            : <ImagePlus className="h-4 w-4 flex-none text-muted-foreground" />}
+          <span className="min-w-0 flex-1">
+            <span className="block text-sm font-medium">
+              {importing ? 'Reading that recipe…' : 'Build from a recipe picture'}
+            </span>
+            <span className="block text-[11px] leading-snug text-muted-foreground">
+              A screenshot of an ingredient list, or the ingredients laid out. Every one is added at its
+              own weight.
+            </span>
           </span>
-          <span className="block text-[11px] leading-snug text-muted-foreground">
-            A screenshot of an ingredient list, or the ingredients laid out. Every one is added at its
-            own weight.
-          </span>
-        </span>
-      </button>
-      {error && (
+        </button>
+      )}
+      {variant === 'row' && error && (
         <p className="text-[11px] leading-snug" style={{ color: 'var(--accent-amber)' }}>{error}</p>
       )}
     </>

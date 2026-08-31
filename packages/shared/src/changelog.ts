@@ -6,11 +6,69 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: "1.407.2",
+    version: "1.413.1",
     date: "2026-08-31",
     changes: [
       "Saving one profile field no longer erases the others. Accepting an activity-level recommendation would have wiped your name, height, date of birth and weight goal — height feeds the calorie estimate, so it would have quietly changed your targets too. It had not happened yet.",
       "Clearing a profile field now works: an empty height clears the height, where before it was indistinguishable from not touching it.",
+    ],
+  },
+  {
+    version: "1.413.0",
+    date: "2026-08-31",
+    changes: [
+      "Body Battery and Readiness now each say what they are for, so they stop reading as the same number.",
+      "Body Battery: energy left right now \u2014 it opens at your readiness and drains as you use it.",
+      "Readiness: how your day is likely to go, set in the morning from last night's sleep and yesterday. It does not move as you use energy.",
+    ],
+  },
+  {
+    version: "1.412.0",
+    date: "2026-08-31",
+    changes: [
+      "Your meal plan can now log the day for you: one tap on the plan card records every planned meal you haven't already logged or said no to.",
+      "It only offers the meals whose time has come \u2014 press it at 9am and it logs breakfast, not tonight's dinner. On an earlier day it offers the lot.",
+      "Meals you already logged, and ones you declined, are left alone.",
+    ],
+  },
+  {
+    version: "1.411.0",
+    date: "2026-08-31",
+    changes: [
+      "The interval walk now shows your speed in km/h, with the min/km pace beside it.",
+      "It also paces you: a bar under the timer tells you to walk faster on a fast block or ease off on a slow one, with green for on pace, amber for slightly out and red for well off.",
+      "Set your own step-rate targets in the walk setup \u2014 a floor for the fast blocks and a ceiling for the slow ones.",
+      "It paces by step rate when the chest strap is on, by speed when it isn't, and by heart rate indoors \u2014 and it always says which one it is using, so a late prompt is never a mystery.",
+      "Stopping at a crossing now reads Stopped rather than counting as a perfect slow block.",
+    ],
+  },
+  {
+    version: "1.410.0",
+    date: "2026-08-31",
+    changes: [
+      "The meal builder now starts with Recipe photo \u00b7 Recipe link \u00b7 Describe it, above the ingredient list. All three already worked \u2014 they were hidden inside the ingredient search box, so the URL option only appeared once you had already pasted a link.",
+      "Describe it is new here: type what is in the meal and it works out the ingredients.",
+      "The barcode scanner stays with the ingredient search, where it belongs \u2014 it adds one product, not a whole meal.",
+    ],
+  },
+  {
+    version: "1.409.0",
+    date: "2026-08-31",
+    changes: [
+      "The Log Food, meal builder, meal detail, quantity and quick-edit pull-ups now carry the Nutrition tab's own background instead of a plain dark panel.",
+      "This only shows if you have wallpapers turned on \u2014 More \u203a Settings \u203a Appearance. With them off the sheets look exactly as before, on purpose: a coloured sheet over a plain page would look worse than the plain one.",
+      "Sheets in Health, Workout and More are unchanged.",
+    ],
+  },
+  {
+    version: "1.408.0",
+    date: "2026-08-31",
+    changes: [
+      "A meal label can now be shared with someone. Pick the new Share code style and the whole recipe travels in the code \u2014 whoever scans it gets the meal added to their own app, with no account and no signal needed.",
+      "Scanning a shared label saves the meal to your library rather than logging it, so it is there to cook again.",
+      "The other label styles are unchanged and still print the ingredient list. Their code is a private bookmark that logs the meal on your own phone, and the label screen now says so \u2014 handing one of those to a friend never worked.",
+      "Scanning a label that is not yours used to say the meal no longer exists, which was wrong. It now says it is not in your library and points at the shareable kind.",
+      "Where a long recipe does not fit the code, the label says how many ingredients were grouped together. The calories and macros are always exact.",
     ],
   },
   {
