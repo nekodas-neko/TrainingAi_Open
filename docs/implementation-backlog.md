@@ -1790,7 +1790,17 @@ Lane A's.
   agree with the calorie goal. It is exempt in `scripts/check-body-fat-correction.js` with that
   reason — **remove the exemption in the same PR**, or the check keeps asserting a decision that has
   been made.
-- **Gate: device** — a Health-screen change on the canonical runtime.
+- **The `Gate: device` was removed 2026-09-01 — it was parking unbuilt work.** `Gate: device` means
+  *waiting on* the S25 smoke run (`docs/agents/README.md` §Gate), which fits a shipped entry whose
+  only residue is the check. **Nothing here is built yet**, so this entry is waiting on an
+  implementer, not on the phone; the check comes after. Its reason — "a Health-screen change on the
+  canonical runtime" — is true of every Lane B item, and gating on it would park the whole lane.
+  **The device check is still owed**, and CLAUDE.md's Canonical Runtime rule says how to satisfy it:
+  the on-device smoke run, *or* a Known-Issues row marking the change not-yet-device-verified. Take
+  that at merge time, not as a reason to leave the two numbers disagreeing on screen.
+- **Checked against the other 39 device-gated entries and this is the only one of its kind** — 35 are
+  shipped-and-awaiting-their-check (correctly parked), and `PS-9`/`PS-10`/`PS-12`/`PS-16` need the
+  Colmi ring in hand, which no note can substitute for.
 
 
 ### [workouts] BF-59 — the weekly set targets are a flat large/small binary, ignoring both the app's own landmark table and the program's goal

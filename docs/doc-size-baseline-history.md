@@ -5245,3 +5245,10 @@ and in each case the missing piece was a number or a field rather than prose:
 
 Both long blocks were cut roughly in half before this number was taken (LB-37 by 14 lines, Q-187 by
 5); +40 is what remains after that trim.
+
+**Amended to 14557 in the same PR (+10).** `LA-45` lost a `Gate: device` for the same reason Q-250
+did: it was parking work nobody had built yet. The gate means *waiting on* the smoke run, which fits
+a shipped entry; LA-45 is waiting on an implementer, and its stated reason — "a Health-screen change
+on the canonical runtime" — is true of every Lane B item, so gating on it parks the lane. The
+replacement text records that the other 39 device-gated entries were checked and **only this one is
+of that kind**, so the next session does not re-audit all 40.
