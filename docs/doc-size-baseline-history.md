@@ -5119,6 +5119,19 @@ is deliberate, which argues for storing it — and that turns a Lane B control i
 "per session" wording is also flagged as ambiguous, because Home shows one session and the request
 only parses on a list.
 
+## 2026-08-31 — implementation-lane-b.md 159 → 156 (−3, TIGHTENED)
+
+The twentieth Lane B run's baton rewrite. It gained this run's material — `tsc` typechecking nothing
+under `__tests__`, LB-38's two falsified hypotheses and the ship-the-instrument lesson, the queue
+head being exhausted of Lane B work, and five new gotchas — and still came out five lines shorter,
+because the rule is rewrite rather than append. The four-tests-that-could-not-fail block compressed
+to its principle now the habit is established, and the re-litigate list lost detail that had aged
+into background. Tightened rather than banked: slack left in a shrink-only ratchet is room the next
+append takes without noticing. (Drafted at 154; the BF-84 line was then rewritten twice as #705
+landed under it — first to stop asserting a state another open PR was about to change, then to
+state the resolution it reached. Two lines, and the right two: a baton is read by someone who
+cannot see which PRs were in flight when it was written.)
+
 ## 2026-09-01 — `docs/implementation-backlog.md` (BF-84's surface settled, and the button already exists)
 
 The owner clarified: one small greyed Rest button on Home's training card. Reading
