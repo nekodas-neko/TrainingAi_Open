@@ -11,7 +11,9 @@ directory. Local SQLite **v32**.
 
 ## Now
 
-**Nothing of Lane A's is open or blocked** once #672 lands. `docs/implementation-backlog.md` is
+**BF-2 is planned and buildable — start there.** Its plan ([`2026-08-31-dexa-filter.md`](../../superpowers/plans/2026-08-31-dexa-filter.md)) reverses two of the entry's assumptions (derived pairs, not stored → **no migration**; offset, not ratio) and its four build steps are each independently mergeable. **Its outcome is unobservable until LA-44** — `dexa_scans` and `measured_rmr` are both empty in production and neither has an entry surface — so do not read "nothing happened" as a broken calibration.
+
+`docs/implementation-backlog.md` is
 **220 entries** — it grows while a session shrinks it, because five agents file into it concurrently.
 
 **This session told the owner the Lane A queue was nearly exhausted; it was not** — re-running `next-item.js` showed **69 READY** with an entirely different top. The queue is scanned, never remembered.
@@ -60,9 +62,7 @@ Two shapes: *the evidence is stale*, and *the evidence was never true*. Q-295 is
 
 ## Shipped this session
 
-**2026-08-30/31, twelve PRs:** Q-311, Q-225, Q-297, Q-527, Q-211, LA-40, LB-14, Q-214, Q-284,
-LB-25, BF-67's plan (#666, which filed LA-43), LA-43 (#672). What each one turned out to be is in
-`docs/overview/entries/2026-08-3{0,1}-*.md` — this line is only so a successor knows the span.
+**2026-08-30/31, thirteen PRs:** Q-311, Q-225, Q-297, Q-527, Q-211, LA-40, LB-14, Q-214, Q-284, LB-25, BF-67's plan (#666, which filed LA-43), LA-43 (#672), BF-2's plan (#673, which filed LA-44). What each turned out to be is in `docs/overview/entries/2026-08-3{0,1}-*.md`.
 
 **LA-43 is the ninth moved premise this session** — filed against an unreachable `??` fallback; the
 live defect was the exact-name filter above it silently deleting every paraphrase. **Two guards in
