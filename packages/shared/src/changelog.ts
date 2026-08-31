@@ -6,6 +6,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.413.0",
+    date: "2026-08-31",
+    changes: [
+      "Body Battery and Readiness now each say what they are for, so they stop reading as the same number.",
+      "Body Battery: energy left right now \u2014 it opens at your readiness and drains as you use it.",
+      "Readiness: how your day is likely to go, set in the morning from last night's sleep and yesterday. It does not move as you use energy.",
+    ],
+  },
+  {
     version: "1.412.0",
     date: "2026-08-31",
     changes: [
