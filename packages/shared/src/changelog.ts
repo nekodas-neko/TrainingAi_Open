@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.415.0",
+    date: "2026-08-31",
+    changes: [
+      "Coach can now be opened for one subject at a time. Opening it from Nutrition gives it your meal plan, your intake and your targets — and not your training, so it stays on topic instead of wandering into your program. Ask it about a workout there and it points you at the right screen rather than guessing.",
+    ],
+  },
+  {
     version: "1.414.1",
     date: "2026-08-31",
     changes: [

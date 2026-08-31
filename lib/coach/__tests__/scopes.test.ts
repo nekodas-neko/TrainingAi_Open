@@ -62,13 +62,44 @@ describe('the nutrition scope', () => {
     expect(n.widgetTools).toContain('handOff')
   })
 
-  // Every scope's lists must name things that exist, or the narrowing silently withholds
-  // everything — an empty enum is not a schema error, it is a tool nobody can call.
-  it('names only real tools, sources and domains', () => {
-    for (const w of n.widgetTools) expect(Object.keys(WIDGET_TOOL_NAMES)).toContain(w)
-    for (const c of n.choiceSources) expect(CHOICE_SOURCES).toContain(c)
-    for (const d of n.patchDomains) expect(COACH_PATCH_DOMAINS).toContain(d)
+  it('names read tools, so it is not a Coach that can see nothing', () => {
     expect(n.readTools?.length).toBeGreaterThan(0)
+  })
+})
+
+// `scopedSchemas` builds `z.enum(scope.choiceSources)` per request, and `z.enum([])` THROWS — so an
+// empty list is not a scope that offers nothing, it is a scope that 500s every request. Asserted
+// across every scope rather than only the one that exists today.
+describe('every scope', () => {
+  it('names a non-empty list wherever an enum is built from it', () => {
+    for (const [id, scope] of Object.entries(COACH_SCOPES)) {
+      expect(scope.choiceSources.length, `${id}.choiceSources`).toBeGreaterThan(0)
+      expect(scope.patchDomains.length, `${id}.patchDomains`).toBeGreaterThan(0)
+      expect(scope.widgetTools.length, `${id}.widgetTools`).toBeGreaterThan(0)
+      // `readTools` is the exception: null means "all", and an empty array is a legitimate
+      // (if useless) scope, because nothing builds an enum from it.
+      for (const t of scope.widgetTools) expect(Object.keys(WIDGET_TOOL_NAMES), id).toContain(t)
+      for (const c of scope.choiceSources) expect(CHOICE_SOURCES, id).toContain(c)
+      for (const d of scope.patchDomains) expect(COACH_PATCH_DOMAINS, id).toContain(d)
+    }
+  })
+})
+
+// A scope names its read tools as strings, and `pickTools` deliberately ignores a name nothing
+// answers to — which is right (a typo must not invent an entry) and is also why a rename in
+// `lib/ai-chat/tools.ts` would silently strip the tool from every scope that lists it, with no
+// error anywhere. This is the only thing that notices.
+describe('a scope names read tools that exist', () => {
+  it('every readTools entry resolves against buildChatTools', async () => {
+    const { buildChatTools } = await import('@/lib/ai-chat/tools')
+    // Never executed — `buildChatTools` only *describes* the tools; the repo is reached inside
+    // each `execute`, which nothing calls here.
+    const available = Object.keys(buildChatTools({} as never, 'u', 'Australia/Brisbane', '2026-09-01'))
+    for (const [id, scope] of Object.entries(COACH_SCOPES)) {
+      for (const name of scope.readTools ?? []) {
+        expect(available, `${id}.readTools names "${name}"`).toContain(name)
+      }
+    }
   })
 })
 
