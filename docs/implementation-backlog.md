@@ -561,6 +561,128 @@ twice on disk (see the migration-number note at the top of this file).
 
 ---
 
+### [body][nutrition][platform] BF-41 — RMR, DEXA and blood are one intake shape; build the pipeline once
+> **⚑ RAISED 2026-08-31 — the owner has now declined typing twice in a row.** After BF-71 shipped the
+> forms: *"can we add the option to upload an image of the results like I did and have it fill it
+> in?"*, then *"I don't want to type it manually; I'd rather it be able to scan the photo."* So the
+> extraction path is the deliverable, not an enhancement on top of the forms — the forms are the
+> confirm step it lands in. Built beside BF-1, which needs the same pipeline for 58 analytes and is
+> the report that justifies it.
+
+> **⚑ RE-ASKED 2026-08-31 — owner, on the screen BF-71 just shipped: *"can we add the option to
+> upload an image of the results like I did and have it fill it in?"*** This entry is that request.
+> Two things changed since it was written and both shrink it:
+> - **The confirm step is no longer new UI.** BF-71 shipped typed forms for DEXA and RMR that already
+>   validate and save. Extraction's job is to **prefill those forms**, not to build a review screen —
+>   so the shape is: pick an image → extract → the existing form opens populated → the owner corrects
+>   anything wrong → save. `source` is already `'manual' | 'extracted'`, with no third value for a
+>   model's unconfirmed output, which is the schema saying the confirm step is mandatory.
+> - **The blood panel is the case that actually needs it.** DEXA is ~10 load-bearing fields and RMR
+>   is 3; both are typable in a minute. A 58-analyte panel is not, so if this is built for one report
+>   first, build it for blood.
+>
+> **⚠ The owner's own rule binds here and it is the reason this was deferred, not an obstacle to
+> route around: CROP BEFORE UPLOAD (BF-1).** The owner said it first — *"I will scrub it of my PII
+> first"* — and the extraction call sends the image to Google, so *redacting after extraction is too
+> late*. The upload surface must therefore make cropping the **default path**, not a suggestion: show
+> the crop step before the image can be sent, and never auto-send a freshly-picked photo. The RMR
+> printouts in particular carry a name and a date of birth in the header, which is exactly the band a
+> crop removes.
+> **And still no source document is stored** — extract, confirm, save the fields, discard the file.
+> That is recorded in the module map and reversing it is its own decision.
+
+> **⚑ PROMOTED, 2026-08-27 — owner: *"So lets prioritize getting this data saved and uploaded."***
+> This entry is now the pipeline's own priority, not a note attached to three others. The reports
+> exist de-identified in [`docs/clinical-baseline-2026-08-27.md`](clinical-baseline-2026-08-27.md),
+> so every schema can be written from a real one today. **Storage is decided: keep every field**
+> (BF-43), which means the DEXA table carries all 11 regions and both index blocks, and the analyte
+> table carries the raw range string and the printed result text, not just what a screen renders.
+
+- **⚑ The real reports have arrived and are recorded, de-identified, in [`docs/clinical-baseline-2026-08-27.md`](clinical-baseline-2026-08-27.md)** — DEXA and RMR
+  (2026-08-27) and a 58-analyte blood panel (2026-04). Write each schema from that file, not from a
+  description. It already settles BF-1's hardest shape questions (one-sided and absent reference
+  ranges, a `<0.2` non-numeric result, free-text flags with commentary, a month-precision date).
+
+- **Lane:** A for storage and extraction, B for the upload/crop/confirm surface.
+- **Added:** 2026-08-27 · owner, about to send all three at once: *"ideally you can see what we are
+  getting and create an endpoint or so to record these down- then the ability to upload the documents
+  and have it auto scan. I will scrub it of my PII first. but there is a lot of fields/details."*
+- **⚑ Read this before BF-1 or BF-2.** It does not replace them; it says what they share, so the
+  second one built does not re-derive the first one's pipeline.
+
+**Three entries already exist and they are at three different stages:**
+
+| Result | Entry | State |
+|---|---|---|
+| **RMR** | BF-33 | **engine shipped** — `measured_rmr` (migrations 225/226), `POST /api/measured-rmr`, plausibility bounds, `ffm_kg_at_test` so a reading re-scales instead of expiring. **No UI.** |
+| **DEXA** | BF-2 | filed, planning item, `⏰` note for the 2026-08-27 scan |
+| **Blood panel** | BF-1 | filed, **owner's crop-before-upload decision already made** |
+
+**They are the same shape.** Each is a **dated clinical measurement from an external provider**, with
+many mostly-nullable fields, arriving either typed by hand or read off a document, and each needs the
+same three things: a PII-safe path to the model, a confirm-before-store step, and a provenance stamp.
+Built separately that is three upload flows, three extraction routes, three review screens and three
+sets of the same mistakes.
+
+**The split that matters — typed storage, one shared pipeline.**
+
+- **Storage stays typed, per result.** `measured_rmr` is already the template and it is the right
+  one: BF-2's calibration and BF-33's precedence rule both do **arithmetic on named columns**, and a
+  JSONB blob makes exactly that hard. DEXA gets its own table; a blood panel gets a **parent plus a
+  child analyte table** (`name, value, unit, ref_low, ref_high, flag`), because a panel is N rows and
+  not N columns.
+- **The pipeline is built once and parameterised by result type:** pick a document → crop → extract
+  with `generateObject` against that type's Zod schema → **show the parsed fields for confirmation**
+  → save. `app/api/nutrition/scan/route.ts` is the working reference for the middle of that, as BF-1
+  already says.
+
+**⚠ Do not design the field lists before seeing a real report.** This repo's own rule about external
+field names — *read the pinned source, never memory* — applies to a DEXA printout and a pathology
+panel just as much as to an API. Providers differ, units differ, and a schema invented from a
+description will silently drop the field that turns out to matter. **The owner is sending real
+(PII-scrubbed) reports; the schemas get written from those.**
+
+**⚠ Two different redactions, and conflating them would be the security bug.**
+1. **The owner scrubbing a report before sending it to a chat session** — happening now, their call,
+   outside the app.
+2. **The app's own crop-before-upload step** — BF-1's decided route (a), because the extraction call
+   sends the document to Google and *"redacting after extraction is too late"*. **That still has to
+   be built even though step 1 happened**, and it applies to DEXA reports too: they carry name, date
+   of birth and a patient reference exactly like a pathology report. BF-1 made this decision for
+   blood panels; **it is hereby the rule for every document type.**
+
+- **No document store exists, and think before adding one.** The only `bytea` column in the schema is
+  `oura_raw_packed.blob`. **Recommended: do not store the source document at all** — extract, confirm,
+  save the fields, discard the file. It removes the largest PII surface in the feature, and the app's
+  Play Store ambition (health data + a declared-use-case review) makes a stored pathology PDF a
+  liability rather than an asset. If a document must be kept, that is its own decision with its own
+  entry, not a side effect of this one.
+- **Sequencing.** BF-33's UI first — the table exists, so it is the smallest end-to-end slice and it
+  proves the confirm step on real numbers. Then DEXA (BF-2), which BF-33's UI can be widened into and
+  which unblocks the scale calibration. Then blood (BF-1), the largest field set.
+
+- **✅ DEXA STORAGE SHIPPED, 2026-08-30 (Lane A).** `dexa_scans` + `dexa_scan_regions` (migration
+  **240**, `claude_ro` views regenerated in **241**), `saveDexaScan`/`getLatestDexaScan`/`listDexaScans`
+  on the repository, and `GET`/`POST /api/dexa-scans`. Written from the real Hologic printout in
+  [`docs/clinical-baseline-2026-08-27.md`](clinical-baseline-2026-08-27.md), every field kept per
+  BF-43, no source document stored. Upsert on `(user_id, scanned_on)` so a re-entry or a replayed
+  extraction updates in place; regions are **replaced** on re-save, not merged. **This unblocks BF-2**
+  — the DEXA half of its first calibration pair now has a table to live in.
+- **Keep:** three things are still owed and this entry stays queued for them.
+  1. **DEXA extraction** (Lane A) — `generateObject` against the route's Zod schema, so a photographed
+     printout produces the same stored row as hand entry. Nothing extracts yet.
+  2. **The blood panel** (BF-1, Lane A) — parent + child analyte tables, the largest field set, and
+     the one whose real report already settles the hard shape questions.
+  3. **The upload / crop / confirm surface** (Lane B) — including the app's **own** crop-before-upload
+     step, which is still required even though the owner scrubbed the reports by hand: that was
+     redaction (1), this is redaction (2), and conflating them is the security bug this entry names.
+     Until it exists there is no way to enter a DEXA scan from the app at all — the route is reachable
+     only by a client that does not exist yet.
+- **Verification.** Each type: hand entry and document extraction produce the same stored row; a
+  deliberately wrong extraction is caught at the confirm step and not stored; and no model-reported
+  number is ever displayed as fact before the owner confirms it (CLAUDE.md — a model handed a score
+  of 80 called it *"perfect"*).
+
 ### [platform][body] BF-79 — the personal details are split across two editors that each resend the other's fields
 
 - **Lane:** B — `components/profile/edit-profile-sheet.tsx`, `goals-section.tsx`,
@@ -3387,122 +3509,6 @@ will hit it.
 - **Keep:** the device pass. The action row's safe-area inset renders 0 in the sandbox and Remove
   sits in that row; and whether the sheet now reads as one thing is the owner's call, not a
   measurement.
-
-### [body][nutrition][platform] BF-41 — RMR, DEXA and blood are one intake shape; build the pipeline once
-
-> **⚑ RE-ASKED 2026-08-31 — owner, on the screen BF-71 just shipped: *"can we add the option to
-> upload an image of the results like I did and have it fill it in?"*** This entry is that request.
-> Two things changed since it was written and both shrink it:
-> - **The confirm step is no longer new UI.** BF-71 shipped typed forms for DEXA and RMR that already
->   validate and save. Extraction's job is to **prefill those forms**, not to build a review screen —
->   so the shape is: pick an image → extract → the existing form opens populated → the owner corrects
->   anything wrong → save. `source` is already `'manual' | 'extracted'`, with no third value for a
->   model's unconfirmed output, which is the schema saying the confirm step is mandatory.
-> - **The blood panel is the case that actually needs it.** DEXA is ~10 load-bearing fields and RMR
->   is 3; both are typable in a minute. A 58-analyte panel is not, so if this is built for one report
->   first, build it for blood.
->
-> **⚠ The owner's own rule binds here and it is the reason this was deferred, not an obstacle to
-> route around: CROP BEFORE UPLOAD (BF-1).** The owner said it first — *"I will scrub it of my PII
-> first"* — and the extraction call sends the image to Google, so *redacting after extraction is too
-> late*. The upload surface must therefore make cropping the **default path**, not a suggestion: show
-> the crop step before the image can be sent, and never auto-send a freshly-picked photo. The RMR
-> printouts in particular carry a name and a date of birth in the header, which is exactly the band a
-> crop removes.
-> **And still no source document is stored** — extract, confirm, save the fields, discard the file.
-> That is recorded in the module map and reversing it is its own decision.
-
-> **⚑ PROMOTED, 2026-08-27 — owner: *"So lets prioritize getting this data saved and uploaded."***
-> This entry is now the pipeline's own priority, not a note attached to three others. The reports
-> exist de-identified in [`docs/clinical-baseline-2026-08-27.md`](clinical-baseline-2026-08-27.md),
-> so every schema can be written from a real one today. **Storage is decided: keep every field**
-> (BF-43), which means the DEXA table carries all 11 regions and both index blocks, and the analyte
-> table carries the raw range string and the printed result text, not just what a screen renders.
-
-- **⚑ The real reports have arrived and are recorded, de-identified, in [`docs/clinical-baseline-2026-08-27.md`](clinical-baseline-2026-08-27.md)** — DEXA and RMR
-  (2026-08-27) and a 58-analyte blood panel (2026-04). Write each schema from that file, not from a
-  description. It already settles BF-1's hardest shape questions (one-sided and absent reference
-  ranges, a `<0.2` non-numeric result, free-text flags with commentary, a month-precision date).
-
-- **Lane:** A for storage and extraction, B for the upload/crop/confirm surface.
-- **Added:** 2026-08-27 · owner, about to send all three at once: *"ideally you can see what we are
-  getting and create an endpoint or so to record these down- then the ability to upload the documents
-  and have it auto scan. I will scrub it of my PII first. but there is a lot of fields/details."*
-- **⚑ Read this before BF-1 or BF-2.** It does not replace them; it says what they share, so the
-  second one built does not re-derive the first one's pipeline.
-
-**Three entries already exist and they are at three different stages:**
-
-| Result | Entry | State |
-|---|---|---|
-| **RMR** | BF-33 | **engine shipped** — `measured_rmr` (migrations 225/226), `POST /api/measured-rmr`, plausibility bounds, `ffm_kg_at_test` so a reading re-scales instead of expiring. **No UI.** |
-| **DEXA** | BF-2 | filed, planning item, `⏰` note for the 2026-08-27 scan |
-| **Blood panel** | BF-1 | filed, **owner's crop-before-upload decision already made** |
-
-**They are the same shape.** Each is a **dated clinical measurement from an external provider**, with
-many mostly-nullable fields, arriving either typed by hand or read off a document, and each needs the
-same three things: a PII-safe path to the model, a confirm-before-store step, and a provenance stamp.
-Built separately that is three upload flows, three extraction routes, three review screens and three
-sets of the same mistakes.
-
-**The split that matters — typed storage, one shared pipeline.**
-
-- **Storage stays typed, per result.** `measured_rmr` is already the template and it is the right
-  one: BF-2's calibration and BF-33's precedence rule both do **arithmetic on named columns**, and a
-  JSONB blob makes exactly that hard. DEXA gets its own table; a blood panel gets a **parent plus a
-  child analyte table** (`name, value, unit, ref_low, ref_high, flag`), because a panel is N rows and
-  not N columns.
-- **The pipeline is built once and parameterised by result type:** pick a document → crop → extract
-  with `generateObject` against that type's Zod schema → **show the parsed fields for confirmation**
-  → save. `app/api/nutrition/scan/route.ts` is the working reference for the middle of that, as BF-1
-  already says.
-
-**⚠ Do not design the field lists before seeing a real report.** This repo's own rule about external
-field names — *read the pinned source, never memory* — applies to a DEXA printout and a pathology
-panel just as much as to an API. Providers differ, units differ, and a schema invented from a
-description will silently drop the field that turns out to matter. **The owner is sending real
-(PII-scrubbed) reports; the schemas get written from those.**
-
-**⚠ Two different redactions, and conflating them would be the security bug.**
-1. **The owner scrubbing a report before sending it to a chat session** — happening now, their call,
-   outside the app.
-2. **The app's own crop-before-upload step** — BF-1's decided route (a), because the extraction call
-   sends the document to Google and *"redacting after extraction is too late"*. **That still has to
-   be built even though step 1 happened**, and it applies to DEXA reports too: they carry name, date
-   of birth and a patient reference exactly like a pathology report. BF-1 made this decision for
-   blood panels; **it is hereby the rule for every document type.**
-
-- **No document store exists, and think before adding one.** The only `bytea` column in the schema is
-  `oura_raw_packed.blob`. **Recommended: do not store the source document at all** — extract, confirm,
-  save the fields, discard the file. It removes the largest PII surface in the feature, and the app's
-  Play Store ambition (health data + a declared-use-case review) makes a stored pathology PDF a
-  liability rather than an asset. If a document must be kept, that is its own decision with its own
-  entry, not a side effect of this one.
-- **Sequencing.** BF-33's UI first — the table exists, so it is the smallest end-to-end slice and it
-  proves the confirm step on real numbers. Then DEXA (BF-2), which BF-33's UI can be widened into and
-  which unblocks the scale calibration. Then blood (BF-1), the largest field set.
-
-- **✅ DEXA STORAGE SHIPPED, 2026-08-30 (Lane A).** `dexa_scans` + `dexa_scan_regions` (migration
-  **240**, `claude_ro` views regenerated in **241**), `saveDexaScan`/`getLatestDexaScan`/`listDexaScans`
-  on the repository, and `GET`/`POST /api/dexa-scans`. Written from the real Hologic printout in
-  [`docs/clinical-baseline-2026-08-27.md`](clinical-baseline-2026-08-27.md), every field kept per
-  BF-43, no source document stored. Upsert on `(user_id, scanned_on)` so a re-entry or a replayed
-  extraction updates in place; regions are **replaced** on re-save, not merged. **This unblocks BF-2**
-  — the DEXA half of its first calibration pair now has a table to live in.
-- **Keep:** three things are still owed and this entry stays queued for them.
-  1. **DEXA extraction** (Lane A) — `generateObject` against the route's Zod schema, so a photographed
-     printout produces the same stored row as hand entry. Nothing extracts yet.
-  2. **The blood panel** (BF-1, Lane A) — parent + child analyte tables, the largest field set, and
-     the one whose real report already settles the hard shape questions.
-  3. **The upload / crop / confirm surface** (Lane B) — including the app's **own** crop-before-upload
-     step, which is still required even though the owner scrubbed the reports by hand: that was
-     redaction (1), this is redaction (2), and conflating them is the security bug this entry names.
-     Until it exists there is no way to enter a DEXA scan from the app at all — the route is reachable
-     only by a client that does not exist yet.
-- **Verification.** Each type: hand entry and document extraction produce the same stored row; a
-  deliberately wrong extraction is caught at the confirm step and not stored; and no model-reported
-  number is ever displayed as fact before the owner confirms it (CLAUDE.md — a model handed a score
-  of 80 called it *"perfect"*).
 
 ### [body][nutrition] BF-33 — a measured RMR has nowhere to go, and the four-number panel the test sheet already draws
 
