@@ -5235,3 +5235,13 @@ proposal with a stated blast radius rather than an implementation detail.
 
 Also notes that `activeBreakdown` already returns all three addends separately, so a one-line
 breakdown needs no new data.
+
+## 2026-08-31 — `docs/implementation-backlog.md` → 14613, `projectOverview.md` → 8586
+
+`lane-a/deload-temp-gate` (TN-18). The backlog growth is TN-18's `Keep:` recording two things the
+entry could not have known: the fix needed the adapter's daily-summary read widened to 28 days, and
+that widening turned `summaryRows[0]` from today into the oldest night — a month-stale deviation
+feeding a deload banner, which the first version of the new test file did not catch.
+
+`projectOverview.md` is the Current Status blurb again — the fourth raise of the evening from that
+one section, which is exactly what the note added to Q-220 earlier today describes.

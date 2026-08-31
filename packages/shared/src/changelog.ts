@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.414.3",
+    date: "2026-08-31",
+    changes: [
+      "The \"Body temp elevated — rest or deload recommended\" prompt no longer fires while your temperature baseline is still off. It was reading the same number readiness was scoring 80/100 and reaching the opposite conclusion, because the baseline it compares against is not centred yet. It comes back on its own once the baseline settles — nothing to switch back.",
+    ],
+  },
+  {
     version: "1.414.2",
     date: "2026-09-01",
     changes: [

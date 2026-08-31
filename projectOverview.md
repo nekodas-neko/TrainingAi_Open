@@ -24,8 +24,22 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.414.1 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Version:** v1.414.3 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-08-31.
+
+**The deload banner stops firing off a temperature baseline that is known to be wrong (TN-18).**
+The owner's 06:43 screenshot held both halves of the same broken baseline for one night: the
+readiness contributor scored temperature **80/100** off `temp_dev_c` = 0.519 °C, while the deload
+banner read the same number and said *"Body temp elevated — rest or deload recommended"*. TN-6a
+suspended the ladder in readiness and its own entry said the suspension must cover all three
+consumers; it covered one, and it was the path the owner does not read. The banner now takes the
+same `isTemperatureBaselineCentred` condition — imported, not re-derived, since two answers to "is
+temperature trustworthy" is what produced the disagreement — and the threshold is untouched, because
+raising it is the Q-504 mistake. **The fix needed the adapter's summary read widened to 28 days,
+which turned `summaryRows[0]` from *today* into *the oldest of 28 nights*; the first version of the
+new test file passed with a month-stale deviation feeding the banner.** Self-clearing: it lifts on
+its own once a re-derivation centres the deviations
+([journal](docs/overview/entries/2026-08-31-deload-temp-gate.md)).
 
 **A dead WebView renderer is handled instead of fatal, and it now leaves evidence (BF-80).** The
 owner's *"tab back into the app and the pages often crash and display a blank page"* had **nothing**
