@@ -4370,3 +4370,17 @@ the number is re-derived on the merge rather than claimed as a delta.
 
 **The baton was trimmed rather than raised.** The LB-30 gotcha earns a line; two older ones were
 reflowed to pay for it, so the file sits back on 126.
+
+## 2026-08-31 — `docs/implementation-backlog.md` 13762 → 13819 (LB-31)
+
+**Fifty-six lines for one entry, and the length is the point.** LB-31 records a red `Tests` check
+that took an hour to place, and most of that hour went into two hypotheses that turned out to be
+wrong — a stale local fixture, then the fresh-CI-database difference. Both were tested and both are
+dead, and the entry says so explicitly, because the next session's instinct will be to try exactly
+those two first.
+
+It carries two findings. The narrow one is a test whose precondition is destroyed by a persisting
+side effect of the route it tests. The durable one is that `ci.yml` has no `push: [main]` trigger
+— correctly, and for reasons written into the workflow — so nothing verifies the *combination* after
+several independently-green PRs land together. Five merged during this PR's own CI runs. That
+defect first appears on the next contributor's PR, on code they never touched.

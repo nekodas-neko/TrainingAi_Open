@@ -10227,6 +10227,63 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   Samsung's WebView — it is Chromium, so the compositor bugs (SVG wiping sibling gradients) stay
   invisible to it. See Q-252.
 
+### [platform] LB-31 — nothing runs the suite on `main`, so a defect that lands there has nothing to report it
+
+- **Lane:** A — the fix is `.github/workflows/ci.yml` and, if the body-battery half is real,
+  `app/api/body-battery/` and `lib/health/`. Found by Lane B on #664.
+- **Added:** 2026-08-31 · Lane B, from a red `Tests` check that took an hour to place.
+
+**Two findings, and the second is the durable one.**
+
+**① `app/api/body-battery/__tests__/anchor-source.test.ts` failed on CI and passes everywhere else.**
+Two assertions: `anchors on our own computed sleep score when only a sleep session exists` got
+`readiness`, and `prefers today's persisted derived readiness` got **55** where it writes **77**.
+
+The mechanism is real whatever triggers it. The three tests are **cumulative on one user in
+escalating precedence**, and `route.ts:206` takes an on-demand `buildReadinessPayload` whenever
+`readinessPlausible` — `ouraToday != null || ownSleepScore != null || bodyMetrics.length > 0` — and
+**that call persists what it computes**, by design, with a comment saying so. So test 2's own sleep
+insert is enough to make `ownSleepScore` non-null, run the build, land a derived readiness in the
+row, and resolve the anchor to `readiness` instead of the `sleep` it asserts. **The test's
+precondition is destroyed by the thing it is testing.**
+
+Whether that fires depends on whether the builder judges the composite real enough to persist for a
+fixture with almost no history — and **#663 retired the Oura activity blend, which changes what goes
+into that composite.** Look there first.
+
+- **⚠ It does NOT reproduce outside CI, and the negative results are the useful part.** Green in
+  isolation; green across the whole `app` suite; and green running the **full** suite
+  (`npx vitest run`, 677 files / 5,683 tests — CI's shape is 680) against a **freshly migrated
+  database created for the probe**. So the two obvious explanations are both dead: it is not a stale
+  local fixture, and it is not the fresh-CI-database difference. Do not spend the hour re-deriving
+  that.
+- **The test is worth hardening regardless of the trigger.** An assertion whose setup can be undone
+  by a persisting side effect of the route under test is fragile by construction. Either seed the
+  derived row the test wants and assert against that, or make the readiness build injectable so the
+  precedence ladder can be exercised one rung at a time.
+
+**② `ci.yml` has no `push: [main]` trigger, so `main` is never verified after a merge.** That is
+deliberate and its reasoning is sound and written down — `main` is protected, only reachable through
+an already-green PR, and re-running costs ~11 billed minutes per merge for a result the PR run
+already produced. **The gap it leaves is the one that bit here:** a PR is green against the `main` it
+was cut from, and nothing re-checks the *combination* after several land together. Five PRs merged
+during this one's CI runs.
+
+So a defect introduced by an interaction between two independently-green PRs is invisible until the
+next PR merges `main` — where it surfaces as **that** PR's red check, on code its author never
+touched, with every incentive to be read as their own and re-diagnosed from scratch. That is an hour
+per occurrence, paid by whoever is unlucky.
+
+- **Options, cheapest first.** A scheduled nightly run of `Tests` on `main` (no `push` trigger, so
+  no per-merge cost, and it names the merge window when something breaks). Or a merge-queue, which
+  is the real fix and much larger. Or accept it and write the symptom down where the next session
+  will look — which is the minimum this entry buys.
+- **Do not resolve this by deleting the reasoning in `ci.yml`.** The no-`push` decision is
+  well-argued; what is missing is anything that verifies `main` at all, and a nightly is not the
+  same thing as the per-merge run that was correctly rejected.
+- **Verification:** whatever ships, the check is that a deliberately broken `main` produces a red
+  signal that names `main`, rather than appearing on the next contributor's PR.
+
 ### [platform] Q-251 — a staging environment, so a migration's first real run is not production
 
 - **Branch:** `feat/staging-environment`
