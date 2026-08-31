@@ -10862,9 +10862,18 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 ### [platform][devices] Q-250 — an Android emulator job in CI, to close the 17 rows that need an Android runtime and nothing else
 
 - **Lane:** A
-- **Gate:** device
+- **The `Gate: device` was removed 2026-09-01, and it was circular.** This entry is the one that
+  *closes* device-gated rows, and it was parked behind the very bottleneck it exists to relieve —
+  so it could never be started, and the 17 rows it would close stayed shut. Nothing in it needs a
+  phone: its assertion runs on a GitHub `ubuntu-latest` emulator, its own body says the remaining
+  work is *"iterated by pushing"*, and the sign-in flow it needs is Maestro YAML against a seeded
+  local Postgres. **It is Lane A work, startable now.** What it still cannot do is anything with a
+  radio, and that has not changed — see the closing bullet.
 
-> **⛔ THE JOB IS DISABLED AND THE ASSERTION NEVER PASSED — read this before anything below.**
+> **⚠️ THE JOB IS DISABLED AND THE ASSERTION NEVER PASSED — read this before anything below.**
+> *(This heading is a warning to read first, not an instruction to stay away — the work below is
+> wanted. Its marker was downgraded on 2026-09-01 because `next-item.js` parks an entry on the
+> no-entry sign, and writing that sign even to explain it re-parks the entry. Do not restore it.)*
 > Corrected 2026-08-17, hours after the note that follows. That note says the local-SQLite half is
 > in. **It is not.** The job was merged, ran for the first time on a real runner, and failed — and
 > it could never have succeeded:
@@ -11440,8 +11449,26 @@ reason it took an hour is that there is no signal that would have answered it di
 - **Plan:** the shipped half is
   [`plans/2026-08-13-meal-plan-prefill-and-confirmation.md`](superpowers/plans/2026-08-13-meal-plan-prefill-and-confirmation.md);
   this half is explicitly listed there under *Explicitly out of scope*.
-- **Lane:** ? — it depends on the design. Re-scaling that happens at read time is a surface change
-  (B); one that rewrites the stored plan is Lane A. Do not start it without settling that first.
+- **Lane:** ? — and it stays unresolved until the gate below clears, because the lane *is* the
+  decision. Re-scaling computed at read time is a surface change (B); one that rewrites the stored
+  plan is Lane A.
+- **Gate:** owner — added 2026-09-01. The three questions below are preferences about how the app
+  should behave, not facts anyone can look up, and building either answer wrong makes the plan worse
+  than a static one. Prose alone was leaving this entry in UNCLASSIFIED where both lanes saw it and
+  neither could start it.
+- **Recommendation, so the gate is a decision rather than a blank page: re-scale at read time,
+  spread across every remaining meal, with a floor — and say so when the floor is hit.**
+  - **Read time, not stored** — the plan stays what the owner chose and only the *display* changes.
+    One source of truth, Lane B, and reversible; a stored rewrite loses the original plan.
+  - **Spread, not next-meal-only.** Taking a 700 kcal lunch overshoot entirely out of dinner is the
+    honest arithmetic and produces an absurd dinner, which gets ignored. Spreading makes several
+    meals slightly wrong, which gets followed.
+  - **A floor, with a sentence when it binds.** Below roughly 250 kcal a meal stops being a meal —
+    say the day is over budget rather than print `eat 180 kcal for dinner` (question 3's answer).
+  - **Reversal cost: low** — a computed view; deleting it restores today's behaviour exactly.
+  - **The alternative** is next-meal-only, better at one real thing: meals you have not reached stay
+    untouched, so a plan you already shopped for survives. If shopping to the plan is how it is
+    used, that flips the recommendation.
 - **Added:** 2026-08-11 · owner-requested
 - **Owner's words, the part not yet built:** *"then as you input your actuall food it can recalculate
   food based on the macros left. I.e if you eat too much during lunch it will cut some portions for
@@ -13977,8 +14004,7 @@ reads.
 
 ### [platform] LB-37 — `tsc` typechecks nothing under `__tests__`, so "TSC_OK" has never covered a spec
 
-- **Lane:** ? — the one-line `tsconfig.json` change is trivial; what it uncovers is not, and the
-  decision of whether to take that on is a platform call rather than an implementer's.
+- **Lane:** A — settled 2026-09-01 by the measurement below, which is what the lane was waiting on.
 - **Added:** 2026-08-31 · found while adding tests for LB-34, by noticing a spec that used two types
   it had never imported and still passed `tsc`.
 - **Measured, not inferred.** `tsconfig.json` carries
@@ -13993,12 +14019,26 @@ reads.
   whatever the runtime happens to do. That is the same class as a guard that cannot fail: a check
   whose silence carries no information.
 - **`e2e/` is NOT excluded** and is typechecked normally. The gap is unit tests only.
-- **Do not just delete the exclude line without measuring first.** It is there deliberately enough
-  that someone wrote it, and no comment says why. The first step is to find out what it is hiding:
-  run `tsc` with the exclusion removed and count the errors before deciding whether this is a
-  one-PR fix, a ratchet like the hex-literal baseline, or something to leave alone with a written
-  reason. **Report that count in the entry either way** — a session that measures it and does not
-  record the number leaves the next one to measure it again.
+- **MEASURED 2026-09-01 — the count is 282, across 83 test files.** This entry asked for the number
+  before the shape was chosen; here it is, so nobody measures it a third time.
+  Method: neutralise the `"**/__tests__/**"` exclusion, `npx tsc --noEmit`, restore, re-run for a
+  baseline. **289 total − 7 baseline = 282, and the split is exact** — all 7 baseline errors are
+  missing type packages in this sandbox (`@sentry/nextjs` ×5, `qrcode`, one `any` following from
+  them) and **none is in a test file**, so there are no false positives to argue about.
+  - **The commonest failures are the shape this entry predicted:** `TS2493` (indexing an empty
+    tuple) ×50 and `TS2741`/`TS2739` (a mock missing required properties) ×53 are both *the fixture
+    drifted from the type it stands in for*; `TS2345` ×56 is a mismatched argument. And
+    `lib/__tests__/ai-dynamic.test.ts` imports `../types/program`, **a module that does not exist** —
+    exactly the case the entry was opened on.
+  - **Worst files:** `packages/shared/src/workout/__tests__/log-exercise.test.ts` (25),
+    `lib/local-store/__tests__/sqlite-backend.test.ts` (16), `save-meal-tags.test.ts` (13),
+    `lib/scale-ble/__tests__/apply-reading.test.ts` (12) — the shared write path and the local
+    store, where a drifted fixture is least affordable.
+- **So the shape is settled: a ratchet.** 282 across 83 files is too much for one diff, and the
+  errors sit in the highest-consequence areas, so leaving the exclusion is not defensible either.
+  Copy the hex-literal pattern — shrink-only per-file baselines, exclusion dropped, a Custom Rules
+  step. Every *new* spec is typechecked immediately, which is the value; the 282 come down as files
+  are touched. **Lane A**: the 83 files reach both lanes, and README §3 sends both to A.
 
 ### [platform][nutrition] LB-38 — the share-code e2e decode fails intermittently on `main`, and the mechanism is not yet known
 

@@ -5227,3 +5227,21 @@ because #708 also struck LB-12 and main has since cleared entries the raises wer
 The pattern is worth stating once, since it has now cost two withdrawn raises: **a baseline raise
 computed before a rebase is a guess.** Re-measure after merging `main`, not before, and expect the
 answer to be lower than either side of the conflict.
+
+## 2026-09-01 — `docs/implementation-backlog.md` 14507 → 14547
+
+`docs/bf55-owner-decision`, second commit. Three entries gained the thing that was blocking them,
+and in each case the missing piece was a number or a field rather than prose:
+
+- **LB-37** asked outright for a count and said a session that measures it without recording it
+  leaves the next one to measure again. It is **282 errors across 83 test files** (289 raw minus a
+  7-error sandbox baseline that touches no test file). That decides the shape — a ratchet, not a
+  one-PR fix — so the measurement is what makes the entry startable, not commentary on it.
+- **Q-250** lost a `Gate: device` that was circular: the entry exists to *close* device-gated rows
+  and was parked behind the bottleneck it relieves. Its replacement text is longer than the field
+  it removed, deliberately, so nobody re-adds the gate.
+- **Q-187** gained `Gate: owner` and a recommendation, because its lane genuinely *is* the pending
+  decision and it was sitting in UNCLASSIFIED where both lanes saw it and neither could start it.
+
+Both long blocks were cut roughly in half before this number was taken (LB-37 by 14 lines, Q-187 by
+5); +40 is what remains after that trim.
