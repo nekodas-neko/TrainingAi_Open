@@ -392,8 +392,20 @@ That is the sibling-surface rule: two controls for the same job, one fixed and o
 
 ### [sleep] BF-83 — last night's sleep grows while you look at it, and nothing says it is still filling
 
-- **Lane:** A if the answer is the freshness/refresh path; B if it is only the label. Settle which
-  with the measurement below before starting.
+- **Keep — THE ENGINE HALF SHIPPED 2026-08-31; the badge and the average are Lane B's.**
+  `/api/sleep-sessions` now returns **`provisional: boolean`** on every row, and
+  `lib/sleep/provisional.ts` is the definition of what it means. What is owed, and only this:
+  render the badge on the sleep detail, and **exclude a provisional night from the recent-nights
+  average it is compared against** — the moving baseline in the table below is that omission.
+  The flag is computed per request, so a client that ignores it is no worse off than today.
+- **⚑ The measure is the ROLLUP's coverage, and a third mechanism was found while settling it.**
+  Two candidate mechanisms are listed below; neither is what happened. Production says the batch
+  covering 4:46 → 6:38 was already ingested at **6:42**, two minutes before the 6:44 screenshot —
+  so the raw data was there and the ROW was stale, because the rollup had not re-derived from it.
+  A test against `max(oura_raw_samples.measured_at)` would have called that night settled four
+  minutes before it grew by 85 minutes. `getSleepCoverageEnd` reads the rollup watermark instead,
+  which only advances when a run COMPLETES, so it covers the draining case AND this one.
+- **Lane:** A for the definition and the flag (**done**); B for the label and the average.
 - **Added:** 2026-09-01 · owner, with two screenshots of the **same night** four minutes apart:
   *"sleep changes depending what time you open it. I'd like it to be the final result on open."*
 
@@ -454,6 +466,10 @@ has already recorded that a bulk job bumps `updated_at` without rewriting a valu
 
 ### [workouts] BF-84 — a per-session Rest button on the training card, and rest is not stored anywhere
 
+- **Gate: owner** — transcribed 2026-08-31 from this entry's own words below (*"settle it before
+  scheduling"*), not a new judgement. `next-item.js` had it at #2 of Lane A's READY list, where
+  nothing said it was waiting on anything. The engine half is a stored row, a sync domain and the
+  inference path, which is expensive to undo if the answer is "a hint".
 - **Lane: A** — derived 2026-09-01, so the next reader does not re-derive it. The entry's own
   conclusion is *"ship the button and the storage together"*; the storage half is a row, a sync
   domain and the inference path; and CLAUDE.md sends a both-lanes item to **Lane A, engine first**.
@@ -688,6 +704,23 @@ brings it back.** It fits every part of the report:
 `onRenderProcessGone`, and no reload path**. Grepped: zero hits for `RenderProcess` anywhere under
 `android/`.
 
+- **⚑ READ THE CAPACITOR SOURCE 2026-08-31 — the hook exists, nothing registers it, and the
+  default is worse than a blank page.** `BridgeWebViewClient.onRenderProcessGone` already forwards
+  to every registered `WebViewListener`, and `WebViewListener`'s own default returns **`false`** —
+  which is the documented "app is killed" answer, not "show nothing". Grepped: this app registers
+  no listener that overrides it. So the missing piece is not a `WebViewClient` (Capacitor supplies
+  one, which is why the entry's grep for `RenderProcess` under `android/` found nothing while the
+  behaviour still exists) — it is a `WebViewListener` that handles the event, reloads, and returns
+  `true`. **That fix is correct regardless of whether the hypothesis holds**, since the current
+  behaviour on a renderer death is process termination.
+- **⚑ And the handler is how the hypothesis gets MEASURED rather than argued.** The entry's own
+  point is that nothing is recorded. A listener that stamps a marker (SharedPreferences, like the
+  ring key) and lets the next JS boot file an `error_events` row turns "we think the renderer is
+  being killed" into a row that says so — without needing the owner to hold a cable. Ship that with
+  the reload, not after it.
+- **⚠ Deliberately NOT batched with the JS work of 2026-08-31.** It is an `android/**` change, so
+  it needs an APK cycle and the install risk that carries; the batch it belongs in is the next
+  native one. Per CLAUDE.md's rule, native is batched hardest.
 - **⚠ Do not fix this by reloading on every `visibilitychange`.** That would re-fetch the whole shell
   on every alt-tab, cost the instant-paint behaviour the cache-seeding rules exist to protect, and
   hide the real fault rather than handling it. The fix is to detect the renderer's death and recover
@@ -2214,6 +2247,22 @@ check the implementation against — read out of `adapter.ts`.**
 
 ### [workouts][platform] BF-68 — the program builder does not know you are injured, and typing it into the chat does not make it stick
 
+- **Keep — SHIPPED 2026-08-31 except the two halves named here.** Both routes read
+  `repo.listInjuries()`; the exclusion happens on the **candidate list**, not in the prompt, using
+  `excludeInjuredExercises` — the predicate extracted out of `injurySafeAlternatives`, so the
+  builder cannot program an exercise the mid-workout swap sheet would then offer to replace. The
+  shared formatter the entry asks for is `formatInjuryContext`
+  (`packages/shared/src/workout/injury-context.ts`), exported for **BF-44** to import rather than
+  re-write. Not done, deliberately: **(1)** the builder chat does not CREATE an injury record — it
+  is a `generateObject` route with no tools, and converting it to a tool-calling flow to gain one
+  would restructure the whole builder response contract; it now tells the user to log it under
+  Health → Injuries instead, which is what makes the constraint outlive the conversation.
+  **(2)** the wizard UI does not surface the constraint — that is the Lane B half below, and it is
+  what the owner would need to *discover* the feature rather than have it apply silently.
+- **⚠ New behaviour worth knowing before the UI half:** when every candidate for the chosen
+  equipment and muscles involves an injured area, generation **refuses with a 400** naming the
+  muscles rather than programming through the injury. Without the Lane B half there is no
+  explanation on screen beyond that message.
 - **Lane:** A — `app/api/generate-program/route.ts` and `app/api/builder-chat/route.ts`; the UI half
   (surfacing the constraint on the wizard) is B and can follow.
 - **Added:** 2026-08-30 · owner, on building a new program with the AI coach: *"be able to put

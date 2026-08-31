@@ -1007,6 +1007,11 @@ export interface WorkoutRepository {
    *  the observation nearest *it*, which bounds the lag to one drain interval instead of
    *  "time since the last sync" — see `resolveDsToMs` in lib/oura-ble/clock.ts. */
   getOuraClockAnchors(userId: string): Promise<import('@/lib/oura-ble/clock').ClockAnchor[]>
+  /** How far in wall-clock time the BLE rollup's derivation has reached — the rollup watermark
+   *  resolved through the clock anchors, or null when no watermark applies to the current epoch.
+   *  A night ending within `PROVISIONAL_COVERAGE_MARGIN_MS` of this can still grow (BF-83); see
+   *  lib/sleep/provisional.ts for why this is the rollup's reach and not the raw table's. */
+  getSleepCoverageEnd(userId: string): Promise<Date | null>
   /** Store (or idempotently re-confirm) a live-counted step window — Tier 2 of the step
    *  orchestration plan. ON CONFLICT (user_id, start_ds) DO UPDATE, so a client retry of
    *  the same window is a no-op rather than a duplicate. */

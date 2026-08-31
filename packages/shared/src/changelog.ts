@@ -6,6 +6,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.414.0",
+    date: "2026-08-31",
+    changes: [
+      "Last night's sleep no longer looks final while it is still filling in. The ring delivers a night in batches, so the same night read 6 h 15 m and then 7 h 40 m four minutes later, with the 30-night average moving under it too. The app now knows which nights are still settling.",
+      "Building a program takes your logged injuries into account. Every exercise that loads an injured area is removed before the coach sees the list, so it cannot pick one — and it says which area it worked around. The same applies when you ask the builder chat for a swap.",
+      "If you mention an injury in the builder chat and none is logged, it now tells you to log it — otherwise the constraint only lasts for that conversation and your daily workout keeps prescribing the same movement.",
+    ],
+  },
+  {
     version: "1.413.2",
     date: "2026-08-31",
     changes: [
