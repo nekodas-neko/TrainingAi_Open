@@ -6,6 +6,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.407.1",
+    date: "2026-08-31",
+    changes: [
+      "A barcode-scanned food now keeps the product picture from the barcode database instead of falling back to a placeholder tile. The picture was always being fetched — five layers between the scan and the saved food were dropping it.",
+      "A barcode-scanned food is also recorded as scanned by barcode rather than by AI, which is what it had been labelled since the feature shipped.",
+    ],
+  },
+  {
     version: "1.407.0",
     date: "2026-08-31",
     changes: [

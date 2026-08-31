@@ -358,6 +358,59 @@ below threshold and left in place for next time.
 > BF-29 (My meals), BF-30 (Meal detail), BF-31 (Edit meal) and BF-26 (Quantity). Two artboards need
 > no entry — `Tap targets` and the `srv/g` studies both shipped in Q-395a.
 
+### [app-shell][platform] BF-80 — the app comes back blank after backgrounding, and nothing is recorded when it does
+
+- **Lane:** A — `android/app/src/main/java/com/trainingai/app/MainActivity.java` is where the fix
+  most likely lives, and it needs an APK.
+- **Added:** 2026-08-31 · owner: *"I notice when I tab out and tab back into the app the pages often
+  crash and display a blank page."* Screenshot: the status bar and the Android nav bar, and nothing
+  between them — **battery 10%**, Messenger running.
+
+**⚠ This is the highest-severity report of the session: the app is unusable when it happens, and the
+app does not know it happened.**
+
+**Checked in production, and the silence is the evidence.** `error_events` holds **three** rows for
+the owner across three days — two `SpeechRecognition.then()` (known, BF-66's neighbour, both older
+than this) and one aborted `POST /api/oura-ble/samples`. **Nothing from a blank screen.** `app/error.tsx`
+exists, so a JS exception during render would paint a fallback rather than nothing, and the client
+reporter would file a row. Neither happened.
+
+**Leading hypothesis: the WebView's render process is being killed while backgrounded, and nothing
+brings it back.** It fits every part of the report:
+- **Blank rather than an error screen** — there is no JS left to throw, so no boundary fires.
+- **Nothing in `error_events`** — the reporter died with the context it was reporting from.
+- **On return from another app** — Android reclaims a backgrounded renderer first.
+- **At 10% battery with another app active** — power saving makes reclamation far more aggressive,
+  which also explains *"often"* rather than *always*.
+
+**And the handler that would deal with it does not exist.** `MainActivity.java` overrides
+`onResume`, `onNewIntent`, PiP and sensors, and contains **no `WebViewClient`, no
+`onRenderProcessGone`, and no reload path**. Grepped: zero hits for `RenderProcess` anywhere under
+`android/`.
+
+- **⚠ Do not fix this by reloading on every `visibilitychange`.** That would re-fetch the whole shell
+  on every alt-tab, cost the instant-paint behaviour the cache-seeding rules exist to protect, and
+  hide the real fault rather than handling it. The fix is to detect the renderer's death and recover
+  from *that*.
+- **The diagnostic that confirms or kills the hypothesis, and it is cheap:** reproduce it, then
+  `adb logcat | grep -i "render process\|RENDER_PROCESS_GONE\|Chromium"`. A `Render process died`
+  line settles it. Two behavioural tells, no cable needed: after a blank screen, does **pull-to-refresh
+  do nothing** (a dead renderer cannot respond to touch) and does **backing out and re-entering fix
+  it**? A dead renderer needs a reload; a JS fault would not survive one either, but would have left
+  a row.
+- **Rule out the cheaper causes first, in this order:** (1) the service worker serving an empty shell
+  — the cache name is build-stamped, so a deploy mid-session is a candidate; (2) a route that renders
+  null while a cache read resolves; (3) the renderer death above. (1) and (2) would both leave
+  evidence — a row, or a screen that recovers on navigation.
+- **⚠ It costs an APK.** Anything in `MainActivity.java` is native, so it ships through the Android
+  workflow, not a Railway deploy. Confirm the owner holds `key.hex` before any suggestion that
+  touches installation — an uninstall destroys the Oura ring key. (Confirmed held 2026-08-25; ask
+  again rather than assuming.)
+- **Verification:** background the app under memory pressure (low battery, several apps open, a
+  camera session helps), return, and it paints its last screen rather than nothing — repeated ten
+  times. And whatever the cause turns out to be, **it must file an `error_events` row**: a failure
+  this total that leaves no trace is the part that let it go unreported until now.
+
 ### [platform][body] BF-78 — a partial PATCH to `/api/user/profile` wipes four columns, and one caller already sends one
 
 - **Lane:** A — `lib/data/postgres/adapter.ts:655` (`updateUserProfile`) and
@@ -830,64 +883,6 @@ was removed rather than left to imply otherwise. Filed as **LB-32**.
 `Delete meals`, not `Delete` — those words are the fix BF-50 shipped for *"you cant do anything with
 it except delete"*, and only the accessible name still carries them. It opens selection mode and
 deletes nothing on tap, which is what makes an icon-only entry point defensible here.
-
-### [nutrition] BF-70 — the barcode scan fetches the product image and three layers throw it away
-
-- **Lane:** A — `packages/shared/src/nutrition/log-food.ts` and the `NewFoodEntry` contract; the
-  form-model half is B but lands in the same change.
-- **Batch:** `barcode-chain` — with BF-38, which is also Lane A and touches the same call site.
-- **Added:** 2026-08-31 · owner, reviewing the tab: *"barcode scanning did not add the image of the
-  food from the db as its item picture."* Screenshot: `LOADED MAC & CHEESE / CORE POWERFOODS`,
-  90% confidence, *"From Open Food Facts barcode database"* — logged with a placeholder tile.
-
-**The picture is fetched successfully and then dropped, three times.** BF-35 already did the hard
-half: `OFF_FIELDS` requests `image_front_thumb_url`, and `/api/nutrition/barcode` awaits
-`fetchOffThumbDataUri(...)` and returns it as `result.imageDataUri`. The API that stores it exists
-too — `/api/nutrition/food-items` accepts `imageDataUri` and validates it against
-`FOOD_ITEM_IMAGE_MAX_BYTES`. Everything between the two discards it:
-
-1. **`EditableNutrition`** (`review-step.tsx:10`) has no `imageDataUri` field, and
-   `scanToEditable()` (`food-logger-sheet.tsx:41`) maps eleven fields and not that one — so the
-   image is gone the moment the Review sheet opens.
-2. **`NewFoodEntry`** (`packages/shared/src/nutrition/log-food.ts`) has no `imageDataUri` either, so
-   `handleConfirm` could not pass one even if the form held it.
-3. **`log-food.ts:214` writes `imageDataUri: null` literally** into the local food item.
-4. **`create-food-item.ts:68` looks like the fix and is inert.** It reads
-   `imageDataUri: s.imageDataUri ?? null` — but `s` is the return of
-   `sanitiseNutrition({ calories, proteinG, carbsG, fatG, servingSizeG, fiberG, sugarG, sodiumMg,
-   satFatG })`, whose `RawNutrition` type is numeric-only. **`s.imageDataUri` is always
-   `undefined`**, so that line is always `null`, and `NewFoodItem` has no image field for a caller to
-   supply one. Its comment — *"Present when the scan came from a barcode/search lookup whose Open
-   Food Facts product carried a thumbnail"* — asserts the opposite of what the code can do, and is
-   the reason nobody has caught this: the file reads as the place BF-35 route 1 was implemented.
-
-So this is a **contract gap along one chain**, not a bug in one place — fixing any single layer
-changes nothing, which is the thing to know before starting. Site 4 is the one to fix first: it is
-the shared creator, and giving `NewFoodItem` the field is what lets the other three carry a value
-worth passing.
-
-**⚠ Second finding in the same line, and it explains a measurement BF-38 already published.**
-`handleConfirm` sets `source: scanResult?.confidence ? 'ai' : 'manual'`. A barcode scan **has** a
-confidence (90% in the screenshot), so every barcode-scanned food is stored as **`source: 'ai'`** —
-the `'barcode'` value is in the type and is essentially never written from this path. That is why
-BF-38 measured only **3** rows with `source = 'barcode'` out of 221. The scan result knows which
-route produced it (the barcode branch stamps
-`notes: 'From Open Food Facts barcode database'`); the source should follow it.
-
-- **Fix the chain in one PR, per the sibling-surface rule** — the form model, the entry contract, the
-  `null` literal, and the same drop on the **photo-scan** path if it has one. Half of this chain
-  fixed is a picture that still never arrives.
-- **Ride BF-38's barcode work if it is in flight.** That entry already says the real barcode task is
-  making the code reachable end-to-end (*"the barcode column is NULL on all 221 rows"*), and the
-  `source` mislabel above is the same call site. Two PRs touching that line will conflict; one should
-  carry both.
-- **Nothing back-fills.** Foods already scanned keep their placeholder — the data URI was never
-  stored and OFF would have to be re-queried per item to recover it. Worth deciding whether a
-  one-off re-fetch for items that have a `barcode` is wanted, which is only possible for the rows
-  that actually have one (see the finding above — most do not).
-- **Verification:** scan a barcode for a product Open Food Facts has a thumbnail for → the logged
-  row shows the product picture, not the fork-and-knife placeholder; the stored item's `source` reads
-  `barcode`; and a product OFF has **no** image for still logs cleanly with the placeholder.
 
 ### [nutrition][platform] BF-57 — a printed meal label only works for the person who printed it, and making it work for anyone is a decision, not a fix
 
@@ -1506,8 +1501,8 @@ forecast before the feature existed.
 reads — BF-41's extraction path fills them), and any photo/upload path, because BF-1's decided rule
 is crop-before-upload and a typed form has no such exposure at all.
 
-**Still true and still blocking:** there is no outbox domain behind either route, so an offline save
-fails visibly rather than queueing. Adding one is a local-store table and a sync domain, which is
+**Still true:** there is no outbox domain behind either route, so an offline save fails visibly
+rather than queueing. Adding one is a local-store table and a sync domain, which is
 Lane A's.
 
 ### [body][nutrition] BF-42 — the daily energy model computes its own BMR and never reads the measured RMR
@@ -1543,6 +1538,11 @@ bug is that it is using a prediction as the definition of BMR when a measurement
   repository method already exists (`repo.getLatestMeasuredRmr`, used by
   `app/api/nutrition-goals/recommend/route.ts:212`), so this is a read plus one substitution, not new
   infrastructure.
+- **✅ MEASUREMENT NOW STORED, 2026-08-31 — this entry is fully verifiable and nothing gates it.**
+  The owner entered the results on the S25: `measured_rmr` = **1325 kcal at 51.5 kg FFM**,
+  `dexa_scans` = **28.5 %**, both dated 2026-08-27, both confirmed in production. So the check this
+  entry asks for — *the Energy Balance card and the goal wizard agree* — can be run today, and they
+  currently do not.
 - **✅ UNBLOCKED 2026-08-31 — the `Needs:` is cleared and deliberately not replaced.** It pointed at
   BF-33, then at BF-71; **BF-71 shipped the entry screen the same day** (`More → Health → DEXA & RMR
   results`, both tables verified filling). BF-71 stays in the queue only for a device check, and a
@@ -1562,166 +1562,6 @@ bug is that it is using a prediction as the definition of BMR when a measurement
   fixed, which is the argument for reading the measurement rather than tuning the prediction.
 - **Verification:** with a measurement stored, the Energy Balance card's resting base and the goal
   wizard's BMR agree; with none stored, both fall back to the same prediction and nothing moves.
-
-### [body][nutrition] 🔵 BF-2 — the "DEXA filter": calibrate the scale's body-fat estimate against a real DEXA, and correct history
-
-> **⚑ ALL FOUR STEPS SHIPPED 2026-08-31, and the chain is verified end to end.** Entering a scan
-> through **BF-71**'s form (#681, which superseded LA-44 the same day) makes the correction live with
-> no other action: one POST to `/api/dexa-scans` moved resting burn **1832 → 1773 kcal/day** and the
-> calorie goal **1961 → 1889**, with `body_metrics.body_fat_pct` and `/api/body-metadata`'s `bodyFat`
-> both still returning the raw 25.3. **A second scan re-derives on its own** — offset 3.2 → 2.6,
-> `pairCount` 1 → 2 — which is the accumulation the owner asked for, and the property that justified
-> deriving pairs rather than storing them.
->
-> **What remains is LA-45**: no screen reads the corrected value yet.
->
-> **Two things a later session must not "simplify".** (1) The correction is applied **per consumer**,
-> never inside `listBodyMetrics` — the Health log sheet seeds from that read and POSTs back at rank
-> `manual`, so a corrected value there overwrites the raw archive.
-> `scripts/check-body-fat-correction.js` holds the line. (2) `bodyFat` and `bodyFatCorrected` are
-> two fields on purpose, and `bodyFatIsCorrected` is a third because an offset can round to zero.
->
-> **⚑ PLANNED 2026-08-31 — [`2026-08-31-dexa-filter.md`](superpowers/plans/2026-08-31-dexa-filter.md).**
-> This is an implementation item now, not a planning one. **Two decisions in the plan reverse what
-> this entry assumed, so read it before building:**
-> **(1) the pairs are DERIVED, not stored** — both halves are already first-class rows (`dexa_scans`
-> joined to `body_metrics` on the date, keyed by `source_map->>'body_fat_pct'`), and a stored pair is
-> a stored counter wearing a different hat. **No new table and no migration number**, which is what
-> takes this off Lane A's migration budget entirely. **(2) offset, not ratio**, at n=1 — one pair
-> supports neither claim, so prefer the one that does not manufacture a claim about readings never
-> observed. Also retired: the `HEALTH_SOURCES` warning below. Read-time correction never writes to
-> `body_metrics`, so no source rank is added and `health-source.ts`'s TS/SQL ladders are untouched.
->
-> **⚑ Re-verified in production 2026-08-31, and the blocker is not what this entry says.**
-> `dexa_scans` holds **zero** of the owner's rows, and so does `measured_rmr` — **neither table has
-> any entry surface**: `grep -rn "dexa-scans\|measured-rmr" app/ components/ lib/` outside
-> `app/api/` returns nothing. The 2026-08-27 printout has been transcribed in
-> `docs/clinical-baseline-2026-08-27.md` for four days with nowhere to go. Filed as LA-44, and
-> **fixed by BF-71 (#681) the same day** — More › Health › DEXA & RMR results. Entering a scan there
-> now makes the correction live with no other action: verified 2026-08-31, resting burn
-> **1832 → 1773 kcal/day** off a single POST to `/api/dexa-scans`. The **scale** half of the pair is confirmed
-> present (2026-08-27, 71.7 kg, 25.3 %, `scale_ble`), and twelve consecutive days sit in
-> **24.9–25.5 %**, so the consistency premise the whole design rests on is measured, not assumed.
-
-> **⚑ PROMOTED TO THE HEAD OF THE QUEUE, 2026-08-27 — owner: *"first we need that Dexa scan filter
-> applied so it shows Body fat on the current scale as per a dexa result."*** The pair it was waiting
-> on exists (DEXA 28.5 % vs same-day Renpho 25.3 %). **With one pair an offset and a ratio are the
-> same correction**, so ship it as the single-pair case — store the pair, derive the correction from
-> the stored pairs, and let a second scan decide the form. Do not hardcode 3.2. The pair and the
-> surrounding scale days are in [`docs/clinical-baseline-2026-08-27.md`](clinical-baseline-2026-08-27.md).
->
-> **⚑ This entry and BF-33 interact, and getting the order wrong silently inflates the RMR.**
-> `personalRmr` ages a measurement by re-scaling its Cunningham residual to **today's** fat-free
-> mass. The stored `ffm_kg_at_test` comes from the DEXA (51.46 kg); today's comes from the scale.
-> Feed it the **uncorrected** scale number and the two are from different instruments — at the
-> measured 3.2-point gap that is 53.56 vs 51.46 kg, so the residual re-scales onto **+45 kcal/day**
-> of fat-free mass the owner does not have, on the very first day. **The corrected body fat has to
-> reach `personalRmr`'s `currentFfmKg`,** not just the protein dose and the goal screen.
-
-- **⚑ The DEXA table exists as of 2026-08-30** — `dexa_scans` (migration 240) with `pct_fat`,
-  `lean_plus_bmc_g` and the rest, plus `GET/POST /api/dexa-scans`, shipped under BF-41. The scan half
-  of a stored pair now has somewhere to go; what this entry still owes is the **pairing** (which scale
-  reading a scan is compared against, keyed by source) and the correction derived from the pairs.
-
-- **⚑ The first calibration pair: DEXA 28.5 % vs Renpho 25.3 %** — the scale under-reads by 3.2 points; weight 72.1 kg vs 71.7 kg. Recorded with surrounding scale days in [`clinical-baseline-2026-08-27.md`](clinical-baseline-2026-08-27.md). Never bake +3.2 in as a constant; the plan derives it.
-
-- **Lane:** A — classified 2026-08-30 by the path rule (*both halves → A, engine first*). The new
-  table and the calibration maths are the engine; the entry/review UI follows as **B**. The planning
-  session still splits the work; it does not re-decide the lane.
-
-> **⚠ PRIORITY CHANGED 2026-08-26 — the owner has a DEXA + RMR test BOOKED.** This entry sat at the tail because the owner filed it as *"a loose note to put more effort into later"*; that is no longer the signal. The planning session it asked for is done (top of this entry).
->
-> **The RMR half was split out as BF-33 and has SHIPPED** — `measured_rmr` (migrations 225/226), `personalRmr`, `/api/measured-rmr`. The empty table it left behind is filled by BF-71's form.
->
-> **Two refinements from the owner, 2026-08-26, that change the shape of the filter:**
->
-> 1. **It must accumulate, not be a single constant.** *"This value needs to be able to accept more (i.e another dexa scan later on) so it can work together to build a correct filter."* Honoured — but by **deriving** the pairs from `dexa_scans` × `body_metrics` rather than storing them, so a second scan becomes a second pair with no entry step (plan §2.2).
-> 2. **The filter is per measurement system, not global.** *"whatever measurement system was used"* —
->    the calibration belongs to the Renpho BIA path specifically. A different scale, or Health
->    Connect, is a different instrument with a different bias, and applying the Renpho correction to
->    it would be worse than applying none. Key the calibration by source, and let a source with no
->    pairs read uncorrected.
->
-> **The owner's own framing of the goal, worth keeping verbatim:** *"whenever I use my scale (renpho)
-> it can make it accurate to what a dexa scan would give. I hear these scales are good at consistency;
-> its just the initial value might be off."* That is the premise the whole design rests on — **and it
-> is testable rather than assumed.** The owner's last ten readings sit in a 24.9-25.3 band, which is
-> consistency; whether the *offset* is stable is what a second scan later would show, and is the
-> reason (1) above matters more than getting the first correction exactly right.
-
-**Owner request, 2026-08-23 (verbatim):** *"I'd like to be able to upload a dexa scan/RMR values;
-and 1- have a filter that aligns our scales values to a dexa scan; will call it 'dexa filter' so if
-our scale says 15% BF but dexa says 20% we will keep that ratio in mind when giving values; as well
-as fixing previous values."*
-
-**This is not a cosmetic display fix — the scale's body-fat % is an input to the calorie and protein
-goals.** Traced chain:
-
-| Step | Where |
-|---|---|
-| BIA estimate from impedance | `lib/scale-ble/composition.ts` → `computeBodyComposition()` |
-| Stored | `body_metrics.body_fat_pct`, `source_map->>'body_fat_pct' = 'scale_ble'` |
-| Lean mass → BMR (Cunningham, `ffm·21.6 + 370`) | `packages/shared/src/health/body-composition.ts:24` |
-| → calorie + protein goal | `packages/shared/src/nutrition/goal-recommendation.ts:166,178` |
-| → energy balance / TDEE | `lib/health/energy-balance-service.ts:193` |
-| → stored `body_comp` snapshot | `lib/data/postgres/slices/oura.ts:1680` |
-| → display panel | `app/health/health-sections.tsx:285` |
-
-**Measured leverage, against the owner's real current numbers** (71.25 kg, 25.2 % BF, 2026-08-23,
-every row `scale_ble`; last 10 readings sit in a tight 24.9–25.3 band). BMR is linear in body-fat %,
-so the error is exact rather than estimated: **`d(BMR)/d(BF point) = −weightKg × 0.216 = −15.4
-kcal/day per percentage point`**, and the calorie goal carries that through `SEDENTARY_MULTIPLIER`
-(1.2) as **−18.5 kcal/day per point**. The owner's own 5-point example is therefore worth **≈92
-kcal/day on the calorie goal and ≈8 g/day on the protein goal** (protein is dosed per kg of *lean*
-mass, `PROTEIN_G_PER_KG_BY_GOAL`, 2.2 for recomp). A DEXA gap does not just change a number on a
-card; it moves the budget the app tells the owner to eat to.
-
-**The premise is already documented as true — this is not speculative.** `lib/scale-ble/composition.ts`
-opens by saying it is *"a GENERIC single-frequency BIA estimator (Deurenberg-style … ), NOT Renpho's
-own proprietary algorithm"* and that its numbers *"will be close to, but not numerically identical
-to"* a reference. So there is a known, unquantified offset and no mechanism to measure it. A DEXA is
-exactly the measurement that quantifies it.
-
-**Design question the plan must answer — do not let it get decided by accident.** "Fixing previous
-values" can mean two very different things:
-- **(a) correct at read time** — store the DEXA reading plus a derived calibration (offset or ratio),
-  leave `body_metrics.body_fat_pct` holding the raw scale value, apply the correction wherever it is
-  consumed. Reversible; the raw reading stays archival, mirroring the `body_hex` rule.
-- **(b) re-stamp the stored column** — a corrective migration over history. Irreversible, needs a
-  migration number (**Lane A only**), and destroys the ability to re-derive if a later DEXA disagrees.
-
-  Recommended: **(a)**. It gives the owner everything asked for, including retroactive correction,
-  without a data-dropping migration, and a second DEXA then just updates the constant.
-
-**Two traps for whoever scopes this:**
-1. **`body_fat_pct` is not the only BIA-derived column.** `muscle_mass_kg`, `bone_mass_kg`,
-   `body_water_pct`, `visceral_fat_index`, `subcutaneous_fat_pct`, `protein_pct` and `metabolic_age`
-   all come out of the same `computeBodyComposition()` call. Correcting body fat alone leaves the row
-   internally inconsistent (fat % and muscle mass disagreeing about the same body). Decide whether
-   the filter is one scalar on body fat or a whole-panel re-derivation.
-2. ~~**Ratio vs offset.**~~ **Settled by the plan §2.3: offset.** One pair supports neither form, so prefer the one that makes no claim about readings never observed. Revisit at n = 2.
-
-**RMR is the separate half of this request, and it is simpler — now filed as BF-33.** Nothing in the tree reads a measured
-RMR — BMR is *always* estimated (Cunningham when body fat is known, Mifflin-St Jeor otherwise,
-`goal-recommendation.ts:166–169`). A measured RMR from a metabolic cart would override the estimate at
-exactly those two call sites. Worth filing as its own task inside the plan; it needs no calibration
-maths at all, just a stored value and a precedence rule.
-
-**Provenance note:** `HEALTH_SOURCES` in `lib/data/health-source.ts:18` ranks
-`manual(5) > scale_ble(4) > oura_ble(3) > oura_cloud(2) > health_connect(1)`. A DEXA is a clinical
-measurement and outranks all of them; adding a source is a code change in that file **plus** the
-inlined SQL `CASE` at line 45 — both must move together or the SQL and TS ladders diverge.
-
-**The pre-scan instructions that used to sit here are spent** — the scan happened on 2026-08-27, the
-same-day Renpho reading was taken, and both are recorded (the scale half in production, the printout
-in [`clinical-baseline-2026-08-27.md`](clinical-baseline-2026-08-27.md)). The one durable line from
-them: a calibration pair's *scale* half cannot be reconstructed after the fact, so any future scan
-needs a same-day weigh-in booked with it.
-
-**Done looks like:** the app states the measured offset against the scale for the same period;
-corrected body fat feeds the calorie and protein goals **and `personalRmr`'s current fat-free mass**;
-and history reads corrected without the raw scale values having been overwritten. **"A DEXA reading
-can be entered" is NOT part of this entry — that was LA-44, superseded by BF-71 (#681).**
 
 ### [body][app-shell] LA-45 — the DEXA-corrected body fat is in the payload and no screen reads it
 
@@ -2735,8 +2575,10 @@ sheets are at the artboards' 16 px gutter now. See BF-45 ③ for why the fix is 
 ### [nutrition] BF-38 — logging the same food twice creates a second `food_items` row: 19 of 209 are redundant
 
 - **Lane:** A — the matching happens at creation, in the route and the shared create path.
-- **Batch:** `barcode-chain` — with BF-70, which fixes the `source: 'ai'` mislabel on the same
-  `handleConfirm` line this entry's barcode half depends on. Two PRs there would conflict.
+- ~~**Batch:** `barcode-chain`~~ — **BF-70 shipped 2026-08-31 and the batch is now this entry
+  alone.** The `handleConfirm` line it shared is already changed: the source comes from
+  `scanOriginToSource(scanResult?.origin, …)` rather than from the presence of a confidence, so a
+  barcode-scanned food is stored as `'barcode'`. This entry's barcode half builds on that.
 - **Added:** 2026-08-26 · BugFix, from the owner's My Foods screenshot. **Not reported** — it was
   visible in the picture sent about something else: `LOADED MAC & CHEESE / CORE POWERFOODS / 350 g /
   672 kcal` appears **twice in a 24-item list**.
@@ -2949,18 +2791,20 @@ back resolving to the tab that owns the destination instead of unwinding to the 
 ### [nutrition] BF-35 — fill the food placeholder: two of the three sources are already free
 
 - **Lane:** A for the storage + the OFF field; B for the render.
-- **⚠ CORRECTED 2026-08-31 — "stored and unseen" was wrong; nothing is stored.** The engine half
-  below did ship, and the barcode route does fetch the thumbnail, but **BF-70 traced four layers
-  between the fetch and the column that each discard it** — including `create-food-item.ts:68`, whose
-  comment claims to carry it and structurally cannot. So the render owed at (1) would display
-  nothing today. **BF-70 is the prerequisite for this entry's route-1 half**, and it is where that
-  work now lives; do not build the render first.
+- **⚠ CORRECTED TWICE. "Stored and unseen" was wrong — nothing was stored; then BF-70 fixed that
+  on 2026-08-31 and now it is.** BF-70 traced the layers between the fetch and the column that each
+  discarded the image — including `create-food-item.ts:68`, whose comment claimed to carry it and
+  structurally could not — and found a **fifth** its own entry had not enumerated, the web POST body
+  in `log-food.ts`. All are fixed, and a real barcode lookup now stores its thumbnail end to end
+  (verified: a 5,359-char data URI on a real Open Food Facts product). **The render at (1) is
+  therefore unblocked** and has something to display.
 - **Keep:** the ENGINE half of routes 1 and 2 shipped 2026-08-26 (migrations 227 + 228, local SQLite
   v30) — `food_items.image_data_uri`, `FOOD_ITEM_IMAGE_MAX_BYTES`, the whole offline chain (delta
   select, pull mapping, local upsert, outbox payload, both write paths), and the barcode route
   fetching the Open Food Facts thumbnail. **Three things are still owed:**
-  1. **The render (Lane B)** — nothing displays the column. **Blocked by BF-70** (see the correction
-     above): the column is empty, so a render alone shows the same placeholder.
+  1. **The render (Lane B)** — nothing displays the column, and **it is no longer blocked**: BF-70
+     shipped, so a barcode scan writes a real image and a render will show it rather than the
+     placeholder. Rows created before 2026-08-31 stay imageless; only new scans carry one.
   2. **Route 2's client half (Lane B)** — `capture-actions.tsx` must emit a second 128 px downscale
      beside the 1024 px scan image. The server accepts and stores one already; it is inert until
      that lands. See constraint (b) above for why the scan image itself cannot be kept as-is.
