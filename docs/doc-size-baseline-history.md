@@ -5157,3 +5157,21 @@ half is a row plus a sync domain plus the inference path, and a both-lanes item 
 engine-first — so Lane B cannot take the surface alone. It also names the one question still open
 (fact or hint) and what it would change, because an entry that looks startable and is not is the
 thing this queue keeps costing sessions.
+
+## 2026-09-01 — `docs/implementation-backlog.md` (BF-85, and BF-35 gets the owner's ask pinned to it)
+
+**BF-85** is a centring complaint whose cause is legible from one line: the input carries
+`text-center` and is a bare `type="number"`, so Chromium's inner spin button eats the right edge and
+the text centres in what remains. The fix is already written in `quantity-editor.tsx:104` — the app's
+other quantity control — which is the sibling-surface rule with the sibling right there. Two things
+ride along: the input's `text-sm` is silently overridden by the `input { font-size: 16px !important }`
+mobile rule that `quantity-editor` documents and works around, and 38 other `type="number"` inputs
+have no spinner reset, which is recorded as a count rather than a sweep because some are in debug
+consoles.
+
+**BF-35** nearly got a wrong note. The owner's *"scan or barcode didn't add the item image"* reads as
+BF-70, which I filed yesterday — but BF-70 **shipped** on 2026-08-31 and stores the thumbnail end to
+end. So this is the unbuilt render at BF-35 (1), and the note went there instead. Two constraints
+went with it: rows created before the fix are permanently imageless, so the placeholder is a
+first-class state and not a loading shim, and the column holds bytes rather than a URL because it is
+read local-first.
