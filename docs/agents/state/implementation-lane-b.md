@@ -25,11 +25,13 @@ owner decisions, Q-222/Q-214a/Q-155/Q-1a/Q-44 are Lane A, Q-181 and Q-151 are WA
 **Q-138 declines to be a dedicated PR in its own words**. Three queue-head entries now say "do not
 build me". **Annotate the lane of anything you derive** — the next session should not re-derive it.
 
-**BF-84 is position 1 and is owner-blocked by its own text** (*"Ask which surface before
-designing"*): Home shows ONE recommended session, so "a button for each session" only makes sense on
-the session list or week strip. Its second question decides the lane — rest as a stored fact (Lane A:
-row, sync domain, inference path) or a hint for today's screen (Lane B). The entry recommends a fact.
-**Do not build past either.**
+**BF-84 is position 1, and READ THE ENTRY rather than this line** — PR #705 was reshaping it as this
+was written, reporting the owner had settled the surface as one greyed button on Home's training
+card. On `main` it still carried two questions: which surface (Home shows ONE recommended session, so
+"a button for each session" only fits the session list or week strip), and whether rest is a stored
+**fact** (Lane A — row, sync domain, inference path) or a hint for today's screen (Lane B). The
+second decides the lane; the entry recommends a fact. **Whichever is still open, do not build past
+it.**
 
 **A HEISENBUG SHOULD BE MADE TO REPORT ITSELF (LB-38).** The share-code e2e decode fails ~1 run in 2
 under file load and **never** in isolation, so it could not be caught on demand. Putting the
