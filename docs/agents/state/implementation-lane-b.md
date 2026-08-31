@@ -6,7 +6,7 @@
 **Updated:** 2026-08-31 · **By:** the eighteenth Lane B run · **Next ID:** `LB-31`
 
 ## Now
-**Merged this run: BF-66 (#662, v1.404.2) and BF-65 (v1.405.0)** — both workout-screen, both JS-only, **neither near a device**.
+**Merged: BF-66 (#662, v1.404.2). In #664: BF-65, LB-23, LB-30 (v1.405.1). Nothing has been near a device.**
 
 **`parseVoice` was a character denylist and is now a tokenizer — never put a strip back.** Its rules:
 a keyword claims the number *before* it; loose numbers fill what is left, weight first; a number
@@ -47,8 +47,8 @@ what your tests are true of, and whether an input a user would produce — or a 
 falls outside it.
 
 ## Do not re-litigate
-- **`useExerciseMedia` is the only `/api/exercise-gif` fetch** and `unoptimized` is mandatory on a
-  `.gif`; both held by `lib/hooks/__tests__/use-exercise-media.test.ts`.
+- **`stableBox`/`tapCentre` (`e2e/fixtures.ts`) before any coordinate dispatch OR geometry assertion** — neither `touchscreen.tap` nor `Input.dispatchTouchEvent` checks actionability. CI proved it on `food-log-swipe-delete:175` after it passed 3/3 locally: **a local pass is not evidence against this race.** The 21 taps inside a `toPass` retry re-measure and are already safe.
+- **`useExerciseMedia` is the only `/api/exercise-gif` fetch**; `unoptimized` is mandatory on a `.gif`. Both held by `lib/hooks/__tests__/use-exercise-media.test.ts`.
 - **`parseVoice` is a tokenizer, not a strip** — never re-add a character denylist to it. A denylist
   keeps whichever letters happen to spell the keywords, which is a rule no user can derive and no
   test would notice; the tokenizer's whole point is that a new filler word costs nothing.

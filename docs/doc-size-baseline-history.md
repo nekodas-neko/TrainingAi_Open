@@ -4253,6 +4253,29 @@ double-count risk; and the "like a total calorie value" analogy needs adjusting,
 sum across substances — what transfers is the shape (one number per substance per day), not the
 total.
 
+## 2026-08-31 — `docs/implementation-backlog.md` 13602 → 13625 → **13784** (BF-67's planning session)
+
+Twenty-three lines, and all of them are one new queue entry: **LA-43**, the program generator
+trusting the model's muscle guess on any name the library does not contain. That is what the backlog
+is for, so the growth is the mechanism working rather than drift — a finding that stayed in a plan
+document instead of the queue would be a dropped finding.
+
+Paid for where it could be. BF-67's own block was cut back to a `Needs:` line and a sentence: the
+plan holds the measurement (0 unmatched of 31 PRs and 39 programmed names, against a 149-row
+library) and the build order, and restating either in the queue entry buys nothing a reader cannot
+get by following the link.
+
+What was **not** done is compressing LA-43 itself. It has to carry why the fallback contradicts the
+comment three lines above it, and why a latent hole is still worth filing — a shorter version would
+read as a style nit rather than as the silent history reset it actually is.
+
+**Re-derived on the merge — three times — and every conflict was the right kind.** Three other PRs
+raised the same number while this one was open (13673, 13714, 13754), so git surfaced a genuine
+disagreement about one value rather than two unrelated edits — the case the entries README says
+should conflict. Resolved each time by counting the merged file rather than taking either side, which
+is the only number true of it: **13784** at the last resolution. The doc-size baselines also split
+per file (LA-33), which is what kept a busy day's worth of concurrent PRs to the one document that
+actually disagreed.
 ## 2026-08-30 — `docs/implementation-backlog.md` (BF-69 gets the owner's join, and two collisions)
 
 The owner answered how the food log should reach the exposure series: attach supplements to a meal or
@@ -4293,6 +4316,21 @@ sync rules to be remembered.
 
 The two collisions stay in the entry, marked resolved, as the checklist a reviewer runs the
 implementation against.
+## 2026-08-31 — `docs/implementation-backlog.md` (BF-70, a picture dropped three times)
+
+The owner reported one missing thumbnail. Tracing it found the image is fetched successfully and
+discarded at three separate layers — the form model has no field for it, the entry contract has no
+field for it, and the local write hardcodes `imageDataUri: null`. Each is listed with its file and
+line because fixing any one of them changes nothing, which is the fact that decides how the work is
+scoped.
+
+The second finding came free and explains a number already in the backlog: `handleConfirm` stamps
+`source: 'ai'` whenever the scan carries a confidence, and a barcode scan does — which is why BF-38
+measured 3 rows with `source = 'barcode'` out of 221. Same line, so the two entries are batched
+rather than left to conflict.
+
+Also note the batch checker earned its keep here: `nutrition-ui-uplift` is Lane B and BF-70 is Lane
+A, and it refused the mix rather than letting a batch become a PR that cannot ship as one.
 
 ## 2026-08-31 — `projectOverview.md` 8468 → 8493, `docs/implementation-backlog.md` 13754 → 13726 (BF-65)
 
@@ -4317,3 +4355,18 @@ than being removed because a clip that has never been seen moving is not finishe
 branch's own 13602 → 13574 was against a base that no longer exists. The drop is the same 28 lines
 either way.)
 
+
+## 2026-08-31 — `projectOverview.md` 8493 → 8497 (LB-23, LB-30)
+
+**Four lines for two status paragraphs, because one of them is a finding rather than a shipping
+note.** CI went red on the exact test LB-30 was filed to describe, on the line the fix was already
+written for — and the thing worth recording is that the same test **passes three times over
+locally**. A session that reads only "flaky, fixed" will re-dismiss the next one; the paragraph
+exists to say that a local pass is not evidence against a race that only a slow runner opens.
+
+The backlog is not listed here: LB-23 and LB-30 were removed and BF-46 was rewritten to its `Keep:`
+residue, but four PRs landed in parallel and the file's size is theirs more than this branch's, so
+the number is re-derived on the merge rather than claimed as a delta.
+
+**The baton was trimmed rather than raised.** The LB-30 gotcha earns a line; two older ones were
+reflowed to pay for it, so the file sits back on 126.

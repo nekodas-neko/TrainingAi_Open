@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.405.1",
+    date: "2026-08-31",
+    changes: [
+      "Sheets that open over a screen \u2014 End of Day, the morning check-in, Log Food \u2014 no longer announce their own title twice to a screen reader. Nothing looks different; it was being said once as the panel's name and again as its heading.",
+    ],
+  },
+  {
     version: "1.405.0",
     date: "2026-08-31",
     changes: [
