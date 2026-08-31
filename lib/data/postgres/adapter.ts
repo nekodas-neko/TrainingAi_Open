@@ -653,16 +653,26 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   }
 
   async updateUserProfile(userId: string, profile: Partial<Pick<User, 'displayName' | 'heightCm' | 'dateOfBirth' | 'weightGoalKg' | 'timezone' | 'sex' | 'activityLevel' | 'fitnessGoal'>>): Promise<User> {
-    const set: Record<string, unknown> = {
-      displayName: profile.displayName ?? null,
-      heightCm: profile.heightCm ?? null,
-      dateOfBirth: profile.dateOfBirth ?? null,
-      weightGoalKg: profile.weightGoalKg ?? null,
+    // BF-78. EVERY column is presence-guarded. Four of them used to be written unconditionally as
+    // `?? null`, which made this a PUT wearing a PATCH's name: any body that omitted display name,
+    // height, date of birth or weight goal erased them. One caller already sent a one-field body
+    // (accepting an activity-level recommendation), so a single tap would have taken height with
+    // it — and height feeds the BMR fallback, so the damage would have reached the calorie model
+    // rather than stopping at the profile screen.
+    const set: Record<string, unknown> = {}
+    for (const key of ['displayName', 'heightCm', 'dateOfBirth', 'weightGoalKg', 'sex', 'activityLevel', 'fitnessGoal'] as const) {
+      if (key in profile) set[key] = profile[key] ?? null
     }
+    // Timezone is the one field a null must NOT clear: it keys every day window in the app, and a
+    // user with no timezone has no "today". Absent and null both leave it alone.
     if (profile.timezone) set.timezone = profile.timezone
-    if ('sex' in profile) set.sex = profile.sex ?? null
-    if ('activityLevel' in profile) set.activityLevel = profile.activityLevel ?? null
-    if ('fitnessGoal' in profile) set.fitnessGoal = profile.fitnessGoal ?? null
+
+    // A PATCH naming no known field is a no-op, not an empty UPDATE — Drizzle rejects `.set({})`.
+    if (Object.keys(set).length === 0) {
+      const [current] = await this.db.select().from(s.users).where(eq(s.users.id, userId)).limit(1)
+      return this.rowToUser(current)
+    }
+
     const [r] = await this.db.update(s.users)
       .set(set)
       .where(eq(s.users.id, userId))

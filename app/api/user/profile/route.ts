@@ -19,6 +19,9 @@ const ProfileSchema = z.object({
   fitnessGoal:   z.enum([...FITNESS_GOALS]).optional().nullable(),
 }).strict()
 
+/** The keys `ProfileSchema` accepts, as data — so the PATCH forwarding cannot drift from it. */
+const PROFILE_FIELDS = Object.keys(ProfileSchema.shape) as (keyof typeof ProfileSchema.shape)[]
+
 export async function GET() {
   const session = await auth()
   if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -54,18 +57,20 @@ export async function PATCH(req: NextRequest) {
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.issues[0]?.message ?? 'Invalid body' }, { status: 400 })
   }
-  const { displayName, heightCm, dateOfBirth, weightGoalKg, timezone, sex, activityLevel, fitnessGoal } = parsed.data
+  // BF-78. Forward only the keys the request actually sent, so `omitted` and `sent as null` stop
+  // meaning the same thing. The old shape mapped every field through `?? undefined`, which
+  // collapsed the two — an explicit `heightCm: null` became indistinguishable from not mentioning
+  // height, and no field could ever be cleared. `sex` was already the exception, and its
+  // `!== undefined` test is the pattern the rest now follow.
+  const patch: Parameters<Awaited<ReturnType<typeof getRepository>>['updateUserProfile']>[1] = {}
+  for (const key of PROFILE_FIELDS) {
+    if (key in parsed.data) {
+      // Each key's type is checked by the schema above; the loop is what keeps the eight in step.
+      ;(patch as Record<string, unknown>)[key] = parsed.data[key]
+    }
+  }
 
   const repo = await getRepository()
-  const user = await repo.updateUserProfile(session.user.id, {
-    displayName: displayName ?? undefined,
-    heightCm: heightCm ?? undefined,
-    dateOfBirth: dateOfBirth ?? undefined,
-    weightGoalKg: weightGoalKg ?? undefined,
-    timezone: timezone ?? undefined,
-    sex: sex !== undefined ? sex : undefined,
-    activityLevel: activityLevel ?? undefined,
-    fitnessGoal: fitnessGoal ?? undefined,
-  })
+  const user = await repo.updateUserProfile(session.user.id, patch)
   return NextResponse.json({ user })
 }

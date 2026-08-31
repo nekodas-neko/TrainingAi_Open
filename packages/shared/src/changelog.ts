@@ -6,6 +6,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.407.2",
+    date: "2026-08-31",
+    changes: [
+      "Saving one profile field no longer erases the others. Accepting an activity-level recommendation would have wiped your name, height, date of birth and weight goal — height feeds the calorie estimate, so it would have quietly changed your targets too. It had not happened yet.",
+      "Clearing a profile field now works: an empty height clears the height, where before it was indistinguishable from not touching it.",
+    ],
+  },
+  {
     version: "1.407.1",
     date: "2026-08-31",
     changes: [

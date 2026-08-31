@@ -411,53 +411,6 @@ brings it back.** It fits every part of the report:
   times. And whatever the cause turns out to be, **it must file an `error_events` row**: a failure
   this total that leaves no trace is the part that let it go unreported until now.
 
-### [platform][body] BF-78 — a partial PATCH to `/api/user/profile` wipes four columns, and one caller already sends one
-
-- **Lane:** A — `lib/data/postgres/adapter.ts:655` (`updateUserProfile`) and
-  `app/api/user/profile/route.ts`.
-- **Added:** 2026-08-31 · found while tracing the owner's request to gather the personal-detail
-  fields into one place. Not reported — nothing has visibly broken yet.
-
-**`updateUserProfile` writes four columns unconditionally as `?? null`:**
-
-```ts
-const set: Record<string, unknown> = {
-  displayName:  profile.displayName  ?? null,
-  heightCm:     profile.heightCm     ?? null,
-  dateOfBirth:  profile.dateOfBirth  ?? null,
-  weightGoalKg: profile.weightGoalKg ?? null,
-}
-if (profile.timezone) set.timezone = profile.timezone
-if ('sex' in profile) set.sex = profile.sex ?? null
-```
-
-The last four are guarded by a presence check. **The first four are not**, so any PATCH that omits
-them **nulls them**. It is a PATCH by name and a PUT by behaviour.
-
-**⚠ One caller already sends a one-field body.**
-`components/profile/goal-recommendation-sheet.tsx:148` PATCHes
-`{ activityLevel: rec.recommended.activityLevel }` when the owner accepts an activity-level
-recommendation — so accepting a recommendation should erase **display name, height, date of birth
-and weight goal** in the same request. Height feeds the BMR fallback, so the damage is not only
-cosmetic: it would silently degrade the calorie model.
-
-- **Measured 2026-08-31: it has NOT fired.** The owner's row still reads height 160, a date of birth,
-  weight goal 60 and a display name. So this is latent, one tap away, not an incident — which is the
-  best moment to fix it and the reason it is at the head of the queue rather than in a Known-Issues
-  row.
-- **`edit-profile-sheet.tsx` is the workaround, and its comment says so** — *"Height, sex, date of
-  birth, activity level and fitness goal are edited from the Goals section — `/api/user/profile`
-  isn't a true partial update, so they must be resent here to avoid wiping them out."* That comment
-  is correct and load-bearing. Every editor of this route has to know every other editor's fields.
-- **Fix: make the four conditional, the same way the other four already are** (`'heightCm' in profile
-  ? …`). Then delete the defensive resend in `edit-profile-sheet.tsx` in the same PR, or the
-  workaround outlives the bug and the next reader re-derives it.
-- **⚠ Check the other two callers before changing the shape:** `goals-section.tsx:141` and
-  `goal-recommendation-sheet.tsx:148`. One of them relies on the resend today.
-- **Verification:** PATCH `{ activityLevel: 'moderate' }` alone and every other column is unchanged;
-  PATCH `{ heightCm: null }` explicitly and height clears, because *omitted* and *sent as null* must
-  stop meaning the same thing.
-
 ### [nutrition][body] 🔵 BF-1 — import blood panel results as a nutrition baseline, de-identified
 > **⚑ RAISED 2026-08-31 — owner: *"can you add blood test as well based on the fields I returned
 > from my image."*** It sat near the bottom of the queue while the panel it needs has been in the
@@ -740,8 +693,10 @@ description will silently drop the field that turns out to matter. **The owner i
 
 - **Lane:** B — `components/profile/edit-profile-sheet.tsx`, `goals-section.tsx`,
   `required-info-section.tsx`, and the More profile tab that mounts them.
-- **Needs:** BF-78 — consolidating on top of a route that nulls omitted columns just moves the
-  hazard.
+- **Unblocked 2026-08-31** — this used to carry `Needs: BF-78`, which has shipped.
+  `/api/user/profile` is a real partial update now: it forwards only the keys a request actually
+  sent, and the adapter presence-guards every column. Consolidating no longer builds on a route that
+  nulls what it is not told about.
 - **Added:** 2026-08-31 · owner: *"can we combine all the personal information fields into 1 section
   in the more/details. Like height/weight/bodyfat etc."*
 
@@ -754,9 +709,12 @@ description will silently drop the field that turns out to matter. **The owner i
 | Weight, body fat (latest reading) | read-only in `GoalsSection`, logged elsewhere |
 | DEXA, measured RMR | `More → Health → DEXA & RMR results` (BF-71) |
 
-- **The split is not only untidy — it is what makes BF-78 dangerous.** Two editors of the same row
-  means each must resend the other's values, and `EditProfileSheet` carries a comment doing exactly
-  that. One section that owns every profile column removes the class, not just the mess.
+- **The split used to be dangerous as well as untidy, and BF-78 removed the danger.** Two editors of
+  the same row each had to resend the other's values, and `EditProfileSheet` carried a comment
+  saying so. **Both resends are now deleted** — each sheet sends only what it owns. What is left for
+  this entry is the mess: two places to look for one row's fields. Note the resends were not merely
+  redundant, they were a second hazard, since `goals-section` resent `displayName` and
+  `weightGoalKg` from a possibly stale `user` prop and could overwrite a change made elsewhere.
 - **Decide what belongs, because "personal information" has an edge.** *Identity and body facts*
   (name, sex, date of birth, height) are stable and belong together. *Weight and body fat* are
   **measurements with a history** — they are logged daily and the profile only shows the latest, so
@@ -768,7 +726,7 @@ description will silently drop the field that turns out to matter. **The owner i
 - **Where:** the owner said More → details. `BF-71` put the clinical screen at `More → Health`, so a
   sibling `More → Profile details` is consistent and leaves the tab itself uncluttered.
 - **Verification:** every profile column is editable in exactly one place; saving one field leaves
-  the rest unchanged (which is BF-78's test, run through the UI); weight and body fat read as
+  the rest unchanged (BF-78's behaviour, now shipped and tested — re-verify it through the UI); weight and body fat read as
   measurements with their date, not as inputs.
 
 ### [nutrition] BF-72 — the diary's hydration wiped its own meal grouping (fixed; device check owed)
