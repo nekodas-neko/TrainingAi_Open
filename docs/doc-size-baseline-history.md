@@ -5148,3 +5148,12 @@ button and the storage together.
 Also records the emoji answer rather than substituting silently: the request was "rest + emoji", the
 repo's convention is Lucide for chrome with emoji reserved for content carrying its own field, so
 `Moon` is the same idea in the app's vocabulary and the owner should hear that.
+
+## 2026-09-01 — `docs/implementation-backlog.md` 14442 → 14445 (+3)
+
+BF-84's lane, derived and recorded once its surface was settled. Three lines to save every future
+reader the same derivation: the entry says ship the button and the storage together, the storage
+half is a row plus a sync domain plus the inference path, and a both-lanes item goes to Lane A
+engine-first — so Lane B cannot take the surface alone. It also names the one question still open
+(fact or hint) and what it would change, because an entry that looks startable and is not is the
+thing this queue keeps costing sessions.
