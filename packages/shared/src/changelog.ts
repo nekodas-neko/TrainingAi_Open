@@ -6,13 +6,22 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: "1.405.2",
+    version: "1.406.1",
     date: "2026-08-31",
     changes: [
-      "Your calorie and protein goals, energy balance and body-composition panel now use a body fat corrected against your DEXA scan instead of the scale's own estimate — worth about 59 kcal/day at the measured 3.2-point gap",
+      "Your calorie and protein goals, energy balance and body-composition snapshot now use a body fat corrected against your DEXA scan instead of the scale's own estimate — worth about 59 kcal/day at the measured 3.2-point gap",
       "The scale's raw reading is never overwritten: the correction is applied when a number is derived, so entering a second scan later re-corrects your whole history",
       "Readings from a scale the DEXA has not been compared against are left alone rather than corrected on a guess",
       "The corrected reading and the measured offset are now in the app's data, ready for the Health screen to show them — the screens themselves still display the scale's own number for now",
+    ],
+  },
+  {
+    version: "1.406.0",
+    date: "2026-08-31",
+    changes: [
+      "You can now enter a DEXA scan or an RMR test \u2014 More \u203a Health \u203a DEXA & RMR results. Until now the app had nowhere to put either, so it was estimating your resting metabolic rate even if you had had it measured.",
+      "A measured resting rate replaces the estimate in your calorie target. On the owner's own test that is 1328 rather than 1485, and a daily budget about 188 kcal lower \u2014 the app was not doing the arithmetic wrong, it was being handed a prediction that ran high.",
+      "A scan's body-fat percentage is what your scale gets calibrated against, so entering one makes every later weigh-in read closer to the truth.",
     ],
   },
   {

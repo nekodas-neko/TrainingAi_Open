@@ -190,6 +190,30 @@ Open a session and go through it:
    it. **This is the step no test here can stand in for.**
 
 
+## B1. Typing in a DEXA scan and an RMR test — BF-71 · **JS**
+
+New screen: **More → Health → DEXA & RMR results**. It works end-to-end against the local database —
+the real 2026-08-27 values were entered through the UI and both tables hold them — so what is
+unverified is not whether it saves, but whether it is **usable on the phone**. The whole form hangs
+off two controls that behave differently in Samsung's WebView than in Chrome, and neither has been
+seen there.
+
+1. **The date picker opens and a date can be set.** Every save depends on it; `<input type="date">`
+   is the control most likely to render as something unexpected in a WebView.
+2. **The number keypad has a decimal point.** Several real values are fractional — BMD `1.046`,
+   T-score `-1.6`, body fat `28.5` — and a keypad without one makes them untypeable. The fields ask
+   for `inputMode="decimal"` precisely for this.
+3. **A negative number can be entered** in T-score / Z-score. They are routinely negative and a
+   keypad with no minus sign would block them.
+4. Type `20547.5` into **Fat (g)** under Body composition: it should read **`= 20.55 kg`** under the
+   field. That echo is the only guard against entering grams as kilograms, which saves cleanly and is
+   wrong by a factor of a thousand.
+5. Save an RMR test, then leave the screen and come back: the stored value shows at the top. This is
+   how you know it landed.
+6. **With the phone offline, saving must show an error** — there is no outbox behind these routes, so
+   the alternative to a visible failure is a save that silently never happened.
+
+
 ## ~~W3. Volume landmarks at S25 width~~ ✅ 2026-08-30
 Owner: *"Looks good."* Nothing clipped or wrapped at 412 dp. **Q-305 is device-verified.**
 
