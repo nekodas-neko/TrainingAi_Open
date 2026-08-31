@@ -1523,11 +1523,41 @@ deadlifts in the builder gets deadlifts again the next time the engine writes a 
   record is offered and, once logged, the next daily prescription respects it too. Resolve the
   injury and both constraints lift.
 
+### [workouts][platform] LA-43 — the program generator trusts the model's muscle guess on any name the library does not contain
+
+- **Branch:** _unassigned_ · **Lane: A** — `app/api/generate-program/route.ts`
+- **Added:** 2026-08-31 · Lane A, from BF-67's planning session.
+- **It contradicts its own comment, three lines up.** `route.ts:131-133` says the AI *"regularly
+  misattributes muscles (e.g. lists Glutes as main for squats), so we **never trust** its
+  mainMuscles/secondaryMuscles output"*, and builds `exerciseMuscleLookup` to override them. Then
+  `route.ts:330` resolves by **exact name** and falls back:
+  `mainMuscles: libraryMuscles?.mainMuscles ?? ex.mainMuscles ?? []`. The `??` arm trusts exactly
+  what the comment forbids, on every generated name the library does not contain.
+- **Two consequences, and the second is the quiet one.** The entry gets the model's guessed muscles,
+  which feed weekly volume accounting; and because `personal_records` and `exercise_estimates` are
+  unique on `(user_id, exercise_name)`, a name outside the library is a **new lift with no
+  history** — a 1RM and PR silently starting from zero on a lift the owner has trained for months.
+- **Measured 2026-08-31: it has never fired.** 31 PR rows and 39 distinct programmed names, zero
+  unmatched, against a 149-row library. So this is a latent hole, not a live fault — file it as
+  prevention rather than as a bug report.
+- **Fix:** resolve every generated name against the library (exact, then normalised for case,
+  punctuation and word order), repair a near-miss, and **fail the generation with a named error**
+  on a genuine miss rather than writing a lift with guessed muscles. Then delete both `??` arms —
+  after the resolver they are unreachable, and leaving them keeps the contradiction alive.
+- **Do this BEFORE BF-67.** That feature asks the model to reuse names it was given, which is
+  precisely the instruction that produces paraphrases — see
+  [the plan](superpowers/plans/2026-08-31-reference-an-old-program.md) §2.2.
+- Testable without the device or an LLM: the resolver is a pure function over the library list.
+
 ### [workouts] BF-67 — building a new program cannot reference an old one, so every program starts from nothing
 
 - **Lane:** A for the payload and prompt, B for the picker.
-- **Planning item** — this is a design with a size question in it, not a defect. Needs a planning
-  session before implementation.
+- **Plan:** [`2026-08-31-reference-an-old-program.md`](superpowers/plans/2026-08-31-reference-an-old-program.md)
+  — **written 2026-08-31**, so this is now an implementation item rather than a planning one.
+- **Needs: LA-43** — resolve generated names against the library first. Shipping the reference
+  payload before it is what makes paraphrase likely while the hole is open, and a paraphrased name
+  silently starts a lift's history from zero. The planning session measured the risk as latent, not
+  live (0 unmatched of 31 PRs and 39 programmed names); the plan's §2 carries the numbers.
 - **Added:** 2026-08-30 · owner: *"be able to reference an old program so it knows what I did and
   what I would like similar to."*
 
