@@ -1427,55 +1427,6 @@ owner has to re-describe in a wizard what the app already knows.
   is exactly the failure this entry is written to prevent. A program id belonging to another user is
   rejected, not read.
 
-### [workouts] BF-66 — `"60 for 6"` is heard perfectly and parsed as nothing, because the letter `r` survives the strip
-
-- **Lane:** B — `components/workout/utils.ts` (`parseVoice`) and `components/workout/voice-log-button.tsx`.
-- **Added:** 2026-08-30 · owner, mid-set on Sumo Deadlift: *"it heard me correctly; is that not how
-  to use it?"* Screenshot: red `Heard "60 for 6"` under the Voice button, dial unchanged at 65 kg.
-
-**Recognition worked. The parser threw it away.** That red line is not a mis-hear message — it is
-`voice-log-button.tsx`'s *parse failure* branch, printed only when `parseVoice` returns neither a
-weight nor a reps. So the app is displaying a perfect transcript as if it were the problem.
-
-**The cause is one character class.** `parseVoice` strips with `[^0-9.\s kgreps×x]` — a denylist
-that keeps every letter appearing in `kg`, `reps` and `x`. `f` and `o` are dropped; **`r` is kept**,
-because `reps` contains it. Measured, with the stripped string in the middle:
-
-| Said | After strip | Parsed |
-|---|---|---|
-| `60 for 6` | `60 r 6` | **nothing** |
-| `60 kg for 6` | `60 kg r 6` | **nothing** |
-| `60 times 6` | `60 es 6` | **nothing** |
-| `60 by 6` | `60 6` | 60 × 6 ✓ |
-| `60 at 6` | `60 6` | 60 × 6 ✓ |
-| `60 x 6` | `60 x 6` | 60 × 6 ✓ |
-
-The final fallback pattern is `(\d+)\s+(\d+)` — two numbers separated by whitespace *and nothing
-else*. Any filler word whose letters are entirely outside `kgrepsx` vanishes and the fallback fires;
-any word leaving a letter behind blocks it. **`by` and `at` work, `for` and `times` do not**, and no
-user could derive that rule. `60 kg for 6` — the most natural phrasing on the list — is among the
-failures.
-
-- **Fix the strip, not the patterns.** Replace the denylist with a positive tokenizer: pull the
-  numbers and the unit/rep keywords out and ignore everything between them. Adding `for` to a list of
-  stripped filler words fixes this one report and leaves `times`, `pounds`, `press`, `set` and every
-  future phrasing behind the same wall.
-- **The existing tests all pass and none of them would have caught it.** `voice-log-parse.test.ts`
-  covers `80 kilos 5 reps`, `5 reps 80`, `80 x 5`, `82.5 × 3`, `5 reps`, `80 kg`, `62.5 kilograms 8
-  repetitions` — every case is either adjacent numbers or an explicit keyword, so the filler-word
-  gap is untested by construction. Add the table above as cases in the same PR.
-- **Second half: the failure message is misleading and it is what produced this report.** `Heard
-  "60 for 6"` in red states the transcript and nothing else, so a correct transcript reads as the
-  app disagreeing with the user's ears. Say what actually failed and what to say instead — *"Didn't
-  understand that — try '60 kg 6 reps'"* — with a real example rather than a grammar.
-- **⚠ There is no discoverable syntax anywhere in the app.** Nothing on the button, no hint, no
-  first-run text; the owner's question is literally *"is that not how to use it?"* Even with the
-  parser fixed, a control whose accepted phrasing can only be learned by failing needs a one-line
-  example on or near the button.
-- **Verification:** every row of the table above logs 60 kg × 6 — including `60 kg for 6` and
-  `60 times 6` — and the existing seven test cases still pass unchanged. On the device, a genuinely
-  unparseable utterance shows the new message with its example, not a bare transcript.
-
 ### [workouts] BF-65 — show the exercise GIF on the per-exercise ready screen, and extract the fetch while doing it
 
 - **Lane:** B — `components/workout/active-workout-screen.tsx` (the ready branch at :240) plus a new

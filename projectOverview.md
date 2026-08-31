@@ -24,8 +24,10 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.403.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Version:** v1.404.2 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-08-31.
+
+**Voice logging heard the owner correctly and threw it away (BF-66).** *"60 for 6"*, mid-set, transcribed perfectly and printed in red — because that red line is the *parse-failure* branch, not a mis-hear message. `parseVoice` stripped every character outside `[0-9.\s kgreps×x]`, a denylist that keeps the `r` of `for` and the `es` of `times`: **`60 by 6` and `60 at 6` worked and `60 for 6` and `60 times 6` did not**, and nothing in the app stated that rule. A positive tokenizer replaces it — take the numbers and the unit/rep keywords, ignore every word between — so a phrasing works by construction rather than one stripped filler at a time. The seven existing tests all passed and none of them *could* have failed: every case was adjacent numbers or an explicit keyword. The failure message now names an example and the button carries it, since the accepted phrasing was previously learnable only by failing at it. **Proven on strings, not on speech** ([journal](docs/overview/entries/2026-08-31-voice-filler-words.md)).
 
 **Four nutrition reports from one device pass, and the interesting one is a fix that is not what its entry proposed (BF-60/61/62/63).** **BF-61:** Delete needed two presses because hit-testing follows the *animated* transform — for the 220 ms the row spends sliding out it is still over the tray and swallows the tap, which is why the owner's *"if I wait a second it works"* was the diagnosis. The tray now stacks above the row while open. **Its test took three attempts and the failures are the value:** a long drag overshoots and animates back *rightwards*, never covering the tray; a CDP-paced flick falls under `FLICK_VELOCITY` and snaps closed instead; and a tap at the tray's *centre* is uncovered within a frame, because the tray uncovers from its right edge first. The first version passed with the fix removed. **BF-62 was NOT `92vh`** — `SheetContent side="bottom"` bakes `.pb-safe-action`, and this repo's own measurement says the inset reports the nav bar's height under edge-to-edge, so `max(inset, 0.75rem)` pads by exactly the bar; five takeover sheets now take `bottomInset="takeover"`. **BF-63** scans a packet into the builder without logging it to today, and **deliberately does not store the code** — that chain is Lane A's and BF-38's. **BF-60** renames the tab to `Search`. **Nothing is device-verified; three of the four stay queued for exactly that** ([journal](docs/overview/entries/2026-08-31-nutrition-batch-bf60-63.md)).
 
@@ -782,6 +784,27 @@ neither of those is the device.
 **Smoke step:** on the S25, open a workout, confirm the **Voice** button is drawn, press it, say a
 weight and reps, and check the set fills in. A denied microphone permission should now say so rather
 than flipping silently back to "Voice".
+
+JS-only — it reaches the phone on the next Railway deploy, no APK rebuild.
+
+### [workouts][devices] ⚠️ Voice logging understands filler words now; nothing has been said into it (BF-66, v1.404.2)
+
+The owner said *"60 for 6"* mid-set, the transcript came back exactly right, and the app printed it
+in red. That red line is the **parse-failure** branch, so a correct transcript was being shown back
+as if it were the problem. `parseVoice` stripped every character outside `[0-9.\s kgreps×x]`, which
+keeps the `r` of `for` and the `es` of `times` — `60 by 6` and `60 at 6` worked because their letters
+all vanished, `60 for 6` and `60 times 6` did not. A positive tokenizer replaces the denylist, the
+failure message now names an example, and the same example sits under the button, which previously
+stated its accepted phrasing nowhere at all.
+
+**Proven on strings, not on speech.** The tokenizer has 17 unit tests and the hint was driven in a
+browser at 412 dp, but no transcript has ever come out of Android's recogniser in this sandbox —
+`Capacitor.isNativePlatform()` is false in `pnpm dev` and in Playwright alike.
+
+**Smoke step:** on the S25, mid-set, say each of `60 for 6`, `60 kg for 6`, `60 times 6`, `60 by 6`
+and `60 x 6` — every one must set the dial to 60 kg × 6. Then say something unparseable and read the
+message: it should offer an example, not repeat your words. **Do this in the same sitting as LA-37's
+row above** — it is the same button and the same press.
 
 JS-only — it reaches the phone on the next Railway deploy, no APK rebuild.
 
