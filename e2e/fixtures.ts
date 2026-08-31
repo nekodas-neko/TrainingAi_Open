@@ -340,8 +340,24 @@ export interface SwipeRowOptions {
   steps?: number
 }
 
-/** The row's box once two reads a frame apart agree on it — see `swipeRowLeft`. */
-async function stableBox(row: Locator): Promise<{ x: number; y: number; width: number; height: number }> {
+/**
+ * An element's box once two reads a frame apart agree on it (LB-30).
+ *
+ * **A `boundingBox()` is a position, not a promise that the element is still there.** A sheet slides
+ * in over `duration-500` and `toBeVisible()` is satisfied the moment it mounts, so a read taken
+ * straight after is a coordinate the element is travelling through. Measured on the meal library:
+ * the row read y=605 and sat at y=503 by the time the touch landed, so every point of the gesture
+ * hit the scroll container beneath it and the drag handler was never invoked once — which reads as a
+ * dead gesture rather than a mis-aimed one, and cost a week of BF-39 as a render-vs-remount question
+ * it never was.
+ *
+ * **Use it wherever a coordinate is dispatched or asserted**, because neither
+ * `Input.dispatchTouchEvent` nor `page.touchscreen.tap()` performs the stability check
+ * `locator.tap()` does, and an assertion on a moving box gives a wrong verdict rather than a missed
+ * tap. It is not a sleep: it returns as soon as two reads agree, so on a settled page it costs one
+ * frame, and it replaces the hand-tuned `waitForTimeout` that used to stand in for it.
+ */
+export async function stableBox(row: Locator): Promise<{ x: number; y: number; width: number; height: number }> {
   let previous = await row.boundingBox()
   for (let attempt = 0; attempt < 60; attempt++) {
     await row.page().waitForTimeout(50)
@@ -350,6 +366,23 @@ async function stableBox(row: Locator): Promise<{ x: number; y: number; width: n
     previous = next
   }
   throw new Error('the row never stopped moving — something is animating it indefinitely')
+}
+
+/**
+ * Tap an element's centre with a real touch, once it has stopped moving.
+ *
+ * `page.touchscreen.tap()` is a CDP dispatch at a coordinate: no actionability check, no stability
+ * check, and no complaint if the element left. Every spec that measured and then tapped was writing
+ * this by hand, which is what made the class worth one helper (LB-30).
+ *
+ * `locator.tap()` is NOT the same thing and is not a substitute here — this app's screens read raw
+ * touch events and several controls sit inside `[data-swipe-carousel]`, which is why these specs
+ * dispatch touches rather than clicking (Q-354).
+ */
+export async function tapCentre(page: Page, target: Locator): Promise<void> {
+  await expect(target).toBeVisible({ timeout: 30_000 })
+  const box = await stableBox(target)
+  await page.touchscreen.tap(box.x + box.width / 2, box.y + box.height / 2)
 }
 
 /**
