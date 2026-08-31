@@ -1,6 +1,6 @@
 # Handoff — 2026-08-31 · the diary's nested meal rows, and the swipe tray's first tap
 
-_Domain: `nutrition` (also touches `app-shell`, `platform`) · Branch: `feat/nutrition-batch-bf60-63` · PR: **#659 open**; **#647 and #653 merged**_
+_Domain: `nutrition` (also touches `app-shell`, `platform`) · Branch: `feat/nutrition-batch-bf60-63` · PRs: **#647, #653 and #659 all merged**_
 
 > **Read first:** `projectOverview.md` (status + Known Issues), then
 > [`docs/domains/nutrition/README.md`](domains/nutrition/README.md), then
@@ -132,15 +132,18 @@ Read, in order: docs/agents/README.md and docs/agents/state/implementation-lane-
 then projectOverview.md, then docs/domains/nutrition/README.md, then
 docs/handoff-2026-08-31-nutrition-diary-and-swipe-tray.md.
 
-First concrete action: check whether PR #659 (feat/nutrition-batch-bf60-63) merged. If it is still
-open, merge it once its five required checks are green — Lint, Tests, Build, Custom Rules, Migration
-Check; E2E is not required. If it conflicts, merge origin/main locally, re-derive the docs/doc-size
-.size numbers from the merged documents, keep BOTH notes in docs/doc-size-baseline-history.md
-chronologically, and rebuild package.json / packages/shared/src/changelog.ts from
-`git show origin/main:...` rather than splicing a conflict hunk.
+First concrete action: run `node scripts/next-item.js --lane B` and work the queue top-down. There
+is nothing open to finish — #647, #653 and #659 all merged, so the lane starts clean. Do NOT
+hand-scan the backlog: most READY rows print no lane and the path rule puts almost all of them in
+Lane A. Re-run it after every merge — BF-60/61/62/63 were all filed into the top of this lane while
+the previous session was working.
 
-Then run `node scripts/next-item.js --lane B` and work the queue top-down. Do NOT hand-scan the
-backlog — most READY rows print no lane and the path rule puts almost all of them in Lane A.
+When you do have a PR open, expect to lose merge races: six landed under this session's, and the
+conflict is always the same two files. Take `--theirs` for `docs/doc-size/*.size` and then
+re-derive the numbers from the merged documents; keep BOTH notes in
+`docs/doc-size-baseline-history.md` chronologically, since it is append-only; and rebuild
+`package.json` / `packages/shared/src/changelog.ts` from `git show origin/main:...` rather than
+splicing a conflict hunk.
 
 Constraints you would otherwise rediscover:
 - `git fetch origin main` RE-SHALLOWS this clone. When a merge says "refusing to merge unrelated
