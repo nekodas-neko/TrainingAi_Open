@@ -4987,3 +4987,20 @@ the entry is what a hand-scan finds: the navigate-vs-expand affordance already e
 defect is `goals-section.tsx` re-implementing `MoreRowGroup`, and Goals staying inline is a
 2026-08-16 owner decision rather than an oversight. An entry whose premises are wrong is a work order
 for the wrong work.
+
+## 2026-08-31 — `projectOverview.md` 8514 → 8519, `docs/implementation-backlog.md` 14456 → 14448 (BF-75)
+
+**The backlog SHRANK by 8** and the ratchet took it, which is the mechanism working: BF-75's 33-line
+work order became a 25-line `Keep:` once the surface shipped, carrying the contrast check that is
+genuinely owed plus the two things the entry did not know — wallpapers ship `enabled: false`, and a
+translucent sheet reveals the overlay rather than the tab.
+
+**`projectOverview.md` goes up 5, and most of the new paragraph was paid for rather than added.**
+BF-57 had two paragraphs, one per half, which was the right shape while the surface was missing and
+is not now that both have shipped — they are one paragraph with two journal links, which gave back
+two lines. The remaining five are BF-75's own, and an index that cannot afford a line for a shipped
+user-visible change is an index that stops being read.
+
+The two findings in it are there because they are the ones a future session would otherwise
+rediscover the hard way: the z-order that makes transparency impossible, and the default that makes
+the whole feature invisible in the sandbox.

@@ -2,10 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { usePathname } from 'next/navigation'
-import {
-  useBackgroundSettingsStore,
-  type BackgroundSection,
-} from '@/lib/stores/background-settings-store'
+import { useBackgroundSettingsStore } from '@/lib/stores/background-settings-store'
 import { useWeather } from '@/lib/weather/use-weather'
 import { computeDayPhase } from '@/lib/background/day-phase'
 import type { WeatherCondition } from '@/lib/weather/types'
@@ -14,43 +11,9 @@ import { CelestialLayer, type CelestialVisibility } from './celestial-layer'
 import { WeatherOverlay } from './weather-overlay'
 import { ScrimLayer } from './scrim-layer'
 import { ScreenPaletteLayer } from './screen-palette-layer'
-import type { ScreenPaletteKey } from '@/lib/background/screen-palettes'
+import { pathnameToSection, pathnameToPaletteKey } from '@/lib/background/pathname-routing'
 
 const RECOMPUTE_INTERVAL_MS = 60 * 1000
-
-// Decision (Batch L chunk 1): the 4 health detail pages (/health/sleep,
-// /health/readiness, /health/activity, /health/heart-rate) keep their own
-// bespoke DetailHero/PAGE_GRADIENTS art rather than the dynamic wallpaper —
-// they already satisfy the per-screen visual-identity goal, and don't need
-// any background layer mounted underneath (their root paints an opaque
-// gradient of its own). `pathnameToSection` returns null for them so
-// DynamicBackground skips rendering — and skips the weather fetch — entirely.
-function pathnameToSection(pathname: string): BackgroundSection | null {
-  if (/^\/health\/(sleep|readiness|activity|heart-rate)(\/|$)/.test(pathname)) return null
-  if (pathname.startsWith('/health')) return 'health'
-  if (pathname.startsWith('/workout')) return 'workout'
-  if (pathname.startsWith('/nutrition')) return 'nutrition'
-  if (pathname.startsWith('/more') || pathname.startsWith('/profile')) return 'more'
-  return 'home'
-}
-
-// Screens rendering a static per-screen palette (chunk 2/3) instead of the
-// shared time-of-day/weather sky system, keyed finer than the 5-key toggle
-// bucket above so multiple distinct scenes can share one on/off switch (e.g.
-// stats gates off the "home" toggle; workout-select gates off
-// the "workout" toggle while the actual in-progress /workout screen — which
-// paints its own bg-black during the active phase — keeps the shared sky
-// scene unchanged). Returns null for Home and the active workout screen.
-function pathnameToPaletteKey(pathname: string): ScreenPaletteKey | null {
-  if (/^\/health\/(sleep|readiness|activity|heart-rate)(\/|$)/.test(pathname)) return null
-  if (pathname.startsWith('/health')) return 'health'
-  if (pathname.startsWith('/nutrition')) return 'nutrition'
-  if (pathname.startsWith('/more') || pathname.startsWith('/profile')) return 'more'
-  if (pathname.startsWith('/stats')) return 'stats'
-  if (pathname.startsWith('/workout-select')) return 'workoutSelect'
-  if (pathname.startsWith('/session-explain')) return 'sessionExplain'
-  return null
-}
 
 function getCelestialVisibility(condition: WeatherCondition): CelestialVisibility {
   if (condition === 'clear') return 'full'

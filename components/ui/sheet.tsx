@@ -6,6 +6,9 @@ import { XIcon } from "lucide-react";
 
 import { cn } from "@trainingai/shared/utils";
 import { BackDismiss } from "@/components/ui/back-dismiss";
+import { ScrimLayer } from "@/components/dynamic-background/scrim-layer";
+import { screenPaletteVar } from "@/lib/background/screen-palettes";
+import { useScreenSurfacePalette } from "@/lib/hooks/use-screen-surface";
 
 function Sheet({ ...props }: React.ComponentProps<typeof SheetPrimitive.Root>) {
   return <SheetPrimitive.Root data-slot="sheet" {...props} />;
@@ -64,17 +67,62 @@ function SheetOverlay({
  */
 type BottomInset = "action" | "takeover";
 
+/**
+ * The screen's wallpaper palette, painted inside a `surface="page"` sheet (BF-75).
+ *
+ * **Painted rather than revealed, and the difference is not stylistic.** The obvious fix is to make
+ * the sheet translucent, and it does not work: the wallpaper sits at `z-[-1]` while `SheetOverlay`
+ * and `SheetContent` are both `z-50`, so a transparent sheet shows the overlay's `bg-black/50`, not
+ * the tab behind it. Turning the overlay off instead would take the dimming that separates a modal
+ * from the page — and on a dense sheet of macro numbers and ingredient rows that dimming is what
+ * keeps the small grey secondary text legible.
+ *
+ * `-z-10` puts it above the sheet's own background and below its content: `SheetContent` is
+ * `fixed z-50`, which establishes a stacking context, so a negative z-index inside it cannot escape
+ * behind the sheet. Without it an `absolute` child paints ABOVE the non-positioned content and the
+ * sheet renders as a blank gradient.
+ *
+ * The `ScrimLayer` is the DetailHero treatment, reused rather than re-tuned: body text on these
+ * sheets must hold ≥4.5:1 and a raw gradient behind live text is what that rule exists to stop.
+ */
+function SheetSurfaceLayer() {
+  const palette = useScreenSurfacePalette();
+  // Null whenever the wallpaper itself is off — including the store's shipped default — so this is
+  // a no-op rather than a coloured panel floating over a plain page.
+  if (!palette) return null;
+  return (
+    <div
+      aria-hidden
+      className="pointer-events-none absolute inset-0 -z-10 overflow-hidden rounded-[inherit]"
+      style={{ background: screenPaletteVar(palette) }}
+    >
+      <ScrimLayer />
+    </div>
+  );
+}
+
 function SheetContent({
   className,
   children,
   side = "right",
   hideCloseButton = false,
   bottomInset = "action",
+  surface = "default",
   ...props
 }: React.ComponentProps<typeof SheetPrimitive.Content> & {
   side?: "top" | "right" | "bottom" | "left";
   hideCloseButton?: boolean;
   bottomInset?: BottomInset;
+  /**
+   * `"page"` paints the screen's own wallpaper palette inside the sheet (BF-75), so a nutrition
+   * pull-up carries the tab's colour instead of stopping the theme at its own edge.
+   *
+   * **Opt-in, never the default, and that is the whole shape of this feature.** `SheetContent` is
+   * the app-wide primitive — every sheet in every tab renders through it — so a global change here
+   * is the *"no global element-selector styling"* hazard wearing a component's clothes. A regression
+   * has to be scoped to the screens that asked for it.
+   */
+  surface?: "default" | "page";
 }) {
   return (
     <SheetPortal>
@@ -99,6 +147,7 @@ function SheetContent({
         )}
         {...props}
       >
+        {surface === "page" && <SheetSurfaceLayer />}
         <BackDismiss />
         {children}
         {!hideCloseButton && (

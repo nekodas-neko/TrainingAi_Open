@@ -286,7 +286,7 @@ export function FoodLoggerSheet({ open, preselectedMealTypeId = null, onClose, o
       {/* Not `open` — `step !== 'capture'`. The capture screen is the sheet below, so opening this
           one too would stack an empty shell behind it and cost a back press to get through. */}
       <Sheet open={open && step !== 'capture'} onOpenChange={o => !o && handleClose()}>
-        <SheetContent side="bottom" className="rounded-t-2xl max-h-[90vh] flex flex-col p-0 bg-secondary border-t border-border/70" hideCloseButton>
+        <SheetContent side="bottom" surface="page" className="rounded-t-2xl max-h-[90vh] flex flex-col p-0 bg-secondary border-t border-border/70" hideCloseButton>
           <div className="flex items-center justify-between px-4 pt-4 pb-2 shrink-0">
             <SheetTitle asChild><h2 className="text-base font-semibold">{STEP_LABELS[step]}</h2></SheetTitle>
             <button onClick={handleClose} aria-label="Close" className="p-2.5 text-muted-foreground hover:text-foreground">

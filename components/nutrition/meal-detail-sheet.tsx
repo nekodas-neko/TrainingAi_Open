@@ -85,7 +85,7 @@ export function MealDetailSheet({
     <Sheet open={meal !== null} onOpenChange={o => { if (!o) close() }}>
       {/* Nothing has ever been opened yet — the very first render, before any row is tapped. */}
       {shown && (
-      <SheetContent side="bottom" className="flex h-[92vh] flex-col" hideCloseButton bottomInset="takeover">
+      <SheetContent side="bottom" surface="page" className="flex h-[92vh] flex-col" hideCloseButton bottomInset="takeover">
         <SheetHeader className="shrink-0 px-4 pb-0">
           <div className="flex items-center gap-2">
             <button onClick={close} aria-label="Back" className="-ml-1.5 rounded-lg p-2.5 text-muted-foreground">

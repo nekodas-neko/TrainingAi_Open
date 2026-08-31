@@ -103,20 +103,25 @@ empty Nutrition tab is the signature of a dead local store. Gaps 2 and 3 (twice 
 cadence) and the dose-entry UI stay queued
 ([journal](docs/overview/entries/2026-08-30-feat-supplement-dose-on-log.md)).
 
-**A shared meal label now carries the meal, not a pointer to it (BF-57, engine half).** Scanning
-someone else's label said *"That saved meal no longer exists"* — the QR held a `saved_meals.id` and
-the scan resolved it against the scanner's own meals, so it was never going to be found. Making ids
-globally resolvable was rejected: a photo of a label would become read access to someone's meal, on
-an app heading for a Play Store health-data declaration. The owner's design instead puts the whole
-meal in the code, so it scans offline, for a user with no account, as a copy. **Nothing is dropped to
-fit** — the tail rolls into one remainder line carrying its macros, so a trimmed copy's totals match
-the original to the gram ([journal](docs/overview/entries/2026-08-30-feat-self-contained-meal-label.md)).
+**A meal label can be handed to someone now (BF-57, both halves).** Scanning someone else's said
+*"That saved meal no longer exists"* — the QR held a `saved_meals.id` resolved against the scanner's
+own meals. Making ids globally resolvable was rejected (a photo of a label would become read access
+to someone's meal, on an app heading for a Play Store health-data declaration); the meal travels in
+the code instead, so it scans offline, for a user with no account, as a copy, and **nothing is
+dropped to fit** — the tail rolls into one remainder carrying its macros, exact to the gram. The
+~30 mm the entry asked for is **not available** on the five print styles: four cannot hold 62 bytes,
+below which the encoder trims the meal's **name**, so they keep the private bookmark and a new
+**Share code** style spends the label on a 34.4 mm code. A scan saves a copy, never logs it.
+**Still owed: the two-phone check, and a printer**
+([engine](docs/overview/entries/2026-08-30-feat-self-contained-meal-label.md) ·
+[surface](docs/overview/entries/2026-08-31-shared-meal-labels.md)).
 
-**And the label now emits it, via a new style — the ~30 mm the entry asked for is not available on the
-others (BF-57, surface half).** Four of the five print styles cannot hold 62 bytes, below which the
-encoder trims the meal's **name**, so they keep the private bookmark while a new **Share code** style
-spends the label on a 34.4 mm code. A scan saves a copy, never logs it. **Still owed: the two-phone
-check, and a printer** ([journal](docs/overview/entries/2026-08-31-shared-meal-labels.md)).
+**The nutrition sheets carry the tab's palette, and the obvious fix could never have worked (BF-75).**
+A translucent sheet reveals `SheetOverlay`'s `bg-black/50`, not the wallpaper — that sits at `z-[-1]`
+while the sheet and its overlay are both `z-50` — so the palette is painted *inside* the sheet, behind
+an opt-in `surface="page"` five nutrition sheets pass and nothing else does. **⚠ Wallpapers ship
+`enabled: false`**, so it is invisible until switched on; the owner has them on. **Still owed: the
+≥4.5:1 contrast check on the S25** ([journal](docs/overview/entries/2026-08-31-nutrition-sheet-surface.md)).
 
 **Both pending weigh-in buttons were dead in production (BF-53).** `scale_raw_samples.id` is a
 `bigserial` and both routes validated it with a UUID regex, so every press of "Not me" or "Yes,
