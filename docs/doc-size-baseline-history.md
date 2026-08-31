@@ -4956,3 +4956,20 @@ each was noticed inside a diff that had no business absorbing it.
 `projectOverview.md` stays at **8514** and is not raised. Its BF-57 paragraph was written at five
 lines and cut to four, and the engine-half paragraph gave back an orphaned link line — the index
 carries the fact and the pointer, and the reasoning lives in the journal entry where it belongs.
+
+## 2026-08-31 — `docs/agents/state/implementation-lane-b.md` 126 → 141 (BF-57's state, minus most of the last run's)
+
+**A baton is the one document where content is the deliverable**, so it grows when a run produces
+state — and this one produced a whole feature area plus four gotchas that each cost real time (the
+`DATABASE_URL` Playwright prefix, a source guard matching a comment that documents its own fix, and
+a default argument quietly turning an assertion into a tautology).
+
+**Most of it was paid for rather than added.** The previous run's three narrative paragraphs — the
+`min-h` finding, BF-71's caller gap, the exercise-clip proxy — were rewritten at roughly half their
+length, and the device section's per-screen enumeration was cut because
+[`device-verification-queue.md`](device-verification-queue.md) is the document that holds it. Raw
+addition was ~30 lines; the net is 15.
+
+The rule this obeys is CLAUDE.md's: *"**rewrite** `docs/agents/state/<agent>.md` in full. Never
+append; a baton that is half last week's is worse than none."* The ratchet is what makes that
+rewrite happen instead of being intended.
