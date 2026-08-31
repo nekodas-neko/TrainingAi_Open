@@ -1526,8 +1526,16 @@ deadlifts in the builder gets deadlifts again the next time the engine writes a 
 ### [workouts] BF-67 — building a new program cannot reference an old one, so every program starts from nothing
 
 - **Lane:** A for the payload and prompt, B for the picker.
-- **Planning item** — this is a design with a size question in it, not a defect. Needs a planning
-  session before implementation.
+- **Plan:** [`2026-08-31-reference-an-old-program.md`](superpowers/plans/2026-08-31-reference-an-old-program.md)
+  — **written 2026-08-31**, so this is now an implementation item rather than a planning one.
+- **LA-43 shipped 2026-08-31 and this is now unblocked.** Generated names resolve against the
+  library (exact → normalised → word order) and are written under the library's spelling, so the
+  paraphrase this feature's prompt provokes no longer starts a lift's history from zero. The plan's
+  §2.2 assumed that hole was open — it is not; a name the library genuinely lacks is dropped and
+  reported rather than saved with guessed muscles. **What the resolver deliberately will NOT do is
+  match a subset**, so a referenced "Barbell Back Squat" still will not reach "Back Squat": the
+  reference payload must send the library's own names, not the old program's free text, if it has
+  drifted.
 - **Added:** 2026-08-30 · owner: *"be able to reference an old program so it knows what I did and
   what I would like similar to."*
 
@@ -1701,6 +1709,54 @@ controls side by side, one wired to the engine and one not.
   → they drop back; complete a set under `Full` → it counts toward the 1RM/PR; complete one under
   `Deload` → it does not. Then the reverse case, a **full** prescription with `Deload` picked, still
   behaves as Q-109/Q-175 built it — that path works today and must not regress.
+
+### [nutrition] BF-70 — the barcode scan fetches the product image and three layers throw it away
+
+- **Lane:** A — `packages/shared/src/nutrition/log-food.ts` and the `NewFoodEntry` contract; the
+  form-model half is B but lands in the same change.
+- **Batch:** `barcode-chain` — with BF-38, which is also Lane A and touches the same call site.
+- **Added:** 2026-08-31 · owner, reviewing the tab: *"barcode scanning did not add the image of the
+  food from the db as its item picture."* Screenshot: `LOADED MAC & CHEESE / CORE POWERFOODS`,
+  90% confidence, *"From Open Food Facts barcode database"* — logged with a placeholder tile.
+
+**The picture is fetched successfully and then dropped, three times.** BF-35 already did the hard
+half: `OFF_FIELDS` requests `image_front_thumb_url`, and `/api/nutrition/barcode` awaits
+`fetchOffThumbDataUri(...)` and returns it as `result.imageDataUri`. The API that stores it exists
+too — `/api/nutrition/food-items` accepts `imageDataUri` and validates it against
+`FOOD_ITEM_IMAGE_MAX_BYTES`. Everything between the two discards it:
+
+1. **`EditableNutrition`** (`review-step.tsx:10`) has no `imageDataUri` field, and
+   `scanToEditable()` (`food-logger-sheet.tsx:41`) maps eleven fields and not that one — so the
+   image is gone the moment the Review sheet opens.
+2. **`NewFoodEntry`** (`packages/shared/src/nutrition/log-food.ts`) has no `imageDataUri` either, so
+   `handleConfirm` could not pass one even if the form held it.
+3. **`log-food.ts:214` writes `imageDataUri: null` literally** into the local food item.
+
+So this is a **contract gap along one chain**, not a bug in one place — fixing any single layer
+changes nothing, which is the thing to know before starting.
+
+**⚠ Second finding in the same line, and it explains a measurement BF-38 already published.**
+`handleConfirm` sets `source: scanResult?.confidence ? 'ai' : 'manual'`. A barcode scan **has** a
+confidence (90% in the screenshot), so every barcode-scanned food is stored as **`source: 'ai'`** —
+the `'barcode'` value is in the type and is essentially never written from this path. That is why
+BF-38 measured only **3** rows with `source = 'barcode'` out of 221. The scan result knows which
+route produced it (the barcode branch stamps
+`notes: 'From Open Food Facts barcode database'`); the source should follow it.
+
+- **Fix the chain in one PR, per the sibling-surface rule** — the form model, the entry contract, the
+  `null` literal, and the same drop on the **photo-scan** path if it has one. Half of this chain
+  fixed is a picture that still never arrives.
+- **Ride BF-38's barcode work if it is in flight.** That entry already says the real barcode task is
+  making the code reachable end-to-end (*"the barcode column is NULL on all 221 rows"*), and the
+  `source` mislabel above is the same call site. Two PRs touching that line will conflict; one should
+  carry both.
+- **Nothing back-fills.** Foods already scanned keep their placeholder — the data URI was never
+  stored and OFF would have to be re-queried per item to recover it. Worth deciding whether a
+  one-off re-fetch for items that have a `barcode` is wanted, which is only possible for the rows
+  that actually have one (see the finding above — most do not).
+- **Verification:** scan a barcode for a product Open Food Facts has a thumbnail for → the logged
+  row shows the product picture, not the fork-and-knife placeholder; the stored item's `source` reads
+  `barcode`; and a product OFF has **no** image for still logs cleanly with the placeholder.
 
 ### [nutrition] BF-63 — barcode scan in the meal builder (shipped; the scan itself needs the device)
 
@@ -2009,6 +2065,8 @@ sheets are at the artboards' 16 px gutter now. See BF-45 ③ for why the fix is 
 ### [nutrition] BF-38 — logging the same food twice creates a second `food_items` row: 19 of 209 are redundant
 
 - **Lane:** A — the matching happens at creation, in the route and the shared create path.
+- **Batch:** `barcode-chain` — with BF-70, which fixes the `source: 'ai'` mislabel on the same
+  `handleConfirm` line this entry's barcode half depends on. Two PRs there would conflict.
 - **Added:** 2026-08-26 · BugFix, from the owner's My Foods screenshot. **Not reported** — it was
   visible in the picture sent about something else: `LOADED MAC & CHEESE / CORE POWERFOODS / 350 g /
   672 kcal` appears **twice in a 24-item list**.

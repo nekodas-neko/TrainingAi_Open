@@ -24,8 +24,10 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.404.2 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Version:** v1.404.3 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-08-31.
+
+**AI program generation deleted every exercise it phrased differently, and said nothing (LA-43).** The prompt tells the model to match library names exactly; the model writes *"Barbell Deadlifts"*, *"Press Dumbbell Incline"*, *"Pull-Ups"*. An exact-match filter removed each one with no trace — so a session came back short of the exercise count its own time budget was computed from, and nothing in the response, the logs or `error_events` said why. **The entry was filed against a different line and that line turned out to be dead code**: the `?? ex.mainMuscles` fallback three lines under a comment saying the model's muscles are never trusted could not fire, because the filter above it had already guaranteed a hit. Names now resolve through exact → normalised → word-order tiers and are kept under the **library's** spelling, because `personal_records` and `exercise_estimates` are unique on `(user_id, exercise_name)` and a surviving paraphrase starts that lift's history from zero. It stops short of subset matching on purpose — that would reach "Bench Press" from "Incline Bench Press", and a wrong merge is unrecoverable while a miss costs one exercise. Measured against the real 142-row catalogue: **0** names stopped resolving, and plurals went from **49 of 121 unreachable to 0**. A genuine miss is now reported; a session left empty returns 502 instead of an unusable program. **Proven end-to-end against real Gemini** ([journal](docs/overview/entries/2026-08-31-fix-generate-program-name-resolution.md)).
 
 **Voice logging heard the owner correctly and threw it away (BF-66).** *"60 for 6"*, mid-set, transcribed perfectly and printed in red — because that red line is the *parse-failure* branch, not a mis-hear message. `parseVoice` stripped every character outside `[0-9.\s kgreps×x]`, a denylist that keeps the `r` of `for` and the `es` of `times`: **`60 by 6` and `60 at 6` worked and `60 for 6` and `60 times 6` did not**, and nothing in the app stated that rule. A positive tokenizer replaces it — take the numbers and the unit/rep keywords, ignore every word between — so a phrasing works by construction rather than one stripped filler at a time. The seven existing tests all passed and none of them *could* have failed: every case was adjacent numbers or an explicit keyword. The failure message now names an example and the button carries it, since the accepted phrasing was previously learnable only by failing at it. **Proven on strings, not on speech** ([journal](docs/overview/entries/2026-08-31-voice-filler-words.md)).
 
@@ -37,14 +39,7 @@
 
 **One photo picker per screen, and the held rebuild's failure was the spec (BF-46 ①a).** Two things said *Add a photo* and only one was a picker — the meal's own screen called `onEdit`. Both are real now, at the top of their own screen, writing through the same `saveMealToLibrary`, so there is still one write path. **The interesting half:** rebuilt, the previous session's failure reproduced — `onChange` firing with a valid data URI and the component never receiving it — and instrumenting the *parent* showed the file landing in the **other** picker, because the screen being left is still in the DOM while it closes and carried the same accessible name the spec waited for. *A precondition satisfied by the state it is meant to replace cannot fail* ([journal](docs/overview/entries/2026-08-30-meal-photo-one-picker.md)).
 
-**The meal photo was blocked by the app's own CSP, on the branch no test runs (BF-46 ①b).** Three
-owner reports, recorded as a save failure that *"does not reproduce in source"*. `MealPhotoTile`'s
-**native** branch did `await fetch(photo.dataUrl)` — and **a `fetch()` of a `data:` URL is governed
-by `connect-src`**, which this CSP does not open to `data:`. It rejected into a `catch {}` written
-for picker cancellations, so choosing a photo on the phone did nothing and said nothing. The web
-branch takes a `File` from an `<input>` and never fetches, which is why every browser test passed.
-Now `Base64` + `dataUrlToBlob`, and non-cancellations toast. **Verifiable only on the S25**
-([journal](docs/overview/entries/2026-08-30-meal-photo-data-url-fetch.md)).
+**The meal photo was blocked by the app's own CSP, on the branch no test runs (BF-46 ①b).** Three owner reports, recorded as a save failure that *"does not reproduce in source"*. `MealPhotoTile`'s **native** branch did `await fetch(photo.dataUrl)` — and **a `fetch()` of a `data:` URL is governed by `connect-src`**, which this CSP does not open to `data:`. It rejected into a `catch {}` written for picker cancellations, so choosing a photo on the phone did nothing and said nothing. The web branch takes a `File` from an `<input>` and never fetches, which is why every browser test passed. Now `Base64` + `dataUrlToBlob`, and non-cancellations toast. **Verifiable only on the S25** ([journal](docs/overview/entries/2026-08-30-meal-photo-data-url-fetch.md)).
 
 **The quantity editor is the owner's Option A, and an ingredient stopped claiming servings (BF-46
 ② ③).** The unit toggle moved into a narrow column beside the stepper — which is what frees the
