@@ -4271,3 +4271,25 @@ entry rather than leaving them for the implementer.
 Two in-repo rules are cited because they answer the obvious fixes: stored counters have all drifted
 here, so the day's amount must be derived rather than accumulated; and the ranked per-field merge with
 `source_map` is the existing multi-writer provenance pattern that `supplement_logs` lacks.
+
+## 2026-08-30 — `docs/implementation-backlog.md` (BF-69's storage model is decided)
+
+The owner took both recommendations, so the entry stops describing a choice and starts describing a
+shape: a day's exposure is an amount derived from contribution rows, each carrying where it came from
+(`manual` or `meal:<id>`).
+
+Three reasons are kept rather than compressed, because each is the answer to an objection an
+implementer will otherwise raise. Amount over tick is argued on **reversal cost** — amount → tick is
+free, tick → amount means back-filling doses nobody recorded — not on richness. Contributions over a
+`source` column is argued from the deletion bug: one shared row cannot have half of it removed.
+And `source_map` is explicitly rejected, because it is the reflex answer to "multiple writers" in this
+codebase and it is the wrong tool here — a rank ladder resolves competing claims about one truth and
+would discard one of two doses that should add.
+
+The consequences section exists because this is a schema change to a **synced** domain: the unique
+constraint that has to go is load-bearing across the local table, the reconcile lists, the delta and
+the push branch, and the entry says so with "never batch this one" rather than leaving it to the
+sync rules to be remembered.
+
+The two collisions stay in the entry, marked resolved, as the checklist a reviewer runs the
+implementation against.
