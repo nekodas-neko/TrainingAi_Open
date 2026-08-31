@@ -172,7 +172,6 @@ sleep ✅ · readiness ✅ · activity ✅ · body ✅ · devices ✅ · workout
   count as "the owner's, recently", never "the system's".
 - **A hardening fix can delete the evidence another open investigation needs** (TN-7). When a fix
   turns a 500 into a fallback, check what was waiting on that 500.
-<<<<<<< HEAD
 - **TN-6a SHIPPED for one of its three consumers, and the queue did not notice** (TN-18, 2026-08-31).
   `readiness-payload.ts:386` gates the ladder on `isTemperatureBaselineCentred(...)`; `grep` finds
   that helper in **exactly one file**, so `ai-dynamic.ts:184`'s bare `> TEMP_ALERT_THRESHOLD_C` still
@@ -194,7 +193,6 @@ sleep ✅ · readiness ✅ · activity ✅ · body ✅ · devices ✅ · workout
   `0.519 °C / 1.714 °C sd = 0.303 z`, matching the stored contributor input to three decimals. The
   small z is **Q-506's inflated sd**, not a second temperature. This was nearly filed as "two
   temperature truths"; the real finding was the ungated banner.
-=======
 - **⛔ "Show HRV on the tile instead of HR?" — ASKED AND ANSWERED 2026-08-31. No.** In contributor
   form against the check-in: **restingHeartRate −0.491**, **hrvBalance −0.331**, and the two
   correlate **+0.751 with each other (56% shared variance)**. Swapping loses a third of the
@@ -216,7 +214,6 @@ sleep ✅ · readiness ✅ · activity ✅ · body ✅ · devices ✅ · workout
   defect. Against the right column: **+0.16 sd, centred.** Third near-miss of this class in two days
   (`tempZ` vs `temp_dev_c`, sleep ×60, now this): **read which column feeds a baseline before
   comparing anything to it.**
->>>>>>> origin/tuning/hrv-tile-question
 - **The HR tile's lever is RAW-vs-BASELINE-RELATIVE, not which metric.** Against `perceived_recovery`:
   waking-rest HR **+0.176 raw → +0.291 relative**, nightly resting HR **+0.129 → +0.278**. Expressing
   either as a delta from the owner's own baseline roughly doubles it; picking between them barely

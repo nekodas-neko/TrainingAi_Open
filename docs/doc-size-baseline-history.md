@@ -4356,3 +4356,17 @@ entry rather than leaving them for the implementer.
 Two in-repo rules are cited because they answer the obvious fixes: stored counters have all drifted
 here, so the day's amount must be derived rather than accumulated; and the ranked per-field merge with
 `source_map` is the existing multi-writer provenance pattern that `supplement_logs` lacks.
+
+## 2026-08-31 — final figures after batching three Tuning PRs into one: backlog → 13876, `docs/agents/state/tuning.md` → 316, `projectOverview.md` → 8485
+
+**The three notes above (TN-18 / four-tiles-at-55, the HRV tile question, the step-goal re-raise and
+measured stride) were written as three separate PRs and landed as one.** Each raise stands on its own
+reasoning; this line only reconciles the arithmetic, because each PR's stated "before" number was the
+baseline at the time it was opened and `main` moved between them.
+
+**Why they were batched, which is the durable part:** all three touched
+`docs/implementation-backlog.md` and its per-file size baseline, so every merge staled the next one
+and each lost the rebase race in turn — three attempts, three conflicts, no merges. The per-file split
+(LA-33) removed the conflict between PRs touching *different* documents; it cannot help PRs touching
+the *same* one. **A run of same-file docs PRs from one agent should be batched from the start** rather
+than opened separately and rebased serially.
