@@ -4884,3 +4884,23 @@ lands in, not an alternative to it — so nobody reads BF-71 as having satisfied
 
 Moved to sit directly after BF-1, which needs the same pipeline for 58 analytes and is the report
 that justifies building it.
+
+## 2026-08-31 — `docs/implementation-backlog.md` (BF-80, and the clinical values landed)
+
+**BF-80** is the session's most severe report and the entry is mostly about the silence around it.
+`error_events` holds three rows for the owner across three days and none of them is a blank screen,
+while `app/error.tsx` exists — so a JS exception would have painted a fallback and filed a row, and
+neither happened. That absence is what points at the WebView's render process rather than at the
+app's own code, and `MainActivity.java` has no `WebViewClient`, no `onRenderProcessGone` and no
+reload path: grepped, zero hits for `RenderProcess` anywhere under `android/`.
+
+The entry ranks three causes and gives the two behavioural tells that separate them without a cable,
+because "reproduce it with logcat" is not a thing the owner will do at 10% battery. It also says
+outright not to fix it by reloading on `visibilitychange` — that hides the fault and costs the
+instant-paint behaviour — and that whatever the cause turns out to be, it must file an
+`error_events` row, since a total failure leaving no trace is why this went unreported for so long.
+
+**BF-71 and BF-42** are updated from production rather than from intent: the owner entered the
+results mid-session and both tables now hold them, so BF-71's device check is closed (the date picker
+and decimal keypads work in Samsung's WebView, which was the entire risk) and BF-42 is verifiable for
+the first time.
