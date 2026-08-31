@@ -5313,3 +5313,19 @@ resolution — read the headings before choosing.
 The number is re-measured after the merge rather than carried across it, per the note above. The
 entry-ID set was diffed against the new `origin/main`: **OR-100 added, nothing lost**, so the
 auto-merge resurrected none of what #714 and #715 removed.
+
+## 2026-09-01 — `docs/implementation-backlog.md` 14708 → 14761 (BF-88, an answer that had to be measured)
+
+The owner asked whether dropping the step baseline for "RMR + steps + exercise" would be more
+accurate. It reads as obviously right and it is measurably wrong: against 124 days of his own data
+the proposed model gives a **lower** burn on **124 of 124**, mean −177 kcal, because the 0.2 × RMR
+it deletes is worth 265 kcal while the 3,000 steps it gains are worth ~106.
+
+The entry is long because the useful finding is not the answer but what the tracing turned up —
+`STEP_BASELINE` means two different things depending on whether maintenance is calibrated, and in
+the calibrated path it is nearly self-cancelling. One constant with two behaviours and no way to
+tell them apart from the screen is how a reasonable proposal gets to look obviously correct.
+
+It carries its numbers (124 days, 50 below threshold, 45 with plausible intake, the RMR of 1,325)
+because the Tuning rule requires a blast radius and because the next session to be asked this will
+otherwise re-run the same six queries.
