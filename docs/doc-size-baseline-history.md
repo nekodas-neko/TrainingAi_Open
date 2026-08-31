@@ -4338,6 +4338,19 @@ The rest are cheap tests that stop a false alarm: check the **spread** before be
 have collapsed (they normally sit 20 points apart), and **reproduce readiness from its stored
 contributors** before calling it wrong (2026-08-31 came to 55.3 against a stored 55).
 
+## 2026-08-31 — `docs/implementation-backlog.md` falls as LA-44 is struck
+
+LA-44 is removed whole: **BF-71 (#681) built it** hours after it was filed, so the entry describes
+work that exists. Checked before striking rather than assumed — BF-71's DEXA form takes a superset of
+the fields LA-44 named, its RMR form takes what `personalRmr` needs, and it adds no `bytea`, which is
+the one thing LA-44 said not to reverse.
+
+**The three surviving references to it were rewritten, not left.** An entry can be deleted from the
+queue in one edit and still be quoted as outstanding in three others — BF-2's banner said its outcome
+was "unobservable until LA-44", which stopped being true the moment #681 landed. A stale pointer to a
+struck entry is worse than the entry, because the next reader trusts prose over a queue they have to
+go and search.
+
 ## 2026-08-31 — `docs/implementation-backlog.md` 14064 → **14089** (BF-2 finishes, LA-45 is filed)
 
 Twenty-five net, and it is one new entry — **LA-45**, the display half. The engine now corrects the

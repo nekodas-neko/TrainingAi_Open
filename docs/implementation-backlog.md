@@ -946,10 +946,15 @@ bug is that it is using a prediction as the definition of BMR when a measurement
 
 ### [body][nutrition] 🔵 BF-2 — the "DEXA filter": calibrate the scale's body-fat estimate against a real DEXA, and correct history
 
-> **⚑ ALL FOUR STEPS SHIPPED 2026-08-31. What remains is not this entry's: LA-45 (a screen that
-> reads the corrected value) and LA-44 (a way to enter a scan at all).** Measured live with the
-> owner's real pair: resting burn **1832 → 1773 kcal/day**, calorie goal **1961 → 1889**, and both
-> `body_metrics.body_fat_pct` and `/api/body-metadata`'s `bodyFat` still returning the raw 25.3.
+> **⚑ ALL FOUR STEPS SHIPPED 2026-08-31, and the chain is verified end to end.** Entering a scan
+> through **BF-71**'s form (#681, which superseded LA-44 the same day) makes the correction live with
+> no other action: one POST to `/api/dexa-scans` moved resting burn **1832 → 1773 kcal/day** and the
+> calorie goal **1961 → 1889**, with `body_metrics.body_fat_pct` and `/api/body-metadata`'s `bodyFat`
+> both still returning the raw 25.3. **A second scan re-derives on its own** — offset 3.2 → 2.6,
+> `pairCount` 1 → 2 — which is the accumulation the owner asked for, and the property that justified
+> deriving pairs rather than storing them.
+>
+> **What remains is LA-45**: no screen reads the corrected value yet.
 >
 > **Two things a later session must not "simplify".** (1) The correction is applied **per consumer**,
 > never inside `listBodyMetrics` — the Health log sheet seeds from that read and POSTs back at rank
@@ -972,9 +977,10 @@ bug is that it is using a prediction as the definition of BMR when a measurement
 > `dexa_scans` holds **zero** of the owner's rows, and so does `measured_rmr` — **neither table has
 > any entry surface**: `grep -rn "dexa-scans\|measured-rmr" app/ components/ lib/` outside
 > `app/api/` returns nothing. The 2026-08-27 printout has been transcribed in
-> `docs/clinical-baseline-2026-08-27.md` for four days with nowhere to go. Filed as **LA-44**. It
-> does **not** block building this — the engine is inert with zero pairs — but it does block the
-> owner *seeing* it, which is what they asked for. The **scale** half of the pair is confirmed
+> `docs/clinical-baseline-2026-08-27.md` for four days with nowhere to go. Filed as LA-44, and
+> **fixed by BF-71 (#681) the same day** — More › Health › DEXA & RMR results. Entering a scan there
+> now makes the correction live with no other action: verified 2026-08-31, resting burn
+> **1832 → 1773 kcal/day** off a single POST to `/api/dexa-scans`. The **scale** half of the pair is confirmed
 > present (2026-08-27, 71.7 kg, 25.3 %, `scale_ble`), and twelve consecutive days sit in
 > **24.9–25.5 %**, so the consistency premise the whole design rests on is measured, not assumed.
 
@@ -1006,7 +1012,7 @@ bug is that it is using a prediction as the definition of BMR when a measurement
 
 > **⚠ PRIORITY CHANGED 2026-08-26 — the owner has a DEXA + RMR test BOOKED.** This entry sat at the tail because the owner filed it as *"a loose note to put more effort into later"*; that is no longer the signal. The planning session it asked for is done (top of this entry).
 >
-> **The RMR half was split out as BF-33 and has SHIPPED** — `measured_rmr` (migrations 225/226), `personalRmr`, `/api/measured-rmr`. Nothing here waits on it; what it left behind is LA-44's empty table.
+> **The RMR half was split out as BF-33 and has SHIPPED** — `measured_rmr` (migrations 225/226), `personalRmr`, `/api/measured-rmr`. The empty table it left behind is filled by BF-71's form.
 >
 > **Two refinements from the owner, 2026-08-26, that change the shape of the filter:**
 >
@@ -1096,42 +1102,7 @@ needs a same-day weigh-in booked with it.
 **Done looks like:** the app states the measured offset against the scale for the same period;
 corrected body fat feeds the calorie and protein goals **and `personalRmr`'s current fat-free mass**;
 and history reads corrected without the raw scale values having been overwritten. **"A DEXA reading
-can be entered" is NOT part of this entry any more — it is LA-44**, and until that ships this work's
-outcome is real but unobservable in the app.
-
-### [body][nutrition] LA-44 — a DEXA scan and a measured RMR can be stored but not entered: both tables are empty and neither has a UI
-
-- **Branch:** _unassigned_ · **Lane: A** for an extraction/confirm route, **B** for the form — engine
-  half first, per the path rule.
-- **Added:** 2026-08-31 · Lane A, from BF-2's planning session.
-- **Measured in production 2026-08-31, not inferred.** `claude_ro.dexa_scans` returns **0 rows** and
-  `claude_ro.measured_rmr` returns **0 rows** (row-scoped to the owner, so this is *none of the
-  owner's*, which is the only claim this endpoint can support — and it is the claim that matters
-  here). `grep -rn "dexa-scans\|measured-rmr" app/ components/ lib/` outside `app/api/` returns
-  **nothing**: no screen, no form, no client fetch calls either route.
-- **So two shipped engines have no way to be fed.** BF-41 shipped `dexa_scans` +
-  `dexa_scan_regions` (migration 240) and `GET`/`POST /api/dexa-scans` on 2026-08-30; BF-33 shipped
-  `measured_rmr` (migrations 225/226), `personalRmr` and `/api/measured-rmr`. Both are correct and
-  both are unreachable. The owner's real 2026-08-27 results are transcribed in
-  [`clinical-baseline-2026-08-27.md`](clinical-baseline-2026-08-27.md) and have been sitting there
-  since, which is how long the gap has been invisible.
-- **This is the general shape worth naming, not a one-off.** An engine-first split leaves the entry
-  surface for "later", and nothing fails when later does not come — no test breaks, no check goes
-  red, and the table simply stays empty. The tell is a populated `docs/` transcription with an empty
-  table behind it.
-- **Why it matters beyond tidiness:** BF-2's whole outcome is gated on it. The correction engine is
-  safely inert with zero pairs, so BF-2 can and should ship first — but the owner asked for the
-  filter *"so it shows Body fat on the current scale as per a dexa result"*, and nothing shows until
-  a scan is entered.
-- **Scope:** a form is enough. `dexa_scans` has ~30 typed columns but only a handful are load-bearing
-  for BF-2 and BF-33 (`scanned_on`, `pct_fat`, `weight_kg`, `fat_g`, `lean_plus_bmc_g`), so the form
-  should take those and treat the rest as optional detail rather than demanding the whole printout.
-  `source` is already `manual` | `extracted` with no third value for a model's unconfirmed output —
-  an extraction route must therefore end in a confirm step, not a direct save.
-- **Do NOT add a `bytea`.** The module map records that no source document is stored — extract,
-  confirm, save the fields, discard the file — and reversing that is its own decision, not a detail
-  of building a form.
-
+can be entered" is NOT part of this entry — that was LA-44, superseded by BF-71 (#681).**
 
 ### [body][app-shell] LA-45 — the DEXA-corrected body fat is in the payload and no screen reads it
 
