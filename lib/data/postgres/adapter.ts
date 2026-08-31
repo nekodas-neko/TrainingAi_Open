@@ -121,6 +121,10 @@ import { computeMuscleRecovery } from '@trainingai/shared/ai-periodization/muscl
 import { resolveSelfReportedSick } from '@trainingai/shared/ai-periodization/signals'
 import { mround } from '@trainingai/shared/1rm'
 import { computeSetAggregates, computeIntensityPct } from '@trainingai/shared/workout/set-aggregates'
+import {
+  deriveBodyFatCalibration, pairScansWithReadings, DEFAULT_CALIBRATED_SOURCE,
+  type BodyFatCalibration,
+} from '@trainingai/shared/health/body-fat-calibration'
 
 // 1 lb = 0.45359237 kg exactly. Used to correct dumbbell weights that were
 // logged in lbs but recorded in the weight_kg column as if they were kg.
@@ -3518,6 +3522,41 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       .orderBy(desc(s.dexaScans.scannedOn))
       .limit(1)
     return row ? { ...this.rowToDexaScan(row), regions: await this.dexaRegions(row.id) } : null
+  }
+
+  async getBodyFatCalibration(
+    userId: string,
+    source = DEFAULT_CALIBRATED_SOURCE,
+  ): Promise<BodyFatCalibration | null> {
+    // Both halves are read whole and paired in TS rather than joined in SQL: the pairing rule (a
+    // ±window, nearest wins, each row used once) is the part that has to be tested, and it is
+    // testable as a pure function only if it lives in one. Neither side is large — the scans are a
+    // handful and the readings are one row per day.
+    const scans = await this.db
+      .select({ scannedOn: s.dexaScans.scannedOn, pctFat: s.dexaScans.pctFat })
+      .from(s.dexaScans)
+      .where(and(eq(s.dexaScans.userId, userId), isNotNull(s.dexaScans.pctFat)))
+    if (scans.length === 0) return null
+
+    const readings = await this.db
+      .select({
+        date: s.bodyMetrics.date,
+        bodyFatPct: s.bodyMetrics.bodyFatPct,
+        sourceMap: s.bodyMetrics.sourceMap,
+      })
+      .from(s.bodyMetrics)
+      .where(and(eq(s.bodyMetrics.userId, userId), isNotNull(s.bodyMetrics.bodyFatPct)))
+
+    const pairs = pairScansWithReadings(
+      scans.map(r => ({ scannedOn: r.scannedOn, pctFat: r.pctFat as number })),
+      readings.map(r => ({
+        date: r.date,
+        bodyFatPct: r.bodyFatPct as number,
+        source: r.sourceMap?.body_fat_pct ?? null,
+      })),
+      source,
+    )
+    return deriveBodyFatCalibration(pairs, source)
   }
 
   async listDexaScans(userId: string): Promise<import('../repository').DexaScanRow[]> {

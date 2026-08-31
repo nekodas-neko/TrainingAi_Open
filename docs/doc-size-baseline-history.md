@@ -4338,6 +4338,19 @@ The rest are cheap tests that stop a false alarm: check the **spread** before be
 have collapsed (they normally sit 20 points apart), and **reproduce readiness from its stored
 contributors** before calling it wrong (2026-08-31 came to 55.3 against a stored 55).
 
+## 2026-08-31 — `docs/implementation-backlog.md` 14007 → **14017** (BF-2 steps 1–2 ship)
+
+Ten lines on BF-2, and they are the ones that stop the next session mis-reading a half-built entry:
+the calibration and its repository read are on `main` and **nothing consumes them**, so no goal, RMR
+or panel has moved. Without that stated, a session reading "shipped" would look for a behaviour
+change, find none, and go hunting a bug that does not exist.
+
+The other half is the step-3 design question, recorded with its measurement rather than as a
+to-do — `listBodyMetrics` has **22 call sites**, which is what makes "correct inside the read" both
+attractive (a missed site becomes impossible) and dangerous (a read-then-write path would persist a
+corrected value into the raw column). A number a successor would otherwise have to re-derive before
+they could even frame the choice.
+
 ## 2026-08-31 — `docs/implementation-backlog.md` 13812 → 13845 → **14007** on the merge (BF-2 gets its plan, and LA-44 is filed)
 
 Thirty-three lines net, and the whole of it is **LA-44** — two shipped engines (`dexa_scans`,
