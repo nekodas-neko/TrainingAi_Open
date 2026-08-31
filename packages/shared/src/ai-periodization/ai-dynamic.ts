@@ -41,6 +41,20 @@ export interface AiDynamicInput {
   illnessFlag: IllnessFlag | null
   /** today's derived stress-high minutes (oura_daily_derived) — null when not computed yet */
   stressHighMinutes: number | null
+  /**
+   * TN-18: is the temperature baseline centred enough for `temperatureDeviation` to mean anything?
+   *
+   * Computed by `isTemperatureBaselineCentred` over the trailing summaries — the SAME condition
+   * readiness uses, imported rather than re-derived, because two answers to "is temperature
+   * trustworthy" is how the owner ended up with a 80/100 contributor and a deload banner
+   * disagreeing about one night.
+   *
+   * **Absent ⇒ NOT trusted**, which suppresses the alert. That default is the safe direction and
+   * it is the opposite of `temperatureBaselineDays`': an omitted maturity count reads as 0 and
+   * also suppresses, so both unknowns fail the same way. A caller that has the summaries passes
+   * the real value; one that does not should not be firing this alert.
+   */
+  temperatureTrusted?: boolean
 }
 
 // ── Muscle recovery helpers ───────────────────────────────────────────────────
@@ -173,6 +187,7 @@ function computeDeloadStrength(
   daySummary: string | null,
   illnessFlag: IllnessFlag | null,
   stressHighMinutes: number | null,
+  temperatureTrusted: boolean,
 ): { recommended: boolean; strength: 'soft' | 'recommended' | 'strong'; temperatureAlert: boolean } {
   // Fever overrides everything — the strongest "don't train hard" signal we have.
   // temperatureAlert stays tied to the Cloud temp-deviation field (its own UI copy).
@@ -180,8 +195,24 @@ function computeDeloadStrength(
     return { recommended: true, strength: 'strong', temperatureAlert: false }
   }
 
-  // Only trust an elevated temperature once the baseline is mature enough to define "normal".
-  const tempAlert = temperatureDeviation != null && temperatureDeviation > TEMP_ALERT_THRESHOLD_C
+  // Only trust an elevated temperature once the baseline is mature enough to define "normal" AND
+  // centred enough for the deviation to mean anything (TN-18).
+  //
+  // The maturity count alone was never sufficient and the owner's screenshot showed why: on
+  // 2026-08-31 the stored deviation was 0.519 °C — over the 0.5 threshold, so this banner said
+  // "Body temp elevated — rest or deload recommended" — while readiness scored temperature
+  // **80/100** on the same night, because its baseline sd is 12x too wide. Two paths, one broken
+  // baseline, opposite verdicts, same frame.
+  //
+  // TN-6a shipped the suspension and said it "must cover all three consumers"; it covered one, and
+  // it was the readiness ladder — the path the owner does not read. This is the path behind the
+  // report that started it: *"its often triggering deload days. its not trustable yet."*
+  //
+  // **Do NOT fix this by raising TEMP_ALERT_THRESHOLD_C.** That is the Q-504 mistake and would be
+  // the fourth "the threshold is right, the input is wrong" in this pillar. The condition is
+  // computed, not a TODO, so it lifts on its own once a re-derivation centres the deviations.
+  const tempAlert = temperatureTrusted
+    && temperatureDeviation != null && temperatureDeviation > TEMP_ALERT_THRESHOLD_C
     && temperatureBaselineDays >= TEMP_BASELINE_MIN_DAYS
   // Derived-first: a non-null derived value means the ring measured today, and it decides.
   // Only with no derived stress at all does the frozen Cloud day_summary still count (S5).
@@ -210,6 +241,7 @@ export function computeAiDynamicNextSession(input: AiDynamicInput): NextSessionR
     sessions, muscleAssignments, muscleRecovery, history, soreMuscles,
     readinessScore, temperatureDeviation, temperatureBaselineDays, daySummary, timezone,
     reminderEnabled, reminderTime, sleepTrend, energyLevel, selfReportedSick, hrvTrend, illnessFlag, stressHighMinutes,
+    temperatureTrusted,
   } = input
 
   const now = new Date()
@@ -257,7 +289,7 @@ export function computeAiDynamicNextSession(input: AiDynamicInput): NextSessionR
 
   const deload = computeDeloadStrength(
     consecutiveTrainingDays, readinessScore, temperatureDeviation, temperatureBaselineDays ?? 0,
-    daySummary, illnessFlag, stressHighMinutes,
+    daySummary, illnessFlag, stressHighMinutes, temperatureTrusted ?? false,
   )
   let recommended = deload.recommended
   let strength = deload.strength

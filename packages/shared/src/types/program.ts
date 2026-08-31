@@ -134,6 +134,13 @@ export interface NextSessionRecommendation {
     temperatureDeviation: number | null
     temperatureBaselineDays: number | null
     temperatureAlertThresholdC: number
+    /**
+     * TN-18: whether the temperature deviation above was trusted at all. False means the alert was
+     * SUSPENDED because the baseline is not centred — without this the explain page would show a
+     * deviation over the threshold beside no alert and read as a bug rather than a suspension.
+     * Optional so a stored payload from before this shipped still parses.
+     */
+    temperatureTrusted?: boolean
   }
 }
 
