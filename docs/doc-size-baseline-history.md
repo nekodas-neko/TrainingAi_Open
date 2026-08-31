@@ -4271,3 +4271,19 @@ entry rather than leaving them for the implementer.
 Two in-repo rules are cited because they answer the obvious fixes: stored counters have all drifted
 here, so the day's amount must be derived rather than accumulated; and the ranked per-field merge with
 `source_map` is the existing multi-writer provenance pattern that `supplement_logs` lacks.
+
+## 2026-08-31 — `docs/implementation-backlog.md` (BF-70, a picture dropped three times)
+
+The owner reported one missing thumbnail. Tracing it found the image is fetched successfully and
+discarded at three separate layers — the form model has no field for it, the entry contract has no
+field for it, and the local write hardcodes `imageDataUri: null`. Each is listed with its file and
+line because fixing any one of them changes nothing, which is the fact that decides how the work is
+scoped.
+
+The second finding came free and explains a number already in the backlog: `handleConfirm` stamps
+`source: 'ai'` whenever the scan carries a confidence, and a barcode scan does — which is why BF-38
+measured 3 rows with `source = 'barcode'` out of 221. Same line, so the two entries are batched
+rather than left to conflict.
+
+Also note the batch checker earned its keep here: `nutrition-ui-uplift` is Lane B and BF-70 is Lane
+A, and it refused the mix rather than letting a batch become a PR that cannot ship as one.
