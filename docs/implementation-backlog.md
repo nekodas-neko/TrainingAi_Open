@@ -2772,6 +2772,10 @@ the match. `Gate: owner` when it is next picked up.
 ### [nutrition] BF-52 — one AI meal builder: type it, photograph it, or paste a URL, from a single entry point
 
 - **Lane:** B for the surface; the routes exist.
+- **Plan:** [`2026-08-31-ai-meal-builder-entry-point.md`](superpowers/plans/2026-08-31-ai-meal-builder-entry-point.md)
+  — **written 2026-08-31, so the planning half is DONE and what remains is the build.** It carries the
+  inventory, one correction, and **one instruction from this entry that it declines with a reason**
+  (see the BF-63 bullet below).
 - **Added:** 2026-08-30 · owner, device pass N5: *"I dont see a URL option or does it just go into
   the add ingredients? Id rather it just be an 'AI Meal builder' option; similar to the food logging
   where you can write/type to it - or upload a photo; or upload a URL link etc."*
@@ -2783,6 +2787,15 @@ inside the ingredient *search* field (`ingredient-picker.tsx` → `importRecipe`
 owner could not find a URL option — it is not presented as one. The photo path shipped as BF-40.
 Free-text description is the scan route's text branch.
 
+- **⚠ SHARPENED by the plan, 2026-08-31.** The photo and URL affordances are not two separate
+  discoverability problems — they are **mutually exclusive renders of the SAME slot**, chosen by what
+  is typed into a field whose placeholder says *"Search your foods or the food database…"*: empty →
+  the recipe-photo button, a URL → the import button, ≥2 characters → the estimate. So the field
+  advertises search and behaves as a mode switch, and making either input findable means taking both
+  out of that slot. Also measured: **`/api/nutrition/scan` already accepts all three shapes in one
+  handler** (`body.image`+`mimeType`, `body.url`, `body.text`), so this really is an entry point and
+  nothing else.
+
 **So the ask is an entry point, not an engine.** Mirror Log Food's own capture row — the user has just
 learned `Photo · Barcode · Describe or enter` one screen away, and a meal builder offering
 `Photo · URL · Describe` reads as the same idea rather than a new one. **Recommendation: do not build
@@ -2790,9 +2803,12 @@ new extraction**; route all three at the existing `/api/nutrition/scan` shapes a
 render what comes back.
 
 - **BF-63 is the per-ingredient half and is being built without waiting on this.** It puts a barcode
-  scan on the ingredient search, which is a defect fix rather than a design. When this row is
-  designed, absorb that button into it — a builder showing a capture row *and* a separate barcode
-  affordance is the duplication this pairing exists to avoid.
+  scan on the ingredient search, which is a defect fix rather than a design. ~~When this row is
+  designed, absorb that button into it~~ — **the plan DECLINES this, 2026-08-31.** The four inputs are
+  not four of a kind: photo and URL produce a **whole ingredient list**, while the estimate and the
+  barcode produce **one ingredient**. A barcode inside a row headed *"start this meal from"* promises
+  it can build a meal from a packet, which it cannot. Split by granularity instead — the capture row
+  above the search, the barcode beside it, where BF-63 already put it.
 - **Carry BF-40's earned constraint:** a recipe page that states no yield hands up `recipeYield: null`
   rather than defaulting to 1 — the banana-bread four-fold error. Any new entry point must preserve
   that, and the amber "set how many portions" line with it.
