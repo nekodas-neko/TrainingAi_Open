@@ -1,6 +1,6 @@
 import { test, expect, type Page } from '@playwright/test'
 import { Client } from 'pg'
-import { settleRouteBoundary } from './fixtures'
+import { settleRouteBoundary, tapCentre } from './fixtures'
 
 /**
  * Log Food → Search reaches the food database (BF-48; the tab was called `Single foods` until
@@ -44,8 +44,7 @@ test.afterAll(async () => {
 async function tap(page: Page, target: ReturnType<Page['getByRole']>) {
   await expect(target).toBeVisible({ timeout: 30_000 })
   await target.scrollIntoViewIfNeeded()
-  const box = (await target.boundingBox())!
-  await page.touchscreen.tap(box.x + box.width / 2, box.y + box.height / 2)
+  await tapCentre(page, target)
 }
 
 async function openSingleFoods(page: Page) {

@@ -168,11 +168,10 @@ export function MorningCheckinSheet({ open, onClose, userId, readiness, onSaved 
         className="rounded-t-2xl max-h-[92vh] flex flex-col p-0 bg-secondary border-t border-border/70"
         hideCloseButton
       >
-        <SheetTitle className="sr-only">Morning Check-in</SheetTitle>
         <div className="flex items-center justify-between px-4 pt-4 pb-3 shrink-0">
           <div className="flex items-center gap-2">
             <Sunrise className="w-4 h-4 text-brand" />
-            <h2 className="text-base font-semibold">Morning Check-in</h2>
+            <SheetTitle asChild><h2 className="text-base font-semibold">Morning Check-in</h2></SheetTitle>
             {readiness != null && (
               <span className="text-[10px] text-muted-foreground">· Readiness {readiness}</span>
             )}

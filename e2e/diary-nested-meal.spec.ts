@@ -1,6 +1,6 @@
 import { test, expect, type Page } from '@playwright/test'
 import { Client } from 'pg'
-import { SEED_EMAIL, settleRouteBoundary } from './fixtures'
+import { SEED_EMAIL, settleRouteBoundary, tapCentre } from './fixtures'
 
 /**
  * A logged meal is one diary row that opens to its ingredients (BF-39).
@@ -119,11 +119,11 @@ test('a logged meal is ONE row that opens to its ingredients', async ({ page }) 
   await expect(row).toHaveAttribute('aria-expanded', 'false')
 
   // Centre it first: a diary row's natural position here is under the bottom tab bar, so the
-  // coordinate tap lands on a nav icon and switches tab — which reads as the row vanishing.
+  // coordinate tap lands on a nav icon and switches tab — which reads as the row vanishing. The
+  // 300 ms sleep that used to stand here is `tapCentre`'s job now: it waits for the row's rect to
+  // settle, which is the condition the sleep was guessing at (LB-30).
   await row.evaluate(el => el.scrollIntoView({ block: 'center' }))
-  await page.waitForTimeout(300)
-  const box = (await row.boundingBox())!
-  await page.touchscreen.tap(box.x + box.width / 2, box.y + box.height / 2)
+  await tapCentre(page, row)
 
   await expect(row).toHaveAttribute('aria-expanded', 'true')
   for (const f of FOODS) await expect(page.getByText(f.name, { exact: true })).toBeVisible()

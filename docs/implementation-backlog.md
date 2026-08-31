@@ -1683,60 +1683,32 @@ owner has to re-describe in a wizard what the app already knows.
   is exactly the failure this entry is written to prevent. A program id belonging to another user is
   rejected, not read.
 
-### [workouts] BF-65 — show the exercise GIF on the per-exercise ready screen, and extract the fetch while doing it
+### [workouts] BF-65 — the exercise clip on the ready screen (shipped; it must be seen *moving*)
 
-- **Lane:** B — `components/workout/active-workout-screen.tsx` (the ready branch at :240) plus a new
-  shared hook; the route and the media both already exist.
-- **Added:** 2026-08-30 · owner, with the ready screen and the warm-up screen side by side: *"id like
-  the exercise gif in the pre session screen so it shows you what movement you will be doing."*
+- **Lane:** B
+- **Gate:** device
+- **Added:** 2026-08-30 · owner: *"id like the exercise gif in the pre session screen so it shows you
+  what movement you will be doing."*
+- **Shipped 2026-08-31** — `exercise-media-panel.tsx` renders the clip at 64 px beside the exercise
+  name, tappable into a full-width strip, with the warm-up screen's dumbbell fallback for anything
+  the route cannot match. `useExerciseMedia` (`lib/hooks/use-exercise-media.ts`) is now the only
+  place `/api/exercise-gif` is fetched — it replaced the four hand-rolled copies rather than
+  becoming a fifth — and the shared `exercise-media:<name>` key is what lets the ready screen paint
+  from what the warm-up screen fetched a minute earlier.
+- **The layout question in the original entry is decided:** the collapsed thumbnail costs so little
+  height that `SET TARGETS`, which was cut off behind the action row in the owner's screenshot, is
+  now fully visible. The expand exists for a proper look and is not needed to see the movement.
+- **Keep:** the **device check**, and only that — and it is the half no harness here can reach. The
+  clip must be **moving** rather than a frozen first frame, which is what `unoptimized` decides and
+  what a screenshot cannot tell you; a guard test holds the prop on every exercise-media `<Image>`,
+  but a passing prop is not a moving picture. **The dataset host is unreachable from the sandbox**
+  (`raw.githubusercontent.com` is dropped by the egress proxy, so the warm-up screen's own
+  long-standing thumbnails are blank there too), so every clip this was verified against was a
+  substituted same-origin file. On the S25: each exercise's ready screen shows **its own** clip and
+  it animates; an unmatched or bodyweight movement shows the dumbbell rather than a gap; and in
+  airplane mode the clip still plays, because the warm-up screen's prefetch put it in the service
+  worker.
 
-**The media is real and it is genuinely animated.** `/api/exercise-gif?name=` returns
-`{ gifUrl, imageUrl }`, and for a generated exercise the gif is `/exercise-media/gifs/male/<slug>.gif`
-with a matching start frame at `…/frames/male/<slug>-start.png`. The warm-up screen renders it at
-40 px today; the ready screen — the one screenshotted, `active-workout-screen.tsx`'s ready branch —
-shows the name, last session, bar load, ramp-up and set targets, and no picture at all. There is also
-no route to one from there: `ExerciseStatsSheet` carries the gif but is mounted only on
-`pre-workout-screen.tsx`.
-
-**Do not add a fifth copy of the fetch — extract it.** The same
-`fetch('/api/exercise-gif?name=…')` → `{gifUrl, imageUrl}` is hand-rolled in **four** places already:
-`warmup-screen.tsx:39`, `exercise-stats-sheet.tsx:71`, `config/exercise-preview-sheet.tsx:33` and
-`workout-builder/builder-review.tsx:154`. The repo's rule is that a pattern at ≥2 sites is extracted
-before a third copy; this is the fifth, so the extraction is part of the work rather than a follow-up.
-
-- **Reuse the warm-up screen's fetch rather than repeating it.** `WarmupScreen` already fetches media
-  for **every** exercise in the session moments earlier, and deliberately re-fetches each binary so
-  the service worker caches it offline. Then it unmounts on the mode change and the map is lost. The
-  ready screen wants exactly one entry of that map. Put the results behind a shared cache key so the
-  second screen paints instantly from what the first already fetched — per the instant-paint rule, a
-  spinner on the ready screen for a file the app downloaded 60 seconds ago is the outcome to avoid.
-- **⚠ `unoptimized` is mandatory on a GIF through `next/image`, and forgetting it fails silently.**
-  The optimizer turns a GIF into a static image, so the picture appears, looks correct, and simply
-  never moves — which reads as "the gif is broken" rather than as a missing prop. `warmup-screen.tsx`
-  gets this right with `unoptimized={thumbSrc.endsWith('.gif')}`; copy that condition.
-- **Put it in a memoised child, not inline.** The ready screen sits behind a 1 Hz session pill and
-  the rest ring, and CLAUDE.md's render rules put repeated/hot-parent widgets in `React.memo` with
-  stable props. `active-workout-screen.tsx` is 626 lines against the ~800 ceiling, and the hotspot
-  rule says new features go into a `components/` child rather than being appended.
-- **Layout is a real decision, not a drop-in.** The screenshot already cuts `SET TARGETS` off behind
-  the action row, so a full-width media block pushes the bar-load number — the thing the user is
-  actually reading — further below the fold. Options worth weighing: a compact thumbnail beside the
-  exercise name that expands on tap (cheapest, keeps the fold), or a modest fixed-height strip under
-  the name. The owner's stated purpose is *"so it shows you what movement you will be doing"*, which
-  argues for it being visible without a tap.
-- **Alternative considered — carry the media on `/api/workout-data`.** That kills N round-trips
-  outright, since the route already returns the exercise list. Rejected as the first move: it makes
-  this a Lane A change to a payload four surfaces read, for a saving the shared cache above already
-  gets. Worth revisiting if the per-exercise fetch turns out to be slow on the device.
-- **Bodyweight and unmatched exercises need a defined empty state.** `/api/exercise-gif` returns
-  `{ gifUrl: null, imageUrl: null }` for anything it cannot match, and the warm-up list falls back to
-  a dumbbell icon. The ready screen needs the same fallback decided up front, or a missing match
-  leaves a hole where the layout expects a picture.
-- **Verification (device, APK):** open a session, and each exercise's ready screen shows its
-  animation — *moving*, not a frozen first frame — including the second and later exercises, which
-  is where a fetch-once effect keyed wrongly would show the first exercise's clip. An exercise with
-  no match shows the fallback rather than a gap. Then airplane mode: the clip still plays, because
-  the warm-up screen's prefetch put it in the service worker.
 
 ### [workouts] BF-64 — the Full/Deload toggle can only ADD deload, never remove one, so `Full · Override` overrides nothing
 
@@ -1939,8 +1911,15 @@ that handler defers, the way it already defers to a carousel.
 
 - **Lane:** B
 - **Batch:** `nutrition-ui-uplift` — ships with BF-45.
-- **Device-verified when built** — see Verification. **Deliberately NOT `Gate: device`:** that
-  field parks an entry, and these are unbuilt. See the note below.
+- **Gate:** device
+- **Keep:** the **device check**, and only that. All four parts have shipped — ① (a) the single
+  picker at the top (v1.402.0), ① (b) the CSP fix that was the save failure's real cause (v1.399.0),
+  ② grams-only ingredient rows and ③ Option A (both v1.401.0). **The `Gate: device` above was
+  deliberately withheld while they were unbuilt** — that field parks an entry, and parking unbuilt
+  work would have hidden it. Now that nothing here is unbuilt, its absence did the opposite: it left
+  an entry with no work in it heading `next-item.js`'s READY list, which is the one thing that tool
+  exists to prevent. On the S25, per ① (b)'s own note: pick a photo in Edit Meal, save, reopen. If it
+  still fails it now fails *loudly*, which is the smaller half of that fix.
 - **Added:** 2026-08-27 · owner, with screenshots. *"overall just a UI rework/uplift. almost there."*
 
 **① Two things, and the owner corrected the first reading of them. ⚠ THE SAVE FAILURE IS REAL AND
@@ -10477,6 +10456,71 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   Samsung's WebView — it is Chromium, so the compositor bugs (SVG wiping sibling gradients) stay
   invisible to it. See Q-252.
 
+### [platform] LB-31 — nothing runs the suite on `main`, so a defect that lands there has nothing to report it
+
+- **Lane:** A — the fix is `.github/workflows/ci.yml` and, if the body-battery half is real,
+  `app/api/body-battery/` and `lib/health/`. Found by Lane B on #664.
+- **Added:** 2026-08-31 · Lane B, from a red `Tests` check that took an hour to place.
+
+**Two findings, and the second is the durable one.**
+
+**① `app/api/body-battery/__tests__/anchor-source.test.ts` failed on CI and passes everywhere else.**
+Two assertions: `anchors on our own computed sleep score when only a sleep session exists` got
+`readiness`, and `prefers today's persisted derived readiness` got **55** where it writes **77**.
+
+The mechanism is real whatever triggers it. The three tests are **cumulative on one user in
+escalating precedence**, and `route.ts:206` takes an on-demand `buildReadinessPayload` whenever
+`readinessPlausible` — `ouraToday != null || ownSleepScore != null || bodyMetrics.length > 0` — and
+**that call persists what it computes**, by design, with a comment saying so. So test 2's own sleep
+insert is enough to make `ownSleepScore` non-null, run the build, land a derived readiness in the
+row, and resolve the anchor to `readiness` instead of the `sleep` it asserts. **The test's
+precondition is destroyed by the thing it is testing.**
+
+Whether that fires depends on whether the builder judges the composite real enough to persist for a
+fixture with almost no history — and **#663 retired the Oura activity blend, which changes what goes
+into that composite.** Look there first.
+
+- **✅ It did not reproduce, and that is now measured rather than assumed.** The failed `Tests` job
+  was re-run on the identical commit and **passed** (run 33352464055, attempt 2). So the test is
+  **flaky**, not a standing defect — which retires the first reading of this, that `main` was red and
+  nobody could see it. It is not red. Say the weaker true thing.
+- **⚠ It does NOT reproduce outside CI either, and the negative results are the useful part.** Green
+  in isolation; green across the whole `app` suite; and green running the **full** suite
+  (`npx vitest run`, 677 files / 5,683 tests — CI's shape is 680) against a **freshly migrated
+  database created for the probe**. So the two obvious explanations are both dead: it is not a stale
+  local fixture, and it is not the fresh-CI-database difference. Do not spend the hour re-deriving
+  that.
+- **The test is worth hardening regardless of the trigger.** An assertion whose setup can be undone
+  by a persisting side effect of the route under test is fragile by construction. Either seed the
+  derived row the test wants and assert against that, or make the readiness build injectable so the
+  precedence ladder can be exercised one rung at a time.
+
+**② `ci.yml` has no `push: [main]` trigger, so `main` is never verified after a merge.** That is
+deliberate and its reasoning is sound and written down — `main` is protected, only reachable through
+an already-green PR, and re-running costs ~11 billed minutes per merge for a result the PR run
+already produced. **The gap it leaves is the one that bit here:** a PR is green against the `main` it
+was cut from, and nothing re-checks the *combination* after several land together. Five PRs merged
+during this one's CI runs.
+
+So a defect introduced by an interaction between two independently-green PRs would be invisible until
+the next PR merges `main` — where it surfaces as **that** PR's red check, on code its author never
+touched, with every incentive to be read as their own and re-diagnosed from scratch.
+
+**That is not what happened here** — ① turned out to be flaky, and the re-run proved it. The gap is
+still real, but this entry is evidence of the *cost of not being able to tell the two apart*, not of
+a defect on `main`. An hour went into distinguishing "flaky test" from "main is broken", and the only
+reason it took an hour is that there is no signal that would have answered it directly.
+
+- **Options, cheapest first.** A scheduled nightly run of `Tests` on `main` (no `push` trigger, so
+  no per-merge cost, and it names the merge window when something breaks). Or a merge-queue, which
+  is the real fix and much larger. Or accept it and write the symptom down where the next session
+  will look — which is the minimum this entry buys.
+- **Do not resolve this by deleting the reasoning in `ci.yml`.** The no-`push` decision is
+  well-argued; what is missing is anything that verifies `main` at all, and a nightly is not the
+  same thing as the per-merge run that was correctly rejected.
+- **Verification:** whatever ships, the check is that a deliberately broken `main` produces a red
+  signal that names `main`, rather than appearing on the next contributor's PR.
+
 ### [platform] Q-251 — a staging environment, so a migration's first real run is not production
 
 - **Branch:** `feat/staging-environment`
@@ -11932,34 +11976,6 @@ per-field merge where an AI write has no honest source rank to claim.
 - `weekly-recap-banner.tsx` + `/api/weekly-digest` at the owner's "monthly scale" lookback.
   Deliberately last, so the daily version settles the layout first.
 
-### [app-shell][nutrition] LB-23 — three sheets announce their own title twice
-
-- **Branch:** `fix/sheet-title-duplication` · **Lane: B** — `components/**` only.
-- **Added:** 2026-08-27 · Lane B, found while writing Q-112a's E2E spec.
-- **What it is.** Radix requires a `SheetTitle` for the dialog's accessible name, so these sheets
-  render an `sr-only` one *and* a visible `<h2>` carrying the identical string. A screen reader
-  therefore reads the name once as the dialog's, then again as a heading; and
-  `getByRole('heading', { name })` is ambiguous, which is why `e2e/day-review-one-door.spec.ts`
-  matches on `getByRole('dialog')` and says so in a comment pointing here.
-- **The three, swept 2026-08-27** (`grep -rn 'SheetTitle className="sr-only"' components/ app/`):
-  - `components/nutrition/end-of-day/end-of-day-review.tsx:214` / `:218` — "End of Day"
-  - `components/morning-checkin-sheet.tsx:171` / `:175` — "Morning Check-in"
-  - `components/nutrition/food-logger-sheet.tsx:247` / `:249` — `STEP_LABELS[step]`, both sides
-  - `components/nutrition/quick-edit-log-sheet.tsx:118` is **not** a violator — sr-only title, no
-    visible heading. Leave it as it is; it is the shape the others become if the `<h2>` is ever
-    dropped instead.
-- **The fix is one line each:** `<SheetTitle asChild><h2 className="…">…</h2></SheetTitle>` and
-  delete the `sr-only` node. `SheetTitle` is `React.ComponentProps<typeof SheetPrimitive.Title>`, so
-  `asChild` is already in its type — no change to `components/ui/sheet.tsx`. Note `SheetTitle` also
-  applies `text-foreground font-semibold`, which the existing `<h2>` classes must survive being
-  merged with.
-- **Severity is low and stated as such.** Nothing is unreachable and nothing is unlabelled; it is
-  redundancy plus a test-locator hazard. It earns an entry because the E2E comment already names it
-  and because a fourth sheet copying the pattern is the cheapest moment to stop it.
-- **Verification.** No behavioural test to add — assert the count instead: after the change,
-  `page.getByRole('heading', { name: 'End of Day' })` resolves to exactly one node, which is the
-  locator the spec can then go back to using.
-
 ### [workouts][platform] LB-24 — deleting the Home day-review orphaned a chart, a route and a cache group
 
 - **Branch:** `chore/load-comparison-rehome-or-delete` · **Lane: A** — the decision reaches
@@ -13412,29 +13428,6 @@ path and wanting a device check before merging — so this is one entangled piec
 of work, not two. Take the `return 60` fix and the offline weight-resolution
 wiring together, with a device check, rather than building a mirror table nobody
 reads.
-
-### [platform] LB-30 — 46 e2e coordinate reads can be measuring a moving element
-
-- **Lane:** B
-- **Added:** 2026-08-31 · Lane B, from the root cause of BF-39's week-long hold.
-
-A `boundingBox()` taken right after a sheet opens is a position the element is still travelling
-through. `SheetContent` slides in over `duration-500`, and `toBeVisible()` — and `toBeInViewport()`
-— are both satisfied long before it lands. **Measured on the meal library**: the row read y=605,
-and by the time a CDP touch reached it the row sat at y=503, so every point of the gesture hit the
-scroll container beneath it and the drag handler was never invoked once. It reads as a dead gesture,
-not a mis-aimed one, which is why it cost a week: the whole investigation was a render-vs-remount
-question the defect never involved.
-
-`swipeRowLeft` (`e2e/fixtures.ts`) now waits for two reads a frame apart to agree before it
-measures, and the three swipe specs go through it. **What is owed is the same audit for the other
-reads**: 46 `boundingBox()` calls across 27 spec files, of which only the ones feeding a
-`touchscreen.tap`/CDP dispatch are exposed — `locator.tap()` does its own stability check and is
-safe. `openSavedMeal` is the pattern that already survives this by re-measuring inside a `toPass`
-retry; a single measure followed by a coordinate tap is the shape to find.
-
-- **Not urgent**, and deliberately below the feature work: it produces flakes, not wrong behaviour,
-  and every one of them is already failing loudly rather than passing silently.
 
 ### [platform] 🟡 J1 residual — CI-enforced cache/fetch hygiene gates
 

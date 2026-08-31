@@ -12,6 +12,7 @@ import { formatSheetDate, mround125 } from "./utils";
 import { calculate1RM, calc1RM, repMaxFromOneRm, BW_REF, displayOneRm, displayOneRmSeries, isBodyweightType, oneRmUnit } from "@trainingai/shared/1rm";
 import { cachedFetch, readCacheSync } from "@/lib/sqlite/cache";
 import { EXERCISE_HISTORY_TTL } from '@trainingai/shared/cache-ttl';
+import { useExerciseMediaFor } from '@/lib/hooks/use-exercise-media';
 
 interface ExerciseStatsSheetProps {
   exercise: WorkoutExercise | null;
@@ -45,39 +46,30 @@ export function ExerciseStatsSheet({ exercise, isDoneToday, onClose, onRedo }: E
   const [entries, setEntries] = useState<ExerciseHistoryEntry[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
-  const [gifUrl, setGifUrl] = useState<string | null>(null);
-  const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [instructionsOpen, setInstructionsOpen] = useState(false);
+  // Shares `exercise-media:<name>` with the warm-up and ready screens, so re-opening an exercise
+  // the session already showed paints its clip from cache. A media failure raises the same flag the
+  // history one does, which is why `onError` is passed at all.
+  const { media } = useExerciseMediaFor(exercise?.name, { onError: () => setError(true) });
 
+  // History only. The skeleton and the error line below both name the history, and the media now
+  // resolves on its own — folding the gif into this promise made a seeded history wait on a picture.
   useEffect(() => {
-    if (!exercise) { setEntries([]); setGifUrl(null); setImageUrl(null); setError(false); return; }
+    if (!exercise) { setEntries([]); setError(false); return; }
 
-    const controller = new AbortController();
-    // Seed history from cache so re-opening an exercise shows its sets on the
-    // first frame; the gif/image below still resolve over the network.
+    // Seed history from cache so re-opening an exercise shows its sets on the first frame.
     const seeded = readCacheSync<{ entries: ExerciseHistoryEntry[] } | null>(`exercise-history:${exercise.name}`);
     if (seeded?.entries) setEntries(seeded.entries);
     setLoading(!seeded?.entries);
     setError(false);
 
-    Promise.all([
-      cachedFetch<{ entries: ExerciseHistoryEntry[] } | null>(
-        `exercise-history:${exercise.name}`, `/api/exercise-history?name=${encodeURIComponent(exercise.name)}`, EXERCISE_HISTORY_TTL,
-        d => setEntries(d?.entries ?? []),
-      ).catch(() => {
-        setError(true);
-        setEntries([]);
-      }),
-      fetch(`/api/exercise-gif?name=${encodeURIComponent(exercise.name)}`, { signal: controller.signal })
-        .then(r => r.ok ? r.json() : null)
-        .then(d => { setGifUrl(d?.gifUrl ?? null); setImageUrl(d?.imageUrl ?? null); })
-        .catch(err => {
-          if (err instanceof DOMException && err.name === 'AbortError') return;
-          setError(true);
-        }),
-    ]).finally(() => setLoading(false));
-
-    return () => controller.abort();
+    void cachedFetch<{ entries: ExerciseHistoryEntry[] } | null>(
+      `exercise-history:${exercise.name}`, `/api/exercise-history?name=${encodeURIComponent(exercise.name)}`, EXERCISE_HISTORY_TTL,
+      d => setEntries(d?.entries ?? []),
+    ).catch(() => {
+      setError(true);
+      setEntries([]);
+    }).finally(() => setLoading(false));
   }, [exercise?.name]);
 
   if (!exercise) return null;
@@ -170,8 +162,8 @@ export function ExerciseStatsSheet({ exercise, isDoneToday, onClose, onRedo }: E
         <div className="flex-1 overflow-y-auto space-y-3 pb-2">
 
           {/* Exercise media — JPEG loads instantly, GIF replaces it once ready */}
-          {(imageUrl || gifUrl) && (
-            <ExerciseMedia name={exercise.name} gifUrl={gifUrl} imageUrl={imageUrl} />
+          {(media.imageUrl || media.gifUrl) && (
+            <ExerciseMedia name={exercise.name} gifUrl={media.gifUrl} imageUrl={media.imageUrl} />
           )}
 
           {/* 1RM rep targets */}

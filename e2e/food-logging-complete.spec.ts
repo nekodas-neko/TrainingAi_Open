@@ -1,6 +1,6 @@
 import { test, expect, type Page } from '@playwright/test'
 import { Client } from 'pg'
-import { SEED_EMAIL, settleRouteBoundary } from './fixtures'
+import { SEED_EMAIL, settleRouteBoundary, stableBox, tapCentre } from './fixtures'
 
 /**
  * "I've finished logging" marks the day, and the counter says what that bought (Q-387).
@@ -28,8 +28,7 @@ async function tap(page: Page, target: ReturnType<Page['getByRole']>): Promise<v
   // `toBeVisible` does not mean "in the viewport", and this control is the LAST element of a long
   // scroll — without the scroll its box is off-screen and the tap lands on whatever is there.
   await target.scrollIntoViewIfNeeded()
-  const box = (await target.boundingBox())!
-  await page.touchscreen.tap(box.x + box.width / 2, box.y + box.height / 2)
+  await tapCentre(page, target)
 }
 
 async function withDb<T>(fn: (db: Client) => Promise<T>): Promise<T> {
@@ -84,7 +83,7 @@ test('marking the day complete writes the flag, and undo clears it', async ({ pa
   const mark = page.getByRole('button', { name: /finished logging/i })
   await expect(mark).toBeVisible({ timeout: 30_000 })
   // 48dp floor — this is a primary action at the end of a long scroll on a 6.9" screen.
-  const box = (await mark.boundingBox())!
+  const box = await stableBox(mark)
   expect(box.height).toBeGreaterThanOrEqual(48)
 
   await tap(page, mark)

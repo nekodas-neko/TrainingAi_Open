@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useMemo } from "react";
 import { ChevronLeftIcon, DumbbellIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Image from "next/image";
@@ -8,6 +8,7 @@ import { MuscleHeatmap, type MuscleActivation } from "@/components/muscle-heatma
 import type { WorkoutExercise } from "@/app/api/workout-data/route";
 import { formatTime } from "./utils";
 import { useElapsedSec } from "./session-clock";
+import { useExerciseMedia } from "@/lib/hooks/use-exercise-media";
 
 // Fallback only — used until the session's budget is known (`workout-data` has not landed yet).
 // The real goal is computed from the session budget by `warmupGoalSecFor` in workout-screen.tsx,
@@ -28,28 +29,10 @@ interface WarmupScreenProps {
 
 export function WarmupScreen({ sessionType, exercises, workoutStartMs, warmupGoalSec, onBeginExercises, onBack }: WarmupScreenProps) {
   const sessionElapsedSec = useElapsedSec(workoutStartMs);
-  const [exerciseMedia, setExerciseMedia] = useState<Record<string, { gif: string | null; img: string | null }>>({});
-  const fetchedRef = useRef(false);
-
-  useEffect(() => {
-    if (fetchedRef.current || exercises.length === 0) return;
-    fetchedRef.current = true;
-    Promise.all(
-      exercises.map(ex =>
-        fetch(`/api/exercise-gif?name=${encodeURIComponent(ex.name)}`)
-          .then(r => r.ok ? r.json() : null)
-          .then(d => {
-            // Prefetch binaries so the service worker caches them for offline use
-            if (d?.gifUrl) fetch(d.gifUrl).catch(() => null);
-            if (d?.imageUrl) fetch(d.imageUrl).catch(() => null);
-            return [ex.name, { gif: d?.gifUrl ?? null, img: d?.imageUrl ?? null }] as [string, { gif: string | null; img: string | null }];
-          })
-          .catch(() => [ex.name, { gif: null, img: null }] as [string, { gif: string | null; img: string | null }])
-      )
-    ).then(pairs => {
-      setExerciseMedia(Object.fromEntries(pairs));
-    });
-  }, [exercises]);
+  const exerciseNames = useMemo(() => exercises.map(ex => ex.name), [exercises]);
+  // `prefetchBinaries` is what pulls the clips into the service worker for the whole session, and
+  // it is why the per-exercise ready screen still plays them in airplane mode.
+  const { media: exerciseMedia } = useExerciseMedia(exerciseNames, { prefetchBinaries: true });
 
   // Stable identity so the memoized MuscleHeatmap doesn't re-render on every 1Hz
   // session-clock tick (PERF-2) — this array previously was rebuilt fresh each render.
@@ -157,7 +140,7 @@ export function WarmupScreen({ sessionType, exercises, workoutStartMs, warmupGoa
             </p>
             {exercises.map((ex, idx) => {
               const media = exerciseMedia[ex.name];
-              const thumbSrc = media?.gif ?? media?.img ?? null;
+              const thumbSrc = media?.gifUrl ?? media?.imageUrl ?? null;
               return (
                 <div
                   key={`${ex.name}-${idx}`}

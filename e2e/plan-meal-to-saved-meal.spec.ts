@@ -1,6 +1,6 @@
 import { test, expect, type Page } from '@playwright/test'
 import { Client } from 'pg'
-import { SEED_EMAIL, settleRouteBoundary } from './fixtures'
+import { SEED_EMAIL, settleRouteBoundary, tapCentre } from './fixtures'
 
 /**
  * A planned meal becomes an ordinary saved meal, once (Q-398).
@@ -133,8 +133,7 @@ async function tap(page: Page, name: RegExp | string) {
   const target = page.getByRole('button', { name })
   await expect(target).toBeVisible({ timeout: 30_000 })
   await target.evaluate(el => el.scrollIntoView({ block: 'center' }))
-  const box = (await target.boundingBox())!
-  await page.touchscreen.tap(box.x + box.width / 2, box.y + box.height / 2)
+  await tapCentre(page, target)
 }
 
 async function openPlanMeals(page: Page) {
@@ -193,8 +192,7 @@ test('the copy is tagged in My Meals as coming from the plan', async ({ page }) 
   await expect(library).toBeVisible({ timeout: 60_000 })
   await expect(async () => {
     if (await page.getByRole('dialog').count() === 0) {
-      const box = (await library.boundingBox())!
-      await page.touchscreen.tap(box.x + box.width / 2, box.y + box.height / 2)
+      await tapCentre(page, library)
     }
     await expect(page.getByText(NAME_A)).toBeVisible({ timeout: 5_000 })
   }).toPass({ timeout: 60_000 })

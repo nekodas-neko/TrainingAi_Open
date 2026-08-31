@@ -1,6 +1,6 @@
 import { test, expect, type Page, type Locator } from '@playwright/test'
 import { Client } from 'pg'
-import { SEED_EMAIL, settleRouteBoundary, swipeRowLeft } from './fixtures'
+import { SEED_EMAIL, settleRouteBoundary, stableBox, swipeRowLeft, tapCentre } from './fixtures'
 
 /**
  * A logged food swipes left to a Delete that lands on the confirmation (BF-45 ⑤).
@@ -113,8 +113,7 @@ async function tapAt(page: Page, target: Locator) {
   // coordinate tap lands on a nav icon and switches tab — which looks exactly like a dead control.
   await target.evaluate(el => el.scrollIntoView({ block: 'center' }))
   await page.waitForTimeout(250)
-  const box = (await target.boundingBox())!
-  await page.touchscreen.tap(box.x + box.width / 2, box.y + box.height / 2)
+  await tapCentre(page, target)
 }
 
 /**
@@ -190,7 +189,7 @@ test('the first tap on Delete opens the confirmation, even mid-animation', async
   // Deep inside the tray, not at its centre: the row uncovers the tray right-edge first, so a point
   // 52 px in stays under the row for most of the slide while a point 32 px in is clear almost at
   // once. One action, `ACTION_WIDTH` = 64, pinned right — see `swipe-actions-math.ts`.
-  const after = (await row.boundingBox())!
+  const after = await stableBox(row)
   await page.touchscreen.tap(box.x + box.width - 52, after.y + after.height / 2)
 
   await expect(
