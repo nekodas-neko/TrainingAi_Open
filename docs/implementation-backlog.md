@@ -422,6 +422,28 @@ sex — right on the page.
 
 ### [readiness][devices] BF-81 — two producers write the daytime-stress metric and they disagree on every day measured
 
+> **⚑ THE DIVERGENCE IS FIXED 2026-08-31. What remains is one owner decision and one finding.**
+> The rollup now writes the three scalars from the SAME points it writes the buckets from, and
+> `/api/body-battery` no longer persists a second answer (it still computes one for its own
+> response). `scripts/check-stress-scalars-one-writer.js` fails CI on a second persister **and** on
+> the rollup losing its write — the second case matters because the entry's own recommendation, a
+> bare deletion, would have left all three columns with no writer at all and `weekly-digest` reads
+> `stressHighMinutes`. Re-measured before fixing: **6 of 8** days disagreed on sign, not 5.
+>
+> - **Keep — the history recompute is the owner's call, and the entry's version would make it
+>   worse.** 38 rows carry `daytime_stress_scaled`; only **8** of them have buckets to re-derive
+>   from. Recomputing those 8 leaves 30 rows on the old producer, so the column would be *more*
+>   mixed, not less. Doing it properly means a wide rollup pass re-deriving buckets from the packed
+>   raw tier for all 38 days first — which is the owner/device-gated pass below. **Nothing was
+>   recomputed**: overwriting stored history is irreversible and was not authorised.
+> - **Keep — `chronic_stress_score` is NULL on all 106 rows, and it is the documented gate, not a
+>   data problem.** `run.ts` says so outright: the intermediate history is built from *that pass's*
+>   stashed signals, so the first score needs a wide pass covering ≥21 nights of real ring data,
+>   which is owner/device-gated. That answers the question this entry asked; no code fix applies.
+> - **Keep — `resilience_daily_stress` on 15 of 106 rows.** Sparse rather than absent. Not
+>   investigated here.
+
+
 - **Lane:** A — `lib/oura-ble/rollup/run.ts` and `app/api/body-battery/route.ts`.
 - **Added:** 2026-08-31 · owner: *"what is happening with our stress indicator? Is this working? What
   are the issues… what is different from our records vs our calculated model."* Measured in

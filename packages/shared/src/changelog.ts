@@ -6,6 +6,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.413.2",
+    date: "2026-08-31",
+    changes: [
+      "The daytime stress strip and the stress number beside it are now the same calculation. They were two, and they disagreed about whether the day was stressful at all on six of the last eight days.",
+      "Days already recorded keep their old numbers for now — correcting them needs a full re-read of the ring's stored history, which is a separate decision.",
+    ],
+  },
+  {
     version: "1.413.1",
     date: "2026-08-31",
     changes: [

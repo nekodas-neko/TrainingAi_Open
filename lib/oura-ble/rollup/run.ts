@@ -3,6 +3,7 @@ import { measuredAtMs, decodeEventBody, hexToBytes } from '@/lib/oura-ble/decode
 import { resolveDsToMs, currentEpoch } from '@/lib/oura-ble/clock'
 import { spo2PctFromR } from '@/lib/oura-ble/spo2'
 import { STEP_FEATURE_TAGS, STEP_MOTION_TAG } from '@/lib/oura-ble/rollup-consumed-tags'
+import { summarizeStressDay } from '@/lib/health/daytime-stress'
 import { computeStepsByDay } from '@/lib/oura-ble/step-day-buckets'
 import { phasesToPhase5Min, stagesToPhase5Min, type SleepStage } from '@trainingai/shared/health/hypnogram'
 import { stageSleepDetailed, summarizeSleepStages, refineOnsetLatencySec, EPOCH_MIN, type SleepEpoch, type OnsetSample } from '@trainingai/shared/health/sleep-staging'
@@ -1026,6 +1027,12 @@ export async function runOuraRollup(
         // silent re-anchor to Oura's opinion. `buildDaytimeStressSeries` (ONNX) stays golden-
         // tested and importable, just unreachable from this production path until D7.
         let series: { tMs: number; level: number }[] = []
+        // BF-81. The three daily scalars are summarised from the SAME points as the buckets, so one
+        // series answers both. `/api/body-battery` used to persist them from a series of its own
+        // (built off `restingHr` + a 28-day HRV mean rather than `latest.rhrLowBpm` + `nightHrvMs`),
+        // which put two numbers behind one metric: measured in production, the sign disagreed on
+        // **6 of 8** days and high-stress minutes by 4–8×.
+        let stressSummary: ReturnType<typeof summarizeStressDay> = null
         if (dhrvModel && nightHrvMs != null && nightHrvMs > 0 && latest.rhrLowBpm != null && latest.rhrLowBpm > 0 && tempBaseline != null && tempBaseline > 0) {
           const baselines: DhrvBaselines = { dhrvBaseline: nightHrvMs, hrBaseline: latest.rhrLowBpm, tempBaseline }
           const pts = buildDaytimeStressSeriesFromModel(
@@ -1035,6 +1042,7 @@ export async function runOuraRollup(
             dhrvModel, baselines, dayStartMs, dayEndMs,
           )
           series = pts.map(p => ({ tMs: p.t, level: p.stressLevel }))
+          stressSummary = summarizeStressDay(pts)
         }
 
         // TN-3a — persist the buckets. `summarizeStressDay` reduces this series to three daily
@@ -1053,6 +1061,16 @@ export async function runOuraRollup(
         // below it, which are what the user actually sees.
         try {
           await io.replaceStressBuckets(day, series.map(p => ({ bucketStart: new Date(p.tMs), level: p.level })))
+          // Deleting the route's write without adding this one would have left the three columns
+          // with no writer at all — the rollup only ever persisted the buckets — and
+          // `weekly-digest` reads `stressHighMinutes`.
+          if (stressSummary) {
+            await io.upsertDailyDerived(day, {
+              daytimeStressScaled: stressSummary.daytimeStressScaled,
+              stressHighMinutes: stressSummary.stressHighMinutes,
+              recoveryHighMinutes: stressSummary.recoveryHighMinutes,
+            })
+          }
         } catch (err) {
           console.error(`[rollup] stress bucket write failed for ${day}, continuing:`, err)
         }

@@ -344,14 +344,13 @@ async function buildBodyBattery(userId: string, tz: string) {
   // run. Under the home/health load burst this route's response returning promptly is what keeps it
   // off the 499 path; the writes settle in the background (Railway is a long-lived Node server).
   // Both carry a .catch so an unawaited rejection can't surface as an unhandledRejection.
-  if (stressSummary) {
-    // Persist today's stress summary (completed-form, review S5).
-    repo.upsertOuraDailyDerived(userId, todayIso, {
-      daytimeStressScaled: stressSummary.daytimeStressScaled,
-      stressHighMinutes: stressSummary.stressHighMinutes,
-      recoveryHighMinutes: stressSummary.recoveryHighMinutes,
-    }).catch(err => console.error('[body-battery] stress persist failed (read still served):', String(err).slice(0, 200)))
-  }
+  // BF-81. This route still COMPUTES a stress summary for today's response — that is what the strip
+  // and the number are drawn from on a live read — but it no longer PERSISTS one. Its series is
+  // built from `restingHr` + a 28-day HRV mean; the rollup's from `latest.rhrLowBpm` + `nightHrvMs`.
+  // Storing both put two numbers behind one metric, and they disagreed: measured in production over
+  // the eight days that had both, the sign differed on **6** and high-stress minutes by 4–8×.
+  // The rollup owns persistence because it is the only path that can re-derive history from the
+  // packed raw tier, so a wide pass fills the past instead of starting from today.
 
   // Write-through daily snapshot (for model tuning — see docs/body-battery-tuning.md). Every read
   // updates today's row, so the last read of the day captures the end-of-day value.
