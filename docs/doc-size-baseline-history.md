@@ -4253,12 +4253,18 @@ double-count risk; and the "like a total calorie value" analogy needs adjusting,
 sum across substances — what transfers is the shape (one number per substance per day), not the
 total.
 
-## 2026-08-31 — `docs/implementation-backlog.md` 13784 → **13762** (LA-43 ships)
+## 2026-08-31 — `docs/implementation-backlog.md` 13784 → 13762 → **13812** on the merge (LA-43 ships)
 
 The queue gives back the twenty-three lines it took this morning: LA-43's entry is removed on
 shipping, which is the protocol working rather than a compaction. **The baseline is lowered rather
 than left with the headroom**, because unclaimed headroom is exactly how the next entry gets added
 for free and the ratchet stops ratcheting.
+
+**Re-derived once more on the merge**: another PR raised the same number to 13834 while this was
+open, so the lowered figure and the raised one had to be reconciled against the merged file rather
+than either side — 13812, which is the raise minus this branch's 22-line removal. A lowered baseline
+conflicts with every concurrent raise by construction; that is the ratchet working, not friction to
+avoid.
 
 BF-67's `Needs: LA-43` bullet is rewritten rather than deleted. An absent target counts as shipped,
 so the pointer would have cleared on its own — but the plan it links to reasons about a hole that is
@@ -4329,3 +4335,18 @@ sync rules to be remembered.
 
 The two collisions stay in the entry, marked resolved, as the checklist a reviewer runs the
 implementation against.
+## 2026-08-31 — `docs/implementation-backlog.md` (BF-70, a picture dropped three times)
+
+The owner reported one missing thumbnail. Tracing it found the image is fetched successfully and
+discarded at three separate layers — the form model has no field for it, the entry contract has no
+field for it, and the local write hardcodes `imageDataUri: null`. Each is listed with its file and
+line because fixing any one of them changes nothing, which is the fact that decides how the work is
+scoped.
+
+The second finding came free and explains a number already in the backlog: `handleConfirm` stamps
+`source: 'ai'` whenever the scan carries a confidence, and a barcode scan does — which is why BF-38
+measured 3 rows with `source = 'barcode'` out of 221. Same line, so the two entries are batched
+rather than left to conflict.
+
+Also note the batch checker earned its keep here: `nutrition-ui-uplift` is Lane B and BF-70 is Lane
+A, and it refused the mix rather than letting a batch become a PR that cannot ship as one.
