@@ -4338,6 +4338,31 @@ The rest are cheap tests that stop a false alarm: check the **spread** before be
 have collapsed (they normally sit 20 points apart), and **reproduce readiness from its stored
 contributors** before calling it wrong (2026-08-31 came to 55.3 against a stored 55).
 
+## 2026-08-31 — `docs/implementation-backlog.md` 13812 → 13845 → **14007** on the merge (BF-2 gets its plan, and LA-44 is filed)
+
+Thirty-three lines net, and the whole of it is **LA-44** — two shipped engines (`dexa_scans`,
+`measured_rmr`) with no entry surface, both tables empty in production, discovered while re-verifying
+BF-2's premises. A finding that stayed in the plan instead of the queue would be a dropped finding,
+so this is the mechanism working rather than drift.
+
+**BF-2's own block paid for more than half of it, and every cut was material that had gone stale
+rather than material that was long.** The pre-scan instruction block (*"⏰ THE SCAN IS 2026-08-27, AND
+ONE THING MUST HAPPEN ON THE DAY"*) is entirely in the past — it happened, and the pair is confirmed
+in production — so it is replaced by the one line still true of it: a future scan needs a same-day
+weigh-in booked with it. The *"still needs a planning session"* line is superseded by the plan
+existing. And the offset-vs-ratio argument was stated **three** times over — banner, bullet, trap —
+which was right while it was open and is noise now the plan settles it; one statement is kept and the
+other two point at §2.3.
+
+**Re-derived on the merge**, as every raise on this file has been today — another PR had taken it to
+13974 while this was open, so the merged figure is that plus this branch's net. Counting the merged
+document is the only resolution that is true of it; picking a side would silently drop one PR's work.
+
+**What was NOT compacted is LA-44's own body.** It has to carry the measurement (0 rows in each
+table, and a grep that finds no client caller), the reason an engine-first split hides this class of
+gap, and the `bytea` decision it must not quietly reverse — a shorter version reads as a UI nit
+rather than as two working engines nothing can feed.
+
 ## 2026-08-31 — `docs/implementation-backlog.md` 13784 → 13762 → **13812** on the merge (LA-43 ships)
 
 The queue gives back the twenty-three lines it took this morning: LA-43's entry is removed on
