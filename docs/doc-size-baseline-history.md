@@ -5018,3 +5018,15 @@ photo and URL produce a whole ingredient list while the barcode and the estimate
 ingredient, and a barcode under *"start this meal from"* promises something it cannot do. **An
 instruction that is quietly not followed is worse than one that is argued with in writing**, which is
 why the strike-through and the reason live in the entry.
+
+## 2026-08-31 — `projectOverview.md` 8519 → 8526, `docs/implementation-backlog.md` 14464 → 14442 (BF-52)
+
+**The backlog shrank again** — BF-52's 46-line work order became a 25-line `Keep:` once the surface
+shipped. What survives is the device check that is genuinely owed, the instruction the plan declined
+(so nobody re-adds the barcode believing it was an oversight), and the two things found while
+building: the URL branch is a **guard** rather than a convenience, and `runRecipeImport` became
+testable only because two callers forced it out of a component.
+
+**`projectOverview.md` goes up 7**, which is one paragraph for a shipped user-visible change. Nothing
+was compacted to pay for it this time; the two BF-57 paragraphs were already merged earlier today and
+there is no other slack in that section that is not load-bearing.

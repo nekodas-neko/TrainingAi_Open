@@ -2769,51 +2769,29 @@ the match. `Gate: owner` when it is next picked up.
   and *first* confirm a non-null `barcode` actually lands in the column, per the external-field rule:
   a wrong or missing field reads as `undefined` and fails silently.
 
-### [nutrition] BF-52 — one AI meal builder: type it, photograph it, or paste a URL, from a single entry point
+### [nutrition] BF-52 — one AI meal builder entry point (shipped; the label wrap needs the device)
 
-- **Lane:** B for the surface; the routes exist.
-- **Plan:** [`2026-08-31-ai-meal-builder-entry-point.md`](superpowers/plans/2026-08-31-ai-meal-builder-entry-point.md)
-  — **written 2026-08-31, so the planning half is DONE and what remains is the build.** It carries the
-  inventory, one correction, and **one instruction from this entry that it declines with a reason**
-  (see the BF-63 bullet below).
-- **Added:** 2026-08-30 · owner, device pass N5: *"I dont see a URL option or does it just go into
-  the add ingredients? Id rather it just be an 'AI Meal builder' option; similar to the food logging
-  where you can write/type to it - or upload a photo; or upload a URL link etc."*
-- **Planning item** — this is a surface design, not a defect. It needs a planning session before
-  implementation.
-
-**Every input already works; none of them is findable.** Recipe-URL import is implemented and lives
-inside the ingredient *search* field (`ingredient-picker.tsx` → `importRecipe`), which is why the
-owner could not find a URL option — it is not presented as one. The photo path shipped as BF-40.
-Free-text description is the scan route's text branch.
-
-- **⚠ SHARPENED by the plan, 2026-08-31.** The photo and URL affordances are not two separate
-  discoverability problems — they are **mutually exclusive renders of the SAME slot**, chosen by what
-  is typed into a field whose placeholder says *"Search your foods or the food database…"*: empty →
-  the recipe-photo button, a URL → the import button, ≥2 characters → the estimate. So the field
-  advertises search and behaves as a mode switch, and making either input findable means taking both
-  out of that slot. Also measured: **`/api/nutrition/scan` already accepts all three shapes in one
-  handler** (`body.image`+`mimeType`, `body.url`, `body.text`), so this really is an entry point and
-  nothing else.
-
-**So the ask is an entry point, not an engine.** Mirror Log Food's own capture row — the user has just
-learned `Photo · Barcode · Describe or enter` one screen away, and a meal builder offering
-`Photo · URL · Describe` reads as the same idea rather than a new one. **Recommendation: do not build
-new extraction**; route all three at the existing `/api/nutrition/scan` shapes and let the builder
-render what comes back.
-
-- **BF-63 is the per-ingredient half and is being built without waiting on this.** It puts a barcode
-  scan on the ingredient search, which is a defect fix rather than a design. ~~When this row is
-  designed, absorb that button into it~~ — **the plan DECLINES this, 2026-08-31.** The four inputs are
-  not four of a kind: photo and URL produce a **whole ingredient list**, while the estimate and the
-  barcode produce **one ingredient**. A barcode inside a row headed *"start this meal from"* promises
-  it can build a meal from a packet, which it cannot. Split by granularity instead — the capture row
-  above the search, the barcode beside it, where BF-63 already put it.
-- **Carry BF-40's earned constraint:** a recipe page that states no yield hands up `recipeYield: null`
-  rather than defaulting to 1 — the banana-bread four-fold error. Any new entry point must preserve
-  that, and the amber "set how many portions" line with it.
-- **Verification:** each of the three inputs reaches the builder with the same populated ingredient
-  list it produces today, and the yield behaviour is unchanged.
+- **Lane:** B
+- **Gate:** device
+- **Shipped 2026-08-31**, branch `feat/meal-builder-entry-point-bf52`, following its own plan
+  [`2026-08-31-ai-meal-builder-entry-point.md`](superpowers/plans/2026-08-31-ai-meal-builder-entry-point.md).
+  Journal: [`2026-08-31-meal-builder-entry-point.md`](overview/entries/2026-08-31-meal-builder-entry-point.md).
+  A `Recipe photo · Recipe link · Describe it` row sits in the builder **above** the collapsed
+  ingredient picker — the old affordances lived inside a search field you had to open first.
+- **The plan declined this entry's instruction to absorb BF-63's barcode**, and shipped that way:
+  these three produce a whole ingredient list, a barcode names one product. It stays on the search.
+- **Two things found while building it.** The URL branch in the search slot **stays**, and not for
+  convenience — without it a pasted link falls through to the AI estimate, which turns a URL into a
+  food called "https" with invented macros. It is a guard. And `runRecipeImport` came out of
+  `ingredient-picker.tsx` so two callers could share it, which made the multi-candidate branch, the
+  serial minting, the 0.01 floor and the `recipeYield` refusal **testable for the first time** —
+  they were defended by prose alone, because exercising them meant rendering a component and neither
+  vitest project runs a DOM.
+- **Keep:** the S25 check, and only that. *"Describe or enter"*-length labels wrap to two lines in a
+  third of 412 dp; the tiles are padding-driven so they grow rather than clip, but whether three
+  tiles plus their expanded input read well on the phone is a judgement the sandbox cannot make.
+  Also confirm the recipe-photo picker still reaches the gallery (Capacitor `CameraSource.Prompt`)
+  now that it draws as a tile — the picking code is unchanged, the chrome around it is not.
 
 ### [nutrition][platform] BF-77 — sharing meals with a partner: copies work today, a shared library is a different product
 

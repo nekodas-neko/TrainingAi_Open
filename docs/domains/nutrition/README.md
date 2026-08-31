@@ -136,6 +136,12 @@ fallback) are what every offline-first domain should copy. See CLAUDE.md, "Offli
   (`image`+`mimeType`, `url`, `text`) in one handler, so the fix is an entry point and not an engine.
   The plan **declines** BF-52's instruction to absorb BF-63's barcode into the new row, and says why:
   photo and URL produce a whole ingredient list, the barcode and the estimate produce one ingredient.
+- [`docs/overview/entries/2026-08-31-meal-builder-entry-point.md`](../../overview/entries/2026-08-31-meal-builder-entry-point.md)
+  — **BF-52 shipped: the builder's source row.** Two findings bind future work here. The URL branch in
+  `ingredient-search.tsx` is a **guard**, not just an affordance — delete it and a pasted link falls to
+  the AI estimate, which produces a food called "https" with invented macros. And `runRecipeImport`
+  now lives in `recipe-import-run.ts` with tests: the `recipeYield` refusal, the multi-candidate
+  branch and the 0.01 floor were prose-only until two callers forced the extraction.
 - No standalone system reference exists for this pillar yet; the offline-first section of
   [`CLAUDE.md`](../../../CLAUDE.md) and [`docs/module-map.md`](../../module-map.md) §3 carry the
   load-bearing rules.

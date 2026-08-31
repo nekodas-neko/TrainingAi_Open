@@ -108,10 +108,14 @@ test.afterAll(async () => {
   })
 })
 
-test('a saved meal renders a printable label in every style', async ({ page }) => {
-  const errors: string[] = []
-  page.on('console', m => { if (m.type() === 'error') errors.push(m.text()) })
-  page.on('pageerror', e => errors.push(String(e)))
+/**
+ * Open the label sheet for the fixture meal and hand back its canvas.
+ *
+ * **Extracted when this test was split** (BF-52's PR, repairing BF-57's). It was inline in one test
+ * that grew past its own 180 s timeout; two tests need it twice, and the navigation is the part with
+ * all the earned retries in it.
+ */
+async function openLabelSheet(page: import('@playwright/test').Page) {
   await page.goto('/nutrition')
   await settleRouteBoundary(page)
 
@@ -144,9 +148,102 @@ test('a saved meal renders a printable label in every style', async ({ page }) =
   }).toPass({ timeout: 90_000 })
 
   await labelButton.tap()
-
   const canvas = page.getByRole('img', { name: `Printable label for ${MEAL_NAME}` })
   await expect(canvas).toBeVisible({ timeout: 30_000 })
+  return canvas
+}
+
+/** The canvas pixels, for `decodeQr`. */
+async function shotOf(canvas: import('@playwright/test').Locator) {
+  return canvas.evaluate((el: HTMLCanvasElement) => {
+    const ctx = el.getContext('2d')!
+    const d = ctx.getImageData(0, 0, el.width, el.height)
+    return { w: el.width, h: el.height, data: Array.from(d.data) }
+  })
+}
+
+/**
+ * The style picker's two settle signals, and the switch that uses both.
+ *
+ * **Lifted to module scope when this test was split.** The single test that owned them grew past its
+ * own 180 s timeout — it paints seven styles and decodes five — so the share-code half became its
+ * own test, and both halves need this.
+ */
+function makeStyleTools(page: import('@playwright/test').Page, canvas: import('@playwright/test').Locator) {
+const inkFraction = async () => canvas.evaluate((el: HTMLCanvasElement) => {
+  const ctx = el.getContext('2d')!
+  const { data } = ctx.getImageData(0, 0, el.width, el.height)
+  let dark = 0
+  for (let i = 0; i < data.length; i += 4) if (data[i] < 128) dark++
+  return dark / (data.length / 4)
+})
+
+/**
+ * Switch to a style and wait until the canvas is actually showing IT (LB-19).
+ *
+ * **`inkFraction > 0.01` could not do this, and that is the whole bug.** The canvas already
+ * carries the previous style's ink when the radio is clicked, so the condition is true before
+ * anything repaints — a precondition satisfied by the state it is meant to replace cannot fail.
+ * The read then lands mid-repaint and the decode below returns null, intermittently, more often
+ * under file-level load.
+ *
+ * Two signals, because one is not enough:
+ *
+ * **The `mm` line changes with the style**, and it is derived from the style rather than from the
+ * paint, so it says the sheet has switched. Measured 2026-08-30, all six distinct — centred 18.5,
+ * black band 16.4, editorial 16.9, deli 17.7, plaque 20.9, big code 20.1.
+ * **Then the ink settles**, which is the only thing that can say the CANVAS is finished: the
+ * sheet's text can update a frame before the draw, and a repaint passes through a cleared canvas,
+ * so "ink changed" on its own can fire on a blank one.
+ *
+ * **Canvas dimensions were the other candidate and they are not usable** — probed the same day,
+ * every style renders 1179×1179. Recorded so nobody re-measures it.
+ */
+const styleFigure = () => page.getByText(/mm at \d+×\d+ modules/).first().textContent()
+
+/** Two identical consecutive reads with ink on them. Settled, not merely non-zero: a repaint
+ *  clears the canvas first, so a single sample can catch it empty. */
+async function waitForSettledInk(style: string) {
+  let previous = -1
+  await expect
+    .poll(async () => {
+      const now = await inkFraction()
+      const settled = now > 0.01 && Math.abs(now - previous) < 1e-9
+      previous = now
+      return settled
+    }, { message: `${style}'s canvas should settle with ink on it`, timeout: 20_000, intervals: [150] })
+    .toBe(true)
+}
+
+async function selectStyle(style: string) {
+  const radio = page.getByRole('radio', { name: new RegExp(escapeRe(style), 'i') })
+  // Already showing — the style was selected before the loop, or the loops overlap at their
+  // edges. Still wait for the paint: skipping the check here is how the first iteration of a
+  // loop ends up asserting nothing.
+  if (await radio.getAttribute('aria-checked') === 'true') return waitForSettledInk(style)
+
+  const figureBefore = (await styleFigure())?.trim()
+  await radio.click()
+
+  await expect
+    .poll(async () => (await styleFigure())?.trim(), {
+      message: `${style} should report its own code size — if it matches the previous style's `
+        + `(${figureBefore}), this signal cannot tell the two apart and the gate is blind again`,
+      timeout: 20_000,
+    })
+    .not.toBe(figureBefore)
+
+  await waitForSettledInk(style)
+}
+
+  return { selectStyle, waitForSettledInk, styleFigure, inkFraction }
+}
+
+test('a saved meal renders a printable label in every style', async ({ page }) => {
+  const errors: string[] = []
+  page.on('console', m => { if (m.type() === 'error') errors.push(m.text()) })
+  page.on('pageerror', e => errors.push(String(e)))
+  const canvas = await openLabelSheet(page)
 
   // Select the style explicitly rather than trusting what the sheet opens on: since Q-400 the pick
   // is remembered in `localStorage`, so "the default" is only what a browser that has never chosen
@@ -157,77 +254,9 @@ test('a saved meal renders a printable label in every style', async ({ page }) =
   await expect(page.getByText(/mm at 25×25 modules/), `console: ${errors.join(' | ')}`).toBeVisible()
 
   /** Is the canvas actually painted? A blank one is white everywhere; a drawn label has ink. */
-  const inkFraction = async () => canvas.evaluate((el: HTMLCanvasElement) => {
-    const ctx = el.getContext('2d')!
-    const { data } = ctx.getImageData(0, 0, el.width, el.height)
-    let dark = 0
-    for (let i = 0; i < data.length; i += 4) if (data[i] < 128) dark++
-    return dark / (data.length / 4)
-  })
+  const { selectStyle } = makeStyleTools(page, canvas)
 
-  /**
-   * Switch to a style and wait until the canvas is actually showing IT (LB-19).
-   *
-   * **`inkFraction > 0.01` could not do this, and that is the whole bug.** The canvas already
-   * carries the previous style's ink when the radio is clicked, so the condition is true before
-   * anything repaints — a precondition satisfied by the state it is meant to replace cannot fail.
-   * The read then lands mid-repaint and the decode below returns null, intermittently, more often
-   * under file-level load.
-   *
-   * Two signals, because one is not enough:
-   *
-   * **The `mm` line changes with the style**, and it is derived from the style rather than from the
-   * paint, so it says the sheet has switched. Measured 2026-08-30, all six distinct — centred 18.5,
-   * black band 16.4, editorial 16.9, deli 17.7, plaque 20.9, big code 20.1.
-   * **Then the ink settles**, which is the only thing that can say the CANVAS is finished: the
-   * sheet's text can update a frame before the draw, and a repaint passes through a cleared canvas,
-   * so "ink changed" on its own can fire on a blank one.
-   *
-   * **Canvas dimensions were the other candidate and they are not usable** — probed the same day,
-   * every style renders 1179×1179. Recorded so nobody re-measures it.
-   */
-  const styleFigure = () => page.getByText(/mm at \d+×\d+ modules/).first().textContent()
-
-  /** Two identical consecutive reads with ink on them. Settled, not merely non-zero: a repaint
-   *  clears the canvas first, so a single sample can catch it empty. */
-  async function waitForSettledInk(style: string) {
-    let previous = -1
-    await expect
-      .poll(async () => {
-        const now = await inkFraction()
-        const settled = now > 0.01 && Math.abs(now - previous) < 1e-9
-        previous = now
-        return settled
-      }, { message: `${style}'s canvas should settle with ink on it`, timeout: 20_000, intervals: [150] })
-      .toBe(true)
-  }
-
-  async function selectStyle(style: string) {
-    const radio = page.getByRole('radio', { name: new RegExp(escapeRe(style), 'i') })
-    // Already showing — the style was selected before the loop, or the loops overlap at their
-    // edges. Still wait for the paint: skipping the check here is how the first iteration of a
-    // loop ends up asserting nothing.
-    if (await radio.getAttribute('aria-checked') === 'true') return waitForSettledInk(style)
-
-    const figureBefore = (await styleFigure())?.trim()
-    await radio.click()
-
-    await expect
-      .poll(async () => (await styleFigure())?.trim(), {
-        message: `${style} should report its own code size — if it matches the previous style's `
-          + `(${figureBefore}), this signal cannot tell the two apart and the gate is blind again`,
-        timeout: 20_000,
-      })
-      .not.toBe(figureBefore)
-
-    await waitForSettledInk(style)
-  }
-
-  // Every style must paint. Black band is the default and is checked first because it is also the
-  // one whose code is tightest, so a regression there matters most. "Square" is Q-393's ingredient
-  // layout, which takes a different draw path entirely — it would be the easiest one to break
-  // silently, since it is the only style that renders from a second data source.
-  for (const style of ['Ingredients · centred', 'Black band', 'Editorial', 'Deli ticket', 'Plaque', 'Big code', 'Share code']) {
+  for (const style of ['Ingredients · centred', 'Black band', 'Editorial', 'Deli ticket', 'Plaque', 'Big code']) {
     await selectStyle(style)
   }
 
@@ -241,78 +270,10 @@ test('a saved meal renders a printable label in every style', async ({ page }) =
   for (const style of ['Ingredients · centred', 'Black band', 'Plaque', 'Big code']) {
     await selectStyle(style)
 
-    const shot = await canvas.evaluate((el: HTMLCanvasElement) => {
-      const ctx = el.getContext('2d')!
-      const d = ctx.getImageData(0, 0, el.width, el.height)
-      return { w: el.width, h: el.height, data: Array.from(d.data) }
-    })
-
-    const text = decodeQr(shot)
+    const text = decodeQr(await shotOf(canvas))
     expect(text, `${style}'s code must decode off the rendered label`).toBeTruthy()
     expect(text, `${style}'s code must resolve to this meal`).toBe(expectedToken)
   }
-
-  /**
-   * **BF-57 — the label a stranger can use.** Everything above proves the code resolves to THIS
-   * meal for the person who printed it. That is a private bookmark: another account's scan of it
-   * finds nothing, which is exactly why a shared label needed a different payload.
-   *
-   * This decodes the `share` style's code back into a meal and checks the numbers, through the real
-   * renderer and a real QR decode. The fixture is eight ingredients against a 251-byte budget, so it
-   * takes the ROLLED path — five named plus one remainder — and the assertion that matters is that
-   * the totals still add up to the recipe **exactly**. That is the guarantee `encodeSharedMeal` is
-   * built around and the one a scanner cannot check for themselves: a copy with plausible-looking
-   * numbers that are quietly wrong is indistinguishable from a correct one.
-   */
-  await selectStyle('Share code')
-  {
-    const shot = await canvas.evaluate((el: HTMLCanvasElement) => {
-      const ctx = el.getContext('2d')!
-      const d = ctx.getImageData(0, 0, el.width, el.height)
-      return { w: el.width, h: el.height, data: Array.from(d.data) }
-    })
-    const text = decodeQr(shot)
-    expect(text, 'the share code must decode off the rendered label').toBeTruthy()
-    // Not the token: this is the assertion that the swap actually happened. A `share` label still
-    // emitting `encodeMealLabelToken` would decode fine and be useless to everyone else.
-    expect(text).not.toBe(expectedToken)
-
-    const shared = decodeSharedMeal(text!)
-    expect(shared, 'the share code must decode as a meal, not a bookmark').not.toBeNull()
-    expect(shared!.name).toBe(MEAL_NAME)
-    // servings = 2, so a scanner's copy is the same batch rather than one plate.
-    expect(shared!.servings).toBe(2)
-    expect(shared!.rolled, 'eight ingredients cannot fit 251 bytes — this is the rolled path').toBeGreaterThan(0)
-    expect(shared!.ingredients.length).toBeLessThan(8)
-
-    // 8 × (60 g, 240 kcal, 50 P, 4 C, 2 F) at quantity 2 — exact, including across the remainder.
-    const sum = (k: 'weightG' | 'calories' | 'proteinG' | 'carbsG' | 'fatG') =>
-      shared!.ingredients.reduce((a, i) => a + i[k], 0)
-    expect(sum('weightG')).toBe(480)
-    expect(sum('calories')).toBe(1920)
-    expect(sum('proteinG')).toBeCloseTo(400, 6)
-    expect(sum('carbsG')).toBeCloseTo(32, 6)
-    expect(sum('fatG')).toBeCloseTo(16, 6)
-  }
-
-  // BF-57 item 2: a copy that arrives with fewer rows than the author's must say so where the person
-  // holding the paper can read it, not only inside the payload.
-  await expect(
-    page.getByText(/groups the other \d+ into one entry/),
-    'the sheet must say what the share code could not name',
-  ).toBeVisible({ timeout: 20_000 })
-
-  // And the print styles must say the opposite, plainly — the confusion BF-57 exists to end is
-  // someone handing over a jar label and it doing nothing.
-  //
-  // Back to `Big code` specifically, not to any token style: the assertions below are about THAT
-  // style's ingredient breakdown, and the decode loop left it selected before this block was
-  // inserted. Restoring a different one would silently move them onto the wrong layout.
-  await selectStyle('Big code')
-  await expect(
-    page.getByText(/private bookmark/i),
-    'a token-carrying style must not read as shareable',
-  ).toBeVisible({ timeout: 20_000 })
 
   // Q-393. The square style is the only one that prints the ingredient breakdown, and it is the
   // only one that renders from a second data source — so it is the easiest to break silently. This
@@ -372,6 +333,65 @@ test('a saved meal renders a printable label in every style', async ({ page }) =
  * which turns a 50 mm label into ~312 mm on paper. That defect survived the 300 → 600 dpi change
  * made specifically for print quality, because nothing looks at the bytes.
  */
+/**
+ * BF-57 — the label a stranger can use.
+ *
+ * **Its own test, because the one it came from ran out of time.** That test paints seven styles and
+ * decodes four; adding an eighth paint, a fifth decode and two more switches took it past its own
+ * 180 s budget — it passed in CI on the PR that added it and failed locally straight afterwards,
+ * which is the marginal-timeout shape this repo has been bitten by before. Split, each half has
+ * room, and a failure now names which half broke.
+ *
+ * The token decode stays with the other test: it proves the code resolves to THIS meal for the
+ * person who printed it. That is a private bookmark, and another account's scan of it finds nothing
+ * — which is exactly why a shared label needed a different payload.
+ */
+test('the share style carries the recipe, and the print styles say they do not', async ({ page }) => {
+  const canvas = await openLabelSheet(page)
+  const { selectStyle } = makeStyleTools(page, canvas)
+
+  await selectStyle('Share code')
+  const text = decodeQr(await shotOf(canvas))
+  expect(text, 'the share code must decode off the rendered label').toBeTruthy()
+  // Not the token: this is the assertion that the swap actually happened. A `share` label still
+  // emitting `encodeMealLabelToken` would decode fine and be useless to everyone else.
+  expect(text).not.toBe(expectedToken)
+
+  const shared = decodeSharedMeal(text!)
+  expect(shared, 'the share code must decode as a meal, not a bookmark').not.toBeNull()
+  expect(shared!.name).toBe(MEAL_NAME)
+  // servings = 2, so a scanner's copy is the same batch rather than one plate.
+  expect(shared!.servings).toBe(2)
+  expect(shared!.rolled, 'eight ingredients cannot fit 251 bytes — this is the rolled path').toBeGreaterThan(0)
+  expect(shared!.ingredients.length).toBeLessThan(8)
+
+  // 8 × (60 g, 240 kcal, 50 P, 4 C, 2 F) at quantity 2 — exact, including across the remainder.
+  // **This is the guarantee a scanner cannot check for themselves:** a copy with plausible-looking
+  // wrong numbers is indistinguishable from a correct one.
+  const sum = (k: 'weightG' | 'calories' | 'proteinG' | 'carbsG' | 'fatG') =>
+    shared!.ingredients.reduce((a, i) => a + i[k], 0)
+  expect(sum('weightG')).toBe(480)
+  expect(sum('calories')).toBe(1920)
+  expect(sum('proteinG')).toBeCloseTo(400, 6)
+  expect(sum('carbsG')).toBeCloseTo(32, 6)
+  expect(sum('fatG')).toBeCloseTo(16, 6)
+
+  // BF-57 item 2: a copy that arrives with fewer rows than the author's must say so where the person
+  // holding the paper can read it, not only inside the payload.
+  await expect(
+    page.getByText(/groups the other \d+ into one entry/),
+    'the sheet must say what the share code could not name',
+  ).toBeVisible({ timeout: 20_000 })
+
+  // And a print style must say the opposite, plainly — the confusion BF-57 exists to end is someone
+  // handing over a jar label and it doing nothing.
+  await selectStyle('Big code')
+  await expect(
+    page.getByText(/private bookmark/i),
+    'a token-carrying style must not read as shareable',
+  ).toBeVisible({ timeout: 20_000 })
+})
+
 test('Save to gallery hands over a PNG that declares its print size', async ({ page }) => {
   await page.goto('/nutrition')
   await settleRouteBoundary(page)

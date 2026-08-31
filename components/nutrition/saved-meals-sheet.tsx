@@ -16,6 +16,7 @@ import { getLocalStore } from '@/lib/local-store'
 import { pushThenRevalidate } from '@/lib/local-store/push-then-revalidate'
 import { FoodList } from './food-list'
 import type { SharedMeal } from '@trainingai/shared/nutrition/label-payload'
+import { MealSourceRow } from './meal-source-row'
 import { CaptureActions } from './capture-actions'
 import { MealListActions } from './meal-list-actions'
 import { RecentFoodsPanel } from './recent-foods-panel'
@@ -673,6 +674,16 @@ export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate,
                   </div>
                 </div>
               )}
+
+              {/* BF-52. The three whole-meal inputs, above the per-ingredient ones — and OUTSIDE the
+                  collapsed picker, which is the point: they used to live inside a search field you
+                  had to open first, so the owner could not find the URL option at all. */}
+              <MealSourceRow
+                hasIngredients={ingredients.length > 0}
+                userId={userId}
+                onImported={importRecipe}
+                onCandidates={setCandidates}
+              />
 
               {/* Artboard 5 ends the list with two affordances rather than a permanently-open search
                   and a tile at the top. The picker still expands in place — a sheet on top of a
