@@ -162,6 +162,14 @@ async function shotOf(canvas: import('@playwright/test').Locator) {
   })
 }
 
+/** Fraction of the canvas that is dark. A drawn share code reads ~0.17; 0 or 1 means the buffer
+ *  came back degenerate rather than merely blank (LB-38). */
+function darkFraction({ data }: { data: number[] }): number {
+  let dark = 0
+  for (let i = 0; i < data.length; i += 4) if (data[i] < 128) dark++
+  return dark / (data.length / 4)
+}
+
 /**
  * The style picker's two settle signals, and the switch that uses both.
  *
@@ -371,11 +379,22 @@ test('the share style carries the recipe, and the print styles say they do not',
   // canvas is being redrawn after `selectStyle` returns, which is the only mechanism left that
   // `waitForSettledInk` would not already have caught.
   let text: string | null = null
+  let lastInk = -1
   for (let attempt = 0; attempt < 6 && text === null; attempt++) {
     if (attempt > 0) await page.waitForTimeout(1_000)
-    text = decodeQr(await shotOf(canvas))
+    const shot = await shotOf(canvas)
+    lastInk = darkFraction(shot)
+    text = decodeQr(shot)
   }
-  expect(text, 'the share code must decode off the rendered label').toBeTruthy()
+  // **The failure reports its own diagnosis, because it will not reproduce on demand** (LB-38).
+  // Measured across nine runs: it passes alone every time and fails only sometimes under
+  // file-level load, so the ink reading at the moment of failure has never been captured locally.
+  // A passing attempt reads **0.172–0.179**. A failure reading ~0 or ~1 means `getImageData`
+  // handed back a degenerate buffer and the gate above passed on a canvas that was never drawn;
+  // a failure reading ~0.17 means the pixels arrived intact and the cause is in the decode.
+  // Those are different bugs with different fixes, and this line is what tells them apart.
+  expect(text, `the share code must decode off the rendered label (ink at last attempt: ${lastInk.toFixed(4)})`)
+    .toBeTruthy()
   // Not the token: this is the assertion that the swap actually happened. A `share` label still
   // emitting `encodeMealLabelToken` would decode fine and be useless to everyone else.
   expect(text).not.toBe(expectedToken)

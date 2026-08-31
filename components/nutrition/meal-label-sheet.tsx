@@ -12,10 +12,11 @@ import { savedMealToIngredients } from '@trainingai/shared/nutrition/saved-meal-
 import { useRovingRadioGroup } from '@/lib/hooks/use-roving-radio-group'
 import { saveImageToGallery } from '@/lib/media/save-to-gallery'
 import { withPngDensity } from '@trainingai/shared/nutrition/png-density'
+import { renderMealLabel, type RenderedMealLabel } from './meal-label-render'
 import {
-  renderMealLabel, MEAL_LABEL_STYLES, DEFAULT_MEAL_LABEL_STYLE, mealLabelStyleSpec, labelPrintDpi,
-  type MealLabelStyle, type RenderedMealLabel,
-} from './meal-label-render'
+  MEAL_LABEL_STYLES, DEFAULT_MEAL_LABEL_STYLE, mealLabelStyleSpec, labelPrintDpi,
+  type MealLabelStyle,
+} from './meal-label-geometry'
 
 /** One key, no schema — see the note on style persistence below. */
 const LABEL_STYLE_KEY = 'ta_meal_label_style'
