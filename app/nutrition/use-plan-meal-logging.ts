@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useUserTimezone } from '@/components/shell/user-timezone-provider'
 import { toast } from 'sonner'
 import type { FoodLogWithItem, MealPlan, MealPlanMeal, MealType } from '@trainingai/shared/types/nutrition'
@@ -52,6 +52,61 @@ export function usePlanMealLogging({ mealPlan, mealTypes, logs, userId, dateRef,
         .map(m => m.position),
     )
   }, [logs, mealPlan])
+
+  /**
+   * Log several planned meals in one action (Q-187 step 4).
+   *
+   * **Sequential on purpose, and this is the one place it is right to be.** The standing rule is
+   * never to await POSTs in a loop — but on the canonical runtime `logPlanMeal` makes no network
+   * call at all: it writes SQLite, queues the outbox and fires `pushThenRevalidate` behind itself.
+   * Running the meals concurrently would interleave those writes on one connection and start N
+   * pushes and N cache invalidations for no gain. The user does not wait on any of it: the button
+   * flips synchronously and each meal's rows appear as it lands.
+   *
+   * One failing meal does not strand the rest — the same reason the outbox quarantines a poison
+   * mutation instead of stopping the queue behind it — and the count that failed is reported rather
+   * than swallowed.
+   */
+  const [bulkLogging, setBulkLogging] = useState(false)
+  // A ref, not the state above: two taps inside one render both read the old `false`, which is how
+  // this app once turned 5 taps into 4 POSTs.
+  const bulkRef = useRef(false)
+
+  const logMeals = useCallback(async (meals: MealPlanMeal[]) => {
+    if (bulkRef.current || meals.length === 0) return
+    bulkRef.current = true
+    setBulkLogging(true)
+    let logged = 0
+    let failed = 0
+    try {
+      for (const meal of meals) {
+        try {
+          const written = await logPlanMeal(
+            {
+              name: meal.name,
+              ingredients: meal.ingredients,
+              mealTypeId: meal.mealTypeId,
+              suggestedTime: meal.suggestedTime,
+            },
+            mealTypes,
+            dateRef.current,
+            userId,
+            new Date(),
+            tz,
+          )
+          for (const log of written) onLogged(log)
+          logged++
+        } catch {
+          failed++
+        }
+      }
+    } finally {
+      bulkRef.current = false
+      setBulkLogging(false)
+    }
+    if (logged > 0) toast.success(`${logged} ${logged === 1 ? 'meal' : 'meals'} logged`)
+    if (failed > 0) toast.error(`${failed} could not be logged`)
+  }, [mealTypes, userId, dateRef, onLogged, tz])
 
   const logMeal = useCallback(async (meal: MealPlanMeal) => {
     setLoggingPosition(meal.position)
@@ -152,5 +207,5 @@ export function usePlanMealLogging({ mealPlan, mealTypes, logs, userId, dateRef,
     }
   }, [userId, dateRef])
 
-  return { logMeal, loggingPosition, loggedPositions, declinedMealIds, setDeclined }
+  return { logMeal, logMeals, bulkLogging, loggingPosition, loggedPositions, declinedMealIds, setDeclined }
 }
