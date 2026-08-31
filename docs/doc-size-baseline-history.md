@@ -5199,15 +5199,35 @@ none of that entry's three levers touch and which the file's own header tells se
 instance of what the note above describes, raised rather than hidden. Trimming it is Orchestrator's
 sweep, not a native-fix PR's.
 
-## 2026-08-31 — `docs/implementation-backlog.md` 14528 → 14514, `projectOverview.md` 8572 → 8586
+## 2026-08-31 — `docs/implementation-backlog.md` 14528 → 14574, `projectOverview.md` 8572 → 8586
 
 `lane-a/coach-nutrition-scope` (LA-47 piece 2). The backlog growth is LA-47 recording that its own
 proposed lane split for the plan widget **does not compile** — a new `CoachWidgetSchema` member is
 a type error until `widget-registry.tsx` handles it, and a branch rendering `null` wedges the
 thread — together with the settled widget design, so whoever pairs on it does not re-derive it.
-Cheaper here than a second entry. The number went **down** on the merge rather than up: LB-12 and
-BF-85 landed on `main` while this branch was open and took more lines with them than LA-47 added.
+Cheaper here than a second entry. Re-derived twice while the branch was open, in both directions:
+LB-12 and BF-85 landing on `main` took more lines away than LA-47 added, and BF-86 then put more
+back. Which is the argument for re-deriving from the merged file rather than splicing a number.
 
 `projectOverview.md` is again the Current Status blurb, which is the growth the note added to Q-220
 earlier today describes. Third raise of the evening from the same cause; the retention rule is
 Orchestrator's sweep.
+## 2026-09-01 — `docs/implementation-backlog.md` (BF-86, and the fix is three lines above the bug)
+
+The owner asked for the app to reset itself on the first open of a new day, and gave the symptom that
+explains why: the morning check-in does not appear on a resume. That half has an exact cause —
+`session-select-content.tsx:784` prompts from an effect with deps `[userId, tz]`, neither of which
+changes, in a tab shell that never unmounts. It runs once per launch. The same file already solves
+this at `:774` with `tabEpoch`, and the check-in guard is already date-stamped, so re-running is
+idempotent: the state is right and only the trigger is missing.
+
+The entry spends its length refusing the requested implementation and saying why, because "close and
+reset the app" is the kind of instruction that gets built literally. BF-80 — filed hours earlier —
+says outright not to fix a resume problem with a reload, and a scheduled reload would give a blank
+screen two candidate causes just as that one is being diagnosed. The recommendation is the mechanism
+the repo already has in miniature: `workout-day-rollover.tsx` is a correct date-change signal wired to
+exactly one consumer, and generalising it delivers the owner's ask with no reload at all.
+
+Also records the scale (56 `cachedFetchToday` sites) and the boundary-test rule, because a rollover
+bug is only visible across local midnight and this repo has repeatedly shipped date logic that works
+all day and fails in a two-hour band.
