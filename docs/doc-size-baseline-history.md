@@ -5127,6 +5127,24 @@ head being exhausted of Lane B work, and five new gotchas — and still came out
 because the rule is rewrite rather than append. The four-tests-that-could-not-fail block compressed
 to its principle now the habit is established, and the re-litigate list lost detail that had aged
 into background. Tightened rather than banked: slack left in a shrink-only ratchet is room the next
-append takes without noticing. (Drafted at 154; the BF-84 line then had to be rewritten to
-survive PR #705 settling its surface mid-run, which is worth two lines — a baton that asserts a
-state another PR is about to change is the failure mode this file exists to prevent.)
+append takes without noticing. (Drafted at 154; the BF-84 line was then rewritten twice as #705
+landed under it — first to stop asserting a state another open PR was about to change, then to
+state the resolution it reached. Two lines, and the right two: a baton is read by someone who
+cannot see which PRs were in flight when it was written.)
+
+## 2026-09-01 — `docs/implementation-backlog.md` (BF-84's surface settled, and the button already exists)
+
+The owner clarified: one small greyed Rest button on Home's training card. Reading
+`recommendation-card.tsx` then changed the entry's shape — `onRestDay` is **already rendered** at
+line 269, inside the `deloadOrRestRecommended` branch. So the handler, the `markRestDayChosen()`
+write and the override are all built; what is being asked for is that the control appear when the app
+has *not* suggested rest. That is a rendering condition, not a new control.
+
+Which makes the surface work small and turns the persistence question into the whole entry: a button
+that only appeared when the app volunteered it was used rarely, and one that is always present will
+be used deliberately — while still writing to `localStorage` alone. The entry now says to ship the
+button and the storage together.
+
+Also records the emoji answer rather than substituting silently: the request was "rest + emoji", the
+repo's convention is Lucide for chrome with emoji reserved for content carrying its own field, so
+`Moon` is the same idea in the app's vocabulary and the owner should hear that.
