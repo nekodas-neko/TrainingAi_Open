@@ -905,6 +905,37 @@ bug is that it is using a prediction as the definition of BMR when a measurement
 
 ### [body][nutrition] 🔵 BF-2 — the "DEXA filter": calibrate the scale's body-fat estimate against a real DEXA, and correct history
 
+> **⚑ STEPS 1 AND 2 SHIPPED 2026-08-31 — `packages/shared/src/health/body-fat-calibration.ts` and
+> `repo.getBodyFatCalibration()`.** The calibration derives, the pairing works against
+> production-shaped rows (+3.2 from the one 2026-08-27 pair, 3 of 11 readings corrected, the rest
+> untouched), and **nothing consumes it yet** — no goal, no RMR, no panel has changed. **What is
+> owed is steps 3 and 4:** the sweep of the read sites, and the payload field. Step 3 has a design
+> question the plan did not settle and this session did not have the measurement for —
+> `listBodyMetrics` has **22 call sites**, so correcting *inside* that read makes a missed site
+> impossible but risks a read-then-write path persisting a corrected value into the raw column.
+> Measure which callers write back before choosing.
+>
+> **⚑ PLANNED 2026-08-31 — [`2026-08-31-dexa-filter.md`](superpowers/plans/2026-08-31-dexa-filter.md).**
+> This is an implementation item now, not a planning one. **Two decisions in the plan reverse what
+> this entry assumed, so read it before building:**
+> **(1) the pairs are DERIVED, not stored** — both halves are already first-class rows (`dexa_scans`
+> joined to `body_metrics` on the date, keyed by `source_map->>'body_fat_pct'`), and a stored pair is
+> a stored counter wearing a different hat. **No new table and no migration number**, which is what
+> takes this off Lane A's migration budget entirely. **(2) offset, not ratio**, at n=1 — one pair
+> supports neither claim, so prefer the one that does not manufacture a claim about readings never
+> observed. Also retired: the `HEALTH_SOURCES` warning below. Read-time correction never writes to
+> `body_metrics`, so no source rank is added and `health-source.ts`'s TS/SQL ladders are untouched.
+>
+> **⚑ Re-verified in production 2026-08-31, and the blocker is not what this entry says.**
+> `dexa_scans` holds **zero** of the owner's rows, and so does `measured_rmr` — **neither table has
+> any entry surface**: `grep -rn "dexa-scans\|measured-rmr" app/ components/ lib/` outside
+> `app/api/` returns nothing. The 2026-08-27 printout has been transcribed in
+> `docs/clinical-baseline-2026-08-27.md` for four days with nowhere to go. Filed as **LA-44**. It
+> does **not** block building this — the engine is inert with zero pairs — but it does block the
+> owner *seeing* it, which is what they asked for. The **scale** half of the pair is confirmed
+> present (2026-08-27, 71.7 kg, 25.3 %, `scale_ble`), and twelve consecutive days sit in
+> **24.9–25.5 %**, so the consistency premise the whole design rests on is measured, not assumed.
+
 > **⚑ PROMOTED TO THE HEAD OF THE QUEUE, 2026-08-27 — owner: *"first we need that Dexa scan filter
 > applied so it shows Body fat on the current scale as per a dexa result."*** The pair it was waiting
 > on exists (DEXA 28.5 % vs same-day Renpho 25.3 %). **With one pair an offset and a ratio are the
@@ -925,31 +956,19 @@ bug is that it is using a prediction as the definition of BMR when a measurement
   of a stored pair now has somewhere to go; what this entry still owes is the **pairing** (which scale
   reading a scan is compared against, keyed by source) and the correction derived from the pairs.
 
-- **⚑ The first calibration pair exists (2026-08-27): DEXA 28.5 % vs Renpho 25.3 % — the scale
-  under-reads body fat by 3.2 points; weight 72.1 kg vs 71.7 kg.** Recorded with surrounding scale
-  days in [`docs/clinical-baseline-2026-08-27.md`](clinical-baseline-2026-08-27.md). **One pair still cannot separate an offset from a ratio**, which is precisely why
-  this entry stores pairs and derives the form at two — do not bake +3.2 in as a constant.
+- **⚑ The first calibration pair: DEXA 28.5 % vs Renpho 25.3 %** — the scale under-reads by 3.2 points; weight 72.1 kg vs 71.7 kg. Recorded with surrounding scale days in [`clinical-baseline-2026-08-27.md`](clinical-baseline-2026-08-27.md). Never bake +3.2 in as a constant; the plan derives it.
 
 - **Lane:** A — classified 2026-08-30 by the path rule (*both halves → A, engine first*). The new
   table and the calibration maths are the engine; the entry/review UI follows as **B**. The planning
   session still splits the work; it does not re-decide the lane.
 
-> **⚠ PRIORITY CHANGED 2026-08-26 — the owner has a DEXA + RMR test BOOKED.** This entry sat at the
-> tail because the owner filed it as *"a loose note to put more effort into later"*; that is no longer
-> the signal. It still needs a planning session before implementation, and the plan should now be
-> written **before the scan happens** so the reading has somewhere to land on the day.
+> **⚠ PRIORITY CHANGED 2026-08-26 — the owner has a DEXA + RMR test BOOKED.** This entry sat at the tail because the owner filed it as *"a loose note to put more effort into later"*; that is no longer the signal. The planning session it asked for is done (top of this entry).
 >
-> **The RMR half is split out as BF-33** and is in the main queue — it needs no calibration maths and
-> no scan to exist before it can be built.
+> **The RMR half was split out as BF-33 and has SHIPPED** — `measured_rmr` (migrations 225/226), `personalRmr`, `/api/measured-rmr`. Nothing here waits on it; what it left behind is LA-44's empty table.
 >
 > **Two refinements from the owner, 2026-08-26, that change the shape of the filter:**
 >
-> 1. **It must accumulate, not be a single constant.** *"This value needs to be able to accept more
->    (i.e another dexa scan later on) so it can work together to build a correct filter."* So the
->    stored thing is a **set of paired (scan, scale) observations** with a calibration *derived* from
->    them — not one offset that a second scan overwrites. This also settles the ratio-vs-offset
->    question below in the only honest way available: with one point you cannot tell them apart, so
->    **store the pairs and pick the form once there are two**, rather than guessing now and baking it in.
+> 1. **It must accumulate, not be a single constant.** *"This value needs to be able to accept more (i.e another dexa scan later on) so it can work together to build a correct filter."* Honoured — but by **deriving** the pairs from `dexa_scans` × `body_metrics` rather than storing them, so a second scan becomes a second pair with no entry step (plan §2.2).
 > 2. **The filter is per measurement system, not global.** *"whatever measurement system was used"* —
 >    the calibration belongs to the Renpho BIA path specifically. A different scale, or Health
 >    Connect, is a different instrument with a different bias, and applying the Renpho correction to
@@ -1013,10 +1032,7 @@ values" can mean two very different things:
    all come out of the same `computeBodyComposition()` call. Correcting body fat alone leaves the row
    internally inconsistent (fat % and muscle mass disagreeing about the same body). Decide whether
    the filter is one scalar on body fat or a whole-panel re-derivation.
-2. **Ratio vs offset is an empirical question with one data point.** With a single DEXA you cannot
-   tell a multiplicative bias from an additive one; they only diverge as weight changes. The owner's
-   phrasing says "keep that ratio in mind", but a plan should say which it picked and why, and prefer
-   the one that degrades safely as the owner's weight moves.
+2. ~~**Ratio vs offset.**~~ **Settled by the plan §2.3: offset.** One pair supports neither form, so prefer the one that makes no claim about readings never observed. Revisit at n = 2.
 
 **RMR is the separate half of this request, and it is simpler — now filed as BF-33.** Nothing in the tree reads a measured
 RMR — BMR is *always* estimated (Cunningham when body fat is known, Mifflin-St Jeor otherwise,
@@ -1029,24 +1045,51 @@ maths at all, just a stored value and a precedence rule.
 measurement and outranks all of them; adding a source is a code change in that file **plus** the
 inlined SQL `CASE` at line 45 — both must move together or the SQL and TS ladders diverge.
 
-**⏰ THE SCAN IS 2026-08-27, AND ONE THING MUST HAPPEN ON THE DAY OR THE CALIBRATION CANNOT BE BUILT
-LATER.** Owner: *"Will need to get the dexa matched with the same days renpho scale measurement so we
-can calibrate our scale by the dexa scan."* Exactly right, and it is the only irreversible part:
+**The pre-scan instructions that used to sit here are spent** — the scan happened on 2026-08-27, the
+same-day Renpho reading was taken, and both are recorded (the scale half in production, the printout
+in [`clinical-baseline-2026-08-27.md`](clinical-baseline-2026-08-27.md)). The one durable line from
+them: a calibration pair's *scale* half cannot be reconstructed after the fact, so any future scan
+needs a same-day weigh-in booked with it.
 
-- **Take a Renpho reading the same day, as close in time to the scan as practical** — ideally both
-  fasted and before training, since BIA moves with hydration and a meal. That reading is one half of
-  the calibration pair and **cannot be reconstructed afterwards**; the DEXA figure can be typed in
-  any time, because the record is dated by when it was measured rather than when it was entered.
-- **Keep the DEXA report itself**, not just body-fat %. Fat mass, lean mass and bone mineral content
-  in kg are what let a later entry re-derive the pair if the stored percentage turns out to be
-  computed differently from the app's.
-- **The reading needs no app work.** `body_metrics` already records the scale over BLE; it is the
-  DEXA half that has nowhere to go yet, which is this entry.
+**Done looks like:** the app states the measured offset against the scale for the same period;
+corrected body fat feeds the calorie and protein goals **and `personalRmr`'s current fat-free mass**;
+and history reads corrected without the raw scale values having been overwritten. **"A DEXA reading
+can be entered" is NOT part of this entry any more — it is LA-44**, and until that ships this work's
+outcome is real but unobservable in the app.
 
-**Done looks like:** a DEXA reading (date, body fat %, and ideally lean/fat mass) can be entered; the
-app states the measured offset against the scale for the same period; corrected body fat feeds the
-calorie and protein goals; and history reads corrected without the raw scale values having been
-overwritten.
+### [body][nutrition] LA-44 — a DEXA scan and a measured RMR can be stored but not entered: both tables are empty and neither has a UI
+
+- **Branch:** _unassigned_ · **Lane: A** for an extraction/confirm route, **B** for the form — engine
+  half first, per the path rule.
+- **Added:** 2026-08-31 · Lane A, from BF-2's planning session.
+- **Measured in production 2026-08-31, not inferred.** `claude_ro.dexa_scans` returns **0 rows** and
+  `claude_ro.measured_rmr` returns **0 rows** (row-scoped to the owner, so this is *none of the
+  owner's*, which is the only claim this endpoint can support — and it is the claim that matters
+  here). `grep -rn "dexa-scans\|measured-rmr" app/ components/ lib/` outside `app/api/` returns
+  **nothing**: no screen, no form, no client fetch calls either route.
+- **So two shipped engines have no way to be fed.** BF-41 shipped `dexa_scans` +
+  `dexa_scan_regions` (migration 240) and `GET`/`POST /api/dexa-scans` on 2026-08-30; BF-33 shipped
+  `measured_rmr` (migrations 225/226), `personalRmr` and `/api/measured-rmr`. Both are correct and
+  both are unreachable. The owner's real 2026-08-27 results are transcribed in
+  [`clinical-baseline-2026-08-27.md`](clinical-baseline-2026-08-27.md) and have been sitting there
+  since, which is how long the gap has been invisible.
+- **This is the general shape worth naming, not a one-off.** An engine-first split leaves the entry
+  surface for "later", and nothing fails when later does not come — no test breaks, no check goes
+  red, and the table simply stays empty. The tell is a populated `docs/` transcription with an empty
+  table behind it.
+- **Why it matters beyond tidiness:** BF-2's whole outcome is gated on it. The correction engine is
+  safely inert with zero pairs, so BF-2 can and should ship first — but the owner asked for the
+  filter *"so it shows Body fat on the current scale as per a dexa result"*, and nothing shows until
+  a scan is entered.
+- **Scope:** a form is enough. `dexa_scans` has ~30 typed columns but only a handful are load-bearing
+  for BF-2 and BF-33 (`scanned_on`, `pct_fat`, `weight_kg`, `fat_g`, `lean_plus_bmc_g`), so the form
+  should take those and treat the rest as optional detail rather than demanding the whole printout.
+  `source` is already `manual` | `extracted` with no third value for a model's unconfirmed output —
+  an extraction route must therefore end in a confirm step, not a direct save.
+- **Do NOT add a `bytea`.** The module map records that no source document is stored — extract,
+  confirm, save the fields, discard the file — and reversing that is its own decision, not a detail
+  of building a form.
+
 
 ### [workouts] BF-59 — the weekly set targets are a flat large/small binary, ignoring both the app's own landmark table and the program's goal
 
