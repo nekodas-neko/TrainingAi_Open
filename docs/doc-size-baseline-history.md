@@ -4802,3 +4802,28 @@ already merged.
 Both lanes now lead with nutrition. Each moved entry was diffed against `main` before the commit —
 six of six byte-identical, BF-57 the one deliberate edit — because a reorder branch that has gone
 stale is how shipped entries get restored.
+
+## 2026-08-31 — `docs/implementation-backlog.md` (BF-78/79, and BF-41 re-asked)
+
+The owner asked to gather the personal-detail fields into one section. Tracing where they live found
+a latent data-loss bug instead: `updateUserProfile` writes `displayName`, `heightCm`, `dateOfBirth`
+and `weightGoalKg` unconditionally as `?? null`, while the other four columns are guarded by presence
+checks — so it is a PATCH by name and a PUT by behaviour. `goal-recommendation-sheet.tsx:148` already
+sends a one-field body, so accepting an activity-level recommendation should erase four columns
+including the height the BMR fallback reads.
+
+Production says it has **not** fired — the owner's row still holds all four — and that is recorded,
+because "latent, one tap away" is a different priority from "already happened" and the entry should
+not overclaim. It goes to the head of the queue on that basis.
+
+BF-79 is the owner's actual request, and the entry's value is the argument that the split *is* the
+bug's habitat: two editors of one row means each resends the other's fields, which
+`edit-profile-sheet.tsx` documents itself doing. It also draws the line the request does not — weight
+and body fat are measurements with a history, so they belong here read-only, or the consolidation
+creates a second write path to `body_metrics`.
+
+BF-41 gains the re-asked upload request. Two notes shrink it: BF-71's typed forms are now the confirm
+target, so extraction prefills rather than needing a review screen; and the blood panel is the report
+that actually justifies it at 58 analytes. The crop-before-upload rule is restated as the owner's own
+words, with the specific reason it must be the default path rather than advice — the extraction call
+is what sends the document to Google.
