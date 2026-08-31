@@ -5118,3 +5118,20 @@ server-side consumer that might act on it. The owner asking for it in a second p
 is deliberate, which argues for storing it — and that turns a Lane B control into a Lane A row. The
 "per session" wording is also flagged as ambiguous, because Home shows one session and the request
 only parses on a list.
+
+## 2026-09-01 — `docs/implementation-backlog.md` (BF-84's surface settled, and the button already exists)
+
+The owner clarified: one small greyed Rest button on Home's training card. Reading
+`recommendation-card.tsx` then changed the entry's shape — `onRestDay` is **already rendered** at
+line 269, inside the `deloadOrRestRecommended` branch. So the handler, the `markRestDayChosen()`
+write and the override are all built; what is being asked for is that the control appear when the app
+has *not* suggested rest. That is a rendering condition, not a new control.
+
+Which makes the surface work small and turns the persistence question into the whole entry: a button
+that only appeared when the app volunteered it was used rarely, and one that is always present will
+be used deliberately — while still writing to `localStorage` alone. The entry now says to ship the
+button and the storage together.
+
+Also records the emoji answer rather than substituting silently: the request was "rest + emoji", the
+repo's convention is Lucide for chrome with emoji reserved for content carrying its own field, so
+`Moon` is the same idea in the app's vocabulary and the owner should hear that.
