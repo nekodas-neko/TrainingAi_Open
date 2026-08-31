@@ -206,6 +206,17 @@ Live at the time of writing (2026-07-30):
 
 ## History
 
+- **[`docs/overview/entries/2026-08-31-voice-filler-words.md`](../../overview/entries/2026-08-31-voice-filler-words.md)**
+  — 🆕 BF-66: `parseVoice` stripped every character outside `[0-9.\s kgreps×x]`, a denylist that keeps
+  the `r` of `for` and the `es` of `times` — so **`60 by 6` and `60 at 6` worked and `60 for 6` and
+  `60 times 6` did not**, and the owner's correct transcript came back in red as if it had been
+  misheard. Replaced by a positive tokenizer (take the numbers and the unit/rep keywords, ignore the
+  words between), so a phrasing works by construction rather than one stripped filler at a time. The
+  seven existing tests all passed and none of them **could** have failed: every case was adjacent
+  numbers or an explicit keyword. **Not device-verified** — no transcript has ever come out of
+  Android's recogniser in any test, so the parser is proven on strings, not on speech; the press is
+  W4 in [`device-verification-queue.md`](../../device-verification-queue.md), sharing a sitting with
+  LA-37.
 - **[`docs/handoff-2026-08-20-workouts-energy-accuracy-and-rpe-intake.md`](../../handoff-2026-08-20-workouts-energy-accuracy-and-rpe-intake.md)**
   — 🆕 the workout-energy intake cluster (Q-391 · Q-419 · ~~Q-423~~ · Q-420 · Q-421 · Q-422), from one
   owner question about making the burn estimate more accurate. Records that `computeActiveEnergy`

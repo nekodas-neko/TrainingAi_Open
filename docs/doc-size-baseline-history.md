@@ -4213,3 +4213,20 @@ because that check is the outstanding thing.
 
 (Re-derived on the merge: this branch was cut on top of #647 before it landed, so its first
 figures were against that head rather than against `main`.)
+
+## 2026-08-31 — `projectOverview.md` 8445 → 8468, `docs/implementation-backlog.md` 13679 → 13602 (BF-66)
+
+**Twenty-three lines, and twenty of them are one Known-Issues row.** The voice fix is JS-only and
+reaches the phone on the next deploy, so it is device-*unverified* rather than device-*blocked* —
+which under the Canonical Runtime rule is exactly the case that has to buy a row rather than a
+queue entry. The row names the five phrasings to say into the button and points at LA-37's row four
+paragraphs above it, because they are the same button and want the same sitting; a reader who does
+one and not the other has done half a check. The remaining three lines are the status paragraph.
+
+**No slack was available to pay for it.** The three paragraphs under the status heading are hours
+old and belong to other branches, and the Known-Issues section's nearest ⚠️ rows are all still owed
+their own device passes, so there was nothing here this branch could honestly strike.
+
+**The backlog falls by BF-66's whole entry.** Nothing is owed past the device check the row above
+now carries, so the entry is removed rather than rewritten to a `Keep:` — the residue lives in
+`projectOverview.md`, and duplicating it in the queue would make an entry that reads as open work.

@@ -6,6 +6,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.404.2",
+    date: "2026-08-31",
+    changes: [
+      "Voice logging understands how people actually say a set. \u201c60 for 6\u201d, \u201c60 kg for 6\u201d and \u201c60 times 6\u201d all log 60\u00a0kg for 6 reps now \u2014 before, only \u201cby\u201d, \u201cat\u201d and \u201cx\u201d worked, and anything else was heard perfectly and then thrown away.",
+      "When it genuinely cannot make sense of what you said, it says so and gives an example instead of just repeating your words back in red. The example is also on the button now, so the phrasing no longer has to be guessed.",
+    ],
+  },
+  {
     version: "1.404.1",
     date: "2026-08-30",
     changes: [
