@@ -4623,3 +4623,76 @@ green on `716cf0b3` was not semantically invalidated and only the mechanical che
 ratchet and the resurrection check — could have been broken by the merge. That is the question to
 ask before deciding how much of the gate to re-run, rather than treating every base move as
 equivalent.
+
+## 2026-08-31 — `docs/implementation-backlog.md` (BF-72, and BF-35/BF-70 corrected)
+
+Three edits from one review session, all about a value that exists and does not arrive.
+
+**BF-72** is a one-line root cause found from the owner's own phrasing — *"it starts as the meal with
+the image, then breaks into its ingredients"* says the optimistic write is right and something after
+it is wrong. The diary's hydration rebuilds each local row from the server response and omits
+`savedMealId`/`mealGroupId`; a local upsert overwrites all columns, so the omission writes NULL, and
+the next line re-reads and renders the stripped copy. Confirmed in production rather than argued:
+11 rows carry both ids and resolve to six real meals, two of which are exactly the five loose rows in
+the screenshot.
+
+**BF-70** gains a fourth drop site, and it is the important one: `create-food-item.ts:68` reads
+`s.imageDataUri` where `s` is `sanitiseNutrition(...)`'s numeric-only return, so the line is always
+null while its comment asserts the value is present. That comment is why nobody caught it — the file
+reads as the place the feature was implemented.
+
+**BF-35's `Keep:` said the images were "stored and unseen"** and that was wrong; nothing stores them,
+so the render it lists as owed would show the same placeholder. Corrected in place with BF-70 named
+as the prerequisite, because building the render first is the wasted PR that line would have caused.
+
+## 2026-08-31 — `docs/implementation-backlog.md` (BF-73, a second pass over BF-50's work)
+
+Both halves of this report are re-reports of controls BF-50 already built, and saying so is most of
+the entry's value. The capture tiles were raised 48 → 62 dp with the number taken from the artboard
+under BF-28's parity rule, so "make them bigger" now means overriding the drawing — legitimate under
+rule 2 (a later owner decision beats the artboard) but it has to be *recorded* as an override, or the
+next parity sweep corrects them back and the owner reports it a third time.
+
+The action pair is the same shape: BF-50 ④ renamed `Select` to `Delete meals` because the words were
+the fix, and the owner now wants that control reduced to an icon. So the entry says the accessible
+name has to carry what the label was carrying, and that the hit box stays 44 dp while the label
+shrinks — the two ways this ships as a regression while looking like the request.
+
+## 2026-08-31 — `docs/implementation-backlog.md` (BF-74/75/76, the nutrition review's second batch)
+
+Three entries where the code changed what the report meant.
+
+**BF-74** looked like a tap-target complaint and is not. `meal-detail-sheet.tsx` passes
+`hideCloseButton`, so the photo's remove ✕ — `absolute right-0 top-0` — is the only ✕ on the screen,
+in the corner every user reads as "close". That is a wrong-meaning problem, and the entry says so
+explicitly because the obvious fix (make it bigger) makes an accidental hit *more* likely.
+
+**BF-75** asked for a nutrition theme, and one already exists: `screen-palettes.ts` defines a
+`nutrition` key and the tab renders it. What is black is every sheet, because `SheetContent` starts
+with `bg-background` — the exact case CLAUDE.md's background rule names. The entry's weight is spent
+on the hazard: that class is the app-wide primitive, so this must be an opt-in variant, and dense
+sheets need the scrim treatment or the wallpaper eats the 4.5:1 floor.
+
+**BF-76** is the owner asking for a sweep rather than a third individual safe-area report, which the
+sibling-surface rule already wanted. It inherits BF-62's `vh`-includes-the-inset hypothesis as its
+first pass, because that generalises to every sheet at once, and it requires the enumeration to be
+produced *before* any fix — a sweep that fixes as it goes cannot say what it covered, which is how
+the fourth report happens.
+## 2026-08-31 — `docs/implementation-backlog.md` (BF-77, and BF-57 raised)
+
+The owner asked to share meals with a partner. The entry's job was to notice that the feature is
+already designed, half-built, and inert — `meal-label-render.ts:694` still calls
+`encodeMealLabelToken(mealId)`, the owner-only token, so BF-57's shipped self-contained payload
+reaches nothing and today's labels still only scan for their author. One line is the difference
+between "not built" and "built and unreachable", which is why it is quoted in both entries.
+
+The rest is the fork: *share a meal* and *have the same meals* are different products, and the
+three-row table exists so the owner can pick on cost rather than on wording. Two things are written
+down because they would otherwise be discovered late — a group library reverses the
+copies-not-coupling principle the owner chose in BF-57 and again in BF-58, and it is the only option
+of the three that carries a consent surface, since one person's food library becomes visible by
+default.
+
+The decision is reduced to a single question — *when your partner changes a shared meal, should your
+copy change too?* — because that is the one answer that separates finished work plus a code from a
+project with a membership model.
