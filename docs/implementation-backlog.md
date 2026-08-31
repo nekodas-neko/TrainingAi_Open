@@ -1322,6 +1322,165 @@ opened on, unchanged.
 - **Verification:** index total drops below the heap total, and a re-read a week later shows growth
   back near trend.
 
+### [nutrition][platform] BF-69 — dosed substances are stored but nothing reads them; make exposure an analysable variable
+
+- **Lane:** A for the read model and any schema; B for the supplements-page UI and the trends surface.
+- **Planning item — but narrower now.** The storage model is DECIDED (see *Decisions* below);
+  what still needs a planning session is the presence model (unknown vs zero), the trends overlay
+  and the supplements-page UI.
+- **Added:** 2026-08-30 · owner, on starting retatrutide: *"I'd like it to be a value that can be
+  correlated to all data… this week I will put it as Reta = 0 so it has a baseline - then next week
+  add a dosage; so all that data is compared against its associated value… So I could see periods
+  where I did take fish oil every day or creatine vs HR."*
+
+**Half of this shipped as BF-3 (migration 244), and it was built for exactly this.**
+`supplement_logs` already carries `amount`, `unit` and `doseText` snapshotted per log, unique on
+`(supplement_id, log_date)`, and its own comment says why: *"`amount`/`unit` are what a correlation
+against resting HR needs, since an exposure variable has to be a number on a date"*, for *"a drug
+whose story is its escalation schedule"*. **The storage is done. There is no reader.** `supplementLogs`
+appears in the local store, the sync engine, the adapter and the schema — and in **none** of
+`health-trends`, `sleep-performance-correlation`, `lib/ai-chat/analytics.ts` or `lib/ai-chat/tools.ts`.
+
+**⚠ The decision that has to come first: a missing row is not a zero.** Today a `supplement_logs`
+row exists only on days something was logged, so "did not take it" and "forgot to log it" are the
+same absence. The owner's baseline week is precisely a request to record a real zero. Every
+correlation downstream is only as good as this: a run of unlogged days read as zeros will invent an
+effect, and this repo has already published a false coefficient from a data-shape mistake and left it
+standing for eleven days (see **A Correlation Across a Model Change Is Not Evidence**). Options for
+the plan:
+  1. a per-substance **`started_on` / `stopped_on` window**, so days outside it are true zeros and
+     days inside it with no row are *unknown*, not zero — cheapest and probably right;
+  2. an explicit "not today" log (a zero-amount row), which is honest but needs daily discipline;
+  3. treat unlogged-inside-window as zero — simplest, and the one that manufactures effects.
+  Whatever is chosen, **unknown must be representable and must be excluded from a correlation rather
+  than counted as zero.**
+
+**⚠ Creatine is already being logged somewhere else, and the two do not know about each other.**
+`food_items` has no supplement link, and the owner's food log already contains supplement rows (a
+`ZMA Complex Supplement` sits in Recently Used). So the owner's *"hopefully this can get picked up
+from the nutrition log"* is a real gap and a real double-count risk: the same creatine could be a
+`supplement_log` and a `food_log` on the same day. Decide one of — link a supplement to a
+`food_items` row, merge the two sources on read with a de-dup rule, or state that dosed substances
+are logged in one place only. Not deciding is how the series ends up double-counting the days the
+owner was most diligent.
+
+**ANSWERED 2026-08-30 — how the food log and the supplement record join up.** Asked how creatine
+logged in the food log should reach the exposure series, the owner proposed: *"in a food log or when
+you create a saved meal you can add 'supplements' to it - it means when the meal gets logged it
+treats it as the supplement being hit. And for reta it would be more a 'selection first to choose
+dosage' but it would get logged the same way."*
+
+**This is the right shape and it dissolves the double-count by construction.** One exposure table,
+two entry points. The rule that makes it work, and that must be written into the plan: **a supplement
+attached to a meal writes a `supplement_logs` row and never a `food_items` row.** The moment the food
+log becomes a second *store* of exposure rather than a second *entry point*, the double-count is back.
+
+- **The variable-dose half is one flag, not a second flow.** Creatine is 5 g every time; retatrutide
+  changes on a titration schedule. So an attachment carries either a fixed amount or "ask me when
+  logging" — which is exactly the owner's *"selection first to choose dosage"* and is a boolean on
+  the attachment rather than a separate feature.
+
+**DECIDED 2026-08-30 (owner) — the storage model, which settles both collisions below with one
+change.**
+
+- **A day's exposure is an AMOUNT, derived from CONTRIBUTIONS — not a tick, and not a stored total.**
+  Each act of taking something is its own row carrying its amount/unit and **where it came from**
+  (`manual`, or `meal:<food_log_id>`). The day's figure is the sum of the live contributions for that
+  substance, computed on read.
+- **Why amount rather than a tick:** the feature exists for a titrating drug, whose whole story is
+  the dose changing week to week, and a boolean cannot tell it. Amount also *subsumes* the tick —
+  adherence is `amount > 0` — so nothing is lost. The decider was reversal cost, which is badly
+  asymmetric: amount → tick later is trivial, tick → amount later means back-filling doses that were
+  never recorded, which is unrecoverable.
+- **Why contributions rather than provenance on the existing daily row:** a `source` column on one
+  shared row does not help, because two writers still share it and neither can remove only its own
+  half — which is the deletion bug. Separate rows make *delete the meal, keep the hand-logged dose*
+  fall out for free, and make a meal logged twice count twice, correctly.
+- **`source_map` was considered and rejected as the wrong fit.** The ranked per-field merge in
+  `lib/data/health-source.ts` resolves **competing claims about one truth** (which scale is right).
+  Two doses are **independent events that add**, not rivals — so a rank ladder would discard one of
+  them. This is worth stating, because `source_map` is the reflex answer to "multiple writers" in
+  this codebase and it is wrong here.
+- **This is also what keeps the stored-counter rule satisfied:** the daily amount is derived on read,
+  never a number edited by add-on-log and subtract-on-delete.
+
+**Consequences for whoever builds it, none of them optional:**
+- **Lane A, and it is a schema change to a SYNCED domain.** `supplement_logs` is unique on
+  `(supplement_id, log_date)` and that constraint is what has to go. The full chain moves with it —
+  local SQLite table + version, `RECONCILE_TABLES`/`RECONCILE_COLUMNS`, `getSyncDelta`, `pullDelta`,
+  `applyDelta`, the outbox payload, and the `pushMutations` branch — per the offline-sync rules, in
+  the same PR. **Never batch this one.**
+- **Existing rows migrate forward cleanly** as a single `manual` contribution each, preserving the
+  BF-3 dose snapshot. No data is lost and no history is rewritten.
+- **`logSupplement`/`unlogSupplement` become contribution-scoped.** Unlogging from the supplements
+  page removes the `manual` contribution only; deleting a meal removes that meal's contribution only.
+  Neither may soft-delete a day wholesale again.
+
+**⚠ The two collisions the decision above resolves, kept because they are what a reviewer should
+check the implementation against — read out of `adapter.ts`.**
+
+1. **`logSupplement` re-stamps; it does not add** *(resolved by contributions)*. The table is `unique(supplement_id, log_date)` and
+   the upsert's own comment says *"the row is one act of taking it"*, re-stamping the dose on a
+   second write. So a meal carrying creatine plus a hand-tick on the supplements page the same day
+   leaves **one** value, last writer wins — and a meal logged twice records one dose, not two. Decide
+   what a day means: *did I take it* (today's model, and fine for adherence) or *how much did I take*
+   (what a titration needs, and not representable as things stand).
+2. **`unlogSupplement` soft-deletes the whole day's row**, with no notion of who wrote it *(resolved
+   by contributions)*. Deleting a
+   meal that carried creatine would wipe a dose the owner also logged by hand. That is silent data
+   loss, and it is why **provenance has to exist before a second writer does.**
+
+- **Do not fix (1) by accumulating a stored number.** CLAUDE.md's stored-counter rule applies exactly
+  — every stored counter in this project has drifted — and an `amount` edited by add-on-log and
+  subtract-on-delete across meal edits is that shape precisely. **Derive the day's exposure from its
+  contributions** rather than storing a running total.
+- **The repo already has the multi-writer precedent: the ranked per-field merge and `source_map` in
+  `lib/data/health-source.ts`**, used for `body_metrics`, `sleep_sessions` and `oura_daily`. Same
+  discipline, whatever the final shape: know which source wrote a value before overwriting or
+  deleting it. That is the half `supplement_logs` does not have yet.
+- **⚠ It is a second writer to a synced domain, so the sync rules bind.** The meal path must go
+  through the same shared write function as the web route and the `pushMutations` branch (one write
+  path per domain), and it must write the **local store** — a supplement dose that only exists
+  server-side after a meal log is the Q-488 shape, where a local-first domain gets a write that never
+  reaches the device.
+- **This raises capture; it does not answer the gate above.** Attaching doses to meals means more
+  days get logged, which is genuinely the best fix for adherence — but *unknown vs zero* is still the
+  decision that has to land first, because more logged days does not make an unlogged one a zero.
+
+- **The "like a total calorie value" analogy is the one thing to adjust.** Doses do not sum across
+  substances — 2 mg of retatrutide, 5 g of creatine and 1,000 mg of fish oil have no meaningful
+  total, and an aggregate exposure number would be a metric that cannot be interpreted. What
+  transfers from nutrition is the *shape*, not the sum: **one number per substance per day**, which
+  is the same shape as steps or calories and is exactly what makes it correlatable. So the model is
+  N parallel series, each selectable, not one column.
+- **Location: log where the owner said, analyse where the other analyses live.** The supplements
+  section of Nutrition is right for entry — it is where the substance is already defined and logged.
+  The comparison belongs on the health/trends surface beside the metrics it is being compared
+  against, with a substance pickable as an overlay series. Building a bespoke chart inside the
+  supplements page would put a second correlation surface in the app.
+- **Recommendation: ship the overlay before the coefficient.** A dose series drawn against resting
+  HR, weight or sleep is immediately useful, honest about gaps, and cannot be wrong the way a number
+  can. A correlation coefficient computed over ~20 self-selected days with a titration confounded by
+  every other change in the owner's life reads as authoritative and is not; if one is ever shown it
+  must carry **n and the window**, exclude unknown days, and never be phrased causally.
+- **⚠ Retatrutide is a prescribed drug, so keep the app descriptive.** Record it, chart it, let the
+  coach *see* it (BF-44's health overview is the natural carrier) — but nothing here should
+  recommend, adjust or comment on dosing, and no LLM-authored line should read as titration advice.
+  The existing `PROSE_GUARDS` rule (quote the given numbers, no superlatives) is the closest thing
+  to precedent and should bind any generated text about this.
+- **Staging that keeps each step verifiable:** (0) the contributions migration decided above, which
+  is Lane A and ships alone; (1) the presence model — `started_on`/`stopped_on`
+  and an unknown-vs-zero rule, plus the supplements-page UI to set it; (2) a read model exposing one
+  daily series per substance; (3) the trends overlay; (4) coach visibility; (5) only then, if it is
+  still wanted, any computed statistic.
+- **Verification:** a baseline week with no dose and a following week at a dose produce two visibly
+  different series with no gap between them; a week where logging was simply missed reads as
+  *unknown* on the chart rather than as zero; and a supplement logged through the food log is
+  either counted once or excluded by a stated rule, never twice. **And the meal path specifically:**
+  log a meal carrying creatine and the dose appears in the supplement record; delete that meal and it
+  goes — without touching a dose logged by hand on the same day; log the same meal twice and the day
+  reads whatever the plan decided a day means, deliberately rather than by accident.
+
 ### [workouts][platform] BF-68 — the program builder does not know you are injured, and typing it into the chat does not make it stick
 
 - **Lane:** A — `app/api/generate-program/route.ts` and `app/api/builder-chat/route.ts`; the UI half
@@ -9677,32 +9836,25 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   deliberate archival policy and is explicitly **out of scope** here (see
   `docs/db-volume-cleanup-handover.md`).
 
-### [activity][devices] Q-284 — decide the fate of the Oura activity blend, which now fires on 1 day in 40
+### [app-shell][activity] LA-42 — `trainingBoostFrom` can never be non-null, now structurally
 
-- **Branch:** `chore/retire-oura-activity-blend`
-- **Plan:** none needed
-- **Added:** 2026-08-15 · from the comprehensive review (a finding that was **softened** during
-  verification — see below)
-- **What it is.** `blendActivityScore` (`lib/activity/blend-activity.ts`) exists to credit gym
-  training that Oura's Cloud activity score under-counted. It returns early unless
-  `ouraActivityScore != null`, and `lib/health/readiness-payload.ts:347` only calls it when
-  `ouraToday?.activityScore != null`, falling through to our own score otherwise.
-- **Measured, and this corrects the first reading.** The initial finding was "dead code — the Cloud
-  is gone, so `oura_daily.activity_score` is always null". **That is not what production says:**
-  `count(activity_score)` over post-re-key days is **1 of 40** (16 of 55 across all history). So the
-  branch is **nearly inert, not dead**, and it is filed on those terms rather than as a deletion.
-- **Why it is still worth an entry.** A branch that fires on one day in forty is a branch nobody can
-  reason about and no test exercises meaningfully. Its constants (`TRAIN_CREDIT_BASE = 6`,
-  `TRAIN_CREDIT_VOL = 8`, `MAX_ADJ = 14`) are described in their own comment as *"heuristic and
-  intentionally bounded; tune against real data over time"* — and there is now no path by which
-  real data will accrue, because the Cloud integration was removed on 2026-08-13.
-- **Decide, in one small PR:** either (a) retire it and let our own Activity Score stand alone —
-  the fallback branch already handles 39 of 40 days and folds in training credit itself — or
-  (b) keep it and document why one day in forty takes a different code path. **Check first whether
-  that single non-null day is real Cloud data or a stray write**; if it is a stray, (a) is
-  unambiguous.
-- **Low priority.** No user-visible fault, no data loss. This is dead-weight removal, and it should
-  not jump ahead of anything in the scoring cluster above.
+- **Branch:** _unassigned_ · **Lane: B** — `components/health/health-score-detail.tsx`
+- **Added:** 2026-08-30 · Lane A, from Q-284's removal.
+- `health-score-detail.tsx:205` computes
+  `trainingBoostFrom={… data.activityBlend.adjustment > 0 ? data.activityBlend.base : null}`.
+  Q-284 deleted `blendActivityScore`, so `adjustment` is now a literal `0` in
+  `readiness-payload.ts` and that ternary can only ever take its null arm.
+- **Not a regression, and that distinction matters for how urgent this is.** The prop was already
+  dead in practice — the blend last had an Oura score to adjust on **2026-07-07**, the re-key day —
+  so nothing changes for a user. Q-284 turned "dead in practice" into "dead by construction", which
+  is what makes it safe to delete rather than merely unused today.
+- **The fix is a deletion**, in Lane B's file: drop the prop and whatever `ScoreRing` does with it,
+  unless that path has another caller. The sibling banner this pairs with (`activity-content.tsx`'s
+  *"Oura 56 · +10 training → 66"*, named in the 2026-07-02 plan) is **already gone** — a grep for
+  `.adjustment` across `app/` and `components/` returns this one line and nothing else.
+- **Low priority.** No user-visible fault; it is dead-weight removal on a surface that already
+  renders correctly.
+
 
 > **⚑ Q-232 … Q-244 are one cluster** — the 2026-08-14 UI/flow/IA + caching review, requested by the
 > owner ("a good review on the ui and flow/location mainly … alongside that have a look at caching

@@ -4231,7 +4231,70 @@ their own device passes, so there was nothing here this branch could honestly st
 now carries, so the entry is removed rather than rewritten to a `Keep:` — the residue lives in
 `projectOverview.md`, and duplicating it in the queue would make an entry that reads as open work.
 
-## 2026-08-31 — `projectOverview.md` 8468 → 8493, `docs/implementation-backlog.md` 13602 → 13574 (BF-65)
+## 2026-08-30 — `docs/implementation-backlog.md` (BF-69, exposure as a variable)
+
+Long because the request arrives on top of storage that already exists and one decision that
+invalidates everything after it.
+
+BF-3 shipped the per-log `amount`/`unit`/`doseText` snapshot, and its own comment says it was built
+so a dose could be correlated against resting HR. What the entry adds is that **nothing reads it** —
+`supplementLogs` is absent from `health-trends`, `sleep-performance-correlation` and both ai-chat
+analysis files — so this is a reader, not a schema.
+
+The decision written at the top is that **a missing row is not a zero**. The owner's baseline week is
+a request to record a real zero, and today "didn't take it" and "forgot to log" are the same absence.
+Three options are laid out with the one that manufactures effects named as such. The repo has already
+published a false coefficient from a data-shape mistake and left it standing for eleven days, which
+is why this is a blocker rather than a caveat.
+
+Two findings the request did not know about: `food_items` has no supplement link and the owner's food
+log already contains supplement rows, so the "picked up from the nutrition log" hope is also a
+double-count risk; and the "like a total calorie value" analogy needs adjusting, because doses do not
+sum across substances — what transfers is the shape (one number per substance per day), not the
+total.
+
+## 2026-08-30 — `docs/implementation-backlog.md` (BF-69 gets the owner's join, and two collisions)
+
+The owner answered how the food log should reach the exposure series: attach supplements to a meal or
+saved meal, and logging the meal logs the dose. Recorded verbatim, because it dissolves the
+double-count by construction — one table, two entry points — and the rule that makes it work is worth
+stating outright: a supplement attached to a meal writes a `supplement_logs` row and never a
+`food_items` row.
+
+What grew the entry is two collisions read out of `adapter.ts` rather than guessed. `logSupplement`
+**re-stamps** rather than adds — its own comment says the row is one act of taking it — so a
+meal-carried dose plus a hand-tick is one value, last writer wins. And `unlogSupplement` soft-deletes
+the whole day with no notion of who wrote it, so deleting a meal would wipe a hand-logged dose. Both
+are silent, and both are only visible from the adapter, which is the argument for putting them in the
+entry rather than leaving them for the implementer.
+
+Two in-repo rules are cited because they answer the obvious fixes: stored counters have all drifted
+here, so the day's amount must be derived rather than accumulated; and the ranked per-field merge with
+`source_map` is the existing multi-writer provenance pattern that `supplement_logs` lacks.
+
+## 2026-08-30 — `docs/implementation-backlog.md` (BF-69's storage model is decided)
+
+The owner took both recommendations, so the entry stops describing a choice and starts describing a
+shape: a day's exposure is an amount derived from contribution rows, each carrying where it came from
+(`manual` or `meal:<id>`).
+
+Three reasons are kept rather than compressed, because each is the answer to an objection an
+implementer will otherwise raise. Amount over tick is argued on **reversal cost** — amount → tick is
+free, tick → amount means back-filling doses nobody recorded — not on richness. Contributions over a
+`source` column is argued from the deletion bug: one shared row cannot have half of it removed.
+And `source_map` is explicitly rejected, because it is the reflex answer to "multiple writers" in this
+codebase and it is the wrong tool here — a rank ladder resolves competing claims about one truth and
+would discard one of two doses that should add.
+
+The consequences section exists because this is a schema change to a **synced** domain: the unique
+constraint that has to go is load-bearing across the local table, the reconcile lists, the delta and
+the push branch, and the entry says so with "never batch this one" rather than leaving it to the
+sync rules to be remembered.
+
+The two collisions stay in the entry, marked resolved, as the checklist a reviewer runs the
+implementation against.
+
+## 2026-08-31 — `projectOverview.md` 8468 → 8493, `docs/implementation-backlog.md` 13754 → 13726 (BF-65)
 
 **Twenty-five lines: a status paragraph and a Known-Issues row, and the row is the one that had to
 be written long.** BF-65 is JS-only, so it reaches the phone on the next deploy and is
@@ -4249,3 +4312,8 @@ branches, and the neighbouring ⚠️ rows are all still owed their own device p
 **The backlog falls despite BF-65 staying.** The entry is rewritten to its `Keep:` residue — the
 device check, and only that — which is shorter than the plan it replaces. It stays queued rather
 than being removed because a clip that has never been seen moving is not finished.
+
+(Backlog figures re-derived on the merge: four PRs landed while this branch's E2E ran, so the
+branch's own 13602 → 13574 was against a base that no longer exists. The drop is the same 28 lines
+either way.)
+
