@@ -905,6 +905,16 @@ bug is that it is using a prediction as the definition of BMR when a measurement
 
 ### [body][nutrition] 🔵 BF-2 — the "DEXA filter": calibrate the scale's body-fat estimate against a real DEXA, and correct history
 
+> **⚑ STEPS 1 AND 2 SHIPPED 2026-08-31 — `packages/shared/src/health/body-fat-calibration.ts` and
+> `repo.getBodyFatCalibration()`.** The calibration derives, the pairing works against
+> production-shaped rows (+3.2 from the one 2026-08-27 pair, 3 of 11 readings corrected, the rest
+> untouched), and **nothing consumes it yet** — no goal, no RMR, no panel has changed. **What is
+> owed is steps 3 and 4:** the sweep of the read sites, and the payload field. Step 3 has a design
+> question the plan did not settle and this session did not have the measurement for —
+> `listBodyMetrics` has **22 call sites**, so correcting *inside* that read makes a missed site
+> impossible but risks a read-then-write path persisting a corrected value into the raw column.
+> Measure which callers write back before choosing.
+>
 > **⚑ PLANNED 2026-08-31 — [`2026-08-31-dexa-filter.md`](superpowers/plans/2026-08-31-dexa-filter.md).**
 > This is an implementation item now, not a planning one. **Two decisions in the plan reverse what
 > this entry assumed, so read it before building:**

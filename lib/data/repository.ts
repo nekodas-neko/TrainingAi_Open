@@ -22,6 +22,7 @@ import type {
   Baseline1rmEntry, PendingTransition, PrescriptionStatus, ProgramVolumeTarget,
 } from '@trainingai/shared/types/ai-periodization'
 import type { TimeseriesCursor, TimeseriesPage, OuraHrDeltaRow, OuraBucketDeltaRow } from './postgres/slices/oura'
+import type { BodyFatCalibration } from '@trainingai/shared/health/body-fat-calibration'
 
 // Result of an upsert-by-client-id workout session write. `wasInserted` is false when a
 // session with that id already existed — in that case the phase fields reflect what was
@@ -890,6 +891,11 @@ export interface WorkoutRepository {
   saveDexaScan(userId: string, input: DexaScanInput): Promise<void>
   getLatestDexaScan(userId: string): Promise<DexaScanRow | null>
   listDexaScans(userId: string): Promise<DexaScanRow[]>
+  /** The body-fat correction for one instrument, DERIVED from the rows that already hold both
+   *  halves — `dexa_scans` and `body_metrics` — rather than from a stored pair table. A stored pair
+   *  would be a stored counter, and it would drift the moment either side were re-entered. `null`
+   *  when the instrument has no pair, which reads as "uncorrected", never as a zero offset. */
+  getBodyFatCalibration(userId: string, source?: string): Promise<BodyFatCalibration | null>
 
   /** BF-33: clinically measured RMR. `saveMeasuredRmr` upserts on (user, date) so re-entering a
    *  test corrects it, while a later test is a new row beside the first. */
