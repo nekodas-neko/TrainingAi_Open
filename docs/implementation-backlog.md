@@ -2219,6 +2219,26 @@ deadlifts in the builder gets deadlifts again the next time the engine writes a 
 
 ### [workouts] BF-67 — building a new program cannot reference an old one, so every program starts from nothing
 
+> **⚑ STEP 2 SHIPPED 2026-08-31 — the engine half. Steps 3 (picker, Lane B) and 4 (history summary)
+> remain.** `/api/generate-program` accepts `referenceProgramId`, resolves it **server-side against
+> `listPrograms(userId)`** so a program the caller does not own is simply absent, and puts session
+> names + exercise names + roles + styles into the prompt, capped at 10 sessions x 20 exercises.
+> **An id, never a program object** — accepting the structure from the client would be an ownership
+> hole and a prompt-injection surface for nothing the id does not already give.
+>
+> - **Keep — step 3, the picker (Lane B).** `listPrograms` already exists; one control in the
+>   builder wizard, and no reference selected leaves today's behaviour unchanged. **Nothing reaches
+>   the owner until this ships** — the parameter has no caller.
+> - **Keep — step 4, the history summary.** Deliberately separate; step 2 sends structure only.
+> - **⚠ The name-drift caveat is real and measured.** Reference names go through LA-43's resolver
+>   before entering the prompt, but the seeded program's `Bench Press` / `Overhead Press` /
+>   `Romanian Deadlift` do **not** resolve — the library holds `Barbell Bench Press` and the resolver
+>   deliberately refuses subset matches. Those enter as stored free text, which the model reads as
+>   intent rather than a selectable name (rule 2 still binds it to the available list). Measured
+>   end-to-end against real Gemini: with the reference, **Barbell Overhead Press** and **Barbell
+>   Front Squat** appeared where neither did without it, so the steer works through the drift.
+
+
 - **Lane:** A for the payload and prompt, B for the picker.
 - **Plan:** [`2026-08-31-reference-an-old-program.md`](superpowers/plans/2026-08-31-reference-an-old-program.md)
   — **written 2026-08-31**, so this is now an implementation item rather than a planning one.

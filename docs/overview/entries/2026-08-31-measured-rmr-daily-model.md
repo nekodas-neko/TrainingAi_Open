@@ -52,3 +52,44 @@ the right concept, exercised the right numbers, and could not fail.
 No runtime pass on `pnpm dev` for this one — the behaviour is covered by the service-level test
 above, which calls `computeEnergyBalance` directly with the owner's real numbers. Device,
 safe-area and WebView paths do not apply.
+
+---
+
+# BF-67 step 2 — a new program can reference an old one (engine half)
+
+Same branch. `/api/generate-program` takes `referenceProgramId` and puts the referenced program's
+structure into the prompt. **Steps 3 (the picker, Lane B) and 4 (the history summary) are not built,
+so nothing reaches the owner yet — the parameter has no caller.**
+
+**An id, never a program object.** The structure is read server-side via `listPrograms(userId)` and
+the id matched against what that returns, so a program the caller does not own is simply absent with
+no separate not-found branch to distinguish the two from outside. Accepting the structure from the
+client would be an ownership hole and a prompt-injection surface for nothing the id does not give.
+
+**Bounded at the schema, not by hoping** — 10 sessions × 20 exercises. The note above
+`MAX_BODY_BYTES` already records that `equipment` and `musclesToFocus` are unbounded arrays held only
+by the byte cap; a program is a larger structure than either. A real five-session program is ~30
+names, so the caps do not bite.
+
+## The drift caveat is real, and measured rather than assumed
+
+The plan and the entry both warned that the reference payload must send the library's own names,
+because LA-43's resolver deliberately refuses subset matches. Measured against the seeded program:
+`Tricep Pushdown` and `Lat Pulldown` resolve, `Front Barbell Squat` → `Barbell Front Squat`, and
+**`Bench Press`, `Overhead Press`, `Deadlift`, `Bicep Curl`, `Romanian Deadlift` and `Calf Raises` do
+not resolve at all** — the library holds `Barbell Bench Press`, and "Bench Press" is a subset of it.
+
+Those enter the prompt as stored free text. That is the right fallback: the model reads them as
+intent, and rule 2 still binds its output to the available list. It is not silently wrong, but it is
+weaker than a resolved name, and the entry now says so.
+
+**End-to-end against real Gemini, same inputs with and without the reference:**
+
+| | without | with |
+|---|---|---|
+| Push #2 | Incline Bench Press | **Barbell Overhead Press** ← referenced |
+| Legs #2 | Leg Press | **Barbell Front Squat** ← referenced |
+
+So the steer works through the drift. **My first check said otherwise and was wrong** — it compared
+the output against the program's *stored* names, which the route never sends, so the intersection was
+empty by construction. Comparing against the resolved names is what shows the effect.
