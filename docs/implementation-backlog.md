@@ -358,6 +358,51 @@ below threshold and left in place for next time.
 > BF-29 (My meals), BF-30 (Meal detail), BF-31 (Edit meal) and BF-26 (Quantity). Two artboards need
 > no entry — `Tap targets` and the `srv/g` studies both shipped in Q-395a.
 
+### [activity][nutrition] BF-87 — "nothing earned from movement yet today" is true and unexplainable, so the owner had to ask
+
+- **Lane:** B — the Energy Balance card's copy (`components/health/…`, the `activeBreakdown`
+  consumer) and the Nutrition "why two numbers" block that says the same thing.
+- **Batch:** `nutrition-ui-uplift`
+- **Added:** 2026-09-01 · owner: *"is basic steps being counted towards calorie burn? It says I've
+  done 1000 but not sure if that's counting towards nutrition."*
+
+**The app is correct and the screen cannot say why.** The owner's screenshot holds both halves of the
+contradiction he is reporting: **STEPS 1,196 Today** beside *"1,365 base — nothing earned from
+movement yet today"*. Both are true, because of one constant:
+
+```ts
+// packages/shared/src/health/daily-energy.ts
+export const STEP_BASELINE = 3000
+const netSteps = Math.max(0, ped - STEP_BASELINE - loggedOutdoorSteps)
+if (netSteps > 0) stepsKcal = est(14, netSteps / WALKING_CADENCE_SPM)
+```
+
+**Only steps above 3,000 earn calories**, deliberately: the sedentary base is BMR × 1.2, and a desk
+day's incidental stepping is already inside that multiplier. Counting every step would double-count
+it. The constant's own comment says exactly this. At 1,196 steps the honest answer is zero, and the
+card gives the honest answer without the reason.
+
+- **This is not a maths fix — it is a copy fix, and a small one.** The card already knows both
+  numbers. *"Steps add to your burn above 3,000/day — 1,196 so far"* answers the question on the
+  screen that raised it. Same for the Nutrition tab's "why two numbers" block, which repeats the
+  phrase.
+- **⚠ Show the threshold, not just the shortfall.** The owner's step goal is 7,000, so on a good day
+  only **4,000** steps convert — roughly 40 minutes of walking at the model's 100 steps/min. A user
+  who thinks all 7,000 count will read the burn as too low and go looking for a bug, which is this
+  report one step later.
+- **The two other addends are silent in the same way.** `workoutKcal` and `activityKcal` also roll
+  into one "earned from movement" figure with no breakdown at the point of confusion —
+  `activeBreakdown` already returns all three separately (Q-391 made sure the parts sum to the
+  total), so the data for a one-line breakdown is already in hand.
+- **⚠ Do not "fix" this by lowering or removing `STEP_BASELINE`.** It is the guard against
+  double-counting against the 1.2 multiplier, it is documented as such, and changing it silently
+  re-scores every historical day — the class this repo has a standing rule about. If the threshold is
+  ever revisited it is a Tuning proposal with the owner's sign-off, and it must state how many past
+  days it moves.
+- **Verification:** on a morning below the threshold the card says why and names the number; above it,
+  the earned figure appears and the explanation stops; and the three addends shown never disagree
+  with the total.
+
 ### [platform] LB-40 — a user who already has a password cannot change it: the form never asks for the current one
 
 - **Lane:** B — `components/profile/edit-profile-sheet.tsx`. The route is correct; only the client
@@ -429,6 +474,7 @@ two screens, and a user who sets one has no way to know the other exists.
   resolving it, and picking a winner from a UI PR is exactly the shape the lane rule exists to stop.
 - **Verification:** one column, one editor, one reader set; every existing `weight_goal_kg` value
   accounted for; the recommendation prompt quotes the same number the Health page shows.
+
 
 ### [app-shell][platform] BF-86 — the morning check-in never re-prompts, because its effect runs once per app launch
 

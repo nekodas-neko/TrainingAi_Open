@@ -5219,6 +5219,23 @@ Also records the scale (56 `cachedFetchToday` sites) and the boundary-test rule,
 bug is only visible across local midnight and this repo has repeatedly shipped date logic that works
 all day and fails in a two-hour band.
 
+## 2026-09-01 — `docs/implementation-backlog.md` (BF-87, a correct number nobody can explain)
+
+The owner asked whether steps count toward calorie burn, and his own screenshot holds both halves:
+1,196 steps beside "nothing earned from movement yet today". Both true, because `STEP_BASELINE` is
+3,000 and only steps above it convert — the sedentary base is BMR × 1.2 and a desk day's incidental
+stepping is already inside that multiplier.
+
+So the entry is a copy fix, and its length is spent on the two ways it could be built wrong. Showing
+the *shortfall* without the *threshold* leaves the same question one step later — the owner's goal is
+7,000 steps, of which only 4,000 convert, and someone expecting all 7,000 to count will read the burn
+as broken. And "fix" by lowering or deleting the constant is the tempting wrong move: it is the guard
+against double-counting, and changing it silently re-scores every historical day, which is a Tuning
+proposal with a stated blast radius rather than an implementation detail.
+
+Also notes that `activeBreakdown` already returns all three addends separately, so a one-line
+breakdown needs no new data.
+
 ## 2026-09-01 — `projectOverview.md` 8572 → 8593, `docs/implementation-backlog.md` 14557 → 14584 (BF-79)
 
 **`projectOverview.md` (+21).** Two shipped changes had to be recorded and only one of them was
@@ -5227,10 +5244,14 @@ BF-79's. Both were tightened before the raise — the BF-85 block came down from
 and BF-79's from ten to nine — and what is left is the two features plus the three findings BF-79
 turned up and filed (LB-40, LB-41, LB-42), one of which is a live bug on `main`.
 
-**`docs/implementation-backlog.md` (+27).** Net of removing the shipped BF-79 entry (43 lines) and
+**`docs/implementation-backlog.md` → 14630 after merging BF-87.** Both PRs raised this one file, which
+is the size conflict that is a real disagreement rather than two additions — resolved by recomputing
+from the merged document, never by taking a side. BF-79's own share is **+27**: net of removing the
+shipped BF-79 entry (43 lines) and
 adding those three (76). LB-42 is the long one deliberately: it has to say which column each reader
 uses before anyone can choose which survives, and that is the whole of the decision it is asking
 for.
 
 Nothing was banked. The alternative to raising was leaving a shipped feature unrecorded in the file
 every session reads first, which is the failure the ratchet is not for.
+
