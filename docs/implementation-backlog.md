@@ -1766,8 +1766,15 @@ that handler defers, the way it already defers to a carousel.
 
 - **Lane:** B
 - **Batch:** `nutrition-ui-uplift` — ships with BF-45.
-- **Device-verified when built** — see Verification. **Deliberately NOT `Gate: device`:** that
-  field parks an entry, and these are unbuilt. See the note below.
+- **Gate:** device
+- **Keep:** the **device check**, and only that. All four parts have shipped — ① (a) the single
+  picker at the top (v1.402.0), ① (b) the CSP fix that was the save failure's real cause (v1.399.0),
+  ② grams-only ingredient rows and ③ Option A (both v1.401.0). **The `Gate: device` above was
+  deliberately withheld while they were unbuilt** — that field parks an entry, and parking unbuilt
+  work would have hidden it. Now that nothing here is unbuilt, its absence did the opposite: it left
+  an entry with no work in it heading `next-item.js`'s READY list, which is the one thing that tool
+  exists to prevent. On the S25, per ① (b)'s own note: pick a photo in Edit Meal, save, reopen. If it
+  still fails it now fails *loudly*, which is the smaller half of that fix.
 - **Added:** 2026-08-27 · owner, with screenshots. *"overall just a UI rework/uplift. almost there."*
 
 **① Two things, and the owner corrected the first reading of them. ⚠ THE SAVE FAILURE IS REAL AND
@@ -11595,34 +11602,6 @@ per-field merge where an AI write has no honest source rank to claim.
 - `weekly-recap-banner.tsx` + `/api/weekly-digest` at the owner's "monthly scale" lookback.
   Deliberately last, so the daily version settles the layout first.
 
-### [app-shell][nutrition] LB-23 — three sheets announce their own title twice
-
-- **Branch:** `fix/sheet-title-duplication` · **Lane: B** — `components/**` only.
-- **Added:** 2026-08-27 · Lane B, found while writing Q-112a's E2E spec.
-- **What it is.** Radix requires a `SheetTitle` for the dialog's accessible name, so these sheets
-  render an `sr-only` one *and* a visible `<h2>` carrying the identical string. A screen reader
-  therefore reads the name once as the dialog's, then again as a heading; and
-  `getByRole('heading', { name })` is ambiguous, which is why `e2e/day-review-one-door.spec.ts`
-  matches on `getByRole('dialog')` and says so in a comment pointing here.
-- **The three, swept 2026-08-27** (`grep -rn 'SheetTitle className="sr-only"' components/ app/`):
-  - `components/nutrition/end-of-day/end-of-day-review.tsx:214` / `:218` — "End of Day"
-  - `components/morning-checkin-sheet.tsx:171` / `:175` — "Morning Check-in"
-  - `components/nutrition/food-logger-sheet.tsx:247` / `:249` — `STEP_LABELS[step]`, both sides
-  - `components/nutrition/quick-edit-log-sheet.tsx:118` is **not** a violator — sr-only title, no
-    visible heading. Leave it as it is; it is the shape the others become if the `<h2>` is ever
-    dropped instead.
-- **The fix is one line each:** `<SheetTitle asChild><h2 className="…">…</h2></SheetTitle>` and
-  delete the `sr-only` node. `SheetTitle` is `React.ComponentProps<typeof SheetPrimitive.Title>`, so
-  `asChild` is already in its type — no change to `components/ui/sheet.tsx`. Note `SheetTitle` also
-  applies `text-foreground font-semibold`, which the existing `<h2>` classes must survive being
-  merged with.
-- **Severity is low and stated as such.** Nothing is unreachable and nothing is unlabelled; it is
-  redundancy plus a test-locator hazard. It earns an entry because the E2E comment already names it
-  and because a fourth sheet copying the pattern is the cheapest moment to stop it.
-- **Verification.** No behavioural test to add — assert the count instead: after the change,
-  `page.getByRole('heading', { name: 'End of Day' })` resolves to exactly one node, which is the
-  locator the spec can then go back to using.
-
 ### [workouts][platform] LB-24 — deleting the Home day-review orphaned a chart, a route and a cache group
 
 - **Branch:** `chore/load-comparison-rehome-or-delete` · **Lane: A** — the decision reaches
@@ -13075,29 +13054,6 @@ path and wanting a device check before merging — so this is one entangled piec
 of work, not two. Take the `return 60` fix and the offline weight-resolution
 wiring together, with a device check, rather than building a mirror table nobody
 reads.
-
-### [platform] LB-30 — 46 e2e coordinate reads can be measuring a moving element
-
-- **Lane:** B
-- **Added:** 2026-08-31 · Lane B, from the root cause of BF-39's week-long hold.
-
-A `boundingBox()` taken right after a sheet opens is a position the element is still travelling
-through. `SheetContent` slides in over `duration-500`, and `toBeVisible()` — and `toBeInViewport()`
-— are both satisfied long before it lands. **Measured on the meal library**: the row read y=605,
-and by the time a CDP touch reached it the row sat at y=503, so every point of the gesture hit the
-scroll container beneath it and the drag handler was never invoked once. It reads as a dead gesture,
-not a mis-aimed one, which is why it cost a week: the whole investigation was a render-vs-remount
-question the defect never involved.
-
-`swipeRowLeft` (`e2e/fixtures.ts`) now waits for two reads a frame apart to agree before it
-measures, and the three swipe specs go through it. **What is owed is the same audit for the other
-reads**: 46 `boundingBox()` calls across 27 spec files, of which only the ones feeding a
-`touchscreen.tap`/CDP dispatch are exposed — `locator.tap()` does its own stability check and is
-safe. `openSavedMeal` is the pattern that already survives this by re-measuring inside a `toPass`
-retry; a single measure followed by a coordinate tap is the shape to find.
-
-- **Not urgent**, and deliberately below the feature work: it produces flakes, not wrong behaviour,
-  and every one of them is already failing loudly rather than passing silently.
 
 ### [platform] 🟡 J1 residual — CI-enforced cache/fetch hygiene gates
 

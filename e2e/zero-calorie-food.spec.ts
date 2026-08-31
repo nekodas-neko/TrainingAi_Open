@@ -1,5 +1,5 @@
 import { test, expect, type Page } from '@playwright/test'
-import { settleRouteBoundary, suppressMorningCheckin } from './fixtures'
+import { settleRouteBoundary, suppressMorningCheckin, tapCentre } from './fixtures'
 
 /**
  * A calorie-free food can be logged, and a disabled button says what it wants (LA-30).
@@ -35,8 +35,7 @@ async function tap(page: Page, name: RegExp | string) {
   const target = page.getByRole('button', { name }).first()
   await expect(target).toBeVisible({ timeout: 30_000 })
   await target.evaluate(el => el.scrollIntoView({ block: 'center' }))
-  const box = (await target.boundingBox())!
-  await page.touchscreen.tap(box.x + box.width / 2, box.y + box.height / 2)
+  await tapCentre(page, target)
 }
 
 async function openDescribe(page: Page): Promise<void> {

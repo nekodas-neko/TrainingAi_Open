@@ -1,6 +1,6 @@
 import { test, expect, type Page } from '@playwright/test'
 import { Client } from 'pg'
-import { SEED_EMAIL, settleRouteBoundary } from './fixtures'
+import { SEED_EMAIL, settleRouteBoundary, stableBox, tapCentre } from './fixtures'
 
 /**
  * The food library and the food-database search draw the SAME row (Q-406).
@@ -46,8 +46,7 @@ test.afterAll(async () => {
 async function tap(page: Page, target: ReturnType<Page['getByRole']>) {
   await expect(target).toBeVisible({ timeout: 30_000 })
   await target.scrollIntoViewIfNeeded()
-  const box = (await target.boundingBox())!
-  await page.touchscreen.tap(box.x + box.width / 2, box.y + box.height / 2)
+  await tapCentre(page, target)
 }
 
 test('the library sheet lists foods in the shared row, calories in their own column', async ({ page }) => {
@@ -70,8 +69,8 @@ test('the library sheet lists foods in the shared row, calories in their own col
   const calorieCell = row.locator('span.tabular-nums')
   await expect(calorieCell).toHaveCount(1)
   await expect(calorieCell).toContainText('389')
-  const cellBox = (await calorieCell.boundingBox())!
-  const rowBox = (await row.boundingBox())!
+  const cellBox = await stableBox(calorieCell)
+  const rowBox = await stableBox(row)
   // Right-aligned: the cell ends within a chevron's width of the row's right edge.
   expect(rowBox.x + rowBox.width - (cellBox.x + cellBox.width)).toBeLessThan(40)
 })

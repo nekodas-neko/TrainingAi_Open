@@ -1,6 +1,6 @@
 import { test, expect, type Page } from '@playwright/test'
 import { Client } from 'pg'
-import { SEED_EMAIL, openSavedMeal, settleRouteBoundary } from './fixtures'
+import { SEED_EMAIL, openSavedMeal, settleRouteBoundary, tapCentre } from './fixtures'
 
 /**
  * The meal photo can be picked, and what gets stored is inside the cap (Q-327).
@@ -74,8 +74,7 @@ async function tap(page: Page, name: RegExp | string) {
   const target = page.getByRole('button', { name }).first()
   await expect(target).toBeVisible({ timeout: 30_000 })
   await target.evaluate(el => el.scrollIntoView({ block: 'center' }))
-  const box = (await target.boundingBox())!
-  await page.touchscreen.tap(box.x + box.width / 2, box.y + box.height / 2)
+  await tapCentre(page, target)
 }
 
 /** Photo-sized JPEG straight into the sheet's file input, the way a gallery pick arrives. */

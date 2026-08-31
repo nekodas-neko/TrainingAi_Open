@@ -1,5 +1,5 @@
 import { test, expect, type Page } from '@playwright/test'
-import { settleRouteBoundary } from './fixtures'
+import { settleRouteBoundary, stableBox } from './fixtures'
 
 /**
  * The meal builder offers a barcode scan (BF-63).
@@ -39,7 +39,7 @@ test('the builder offers a barcode scan beside the ingredient search', async ({ 
   await expect(scan, 'a packet ingredient has to be typed without this').toBeVisible({ timeout: 15_000 })
 
   // The 48 dp floor applies to it like every other control on this screen.
-  const box = (await scan.boundingBox())!
+  const box = await stableBox(scan)
   expect(box.height, 'below the 48 dp tap-target floor').toBeGreaterThanOrEqual(44)
   expect(box.width, 'below the 48 dp tap-target floor').toBeGreaterThanOrEqual(44)
 

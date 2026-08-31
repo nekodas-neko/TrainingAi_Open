@@ -1,6 +1,6 @@
 import { test, expect, type Page } from '@playwright/test'
 import { Client } from 'pg'
-import { SEED_EMAIL, settleRouteBoundary } from './fixtures'
+import { SEED_EMAIL, settleRouteBoundary, tapCentre } from './fixtures'
 
 /**
  * A recipe URL becomes a meal, and a recipe with no stated yield is asked about (Q-409).
@@ -79,8 +79,7 @@ async function tap(page: Page, name: RegExp | string) {
   const target = page.getByRole('button', { name }).first()
   await expect(target).toBeVisible({ timeout: 30_000 })
   await target.evaluate(el => el.scrollIntoView({ block: 'center' }))
-  const box = (await target.boundingBox())!
-  await page.touchscreen.tap(box.x + box.width / 2, box.y + box.height / 2)
+  await tapCentre(page, target)
 }
 
 /** Calories the row currently reports, read off its own totals line. */
