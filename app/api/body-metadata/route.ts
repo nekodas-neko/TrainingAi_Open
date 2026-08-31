@@ -7,6 +7,7 @@ import { BodyMetadataPostSchema } from "@trainingai/shared/validation/body-metri
 import { type Sex } from "@trainingai/shared/health/workout-energy";
 import { computeActiveEnergy } from "@trainingai/shared/health/daily-energy";
 import { readJsonLimited } from '@trainingai/shared/http/request-guards'
+import { correctBodyFatPct, type BodyFatCalibration } from '@trainingai/shared/health/body-fat-calibration'
 
 // One day's body metadata.
 const MAX_BODY_BYTES = 16 * 1024
@@ -17,7 +18,28 @@ const MAX_BODY_BYTES = 16 * 1024
 export interface BodyMetaRow {
   date: string;
   weightKg: number | null;
+  /**
+   * The RAW stored reading, and it must stay raw. The health screen's log sheet seeds its input
+   * from this field and POSTs the value back at source `manual`, a rank that outranks `scale_ble` —
+   * so a corrected value here would let the user overwrite their own measurement by saving a field
+   * they never touched, and collapse the next DEXA calibration toward zero (BF-2).
+   */
   bodyFat: number | null;
+  /**
+   * What to DISPLAY: the DEXA-corrected reading, or the raw one where no calibration applies.
+   *
+   * Optional because the client builds `BodyMetaRow` literals for its own optimistic paint after a
+   * log, and those genuinely carry no calibration — a manual entry is not the instrument the DEXA
+   * was compared against. Absent is the truthful value there, not a fabricated one.
+   */
+  bodyFatCorrected?: number | null;
+  /**
+   * Whether a calibration was applied to this reading. **Not derivable from the two values above** —
+   * an offset can round to zero, and two thirds of the owner's history is on instruments the
+   * calibration does not cover, so a chart has to mark where the calibrated span begins rather than
+   * draw an unexplained step at the boundary.
+   */
+  bodyFatIsCorrected?: boolean;
   calories: number | null;
   protein: number | null;
   carb: number | null;
@@ -56,11 +78,14 @@ export interface WeekToDate {
   waterMl: number;
 }
 
-function toRow(m: { date: string; weightKg?: number; bodyFatPct?: number; calories?: number; proteinG?: number; carbsG?: number; fatG?: number; steps?: number; distanceKm?: number; restingHeartRate?: number; hrvMs?: number; spo2Pct?: number; waterMl?: number; waistCm?: number; chestCm?: number; armCm?: number; thighCm?: number; hipCm?: number; neckCm?: number; skeletalMusclePct?: number; fatFreeMassKg?: number; subcutaneousFatPct?: number; visceralFatIndex?: number; bodyWaterPct?: number; muscleMassKg?: number; boneMassKg?: number; proteinPct?: number; bmrKcal?: number; metabolicAge?: number }): BodyMetaRow {
+function toRow(m: { date: string; weightKg?: number; bodyFatPct?: number; bodyFatSource?: string; calories?: number; proteinG?: number; carbsG?: number; fatG?: number; steps?: number; distanceKm?: number; restingHeartRate?: number; hrvMs?: number; spo2Pct?: number; waterMl?: number; waistCm?: number; chestCm?: number; armCm?: number; thighCm?: number; hipCm?: number; neckCm?: number; skeletalMusclePct?: number; fatFreeMassKg?: number; subcutaneousFatPct?: number; visceralFatIndex?: number; bodyWaterPct?: number; muscleMassKg?: number; boneMassKg?: number; proteinPct?: number; bmrKcal?: number; metabolicAge?: number }, calibration: BodyFatCalibration | null): BodyMetaRow {
+  const corrected = correctBodyFatPct(m.bodyFatPct ?? null, m.bodyFatSource ?? null, calibration);
   return {
     date:             m.date,
     weightKg:         m.weightKg         ?? null,
     bodyFat:          m.bodyFatPct        ?? null,
+    bodyFatCorrected: corrected?.pct      ?? null,
+    bodyFatIsCorrected: corrected?.corrected ?? false,
     calories:         m.calories          ?? null,
     protein:          m.proteinG          ?? null,
     carb:             m.carbsG            ?? null,
@@ -110,13 +135,14 @@ export async function GET() {
 
   const repo = await getRepository();
   const weekStartForFetch = startOfWeekInTz(tz);
-  const [metrics, foodLogs, activityLogs, weekFoodSummary, weightHistory, todayWorkouts] = await Promise.all([
+  const [metrics, foodLogs, activityLogs, weekFoodSummary, weightHistory, todayWorkouts, bodyFatCalibration] = await Promise.all([
     repo.listBodyMetrics(userId, from, today),
     repo.listFoodLogs(userId, today).catch(() => []),
     repo.listActivityLogs(userId, weekStartForFetch, today).catch(() => []),
     repo.listFoodLogsSummary(userId, weekStartForFetch, today).catch(() => []),
     repo.listBodyMetrics(userId, from180, today).catch(() => []),
     repo.getWorkoutSessionsFrom(userId, todayStartUtc).catch(() => []),
+    repo.getBodyFatCalibration(userId).catch(() => null),
   ]);
 
   // Newest row (by date) that actually carries a weight — the last-known value, however old.
@@ -140,7 +166,7 @@ export async function GET() {
   const weekActivitySteps = activityLogs.reduce((sum, a) => sum + (a.steps ?? 0), 0);
 
   const todayMetric = metrics.find(m => m.date === today);
-  const recent = metrics.slice(0, 7).map(toRow);
+  const recent = metrics.slice(0, 7).map(m => toRow(m, bodyFatCalibration));
 
   // Total active energy to add to the energy budget's "burned" — strength workouts + logged
   // activities (walk/run/cycle/…) + passive steps above a sedentary baseline, all net-of-rest via
@@ -166,7 +192,7 @@ export async function GET() {
 
   // Option 3: prefer food_logs totals for today if any entries exist,
   // otherwise fall back to body_metrics (Health Connect / MFP)
-  let todayRow: BodyMetaRow | null = todayMetric ? toRow(todayMetric) : null;
+  let todayRow: BodyMetaRow | null = todayMetric ? toRow(todayMetric, bodyFatCalibration) : null;
   if (foodLogs.length > 0) {
     const totals = foodLogs.reduce(
       (acc, l) => ({
@@ -225,7 +251,16 @@ export async function GET() {
   // Deliberate no-store, not the sibling SWR header: this payload folds live today
   // food/activity totals that must never be served stale — do not "fix" to SWR.
   return NextResponse.json(
-    { today: todayRow, recent, weekToDate, calsBurnedToday, activeEnergyKcalToday, latestWeightKg, latestWeightDate },
+    {
+      today: todayRow, recent, weekToDate, calsBurnedToday, activeEnergyKcalToday,
+      latestWeightKg, latestWeightDate,
+      // The owner asked to be shown the offset, not just its effect. `pairCount` is what says how
+      // much to trust it: at one pair an offset and a ratio are the same number, so the UI must not
+      // present it as a settled calibration.
+      bodyFatCalibration: bodyFatCalibration
+        ? { offsetPct: bodyFatCalibration.offsetPct, pairCount: bodyFatCalibration.pairs.length, source: bodyFatCalibration.source }
+        : null,
+    },
     { headers: { "Cache-Control": "private, no-store" } },
   );
 }

@@ -94,7 +94,7 @@ deal, and every candidate sits within ~24 px of the reference.
 
 ## Verified
 
-`tsc --noEmit` clean · `pnpm check:rules` **Ran 63 of 63** · full suite **526 files / 4783 passed** ·
+`tsc --noEmit` clean · `pnpm check:rules` **Ran 64 of 64** (the count moved with #676's new check, re-run after merging it) · full suite **526 files / 4783 passed** ·
 `meal-photo-picker` + `zero-calorie-food` e2e green (7 tests), which is the pair that exercises the
 renamed remove control and the capture tiles.
 

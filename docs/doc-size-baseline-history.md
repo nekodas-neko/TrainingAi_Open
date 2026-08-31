@@ -4338,6 +4338,55 @@ The rest are cheap tests that stop a false alarm: check the **spread** before be
 have collapsed (they normally sit 20 points apart), and **reproduce readiness from its stored
 contributors** before calling it wrong (2026-08-31 came to 55.3 against a stored 55).
 
+## 2026-08-31 — `docs/implementation-backlog.md` → **14344** on the merge (LA-45 survives a conflict that was not the usual one)
+
+The backlog conflict here was **an addition against an empty side**, not the two deletions CLAUDE.md
+warns about — LA-45 is new and `main` had never seen it, so keeping HEAD was right where "keep
+neither" would have deleted a freshly filed entry. This is what the rule's *read the headings before
+choosing* is for, and the resolution asserts the other side is genuinely empty rather than trusting
+the eye.
+
+## 2026-08-31 — `docs/implementation-backlog.md` falls as LA-44 is struck
+
+LA-44 is removed whole: **BF-71 (#681) built it** hours after it was filed, so the entry describes
+work that exists. Checked before striking rather than assumed — BF-71's DEXA form takes a superset of
+the fields LA-44 named, its RMR form takes what `personalRmr` needs, and it adds no `bytea`, which is
+the one thing LA-44 said not to reverse.
+
+**The three surviving references to it were rewritten, not left.** An entry can be deleted from the
+queue in one edit and still be quoted as outstanding in three others — BF-2's banner said its outcome
+was "unobservable until LA-44", which stopped being true the moment #681 landed. A stale pointer to a
+struck entry is worse than the entry, because the next reader trusts prose over a queue they have to
+go and search.
+
+## 2026-08-31 — `docs/implementation-backlog.md` 14064 → **14089** (BF-2 finishes, LA-45 is filed)
+
+Twenty-five net, and it is one new entry — **LA-45**, the display half. The engine now corrects the
+body fat everywhere a number is derived from it and **no screen reads the corrected value**, so the
+Health card shows 25.3 while the calorie goal is already computed from 28.5. Two figures disagreeing
+on screen is worse than neither being corrected, which is why it is a queue entry rather than a note.
+
+BF-2's own step banner paid seven back. It had been rewritten twice today as steps landed, and the
+third version would have been a third "what is shipped so far" paragraph on an entry whose work is
+finished; it is replaced by the two things a later session must not simplify — the per-consumer
+correction, and the three separate payload fields.
+
+What LA-45 does **not** compress is the seeding rule: display `bodyFatCorrected`, seed the log input
+from `bodyFat`. Backwards, that lets someone overwrite their own measurement by saving a field they
+never touched, and no test in the repo would notice.
+
+## 2026-08-31 — `docs/implementation-backlog.md` 14017 → **14025** (BF-2 step 3 ships)
+
+Eight lines, and they buy one thing: a standing "do not simplify this back" on the step-3 design.
+Correcting inside `listBodyMetrics` looks obviously right — one place, no consumer can be missed —
+and it is wrong for a reason nothing in the code says out loud, because the path runs through a
+client edit sheet and a source rank. A future session that reads the per-consumer sweep as
+duplication will refactor it and quietly destroy the raw archive. The entry now carries the reason
+rather than the conclusion.
+
+The step-1/2 block it replaces is gone, not appended to: it existed to say "nothing consumes this
+yet", which stopped being true today, and leaving it would have had the entry contradict itself.
+
 ## 2026-08-31 — `docs/implementation-backlog.md` 14007 → **14017** (BF-2 steps 1–2 ship)
 
 Ten lines on BF-2, and they are the ones that stop the next session mis-reading a half-built entry:
@@ -4771,3 +4820,16 @@ against an EDIT — my side held the updated entries and main's side of the hunk
 had gone elsewhere. Resolved by placing this branch's content in #682's positions and then
 de-duplicating: BF-70 and BF-75 arrived twice, byte-identical. **Nothing differed between any pair**,
 which is what makes the de-duplication safe to state rather than hope.
+
+## 2026-08-31 — re-derived against #676: `projectOverview.md` → 8514, `docs/implementation-backlog.md` → 14336
+
+**Both come in UNDER main's baselines**, and the reason is worth stating because it is not this
+branch being small. #676 compacted the status section — it deleted BF-71's paragraph along with the
+older BF-2 and BF-46 ones — while this branch was adding its own. The conflict was therefore a
+COMPACTION against an ADDITION: keeping this side whole would have restored three paragraphs main
+had just removed, on the one file whose entire problem is unbounded growth. Only the new paragraph
+was kept.
+
+**The backlog was the move-against-edit case again** (#682's relocation), and after resolution every
+one of BF-70/71/72/73/74/75/76 and LB-32 appears exactly once, with the four rewritten entries
+carrying this branch's headings rather than the pre-fix ones.

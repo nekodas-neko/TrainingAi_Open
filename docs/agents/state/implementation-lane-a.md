@@ -4,14 +4,14 @@
 > is how six concurrent sessions stay tellable apart; a renamed successor is a lost thread even with a
 > perfect baton.
 
-**Updated:** 2026-08-31 · **By:** the twelfth session to run as Lane A · **Next ID:** `LA-44`
+**Updated:** 2026-08-31 · **By:** the twelfth session to run as Lane A · **Next ID:** `LA-46`
 (`grep -rhoE '\bLA-[0-9]+\b' docs/ | sort -t- -k2 -n | tail -1` is the authority, not this line)
 **Migrations:** directory head **246**, next free **247** — claim against open PRs too, not just the
 directory. Local SQLite **v32**.
 
 ## Now
 
-**BF-2 is planned and buildable — start there.** Its plan ([`2026-08-31-dexa-filter.md`](../../superpowers/plans/2026-08-31-dexa-filter.md)) reverses two of the entry's assumptions (derived pairs, not stored → **no migration**; offset, not ratio) and its four build steps are each independently mergeable. **Its outcome is unobservable until LA-44** — `dexa_scans` and `measured_rmr` are both empty in production and neither has an entry surface — so do not read "nothing happened" as a broken calibration.
+**BF-2 is finished — all four steps.** What is left is **LA-45** only (Lane B: a screen that reads `bodyFatCorrected`) — **LA-44 was superseded by BF-71 (#681)** hours after it was filed, and the chain is verified end to end: a scan entered through BF-71's form moves the calorie goal with no other action, and a second scan re-derives the offset on its own. **Merge `main` before starting any queue item; two entries this session were already built by another agent.** **Do not refactor the per-consumer correction back into `listBodyMetrics`**: the Health log sheet seeds from that read and POSTs back at rank `manual`, so a corrected value there overwrites the raw archive. `check-body-fat-correction.js` holds the line.
 
 `docs/implementation-backlog.md` is
 **220 entries** — it grows while a session shrinks it, because five agents file into it concurrently.
@@ -62,7 +62,7 @@ Two shapes: *the evidence is stale*, and *the evidence was never true*. Q-295 is
 
 ## Shipped this session
 
-**2026-08-30/31, thirteen PRs:** Q-311, Q-225, Q-297, Q-527, Q-211, LA-40, LB-14, Q-214, Q-284, LB-25, BF-67's plan (#666, which filed LA-43), LA-43 (#672), BF-2's plan (#673, which filed LA-44). What each turned out to be is in `docs/overview/entries/2026-08-3{0,1}-*.md`.
+**2026-08-30/31, thirteen PRs:** Q-311, Q-225, Q-297, Q-527, Q-211, LA-40, LB-14, Q-214, Q-284, LB-25, BF-67's plan (#666, which filed LA-43), LA-43 (#672), BF-2's plan (#673), and BF-2 itself — all four steps in #676, which also filed LA-45. What each turned out to be is in `docs/overview/entries/2026-08-3{0,1}-*.md`.
 
 **LA-43 is the ninth moved premise this session** — filed against an unreachable `??` fallback; the
 live defect was the exact-name filter above it silently deleting every paraphrase. **Two guards in

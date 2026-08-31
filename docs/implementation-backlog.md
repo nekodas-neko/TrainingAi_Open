@@ -1205,15 +1205,21 @@ bug is that it is using a prediction as the definition of BMR when a measurement
 
 ### [body][nutrition] 🔵 BF-2 — the "DEXA filter": calibrate the scale's body-fat estimate against a real DEXA, and correct history
 
-> **⚑ STEPS 1 AND 2 SHIPPED 2026-08-31 — `packages/shared/src/health/body-fat-calibration.ts` and
-> `repo.getBodyFatCalibration()`.** The calibration derives, the pairing works against
-> production-shaped rows (+3.2 from the one 2026-08-27 pair, 3 of 11 readings corrected, the rest
-> untouched), and **nothing consumes it yet** — no goal, no RMR, no panel has changed. **What is
-> owed is steps 3 and 4:** the sweep of the read sites, and the payload field. Step 3 has a design
-> question the plan did not settle and this session did not have the measurement for —
-> `listBodyMetrics` has **22 call sites**, so correcting *inside* that read makes a missed site
-> impossible but risks a read-then-write path persisting a corrected value into the raw column.
-> Measure which callers write back before choosing.
+> **⚑ ALL FOUR STEPS SHIPPED 2026-08-31, and the chain is verified end to end.** Entering a scan
+> through **BF-71**'s form (#681, which superseded LA-44 the same day) makes the correction live with
+> no other action: one POST to `/api/dexa-scans` moved resting burn **1832 → 1773 kcal/day** and the
+> calorie goal **1961 → 1889**, with `body_metrics.body_fat_pct` and `/api/body-metadata`'s `bodyFat`
+> both still returning the raw 25.3. **A second scan re-derives on its own** — offset 3.2 → 2.6,
+> `pairCount` 1 → 2 — which is the accumulation the owner asked for, and the property that justified
+> deriving pairs rather than storing them.
+>
+> **What remains is LA-45**: no screen reads the corrected value yet.
+>
+> **Two things a later session must not "simplify".** (1) The correction is applied **per consumer**,
+> never inside `listBodyMetrics` — the Health log sheet seeds from that read and POSTs back at rank
+> `manual`, so a corrected value there overwrites the raw archive.
+> `scripts/check-body-fat-correction.js` holds the line. (2) `bodyFat` and `bodyFatCorrected` are
+> two fields on purpose, and `bodyFatIsCorrected` is a third because an offset can round to zero.
 >
 > **⚑ PLANNED 2026-08-31 — [`2026-08-31-dexa-filter.md`](superpowers/plans/2026-08-31-dexa-filter.md).**
 > This is an implementation item now, not a planning one. **Two decisions in the plan reverse what
@@ -1230,9 +1236,10 @@ bug is that it is using a prediction as the definition of BMR when a measurement
 > `dexa_scans` holds **zero** of the owner's rows, and so does `measured_rmr` — **neither table has
 > any entry surface**: `grep -rn "dexa-scans\|measured-rmr" app/ components/ lib/` outside
 > `app/api/` returns nothing. The 2026-08-27 printout has been transcribed in
-> `docs/clinical-baseline-2026-08-27.md` for four days with nowhere to go. Filed as **LA-44**. It
-> does **not** block building this — the engine is inert with zero pairs — but it does block the
-> owner *seeing* it, which is what they asked for. The **scale** half of the pair is confirmed
+> `docs/clinical-baseline-2026-08-27.md` for four days with nowhere to go. Filed as LA-44, and
+> **fixed by BF-71 (#681) the same day** — More › Health › DEXA & RMR results. Entering a scan there
+> now makes the correction live with no other action: verified 2026-08-31, resting burn
+> **1832 → 1773 kcal/day** off a single POST to `/api/dexa-scans`. The **scale** half of the pair is confirmed
 > present (2026-08-27, 71.7 kg, 25.3 %, `scale_ble`), and twelve consecutive days sit in
 > **24.9–25.5 %**, so the consistency premise the whole design rests on is measured, not assumed.
 
@@ -1264,7 +1271,7 @@ bug is that it is using a prediction as the definition of BMR when a measurement
 
 > **⚠ PRIORITY CHANGED 2026-08-26 — the owner has a DEXA + RMR test BOOKED.** This entry sat at the tail because the owner filed it as *"a loose note to put more effort into later"*; that is no longer the signal. The planning session it asked for is done (top of this entry).
 >
-> **The RMR half was split out as BF-33 and has SHIPPED** — `measured_rmr` (migrations 225/226), `personalRmr`, `/api/measured-rmr`. Nothing here waits on it; what it left behind is LA-44's empty table.
+> **The RMR half was split out as BF-33 and has SHIPPED** — `measured_rmr` (migrations 225/226), `personalRmr`, `/api/measured-rmr`. The empty table it left behind is filled by BF-71's form.
 >
 > **Two refinements from the owner, 2026-08-26, that change the shape of the filter:**
 >
@@ -1354,8 +1361,39 @@ needs a same-day weigh-in booked with it.
 **Done looks like:** the app states the measured offset against the scale for the same period;
 corrected body fat feeds the calorie and protein goals **and `personalRmr`'s current fat-free mass**;
 and history reads corrected without the raw scale values having been overwritten. **"A DEXA reading
-can be entered" is NOT part of this entry any more — it is LA-44**, and until that ships this work's
-outcome is real but unobservable in the app.
+can be entered" is NOT part of this entry — that was LA-44, superseded by BF-71 (#681).**
+
+### [body][app-shell] LA-45 — the DEXA-corrected body fat is in the payload and no screen reads it
+
+- **Branch:** _unassigned_ · **Lane: B** — `app/health/health-sections.tsx`, `app/health/health-content.tsx`, the day-detail body row.
+- **Added:** 2026-08-31 · Lane A, on shipping BF-2 step 4.
+- **The engine is done and invisible.** `/api/body-metadata` and `/api/day-log` now carry
+  **`bodyFatCorrected`** and **`bodyFatIsCorrected`** per reading, and `body-metadata` also returns
+  `bodyFatCalibration: { offsetPct, pairCount, source } | null` once per response. Every screen
+  still renders `bodyFat`, which is the RAW scale value — so the owner's Health screen shows 25.3
+  while their calorie goal is already computed from the corrected 28.5. **The two disagreeing on
+  screen is worse than neither being corrected**, which is why this is filed rather than left.
+- **`bodyFat` must stay raw and must stay the value the log sheet seeds from.** `openLog`
+  (`health-content.tsx:493`) and `log-value-sheet.tsx:32` pre-fill the body-fat input from it and
+  POST it back at source `manual`, a rank that outranks `scale_ble`. Seed from `bodyFat`, display
+  `bodyFatCorrected`. Getting this backwards lets the user overwrite their own measurement by saving
+  a field they never touched, and collapses the next calibration toward zero.
+- **Mark the boundary, do not hide it.** Two thirds of the owner's history is on instruments the
+  calibration does not cover (no provenance to 2026-06-23, `health_connect` to 08-01, `scale_ble`
+  from 07-29), so a 90-day body-fat trend contains both kinds and has a ~3.2-point step at the
+  changeover. `bodyFatIsCorrected` is per reading precisely so the chart can say why rather than
+  draw an unexplained jump. **Do not infer it from `bodyFatCorrected !== bodyFat`** — an offset can
+  round to zero, and "corrected by 0.0" and "not corrected" are different claims.
+- **Show the offset; the owner asked for it.** *"so it shows Body fat on the current scale as per a
+  dexa result"* — `offsetPct` with `pairCount` beside it. At `pairCount: 1` an offset and a ratio
+  are the same number, so it must not be presented as a settled calibration.
+- **`health-sections.tsx` derives `bodyComposition(r.weightKg, r.bodyFat)`** at three sites for the
+  lean-mass and BMR tiles. Those should move to `bodyFatCorrected`, which is what makes the panel
+  agree with the calorie goal. It is exempt in `scripts/check-body-fat-correction.js` with that
+  reason — **remove the exemption in the same PR**, or the check keeps asserting a decision that has
+  been made.
+- **Gate: device** — a Health-screen change on the canonical runtime.
+
 
 ### [workouts] BF-59 — the weekly set targets are a flat large/small binary, ignoring both the app's own landmark table and the program's goal
 
