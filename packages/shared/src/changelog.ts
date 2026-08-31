@@ -6,6 +6,16 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.406.1",
+    date: "2026-08-31",
+    changes: [
+      "Your calorie and protein goals, energy balance and body-composition snapshot now use a body fat corrected against your DEXA scan instead of the scale's own estimate — worth about 59 kcal/day at the measured 3.2-point gap",
+      "The scale's raw reading is never overwritten: the correction is applied when a number is derived, so entering a second scan later re-corrects your whole history",
+      "Readings from a scale the DEXA has not been compared against are left alone rather than corrected on a guess",
+      "The corrected reading and the measured offset are now in the app's data, ready for the Health screen to show them — the screens themselves still display the scale's own number for now",
+    ],
+  },
+  {
     version: "1.406.0",
     date: "2026-08-31",
     changes: [

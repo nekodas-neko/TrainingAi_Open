@@ -16,6 +16,7 @@ import type { NutritionTargets } from '@trainingai/shared/types/nutrition'
 import type { UserGoals } from '@/lib/data/repository'
 import type { ProgramPhaseType } from '@trainingai/shared/types/program'
 import { readJsonLimited } from '@trainingai/shared/http/request-guards'
+import { correctBodyFatPct } from '@trainingai/shared/health/body-fat-calibration'
 
 // An optional source marker; the body is normally absent.
 const MAX_BODY_BYTES = 4 * 1024
@@ -182,7 +183,17 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'no_weight_data' }, { status: 400 })
   }
 
-  const latestBodyFatPct = bodyMetrics.find(m => m.bodyFatPct != null)?.bodyFatPct ?? undefined
+  // BF-2: correct the scale's BIA estimate against the DEXA before it reaches the calorie goal, the
+  // protein dose, or `personalRmr`'s current fat-free mass. The last one is why this matters most:
+  // it re-scales a measured RMR's residual onto today's lean mass, and `ffm_kg_at_test` came from
+  // the DEXA — so an uncorrected scale number puts the two sides on different instruments.
+  const latestBodyFatRow = bodyMetrics.find(m => m.bodyFatPct != null) ?? null
+  const bodyFatCalibration = await repo.getBodyFatCalibration(userId).catch(() => null)
+  const latestBodyFatPct = correctBodyFatPct(
+    latestBodyFatRow?.bodyFatPct ?? null,
+    latestBodyFatRow?.bodyFatSource ?? null,
+    bodyFatCalibration,
+  )?.pct ?? undefined
 
   let phaseInfo: ContextInput['phaseInfo'] = null
   if (program && program.phaseMode === 'automatic' && program.sessionsPerCycle && program.sessionsPerCycle >= 1) {

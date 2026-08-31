@@ -8,6 +8,7 @@ import { computeActiveEnergy, SEDENTARY_MULTIPLIER } from '@trainingai/shared/he
 import { type Sex } from '@trainingai/shared/health/workout-energy'
 import { mifflinStJeorBmr } from '@trainingai/shared/nutrition/goal-recommendation'
 import { bodyComposition } from '@trainingai/shared/health/body-composition'
+import { correctBodyFatPct } from '@trainingai/shared/health/body-fat-calibration'
 import {
   computeCalorieBalance, targetFromMaintenance, GOAL_DAILY_DELTA, scaleMacrosForEarnedKcal,
 } from '@trainingai/shared/nutrition/calorie-balance'
@@ -92,7 +93,7 @@ export async function computeEnergyBalance(
 
   // The whole window is fetched, not just the requested day: a calibrated maintenance needs the
   // window's average movement to separate resting burn from habitual movement (see below).
-  const [metrics, foodSummary, activityLogs, workouts, targets, userGoals, profile, dayCheckins] = await Promise.all([
+  const [metrics, foodSummary, activityLogs, workouts, targets, userGoals, profile, dayCheckins, bodyFatCalibration] = await Promise.all([
     repo.listBodyMetrics(userId, windowStart, date).catch(() => []),
     repo.listFoodLogsSummary(userId, windowStart, date).catch(() => []),
     repo.listActivityLogs(userId, windowStart, date).catch(() => []),
@@ -104,6 +105,7 @@ export async function computeEnergyBalance(
     // maintenance mean — a day abandoned after lunch is indistinguishable from a completed light
     // one, and counting it dragged the estimate 86 kcal lower per partial day.
     repo.listDayCheckins(userId, windowStart, date, 'evening').catch(() => []),
+    repo.getBodyFatCalibration(userId).catch(() => null),
   ])
 
   // Q-421: one batch read for the whole window rather than a query per session. Sessions with no
@@ -121,7 +123,15 @@ export async function computeEnergyBalance(
   const byDateDesc = (a: { date: string }, b: { date: string }) => b.date.localeCompare(a.date)
   // Last known weight, however old — a stale weight still beats having no BMR at all.
   const latestWeightKg = metrics.filter(m => m.weightKg != null).sort(byDateDesc)[0]?.weightKg ?? null
-  const latestBodyFatPct = metrics.filter(m => m.bodyFatPct != null).sort(byDateDesc)[0]?.bodyFatPct ?? null
+  // BF-2: the scale's BIA estimate is corrected against the DEXA before anything derives from it.
+  // The correction is per instrument, so the row's own provenance decides — a reading from an
+  // uncalibrated or unrecorded source is left alone rather than corrected on a guess.
+  const latestBodyFatRow = metrics.filter(m => m.bodyFatPct != null).sort(byDateDesc)[0] ?? null
+  const latestBodyFatPct = correctBodyFatPct(
+    latestBodyFatRow?.bodyFatPct ?? null,
+    latestBodyFatRow?.bodyFatSource ?? null,
+    bodyFatCalibration,
+  )?.pct ?? null
 
   const heightCm = profile?.heightCm ?? null
   const ageYears = ageFromDob(profile?.dateOfBirth ?? null, new Date())

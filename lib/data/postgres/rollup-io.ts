@@ -7,6 +7,7 @@ import type { ClockAnchor } from '@/lib/oura-ble/clock'
 import type { HealthSource } from '@/lib/data/health-source'
 import type { BodyMetrics } from '@trainingai/shared/types'
 import type { RollupIO, RollupFrameQuery } from '@/lib/oura-ble/rollup/io'
+import type { BodyFatCalibration } from '@trainingai/shared/health/body-fat-calibration'
 
 type Db = ReturnType<typeof getDb>
 
@@ -21,6 +22,7 @@ export interface PostgresRollupIODeps {
   getOuraClockAnchor(userId: string): Promise<{ anchorDs: number; anchorUtc: Date } | null>
   getOuraClockAnchors(userId: string): Promise<ClockAnchor[]>
   upsertBodyMetrics(userId: string, rows: Omit<BodyMetrics, 'id' | 'userId' | 'createdAt'>[], source: HealthSource): Promise<void>
+  getBodyFatCalibration(userId: string): Promise<BodyFatCalibration | null>
   refitDaytimeHrvModel(userId: string, timezone: string): Promise<void>
 }
 
@@ -83,6 +85,11 @@ export function createPostgresRollupIO(deps: PostgresRollupIODeps): RollupIO {
 
     readDaytimeHrvModel: () => oura.getDaytimeHrvModel(db, userId),
     refitDaytimeHrvModel: timezone => deps.refitDaytimeHrvModel(userId, timezone),
-    persistBodyComp: async () => { await oura.persistBodyCompFromMetrics(db, userId) },
+    persistBodyComp: async () => {
+      // The rollup rewrites every day's snapshot, so it has to carry the same correction the live
+      // reads do — otherwise a rollup pass silently reverts them to uncorrected.
+      const calibration = await deps.getBodyFatCalibration(userId).catch(() => null)
+      await oura.persistBodyCompFromMetrics(db, userId, calibration)
+    },
   }
 }

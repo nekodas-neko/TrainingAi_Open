@@ -6,6 +6,7 @@ import { isTemperatureBaselineCentred } from '@trainingai/shared/health/temperat
 import { toZonedTime } from "date-fns-tz";
 import type { ActivityLog } from "@trainingai/shared/types";
 import { nightSessions } from '@trainingai/shared/health/sleep-night'
+import { correctBodyFatPct } from '@trainingai/shared/health/body-fat-calibration'
 
 export interface DayExercise {
   name: string;
@@ -22,7 +23,12 @@ export interface DayExercise {
 
 export interface DayBodyMeta {
   weightKg: number | null;
+  /** The RAW stored reading — see `BodyMetaRow.bodyFat` for why it must stay raw (BF-2). */
   bodyFat: number | null;
+  /** What to DISPLAY: the DEXA-corrected reading, or the raw one where no calibration applies. */
+  bodyFatCorrected?: number | null;
+  /** Whether a calibration applied. Not derivable from the two values — an offset can round to 0. */
+  bodyFatIsCorrected?: boolean;
   calories: number | null;
   protein: number | null;
   carb: number | null;
@@ -199,12 +205,18 @@ export async function GET(req: NextRequest) {
   // Body metadata from Postgres
   let bodyMeta: DayBodyMeta | null = null;
   try {
-    const metricRows = await repo.listBodyMetrics(userId, pgDate, pgDate);
+    const [metricRows, bodyFatCalibration] = await Promise.all([
+      repo.listBodyMetrics(userId, pgDate, pgDate),
+      repo.getBodyFatCalibration(userId).catch(() => null),
+    ]);
     if (metricRows.length > 0) {
       const m = metricRows[0];
+      const correctedBodyFat = correctBodyFatPct(m.bodyFatPct ?? null, m.bodyFatSource ?? null, bodyFatCalibration);
       bodyMeta = {
         weightKg:   m.weightKg   ?? null,
         bodyFat:    m.bodyFatPct ?? null,
+        bodyFatCorrected:   correctedBodyFat?.pct ?? null,
+        bodyFatIsCorrected: correctedBodyFat?.corrected ?? false,
         calories:   m.calories   ?? null,
         protein:    m.proteinG   ?? null,
         carb:       m.carbsG     ?? null,
