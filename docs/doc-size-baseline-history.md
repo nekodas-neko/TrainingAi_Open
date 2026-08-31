@@ -5198,3 +5198,40 @@ none of that entry's three levers touch and which the file's own header tells se
 `projectOverview.md` grew by exactly the blurb this session added to that section — i.e. it is an
 instance of what the note above describes, raised rather than hidden. Trimming it is Orchestrator's
 sweep, not a native-fix PR's.
+
+## 2026-09-01 — `docs/implementation-backlog.md` (BF-86, and the fix is three lines above the bug)
+
+The owner asked for the app to reset itself on the first open of a new day, and gave the symptom that
+explains why: the morning check-in does not appear on a resume. That half has an exact cause —
+`session-select-content.tsx:784` prompts from an effect with deps `[userId, tz]`, neither of which
+changes, in a tab shell that never unmounts. It runs once per launch. The same file already solves
+this at `:774` with `tabEpoch`, and the check-in guard is already date-stamped, so re-running is
+idempotent: the state is right and only the trigger is missing.
+
+The entry spends its length refusing the requested implementation and saying why, because "close and
+reset the app" is the kind of instruction that gets built literally. BF-80 — filed hours earlier —
+says outright not to fix a resume problem with a reload, and a scheduled reload would give a blank
+screen two candidate causes just as that one is being diagnosed. The recommendation is the mechanism
+the repo already has in miniature: `workout-day-rollover.tsx` is a correct date-change signal wired to
+exactly one consumer, and generalising it delivers the owner's ask with no reload at all.
+
+Also records the scale (56 `cachedFetchToday` sites) and the boundary-test rule, because a rollover
+bug is only visible across local midnight and this repo has repeatedly shipped date logic that works
+all day and fails in a two-hour band.
+
+## 2026-09-01 — `docs/implementation-backlog.md` (BF-87, a correct number nobody can explain)
+
+The owner asked whether steps count toward calorie burn, and his own screenshot holds both halves:
+1,196 steps beside "nothing earned from movement yet today". Both true, because `STEP_BASELINE` is
+3,000 and only steps above it convert — the sedentary base is BMR × 1.2 and a desk day's incidental
+stepping is already inside that multiplier.
+
+So the entry is a copy fix, and its length is spent on the two ways it could be built wrong. Showing
+the *shortfall* without the *threshold* leaves the same question one step later — the owner's goal is
+7,000 steps, of which only 4,000 convert, and someone expecting all 7,000 to count will read the burn
+as broken. And "fix" by lowering or deleting the constant is the tempting wrong move: it is the guard
+against double-counting, and changing it silently re-scores every historical day, which is a Tuning
+proposal with a stated blast radius rather than an implementation detail.
+
+Also notes that `activeBreakdown` already returns all three addends separately, so a one-line
+breakdown needs no new data.
