@@ -6,10 +6,17 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: "1.414.3",
+    version: "1.415.1",
     date: "2026-08-31",
     changes: [
       "The \"Body temp elevated — rest or deload recommended\" prompt no longer fires while your temperature baseline is still off. It was reading the same number readiness was scoring 80/100 and reaching the opposite conclusion, because the baseline it compares against is not centred yet. It comes back on its own once the baseline settles — nothing to switch back.",
+    ],
+  },
+  {
+    version: "1.415.0",
+    date: "2026-08-31",
+    changes: [
+      "Coach can now be opened for one subject at a time. Opening it from Nutrition gives it your meal plan, your intake and your targets — and not your training, so it stays on topic instead of wandering into your program. Ask it about a workout there and it points you at the right screen rather than guessing.",
     ],
   },
   {

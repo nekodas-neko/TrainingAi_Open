@@ -24,7 +24,7 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.414.3 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Version:** v1.415.1 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-08-31.
 
 **The deload banner stops firing off a temperature baseline that is known to be wrong (TN-18).**
@@ -40,6 +40,19 @@ which turned `summaryRows[0]` from *today* into *the oldest of 28 nights*; the f
 new test file passed with a month-stale deviation feeding the banner.** Self-clearing: it lifts on
 its own once a re-derivation centres the deviations
 ([journal](docs/overview/entries/2026-08-31-deload-temp-gate.md)).
+**Coach can be scoped to one subject, and the scope is made of what it never receives (LA-47).**
+Opening Coach from Nutrition will give it the meal plan, intake and targets — and **not** the
+training tools, so a program question produces a hand-off instead of a guess. Enforced three ways
+the model cannot argue with: the training tools are absent, and `renderChoiceList`'s `source` and
+`proposeChange`'s `domain` enums are **rebuilt narrowed per request**, so an out-of-scope call is a
+schema error the SDK retries rather than a request anything downstream has to refuse. Verified
+against a real Gemini turn in both directions. `general` withholds nothing, so every existing
+caller is unchanged. **A bug the tests caught and review would not have:** `value in COACH_SCOPES`
+walks the prototype chain, so `scope: "toString"` resolved to `Object.prototype.toString` and would
+have crashed the request. **The plan-widget half did NOT ship** — the entry proposes splitting it
+across lanes and that split does not compile, since a new widget-union member is a type error until
+the registry handles it, and a branch rendering `null` wedges the thread outright
+([journal](docs/overview/entries/2026-08-31-coach-nutrition-scope.md)).
 
 **A dead WebView renderer is handled instead of fatal, and it now leaves evidence (BF-80).** The
 owner's *"tab back into the app and the pages often crash and display a blank page"* had **nothing**
