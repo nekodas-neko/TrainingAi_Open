@@ -4253,7 +4253,7 @@ double-count risk; and the "like a total calorie value" analogy needs adjusting,
 sum across substances — what transfers is the shape (one number per substance per day), not the
 total.
 
-## 2026-08-31 — `docs/implementation-backlog.md` 13602 → 13625 → **13744** (BF-67's planning session)
+## 2026-08-31 — `docs/implementation-backlog.md` 13602 → 13625 → **13784** (BF-67's planning session)
 
 Twenty-three lines, and all of them are one new queue entry: **LA-43**, the program generator
 trusting the model's muscle guess on any name the library does not contain. That is what the backlog
@@ -4269,12 +4269,13 @@ What was **not** done is compressing LA-43 itself. It has to carry why the fallb
 comment three lines above it, and why a latent hole is still worth filing — a shorter version would
 read as a style nit rather than as the silent history reset it actually is.
 
-**Re-derived on the merge — twice — and both conflicts were the right kind.** Two other PRs raised
-the same number while this one was open (to 13673, then to 13714), so git surfaced a genuine
+**Re-derived on the merge — three times — and every conflict was the right kind.** Three other PRs
+raised the same number while this one was open (13673, 13714, 13754), so git surfaced a genuine
 disagreement about one value rather than two unrelated edits — the case the entries README says
 should conflict. Resolved each time by counting the merged file rather than taking either side, which
-is the only number true of it: **13744** at the second resolution. The doc-size baselines also split
-per file (LA-33), which is what kept this to the one document that actually disagreed.
+is the only number true of it: **13784** at the last resolution. The doc-size baselines also split
+per file (LA-33), which is what kept a busy day's worth of concurrent PRs to the one document that
+actually disagreed.
 ## 2026-08-30 — `docs/implementation-backlog.md` (BF-69 gets the owner's join, and two collisions)
 
 The owner answered how the food log should reach the exposure series: attach supplements to a meal or
@@ -4293,3 +4294,25 @@ entry rather than leaving them for the implementer.
 Two in-repo rules are cited because they answer the obvious fixes: stored counters have all drifted
 here, so the day's amount must be derived rather than accumulated; and the ranked per-field merge with
 `source_map` is the existing multi-writer provenance pattern that `supplement_logs` lacks.
+
+## 2026-08-30 — `docs/implementation-backlog.md` (BF-69's storage model is decided)
+
+The owner took both recommendations, so the entry stops describing a choice and starts describing a
+shape: a day's exposure is an amount derived from contribution rows, each carrying where it came from
+(`manual` or `meal:<id>`).
+
+Three reasons are kept rather than compressed, because each is the answer to an objection an
+implementer will otherwise raise. Amount over tick is argued on **reversal cost** — amount → tick is
+free, tick → amount means back-filling doses nobody recorded — not on richness. Contributions over a
+`source` column is argued from the deletion bug: one shared row cannot have half of it removed.
+And `source_map` is explicitly rejected, because it is the reflex answer to "multiple writers" in this
+codebase and it is the wrong tool here — a rank ladder resolves competing claims about one truth and
+would discard one of two doses that should add.
+
+The consequences section exists because this is a schema change to a **synced** domain: the unique
+constraint that has to go is load-bearing across the local table, the reconcile lists, the delta and
+the push branch, and the entry says so with "never batch this one" rather than leaving it to the
+sync rules to be remembered.
+
+The two collisions stay in the entry, marked resolved, as the checklist a reviewer runs the
+implementation against.
