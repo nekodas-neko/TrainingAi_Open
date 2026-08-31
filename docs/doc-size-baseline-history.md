@@ -4874,3 +4874,13 @@ It also records the sequencing argument that BF-71 settled by shipping: typed fo
 DEXA (~10 fields) and RMR (3), and are obviously wrong for 58 analytes. So this is the report that
 justifies BF-41's extraction path, and if that path is built for one report first, it should be built
 for this one.
+
+## 2026-08-31 — `docs/implementation-backlog.md` (BF-41 moved beside BF-1)
+
+The owner declined typing twice in a row, in consecutive messages, after BF-71 shipped the forms. The
+note records both quotes because the pair is the point: one request is a preference, two in a row is
+the feature. It also states the relationship plainly — the forms are the confirm step the extraction
+lands in, not an alternative to it — so nobody reads BF-71 as having satisfied this.
+
+Moved to sit directly after BF-1, which needs the same pipeline for 58 analytes and is the report
+that justifies building it.
