@@ -405,6 +405,162 @@ cosmetic: it would silently degrade the calorie model.
   PATCH `{ heightCm: null }` explicitly and height clears, because *omitted* and *sent as null* must
   stop meaning the same thing.
 
+### [nutrition][body] 🔵 BF-1 — import blood panel results as a nutrition baseline, de-identified
+> **⚑ RAISED 2026-08-31 — owner: *"can you add blood test as well based on the fields I returned
+> from my image."*** It sat near the bottom of the queue while the panel it needs has been in the
+> repo since 2026-08-27. Two facts that make it startable today:
+> - **The 58 analytes are already transcribed and de-identified** in
+>   [`clinical-baseline-2026-08-27.md`](clinical-baseline-2026-08-27.md). The schema can be written
+>   from a real report without the owner sending anything, and the awkward shapes are already in it —
+>   a `<0.2` result that is not a number, one-sided and absent reference ranges, free-text flags
+>   carrying commentary, and a month-precision date.
+> - **This is the report that justifies extraction, and DEXA/RMR were not.** BF-71 shipped typed
+>   forms for those because ~10 fields and 3 fields are a minute of typing. **58 analytes are not**,
+>   so if the upload path (BF-41) is built for one report first, build it for this one. The typed
+>   form is still the fallback and the confirm target — extraction prefills, the owner corrects,
+>   then it saves.
+
+- **⚑ A real panel is available, de-identified, in [`docs/clinical-baseline-2026-08-27.md`](clinical-baseline-2026-08-27.md)** — 58 analytes, April 2026. Write the
+  schema from it: reference ranges arrive as `low-high`, one-sided (`<25`, `>59`) and absent; one
+  result is `<0.2` and not a number; flags are free text carrying commentary; the date is a month.
+
+- **Lane:** A — classified 2026-08-30 by CLAUDE.md's path rule (*touches storage or `app/api/**` → A; both halves → A, engine first*). New table plus extraction route is the engine and needs a migration, which only **A** may number; the upload/review surface follows as **B**.
+
+
+**Owner request, 2026-08-23 (verbatim):** *"I'd like to be able to import some blood scan results and
+de-identify myself/user etc to have a baseline - should help with reccomendations for nutrition etc."*
+
+**Nothing like this exists.** Grepped the schema for blood/biomarker/lab/analyte names: zero hits.
+(`oura_daily.illness_biomarkers` is Oura's illness-detection JSONB and is unrelated — do not overload
+it.) So this is a new table, a new ingest path, and a new consumer.
+
+**The extraction pattern already exists and should be copied, not reinvented:**
+`app/api/nutrition/scan/route.ts` is a working vision→structured-data route — `generateObject` with a
+Zod schema (never `JSON.parse` of model text, per CLAUDE.md), `isAllowedImageMime` and
+`readJsonLimited` from `@trainingai/shared/http/request-guards`, and a `rateLimit` call. A pathology
+report is the same problem shape as a nutrition label.
+
+**⚠️ The de-identification requirement is the hard part, and it is not a storage problem — it is a
+transmission one.** Two things are true and they point in opposite directions:
+- **The app's own logging is already clean.** `lib/ai/instrument.ts` says in its own comments
+  *"Pass ids/dates/keys only, never raw prompt text or health data"* and *"Metadata only (tokens +
+  fingerprint hash), no prompt bodies"* — `ai_call_log` will not capture the report.
+- **The extraction call itself sends the document to Google.** A real pathology report carries full
+  name, date of birth, address, Medicare/patient reference, and the requesting doctor. Redacting
+  *after* extraction is too late, and redacting *before* extraction is circular, because reading the
+  pixels is the extraction.
+
+  **✅ DECIDED by the owner, 2026-08-23 — route (a), crop before upload.** Verbatim: *"Yes we can
+  crop the report; if its a document that gets uploaded; we can choose where the crop should be; or
+  it can be pre-cropped. I have an example one ready so we should be able to go with that for
+  testing."* The gate is cleared; this entry is buildable once planned. Two requirements come out of
+  that answer and both are binding:
+  - **The crop is chosen, not fixed.** An in-app crop step where the owner picks the region, because
+    lab layouts differ between providers and a hardcoded header height would silently leak on the
+    first report that does not match it.
+  - **An already-cropped file must be accepted as-is.** The crop step is offered, never forced —
+    the owner may arrive with the redaction already done.
+
+  Route (b), typing analytes by hand, stays as the always-available fallback: it needs no AI call at
+  all and is the honest answer when a report will not extract cleanly. Route (c) — sending the whole
+  report — is rejected and should not be revisited without a new owner decision.
+
+  Under every route: **do not persist the document.** Store the extracted analytes and discard the
+  image, which makes the de-identification durable rather than a promise about a retention policy.
+
+**Three things the crop decision surfaces, all verified 2026-08-23:**
+
+1. **The upload pipeline is image-only, and a pathology report is usually a PDF.**
+   `ALLOWED_IMAGE_MIME` (`packages/shared/src/http/request-guards.ts:34`) is exactly
+   `['image/jpeg', 'image/png', 'image/webp']` — no PDF, and nothing in the tree renders one. The
+   owner's words were *"a document that gets uploaded"*, so the plan must pick one: add a
+   PDF→raster step (a new dependency, and it must run **on-device** or the un-cropped PDF reaches
+   the server, defeating the whole decision), or accept only images and let the owner photograph or
+   screenshot the report. **Recommended: images only for v1.** `@capacitor/camera` with
+   `CameraSource.Prompt` already gives camera-or-gallery in one call
+   (`components/nutrition/capture-actions.tsx`, `handleCapturePhoto`), so photographing a printed report or picking a
+   screenshot works today with no new plumbing.
+2. **No crop UI exists anywhere in the app** — grepped `components/`, `app/` and `lib/`; the only
+   hits are unrelated (voice logging, meal-label rendering, the GIF creator). So the crop is new
+   work. **The cheap path is `Camera.getPhoto({ allowEditing: true })`**, which hands off to
+   Android's own crop screen — no new dependency, and it satisfies "we can choose where the crop
+   should be". Evaluate that before reaching for a React cropper library.
+3. **🔴 The example report must never be committed — this repository is PUBLIC.** Confirmed via the
+   API on 2026-08-23: `"private": false`, `"visibility": "public"`. The owner has *"an example one
+   ready"* for testing, and the obvious next move — dropping it in as a test fixture — would publish
+   a real pathology report, with the identifiers the entire feature exists to remove, to a public
+   repository and to anyone who has ever cloned it. **Git history makes that effectively permanent.**
+   Test against a **synthetic** report built to match the layout, keep the real one outside the
+   repository entirely, and treat any local copy as untracked. If the real report is ever needed to
+   validate extraction, run it through a local dev server by hand and commit nothing.
+
+**What it would feed — worth scoping before building, because "helps with nutrition" is not yet a
+consumer.** The honest position is that no code reads a biomarker today. The realistic first consumers
+are `app/api/ai/health-insight/route.ts` (already assembles a metric-line profile from
+`body_metrics` + Oura and would take biomarker lines naturally) and the goal recommendation in
+`packages/shared/src/nutrition/goal-recommendation.ts`. **Name two or three specific markers and what
+they would change** — the failure mode here is a table of 40 analytes that nothing ever reads, which
+is the same shape as the two structurally-dead nutrition trend views already recorded in this file.
+
+**Done looks like:** a blood panel can be entered or imported without identifying details leaving the
+device; the analytes are stored with their date, units and reference range; and at least one
+recommendation surface visibly changes because of a value in it.
+
+---
+
+## [devices] ▶ Oura on-device + own-analysis — live handover (owner-directed 2026-07-21, ongoing)
+
+**Implementer entry point:** [`docs/oura-ondevice-hybrid-handover.md`](oura-ondevice-hybrid-handover.md)
+(condensed baton, D0–D7 sequence) and
+[`docs/oura-ondevice-hybrid-implementer-progress.md`](oura-ondevice-hybrid-implementer-progress.md)
+(live state + exact next tasks). This entry is the short pointer, not a duplicate spec.
+
+**D0 (steps) and D1 (durability chain, all sync tracks) are closed.** D5 (own
+daytime-HRV) and D6 (comparison harness) are shipped, pending a real H10 spot-check
+to validate tolerances. D2 Tasks 2+3 (native raw store + WebView bridge) are built
+and **device-verified 2026-07-30** (Full re-sync drain + kill-mid-drain, both clean on the S25).
+
+**Ordered, with what gates what:**
+
+1. ~~⛔ BLOCKING, owner-only. D2 Tasks 2+3 need on-device verification~~ ✅ **CLEARED
+   2026-07-30.** Full re-sync (694 batches) and kill-mid-drain both ran clean on the S25. See
+   Q-29 above and `docs/oura-ondevice-hybrid-implementer-progress.md` for the evidence and two
+   UI-gap caveats (Q-33).
+2. **D2 Tasks 4-9** (clock anchor, rollup port, neural WASM, tier-ladder, prune,
+   storage readout) — **unblocked, next up.** Neural port is SleepNet + step_counter only.
+   ~~CSP prerequisite before Task 6: add `wasm-unsafe-eval` to the prod `script-src`.~~ ✅ shipped
+   2026-08-20 (Q-546, #259).
+3. **B3 (Track-B replace-by-day outbox) + B5 (concurrent-pool load test)** —
+   D2-blocked.
+4. **D3** — silent read-flip to local-first. Needs D2 Tasks 4-9.
+5. **D4** — server-raw cutover: pull-to-device + completeness audit + **staged drop
+   of the 437k-row `oura_raw_samples` table**. ⚠️ **DESTRUCTIVE — explicit owner
+   confirmation required before touching this.** Must rewrite the CLAUDE.md "never
+   prune `body_hex`" rule in the same PR.
+6. **D7** — delete the dormant oracle ONNX models from serving (~T+3mo out). Keeps
+   SleepNet + step_counter.
+
+**✅ CLOSED 2026-08-02 — shipped as #1004** (migration `166_sleep_sessions_oura_id_user_scope.sql`).
+Kept below for the reasoning, which explains why the constraint is user-scoped now. **Not verified
+with two real BLE-ring accounts** — there is only one today.
+
+~~Also still open, found while closing a prior session, otherwise orphaned:~~
+`sleep_sessions.oura_id` was a **global** unique constraint, but the BLE rollup
+derives it as `` `ble:${startDs}` `` with **no user component** — a second real
+account wearing a BLE ring collides with the first account's nights, and because
+`aggregateOuraRawSamples` writes errors into `stepErrors` rather than throwing,
+that account's sleep data would silently stop landing (this already happened
+between test users — it was the year-long CI flake, now fixed for tests but not for
+the underlying id scheme). Fix: either `` `ble:${userId}:${ds}` `` or move the
+constraint to `(user_id, oura_id)`. Touches the Cloud dedup key — wants its own
+migration + PR, sandbox-buildable.
+
+**Not part of this initiative, but found doing the 2026-07-29 handover and
+otherwise orphaned:** migration numbers 081, 087, 146 and 161 are each claimed
+twice on disk (see the migration-number note at the top of this file).
+
+---
+
 ### [platform][body] BF-79 — the personal details are split across two editors that each resend the other's fields
 
 - **Lane:** B — `components/profile/edit-profile-sheet.tsx`, `goals-section.tsx`,
@@ -14106,149 +14262,6 @@ intake traced it, it did not design it.
 **Done looks like:** a week-in-review page reachable from the notification and from a permanent
 Health entry point, drawing its charts from values the route returned rather than from parsed prose,
 with the recap week visibly compared against the one before it.
-
-### [nutrition][body] 🔵 BF-1 — import blood panel results as a nutrition baseline, de-identified
-
-- **⚑ A real panel is available, de-identified, in [`docs/clinical-baseline-2026-08-27.md`](clinical-baseline-2026-08-27.md)** — 58 analytes, April 2026. Write the
-  schema from it: reference ranges arrive as `low-high`, one-sided (`<25`, `>59`) and absent; one
-  result is `<0.2` and not a number; flags are free text carrying commentary; the date is a month.
-
-- **Lane:** A — classified 2026-08-30 by CLAUDE.md's path rule (*touches storage or `app/api/**` → A; both halves → A, engine first*). New table plus extraction route is the engine and needs a migration, which only **A** may number; the upload/review surface follows as **B**.
-
-
-**Owner request, 2026-08-23 (verbatim):** *"I'd like to be able to import some blood scan results and
-de-identify myself/user etc to have a baseline - should help with reccomendations for nutrition etc."*
-
-**Nothing like this exists.** Grepped the schema for blood/biomarker/lab/analyte names: zero hits.
-(`oura_daily.illness_biomarkers` is Oura's illness-detection JSONB and is unrelated — do not overload
-it.) So this is a new table, a new ingest path, and a new consumer.
-
-**The extraction pattern already exists and should be copied, not reinvented:**
-`app/api/nutrition/scan/route.ts` is a working vision→structured-data route — `generateObject` with a
-Zod schema (never `JSON.parse` of model text, per CLAUDE.md), `isAllowedImageMime` and
-`readJsonLimited` from `@trainingai/shared/http/request-guards`, and a `rateLimit` call. A pathology
-report is the same problem shape as a nutrition label.
-
-**⚠️ The de-identification requirement is the hard part, and it is not a storage problem — it is a
-transmission one.** Two things are true and they point in opposite directions:
-- **The app's own logging is already clean.** `lib/ai/instrument.ts` says in its own comments
-  *"Pass ids/dates/keys only, never raw prompt text or health data"* and *"Metadata only (tokens +
-  fingerprint hash), no prompt bodies"* — `ai_call_log` will not capture the report.
-- **The extraction call itself sends the document to Google.** A real pathology report carries full
-  name, date of birth, address, Medicare/patient reference, and the requesting doctor. Redacting
-  *after* extraction is too late, and redacting *before* extraction is circular, because reading the
-  pixels is the extraction.
-
-  **✅ DECIDED by the owner, 2026-08-23 — route (a), crop before upload.** Verbatim: *"Yes we can
-  crop the report; if its a document that gets uploaded; we can choose where the crop should be; or
-  it can be pre-cropped. I have an example one ready so we should be able to go with that for
-  testing."* The gate is cleared; this entry is buildable once planned. Two requirements come out of
-  that answer and both are binding:
-  - **The crop is chosen, not fixed.** An in-app crop step where the owner picks the region, because
-    lab layouts differ between providers and a hardcoded header height would silently leak on the
-    first report that does not match it.
-  - **An already-cropped file must be accepted as-is.** The crop step is offered, never forced —
-    the owner may arrive with the redaction already done.
-
-  Route (b), typing analytes by hand, stays as the always-available fallback: it needs no AI call at
-  all and is the honest answer when a report will not extract cleanly. Route (c) — sending the whole
-  report — is rejected and should not be revisited without a new owner decision.
-
-  Under every route: **do not persist the document.** Store the extracted analytes and discard the
-  image, which makes the de-identification durable rather than a promise about a retention policy.
-
-**Three things the crop decision surfaces, all verified 2026-08-23:**
-
-1. **The upload pipeline is image-only, and a pathology report is usually a PDF.**
-   `ALLOWED_IMAGE_MIME` (`packages/shared/src/http/request-guards.ts:34`) is exactly
-   `['image/jpeg', 'image/png', 'image/webp']` — no PDF, and nothing in the tree renders one. The
-   owner's words were *"a document that gets uploaded"*, so the plan must pick one: add a
-   PDF→raster step (a new dependency, and it must run **on-device** or the un-cropped PDF reaches
-   the server, defeating the whole decision), or accept only images and let the owner photograph or
-   screenshot the report. **Recommended: images only for v1.** `@capacitor/camera` with
-   `CameraSource.Prompt` already gives camera-or-gallery in one call
-   (`components/nutrition/capture-actions.tsx`, `handleCapturePhoto`), so photographing a printed report or picking a
-   screenshot works today with no new plumbing.
-2. **No crop UI exists anywhere in the app** — grepped `components/`, `app/` and `lib/`; the only
-   hits are unrelated (voice logging, meal-label rendering, the GIF creator). So the crop is new
-   work. **The cheap path is `Camera.getPhoto({ allowEditing: true })`**, which hands off to
-   Android's own crop screen — no new dependency, and it satisfies "we can choose where the crop
-   should be". Evaluate that before reaching for a React cropper library.
-3. **🔴 The example report must never be committed — this repository is PUBLIC.** Confirmed via the
-   API on 2026-08-23: `"private": false`, `"visibility": "public"`. The owner has *"an example one
-   ready"* for testing, and the obvious next move — dropping it in as a test fixture — would publish
-   a real pathology report, with the identifiers the entire feature exists to remove, to a public
-   repository and to anyone who has ever cloned it. **Git history makes that effectively permanent.**
-   Test against a **synthetic** report built to match the layout, keep the real one outside the
-   repository entirely, and treat any local copy as untracked. If the real report is ever needed to
-   validate extraction, run it through a local dev server by hand and commit nothing.
-
-**What it would feed — worth scoping before building, because "helps with nutrition" is not yet a
-consumer.** The honest position is that no code reads a biomarker today. The realistic first consumers
-are `app/api/ai/health-insight/route.ts` (already assembles a metric-line profile from
-`body_metrics` + Oura and would take biomarker lines naturally) and the goal recommendation in
-`packages/shared/src/nutrition/goal-recommendation.ts`. **Name two or three specific markers and what
-they would change** — the failure mode here is a table of 40 analytes that nothing ever reads, which
-is the same shape as the two structurally-dead nutrition trend views already recorded in this file.
-
-**Done looks like:** a blood panel can be entered or imported without identifying details leaving the
-device; the analytes are stored with their date, units and reference range; and at least one
-recommendation surface visibly changes because of a value in it.
-
----
-
-## [devices] ▶ Oura on-device + own-analysis — live handover (owner-directed 2026-07-21, ongoing)
-
-**Implementer entry point:** [`docs/oura-ondevice-hybrid-handover.md`](oura-ondevice-hybrid-handover.md)
-(condensed baton, D0–D7 sequence) and
-[`docs/oura-ondevice-hybrid-implementer-progress.md`](oura-ondevice-hybrid-implementer-progress.md)
-(live state + exact next tasks). This entry is the short pointer, not a duplicate spec.
-
-**D0 (steps) and D1 (durability chain, all sync tracks) are closed.** D5 (own
-daytime-HRV) and D6 (comparison harness) are shipped, pending a real H10 spot-check
-to validate tolerances. D2 Tasks 2+3 (native raw store + WebView bridge) are built
-and **device-verified 2026-07-30** (Full re-sync drain + kill-mid-drain, both clean on the S25).
-
-**Ordered, with what gates what:**
-
-1. ~~⛔ BLOCKING, owner-only. D2 Tasks 2+3 need on-device verification~~ ✅ **CLEARED
-   2026-07-30.** Full re-sync (694 batches) and kill-mid-drain both ran clean on the S25. See
-   Q-29 above and `docs/oura-ondevice-hybrid-implementer-progress.md` for the evidence and two
-   UI-gap caveats (Q-33).
-2. **D2 Tasks 4-9** (clock anchor, rollup port, neural WASM, tier-ladder, prune,
-   storage readout) — **unblocked, next up.** Neural port is SleepNet + step_counter only.
-   ~~CSP prerequisite before Task 6: add `wasm-unsafe-eval` to the prod `script-src`.~~ ✅ shipped
-   2026-08-20 (Q-546, #259).
-3. **B3 (Track-B replace-by-day outbox) + B5 (concurrent-pool load test)** —
-   D2-blocked.
-4. **D3** — silent read-flip to local-first. Needs D2 Tasks 4-9.
-5. **D4** — server-raw cutover: pull-to-device + completeness audit + **staged drop
-   of the 437k-row `oura_raw_samples` table**. ⚠️ **DESTRUCTIVE — explicit owner
-   confirmation required before touching this.** Must rewrite the CLAUDE.md "never
-   prune `body_hex`" rule in the same PR.
-6. **D7** — delete the dormant oracle ONNX models from serving (~T+3mo out). Keeps
-   SleepNet + step_counter.
-
-**✅ CLOSED 2026-08-02 — shipped as #1004** (migration `166_sleep_sessions_oura_id_user_scope.sql`).
-Kept below for the reasoning, which explains why the constraint is user-scoped now. **Not verified
-with two real BLE-ring accounts** — there is only one today.
-
-~~Also still open, found while closing a prior session, otherwise orphaned:~~
-`sleep_sessions.oura_id` was a **global** unique constraint, but the BLE rollup
-derives it as `` `ble:${startDs}` `` with **no user component** — a second real
-account wearing a BLE ring collides with the first account's nights, and because
-`aggregateOuraRawSamples` writes errors into `stepErrors` rather than throwing,
-that account's sleep data would silently stop landing (this already happened
-between test users — it was the year-long CI flake, now fixed for tests but not for
-the underlying id scheme). Fix: either `` `ble:${userId}:${ds}` `` or move the
-constraint to `(user_id, oura_id)`. Touches the Cloud dedup key — wants its own
-migration + PR, sandbox-buildable.
-
-**Not part of this initiative, but found doing the 2026-07-29 handover and
-otherwise orphaned:** migration numbers 081, 087, 146 and 161 are each claimed
-twice on disk (see the migration-number note at the top of this file).
-
----
 
 ### [workouts][devices] 🔵 PS-7 — camera form capture, Phase 0 only: can the S25 WebView run a pose landmarker at all?
 
