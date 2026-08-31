@@ -4827,3 +4827,19 @@ target, so extraction prefills rather than needing a review screen; and the bloo
 that actually justifies it at 58 analytes. The crop-before-upload rule is restated as the owner's own
 words, with the specific reason it must be the default path rather than advice — the extraction call
 is what sends the document to Google.
+
+## 2026-08-31 — `docs/implementation-backlog.md` (BF-1 raised from the bottom of the queue)
+
+The owner asked for the blood panel, and BF-1 was sitting near line 14,118 of a 14,300-line file
+while the report it needs has been in the repo, de-identified, since 2026-08-27. Raised to second in
+Lane A — behind BF-78 only, because a latent data-loss fix is smaller and outranks a new feature.
+
+The note added to it does one job: say why it is startable today. The 58 analytes are already
+transcribed, so the schema can be written from a real report with nothing further from the owner, and
+the awkward shapes are already in that file — a `<0.2` that is not a number, one-sided and absent
+reference ranges, free-text flags, a month-precision date.
+
+It also records the sequencing argument that BF-71 settled by shipping: typed forms were right for
+DEXA (~10 fields) and RMR (3), and are obviously wrong for 58 analytes. So this is the report that
+justifies BF-41's extraction path, and if that path is built for one report first, it should be built
+for this one.
