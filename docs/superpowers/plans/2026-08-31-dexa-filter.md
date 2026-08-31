@@ -88,6 +88,32 @@ asserts something specific about the bias at readings we have never observed; an
 what was measured. Ship the offset, keep the pairs derivable, and revisit at n = 2 — that decision is
 its own follow-up, not a placeholder in this code.
 
+### 2.3b The correction reaches a third of the history, and leaves a visible step. Say so.
+
+Measured in production 2026-08-31 — the three instruments are **contiguous, near-disjoint date
+ranges**, not interleaved:
+
+| `source_map->>'body_fat_pct'` | Range | Rows | Mean BF |
+|---|---|---|---|
+| `null` (no provenance recorded) | 2026-05-07 → 2026-06-23 | 40 | 23.50 % |
+| `health_connect` | 2026-06-24 → 2026-08-01 | 11 | 22.82 % |
+| `scale_ble` | 2026-07-29 → 2026-08-31 | **31** | 24.43 % |
+
+So "fixing previous values" corrects **31 of 82 rows** — the last month — and leaves the earlier
+two-thirds untouched. At the measured 3.2-point offset that puts a **visible step in any body-fat
+chart at 2026-07-29**, which will read as a real change in the body rather than a change in the
+correction.
+
+**Do not close the step by widening the correction.** The 40 provenance-less rows predate
+`source_map` being populated and are *probably* the same scale — but "probably" is how a calibration
+gets applied to an instrument it was not measured on, which is precisely what the owner's own
+refinement (2) rules out. `health_connect` is definitely a different instrument.
+
+**Close it by labelling instead.** The correction result already knows the source, so every corrected
+reading carries `corrected: true` and every other one carries `false`; the chart marks where the
+calibrated span begins. A step the user can see the reason for is a fact; an unexplained one is a bug
+report.
+
 ### 2.4 Correct body fat only. Do not correct the rest of the BIA panel.
 
 Trap 1 in the entry: `muscle_mass_kg`, `bone_mass_kg`, `body_water_pct`, `visceral_fat_index`,
@@ -195,9 +221,11 @@ each consumer — but it must be *verified*, not assumed, with a test that asser
 ### Step 4 — surface the correction in the payload
 
 Whatever the goal/energy-balance responses already return gains the calibration alongside the
-corrected value: `{ bodyFatPct, bodyFatPctRaw, calibration: { offsetPct, pairs } | null }`. The UI
-cannot honestly label a corrected number without being told it was corrected and by how much, and
-the owner explicitly asked to be shown the offset.
+corrected value: `{ bodyFatPct, bodyFatPctRaw, corrected: boolean, calibration: { offsetPct, pairs }
+| null }`. The UI cannot honestly label a corrected number without being told it was corrected and by
+how much, and the owner explicitly asked to be shown the offset. **`corrected` is per reading, not
+per response** — §2.3b is why: two-thirds of the history is on instruments this calibration does not
+cover, so a series carries both kinds and the chart has to be able to tell them apart.
 
 ---
 

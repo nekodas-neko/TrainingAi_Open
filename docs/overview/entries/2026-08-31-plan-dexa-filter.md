@@ -60,6 +60,20 @@ It needs no patch of its own: `goal-recommendation.ts:178` passes it a `leanMass
 construction. That is precisely why the plan puts the correction at the input boundary rather than at
 each consumer — but the plan says to prove it with a test that fails without it, not to assume it.
 
+## The correction reaches a third of the history
+
+The three instruments turn out to occupy **contiguous, near-disjoint date ranges** rather than being
+interleaved: no provenance at all from 2026-05-07 to 06-23 (40 rows), `health_connect` to 08-01
+(11), `scale_ble` from 07-29 (31). So "fixing previous values" corrects **31 of 82 rows** and leaves
+the earlier two-thirds alone — putting a **~3.2-point step in any body-fat chart at 2026-07-29** that
+will read as a change in the body rather than a change in the correction.
+
+**Widening the correction to close it is the wrong fix.** The provenance-less rows predate
+`source_map` and are *probably* the same scale, but "probably" is exactly how a calibration gets
+applied to an instrument it was never measured on — which the owner's own refinement ("the filter is
+per measurement system, not global") rules out. The plan closes it by labelling: `corrected` is
+carried **per reading**, so the chart can mark where the calibrated span begins.
+
 ## What the plan deliberately leaves alone
 
 Only `body_fat_pct` is corrected. `muscle_mass_kg`, `bone_mass_kg`, `body_water_pct` and the rest come
