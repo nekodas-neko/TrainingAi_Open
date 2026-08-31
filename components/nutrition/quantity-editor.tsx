@@ -5,6 +5,7 @@ import { SegmentedTabs } from '@/components/ui/segmented-tabs'
 import { MACRO_COLORS } from '@trainingai/shared/nutrition/macro-colors'
 import type { FoodItem } from '@trainingai/shared/types/nutrition'
 import type { QtyUnit } from './saved-meal-qty'
+import { NUMBER_INPUT_RESET } from '@/components/ui/input'
 
 interface Props {
   item: FoodItem
@@ -101,7 +102,7 @@ export function QuantityEditor({ item, qty, unit, onUnitChange, onQtyChange, onS
           onChange={e => onQtyChange(e.target.value)}
           autoFocus={autoFocus}
           aria-label={unit === 'g' ? `Grams of ${item.name}` : `Servings of ${item.name}`}
-          className="h-full min-w-0 flex-1 rounded-xl bg-muted px-3 text-center !text-3xl font-bold tabular-nums outline-none focus:ring-2 focus:ring-brand [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none"
+          className={`h-full min-w-0 flex-1 rounded-xl bg-muted px-3 text-center !text-3xl font-bold tabular-nums outline-none focus:ring-2 focus:ring-brand ${NUMBER_INPUT_RESET}`}
         />
         <button
           onClick={() => onStep(1)}

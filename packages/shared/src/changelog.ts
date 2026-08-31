@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.413.3",
+    date: "2026-09-01",
+    changes: [
+      "The quantity box on Assign to Meal is centred properly. It was pushed off-centre by the number spinner Chromium draws inside the box, and its text was rendering a size larger than the \u00d71/\u00d72 chips beside it.",
+    ],
+  },
+  {
     version: "1.413.2",
     date: "2026-08-31",
     changes: [
