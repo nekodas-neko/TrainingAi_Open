@@ -4644,3 +4644,16 @@ reads as the place the feature was implemented.
 **BF-35's `Keep:` said the images were "stored and unseen"** and that was wrong; nothing stores them,
 so the render it lists as owed would show the same placeholder. Corrected in place with BF-70 named
 as the prerequisite, because building the render first is the wasted PR that line would have caused.
+
+## 2026-08-31 — `docs/implementation-backlog.md` (BF-73, a second pass over BF-50's work)
+
+Both halves of this report are re-reports of controls BF-50 already built, and saying so is most of
+the entry's value. The capture tiles were raised 48 → 62 dp with the number taken from the artboard
+under BF-28's parity rule, so "make them bigger" now means overriding the drawing — legitimate under
+rule 2 (a later owner decision beats the artboard) but it has to be *recorded* as an override, or the
+next parity sweep corrects them back and the owner reports it a third time.
+
+The action pair is the same shape: BF-50 ④ renamed `Select` to `Delete meals` because the words were
+the fix, and the owner now wants that control reduced to an icon. So the entry says the accessible
+name has to carry what the label was carrying, and that the hit box stays 44 dp while the label
+shrinks — the two ways this ships as a regression while looking like the request.

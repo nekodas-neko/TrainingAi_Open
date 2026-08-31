@@ -1771,6 +1771,49 @@ controls side by side, one wired to the engine and one not.
   `Deload` → it does not. Then the reverse case, a **full** prescription with `Deload` picked, still
   behaves as Q-109/Q-175 built it — that path works today and must not regress.
 
+### [nutrition] BF-73 — the Log Food screen: bigger capture tiles, and `New` should outrank `Delete meals`
+
+- **Lane:** B — `components/nutrition/capture-actions.tsx` and `components/nutrition/meal-list-actions.tsx`.
+- **Batch:** `nutrition-ui-uplift`
+- **Added:** 2026-08-31 · owner, on the Log Food sheet: *"don't like this UI from this screen — the
+  icons/sections for photo/barcode/describe should be larger. Delete meals + New should be
+  different. Maybe a big 'New' button + a small delete bin."*
+
+**① The capture tiles have already been enlarged once, which is the thing to know before doing it
+again.** BF-50 ① took them from `min-h-12` (48 dp) to `min-h-[62px]`, and the comment records where
+62 came from: *"from the artboard's capture tiles — not a number invented here (BF-28's parity
+rule)"*. The owner is now asking for bigger than the drawing.
+
+- **That is allowed, and BF-28 rule 2 is why:** a later owner decision beats the artboard, and this
+  is one. Record it as an owner override rather than a parity fix, so the next parity sweep does not
+  "correct" the tiles back to 62 and re-open this.
+- **Keep `min-h`, never a fixed height.** The existing comment earned that: *"Describe or enter"*
+  wraps to two lines in a third of 412 dp and a fixed height clips it. Growing the tile means raising
+  the floor and letting the label breathe — more vertical padding and a larger icon (`h-5 w-5` today)
+  — not pinning a height.
+- The icon and the 11 px label should scale with the tile; a bigger box around the same small glyph
+  is what makes a control read as empty rather than prominent.
+
+**② The action pair is deliberately equal-weight today, and the owner wants a hierarchy.** Both are
+`size="sm"` pills with `min-h-[44px]`: `Delete meals` in `secondary`, `New` in the default accent.
+The owner's ask — a big `New`, a small bin — is the better shape and worth stating why: **`New` is
+the frequent act and deleting meals is rare and destructive**, so equal visual weight overstates the
+destructive one.
+
+- **The bin must stay a real 44 dp target while looking small.** Shrinking the *label* to an icon is
+  the ask; shrinking the *hit box* is a tap-target regression the repo already has a floor for.
+- **⚠ It needs an `aria-label`, and it is losing the one thing that made it clear.** BF-50 ④ renamed
+  this control from `Select` to `Delete meals` precisely because *"there is a 'select' button… but
+  you can't do anything with it except delete"* — the words are the fix that entry shipped. An
+  icon-only bin throws them away visually, so the accessible name has to carry them: `aria-label="Delete meals"`, not `"Delete"`.
+- **The risk is low and worth saying so:** the bin opens *selection mode*, it does not delete
+  anything, and the destructive confirm sits behind it. So an icon-only entry point is defensible
+  here in a way it would not be if it deleted on tap.
+- **Verification:** on the S25, the three capture tiles read as the screen's primary controls and
+  *"Describe or enter"* still fits on two lines without clipping; `New` is visibly the primary action
+  and the bin visibly secondary; the bin still measures ≥44 dp and a screen reader announces it as
+  "Delete meals".
+
 ### [nutrition] BF-72 — the diary's own hydration wipes the meal grouping it just drew
 
 - **Lane:** B — `app/nutrition/use-food-logs-loader.ts:104`.
