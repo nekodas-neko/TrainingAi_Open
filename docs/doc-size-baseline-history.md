@@ -4338,6 +4338,22 @@ The rest are cheap tests that stop a false alarm: check the **spread** before be
 have collapsed (they normally sit 20 points apart), and **reproduce readiness from its stored
 contributors** before calling it wrong (2026-08-31 came to 55.3 against a stored 55).
 
+## 2026-08-31 — `docs/implementation-backlog.md` 14064 → **14089** (BF-2 finishes, LA-45 is filed)
+
+Twenty-five net, and it is one new entry — **LA-45**, the display half. The engine now corrects the
+body fat everywhere a number is derived from it and **no screen reads the corrected value**, so the
+Health card shows 25.3 while the calorie goal is already computed from 28.5. Two figures disagreeing
+on screen is worse than neither being corrected, which is why it is a queue entry rather than a note.
+
+BF-2's own step banner paid seven back. It had been rewritten twice today as steps landed, and the
+third version would have been a third "what is shipped so far" paragraph on an entry whose work is
+finished; it is replaced by the two things a later session must not simplify — the per-consumer
+correction, and the three separate payload fields.
+
+What LA-45 does **not** compress is the seeding rule: display `bodyFatCorrected`, seed the log input
+from `bodyFat`. Backwards, that lets someone overwrite their own measurement by saving a field they
+never touched, and no test in the repo would notice.
+
 ## 2026-08-31 — `docs/implementation-backlog.md` 14017 → **14025** (BF-2 step 3 ships)
 
 Eight lines, and they buy one thing: a standing "do not simplify this back" on the step-3 design.

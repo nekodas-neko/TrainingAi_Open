@@ -57,6 +57,40 @@ describe.skipIf(!canRun)('BF-2 — every consumer of a stored body fat sees the 
     expect(row.bodyFatSource).toBe('scale_ble')
   })
 
+  // Step 4. The display payloads carry BOTH: `bodyFat` raw so the edit sheet cannot launder a
+  // corrected value back into the archive, and `bodyFatCorrected` for what the screen should show.
+  // A file-level check cannot express "this field specifically must stay raw", so it is pinned here.
+  it('gives the display payloads a corrected value WITHOUT touching the raw one', async () => {
+    await addScan()
+    // Not the route itself — importing it pulls in next-auth, which does not load under vitest.
+    // This pins the values the routes build their two fields from; that the routes actually build
+    // them is verified against the running dev server.
+    const cal = await repo.getBodyFatCalibration(USER)
+    const { correctBodyFatPct } = await import('@trainingai/shared/health/body-fat-calibration')
+    const [row] = await repo.listBodyMetrics(USER, '2026-08-27', '2026-08-27')
+
+    // What `toRow` and `day-log` build their two fields from.
+    const shown = correctBodyFatPct(row.bodyFatPct ?? null, row.bodyFatSource ?? null, cal)
+    expect(shown!.rawPct).toBe(SCALE_PCT)
+    expect(shown!.pct).toBe(DEXA_PCT)
+    expect(shown!.corrected).toBe(true)
+
+    // …and the raw column is what a later calibration will pair against, so it must be untouched.
+    const stored = await pool.query<{ body_fat_pct: number }>(
+      `SELECT body_fat_pct FROM body_metrics WHERE user_id = $1 AND date = '2026-08-27'`, [USER])
+    expect(stored.rows[0].body_fat_pct).toBe(SCALE_PCT)
+  })
+
+  // `corrected` is not derivable from `pct !== rawPct`, which is why it is a separate field on the
+  // payload rather than something a screen infers.
+  it('reports not-corrected for an instrument the calibration does not cover', async () => {
+    await addScan()
+    const cal = await repo.getBodyFatCalibration(USER)
+    const { correctBodyFatPct } = await import('@trainingai/shared/health/body-fat-calibration')
+    const other = correctBodyFatPct(22.8, 'health_connect', cal)
+    expect(other).toEqual({ pct: 22.8, rawPct: 22.8, corrected: false })
+  })
+
   it('moves the body_comp snapshot the rollup persists', async () => {
     await pool.query(`DELETE FROM oura_daily_derived WHERE user_id = $1`, [USER])
     await dropScan()

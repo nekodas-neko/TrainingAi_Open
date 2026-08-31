@@ -41,14 +41,10 @@ const EXEMPT = {
 // Rule 2 only. These read a stored body fat and pass it on for DISPLAY OR EDITING, where the raw
 // number is the correct one to show — and in the first case, the one that must be shown.
 const PASSTHROUGH_EXEMPT = {
-  'app/api/body-metadata/route.ts':
-    'its GET seeds the health screen log sheet, which POSTs the value straight back at source ' +
-    '`manual` — a rank that outranks `scale_ble`. Returning a corrected value here would let the ' +
-    'user overwrite their own raw reading by saving an untouched field, and collapse the next ' +
-    'calibration toward zero. This one must stay raw',
-  'app/api/day-log/route.ts':
-    'a day row for display. Correcting it needs the per-reading `corrected` flag beside it or the ' +
-    'number is unexplained — that is step 4 of the plan, and Lane B renders it',
+  // NOTE: `body-metadata` and `day-log` were listed here until step 4. They now carry the
+  // correction in `bodyFatCorrected`/`bodyFatIsCorrected` while `bodyFat` stays raw — an invariant
+  // a file-level check cannot express, so it is pinned by
+  // `lib/data/postgres/__tests__/body-fat-correction-consumers.test.ts` instead.
   'packages/shared/src/health/score-audit/build-day-audit.ts':
     'a score AUDIT — it reports what was actually stored on the day. A corrected number here ' +
     'would make the audit disagree with the row it is auditing, which defeats the point of it',
@@ -68,6 +64,7 @@ function walk(dir, out = []) {
 }
 
 const failures = []
+const handlesButListed = []
 const exemptSeen = new Set()
 
 for (const dir of ['app', 'lib', 'packages/shared/src']) {
@@ -77,9 +74,16 @@ for (const dir of ['app', 'lib', 'packages/shared/src']) {
     const derives = DERIVERS.test(src)
     const passesThrough = READS_LIST.test(src) && READS_FIELD.test(src)
     if (!derives && !passesThrough) continue
+    // The import is checked BEFORE the exemption on purpose. A file that has since started handling
+    // the calibration is no longer exempt, and leaving it listed hides that from the next reader —
+    // the same failure as a stale entry pointing at a file that stopped consuming anything.
+    if (CALIBRATION_IMPORT.test(src)) {
+      const listed = rel in EXEMPT || rel in PASSTHROUGH_EXEMPT
+      if (listed) handlesButListed.push(rel)
+      continue
+    }
     if (derives && rel in EXEMPT) { exemptSeen.add(rel); continue }
     if (!derives && rel in PASSTHROUGH_EXEMPT) { exemptSeen.add(rel); continue }
-    if (CALIBRATION_IMPORT.test(src)) continue
     failures.push(rel)
   }
 }
@@ -88,13 +92,16 @@ for (const dir of ['app', 'lib', 'packages/shared/src']) {
 // stopped deriving anything, and the next reader trusts it.
 const stale = [...Object.keys(EXEMPT), ...Object.keys(PASSTHROUGH_EXEMPT)].filter(rel => !exemptSeen.has(rel))
 
-if (failures.length || stale.length) {
+if (failures.length || stale.length || handlesButListed.length) {
   console.error('check-body-fat-correction FAILED\n')
   for (const rel of failures) {
     console.error(`  • ${rel} consumes a stored body fat without correcting it.`)
     console.error('      Apply `correctBodyFatPct(row.bodyFatPct, row.bodyFatSource, calibration)`')
     console.error('      with `repo.getBodyFatCalibration(userId)`, or add the file to EXEMPT in')
     console.error('      scripts/check-body-fat-correction.js with the reason it does not need it.\n')
+  }
+  for (const rel of handlesButListed) {
+    console.error(`  • ${rel} imports the calibration but is still listed as exempt — remove the entry.\n`)
   }
   for (const rel of stale) {
     console.error(`  • ${rel} is listed as EXEMPT but no longer consumes a stored body fat — remove it.\n`)

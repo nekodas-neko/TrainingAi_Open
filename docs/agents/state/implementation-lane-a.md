@@ -11,7 +11,7 @@ directory. Local SQLite **v32**.
 
 ## Now
 
-**BF-2 steps 1–3 are shipped; only step 4 is owed and it is Lane B's.** The plan is [`2026-08-31-dexa-filter.md`](../../superpowers/plans/2026-08-31-dexa-filter.md). **Its outcome is still unobservable until LA-44** — `dexa_scans` and `measured_rmr` are both empty in production and neither has an entry surface — so do not read "nothing happened" as a broken calibration. **Do not refactor the per-consumer correction back into `listBodyMetrics`**: the Health log sheet seeds from that read and POSTs back at rank `manual`, so a corrected value there overwrites the raw archive. `check-body-fat-correction.js` holds the line.
+**BF-2 is finished — all four steps.** What is left is LA-45 (Lane B: a screen that reads `bodyFatCorrected`) and LA-44 (no way to enter a scan at all). **Its outcome is still unobservable until LA-44** — `dexa_scans` and `measured_rmr` are both empty in production and neither has an entry surface — so do not read "nothing happened" as a broken calibration. **Do not refactor the per-consumer correction back into `listBodyMetrics`**: the Health log sheet seeds from that read and POSTs back at rank `manual`, so a corrected value there overwrites the raw archive. `check-body-fat-correction.js` holds the line.
 
 `docs/implementation-backlog.md` is
 **220 entries** — it grows while a session shrinks it, because five agents file into it concurrently.
