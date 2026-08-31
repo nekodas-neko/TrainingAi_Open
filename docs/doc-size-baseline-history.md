@@ -4098,7 +4098,163 @@ The recommendation is to reuse `toggleDeloadRevert` rather than teach `/prescrib
 input: the full numbers are already carried on the prescription, so the cheap path costs no LLM
 call, no rate-limit budget, and works offline.
 
-## 2026-08-31 — backlog 13585 → 13602 and `docs/agents/state/tuning.md` 235 → 256 (the HRV tile question)
+## 2026-08-30 — `docs/implementation-backlog.md` (BF-65, a feature request that is mostly a cleanup)
+
+The owner asked for one picture on one screen. Most of the entry is what reading the code turned up
+around it: the same `/api/exercise-gif` fetch is hand-rolled in **four** files, so satisfying the
+request naively writes a fifth and walks past the repo's own extract-before-the-third-copy rule.
+Saying that in the entry is what makes the extraction part of the work rather than a follow-up
+nobody files.
+
+Two things are written down because they fail *quietly*. `next/image` silently converts a GIF to a
+static image without `unoptimized`, so the feature would ship looking finished and never move — the
+warm-up screen already carries the correct condition to copy. And the warm-up screen fetches every
+exercise's media moments earlier and prefetches the binaries for the service worker, then unmounts
+and drops the map; without a shared cache key the ready screen re-downloads what the app already has,
+which is also what breaks the offline case.
+
+The layout note is deliberate: the screenshot already cuts `SET TARGETS` off behind the action row,
+so "add a picture" is a fold decision, not a drop-in.
+
+## 2026-08-30 — `docs/implementation-backlog.md` (BF-66, a table that had to be measured)
+
+The owner asked a question — *"it heard me correctly; is that not how to use it?"* — and the answer
+is a six-row table produced by running `parseVoice` rather than reading it. `by` and `at` work while
+`for` and `times` do not, because the strip is a character denylist that keeps every letter appearing
+in `kg`/`reps`/`x`: `r` survives `for`, `es` survives `times`, and the two-numbers fallback then can
+never fire. Nobody derives that from the source at a glance, and nobody derives it from using the app
+at all, which is why the table is in the entry instead of a sentence saying the regex is fragile.
+
+It also carries the reason the seven existing tests pass: every one of them is adjacent numbers or an
+explicit keyword, so the filler-word gap is untested by construction rather than by oversight.
+
+And the second half, which is the part that generated the report: the failure message prints the
+transcript in red, so a *correct* transcript reads as the app mishearing. Fixing the parser without
+fixing that message leaves the next unparseable phrase just as confusing.
+
+## 2026-08-30 — `docs/implementation-backlog.md` (BF-67 and BF-68, the program builder's two blind spots)
+
+Two owner requests about the AI program builder, filed separately because one is buildable and one
+is a design.
+
+BF-68 is measured: `injur` appears **zero times** across both builder routes and all three builder
+components, and `generate-program`'s schema is a strict thirteen-field wizard payload with no
+free-text field at all. The entry's real content is the trap — `builder-chat` *does* take free text,
+so typing "I have a sore lower back" often works by luck, and then the constraint dies when the
+program is saved while the daily engine, which already reads the injuries table, never hears about
+it. That argues for feeding the existing records in rather than adding a field, and for the free-text
+path writing a record instead of a prompt line.
+
+BF-67 is flagged as a planning item because the owner's one sentence contains two payloads —
+structure ("similar to") is ~30 exercise names, history ("what I did") is unbounded — and treating
+them as one is how a prompt gets a year of set logs in it. It also carries two constraints worth
+having before design starts: send a program id rather than a program object, and give the reference
+its own schema caps rather than inheriting the byte-limit situation the route already documents.
+## 2026-08-31 — `projectOverview.md` 8453 → 8450, `docs/implementation-backlog.md` 13776 → 13762, `implementation-lane-b.md` held at 126
+## 2026-08-31 — `projectOverview.md` 8453 → 8450, `docs/implementation-backlog.md` 13585 → 13571, `implementation-lane-b.md` held at 126
+
+Three baselines fall; none rises. **Re-derived on the merge**: this branch was cut at 8449, and
+Q-211's four-line paragraph landed under it. **`projectOverview.md`** loses four lines of merge debris — its
+Current Status carried *three* duplicated `**Version:**` lines and a stray `v1.398.0` /
+`**Last updated:**` pair mid-section, all of it from parallel PRs resolving the same shared line —
+and gains one paragraph, written as a single long line in the section's current house style.
+
+**`docs/implementation-backlog.md`** falls 14 as BF-39's entry is removed on shipping and LB-30 is
+filed, which is the queue working rather than a compaction.
+
+**The baton was rewritten and then cut back to its baseline**, which is the part worth recording:
+correcting BF-39's state cost more lines than the correction saved, so the "finding that should
+change how you start" section was compressed from a heading plus three bullets into one paragraph,
+and four gotchas were merged. **Nothing was dropped** — the fourth instance of the precondition
+finding (BF-39's own) is now in there too, and it is the one that cost the most.
+## 2026-08-31 — `projectOverview.md` 8446 → 8443, `docs/implementation-backlog.md` 13752 → 13743 (LB-28)
+
+Both fall, and the projectOverview one is the note worth reading: the new status entry was **paid
+for in the same section** rather than by raising the number. The BF-46 ①a paragraph from the day
+before was rewritten as one long line in the style the rest of the section has moved to, which
+freed nine — so the index gained an entry and lost seven lines.
+
+Nothing was cut from that paragraph except restatement: the picker count, the shared write path, the
+reproduction, the parent instrumentation and the precondition finding are all still in it, and its
+journal link is unchanged.
+
+**Re-derive both on the merge if #647 lands first** — it removes BF-39's queue entry and repairs
+four lines of duplicated `**Version:**` debris in the same section, so the merged figures will be
+lower than these. Take them from the merged documents rather than picking a side.
+
+## 2026-08-30 — `docs/implementation-backlog.md` (BF-67 gets its answer, and a reason)
+
+The owner answered the template-vs-context question — *"more like understanding what I did… ideally
+we should try keep similar exercises so we aren't changing it up too much"* — which is recorded
+verbatim because it moves the open question from *what does reference mean* to *what counts as a
+reason to change*.
+
+The two lines that grew the file are the ones that turn a preference into a constraint.
+`personal_records` and `exercise_estimates` are both unique on `(user_id, exercise_name)`, so
+**history follows the name, not the program**: continuity is what preserves the 1RM and the PR, and a
+paraphrased name silently starts from zero. And name fidelity is not enforced — `generate-program`
+looks muscles up by exact name and falls back to the model's own guess on a miss, which is the tell.
+An LLM told to keep similar exercises is exactly the thing that paraphrases, so the entry now says
+the route has to resolve generated names against the library before this feature can deliver
+continuity rather than the look of it.
+## 2026-08-31 — `projectOverview.md` 8443 → 8445, `docs/implementation-backlog.md` 13745 → 13679 (BF-60/61/62/63)
+
+**A rise of two, and it is a rise rather than a trade.** The nutrition batch adds one status
+paragraph and pays for none of it, because the section has no slack left that is this branch's to
+take: the two paragraphs above it are hours old and the ones below belong to other agents. Two lines
+for four owner reports, one of which corrects the fix its own entry proposed, is worth the ratchet
+moving.
+
+**The backlog falls 66.** BF-60 is removed outright — a tab rename with an e2e assertion on the
+label owes nothing further — while BF-61, BF-62 and BF-63 are rewritten to their `Keep:` residue,
+which is the **device check** in all three cases and nothing else. That is the protocol working
+rather than a compaction: an entry that shipped but is not device-verified stays in the queue,
+because that check is the outstanding thing.
+
+(Re-derived on the merge: this branch was cut on top of #647 before it landed, so its first
+figures were against that head rather than against `main`.)
+
+## 2026-08-31 — `projectOverview.md` 8445 → 8468, `docs/implementation-backlog.md` 13679 → 13602 (BF-66)
+
+**Twenty-three lines, and twenty of them are one Known-Issues row.** The voice fix is JS-only and
+reaches the phone on the next deploy, so it is device-*unverified* rather than device-*blocked* —
+which under the Canonical Runtime rule is exactly the case that has to buy a row rather than a
+queue entry. The row names the five phrasings to say into the button and points at LA-37's row four
+paragraphs above it, because they are the same button and want the same sitting; a reader who does
+one and not the other has done half a check. The remaining three lines are the status paragraph.
+
+**No slack was available to pay for it.** The three paragraphs under the status heading are hours
+old and belong to other branches, and the Known-Issues section's nearest ⚠️ rows are all still owed
+their own device passes, so there was nothing here this branch could honestly strike.
+
+**The backlog falls by BF-66's whole entry.** Nothing is owed past the device check the row above
+now carries, so the entry is removed rather than rewritten to a `Keep:` — the residue lives in
+`projectOverview.md`, and duplicating it in the queue would make an entry that reads as open work.
+
+## 2026-08-30 — `docs/implementation-backlog.md` (BF-69, exposure as a variable)
+
+Long because the request arrives on top of storage that already exists and one decision that
+invalidates everything after it.
+
+BF-3 shipped the per-log `amount`/`unit`/`doseText` snapshot, and its own comment says it was built
+so a dose could be correlated against resting HR. What the entry adds is that **nothing reads it** —
+`supplementLogs` is absent from `health-trends`, `sleep-performance-correlation` and both ai-chat
+analysis files — so this is a reader, not a schema.
+
+The decision written at the top is that **a missing row is not a zero**. The owner's baseline week is
+a request to record a real zero, and today "didn't take it" and "forgot to log" are the same absence.
+Three options are laid out with the one that manufactures effects named as such. The repo has already
+published a false coefficient from a data-shape mistake and left it standing for eleven days, which
+is why this is a blocker rather than a caveat.
+
+Two findings the request did not know about: `food_items` has no supplement link and the owner's food
+log already contains supplement rows, so the "picked up from the nutrition log" hope is also a
+double-count risk; and the "like a total calorie value" analogy needs adjusting, because doses do not
+sum across substances — what transfers is the shape (one number per substance per day), not the
+total.
+## 2026-08-31 — backlog → 13683 and `docs/agents/state/tuning.md` 235 → 256 (the HRV tile question)
+
+*(Backlog figure is from the final rebase — other PRs raised it while this branch was open. This branch's own delta is +17.)*
 
 **No new entry — the growth is entirely a closed question and four traps.** The owner asked whether
 HRV should replace resting HR on the Home tile. Measured, it should not: **restingHeartRate −0.491

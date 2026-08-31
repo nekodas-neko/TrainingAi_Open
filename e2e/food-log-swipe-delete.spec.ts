@@ -1,6 +1,6 @@
 import { test, expect, type Page, type Locator } from '@playwright/test'
 import { Client } from 'pg'
-import { SEED_EMAIL, settleRouteBoundary } from './fixtures'
+import { SEED_EMAIL, settleRouteBoundary, swipeRowLeft } from './fixtures'
 
 /**
  * A logged food swipes left to a Delete that lands on the confirmation (BF-45 ⑤).
@@ -100,33 +100,6 @@ test.beforeEach(async ({ page }) => {
 
 const diaryRow = (page: Page) => page.getByRole('button', { name: new RegExp(`^${FOOD}`) }).first()
 
-/**
- * A leftward touch drag across the row, far enough past halfway that the tray rests open.
- *
- * **Centre the row first.** Its natural position was 32 px above the fold, under the bottom tab
- * bar, so every touch point landed on a nav icon and the tray never moved — a harness failure that
- * reads exactly like an unwired gesture, and cost an hour before the target was printed.
- */
-async function swipeLeft(page: Page, row: Locator) {
-  await row.evaluate(el => el.scrollIntoView({ block: 'center' }))
-  await page.waitForTimeout(300)
-  const box = (await row.boundingBox())!
-  const y = box.y + box.height / 2
-  const startX = box.x + box.width / 2
-  const cdp = await page.context().newCDPSession(page)
-  try {
-    await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: startX, y }] })
-    for (let step = 1; step <= 10; step++) {
-      await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: startX - 20 * step, y }] })
-      await page.waitForTimeout(16)
-    }
-    // The final point matters: the day-swipe handler reads `changedTouches[0]`, so an empty
-    // touchEnd would silently skip the very gesture the second test exists to provoke.
-    await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [{ x: startX - 200, y }] })
-  } finally {
-    await cdp.detach()
-  }
-}
 
 /**
  * A coordinate tap, not `locator.tap()`. The dev-only Next.js error overlay mounts a
@@ -170,7 +143,7 @@ test('a swipe reveals Delete, and Delete asks before it deletes', async ({ page 
 
   const row = diaryRow(page)
   await expect(row).toBeVisible({ timeout: 30_000 })
-  await swipeLeft(page, row)
+  await swipeRowLeft(page, row, { centreFirst: true, releaseWithPoint: true })
 
   await tapAt(page, page.getByRole('button', { name: `Delete ${FOOD}` }))
 
@@ -181,13 +154,59 @@ test('a swipe reveals Delete, and Delete asks before it deletes', async ({ page 
   await expect.poll(logCount, { timeout: 15_000 }).toBe(0)
 })
 
+/**
+ * BF-61 — the first tap on Delete must work.
+ *
+ * The owner reported needing two presses and confirmed the cause by waiting: *"if I wait a second
+ * it works."* The row carries `transition: transform 0.22s`, and hit-testing follows the **animated**
+ * transform, so while the row is sliding out it is still physically over part of the tray. A tap in
+ * that window lands on the row, which swallows it; the second tap, after the settle, reaches the
+ * button.
+ *
+ * **The transition is lengthened to make a timing bug deterministic.** Left at 220 ms the window is
+ * narrower than one protocol round-trip on a loaded runner, so the tap would sometimes land after
+ * the settle and the test would pass whether or not the bug was fixed — a false green, which is
+ * worse than no test. Only the DURATION is changed; the fix under test (stacking the tray above the
+ * row while open) is duration-independent, and removing it fails this in both directions.
+ *
+ * The tap point is computed from the row's own box rather than measured off the button, because a
+ * measurement is a round-trip and the point of this test is not to spend one.
+ */
+test('the first tap on Delete opens the confirmation, even mid-animation', async ({ page }) => {
+  await withDb(db => seedLog(db, 1))
+  await openYesterday(page)
+  await page.addStyleTag({ content: '[data-swipe-actions] > div:last-child { transition-duration: 6s !important }' })
+
+  const row = diaryRow(page)
+  await expect(row).toBeVisible({ timeout: 30_000 })
+  const box = (await row.boundingBox())!
+  // 36 px rests the row open on DISTANCE (past half the 64 px tray) rather than on velocity, which
+  // is what leaves it SHORT of its resting offset and sweeping across the tray on the way. A fast
+  // flick would be the same gesture in life, but `@use-gesture`'s velocity over a CDP-paced drag
+  // lands under `FLICK_VELOCITY` and the row snaps closed instead — measured, and it made the first
+  // version of this test fail for the wrong reason.
+  await swipeRowLeft(page, row, { distance: 36, centreFirst: true, releaseWithPoint: true })
+
+  // Deep inside the tray, not at its centre: the row uncovers the tray right-edge first, so a point
+  // 52 px in stays under the row for most of the slide while a point 32 px in is clear almost at
+  // once. One action, `ACTION_WIDTH` = 64, pinned right — see `swipe-actions-math.ts`.
+  const after = (await row.boundingBox())!
+  await page.touchscreen.tap(box.x + box.width - 52, after.y + after.height / 2)
+
+  await expect(
+    page.getByRole('heading', { name: 'Delete food log?' }),
+    'the tap landed on the row instead of the tray — the row is still over it while it slides',
+  ).toBeVisible({ timeout: 5_000 })
+  expect(await logCount(), 'the tap deleted the entry with no confirmation').toBe(1)
+})
+
 test('the drag opens the tray without also stepping the diary to the next day', async ({ page }) => {
   await withDb(db => seedLog(db, 1))
   await openYesterday(page)
 
   const row = diaryRow(page)
   await expect(row).toBeVisible({ timeout: 30_000 })
-  await swipeLeft(page, row)
+  await swipeRowLeft(page, row, { centreFirst: true, releaseWithPoint: true })
 
   await expect(page.getByRole('button', { name: `Delete ${FOOD}` })).toBeVisible({ timeout: 10_000 })
   await expect(page.getByText('Yesterday', { exact: true })).toBeVisible()

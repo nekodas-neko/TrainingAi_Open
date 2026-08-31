@@ -204,7 +204,7 @@ test('back closes the meal on top of the list and leaves the list open', async (
   // what the user sees.
   await expect(async () => {
     await clickInView('Meals')
-    await expect(page.getByPlaceholder('Search your meals')).toBeVisible({ timeout: 3_000 })
+    await expect(page.getByPlaceholder('Filter your meals')).toBeVisible({ timeout: 3_000 })
   }).toPass({ timeout: 60_000 })
   expect(await page.evaluate(() => history.length)).toBe(before + 1)
 
@@ -226,7 +226,7 @@ test('back closes the meal on top of the list and leaves the list open', async (
   // that the list SURVIVED is its content coming back, not a dialog count.
   await page.goBack()
   await expect(opened).toHaveCount(0, { timeout: 10_000 })
-  await expect(page.getByPlaceholder('Search your meals')).toBeVisible({ timeout: 10_000 })
+  await expect(page.getByPlaceholder('Filter your meals')).toBeVisible({ timeout: 10_000 })
   expect(new URL(page.url()).pathname).toBe('/nutrition')
 
   // Two: the screen goes, and only now does the page underneath give way to nothing.

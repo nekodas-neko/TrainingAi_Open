@@ -187,6 +187,19 @@ Live at the time of writing (2026-07-30):
 
 ## History
 
+- **[`docs/handoff-2026-08-31-nutrition-diary-and-swipe-tray.md`](../../handoff-2026-08-31-nutrition-diary-and-swipe-tray.md)**
+  — 🆕 the session that shipped BF-39, BF-60/61/62/63, LB-28 and LB-30. **Read its gotchas before
+  writing an e2e that taps a coordinate**: `Input.dispatchTouchEvent` performs none of
+  `locator.tap()`'s actionability checks, and the three gestures that do *not* reproduce BF-61 are
+  written down there.
+- **[`docs/overview/entries/2026-08-31-diary-nested-meal-rows.md`](../../overview/entries/2026-08-31-diary-nested-meal-rows.md)**
+  — 🆕 **BF-39**: a logged meal draws as **one** diary row, headed by the meal's name and photo, and
+  opens to its ingredients. Grouped on `meal_group_id`, never `saved_meal_id`; the name and photo
+  come from [`use-saved-meal-summaries.ts`](../../../lib/hooks/use-saved-meal-summaries.ts), a
+  local-first read on the shared `saved-meals` key. **Read the second half before trusting any
+  measurement made against a swipe spec**: the week-long hold, recorded as a `useDrag` being dropped
+  by a sibling re-render, was the spec measuring a row the sheet had not finished animating — the
+  drag handler was never invoked at all.
 - **[`docs/overview/entries/2026-08-30-nutrition-ui-uplift.md`](../../overview/entries/2026-08-30-nutrition-ui-uplift.md)**
   — 🆕 **BF-45 / BF-50 / BF-51**: eight surface fixes from two device passes — the macro ring starting
   at 9 o'clock (`from -90deg` is the SVG idiom; CSS conic gradients already start at the top, and

@@ -805,6 +805,9 @@ app, opposite advice. **That contradiction is the defect**, not the absence of a
 
 - **Needs:** BF-43 — the clinical half of the overview cannot be wired before it is decided what the
   model may see. **The injury line does not wait on it** and should ship first, alone if need be.
+- **BF-68 is the same gap on the program builder**, where `injur` also appears zero times. Whichever
+  ships first exports the active-injury formatter (muscle, severity, days active) for the other to
+  import — two hand-written injury summaries in two prompts drift.
 - **Verification.** Ask the chat for a lower-body session with an active lower-back injury logged: it
   names the injury unprompted and does not recommend a deadlift, matching what the workout screen
   does for the same state. Resolve the injury and the constraint disappears from both.
@@ -1245,25 +1248,6 @@ a finding — it does not by itself explain a plain `GET` hanging beside it.
 - **Keep:** whatever the cause, `connectionTimeoutMillis: 0` on a pool of 10 is worth a decision of
   its own — a bounded wait turns a hang into an error state a card can show.
 
-### [platform] LB-28 — CI should refuse `savePreference` inside a `useEffect`
-
-- **Lane:** B
-- **Added:** 2026-08-30 · Lane B, from the defect LB-27 describes.
-- **Needs:** LB-27
-
-The footgun is invisible at the call site: `useEffect(() => localStorage.setItem(K, v), [v])` is a
-free write, and the same line calling `savePreference` is a **network PATCH on every mount**.
-`usePersistedPreference` exists for the mirror case, but nothing stops the next conversion reaching
-for `savePreference` again — and the failure it produces names unrelated specs.
-
-**One check, narrow on purpose:** flag `savePreference(`/`savePreferences(` that appears inside a
-`useEffect(` block in `app/`, `components/` or `lib/`. A tap handler nested inside an effect would
-be a false positive; there are none today, and the escape hatch is the same as every other rule
-here — an entry in the script with a written reason.
-
-**Do not widen it to "no fetch in an effect"**, which is most of this codebase. The rule is about
-one helper whose cost is not visible in its name.
-
 ### [platform] BF-55 — 84 MB of index against 63 MB of table, and the database is growing ~7× its expected trend
 
 - **Lane:** A
@@ -1338,6 +1322,237 @@ opened on, unchanged.
 - **Verification:** index total drops below the heap total, and a re-read a week later shows growth
   back near trend.
 
+### [nutrition][platform] BF-69 — dosed substances are stored but nothing reads them; make exposure an analysable variable
+
+- **Lane:** A for the read model and any schema; B for the supplements-page UI and the trends surface.
+- **Planning item** — a design with one decision in it that invalidates everything downstream if
+  taken wrongly. Needs a planning session.
+- **Added:** 2026-08-30 · owner, on starting retatrutide: *"I'd like it to be a value that can be
+  correlated to all data… this week I will put it as Reta = 0 so it has a baseline - then next week
+  add a dosage; so all that data is compared against its associated value… So I could see periods
+  where I did take fish oil every day or creatine vs HR."*
+
+**Half of this shipped as BF-3 (migration 244), and it was built for exactly this.**
+`supplement_logs` already carries `amount`, `unit` and `doseText` snapshotted per log, unique on
+`(supplement_id, log_date)`, and its own comment says why: *"`amount`/`unit` are what a correlation
+against resting HR needs, since an exposure variable has to be a number on a date"*, for *"a drug
+whose story is its escalation schedule"*. **The storage is done. There is no reader.** `supplementLogs`
+appears in the local store, the sync engine, the adapter and the schema — and in **none** of
+`health-trends`, `sleep-performance-correlation`, `lib/ai-chat/analytics.ts` or `lib/ai-chat/tools.ts`.
+
+**⚠ The decision that has to come first: a missing row is not a zero.** Today a `supplement_logs`
+row exists only on days something was logged, so "did not take it" and "forgot to log it" are the
+same absence. The owner's baseline week is precisely a request to record a real zero. Every
+correlation downstream is only as good as this: a run of unlogged days read as zeros will invent an
+effect, and this repo has already published a false coefficient from a data-shape mistake and left it
+standing for eleven days (see **A Correlation Across a Model Change Is Not Evidence**). Options for
+the plan:
+  1. a per-substance **`started_on` / `stopped_on` window**, so days outside it are true zeros and
+     days inside it with no row are *unknown*, not zero — cheapest and probably right;
+  2. an explicit "not today" log (a zero-amount row), which is honest but needs daily discipline;
+  3. treat unlogged-inside-window as zero — simplest, and the one that manufactures effects.
+  Whatever is chosen, **unknown must be representable and must be excluded from a correlation rather
+  than counted as zero.**
+
+**⚠ Creatine is already being logged somewhere else, and the two do not know about each other.**
+`food_items` has no supplement link, and the owner's food log already contains supplement rows (a
+`ZMA Complex Supplement` sits in Recently Used). So the owner's *"hopefully this can get picked up
+from the nutrition log"* is a real gap and a real double-count risk: the same creatine could be a
+`supplement_log` and a `food_log` on the same day. Decide one of — link a supplement to a
+`food_items` row, merge the two sources on read with a de-dup rule, or state that dosed substances
+are logged in one place only. Not deciding is how the series ends up double-counting the days the
+owner was most diligent.
+
+- **The "like a total calorie value" analogy is the one thing to adjust.** Doses do not sum across
+  substances — 2 mg of retatrutide, 5 g of creatine and 1,000 mg of fish oil have no meaningful
+  total, and an aggregate exposure number would be a metric that cannot be interpreted. What
+  transfers from nutrition is the *shape*, not the sum: **one number per substance per day**, which
+  is the same shape as steps or calories and is exactly what makes it correlatable. So the model is
+  N parallel series, each selectable, not one column.
+- **Location: log where the owner said, analyse where the other analyses live.** The supplements
+  section of Nutrition is right for entry — it is where the substance is already defined and logged.
+  The comparison belongs on the health/trends surface beside the metrics it is being compared
+  against, with a substance pickable as an overlay series. Building a bespoke chart inside the
+  supplements page would put a second correlation surface in the app.
+- **Recommendation: ship the overlay before the coefficient.** A dose series drawn against resting
+  HR, weight or sleep is immediately useful, honest about gaps, and cannot be wrong the way a number
+  can. A correlation coefficient computed over ~20 self-selected days with a titration confounded by
+  every other change in the owner's life reads as authoritative and is not; if one is ever shown it
+  must carry **n and the window**, exclude unknown days, and never be phrased causally.
+- **⚠ Retatrutide is a prescribed drug, so keep the app descriptive.** Record it, chart it, let the
+  coach *see* it (BF-44's health overview is the natural carrier) — but nothing here should
+  recommend, adjust or comment on dosing, and no LLM-authored line should read as titration advice.
+  The existing `PROSE_GUARDS` rule (quote the given numbers, no superlatives) is the closest thing
+  to precedent and should bind any generated text about this.
+- **Staging that keeps each step verifiable:** (1) the presence model — `started_on`/`stopped_on`
+  and an unknown-vs-zero rule, plus the supplements-page UI to set it; (2) a read model exposing one
+  daily series per substance; (3) the trends overlay; (4) coach visibility; (5) only then, if it is
+  still wanted, any computed statistic.
+- **Verification:** a baseline week with no dose and a following week at a dose produce two visibly
+  different series with no gap between them; a week where logging was simply missed reads as
+  *unknown* on the chart rather than as zero; and a supplement logged through the food log is
+  either counted once or excluded by a stated rule, never twice.
+
+### [workouts][platform] BF-68 — the program builder does not know you are injured, and typing it into the chat does not make it stick
+
+- **Lane:** A — `app/api/generate-program/route.ts` and `app/api/builder-chat/route.ts`; the UI half
+  (surfacing the constraint on the wizard) is B and can follow.
+- **Added:** 2026-08-30 · owner, on building a new program with the AI coach: *"be able to put
+  somewhere or say 'i have a sore lower back, so would rather not heavily loaded lower back
+  exercises' and for it to recommend against deadlifts or something."*
+
+**Measured: `injur` appears zero times in the entire builder path** — both routes and all three
+`components/workout-builder/` files. `generate-program`'s request schema is a `.strict()` 13-field
+wizard payload with no injury data and no free-text field at all, so the generator cannot know and
+the user cannot tell it.
+
+**`builder-chat` is the trap, not the answer.** It *does* take free text (`message`, 1,000 chars), so
+typing the sentence above during the review step will often produce a sensible-looking swap. But the
+model is handed no injury record and no instruction to treat it as a hard constraint, so it is luck
+rather than a rule — and **the constraint dies when the program is saved.** The daily prescription
+engine, which already reads `repo.listInjuries()`, never learns about it. A back that stopped
+deadlifts in the builder gets deadlifts again the next time the engine writes a session.
+
+- **Recommendation: feed the existing `injuries` table into both routes, and make the free-text path
+  WRITE to it.** This is not new infrastructure. `injuries` has `muscleName`, `severity`, `notes`,
+  `startedDate`, `resolvedDate`; it already drives `activeInjuredMusclesInSession`, the mid-workout
+  injury-swap sheet via `injurySafeAlternatives`, and the prescription's re-evaluation pass. Making
+  the builder read the same rows means one place to say it, every surface obeys it, and marking it
+  resolved lifts the constraint everywhere at once.
+- **The free-text half should create a record, not a prompt line.** When the builder chat is told
+  about an injury, it should offer to log one — Coach already has a tool that does exactly this. A
+  constraint that exists only inside one generation is the failure mode above.
+- **Batch/Needs — BF-44 is the same gap on the chat surface** and proposes an always-on active-injury
+  context line. Whoever ships first exports that formatter (muscle, severity, days active) and the
+  other imports it; two hand-written injury summaries in two prompts is the drift this repo files
+  entries about. Not a `Needs:` — neither blocks the other, and either alone is an improvement.
+- **⚠ Do not have the model decide which exercises an injury rules out.** `injurySafeAlternatives`
+  is deterministic and already knows, from the muscle assignments. The prompt's job is to state the
+  injured muscles and the rule; the exercise-level exclusion should come from the same code the swap
+  sheet uses, or the builder and the swap sheet will disagree about the same injury.
+- **Verification:** log a lower-back injury, generate a program — no heavily-loaded lower-back
+  primary appears, and the model says why unprompted. Say it in the builder chat instead: an injury
+  record is offered and, once logged, the next daily prescription respects it too. Resolve the
+  injury and both constraints lift.
+
+### [workouts] BF-67 — building a new program cannot reference an old one, so every program starts from nothing
+
+- **Lane:** A for the payload and prompt, B for the picker.
+- **Planning item** — this is a design with a size question in it, not a defect. Needs a planning
+  session before implementation.
+- **Added:** 2026-08-30 · owner: *"be able to reference an old program so it knows what I did and
+  what I would like similar to."*
+
+**The generator's entire input is the wizard form.** `RequestSchema` in `generate-program` is
+`.strict()` with thirteen fields — name, equipment, sessions per week, minutes, muscles, goal,
+progression mode, phase structure, weeks, schedule shape. No program id, no history, no notes. So a
+program built after a year of training starts from the same blank slate as the first one, and the
+owner has to re-describe in a wizard what the app already knows.
+
+**"What I did" and "what I liked" are two different payloads, and conflating them is the size trap.**
+
+1. **Structure** — the old program's session names, exercises, roles and progression styles. Small
+   and bounded: a 5-session program is ~30 exercise names. This is the "similar to" half.
+2. **History** — what was actually trained under it. Unbounded if taken literally; a year of set logs
+   cannot go in a prompt. It needs a *summary*: per exercise, sessions logged, latest 1RM, and
+   whether it was dropped part-way. Adherence is the interesting signal — an exercise programmed
+   twelve times and trained twice is one the next program should probably not repeat.
+
+- **Recommendation: ship structure first, summary second.** Structure alone answers "make me another
+  one like that", is cheap to build (`listPrograms` already exists), and is verifiable. The history
+  summary is where the design work is, and it can land on top without changing the picker.
+- **ANSWERED 2026-08-30 — it is context, with continuity as a constraint.** Asked whether the old
+  program is a template to vary or context to learn from, the owner said: *"more like understanding
+  what I did and how to build the next program - ideally we should try keep similar exercises right so
+  we aren't changing it up too much?"* So the instruction is **carry the exercises forward unless
+  there is a reason not to**, and the design question is no longer *what does reference mean* but
+  *what counts as a reason to change*. Candidates for the plan to settle: a changed goal, a changed
+  muscle focus, an exercise that was programmed and never actually trained, equipment no longer
+  available, and an active injury (BF-68).
+- **⚠ Continuity is not a preference — it is what preserves the training history, and this is the
+  finding that should drive the design.** `personal_records` is `unique on (user_id,
+  exercise_name)`, and `exercise_estimates` is keyed the same way. **History follows the NAME, not
+  the program**, so an exercise carried into a new program keeps its 1RM and its PR automatically —
+  and a *renamed* one silently starts from zero. "Bent-Over Barbell Row" and "Barbell Bent-Over
+  Row" are the same lift to the owner and two different exercises to the database.
+- **⚠ And name fidelity is not enforced today.** `generate-program` hands the model the filtered
+  library list and looks muscles up by exact name — but on a miss it falls back to
+  `?? ex.mainMuscles`, the model's own guess, which is the tell that a name outside the library
+  passes through. An LLM asked to "keep similar exercises" is precisely the thing that paraphrases,
+  so **the route needs to resolve every generated name against the library and reject or repair a
+  non-match** before this feature can deliver continuity rather than the appearance of it. Worth
+  measuring first: how many of the owner's existing `personal_records` rows have no
+  `exercise_library` match already.
+- **⚠ Bound the payload at the schema, not by hoping.** The note above `MAX_BODY_BYTES` in
+  `generate-program` already records that `equipment` and `musclesToFocus` are unbounded arrays and
+  the byte cap is the only thing holding them. A reference program is a much larger structure; it
+  needs its own `.max()` counts rather than inheriting that situation.
+- **Send an id, not the program.** The client should pass a program id and the route should read it
+  server-side. Accepting a whole program object from the client is an ownership hole and a
+  prompt-injection surface for no benefit — and any id the client sends still needs a `user_id`-scoped
+  read, per the write-path ownership rules.
+- **Verification:** pick a previous program in the builder, generate, and the result visibly echoes
+  its split and its main lifts rather than a generic template; pick none and the output is unchanged
+  from today. **Every carried-forward exercise keeps its 1RM and PR on the first session** — which is
+  the check that catches a paraphrased name, since a lift that reads correctly but shows no history
+  is exactly the failure this entry is written to prevent. A program id belonging to another user is
+  rejected, not read.
+
+### [workouts] BF-65 — show the exercise GIF on the per-exercise ready screen, and extract the fetch while doing it
+
+- **Lane:** B — `components/workout/active-workout-screen.tsx` (the ready branch at :240) plus a new
+  shared hook; the route and the media both already exist.
+- **Added:** 2026-08-30 · owner, with the ready screen and the warm-up screen side by side: *"id like
+  the exercise gif in the pre session screen so it shows you what movement you will be doing."*
+
+**The media is real and it is genuinely animated.** `/api/exercise-gif?name=` returns
+`{ gifUrl, imageUrl }`, and for a generated exercise the gif is `/exercise-media/gifs/male/<slug>.gif`
+with a matching start frame at `…/frames/male/<slug>-start.png`. The warm-up screen renders it at
+40 px today; the ready screen — the one screenshotted, `active-workout-screen.tsx`'s ready branch —
+shows the name, last session, bar load, ramp-up and set targets, and no picture at all. There is also
+no route to one from there: `ExerciseStatsSheet` carries the gif but is mounted only on
+`pre-workout-screen.tsx`.
+
+**Do not add a fifth copy of the fetch — extract it.** The same
+`fetch('/api/exercise-gif?name=…')` → `{gifUrl, imageUrl}` is hand-rolled in **four** places already:
+`warmup-screen.tsx:39`, `exercise-stats-sheet.tsx:71`, `config/exercise-preview-sheet.tsx:33` and
+`workout-builder/builder-review.tsx:154`. The repo's rule is that a pattern at ≥2 sites is extracted
+before a third copy; this is the fifth, so the extraction is part of the work rather than a follow-up.
+
+- **Reuse the warm-up screen's fetch rather than repeating it.** `WarmupScreen` already fetches media
+  for **every** exercise in the session moments earlier, and deliberately re-fetches each binary so
+  the service worker caches it offline. Then it unmounts on the mode change and the map is lost. The
+  ready screen wants exactly one entry of that map. Put the results behind a shared cache key so the
+  second screen paints instantly from what the first already fetched — per the instant-paint rule, a
+  spinner on the ready screen for a file the app downloaded 60 seconds ago is the outcome to avoid.
+- **⚠ `unoptimized` is mandatory on a GIF through `next/image`, and forgetting it fails silently.**
+  The optimizer turns a GIF into a static image, so the picture appears, looks correct, and simply
+  never moves — which reads as "the gif is broken" rather than as a missing prop. `warmup-screen.tsx`
+  gets this right with `unoptimized={thumbSrc.endsWith('.gif')}`; copy that condition.
+- **Put it in a memoised child, not inline.** The ready screen sits behind a 1 Hz session pill and
+  the rest ring, and CLAUDE.md's render rules put repeated/hot-parent widgets in `React.memo` with
+  stable props. `active-workout-screen.tsx` is 626 lines against the ~800 ceiling, and the hotspot
+  rule says new features go into a `components/` child rather than being appended.
+- **Layout is a real decision, not a drop-in.** The screenshot already cuts `SET TARGETS` off behind
+  the action row, so a full-width media block pushes the bar-load number — the thing the user is
+  actually reading — further below the fold. Options worth weighing: a compact thumbnail beside the
+  exercise name that expands on tap (cheapest, keeps the fold), or a modest fixed-height strip under
+  the name. The owner's stated purpose is *"so it shows you what movement you will be doing"*, which
+  argues for it being visible without a tap.
+- **Alternative considered — carry the media on `/api/workout-data`.** That kills N round-trips
+  outright, since the route already returns the exercise list. Rejected as the first move: it makes
+  this a Lane A change to a payload four surfaces read, for a saving the shared cache above already
+  gets. Worth revisiting if the per-exercise fetch turns out to be slow on the device.
+- **Bodyweight and unmatched exercises need a defined empty state.** `/api/exercise-gif` returns
+  `{ gifUrl: null, imageUrl: null }` for anything it cannot match, and the warm-up list falls back to
+  a dumbbell icon. The ready screen needs the same fallback decided up front, or a missing match
+  leaves a hole where the layout expects a picture.
+- **Verification (device, APK):** open a session, and each exercise's ready screen shows its
+  animation — *moving*, not a frozen first frame — including the second and later exercises, which
+  is where a fetch-once effect keyed wrongly would show the first exercise's clip. An exercise with
+  no match shows the fallback rather than a gap. Then airplane mode: the clip still plays, because
+  the warm-up screen's prefetch put it in the service worker.
+
 ### [workouts] BF-64 — the Full/Deload toggle can only ADD deload, never remove one, so `Full · Override` overrides nothing
 
 - **Lane:** A — the decision lives in `packages/shared/src/workout/session-data.ts` and
@@ -1399,154 +1614,69 @@ controls side by side, one wired to the engine and one not.
   `Deload` → it does not. Then the reverse case, a **full** prescription with `Deload` picked, still
   behaves as Q-109/Q-175 built it — that path works today and must not regress.
 
-### [nutrition] BF-63 — the meal builder has no barcode scan, so a packet ingredient has to be typed
+### [nutrition] BF-63 — barcode scan in the meal builder (shipped; the scan itself needs the device)
 
-- **Lane:** B — `components/nutrition/ingredient-picker.tsx` + `ingredient-search.tsx`; the scanner
-  and the lookup route both already exist.
+- **Lane:** B
 - **Batch:** `nutrition-ui-uplift`
-- **Added:** 2026-08-30 · owner, on the meal builder: *"in the meal creator there is no scan/barcode
-  option."* Screenshot: `ADD INGREDIENTS` offering only the text field.
+- **Added:** 2026-08-30 · owner
+- **Shipped 2026-08-31** — `ingredient-picker.tsx` opens `BarcodeScanner` and mints the hit with
+  `source: 'barcode'`, added as an ingredient rather than logged to today. A printed meal label is
+  recognised and refused with a reason (nesting a meal is not built). The route's
+  unavailable/not-found split is carried through.
+- **Keep:** the **device check**, and only that. The scan needs a camera — the Capacitor plugin on
+  device, `getUserMedia` on web — so no harness in this repo can drive it, which is why there was no
+  barcode e2e before this and still is none for the scan itself. On the S25: scan a packet in the
+  builder → it appears in the ingredient list with the product's name and macros, the food item
+  lands in the library, **nothing is logged to today's diary**, and a down database says so rather
+  than reading as "no match".
+- **Keep:** the **code is still not stored**, deliberately. `barcode` is NULL on every `food_items`
+  row including the three already marked `'barcode'`; `/api/nutrition/barcode` does not return what
+  it looked up and `NewFoodItem` has no field for it. That chain is **Lane A** and is BF-38's, and
+  this path defers to it rather than adding a fourth writer of NULL.
 
-**The capability is one file away, not missing.** `saved-meals-sheet.tsx` renders *both*
-`CaptureActions` (the Log Food screen, which has `Photo · Barcode · Describe or enter`) and
-`IngredientPicker` (the build form, which has none of it). So the owner learns barcode scanning on
-one screen of this sheet and loses it on the next. `barcode-scanner.tsx` is a standalone overlay
-taking `onResult`/`onClose`, and `/api/nutrition/barcode` is a plain GET — both are reusable as they
-stand.
+### [nutrition][app-shell] BF-62 — the meal detail sheet's action row sits close to the gesture bar (fixed, NOT the way this entry proposed)
 
-**But do NOT drop `CaptureActions` into the builder.** Its `onScanResult` routes a hit into the
-*food logger*, which logs the product to today. In the builder the same scan must mint a food item
-and **add it as an ingredient to the meal being built** — that is `addExternalFood`'s shape
-(`createFoodItem(…)` then `accept(item)`), fed from a `NutritionScanResult` instead of an
-`ExternalFood`. Reusing the wrong half is how a scan in the builder silently logs breakfast.
-
-- **`source: 'barcode'`, and the comment already anticipates this.** `ingredient-picker.tsx:119`
-  explains that its external-search path writes `source: 'text'` because *"a barcode identifies one
-  exact product; a name search returns a plausible near-match"*. The type has `'barcode'`; a scanned
-  ingredient must use it, or the distinction that comment protects is lost the moment this ships.
-- **⚠ Carry the code itself, per BF-38.** That entry measured production: **`barcode` is NULL on all
-  221 rows, including all 3 whose `source` is `'barcode'`** — `/api/nutrition/barcode` never returns
-  the code it looked up, so nothing downstream can store it. Adding a second scan path that writes
-  another NULL makes BF-38's job bigger. Either return `code` from the route and thread it, or say in
-  the diff that this path defers to BF-38 — a silent third NULL-writer is the outcome to avoid.
-- **Decide the saved-meal QR case rather than discovering it.** `CaptureActions.handleBarcode`
-  shape-detects a printed meal label (22 base64url chars) before falling through to the product
-  lookup. Scanned *inside a builder*, that payload means "add this saved meal as an ingredient",
-  which is meal-nesting and is not built. Simplest honest answer: recognise it and say it is not
-  supported here, rather than passing a meal token to a product lookup that will 400 it.
-- **Relationship to BF-52 — this is the smaller, buildable half.** BF-52 is a planning item about
-  *meal-level* entry points (build a whole meal from a photo, URL or description) and proposes
-  mirroring Log Food's capture row. This report is per-*ingredient* and needs no design work. Build
-  it now; when BF-52 is planned, its capture row should absorb this button rather than adding a
-  second barcode affordance beside it.
-- **Verification:** in the builder, scan a packet → it appears in the ingredient list with the
-  product's name and macros; the food item lands in the library with `source = 'barcode'`; nothing is
-  logged to today's food log; and Open Food Facts being down says so rather than reading as "no
-  match" (the distinction `/api/nutrition/barcode` already draws).
-
-### [nutrition][app-shell] BF-62 — the meal detail sheet's action row still sits close to the gesture bar, and `92vh` is the likely reason
-
-- **Lane:** B — `components/nutrition/meal-detail-sheet.tsx:81`.
+- **Lane:** B
 - **Batch:** `nutrition-ui-uplift`
-- **Added:** 2026-08-30 · owner, on the meal detail sheet: *"the safe space is still a little off
-  here."* Screenshot: `Log this meal` plus three icon buttons sitting close to the gesture bar.
+- **Added:** 2026-08-30 · owner
+- **⚠ The `92vh` hypothesis was wrong, and the reason is worth carrying.** `SheetContent
+  side="bottom"` bakes `.pb-safe-action` — the inset against a **0.75rem** floor — and `globals.css`
+  records the measurement beside its larger sibling: under Capacitor's edge-to-edge the WebView is
+  drawn behind the nav bar, so the inset reports **the bar's own height**. Padding by
+  `max(inset, 0.75rem)` therefore pads by exactly the bar and leaves a primary button flush on it.
+  That is the report. The height was never involved.
+- **Shipped 2026-08-31** — `SheetContent` and `SheetFooter` both take `bottomInset="takeover"`,
+  which swaps in `.pb-safe-action-lg` (inset + a real gap, with a floor). The class is **chosen, not
+  appended**: tailwind-merge cannot see these custom classes and the two would stack. Five
+  takeover-height nutrition sheets pass it — meal detail, saved meals, and the three meal-plan
+  sheets.
+- **Keep:** the **device check**, and only that. On the S25 with **gesture** navigation *and* with
+  **3-button** navigation — the inset differs by mode, and checking one mode is what lets this class
+  through. The sandbox renders the inset as 0, so none of this is verified.
+- **Keep:** `components/activity/exercise-review-sheet.tsx` (`h-[85vh]`) was **not** changed. It has
+  no bottom-anchored action row to be flush against, it is another domain, and nothing was reported
+  on it — re-judge it if one is.
 
-**This is NOT the gutter fix that shipped.** BF-45 ③ moved the nutrition sheets from `px-1` to 16 px
-**horizontal** gutters in v1.397.0. This is **vertical** clearance on a bottom-anchored action row —
-a different axis and a different fix, reported in the same breath as the old one and easy to mistake
-for a regression of it.
+### [nutrition][app-shell] BF-61 — the swipe tray's Delete needs two presses (fixed; device check owed)
 
-**And it is not a missing `pb-safe`.** CLAUDE.md is explicit that `SheetContent side="bottom"` owns
-the bottom inset, that `p-0` does not strip the baked padding, and that tailwind-merge cannot see the
-custom classes. The action row here is `pt-2` with no bottom padding, which is correct by that rule.
-**Do not "fix" this by adding one** — that is the mistake the rule exists to prevent.
+- **Lane:** B
+- **Batch:** `nutrition-ui-uplift`
+- **Added:** 2026-08-30 · owner, confirmed on device the same day: *"if I wait a second it works."*
+- **Shipped 2026-08-31** — the tray stacks above the row while open. Hit-testing follows the
+  *animated* transform, so for the 220 ms the row spends sliding out it is still over part of the
+  tray and swallows the tap.
+- **The regression test is the part to read before touching this again** (`e2e/food-log-swipe-delete.spec.ts`).
+  Three shapes do **not** reproduce it: a long drag overshoots the resting offset and animates back
+  **rightwards**, never covering the tray; a short flick through CDP falls under `FLICK_VELOCITY` so
+  the row snaps closed; and a tap at the tray's **centre** is uncovered almost at once, because the
+  tray uncovers from its right edge first. What works is a 36 px drag (rests open on distance,
+  leaving the row short of its offset), a tap 52 px into the tray, and the transition stretched to
+  6 s so the window is wider than a protocol round-trip. Mutation-proved both ways.
+- **Keep:** the **device check**, and only that. On the S25, swipe and tap Delete **immediately** —
+  the confirmation must appear on the first press, on **both** the meal list and the food rows, and
+  the slow tap must keep working. **BF-29's 2026-08-30 pass is not evidence**: it was the meal list,
+  tapped slowly.
 
-**Hypothesis, and it is specific: `h-[92vh]`.** The sheet is `className="flex h-[92vh] flex-col"`. On
-Android gesture navigation a WebView's `vh` is computed against a viewport that **includes** the
-gesture inset, so 92% of it can extend under the bar — and the baked bottom padding is then measured
-inside a box whose height already overshoots. The padding is present and still lands short.
-**Unverified: the sandbox renders the inset as 0, which is exactly why this class recurs.**
-
-- **If confirmed, the fix is the height, not the padding** — `dvh` rather than `vh`, or a height that
-  subtracts the inset, so the baked padding has real space to sit in.
-- **Sweep the siblings in the same pass.** Any sheet with a `vh` height has this shape;
-  `grep -rn 'h-\[[0-9]*vh\]' components/` is the search, and fixing this one sheet alone is the
-  half-done kind the sibling-surface rule is about.
-- **Verification:** on the S25 with gesture navigation **and** with 3-button navigation — the inset
-  differs by mode, and checking one mode is what lets this class through.
-
-### [nutrition][app-shell] BF-61 — the swipe tray's Delete needs two presses, and the transition is the cause (owner-confirmed)
-
-- **Lane:** B — `components/ui/swipe-actions.tsx`.
-- **Batch:** `nutrition-ui-uplift` — same screen, same device pass.
-- **Added:** 2026-08-30 · owner, on the shipped swipe tray: *"when sliding and pressing delete it
-  requires 2 presses before the confirmation comes up."*
-- **Confirmed on device 2026-08-30** · owner, running the timing check below: *"if I wait a second
-  it works."* So this is a **cause, not a hypothesis** — do not re-diagnose it.
-
-**What I ruled out by reading the component**, so nobody re-checks these first: the tray buttons are
-not overlapped by the row once it has settled (the row translates to exactly the tray's left edge,
-and the parent clips); `aria-hidden`/`tabIndex` flip on `isOpen`, which is true the moment `open()`
-sets the offset, so the button is focusable and hit-testable immediately; and `useDrag`'s
-`filterTaps` is bound to the **row** div while the tray is a sibling — a tap on Delete never reaches
-the drag handler.
-
-**The mechanism.** The row carries `transition: transform 0.22s cubic-bezier(…)`. Hit-testing follows
-the *animated* transform, so for those 220 ms the row is still physically covering part of the tray:
-a tap in that window lands on the row, not on Delete. The row swallows it, the animation finishes,
-and the second tap hits the button. Waiting a second — which is what the owner did — puts the tap
-after the settle, and one press works. That is the whole bug.
-
-- **Do NOT fix it by shortening the animation.** A window that swallows input at 0.22 s still
-  swallows it at 0.1 s; it just makes the bug rarer and harder to report.
-- **Leading candidate: raise the tray above the row in stacking order while `isOpen`.** The tray is
-  already a sibling with `absolute inset-y-0 right-0`; giving it a `z-` above the row when open means
-  a tap inside the tray's rect reaches the button even while the row is still sliding across it. The
-  row is translating *away* from that rect anyway, so nothing the row owns becomes unreachable — and
-  when closed the tray keeps its current stacking, so a tap anywhere on a closed row is unaffected.
-- **Second option if that misbehaves:** settle `offset` to its final value at release and let the
-  transition be purely visual — but that is the same "animate something the hit-test disagrees with"
-  shape, so prefer the stacking fix.
-- **One fix covers both trays.** `SwipeActions` has exactly two call sites — `meal-card.tsx` and
-  `saved-meal-card.tsx` — so this is one component change, not a sweep. That also settles the BF-29
-  question below: the two trays are the same component, so the earlier pass simply did not tap fast
-  enough rather than the trays differing.
-- **⚠ Re-run BF-29's check with the deliberate fast tap.** BF-29 passed on the device on 2026-08-30
-  (*"Yes all good here"*) on the **meal** list, while this report came from the **food-row** tray from
-  BF-45 ⑤. Same component, so BF-29's pass is not evidence the meal list is clear.
-- **Verification:** on the S25, swipe and tap Delete **immediately** — the confirmation must appear on
-  the first press, on both the meal list and the food rows. The slow tap must keep working too; a fix
-  that trades one for the other is not a fix.
-
-### [nutrition] BF-60 — the `Single foods` tab is the search surface now, so call it `Search`
-
-- **Batch:** `nutrition-ui-uplift` — a one-word rename that should ride the batch already touching this
-  screen rather than costing its own PR and its own device look.
-- **Lane:** B — `components/nutrition/saved-meals-sheet.tsx:64` (`LIST_TABS`).
-- **Added:** 2026-08-30 · owner, with the Log Food screen: *"single foods here should be → Search. I
-  think that would represent it better."*
-
-**The label was right when it was written and BF-48 made it wrong.** `Single foods` was chosen to
-name a *composition against one thing* — the code carries a comment saying so, and it was a good
-label for a tab listing the single foods you had logged. **BF-48 then gave that tab the food
-database**, and the screen now says it out loud: the placeholder reads *"Search your foods or the
-food database…"*. A tab that reaches outside your own data is not "your single foods" any more.
-
-- **Rename to `Search`, and update the comment above `LIST_TABS` in the same change.** That comment
-  is the recorded reasoning for the old label; leaving it in place would have the file defending a
-  name it no longer uses, which is how a later session talks itself into reverting this.
-
-**⚠ One wrinkle, worth deciding rather than discovering.** `Meals` has a search box too — `FoodList`
-renders one with placeholder *"Search your meals"*. So `Search` as a tab name is not strictly
-exclusive. The distinction that makes it honest: **Meals *filters* a list you already own; this tab
-*searches* beyond it.** Make the two read differently — filter placeholder on Meals, search
-placeholder here — or the rename swaps one ambiguity for another.
-
-- **Alternatives considered, in case this comes back:** `All foods` (accurate, but reads as a bigger
-  list of yours rather than a lookup), `Database` (jargon), `Find food` (parallel with the other tabs
-  as an action but wordier at 412 dp). **`Search` is the owner's pick and the shortest true one.**
-- **Verification:** the tab reads `Search`, the `LIST_TABS` comment describes the current labels, and
-  the two search inputs are worded so a filter and a lookup do not read the same.
 
 ### [nutrition] BF-45 — the nutrition tab's UI uplift (all five shipped; device check owed)
 
@@ -1787,53 +1917,6 @@ sheets are at the artboards' 16 px gutter now. See BF-45 ③ for why the fix is 
 - **The owner asked to stop here:** *"Lets get this into the right section and UI before we deep dive
   this more."* So N5's recipe-import checks (yield, multi-dish, duplicate handling) are **not
   answered** and stay owed — do not read this entry as clearing them.
-
-### [nutrition] BF-39 — a logged meal draws as one nested row (BUILT AND HELD — read the measurement first)
-
-- **Lane:** B
-- **Batch:** `nutrition-ui-uplift`
-- **Added:** 2026-08-26 · owner, re-raised 2026-08-27 with a screenshot and again 2026-08-30 — three
-  reports from three screens, the strongest priority signal in the nutrition cluster.
-
-**The engine shipped 2026-08-30** (migrations 238 + 239, local SQLite **v31**):
-`food_logs.saved_meal_id` and `food_logs.meal_group_id`, stamped by `logMealItems` on both write
-paths and carried through the outbox payload, the push branch, the sync delta, the pull mapping and
-the local read. **What is owed is the rendering, and it was built and NOT shipped.**
-
-**⚠ IT WAS BUILT, IT WORKS, AND IT BROKE A DIFFERENT SCREEN'S GESTURE. Do not rebuild it the same
-way.** The render half is straightforward and its own three e2e tests pass. What it could not do is
-coexist with the meal library's swipe tray: `meal-detail-artboard-parity` and
-`my-meals-artboard-parity`'s swipe tests failed **deterministically, on both CI attempts and
-locally**, with the tray's `Delete <meal>` button never appearing after a left-swipe.
-
-**What was measured, in order — this is the valuable part:**
-1. **It is a regression of this work, not a flake.** The same two specs pass on `main` and fail on
-   the branch, run the same way, minutes apart.
-2. **The cause is the saved-meal summaries hook**, not the grouping or the rendering. Disabling
-   `useSavedMealSummaries` alone — leaving every other line — turns both specs green.
-3. **Moving the hook out of `nutrition-content.tsx`** into a memoised `DiaryMealList` (so the map's
-   arrival cannot re-render the library sheet) fixed `my-meals-artboard-parity` and **not**
-   `meal-detail-artboard-parity`.
-4. **The trigger is the `saved-meals` invalidation subscription**, not its network fetch. Removing
-   `useInvalidationRefetch` entirely turns both green; keeping it but re-reading only from the local
-   store and the cache seed — no request — leaves both red. So something in opening a meal
-   invalidates `saved-meals`, and the resulting work lands while a `SwipeActions` row is mid-drag.
-
-**Where to start.** Find what invalidates `saved-meals` during `openSavedMeal`, and why a subscriber
-re-rendering a sibling subtree drops an in-flight `useDrag`. `SwipeActions` keeps `offset` in
-`useState` and a module-level `openRows` registry — a re-render should be harmless and a **remount**
-would not be, so establish which is happening before changing either component.
-
-**The diary needs the meal's name and photo from somewhere**, and every option has a cost: this hook
-(above), a join into the food-log read (**Lane A** — `app/api` and `lib/data`), or a seed-only read
-that goes stale (the Q-260 shape). Settle that before building again.
-
-- **The grouping rule itself is settled and was proved by mutation** — keep it: group on
-  `meal_group_id`, **never** `saved_meal_id` (two servings of one meal on one day share the meal and
-  not the group); a group needs a *resolvable* meal, so pre-BF-39 rows and a deleted meal's rows
-  render loose because **nothing back-fills**; and a one-row group is not nested.
-- **Verification when it is rebuilt:** the three tests written for it, **plus** the meal-library
-  swipe specs in the same run — the pair this attempt broke.
 
 ### [nutrition] BF-38 — logging the same food twice creates a second `food_items` row: 19 of 209 are redundant
 
@@ -9710,32 +9793,25 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   deliberate archival policy and is explicitly **out of scope** here (see
   `docs/db-volume-cleanup-handover.md`).
 
-### [activity][devices] Q-284 — decide the fate of the Oura activity blend, which now fires on 1 day in 40
+### [app-shell][activity] LA-42 — `trainingBoostFrom` can never be non-null, now structurally
 
-- **Branch:** `chore/retire-oura-activity-blend`
-- **Plan:** none needed
-- **Added:** 2026-08-15 · from the comprehensive review (a finding that was **softened** during
-  verification — see below)
-- **What it is.** `blendActivityScore` (`lib/activity/blend-activity.ts`) exists to credit gym
-  training that Oura's Cloud activity score under-counted. It returns early unless
-  `ouraActivityScore != null`, and `lib/health/readiness-payload.ts:347` only calls it when
-  `ouraToday?.activityScore != null`, falling through to our own score otherwise.
-- **Measured, and this corrects the first reading.** The initial finding was "dead code — the Cloud
-  is gone, so `oura_daily.activity_score` is always null". **That is not what production says:**
-  `count(activity_score)` over post-re-key days is **1 of 40** (16 of 55 across all history). So the
-  branch is **nearly inert, not dead**, and it is filed on those terms rather than as a deletion.
-- **Why it is still worth an entry.** A branch that fires on one day in forty is a branch nobody can
-  reason about and no test exercises meaningfully. Its constants (`TRAIN_CREDIT_BASE = 6`,
-  `TRAIN_CREDIT_VOL = 8`, `MAX_ADJ = 14`) are described in their own comment as *"heuristic and
-  intentionally bounded; tune against real data over time"* — and there is now no path by which
-  real data will accrue, because the Cloud integration was removed on 2026-08-13.
-- **Decide, in one small PR:** either (a) retire it and let our own Activity Score stand alone —
-  the fallback branch already handles 39 of 40 days and folds in training credit itself — or
-  (b) keep it and document why one day in forty takes a different code path. **Check first whether
-  that single non-null day is real Cloud data or a stray write**; if it is a stray, (a) is
-  unambiguous.
-- **Low priority.** No user-visible fault, no data loss. This is dead-weight removal, and it should
-  not jump ahead of anything in the scoring cluster above.
+- **Branch:** _unassigned_ · **Lane: B** — `components/health/health-score-detail.tsx`
+- **Added:** 2026-08-30 · Lane A, from Q-284's removal.
+- `health-score-detail.tsx:205` computes
+  `trainingBoostFrom={… data.activityBlend.adjustment > 0 ? data.activityBlend.base : null}`.
+  Q-284 deleted `blendActivityScore`, so `adjustment` is now a literal `0` in
+  `readiness-payload.ts` and that ternary can only ever take its null arm.
+- **Not a regression, and that distinction matters for how urgent this is.** The prop was already
+  dead in practice — the blend last had an Oura score to adjust on **2026-07-07**, the re-key day —
+  so nothing changes for a user. Q-284 turned "dead in practice" into "dead by construction", which
+  is what makes it safe to delete rather than merely unused today.
+- **The fix is a deletion**, in Lane B's file: drop the prop and whatever `ScoreRing` does with it,
+  unless that path has another caller. The sibling banner this pairs with (`activity-content.tsx`'s
+  *"Oura 56 · +10 training → 66"*, named in the 2026-07-02 plan) is **already gone** — a grep for
+  `.adjustment` across `app/` and `components/` returns this one line and nothing else.
+- **Low priority.** No user-visible fault; it is dead-weight removal on a surface that already
+  renders correctly.
+
 
 > **⚑ Q-232 … Q-244 are one cluster** — the 2026-08-14 UI/flow/IA + caching review, requested by the
 > owner ("a good review on the ui and flow/location mainly … alongside that have a look at caching
@@ -10355,10 +10431,20 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   raw archive should move to the device (D4). This is reclaimable waste inside the current design and
   needs no architectural decision.
 
-### [platform] Q-214 — a tap during the sync pull queues behind the whole delta on the one SQLite connection
+### [platform] Q-214a — a tap during the sync pull queues behind the whole delta on the one SQLite connection
 
 - **Branch:** `perf/sync-pull-sqlite-connection-hold`
 - **Added:** 2026-08-13 · found while fixing the check-in saves (#1292).
+- **⚠️ RENUMBERED `Q-214` → `Q-214a` on 2026-08-30, because the number was reused and the reuse
+  was actively misleading.** `Q-214` had already shipped on 2026-08-12 — the `upsertOuraHeartrate`
+  duplicate-collapse fix that stopped a 5,771-hit `[pg 21000]` fault
+  ([journal](overview/history-2026-08-12.md)) — and its queue entry was removed on completion, so
+  the next session took the number back. `check-backlog-pointers.js` cannot see that: it fails on
+  a duplicate *within the backlog*, and there was only ever one Q-214 in the file at a time.
+  **The harm was real rather than cosmetic:** `projectOverview.md` says *"That is Q-214, fixed on
+  2026-08-13"* in three places, so a session orienting from it would conclude this entry was done —
+  and what is still open here includes silent data loss, not just latency. Per CLAUDE.md the
+  letter-suffix goes to the second claimant; the shipped work keeps `Q-214` everywhere it is cited.
 - The Capacitor SQLite plugin has a single connection, and `applyDelta` holds a native transaction
   (`beginTransaction`, `lib/local-store/sqlite-backend.ts:384/1201/2077`) across the whole delta. A
   user write landing during a pull queues behind all of it — measured as **~2 minutes** of a
@@ -11441,34 +11527,6 @@ per-field merge where an AI write has no honest source rank to claim.
   composition, energy in/out, per-session volume, steps, scores, sleep and a day HR trace from
   reusable components. What is missing is one entry point instead of two, three stats, a 7-day
   comparison, and the wrap-up continuing from the read-through. Reasoning and alternatives: the plan.
-
-### [sleep][readiness] LB-25 — body temperature has no way to reach a screen, so Q-112b shipped without it
-
-- **Branch:** `feat/day-log-body-temp` · **Lane: A** — the fix is a field on
-  `app/api/day-log/route.ts`; the render that consumes it is a handful of lines in
-  `components/health/day-detail/day-read-through.tsx` and can ride along.
-- **Added:** 2026-08-27 · Lane B, split out of Q-112b when the premise was checked against `main`.
-- **Why it is not simply "add a stat".** Q-112b asked for HR min/max, body temp and the AI digest.
-  Two of the three shipped; body temp is the one with **no client-reachable source**:
-  - `oura_daily.temperature_deviation` is the frozen Cloud column the plan explicitly forbids — it
-    stops at the BLE re-key and would print a months-old figure as today's.
-  - The live derived values are `oura_daily_summary.temp_mean_c` / `temp_dev_c`
-    (`lib/data/postgres/schema.ts:1315`). **No route returns either.** `app/api/ai/health-insight`
-    reads `tempDevC` and feeds it to a prompt; nothing hands it to a component.
-  - They *are* synced to the local store (`store.getOuraDailySummary(from, to)`), so a device-only
-    local-first read would work — and would be unverifiable in `pnpm dev` or Playwright, where
-    `getLocalStore` returns null. That is the trade this entry exists to avoid making silently.
-- **The shape:** add `bodyTemp: { meanC, devC } | null` to `DayLogResult`, sourced from
-  `oura_daily_summary` for the requested day. One field, one `Stat` pair beside the sleep or body
-  section. Q-105's precedence is what decides the source; it is **not** a new precedence.
-- **Do not reach for `oura_daily`** even as a fallback for pre-re-key days. A value that is correct
-  for 2026-07-05 and stale for every day since is worse than a blank, because a blank says so.
-- **Related, deliberately not folded in:** the day HR trace is bucketed by **mean** over 15 minutes
-  (`app/api/day-log/route.ts:271`), so the range Q-112b shipped is labelled *"15-min averages"*
-  rather than min/max — a three-minute resting dip to 48 surfaces as about 55. The true per-bucket
-  extremes exist as `oura_bucket.hr_min` / `hr_max`. If this entry is taken, adding
-  `hrLow`/`hrHigh` to the same payload is nearly free and would let that label become *Low* / *High*
-  honestly.
 
 ### [readiness][nutrition] Q-112c — the 7-day comparison window
 
@@ -12974,6 +13032,29 @@ path and wanting a device check before merging — so this is one entangled piec
 of work, not two. Take the `return 60` fix and the offline weight-resolution
 wiring together, with a device check, rather than building a mirror table nobody
 reads.
+
+### [platform] LB-30 — 46 e2e coordinate reads can be measuring a moving element
+
+- **Lane:** B
+- **Added:** 2026-08-31 · Lane B, from the root cause of BF-39's week-long hold.
+
+A `boundingBox()` taken right after a sheet opens is a position the element is still travelling
+through. `SheetContent` slides in over `duration-500`, and `toBeVisible()` — and `toBeInViewport()`
+— are both satisfied long before it lands. **Measured on the meal library**: the row read y=605,
+and by the time a CDP touch reached it the row sat at y=503, so every point of the gesture hit the
+scroll container beneath it and the drag handler was never invoked once. It reads as a dead gesture,
+not a mis-aimed one, which is why it cost a week: the whole investigation was a render-vs-remount
+question the defect never involved.
+
+`swipeRowLeft` (`e2e/fixtures.ts`) now waits for two reads a frame apart to agree before it
+measures, and the three swipe specs go through it. **What is owed is the same audit for the other
+reads**: 46 `boundingBox()` calls across 27 spec files, of which only the ones feeding a
+`touchscreen.tap`/CDP dispatch are exposed — `locator.tap()` does its own stability check and is
+safe. `openSavedMeal` is the pattern that already survives this by re-measuring inside a `toPass`
+retry; a single measure followed by a coordinate tap is the shape to find.
+
+- **Not urgent**, and deliberately below the feature work: it produces flakes, not wrong behaviour,
+  and every one of them is already failing loudly rather than passing silently.
 
 ### [platform] 🟡 J1 residual — CI-enforced cache/fetch hygiene gates
 

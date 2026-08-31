@@ -148,6 +148,28 @@ sets log and the rest timer behaves, it passes. Only worth a deliberate run for 
 half, since nothing else in the app depends on that setting.
 
 
+## W4. Voice logging, mid-set — LA-37 + BF-66 · **JS**
+
+Two fixes, one press. The button was **absent** on the APK until LA-37 (an unsettled plugin promise
+left it undrawn), and the parser threw away most of the ways a set is actually said until BF-66.
+Neither has been near a microphone: `Capacitor.isNativePlatform()` is false in `pnpm dev` and in
+Playwright, so the native recogniser has never produced a transcript in any test.
+
+Open a workout, reach a set card, and:
+
+1. The **Voice** button is drawn at all, with `Say "60 kg 6 reps"` under it. (LA-37 — if it is
+   missing, stop here and say so; everything below is behind it.)
+2. Press it and say each of **`60 for 6`**, **`60 kg for 6`**, **`60 times 6`**, **`60 by 6`** and
+   **`60 x 6`**. Every one must set the dial to **60 kg × 6**. Before BF-66 the last two worked and
+   the first three did not, which is the whole report.
+3. Say something deliberately unparseable ("start the next set"). A pass is a message offering an
+   example — not your own words repeated back in red.
+4. Deny the microphone permission once: it must say so rather than flipping silently back to
+   "Voice".
+
+Only step 2 needs care about *what* is said; the rest are one press each.
+
+
 ## ~~W3. Volume landmarks at S25 width~~ ✅ 2026-08-30
 Owner: *"Looks good."* Nothing clipped or wrapped at 412 dp. **Q-305 is device-verified.**
 

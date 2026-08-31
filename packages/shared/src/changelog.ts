@@ -6,6 +6,39 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.404.2",
+    date: "2026-08-31",
+    changes: [
+      "Voice logging understands how people actually say a set. \u201c60 for 6\u201d, \u201c60 kg for 6\u201d and \u201c60 times 6\u201d all log 60\u00a0kg for 6 reps now \u2014 before, only \u201cby\u201d, \u201cat\u201d and \u201cx\u201d worked, and anything else was heard perfectly and then thrown away.",
+      "When it genuinely cannot make sense of what you said, it says so and gives an example instead of just repeating your words back in red. The example is also on the button now, so the phrasing no longer has to be guessed.",
+    ],
+  },
+  {
+    version: "1.404.1",
+    date: "2026-08-30",
+    changes: [
+      "The day view now shows the night\u2019s body temperature. The deviation from your usual sits beside it only once that baseline is trustworthy \u2014 right now every night reads warm because the baseline is about 0.36\u00a0\u00b0C low, which is the same reason readiness stopped scoring temperature at all, so showing it would mean printing a number the app itself will not use.",
+    ],
+  },
+  {
+    version: "1.404.0",
+    date: "2026-08-31",
+    changes: [
+      "Delete on a swiped row works on the first press. The row is still sliding for a fifth of a second after you let go, and a tap in that window landed on the row instead of the button \u2014 which is why waiting a moment worked and tapping straight away did not.",
+      "The meal builder can scan a barcode. Log Food could already; the screen where you actually build a meal could not, so a packet ingredient had to be typed out.",
+      "Log Food's \u201cSingle foods\u201d tab is now called \u201cSearch\u201d, because it reaches the food database and not just foods you have logged. The Meals box says \u201cFilter your meals\u201d, since that one only narrows the list you already have.",
+      "Full-height sheets leave real room under their buttons instead of sitting them on the gesture bar.",
+    ],
+  },
+  {
+    version: "1.403.0",
+    date: "2026-08-31",
+    changes: [
+      "A meal you logged is one row in the diary again, headed by the meal's own name and picture, instead of one row per ingredient. An AI-logged breakfast used to fill the whole meal section; tap the row to open it and the ingredients are still all there.",
+      "Two helpings of the same meal on one day stay two rows \u2014 they are two helpings, and merging them would report one.",
+    ],
+  },
+  {
     version: "1.402.1",
     date: "2026-08-30",
     changes: [
