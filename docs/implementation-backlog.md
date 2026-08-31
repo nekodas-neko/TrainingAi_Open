@@ -1363,6 +1363,51 @@ from the nutrition log"* is a real gap and a real double-count risk: the same cr
 are logged in one place only. Not deciding is how the series ends up double-counting the days the
 owner was most diligent.
 
+**ANSWERED 2026-08-30 — how the food log and the supplement record join up.** Asked how creatine
+logged in the food log should reach the exposure series, the owner proposed: *"in a food log or when
+you create a saved meal you can add 'supplements' to it - it means when the meal gets logged it
+treats it as the supplement being hit. And for reta it would be more a 'selection first to choose
+dosage' but it would get logged the same way."*
+
+**This is the right shape and it dissolves the double-count by construction.** One exposure table,
+two entry points. The rule that makes it work, and that must be written into the plan: **a supplement
+attached to a meal writes a `supplement_logs` row and never a `food_items` row.** The moment the food
+log becomes a second *store* of exposure rather than a second *entry point*, the double-count is back.
+
+- **The variable-dose half is one flag, not a second flow.** Creatine is 5 g every time; retatrutide
+  changes on a titration schedule. So an attachment carries either a fixed amount or "ask me when
+  logging" — which is exactly the owner's *"selection first to choose dosage"* and is a boolean on
+  the attachment rather than a separate feature.
+
+**⚠ Two collisions, read out of `adapter.ts` — both must be settled before this is built.**
+
+1. **`logSupplement` re-stamps; it does not add.** The table is `unique(supplement_id, log_date)` and
+   the upsert's own comment says *"the row is one act of taking it"*, re-stamping the dose on a
+   second write. So a meal carrying creatine plus a hand-tick on the supplements page the same day
+   leaves **one** value, last writer wins — and a meal logged twice records one dose, not two. Decide
+   what a day means: *did I take it* (today's model, and fine for adherence) or *how much did I take*
+   (what a titration needs, and not representable as things stand).
+2. **`unlogSupplement` soft-deletes the whole day's row**, with no notion of who wrote it. Deleting a
+   meal that carried creatine would wipe a dose the owner also logged by hand. That is silent data
+   loss, and it is why **provenance has to exist before a second writer does.**
+
+- **Do not fix (1) by accumulating a stored number.** CLAUDE.md's stored-counter rule applies exactly
+  — every stored counter in this project has drifted — and an `amount` edited by add-on-log and
+  subtract-on-delete across meal edits is that shape precisely. **Derive the day's exposure from its
+  contributions** rather than storing a running total.
+- **The repo already has the multi-writer precedent: the ranked per-field merge and `source_map` in
+  `lib/data/health-source.ts`**, used for `body_metrics`, `sleep_sessions` and `oura_daily`. Same
+  discipline, whatever the final shape: know which source wrote a value before overwriting or
+  deleting it. That is the half `supplement_logs` does not have yet.
+- **⚠ It is a second writer to a synced domain, so the sync rules bind.** The meal path must go
+  through the same shared write function as the web route and the `pushMutations` branch (one write
+  path per domain), and it must write the **local store** — a supplement dose that only exists
+  server-side after a meal log is the Q-488 shape, where a local-first domain gets a write that never
+  reaches the device.
+- **This raises capture; it does not answer the gate above.** Attaching doses to meals means more
+  days get logged, which is genuinely the best fix for adherence — but *unknown vs zero* is still the
+  decision that has to land first, because more logged days does not make an unlogged one a zero.
+
 - **The "like a total calorie value" analogy is the one thing to adjust.** Doses do not sum across
   substances — 2 mg of retatrutide, 5 g of creatine and 1,000 mg of fish oil have no meaningful
   total, and an aggregate exposure number would be a metric that cannot be interpreted. What
@@ -1391,7 +1436,10 @@ owner was most diligent.
 - **Verification:** a baseline week with no dose and a following week at a dose produce two visibly
   different series with no gap between them; a week where logging was simply missed reads as
   *unknown* on the chart rather than as zero; and a supplement logged through the food log is
-  either counted once or excluded by a stated rule, never twice.
+  either counted once or excluded by a stated rule, never twice. **And the meal path specifically:**
+  log a meal carrying creatine and the dose appears in the supplement record; delete that meal and it
+  goes — without touching a dose logged by hand on the same day; log the same meal twice and the day
+  reads whatever the plan decided a day means, deliberately rather than by accident.
 
 ### [workouts][platform] BF-68 — the program builder does not know you are injured, and typing it into the chat does not make it stick
 
