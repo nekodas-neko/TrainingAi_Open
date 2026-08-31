@@ -5188,6 +5188,37 @@ outright would have deleted the Lane B obligations with them.
 `projectOverview.md` is a net +9 against +12 added: the status section carried **two** `**Version:**`
 lines, v1.413.2 and a stale v1.406.1 below it, and the second was removed.
 
+## 2026-08-31 — `docs/implementation-backlog.md` 14506 → 14528, `projectOverview.md` 8557 → 8572
+
+`lane-a/renderer-recovery` (BF-80). BF-80's entry traded its "deliberately not batched" paragraph
+for a `Keep:` describing what shipped, so the backlog's growth is Q-220 gaining a measurement: the
+`projectOverview.md` **Current Status** section is a 740-line log of **142 dated blurbs**, which
+none of that entry's three levers touch and which the file's own header tells sessions not to write.
+
+`projectOverview.md` grew by exactly the blurb this session added to that section — i.e. it is an
+instance of what the note above describes, raised rather than hidden. Trimming it is Orchestrator's
+sweep, not a native-fix PR's.
+
+## 2026-09-01 — `docs/implementation-backlog.md` (BF-86, and the fix is three lines above the bug)
+
+The owner asked for the app to reset itself on the first open of a new day, and gave the symptom that
+explains why: the morning check-in does not appear on a resume. That half has an exact cause —
+`session-select-content.tsx:784` prompts from an effect with deps `[userId, tz]`, neither of which
+changes, in a tab shell that never unmounts. It runs once per launch. The same file already solves
+this at `:774` with `tabEpoch`, and the check-in guard is already date-stamped, so re-running is
+idempotent: the state is right and only the trigger is missing.
+
+The entry spends its length refusing the requested implementation and saying why, because "close and
+reset the app" is the kind of instruction that gets built literally. BF-80 — filed hours earlier —
+says outright not to fix a resume problem with a reload, and a scheduled reload would give a blank
+screen two candidate causes just as that one is being diagnosed. The recommendation is the mechanism
+the repo already has in miniature: `workout-day-rollover.tsx` is a correct date-change signal wired to
+exactly one consumer, and generalising it delivers the owner's ask with no reload at all.
+
+Also records the scale (56 `cachedFetchToday` sites) and the boundary-test rule, because a rollover
+bug is only visible across local midnight and this repo has repeatedly shipped date logic that works
+all day and fails in a two-hour band.
+
 ## 2026-09-01 — `docs/implementation-backlog.md` (BF-87, a correct number nobody can explain)
 
 The owner asked whether steps count toward calorie burn, and his own screenshot holds both halves:
