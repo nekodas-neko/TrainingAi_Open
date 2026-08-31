@@ -4316,3 +4316,18 @@ sync rules to be remembered.
 
 The two collisions stay in the entry, marked resolved, as the checklist a reviewer runs the
 implementation against.
+## 2026-08-31 — `docs/implementation-backlog.md` (BF-70, a picture dropped three times)
+
+The owner reported one missing thumbnail. Tracing it found the image is fetched successfully and
+discarded at three separate layers — the form model has no field for it, the entry contract has no
+field for it, and the local write hardcodes `imageDataUri: null`. Each is listed with its file and
+line because fixing any one of them changes nothing, which is the fact that decides how the work is
+scoped.
+
+The second finding came free and explains a number already in the backlog: `handleConfirm` stamps
+`source: 'ai'` whenever the scan carries a confidence, and a barcode scan does — which is why BF-38
+measured 3 rows with `source = 'barcode'` out of 221. Same line, so the two entries are batched
+rather than left to conflict.
+
+Also note the batch checker earned its keep here: `nutrition-ui-uplift` is Lane B and BF-70 is Lane
+A, and it refused the mix rather than letting a batch become a PR that cannot ship as one.
