@@ -5119,6 +5119,19 @@ is deliberate, which argues for storing it — and that turns a Lane B control i
 "per session" wording is also flagged as ambiguous, because Home shows one session and the request
 only parses on a list.
 
+## 2026-08-31 — implementation-lane-b.md 159 → 156 (−3, TIGHTENED)
+
+The twentieth Lane B run's baton rewrite. It gained this run's material — `tsc` typechecking nothing
+under `__tests__`, LB-38's two falsified hypotheses and the ship-the-instrument lesson, the queue
+head being exhausted of Lane B work, and five new gotchas — and still came out five lines shorter,
+because the rule is rewrite rather than append. The four-tests-that-could-not-fail block compressed
+to its principle now the habit is established, and the re-litigate list lost detail that had aged
+into background. Tightened rather than banked: slack left in a shrink-only ratchet is room the next
+append takes without noticing. (Drafted at 154; the BF-84 line was then rewritten twice as #705
+landed under it — first to stop asserting a state another open PR was about to change, then to
+state the resolution it reached. Two lines, and the right two: a baton is read by someone who
+cannot see which PRs were in flight when it was written.)
+
 ## 2026-09-01 — `docs/implementation-backlog.md` (BF-84's surface settled, and the button already exists)
 
 The owner clarified: one small greyed Rest button on Home's training card. Reading
@@ -5135,3 +5148,12 @@ button and the storage together.
 Also records the emoji answer rather than substituting silently: the request was "rest + emoji", the
 repo's convention is Lucide for chrome with emoji reserved for content carrying its own field, so
 `Moon` is the same idea in the app's vocabulary and the owner should hear that.
+
+## 2026-09-01 — `docs/implementation-backlog.md` 14442 → 14445 (+3)
+
+BF-84's lane, derived and recorded once its surface was settled. Three lines to save every future
+reader the same derivation: the entry says ship the button and the storage together, the storage
+half is a row plus a sync domain plus the inference path, and a both-lanes item goes to Lane A
+engine-first — so Lane B cannot take the surface alone. It also names the one question still open
+(fact or hint) and what it would change, because an entry that looks startable and is not is the
+thing this queue keeps costing sessions.
