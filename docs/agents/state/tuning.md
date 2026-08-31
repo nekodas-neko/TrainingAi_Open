@@ -245,6 +245,11 @@ sleep ✅ · readiness ✅ · activity ✅ · body ✅ · devices ✅ · workout
 - **⚠ `activity_logs` 2026-07-01 is CORRUPT** — 4,970 steps over 3.30 km in **0.2 minutes**, and more
   steps than `body_metrics` holds for the whole day (1,358). Excluded from every stride figure. Any
   per-user derivation needs a sanity gate (plausible cadence, walk steps ≤ day steps).
+- **✅ THE STEP-GOAL DESIGN IS FULLY DECIDED — nothing is gated on the owner.** Three sign-offs now:
+  2026-08-19 *"use 1 number; the AI should define it and allow manual entry"*, 2026-08-30 *"the goal
+  stays 7,000"*, and 2026-08-31 **MANUAL WINS** — a hand-set goal is authoritative, the AI may offer
+  and may fill only while unset, accepting converts to manual, and **clearing must return to the
+  derived path**. Q-524 and TN-17 both carry it. **Do not re-ask any of it.**
 - **⛔ The step-goal design was DECIDED on 2026-08-19 and is unbuilt — do not re-open it, and do not
   recommend a number.** Q-524 carries the owner's words: *"we need to use 1 number here. The AI
   should be able to define the number and allow for manual entry."* `users.steps_goal` becomes the
