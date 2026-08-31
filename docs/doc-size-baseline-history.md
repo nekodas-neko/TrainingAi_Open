@@ -5252,3 +5252,16 @@ a shipped entry; LA-45 is waiting on an implementer, and its stated reason — "
 on the canonical runtime" — is true of every Lane B item, so gating on it parks the lane. The
 replacement text records that the other 39 device-gated entries were checked and **only this one is
 of that kind**, so the next session does not re-audit all 40.
+
+**Amended again to 14603 (+46).** Chasing LA-45 turned up that this file's field rules *already*
+forbid `Gate: device` on unbuilt work, in terms, with three recorded outbreaks — so LA-45 was a
+straggler under an existing rule rather than a new finding, and its note now cites the rule instead
+of re-deriving it. The same audit found the identical failure one section over: `Keep:` routes an
+entry into a **KEEP** heading reading *"not new work"*, and four of Lane B's twelve were builds,
+including `Q-519`'s entire UI half. `Keep:` was documented nowhere, so that is now written into the
+field rules (+9) and filed as **OR-100** (+33) with the split-and-enforce recommendation. `Q-519`
+also lost a stale no-entry marker that was hiding it outright.
+
+The growth here is the queue learning a rule it did not have. If OR-100 ships, the four split
+entries will grow this file again — that is the correct direction, and worth saying now so the next
+raise is not read as drift.

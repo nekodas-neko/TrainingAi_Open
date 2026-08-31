@@ -81,6 +81,15 @@ silently misdirecting the next session. Update them in the same PR that consumes
 >   same mistake later the same day, by a session that had read BF-45's warning** — which is why the
 >   rule now lives here, where entries are written, rather than only inside the entry that found it.
 >
+> - **`Keep: <what is owed>`** — the entry partly shipped and stays queued for the residue.
+>   `next-item.js` routes it to a **KEEP** section headed *"shipped; only the stated residue is owed.
+>   Not new work"* — so **what follows `Keep:` must be a check, a decision, or a measurement, never a
+>   build.** Measured 2026-09-01: of Lane B's 12 KEEP entries, 5 were device checks and **4 held
+>   genuine unbuilt work** — `Q-519`'s entire UI half among them — sitting under a heading that tells
+>   the lane not to look. That is the same failure as `Gate: device` on unbuilt work, one section
+>   over. **If the residue is something to build, split it** per the two-entry rule below (`Needs:`
+>   pointing at the shipped half) rather than describing it in a `Keep:`. Tracked as `OR-100`.
+>
 > - **`Batch: <slug>`** — these entries ship as **one PR**, because one verification pass covers all
 >   of them. `next-item.js` groups them and the batch takes its highest member's queue position.
 >   **Never batch a migration or a sync-push change**; batch native/Kotlin work hardest, since each
@@ -1222,6 +1231,39 @@ deletes nothing on tap, which is what makes an icon-only entry point defensible 
   sandbox** — the feature is off by default there, so the e2e has to switch it on to assert anything
   at all.
 
+### [platform] OR-100 — `Keep:` files buildable work under a heading that tells the lane not to look
+
+- **Lane:** A — `scripts/next-item.js` and `scripts/check-backlog-pointers.js`.
+- **Added:** 2026-09-01 · Orchestrator, while answering *"B is still saying there is no work for it"*.
+- **Measured, on Lane B's own queue.** 12 entries route to **KEEP**, whose heading reads *"shipped;
+  only the stated residue is owed. **Not new work**"*. Five are device checks and belong there
+  (`BF-45`, `BF-61`, `BF-62`, `BF-63`, `BF-51`), one is an owner call (`LB-29`), one says outright
+  *"nothing to build"* (`Q-359`). **Four are builds:** `Q-519` — *"the UI half, Lane B's. Nothing can
+  write a bedtime yet — there is no control"*, a fully specified task whose engine half shipped in
+  migrations 233/234; `Q-300` — *"the surfacing itself is unbuilt"*; `Q-491` — a ratchet script;
+  `Q-403`. So Lane B's real buildable depth is **~13, not the 9 that READY reports**.
+- **This is the `Gate: device` failure one section over, and that one is already documented** with
+  three recorded outbreaks. Same mechanism: a field written to mean *"partly done"* is read by the
+  runner as *"do not start"*, and the entry disappears from where implementers look. The difference
+  is that `Gate:` is specified in this file's field rules and `Keep:` was **not documented anywhere**
+  until this entry added it.
+- **Recommendation: split, and make the split enforceable.** The two-entry rule already covers this —
+  *"an item needing both halves of the app is two entries"* — so a partly-shipped entry whose residue
+  is a build becomes a new entry with `Needs:` pointing at the shipped one, and the original keeps a
+  `Keep:` naming only its check. Then teach `check-backlog-pointers.js` to fail on a `Keep:` whose
+  text reads as a build. **Start with the enforcement off** (print a count, as the
+  helper-key skip does) until the four known cases are split, or CI goes red on entries nobody has
+  triaged yet.
+- **Why not the obvious alternative.** Routing `Keep:` entries into READY instead would surface the
+  four and bury the seven that genuinely are not work, which is the same problem with the sign
+  flipped — READY would stop meaning startable, and that is the one property an implementer relies
+  on. Keeping the sections honest is worth more than making one of them longer.
+- **Reversal cost: low.** A section-routing change and a check; no data, no migration, no runtime.
+- **Do not batch this with a queue sweep.** It changes what the runner shows, so its verification is
+  "run both lanes before and after and diff the sections" — a sweep landing in the same PR makes that
+  diff unreadable.
+
+
 ### [devices] PS-11 — FIRST OVERNIGHT SYNC: prove every metric actually landed ⭐ TOMORROW'S JOB
 
 - **Lane:** A
@@ -1790,17 +1832,17 @@ Lane A's.
   agree with the calorie goal. It is exempt in `scripts/check-body-fat-correction.js` with that
   reason — **remove the exemption in the same PR**, or the check keeps asserting a decision that has
   been made.
-- **The `Gate: device` was removed 2026-09-01 — it was parking unbuilt work.** `Gate: device` means
-  *waiting on* the S25 smoke run (`docs/agents/README.md` §Gate), which fits a shipped entry whose
-  only residue is the check. **Nothing here is built yet**, so this entry is waiting on an
-  implementer, not on the phone; the check comes after. Its reason — "a Health-screen change on the
-  canonical runtime" — is true of every Lane B item, and gating on it would park the whole lane.
-  **The device check is still owed**, and CLAUDE.md's Canonical Runtime rule says how to satisfy it:
-  the on-device smoke run, *or* a Known-Issues row marking the change not-yet-device-verified. Take
-  that at merge time, not as a reason to leave the two numbers disagreeing on screen.
-- **Checked against the other 39 device-gated entries and this is the only one of its kind** — 35 are
-  shipped-and-awaiting-their-check (correctly parked), and `PS-9`/`PS-10`/`PS-12`/`PS-16` need the
-  Colmi ring in hand, which no note can substitute for.
+- **The `Gate: device` was removed 2026-09-01 — it was the documented mistake, made a third time.**
+  This file's own field rules say it outright: *"`Gate: device` means SHIPPED and awaiting a device
+  check — never 'will need one when built'"*, because a gate **parks** the entry and hides it from
+  `next-item.js`. Nothing here is built. The stated reason — "a Health-screen change on the canonical
+  runtime" — is true of every Lane B item, so gating on it parks the lane. **The device check is
+  still owed**; per CLAUDE.md's Canonical Runtime rule it is satisfied at merge by the smoke run *or*
+  a Known-Issues row marking the change not-yet-device-verified. That is a **Verification** line, not
+  a gate.
+- **The other 39 device-gated entries were checked and this is the only one of its kind** — 35 are
+  shipped-and-awaiting-their-check, and `PS-9`/`PS-10`/`PS-12`/`PS-16` need the Colmi ring in hand.
+  So the rule is holding now; this was a straggler, not a fourth outbreak.
 
 
 ### [workouts] BF-59 — the weekly set targets are a flat large/small binary, ignoring both the app's own landmark table and the program's goal
@@ -9766,7 +9808,11 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   to 683 — **the estimated bedtime reads ~23 minutes later for two weeks**. `nightSessions()` cannot
   help: it reassembles a night split by a wake-up (Q-76) and needs an earlier fragment, which does not
   exist when the ring was off.
-- **⛔ THE ORIGINAL DESIGN IS FALSIFIED — read this before building.** It proposed writing **only
+- **⚠️ THE ORIGINAL DESIGN IS FALSIFIED — read this before building.** *(Marker downgraded
+  2026-09-01. It is stale: this paragraph does not say stop, it says read — and the entry has since
+  replaced the falsified design with the "Build this instead" bullet below, whose engine half then
+  shipped. `next-item.js` parks on the no-entry sign, so the marker was hiding a specified,
+  ready-to-build Lane B task from the lane that owns it. Do not restore it.)* It proposed writing **only
   `sleep_start`** at `manual` rank (5), leaning on the per-field merge in `lib/data/health-source.ts`
   to leave the measured columns at `oura_ble` (3), and rested on an invariant: *"`duration_hours`,
   `time_in_bed_hours` and `efficiency` are stored columns, not derived from `sleep_end − sleep_start`
