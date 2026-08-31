@@ -4150,6 +4150,19 @@ structure ("similar to") is ~30 exercise names, history ("what I did") is unboun
 them as one is how a prompt gets a year of set logs in it. It also carries two constraints worth
 having before design starts: send a program id rather than a program object, and give the reference
 its own schema caps rather than inheriting the byte-limit situation the route already documents.
+## 2026-08-31 — `docs/implementation-backlog.md` falls as BF-70 and BF-2 are struck
+
+Two entries out. **BF-2 is the one worth recording: it had shipped hours earlier and was still
+sitting at READY #3.** `check-backlog-pointers.js` fails on a completion word in a queue *heading*,
+and BF-2's were all in its body banner, so the check passed on an entry describing finished work. The
+lesson is procedural rather than about size — re-run `next-item.js` after striking something, because
+the edit is not the evidence.
+
+Four references to BF-70 went stale the moment it was removed — BF-38's batch line and three lines in
+BF-35 including *"Blocked by BF-70"*. Rewritten rather than left, for the same reason as LA-44's
+earlier today: prose that points at a struck entry outlives the entry and gets trusted.
+
+
 ## 2026-08-31 — `projectOverview.md` 8453 → 8450, `docs/implementation-backlog.md` 13776 → 13762, `implementation-lane-b.md` held at 126
 ## 2026-08-31 — `projectOverview.md` 8453 → 8450, `docs/implementation-backlog.md` 13585 → 13571, `implementation-lane-b.md` held at 126
 
