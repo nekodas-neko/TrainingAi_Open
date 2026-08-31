@@ -11,6 +11,25 @@ import { DEFAULT_TZ } from '../date-utils'
  * exists (e.g. picked from the library) and is not recreated; otherwise a new
  * food item is created from these fields.
  */
+/**
+ * How the food was identified → the `source` a `food_items` row records.
+ *
+ * `'search'` maps to `'ai'` only because the column has no value for an Open Food Facts text
+ * lookup, and adding one is a migration. That is a wrong label this change does not fix, not a
+ * chosen one — BF-70's follow-up. `'barcode'` is the value BF-70 exists to start writing: it was
+ * essentially never stored, which is why BF-38 measured 3 of 221 rows carrying it.
+ */
+export function scanOriginToSource(
+  origin: 'barcode' | 'search' | 'photo' | undefined,
+  confidence: string | undefined,
+): NewFoodEntry['source'] {
+  if (origin === 'barcode') return 'barcode'
+  if (origin === 'photo' || origin === 'search') return 'ai'
+  // No origin: a hand-typed entry, or a result from a producer that predates the field. Fall back
+  // to the old rule so an unknown producer behaves exactly as it did before.
+  return confidence ? 'ai' : 'manual'
+}
+
 export interface NewFoodEntry {
   foodItemId?: string
   name: string
@@ -26,6 +45,8 @@ export interface NewFoodEntry {
   satFatG?: number
   source: 'ai' | 'manual' | 'barcode' | 'text'
   quantityMultiplier: number
+  /** BF-35's thumbnail, when the entry came from a lookup that carried one (BF-70). */
+  imageDataUri?: string | null
 }
 
 function r1(n: number) { return Math.round(n * 10) / 10 }
@@ -115,6 +136,10 @@ async function createFoodItem(entry: NewFoodEntry): Promise<string> {
       sodiumMg: entry.sodiumMg,
       satFatG: entry.satFatG,
       source: entry.source,
+      // BF-70. The fifth layer in the chain, and the one its entry did not enumerate: the route has
+      // accepted and stored `imageDataUri` since BF-35, so omitting it here dropped the picture on
+      // the WEB path even once the local path carried it.
+      imageDataUri: entry.imageDataUri ?? undefined,
     }),
   })
   if (!res.ok) throw new Error('Failed to create food item')
@@ -209,9 +234,9 @@ export async function logFoodEntries(
           proteinG: entry.proteinG, carbsG: entry.carbsG, fatG: entry.fatG,
           fiberG: entry.fiberG ?? null, sugarG: entry.sugarG ?? null,
           sodiumMg: entry.sodiumMg ?? null, satFatG: entry.satFatG ?? null,
-          // BF-35. This path creates items from a log entry, which carries no picture — an item
-          // logged this way gets one only if a later lookup supplies it.
-          source: entry.source, imageDataUri: null, updatedAt: now,
+          // BF-35/BF-70. A barcode or search lookup carries a thumbnail; a typed entry does not,
+          // and absent stays absent rather than becoming a placeholder written into the row.
+          source: entry.source, imageDataUri: entry.imageDataUri ?? null, updatedAt: now,
         })
         if (isNew) {
           await store.queueMutation({

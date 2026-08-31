@@ -37,6 +37,13 @@ export interface NewFoodItem {
   sodiumMg?: number
   satFatG?: number
   source: FoodItem['source']
+  /**
+   * BF-35's thumbnail, when the scan came from a lookup that carried one. Supplied by the CALLER —
+   * it used to be read off `sanitiseNutrition`'s return, whose `RawNutrition` is numeric-only, so
+   * that line resolved to `undefined` on every call and the image was dropped here for as long as
+   * the field has existed (BF-70).
+   */
+  imageDataUri?: string | null
 }
 
 export async function createFoodItem(input: NewFoodItem, userId?: string): Promise<FoodItem> {
@@ -65,7 +72,7 @@ export async function createFoodItem(input: NewFoodItem, userId?: string): Promi
     // BF-35. Present when the scan came from a barcode/search lookup whose Open Food Facts product
     // carried a thumbnail. Never blocks the save: `fetchOffThumbDataUri` returns null on every
     // failure path, so absent is the ordinary case and the placeholder tile covers it.
-    imageDataUri: s.imageDataUri ?? null,
+    imageDataUri: input.imageDataUri ?? null,
     createdAt: new Date(),
   }
 

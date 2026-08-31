@@ -19,6 +19,9 @@ interface EditableNutrition {
   sugarG: number
   sodiumMg: number
   satFatG: number
+  /** BF-70. Carried through the Review sheet untouched — it is not an editable field, but dropping
+   *  it here is where the barcode thumbnail used to be lost before the form ever saved. */
+  imageDataUri?: string | null
 }
 
 interface BaseNutrition {

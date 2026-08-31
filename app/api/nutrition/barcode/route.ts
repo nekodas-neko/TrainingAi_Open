@@ -68,6 +68,9 @@ export async function GET(req: Request) {
   const result = offProductToNutrition(data.product)
   if (!result) return NextResponse.json({ notFound: true }, { status: 404 })
   result.notes = 'From Open Food Facts barcode database'
+  // BF-70. What makes the stored row say it came from a barcode. `confidence` cannot: the shared
+  // OFF mapper sets it to 'high' for the text-search route too, and the photo scan sets one as well.
+  result.origin = 'barcode'
 
   // BF-35. The thumbnail URL rode the lookup above for free; turning it into something this app can
   // store costs one fetch, here, once per scan — never per render. Bytes rather than the URL because

@@ -148,6 +148,16 @@ export interface NutritionScanResult {
   /** BF-35. Set by the barcode/search routes when Open Food Facts had a thumbnail and it fetched
    *  cleanly. Always optional: a picture must never be able to fail a nutrition lookup. */
   imageDataUri?: string | null
+  /**
+   * BF-70. Which route identified this food, so a caller can record HOW rather than guess.
+   *
+   * The two signals already here cannot answer it. `confidence` is `'high'` from
+   * `offProductToNutrition` for **both** OFF routes and is set by the photo scan too, so it means
+   * "came from a scan" and nothing more — which is why every barcode-scanned food was stored as
+   * `'ai'`. And `notes` is model-authored prose on the photo path, so keying behaviour off it
+   * would be gating on LLM output.
+   */
+  origin?: 'barcode' | 'search' | 'photo'
 }
 
 // ── Meal Plan (Q-186) ──────────────────────────────────────────────────────────
