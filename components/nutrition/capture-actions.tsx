@@ -323,27 +323,44 @@ export function CaptureActions({ onScanResult, onManual, onScannedSavedMeal, chi
   }
 
   const actions = [
-    { icon: <CameraIcon className="h-5 w-5" />, label: 'Photo', action: handleCapturePhoto },
-    { icon: <Hash className="h-5 w-5" />, label: 'Barcode', action: () => setShowBarcode(true) },
-    { icon: <PenLine className="h-5 w-5" />, label: 'Describe or enter', action: () => setShowDescribe(true) },
+    { icon: <CameraIcon className="h-7 w-7" />, label: 'Photo', action: handleCapturePhoto },
+    { icon: <Hash className="h-7 w-7" />, label: 'Barcode', action: () => setShowBarcode(true) },
+    { icon: <PenLine className="h-7 w-7" />, label: 'Describe or enter', action: () => setShowDescribe(true) },
   ]
 
   return (
     <>
-      {/* BF-50 ①: 62 px, from the artboard's capture tiles — not a number invented here (BF-28's
-          parity rule). They were `min-h-12` (48), which clears the tap floor and still read as
-          small against a full-width sheet. `min-h`, not a fixed height, because "Describe or
-          enter" wraps to two lines in a third of 412 dp and a fixed 62 would clip it. */}
+      {/* BF-73 ①. An **owner override of the artboard, not a parity fix** — record it as such so
+          the next parity sweep does not "correct" it back. BF-50 ① aimed at 62 because that is what
+          artboard 2 draws; the owner has now seen it on the phone and asked for bigger (*"the
+          icons/sections for photo/barcode/describe should be larger"*), and BF-28 rule 2 is that a
+          later owner decision beats the drawing.
+
+          **The height comes from padding and the icon, and it has to, because `min-h-[Npx]` does
+          nothing on a `<button>` here.** `globals.css` sets a bare `button, [role="button"]
+          { min-height: 48px }`, and it beats the utility: measured in the browser, a button with
+          `min-h-[84px]` computes `min-height: 48px` while the same class on a `<div>` computes
+          84px. So BF-50 ①'s `min-h-[62px]` never applied either — that tile measured **60 px**, the
+          content's own height, not the 62 its comment claimed. Filed as LB-32.
+
+          Measured here, same method: **60 px → 79 px**. `py-2.5` → `py-3.5` and `h-5` → `h-7` are
+          what moved it; the label went to `text-xs` so the glyph did not outgrow its caption. A
+          bigger box around the same small icon reads as empty rather than prominent, which would
+          have answered the letter of the request and not the point of it.
+
+          **Still no fixed height**, for BF-50's reason, which is unchanged and is the thing that
+          would break: "Describe or enter" wraps to two lines in a third of 412 dp, and `h-[Npx]`
+          clips the second one. */}
       <div className="flex shrink-0 gap-2 px-4">
         {actions.map(a => (
           <button
             key={a.label}
             type="button"
             onClick={a.action}
-            className="flex min-h-[62px] flex-1 flex-col items-center justify-center gap-1 rounded-2xl border border-border/60 bg-background/50 px-1 py-2.5 transition-colors active:bg-muted/40"
+            className="flex flex-1 flex-col items-center justify-center gap-1.5 rounded-2xl border border-border/60 bg-background/50 px-1 py-3.5 transition-colors active:bg-muted/40"
           >
             <span className="text-muted-foreground">{a.icon}</span>
-            <span className="text-center text-[11px] font-medium leading-tight">{a.label}</span>
+            <span className="text-center text-xs font-medium leading-tight">{a.label}</span>
           </button>
         ))}
       </div>

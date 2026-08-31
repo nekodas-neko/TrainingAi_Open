@@ -4,6 +4,7 @@ import { cachedFetch } from '@/lib/sqlite/cache'
 import { NUTRITION_FOOD_LOGS_TTL } from '@trainingai/shared/cache-ttl'
 import { getLocalStore } from '@/lib/local-store'
 import { decideLogsApplication } from './food-log-application'
+import { toLocalFoodItems, toLocalFoodLogs } from './food-log-hydration'
 import { pendingDeletedIds, withoutPendingDeletes } from '@trainingai/shared/sync/pending-deletes'
 
 /**
@@ -91,22 +92,14 @@ export function useFoodLogsLoader({ userId, logsDateRef, selectedDateRef, setLog
 
     try {
       const nowIso = new Date().toISOString();
+      // BF-72: both payloads are built by `food-log-hydration.ts` rather than inline here. The
+      // defect this fixes was a *missing field in an object literal* — `savedMealId` and
+      // `mealGroupId` were absent, the local upsert wrote NULL over them, and the next line
+      // re-read and rendered the stripped copy. Nothing typed catches that, because every field is
+      // optional going in; a named function with a test that lists the columns does.
       await store.applyDelta({
-        foodItems: server.map(l => ({
-          id: l.foodItemId, name: l.foodItem.name, brand: l.foodItem.brand ?? null,
-          servingSizeG: l.foodItem.servingSizeG, calories: l.foodItem.calories,
-          proteinG: l.foodItem.proteinG, carbsG: l.foodItem.carbsG, fatG: l.foodItem.fatG,
-          fiberG: l.foodItem.fiberG ?? null, sugarG: l.foodItem.sugarG ?? null,
-          sodiumMg: l.foodItem.sodiumMg ?? null, satFatG: l.foodItem.satFatG ?? null,
-          imageDataUri: l.foodItem.imageDataUri ?? null,
-          source: l.foodItem.source, updatedAt: nowIso,
-        })),
-        foodLogs: server.map(l => ({
-          id: l.id, date: today, mealTypeId: l.mealTypeId, foodItemId: l.foodItemId,
-          quantityMultiplier: l.quantityMultiplier,
-          loggedAt: typeof l.loggedAt === 'string' ? l.loggedAt : new Date(l.loggedAt).toISOString(),
-          updatedAt: nowIso, deletedAt: null, syncStatus: 'synced' as const,
-        })),
+        foodItems: toLocalFoodItems(server, nowIso),
+        foodLogs: toLocalFoodLogs(server, today, nowIso),
       });
       applyLogs(await store.getFoodLogsWithItems(today));
     } catch {
