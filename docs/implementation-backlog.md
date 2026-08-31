@@ -81,6 +81,15 @@ silently misdirecting the next session. Update them in the same PR that consumes
 >   same mistake later the same day, by a session that had read BF-45's warning** — which is why the
 >   rule now lives here, where entries are written, rather than only inside the entry that found it.
 >
+> - **`Keep: <what is owed>`** — the entry partly shipped and stays queued for the residue.
+>   `next-item.js` routes it to a **KEEP** section headed *"shipped; only the stated residue is owed.
+>   Not new work"* — so **what follows `Keep:` must be a check, a decision, or a measurement, never a
+>   build.** Measured 2026-09-01: of Lane B's 12 KEEP entries, 5 were device checks and **4 held
+>   genuine unbuilt work** — `Q-519`'s entire UI half among them — sitting under a heading that tells
+>   the lane not to look. That is the same failure as `Gate: device` on unbuilt work, one section
+>   over. **If the residue is something to build, split it** per the two-entry rule below (`Needs:`
+>   pointing at the shipped half) rather than describing it in a `Keep:`. Tracked as `OR-100`.
+>
 > - **`Batch: <slug>`** — these entries ship as **one PR**, because one verification pass covers all
 >   of them. `next-item.js` groups them and the batch takes its highest member's queue position.
 >   **Never batch a migration or a sync-push change**; batch native/Kotlin work hardest, since each
@@ -1327,6 +1336,39 @@ deletes nothing on tap, which is what makes an icon-only entry point defensible 
   sandbox** — the feature is off by default there, so the e2e has to switch it on to assert anything
   at all.
 
+### [platform] OR-100 — `Keep:` files buildable work under a heading that tells the lane not to look
+
+- **Lane:** A — `scripts/next-item.js` and `scripts/check-backlog-pointers.js`.
+- **Added:** 2026-09-01 · Orchestrator, while answering *"B is still saying there is no work for it"*.
+- **Measured, on Lane B's own queue.** 12 entries route to **KEEP**, whose heading reads *"shipped;
+  only the stated residue is owed. **Not new work**"*. Five are device checks and belong there
+  (`BF-45`, `BF-61`, `BF-62`, `BF-63`, `BF-51`), one is an owner call (`LB-29`), one says outright
+  *"nothing to build"* (`Q-359`). **Four are builds:** `Q-519` — *"the UI half, Lane B's. Nothing can
+  write a bedtime yet — there is no control"*, a fully specified task whose engine half shipped in
+  migrations 233/234; `Q-300` — *"the surfacing itself is unbuilt"*; `Q-491` — a ratchet script;
+  `Q-403`. So Lane B's real buildable depth is **~13, not the 9 that READY reports**.
+- **This is the `Gate: device` failure one section over, and that one is already documented** with
+  three recorded outbreaks. Same mechanism: a field written to mean *"partly done"* is read by the
+  runner as *"do not start"*, and the entry disappears from where implementers look. The difference
+  is that `Gate:` is specified in this file's field rules and `Keep:` was **not documented anywhere**
+  until this entry added it.
+- **Recommendation: split, and make the split enforceable.** The two-entry rule already covers this —
+  *"an item needing both halves of the app is two entries"* — so a partly-shipped entry whose residue
+  is a build becomes a new entry with `Needs:` pointing at the shipped one, and the original keeps a
+  `Keep:` naming only its check. Then teach `check-backlog-pointers.js` to fail on a `Keep:` whose
+  text reads as a build. **Start with the enforcement off** (print a count, as the
+  helper-key skip does) until the four known cases are split, or CI goes red on entries nobody has
+  triaged yet.
+- **Why not the obvious alternative.** Routing `Keep:` entries into READY instead would surface the
+  four and bury the seven that genuinely are not work, which is the same problem with the sign
+  flipped — READY would stop meaning startable, and that is the one property an implementer relies
+  on. Keeping the sections honest is worth more than making one of them longer.
+- **Reversal cost: low.** A section-routing change and a check; no data, no migration, no runtime.
+- **Do not batch this with a queue sweep.** It changes what the runner shows, so its verification is
+  "run both lanes before and after and diff the sections" — a sweep landing in the same PR makes that
+  diff unreadable.
+
+
 ### [devices] PS-11 — FIRST OVERNIGHT SYNC: prove every metric actually landed ⭐ TOMORROW'S JOB
 
 - **Lane:** A
@@ -1895,7 +1937,17 @@ Lane A's.
   agree with the calorie goal. It is exempt in `scripts/check-body-fat-correction.js` with that
   reason — **remove the exemption in the same PR**, or the check keeps asserting a decision that has
   been made.
-- **Gate: device** — a Health-screen change on the canonical runtime.
+- **The `Gate: device` was removed 2026-09-01 — it was the documented mistake, made a third time.**
+  This file's own field rules say it outright: *"`Gate: device` means SHIPPED and awaiting a device
+  check — never 'will need one when built'"*, because a gate **parks** the entry and hides it from
+  `next-item.js`. Nothing here is built. The stated reason — "a Health-screen change on the canonical
+  runtime" — is true of every Lane B item, so gating on it parks the lane. **The device check is
+  still owed**; per CLAUDE.md's Canonical Runtime rule it is satisfied at merge by the smoke run *or*
+  a Known-Issues row marking the change not-yet-device-verified. That is a **Verification** line, not
+  a gate.
+- **The other 39 device-gated entries were checked and this is the only one of its kind** — 35 are
+  shipped-and-awaiting-their-check, and `PS-9`/`PS-10`/`PS-12`/`PS-16` need the Colmi ring in hand.
+  So the rule is holding now; this was a straggler, not a fourth outbreak.
 
 
 ### [workouts] BF-59 — the weekly set targets are a flat large/small binary, ignoring both the app's own landmark table and the program's goal
@@ -2155,11 +2207,26 @@ nothing calls**, plus write amplification on every HR insert, which is the highe
 the app (87,021 rows today). Q-180 weighed the *method*; the index was never in that accounting, and
 it is 2× the heap of the table it sits on (`oura_heartrate`: 32 MB of index on 9 MB of data).
 
-- **Gate: owner** — this reverses part of a decision the owner signed off, so it is theirs.
-  **Recommendation: drop it, and say in `getOuraTimeseriesDelta`'s comment that the restore driver
-  must recreate it.** Reversal is one `CREATE INDEX` over 9 MB of heap — seconds — and the driver
-  that needs it does not exist yet, so nothing can regress in the meantime. Keeping it costs 18 MB
-  and every insert, indefinitely, for a path with no caller.
+- **✅ THE OWNER GATE IS CLEARED, 2026-09-01 — the field is removed above, deliberately.** The owner
+  approved the drop: *"yes if we are not using it and you are sure its reversible then get rid of
+  it."* Both conditions were re-verified
+  against production before recording this, rather than resting on the 2026-08-30 table above:
+  - **Unused, and the reading is now stronger.** `oura_heartrate_user_updated` reads
+    **`idx_scan` 0 and `idx_tup_read` 0**, and it has grown to **20 MB**. On the *same table*,
+    `oura_heartrate_user_id_timestamp_key` shows **40,195 scans / 18.6 M tuples read** — so this is
+    not a quiet table, it is an index the planner never chooses.
+  - **No caller.** `getOuraTimeseriesDelta` exists in `slices/oura.ts:700`, `adapter.ts:6293` and the
+    `repository.ts:1203` interface, and **nothing invokes it**; the only other mention is
+    `sync-engine.ts:729` recording that the driver "never was" written.
+  - **Reversible.** A plain btree from `130_oura_heartrate_updated_at.sql` — one `CREATE INDEX` over
+    9.6 MB of heap.
+  - **⚠️ And the entry's own warning held up.** `rr_intervals_pkey` read `idx_scan` 0 on 2026-08-30
+    and reads **5,034** now. Had "never scanned" been treated as a drop rule, that constraint would
+    have gone. **Drop `oura_heartrate_user_updated` and nothing else from that table.**
+- **Lane A takes it from here — this is a migration and the Orchestrator may not number one.** What
+  it owes: the `DROP INDEX`, and a line in `getOuraTimeseriesDelta`'s doc comment saying the restore
+  driver must recreate the index, since Q-180's "it costs nothing at runtime" is what this narrows.
+  **Q-180's decision to keep the *method* stands; only its index goes.**
 - **The alternative** is keeping it so the restore driver finds its index waiting, which is what
   Q-180 chose. That is defensible if the driver is imminent; it has not been written in the two weeks
   since, and the index is 21 % of the index budget this entry was opened about.
@@ -9846,7 +9913,11 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   to 683 — **the estimated bedtime reads ~23 minutes later for two weeks**. `nightSessions()` cannot
   help: it reassembles a night split by a wake-up (Q-76) and needs an earlier fragment, which does not
   exist when the ring was off.
-- **⛔ THE ORIGINAL DESIGN IS FALSIFIED — read this before building.** It proposed writing **only
+- **⚠️ THE ORIGINAL DESIGN IS FALSIFIED — read this before building.** *(Marker downgraded
+  2026-09-01. It is stale: this paragraph does not say stop, it says read — and the entry has since
+  replaced the falsified design with the "Build this instead" bullet below, whose engine half then
+  shipped. `next-item.js` parks on the no-entry sign, so the marker was hiding a specified,
+  ready-to-build Lane B task from the lane that owns it. Do not restore it.)* It proposed writing **only
   `sleep_start`** at `manual` rank (5), leaning on the per-field merge in `lib/data/health-source.ts`
   to leave the measured columns at `oura_ble` (3), and rested on an invariant: *"`duration_hours`,
   `time_in_bed_hours` and `efficiency` are stored columns, not derived from `sleep_end − sleep_start`
@@ -10952,9 +11023,18 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 ### [platform][devices] Q-250 — an Android emulator job in CI, to close the 17 rows that need an Android runtime and nothing else
 
 - **Lane:** A
-- **Gate:** device
+- **The `Gate: device` was removed 2026-09-01, and it was circular.** This entry is the one that
+  *closes* device-gated rows, and it was parked behind the very bottleneck it exists to relieve —
+  so it could never be started, and the 17 rows it would close stayed shut. Nothing in it needs a
+  phone: its assertion runs on a GitHub `ubuntu-latest` emulator, its own body says the remaining
+  work is *"iterated by pushing"*, and the sign-in flow it needs is Maestro YAML against a seeded
+  local Postgres. **It is Lane A work, startable now.** What it still cannot do is anything with a
+  radio, and that has not changed — see the closing bullet.
 
-> **⛔ THE JOB IS DISABLED AND THE ASSERTION NEVER PASSED — read this before anything below.**
+> **⚠️ THE JOB IS DISABLED AND THE ASSERTION NEVER PASSED — read this before anything below.**
+> *(This heading is a warning to read first, not an instruction to stay away — the work below is
+> wanted. Its marker was downgraded on 2026-09-01 because `next-item.js` parks an entry on the
+> no-entry sign, and writing that sign even to explain it re-parks the entry. Do not restore it.)*
 > Corrected 2026-08-17, hours after the note that follows. That note says the local-SQLite half is
 > in. **It is not.** The job was merged, ran for the first time on a real runner, and failed — and
 > it could never have succeeded:
@@ -11530,8 +11610,26 @@ reason it took an hour is that there is no signal that would have answered it di
 - **Plan:** the shipped half is
   [`plans/2026-08-13-meal-plan-prefill-and-confirmation.md`](superpowers/plans/2026-08-13-meal-plan-prefill-and-confirmation.md);
   this half is explicitly listed there under *Explicitly out of scope*.
-- **Lane:** ? — it depends on the design. Re-scaling that happens at read time is a surface change
-  (B); one that rewrites the stored plan is Lane A. Do not start it without settling that first.
+- **Lane:** ? — and it stays unresolved until the gate below clears, because the lane *is* the
+  decision. Re-scaling computed at read time is a surface change (B); one that rewrites the stored
+  plan is Lane A.
+- **Gate:** owner — added 2026-09-01. The three questions below are preferences about how the app
+  should behave, not facts anyone can look up, and building either answer wrong makes the plan worse
+  than a static one. Prose alone was leaving this entry in UNCLASSIFIED where both lanes saw it and
+  neither could start it.
+- **Recommendation, so the gate is a decision rather than a blank page: re-scale at read time,
+  spread across every remaining meal, with a floor — and say so when the floor is hit.**
+  - **Read time, not stored** — the plan stays what the owner chose and only the *display* changes.
+    One source of truth, Lane B, and reversible; a stored rewrite loses the original plan.
+  - **Spread, not next-meal-only.** Taking a 700 kcal lunch overshoot entirely out of dinner is the
+    honest arithmetic and produces an absurd dinner, which gets ignored. Spreading makes several
+    meals slightly wrong, which gets followed.
+  - **A floor, with a sentence when it binds.** Below roughly 250 kcal a meal stops being a meal —
+    say the day is over budget rather than print `eat 180 kcal for dinner` (question 3's answer).
+  - **Reversal cost: low** — a computed view; deleting it restores today's behaviour exactly.
+  - **The alternative** is next-meal-only, better at one real thing: meals you have not reached stay
+    untouched, so a plan you already shopped for survives. If shopping to the plan is how it is
+    used, that flips the recommendation.
 - **Added:** 2026-08-11 · owner-requested
 - **Owner's words, the part not yet built:** *"then as you input your actuall food it can recalculate
   food based on the macros left. I.e if you eat too much during lunch it will cut some portions for
@@ -14067,8 +14165,7 @@ reads.
 
 ### [platform] LB-37 — `tsc` typechecks nothing under `__tests__`, so "TSC_OK" has never covered a spec
 
-- **Lane:** ? — the one-line `tsconfig.json` change is trivial; what it uncovers is not, and the
-  decision of whether to take that on is a platform call rather than an implementer's.
+- **Lane:** A — settled 2026-09-01 by the measurement below, which is what the lane was waiting on.
 - **Added:** 2026-08-31 · found while adding tests for LB-34, by noticing a spec that used two types
   it had never imported and still passed `tsc`.
 - **Measured, not inferred.** `tsconfig.json` carries
@@ -14083,12 +14180,26 @@ reads.
   whatever the runtime happens to do. That is the same class as a guard that cannot fail: a check
   whose silence carries no information.
 - **`e2e/` is NOT excluded** and is typechecked normally. The gap is unit tests only.
-- **Do not just delete the exclude line without measuring first.** It is there deliberately enough
-  that someone wrote it, and no comment says why. The first step is to find out what it is hiding:
-  run `tsc` with the exclusion removed and count the errors before deciding whether this is a
-  one-PR fix, a ratchet like the hex-literal baseline, or something to leave alone with a written
-  reason. **Report that count in the entry either way** — a session that measures it and does not
-  record the number leaves the next one to measure it again.
+- **MEASURED 2026-09-01 — the count is 282, across 83 test files.** This entry asked for the number
+  before the shape was chosen; here it is, so nobody measures it a third time.
+  Method: neutralise the `"**/__tests__/**"` exclusion, `npx tsc --noEmit`, restore, re-run for a
+  baseline. **289 total − 7 baseline = 282, and the split is exact** — all 7 baseline errors are
+  missing type packages in this sandbox (`@sentry/nextjs` ×5, `qrcode`, one `any` following from
+  them) and **none is in a test file**, so there are no false positives to argue about.
+  - **The commonest failures are the shape this entry predicted:** `TS2493` (indexing an empty
+    tuple) ×50 and `TS2741`/`TS2739` (a mock missing required properties) ×53 are both *the fixture
+    drifted from the type it stands in for*; `TS2345` ×56 is a mismatched argument. And
+    `lib/__tests__/ai-dynamic.test.ts` imports `../types/program`, **a module that does not exist** —
+    exactly the case the entry was opened on.
+  - **Worst files:** `packages/shared/src/workout/__tests__/log-exercise.test.ts` (25),
+    `lib/local-store/__tests__/sqlite-backend.test.ts` (16), `save-meal-tags.test.ts` (13),
+    `lib/scale-ble/__tests__/apply-reading.test.ts` (12) — the shared write path and the local
+    store, where a drifted fixture is least affordable.
+- **So the shape is settled: a ratchet.** 282 across 83 files is too much for one diff, and the
+  errors sit in the highest-consequence areas, so leaving the exclusion is not defensible either.
+  Copy the hex-literal pattern — shrink-only per-file baselines, exclusion dropped, a Custom Rules
+  step. Every *new* spec is typechecked immediately, which is the value; the 282 come down as files
+  are touched. **Lane A**: the 83 files reach both lanes, and README §3 sends both to A.
 
 ### [platform][nutrition] LB-38 — the share-code e2e decode fails intermittently on `main`, and the mechanism is not yet known
 
