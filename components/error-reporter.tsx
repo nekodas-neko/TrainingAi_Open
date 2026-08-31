@@ -2,6 +2,7 @@
 
 import { useEffect } from "react"
 import { startAppLoadReporting } from "@/lib/app-load-metrics"
+import { reportRenderProcessDeaths } from "@/lib/renderer-recovery"
 
 const MAX_REPORTS_PER_MINUTE = 5
 const THROTTLE_WINDOW_MS = 60_000
@@ -49,6 +50,12 @@ export function ErrorReporter() {
     // `lib/app-load-metrics.ts` (waiting for `load`, reading the navigation entry, the
     // once-per-context guard, the beacon) so this file's share of it stays one call.
     const stopAppLoadReporting = startAppLoadReporting(process.env.NEXT_PUBLIC_BUILD_ID || undefined)
+
+    // BF-80. A dead WebView renderer takes this component's own listeners with it, so the death is
+    // recorded natively and collected here on the next boot. It rides on this mount for the same
+    // reason app-load timing does — this is the global client-telemetry mount — and all of its
+    // logic lives in `lib/renderer-recovery.ts`. No-ops outside the APK.
+    reportRenderProcessDeaths()
 
     return () => {
       window.removeEventListener("error", onError)
