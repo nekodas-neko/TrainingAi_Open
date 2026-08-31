@@ -8925,6 +8925,7 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 - **Branch:** `feat/readiness-training-load-input`
 - **Plan:** none yet — this is a modelling change and wants a written plan before code
 - **Added:** 2026-08-15 · from the comprehensive review §1.8 (and §2.1's incumbent comparison)
+- **Lane:** A — derived 2026-08-31 by the path rule while selecting Lane B's next item: readiness's composite is `packages/shared/src/health/**` and is served by `app/api/readiness-score`, so it is reached by `app/api/**`.
 - **The mechanism, in one line.** `lib/health/readiness-payload.ts:329`:
   ```ts
   const ownActivityScore = activityResult?.preTaperScore ?? null // pre-taper → readiness composite (no double-count)
@@ -9004,6 +9005,7 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 - **Branch:** `fix/body-battery-daytime-recovery`
 - **Plan:** none yet · tuning notes live in [`docs/body-battery-tuning.md`](body-battery-tuning.md)
 - **Added:** 2026-08-15 · from the comprehensive review §1.5
+- **Lane:** A — derived 2026-08-31 by the path rule while selecting Lane B's next item: the Body Battery walk is `packages/shared/src/health/body-battery-walk.ts` with its constants in `app/api/body-battery`.
 - **Measured, grouped by `model_version` over 40 production days:**
 
   | model_version | n | charge/day | drain/day | ratio | hit 0 | ended at daily min |
@@ -10546,6 +10548,7 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 - **Branch:** `feat/score-coverage-surfacing`
 - **Plan:** none yet
 - **Added:** 2026-08-15 · from the comprehensive review §1.1
+- **Lane:** A — derived 2026-08-31 by the path rule while selecting Lane B's next item: `lib/health/score-availability.ts` is reached by `app/api/readiness-score`, `app/api/body-battery` and `app/api/ai/health-insight`. The surfaces that consume it are Lane B, so this is a both-lanes item and the engine half goes first.
 - **Measured** over 40 post-re-key days (`claude_ro.oura_daily_derived`):
 
   | Pillar | days with a value | coverage |
@@ -10593,6 +10596,7 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 - **Branch:** `feat/acwr-ewma-and-copy`
 - **Plan:** none yet · **has an owner-decision component** (the copy change)
 - **Added:** 2026-08-15 · from the comprehensive review §2.2
+- **Lane:** A — derived 2026-08-31 by the path rule while selecting Lane B's next item: it names `lib/health/readiness-payload.ts`, which three API routes reach.
 - **Where it bites.** `computeVolumeAcwr` (`@trainingai/shared/ai-periodization/acwr`) implements the
   naive 7:28 acute:chronic ratio and drives: the **early-deload card**
   (`EARLY_DELOAD_ACWR_MIN = 1.2`, `lib/health/readiness-payload.ts`) and the **Activity Score
@@ -10677,6 +10681,7 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 - **Branch:** `chore/drop-unused-indexes`
 - **Plan:** none needed
 - **Added:** 2026-08-15 · from the comprehensive review §4
+- **Lane:** A — derived 2026-08-31 by the path rule while selecting Lane B's next item: dropping an index is a migration, and Postgres migration numbers belong to Lane A alone.
 - **Measured** (`pg_stat_user_indexes WHERE idx_scan = 0`, largest first):
 
   | table | index | size |
@@ -10865,6 +10870,13 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 - **`pointer: { touch: true, mouse: false }` does NOT fix it** — tried, measured, reverted. All three
   mouse paths still fail with it set. Whatever suppresses the click is not that switch, so a real fix
   means going into use-gesture's tap/click-suppression behaviour or restructuring the binding.
+- **Reproduced again 2026-08-31, incidentally, by a spec that was not looking for it.** Q-187's
+  `e2e/plan-day-fill.spec.ts` drove the plan card's new "log the meals so far" button with
+  `locator.click()` and the button did nothing at all — no toast, no request, no error; the same
+  silence the table above records. `locator.tap()` works, and that spec now uses it with a comment
+  saying why. **So the practical cost of leaving this open is a trap for the next spec author**,
+  not a user-facing bug — every new e2e assertion that presses something inside the Nutrition
+  scroll container has to know about this first, and the failure gives no clue.
 - **Recommendation: do not pursue without a reason.** The only working path is the one that matters,
   a rewrite risks it, and there is no user on the supported runtime who benefits. Revisit if the app
   ever gets genuine desktop use, or if an automated accessibility/interaction scanner starts driving
@@ -11467,66 +11479,40 @@ reason it took an hour is that there is no signal that would have answered it di
   does not run in the sandbox**, so none of it is verifiable here. It needs the on-device smoke run
   in the same session, not a Known-Issues row.
 
-### [nutrition] Q-187 — Meal Plan (Phase 2): prefill the day's food logs from the active plan
+### [nutrition] Q-187 — Meal Plan (Phase 2): the day recalculates against what was actually eaten
 
-- **✅ Second slice SHIPPED 2026-08-14: the `plan_meal_answers` table and its full sync path**, with
-  nothing reading it — the plan's own sequencing ("provable in isolation"). Migration 187 + 188
-  (regenerated `claude_ro` views), local SQLite v26, `getSyncDelta`/`pullDelta`/`applyDelta`, a
-  `pushMutations` branch sharing the web route's functions, and `/api/nutrition/plan-meal-answers`.
-  Only *declines* are stored — "ate it" stays derivable from the food log, and unconfirmed prefills
-  never enter `food_logs`, so none of its 23 readers change. Journal:
-  [`docs/overview/overview/history-2026-08-12.md`](overview/history-2026-08-12.md).
-- **✅ Second UI slice SHIPPED 2026-08-15 (v1.315.0): a planned meal can be declined.** The dismiss
-  button sits beside "I ate this", hides once the meal is logged (that answer is derived from the
-  food), and undoes in one tap. Declining writes nothing to `food_logs`, with a test on the day's
-  food rather than on row counts. Journal:
-  [`docs/overview/overview/history-2026-08-15.md`](overview/history-2026-08-15.md).
-- **⏭️ What is left: automatic prefill only** — the plan's step 4, deliberately last because an
-  automatic prefill that guesses wrong trains the owner to ignore it. Its recommendation is an
-  explicit "fill my day" action rather than filling on open.
-- **⏭️ Superseded note (what was left before 2026-08-15): the prefill UI only** — the day-open (or explicit "fill my day") prefill and the
-  per-meal yes/no wired to `logPlanMeal` (yes) and the new table (no). **Held deliberately** until
-  the Q-232 cluster's Q-237 lands, so `app/nutrition/nutrition-content.tsx` has one owner at a time.
-  The plan's steps 2-4 are the remaining work; steps 1 and its offline-first checklist are done.
-- **✅ First slice SHIPPED 2026-08-12 (v1.299.0): one-tap "I ate this" on the plan card.** The plan
-  now does something on the day it is for. What remains here is only the *automatic* half — the
-  prefill and its per-meal yes/no, which is what forces the "prefilled but unconfirmed" state into
-  existence. See [`docs/overview/overview/history-2026-08-12.md`](overview/history-2026-08-12.md);
-  the shared write path is `packages/shared/src/nutrition/log-plan-meal.ts`.
+> **All four steps of the original Q-187 have shipped**, the last on 2026-08-31 (v1.412.0): a
+> one-tap **"Log the N meals so far"** on the plan card, bounded by the clock. What is kept here is
+> the owner's **second sentence**, which the plan deliberately held back and which has no design yet.
 
-- **Branch:** `feat/meal-plan-prefill`
-- **📋 PLAN WRITTEN 2026-08-13:**
-  [`plans/2026-08-13-meal-plan-prefill-and-confirmation.md`](superpowers/plans/2026-08-13-meal-plan-prefill-and-confirmation.md).
-  Its central recommendation, which changes the shape of the work: **keep unconfirmed prefills out of
-  `food_logs` entirely** rather than adding a `confirmed_at` column and filtering it. `food_logs` is
-  read in **24 files**; a column means teaching all 24 a new filter in the domain with the worst
-  data-loss history, with 24 chances to be half-done — the same shape as the Q-182 soft-delete
-  burn-down that took 35 sites and its own session. A separate `plan_meal_answers` table makes the
-  illegal state unrepresentable instead of filtered, and needs **zero** reader changes.
-  Second finding: **only "no" needs storing.** "Ate it" stays derivable from the day's food exactly as
-  phase 1 does it; an absent log cannot be told apart from "hasn't answered yet", so a decline is the
-  one fact that must persist. Storing "confirmed" as well as the food log would be two sources of
-  truth for one fact.
-- **Added:** 2026-08-11 · owner-requested · **unblocked** — Q-186 shipped 2026-08-11 (v1.282.0)
-- **What it is.** With a plan active, prefill the day's meals and prompt accept/deny per meal
-  ("did you actually eat this?"), instead of logging each food by hand.
-- **Why it is split out.** It writes to `food_logs` — an offline-first synced domain with an outbox
-  path, a `pushMutations` branch that must mirror the web route, and the app's worst history of
-  data-loss bugs. Prefilled-but-unconfirmed rows also need a state that never counts toward
-  totals, or the energy-balance bar starts reporting food that was never eaten. Needs its own plan
-  once Q-186 is in real use and the shape of a plan is settled. The shape is now settled: a plan
-  has variants (`all`, or `training`+`rest`) and each variant has positioned meals carrying their
-  own macros — see `docs/overview/entries/2026-08-11-meal-plan-phase-1.md`.
-- **Q-192 is done (v1.288.0), so this is fully unblocked.** A saved plan's meals now carry an
-  ingredient snapshot and a suggested time, which is what a prefill needs to write a food log from.
-  `savedMealToIngredients()` and `sumIngredients()` give the macros; the remaining work is the
-  offline-first write path and the "prefilled but unconfirmed" state, exactly as described above.
-- **A shippable first slice, if the whole thing is too big for one session (added 2026-08-12).** A
-  one-tap **"log this planned meal"** on the plan card needs none of the hard half: the user taps it,
-  so there is no unconfirmed state to invent and no risk of totals counting food nobody ate. The
-  write is the ordinary `logMealItems` path that Saved Meals already uses, over the ingredient
-  snapshot Q-192 added. It delivers most of the daily value and leaves the automatic prefill — the
-  part that needs the unconfirmed state — as a genuinely separate decision.
+- **Branch:** none yet
+- **Plan:** the shipped half is
+  [`plans/2026-08-13-meal-plan-prefill-and-confirmation.md`](superpowers/plans/2026-08-13-meal-plan-prefill-and-confirmation.md);
+  this half is explicitly listed there under *Explicitly out of scope*.
+- **Lane:** ? — it depends on the design. Re-scaling that happens at read time is a surface change
+  (B); one that rewrites the stored plan is Lane A. Do not start it without settling that first.
+- **Added:** 2026-08-11 · owner-requested
+- **Owner's words, the part not yet built:** *"then as you input your actuall food it can recalculate
+  food based on the macros left. I.e if you eat too much during lunch it will cut some portions for
+  other meals or vice versa."*
+- **Why it needs its own design rather than a slice.** Three questions with no obvious answer, and
+  getting any of them wrong makes the plan actively worse than a static one:
+  1. **What gets re-scaled** — every remaining meal proportionally, or the next one only? Spreading a
+     700 kcal lunch overshoot across two remaining meals is gentle and makes both wrong; taking it
+     out of dinner is honest and can make dinner absurd.
+  2. **Whether a floor exists.** A day that ran 900 over by lunch can push the remaining meals below
+     anything edible. A plan that says *"eat 180 kcal for dinner"* will be ignored, and a plan that
+     is ignored once is ignored after.
+  3. **What happens when the remaining macros are unreachable** — under-eaten by 1,200 kcal at 8pm,
+     the honest answer is "you will not catch this up", and the plan has no way to say that today.
+- **What it can build on, all shipped.** The day's actual totals are already computed for the plan
+  card (`eaten`); each planned meal carries its own ingredient snapshot and macros (Q-192); and
+  `fillableMeals` (`components/nutrition/plan-day-fill.ts`) already answers *which meals are still
+  ahead of you*, which is exactly the set a re-scale would act on.
+- **Do not fold this into the prefill.** The prefill's whole property is that nothing enters
+  `food_logs` unconfirmed; a re-scale changes what is *suggested*, not what is logged, and mixing
+  the two is how the illegal state gets reintroduced.
+
 
 ### [platform] ⏳ Q-181 — a schema per vitest worker: WATCH ONLY, deferral re-confirmed by measurement
 
