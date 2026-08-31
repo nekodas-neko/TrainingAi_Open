@@ -5030,3 +5030,20 @@ testable only because two callers forced it out of a component.
 **`projectOverview.md` goes up 7**, which is one paragraph for a shipped user-visible change. Nothing
 was compacted to pay for it this time; the two BF-57 paragraphs were already merged earlier today and
 there is no other slack in that section that is not load-bearing.
+
+## 2026-08-31 — `docs/agents/state/implementation-lane-b.md` 141 → 159 (the nineteenth Lane B run)
+
+Five PRs merged under this baton (#692–#696), and the run produced more transferable finding than
+code. The block that grew is the one worth the lines: **seven tests across two runs that could not
+fail as first written**, each named with its mechanism — a hit-test defeated by
+`pointer-events-none`, a floor test using a weight where the floor was a no-op, three source greps
+matching their own explanatory comments, and two from the run before. A successor who reads only that block and mutates
+their guards has taken the whole lesson.
+
+**Paid for where it could be.** The standalone *"finding that should change how you start"* section
+was folded into it — it made the same point with three of the same examples, which is exactly the
+duplication a rewrite is supposed to remove. The device narrative was compressed to a bulleted list
+even while gaining three items, and one gotcha was retired into the new block.
+
+The rule this obeys is CLAUDE.md's: **rewrite the baton in full, never append.** The ratchet is what
+turns that from an intention into a thing that happens.
