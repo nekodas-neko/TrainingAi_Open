@@ -69,16 +69,11 @@ export function EditProfileSheet({ user, onSaved }: EditProfileSheetProps) {
       const res = await fetch('/api/user/profile', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
+        // BF-78. This sheet edits three fields and now sends three. The five it used to resend
+        // were a workaround for the route nulling anything omitted; it is a real partial update
+        // now, so resending them would be the thing that could go stale.
         body: JSON.stringify({
           displayName: displayName || null,
-          // Height, sex, date of birth, activity level and fitness goal are edited
-          // from the Goals section — /api/user/profile isn't a true partial update,
-          // so they must be resent here to avoid wiping them out.
-          heightCm: user?.heightCm ?? null,
-          dateOfBirth: user?.dateOfBirth ?? null,
-          sex: user?.sex ?? null,
-          activityLevel: user?.activityLevel ?? null,
-          fitnessGoal: user?.fitnessGoal ?? null,
           weightGoalKg: weightGoalKg ? Number(weightGoalKg) : null,
           timezone: timezone || null,
         }),

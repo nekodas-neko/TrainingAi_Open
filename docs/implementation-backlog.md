@@ -420,6 +420,21 @@ has already recorded that a bulk job bumps `updated_at` without rewriting a valu
   then query `sleep_sessions` for that date immediately. Row already final → (2). Row still short →
   (1).
 
+- **⚑ (2) IS RULED OUT FROM CODE, 2026-08-31 — no waiting for a morning, and this settles the lane.**
+  `app/health/sleep/sleep-content.tsx` seeds from cache and then calls `cachedFetch(...)` **without**
+  `freshWithinTtl`. `lib/sqlite/cache.ts` only short-circuits on a fresh TTL when that flag is
+  passed, so this screen always revalidates over the network on mount — and it carries a
+  `useInvalidationRefetch('sleep-sessions')` listener on top. It is a route, not a persistent tab, so
+  opening it mounts it. **The client cannot have painted a stale row.** The reading changed because
+  the row changed: mechanism (1), the night was still draining at 6:44.
+- **⚑ So the lane is A, and the deliverable is the PROVISIONAL concept, not a refresh.** The
+  recommendation's refresh half is already in place and did not help — a revalidate returns the
+  newest number, which is exactly what made a growing number look final twice. What is missing is
+  the engine knowing whether the ring has reported the wake, so a night can be *labelled* incomplete
+  and **excluded from its own 30-night comparison** (the moving baseline in the table above is that
+  omission, and it is the repo's own partial-day rule). The label is B's; deciding what "complete"
+  means is A's, and nothing can be built until that definition exists.
+
 - **Recommendation, and it holds either way: force a revalidate when the detail opens, and mark the
   night provisional until the ring has reported the wake.** The owner asks for "the final result on
   open", and the honest version of that is *don't call a growing number final* — the app cannot know
@@ -558,6 +573,28 @@ sex — right on the page.
 
 ### [readiness][devices] BF-81 — two producers write the daytime-stress metric and they disagree on every day measured
 
+> **⚑ THE DIVERGENCE IS FIXED 2026-08-31. What remains is one owner decision and one finding.**
+> The rollup now writes the three scalars from the SAME points it writes the buckets from, and
+> `/api/body-battery` no longer persists a second answer (it still computes one for its own
+> response). `scripts/check-stress-scalars-one-writer.js` fails CI on a second persister **and** on
+> the rollup losing its write — the second case matters because the entry's own recommendation, a
+> bare deletion, would have left all three columns with no writer at all and `weekly-digest` reads
+> `stressHighMinutes`. Re-measured before fixing: **6 of 8** days disagreed on sign, not 5.
+>
+> - **Keep — the history recompute is the owner's call, and the entry's version would make it
+>   worse.** 38 rows carry `daytime_stress_scaled`; only **8** of them have buckets to re-derive
+>   from. Recomputing those 8 leaves 30 rows on the old producer, so the column would be *more*
+>   mixed, not less. Doing it properly means a wide rollup pass re-deriving buckets from the packed
+>   raw tier for all 38 days first — which is the owner/device-gated pass below. **Nothing was
+>   recomputed**: overwriting stored history is irreversible and was not authorised.
+> - **Keep — `chronic_stress_score` is NULL on all 106 rows, and it is the documented gate, not a
+>   data problem.** `run.ts` says so outright: the intermediate history is built from *that pass's*
+>   stashed signals, so the first score needs a wide pass covering ≥21 nights of real ring data,
+>   which is owner/device-gated. That answers the question this entry asked; no code fix applies.
+> - **Keep — `resilience_daily_stress` on 15 of 106 rows.** Sparse rather than absent. Not
+>   investigated here.
+
+
 - **Lane:** A — `lib/oura-ble/rollup/run.ts` and `app/api/body-battery/route.ts`.
 - **Added:** 2026-08-31 · owner: *"what is happening with our stress indicator? Is this working? What
   are the issues… what is different from our records vs our calculated model."* Measured in
@@ -661,10 +698,22 @@ brings it back.** It fits every part of the report:
   do nothing** (a dead renderer cannot respond to touch) and does **backing out and re-entering fix
   it**? A dead renderer needs a reload; a JS fault would not survive one either, but would have left
   a row.
-- **Rule out the cheaper causes first, in this order:** (1) the service worker serving an empty shell
-  — the cache name is build-stamped, so a deploy mid-session is a candidate; (2) a route that renders
-  null while a cache read resolves; (3) the renderer death above. (1) and (2) would both leave
-  evidence — a row, or a screen that recovers on navigation.
+- **Rule out the cheaper causes first, in this order:** (1) the service worker serving an empty shell;
+  (2) a route that renders null while a cache read resolves; (3) the renderer death above.
+- **⚑ (1) IS RULED OUT from code, 2026-08-31 — no device needed.** `public/sw-template.js`'s
+  navigation branch is **network-first**: it fetches, caches only on `res.ok`, and falls back to a
+  cached document *only* in the `catch`, i.e. when the network failed. It cannot serve an empty
+  shell. And it is not even reached by this symptom — returning from the background resumes the
+  existing document rather than navigating, so the service worker is not consulted at all.
+- **⚑ The entry's own reasoning about (2) is wrong, and it matters.** It says (1) and (2) "would
+  both leave evidence — a row, or a screen that recovers on navigation". **A route rendering null
+  leaves no row**: a null render is not an exception, so `app/error.tsx` never fires and the client
+  reporter is never called. So the absence of an `error_events` row does **not** distinguish (2)
+  from renderer death — only the recovery behaviour does. Test it that way: after a blank screen,
+  does navigating (not reloading) restore it? Yes → (2). No → (3).
+- **A JS-side detector cannot see (3), which is why one was not built here.** If the renderer is
+  dead there is no JS left to notice or report, exactly as the entry says. Instrumentation would
+  only ever catch (2) — worth adding once (2) is not already excluded by the navigation test above.
 - **⚠ It costs an APK.** Anything in `MainActivity.java` is native, so it ships through the Android
   workflow, not a Railway deploy. Confirm the owner holds `key.hex` before any suggestion that
   touches installation — an uninstall destroys the Oura ring key. (Confirmed held 2026-08-25; ask
@@ -673,53 +722,6 @@ brings it back.** It fits every part of the report:
   camera session helps), return, and it paints its last screen rather than nothing — repeated ten
   times. And whatever the cause turns out to be, **it must file an `error_events` row**: a failure
   this total that leaves no trace is the part that let it go unreported until now.
-
-### [platform][body] BF-78 — a partial PATCH to `/api/user/profile` wipes four columns, and one caller already sends one
-
-- **Lane:** A — `lib/data/postgres/adapter.ts:655` (`updateUserProfile`) and
-  `app/api/user/profile/route.ts`.
-- **Added:** 2026-08-31 · found while tracing the owner's request to gather the personal-detail
-  fields into one place. Not reported — nothing has visibly broken yet.
-
-**`updateUserProfile` writes four columns unconditionally as `?? null`:**
-
-```ts
-const set: Record<string, unknown> = {
-  displayName:  profile.displayName  ?? null,
-  heightCm:     profile.heightCm     ?? null,
-  dateOfBirth:  profile.dateOfBirth  ?? null,
-  weightGoalKg: profile.weightGoalKg ?? null,
-}
-if (profile.timezone) set.timezone = profile.timezone
-if ('sex' in profile) set.sex = profile.sex ?? null
-```
-
-The last four are guarded by a presence check. **The first four are not**, so any PATCH that omits
-them **nulls them**. It is a PATCH by name and a PUT by behaviour.
-
-**⚠ One caller already sends a one-field body.**
-`components/profile/goal-recommendation-sheet.tsx:148` PATCHes
-`{ activityLevel: rec.recommended.activityLevel }` when the owner accepts an activity-level
-recommendation — so accepting a recommendation should erase **display name, height, date of birth
-and weight goal** in the same request. Height feeds the BMR fallback, so the damage is not only
-cosmetic: it would silently degrade the calorie model.
-
-- **Measured 2026-08-31: it has NOT fired.** The owner's row still reads height 160, a date of birth,
-  weight goal 60 and a display name. So this is latent, one tap away, not an incident — which is the
-  best moment to fix it and the reason it is at the head of the queue rather than in a Known-Issues
-  row.
-- **`edit-profile-sheet.tsx` is the workaround, and its comment says so** — *"Height, sex, date of
-  birth, activity level and fitness goal are edited from the Goals section — `/api/user/profile`
-  isn't a true partial update, so they must be resent here to avoid wiping them out."* That comment
-  is correct and load-bearing. Every editor of this route has to know every other editor's fields.
-- **Fix: make the four conditional, the same way the other four already are** (`'heightCm' in profile
-  ? …`). Then delete the defensive resend in `edit-profile-sheet.tsx` in the same PR, or the
-  workaround outlives the bug and the next reader re-derives it.
-- **⚠ Check the other two callers before changing the shape:** `goals-section.tsx:141` and
-  `goal-recommendation-sheet.tsx:148`. One of them relies on the resend today.
-- **Verification:** PATCH `{ activityLevel: 'moderate' }` alone and every other column is unchanged;
-  PATCH `{ heightCm: null }` explicitly and height clears, because *omitted* and *sent as null* must
-  stop meaning the same thing.
 
 ### [nutrition][body] 🔵 BF-1 — import blood panel results as a nutrition baseline, de-identified
 > **⚑ RAISED 2026-08-31 — owner: *"can you add blood test as well based on the fields I returned
@@ -1003,8 +1005,10 @@ description will silently drop the field that turns out to matter. **The owner i
 
 - **Lane:** B — `components/profile/edit-profile-sheet.tsx`, `goals-section.tsx`,
   `required-info-section.tsx`, and the More profile tab that mounts them.
-- **Needs:** BF-78 — consolidating on top of a route that nulls omitted columns just moves the
-  hazard.
+- **Unblocked 2026-08-31** — this used to carry `Needs: BF-78`, which has shipped.
+  `/api/user/profile` is a real partial update now: it forwards only the keys a request actually
+  sent, and the adapter presence-guards every column. Consolidating no longer builds on a route that
+  nulls what it is not told about.
 - **Added:** 2026-08-31 · owner: *"can we combine all the personal information fields into 1 section
   in the more/details. Like height/weight/bodyfat etc."*
 
@@ -1017,9 +1021,12 @@ description will silently drop the field that turns out to matter. **The owner i
 | Weight, body fat (latest reading) | read-only in `GoalsSection`, logged elsewhere |
 | DEXA, measured RMR | `More → Health → DEXA & RMR results` (BF-71) |
 
-- **The split is not only untidy — it is what makes BF-78 dangerous.** Two editors of the same row
-  means each must resend the other's values, and `EditProfileSheet` carries a comment doing exactly
-  that. One section that owns every profile column removes the class, not just the mess.
+- **The split used to be dangerous as well as untidy, and BF-78 removed the danger.** Two editors of
+  the same row each had to resend the other's values, and `EditProfileSheet` carried a comment
+  saying so. **Both resends are now deleted** — each sheet sends only what it owns. What is left for
+  this entry is the mess: two places to look for one row's fields. Note the resends were not merely
+  redundant, they were a second hazard, since `goals-section` resent `displayName` and
+  `weightGoalKg` from a possibly stale `user` prop and could overwrite a change made elsewhere.
 - **Decide what belongs, because "personal information" has an edge.** *Identity and body facts*
   (name, sex, date of birth, height) are stable and belong together. *Weight and body fat* are
   **measurements with a history** — they are logged daily and the profile only shows the latest, so
@@ -1034,7 +1041,7 @@ description will silently drop the field that turns out to matter. **The owner i
   pass, and the two will disagree about where height and sex belong if built independently. This
   entry owns the content; that one owns the placement.
 - **Verification:** every profile column is editable in exactly one place; saving one field leaves
-  the rest unchanged (which is BF-78's test, run through the UI); weight and body fat read as
+  the rest unchanged (BF-78's behaviour, now shipped and tested — re-verify it through the UI); weight and body fat read as
   measurements with their date, not as inputs.
 
 ### [nutrition] BF-72 — the diary's hydration wiped its own meal grouping (fixed; device check owed)
@@ -1740,64 +1747,6 @@ is crop-before-upload and a typed form has no such exposure at all.
 rather than queueing. Adding one is a local-store table and a sync domain, which is
 Lane A's.
 
-### [body][nutrition] BF-42 — the daily energy model computes its own BMR and never reads the measured RMR
-
-- **Lane:** A — `lib/health/energy-balance-service.ts`.
-- **Added:** 2026-08-27 · found while answering the owner's question *"are we able to make sure that
-  our excercise calculations add on to the base correctly."* The adding-on is correct. The **base**
-  is not going to be.
-
-**BF-33 wired the measurement into `calculateBaseline`, which is the goal wizard. The live daily
-model is a third path and it was missed.** `energy-balance-service.ts:191-197` computes its own BMR:
-
-```ts
-const bmr = latestBodyFatPct != null
-  ? cunninghamBmr(latestWeightKg! * (1 - latestBodyFatPct / 100))
-  : mifflinStJeorBmr(...)
-const formulaBaseline = Math.round(bmr * SEDENTARY_MULTIPLIER)
-```
-
-No `personalRmr`, no `getLatestMeasuredRmr`. So the moment the owner types 1325 into BF-33's UI, the
-goal wizard will use it and the **Energy Balance card will not** — two numbers for one person's
-resting rate, on two screens, which is the same failure Q-401 fixed for activity multipliers.
-
-**It is worse than a missed read, because that BMR is also a floor.** `restingBaseKcal` is
-`Math.max(Math.round(bmr), maintenanceKcal - avgActiveKcal)`. For this owner the formula BMR is
-**1481** and the measured RMR is **1325**, so the floor sits **156 kcal above the measured resting
-rate** and clamps the calibrated maintenance up to it — the calibration cannot report the truth even
-when the data says so. The floor's comment (*"resting burn can never fall below BMR"*) is sound; the
-bug is that it is using a prediction as the definition of BMR when a measurement is available.
-
-- **Fix:** read the measurement in the service, run it through `personalRmr(measured, leanMassKg)`
-  the same way `calculateBaseline` does, and use the result as both the base and the floor. The
-  repository method already exists (`repo.getLatestMeasuredRmr`, used by
-  `app/api/nutrition-goals/recommend/route.ts:212`), so this is a read plus one substitution, not new
-  infrastructure.
-- **✅ MEASUREMENT NOW STORED, 2026-08-31 — this entry is fully verifiable and nothing gates it.**
-  The owner entered the results on the S25: `measured_rmr` = **1325 kcal at 51.5 kg FFM**,
-  `dexa_scans` = **28.5 %**, both dated 2026-08-27, both confirmed in production. So the check this
-  entry asks for — *the Energy Balance card and the goal wizard agree* — can be run today, and they
-  currently do not.
-- **✅ UNBLOCKED 2026-08-31 — the `Needs:` is cleared and deliberately not replaced.** It pointed at
-  BF-33, then at BF-71; **BF-71 shipped the entry screen the same day** (`More → Health → DEXA & RMR
-  results`, both tables verified filling). BF-71 stays in the queue only for a device check, and a
-  `Needs:` on it would park this entry behind a check it does not depend on — reading a stored value
-  needs the value to be storable, which it now is. Enter the 2026-08-27 results and this is
-  immediately verifiable.
-- **BF-71 measured the prize this entry predicted.** With 1,325 kcal and 51.46 kg FFM stored,
-  `calculateBaseline` returns **BMR 1328 / TDEE 1594** against **1485 / 1782** predicted. The
-  **188 kcal/day** below is confirmed, not forecast — and the Energy Balance card is still showing
-  the prediction, which is exactly what this entry fixes.
-- **⚠ The numbers above are from 2026-08-27 and the formula BMR has since moved — re-measure before
-  trusting them.** On 2026-08-31 the owner's latest reading is 71.45 kg at 25.2% → 53.4 kg FFM →
-  Cunningham **1,524**, not 1,481 (that figure was Cunningham at the *test-day* FFM, which is where
-  the −156 residual comes from and is still correct). The live gap: the Energy Balance card shows a
-  **1,629** base — `1,524 × 1.2 − 200`, reproducing to within a kcal — where the measurement would
-  give **≈1,442**. So the cost is **~188 kcal/day**, and it tracks the scale rather than staying
-  fixed, which is the argument for reading the measurement rather than tuning the prediction.
-- **Verification:** with a measurement stored, the Energy Balance card's resting base and the goal
-  wizard's BMR agree; with none stored, both fall back to the same prediction and nothing moves.
-
 ### [body][app-shell] LA-45 — the DEXA-corrected body fat is in the payload and no screen reads it
 
 - **Branch:** _unassigned_ · **Lane: B** — `app/health/health-sections.tsx`, `app/health/health-content.tsx`, the day-detail body row.
@@ -2306,6 +2255,26 @@ deadlifts in the builder gets deadlifts again the next time the engine writes a 
   injury and both constraints lift.
 
 ### [workouts] BF-67 — building a new program cannot reference an old one, so every program starts from nothing
+
+> **⚑ STEP 2 SHIPPED 2026-08-31 — the engine half. Steps 3 (picker, Lane B) and 4 (history summary)
+> remain.** `/api/generate-program` accepts `referenceProgramId`, resolves it **server-side against
+> `listPrograms(userId)`** so a program the caller does not own is simply absent, and puts session
+> names + exercise names + roles + styles into the prompt, capped at 10 sessions x 20 exercises.
+> **An id, never a program object** — accepting the structure from the client would be an ownership
+> hole and a prompt-injection surface for nothing the id does not already give.
+>
+> - **Keep — step 3, the picker (Lane B).** `listPrograms` already exists; one control in the
+>   builder wizard, and no reference selected leaves today's behaviour unchanged. **Nothing reaches
+>   the owner until this ships** — the parameter has no caller.
+> - **Keep — step 4, the history summary.** Deliberately separate; step 2 sends structure only.
+> - **⚠ The name-drift caveat is real and measured.** Reference names go through LA-43's resolver
+>   before entering the prompt, but the seeded program's `Bench Press` / `Overhead Press` /
+>   `Romanian Deadlift` do **not** resolve — the library holds `Barbell Bench Press` and the resolver
+>   deliberately refuses subset matches. Those enter as stored free text, which the model reads as
+>   intent rather than a selectable name (rule 2 still binds it to the available list). Measured
+>   end-to-end against real Gemini: with the reference, **Barbell Overhead Press** and **Barbell
+>   Front Squat** appeared where neither did without it, so the steer works through the drift.
+
 
 - **Lane:** A for the payload and prompt, B for the picker.
 - **Plan:** [`2026-08-31-reference-an-old-program.md`](superpowers/plans/2026-08-31-reference-an-old-program.md)

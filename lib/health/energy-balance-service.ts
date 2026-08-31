@@ -7,7 +7,7 @@ import { shiftDateStr, ageFromDob } from '@trainingai/shared/date-utils'
 import { computeActiveEnergy, SEDENTARY_MULTIPLIER } from '@trainingai/shared/health/daily-energy'
 import { type Sex } from '@trainingai/shared/health/workout-energy'
 import { mifflinStJeorBmr } from '@trainingai/shared/nutrition/goal-recommendation'
-import { bodyComposition } from '@trainingai/shared/health/body-composition'
+import { personalRmr, bodyComposition } from '@trainingai/shared/health/body-composition'
 import { correctBodyFatPct } from '@trainingai/shared/health/body-fat-calibration'
 import {
   computeCalorieBalance, targetFromMaintenance, GOAL_DAILY_DELTA, scaleMacrosForEarnedKcal,
@@ -93,7 +93,7 @@ export async function computeEnergyBalance(
 
   // The whole window is fetched, not just the requested day: a calibrated maintenance needs the
   // window's average movement to separate resting burn from habitual movement (see below).
-  const [metrics, foodSummary, activityLogs, workouts, targets, userGoals, profile, dayCheckins, bodyFatCalibration] = await Promise.all([
+  const [metrics, foodSummary, activityLogs, workouts, targets, userGoals, profile, dayCheckins, bodyFatCalibration, measuredRmr] = await Promise.all([
     repo.listBodyMetrics(userId, windowStart, date).catch(() => []),
     repo.listFoodLogsSummary(userId, windowStart, date).catch(() => []),
     repo.listActivityLogs(userId, windowStart, date).catch(() => []),
@@ -106,6 +106,7 @@ export async function computeEnergyBalance(
     // one, and counting it dragged the estimate 86 kcal lower per partial day.
     repo.listDayCheckins(userId, windowStart, date, 'evening').catch(() => []),
     repo.getBodyFatCalibration(userId).catch(() => null),
+    repo.getLatestMeasuredRmr(userId).catch(() => null),
   ])
 
   // Q-421: one batch read for the whole window rather than a query per session. Sessions with no
@@ -205,9 +206,22 @@ export async function computeEnergyBalance(
   // silently opts out of it — and this is a live surface: a floored 3% reading would put lean mass
   // at 97% of bodyweight and hand the owner an energy budget ~24% too high.
   const comp = bodyComposition(latestWeightKg, latestBodyFatPct)
-  const bmr = comp != null
+  // BF-42. A clinically measured resting rate outranks any prediction, and this was the third path
+  // that never read one: BF-33 wired the measurement into `calculateBaseline` (the goal wizard) and
+  // this live daily model kept predicting, so the two screens would have shown two resting rates
+  // for one person. `personalRmr` re-scales the measurement's Cunningham residual onto TODAY's
+  // fat-free mass, which is the same treatment the wizard gives it.
+  //
+  // `comp.ffmKg` is derived from the DEXA-corrected body fat (BF-2), and that matters here more
+  // than anywhere: `ffm_kg_at_test` came from the DEXA, so handing this the raw scale number would
+  // re-scale the residual across two different instruments.
+  const measuredBmr = personalRmr(
+    measuredRmr ? { rmrKcal: measuredRmr.rmrKcal, ffmKgAtTest: measuredRmr.ffmKgAtTest } : null,
+    comp?.ffmKg ?? null,
+  )
+  const bmr = measuredBmr ?? (comp != null
     ? comp.bmrKcal
-    : mifflinStJeorBmr(latestWeightKg!, heightCm!, ageYears!, sex!)
+    : mifflinStJeorBmr(latestWeightKg!, heightCm!, ageYears!, sex!))
   // Sedentary base only — measured movement is added explicitly, so a higher activity multiplier
   // here would double-count it. See daily-energy.ts.
   const formulaBaseline = Math.round(bmr * SEDENTARY_MULTIPLIER)
@@ -238,7 +252,11 @@ export async function computeEnergyBalance(
     ? windowDays.reduce((sum, d) => sum + activeEnergyFor(d.date).total, 0) / windowDays.length
     : 0
 
-  // Resting burn can never fall below BMR, whatever the arithmetic says.
+  // Resting burn can never fall below BMR, whatever the arithmetic says — and BF-42 is about WHICH
+  // number that floor uses. It was the prediction even when a measurement existed, so for this
+  // owner it sat 156 kcal above the measured resting rate (1481 predicted vs 1325 measured) and
+  // clamped the calibrated maintenance up to it: the calibration could not report the truth even
+  // when the data said so. `bmr` is the measurement when there is one, so the floor is too.
   const restingBaseKcal = source === 'calibrated'
     ? Math.max(Math.round(bmr), Math.round(maintenanceKcal - avgActiveKcal))
     : formulaBaseline

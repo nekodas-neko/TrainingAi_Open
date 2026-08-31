@@ -6,6 +6,16 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.413.2",
+    date: "2026-08-31",
+    changes: [
+      "Energy Balance now uses your measured resting rate instead of estimating one. It was predicting 1481 where your test says 1325, and that estimate was also the floor under the calibrated maintenance — so the calibration could not report a lower number even when your own data said so.",
+      "The daytime stress strip and the stress number beside it are now the same calculation. They were two, and they disagreed about whether the day was stressful at all on six of the last eight days.",
+      "Saving one profile field no longer erases the others. Accepting an activity-level recommendation would have wiped your name, height, date of birth and weight goal. It had not happened yet.",
+      "Clearing a profile field now works: an empty height clears the height, where before it was indistinguishable from not touching it.",
+    ],
+  },
+  {
     version: "1.413.1",
     date: "2026-08-31",
     changes: [

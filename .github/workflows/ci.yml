@@ -337,6 +337,9 @@ jobs:
       - name: The nutrition sanitiser declares no image field
         run: node scripts/check-sanitiser-no-image-field.js
 
+      - name: One producer persists the daytime-stress scalars
+        run: node scripts/check-stress-scalars-one-writer.js
+
       - name: One canonical TTL per cache key
         run: node scripts/check-cache-ttl-divergence.js
 

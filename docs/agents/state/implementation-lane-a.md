@@ -11,7 +11,9 @@ directory. Local SQLite **v32**.
 
 ## Now
 
-**BF-70 and BF-2 both shipped and both entries are now REMOVED. BF-2 read as READY #3 for hours after shipping** — `check-backlog-pointers.js` looks for completion words in HEADINGS and BF-2's were in its body, so nothing caught it. **Re-run `next-item.js` after striking an entry; do not trust the edit.** What is left is **LA-45** only (Lane B: a screen that reads `bodyFatCorrected`) — **LA-44 was superseded by BF-71 (#681)** hours after it was filed, and the chain is verified end to end: a scan entered through BF-71's form moves the calorie goal with no other action, and a second scan re-derives the offset on its own. **Merge `main` before starting any queue item; two entries this session were already built by another agent.** **Do not refactor the per-consumer correction back into `listBodyMetrics`**: the Health log sheet seeds from that read and POSTs back at rank `manual`, so a corrected value there overwrites the raw archive. `check-body-fat-correction.js` holds the line.
+**BF-42, BF-81 (divergence half), BF-78, BF-70 and BF-2 shipped. BF-81 KEEPS an owner decision (recomputing 38 stored stress days — only 8 are re-derivable without a wide pass, so the naive version makes the column more mixed); the other three entries are REMOVED. BF-2 read as READY #3 for hours after shipping** — `check-backlog-pointers.js` looks for completion words in HEADINGS and BF-2's were in its body, so nothing caught it. **Re-run `next-item.js` after striking an entry; do not trust the edit.** What is left is **LA-45** only (Lane B: a screen that reads `bodyFatCorrected`) — **LA-44 was superseded by BF-71 (#681)** hours after it was filed, and the chain is verified end to end: a scan entered through BF-71's form moves the calorie goal with no other action, and a second scan re-derives the offset on its own. **Merge `main` before starting any queue item; two entries this session were already built by another agent.** **Two entries were investigated rather than built, findings on them:** BF-80 — cause (1) ruled out from the service worker, and its claim that a null render "would leave a row" is wrong, so an absent `error_events` row does NOT distinguish it from renderer death; the diagnostic needs `adb logcat`. BF-83 — cause (2) ruled out (the sleep screen always revalidates), **which settles its lane as A**: the deliverable is defining when a night is complete, not adding a refresh.
+
+**Do not refactor the per-consumer correction back into `listBodyMetrics`**: the Health log sheet seeds from that read and POSTs back at rank `manual`, so a corrected value there overwrites the raw archive. `check-body-fat-correction.js` holds the line.
 
 `docs/implementation-backlog.md` is
 **220 entries** — it grows while a session shrinks it, because five agents file into it concurrently.
@@ -56,13 +58,11 @@ The earlier session's six were Q-540 (sizing), Q-403 (tier), Q-295 (latency), Q-
 blast radius), BF-4 (hypotheses already answered), and the "add an admin button" request (the buttons
 had shipped two days earlier).
 
-Two shapes: *the evidence is stale*, and *the evidence was never true*. Q-295 is the one to remember — a review doc had carried the corrected number for a week while claiming it *"corroborates Q-295 exactly"*, and nobody propagated it.
-
-**Q-304b is the sharpest case.** The owner authorised recomputing 30 rows; measuring first found the specified method moves **zero** rows by construction, the real blast radius is **277**, and **76 of those** would silently substitute a since-edited prescription. The authorisation was real and the work would still have been wrong.
+Two shapes: *the evidence is stale*, and *the evidence was never true*. Q-295 is the one to remember — a review doc had carried the corrected number for a week while claiming it *"corroborates Q-295 exactly"*, and nobody propagated it. **Q-304b is the sharpest case.** The owner authorised recomputing 30 rows; measuring first found the specified method moves **zero** rows by construction, the real blast radius is **277**, and **76 of those** would silently substitute a since-edited prescription. The authorisation was real and the work would still have been wrong. (BF-81 repeated the shape on 2026-08-31: its recommended recompute reaches 8 of 38 rows and would leave the column more mixed.)
 
 ## Shipped this session
 
-**2026-08-30/31, thirteen PRs:** Q-311, Q-225, Q-297, Q-527, Q-211, LA-40, LB-14, Q-214, Q-284, LB-25, BF-67's plan (#666, which filed LA-43), LA-43 (#672), BF-2's plan (#673), and BF-2 itself — all four steps in #676, which also filed LA-45. What each turned out to be is in `docs/overview/entries/2026-08-3{0,1}-*.md`.
+**2026-08-30/31:** Q-311, Q-225, Q-297, Q-527, Q-211, LA-40, LB-14, Q-214, Q-284, LB-25, LA-43 (#672), BF-2 all four steps (#676, filed LA-45), BF-70 (#687), BF-78/BF-81/BF-42 batched (#691). Details in `docs/overview/entries/2026-08-3{0,1}-*.md`.
 
 **LA-43 is the ninth moved premise this session** — filed against an unreachable `??` fallback; the
 live defect was the exact-name filter above it silently deleting every paraphrase. **Two guards in

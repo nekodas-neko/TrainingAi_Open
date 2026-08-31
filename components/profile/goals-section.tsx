@@ -135,20 +135,17 @@ export function GoalsSection({ user, onUserSaved }: GoalsSectionProps) {
   async function patchProfile(patch: Record<string, unknown>) {
     setSaving(true)
     try {
-      // /api/user/profile nulls out any field omitted from the body (it isn't a
-      // true partial update), so the full current profile must be sent alongside
-      // the patched field(s) to avoid wiping unrelated fields.
+      // BF-78. This section owns height, date of birth and sex, so it sends those plus whatever
+      // the caller patched. It used to send the whole profile because the route nulled anything
+      // omitted; that is fixed, and resending `displayName`/`weightGoalKg` from a possibly stale
+      // `user` prop is now a way to overwrite a change made elsewhere rather than a safeguard.
       const res = await fetch('/api/user/profile', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          displayName: user?.displayName,
           heightCm: heightCm ? Number(heightCm) : null,
           dateOfBirth: birthYear ? `${birthYear}-01-01` : null,
-          weightGoalKg: user?.weightGoalKg,
           sex: sex || null,
-          activityLevel: user?.activityLevel,
-          fitnessGoal: user?.fitnessGoal,
           ...patch,
         }),
       })

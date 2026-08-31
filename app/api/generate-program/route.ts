@@ -33,7 +33,23 @@ const RequestSchema = z.object({
   scheduleType: z.enum(['rotation', 'weekly']).default('rotation'),
   rotationRestAfterN: z.number().int().min(1).max(7).default(3),
   weeklyDays: z.array(z.number().int().min(0).max(6)).default([0, 2, 4]),
+  /**
+   * BF-67. The id of an existing program to build the new one "similar to". **An id, never a
+   * program object** — the structure is read server-side and `user_id`-scoped, because accepting
+   * one from the client would be both an ownership hole and a prompt-injection surface, for no
+   * benefit the id does not already give.
+   */
+  referenceProgramId: z.string().uuid().optional(),
 }).strict()
+
+/**
+ * How much of a referenced program reaches the prompt. Bounded at the schema rather than by hoping:
+ * the note above `MAX_BODY_BYTES` already records that `equipment` and `musclesToFocus` are
+ * unbounded arrays held only by the byte cap, and a program is a larger structure than either.
+ * A real five-session program is ~30 exercise names, so these caps do not bite on anything real.
+ */
+const REFERENCE_MAX_SESSIONS = 10
+const REFERENCE_MAX_EXERCISES_PER_SESSION = 20
 
 const EQUIPMENT_LABEL: Record<string, string> = {
   barbell: 'Barbell', dumbbell: 'Dumbbells', cable: 'Cables',
@@ -103,9 +119,15 @@ export async function POST(req: Request) {
   const inputs = parsed.data
   const repo = await getRepository()
 
-  const [allExercises, userStyles] = await Promise.all([
+  const [allExercises, userStyles, referenceProgram] = await Promise.all([
     repo.listExerciseLibrary(),
     repo.listProgressionStyles(userId),
+    // BF-67. `listPrograms` is already user-scoped, and the id is matched against what it returns
+    // rather than fetched directly — so a referenced program the caller does not own is simply
+    // absent, with no separate not-found branch to distinguish the two cases from outside.
+    inputs.referenceProgramId
+      ? repo.listPrograms(userId).then(ps => ps.find(p => p.id === inputs.referenceProgramId) ?? null).catch(() => null)
+      : Promise.resolve(null),
   ])
 
   const equipmentSet = buildEquipmentSet(inputs.equipment)
@@ -162,6 +184,34 @@ export async function POST(req: Request) {
     const accessories = exerciseCount - compounds
     targetExercises = `${inputs.timePerSessionMinutes} min session (working time after warmup + finish-early margins: ${workMin} min) → target ~${exerciseCount} exercises (${compounds} compounds + ${accessories} accessories). Use the style time estimates below to stay within budget.`
   }
+
+  // BF-67. Structure only — session names, exercise names, roles and styles. No loads, no history:
+  // what the owner asked for is *"what I did and what I would like similar to"*, and the shape is
+  // what carries that. Exercise names go in under the LIBRARY's spelling where the program has
+  // drifted, because the resolver added by LA-43 matches exact → normalised → word order and
+  // deliberately will NOT match a subset: a stored "Barbell Back Squat" would not reach a library
+  // "Back Squat", and the model would be shown a name it cannot legally return.
+  const referenceBlock = referenceProgram
+    ? `
+
+REFERENCE PROGRAM — the user's existing "${referenceProgram.name}". Build something in the same
+spirit: keep exercises they already do where the constraints above still allow it, and change one
+only when there is a reason. Do NOT copy it verbatim — the constraints above win.
+${referenceProgram.sessions
+  .slice(0, REFERENCE_MAX_SESSIONS)
+  .map(sess => {
+    const names = sess.exercises
+      .slice(0, REFERENCE_MAX_EXERCISES_PER_SESSION)
+      .map(ex => {
+        const canonical = nameResolver.resolve(ex.exerciseName)?.name ?? ex.exerciseName
+        const style = userStyles.find(st => st.id === ex.styleId)?.name
+        return `${canonical} (${ex.exerciseRole}${style ? `, ${style}` : ''})`
+      })
+      .join(', ')
+    return `- ${sess.name}: ${names}`
+  })
+  .join('\n')}`
+    : ''
 
   const systemPrompt = `You are an expert strength and conditioning coach designing programs for optimal muscle growth and strength.`
 
@@ -247,7 +297,7 @@ Rules:
 13. Before finalising: tally sets per large muscle across all sessions. Confirm each large muscle hits its target. Confirm time budget is met. Confirm no consecutive sessions share primary muscles.
 
 Available exercises (name|muscles|equipment):
-${exerciseList}`
+${exerciseList}${referenceBlock}`
 
   try {
     const { object: raw } = await loggedGenerateObject(
