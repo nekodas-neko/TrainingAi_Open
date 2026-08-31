@@ -362,6 +362,16 @@ below threshold and left in place for next time.
 
 - **Lane:** B — `components/more/profile-tab.tsx`, `components/more/settings-panel.tsx`,
   `components/more/more-row.tsx`, and the sub-screens under `app/more/`.
+- **Needs:** BF-79 — this entry decides where the personal-details section LIVES and BF-79 decides
+  what is in it; built independently they disagree about where height and biological sex belong.
+  Stated in prose below since 2026-08-31 and as a field since the plan was written, which is what
+  let `next-item.js` offer this at the head of Lane B while its content half was parked.
+- **Plan:** [`2026-08-31-more-page-grouping-and-interaction-model.md`](superpowers/plans/2026-08-31-more-page-grouping-and-interaction-model.md)
+  — **written 2026-08-31, so the planning half of this entry is DONE and what remains is the build.**
+  It carries the inventory (eight single-row groups, not seven — `Developer` on the Settings
+  sub-screen has the same shape), the grouping proposal (seven headings → two, each covering three or
+  more rows), the interaction model, and three corrections to the premises below. **§6 is the
+  sequencing and §3–§4 are separable from BF-79 if the owner wants the screen fixed sooner.**
 - **Added:** 2026-08-31 · owner: *"a review of all the pages/chevrons in the More page and
   reorganize/group things together that can be. It's very messy and not very organized. Some items
   could be changed from sliders to text or buttons etc. All needs to be reviewed."*
@@ -375,14 +385,22 @@ overhead, and it is most of why the screen reads as long and empty at the same t
 
 **⚠ And `Goals` is not like the others.** Every other entry is a chevron to a sub-screen. Goals is an
 **inline accordion** that expands into `Required Information` — weight, body fat, height, biological
-sex — right on the page. So one control on the screen behaves differently from the other six, which
-is the specific inconsistency behind *"messy"*: the user cannot predict whether tapping navigates or
-expands.
+sex — right on the page.
+
+- **⚠ CORRECTED by the plan, 2026-08-31.** *"The user cannot predict whether tapping navigates or
+  expands"* overstates it: `MoreRow` draws `ChevronRight` and `GoalsSection` draws a rotating
+  `ChevronDown`, so the conventional affordance is already there. **The real defect is that
+  `goals-section.tsx` does not USE `MoreRowGroup` — it re-implements it**, hand-writing the same
+  heading and shell classes and putting its own button inside, which is why the two shapes can drift.
+  And **Goals staying inline is a 2026-08-16 OWNER DECISION** (`/more/goals` "was never built and is
+  not going to be"), so it is not a thing to fix by moving. See plan §2 and §4.
 
 - **⚠ Overlaps BF-79 and should be sequenced with it, not against it.** BF-79 gathers the personal
   details into one section; this entry decides where that section *lives* and how it is reached. If
   both are built independently they will disagree about where height and sex belong. **Recommendation:
   BF-79 decides the content, this decides the placement, and they ship in that order or together.**
+- **⚠ The "sliders" question is the OWNER'S and the plan does not decide it** — it proposes no control
+  change at all. See below for why.
 - **On the "sliders" — there are none on this screen, and the real answer is better.** The settings
   sub-screen uses **five `Switch` toggles** (calendar sync, day-review reminders, health alerts, rest
   chip, run chip) and those are correct for booleans. What the owner is reacting to is more likely
