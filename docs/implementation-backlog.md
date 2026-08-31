@@ -3949,6 +3949,23 @@ the day's move-hours total is below the goal.
   tile's type size — **the cue text grew** from one word ("Low") to five ("−7 vs usual"), and the row
   has 20 layout styles. Reaches the phone through a Railway deploy; no new APK.
 
+> **⛔ "Should the tile show HRV instead?" — ASKED AND ANSWERED 2026-08-31. No. Do not re-open.**
+> ([review](reviews/2026-08-31-hrv-as-a-tile-metric.md).) Measured in contributor form, which is the
+> only fair comparison, against the owner's check-in (`perceived_recovery + sleep_quality_feel`;
+> negative r is correct, `provisional` rows excluded):
+>
+> | contributor | r vs check-in |
+> |---|---|
+> | **restingHeartRate** | **−0.491** (n = 40) |
+> | hrvBalance | **−0.331** (n = 39) |
+>
+> **HR wins, and it is not even a choice between two independent signals** — the two contributors
+> correlate **+0.751 with each other (56 % shared variance)**, so swapping loses a third of the
+> correlation and buys almost no new information. HRV is also the noisier vital: **CV 17.2 %** against
+> resting HR's **5.6 %**, night-to-night swing **7.42 ms** on a mean of 55.6 (**13 %**). It is real
+> signal, not noise (lag-1 autocorrelation **+0.439**; noise ratio 0.77 against 1.13 for white noise)
+> — it is simply a weaker single-night reading. **HRV belongs on a detail screen, not on this tile.**
+
 **Pass test, measured against production rather than asserted (71 nights, 2026-08-30):**
 
 | | value |
