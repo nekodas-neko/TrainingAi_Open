@@ -77,6 +77,17 @@ public class MainActivity extends BridgeActivity {
         }
     }
 
+    // Exposed to JS as window.AndroidRenderer — BF-80. The renderer's death is recorded
+    // natively because there is no JS alive to record it at the time; this is how the next boot
+    // collects it and turns it into an `error_events` row. Consuming clears it, so one death is
+    // reported once.
+    private class RendererBridge {
+        @JavascriptInterface
+        public String consumeRenderProcessGone() {
+            return RenderProcessRecovery.consumePending(MainActivity.this);
+        }
+    }
+
     // Exposed to JS as window.AndroidScreen — lets the workout screen keep the
     // display on while a session is active without any Capacitor plugin.
     private class ScreenBridge {
@@ -499,12 +510,17 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(com.trainingai.app.scale.ScaleBlePlugin.class);
         registerPlugin(com.trainingai.app.media.MediaSavePlugin.class);
         super.onCreate(savedInstanceState);
+        // BF-80. Registered before anything else touches the WebView: Capacitor already forwards
+        // `onRenderProcessGone` to its listeners and the default answer is `false`, which the
+        // platform reads as "kill the app". Without a listener there is no recovery at all.
+        getBridge().addWebViewListener(new RenderProcessRecovery(this));
         getBridge().getWebView().addJavascriptInterface(new PipBridge(), "AndroidPip");
         getBridge().getWebView().addJavascriptInterface(new ScreenBridge(), "AndroidScreen");
         getBridge().getWebView().addJavascriptInterface(new MotionBridge(), "AndroidMotion");
         getBridge().getWebView().addJavascriptInterface(new LocationBridge(), "AndroidLocation");
         getBridge().getWebView().addJavascriptInterface(new RestChipBridge(), "AndroidRestChip");
         getBridge().getWebView().addJavascriptInterface(new RunChipBridge(), "AndroidRunChip");
+        getBridge().getWebView().addJavascriptInterface(new RendererBridge(), "AndroidRenderer");
         // Suppress Android's long-press context menu in the WebView so it doesn't
         // send pointercancel and cancel dnd-kit's 300ms drag activation delay.
         getBridge().getWebView().setOnLongClickListener(v -> true);

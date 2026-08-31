@@ -9,6 +9,7 @@ import type { EditableNutrition } from './review-step'
 import { todayInTz } from '@trainingai/shared/date-utils'
 import { cachedFetch, readCacheSync } from '@/lib/sqlite/cache'
 import { TTL_LONG, NUTRITION_FOOD_LOGS_TTL } from '@trainingai/shared/cache-ttl'
+import { NUMBER_INPUT_RESET } from '@/components/ui/input'
 
 interface Props {
   nutrition: EditableNutrition
@@ -118,7 +119,11 @@ export function AssignStep({ nutrition, preselectedMealTypeId, onBack, onConfirm
             min={0.1}
             value={quantity}
             onChange={e => setQuantity(Math.min(100, parseFloat(e.target.value) || 1))}
-            className="w-20 h-11 rounded-xl border bg-background px-3 text-sm tabular-nums text-center"
+            // `!text-sm`, not `text-sm`: `globals.css` sets `input { font-size: 16px !important }`
+            // under 640px to stop iOS zoom, so the plain class was silently doing nothing and the
+            // value rendered 16px beside 14px chips — which is the "differently proportioned" half
+            // of what the owner reported. Same workaround, and same reason, as `quantity-editor`.
+            className={`w-20 h-11 rounded-xl border bg-background px-3 !text-sm tabular-nums text-center ${NUMBER_INPUT_RESET}`}
           />
         </div>
       </div>

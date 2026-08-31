@@ -5204,3 +5204,26 @@ outright would have deleted the Lane B obligations with them.
 
 `projectOverview.md` is a net +9 against +12 added: the status section carried **two** `**Version:**`
 lines, v1.413.2 and a stale v1.406.1 below it, and the second was removed.
+
+## 2026-08-31 — `docs/implementation-backlog.md` 14506 → 14528, `projectOverview.md` 8557 → 8572
+
+`lane-a/renderer-recovery` (BF-80). BF-80's entry traded its "deliberately not batched" paragraph
+for a `Keep:` describing what shipped, so the backlog's growth is Q-220 gaining a measurement: the
+`projectOverview.md` **Current Status** section is a 740-line log of **142 dated blurbs**, which
+none of that entry's three levers touch and which the file's own header tells sessions not to write.
+
+`projectOverview.md` grew by exactly the blurb this session added to that section — i.e. it is an
+instance of what the note above describes, raised rather than hidden. Trimming it is Orchestrator's
+sweep, not a native-fix PR's.
+
+## 2026-09-01 — `docs/implementation-backlog.md` 14528 → 14507 (shrink)
+
+`docs/bf55-owner-decision`. Two independent raises collided in this file and both are now moot. The
+lane sweep (#708) raised it to 14521 for 52 added `Lane:`/`Gate:` fields; `lane-a/renderer-recovery`
+raised it to 14528 the same day. Merging `main` in produced a conflict between those two numbers,
+and neither is the count — the real file after both landed plus BF-55's gate-clearing is **14507**,
+because #708 also struck LB-12 and main has since cleared entries the raises were sized against.
+
+The pattern is worth stating once, since it has now cost two withdrawn raises: **a baseline raise
+computed before a rebase is a guess.** Re-measure after merging `main`, not before, and expect the
+answer to be lower than either side of the conflict.
