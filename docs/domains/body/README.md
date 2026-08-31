@@ -34,6 +34,14 @@ others (energy balance, bodyweight 1RM, readiness) and shouldn't be buried insid
 - [`docs/reviews/2026-08-03-cross-domain-bug-review.md`](../../reviews/2026-08-03-cross-domain-bug-review.md)
   — Q-56 (open, investigation-first, shared with `devices`/`sleep`): real `body_metrics` rows landed
   dated up to 5 days in the future in production; one is still live and wrong as of 2026-08-03.
+- [`docs/overview/entries/2026-08-31-bf-71-clinical-entry.md`](../../overview/entries/2026-08-31-bf-71-clinical-entry.md)
+  — 🆕 **BF-71**: `More → Health → DEXA & RMR results` is where a scan or a metabolic test gets typed
+  in. Both routes had shipped complete and **nothing called either**, so `measured_rmr` and
+  `dexa_scans` were empty in production while every resting rate stayed predicted — a defect no test
+  could fail for, because an empty table is a valid state. Read it before adding a field: only
+  `scannedOn` and `pctFat` are read by anything today (`getBodyFatCalibration` selects exactly those
+  two), the per-region bone rows are deliberately absent, and mass fields echo themselves in kg
+  because the schema's grams bound cannot catch a value entered in the wrong unit.
 - Plans: `ls docs/superpowers/plans/*body*` / `*scale*`.
 
 - Reviews: [`docs/reviews/2026-08-07-full-app-review.md`](../../reviews/2026-08-07-full-app-review.md) — **full-app deep review, 2026-08-07** (saving/caching/performance/logic across all 201 routes and 40 pages; 53 findings queued as Q-117…Q-138, plus root cause for Q-73 and mechanisms for Q-72/Q-107)

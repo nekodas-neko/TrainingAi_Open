@@ -6,27 +6,35 @@
 **Updated:** 2026-08-31 · **By:** the eighteenth Lane B run · **Next ID:** `LB-32`
 
 ## Now
-**Merged: BF-66 (#662, v1.404.2). In #664: BF-65, LB-23, LB-30 (v1.405.1). Nothing has been near a device.**
+**Merged: BF-66 (#662, v1.404.2) and BF-65/LB-23/LB-30/LB-31 (#664, v1.405.1). Open: BF-71 (v1.406.0). Nothing has been near a device.**
 
-**`parseVoice` was a character denylist and is now a tokenizer — never put a strip back.** Its rules:
-a keyword claims the number *before* it; loose numbers fill what is left, weight first; a number
-before `sets` is discarded; **a lone bare number parses to nothing on purpose**. `VOICE_LOG_EXAMPLE`
-is exported and used twice — the error and the button's hint — and two literals is how a hint starts
-promising a phrasing the parser dropped.
+**BF-71: a route with no caller fails no test.** Both clinical routes shipped complete — schema,
+repo reads, a live consumer — and nothing called either, so two tables were empty in production
+while every resting rate stayed predicted. An empty table is a valid state; nothing surfaces it.
+**When an entry says a storage half shipped, grep for a client caller before believing the feature
+exists.** Only `scannedOn` and `pctFat` are read by anything (`getBodyFatCalibration` selects exactly
+those); the 12 per-region bone rows are deliberately absent, being 36 typed fields nothing reads.
 
-**`useExerciseMedia` is now the ONLY fetch of `/api/exercise-gif`** — it replaced four hand-rolled
-copies rather than becoming a fifth. **The shared `exercise-media:<name>` key is the feature, not
-plumbing:** the warm-up screen fetches the whole session then unmounts, so the ready screen paints
-from its cache. `unoptimized` on a `.gif` fails **silently** — the picture appears, looks right, and
-never moves.
+**When Lane B work wants a Lane A file, check whether it actually needs one.** BF-71 wanted an
+invalidation group (`lib/cache-groups.ts`) and a TTL constant (`packages/shared/**`). Neither key
+needs invalidating: `cachedFetch` always revalidates, neither passes `freshWithinTtl`, neither is
+seed-only — so both are first-paint accelerators and clearing one buys a blank paint.
 
-**The sandbox cannot render any exercise clip** — the dataset is on `raw.githubusercontent.com`,
-which the egress proxy drops, so clips are blank boxes **including the warm-up screen's own,
-untouched for months**. That is how it was pinned to the environment, not the new component (CSP was
-ruled out). Verify with same-origin substitutes in `exercise_gif_cache`, asserting `naturalWidth > 0`.
+**`parseVoice` is a tokenizer, never a character denylist again** — a keyword claims the number
+before it, loose numbers fill what is left weight-first, a lone bare number parses to nothing on
+purpose. **`useExerciseMedia` is the ONLY fetch of `/api/exercise-gif`** (it replaced four copies);
+its shared `exercise-media:<name>` key is what makes the ready screen instant, and `unoptimized` on
+a `.gif` fails **silently** — the picture appears, looks right, never moves.
+
+**The sandbox cannot render any exercise clip**: the dataset is on `raw.githubusercontent.com`, which
+the egress proxy drops, so clips are blank **including the warm-up screen's own, untouched for
+months** — that is how it was pinned to the environment rather than the component. Verify with
+same-origin substitutes asserting `naturalWidth > 0`.
 
 **Start from `node scripts/next-item.js --lane B`, never a hand-scan — re-run after every merge.**
-Next: the `nutrition-ui-uplift` residue, **BF-52** (planning), **Q-407**, **LB-12**; then Lane A.
+Next: **BF-52** (planning), **Q-407**, **LB-12**, and the `nutrition-ui-uplift` residue — all of
+which are nutrition/body UI in the area whose device pass is still outstanding, so expect to ship
+them unverified or wait for the owner.
 
 **Three things are blocked on the owner, each with a written recommendation. Do not decide them
 yourself and do not build past them:**
@@ -39,19 +47,15 @@ yourself and do not build past them:**
 - **The device pass.**
 
 ## The finding that should change how you start
-**A test suite can be complete and incapable of failing.** `voice-log-parse.test.ts` had seven passing
-cases against a parser that dropped the most natural phrasing in the app: every case was adjacent
-numbers or an explicit keyword, so **the gap was untested by construction** and the file did not look
-thin. The same day, a spec asserting a clip's `src` passed against a picture that never loaded. Ask
-what your tests are true of, and whether an input a user would produce — or a pixel they would see —
-falls outside it.
+**A test suite can be complete and incapable of failing.** Seven passing `parseVoice` cases were all
+adjacent numbers or explicit keywords, so the app's most natural phrasing was **untested by
+construction** and the file did not look thin; a spec asserting a clip's `src` passed against a
+picture that never loaded; and BF-71's caller guard matched `/api/dexa-scans-DISABLED`. Ask what your
+tests are true of — and **mutate them**, because none of those three showed up by reading.
 
 ## Do not re-litigate
 - **`stableBox`/`tapCentre` (`e2e/fixtures.ts`) before any coordinate dispatch OR geometry assertion** — neither `touchscreen.tap` nor `Input.dispatchTouchEvent` checks actionability. CI proved it on `food-log-swipe-delete:175` after it passed 3/3 locally: **a local pass is not evidence against this race.** The 21 taps inside a `toPass` retry re-measure and are already safe.
-- **`useExerciseMedia` is the only `/api/exercise-gif` fetch**; `unoptimized` is mandatory on a `.gif`. Both held by `lib/hooks/__tests__/use-exercise-media.test.ts`.
-- **`parseVoice` is a tokenizer, not a strip** — never re-add a character denylist to it. A denylist
-  keeps whichever letters happen to spell the keywords, which is a rule no user can derive and no
-  test would notice; the tokenizer's whole point is that a new filler word costs nothing.
+- Both of the above are held by tests (`use-exercise-media.test.ts`, `voice-log-parse.test.ts`).
 - **`lib/coach/**`, `packages/shared/**`, `app/api/**`, `lib/data/**` are Lane A** whatever the edit
   looks like — the **path**, not the nature of the edit. `lib/health/readiness-payload.ts` counts.
   `scripts/**` is not answered by the rule; record the claim if you take one.
@@ -81,13 +85,10 @@ falls outside it.
 **Nothing from the last five runs is device-verified.** [`device-verification-queue.md`](../../device-verification-queue.md)
 groups by screen — work a section, not an entry.
 
-**This run adds W4 and W5, both workout presses.** Mid-set say `60 for 6`, `60 kg for 6`, `60 times 6`, `60 by 6`,
-`60 x 6` — all five must give 60 kg × 6 — then something unparseable, which must offer an example.
-**W5:** each ready screen's clip is **moving**, exercise 2's is its own, and it plays in airplane
-mode. Nothing animated has been rendered anywhere in this work.
-
-**The previous run's nutrition pass is still owed** — the queue's whole **Nutrition** section, best
-done in one sitting. It is enumerated there, per screen; a second copy here is one that drifts.
+**W4/W5 (voice logging, exercise clips) and now BF-71's form are all enumerated in that queue** —
+per screen, which is where they stay. **Nothing animated has been rendered anywhere in this work**,
+and BF-71's `<input type="date">` and decimal keypads have never been on the phone. The previous
+run's whole **Nutrition** section is still owed, best done in one sitting.
 
 Carried: Q-467, Q-499, Q-538, Q-305 at S25 width, Q-477 across local midnight, BF-10, LB-5, Q-328/Q-321/Q-486, Q-389, a TalkBack pass, Q-450/Q-418 (Polar H10). **Q-315 needs a DESKTOP.**
 
@@ -118,8 +119,7 @@ None held.
   settle; `toBeInViewport()` does not). Also **centre a row** (its natural spot is under the tab bar),
   **hide the dev overlay**, **scope assertions to the sheet** (three mounted layers say "Protein"),
   and **`getByText` matches SUBSTRINGS**.
-- **`deleteFoodLog` writes a tombstone** — a count ignoring `deleted_at IS NULL` *passes* on a
-  broken delete.
+- **`deleteFoodLog` writes a tombstone** — a count ignoring `deleted_at IS NULL` *passes* on a broken delete.
 - **`SegmentedTabs` renders `role="tab"`**, takes `orientation="vertical"`, and the 48 dp floor is
   per segment — a stacked toggle is 96 px and its neighbour must match.
 - **Never merge `main` or edit the tree while a local e2e run is live** — the tell is
