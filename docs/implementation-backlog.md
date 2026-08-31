@@ -1771,6 +1771,52 @@ controls side by side, one wired to the engine and one not.
   `Deload` → it does not. Then the reverse case, a **full** prescription with `Deload` picked, still
   behaves as Q-109/Q-175 built it — that path works today and must not regress.
 
+### [nutrition] BF-72 — the diary's own hydration wipes the meal grouping it just drew
+
+- **Lane:** B — `app/nutrition/use-food-logs-loader.ts:104`.
+- **Batch:** `nutrition-ui-uplift`
+- **Added:** 2026-08-31 · owner: *"when I add my saved meal it starts as the meal with the image,
+  then breaks into its ingredients."* That sequence is the whole diagnosis — the optimistic write is
+  right and something after it is wrong.
+
+**One line. `applyDelta`'s `foodLogs` payload omits `savedMealId` and `mealGroupId`:**
+
+```ts
+foodLogs: server.map(l => ({
+  id: l.id, date: today, mealTypeId: l.mealTypeId, foodItemId: l.foodItemId,
+  quantityMultiplier: l.quantityMultiplier, loggedAt: …,
+  updatedAt: nowIso, deletedAt: null, syncStatus: 'synced' as const,
+})),
+```
+
+CLAUDE.md's rule is that **a local upsert overwrites all columns by default**, and
+`sqlite-backend.ts:2036` writes `record.savedMealId ?? null, record.mealGroupId ?? null` — so an
+omitted field is written as NULL. The very next line re-reads
+`store.getFoodLogsWithItems(today)` and renders it. The screen strips its own grouping and then
+draws the stripped copy.
+
+**Confirmed against production, so no part of this is inferred.** Today's `food_logs` hold
+**11 rows carrying both ids**, resolving to six real meals — `Cruskit + PB` (2 rows) and
+`Protein Shake` (3) are exactly the five loose rows in the owner's breakfast screenshot. The server
+is correct; the device clobbers its own copy.
+
+- **Fix:** carry both fields in that payload. The sibling paths already do —
+  `log-meal.ts`'s local upsert, the outbox payload and the `pushMutations` branch all pass them, and
+  the local read at `sqlite-backend.ts:2235` selects them. This one site was missed.
+- **⚠ Sweep every other `applyDelta`/hydrate payload in the same PR.** This is a screen-level
+  hydration that predates the columns; BF-39's chain audit covered the sync engine and not this. Any
+  other place that rebuilds a local row from a server response has the same exposure — a partial
+  object silently nulls what it omits.
+- **⚠ Second, smaller finding at the same line: `syncStatus: 'synced'`** is stamped on every row,
+  including one whose own mutation may still be in the outbox. `applyDelta` gates on
+  `sync_status === 'synced'` before overwriting precisely so a pull cannot revert a pending local
+  edit; stamping it here from a screen-level hydrate hands that guard a value it did not earn.
+  Worth a look, not necessarily a change — but decide it rather than inherit it.
+- **Verification:** log a saved meal, wait for the refetch, and it stays one row with its name and
+  photo — the owner's report is the test. Then reload the tab: still grouped, because the local copy
+  kept its ids. Production already shows the rows are correct, so a failure after this fix is a
+  render bug, not a data one.
+
 ### [nutrition] BF-70 — the barcode scan fetches the product image and three layers throw it away
 
 - **Lane:** A — `packages/shared/src/nutrition/log-food.ts` and the `NewFoodEntry` contract; the
@@ -1792,9 +1838,19 @@ too — `/api/nutrition/food-items` accepts `imageDataUri` and validates it agai
 2. **`NewFoodEntry`** (`packages/shared/src/nutrition/log-food.ts`) has no `imageDataUri` either, so
    `handleConfirm` could not pass one even if the form held it.
 3. **`log-food.ts:214` writes `imageDataUri: null` literally** into the local food item.
+4. **`create-food-item.ts:68` looks like the fix and is inert.** It reads
+   `imageDataUri: s.imageDataUri ?? null` — but `s` is the return of
+   `sanitiseNutrition({ calories, proteinG, carbsG, fatG, servingSizeG, fiberG, sugarG, sodiumMg,
+   satFatG })`, whose `RawNutrition` type is numeric-only. **`s.imageDataUri` is always
+   `undefined`**, so that line is always `null`, and `NewFoodItem` has no image field for a caller to
+   supply one. Its comment — *"Present when the scan came from a barcode/search lookup whose Open
+   Food Facts product carried a thumbnail"* — asserts the opposite of what the code can do, and is
+   the reason nobody has caught this: the file reads as the place BF-35 route 1 was implemented.
 
 So this is a **contract gap along one chain**, not a bug in one place — fixing any single layer
-changes nothing, which is the thing to know before starting.
+changes nothing, which is the thing to know before starting. Site 4 is the one to fix first: it is
+the shared creator, and giving `NewFoodItem` the field is what lets the other three carry a value
+worth passing.
 
 **⚠ Second finding in the same line, and it explains a measurement BF-38 already published.**
 `handleConfirm` sets `source: scanResult?.confidence ? 'ai' : 'manual'`. A barcode scan **has** a
@@ -2332,11 +2388,18 @@ back resolving to the tab that owns the destination instead of unwinding to the 
 ### [nutrition] BF-35 — fill the food placeholder: two of the three sources are already free
 
 - **Lane:** A for the storage + the OFF field; B for the render.
+- **⚠ CORRECTED 2026-08-31 — "stored and unseen" was wrong; nothing is stored.** The engine half
+  below did ship, and the barcode route does fetch the thumbnail, but **BF-70 traced four layers
+  between the fetch and the column that each discard it** — including `create-food-item.ts:68`, whose
+  comment claims to carry it and structurally cannot. So the render owed at (1) would display
+  nothing today. **BF-70 is the prerequisite for this entry's route-1 half**, and it is where that
+  work now lives; do not build the render first.
 - **Keep:** the ENGINE half of routes 1 and 2 shipped 2026-08-26 (migrations 227 + 228, local SQLite
   v30) — `food_items.image_data_uri`, `FOOD_ITEM_IMAGE_MAX_BYTES`, the whole offline chain (delta
   select, pull mapping, local upsert, outbox payload, both write paths), and the barcode route
   fetching the Open Food Facts thumbnail. **Three things are still owed:**
-  1. **The render (Lane B)** — nothing displays the column yet, so the images are stored and unseen.
+  1. **The render (Lane B)** — nothing displays the column. **Blocked by BF-70** (see the correction
+     above): the column is empty, so a render alone shows the same placeholder.
   2. **Route 2's client half (Lane B)** — `capture-actions.tsx` must emit a second 128 px downscale
      beside the 1024 px scan image. The server accepts and stores one already; it is inert until
      that lands. See constraint (b) above for why the scan image itself cannot be kept as-is.
