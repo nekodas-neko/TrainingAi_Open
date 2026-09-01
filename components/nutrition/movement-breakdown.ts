@@ -9,23 +9,10 @@
  * reason, so the reason had to be asked for.
  */
 
-/**
- * The step threshold, **mirrored** from `STEP_BASELINE` in
- * `packages/shared/src/health/daily-energy.ts` rather than imported — and that is a deliberate
- * exception to the one-formula rule, not an oversight.
- *
- * Importing it pulls `daily-energy` → `workout-energy` → `lib/oura-models/constants`, which reads
- * `node:fs/promises`. No client component has ever imported `daily-energy`; the first one to try
- * (this file) took the whole Nutrition tab to a 500 with *"the chunking context does not support
- * external modules"*. The value is needed for **display copy**, so paying a server-only dependency
- * to render a number is the wrong trade.
- *
- * **It cannot drift.** `__tests__/movement-breakdown.test.ts` imports the shared constant — tests
- * run in node, where the chain is harmless — and fails if the two disagree. **LB-43** proposes
- * splitting the constant into a leaf module so this mirror can be deleted; that is Lane A's, since
- * it edits `packages/shared/**`.
- */
-export const STEP_BASELINE = 3_000
+// LB-43: the mirror is gone. `STEP_BASELINE` now comes from the dependency-free leaf module, so
+// this is the shared constant rather than a copy of it — and `energy-baseline` reaches no node
+// builtin, which is what makes it importable from a client component at all.
+export { STEP_BASELINE } from '@trainingai/shared/health/energy-baseline'
 
 export interface MovementParts {
   workoutKcal: number

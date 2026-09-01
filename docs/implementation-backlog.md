@@ -608,6 +608,22 @@ currently earn nothing from stepping at all; mean 5,716, median bucket 2–4k.
 
 ### [platform][nutrition] LB-43 — a client component cannot import `daily-energy`, so a display constant is mirrored
 
+- **✅ FIXED 2026-09-01. The mirror is gone and `/nutrition` returns 200.** `STEP_BASELINE`,
+  `WALKING_CADENCE_SPM` and `STEPS_PER_KM` now live beside `SEDENTARY_MULTIPLIER` in the leaf
+  module; `daily-energy.ts` re-exports all four, so every server-side importer is untouched.
+- **⚑ The entry's file name was wrong, and the reason matters: THE LEAF MODULE ALREADY EXISTED.**
+  It proposed *"something like `packages/shared/src/health/energy-constants.ts`"* —
+  `energy-baseline.ts` already was that module, created for the **identical failure one node
+  builtin earlier** (Q-401: the same chain reaching `node:path`, breaking the same tab, through
+  `goal-recommendation` → `calorie-balance` → `calorie-zone-bar`). Adding a second leaf module for
+  one purpose is the drift the one-formula rule is about, so the constants moved into the existing
+  one and its doc now carries both incidents. **The lesson is in the module, not just here: this
+  chain has now broken the Nutrition tab twice, with a different builtin each time.**
+- **⚠ The drift test that guarded the mirror is now tautological, and was replaced rather than
+  kept.** `expect(STEP_BASELINE).toBe(SHARED_STEP_BASELINE)` cannot fail once one re-exports the
+  other, and a test that cannot fail is worse than none. What replaced it is the invariant nothing
+  else checks: **`energy-baseline.ts` imports nothing at all** — no `import`, no `require`. That is
+  the only thing keeping it client-importable, and `tsc` would say nothing if it changed.
 - **Lane:** A — the fix edits `packages/shared/**`. Lane B can only mirror the value, which is what
   BF-87 did.
 - **Added:** 2026-09-01 · found by BF-87, which needed `STEP_BASELINE` for **copy** and took the

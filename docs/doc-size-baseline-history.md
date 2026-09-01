@@ -5513,6 +5513,14 @@ would leave 30 on the old producer and make the column's provenance harder to re
 easier. BF-84's *fact or hint* was asked too and turned out to be **already answered** in a PR that
 merged while this branch was open — the answer matched, and nothing needed changing.
 
+## 2026-09-01 — `docs/implementation-backlog.md` → 15013, `projectOverview.md` → 8668 (LB-43)
+
+The backlog growth is LB-43 recording the two things its own text could not have known: the leaf
+module it proposed creating **already existed** (`energy-baseline.ts`, built for the identical
+failure one node builtin earlier), and the drift test guarding the mirror became **tautological**
+once the mirror was deleted, so it was replaced rather than kept. Both belong on the entry: the
+first stops the next reader creating the duplicate file, the second explains why a test changed
+shape in a PR that was supposed to only move constants.
 
 ## 2026-09-01 — `docs/implementation-backlog.md` 14977 → 14986 (BF-88 approved: gate cleared, order swapped, dependency inverted)
 
@@ -5598,7 +5606,7 @@ the field rather than hide it, or a cold cache plus a dead network silently repr
 That reasoning is what a future session needs and what a one-line "fixed the password field" would
 lose.
 
-## 2026-09-01 — `projectOverview.md` → 8678, `docs/implementation-backlog.md` → 15075 (LB-41, LB-29)
+## 2026-09-01 — `projectOverview.md` → 8690, `docs/implementation-backlog.md` → 15091 (LB-41, LB-29)
 
 Two shipped fixes recorded; **the backlog shrank**, since both entries were removed and nothing new
 was filed. The status block is 11 lines for two entries because the interesting half of LB-29 is not
