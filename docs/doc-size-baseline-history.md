@@ -5913,3 +5913,12 @@ session hit.
 
 Ratcheted down rather than left at 208: a baseline above the file's real length is headroom for
 silent growth, which is the thing these numbers exist to stop.
+
+## 2026-09-01 — `docs/implementation-backlog.md` → 14922 (BF-69 planned)
+
+Eight lines replacing three. The growth is one measurement and its consequence, and neither
+compresses: production holds **two supplements, one log ever, no amounts, and no retatrutide row**,
+so BF-69's own framing — *"the storage is done, there is no reader"* — is right about the reader and
+understates the rest. The line that has to survive is the one that reorders the work: the trends
+overlay is gated on **data**, not effort, and building it first would render a chart of one point
+where a broken query and an empty one look identical.
