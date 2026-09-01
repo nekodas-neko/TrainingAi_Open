@@ -6838,13 +6838,65 @@ screenshot is a **1:39** walk with the screen on, which exercises none of it.
 - **Verification.** HR live on-device with the strap paired, and the stale guard exercised by walking
   out of range. The notification half is **APK-only** and cannot be checked in `pnpm dev` at all.
 
+### [cardio][devices] LA-52 — the walk pacer's speed rung reads the WHOLE-WALK average, so it cannot track effort
+
+- **Lane:** B — `lib/stores/guided-walk-store.ts` is Lane B's. Filed by Lane A while scoping LA-48;
+  the letter records who found it, not who ships it.
+- **Added:** 2026-09-01 · Lane A, from reading the pacer's inputs rather than from a report.
+- **Measured, not inferred.** `appendPoint` sets
+  `currentPaceSecPerKm: computeAvgPaceSecPerKm(distanceKm, elapsedSec)` with **cumulative** distance
+  and **cumulative** elapsed since `startedAtMs`, and `computeAvgPaceSecPerKm` is
+  `durationSec / distanceKm`. `walk-active.tsx` then feeds `kmhFromPace(currentPaceSecPerKm)`
+  straight into `readPacer` as `speedKmh`. So the speed rung's input is the **average speed of the
+  whole walk so far**, not the speed now.
+- **Three consequences, in order of how visible they are:**
+  1. **The band cannot respond within a segment.** Twenty minutes in, a 30-second surge or slow-down
+     moves a cumulative mean by almost nothing — so `Q-410`'s *"go green → amber → red as you slow
+     down"* cannot happen on this rung, whatever `BAND_TOLERANCE` is set to.
+  2. **`STOPPED_KMH` is effectively dead on this rung.** Reading `stopped` needs the whole-walk
+     average below **1.5 km/h**; after a few minutes of walking, standing still cannot get it there.
+     The constant exists for the crossing case (LB-36 check 3) and cannot fire.
+  3. **Warmup, fast and slow all band against the same slowly-drifting number**, so the fast/slow
+     distinction the plan is built on is invisible to the speed rung.
+- **⚠ The e2e passes and is not wrong.** `e2e/walk-pacer-speed-rung.spec.ts` asserts the readout
+  appears, the fallback note names the rung, and a thin history drops the rung — none of which needs
+  the band to *respond*. It also drives a short series, and early in a walk a cumulative mean is
+  still responsive. A test that never changes effort mid-walk cannot see this.
+- **The fix is a windowed speed, and it is a store change.** Derive from the last N seconds of
+  `rawPoints` (the same `haversineDistanceKm` already there) rather than from the cumulative totals,
+  and keep the cumulative figure for the summary, which genuinely wants an average. **Do not "fix" it
+  by widening `BAND_TOLERANCE`** — that treats an inert signal as a noisy one and would make the
+  cadence rung worse in the same move.
+- **Verification:** on a real walk, slow deliberately mid-segment and watch the band move within
+  ~10 s; stop at a crossing and read **Stopped**. Both are already LB-36's device checks — this entry
+  is why two of them would fail today.
+
 ### [cardio][devices] LA-48 — a walk's pacer creates an adherence number and nothing stores it
 
 - **Branch:** none yet
 - **Added:** 2026-08-31 · Lane B, splitting the storage half out of Q-410 when the surface half shipped
-- **Lane:** A — `activity_logs.segments` is a schema edit (`lib/data/postgres/schema.ts`), and per the
-  offline-sync rule the local SQLite mirror, the outbox payload, `getSyncDelta` and `applyDelta` all
-  move in the same PR. Nothing here is reachable from Lane B.
+- **Lane:** A
+- **Needs:** LA-52
+- **⚠ SCOPE CORRECTED 2026-09-01 by Lane A, from reading the code rather than the entry.** Two of the
+  three claims below moved:
+  - **There is NO migration and NO local schema version.** `activity_logs.segments` is `jsonb` on the
+    server (`$type<>` is a TypeScript annotation) and `TEXT` locally, so nothing is a column edit.
+    What must move together is the **type in four places** — `WalkSegmentStat`
+    (`lib/walk/segment-stats.ts`), the `$type<>` in `schema.ts`, `LocalActivityLog`
+    (`lib/local-store/types.ts`), and **`WalkSegmentStatSchema`
+    (`packages/shared/src/validation/activity-log.ts`)**. That last one is the trap: Zod **strips**
+    unknown keys by default, so a field added everywhere except the wire schema is silently dropped
+    on both write paths with no error — the same silent-loss shape that dead-lettered every guided
+    walk in 2026-08-02, in reverse.
+  - **The adherence roll-up needs no Lane B producer.** `readPacer` is pure and every input is
+    already reconstructible from what `computeWalkSegmentStats` receives — cadence from
+    `cadenceSeries`, hr from `hrSamples`, and speed from `rawPoints` via the *same* cumulative
+    formula the live store uses, so a post-hoc reconstruction matches what the walker saw exactly.
+  - **Which is precisely why this now `Needs: LA-52`.** It matches what the walker saw, and what the
+    walker saw on the speed rung is a whole-walk average. Storing adherence computed from that would
+    bake the defect into the archive as an analysis variable — the class BF-59 exists about. **Ship
+    `steps` first if this is split; it is a clean derivation from `cadenceSeries` and depends on
+    nothing.**
 - **Why this exists separately.** Q-410's surface half shipped 2026-08-31: `lib/walk/walk-pacer.ts`
   now decides, once a second, which signal is pacing a segment and which band the walker is in. That
   is a *new* measurement — it did not exist before, so nothing records it — and the owner's ask was
