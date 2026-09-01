@@ -285,7 +285,11 @@ export function GoalsSection({ user, onUserSaved }: GoalsSectionProps) {
 
   return (
     <div>
-      <p className="px-1 pb-1.5 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Goals</p>
+      {/* BF-82 §4. This used to carry a `MoreRowGroup`-shaped uppercase heading above the card,
+          copied from the primitive rather than imported — which made an inline disclosure look
+          like the navigation rows below it. The card keeps its own "Goals" title inside the
+          button, the way StatsGrid and TrophyCase title themselves, so nothing is lost. The
+          bordered shell stays: without it Goals is a bare button among cards. */}
       <div className="rounded-2xl bg-muted/40 border border-border overflow-hidden">
         <button
           type="button"

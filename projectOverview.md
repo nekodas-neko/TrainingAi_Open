@@ -24,8 +24,24 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.418.3 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Version:** v1.419.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-09-01.
+
+**The More page is two groups, not nine (BF-82).** Owner: *"a review of all the pages/chevrons in
+the More page and reorganize/group things together that can be. It’s very messy and not very
+organized."* `MoreRowGroup` is an uppercase heading plus a bordered container, and **nine of them
+wrapped exactly one row** — seven on the tab, one on the Settings sub-screen, and one hand-written
+copy in `feedback-section.tsx`; `goals-section.tsx` was a tenth copy, which is what made an inline
+disclosure look like the navigating rows below it. Now: `Your setup` and `App`, each covering three
+or four rows; `label` is optional on the primitive so one row can be a plain card; Report an Issue
+moved to the bottom actions where the other sheet-openers are; Goals presents as a card like
+`StatsGrid` and `TrophyCase` above it, with its disclosure untouched.
+`more-row-group-arity.test.ts` fails a labelled group under two rows and was mutation-verified.
+**Destination parity was clicked, not read** — all seven rows still land where they did, admin and
+non-admin. **Not device-verified**, and the bottom actions row moved, so the clearance under Sign Out
+is unseen; BF-82 stays queued on `Verify: device` and on the owner’s *"sliders"* question, which is a
+decision the plan deliberately does not make — there are no sliders on the screen
+([journal](docs/overview/entries/2026-09-01-feat-bf-82-more-page-grouping.md)).
 
 **The Home pill that "moved" had not moved, and a swipe marker nothing read (BF-96, BF-95).** Owner:
 *"I dont like how the temperature/uV pill sits. can we go back to the old way when it was side by

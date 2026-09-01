@@ -179,12 +179,14 @@ export function SettingsPanel() {
   )
 }
 
-/** Developer is a separate group rather than a fourth row in the card above: it is admin-only, so
- *  folding it into the same container would leave a visibly short card for everyone else. */
+/** Developer is a separate card rather than a fourth row in the block above: it is admin-only, so
+ *  folding it into the same container would leave a visibly short card for everyone else. It
+ *  carries no heading (BF-82) — "DEVELOPER" over one row was the same single-row-group shape the
+ *  More tab had seven of, and the row already says what it is. */
 export function DeveloperSettingsGroup() {
   const router = useTransitionRouter()
   return (
-    <MoreRowGroup label="Developer">
+    <MoreRowGroup>
       <MoreRow
         icon={Terminal}
         label="Device consoles &amp; diagnostics"
