@@ -27,6 +27,18 @@
 **Version:** v1.417.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-09-01.
 
+**The prune that was working, and the retraction that matters more than the entry (BF-93).** A
+session reported `error_events` never prunes — no `DELETE`, no cron, no trigger — and wrote that
+into CLAUDE.md, the file every session reads first. The `DELETE` is in `insertErrorEvent` and has
+been there since the initial public snapshot. **The evidence for the finding was the prune working:**
+it fires from a write path, not a scheduler, so it runs only when a fault is recorded, and faults are
+now rare — measured, last write **2026-08-30**, oldest row **2026-07-31**, span exactly **30 days**,
+the cutoff computed from the last write to the day. Reading the age against *today* instead is the
+whole mistake. CLAUDE.md is retracted, `export-map.ts` was right and is untouched, and a behavioural
+test now pins it because **a grep is what failed the first time**. Owner confirmed: leave the prune,
+skip the message truncation — under a working prune those rows age out on their own
+([journal](docs/overview/entries/2026-09-01-error-events-prune-refuted.md)).
+
 **A chosen rest day is a fact now, not a `localStorage` key (BF-84, engine half).** The route it
 posted to persisted nothing — its own comment said rest is inferred from gaps in workout history —
 so the choice never reached the server, the second device never saw it, it died on a reinstall, and

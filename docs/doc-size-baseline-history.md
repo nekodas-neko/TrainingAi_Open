@@ -5714,3 +5714,20 @@ drew. The file computes `entries` twelve lines earlier and its own comment state
 single row already states its own macros, so a footer would repeat it"* — applied to the collapsed
 branch and never to this one. The entry works the condition through all four cases so the fix can be
 checked rather than trusted.
+
+## 2026-09-01 — `docs/agents/state/bugfix.md` 251 → 269 (two traps that each produced a false finding tonight)
+
+Both are this role's own errors from this session, and one of them reached the file every agent reads
+before anything else, so they go in the traps list rather than a journal entry.
+
+**`grep … | head -N` cannot establish an absence.** It produced *"there is no Sentry"* (five
+substring matches inside `MuscleSetsEntry`; `package.json` was below the cut) and then, an hour later
+and unlearned, *"`error_events` never prunes"* (`head -5` showed two unrelated `prune` functions
+while `adapter.ts:5093` holds the `DELETE`). The second was written into CLAUDE.md and Lane A had to
+retract it in #737. The rule is stated as a hard never, with both instances named, because the first
+one clearly was not enough.
+
+**A write-triggered retention window is measured from the last write, not from `now()`.** The same
+finding's second error, independent of the grep: 32 days against today looked like a broken 30-day
+prune; against the last write it is exactly 30. What looked like the failure was the mechanism
+working.
