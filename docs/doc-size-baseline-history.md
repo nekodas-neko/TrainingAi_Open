@@ -5793,7 +5793,7 @@ a lead not a result**, and specifically noted as the *reverse* of the density hy
 days earlier — the two use different quantities, and conflating them is exactly how that refutation
 gets mis-cited.
 
-## 2026-09-01 — `projectOverview.md` → 8798, `docs/implementation-backlog.md` → 15284 (BF-86)
+## 2026-09-01 — `projectOverview.md` → 8810, `docs/implementation-backlog.md` → 15176 (BF-86)
 
 One shipped fix, and the backlog entry shrank rather than grew — BF-86's queue text became a `Keep:`
 plus the new `Verify: device`, since what remains is a look on the phone rather than work. The

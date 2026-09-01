@@ -22,8 +22,8 @@ import { estSessionKcal, estWorkoutKcal, MAX_PLAUSIBLE_SESSION_MIN, type Intensi
 //
 // LB-43: three of them used to be declared here, which made `STEP_BASELINE` unreachable from a
 // client component — BF-87 took the Nutrition tab to a 500 importing it for a line of copy.
-export { SEDENTARY_MULTIPLIER, STEP_BASELINE, WALKING_CADENCE_SPM, STEPS_PER_KM } from './energy-baseline'
-import { STEP_BASELINE, WALKING_CADENCE_SPM, STEPS_PER_KM } from './energy-baseline'
+export { SEDENTARY_MULTIPLIER, STEP_BASE_CREDIT, WALKING_CADENCE_SPM, STEPS_PER_KM } from './energy-baseline'
+import { WALKING_CADENCE_SPM, STEPS_PER_KM } from './energy-baseline'
 
 
 // App activityType string → Oura MET-table id (`energy-expenditure-features.json` activity_type_dict).
@@ -89,6 +89,29 @@ export interface ActiveEnergyResult {
   workoutKcalBySession: { id: string; kcal: number; source: 'hr' | 'met' }[]
 }
 
+/**
+ * The kcal a given step count is worth for this profile — the one place steps become calories.
+ *
+ * Exported because `energy-balance-service.ts` needs exactly this to credit `STEP_BASE_CREDIT` out
+ * of the formula resting base, and computing it there with its own MET call would be a second
+ * implementation of the same conversion. **The figure is per user, never a constant:** ~102 kcal for
+ * an 82 kg 33-year-old male, materially different for anyone else, and hardcoding it mis-bases every
+ * other account.
+ *
+ * Returns 0 on an incomplete profile, matching `computeActiveEnergy` — a base that cannot compute
+ * its credit must fall back to the un-credited number rather than to a wrong one.
+ */
+export function stepEnergyKcal(profile: EnergyProfile, steps: number): number {
+  const { ageYears, weightKg, sex } = profile
+  if (ageYears == null || weightKg == null || sex == null || steps <= 0) return 0
+  return Math.round(
+    estWorkoutKcal({
+      durationMin: steps / WALKING_CADENCE_SPM,
+      ageYears, weightKg, sex, activityId: 14, intensity: 'moderate',
+    }) ?? 0,
+  )
+}
+
 /** Duration (min) for a logged activity: use the recorded duration, else estimate from distance. */
 function activityDurationMin(a: { activityType: string; durationMin?: number | null; distanceKm?: number | null }): number | null {
   if (a.durationMin != null && a.durationMin > 0) return Math.min(a.durationMin, MAX_PLAUSIBLE_SESSION_MIN)
@@ -152,14 +175,24 @@ export function computeActiveEnergy(input: ActiveEnergyInput): ActiveEnergyResul
     if (dur != null && dur > 0) activityKcal += est(ouraIdForActivityType(a.activityType), dur)
   }
 
-  // Passive steps — above the sedentary baseline, minus steps already inside logged outdoor activities.
+  // Passive steps — from the FIRST step, minus steps already inside logged outdoor activities.
+  //
+  // BF-88: there used to be a `- STEP_BASELINE` here, so the first 3,000 steps of every day earned
+  // nothing. The threshold is gone and its energy is credited out of the resting base instead
+  // (`STEP_BASE_CREDIT`, applied in `energy-balance-service.ts` on the formula path only). At
+  // exactly 3,000 steps the two are equal and the day's total is unchanged; below it the day no
+  // longer gets paid for incidental walking that did not happen.
+  //
+  // **The subtraction moved rather than vanished.** Removing it here without the base credit
+  // over-counts every day by ~102 kcal, which is the failure mode to watch for if one half of this
+  // pair is ever reverted alone.
   let stepsKcal = 0
   const ped = input.pedometerSteps ?? 0
   if (ped > 0) {
     const loggedOutdoorSteps = input.activities
       .filter(a => PEDOMETER_ACTIVITY_TYPES.has(a.activityType.toLowerCase()) && a.distanceKm != null && a.distanceKm > 0)
       .reduce((sum, a) => sum + a.distanceKm! * STEPS_PER_KM, 0)
-    const netSteps = Math.max(0, ped - STEP_BASELINE - loggedOutdoorSteps)
+    const netSteps = Math.max(0, ped - loggedOutdoorSteps)
     if (netSteps > 0) stepsKcal = est(14, netSteps / WALKING_CADENCE_SPM)
   }
 

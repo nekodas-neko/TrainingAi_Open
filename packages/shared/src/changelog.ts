@@ -6,10 +6,20 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: "1.417.1",
+    version: "1.418.1",
     date: "2026-09-01",
     changes: [
       "Opening the app in the morning gives you the check-in again. If you left it open overnight it just resumed and never noticed the date had changed, so the prompt \u2014 and yesterday\u0027s ticks \u2014 stayed as they were. It now catches up the moment you look at it, with no restart and no loading screen.",
+    ],
+  },
+  {
+    version: "1.418.0",
+    date: "2026-09-01",
+    changes: [
+      "Every step counts towards calories burned now, from the first one. The first 3,000 used to earn nothing \u2014 the resting figure already assumed a desk day\u0027s walking \u2014 so instead of skipping those steps, that walking is taken out of the resting figure and the steps are counted properly.",
+      "A day at about 3,000 steps burns exactly what it did before; this changes how the number is split between resting and moving, not the total. A day with almost no walking now reads lower, which is the point \u2014 you were being credited for walking that did not happen.",
+      "Your calorie target is unchanged. Only the burn breakdown moved.",
+      "The screens no longer mention a 3,000-step threshold, because there is not one any more.",
     ],
   },
   {

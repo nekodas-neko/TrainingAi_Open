@@ -24,7 +24,7 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.417.1 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Version:** v1.418.1 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-09-01.
 
 **The app notices the day changed on resume, without restarting (BF-86).** Owner: *"when I open the
@@ -50,6 +50,18 @@ and its tests stay, and its doc comment now carries the `CREATE INDEX` the resto
 **The entry falsified its own rule and that is the durable part:** `idx_scan` counts reads, not
 constraint enforcement, so three of its four zeros were PK/UNIQUE indexes — `rr_intervals_pkey` read
 0 one day and 5,034 the next ([journal](docs/overview/entries/2026-09-01-drop-unused-hr-index.md)).
+**Steps count from the first one (BF-88, v1.418.0).** The first 3,000 steps of every day used to
+earn nothing, because the resting base already assumed a desk day's walking. The owner asked the
+version of the question that works — *"cant we remove some calories for the base 3000 and have it
+start from 0 steps?"* — and that is what shipped: the credit comes out of the base, the steps are
+counted. **A day at 3,000 steps burns exactly what it did before** (verified live: base 2087 +
+active 110 = 2197, the old base to the kcal); below it the day drops, which is the point. The
+calorie target does not move. `STEP_BASELINE` is renamed `STEP_BASE_CREDIT` because a test pinning
+3,000 cannot notice a change of meaning, and the rename is what found the three copy sites BF-87
+had shipped hours earlier. Two mutations survived their first tests — the credit applied on the
+calibrated path as well, and the credit taken off the maintenance target too, which cuts recommended
+intake by ~100 kcal a day and passes every relative assertion. **Not device-verified**
+([journal](docs/overview/entries/2026-09-01-step-base-credit.md)).
 
 **The E2E harness already looks; what it cannot do is take a photo (BF-91).** The entry read *"58
 specs assert nothing visual"* — **21 of the 58** assert layout, and the four flows it named already

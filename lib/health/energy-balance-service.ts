@@ -4,7 +4,7 @@
 
 import { fromZonedTime, toZonedTime } from 'date-fns-tz'
 import { shiftDateStr, ageFromDob } from '@trainingai/shared/date-utils'
-import { computeActiveEnergy, SEDENTARY_MULTIPLIER } from '@trainingai/shared/health/daily-energy'
+import { computeActiveEnergy, stepEnergyKcal, SEDENTARY_MULTIPLIER, STEP_BASE_CREDIT } from '@trainingai/shared/health/daily-energy'
 import { type Sex } from '@trainingai/shared/health/workout-energy'
 import { mifflinStJeorBmr } from '@trainingai/shared/nutrition/goal-recommendation'
 import { personalRmr, bodyComposition } from '@trainingai/shared/health/body-composition'
@@ -224,6 +224,14 @@ export async function computeEnergyBalance(
     : mifflinStJeorBmr(latestWeightKg!, heightCm!, ageYears!, sex!))
   // Sedentary base only — measured movement is added explicitly, so a higher activity multiplier
   // here would double-count it. See daily-energy.ts.
+  //
+  // **⚠ This value has TWO consumers and BF-88 changed only one of them.** It is the resting base on
+  // the formula path *and* the maintenance estimate when the calibration is not ready. The step
+  // credit comes off the **base**, below — not off this, and not off maintenance. Maintenance means
+  // "what a typical day costs", and a typical day is ~3,000 steps, which after the shift still adds
+  // back exactly what the credit removed. Subtracting it here instead would quietly cut the user's
+  // recommended intake by the credit every day, which is a different change from the one that was
+  // approved.
   const formulaBaseline = Math.round(bmr * SEDENTARY_MULTIPLIER)
 
   // Every COMPLETED day in the window, so unlogged days read as gaps rather than zero-calorie
@@ -257,9 +265,25 @@ export async function computeEnergyBalance(
   // owner it sat 156 kcal above the measured resting rate (1481 predicted vs 1325 measured) and
   // clamped the calibrated maintenance up to it: the calibration could not report the truth even
   // when the data said so. `bmr` is the measurement when there is one, so the floor is too.
+  // BF-88. Steps now count from the first one, so the energy the base used to assume for the first
+  // 3,000 has to come back out of it — otherwise every day is counted twice for the same walking.
+  //
+  // **Computed for this user, never a constant.** ~102 kcal for the owner; a lighter or heavier
+  // account gets a different figure, and hardcoding one mis-bases every other user.
+  //
+  // **Formula path only, and this is the half an implementer gets wrong.** On the calibrated path
+  // the base is `maintenance − avgActiveKcal` where `maintenance` is MEASURED: lowering the step
+  // floor raises `avgActiveKcal`, so the subtraction already happens there. Applying the credit to
+  // both double-subtracts it.
+  const stepBaseCreditKcal = stepEnergyKcal(energyProfile, STEP_BASE_CREDIT)
+
+  // Floored at BMR for the same reason the calibrated branch is: a resting burn below BMR is not a
+  // number this model is allowed to report, whatever the credit arithmetic says. It only binds for
+  // a profile whose credit exceeds 0.2 × BMR, which no plausible one does — but "no plausible one"
+  // is not a guarantee, and this is the cheaper half of being wrong.
   const restingBaseKcal = source === 'calibrated'
     ? Math.max(Math.round(bmr), Math.round(maintenanceKcal - avgActiveKcal))
-    : formulaBaseline
+    : Math.max(Math.round(bmr), formulaBaseline - stepBaseCreditKcal)
 
   const balance = computeCalorieBalance({
     restingBaseKcal, activeKcal: activeEnergy.total, intakeKcal, goalDeltaKcal,
