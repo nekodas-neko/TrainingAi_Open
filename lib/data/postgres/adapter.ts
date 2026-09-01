@@ -1624,7 +1624,13 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
 
   // ── Scheduling ─────────────────────────────────────────────────────────────
   async getNextSession(userId: string, timezone = DEFAULT_TZ): Promise<NextSessionRecommendation> {
-    const program = await this.getActiveProgram(userId)
+    const todayAest = todayInTz(timezone)
+    // Fetched alongside the program rather than after it: the common path needs both, and the rest
+    // choice gates everything below including the readiness/AI branch, which is the expensive one.
+    const [program, restChosen] = await Promise.all([
+      this.getActiveProgram(userId),
+      this.isRestDayChosen(userId, todayAest),
+    ])
     if (!program || !program.sessions.length) {
       return { isRestDay: false, reason: 'No active program configured', reminderEnabled: false, reminderTime: null }
     }
@@ -1654,12 +1660,23 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       .limit(30)
 
     const lastWs = recentWsWithName[0] ?? null
-    const todayAest = todayInTz(timezone)
 
     // Always show today's actual session first — overrides rest-day rules
     if (lastWs && toAestDay(lastWs.startedAt, timezone) === todayAest) {
       const todaySession = sessions.find(sess => sess.name.toLowerCase() === lastWs.sessionName?.toLowerCase())
       if (todaySession) return { isRestDay: false, session: todaySession, reason: `Already trained: ${todaySession.name}`, ...rem }
+    }
+
+    // BF-84 — a rest day the user CHOSE outranks every inference below it, because it is the one
+    // signal here that is a statement rather than a deduction. Before this, the choice lived only
+    // in a `localStorage` marker the client re-applied over this route's answer, so refetching
+    // `/api/next-session` reverted it and the second device never saw it at all.
+    //
+    // Deliberately AFTER the already-trained branch: logging a workout is a stronger statement than
+    // having said earlier that you would rest, and the row stays put so the choice is still there
+    // tomorrow if the session is later deleted.
+    if (restChosen) {
+      return { isRestDay: true, reason: 'Rest day — you chose to rest today', ...rem }
     }
 
     // Compute most-overdue session using name-based last-done lookup
@@ -3039,6 +3056,45 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       journal: r.journal, foodLoggingCompletedAt: r.foodLoggingCompletedAt,
       createdAt: r.createdAt, updatedAt: r.updatedAt,
     }
+  }
+
+  // ── Rest days ──────────────────────────────────────────────────────────────
+
+  /**
+   * Record (or withdraw) a chosen rest day — BF-84's one write, called by both the web route and
+   * the `rest_days` push branch, so the two paths cannot drift.
+   *
+   * Un-choosing tombstones instead of deleting. That matters more here than in most domains: the
+   * choice used to live in a `localStorage` key that expired at midnight, so a mistap cost you
+   * until you navigated away. Stored, a mistap is durable, and the undo has to be as reliable as
+   * the mark. Re-choosing resurrects the same row rather than inserting a second one, which is
+   * what the `(user_id, date)` unique index is for.
+   */
+  async setRestDay(userId: string, date: string, resting: boolean): Promise<void> {
+    await this.db.insert(s.restDays)
+      .values({ userId, date, deletedAt: resting ? null : new Date() })
+      .onConflictDoUpdate({
+        target: [s.restDays.userId, s.restDays.date],
+        set: { deletedAt: resting ? null : new Date(), updatedAt: new Date() },
+        // Scoped even though the conflict target already includes user_id: an onConflictDoUpdate
+        // arm is an UPDATE, and the standing rule is that every one of them is user-scoped.
+        setWhere: eq(s.restDays.userId, userId),
+      })
+  }
+
+  async isRestDayChosen(userId: string, date: string): Promise<boolean> {
+    const [r] = await this.db.select({ id: s.restDays.id }).from(s.restDays)
+      .where(and(eq(s.restDays.userId, userId), eq(s.restDays.date, date), isNull(s.restDays.deletedAt)))
+      .limit(1)
+    return r != null
+  }
+
+  async listRestDays(userId: string, from: string, to: string): Promise<string[]> {
+    const rows = await this.db.select({ date: s.restDays.date }).from(s.restDays)
+      .where(and(eq(s.restDays.userId, userId), gte(s.restDays.date, from), lte(s.restDays.date, to),
+                 isNull(s.restDays.deletedAt)))
+      .orderBy(asc(s.restDays.date))
+    return rows.map(r => r.date)
   }
 
   async countWorkoutSessions(userId: string): Promise<number> {
@@ -4800,6 +4856,25 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
             sleepPhase5Min:  str(p.sleepPhase5Min),
             timeInBedHours:  num(p.timeInBedHours),
           }], 'oura_ble')
+          processed++
+        } else if (mut.domain === 'rest_days') {
+          // BF-84. Calls the same `setRestDay` the web route calls, so the two write paths cannot
+          // drift — the standing rule that a diverged push branch is how the web half works while
+          // the APK mutation strands silently.
+          //
+          // `resting` must be a real boolean rather than truthy: a missing field would otherwise
+          // read as "un-rest" and silently withdraw a choice the user made. A malformed payload is
+          // a permanent 4xx — retrying cannot make it parse — so it quarantines.
+          //
+          // The slash→dash replace matches every sibling branch, but note it is NOT load-bearing
+          // here: `date` is a DATE column and Postgres parses `2026/08/22` to the same day, which
+          // was confirmed by mutation (removing it fails nothing). It stays for shape-consistency,
+          // so a later change that does date arithmetic on this value starts from the ISO form.
+          const p = clean as Record<string, unknown>
+          if (typeof p.resting !== 'boolean') {
+            throw new Error('rest_days: `resting` must be a boolean')
+          }
+          await this.setRestDay(userId, mut.date.replace(/\//g, '-'), p.resting)
           processed++
         } else if (mut.domain === 'manual_bedtime') {
           // Q-519. Calls the same `setManualSleepStart` the web route calls, so the two write paths

@@ -14,7 +14,7 @@ silently misdirecting the next session. Update them in the same PR that consumes
 
 | Pointer | Value | Source of truth |
 |---|---|---|
-| Next free Postgres migration | **247** | `lib/data/postgres/migrations/` |
+| Next free Postgres migration | **249** | `lib/data/postgres/migrations/` |
 | Local SQLite schema version | **v32** | `lib/sqlite/migrations.ts`; `lib/sqlite/__tests__/migrations.test.ts` asserts the max |
 
 > **There is no third pointer any more.** Entry IDs are not allocated from a shared counter and
@@ -797,55 +797,6 @@ currently earn nothing from stepping at all; mean 5,716, median bucket 2–4k.
   names its basis on both paths. And a second profile (different weight) gets a different
   subtraction, proving it was computed.
 
-### [platform][nutrition] LB-43 — a client component cannot import `daily-energy`, so a display constant is mirrored
-
-- **✅ FIXED 2026-09-01. The mirror is gone and `/nutrition` returns 200.** `STEP_BASELINE`,
-  `WALKING_CADENCE_SPM` and `STEPS_PER_KM` now live beside `SEDENTARY_MULTIPLIER` in the leaf
-  module; `daily-energy.ts` re-exports all four, so every server-side importer is untouched.
-- **⚑ The entry's file name was wrong, and the reason matters: THE LEAF MODULE ALREADY EXISTED.**
-  It proposed *"something like `packages/shared/src/health/energy-constants.ts`"* —
-  `energy-baseline.ts` already was that module, created for the **identical failure one node
-  builtin earlier** (Q-401: the same chain reaching `node:path`, breaking the same tab, through
-  `goal-recommendation` → `calorie-balance` → `calorie-zone-bar`). Adding a second leaf module for
-  one purpose is the drift the one-formula rule is about, so the constants moved into the existing
-  one and its doc now carries both incidents. **The lesson is in the module, not just here: this
-  chain has now broken the Nutrition tab twice, with a different builtin each time.**
-- **⚠ The drift test that guarded the mirror is now tautological, and was replaced rather than
-  kept.** `expect(STEP_BASELINE).toBe(SHARED_STEP_BASELINE)` cannot fail once one re-exports the
-  other, and a test that cannot fail is worse than none. What replaced it is the invariant nothing
-  else checks: **`energy-baseline.ts` imports nothing at all** — no `import`, no `require`. That is
-  the only thing keeping it client-importable, and `tsc` would say nothing if it changed.
-- **Lane:** A — the fix edits `packages/shared/**`. Lane B can only mirror the value, which is what
-  BF-87 did.
-- **Added:** 2026-09-01 · found by BF-87, which needed `STEP_BASELINE` for **copy** and took the
-  whole Nutrition tab to a 500 getting it.
-
-**The chain, measured rather than guessed.** `packages/shared/src/health/daily-energy.ts` imports
-`workout-energy.ts`, which imports `@/lib/oura-models/constants`, which reads `node:fs/promises`.
-Turbopack fails the client chunk outright — *"the chunking context (unknown) does not support
-external modules (request: node:fs/promises)"* — and `/nutrition` returns 500. **No client component
-had ever imported `daily-energy`**, so nothing had tripped it before; BF-87's was the first, and it
-only wanted one number to print.
-
-**What BF-87 shipped instead.** `components/nutrition/movement-breakdown.ts` declares its own
-`STEP_BASELINE = 3_000` with the reason written above it, and
-`__tests__/movement-breakdown.test.ts` imports the shared constant — tests run in node, where the
-chain is harmless — and fails if the two disagree. So it cannot drift silently. It is still a second
-copy of a number, which the one-formula rule is against, and this entry is how it stops being one.
-
-- **The fix is a leaf module, not a refactor of the maths.** `STEP_BASELINE`, `SEDENTARY_MULTIPLIER`,
-  `STEPS_PER_KM` and `WALKING_CADENCE_SPM` are plain constants with no dependencies; moved into
-  something like `packages/shared/src/health/energy-constants.ts` and re-exported from
-  `daily-energy.ts`, every existing importer is unaffected and a client component can take the
-  constant without the chain. Then delete the mirror and point the test at the real thing.
-- **⚠ Do not "fix" it by making `oura-models` client-safe.** That module reads model files off disk
-  on purpose; the problem is not that it is server-only, it is that a display constant is behind it.
-- **The blast radius is worth measuring first.** `daily-energy.ts` is imported by the energy service,
-  the AI tools and the meal-plan routes — all server-side — so the move should be additive and
-  invisible to them. Confirm with `grep -rn "shared/health/daily-energy"` before and after.
-- **Verification:** a client component imports the constant and `/nutrition` still returns 200;
-  `movement-breakdown.ts` no longer declares its own; the shared module's own tests are unchanged.
-
 
 ### [platform][body] LB-42 — `weight_goal_kg` and `target_weight_kg` are two columns for one goal
 
@@ -1026,77 +977,52 @@ has already recorded that a bulk job bumps `updated_at` without rewriting a valu
   view says it is provisional, the later one does not, and neither silently contradicts the other.
   The 30-night comparison must exclude a provisional night from its own average.
 
-### [workouts] BF-84 — a per-session Rest button on the training card, and rest is not stored anywhere
+### [workouts] BF-84 — the Rest button on Home's card, when the app has not suggested rest
 
-- **✅ THE OWNER GATE IS CLEARED, 2026-09-01 — the field is removed above, deliberately.** Asked
-  *fact or hint?*, the owner answered: *"Happy to continue just having it as 'rest' = no workouts
-  logged so it just changes the display on home card — but also happy to have it in the DB. Whatever
-  would be better in the long run."* That is the call handed back with the criterion attached, so
-  **the answer is FACT — store it**, and the criterion is why:
-  - **Rest days are training data.** If a chosen rest is only ever a display condition, training
-    load, weekly cadence and phase counting all read it as a *missed* session rather than a taken
-    one. Every derived number quietly disagrees with what the owner actually did.
-  - **`no workouts logged` is not the same claim as `I chose to rest`** — a day with no logs is also
-    a day you forgot, or were ill, or logged late. The stored row separates them, and no amount of
-    display logic recovers a distinction that was never written down.
-  - **The current version is worse than it looks** and its failure has not been hit yet: a
-    `localStorage` key, so the second device never sees it, it dies on reinstall, and refetching
-    `/api/next-session` silently reverts the selection. Choosing "hint" keeps all three.
-  - **What it costs:** a migration, a sync domain and the inference path — expensive to undo, which
-    is exactly why it was gated. Taken deliberately, with the owner's "long run" as the reason.
-- **Lane: A** — derived 2026-09-01, so the next reader does not re-derive it. The entry's own
-  conclusion is *"ship the button and the storage together"*; the storage half is a row, a sync
-  domain and the inference path; and CLAUDE.md sends a both-lanes item to **Lane A, engine first**.
-  Lane B cannot take the surface alone — the same sentence forbids it. **Settled 2026-09-01: fact.**
-  It stays Lane A, engine first, and does not collapse back to Lane B.
-- **Added:** 2026-09-01 · owner, on Home's Recommended Today card: *"for the training card, I'd like
-  a small button for each session to choose 'rest'."*
+> **✅ The engine half shipped 2026-09-01** (`lane-a/rest-day-stored`, migration 247). A chosen rest
+> day is now a row in `rest_days`, written through the `rest_days` outbox domain so an offline
+> choice is carried, and `getNextSession` prefers it over inferring rest from a gap — after the
+> already-trained branch, before the readiness/AI one. `/api/log-rest-day` and the push branch call
+> one `setRestDay`. All three of the original failures are closed: the second device sees the
+> choice, it survives a reinstall, and a refetch no longer reverts it.
+> [journal](overview/entries/2026-09-01-rest-day-stored.md)
+>
+> - **Keep:** the surface. Lane B's, and safe to ship second now that the storage exists.
 
-**⚠ Rest already exists and is weaker than it looks.** `lib/home/rest-day.ts` is the whole feature: a
-`localStorage` key stamped with today's date, applied client-side by `withRestDayOverride`. Its own
-comment is the finding — ***"`/api/log-rest-day` persists nothing (rest days are inferred from gaps
-in workout history), so refetching `/api/next-session` after choosing rest just recomputes the prompt
-and reverts the selection."*** So today's rest choice:
-- does not reach the server, so **the other device never sees it**;
-- does not survive clearing app data or a reinstall;
-- is invisible to every server-side consumer — the AI prescription, readiness, the weekly cadence
-  math — all of which infer rest from *absence of a workout*, not from the choice.
-
-**And it is reachable from exactly one screen** (`session-select-content.tsx:984`), which is why the
-owner is asking for it on Home. Adding a second client-side caller would make two buttons over one
-`localStorage` flag.
-
-- **The question to settle first, because it decides the lane:** *should choosing rest be a fact the
-  app knows, or a hint for today's screen?* **Recommendation: a fact.** The owner is asking for it in
-  a second place, which is the signal it is being used deliberately rather than as a one-off dismiss
-  — and a deliberate rest day is exactly the kind of thing readiness and the deload logic should see
-  rather than infer from a gap two days later. That makes it Lane A: a stored row, a sync domain, and
-  the inference path taught to prefer it.
+- **Lane: B** — reassigned 2026-09-01. It was Lane A while the storage was owed; what is left is a
+  rendering condition in `app/session-select/components/recommendation-card.tsx`, which is Lane B's
+  file and touches no storage.
+- **⚠ BF-94 supersedes the SHAPE of this half — read it before building.** Filed later the same day
+  from a second owner request (*"can we have the full button for workout; that lets you swipe it to
+  turn it to rest?"*), it replaces the two-button row described below with a swipe on the full-width
+  Start button, reusing `components/ui/swipe-actions.tsx`. It carries `Needs: BF-84`, so it is
+  waiting on this entry. **Do not build the greyed second button and then have BF-94 delete it** —
+  settle which shape ships, in one pass, and if it is BF-94's then this entry's remaining half is
+  just "make Rest reachable on an ordinary day", which BF-94 already does.
+- **What is left, precisely (the pre-BF-94 shape).** `recommendation-card.tsx:269` already renders
+  `onRestDay` — inside the `recommendation?.deloadOrRestRecommended` branch, as one of a two-button
+  grid. The owner asked for it to be available when the app has **not** volunteered rest, i.e. his
+  choice rather than only the app's. So: lift it out of that branch, `variant="secondary"` (greyed,
+  per the request), and a Lucide `Moon`/`BedDouble` beside the label.
+- **✅ Lucide icon, not an emoji — confirmed by the owner 2026-09-01** (*"yes use icons not emoji"*),
+  after the request originally said "rest + emoji". Recorded as decided so nobody re-opens it from
+  the original wording.
 - **✅ SURFACE SETTLED 2026-09-01 — owner: *"a small greyed button that says rest + emoji, on the
   training card on home screen."*** One secondary button on Home's Recommended Today card, beside
   Start Workout. Not per-session and not the week strip.
-- **⚑ And the button already exists — it is just conditional.** `recommendation-card.tsx:269` renders
-  `onRestDay` today, inside the `recommendation?.deloadOrRestRecommended` branch, as one of a
-  two-button grid. So the handler, the `markRestDayChosen()` write and the `withRestDayOverride`
-  re-application are all built and working. **What the owner is asking for is for it to be available
-  when the app has NOT suggested rest** — his choice rather than only the app's — which is a
-  rendering condition, not a new control.
-- **That makes the surface work small and the persistence question the whole entry.** A control that
-  only appeared when the app volunteered it was used rarely; one that is always there will be used
-  deliberately and often, and it still writes to `localStorage` alone. Ship the button and the
-  storage together, or the first thing the owner does with the new button is lose the choice on his
-  other device.
-- **✅ Lucide icon, not an emoji — confirmed by the owner 2026-09-01** (*"yes use icons not emoji"*),
-  after the request originally said "rest + emoji". `Moon` or `BedDouble` beside the label. Recorded
-  as decided so nobody re-opens it from the original wording.
-- **Greyed, per the request, and that is also correct** — Start Workout is the primary action and
-  rest is the secondary one. `variant="secondary"` on the shared `Button` gets it without a new
-  colour.
-- **If it stays client-only, say so on screen.** A rest choice that silently evaporates on the other
-  device is worse than no button, and today it does exactly that without telling anyone.
-- **Verification:** choosing rest survives an app restart and appears on a second device; the AI
-  prescription and the weekly cadence read the stored rest day rather than inferring it; and the
-  existing session-select control and the new one are the same write, not two.
+- **Do not add a second write path.** `chooseRestDay(userId, { tz })` in `lib/home/rest-day.ts` is
+  the one write for every surface — outbox row when the local store is there, POST when it is not,
+  both ending at `setRestDay`. The existing session-select control already routes through it. A
+  handler that posts to `/api/log-rest-day` directly would skip the outbox and lose an offline
+  choice, which is the bug this entry just fixed.
+- **The un-choose path exists and has no control yet.** `chooseRestDay(userId, { tz, resting: false })`
+  withdraws the choice (tombstone, resurrectable). Worth a second tap on the rest card rather than
+  leaving a mistap durable for the day — the old marker expired at midnight and this one does not.
+- **Verification:** choosing rest from Home survives an app restart and appears on a second device;
+  the recommendation still says rest after a pull-to-refresh; and the session-select control and the
+  Home one are the same write, not two.
+- **Added:** 2026-09-01 · owner, on Home's Recommended Today card: *"for the training card, I'd like
+  a small button for each session to choose 'rest'."*
 
 ### [app-shell] BF-82 — the More page is seven groups of one row each, with one of them behaving differently
 
