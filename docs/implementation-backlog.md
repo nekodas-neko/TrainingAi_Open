@@ -465,8 +465,12 @@ The two-channel split is the second half and only pays off when the screen is of
 
 ### [nutrition] BF-104 — log a meal at 0.5× / 1× / 1.5×; the storage supports it and nothing sets it
 
-- **Lane:** B for the picker on the meal sheet; A for the one argument through
-  `packages/shared/src/nutrition/log-meal.ts`.
+- **Lane:** B — the picker on the meal sheet, and only that. **The engine argument it needs is
+  LB-49**, which is Lane A's: `logMealFromSaved` lives in `packages/shared` and is called from the
+  web route and the `pushMutations` branch, so a lane that cannot edit either cannot thread a
+  parameter through it. Split on 2026-09-01 by Lane B, which reached this entry at the top of its
+  queue and could not start it.
+- **Needs:** LB-49
 - **Added:** 2026-09-01 · owner: *"when logging food/meals we should be able to choose how much of the
   meal; i.e full at 1x or 1.5 or 0.5 etc."*
 
@@ -574,7 +578,12 @@ work is mostly plumbing: surface the baseline, skip the model.**
 
 ### [nutrition][platform] BF-102 — "Calibrated" activity level, and a prompt that tells the model something false
 
-- **Lane:** B for the option; A for the measured factor and the prompt string.
+- **Lane:** B — the `Calibrated` option in the activity-level picker
+  (`components/profile/required-info-section.tsx`) and its not-enough-data state. **The factor it
+  displays is LB-50**, Lane A's: it is computed from the energy model and the recommend route's
+  prompt string, neither of which Lane B owns. An option that shows a band name and no number is
+  not this feature. Split on 2026-09-01 by Lane B, which reached this entry and could not start it.
+- **Needs:** LB-50
 - **Added:** 2026-09-01 · owner: *"for the activity level there should be a button to choose
   'Calibrated Level' which would be what we are using now right — rather than the default response."*
 
@@ -1756,6 +1765,61 @@ deletes nothing on tap, which is what makes an icon-only entry point defensible 
   beside a changed nutrition sheet is not. **Nothing about the wallpaper can be judged in the
   sandbox** — the feature is off by default there, so the e2e has to switch it on to assert anything
   at all.
+
+### [nutrition] LB-49 — the meal-log scale argument, through the one shared write function
+
+- **Lane:** A — `packages/shared/src/nutrition/log-meal.ts`, plus the web route and the
+  `pushMutations` branch that both call it.
+- **Added:** 2026-09-01 · Lane B, splitting BF-104 so its surface half is startable. The letter
+  records who found it, not who ships it.
+
+**One optional argument, and the reason it is not Lane B's is the reason it is worth doing carefully:
+`logMealFromSaved` is the single shared write function both server paths call**, which is the
+Canonical-Runtime rule the push branch is CI-gated on. A scale threaded anywhere else would be a
+second write path.
+
+- **The change:** `logMealFromSaved(meal, …, scale = 1)` writing
+  `quantityMultiplier: item.quantityMultiplier * scale` at all three sites (`log-meal.ts:83, 96, 131`).
+  **No schema change** — `food_logs.quantity_multiplier` is already per-row.
+- **Scale at WRITE time; do not store the factor.** The rows are already point-in-time snapshots —
+  `logMealFromSaved` copies the definition's multipliers rather than referencing them — so a log
+  survives the meal being edited afterwards. A meal-level factor every reader had to remember to
+  apply would break that and put a second multiplier in the system (Q-401's two TDEE models,
+  BF-88's two meanings for one constant).
+- **The cost of that, stated so it is chosen rather than discovered:** *"I ate 1.5×"* is not
+  recoverable afterwards — only the scaled per-item amounts are. BF-3 went the other way for
+  supplement doses, because a titrating dose is the datum; here the datum is the food.
+- **The outbox payload carries it too**, or the APK logs 1× while the web logs 1.5× — the drift
+  class the sync rules exist for. Local table column, `queueMutation` payload, `pushMutations`
+  branch and pull mapping in the same PR.
+- **Verification:** `logMealFromSaved(cruskitPB, …, 1.5)` writes two rows whose per-item grams are
+  each 1.5× the definition and whose calories total **365** against 243 at 1×; `scale = 1` is
+  byte-identical to today's output; and the web route and the push branch produce the same rows for
+  the same payload.
+
+### [nutrition][platform] LB-50 — the measured activity factor, and a prompt that tells the model something false
+
+- **Lane:** A — `app/api/nutrition-goals/recommend/route.ts` and the energy model.
+- **Added:** 2026-09-01 · Lane B, splitting BF-102 so its picker half has a number to show.
+
+**Two things, and the first should ship on its own whether or not the picker ever does.**
+
+- **⚠ A REAL BUG.** `app/api/nutrition-goals/recommend/route.ts:111-112` builds the prompt as
+  *`Baseline (Katch-McArdle, lean mass Xkg, activity level "moderate"): BMR X, TDEE X…`* — which
+  reads as though the TDEE were computed **for** that activity level. It was not: `calculateBaseline`
+  computes `tdee = bmr × SEDENTARY_MULTIPLIER` regardless, because Q-401 deleted `ACTIVITY_MULTIPLIERS`
+  to stop a self-report double-counting against measured movement. **The model is being told
+  something false about its own input** and may adjust as if the baseline already contained a
+  moderate multiplier. One string, no feature attached.
+- **The factor itself.** On the calibrated path `maintenanceKcal / bmr` **is** the activity factor;
+  on the formula path `(restingBase + avgActiveKcal) / bmr` is its measured equivalent. Expose it
+  with its window so BF-102 can render *"Calibrated · 1.38×, from your last 14 days"*.
+- **⚠ It needs the not-enough-data state the maintenance figure already has** (*"Log food on 8 more
+  days to calibrate"*). A calibrated factor that silently falls back to a guess is a worse picker
+  than the one it replaces.
+- **Verification:** the prompt no longer implies the TDEE is activity-scaled; the exposed factor
+  matches `maintenanceKcal / bmr` for the same window; and an under-calibrated account gets the
+  reason rather than a number.
 
 ### [platform] OR-100 — `Keep:` files buildable work under a heading that tells the lane not to look
 
@@ -7185,38 +7249,30 @@ screenshot is a **1:39** walk with the screen on, which exercises none of it.
 - **Verification.** HR live on-device with the strap paired, and the stale guard exercised by walking
   out of range. The notification half is **APK-only** and cannot be checked in `pnpm dev` at all.
 
-### [cardio][devices] LA-52 — the walk pacer's speed rung reads the WHOLE-WALK average, so it cannot track effort
+### [cardio][devices] LA-52 — the walk pacer's speed rung read the WHOLE-WALK average (fixed; device check owed)
 
-- **Lane:** B — `lib/stores/guided-walk-store.ts` is Lane B's. Filed by Lane A while scoping LA-48;
-  the letter records who found it, not who ships it.
+- **Keep:** the device check, and only that — and it is the whole point of the fix, so it matters.
+  On a real walk: slow deliberately mid-segment and the band must move within ~10 s; stop at a
+  crossing and the readout must say **Stopped**. Both are already LB-36's device checks 2 and 3,
+  which could not have passed before this.
+- **Verify:** device.
+- **✅ SHIPPED** (`fix/la-52-windowed-walk-speed`, 2026-09-01, v1.427.0). `windowedSpeedKmh` in
+  `lib/walk/walk-pacer.ts` reads the last `SPEED_WINDOW_SEC` (20 s) of `rawPoints`; the store carries
+  it as `recentSpeedKmh` and `walk-active.tsx` feeds **that** to `readPacer` and to the big km/h
+  number. `currentPaceSecPerKm` stays cumulative for the summary, which genuinely wants an average.
+- **⚠ The screen's big km/h readout was the average too, and the entry did not say so.** It came off
+  the same `currentPaceSecPerKm`, with a code comment claiming *"Both come off the one pace series —
+  there is no second computation"*. So the walker reading `4.8 km/h` mid-walk was reading their
+  average since starting. That is now live, and the min/km beside it is labelled **`avg`** — two
+  numbers side by side with nothing saying which is which is how the cumulative one came to be
+  trusted as "now".
+- **⚠ `e2e/walk-pacer-speed-rung.spec.ts` asserted the two were one number in two units**, and that
+  claim is now false by design. Updated in the same PR rather than left to break: the `avg` label is
+  the assertion, and the unit agreement moved to a fixture that can hold effort constant.
+- **A GPS dropout freezes the reading** rather than decaying it to zero — the same exposure the
+  cumulative figure already had. Deliberate: a wall clock would read "Stopped" in a tunnel, and the
+  store only recomputes when a point arrives anyway.
 - **Added:** 2026-09-01 · Lane A, from reading the pacer's inputs rather than from a report.
-- **Measured, not inferred.** `appendPoint` sets
-  `currentPaceSecPerKm: computeAvgPaceSecPerKm(distanceKm, elapsedSec)` with **cumulative** distance
-  and **cumulative** elapsed since `startedAtMs`, and `computeAvgPaceSecPerKm` is
-  `durationSec / distanceKm`. `walk-active.tsx` then feeds `kmhFromPace(currentPaceSecPerKm)`
-  straight into `readPacer` as `speedKmh`. So the speed rung's input is the **average speed of the
-  whole walk so far**, not the speed now.
-- **Three consequences, in order of how visible they are:**
-  1. **The band cannot respond within a segment.** Twenty minutes in, a 30-second surge or slow-down
-     moves a cumulative mean by almost nothing — so `Q-410`'s *"go green → amber → red as you slow
-     down"* cannot happen on this rung, whatever `BAND_TOLERANCE` is set to.
-  2. **`STOPPED_KMH` is effectively dead on this rung.** Reading `stopped` needs the whole-walk
-     average below **1.5 km/h**; after a few minutes of walking, standing still cannot get it there.
-     The constant exists for the crossing case (LB-36 check 3) and cannot fire.
-  3. **Warmup, fast and slow all band against the same slowly-drifting number**, so the fast/slow
-     distinction the plan is built on is invisible to the speed rung.
-- **⚠ The e2e passes and is not wrong.** `e2e/walk-pacer-speed-rung.spec.ts` asserts the readout
-  appears, the fallback note names the rung, and a thin history drops the rung — none of which needs
-  the band to *respond*. It also drives a short series, and early in a walk a cumulative mean is
-  still responsive. A test that never changes effort mid-walk cannot see this.
-- **The fix is a windowed speed, and it is a store change.** Derive from the last N seconds of
-  `rawPoints` (the same `haversineDistanceKm` already there) rather than from the cumulative totals,
-  and keep the cumulative figure for the summary, which genuinely wants an average. **Do not "fix" it
-  by widening `BAND_TOLERANCE`** — that treats an inert signal as a noisy one and would make the
-  cadence rung worse in the same move.
-- **Verification:** on a real walk, slow deliberately mid-segment and watch the band move within
-  ~10 s; stop at a crossing and read **Stopped**. Both are already LB-36's device checks — this entry
-  is why two of them would fail today.
 
 ### [cardio][devices] LA-48 — a walk's pacer creates an adherence number and nothing stores it
 

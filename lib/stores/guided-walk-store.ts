@@ -4,6 +4,7 @@ import { persist, createJSONStorage } from 'zustand/middleware'
 import { DEFAULT_WALK_CONFIG, buildIntervalPlan, type WalkConfig } from '@/lib/walk/interval-plan'
 import type { RoutePoint } from '@/lib/activity/route-encoding'
 import { haversineDistanceKm, computeAvgPaceSecPerKm } from '@/lib/activity/activity-metrics'
+import { windowedSpeedKmh } from '@/lib/walk/walk-pacer'
 import { debouncedLocalStorage } from '@/lib/stores/debounced-storage'
 
 export type WalkMode = 'config' | 'active' | 'done'
@@ -26,7 +27,11 @@ interface GuidedWalkState {
   startedAtMs: number | null   // wall-clock start; the timer resyncs from this
   rawPoints: RoutePoint[]
   distanceKm: number
+  /** Cumulative: total distance over total elapsed. The summary wants this; the pacer must not
+   *  (LA-52) — see `recentSpeedKmh`. */
   currentPaceSecPerKm: number | null
+  /** Speed over the last `SPEED_WINDOW_SEC`, which is what the walker is doing *now*. */
+  recentSpeedKmh: number | null
   setConfig: (c: Partial<WalkConfig>) => void
   setCustomConfig: (c: WalkConfig) => void
   start: (nowMs: number) => void
@@ -45,21 +50,24 @@ export const useGuidedWalkStore = create<GuidedWalkState>()(
       rawPoints: [],
       distanceKm: 0,
       currentPaceSecPerKm: null,
+      recentSpeedKmh: null,
       setConfig: (c) => set(s => ({ config: { ...s.config, ...c } })),
       setCustomConfig: (c) => set({ customConfig: c }),
-      start: (nowMs) => set({ mode: 'active', startedAtMs: nowMs, rawPoints: [], distanceKm: 0, currentPaceSecPerKm: null }),
+      start: (nowMs) => set({ mode: 'active', startedAtMs: nowMs, rawPoints: [], distanceKm: 0, currentPaceSecPerKm: null, recentSpeedKmh: null }),
       appendPoint: (point) => set((s) => {
         const prevPoint = s.rawPoints[s.rawPoints.length - 1]
         const distanceKm = prevPoint ? s.distanceKm + haversineDistanceKm(prevPoint, point) : s.distanceKm
         const elapsedSec = s.startedAtMs != null ? (point.t - s.startedAtMs) / 1000 : 0
+        const rawPoints = [...s.rawPoints, point]
         return {
-          rawPoints: [...s.rawPoints, point],
+          rawPoints,
           distanceKm,
           currentPaceSecPerKm: computeAvgPaceSecPerKm(distanceKm, elapsedSec) ?? null,
+          recentSpeedKmh: windowedSpeedKmh(rawPoints),
         }
       }),
       finish: () => set({ mode: 'done' }),
-      reset: () => set({ mode: 'config', startedAtMs: null, rawPoints: [], distanceKm: 0, currentPaceSecPerKm: null }),
+      reset: () => set({ mode: 'config', startedAtMs: null, rawPoints: [], distanceKm: 0, currentPaceSecPerKm: null, recentSpeedKmh: null }),
     }),
     {
       name: 'ta_guided_walk_v1',

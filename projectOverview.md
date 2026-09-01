@@ -24,8 +24,23 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.425.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Version:** v1.427.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-09-01.
+
+**The walk pacer reads speed now rather than the whole walk (LA-52).** `appendPoint` set
+`currentPaceSecPerKm` from cumulative distance over cumulative elapsed and the screen fed that
+straight into `readPacer`, so the speed rung's input was the **average speed of the walk so far**.
+Twenty minutes in, a surge or a slow-down moved it by almost nothing; `STOPPED_KMH` could never fire,
+because standing still cannot drag a whole-walk average below 1.5 km/h; and warm-up, fast and slow
+all banded against one drifting number. `windowedSpeedKmh` now reads the last **20 s** of
+`rawPoints`, carried on the store as `recentSpeedKmh`. **The entry missed half of it: the big
+on-screen km/h was the average too** — under a comment claiming both figures came off one series —
+so a walker reading 4.8 km/h mid-walk was reading their average since starting. That number is live
+now and the min/km beside it is labelled `avg`. **`e2e/walk-pacer-speed-rung.spec.ts` asserted the
+two were one number in two units and was updated in the same PR**, since that claim is now false by
+design. **Not device-verified** — slowing mid-segment and stopping at a crossing are LB-36's device
+checks 2 and 3, which could not have passed before this
+([journal](docs/overview/entries/2026-09-01-fix-la-52-windowed-walk-speed.md)).
 
 **One name for the saved list — `My Foods`, everywhere (BF-103).** The owner overrode the entry's own
 proposal and was right to: it suggested `Saved` for the tab with `My Meals` left on the button, which

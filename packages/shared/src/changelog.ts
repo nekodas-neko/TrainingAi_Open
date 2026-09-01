@@ -6,6 +6,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.427.0",
+    date: "2026-09-01",
+    changes: [
+      "The speed on the guided-walk screen is now your speed right now, over the last twenty seconds. It was your average since the walk started \u2014 so twenty minutes in, speeding up or slowing down barely moved it, and the pacer bar could not react to a fast or slow block at all.",
+      "Stopping at a crossing now reads Stopped. It never could before: standing still cannot drag a whole-walk average below the 1.5 km/h it takes to say so.",
+      "The min/km figure beside it is unchanged and is now labelled avg, because it is still the average for the whole walk \u2014 that is the unit your splits are in. The two are different numbers on purpose.",
+    ],
+  },
+  {
     version: "1.425.0",
     date: "2026-09-01",
     changes: [
