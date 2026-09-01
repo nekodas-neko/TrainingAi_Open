@@ -6085,3 +6085,17 @@ the document scroller. No code has ever saved a position — so *"many pages if 
 exactly right, and one fix in the shell covers every screen. The two warnings are the ones that make
 a naive attempt fail: restoring before the cache-seeded content has height gets clamped to 0 and
 looks identical to the bug, and restoring on forward navigation is wrong.
+
+## 2026-09-01 — `projectOverview.md` → 8984 (BF-64)
+
++17 for an owner-reported bug, and the lines that earn it are the ones a short version would cut
+first. "The Full toggle works now" hides the mechanism — the override was applied inside an `else if`
+that only ran when the exercise was **not already deloaded**, so the pipeline could add a deload and
+never remove one. That asymmetry is the reusable part: a control can be fully wired and still be
+one-way, and the screen will not show you which.
+
+The other two kept lines are negatives. The override keys on an **explicit choice**, because keyed on
+`!deload` it would paint full weights for a frame and snap back — invisible in review, obvious on a
+phone. And the verification line says the fixture was **hand-built**, because the local seed has no
+`ai_dynamic` program and zero prescriptions: a session that renders this screen and sees a toggle has
+verified nothing, and would not know it.

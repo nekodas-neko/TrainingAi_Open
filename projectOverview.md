@@ -24,8 +24,25 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.421.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Version:** v1.422.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-09-01.
+
+**`Full · Override` now overrides something (BF-64).** Owner: *"pressing full or deload doesnt change
+the 'prescription' not sure if its over writing it."* It was overwriting **in one direction only** —
+`session-data.ts` applies the deload override inside an `else if` that runs only when the exercise is
+not already deloaded, so the pipeline could ADD a deload and never remove one, while the toggle
+rendered the word **Override**. Worse than the BF-8 bug it descends from: that was the toggle
+disagreeing with the card, this was a control that did nothing. Session-level `Full` is now the
+per-exercise revert applied to every deloaded exercise — the machinery was already on the device, so
+no LLM call, no 429 budget, works offline. **All three of the entry's warnings held:** the override
+keys on an *explicit* choice (keyed on `!deload` it would flash full weights on first render); an
+exercise with no `preDeload` stays deloaded **and the card names it**; and 1RM accounting follows
+without a separate change, because the revert clears `deloaded` and the completion path already reads
+the reverted array. Five mutations, five failures, including that last one.
+**Verified only against a hand-built fixture — the local seed has no `ai_dynamic` program and zero
+prescriptions, so the path is unreachable out of the box — and NOT on device**, which is where
+completing a set under each toggle position would show the 1RM actually count or not
+([journal](docs/overview/entries/2026-09-01-fix-deload-full-override.md)).
 
 **The e2e README told spec authors the opposite of what was measured (Q-354).** On Nutrition a
 `.click()` is swallowed and gives no clue — no toast, no request, no error, just silence — while a

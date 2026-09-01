@@ -37,6 +37,13 @@ interface AiPrescriptionCardProps {
   exerciseTypeById?: Record<string, string | undefined>;
   // Per session-exercise id: signals that shaped the choice (role, 1RM trend).
   exerciseSignalsById?: Record<string, ExerciseSignal | undefined>;
+  /** BF-64: the user picked `Full` over a deload prescription and the revert is running. The card's
+   *  own heading stays true — the PRESCRIPTION is still a deload — so the override is stated
+   *  separately rather than by rewriting what the prescription says. */
+  overrideFull?: boolean;
+  /** Deloaded exercises the override could not revert (the prescription carried no `preDeload` for
+   *  them). Named, because silently reverting some and not others is what would mislead. */
+  overrideBlockedNames?: string[];
   sessionId: string;
   onStatusChange: (newStatus: PrescriptionStatus) => void;
   onPhaseChanged?: () => void;
@@ -53,6 +60,8 @@ export function AiPrescriptionCard({
   sessionId,
   onStatusChange,
   onPhaseChanged,
+  overrideFull = false,
+  overrideBlockedNames = [],
 }: AiPrescriptionCardProps) {
   const router = useTransitionRouter();
   const [expanded, setExpanded] = useState(prescriptionStatus === 'pending');
@@ -165,6 +174,9 @@ export function AiPrescriptionCard({
                 ? " · Phase transition suggested"
                 : ` · Moved to ${phaseLabel[prescription.phase] ?? prescription.phase}`)}
               {isDeloadRecommended && isPending && " · Deload recommended"}
+              {/* The prescription is still a deload; the session about to run is not. Both facts,
+                  because the card describing only the first is what made the toggle read as a lie. */}
+              {overrideFull && " · Full override on"}
             </p>
           </div>
         </div>
@@ -173,6 +185,30 @@ export function AiPrescriptionCard({
 
       <CollapsibleContent>
         <div className="space-y-2 pt-1 border-t border-brand/20">
+          {/* BF-64. Stated inside the card rather than on the toggle: the toggle says what WILL run,
+              this says what the prescription said and what is happening to it. The blocked list is
+              the part that cannot be left out — reverting most exercises and quietly leaving two
+              deloaded, with nothing on screen naming them, is the failure this fix would otherwise
+              introduce while fixing the first one. */}
+          {overrideFull && (
+            <div className="flex items-start gap-1.5 rounded-lg border border-border bg-muted/40 px-2.5 py-2">
+              <TrendingUpIcon className="h-3.5 w-3.5 flex-none mt-0.5 text-muted-foreground" />
+              <div className="space-y-1">
+                <p className="text-[11px] font-semibold">Running full, overriding the deload</p>
+                <p className="text-[11px] text-muted-foreground leading-relaxed">
+                  {overrideBlockedNames.length === 0
+                    ? "Every exercise is back to its pre-deload weights and sets, and these sets count toward your 1RM."
+                    : `Most exercises are back to their pre-deload weights and sets. ${
+                        overrideBlockedNames.length === 1
+                          ? `${overrideBlockedNames[0]} stays`
+                          : `${overrideBlockedNames.slice(0, -1).join(", ")} and ${overrideBlockedNames.at(-1)} stay`
+                      } deloaded — the prescription did not record full numbers for ${
+                        overrideBlockedNames.length === 1 ? "it" : "them"
+                      }, so ${overrideBlockedNames.length === 1 ? "its" : "their"} sets will not count toward your 1RM.`}
+                </p>
+              </div>
+            </div>
+          )}
           {/* An auto-applied transition changed the load without the lifter pressing anything,
               so its justification leads the card rather than sitting under the exercise list. */}
           {prescription.transitionRationale && (

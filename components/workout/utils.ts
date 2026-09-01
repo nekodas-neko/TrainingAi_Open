@@ -166,6 +166,63 @@ export const PLATE_PAIRS_KG = [25, 20, 15, 10, 5, 2.5, 1.25] as const;
 // Reverts are a client-side overlay on the server prescription: the stored
 // prescription stays deloaded, this swap only affects what the workout runs
 // (and clears `deloaded` so the log payload and PR paths treat it as full).
+/**
+ * Whether the user has explicitly chosen `Full` over a deload prescription — the case where the
+ * toggle's own word, **Override**, has to mean something (BF-64).
+ *
+ * **Keyed on the explicit choice, never on `deload === false`.** The choice state seeds `false` and
+ * only adopts the prescription in an effect, so on first render `deload` is false while the
+ * prescription is a deload and the user has chosen nothing. Keyed on `!deload`, a session-level
+ * revert would paint full weights for a frame and then snap back.
+ */
+export function isFullOverride(chosen: boolean, prescribedDeload: boolean | undefined, deload: boolean): boolean {
+  return chosen && prescribedDeload === true && deload === false
+}
+
+/**
+ * The exercises to revert this render: the per-exercise reverts the user picked, plus — under a
+ * session-level `Full` override — every deloaded exercise the prescription recorded pre-deload
+ * numbers for (BF-64).
+ *
+ * **Why the override is a revert and not a regeneration.** Before this, choosing `Full` changed
+ * nothing: `session-data.ts` applies the deload override inside an `else if` that runs only when the
+ * prescription's exercise is not already deloaded, so the pipeline could ADD a deload and never
+ * remove one — the toggle offered an `Override` that overrode nothing. The numbers to go back to are
+ * already on the device in each exercise's `preDeload` block, so this reuses `applyDeloadReverts`:
+ * no LLM call, no 429 budget, works offline. A `/prescribe` round-trip would cost a rebuild to reach
+ * numbers we hold, and the route takes no intensity input at all (`PrescribeBodySchema` is
+ * `excludeSessionId` + `durationPreset`), so there is no server path even in principle.
+ *
+ * **1RM/PR accounting follows without a separate change, and that is by design.** The revert clears
+ * `deloaded`, `handleLogSet` reads the reverted array, and its gate is
+ * `ex.deloaded === true || (isAnyDeload && !isBaseline)` with `deload` false under an override — so
+ * a reverted exercise runs full weights and counts, and one that could not revert does not.
+ *
+ * An exercise with no `preDeloadStyle` is **absent by construction**, which decides the optional-
+ * `preDeload` case: it stays deloaded, the conservative answer, and the prescription card names it.
+ * `applyDeloadReverts` would skip it anyway; excluding it here is what lets the caller ask which
+ * ones were skipped.
+ */
+export function deloadRevertNames(
+  exercises: readonly Pick<WorkoutExercise, 'name' | 'deloaded' | 'preDeloadStyle'>[],
+  perExerciseReverts: readonly string[],
+  overrideFull: boolean,
+): string[] {
+  if (!overrideFull) return [...perExerciseReverts]
+  const all = exercises.filter(ex => ex.deloaded && ex.preDeloadStyle).map(ex => ex.name)
+  return [...new Set([...perExerciseReverts, ...all])]
+}
+
+/** Deloaded exercises a session-level override could NOT revert, because the prescription carried
+ *  no `preDeload` block for them. Named on the card: silently reverting some and not others, with
+ *  nothing on screen saying which, is the failure the fix would otherwise introduce. */
+export function deloadOverrideBlocked(
+  exercises: readonly Pick<WorkoutExercise, 'name' | 'deloaded' | 'preDeloadStyle'>[],
+  overrideFull: boolean,
+): string[] {
+  return overrideFull ? exercises.filter(ex => ex.deloaded && !ex.preDeloadStyle).map(ex => ex.name) : []
+}
+
 export function applyDeloadReverts(
   exercises: WorkoutExercise[],
   revertedNames: string[],
