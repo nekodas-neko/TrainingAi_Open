@@ -2075,45 +2075,29 @@ Lane A's.
 
 ### [body][app-shell] LA-45 — the DEXA-corrected body fat is in the payload and no screen reads it
 
-- **Branch:** _unassigned_ · **Lane: B** — `app/health/health-sections.tsx`, `app/health/health-content.tsx`, the day-detail body row.
-- **Added:** 2026-08-31 · Lane A, on shipping BF-2 step 4.
-- **The engine is done and invisible.** `/api/body-metadata` and `/api/day-log` now carry
-  **`bodyFatCorrected`** and **`bodyFatIsCorrected`** per reading, and `body-metadata` also returns
-  `bodyFatCalibration: { offsetPct, pairCount, source } | null` once per response. Every screen
-  still renders `bodyFat`, which is the RAW scale value — so the owner's Health screen shows 25.3
-  while their calorie goal is already computed from the corrected 28.5. **The two disagreeing on
-  screen is worse than neither being corrected**, which is why this is filed rather than left.
-- **`bodyFat` must stay raw and must stay the value the log sheet seeds from.** `openLog`
-  (`health-content.tsx:493`) and `log-value-sheet.tsx:32` pre-fill the body-fat input from it and
-  POST it back at source `manual`, a rank that outranks `scale_ble`. Seed from `bodyFat`, display
-  `bodyFatCorrected`. Getting this backwards lets the user overwrite their own measurement by saving
-  a field they never touched, and collapses the next calibration toward zero.
-- **Mark the boundary, do not hide it.** Two thirds of the owner's history is on instruments the
-  calibration does not cover (no provenance to 2026-06-23, `health_connect` to 08-01, `scale_ble`
-  from 07-29), so a 90-day body-fat trend contains both kinds and has a ~3.2-point step at the
-  changeover. `bodyFatIsCorrected` is per reading precisely so the chart can say why rather than
-  draw an unexplained jump. **Do not infer it from `bodyFatCorrected !== bodyFat`** — an offset can
-  round to zero, and "corrected by 0.0" and "not corrected" are different claims.
-- **Show the offset; the owner asked for it.** *"so it shows Body fat on the current scale as per a
-  dexa result"* — `offsetPct` with `pairCount` beside it. At `pairCount: 1` an offset and a ratio
-  are the same number, so it must not be presented as a settled calibration.
-- **`health-sections.tsx` derives `bodyComposition(r.weightKg, r.bodyFat)`** at three sites for the
-  lean-mass and BMR tiles. Those should move to `bodyFatCorrected`, which is what makes the panel
-  agree with the calorie goal. It is exempt in `scripts/check-body-fat-correction.js` with that
-  reason — **remove the exemption in the same PR**, or the check keeps asserting a decision that has
-  been made.
-- **The `Gate: device` was removed 2026-09-01 — it was the documented mistake, made a third time.**
-  This file's own field rules say it outright: *"`Gate: device` means SHIPPED and awaiting a device
-  check — never 'will need one when built'"*, because a gate **parks** the entry and hides it from
-  `next-item.js`. Nothing here is built. The stated reason — "a Health-screen change on the canonical
-  runtime" — is true of every Lane B item, so gating on it parks the lane. **The device check is
-  still owed**; per CLAUDE.md's Canonical Runtime rule it is satisfied at merge by the smoke run *or*
-  a Known-Issues row marking the change not-yet-device-verified. That is a **Verification** line, not
-  a gate.
-- **The other 39 device-gated entries were checked and this is the only one of its kind** — 35 are
-  shipped-and-awaiting-their-check, and `PS-9`/`PS-10`/`PS-12`/`PS-16` need the Colmi ring in hand.
-  So the rule is holding now; this was a straggler, not a fourth outbreak.
-
+- **Keep:** one look on the S25, and only that.
+- **Verify:** device — and here it is not a formality. `health-content.tsx`'s local-store seed and the
+  network fetch race, and a local row carries the raw reading with no calibration; the fix that stops
+  the seed clobbering the correction is **unreachable on web**, where `getLocalStore` returns null.
+  On the S25: open Health → Body offline and after a sync, and confirm the body-fat number does not
+  flick back to the scale's value. Also confirm the **week-day sheet's `% BF` chip**, which is the one
+  surface that could not be driven in the browser.
+- **✅ SHIPPED** (`feat/la-45-corrected-body-fat-display`, 2026-09-01, v1.420.0). Seven surfaces read
+  the corrected value through one rule (`components/health/body-fat-display.ts`); the card states the
+  offset and its pair count and marks a mixed window;
+  `components/health/__tests__/body-fat-display-sites.test.ts` pins every site and the inverse (the
+  log sheet still seeds raw), mutation-verified eight ways. `check-body-fat-correction.js`'s
+  `health-sections.tsx` exemption is gone, as this entry asked.
+- **⚠ The local seed has no DEXA scan and no `source_map`, so the feature is UNREACHABLE in the
+  sandbox** — every reading returns `corrected: false` and a session that renders the screen and sees
+  a plain number has verified nothing. A fixture was seeded by hand into the local DB (one scan at
+  21.2% on 2026-08-25, `scale_ble` provenance on the newest four readings) and left there, so the
+  path stays testable. It is fabricated, like the rest of that seed.
+- **`bodyFat` must stay raw and must stay the value the log sheet seeds from.** `openLog` POSTs it
+  back at source `manual`, a rank that outranks `scale_ble`. Seed from `bodyFat`, display
+  `displayBodyFat`. Getting this backwards lets the user overwrite their own measurement by saving a
+  field they never touched, and collapses the next calibration toward zero. The guard's last case is
+  exactly this, and it fails when the seed is switched to the corrected value.
 
 ### [workouts] BF-59 — the weekly set targets are a flat large/small binary, ignoring both the app's own landmark table and the program's goal
 

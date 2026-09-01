@@ -74,7 +74,7 @@ was filed for the gap.
 > empty Meals tab, and the only symptom is a dead button. So the prediction above ("throws") was
 > right about the mechanism and wrong about what a user would see — this would have been reported as
 > *"the button does nothing"*, not as a crash. See
-> [that entry](2026-08-26-empty-meal-library-e2e.md).
+> [that entry](../history-2026-08-30.md), folded into the batched history.
 
 ## Verification
 

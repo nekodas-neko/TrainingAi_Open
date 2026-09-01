@@ -6,6 +6,16 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.420.0",
+    date: "2026-09-01",
+    changes: [
+      "Health, the day sheet, Profile details and Goals all show your DEXA-corrected body fat now. The correction already fed your calorie goal and protein target \u2014 the screens were still showing the scale's raw number, so the two disagreed with nothing to say which was which.",
+      "The Body Fat card says why its number differs from the scale: the offset, and how many scans it came from. One scan is one comparison, not a settled calibration, so it says that rather than hiding it.",
+      "Where a stretch of readings is on an instrument the scan does not cover, the card says how many of them are corrected, instead of letting the chart draw the changeover as an unexplained step.",
+      "Logging body fat still starts from the scale's raw reading, not the corrected one \u2014 saving a corrected number back would overwrite the measurement for good.",
+    ],
+  },
+  {
     version: "1.419.0",
     date: "2026-09-01",
     changes: [

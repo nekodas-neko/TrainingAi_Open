@@ -6,6 +6,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { cachedFetch, readCacheSync } from "@/lib/sqlite/cache"
 import { DAY_LOG_TTL } from "@trainingai/shared/cache-ttl"
 import type { DayLogResult, DayExercise } from "@/app/api/day-log/route"
+import { displayBodyFat } from "@/components/health/body-fat-display"
 
 function formatOverlayDate(dateKey: string): string {
   const [y, m, d] = dateKey.split("/").map(Number)
@@ -78,7 +79,7 @@ export function WeekDaySheet({ date, onClose, onExerciseTap }: WeekDaySheetProps
               bodyMeta?.steps != null      && { Icon: FootprintsIcon,  text: bodyMeta.steps.toLocaleString() },
               bodyMeta?.calories != null   && { Icon: FlameIcon,       text: `${bodyMeta.calories} kcal` },
               bodyMeta?.protein != null    && { Icon: BeefIcon,        text: `${bodyMeta.protein}g` },
-              bodyMeta?.bodyFat != null    && { Icon: BarChart3Icon,   text: `${bodyMeta.bodyFat}% BF` },
+              displayBodyFat(bodyMeta) != null && { Icon: BarChart3Icon, text: `${displayBodyFat(bodyMeta)}% BF` },
             ].filter((v): v is { Icon: LucideIcon; text: string } => Boolean(v));
 
             return (

@@ -24,8 +24,24 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.419.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Version:** v1.420.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-09-01.
+
+**The screens show the DEXA-corrected body fat now (LA-45).** BF-2 step 4 put
+`bodyFatCorrected`/`bodyFatIsCorrected` on every row of `/api/body-metadata` and `/api/day-log`, plus
+the offset once per response — and **nothing read any of it**, so Health showed the raw 18.4 while the
+calorie goal was already built from the corrected 21.6. Seven surfaces now go through one rule
+(`components/health/body-fat-display.ts`), and the card says why its number differs from the scale:
+`DEXA-corrected +3.2% · 1 scan compared`, with `3 of 4 corrected` on a window that mixes instruments,
+because two thirds of the history is on instruments the offset does not cover. **Two invariants hold
+it and both are easy to reverse:** `bodyFat` stays what the log sheet seeds from (it POSTs at `manual`,
+which outranks `scale_ble`, so a corrected value round-tripped through the edit sheet would overwrite
+the measurement permanently), and "corrected" is never inferred from the values differing, since an
+offset can round to zero. Verified on `pnpm dev` against a hand-seeded DEXA pair — the local seed has
+none, so the whole path is unreachable without one — including the case that matters: the card read
+21.6 while the log sheet seeded 18.4. **Not device-verified**, and the local-store fix inside it is
+only reachable on the APK
+([journal](docs/overview/entries/2026-09-01-feat-la-45-corrected-body-fat-display.md)).
 
 **The More page is two groups, not nine (BF-82).** Owner: *"a review of all the pages/chevrons in
 the More page and reorganize/group things together that can be. It’s very messy and not very

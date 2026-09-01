@@ -5872,3 +5872,17 @@ what a successor pattern-matches on and a one-line version ("mutate your guards"
 gets nodded at. `BF-79`'s "do not re-litigate" bullet became a "has now been built on" bullet in the
 same pass — BF-82 shipped, so the guard-rail has done its job and only the placement needs carrying.
 
+
+## 2026-09-01 — `projectOverview.md` → 8894 (LA-45)
+
++16 for one status block, and the lines that could not be cut are the two invariants. "Health shows
+the corrected body fat now" is the short version and it is the one that gets the next session to
+reverse one of them: `bodyFat` must stay what the log sheet seeds from — it POSTs at `manual`, which
+outranks `scale_ble`, so a corrected value round-tripped through the edit sheet overwrites the
+measurement permanently and collapses the next calibration toward zero — and "corrected" is never
+inferred from the two values differing, because an offset can round to zero. Both read as pedantic
+until you have written the wrong one, and neither is visible from the screen afterwards.
+
+The line about the hand-seeded DEXA pair is there for the same reason: the local seed has no scan and
+no `source_map`, so the whole feature is unreachable in the sandbox and a session that renders the
+screen and sees a plain number has verified nothing.
