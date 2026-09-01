@@ -29,7 +29,6 @@ function Divider() {
 export function EditProfileSheet({ user, onSaved }: EditProfileSheetProps) {
   const [open, setOpen] = useState(false)
 
-  const [displayName, setDisplayName] = useState(user?.displayName ?? '')
   const [weightGoalKg, setWeightGoalKg] = useState(user?.weightGoalKg?.toString() ?? '')
   const [timezone, setTimezone] = useState(user?.timezone ?? 'Australia/Brisbane')
   const [units, setUnits] = useState<'kg' | 'lbs'>('kg')
@@ -49,7 +48,6 @@ export function EditProfileSheet({ user, onSaved }: EditProfileSheetProps) {
 
   function resetFromUser(u: User | null) {
     if (!u) return
-    setDisplayName(u.displayName ?? '')
     setWeightGoalKg(u.weightGoalKg?.toString() ?? '')
     setTimezone(u.timezone ?? 'Australia/Brisbane')
     try {
@@ -69,11 +67,10 @@ export function EditProfileSheet({ user, onSaved }: EditProfileSheetProps) {
       const res = await fetch('/api/user/profile', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        // BF-78. This sheet edits three fields and now sends three. The five it used to resend
-        // were a workaround for the route nulling anything omitted; it is a real partial update
-        // now, so resending them would be the thing that could go stale.
+        // BF-78 cut the resends: the route is a real partial update, so sending a field this
+        // sheet does not edit is a way to overwrite it, not a safeguard. BF-79 then moved the
+        // display name to `More → Profile details`, leaving the two below.
         body: JSON.stringify({
-          displayName: displayName || null,
           weightGoalKg: weightGoalKg ? Number(weightGoalKg) : null,
           timezone: timezone || null,
         }),
@@ -139,22 +136,6 @@ export function EditProfileSheet({ user, onSaved }: EditProfileSheetProps) {
 
         <div className="overflow-y-auto">
           <div className="rounded-2xl bg-muted/40 border border-border overflow-hidden mx-4 mt-4">
-            {/* Display Name */}
-            <div className="flex items-center gap-3 px-4 py-3">
-              <div className="flex-1 min-w-0">
-                <Label htmlFor="ep-displayName" className="text-xs text-muted-foreground">Display Name</Label>
-                <Input
-                  id="ep-displayName"
-                  value={displayName}
-                  onChange={e => setDisplayName(e.target.value)}
-                  placeholder={user?.name ?? 'Your name'}
-                  className="mt-0.5 border-0 bg-transparent p-0 h-auto text-sm font-medium focus-visible:ring-0 focus-visible:ring-offset-0 placeholder:text-muted-foreground/50"
-                />
-              </div>
-            </div>
-
-            <Divider />
-
             {/* Weight Goal */}
             <div className="flex items-center gap-3 px-4 py-3">
               <div className="flex-1 min-w-0">

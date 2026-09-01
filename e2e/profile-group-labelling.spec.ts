@@ -45,17 +45,30 @@ test('the goals option groups expose a name and their selection state', async ({
   // `FITNESS_GOALS` drives the list, so assert non-empty rather than pinning its current length.
   expect(await fitnessGoal.getByRole('radio').count()).toBeGreaterThan(0)
 
-  const sex = page.getByRole('radiogroup', { name: 'Biological Sex' })
-  await expect(sex).toBeVisible()
-  await expect(sex.getByRole('radio')).toHaveCount(3)
-
   const activityLevel = page.getByRole('radiogroup', { name: 'Activity Level' })
   await expect(activityLevel).toBeVisible()
   expect(await activityLevel.getByRole('radio').count()).toBeGreaterThan(0)
 
-  // Deliberately no assertion that one of these is checked: all three clear on a second tap of the
+  // Deliberately no assertion that one of these is checked: both clear on a second tap of the
   // active option, and the seed user may legitimately have none set. The claim under test is that
   // the state is *exposed*, which is `aria-checked` being present on every option either way.
+  for (const radio of await activityLevel.getByRole('radio').all()) {
+    expect(await radio.getAttribute('aria-checked')).toMatch(/^(true|false)$/)
+  }
+})
+
+/**
+ * Biological Sex moved off the Goals accordion in BF-79 — it is a personal detail, and it is edited
+ * on `More → Profile details` now. The group's labelling is the same claim as above and has to
+ * survive the move, so the assertion follows the control rather than being deleted with it.
+ */
+test('the Biological Sex group keeps its name on the Profile details screen', async ({ page }) => {
+  await page.goto('/more/details')
+  await settleRouteBoundary(page)
+
+  const sex = page.getByRole('radiogroup', { name: 'Biological Sex' })
+  await expect(sex).toBeVisible({ timeout: 60_000 })
+  await expect(sex.getByRole('radio')).toHaveCount(3)
   for (const radio of await sex.getByRole('radio').all()) {
     expect(await radio.getAttribute('aria-checked')).toMatch(/^(true|false)$/)
   }

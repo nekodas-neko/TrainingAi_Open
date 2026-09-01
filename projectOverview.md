@@ -24,8 +24,28 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.415.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
-**Last updated:** 2026-08-31.
+**Version:** v1.416.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Last updated:** 2026-09-01.
+
+**The personal details are one screen, and one writer (BF-79).** Owner: *"can we combine all the
+personal information fields into 1 section in the more/details."* They were split between the Edit
+Profile sheet (display name) and the Goals accordion (height, birth year, biological sex) — and
+until BF-78 each editor resent the other's fields from a possibly stale copy. `More → Profile
+details` (`app/more/details/`) now holds all four, with **weight and body fat read-only** beside a
+link to where they are logged — an input there would open a second write path into `body_metrics`.
+Targets and activity level stayed in Goals, so the split closed rather than moved, and Goals gained
+an *Open Profile details* button because it still demands fields it can no longer edit. Reading the
+same two components filed three findings rather than fixing them — **LB-40** (a user who already has
+a password *cannot change it*: the form never renders the field the route requires), **LB-42** (two
+columns for one weight goal, with different readers, so the number the user sees and the one the AI
+is told can differ — Lane A), **LB-41** (a Weight Units toggle with no consumer). **Not
+device-verified** ([journal](docs/overview/entries/2026-09-01-personal-details-consolidation.md)).
+
+**The quantity box on Assign to Meal centres (BF-85).** Chromium draws the spin button inside the
+box, so `text-center` sat left of centre; and `text-sm` was inert under `globals.css`'s
+`input { font-size: 16px !important }`. The entry's own fix — use the shared `Input` primitive —
+was wrong: **1 of 28** `type="number"` inputs uses it, and neither quantity control does. **Not
+device-verified** ([journal](docs/overview/entries/2026-09-01-quantity-box-spinner-reset.md)).
 
 **Coach can be scoped to one subject, and the scope is made of what it never receives (LA-47).**
 Opening Coach from Nutrition will give it the meal plan, intake and targets — and **not** the
