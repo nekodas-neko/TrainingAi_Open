@@ -24,7 +24,7 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.416.4 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Version:** v1.417.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-09-01.
 
 **An account with a password could not change it (LB-40).** `EditProfileSheet` initialised
@@ -48,6 +48,18 @@ the mirror is now tautological and was replaced** — a re-export cannot disagre
 the invariant nothing else checks: `energy-baseline.ts` imports nothing at all, which is the only
 property keeping it client-importable and the one that broke twice
 ([journal](docs/overview/entries/2026-09-01-energy-constants-leaf.md)).
+
+**Two settings that did nothing, both decided by the owner (LB-41, LB-29).** The **Kg / Lbs switch**
+was `useState('kg')` — never persisted, never read, reset on every reopen, and nothing in the app
+renders pounds; removed rather than left offering what it could not do, with real unit display
+filed as the feature it would actually be. And **a setting could be overwritten by the server's
+older copy**: `savePreference` PATCHes fire-and-forget, so a reload before it landed was answered
+with the previous value — permanently offline, where the PATCH never lands. The owner chose *the
+change follows to other devices* over the simpler never-clobber rule, so hydration now skips a key
+whose PATCH is unacknowledged and **re-sends** it, which self-heals offline on the first launch with
+a network. Verified in a browser with the PATCH held open: the choice survives the reload. **Not
+device-verified** ([journal](docs/overview/entries/2026-09-01-settings-that-did-nothing.md)).
+
 
 **The calorie bar says why zero is zero (BF-87).** Owner: *"is basic steps being counted towards
 calorie burn? It says I've done 1000 but not sure if that's counting towards nutrition."* The app was

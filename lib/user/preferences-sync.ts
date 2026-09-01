@@ -11,9 +11,16 @@ import { PREFERENCE_STORAGE, type UserPreferences } from '@trainingai/shared/use
  * separately and **no read site called it**, so nothing user-visible had changed. This is what
  * connects them.
  *
- * **The conflict rule is settled and one-directional: the server wins.** `localStorage` is a seed
- * written *from* the server and never the reverse, which is the same rule Q-241 set for goals. So
- * `hydrate` overwrites the device copy without comparing, and `savePreference` writes both.
+ * **The conflict rule is "the server wins, EXCEPT over a change it has not seen yet" (LB-29).**
+ * `localStorage` is a seed written from the server, so `hydrate` overwrites the device copy without
+ * comparing — but only for keys whose last local write has been acknowledged. A key written here
+ * and not yet PATCHed is marked unsynced, and hydration leaves it alone and re-sends it instead.
+ *
+ * Without that mark the seed loses the write that produced it: `savePreference` writes locally and
+ * PATCHes in the background, so a reload in that window is answered with the server's *previous*
+ * value, which is then written over the user's choice. Offline it is not a race but permanent —
+ * the PATCH never lands, so every launch re-writes the old value. The owner asked for the change to
+ * follow across devices, which rules out the simpler "only ever fill in a key the device lacks".
  *
  * **Seeding rather than reading through** is what keeps first paint synchronous: every surface here
  * already reads its `localStorage` key during render, and making them await a fetch would trade a
@@ -39,6 +46,51 @@ function encode(name: PreferenceName, value: unknown): string {
 const EXCLUSIVE_GROUPS: readonly (readonly PreferenceName[])[] = [['brandTheme', 'brandHue']]
 
 /**
+ * Preferences written here whose PATCH has not been acknowledged (LB-29).
+ *
+ * In `localStorage` rather than memory because **the reload is the whole problem** — a
+ * session-scoped set does not survive the navigation that loses the value. One key holding a name
+ * list, not a key each, so the set is read and written atomically.
+ */
+const UNSYNCED_KEY = 'ta_prefs_unsynced'
+
+function readUnsynced(): Set<string> {
+  if (typeof window === 'undefined') return new Set()
+  try {
+    const raw = localStorage.getItem(UNSYNCED_KEY)
+    const parsed: unknown = raw ? JSON.parse(raw) : []
+    return new Set(Array.isArray(parsed) ? parsed.filter((n): n is string => typeof n === 'string') : [])
+  } catch {
+    // Unparseable or unavailable. An empty set means hydration behaves exactly as it did before
+    // this entry — the server wins — which is the safe direction to fail in.
+    return new Set()
+  }
+}
+
+function writeUnsynced(names: Set<string>): void {
+  try {
+    if (names.size === 0) localStorage.removeItem(UNSYNCED_KEY)
+    else localStorage.setItem(UNSYNCED_KEY, JSON.stringify([...names]))
+  } catch { /* private mode or quota */ }
+}
+
+/** Read a device value back as the type the schema expects, for re-sending an unsynced key. */
+function decode(name: PreferenceName, raw: string | null): unknown {
+  if (raw === null) return null
+  const { encoding } = PREFERENCE_STORAGE[name]
+  if (encoding === 'json') {
+    try { return JSON.parse(raw) } catch { return null }
+  }
+  if (encoding === 'number') {
+    const n = Number(raw)
+    return Number.isFinite(n) ? n : null
+  }
+  // The reminder toggles are `String(boolean)` compared against the literal 'false'.
+  if (encoding === 'boolean') return raw !== 'false'
+  return raw
+}
+
+/**
  * Seed the device keys from the server bag.
  *
  * **It never deletes a key the bag does not carry, and that is a correction rather than a
@@ -58,7 +110,11 @@ const EXCLUSIVE_GROUPS: readonly (readonly PreferenceName[])[] = [['brandTheme',
  */
 export function hydrateUserPreferences(prefs: UserPreferences | null | undefined): void {
   if (!prefs || typeof window === 'undefined') return
+  const unsynced = readUnsynced()
   for (const [name, { key }] of Object.entries(PREFERENCE_STORAGE)) {
+    // LB-29: this key holds a change the server has not acknowledged, so its copy is older than
+    // ours by definition. Seeding over it is what loses the choice that was just made.
+    if (unsynced.has(name)) continue
     const value = prefs[name as PreferenceName]
     if (value === undefined) continue
     try {
@@ -68,6 +124,9 @@ export function hydrateUserPreferences(prefs: UserPreferences | null | undefined
     }
   }
   for (const group of EXCLUSIVE_GROUPS) {
+    // An unsynced member of the pair is a choice in flight; clearing its partner from under it
+    // would apply the server's older half of a pair the user has already replaced.
+    if (group.some(n => unsynced.has(n))) continue
     const chosen = group.find(n => prefs[n] !== undefined)
     if (!chosen) continue
     for (const other of group) {
@@ -75,6 +134,30 @@ export function hydrateUserPreferences(prefs: UserPreferences | null | undefined
       try { localStorage.removeItem(PREFERENCE_STORAGE[other].key) } catch { /* see above */ }
     }
   }
+  resendUnsynced(unsynced)
+}
+
+/**
+ * Re-send the device's value for every key whose last PATCH is unaccounted for.
+ *
+ * This is what makes the offline case self-heal rather than merely survive: the mark persists
+ * across launches, so the first launch with a network carries the change to the server, and the
+ * mark clears. Without it a key would stay pinned to the device forever and never propagate —
+ * which is the promise the owner chose against.
+ */
+function resendUnsynced(unsynced: Set<string>): void {
+  if (unsynced.size === 0) return
+  const patch: PreferencePatch = {}
+  for (const name of unsynced) {
+    if (!(name in PREFERENCE_STORAGE)) continue
+    const n = name as PreferenceName
+    ;(patch as Record<string, unknown>)[n] = decode(n, localStorage.getItem(PREFERENCE_STORAGE[n].key))
+  }
+  if (Object.keys(patch).length === 0) {
+    writeUnsynced(new Set())
+    return
+  }
+  void patchServer(patch, [...unsynced])
 }
 
 /**
@@ -166,11 +249,29 @@ export function savePreferences(patch: PreferencePatch): void {
       // Private mode or quota — still try the server, which is the authority anyway.
     }
   }
-  void fetch('/api/user/preferences', {
+  const names = Object.keys(patch)
+  // Marked BEFORE the request, so a reload mid-flight finds the mark rather than racing it.
+  const unsynced = readUnsynced()
+  for (const n of names) unsynced.add(n)
+  writeUnsynced(unsynced)
+
+  void patchServer(patch, names)
+}
+
+/** PATCH the bag, and clear the unsynced mark for exactly the keys the server accepted. */
+function patchServer(patch: PreferencePatch, names: string[]): Promise<void> {
+  return fetch('/api/user/preferences', {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(patch),
+  }).then(res => {
+    // Only a 2xx clears the mark. A 4xx/5xx leaves the key unsynced, so the device keeps winning
+    // and the next hydration tries again — the same shape as the offline case.
+    if (!res.ok) return
+    const still = readUnsynced()
+    for (const n of names) still.delete(n)
+    writeUnsynced(still)
   }).catch(() => {
-    // Offline or signed out. The device keeps the value; the next successful save carries it.
+    // Offline or signed out. The mark persists, so the next launch re-sends it.
   })
 }
