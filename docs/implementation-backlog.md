@@ -814,7 +814,7 @@ has already recorded that a bulk job bumps `updated_at` without rewriting a valu
 > already-trained branch, before the readiness/AI one. `/api/log-rest-day` and the push branch call
 > one `setRestDay`. All three of the original failures are closed: the second device sees the
 > choice, it survives a reinstall, and a refetch no longer reverts it.
-> [journal](../overview/entries/2026-09-01-rest-day-stored.md)
+> [journal](overview/entries/2026-09-01-rest-day-stored.md)
 >
 > - **Keep:** the surface. Lane B's, and safe to ship second now that the storage exists.
 
