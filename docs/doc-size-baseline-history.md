@@ -6249,7 +6249,20 @@ The line about the guard finding twelve e2e specs the entry's own file table mis
 evidence for a general point: a rename's blast radius includes its tests, and a file table written by
 reading will not contain them.
 
-## 2026-09-01 — `projectOverview.md` → 9067, `docs/implementation-backlog.md` → 15361 (LB-37 shipped)
+## 2026-09-01 — `docs/implementation-backlog.md` 15376 → 15443 (BF-105, walk phase cues)
+
++67 lines for one entry, above the usual because most of it is evidence that the obvious diagnosis is
+wrong. "The phase change isn't signalled" reads like a missing feature; the cue is in fact scheduled,
+on a real HIGH-importance channel with a default sound, on an exact alarm with `allowWhileIdle`. Each
+of those took a check — including the pinned plugin source for what an absent `sound` does, which is
+keep Android's default rather than go silent — and an implementer who skips them builds a cue that
+already exists. The entry also carries two things that would otherwise be found on-device at the cost
+of an APK cycle: a NotificationChannel's sound and vibration are immutable once created, so
+differentiating fast from slow needs new channel ids rather than edited settings; and that work is JS
+in `capacitor-native-init.tsx`, so it ships through Railway despite looking native. The one genuinely
+native piece — a custom sound file in `res/raw/` — is marked as such.
+
+## 2026-09-01 — `projectOverview.md` → 9067, `docs/implementation-backlog.md` → 15436 (LB-37 shipped)
 
 The backlog shrank: LB-37's entry carried the whole measurement argument — the method, the error-code
 breakdown, the case for a ratchet over a sweep — and that is now in the journal, where it is read
