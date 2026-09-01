@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.416.2",
+    date: "2026-09-01",
+    changes: [
+      "Your goal weight is one number again. It was stored in two places — one edited on the profile sheet, one in the Goals section — and the Health page showed one of them while the nutrition coach was told the other. Both screens now read and write the same value, and nothing you had set was lost.",
+    ],
+  },
+  {
     version: "1.416.1",
     date: "2026-09-01",
     changes: [
