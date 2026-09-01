@@ -388,6 +388,81 @@ below threshold and left in place for next time.
 > BF-29 (My meals), BF-30 (Meal detail), BF-31 (Edit meal) and BF-26 (Quantity). Two artboards need
 > no entry — `Tap targets` and the `srv/g` studies both shipped in Q-395a.
 
+### [activity][app-shell] BF-105 — the interval-walk phase change fires one generic ping and nothing in-app
+
+- **Lane:** B — `components/guided-walk/walk-active.tsx`, `lib/walk/walk-cues.ts`,
+  `components/capacitor-native-init.tsx` (channel definitions). **No APK needed** — see the native
+  note below, which is the part that looks like it needs one and doesn't.
+- **Added:** 2026-09-01 · owner, mid-walk screenshot: *"there isn't enough of a queue to indicate
+  session phase changed. needs more sound and possible visually cues."*
+- **Verify:** device — notification sound, vibration and channel behaviour are all invisible in the
+  web sandbox and in `pnpm dev`.
+
+**The cue exists and fires on time — this is not a missing feature or a timing bug, and an implementer
+should not go looking for one.** `scheduleWalkCues` (`lib/walk/walk-cues.ts`) schedules one local
+notification per segment boundary, up front, at walk start. Checked end to end:
+
+- the `workout-timers` channel **is** created — `components/capacitor-native-init.tsx:147`, importance
+  **4 (HIGH)**, `vibration: true`. No custom `sound`, and per the pinned plugin source
+  (`NotificationChannelManager.java:90-101`) an absent sound means `setSound` is never called, so the
+  channel keeps Android's **default notification sound**. It is audible, not silent.
+- timing is exact: `USE_EXACT_ALARM` is granted in the manifest (`AndroidManifest.xml:132`) and the
+  plugin takes the `setExactAndAllowWhileIdle` branch, with `allowWhileIdle: true` set on every cue.
+
+**So what is actually wrong is that the cue carries no information.** Two findings, and the second is
+the one that matches the screenshot:
+
+1. **Every transition sounds identical.** `cueTitle` varies the *text* — "Fast — push the pace" against
+   "Slow — ease off" — but sound, vibration and importance belong to the **channel**, and there is one
+   channel for all of them. Walking with the phone in a pocket, "a notification fired" is the whole
+   signal; which way the pace just changed is unrecoverable without taking the phone out and reading
+   it, which is the thing the cue exists to avoid.
+2. **There is no in-app cue at all.** `walk-active.tsx` calls `hapticSuccess()` at exactly one place —
+   line 130, `e >= plan.totalSec`, the end of the entire walk. Nothing fires on a segment boundary. So
+   with the app open and in hand (as in the report), the screen's whole response to a phase change is
+   **one word swapping and changing colour**, plus the countdown resetting — no haptic, no flash, no
+   motion. Everything else on screen (bpm, spm, steps, the pacer bar) is unchanged. It is easy to miss
+   while walking and looking up.
+
+**⚠ `walk-cues.ts:44` says the opposite, and that comment is why this reads as handled.** Its catch
+block is annotated *"the in-app timer still drives cues when foregrounded"* — **there is no such
+path.** Delete or correct that comment in the same PR; left standing it will send the next reader
+looking for an in-app cue that does not exist, exactly as it did here.
+
+**⚠ The native constraint that will otherwise be discovered on-device: a NotificationChannel's sound
+and vibration are immutable once created.** `createChannel` on an existing id is a no-op for those
+fields, and the owner's phone already has `workout-timers`. So giving fast and slow different sounds
+means **new channel ids** (`walk-cue-fast` / `walk-cue-slow`), not edited settings — and the old
+channel should be deleted so the app's notification settings don't accumulate a dead row. All of that
+is JS in `capacitor-native-init.tsx`, so despite being notification-channel work it **ships through a
+Railway deploy with no APK**.
+
+**Recommendation — do the in-app half first; it is where the reported failure is and it is cheap.**
+Fire on `active.segment.index` change, not on a timer: a distinct haptic per kind (`hapticSuccess` for
+fast, `hapticLight` for slow — different enough to tell apart through a pocket) plus a visual
+transition the peripheral vision catches, which is a brief full-bleed colour wash and the phase word
+scaling in rather than swapping. `motion` v12 is installed and is the tool for it; do not hand-roll.
+The two-channel split is the second half and only pays off when the screen is off.
+
+- **Sound beyond the notification is a bigger ask than it looks.** There is no TTS in the app — Q-189
+  deleted that route — and the one beep generator, `playBeep()`, is a private function inside
+  `components/workout-screen.tsx:86`; sharing it means extracting to `lib/` first, per One Formula One
+  Place. It also cannot replace the notification: Web Audio is suspended in a backgrounded WebView, so
+  an in-app beep only supplements the foreground case. **A custom notification sound per channel is the
+  version that works with the screen off**, and it needs an audio file in `android/app/src/main/res/raw/`
+  — which *is* an APK change, and is the one piece of this entry that is.
+- **Adjacent, not part of this:** a guided walk never sets `AndroidScreen.setKeepAwake` — only
+  `workout-screen.tsx:1373` does — so the screen sleeps mid-walk and the notification is the primary
+  channel by default. That is arguably correct for a 30-minute walk and is not being changed here, but
+  it is why finding 1 matters more than finding 2 in practice.
+- **Verification (device):** with the app foregrounded, a fast→slow boundary produces a haptic and a
+  visible transition without the phone being raised; with the screen off and the phone pocketed, the
+  two directions are distinguishable by sound or vibration alone; the cue still fires at the right
+  second after the app has been backgrounded for several minutes (the exact-alarm path, worth
+  re-confirming rather than assuming); and the walk's cues are cancelled on leaving so a stopped walk
+  does not keep pinging.
+
+
 ### [nutrition] BF-104 — log a meal at 0.5× / 1× / 1.5×; the storage supports it and nothing sets it
 
 - **Lane:** B for the picker on the meal sheet; A for the one argument through
