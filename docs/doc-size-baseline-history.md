@@ -5993,7 +5993,20 @@ understates the rest. The line that has to survive is the one that reorders the 
 overlay is gated on **data**, not effort, and building it first would render a chart of one point
 where a broken query and an empty one look identical.
 
-## 2026-09-01 — `docs/implementation-backlog.md` → 14951 (LA-52 filed, LA-48 re-scoped)
+## 2026-09-01 — `docs/implementation-backlog.md` → 14924 (BF-64 re-classified to Lane B)
+
+Seventeen lines, and they are three findings rather than restatement. BF-64 was assigned Lane A on
+the assumption its fix lives in the server pipeline; following its own recommendation, the fix is
+entirely client-side and Lane B's. The two lines that would otherwise cost the implementer a day
+each: `applyDeloadReverts` **already** clears `deloaded` so the PR path treats a reverted exercise
+as full — the hazard the entry flags is handled by the mechanism it recommends — and
+`preDeloadStyle`'s all-false `useFor1rm` **looks like a bug and is not**, because `estimateOneRm`
+reads an all-false style as "use them all".
+
+A finding that something is *not* broken earns its lines here exactly when the thing looks broken on
+sight, which this does.
+
+## 2026-09-01 — `docs/implementation-backlog.md` → 14976 (LA-52 filed, LA-48 re-scoped)
 
 One new entry and a scope correction, both from reading code rather than from a report. The lines
 that cannot be cut are the three consequences of the pacer's speed rung being fed a whole-walk
