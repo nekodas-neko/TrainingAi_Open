@@ -6,6 +6,7 @@ import { cn } from '@trainingai/shared/utils'
 import { MACRO_COLORS } from '@trainingai/shared/nutrition/macro-colors'
 import type { MealPlan, MealPlanVariant, MealPlanMeal, MealPlanDayType, MealType } from '@trainingai/shared/types/nutrition'
 import { fillableMeals } from './plan-day-fill'
+import { rescaleRemaining } from './plan-rescale'
 import { PlanMealRow } from './plan-meal-row'
 
 interface Props {
@@ -128,6 +129,22 @@ export const MealPlanSection = memo(function MealPlanSection({
         declinedMealIds: declinedMealIds ?? new Set(),
       })
     : []
+  // Q-187's second half. Read time only: `plan` is untouched, and every number below falls back to
+  // the planned one the moment this returns null.
+  const rescale = rescaleRemaining({
+    meals: variant.meals,
+    target: {
+      calories: variant.targetCalories,
+      proteinG: variant.targetProteinG,
+      carbsG: variant.targetCarbsG,
+      fatG: variant.targetFatG,
+    },
+    eaten,
+    loggedPositions: loggedPositions ?? new Set(),
+    declinedMealIds: declinedMealIds ?? new Set(),
+    isToday: logDate != null && today != null && logDate === today,
+  })
+
   const dayLabel = variant.dayType === 'all' ? null
     : variant.dayType === 'training' ? 'Training day' : 'Rest day'
 
@@ -170,6 +187,16 @@ export const MealPlanSection = memo(function MealPlanSection({
         <MacroRow label="Fat" eaten={eaten?.fatG} target={variant.targetFatG} color={MACRO_COLORS.fat} />
       </div>
 
+      {/* Q-187's floor sentence. It only appears when the plan can no longer be met as written —
+          otherwise the adjusted numbers on the rows speak for themselves and a banner repeating
+          them is noise. Text, not a colour: over-budget is a state the reader has to be able to
+          read, not infer from a tint. */}
+      {rescale?.note && (
+        <p className="mt-3 rounded-xl bg-muted/50 px-3 py-2 text-[11px] leading-snug text-muted-foreground">
+          {rescale.note}
+        </p>
+      )}
+
       {/* Q-187 step 4: the plan's automatic half, as an explicit action rather than a prefill on
           day open — a prefill that guesses wrong trains you to ignore it. It sits in the collapsed
           card because not having to expand first is the entire value; it is hidden when there is
@@ -209,6 +236,10 @@ export const MealPlanSection = memo(function MealPlanSection({
                 key={meal.id}
                 meal={meal}
                 accent={BRAND}
+                adjustedCalories={rescale?.byPosition.get(meal.position)?.calories}
+                adjustedProteinG={rescale?.byPosition.get(meal.position)?.proteinG}
+                adjustedCarbsG={rescale?.byPosition.get(meal.position)?.carbsG}
+                adjustedFatG={rescale?.byPosition.get(meal.position)?.fatG}
                 logging={loggingPosition === meal.position}
                 busyLogging={loggingPosition != null || bulkLogging === true}
                 logged={loggedPositions?.has(meal.position) ?? false}

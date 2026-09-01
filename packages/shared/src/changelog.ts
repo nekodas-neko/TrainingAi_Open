@@ -6,6 +6,16 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.428.0",
+    date: "2026-09-01",
+    changes: [
+      "Your meal plan now adjusts to what you have actually eaten. Log a big lunch and the meals still to come are scaled down to fit the rest of the day; eat light and they scale up. Each meal shows the new figure with the planned one beside it, so nothing is hidden and the plan itself is unchanged.",
+      "The overshoot is spread across every remaining meal rather than taken out of the next one \u2014 taking a 700 kcal lunch entirely out of dinner is honest arithmetic and produces a dinner nobody eats.",
+      "There is a floor. A meal that would drop under 250 kcal is left as planned instead, and the card says why \u2014 \u0022you're 400 kcal past today's target, so the remaining 3 meals are left as planned\u0022. A plan that tells you to eat 180 kcal for dinner gets ignored once and then always.",
+      "Nothing is logged or saved by any of this. It changes what is suggested, not what you ate.",
+    ],
+  },
+  {
     version: "1.427.0",
     date: "2026-09-01",
     changes: [

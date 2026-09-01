@@ -24,7 +24,7 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.427.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Version:** v1.428.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-09-01.
 
 **Test files are typechecked now, and they never were (LB-37).** `tsconfig.json` excluded
@@ -40,6 +40,20 @@ and the spec passes. Two placement calls: a **second tsconfig** rather than edit
 `next build` reads, and the step in **Build** rather than Custom Rules, which installs nothing and
 would have failed CI on the entry's own suggestion
 ([journal](docs/overview/entries/2026-09-01-typecheck-tests.md)).
+
+**The meal plan recalculates against what you actually ate (Q-187).** The owner's held-back
+sentence — *"if you eat too much during lunch it will cut some portions for other meals or vice
+versa"* — with the gate answered the same day: *"if choosing one then spread is fine."* The day's
+overshoot or shortfall is spread across every remaining meal **at read time**, each row showing the
+adjusted figure with `(planned N)` beside it. **The floor is the half that keeps it usable:** a meal
+that would drop under 250 kcal is left as planned and the card says why, because a plan that says
+*"eat 180 kcal for dinner"* is ignored once and then always. **The entry pointed at the wrong set** —
+`fillableMeals` answers which meals are *due enough to log now*, which is the opposite of what is
+left to eat; using it would have handed a skipped lunch's calories to dinner. Nothing is stored and
+nothing is logged. **Not device-verified, and there is no e2e** — the seed creates no meal plan and
+no food logs, so the whole plan card is unreachable from the harness (**LB-51**); the three states
+were driven by hand against the local database instead
+([journal](docs/overview/entries/2026-09-01-feat-q-187-plan-rescale.md)).
 
 **The walk pacer reads speed now rather than the whole walk (LA-52).** `appendPoint` set
 `currentPaceSecPerKm` from cumulative distance over cumulative elapsed and the screen fed that
