@@ -6191,3 +6191,17 @@ the first: the lesson from one did not generalise to the other.
 The line about the four spec failures all reporting `expected 840, received 0` is the one that saves
 the most time later. That is what makes a fixture problem indistinguishable from a regression, and
 the fix — a spec that asserts its own preconditions — is worth more than the feature it guards.
+
+## 2026-09-01 — `docs/implementation-backlog.md` 15352 → 15376 (BF-103 rewritten on an owner decision)
+
++24 lines, all inside one existing entry — no new entry, no new heading. The owner rejected BF-103's
+`Saved` recommendation in favour of `My Foods` on every surface, on the grounds that the historical
+failure was two labels for one list rather than the wording of either. Rewriting the entry to record
+that cost more lines than it saved because the sweep that came with it is the substance: `My Meals`
+turned out to be **eight** user-visible strings across five files, not the two the entry named — a
+toast with two arms, an empty state, three buttons, a badge and an `aria-label` — and a table naming
+each is what stops the rename shipping half-done. The other addition is a warning the entry did not
+carry: `My Foods` was already the name of a **merged** list in v1.382.0 and the merge was reverted in
+v1.385.0, so an implementer reading the new label could reasonably re-merge the tabs and reintroduce
+a defect the app has already paid for. Both are the kind of thing that is cheap here and expensive in
+review.
