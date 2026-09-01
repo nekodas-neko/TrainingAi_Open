@@ -6,6 +6,16 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.421.0",
+    date: "2026-09-01",
+    changes: [
+      "The device consoles are listed in the admin console again. They were always routed there and always admin-only \u2014 what moved was the link, out to Settings \u2192 Developer, so going to the admin console and finding nothing was the whole problem.",
+      "The Oura BLE screen is in the order the runbook uses instead of fourteen panels in the order they were written: check there is room, drain, confirm what landed, validate it, then the probes and the two things that write.",
+      "Each section says when you would be on it, since a panel's title tells you what it reads and never when to read it.",
+      "Settings \u2192 Developer keeps the app diagnostics \u2014 error log, AI usage, day review \u2014 and no longer lists the device screens as well.",
+    ],
+  },
+  {
     version: "1.420.0",
     date: "2026-09-01",
     changes: [

@@ -1,6 +1,6 @@
 "use client"
 
-import { Bluetooth, ClipboardList, Footprints, Gauge, ScrollText, Sparkles } from 'lucide-react'
+import { Gauge, ScrollText, Sparkles } from 'lucide-react'
 import { useTransitionRouter } from '@/lib/view-transition'
 import { MoreSubScreen } from '@/components/more/sub-screen'
 import { MoreRow, MoreRowGroup } from '@/components/more/more-row'
@@ -11,19 +11,19 @@ import SetHrBackfillCard from '@/components/admin/set-hr-backfill-card'
 import WorkoutHrBackfillCard from '@/components/admin/workout-hr-backfill-card'
 import ModelAssetsCard from '@/components/admin/model-assets-card'
 
-/** Settings → Developer. These are debug tools for the owner's own device, used far more often than
- *  user administration, and they used to be the deepest-buried things in the app: a button, inside
- *  a tab, inside a console, reachable only from the bottom of the More scroll (Q-234). */
+/** Settings → Developer. App diagnostics — the error log, AI usage, day review, and the one-off
+ *  maintenance cards. **Device consoles are NOT here (Q-531)**: they live under `/admin` → Devices,
+ *  because a drain or a re-sync is destructive in the wrong hands and access control outranks the
+ *  taxonomy that put them here (Q-234). Do not re-add a device row to this screen. */
 export function DeveloperContent() {
   const router = useTransitionRouter()
   return (
     <MoreSubScreen title="Developer">
-      <MoreRowGroup label="Device consoles">
-        <MoreRow icon={Bluetooth} label="Oura BLE debug" onClick={() => router.push('/admin/oura-ble')} />
-        <MoreRow icon={Footprints} label="Cadence calibration" onClick={() => router.push('/admin/cadence')} />
-        <MoreRow icon={ClipboardList} label="Device data capture" onClick={() => router.push('/admin/data-capture')} />
-      </MoreRowGroup>
-
+      {/* Q-531: the three device consoles used to be listed here as well. They are routed under
+          `/admin` and always were, so listing them from two places is what made the drain → verify
+          flow feel spread out — the owner went to the admin console and found nothing. One home:
+          `/admin` → Devices. What stays here is the diagnostics that are genuinely about the app
+          rather than about a device. */}
       <MoreRowGroup label="Diagnostics">
         <MoreRow icon={ScrollText} label="Error log" onClick={() => router.push('/more/settings/developer/errors')} />
         <MoreRow icon={Sparkles} label="AI usage" onClick={() => router.push('/more/settings/developer/ai-usage')} />

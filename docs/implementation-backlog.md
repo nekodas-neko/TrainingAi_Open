@@ -8125,61 +8125,32 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 
 ### [app-shell][devices] Q-531 — Q-234 moved the device consoles out of /admin, and in use that made them worse
 
-- **✅ THE OWNER GATE IS CLEARED, 2026-09-01 — the field is removed above, deliberately.**
-  Asked where the drain / re-sync / verify flow should live, the owner answered: *"Happy to have it
-  wherever you want; but it should be behind the admin portal — as regular users should not be able
-  to touch it."*
-- **So the decision has a hard half and a soft half, and only the hard half is the owner's.**
-  - **Hard, and it settles Q-234's premise: these consoles go back behind `/admin`.** Q-234 moved
-    them to Settings → Developer on a taxonomic argument — device diagnostics are not user
-    administration — and that argument never weighed *who may reach them*. The app has other users
-    (CLAUDE.md's amended Canonical Runtime section says so outright), and a drain or a re-sync is
-    destructive in the wrong hands. Access control beats taxonomy, so the move is reverted in
-    effect. **`requireAdmin`, not merely an unlinked route** — hiding a page is not gating it.
-  - **Soft, and it is the implementer's: one screen holding the whole flow.** The owner explicitly
-    handed the layout back. Their original complaint was *"everything is spread out sporadically"*,
-    which is about the flow being broken across places rather than about the parent menu — so
-    reverting the location alone would leave the actual grievance intact. **Build the three consoles
-    as one `/admin` Devices screen carrying drain → re-sync → verify end to end**, in the order the
-    runbook uses.
-- **What this does NOT license.** The entry still asks for the owner to walk the flow and say where
-  they expected each step to land, and that is still worth having — but it is no longer a blocker,
-  because the failure it guards against (an agent re-picking the structure on taxonomy alone) is
-  precisely what the "one screen, runbook order" instruction removes. Reversal cost is low: a screen
-  and a route guard, no data.
-- **Lane:** B for the screen; **the `requireAdmin` guard on any route that moves is Lane A.** If the
-  routes stay put and only the UI regroups, it is Lane B alone.
-
-- **Superseded context — the block below is what the entry said before the decision.** Skipped by
-  Implementation Lane B on
-  2026-08-17 while taking Q-532 below it. This entry asks for the *premise* of a shipped IA decision
-  to be re-litigated against a real user's task, and the owner's report is the only evidence of what
-  that task actually is. An agent choosing the new structure alone would be repeating exactly the
-  mistake the entry describes — Q-234 reasoned taxonomically, correctly on paper, and was wrong in
-  use. What unblocks it: the owner walking the drain/re-sync/verify flow start to finish and saying
-  where they expected each step to live. That is a planning session's output (a plan doc), not a
-  Lane B implementation item.
-- **Branch:** `fix/device-console-ia`
+- **Keep:** the owner walking the drain → re-sync → verify flow on the S25 and saying whether the
+  section order matches what they actually do. That was never a blocker and is not one now; it is the
+  only part that cannot be answered from the sandbox.
+- **Verify:** device.
+- **✅ SHIPPED** (`fix/device-console-ia`, 2026-09-01, v1.421.0). `/admin` grew a **Devices** tab;
+  `/admin/oura-ble` is six numbered sections in §4-of-the-runbook order rather than fourteen stacked
+  consoles; Settings → Developer lost its device rows and kept Diagnostics.
+  `app/admin/__tests__/device-console-access.test.ts` pins the gating, the reachability, the one-home
+  rule and Q-544's card ordering — five mutations, five failures.
+- **⚠ THE ENTRY'S HARD HALF WAS ALREADY TRUE, AND THAT CHANGED THE WORK.** It reads as though the
+  consoles needed moving back behind `/admin` under `requireAdmin`. They were already there:
+  `/admin/oura-ble`, `/admin/cadence` and `/admin/data-capture` all call `isAdminUser` and redirect,
+  and always did — **Q-234 moved the LINKS, not the routes.** So the owner's *"it was moved away from
+  the admin section"* was true of the navigation and false of the routing: they went to `/admin`, the
+  consoles were not listed, and they concluded the consoles had left. **A reachability defect, which
+  needs the opposite fix from the one this entry proposed.** Implementing it as written would have
+  been a no-op dressed as a security fix.
+- **Lane:** B. No route moved, which is what the entry's own lane rule makes the deciding question.
+- **Do not re-add a device row to Settings → Developer.** Two homes is what *"everything is spread
+  out sporadically"* meant, and the taxonomy argument that put them there (Q-234: device diagnostics
+  are not user administration) is sound on paper and was wrong in use. The owner: *"it should be
+  behind the admin portal — as regular users should not be able to touch it."*
+- **Related, and still open:** Q-537 (the ring key has one copy — its placement half, nesting the key
+  field behind something deliberate so it cannot be edited by accident, is still unbuilt) and Q-532
+  (the scan auto-recentre).
 - **Added:** 2026-08-17, from an owner report while running the Oura re-sync runbook.
-- **This is feedback on a shipped change, not a new idea.** Q-234 landed 2026-08-15 (v1.313.0):
-  `/admin` kept user administration, diagnostics moved to **Settings → Developer**, and the three
-  device consoles became rows there. Its journal records that as done and correct. The owner, using
-  it under real conditions for the first time, reports the opposite: *"it was moved away from the
-  admin section to the diagnostic section = bad"*, and *"everything is spread out sporadically,
-  needs organisation"*.
-- **Why the disagreement is the useful part.** Q-234's reasoning was taxonomic — device diagnostics
-  are not user administration, so they belong apart. That is sound on paper and appears to be wrong
-  in use, because the operations these screens support (drain, re-sync, verify) are a **single task**
-  that now spans two locations. Re-litigate the premise before re-arranging anything; a second
-  reorganisation chosen the same way will land in the same place.
-- **What to do.** Read the Q-234 entry and its journal first, then treat this as an IA question with
-  a real user's task in hand: what does someone actually *do* on these screens, start to finish, and
-  where should that live. The answer may be that diagnostics belong back under `/admin`, or that
-  the split is right but the destination is wrong. Decide it deliberately and write down why.
-- **Related:** Q-537 (ring key has one copy) and Q-532 (the scan auto-recentre) both live on these
-  screens. Q-537's placement half — the key field should be nested behind something deliberate so it
-  cannot be edited by accident — is best solved as part of this, not separately.
-- **Verification:** device-only. None of it is checkable from the sandbox.
 
 ### [workouts][app-shell][platform] Q-461 — the workout flow cannot be automated past set 1: the Start Set button animates forever, so Playwright never sees it as stable
 

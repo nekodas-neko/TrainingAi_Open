@@ -5937,3 +5937,16 @@ screen and sees a plain number has verified nothing.
 (8911, not the 8894 this branch measured before merging: BF-59's screen half landed 17 lines in
 between. A size baseline is a measurement of the merged file, never the sum of two hunks — resolving
 that conflict by picking a side would have been wrong whichever side won.)
+
+## 2026-09-01 — `projectOverview.md` → 8926 (Q-531)
+
++15, and the lines that cannot be cut are the correction rather than the change. "The device
+consoles are grouped better now" is the short version and it loses the only thing a future session
+needs: **the entry's premise was false, and checking it inverted the fix.** The consoles were already
+routed under `/admin` and already gated; Q-234 had moved the links. Written short, the next reader
+sees a tidy-up. Written this way, they see that an owner report can be literally true about the
+navigation and literally false about the routing, and that the difference decides whether you are
+fixing access control or reachability.
+
+The backlog **shrank by 24 lines** — Q-531 carried the whole owner-gate argument and a superseded
+block preserved from before the decision, both of which are now either shipped or in the journal.
