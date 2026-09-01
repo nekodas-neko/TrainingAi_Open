@@ -5751,3 +5751,24 @@ the dashboard and it distinguishes three hypotheses at once.
 The baton gains the third trap of the night in one family — Sentry, the prune, and now this. All
 three were negatives asserted from evidence that could not have shown a positive: a truncated grep
 twice, and a redirect stub once.
+
+## 2026-09-01 — BF-92 answered from the dashboard, and LA-20 confirmed fixed
+
+The owner opened Sentry: **one issue**, the Q-404 setup probe, 13 days old, server-side (US region,
+no url, no browser). That is not one of the three outcomes this entry predicted, and it is better —
+it settles all three at once.
+
+Client events are blocked: **9 client-source `error_events` rows against 0 Sentry browser events**
+over the same 13 days, same app, same device. Same-origin lands, cross-origin does not. Sentry
+holding nothing *else* turns out to be correct rather than a second fault — it only sees uncaught
+escapes, and the window's 34 server rows are all caught-and-reported (31 daytime-stress guard, 3
+aborted disconnects).
+
+The entry also gains the caveat the answer exposed: **0 `captureException` call sites** means Sentry's
+whole view is uncaught escapes — 1 event against `error_events`' 43. A quiet Sentry is not a quiet
+app, and fixing the CSP does not change that.
+
+`projectOverview.md` grows by the LA-20 confirmation, found in the same queries: all **31**
+`daytime-stress` occurrences fall on **2026-08-23**, the day of the fix, with **zero in the nine days
+since**. That entry's `Keep: production not verified` asked for exactly this check and it had never
+been run.

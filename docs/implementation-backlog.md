@@ -675,7 +675,24 @@ against it.**
   server-to-server call that **no CSP touches**. `instrumentation.ts`'s `onRequestError` hook calls
   `captureRequestError` for everything escaping a route handler. **The owner confirmed `SENTRY_DSN`
   is set (2026-09-01).** So the server path should be live and collecting.
-- **⭐ THE DECIDING OBSERVATION, and it needs one look at the dashboard.** If this entry is right,
+- **✅ ANSWERED 2026-09-01 — the owner looked, and the dashboard settles it.** Sentry holds
+  **exactly one issue**: `Q404WiringProbe`, *"Deliberate error proving the Sentry wiring delivers"*,
+  1 event, 13 days old, `url: --`, `transaction: --`, geography **US** (Railway's region, not the
+  owner's). A server-side event — the probe Q-404 fired at setup. Three conclusions:
+  1. **Server → Sentry works.** The probe delivered.
+  2. **Client → Sentry is blocked — now shown rather than argued.** Over the same 13 days
+     `error_events` recorded **9 client-source rows** while Sentry holds **zero** browser events.
+     Same app, same window, same device; the reporter that lands is same-origin and the one that
+     does not is cross-origin. That is the CSP.
+  3. **Sentry holding nothing else is CORRECT, not a second fault.** It only sees what escapes a
+     route handler uncaught, and nothing did: the 34 server rows over that window are **31 ×** the
+     `daytime-stress` constants guard plus **3 ×** `aborted` client disconnects, all caught and
+     reported by the app's own path, which by design never reaches the hook.
+- **⚠ Even with the CSP fixed, Sentry will see a narrow slice.** There are **0** explicit
+  `captureException`/`captureMessage` call sites, so its whole view is uncaught escapes: **1 event
+  against `error_events`' 43** over the same 13 days. Whether to forward caught server faults is a
+  separate decision this entry does not take — but nobody should read a quiet Sentry as a quiet app.
+- **(answered — kept for the reasoning) The deciding observation this entry asked for.** If this entry is right,
   Sentry holds **server** events and **zero browser** events — the two paths differ only in whether a
   CSP sits between them. A dashboard with both would refute the CSP diagnosis outright; a dashboard
   with neither points at the server DSN or the SDK rather than the header. Filter by platform
