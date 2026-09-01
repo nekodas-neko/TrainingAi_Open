@@ -14,7 +14,7 @@ silently misdirecting the next session. Update them in the same PR that consumes
 
 | Pointer | Value | Source of truth |
 |---|---|---|
-| Next free Postgres migration | **249** | `lib/data/postgres/migrations/` |
+| Next free Postgres migration | **250** | `lib/data/postgres/migrations/` |
 | Local SQLite schema version | **v32** | `lib/sqlite/migrations.ts`; `lib/sqlite/__tests__/migrations.test.ts` asserts the max |
 
 > **There is no third pointer any more.** Entry IDs are not allocated from a shared counter and
@@ -2618,94 +2618,33 @@ a finding — it does not by itself explain a plain `GET` hanging beside it.
 - **Keep:** whatever the cause, `connectionTimeoutMillis: 0` on a pool of 10 is worth a decision of
   its own — a bounded wait turns a hang into an error state a card can show.
 
-### [platform] BF-55 — 84 MB of index against 63 MB of table, and the database is growing ~7× its expected trend
+### [platform] BF-55 — the database is growing ~7× its expected trend
 
-- **Lane:** A
-- **Added:** 2026-08-30 · measured against production while checking BF-54. **These are the size
-  columns, read from the filesystem, so they are exact** — unlike the row counts BF-54 is about.
+> **✅ The index half shipped 2026-09-01** (migration 249). `oura_heartrate_user_updated` —
+> `idx_scan` 0, `idx_tup_read` 0, **21 MB**, a quarter of the database's index budget — is dropped,
+> with the owner's conditional approval and both conditions re-verified against production.
+> `getOuraTimeseriesDelta` and its tests stay per Q-180; its doc comment now carries the
+> `CREATE INDEX` the restore driver must run, and a test holds that paragraph in place.
+> [journal](overview/entries/2026-09-01-drop-unused-hr-index.md)
+>
+> - **Keep:** the growth trend, which this did not explain.
 
-**Two readings, both from `pg_stat_user_tables` on 2026-08-30:**
-
-1. **Indexes outweigh the data.** Whole database: **84 MB of index against 63 MB of heap** — 1.33×.
-   Per table it is starker: `oura_raw_samples` 38 MB index on 30 MB heap; `oura_heartrate` **32 MB
-   index on 9 MB heap**, 3.5×. An index set larger than the data it points at is either redundant
-   indexes or bloat, and both are fixable.
-2. **Growth is off trend.** Total is **206 MB**, against the **171 MB baseline of 2026-08-18** —
-   **+35 MB in 12 days, ~2.9 MB/day**, where CLAUDE.md's post-packing expectation is **~0.4 MB/day**.
-   That is roughly seven times trend, and CLAUDE.md says anything materially above it gets recorded
-   the same session. This is that record.
-
-**What this is not.** It is **not** the 0.79 GB premise of Q-549, which was falsified on 2026-08-25
-and is unrelated. And it is not, on this evidence, dead-tuple bloat in the heap: `oura_raw_samples`
-carries 7,333 dead tuples, which is real but small against 180,415 live rows.
-
-- **First move is measurement, not a VACUUM.** List the indexes on `oura_raw_samples` and
-  `oura_heartrate` with their sizes and `idx_scan` from `pg_stat_user_indexes`; an index never
-  scanned is a candidate to drop, and dropping one is cheaper and safer than REINDEX.
-
-**✅ THAT MEASUREMENT IS DONE — 2026-08-30, against production. It found one 18 MB answer and
-falsified the rule it was taken under.**
-
-| Table | Index | `idx_scan` | Size |
-|---|---|---|---|
-| `oura_heartrate` | **`oura_heartrate_user_updated`** | **0** | **18 MB** |
-| `oura_raw_samples` | `…_user_id_ring_timestamp_ds_tag_body_hex_key` | 3,546 | 17 MB |
-| `oura_raw_samples` | `oura_raw_samples_user_tag_ts` | 251 | 15 MB |
-| `oura_heartrate` | `oura_heartrate_user_id_timestamp_key` | 5,991 | 9.4 MB |
-| `oura_raw_samples` | `oura_raw_samples_pkey` | 3,618 | 5.3 MB |
-| `oura_heartrate` | `oura_heartrate_pkey` | 0 | 4.4 MB |
-| `rr_intervals` | `rr_intervals_user_id_at_key` | 0 | 3.5 MB |
-| `rr_intervals` | `rr_intervals_pkey` | 0 | 3.5 MB |
-
-**⚠ "Never scanned is a candidate to drop" is wrong for three of those four zeros, and this entry
-said it.** `idx_scan` counts **reads**, not constraint enforcement. `oura_heartrate_pkey`,
-`rr_intervals_pkey` and `rr_intervals_user_id_at_key` are PRIMARY KEY / UNIQUE indexes: they are
-consulted on **every insert** to reject a duplicate, and that work is invisible to this counter.
-Dropping one drops the constraint. They are not candidates.
-
-**The one real candidate is the largest index in the database, and it belongs to a decision that
-predates this measurement.** `oura_heartrate_user_updated` is
-`(user_id, updated_at, id)` from migration 130 — the keyset-pagination index for
-`getOuraTimeseriesDelta`, whose own doc comment records **Q-180 (decided 2026-08-14)**: the method
-has no production caller, and is kept deliberately because intraday HR reaches a fresh device by no
-other path, the server is the archive, and — in as many words — *"It costs nothing at runtime."*
-
-**It does not cost nothing.** It is **18 MB of the database's 84 MB of index — 21 % — for a code path
-nothing calls**, plus write amplification on every HR insert, which is the highest-volume write in
-the app (87,021 rows today). Q-180 weighed the *method*; the index was never in that accounting, and
-it is 2× the heap of the table it sits on (`oura_heartrate`: 32 MB of index on 9 MB of data).
-
-- **✅ THE OWNER GATE IS CLEARED, 2026-09-01 — the field is removed above, deliberately.** The owner
-  approved the drop: *"yes if we are not using it and you are sure its reversible then get rid of
-  it."* Both conditions were re-verified
-  against production before recording this, rather than resting on the 2026-08-30 table above:
-  - **Unused, and the reading is now stronger.** `oura_heartrate_user_updated` reads
-    **`idx_scan` 0 and `idx_tup_read` 0**, and it has grown to **20 MB**. On the *same table*,
-    `oura_heartrate_user_id_timestamp_key` shows **40,195 scans / 18.6 M tuples read** — so this is
-    not a quiet table, it is an index the planner never chooses.
-  - **No caller.** `getOuraTimeseriesDelta` exists in `slices/oura.ts:700`, `adapter.ts:6293` and the
-    `repository.ts:1203` interface, and **nothing invokes it**; the only other mention is
-    `sync-engine.ts:729` recording that the driver "never was" written.
-  - **Reversible.** A plain btree from `130_oura_heartrate_updated_at.sql` — one `CREATE INDEX` over
-    9.6 MB of heap.
-  - **⚠️ And the entry's own warning held up.** `rr_intervals_pkey` read `idx_scan` 0 on 2026-08-30
-    and reads **5,034** now. Had "never scanned" been treated as a drop rule, that constraint would
-    have gone. **Drop `oura_heartrate_user_updated` and nothing else from that table.**
-- **Lane A takes it from here — this is a migration and the Orchestrator may not number one.** What
-  it owes: the `DROP INDEX`, and a line in `getOuraTimeseriesDelta`'s doc comment saying the restore
-  driver must recreate the index, since Q-180's "it costs nothing at runtime" is what this narrows.
-  **Q-180's decision to keep the *method* stands; only its index goes.**
-- **The alternative** is keeping it so the restore driver finds its index waiting, which is what
-  Q-180 chose. That is defensible if the driver is imminent; it has not been written in the two weeks
-  since, and the index is 21 % of the index budget this entry was opened about.
-
-**Sizes re-confirmed the same day: 206 MB total, 63 MB heap, 84 MB index** — the 1.33× the entry
-opened on, unchanged.
-
+- **Lane:** A.
+- **What is still owed.** Total was **206 MB** against the **171 MB baseline of 2026-08-18** —
+  ~2.9 MB/day where the post-packing expectation is ~0.4 MB/day. Removing 21 MB of index and one
+  write-amplification source does not account for that; the question is what is adding ~2.5 MB/day
+  more than expected, and the answer is most likely in the highest-volume writers rather than in
+  indexes. Re-measure the total before assuming the trend still holds — it has not been read since
+  2026-08-30.
+- **⚠ Do not re-run the index audit expecting more wins, and do not reach for `idx_scan = 0`.** That
+  counter records READS, not constraint enforcement, so every PRIMARY KEY and UNIQUE index can read
+  0 while being consulted on every insert. This entry's own first draft called them drop candidates;
+  `rr_intervals_pkey` read 0 on 2026-08-30 and **5,034** a day later. The one genuine candidate has
+  now been taken.
 - **Cost check before anyone panics:** at Railway's $0.15/GB/month this whole database is about
   **three cents a month**. The reason to act is that a 7× trend compounds, not that the bill hurts.
-- **Verification:** index total drops below the heap total, and a re-read a week later shows growth
-  back near trend.
+- **Added:** 2026-08-30 · measured against production while checking BF-54. **These are the size
+  columns, read from the filesystem, so they are exact** — unlike the row counts BF-54 is about.
 
 ### [nutrition][platform] BF-69 — dosed substances are stored but nothing reads them; make exposure an analysable variable
 
