@@ -5315,6 +5315,15 @@ proposal with a stated blast radius rather than an implementation detail.
 Also notes that `activeBreakdown` already returns all three addends separately, so a one-line
 breakdown needs no new data.
 
+## 2026-08-31 — `docs/implementation-backlog.md` → 14746, `projectOverview.md` → 8599
+
+`lane-a/deload-temp-gate` (TN-18). The backlog growth is TN-18's `Keep:` recording two things the
+entry could not have known: the fix needed the adapter's daily-summary read widened to 28 days, and
+that widening turned `summaryRows[0]` from today into the oldest night — a month-stale deviation
+feeding a deload banner, which the first version of the new test file did not catch.
+
+`projectOverview.md` is the Current Status blurb again — the fourth raise of the evening from that
+one section, which is exactly what the note added to Q-220 earlier today describes.
 ## 2026-09-01 — `docs/implementation-backlog.md` → 14708 (merge resolution)
 
 `docs/bf55-owner-decision`, merging `main` after #714 and #715 landed. Both sides of this file's
@@ -5387,3 +5396,15 @@ preference, and this queue has already re-litigated settled questions that way.
 spread and next-meal-only to be offered as an option, and that is deferred to its own entry until
 the spread version has been lived with. A preference shipped alongside the behaviour it toggles has
 no evidence behind either branch.
+## 2026-09-01 — `docs/implementation-backlog.md` → 14832, `projectOverview.md` → 8619
+
+`lane-a/deload-temp-gate` (TN-18), re-derived after merging a `main` that had moved five times while
+the branch was open. Both numbers are the merged files counted, not a spliced arithmetic — which is
+the only way to get this right when the other side is also growing.
+
+## 2026-09-01 — `docs/implementation-backlog.md` → 14877 (merge resolution)
+
+`docs/owner-decisions-2026-09-01`, merging `main` after #719. Re-measured after the merge rather
+than carried across it, and both sides of this file's own conflict were kept — it is append-only, so
+a conflict here is two *additions*, the opposite of the backlog's. Entry-ID set diffed against the
+new `origin/main`: **identical, nothing added or lost.**

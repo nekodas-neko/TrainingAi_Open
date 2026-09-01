@@ -24,7 +24,7 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.416.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Version:** v1.416.1 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-09-01.
 
 **The personal details are one screen, and one writer (BF-79).** Owner: *"can we combine all the
@@ -47,6 +47,19 @@ box, so `text-center` sat left of centre; and `text-sm` was inert under `globals
 was wrong: **1 of 28** `type="number"` inputs uses it, and neither quantity control does. **Not
 device-verified** ([journal](docs/overview/entries/2026-09-01-quantity-box-spinner-reset.md)).
 
+**The deload banner stops firing off a temperature baseline that is known to be wrong (TN-18).**
+The owner's 06:43 screenshot held both halves of the same broken baseline for one night: the
+readiness contributor scored temperature **80/100** off `temp_dev_c` = 0.519 °C, while the deload
+banner read the same number and said *"Body temp elevated — rest or deload recommended"*. TN-6a
+suspended the ladder in readiness and its own entry said the suspension must cover all three
+consumers; it covered one, and it was the path the owner does not read. The banner now takes the
+same `isTemperatureBaselineCentred` condition — imported, not re-derived, since two answers to "is
+temperature trustworthy" is what produced the disagreement — and the threshold is untouched, because
+raising it is the Q-504 mistake. **The fix needed the adapter's summary read widened to 28 days,
+which turned `summaryRows[0]` from *today* into *the oldest of 28 nights*; the first version of the
+new test file passed with a month-stale deviation feeding the banner.** Self-clearing: it lifts on
+its own once a re-derivation centres the deviations
+([journal](docs/overview/entries/2026-08-31-deload-temp-gate.md)).
 **Coach can be scoped to one subject, and the scope is made of what it never receives (LA-47).**
 Opening Coach from Nutrition will give it the meal plan, intake and targets — and **not** the
 training tools, so a program question produces a hand-off instead of a guess. Enforced three ways
