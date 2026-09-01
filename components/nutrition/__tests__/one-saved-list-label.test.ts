@@ -24,6 +24,13 @@ function userVisibleStrings(): { file: string; line: number; text: string }[] {
   const files = execFileSync('git', ['ls-files', 'app', 'components', 'e2e'], {
     cwd: ROOT, encoding: 'utf8',
   }).split('\n').filter(f => /\.tsx?$/.test(f))
+    // …but not THIS file. The scanner's own regex and its own test name both contain the literal,
+    // and comment-stripping cannot reach either — one is code, the other is a string argument. So
+    // the guard reported itself twice and `main` went red on it, which is the same shape as the
+    // block-comment case above: a source scan whose first finding is its own documentation. Excluded
+    // by path rather than by a cleverer matcher, because the next person to add a line quoting the
+    // old name here would hit it again.
+    .filter(f => f !== 'components/nutrition/__tests__/one-saved-list-label.test.ts')
 
   const out: { file: string; line: number; text: string }[] = []
   for (const file of files) {
