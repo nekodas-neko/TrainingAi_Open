@@ -6030,3 +6030,9 @@ distinction is the reusable lesson, and it does not survive compression.
 The second half is the queue mechanic: an entry whose own text says *do not pursue* sat at the head
 of READY, so every session in turn was offered a build it argues against and skipped it. `Reference:`
 exists for that and nobody had applied it.
+
+`docs/implementation-backlog.md` → **14988** (+12) in the same PR: Q-354 keeps its whole body, because
+it is now a reference and the body IS the artefact — the measured input-method table is the thing
+other entries and spec authors read. What was added is the `Reference:` line and the correction note
+recording that the README pointed the wrong way, which is the part a future reader would otherwise
+re-derive by trusting the old text.
