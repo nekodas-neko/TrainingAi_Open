@@ -1,4 +1,6 @@
 import { classifyZone } from '@trainingai/shared/health/hr-zones'
+import { haversineDistanceKm } from '@/lib/activity/activity-metrics'
+import type { RoutePoint } from '@/lib/activity/route-encoding'
 import type { KindAggregate } from './segment-stats'
 
 /**
@@ -84,6 +86,57 @@ export function resolveCadenceTargets(
 export function kmhFromPace(secPerKm: number | null | undefined): number | null {
   if (secPerKm == null || secPerKm <= 0) return null
   return 3600 / secPerKm
+}
+
+/**
+ * How far back the live speed reads, in seconds.
+ *
+ * Twenty is a compromise with one hard constraint on each side. Shorter and a single wandering GPS
+ * fix — a few metres of drift between two samples — swings the band; longer and the reading stops
+ * being *now*, which is the defect this exists to fix. LB-36's device check asks for the band to
+ * move within about ten seconds of deliberately slowing, and a twenty-second window has moved most
+ * of the way there by then.
+ */
+export const SPEED_WINDOW_SEC = 20
+
+/**
+ * The walker's speed over the last `SPEED_WINDOW_SEC`, in km/h — **not** the average since the walk
+ * started (LA-52).
+ *
+ * The store used to feed `readPacer` with `kmhFromPace(currentPaceSecPerKm)`, and that pace is
+ * cumulative distance over cumulative elapsed. Three things followed and none of them were visible
+ * from a passing test: twenty minutes in, a thirty-second surge moves a cumulative mean by almost
+ * nothing, so the band could not respond within a segment; `STOPPED_KMH` could never fire, because
+ * standing still cannot drag a whole-walk average below 1.5 km/h; and warm-up, fast and slow all
+ * banded against the same slowly-drifting number.
+ *
+ * Null under two points or a zero-length span — an unknown speed, which drops the pacer to the heart
+ * rate rung rather than reading zero and announcing "Stopped".
+ *
+ * **It reads the points and nothing else, deliberately.** Adding a wall clock would let the figure
+ * decay toward zero while the walker stands still and produces no new fixes — which is right when
+ * they have stopped and wrong in a tunnel, and the store only recomputes when a point arrives
+ * anyway. A GPS dropout therefore freezes this reading, exactly as it already freezes the cumulative
+ * one.
+ */
+export function windowedSpeedKmh(points: RoutePoint[], windowSec: number = SPEED_WINDOW_SEC): number | null {
+  if (points.length < 2) return null
+  const last = points[points.length - 1]
+  const cutoff = last.t - windowSec * 1000
+
+  let start = points.findIndex(p => p.t >= cutoff)
+  if (start < 0) start = points.length - 1
+  // A sparse fix rate can leave one point inside the window. Reaching back for the previous one
+  // makes the reading older than `windowSec` rather than absent, which is the better failure: an
+  // absent speed silently demotes the whole rung to heart rate.
+  if (points.length - start < 2) start = points.length - 2
+
+  const elapsedSec = (last.t - points[start].t) / 1000
+  if (elapsedSec <= 0) return null
+
+  let km = 0
+  for (let i = start + 1; i < points.length; i++) km += haversineDistanceKm(points[i - 1], points[i])
+  return km / (elapsedSec / 3600)
 }
 
 /**
