@@ -5342,3 +5342,31 @@ tell them apart from the screen is how a reasonable proposal gets to look obviou
 It carries its numbers (124 days, 50 below threshold, 45 with plausible intake, the RMR of 1,325)
 because the Tuning rule requires a blast radius and because the next session to be asked this will
 otherwise re-run the same six queries.
+
+## 2026-09-01 — `projectOverview.md` → 8606, `docs/implementation-backlog.md` → 14816 (BF-79)
+
+**`projectOverview.md` 8572 → 8606, and BOTH numbers moved under it.** Main shrank the baseline to
+**8586** in the same window (#713/#716) while this branch raised it to 8593, so neither side of the
+conflict was the answer — the figure is recomputed from the merged document, like the backlog one
+below. Two shipped changes had to be recorded and only one of them was this PR's: BF-85 merged in
+#711 **without a status block**, so its paragraph lands here alongside BF-79's. Both blocks were
+tightened twice before the raise; what is left is the two features and a one-clause mention of each
+finding, with the detail in the backlog where it belongs. One of those findings, LB-40, is a live
+bug on `main`.
+
+**`docs/implementation-backlog.md` → 14816, recomputed three times.** Both PRs raised this one file, which
+is the size conflict that is a real disagreement rather than two additions — resolved by recomputing
+from the merged document, never by taking a side. BF-79's own share is **+27**: net of removing the
+shipped BF-79 entry (43 lines) and adding LB-40/41/42 (76). LB-42 is the long one deliberately: it has to say which column each reader
+uses before anyone can choose which survives, and that is the whole of the decision it is asking
+for.
+
+**And `docs/overview/entries/` crossed its 250 total ceiling** at 251, which is a failure rather
+than the chore *note* it prints at 20 foldable. So the compaction sweep ran in this PR: the 22
+oldest **unlinked** entries folded into `history-2026-08-30.md` (110 KB → 184 KB), leaving 229
+total and 21 foldable. Linked entries were left alone — a durable doc citing a folded path is a
+broken link, which is how the first sweep broke 48 of them.
+
+Nothing was banked. The alternative to raising was leaving a shipped feature unrecorded in the file
+every session reads first, which is the failure the ratchet is not for.
+

@@ -6,6 +6,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.416.0",
+    date: "2026-09-01",
+    changes: [
+      "Your personal details are one screen now — More \u2192 Profile details. Your name, biological sex, birth year and height were split between the Edit Profile sheet and the Goals section; they are together, and each one saves on its own.",
+      "Weight and body fat appear there as your latest reading with the day it was taken, and a button to the Health page, rather than as boxes to type into. They are measurements, not profile settings.",
+      "Goals still asks for height, birth year and sex before it will recommend anything, and now takes you to where they are edited instead of naming fields that are no longer on that screen.",
+    ],
+  },
+  {
     version: "1.415.0",
     date: "2026-08-31",
     changes: [

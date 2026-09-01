@@ -62,6 +62,16 @@ split is "does it feel slow" vs "is it actually slow at the source".
   is still binding and is the one people re-open by accident:** `GoalsSection`, `StatsGrid`,
   `TrophyCase`, `AchievementsSection`, "Your Year" and the season badges **stay inline on More**, and
   `/more/goals` and `/more/achievements` were never built and are not going to be.
+- [`docs/overview/entries/2026-09-01-personal-details-consolidation.md`](../../overview/entries/2026-09-01-personal-details-consolidation.md)
+  — **BF-79: `More → Profile details` (`app/more/details/`), the ninth sub-route.** Display name,
+  biological sex, birth year and height are edited there and **nowhere else**; weight and body fat
+  appear as read-only measurements, because an input would open a second write path into
+  `body_metrics`. Targets and activity level deliberately stayed in Goals, whose missing-field notice
+  now links here rather than naming fields it cannot edit. **BF-82 inherits this placement** — moving
+  the section is a route rename, but do not re-scatter the fields while regrouping. A source guard
+  (`components/profile/__tests__/personal-details-one-editor.test.ts`) holds the one-writer rule; it
+  extracts the request-body spans rather than matching the whole file, because the first version
+  could not tell a write from a form seed.
 - [`docs/overview/entries/2026-08-31-nutrition-sheet-surface.md`](../../overview/entries/2026-08-31-nutrition-sheet-surface.md)
   — **BF-75: `SheetContent` gained an opt-in `surface="page"`.** The app-wide sheet primitive changed,
   so this is app-shell's as much as nutrition's. Two things bind any future work on it: the layer is
