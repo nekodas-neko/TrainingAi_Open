@@ -16,7 +16,9 @@ import {
 import { formatDateDisplay, todayInTz } from '@trainingai/shared/date-utils'
 import { displayBodyFat, type BodyFatReading } from '@/components/health/body-fat-display'
 import { cachedFetch, isBodyMetadataFresh } from '@/lib/sqlite/cache'
-import { TTL_MEDIUM } from '@trainingai/shared/cache-ttl'
+import { TTL_LONG, TTL_MEDIUM } from '@trainingai/shared/cache-ttl'
+import type { MeasuredRmr } from '@trainingai/shared/health/body-composition'
+import { goalBaseline } from './goal-baseline'
 import { RequiredInfoSection } from './required-info-section'
 import { GoalTargetsSection } from './goal-targets-section'
 import { GoalRecommendationSheet, type GoalRecommendationData } from './goal-recommendation-sheet'
@@ -41,6 +43,7 @@ export function GoalsSection({ user, onUserSaved }: GoalsSectionProps) {
   const [latestWeightKg, setLatestWeightKg] = useState<number | null>(null)
   const [latestWeightLabel, setLatestWeightLabel] = useState<string | null>(null)
   const [latestBfPct, setLatestBfPct] = useState<number | null>(null)
+  const [measuredRmr, setMeasuredRmr] = useState<MeasuredRmr | null>(null)
   const [latestBfLabel, setLatestBfLabel] = useState<string | null>(null)
 
   // Goals — localStorage-backed targets
@@ -79,6 +82,15 @@ export function GoalsSection({ user, onUserSaved }: GoalsSectionProps) {
     if (tw) setTargetWeightStr(tw)
     const tb = localStorage.getItem(TARGET_BF_KEY)
     if (tb) setTargetBfStr(tb)
+
+    // BF-101. `calculateBaseline` routes this through `personalRmr`, so without it the Recommended
+    // calories would quote a *predicted* resting rate on a screen whose Health card shows the
+    // measured one. `listMeasuredRmr` orders by `measured_on` descending, so [0] is the latest —
+    // the same row `getLatestMeasuredRmr` hands the recommend route.
+    cachedFetch<{ tests: (MeasuredRmr & { measuredOn: string })[] }>('measured-rmr', '/api/measured-rmr', TTL_LONG, d => {
+      const latest = d?.tests?.[0]
+      setMeasuredRmr(latest ? { rmrKcal: latest.rmrKcal, ffmKgAtTest: latest.ffmKgAtTest } : null)
+    }).catch(() => {})
 
     cachedFetch<GoalSeedValues>('user-goals', '/api/user/goals', TTL_MEDIUM, d => {
       if (!d) return
@@ -259,6 +271,10 @@ export function GoalsSection({ user, onUserSaved }: GoalsSectionProps) {
   if (!user?.fitnessGoal) missingHere.push('Fitness Goal')
   const missingFields = [...missingDetails, ...missingHere]
 
+  // Null whenever any of those is absent — `goalBaseline` withholds the whole result rather than
+  // computing from a default the user never chose, and every Recommended control renders nothing.
+  const baseline = goalBaseline({ user, latestWeightKg, latestBodyFatPct: latestBfPct, measuredRmr })
+
   async function getRecommendation() {
     setRecommending(true)
     try {
@@ -350,6 +366,7 @@ export function GoalsSection({ user, onUserSaved }: GoalsSectionProps) {
               todayMeta={todayMeta}
               weekToDate={weekToDate}
               macroRefreshKey={macroRefreshKey}
+              baseline={baseline}
             />
 
             <div className="rounded-2xl bg-muted/40 border border-border overflow-hidden px-4 py-3 space-y-1.5">

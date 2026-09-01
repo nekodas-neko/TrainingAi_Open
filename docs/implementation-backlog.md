@@ -658,48 +658,25 @@ numbers multiply, they do not substitute.
   what shipped at the time.
 - **Added:** 2026-09-01 · owner, deciding it himself: *"we only need one. lets go with MyFoods."*
 
-### [nutrition][body] BF-101 — a "Recommended" button per goal field; the numbers already exist and need no AI
+### [nutrition][body] BF-101 — a "Recommended" value per goal field, computed rather than generated
 
-- **Lane:** B — the Profile goals form (`app/more/…` profile tab) reading an existing shared function.
-  A for a non-AI endpoint if the values are not already reachable client-side.
+- **Keep:** one look on the S25. Six new controls land inside an already-dense collapsible, and the
+  offer button carries two lines of text at 412 dp — whether it crowds the fields around it, and
+  whether the macro pane still reads as a form, is the only thing unchecked.
+- **Verify:** device.
+- **✅ SHIPPED** (`feat/bf-101-recommended-values`, 2026-09-01, v1.426.0). Steps, water and calories
+  on the goals form; calories, protein, carbs and fat in the macro pane. No route, no model: it
+  assembles the same `BaselineInput` `/api/nutrition-goals/recommend` assembles and calls the same
+  `calculateBaseline`, so the button and the AI sheet's starting point cannot disagree.
+- **The measured RMR is carried through, and that was the one real decision.** `calculateBaseline`
+  routes it via `personalRmr` (BF-33), so omitting it would have quoted a *predicted* resting rate
+  on a screen whose Health card shows the measured one — the "two numbers for one thing" class
+  LA-45 and BF-99 both closed. It costs one `GET /api/measured-rmr` on the profile tab.
+- **Sleep and fiber have no button, deliberately** — `BaselineResult` carries no figure for either,
+  and an invented one would sit unsourced beside seven sourced ones. Both are pinned by the guard.
 - **Added:** 2026-09-01 · owner, on the Profile goal fields: *"maybe each should have a button under
   it that says (Recommended value) — id assume we use AI here to choose but maybe we could have some
   logic to decide so not using the ai if not needed?"*
-
-**The logic already exists and the AI is layered on top of it, not instead of it.**
-`calculateBaseline` (`packages/shared/src/nutrition/goal-recommendation.ts:166`) already returns a
-deterministic value for **every field on that screen except sleep**:
-
-```ts
-return { bmr, tdee, calories, proteinG, carbsG, fatG, waterMl, stepsGoal, leanMassKg }
-```
-
-Calories are `bmr × SEDENTARY_MULTIPLIER + CALORIE_ADJUSTMENT_BY_GOAL[goal]`; protein is dosed per kg
-of lean mass; water is `weightKg × 33 + WATER_BUMP_BY_ACTIVITY[level]`; steps are
-`STEP_GOAL_BY_ACTIVITY[level]`. **The `bmr` is the measured RMR** when one exists — `calculateBaseline`
-calls `personalRmr` (BF-33), the same function the daily energy model uses, so the wizard and the
-Health card cannot disagree about resting rate. `/api/nutrition-goals/recommend` computes this
-baseline and then runs `generateObject` to *adjust* it. **So the owner's instinct is right and the
-work is mostly plumbing: surface the baseline, skip the model.**
-
-- **The drift a per-field button would surface is already live.** Activity Level is **Moderate**,
-  whose `STEP_GOAL_BY_ACTIVITY` is **10,000** — and the stored Steps Goal is **7,000**, the
-  *sedentary* number. Water tracks it correctly (71.7 kg × 33 + 250 = **2,616** against a stored
-  **2,600**). One field follows the recommendation, another does not, and nothing on screen says
-  which. That is the value of the button in one screenshot.
-- **⚠ Sleep has no baseline and an implementer must not invent one.** `BaselineResult` carries no
-  sleep field. Either leave sleep without a button or add a heuristic **deliberately**, as its own
-  decision — silently inventing one puts an unsourced number next to six sourced ones.
-- **⚠ It must hide, not guess, on an incomplete profile.** `calculateBaseline` needs weight, height,
-  age and sex; the recommend route already gates on a `missing` list. A button that renders a number
-  computed from absent inputs is worse than no button.
-- **Recommendation: a non-AI path, and keep the AI button as the second thing.** The deterministic
-  value is instant, free, reproducible and explainable ("33 ml/kg + your activity bump"); the AI pass
-  earns its place only where it adjusts for something the formula cannot see. Two buttons with
-  different promises beats one that sometimes calls a model.
-- **Verification:** each field's Recommended value equals `calculateBaseline`'s for the same profile;
-  tapping it fills the field without saving until the user saves; and no network call to an AI route
-  is made by the deterministic path.
 
 ### [nutrition][platform] BF-102 — "Calibrated" activity level, and a prompt that tells the model something false
 
@@ -1885,6 +1862,26 @@ deletes nothing on tap, which is what makes an icon-only entry point defensible 
   beside a changed nutrition sheet is not. **Nothing about the wallpaper can be judged in the
   sandbox** — the feature is off by default there, so the e2e has to switch it on to assert anything
   at all.
+
+### [nutrition][platform] LB-48 — saving a measured RMR does not evict the cache key two screens read
+
+- **Lane:** A — the fix is one key added to a group in `lib/cache-groups.ts`, which Lane A owns.
+- **Added:** 2026-09-01 · found while building BF-101, which made the key load-bearing on a second
+  screen.
+
+`POST /api/measured-rmr` (`components/more/clinical/measured-rmr-form.tsx`) invalidates nothing, and
+`measured-rmr` is in no group. Two screens read that key: the clinical console, which does not need
+the eviction because `onSaved(record)` updates it locally, and — since BF-101 — the Profile goals
+form, whose Recommended calories are computed from it via `personalRmr`.
+
+- **The blast radius is small and worth stating exactly, because it is smaller than the rule
+  implies.** Both reads revalidate over the network (neither passes `freshWithinTtl`), so this is
+  not hard staleness. What it costs is one app session: the goals section's fetch is keyed on
+  `user?.id` inside the persistent tab shell, so after saving an RMR test the Recommended calories
+  quote the previous resting rate until the app is restarted.
+- **The fix:** add `measured-rmr` to `invalidateGoalRecommendations()` and call that group from the
+  RMR form's success path. The group already exists and the form already has a success path.
+- **Do not "fix" it with a shorter TTL** — an effect that runs once never consults one.
 
 ### [platform] OR-100 — `Keep:` files buildable work under a heading that tells the lane not to look
 

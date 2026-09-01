@@ -6316,3 +6316,20 @@ are "NULL on every table", which was true on 2026-08-20 and is false now. The ru
 `count(*)` — survives and is more important than before, because coverage is now *partial*:
 `oura_raw_samples` reads exactly right while `oura_raw_packed` still reads 55 against 1,051, and
 nothing in the output says which side a table is on.
+## 2026-09-01 — `projectOverview.md` → 9078 (BF-101)
+
++15 for a feature whose whole point is a claim about *numbers*, and the numbers are what has to be in
+the index. The 7,000-against-Moderate drift is the evidence the control exists, and it is the one
+line a future session would otherwise have to re-derive from the owner's screenshot to know whether
+the feature is working.
+
+The measured-RMR sentence is there for a narrower reason: it is the decision most likely to be
+undone as an optimisation. Dropping that fetch looks free and silently reintroduces the "two numbers
+for one thing" defect LA-45 and BF-99 each cost a session to close.
+
+The backlog baseline is untouched — BF-101 left the queue as a shipped entry with a `Keep:` line for
+its device check, and LB-48 replaced it in roughly the same number of lines.
+
+**Recomputed from the merged file on rebase**, not spliced: `main` had moved to 9063 while this
+branch sat behind a red base, so the number this branch first wrote (9068, from a 9053 base) was
+stale by exactly the block someone else added. 9078 is the merged file's own count.
