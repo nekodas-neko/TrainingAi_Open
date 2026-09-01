@@ -27,6 +27,17 @@
 **Version:** v1.417.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-09-01.
 
+**21 MB of index for a code path nothing calls (BF-55, migration 249).**
+`oura_heartrate_user_updated` was migration 130's keyset index for `getOuraTimeseriesDelta` — the
+restore pull Q-180 kept with no caller because *"it costs nothing at runtime"*. True of the method;
+the index was never in that accounting. Measured twice a day apart: **`idx_scan` 0, `idx_tup_read`
+0, 21 MB** — a quarter of the database's whole index budget — while the same table's other index
+showed **47,922 scans / 22.7 M tuples**. Dropped with the owner's conditional approval; the method
+and its tests stay, and its doc comment now carries the `CREATE INDEX` the restore driver must run.
+**The entry falsified its own rule and that is the durable part:** `idx_scan` counts reads, not
+constraint enforcement, so three of its four zeros were PK/UNIQUE indexes — `rr_intervals_pkey` read
+0 one day and 5,034 the next ([journal](docs/overview/entries/2026-09-01-drop-unused-hr-index.md)).
+
 **The E2E harness already looks; what it cannot do is take a photo (BF-91).** The entry read *"58
 specs assert nothing visual"* — **21 of the 58** assert layout, and the four flows it named already
 have dedicated specs. What is genuinely absent is pixel baselines, and a session cannot make one:

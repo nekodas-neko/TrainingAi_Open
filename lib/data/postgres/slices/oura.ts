@@ -696,6 +696,20 @@ async function pullKeyset<T>(
  * `__tests__/oura-timeseries-pull.test.ts`. **This comment is the point of the decision** — the
  * entry's real complaint was that an uncalled method costs a paragraph in every dead-code sweep.
  * Re-litigate it only if the device stops needing a cloud restore of intraday HR.
+ *
+ * **⚠ ITS INDEX IS GONE, AND THE DRIVER MUST RECREATE IT (BF-55, migration 249).** Point 3 above
+ * said this "costs nothing at runtime" and that was true of the *method*; the index was never in
+ * that accounting. `oura_heartrate_user_updated (user_id, updated_at, id)` measured **21 MB at
+ * `idx_scan` 0** — a quarter of the whole database's index budget, plus write amplification on the
+ * app's highest-volume insert — so it was dropped and the method kept.
+ *
+ * Without it these keyset queries fall back to a scan, which is fine at test size and is **not**
+ * fine against 87 k+ production rows. Recreating it is one statement, and it belongs in the same
+ * change as the driver rather than in a later "why is restore slow" investigation:
+ *
+ * ```sql
+ * CREATE INDEX IF NOT EXISTS oura_heartrate_user_updated ON oura_heartrate(user_id, updated_at, id);
+ * ```
  */
 export async function getOuraTimeseriesDelta(
   userId: string,
