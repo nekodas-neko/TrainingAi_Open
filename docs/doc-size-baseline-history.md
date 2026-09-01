@@ -5831,6 +5831,7 @@ countable, not finished work that vanishes. The status block leads with the fact
 moved, because "go back to the old way" invites reverting a layout that was never changed, and with
 the measured 12–22 character range that corrects the entry's own figure.
 
+
 ## 2026-09-01 — `projectOverview.md` → 8860, `docs/implementation-backlog.md` → 14993 (BF-97, engine half)
 
 The backlog **shrank by 23 lines**: BF-97's entry carried the three-option decision and the argument
@@ -5844,8 +5845,34 @@ measurement of the merged file, never a hunk to splice.)
 group is minted **only** past one entry and **only** alongside a name. Both are what stop the fix
 from rebuilding the bug one layer down, and a status block that said "scans group now" would be
 wrong on top of being shorter — nothing renders differently until Lane B's half lands.
+## 2026-09-01 — `projectOverview.md` → 8878 (BF-82)
 
-## 2026-09-01 — `projectOverview.md` → 8877, `docs/implementation-backlog.md` → 14933 (BF-59, screen half)
++18 lines for one status block. It is long for one because a short version of it — "the More page is
+grouped now" — is the version that gets a future session to redo the argument. What the lines buy:
+the count is **nine single-row groups, not the seven the entry claimed**, because two of them were
+outside `profile-tab.tsx` and one was a hand-written copy of the primitive rather than a use of it;
+`label` became optional so a lone row can still be a card; and the *"sliders"* half is
+recorded as **answered** with the owner's own words, because the alternative is a future session
+reading the original request and changing a control nobody asked to change.
+
+The backlog **shrank by 19 lines net** across the same PR — BF-82's entry lost the whole planning
+argument it had accumulated (it is in the plan document, which is where it belongs) and kept only its
+residue, and LB-44 was added.
+
+(8878 rather than the 8864 this branch measured before merging: BF-97's engine half landed 14 lines
+of its own in between. The number is a measurement of the merged file, never the sum of two hunks.)
+
+## 2026-09-01 — `docs/agents/state/implementation-lane-b.md` → 168 (BF-82)
+
++12 net after trimming 7. The run was long — fourteen merges — and what the added lines carry is one
+lesson repeated in four different disguises: **a guard that cannot fail is not a guard.** All four
+passed on the first write and all four were caught only by mutating the fix away; none was visible by
+reading. Compressed to a paragraph rather than four bullets, but not cut, because the *shapes* are
+what a successor pattern-matches on and a one-line version ("mutate your guards") is the version that
+gets nodded at. `BF-79`'s "do not re-litigate" bullet became a "has now been built on" bullet in the
+same pass — BF-82 shipped, so the guard-rail has done its job and only the placement needs carrying.
+
+## 2026-09-01 — `projectOverview.md` → 8895, `docs/implementation-backlog.md` → 14933 (BF-59, screen half)
 
 The backlog **shrank by 60 lines**: BF-59 carried the whole measurement — three tables of
 stored-vs-landmark numbers and the argument for which fix mattered most — and that measurement is now

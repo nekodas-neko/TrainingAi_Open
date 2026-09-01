@@ -3,11 +3,16 @@ import { ChevronRight } from 'lucide-react'
 
 /** A labelled group of navigation rows on the More tab — the grouped-list pattern the IA plan
  *  (docs/superpowers/plans/2026-08-14-more-tab-information-architecture.md) moves this screen to.
- *  Extracted when Devices became the second copy of the Admin row's markup. */
-export function MoreRowGroup({ label, children }: { label: string; children: React.ReactNode }) {
+ *  Extracted when Devices became the second copy of the Admin row's markup.
+ *
+ *  `label` is optional, and omitting it is the supported way to present ONE row (BF-82): a heading
+ *  over a single row is three stacked elements to draw one tappable line, which is what made this
+ *  screen read as long and empty at once. `__tests__/more-row-group-arity.test.ts` fails a labelled group
+ *  with fewer than two rows; an unlabelled one is a plain card and is exempt by construction. */
+export function MoreRowGroup({ label, children }: { label?: string; children: React.ReactNode }) {
   return (
     <div>
-      <p className="px-1 pb-1.5 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">{label}</p>
+      {label && <p className="px-1 pb-1.5 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">{label}</p>}
       <div className="rounded-2xl bg-muted/40 border border-border overflow-hidden">
         {children}
       </div>

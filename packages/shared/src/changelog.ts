@@ -6,6 +6,16 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.419.0",
+    date: "2026-09-01",
+    changes: [
+      "The More page is grouped. It used to carry nine headings over one row each \u2014 an uppercase title and a bordered box to draw a single tappable line \u2014 which is most of why it read as long and empty at once. There are now two: Your setup and App.",
+      "Report an Issue sits with Edit Profile and Sign Out at the bottom. It opens a sheet rather than going anywhere, so it no longer pretends to be a destination.",
+      "Goals looks like the cards above it instead of borrowing the chrome of the rows below it. It still expands in place and every field is where it was.",
+      "Every destination on the page is still reachable: profile details, program, DEXA & RMR, devices, settings, data & sync, about, and the admin console.",
+    ],
+  },
+  {
     version: "1.418.3",
     date: "2026-09-01",
     changes: [
