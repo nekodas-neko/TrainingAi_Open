@@ -97,9 +97,16 @@ function findDead(interfaceSrc, texts, implFile = IMPL_FILE) {
  * shipping Q-291's `listAiHealthInsightsForDate`, whose caller was a new file).
  *
  * `--cached --others --exclude-standard` = tracked plus untracked, minus anything gitignored.
+ *
+ * `cwd` exists for the test and for nothing else (LB-44). Proving that an UNTRACKED file is listed
+ * means creating one, and creating one inside this repository raced every test that walks
+ * `app`/`components`/`lib` reading each file it finds — the probe was listed, then deleted, then
+ * read. The failure surfaced in an unrelated file on an unrelated branch as a missing source file,
+ * which is the worst shape a flake can take. A throwaway git repo proves the same property and
+ * touches nothing anyone else is reading.
  */
-function sourceFileList() {
-  return execSync('git ls-files --cached --others --exclude-standard "*.ts" "*.tsx"', { encoding: 'utf8' })
+function sourceFileList(cwd) {
+  return execSync('git ls-files --cached --others --exclude-standard "*.ts" "*.tsx"', { encoding: 'utf8', ...(cwd ? { cwd } : {}) })
     .trim().split('\n').filter(Boolean)
 }
 
