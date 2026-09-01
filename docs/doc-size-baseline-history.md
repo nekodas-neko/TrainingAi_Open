@@ -5379,12 +5379,52 @@ broken link, which is how the first sweep broke 48 of them.
 Nothing was banked. The alternative to raising was leaving a shipped feature unrecorded in the file
 every session reads first, which is the failure the ratchet is not for.
 
+
+## 2026-09-01 — `docs/implementation-backlog.md` 14816 → 14861 (+45)
+
+`docs/owner-decisions-2026-09-01`. Three owner gates cleared in one sitting, and the growth is the
+decisions themselves rather than new work: **BF-84** (rest is a stored fact, not a display hint),
+**Q-187** (spread the overshoot, at read time, with a floor) and **Q-531** (the device consoles go
+back behind `/admin`, and the layout was handed back to the implementer).
+
+Each records the owner's own words and the reasoning, because two of the three were answered with
+*"whatever is better in the long run"* / *"wherever you want"* — a call handed back with a criterion
+attached. Writing only the verdict would leave the next reader unable to tell a decision from a
+preference, and this queue has already re-litigated settled questions that way.
+
+`Q-187` also gained an explicit **not-in-scope** bullet: the owner asked for the choice between
+spread and next-meal-only to be offered as an option, and that is deferred to its own entry until
+the spread version has been lived with. A preference shipped alongside the behaviour it toggles has
+no evidence behind either branch.
 ## 2026-09-01 — `docs/implementation-backlog.md` → 14832, `projectOverview.md` → 8619
 
 `lane-a/deload-temp-gate` (TN-18), re-derived after merging a `main` that had moved five times while
 the branch was open. Both numbers are the merged files counted, not a spliced arithmetic — which is
 the only way to get this right when the other side is also growing.
 
+## 2026-09-01 — `docs/implementation-backlog.md` → 14877 (merge resolution)
+
+`docs/owner-decisions-2026-09-01`, merging `main` after #719. Re-measured after the merge rather
+than carried across it, and both sides of this file's own conflict were kept — it is append-only, so
+a conflict here is two *additions*, the opposite of the backlog's. Entry-ID set diffed against the
+new `origin/main`: **identical, nothing added or lost.**
+
+## 2026-09-01 — `docs/implementation-backlog.md` 14877 → 14892 (+15)
+
+Same branch, second pass: an audit of the 11 remaining `Gate: owner` entries for the failure the
+Orchestrator baton warns about — *a decision the owner already made, with the gate left on*. Three of
+eleven had it.
+
+- **Q-540** carried `Gate: owner` on the line directly above *"✅ UNBLOCKED 2026-08-17"*, and was
+  then superseded by its own 2026-08-25 re-measurement (Q-541's packing made the table it narrows
+  stop growing). It becomes `Reference:` — the measurement stays findable, the runner stops offering
+  work the entry argues against.
+- **Q-4** and **Q-71** are owner *actions*, not decisions: consent for the first was given
+  2026-08-04, and the second's decision plus its re-scope condition were both settled by 2026-08-12.
+  Both are cross-linked into `device-verification-queue.md`, which is the list the owner actually
+  works from — a settled decision wearing a decision-gate is invisible there.
+
+The growth is three entries gaining the sentence that says why they are not what their field claims.
 ## 2026-09-01 — `docs/implementation-backlog.md` → 14895, `projectOverview.md` → 8631
 
 `lane-a/one-weight-goal` (LB-42). The backlog growth is the entry recording the half that did NOT
@@ -5429,7 +5469,7 @@ BF-87's "do not lower STEP_BASELINE" is rewritten in the same pass. It was corre
 uncompensated version and would have made an implementer refuse the compensated one — a stale
 prohibition being obeyed is the failure mode that needed closing in the same diff that created it.
 
-## 2026-09-01 — `docs/implementation-backlog.md` → 14917
+## 2026-09-01 — `docs/implementation-backlog.md` → 14977
 
 `lane-a/keep-kind` (OR-100). The growth is OR-100 recording that it undercounted its own problem:
 the entry measured **4** buildable `Keep:` residues on one lane, and the classifier finds **13**
