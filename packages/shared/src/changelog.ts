@@ -9,7 +9,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: "1.416.4",
     date: "2026-09-01",
     changes: [
-      "Internal tidy-up behind the Nutrition tab's movement breakdown — the step threshold it prints is now the same value the calculation uses rather than a copy of it. Nothing on screen changes.",
+      "You can change your password again. The Current password box was never being shown, so the save was rejected for a field that was not on screen \u2014 which meant an account with a password could not change it at all.",
     ],
   },
   {
