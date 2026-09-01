@@ -14,8 +14,8 @@ silently misdirecting the next session. Update them in the same PR that consumes
 
 | Pointer | Value | Source of truth |
 |---|---|---|
-| Next free Postgres migration | **249** | `lib/data/postgres/migrations/` |
-| Local SQLite schema version | **v32** | `lib/sqlite/migrations.ts`; `lib/sqlite/__tests__/migrations.test.ts` asserts the max |
+| Next free Postgres migration | **254** | `lib/data/postgres/migrations/` |
+| Local SQLite schema version | **v33** | `lib/sqlite/migrations.ts`; `lib/sqlite/__tests__/migrations.test.ts` asserts the max |
 
 > **There is no third pointer any more.** Entry IDs are not allocated from a shared counter and
 > never were safely: a next-free pointer is a *floor*, not an authority, because it cannot see an
@@ -388,56 +388,53 @@ below threshold and left in place for next time.
 > BF-29 (My meals), BF-30 (Meal detail), BF-31 (Edit meal) and BF-26 (Quantity). Two artboards need
 > no entry — `Tap targets` and the `srv/g` studies both shipped in Q-395a.
 
-### [nutrition] BF-97 — a scanned meal still lands as N loose rows, which is the case BF-39 was filed for
+### [nutrition] BF-97 — a scanned meal groups in the diary: the rendering half
 
-- **Lane:** B for the diary rule; A if the scan write path has to mint the group id.
+> **✅ THE ENGINE HALF SHIPPED 2026-09-01** (migration 252 + the `claude_ro` regeneration 253, local
+> SQLite **v33**). `food_logs.meal_group_name`, threaded through both write paths, the sync delta,
+> the outbox payload and the local store; `logFoodEntries` mints a group for a multi-item scan and
+> `food-logger-sheet` passes the dish name the user confirmed.
+> [journal](overview/entries/2026-09-01-scan-meal-group.md)
+>
+> - **Keep:** the rendering rule, and nothing else. **Nothing looks different yet** — the ids and the
+>   name are written and `groupDiaryEntries` still requires a `savedMealId`, so a scan renders
+>   exactly as it did. That is deliberate: the engine half cannot half-break a screen.
+
+- **Lane: B** — `components/nutrition/diary-groups.ts` and the two renderers, per the entry's own
+  split. The engine half was A's because it needed a migration.
+- **What is owed, precisely.** `groupDiaryEntries` gates on `!groupId || !mealId ||
+  !knownMealIds.has(mealId)`. **Option 1 was the recommendation and it is what the engine built:**
+  a group may have a name *instead of* a saved meal. So the gate becomes "a group id **and** a way
+  to name it — a resolvable `savedMealId`, or a `mealGroupName`", and `DiaryEntry.kind: 'meal'`
+  takes `savedMealId?: string | null` plus a name. `diary-meal-group.tsx` and `meal-card.tsx` both
+  follow the type: the photo comes from the saved meal today, and a scanned group has none.
+- **⚠ Do not head a group with a name the app invented.** The existing rule — *"heading them 'Meal'
+  would be inventing a name the app does not have"* — is still right and is why the engine mints a
+  group **only** alongside a name. A group id with no name should keep rendering flat.
+- **Verify:** device — scan a multi-item meal on the S25 and confirm it draws as one collapsible row
+  with the dish name and an item count; two scans on one day stay two rows; a single-item scan is
+  still a plain row.
 - **Added:** 2026-09-01 · owner, with two screenshots side by side: *"looks like saved meals groups
   the food well; but when scanning it doesnt."*
 
-**Saved meals group; scans do not — and the docstring for the grouping says why in its own words.**
-`components/nutrition/diary-groups.ts` opens by quoting the report that produced BF-39: *"A
-screenshot showed one AI-logged breakfast as **eight** diary rows — flour, protein powder, baking
-powder, salt, milk, eggs, butter, bacon — filling the whole meal section."* Today's screenshot is
-the same shape: a scanned lunch as **eight** rows — beef, carrots, spinach, cabbage, corn, capsicum,
-cucumber, broccoli. **BF-39 shipped the saved-meal half and the motivating case is still open.**
+### [nutrition] BF-98 — a section holding one grouped meal draws its macros twice (fixed; the reproduction is not understood)
 
-**Why, exactly.** `groupDiaryEntries` requires *both* ids and a resolvable meal:
-
-```ts
-if (!groupId || !mealId || !knownMealIds.has(mealId)) { out.push({ kind: 'log', … }); continue }
-```
-
-and `mealGroupId` is minted in exactly one place — `packages/shared/src/nutrition/log-meal.ts:58`,
-always alongside `savedMealId: meal.id`. `app/api/nutrition/scan/route.ts` contains **zero**
-references to either field. A scan therefore cannot produce a group even in principle.
-
-- **The decision this needs is where a scanned group's NAME comes from**, and it is why the entry
-  stops here rather than picking. The grouping rule deliberately refuses to head a group it cannot
-  name — *"heading them 'Meal' would be inventing a name the app does not have"* — and that
-  reasoning still holds. Three options:
-  1. **Relax the rule to allow a group with a name but no saved meal.** The scan already produces a
-     dish description; carry it onto the logs and let `DiaryEntry.kind: 'meal'` take a name instead
-     of a `savedMealId`. Least invasive to the user's data — nothing new appears in My Meals.
-  2. **Have a scan create a saved meal.** Grouping then works unchanged, but every scanned lunch
-     becomes a permanent entry in My Meals, which the owner has to prune. Likely unwanted.
-  3. **Group on `mealGroupId` alone, unnamed.** Cheapest, and the rule already argues against it.
-- **Recommendation: option 1**, and note it makes `savedMealId` optional on the `'meal'` entry —
-  a type change the renderer and `diary-meal-group.tsx` both have to follow (the photo comes from
-  the saved meal today; a scan would supply its own image or none).
-- **⚠ Do not "fix" this by making the scan write `savedMealId` to a placeholder meal.** That puts a
-  fake row in the user's meal library to satisfy a display rule, and every screen reading saved
-  meals then has to know about it.
-- **Related, and NOT the same bug:** BF-72 is grouping being **lost** on hydration
-  (`use-food-logs-loader.ts` drops both ids from the `applyDelta` payload). This entry is grouping
-  never being **created**. BF-72 shipped and owes a device check; a scan would still render flat
-  with BF-72 perfect.
-- **Verification:** a scanned multi-item meal draws as one collapsible row with its own name and an
-  item count; two scans on one day stay separate rows; and a single-item scan still renders as a
-  plain row, per the existing "a group of one buys nothing" rule.
-
-### [nutrition] BF-98 — a section holding one grouped meal draws its macros twice
-
-- **Lane:** B — `components/nutrition/meal-card.tsx:145`, one condition.
+- **Lane:** B — `components/nutrition/meal-card.tsx`, one condition. **Shipped 2026-09-01.**
+- **Verify:** device — the owner's screenshot is the only place the duplication has been seen. On
+  the S25, open a meal section holding **only** a scanned or saved group: exactly one macro row and
+  one calorie total. Then add a loose item to that section — the footer returns, with numbers that
+  differ from the group's.
+- **⚠ Keep — the duplication could NOT be reproduced in e2e, and that is unresolved rather than
+  disproved.** `diary-nested-meal.spec.ts`'s fixture is the entry's exact case (one saved meal,
+  three ingredients, alone in its section) and the totals footer **does not render there on either
+  condition** — a test written against it passed with the fix reverted, so it was deleted rather
+  than kept as an assertion that cannot fail. The change is still right by reading: `logs` is the
+  flat list, `entries` is the rendered rows, and the collapsed branch twelve lines above already
+  applies that rule. What differs between the owner's diary and that fixture is the open question —
+  a `savedMeals` map that resolves, a meal type with other content, or the collapsed branch being
+  what was photographed. **Answer it before assuming the report is closed.** The change is held by
+  a source guard in `__tests__/diary-groups.test.ts` (mutation-checked) plus the entry-count cases
+  beside it.
 - **Added:** 2026-09-01 · owner, same message: *"the combined item UI doesnt look great with the
   double macros at the bottom."*
 
@@ -469,51 +466,6 @@ computes that as `entries` (`:35`, from `groupDiaryEntries`). One group is one r
 - **Verification:** a meal section containing only a scanned or saved group shows exactly one macro
   row and one calorie total; adding a loose item to that section brings the footer back with numbers
   that differ from the group's.
-
-
-### [app-shell] BF-96 — the weather chip wraps because it is the only thing in the header allowed to
-
-- **Lane:** B — `components/weather-chip.tsx:38` (one class pair).
-- **Added:** 2026-09-01 · owner, with a Home screenshot: *"I dont like how the temperature/uV pill
-  sits. can we go back to the old way when it was side by side. you can make it smaller if needed."*
-
-**Nothing changed the layout — the chip is still side by side, and it is WRAPPING.** Its root is
-already `flex items-center gap-1` rendering `21°` `·` `UV 5` inline. What the screenshot shows is
-`UV 5` breaking at its own space, so `5` drops under `UV` and the pill becomes two lines tall.
-
-**The cause is an asymmetry with its sibling**, in `session-select-content.tsx:1071-1076`:
-
-```tsx
-<div className="flex items-center gap-2">
-  <p className="text-xs … whitespace-nowrap shrink-0">   {/* the date: will not wrap, will not shrink */}
-    {formatInTimeZone(new Date(), tz, "EEEE d MMMM")}
-  </p>
-  <WeatherChip />                                         {/* neither class — so it absorbs everything */}
-</div>
-```
-
-The date refuses to give up space, so the chip is the **only** compressible item in the row and takes
-100% of any shortfall.
-
-**Why it looked fine before, measured rather than assumed.** `EEEE d MMMM` ranges from **12 to 20
-characters** across the year. Today is *"Tuesday 1 September"* — **19**, near the maximum. On a
-*"Friday 1 May"* day there are eight characters of slack and nothing wraps. **The old way the owner
-remembers is the same code on a shorter date**, which is also why this will keep coming back on its
-own schedule if only the symptom is nudged.
-
-- **Fix: give the chip the two classes its sibling already has** — `whitespace-nowrap shrink-0` on the
-  root `div`. That is the whole change, and it is the sibling-surface rule: the row already decided
-  how items behave under pressure and one of the two was never told.
-- **On *"you can make it smaller if needed"* — it is not needed, and size is the wrong lever.** The
-  chip is 19 px of text; wrapping is a `white-space` bug, not a width shortage. If the longest dates
-  still overflow after the fix, shorten the **date** (`EEE d MMMM` → *"Tue 1 September"*, −4 chars)
-  rather than the chip: the date is partly recoverable from the phone's own UI, the temperature and
-  UV are not.
-- **⚠ Do not add hex literals.** `uvColor()` already carries five (`#8b5cf6` … `#22c55e`) and
-  `check-hex-literals.js` is shrink-only per file — a fix that adds one must raise that file's number
-  in the same PR.
-- **Verification:** on the S25, the pill is one line on **every** date — check a long one
-  (*Wednesday 30 September*, 20 chars) rather than today's, since today's is not the worst case.
 
 
 ### [workouts][app-shell] BF-94 — swipe the Start button to reveal Rest, instead of a permanent two-button row
@@ -576,38 +528,6 @@ one. A swipe on the single Start button adds an affordance that does not current
   change tabs or scroll the page; the first tap on the revealed Rest lands (BF-61); a vertical drag
   still scrolls; the card still reaches Rest in one tap on a deload day; and the choice survives a
   tab switch and an app restart (which is BF-84's half).
-
-### [app-shell] BF-95 — the swipe primitive marks itself `data-swipe-actions` and the tab navigator ignores it
-
-- **Lane:** B — `components/shell/tab-swipe-navigator.tsx:42-43`.
-- **Added:** 2026-09-01 · found while tracing BF-94.
-
-**A declared contract that nothing honours.** `components/ui/swipe-actions.tsx:92` sets
-`data-swipe-actions` on every row, with a comment stating exactly what it is for — *"marks the row as
-owning horizontal gestures that start on it, the way `data-swipe-carousel` already marks a
-carousel"*. The navigator's exclusion list is:
-
-```ts
-const inScroller = (e.target as Element)?.closest?.(
-  "[data-swipe-carousel], .overflow-x-auto, [data-hscroll]"
-);
-```
-
-**`data-swipe-actions` is not in it.** The marker is set and never read.
-
-- **Why it has not bitten yet, and why that is not a reason to leave it.** The navigator only arms a
-  tab swipe when the touch starts within **24 px of a screen edge** (`EDGE_PX`), so it takes a
-  swipe-to-delete begun in that strip to run both gestures from one touch. Meal rows are full-width,
-  so the strip is reachable — this is latent, not impossible, and it is the failure the marker was
-  added to prevent.
-- **The fix is one string.** Add `[data-swipe-actions]` to the selector. It costs nothing and makes
-  the primitive's own comment true.
-- **⚠ Do not instead delete the marker as unused.** It is the correct mechanism and the navigator is
-  the side that is wrong; removing it would make the next swipe surface (BF-94) re-derive the whole
-  problem.
-- **Verification:** a swipe-to-delete started at the far left edge of a meal row opens the tray and
-  does **not** change tabs — on the device, since the web sandbox does not reproduce the WebView's
-  touch behaviour.
 
 ### [platform] LA-49 — 34 entries carry a `⛔`; only 7 mean blocked, and the tool parks all 34
 
@@ -751,6 +671,11 @@ experiment, not an inference.
 ### [platform] LA-50 — pixel baselines need a CI-side job, because a session cannot generate one
 
 - **Lane:** A — `.github/workflows/` and `playwright.config.ts`.
+- **Gate:** owner — a baseline job has to **push commits from Actions**, which means granting the
+  workflow write permission to the repository. That is a decision about the blast radius of a
+  compromised action, not an implementation detail, and it is the first thing to settle. It also
+  inherited BF-91's queue position when that entry was split; the gate is what stops it heading the
+  work list on a priority it was never given.
 - **Added:** 2026-09-01 · split out of BF-91, whose recommendation this is the blocked half of.
 
 **Measured, not assumed.** `playwright.config.ts` runs the sandbox Chromium at a fixed path because
@@ -773,119 +698,6 @@ spec, and it will not change by trying harder.
   a claim you can state in a sentence beats an image a human has to approve.
 - **Verification:** a deliberate colour or spacing change fails a baseline in CI, and a Playwright
   version bump has a documented one-command path to regenerate.
-
-### [nutrition][activity] BF-88 — the energy model runs on two different bases and the card never says which
-
-- **Lane:** A — `lib/health/energy-balance-service.ts:227-265` and the two constants in
-  `packages/shared/src/health/{energy-baseline,daily-energy}.ts`. **The copy is now Lane A's too, in
-  this entry** — see the shipped-copy note below.
-- **DECIDED 2026-09-01 — the owner approved the shift and asked for it to ship.** *"yes that sounds
-  good lets ship that."* The `Gate: owner` this entry carried is **cleared**; the sign-off a scoring
-  change needs has been given, against the blast radius restated below (74 of 124 days unchanged
-  exactly, 50 moved, −17 averaged across all days). **Ready for Lane A.** The direction was the
-  owner's own: *"cant we remove some calories for the base 3000 and have it start from 0 steps?"*
-- **Added:** 2026-09-01 · owner: *"is it possible to get rid of the baseline; and have it reference
-  steps + exercise only? that would be more accurate right? rmr + activity?"*
-
-**The question was answered "no, and here is why", but tracing it found a real gap.** The model has
-two paths and they behave differently under exactly the change that was proposed:
-
-| | resting base | what `STEP_BASELINE` does |
-|---|---|---|
-| **fallback** (`source !== 'calibrated'`) | `bmr × 1.2` | changes total burn directly |
-| **calibrated** | `max(bmr, maintenanceKcal − avgActiveKcal)` | **nearly self-cancelling** |
-
-In the calibrated path the same steps are added to today's `activeKcal` *and* to the
-`avgActiveKcal` that gets subtracted out of maintenance, so dropping the threshold moves the
-resting/active **split** on the card while barely moving the total. In the fallback path the same
-edit is worth **−177 kcal/day**. One constant, two meanings, and nothing on screen distinguishes
-them — which is how a reasonable proposal ("drop the baseline, count all steps") can look
-obviously right and be measurably wrong.
-
-**Measured against 124 days of the owner's own data (2026-09-01).** Dropping `STEP_BASELINE` to 0
-and `SEDENTARY_MULTIPLIER` to 1.0 gives a **lower** burn on **124 of 124 days**: mean −177 kcal,
-range −159 to −249, zero days higher. The asymmetry is arithmetic — 0.2 × RMR is 265 kcal, while
-3,000 steps at the walking MET are ~106. Distribution: 50 of 124 days sit below 3,000 steps and so
-currently earn nothing from stepping at all; mean 5,716, median bucket 2–4k.
-
-- **Recommendation: make the shift the owner proposed — subtract the first 3,000 steps' worth of
-  kcal from the resting base, then count steps from zero.** *"cant we remove some calories for the
-  base 3000 and have it start from 0 steps?"* — yes, and this is the version that works, because it
-  **conserves** rather than deletes. The earlier proposal (drop the multiplier to 1.0, count all
-  steps) removed 265 kcal of base and handed back 102, which is why it lost on all 124 days. This
-  one removes exactly what it hands back.
-
-  Measured through `computeActiveEnergy` for the owner's profile:
-
-  | steps | 0 | 1,196 | 2,000 | 3,000 | 5,000 | 7,000 | 10,000 | 15,000 |
-  |---|---|---|---|---|---|---|---|---|
-  | current total | 1590 | 1590 | 1590 | 1590 | 1658 | 1726 | 1827 | 1997 |
-  | proposed total | 1488 | 1529 | 1556 | 1590 | 1658 | 1725 | 1827 | 1997 |
-  | delta | −102 | −61 | −34 | **0** | **0** | −1 | **0** | **0** |
-
-  **Identical at and above 3,000 steps** — it is a reparameterisation there, not a re-scoring. Below
-  it the total drops, which is the intent: a day with no walking should not be paid for incidental
-  walking that did not happen. Blast radius over 124 days: **74 unchanged exactly**, 50 moved, mean
-  −43 on the moved days, worst −86, **−17 averaged across all days**. Against −177 on every day for
-  the earlier version.
-
-  And it delivers BF-87's ask as a side effect: with the floor at zero the rate is **one number**,
-  ~34 kcal per 1,000 steps, linear from the first step. No threshold left to explain.
-- **⚠ BF-87 SHIPPED FIRST (#725, 2026-09-01) AND ITS COPY IS WHAT THIS ENTRY FALSIFIES.** The
-  dependency between the two was inverted for exactly this reason and the inversion did not land in
-  time — BF-87 merged first. Three live sites now print *"steps above 3,000/day"*, and this entry
-  makes steps count from zero:
-
-  | site | line |
-  |---|---|
-  | `components/nutrition/calorie-zone-bar.tsx` | `:54` — *"nothing earned from movement yet; steps count above 3,000/day"* |
-  | `components/nutrition/energy-card.tsx` | `:276` — *"from workouts, activities, and steps above 3,000/day"* |
-  | `components/nutrition/calorie-balance-bar.tsx` | `:117` — same sentence |
-
-  **Rewriting all three is part of THIS entry, not a follow-up.** After the shift the true sentence
-  is the simpler one BF-87 was originally asked for: a single rate, ~34 kcal per 1,000 steps, from
-  the first step. **The zero-state line disappears entirely** — there is no longer a case where
-  movement has earned nothing while steps exist.
-- **⚠ THE VALUE CAN STAY 3,000 WHILE ITS MEANING CHANGES, AND NOTHING WOULD CATCH THAT.** This entry
-  does not necessarily change the number: `STEP_BASELINE` may keep sitting at 3,000 as *the amount
-  subtracted from the resting base* while the step term counts from zero. Same value, every test
-  green, and the three copy sites above quietly become false. **A test that pins a value cannot
-  notice a change of meaning.** So rename it — `STEP_BASE_CREDIT` for the base subtraction, and
-  nothing at all for a threshold that no longer exists — and let the rename break every consumer on
-  purpose.
-- **LB-43 shipped first (#729) and made this easier, not harder.** The constants moved to the
-  dependency-free leaf (`packages/shared/src/health/energy-baseline`) and
-  `components/nutrition/movement-breakdown.ts` now **re-exports** it rather than carrying its own
-  copy. There is exactly **one** `STEP_BASELINE` again, so the rename above is a single edit with the
-  compiler finding every caller — which is the argument for a rename over an edit in place. The
-  earlier version of this entry warned about editing the number in two places under a test that only
-  checked they matched; that hazard is gone and the bullet is replaced rather than left to be obeyed.
-- **⚠ The subtraction is COMPUTED, never a constant — 102 is this owner's number, not the app's.**
-  It is `stepKcal(STEP_BASELINE)` at the user's own age/weight/sex, so a lighter or heavier user
-  gets a different figure. Hardcoding 102 silently mis-bases every other account, and this app now
-  has more than one.
-- **⚠ The two paths need DIFFERENT treatment, which is the finding above being load-bearing.** On
-  the **formula** path the base is `bmr × 1.2` and must have the step-baseline equivalent subtracted.
-  On the **calibrated** path it must not: the base there is `maintenance − avgActiveKcal`, and
-  `maintenance` is measured, so lowering the step floor raises `avgActiveKcal` and the subtraction
-  happens by itself. Applying the correction to both double-subtracts it. An implementer who reads
-  only the constant, and not which path consumes it, will get this wrong.
-- **⚠ Still NOT licensed: a TEF term computed from logged intake.** The genuinely more accurate
-  version of all of this, and unusable at current logging density — **45 of 124 days** carry a
-  plausible intake, so it would vanish on two-thirds of days and make burn swing on whether food was
-  logged, which is worse than a constant.
-- **One real mismatch, recorded and deliberately not acted on.** `SEDENTARY_MULTIPLIER` is a
-  *Mifflin-St Jeor BMR* activity factor, and since BF-42 it is applied to a *measured RMR*
-  (1,325 kcal, FFM 51.5 kg, 2026-08-27). Those are different quantities and the factors were never
-  validated against the second. For this owner the direction is not clearly an over-count —
-  measured 1,325 sits **below** predicted 1,481 — so it is filed as a known imprecision rather than
-  a defect. Anyone revisiting it needs a source for an RMR-based factor, not a re-derivation.
-- **Verification:** a day at or above 3,000 steps reports **exactly** the total it reported before —
-  that equality is the test that the shift conserved rather than re-scored, and it should be a unit
-  test, not an eyeball. A day below 3,000 reports less, by the computed amount. The burn explanation
-  names its basis on both paths. And a second profile (different weight) gets a different
-  subtraction, proving it was computed.
-
 
 ### [platform][body] LB-42 — `weight_goal_kg` and `target_weight_kg` are two columns for one goal
 
@@ -931,66 +743,35 @@ two screens, and a user who sets one has no way to know the other exists.
   accounted for; the recommendation prompt quotes the same number the Health page shows.
 
 
-### [app-shell][platform] BF-86 — the morning check-in never re-prompts, because its effect runs once per app launch
+### [app-shell][platform] BF-86 — the morning check-in never re-prompts (fixed; the "close/reset" half is answered, not built)
 
-- **Lane:** B for the check-in and the rollover signal; A only if a day-scoped server read turns out
-  to need it too.
+- **Lane:** B
+- **Verify:** device — leave the app open overnight on the S25 and resume it after midnight: the
+  morning check-in prompts once, yesterday's ticks are gone, and no reload or spinner happens.
+  Resume again ten minutes later and nothing re-prompts. Playwright's clock proves the logic; it
+  cannot prove Android's process lifecycle, and a WebView that was evicted and restored is a
+  different path from a resume.
+- **Keep — nothing to build; this records the decision so it is not re-opened.** The check-in half
+  shipped: `LocalDayProvider` (`components/shell/local-day-provider.tsx`) re-evaluates the local date
+  on mount and `visibilitychange`, and three consumers subscribe — the workout store's `todayLogged`,
+  the morning check-in prompt, and the today-mood read. An e2e test drives Playwright's clock across
+  local midnight, so the case fires on every run rather than once a day.
+- **Keep — the owner's *"close / do a full reset"* is deliberately NOT implemented as a reload**, and
+  the entry's three reasons stand: BF-80 forbids fixing a resume problem by reloading; instant paint
+  exists so a repeat open shows data rather than a spinner; and an unsynced outbox and an in-progress
+  workout both survive today without being tested on a schedule. **The signal delivers the ask
+  without the reset** — on the first resume of a new day the app re-prompts and re-reads, and on any
+  other resume it does nothing. If the owner still wants a literal restart after using it, that is a
+  new entry with that experience as its subject, not this one.
+- **Keep — the today-scoped read surface is NOT swept, and that is a scope line rather than an
+  oversight.** ~30 `cachedFetchToday` call sites and 59 `readTodayCacheSync` sites exist; both already
+  treat a past-dated entry as a miss, so they are correct **whenever they run**, and most sit behind
+  the `tabEpoch` re-show pass. Whether any is both persistently mounted and never re-read is the
+  Q-359 question and belongs there — subscribing all of them blind would be a large diff justified by
+  a guess. `useLocalDay()` is the mechanism if one turns out to need it.
 - **Added:** 2026-09-01 · owner: *"when the app is opened first thing in the morning or after 12 at
   night, I'd like it to close/do a full reset so I open the fresh app… when I open the app in the
   morning and it just resumes, it doesn't give me the morning check-in."*
-
-**The check-in half has an exact cause.** `session-select-content.tsx:784` prompts the morning
-check-in from a `useEffect` with deps `[userId, tz]`. Neither changes while the app is running, and
-**the tab shell is persistent — it does not unmount** — so the effect runs **once per app launch**
-and never again. Leave the app open overnight, resume it at 6 am, and nothing re-evaluates whether
-today's check-in is owed. That is the `check-fetch-once-effects` class CLAUDE.md already names:
-*"anything in the persistent tab shell holds its first payload until the app is killed."*
-
-**The fix pattern is three lines above the bug.** At `:774` the same file already carries:
-
-```ts
-// The persistent shell re-shows this tab without remounting it — re-run the
-// mount refresh pass (same cachedFetch-backed reads a remount used to run).
-useEffect(() => { … }, [tabEpoch, fetchMeta, fetchWorkoutData, loadTodayMood])
-```
-
-The check-in effect does not use `tabEpoch`. **And re-running it is already safe**: the guard
-`isMorningCheckinPromptDone(tz)` compares a `localStorage` marker against `todayInTz(tz)`, so it is
-date-stamped and idempotent — re-running on a resume prompts once on a new day and no-ops on the
-same day. The state is right; only the trigger is missing.
-
-**⚠ On the "close / full reset" half — do not implement it as a reload or a process kill.** Three
-reasons, and the first is that this repo just wrote the rule down:
-  1. **BF-80** (the app returning blank after backgrounding) says explicitly not to fix a resume
-     problem by reloading on `visibilitychange` — it costs the instant-paint behaviour and hides real
-     faults. A scheduled reload would make BF-80 much harder to diagnose, because a blank screen
-     would then have two candidate causes.
-  2. **The instant-paint rules** exist so a repeat open shows last-known data immediately. A hard
-     reset trades the owner's stated want (a correct fresh view) for a spinner.
-  3. An unsynced outbox and an in-progress workout both survive a restart today, but neither is a
-     thing to test on a schedule for cosmetic reasons.
-
-- **Recommendation: one "the local date changed" signal, and every day-scoped consumer subscribes.**
-  That signal already exists in miniature: `components/shell/workout-day-rollover.tsx` sits in the
-  root layout and fires on mount + `visibilitychange`, comparing `todayInTz(tz)` against a stored
-  date. It is exactly the right mechanism and it is wired to exactly one consumer — the workout
-  store's `todayLogged`. Generalise it (a context or a small event) and the owner's ask becomes
-  true without a reload: on the first resume of a new day the app re-prompts, re-reads and
-  re-paints, and on any other resume it does nothing.
-- **What is day-scoped and would subscribe** — enumerate before building, do not guess: the morning
-  check-in prompt, the mood prompt, the rest-day marker (`ta_rest_day`, BF-84), `todayLogged`, and
-  **56 `cachedFetchToday` call sites**. `cachedFetchToday` already embeds the date in its key, so
-  those may need nothing beyond a re-read — confirm rather than assume, because a key that rotates
-  and a component that never re-reads is the Q-402 shape.
-- **⚠ Test the boundary, not the feature.** A rollover bug only appears across local midnight, and
-  this repo has a documented history of date logic that works all day and fails in a two-hour band.
-  Any test drives the clock or an `Etc/GMT±N` timezone across the boundary rather than waiting for
-  it.
-- **Verification:** leave the app open overnight and resume it after midnight — the morning check-in
-  prompts once, yesterday's ticks are gone, and today's date is on screen, **with no reload and no
-  spinner**. Resume it again ten minutes later and nothing re-prompts. Do the same having force-
-  closed the app first: identical result, which is the point.
-
 
 ### [sleep] BF-83 — last night's sleep grows while you look at it, and nothing says it is still filling
 
@@ -1113,70 +894,59 @@ has already recorded that a bulk job bumps `updated_at` without rewriting a valu
 - **Added:** 2026-09-01 · owner, on Home's Recommended Today card: *"for the training card, I'd like
   a small button for each session to choose 'rest'."*
 
+### [app-shell] BF-96 — the temperature/UV pill wrapped (fixed; the device check is the whole of what is left)
+
+- **Lane:** B
+- **Verify:** device — on the S25, the pill is one line on a **long** date. Today's is not the worst
+  case: `EEEE d MMMM` runs 12–22 characters (measured 2026-09-01, correcting this entry's original
+  "12 to 20"), so check *Wednesday 30 September* rather than whatever today gives.
+- **Keep — nothing to build.** The chip was never moved; it was wrapping, because the header row's
+  other item (the date) carries `whitespace-nowrap shrink-0` and the chip carried neither, so it
+  absorbed every shortfall. It has both now.
+- **Keep — the sandbox cannot show this.** There is no weather snapshot in the seeded DB, so
+  `WeatherChip` renders only its skeleton and the wrap can be neither reproduced nor disproved off
+  the device. The classes are held by a mutation-checked source guard meanwhile.
+- **Keep — if a long date still overflows on device, shorten the DATE, not the chip.** `EEE d MMMM`
+  saves four characters; the date is partly recoverable from the phone's own UI, the temperature and
+  UV are not. Making the chip smaller is the wrong lever: this is `white-space`, not width.
+- **Added:** 2026-09-01 · owner: *"I dont like how the temperature/uV pill sits. can we go back to
+  the old way when it was side by side. you can make it smaller if needed."*
+
+### [app-shell] BF-95 — the swipe marker the tab navigator ignored (fixed; device check owed)
+
+- **Lane:** B
+- **Verify:** device — a swipe-to-delete started at the far **left edge** of a meal row must open the
+  tray and **not** change tab. The web sandbox does not reproduce the WebView's touch behaviour, and
+  the navigator only arms within 24 px of the edge, so the strip has to be hit deliberately.
+- **Keep — nothing to build.** `swipe-actions.tsx` declared `data-swipe-actions` and the navigator's
+  exclusion list did not read it; it does now. A guard asserts the pairing from **both** ends, since
+  deleting the marker as unused would have been the wrong fix and a navigator-only test would have
+  called it a pass.
+- **Added:** 2026-09-01 · found while tracing BF-94.
+
 ### [app-shell] BF-82 — the More page is seven groups of one row each, with one of them behaving differently
 
-- **Lane:** B — `components/more/profile-tab.tsx`, `components/more/settings-panel.tsx`,
-  `components/more/more-row.tsx`, and the sub-screens under `app/more/`.
-- **Unblocked 2026-09-01 — BF-79 shipped, and it made a placement decision this entry now inherits
-  rather than chooses.** The personal details are one screen at **`app/more/details/`**, reached
-  from a `Profile` group on the tab, and a `Profile details` row is what the grouping proposal has
-  to absorb. That was BF-79's own recommendation and it went first because this entry waited on it;
-  if the plan's grouping wants that section somewhere else, moving it is a route rename, not a
-  redesign. **What is settled: height, birth year, biological sex and the display name are on that
-  screen and nowhere else** — do not re-scatter them while regrouping.
-- **Plan:** [`2026-08-31-more-page-grouping-and-interaction-model.md`](superpowers/plans/2026-08-31-more-page-grouping-and-interaction-model.md)
-  — **written 2026-08-31, so the planning half of this entry is DONE and what remains is the build.**
-  It carries the inventory (eight single-row groups, not seven — `Developer` on the Settings
-  sub-screen has the same shape), the grouping proposal (seven headings → two, each covering three or
-  more rows), the interaction model, and three corrections to the premises below. **§6 is the
-  sequencing and §3–§4 are separable from BF-79 if the owner wants the screen fixed sooner.**
+- **Keep:** one look on the S25. Nothing else is owed.
+- **Verify:** device.
+- **Lane:** B.
+- **✅ The grouping and interaction half SHIPPED** (`feat/bf-82-more-page-grouping`, PR #749,
+  2026-09-01, v1.419.0) — nine single-row groups became two headings of three or four rows,
+  `Feedback` moved to the bottom actions where the other sheet-openers live, `Developer` on the
+  Settings sub-screen lost its heading, and `Goals` stopped wearing `MoreRowGroup`'s chrome.
+  `components/more/__tests__/more-row-group-arity.test.ts` is what stops the next one; it was
+  mutation-verified against a restored `label="Developer"`.
+- **✅ The "sliders" question is ANSWERED and there is no control change to make.** Asked directly on
+  2026-09-01; the owner: *"yes it wasnt the sliders specifically; more that its messy and needs
+  re'organisation."* So the word was loose and the complaint was the layout, which is what shipped.
+  **Do not change any control on this screen off the original wording** — measured the same day,
+  More and its six sub-screens carry **no slider and no `<select>` at all**: the value controls are
+  typed number boxes, and activity level and fitness goal are already roving radio-button groups.
 - **Added:** 2026-08-31 · owner: *"a review of all the pages/chevrons in the More page and
   reorganize/group things together that can be. It's very messy and not very organized. Some items
   could be changed from sliders to text or buttons etc. All needs to be reviewed."*
-- **Planning item** — this is an information-architecture pass, and doing it row-by-row is what
-  produced the current shape.
-
-**The structural problem, from the source rather than the impression.** `profile-tab.tsx` renders
-**seven `MoreRowGroup`s — Program, Health, Devices, Settings, Data, About, Admin — and each holds
-exactly ONE row.** A group heading exists to group things; a heading per row is pure vertical
-overhead, and it is most of why the screen reads as long and empty at the same time.
-
-**⚠ And `Goals` is not like the others.** Every other entry is a chevron to a sub-screen. Goals is an
-**inline accordion** that expands into `Required Information` — weight, body fat, height, biological
-sex — right on the page.
-
-- **⚠ CORRECTED by the plan, 2026-08-31.** *"The user cannot predict whether tapping navigates or
-  expands"* overstates it: `MoreRow` draws `ChevronRight` and `GoalsSection` draws a rotating
-  `ChevronDown`, so the conventional affordance is already there. **The real defect is that
-  `goals-section.tsx` does not USE `MoreRowGroup` — it re-implements it**, hand-writing the same
-  heading and shell classes and putting its own button inside, which is why the two shapes can drift.
-  And **Goals staying inline is a 2026-08-16 OWNER DECISION** (`/more/goals` "was never built and is
-  not going to be"), so it is not a thing to fix by moving. See plan §2 and §4.
-
-- **✅ The BF-79 overlap is resolved — it shipped first, as this entry asked.** Its content decision
-  stands (identity and body facts together; weight and body fat read-only as measurements; targets
-  and activity level left in Goals). The `Profile` group it added is one more single-row group for
-  the inventory below, which now reads **nine**, not eight.
-- **⚠ The "sliders" question is the OWNER'S and the plan does not decide it** — it proposes no control
-  change at all. See below for why.
-- **On the "sliders" — there are none on this screen, and the real answer is better.** The settings
-  sub-screen uses **five `Switch` toggles** (calendar sync, day-review reminders, health alerts, rest
-  chip, run chip) and those are correct for booleans. What the owner is reacting to is more likely
-  the **goal fields in the Goals accordion**, where a target is typed into a small box beside the
-  current value (`71.5 kg · Today → [60] kg`). Confirm which controls are meant before changing any:
-  a switch is right for on/off and wrong for a value, and swapping either way for the wrong reason is
-  a regression.
-- **What the pass should produce, in this order:** (1) an inventory — every row, its destination, and
-  what it actually controls; (2) a grouping proposal where a heading covers **two or more** rows or
-  is dropped; (3) one interaction model — everything navigates, or the one that expands earns its
-  exception in writing. Enumerate before changing anything, as BF-76 requires of its sweep, or the
-  PR cannot say what it covered.
-- **Do not delete the About or Admin rows to tidy up.** `About` carries the version string, which is
-  how a stale-bundle question gets answered (it was needed twice this session), and `Admin` is
-  gated on `isAdmin`.
-- **Verification:** no group heading covers a single row; every row on the page responds the same way
-  to a tap or states why it does not; and every destination reachable before the change is still
-  reachable after it — enumerated in the PR body, per the parity rule.
+- **If the device look says it is still messy**, that is a new entry against what the owner points
+  at, not a re-opening of this one — the plan's §3/§4 are built and the parity is enumerated in #749.
+- **Plan:** [`2026-08-31-more-page-grouping-and-interaction-model.md`](superpowers/plans/2026-08-31-more-page-grouping-and-interaction-model.md).
 
 ### [readiness][devices] BF-81 — two producers write the daytime-stress metric and they disagree on every day measured
 
@@ -1365,174 +1135,41 @@ brings it back.** It fits every part of the report:
   times. And whatever the cause turns out to be, **it must file an `error_events` row**: a failure
   this total that leaves no trace is the part that let it go unreported until now.
 
-### [nutrition][body] 🔵 BF-1 — import blood panel results as a nutrition baseline, de-identified
-> **⚑ RAISED 2026-08-31 — owner: *"can you add blood test as well based on the fields I returned
-> from my image."*** It sat near the bottom of the queue while the panel it needs has been in the
-> repo since 2026-08-27. Two facts that make it startable today:
-> - **The 58 analytes are already transcribed and de-identified** in
->   [`clinical-baseline-2026-08-27.md`](clinical-baseline-2026-08-27.md). The schema can be written
->   from a real report without the owner sending anything, and the awkward shapes are already in it —
->   a `<0.2` result that is not a number, one-sided and absent reference ranges, free-text flags
->   carrying commentary, and a month-precision date.
-> - **This is the report that justifies extraction, and DEXA/RMR were not.** BF-71 shipped typed
->   forms for those because ~10 fields and 3 fields are a minute of typing. **58 analytes are not**,
->   so if the upload path (BF-41) is built for one report first, build it for this one. The typed
->   form is still the fallback and the confirm target — extraction prefills, the owner corrects,
->   then it saves.
+### [nutrition][body] 🔵 BF-1 — blood panels: the extraction route, the consumers and the UI
 
-- **⚑ A real panel is available, de-identified, in [`docs/clinical-baseline-2026-08-27.md`](clinical-baseline-2026-08-27.md)** — 58 analytes, April 2026. Write the
-  schema from it: reference ranges arrive as `low-high`, one-sided (`<25`, `>59`) and absent; one
-  result is `<0.2` and not a number; flags are free text carrying commentary; the date is a month.
+> **✅ THE STORAGE HALF SHIPPED 2026-09-01** (migrations 250 + 251). `blood_panels` +
+> `blood_analytes`, written from the real 58-analyte report; `packages/shared/src/health/analyte-keys.ts`
+> (a leaf module, importing nothing) with `rangeVerdict`, `parseResult`, `parseReference` and the
+> key table; `POST/GET/DELETE /api/blood-panel`, the manual path, `.strict()` so an identifier field
+> is a 400. [journal](overview/entries/2026-09-01-blood-panel-storage.md)
+>
+> - **Keep:** three things, and none of them is the schema.
 
-- **⚑ PLANNED 2026-09-01 — [`2026-09-01-blood-panel-import.md`](superpowers/plans/2026-09-01-blood-panel-import.md).**
-  The schema is written from the real 41-analyte panel rather than a description, which is what the
-  entry asked for. The shapes that drove it: `<0.2` is a result that is **not a number** (so
-  `value_num` + `value_operator`, never a number column alone), reference ranges come two-sided,
-  one-sided in both directions, and absent (so `ref_low`/`ref_high` both nullable), the date is a
-  **month** (so a precision column, or every panel lands on the 1st and lies), and flags are
-  commentary — *"Normal (athletic)"* on a creatinine inside its range — so **out-of-range is derived
-  from the bounds, never taken from the flag**.
-  The plan also answers the entry's own hardest question — *name two or three markers and what they
-  would change* — from the owner's numbers: **urea 9.2** against a protein target the app already
-  sets, **LDL 3.57 / non-HDL 3.93 high with triglycerides optimal** (a fat-*quality* signal, not a
-  quantity one), and **fasting insulin 4 / glucose 4.8**, whose value is negative — it removes a
-  hedge from the carbohydrate recommendation.
-- **Lane:** A — classified 2026-08-30 by CLAUDE.md's path rule (*touches storage or `app/api/**` → A; both halves → A, engine first*). New table plus extraction route is the engine and needs a migration, which only **A** may number; the upload/review surface follows as **B**.
-
-
-**Owner request, 2026-08-23 (verbatim):** *"I'd like to be able to import some blood scan results and
-de-identify myself/user etc to have a baseline - should help with reccomendations for nutrition etc."*
-
-**Nothing like this exists.** Grepped the schema for blood/biomarker/lab/analyte names: zero hits.
-(`oura_daily.illness_biomarkers` is Oura's illness-detection JSONB and is unrelated — do not overload
-it.) So this is a new table, a new ingest path, and a new consumer.
-
-**The extraction pattern already exists and should be copied, not reinvented:**
-`app/api/nutrition/scan/route.ts` is a working vision→structured-data route — `generateObject` with a
-Zod schema (never `JSON.parse` of model text, per CLAUDE.md), `isAllowedImageMime` and
-`readJsonLimited` from `@trainingai/shared/http/request-guards`, and a `rateLimit` call. A pathology
-report is the same problem shape as a nutrition label.
-
-**⚠️ The de-identification requirement is the hard part, and it is not a storage problem — it is a
-transmission one.** Two things are true and they point in opposite directions:
-- **The app's own logging is already clean.** `lib/ai/instrument.ts` says in its own comments
-  *"Pass ids/dates/keys only, never raw prompt text or health data"* and *"Metadata only (tokens +
-  fingerprint hash), no prompt bodies"* — `ai_call_log` will not capture the report.
-- **The extraction call itself sends the document to Google.** A real pathology report carries full
-  name, date of birth, address, Medicare/patient reference, and the requesting doctor. Redacting
-  *after* extraction is too late, and redacting *before* extraction is circular, because reading the
-  pixels is the extraction.
-
-  **✅ DECIDED by the owner, 2026-08-23 — route (a), crop before upload.** Verbatim: *"Yes we can
-  crop the report; if its a document that gets uploaded; we can choose where the crop should be; or
-  it can be pre-cropped. I have an example one ready so we should be able to go with that for
-  testing."* The gate is cleared; this entry is buildable once planned. Two requirements come out of
-  that answer and both are binding:
-  - **The crop is chosen, not fixed.** An in-app crop step where the owner picks the region, because
-    lab layouts differ between providers and a hardcoded header height would silently leak on the
-    first report that does not match it.
-  - **An already-cropped file must be accepted as-is.** The crop step is offered, never forced —
-    the owner may arrive with the redaction already done.
-
-  Route (b), typing analytes by hand, stays as the always-available fallback: it needs no AI call at
-  all and is the honest answer when a report will not extract cleanly. Route (c) — sending the whole
-  report — is rejected and should not be revisited without a new owner decision.
-
-  Under every route: **do not persist the document.** Store the extracted analytes and discard the
-  image, which makes the de-identification durable rather than a promise about a retention policy.
-
-**Three things the crop decision surfaces, all verified 2026-08-23:**
-
-1. **The upload pipeline is image-only, and a pathology report is usually a PDF.**
-   `ALLOWED_IMAGE_MIME` (`packages/shared/src/http/request-guards.ts:34`) is exactly
-   `['image/jpeg', 'image/png', 'image/webp']` — no PDF, and nothing in the tree renders one. The
-   owner's words were *"a document that gets uploaded"*, so the plan must pick one: add a
-   PDF→raster step (a new dependency, and it must run **on-device** or the un-cropped PDF reaches
-   the server, defeating the whole decision), or accept only images and let the owner photograph or
-   screenshot the report. **Recommended: images only for v1.** `@capacitor/camera` with
-   `CameraSource.Prompt` already gives camera-or-gallery in one call
-   (`components/nutrition/capture-actions.tsx`, `handleCapturePhoto`), so photographing a printed report or picking a
-   screenshot works today with no new plumbing.
-2. **No crop UI exists anywhere in the app** — grepped `components/`, `app/` and `lib/`; the only
-   hits are unrelated (voice logging, meal-label rendering, the GIF creator). So the crop is new
-   work. **The cheap path is `Camera.getPhoto({ allowEditing: true })`**, which hands off to
-   Android's own crop screen — no new dependency, and it satisfies "we can choose where the crop
-   should be". Evaluate that before reaching for a React cropper library.
-3. **🔴 The example report must never be committed — this repository is PUBLIC.** Confirmed via the
-   API on 2026-08-23: `"private": false`, `"visibility": "public"`. The owner has *"an example one
-   ready"* for testing, and the obvious next move — dropping it in as a test fixture — would publish
-   a real pathology report, with the identifiers the entire feature exists to remove, to a public
-   repository and to anyone who has ever cloned it. **Git history makes that effectively permanent.**
-   Test against a **synthetic** report built to match the layout, keep the real one outside the
-   repository entirely, and treat any local copy as untracked. If the real report is ever needed to
-   validate extraction, run it through a local dev server by hand and commit nothing.
-
-**What it would feed — worth scoping before building, because "helps with nutrition" is not yet a
-consumer.** The honest position is that no code reads a biomarker today. The realistic first consumers
-are `app/api/ai/health-insight/route.ts` (already assembles a metric-line profile from
-`body_metrics` + Oura and would take biomarker lines naturally) and the goal recommendation in
-`packages/shared/src/nutrition/goal-recommendation.ts`. **Name two or three specific markers and what
-they would change** — the failure mode here is a table of 40 analytes that nothing ever reads, which
-is the same shape as the two structurally-dead nutrition trend views already recorded in this file.
-
-**Done looks like:** a blood panel can be entered or imported without identifying details leaving the
-device; the analytes are stored with their date, units and reference range; and at least one
-recommendation surface visibly changes because of a value in it.
-
----
-
-## [devices] ▶ Oura on-device + own-analysis — live handover (owner-directed 2026-07-21, ongoing)
-
-**Implementer entry point:** [`docs/oura-ondevice-hybrid-handover.md`](oura-ondevice-hybrid-handover.md)
-(condensed baton, D0–D7 sequence) and
-[`docs/oura-ondevice-hybrid-implementer-progress.md`](oura-ondevice-hybrid-implementer-progress.md)
-(live state + exact next tasks). This entry is the short pointer, not a duplicate spec.
-
-**D0 (steps) and D1 (durability chain, all sync tracks) are closed.** D5 (own
-daytime-HRV) and D6 (comparison harness) are shipped, pending a real H10 spot-check
-to validate tolerances. D2 Tasks 2+3 (native raw store + WebView bridge) are built
-and **device-verified 2026-07-30** (Full re-sync drain + kill-mid-drain, both clean on the S25).
-
-**Ordered, with what gates what:**
-
-1. ~~⛔ BLOCKING, owner-only. D2 Tasks 2+3 need on-device verification~~ ✅ **CLEARED
-   2026-07-30.** Full re-sync (694 batches) and kill-mid-drain both ran clean on the S25. See
-   Q-29 above and `docs/oura-ondevice-hybrid-implementer-progress.md` for the evidence and two
-   UI-gap caveats (Q-33).
-2. **D2 Tasks 4-9** (clock anchor, rollup port, neural WASM, tier-ladder, prune,
-   storage readout) — **unblocked, next up.** Neural port is SleepNet + step_counter only.
-   ~~CSP prerequisite before Task 6: add `wasm-unsafe-eval` to the prod `script-src`.~~ ✅ shipped
-   2026-08-20 (Q-546, #259).
-3. **B3 (Track-B replace-by-day outbox) + B5 (concurrent-pool load test)** —
-   D2-blocked.
-4. **D3** — silent read-flip to local-first. Needs D2 Tasks 4-9.
-5. **D4** — server-raw cutover: pull-to-device + completeness audit + **staged drop
-   of the 437k-row `oura_raw_samples` table**. ⚠️ **DESTRUCTIVE — explicit owner
-   confirmation required before touching this.** Must rewrite the CLAUDE.md "never
-   prune `body_hex`" rule in the same PR.
-6. **D7** — delete the dormant oracle ONNX models from serving (~T+3mo out). Keeps
-   SleepNet + step_counter.
-
-**✅ CLOSED 2026-08-02 — shipped as #1004** (migration `166_sleep_sessions_oura_id_user_scope.sql`).
-Kept below for the reasoning, which explains why the constraint is user-scoped now. **Not verified
-with two real BLE-ring accounts** — there is only one today.
-
-~~Also still open, found while closing a prior session, otherwise orphaned:~~
-`sleep_sessions.oura_id` was a **global** unique constraint, but the BLE rollup
-derives it as `` `ble:${startDs}` `` with **no user component** — a second real
-account wearing a BLE ring collides with the first account's nights, and because
-`aggregateOuraRawSamples` writes errors into `stepErrors` rather than throwing,
-that account's sleep data would silently stop landing (this already happened
-between test users — it was the year-long CI flake, now fixed for tests but not for
-the underlying id scheme). Fix: either `` `ble:${userId}:${ds}` `` or move the
-constraint to `(user_id, oura_id)`. Touches the Cloud dedup key — wants its own
-migration + PR, sandbox-buildable.
-
-**Not part of this initiative, but found doing the 2026-07-29 handover and
-otherwise orphaned:** migration numbers 081, 087, 146 and 161 are each claimed
-twice on disk (see the migration-number note at the top of this file).
-
----
+- **Lane:** A for the first two; B for the third.
+- **1. The extraction route (`POST /api/blood-panel/scan`), Lane A.** `generateObject` against the
+  cropped image, returning label / unit / reference / result strings which
+  `parseResult` + `parseReference` + `analyteKey` turn into rows. **Never a `JSON.parse` of model
+  text**, and **never** the model's own out-of-range judgement — the verdict is computed and the
+  helper already exists. Copy `/api/nutrition/scan`'s shape, including its rate limit. **No image is
+  persisted anywhere**, and that is a test, not a comment.
+- **2. The consumers, Lane A — and a table nothing reads is the failure mode.** The plan names the
+  three markers and what each would change: **urea 9.2** against a protein target the app already
+  sets; **LDL 3.57 / non-HDL 3.93 high with triglycerides optimal**, a fat-*quality* signal rather
+  than a quantity one; and **fasting insulin 4 / glucose 4.8**, whose value is negative — it removes
+  a hedge from the carbohydrate recommendation. `latestAnalytes` was written for this and **removed
+  again** because `check-dead-repo-methods` correctly rejected a method with no caller; bring it
+  back in the same PR as its reader.
+- **3. Crop, upload and the review-and-correct form, Lane B.** `Needs: BF-1`. **The crop happens
+  BEFORE the upload** — extraction sends the document to Google, so redacting afterwards is too
+  late, and the storage half being de-identified does not cover the image. The typed form is the
+  fallback and the confirm target; the engine already accepts a fully manual panel with no
+  extraction call, which is what makes that split safe.
+- **⚠ Do not re-derive the schema.** It came from a real report and the awkward shapes are already
+  in it. If a new provider prints a shape none of the four covers, add the shape — do not simplify
+  the columns that exist.
+- **Added:** 2026-08-23 · owner: *"I'd like to be able to import some blood scan results and
+  de-identify myself/user etc to have a baseline - should help with reccomendations for nutrition
+  etc."*
 
 ### [body][nutrition][platform] BF-41 — RMR, DEXA and blood are one intake shape; build the pipeline once
 > **⚑ RAISED 2026-08-31 — the owner has now declined typing twice in a row.** After BF-71 shipped the
@@ -2416,143 +2053,67 @@ Lane A's.
 
 ### [body][app-shell] LA-45 — the DEXA-corrected body fat is in the payload and no screen reads it
 
-- **Branch:** _unassigned_ · **Lane: B** — `app/health/health-sections.tsx`, `app/health/health-content.tsx`, the day-detail body row.
-- **Added:** 2026-08-31 · Lane A, on shipping BF-2 step 4.
-- **The engine is done and invisible.** `/api/body-metadata` and `/api/day-log` now carry
-  **`bodyFatCorrected`** and **`bodyFatIsCorrected`** per reading, and `body-metadata` also returns
-  `bodyFatCalibration: { offsetPct, pairCount, source } | null` once per response. Every screen
-  still renders `bodyFat`, which is the RAW scale value — so the owner's Health screen shows 25.3
-  while their calorie goal is already computed from the corrected 28.5. **The two disagreeing on
-  screen is worse than neither being corrected**, which is why this is filed rather than left.
-- **`bodyFat` must stay raw and must stay the value the log sheet seeds from.** `openLog`
-  (`health-content.tsx:493`) and `log-value-sheet.tsx:32` pre-fill the body-fat input from it and
-  POST it back at source `manual`, a rank that outranks `scale_ble`. Seed from `bodyFat`, display
-  `bodyFatCorrected`. Getting this backwards lets the user overwrite their own measurement by saving
-  a field they never touched, and collapses the next calibration toward zero.
-- **Mark the boundary, do not hide it.** Two thirds of the owner's history is on instruments the
-  calibration does not cover (no provenance to 2026-06-23, `health_connect` to 08-01, `scale_ble`
-  from 07-29), so a 90-day body-fat trend contains both kinds and has a ~3.2-point step at the
-  changeover. `bodyFatIsCorrected` is per reading precisely so the chart can say why rather than
-  draw an unexplained jump. **Do not infer it from `bodyFatCorrected !== bodyFat`** — an offset can
-  round to zero, and "corrected by 0.0" and "not corrected" are different claims.
-- **Show the offset; the owner asked for it.** *"so it shows Body fat on the current scale as per a
-  dexa result"* — `offsetPct` with `pairCount` beside it. At `pairCount: 1` an offset and a ratio
-  are the same number, so it must not be presented as a settled calibration.
-- **`health-sections.tsx` derives `bodyComposition(r.weightKg, r.bodyFat)`** at three sites for the
-  lean-mass and BMR tiles. Those should move to `bodyFatCorrected`, which is what makes the panel
-  agree with the calorie goal. It is exempt in `scripts/check-body-fat-correction.js` with that
-  reason — **remove the exemption in the same PR**, or the check keeps asserting a decision that has
-  been made.
-- **The `Gate: device` was removed 2026-09-01 — it was the documented mistake, made a third time.**
-  This file's own field rules say it outright: *"`Gate: device` means SHIPPED and awaiting a device
-  check — never 'will need one when built'"*, because a gate **parks** the entry and hides it from
-  `next-item.js`. Nothing here is built. The stated reason — "a Health-screen change on the canonical
-  runtime" — is true of every Lane B item, so gating on it parks the lane. **The device check is
-  still owed**; per CLAUDE.md's Canonical Runtime rule it is satisfied at merge by the smoke run *or*
-  a Known-Issues row marking the change not-yet-device-verified. That is a **Verification** line, not
-  a gate.
-- **The other 39 device-gated entries were checked and this is the only one of its kind** — 35 are
-  shipped-and-awaiting-their-check, and `PS-9`/`PS-10`/`PS-12`/`PS-16` need the Colmi ring in hand.
-  So the rule is holding now; this was a straggler, not a fourth outbreak.
+- **Keep:** one look on the S25, and only that.
+- **Verify:** device — and here it is not a formality. `health-content.tsx`'s local-store seed and the
+  network fetch race, and a local row carries the raw reading with no calibration; the fix that stops
+  the seed clobbering the correction is **unreachable on web**, where `getLocalStore` returns null.
+  On the S25: open Health → Body offline and after a sync, and confirm the body-fat number does not
+  flick back to the scale's value. Also confirm the **week-day sheet's `% BF` chip**, which is the one
+  surface that could not be driven in the browser.
+- **✅ SHIPPED** (`feat/la-45-corrected-body-fat-display`, 2026-09-01, v1.420.0). Seven surfaces read
+  the corrected value through one rule (`components/health/body-fat-display.ts`); the card states the
+  offset and its pair count and marks a mixed window;
+  `components/health/__tests__/body-fat-display-sites.test.ts` pins every site and the inverse (the
+  log sheet still seeds raw), mutation-verified eight ways. `check-body-fat-correction.js`'s
+  `health-sections.tsx` exemption is gone, as this entry asked.
+- **⚠ The local seed has no DEXA scan and no `source_map`, so the feature is UNREACHABLE in the
+  sandbox** — every reading returns `corrected: false` and a session that renders the screen and sees
+  a plain number has verified nothing. A fixture was seeded by hand into the local DB (one scan at
+  21.2% on 2026-08-25, `scale_ble` provenance on the newest four readings) and left there, so the
+  path stays testable. It is fabricated, like the rest of that seed.
+- **`bodyFat` must stay raw and must stay the value the log sheet seeds from.** `openLog` POSTs it
+  back at source `manual`, a rank that outranks `scale_ble`. Seed from `bodyFat`, display
+  `displayBodyFat`. Getting this backwards lets the user overwrite their own measurement by saving a
+  field they never touched, and collapses the next calibration toward zero. The guard's last case is
+  exactly this, and it fails when the seed is switched to the corrected value.
 
+### [workouts] BF-59 — the AI's set prescription still steers off the flat binary
 
-### [workouts] BF-59 — the weekly set targets are a flat large/small binary, ignoring both the app's own landmark table and the program's goal
+> **✅ THE SCREEN'S HALF SHIPPED 2026-09-01.** The Training card's weekly targets are **derived**
+> from `volumeLandmarks(goal, muscle)` scaled by the week's phase mix, not read from
+> `program_volume_targets.target_sets_per_week`. `/api/weekly-muscle-sets` also returns a `phase`
+> block — scale, dominant phase and the session counts behind it — so the card can say *why* the
+> target is low. **Owner decision, 2026-09-01:** scale the target **and** print the reason;
+> multipliers accumulation 1.0 · intensification 0.8 · realisation 0.6 · deload 0.5.
+> [journal](overview/entries/2026-09-01-phase-aware-volume-targets.md)
+>
+> - **Keep:** two things, and the first is a live inconsistency rather than a nicety.
 
-- **Lane:** A — `packages/shared/src/ai-periodization/volume-targets.ts` is the source of truth;
-  `program_volume_targets` is what the screen reads, and it disagrees.
+- **Lane:** A for 1; B for 2.
+- **1. `signals.ts` still reads the stored number, so the ENGINE and the SCREEN now disagree.**
+  `packages/shared/src/ai-periodization/signals.ts:399` builds `volumeBudgetPerMuscleGroup` from
+  `vt.targetSetsPerWeek` — the same flat 14/10 the screen has stopped reading. Before this change
+  both were wrong together; now only the prescription is. Point it at `weeklyVolumeTarget` with the
+  session's own phase. **Deliberately not done in the same PR:** it changes prescribed sets on the
+  device, which is a behavioural change needing a device pass, where the card is a display change
+  that can be read on a screenshot.
+- **2. The card must PRINT the phase, Lane B.** The route returns `phase: { scale, dominant, counts }`
+  and nothing renders it yet, so today the target simply moved with no explanation — which is the
+  option the owner explicitly did **not** pick. One line on the Training card: *"peaking — volume is
+  meant to be low"* when `dominant` is `realisation`, and the equivalent for `deload`. Until it
+  lands, the shipped half is only two thirds of the answer.
+- **⚠ Do not re-seed `program_volume_targets` to "fix" the numbers.** The stored rows are now the
+  **roster** — which muscles the program trains — and nothing reads their number. Re-seeding
+  recreates the second source of truth this removed. Deciding whether the column becomes a per-program
+  override or is dropped is its own entry, and neither is urgent.
+- **Verify:** device — with a peaking week logged, the Training card reads at-or-near target instead
+  of red, and says why. Two owner-visible checks the sandbox cannot make: that the reduced numbers
+  feel right on their own training, and that a `strength` program's targets look visibly lower than a
+  `hypertrophy` one's.
 - **Added:** 2026-08-30 · owner, with the Health → Training screen after a full week: *"i did the
   full sessions for the week; and i was nowhere near hitting the reccomended amount of muscle sets.
-  are we aiming too high; is it calculating wrong? whats the issue?"*
-
-> **⚑ THE OWNER SUPPLIED THE MISSING CAUSE, 2026-08-30: *"oh yes cause its realization phase its
-> been less sets."*** This reframes the entry and **the framing below is incomplete without it.** In a
-> realisation/peaking block, low volume is the *prescription* — the app's own `explain.ts` calls it
-> *"peak strength — heaviest load, lowest reps"*, and `autoregulation.ts` refuses rep pushes in it.
-> **So the owner's week was correct training, and the screen painted correct training red.**
->
-> **MAV is an ACCUMULATION target.** Showing it during a peak and colouring the shortfall as failure
-> tells an athlete that doing the right thing is wrong — which is worse than a wrong number, because
-> the wrong number is at least ignorable.
->
-> **And it is not one phase per week.** Phase lives in `session_periodization`, **per program
-> session**, and production shows the owner's sessions spanning three at once — `accumulation`,
-> `intensification` and `realisation`, all with recent `updated_at`. So "this week's volume target"
-> is a computation over the phases the week's sessions are actually in, not a constant that can be
-> stored anywhere.
->
-> **What this makes the real fix**, in order of how much it matters:
-> 1. **The target must take the phase.** A realisation week should show a reduced target, or the
->    progress bar should say *"peaking — volume is meant to be low"* rather than showing a deficit.
-> 2. The per-muscle landmarks and the goal multiplier (below) — real, but second-order beside this.
->
-> **⚠ Do not ship (2) alone and call this closed.** Correcting 128 → ≈106 still paints a peaking week
-> red; it just paints it slightly less red.
-
-**The counting is right. The target is wrong — for three reasons, and the entry originally found only
-two.** Measured from the owner's screen and production:
-
-| | |
-|---|---|
-| Sessions completed | 5 — the full week, nothing skipped |
-| Sets actually logged | **50** |
-| Muscle-set credits awarded | **79** (secondary muscles at 0.5, as designed) |
-| Sum of displayed targets | **128** |
-
-Reaching 128 credits at the observed 1.58 credits-per-set ratio needs **~81 real sets a week** —
-**62% more than the program prescribed**, or ~16 sets per session across five 52-minute sessions.
-**The target is not reachable by completing the program**, which is the complaint.
-
-**Root cause: `program_volume_targets` holds a flat binary — 14 for seven "large" muscles, 10 for the
-small ones.** Every stored row read from production is one of those two numbers. That is exactly what
-the app's own landmark table says it does not do; `volume-targets.ts` opens with:
-
-> *"Landmarks are per-muscle rather than a large/small binary — muscle size alone doesn't predict
-> volume tolerance."*
-
-**Two things the stored targets throw away:**
-
-1. **The per-muscle landmarks.** Stored vs `MUSCLE_LANDMARKS` MAV: chest 14 **vs 16**, lats 14 **vs
-   16**, shoulders 14 **vs 16**, hamstrings 14 **vs 12**, glutes 14 **vs 10**, biceps 10 **vs 14**,
-   triceps 10 **vs 12**, lower back 10 **vs 8**. Only quads and upper back agree.
-2. **The goal multiplier.** The owner's active program `Shikai` is **`powerbuilding` = ×0.8**, and
-   nothing in the stored targets reflects it. Applying both fixes moves the week from **128 to ≈106**.
-
-**What that does to the owner's week — the part worth telling them:**
-
-| Muscle | Logged | Shown | Goal-adjusted MAV | Verdict |
-|---|---|---|---|---|
-| Glutes | 9 | 14 | **8** | **exceeded** |
-| Hamstrings | 10 | 14 | **10** | **met** |
-| Lower back | 7 | 10 | **6** | **exceeded** |
-| Triceps | 9 | 10 | 10 | nearly met |
-| Chest | 8 | 14 | 13 | genuinely short |
-| Lats | 6 | 14 | 13 | genuinely short |
-
-They are **not** under-training the way the screen says — on several muscles they are at or past the
-sweet spot. Real gaps remain (chest, lats, quads, upper back, shoulders, biceps); the point is the
-screen cannot currently tell the two apart.
-
-- **This is a One-Formula-One-Place violation**, the class CLAUDE.md names: two implementations of
-  weekly volume targets, and the one the user sees is the cruder one. Derive
-  `program_volume_targets` from `volumeLandmarks(trainingGoal, muscle)` instead of a binary.
-- **⚠ Seeding is not enough — these rows exist and are wrong.** `ON CONFLICT DO NOTHING` never
-  corrects a drifted row (CLAUDE.md, Postgres data migrations), so this needs an explicit idempotent
-  `UPDATE … WHERE` or every existing program keeps the flat numbers forever.
-- **Do not silently overwrite a target the owner set by hand.** If the schema cannot tell a seeded
-  target from an edited one, say so and ask before the corrective migration runs.
-- ~~**A second question: does the program prescribe enough volume to reach MAV at all?**~~
-  **Withdrawn 2026-08-30 — the owner answered it before it was asked.** 50 sets is short of MAV
-  because it is a **peaking block**, which is what a peaking block is for. There is no volume
-  shortfall to explain. *(Kept struck rather than deleted: the question was reasonable on the data
-  available and would be re-asked by the next person who looks at 50-against-106 without knowing the
-  phase — which is itself the argument for putting the phase on the screen.)*
-- **Verification:** **a week of realisation sessions does not read as a deficit** — either the target
-  drops or the card says why it is low; displayed targets match `volumeLandmarks` for the active
-  program's goal; a `strength` program (×0.65) shows visibly lower targets than a `hypertrophy` one
-  (×1.0); and an accumulation week reads at-or-near target on the muscles the table says it should.
-- **Do not "fix" this by lowering the numbers until they match.** The owner's week was correct
-  training; the target was measuring the wrong thing for that week. A target tuned until nothing ever
-  reads red measures nothing at all.
+  are we aiming too high; is it calculating wrong? whats the issue?"* — then the cause, in their own
+  words: *"oh yes cause its realization phase its been less sets."*
 
 ### [workouts] BF-56 — swapping an exercise silently changes its role, which changes the prescribed sets and percentages
 
@@ -2618,94 +2179,33 @@ a finding — it does not by itself explain a plain `GET` hanging beside it.
 - **Keep:** whatever the cause, `connectionTimeoutMillis: 0` on a pool of 10 is worth a decision of
   its own — a bounded wait turns a hang into an error state a card can show.
 
-### [platform] BF-55 — 84 MB of index against 63 MB of table, and the database is growing ~7× its expected trend
+### [platform] BF-55 — the database is growing ~7× its expected trend
 
-- **Lane:** A
-- **Added:** 2026-08-30 · measured against production while checking BF-54. **These are the size
-  columns, read from the filesystem, so they are exact** — unlike the row counts BF-54 is about.
+> **✅ The index half shipped 2026-09-01** (migration 249). `oura_heartrate_user_updated` —
+> `idx_scan` 0, `idx_tup_read` 0, **21 MB**, a quarter of the database's index budget — is dropped,
+> with the owner's conditional approval and both conditions re-verified against production.
+> `getOuraTimeseriesDelta` and its tests stay per Q-180; its doc comment now carries the
+> `CREATE INDEX` the restore driver must run, and a test holds that paragraph in place.
+> [journal](overview/entries/2026-09-01-drop-unused-hr-index.md)
+>
+> - **Keep:** the growth trend, which this did not explain.
 
-**Two readings, both from `pg_stat_user_tables` on 2026-08-30:**
-
-1. **Indexes outweigh the data.** Whole database: **84 MB of index against 63 MB of heap** — 1.33×.
-   Per table it is starker: `oura_raw_samples` 38 MB index on 30 MB heap; `oura_heartrate` **32 MB
-   index on 9 MB heap**, 3.5×. An index set larger than the data it points at is either redundant
-   indexes or bloat, and both are fixable.
-2. **Growth is off trend.** Total is **206 MB**, against the **171 MB baseline of 2026-08-18** —
-   **+35 MB in 12 days, ~2.9 MB/day**, where CLAUDE.md's post-packing expectation is **~0.4 MB/day**.
-   That is roughly seven times trend, and CLAUDE.md says anything materially above it gets recorded
-   the same session. This is that record.
-
-**What this is not.** It is **not** the 0.79 GB premise of Q-549, which was falsified on 2026-08-25
-and is unrelated. And it is not, on this evidence, dead-tuple bloat in the heap: `oura_raw_samples`
-carries 7,333 dead tuples, which is real but small against 180,415 live rows.
-
-- **First move is measurement, not a VACUUM.** List the indexes on `oura_raw_samples` and
-  `oura_heartrate` with their sizes and `idx_scan` from `pg_stat_user_indexes`; an index never
-  scanned is a candidate to drop, and dropping one is cheaper and safer than REINDEX.
-
-**✅ THAT MEASUREMENT IS DONE — 2026-08-30, against production. It found one 18 MB answer and
-falsified the rule it was taken under.**
-
-| Table | Index | `idx_scan` | Size |
-|---|---|---|---|
-| `oura_heartrate` | **`oura_heartrate_user_updated`** | **0** | **18 MB** |
-| `oura_raw_samples` | `…_user_id_ring_timestamp_ds_tag_body_hex_key` | 3,546 | 17 MB |
-| `oura_raw_samples` | `oura_raw_samples_user_tag_ts` | 251 | 15 MB |
-| `oura_heartrate` | `oura_heartrate_user_id_timestamp_key` | 5,991 | 9.4 MB |
-| `oura_raw_samples` | `oura_raw_samples_pkey` | 3,618 | 5.3 MB |
-| `oura_heartrate` | `oura_heartrate_pkey` | 0 | 4.4 MB |
-| `rr_intervals` | `rr_intervals_user_id_at_key` | 0 | 3.5 MB |
-| `rr_intervals` | `rr_intervals_pkey` | 0 | 3.5 MB |
-
-**⚠ "Never scanned is a candidate to drop" is wrong for three of those four zeros, and this entry
-said it.** `idx_scan` counts **reads**, not constraint enforcement. `oura_heartrate_pkey`,
-`rr_intervals_pkey` and `rr_intervals_user_id_at_key` are PRIMARY KEY / UNIQUE indexes: they are
-consulted on **every insert** to reject a duplicate, and that work is invisible to this counter.
-Dropping one drops the constraint. They are not candidates.
-
-**The one real candidate is the largest index in the database, and it belongs to a decision that
-predates this measurement.** `oura_heartrate_user_updated` is
-`(user_id, updated_at, id)` from migration 130 — the keyset-pagination index for
-`getOuraTimeseriesDelta`, whose own doc comment records **Q-180 (decided 2026-08-14)**: the method
-has no production caller, and is kept deliberately because intraday HR reaches a fresh device by no
-other path, the server is the archive, and — in as many words — *"It costs nothing at runtime."*
-
-**It does not cost nothing.** It is **18 MB of the database's 84 MB of index — 21 % — for a code path
-nothing calls**, plus write amplification on every HR insert, which is the highest-volume write in
-the app (87,021 rows today). Q-180 weighed the *method*; the index was never in that accounting, and
-it is 2× the heap of the table it sits on (`oura_heartrate`: 32 MB of index on 9 MB of data).
-
-- **✅ THE OWNER GATE IS CLEARED, 2026-09-01 — the field is removed above, deliberately.** The owner
-  approved the drop: *"yes if we are not using it and you are sure its reversible then get rid of
-  it."* Both conditions were re-verified
-  against production before recording this, rather than resting on the 2026-08-30 table above:
-  - **Unused, and the reading is now stronger.** `oura_heartrate_user_updated` reads
-    **`idx_scan` 0 and `idx_tup_read` 0**, and it has grown to **20 MB**. On the *same table*,
-    `oura_heartrate_user_id_timestamp_key` shows **40,195 scans / 18.6 M tuples read** — so this is
-    not a quiet table, it is an index the planner never chooses.
-  - **No caller.** `getOuraTimeseriesDelta` exists in `slices/oura.ts:700`, `adapter.ts:6293` and the
-    `repository.ts:1203` interface, and **nothing invokes it**; the only other mention is
-    `sync-engine.ts:729` recording that the driver "never was" written.
-  - **Reversible.** A plain btree from `130_oura_heartrate_updated_at.sql` — one `CREATE INDEX` over
-    9.6 MB of heap.
-  - **⚠️ And the entry's own warning held up.** `rr_intervals_pkey` read `idx_scan` 0 on 2026-08-30
-    and reads **5,034** now. Had "never scanned" been treated as a drop rule, that constraint would
-    have gone. **Drop `oura_heartrate_user_updated` and nothing else from that table.**
-- **Lane A takes it from here — this is a migration and the Orchestrator may not number one.** What
-  it owes: the `DROP INDEX`, and a line in `getOuraTimeseriesDelta`'s doc comment saying the restore
-  driver must recreate the index, since Q-180's "it costs nothing at runtime" is what this narrows.
-  **Q-180's decision to keep the *method* stands; only its index goes.**
-- **The alternative** is keeping it so the restore driver finds its index waiting, which is what
-  Q-180 chose. That is defensible if the driver is imminent; it has not been written in the two weeks
-  since, and the index is 21 % of the index budget this entry was opened about.
-
-**Sizes re-confirmed the same day: 206 MB total, 63 MB heap, 84 MB index** — the 1.33× the entry
-opened on, unchanged.
-
+- **Lane:** A.
+- **What is still owed.** Total was **206 MB** against the **171 MB baseline of 2026-08-18** —
+  ~2.9 MB/day where the post-packing expectation is ~0.4 MB/day. Removing 21 MB of index and one
+  write-amplification source does not account for that; the question is what is adding ~2.5 MB/day
+  more than expected, and the answer is most likely in the highest-volume writers rather than in
+  indexes. Re-measure the total before assuming the trend still holds — it has not been read since
+  2026-08-30.
+- **⚠ Do not re-run the index audit expecting more wins, and do not reach for `idx_scan = 0`.** That
+  counter records READS, not constraint enforcement, so every PRIMARY KEY and UNIQUE index can read
+  0 while being consulted on every insert. This entry's own first draft called them drop candidates;
+  `rr_intervals_pkey` read 0 on 2026-08-30 and **5,034** a day later. The one genuine candidate has
+  now been taken.
 - **Cost check before anyone panics:** at Railway's $0.15/GB/month this whole database is about
   **three cents a month**. The reason to act is that a 7× trend compounds, not that the bill hurts.
-- **Verification:** index total drops below the heap total, and a re-read a week later shows growth
-  back near trend.
+- **Added:** 2026-08-30 · measured against production while checking BF-54. **These are the size
+  columns, read from the filesystem, so they are exact** — unlike the row counts BF-54 is about.
 
 ### [nutrition][platform] BF-69 — dosed substances are stored but nothing reads them; make exposure an analysable variable
 

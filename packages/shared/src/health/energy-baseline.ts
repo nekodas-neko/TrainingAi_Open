@@ -30,9 +30,35 @@
  *  on one screen. Activity is only ever ADDED to this number, never multiplied into it. */
 export const SEDENTARY_MULTIPLIER = 1.2
 
-/** Steps assumed already covered by the sedentary base (a desk-job day's incidental stepping). Only
- *  steps above this count as extra movement, so we don't double-count the baseline against BMR×1.2. */
-export const STEP_BASELINE = 3000
+/**
+ * The step count whose energy is CREDITED OUT of the formula resting base, so stepping can be
+ * counted from the first step (BF-88).
+ *
+ * **It was `STEP_BASELINE`, a threshold, and the rename is the point.** Until 2026-09-01 the base
+ * was `BMR × 1.2` and only steps *above* 3,000 earned anything — which meant a day with 1,196 steps
+ * was paid for 3,000 steps' worth of incidental walking that did not happen, and the card had to
+ * explain a threshold. The owner asked the right question: *"cant we remove some calories for the
+ * base 3000 and have it start from 0 steps?"*
+ *
+ * So the same 3,000 steps are now subtracted from the base as kcal instead of skipped as steps. At
+ * exactly 3,000 the two are equal and the day's total burn is **unchanged** — measured across 124
+ * days, 74 unchanged exactly and every day at or above 3,000 identical to the kcal. Below it the
+ * total drops, which is the intent.
+ *
+ * **The value did not change and its meaning did, which is why this is a rename and not an edit.**
+ * A test pinning `3000` cannot notice a change of meaning; a rename breaks every consumer on
+ * purpose. If you are here because the compiler sent you, read what the new name means before
+ * substituting the old one back.
+ *
+ * **⚠ The kcal this represents is COMPUTED per user, never a constant.** It is this many steps'
+ * energy at the user's own age, weight and sex — about 102 kcal for the owner, different for anyone
+ * else. `stepEnergyKcal` in `daily-energy.ts` is the one place that turns it into calories.
+ *
+ * **⚠ It applies to the FORMULA path only.** On the calibrated path the base is
+ * `maintenance − avgActiveKcal`, and lowering the step floor raises `avgActiveKcal`, so the
+ * subtraction happens by itself. Applying the credit there as well double-subtracts it.
+ */
+export const STEP_BASE_CREDIT = 3000
 
 /** Walking cadence for turning a step count into minutes. Tudor-Locke: ~100 steps/min ≈ the
  *  moderate-intensity walking threshold, which matches the walking MET (4.3) used by `daily-energy`. */

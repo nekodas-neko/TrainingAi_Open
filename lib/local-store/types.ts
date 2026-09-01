@@ -408,6 +408,9 @@ export interface LocalFoodLog {
   /** BF-39. One id per logging occasion. Two servings of one meal on a day share `savedMealId`
    *  and differ here, which is why the diary groups on this. */
   mealGroupId?:       string | null;
+  /** BF-97. A scanned group's own name — it has no saved meal to be named from. Null on a
+   *  saved-meal group and on every row logged before the column existed. */
+  mealGroupName?:     string | null;
   quantityMultiplier: number;
   loggedAt:           string;
   updatedAt:          string;

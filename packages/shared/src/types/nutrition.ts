@@ -47,6 +47,15 @@ export interface FoodLog {
   /** BF-39. One id per logging OCCASION. Two servings of the same meal on one day share
    *  `savedMealId` and differ here, which is why the diary groups on this and not on that. */
   mealGroupId?: string | null
+  /**
+   * BF-97. The group's own name, for a group that has no saved meal to be named from — a scanned
+   * dish. Denormalised onto every row of the group, because a group IS the rows sharing a
+   * `mealGroupId` and there is no group table to join to offline.
+   *
+   * Null on a saved-meal group, which takes its name from `savedMealId`, and on every row logged
+   * before this column existed.
+   */
+  mealGroupName?: string | null
 }
 
 export interface FoodLogWithItem extends FoodLog {

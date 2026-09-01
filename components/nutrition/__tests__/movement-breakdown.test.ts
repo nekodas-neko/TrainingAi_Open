@@ -1,9 +1,9 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { movementParts, movementSummary, STEP_BASELINE } from '../movement-breakdown'
+import { movementParts, movementSummary } from '../movement-breakdown'
 import { computeActiveEnergy } from '@trainingai/shared/health/daily-energy'
-import { STEP_BASELINE as SHARED_STEP_BASELINE } from '@trainingai/shared/health/energy-baseline'
+import { STEP_BASE_CREDIT } from '@trainingai/shared/health/energy-baseline'
 
 /**
  * BF-87 — the breakdown under the calorie bar, and the threshold that explains a zero.
@@ -56,10 +56,10 @@ describe('the parts the service hands us already add up', () => {
   const cases: { name: string; input: Parameters<typeof computeActiveEnergy>[0] }[] = [
     {
       name: 'steps only, above the baseline',
-      input: { profile, strengthSessions: [], activities: [], pedometerSteps: SHARED_STEP_BASELINE + 4200 },
+      input: { profile, strengthSessions: [], activities: [], pedometerSteps: STEP_BASE_CREDIT + 4200 },
     },
     {
-      name: 'steps below the baseline earn nothing',
+      name: 'a short day, which now earns something rather than nothing',
       input: { profile, strengthSessions: [], activities: [], pedometerSteps: 1196 },
     },
     {
@@ -68,7 +68,7 @@ describe('the parts the service hands us already add up', () => {
         profile,
         strengthSessions: [{ durationMin: 47, id: 's1', rpe: 8 }],
         activities: [{ activityType: 'cycle', durationMin: 23, distanceKm: null }],
-        pedometerSteps: SHARED_STEP_BASELINE + 3311,
+        pedometerSteps: STEP_BASE_CREDIT + 3311,
       },
     },
     {
@@ -77,7 +77,7 @@ describe('the parts the service hands us already add up', () => {
         profile,
         strengthSessions: [{ durationMin: 13, id: 's1' }, { durationMin: 7, id: 's2' }],
         activities: [{ activityType: 'walk', durationMin: 11, distanceKm: 1.3 }],
-        pedometerSteps: SHARED_STEP_BASELINE + 1717,
+        pedometerSteps: STEP_BASE_CREDIT + 1717,
       },
     },
   ]
@@ -97,8 +97,21 @@ describe('the parts the service hands us already add up', () => {
     })
   }
 
-  it('a step count below the baseline really does earn zero', () => {
+  /**
+   * BF-88 inverted this, and the inversion is the change.
+   *
+   * BF-87 shipped a line explaining why 1,196 steps earned nothing; BF-88 removed the threshold that
+   * made that true, crediting the same 3,000 steps' energy out of the resting base instead. The
+   * summary is no longer empty at 1,196 steps, and the copy that explained the zero is gone with it.
+   */
+  it('a short day earns from the first step now, and says so', () => {
     const r = computeActiveEnergy({ profile, strengthSessions: [], activities: [], pedometerSteps: 1196 })
+    expect(r.stepsKcal).toBeGreaterThan(0)
+    expect(movementSummary(r)).toMatch(/steps$/)
+  })
+
+  it('an empty summary now means no movement at all, not a shortfall', () => {
+    const r = computeActiveEnergy({ profile, strengthSessions: [], activities: [], pedometerSteps: 0 })
     expect(r.stepsKcal).toBe(0)
     expect(movementSummary(r)).toBe('')
   })
@@ -109,13 +122,20 @@ describe('the parts the service hands us already add up', () => {
   })
 })
 
-describe('the threshold is quoted, never restated', () => {
-  // LB-43 removed the mirror, so this pair no longer asks whether two copies agree — a re-export
-  // cannot disagree with itself, and a test that cannot fail is worse than none. What it asks now
-  // is whether the constant is still the shared one and still reachable from a client component.
-  it('is the shared constant, not a copy of it', () => {
-    expect(STEP_BASELINE).toBe(SHARED_STEP_BASELINE)
-    expect(codeWithImports('components/nutrition/movement-breakdown.ts')).toMatch(/energy-baseline/)
+describe('the threshold is gone, and no copy re-states it', () => {
+  // BF-87 put a threshold in three sentences; BF-88 removed the threshold. What is asserted now is
+  // that none of them grew it back — a stale "steps above 3,000/day" is a sentence that is simply
+  // false, and the kind that survives because it still reads plausibly.
+  it('no nutrition surface still promises a step threshold', () => {
+    for (const rel of [
+      'components/nutrition/calorie-zone-bar.tsx',
+      'components/nutrition/calorie-balance-bar.tsx',
+      'components/nutrition/energy-card.tsx',
+      'components/nutrition/movement-breakdown.ts',
+    ]) {
+      expect(code(rel), rel).not.toMatch(/steps? (count |above )/i)
+      expect(code(rel), rel).not.toMatch(/STEP_BASELINE/)
+    }
   })
 
   it('does not import the shared module into the client bundle', () => {
@@ -137,17 +157,21 @@ describe('the threshold is quoted, never restated', () => {
     expect(src).not.toMatch(/require\s*\(/)
   })
 
-  it('the zero-earned line names the threshold, not just the shortfall', () => {
+  /**
+   * The zero-state line survives, with a different meaning. BF-87's version explained why steps
+   * existed and earned nothing; that case cannot arise any more. What remains is the honest one —
+   * a day with nothing recorded at all — and it must not claim a threshold to explain itself.
+   */
+  it('the zero line describes an empty day rather than a shortfall', () => {
     const src = code('components/nutrition/calorie-zone-bar.tsx')
-    expect(src).toContain('STEP_BASELINE.toLocaleString()')
-    // The old copy stated the fact and withheld the reason, which is the whole report.
+    expect(src).toContain('no movement recorded yet today')
     expect(src).not.toContain('nothing earned from movement yet today')
   })
 
-  it('both "calories out" explainers name it too, rather than "a baseline"', () => {
+  it('both "calories out" explainers say every step counts', () => {
     for (const rel of ['components/nutrition/calorie-balance-bar.tsx', 'components/nutrition/energy-card.tsx']) {
       const src = code(rel)
-      expect(src, rel).toContain('STEP_BASELINE.toLocaleString()')
+      expect(src, rel).toContain('every step you take')
       expect(src, rel).not.toContain('steps above a baseline')
     }
   })

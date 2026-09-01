@@ -92,17 +92,44 @@ export interface WorkoutRepository {
 // `listAiHealthInsightsForDate` whose only caller was a new file. A guard that fails on correct code
 // is one somebody deletes.
 describe('the file list covers the working tree, not just the index', () => {
+  //
+  // **The probe lives in a throwaway git repo, not in this one (LB-44).** It used to be written to
+  // `lib/zz-dead-repo-methods-probe.ts` and deleted in a `finally`, which raced every test that walks
+  // `app`/`components`/`lib` reading each file it finds: the walker listed the probe, this test
+  // deleted it, the walker read it and threw `ENOENT`. The failure named
+  // `lib/media/__tests__/no-data-url-fetch.test.ts` on a branch that had touched neither file, which
+  // is the worst shape a flake can take — it reads as a missing source file and sends you into the
+  // diff. Both files passed alone. A temp repo proves the same property and touches nothing anyone
+  // else is reading.
   it('includes an untracked source file', () => {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { sourceFileList } = require('../check-dead-repo-methods.js') as { sourceFileList: () => string[] }
+    const { sourceFileList } = require('../check-dead-repo-methods.js') as { sourceFileList: (cwd?: string) => string[] }
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const fs = require('fs') as typeof import('fs')
-    const probe = 'lib/zz-dead-repo-methods-probe.ts'
-    fs.writeFileSync(probe, 'export const probe = 1\n')
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const os = require('os') as typeof import('os')
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const path = require('path') as typeof import('path')
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { execSync } = require('child_process') as typeof import('child_process')
+
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'dead-repo-probe-'))
     try {
-      expect(sourceFileList()).toContain(probe)
+      execSync('git init -q', { cwd: dir })
+      // Tracked and untracked, so the assertion is that BOTH are listed rather than that anything is.
+      fs.writeFileSync(path.join(dir, 'tracked.ts'), 'export const tracked = 1\n')
+      execSync('git add tracked.ts', { cwd: dir })
+      fs.writeFileSync(path.join(dir, 'untracked.ts'), 'export const untracked = 1\n')
+      // Gitignored files stay out — that is the `--exclude-standard` half of the flag pair.
+      fs.writeFileSync(path.join(dir, '.gitignore'), 'ignored.ts\n')
+      fs.writeFileSync(path.join(dir, 'ignored.ts'), 'export const ignored = 1\n')
+
+      const listed = sourceFileList(dir)
+      expect(listed).toContain('untracked.ts')
+      expect(listed).toContain('tracked.ts')
+      expect(listed).not.toContain('ignored.ts')
     } finally {
-      fs.unlinkSync(probe)
+      fs.rmSync(dir, { recursive: true, force: true })
     }
   })
 

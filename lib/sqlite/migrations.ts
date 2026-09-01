@@ -225,6 +225,7 @@ export const RECONCILE_COLUMNS: { table: string; column: string; ddl: string }[]
   { table: 'food_items',      column: 'image_data_uri',  ddl: `ALTER TABLE food_items ADD COLUMN image_data_uri TEXT` },
   { table: 'food_logs',       column: 'saved_meal_id',  ddl: `ALTER TABLE food_logs ADD COLUMN saved_meal_id TEXT` },
   { table: 'food_logs',       column: 'meal_group_id',  ddl: `ALTER TABLE food_logs ADD COLUMN meal_group_id TEXT` },
+  { table: 'food_logs',       column: 'meal_group_name', ddl: `ALTER TABLE food_logs ADD COLUMN meal_group_name TEXT` },
   { table: 'workout_sessions', column: 'deleted_at',  ddl: `ALTER TABLE workout_sessions ADD COLUMN deleted_at TEXT` },
   { table: 'workout_sessions', column: 'sync_status', ddl: `ALTER TABLE workout_sessions ADD COLUMN sync_status TEXT NOT NULL DEFAULT 'synced'` },
   { table: 'exercise_logs',    column: 'deleted_at',  ddl: `ALTER TABLE exercise_logs ADD COLUMN deleted_at TEXT` },
@@ -601,6 +602,8 @@ const CREATE_FOOD_LOGS = `CREATE TABLE IF NOT EXISTS food_logs (
   -- On this side both are plain TEXT with no FK: the local store mirrors, it does not enforce.
   saved_meal_id       TEXT,
   meal_group_id       TEXT,
+  -- BF-97. A scanned group has no saved_meal_id to be named from, so it carries its own name.
+  meal_group_name     TEXT,
   quantity_multiplier REAL NOT NULL DEFAULT 1,
   logged_at           TEXT NOT NULL,
   updated_at          TEXT NOT NULL,
@@ -1354,6 +1357,16 @@ export const MIGRATIONS: UpgradeStatement[] = [
       `ALTER TABLE supplement_logs ADD COLUMN dose_text TEXT`,
       `ALTER TABLE supplements ADD COLUMN default_amount REAL`,
       `ALTER TABLE supplements ADD COLUMN unit TEXT`,
+    ],
+  },
+  {
+    toVersion: 33,
+    statements: [
+      // BF-97. Same shape as v30/v31/v32, and for the same reason: `food_logs` exists on every
+      // upgraded device, so the column added to its `CREATE TABLE IF NOT EXISTS` body above reaches
+      // fresh installs ONLY. This ALTER reaches everyone else; the RECONCILE_COLUMNS row is the
+      // authority if this upgrade half-applies.
+      `ALTER TABLE food_logs ADD COLUMN meal_group_name TEXT`,
     ],
   },
 ];

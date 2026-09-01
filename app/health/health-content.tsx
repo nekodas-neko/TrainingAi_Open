@@ -15,6 +15,7 @@ import { getLocalStore } from "@/lib/local-store";
 import { pushMutations, pullDelta } from "@/lib/local-store/sync-engine";
 import { PullToSync } from "@/components/pull-to-sync";
 import type { BodyMetaRow, WeekToDate } from "@/app/api/body-metadata/route";
+import { displayBodyFat, type BodyFatCalibrationMeta } from "@/components/health/body-fat-display";
 import { cachedFetch, readCacheSync, setCached, cachedFetchToday, readTodayCacheSync, isBodyMetadataFresh } from "@/lib/sqlite/cache";
 import { useUserTimezone } from '@/components/shell/user-timezone-provider';
 import { runWithConcurrency } from "@/lib/async/run-with-concurrency";
@@ -106,6 +107,10 @@ export default function HealthContent({ userId, sex: sexProp, heightCm: heightCm
   const [metaToday, setMetaToday] = useState<BodyMetaRow | null>(null);
   const [metaRecent, setMetaRecent] = useState<BodyMetaRow[]>([]);
   const [metaLoading, setMetaLoading] = useState(true);
+  // LA-45: the DEXA offset itself, so the body-fat card can show WHY its number differs from the
+  // scale's. `pairCount` is what says how much to trust it — at one pair an offset and a ratio are
+  // the same number, so the card must not present it as a settled calibration.
+  const [bodyFatCalibration, setBodyFatCalibration] = useState<BodyFatCalibrationMeta | null>(null);
   const [sleepRows, setSleepRows] = useState<SleepRow[]>([]);
   const [readiness, setReadiness] = useState<ReadinessScoreResponse | null>(null);
   const [logState, setLogState] = useState<LogState | null>(null);
@@ -161,9 +166,10 @@ export default function HealthContent({ userId, sex: sexProp, heightCm: heightCm
   // Paint the non-today-specific parts of a body-metadata payload (trend arrays, week-to-date)
   // immediately, even from a stale (not-today) cache entry — only `metaToday`/`activeEnergyKcalToday`
   // (today's tiles, which already render "—" for null) wait for a freshness-confirmed payload.
-  const setMetaFromPayload = useCallback((data: { today: BodyMetaRow | null; recent: BodyMetaRow[]; weekToDate?: WeekToDate | null; activeEnergyKcalToday?: number | null; latestWeightKg?: number | null; latestWeightDate?: string | null } | null | undefined) => {
+  const setMetaFromPayload = useCallback((data: { today: BodyMetaRow | null; recent: BodyMetaRow[]; weekToDate?: WeekToDate | null; activeEnergyKcalToday?: number | null; latestWeightKg?: number | null; latestWeightDate?: string | null; bodyFatCalibration?: BodyFatCalibrationMeta | null } | null | undefined) => {
     if (!data) return;
     setMetaRecent(data.recent ?? []);
+    if (data.bodyFatCalibration !== undefined) setBodyFatCalibration(data.bodyFatCalibration ?? null);
     setWeekToDate(data.weekToDate ?? null);
     setMetaLoading(false);
     if (data.latestWeightKg !== undefined) setLatestWeightMeta({ kg: data.latestWeightKg ?? null, date: data.latestWeightDate ?? null });
@@ -175,7 +181,7 @@ export default function HealthContent({ userId, sex: sexProp, heightCm: heightCm
 
   // Seed from sessionStorage mirror synchronously before first paint
   useLayoutEffect(() => {
-    const meta = readCacheSync<{ today: BodyMetaRow | null; recent: BodyMetaRow[]; weekToDate?: WeekToDate | null }>('body-metadata');
+    const meta = readCacheSync<{ today: BodyMetaRow | null; recent: BodyMetaRow[]; weekToDate?: WeekToDate | null; bodyFatCalibration?: BodyFatCalibrationMeta | null }>('body-metadata');
     if (meta) setMetaFromPayload(meta);
     const sleep = readCacheSync<SleepRow[]>('sleep-sessions');
     if (sleep) setSleepRows(Array.isArray(sleep) ? sleep : []);
@@ -255,19 +261,42 @@ export default function HealthContent({ userId, sex: sexProp, heightCm: heightCm
           bmrKcal: m.bmrKcal,
           metabolicAge: m.metabolicAge,
         });
-        setMetaRecent(filtered.map(toRow));
+        // LA-45: the local store holds the RAW reading and no calibration, so a local row carries
+        // no `bodyFatCorrected`. The two writers race — whichever lands second wins — so without
+        // this the corrected value flickers back to the scale's number whenever the local seed
+        // arrives after the network. Carry the correction forward per date; a local row genuinely
+        // newer than the server's is still the one that supplies the raw value and everything else.
+        setMetaRecent(prev => {
+          const corrected = new Map(prev.map(r => [r.date, r]));
+          return filtered.map(m => {
+            const row = toRow(m);
+            const had = corrected.get(row.date);
+            if (had?.bodyFatCorrected != null && had.bodyFat === row.bodyFat) {
+              row.bodyFatCorrected = had.bodyFatCorrected;
+              row.bodyFatIsCorrected = had.bodyFatIsCorrected;
+            }
+            return row;
+          });
+        });
         // SYNC-R2: the local seed previously never set today's tile, so an offline fresh
         // app-open on Health left steps/weight blank until the network fetch landed —
         // mirrors session-select-content.tsx's Home fetchMeta pattern (SYNC-R1).
         const todayStr = todayInTz(tz);
         const todayRow = filtered.find(m => m.date === todayStr);
-        if (todayRow) setMetaToday(toRow(todayRow));
+        if (todayRow) setMetaToday(prev => {
+          const row = toRow(todayRow);
+          if (prev?.date === row.date && prev.bodyFatCorrected != null && prev.bodyFat === row.bodyFat) {
+            row.bodyFatCorrected = prev.bodyFatCorrected;
+            row.bodyFatIsCorrected = prev.bodyFatIsCorrected;
+          }
+          return row;
+        });
         setMetaLoading(false);
       }
       if (localSleep.length > 0) setSleepRows(localSleep as unknown as SleepRow[]);
     })();
     const networkPromise = Promise.all([
-      cachedFetch<{ today: BodyMetaRow | null; recent: BodyMetaRow[]; weekToDate?: WeekToDate | null; activeEnergyKcalToday?: number | null }>(
+      cachedFetch<{ today: BodyMetaRow | null; recent: BodyMetaRow[]; weekToDate?: WeekToDate | null; activeEnergyKcalToday?: number | null; bodyFatCalibration?: BodyFatCalibrationMeta | null }>(
         'body-metadata', '/api/body-metadata', TTL_MEDIUM,
         setMetaFromPayload,
       ),
@@ -507,7 +536,10 @@ export default function HealthContent({ userId, sex: sexProp, heightCm: heightCm
   const latestWeightIsStale = metaToday?.weightKg == null && metaRecent.find(r => r.weightKg != null)?.weightKg == null && latestWeightMeta.kg != null;
   const latestSteps  = metaToday?.steps ?? null;
   const latestDistanceKm = metaToday?.distanceKm ?? null;
-  const latestBf = metaRecentReversed.map(r => r.bodyFat).find((v): v is number => v != null) ?? null;
+  // The corrected value (LA-45). This feeds the BMI classification and the card's visibility gate,
+  // both of which are derivations — the raw reading stays reachable through `metaToday.bodyFat`,
+  // which is what `openLog` seeds from and must keep seeding from.
+  const latestBf = metaRecentReversed.map(displayBodyFat).find((v): v is number => v != null) ?? null;
 
   const todayWaterMl = (metaToday as (typeof metaToday & { waterMl?: number | null }) | null)?.waterMl ?? null;
   const bodyBaseline = progressSummary?.bodyBaseline ?? { weightKg: null, bodyFatPct: null };
@@ -528,7 +560,7 @@ export default function HealthContent({ userId, sex: sexProp, heightCm: heightCm
     weightTrendKgPerWeek, energyBalanceKcal, energyBalance, trainingLoad, sleepCorr, injuries,
     setInjuries, userId, recoveryMuscles, handleDayClick, weeklyStats,
     activeSessions, trainingGoal, muscleSets, strengthTrend, weekToDate, userGoals,
-    progressSummary, bodyBaseline, healthTrends,
+    progressSummary, bodyBaseline, healthTrends, bodyFatCalibration,
   });
 
 

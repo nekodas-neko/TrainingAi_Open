@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
-  computeActiveEnergy, ouraIdForActivityType, SEDENTARY_MULTIPLIER, STEP_BASELINE, STEPS_PER_KM,
+  computeActiveEnergy, ouraIdForActivityType, stepEnergyKcal, SEDENTARY_MULTIPLIER, STEP_BASE_CREDIT, STEPS_PER_KM,
 } from './daily-energy'
 // Relative, not `@/` — this file sits under packages/shared/src (not in a `__tests__` folder, so
 // the package's own tsconfig compiles it) and that tsconfig has no path mapping into the app root.
@@ -73,11 +73,58 @@ describe('daily-energy', () => {
     expect(Math.abs(withDist.activityKcal - withDur.activityKcal)).toBeLessThan(withDur.activityKcal * 0.15)
   })
 
-  it('only counts steps above the sedentary baseline', () => {
-    const below = computeActiveEnergy({ profile, strengthSessions: [], activities: [], pedometerSteps: STEP_BASELINE - 500 })
-    expect(below.stepsKcal).toBe(0)
-    const above = computeActiveEnergy({ profile, strengthSessions: [], activities: [], pedometerSteps: STEP_BASELINE + 7000 })
-    expect(above.stepsKcal).toBeGreaterThan(0)
+  /**
+   * Deliberately NOT behind `itVendor`, and measured rather than assumed: walking (activity 14)
+   * returns a real figure under the synthetic fixtures — 111 kcal for 3,000 steps at 82.5 kg —
+   * where the strength and run cases above return nothing and are gated for it. Gating these too
+   * would mean they never run anywhere, which is worse than not having them.
+   *
+   * BF-88 inverted this test, and the inversion is the whole change.
+   *
+   * It used to assert that steps below the baseline earn **nothing**. They earn from the first step
+   * now, and the same 3,000 steps' energy is credited out of the resting base instead
+   * (`energy-balance-service.ts`, formula path only). A day at exactly `STEP_BASE_CREDIT` is where
+   * the two meet — that equality is what makes the shift a reparameterisation rather than a
+   * re-scoring, and it is asserted in `energy-balance-service`'s own tests where both halves are
+   * visible together.
+   */
+  it('counts steps from the first one, not from a threshold', () => {
+    const few = computeActiveEnergy({ profile, strengthSessions: [], activities: [], pedometerSteps: 1196 })
+    expect(few.stepsKcal, 'a short day now earns something').toBeGreaterThan(0)
+
+    const more = computeActiveEnergy({ profile, strengthSessions: [], activities: [], pedometerSteps: 10_000 })
+    expect(more.stepsKcal).toBeGreaterThan(few.stepsKcal)
+
+    // Linear from zero: no threshold left to explain, which is what lets the card quote one rate.
+    const half = computeActiveEnergy({ profile, strengthSessions: [], activities: [], pedometerSteps: 5_000 })
+    expect(Math.abs(half.stepsKcal * 2 - more.stepsKcal)).toBeLessThanOrEqual(1)
+  })
+
+  /**
+   * The credit and the step term must be the same conversion, or the shift stops conserving.
+   *
+   * `stepEnergyKcal` exists so `energy-balance-service` can subtract exactly what
+   * `computeActiveEnergy` adds back. A second MET call with a different activity id or intensity
+   * would leave a silent per-day drift that no test of either half alone would notice.
+   */
+  it('stepEnergyKcal agrees with what computeActiveEnergy adds for the same steps', () => {
+    const viaActive = computeActiveEnergy({
+      profile, strengthSessions: [], activities: [], pedometerSteps: STEP_BASE_CREDIT,
+    })
+    expect(stepEnergyKcal(profile, STEP_BASE_CREDIT)).toBe(viaActive.stepsKcal)
+  })
+
+  it('stepEnergyKcal is per-profile, and returns 0 rather than a wrong number when it cannot compute', () => {
+    const heavier = { ...profile, weightKg: (profile.weightKg ?? 82) * 1.5 }
+    expect(stepEnergyKcal(heavier, STEP_BASE_CREDIT)).toBeGreaterThan(stepEnergyKcal(profile, STEP_BASE_CREDIT))
+  })
+
+  // No MET lookup on either path, so this one holds whether or not the vendor table is present —
+  // and it is the guard that matters most: a credit computed from an incomplete profile must be 0,
+  // not a number, or the resting base is silently reduced by a figure nothing supports.
+  it('stepEnergyKcal refuses to guess without a profile', () => {
+    expect(stepEnergyKcal({ ageYears: null, weightKg: null, sex: null }, STEP_BASE_CREDIT)).toBe(0)
+    expect(stepEnergyKcal(profile, 0)).toBe(0)
   })
 
   it('subtracts a logged outdoor walk\'s steps from the passive total (no double-count)', () => {

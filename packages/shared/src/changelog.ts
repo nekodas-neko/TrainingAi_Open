@@ -6,6 +6,58 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.420.0",
+    date: "2026-09-01",
+    changes: [
+      "Health, the day sheet, Profile details and Goals all show your DEXA-corrected body fat now. The correction already fed your calorie goal and protein target \u2014 the screens were still showing the scale's raw number, so the two disagreed with nothing to say which was which.",
+      "The Body Fat card says why its number differs from the scale: the offset, and how many scans it came from. One scan is one comparison, not a settled calibration, so it says that rather than hiding it.",
+      "Where a stretch of readings is on an instrument the scan does not cover, the card says how many of them are corrected, instead of letting the chart draw the changeover as an unexplained step.",
+      "Logging body fat still starts from the scale's raw reading, not the corrected one \u2014 saving a corrected number back would overwrite the measurement for good.",
+    ],
+  },
+  {
+    version: "1.419.0",
+    date: "2026-09-01",
+    changes: [
+      "The More page is grouped. It used to carry nine headings over one row each \u2014 an uppercase title and a bordered box to draw a single tappable line \u2014 which is most of why it read as long and empty at once. There are now two: Your setup and App.",
+      "Report an Issue sits with Edit Profile and Sign Out at the bottom. It opens a sheet rather than going anywhere, so it no longer pretends to be a destination.",
+      "Goals looks like the cards above it instead of borrowing the chrome of the rows below it. It still expands in place and every field is where it was.",
+      "Every destination on the page is still reachable: profile details, program, DEXA & RMR, devices, settings, data & sync, about, and the admin console.",
+    ],
+  },
+  {
+    version: "1.418.3",
+    date: "2026-09-01",
+    changes: [
+      "The temperature and UV pill on Home stays on one line. It was never moved \u2014 it was wrapping, because it was the only thing in that row allowed to give up space and a long date like \u0022Wednesday 30 September\u0022 uses all of it.",
+      "A swipe-to-delete started at the very edge of the screen no longer risks changing tab at the same time.",
+    ],
+  },
+  {
+    version: "1.418.2",
+    date: "2026-09-01",
+    changes: [
+      "A meal section holding just one combined meal no longer prints its macros and calories twice. The totals row underneath was counting ingredients rather than rows, so a three-ingredient meal on its own repeated the numbers the meal already showed.",
+    ],
+  },
+  {
+    version: "1.418.1",
+    date: "2026-09-01",
+    changes: [
+      "Opening the app in the morning gives you the check-in again. If you left it open overnight it just resumed and never noticed the date had changed, so the prompt \u2014 and yesterday\u0027s ticks \u2014 stayed as they were. It now catches up the moment you look at it, with no restart and no loading screen.",
+    ],
+  },
+  {
+    version: "1.418.0",
+    date: "2026-09-01",
+    changes: [
+      "Every step counts towards calories burned now, from the first one. The first 3,000 used to earn nothing \u2014 the resting figure already assumed a desk day\u0027s walking \u2014 so instead of skipping those steps, that walking is taken out of the resting figure and the steps are counted properly.",
+      "A day at about 3,000 steps burns exactly what it did before; this changes how the number is split between resting and moving, not the total. A day with almost no walking now reads lower, which is the point \u2014 you were being credited for walking that did not happen.",
+      "Your calorie target is unchanged. Only the burn breakdown moved.",
+      "The screens no longer mention a 3,000-step threshold, because there is not one any more.",
+    ],
+  },
+  {
     version: "1.417.0",
     date: "2026-09-01",
     changes: [

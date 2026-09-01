@@ -371,47 +371,40 @@ export function ProfileTab({ user, seasons, equippedTitle, friendCode, onUserSav
       {/* ── Goals ─────────────────────────────────────────────────────────── */}
       <GoalsSection user={user} onUserSaved={onUserSaved} />
 
-      {/* ── Profile details ───────────────────────────────────────────────── */}
-      {/* BF-79. Name, biological sex, birth year and height used to be split between the Edit
-          Profile sheet and the Goals accordion — two places to look for one row of the users
-          table. They are one screen now, alongside the weight and body-fat measurements as
-          read-only readings. */}
-      <MoreRowGroup label="Profile">
+      {/* ── YOUR SETUP ────────────────────────────────────────────────────── */}
+      {/* BF-82. These were SEVEN groups of one row each — nine counting `Feedback` here, which
+          hand-copied `MoreRowGroup`'s markup, and `Developer` on the Settings sub-screen, which
+          used the real one. A heading exists to group things; a heading per row is three stacked
+          elements to present one tappable line, and it is most of why this screen read as long and
+          empty at the same time.
+
+          Two headings, not none and not more: a flat list would be simpler, but `Admin` is
+          conditional and destructive-adjacent and reads as a mistake appended to one. Any split
+          finer than *your stuff / the app* puts us back at one-row headings, which is the defect. */}
+      <MoreRowGroup label="Your setup">
+        {/* BF-79 put name, biological sex, birth year and height on one screen. They live there and
+            nowhere else — do not re-scatter them while regrouping. */}
         <MoreRow
           icon={UserRound}
-          label="Name, body facts &amp; measurements"
+          label="Profile details"
           onClick={() => router.push('/more/details')}
         />
-      </MoreRowGroup>
-
-      {/* ── Program ───────────────────────────────────────────────────────── */}
-      {/* The Program Builder used to be a More sub-tab literally named "Workout", colliding with
-          the Workout tab in the bottom nav two containers away (Q-235). */}
-      <MoreRowGroup label="Program">
+        {/* The Program Builder used to be a More sub-tab literally named "Workout", colliding with
+            the Workout tab in the bottom nav two containers away (Q-235). */}
         <MoreRow
           icon={Dumbbell}
           label="Sessions, progression &amp; schedule"
           onClick={() => router.push('/program')}
         />
-      </MoreRowGroup>
-
-      {/* ── Health ────────────────────────────────────────────────────────── */}
-      {/* BF-71: /api/measured-rmr and /api/dexa-scans shipped, and were reachable from nowhere in
-          the app — both tables sat empty in production while every resting rate the app quoted was
-          predicted. This row is the missing half. */}
-      <MoreRowGroup label="Health">
+        {/* BF-71: /api/measured-rmr and /api/dexa-scans shipped reachable from nowhere, so both
+            tables sat empty while every resting rate the app quoted was predicted. */}
         <MoreRow
           icon={Scan}
           label="DEXA &amp; RMR results"
           onClick={() => router.push('/more/clinical')}
         />
-      </MoreRowGroup>
-
-      {/* ── Devices ───────────────────────────────────────────────────────── */}
-      {/* Ring, chest strap, scale and the background-location permission used to sit inline here,
-          four cards deep in this scroll (Q-233). They are one screen now — "is my ring connected
-          and what is its battery" should not require scrolling two-thirds of the way down More. */}
-      <MoreRowGroup label="Devices">
+        {/* Ring, strap, scale and the background-location permission used to sit inline here, four
+            cards deep in this scroll (Q-233). */}
         <MoreRow
           icon={Bluetooth}
           label="Ring, strap, scale &amp; permissions"
@@ -419,43 +412,32 @@ export function ProfileTab({ user, seasons, equippedTitle, friendCode, onUserSav
         />
       </MoreRowGroup>
 
-      {/* ── Settings ─────────────────────────────────────────────────────── */}
-      {/* Preferences, Theme & Appearance and Home Widgets were three collapsibles inline here
-          (Q-232). They are one screen now; every value they set is a localStorage flag read
-          elsewhere, so none of that state was shared with this file. */}
-      <MoreRowGroup label="Settings">
+      {/* ── APP ───────────────────────────────────────────────────────────── */}
+      <MoreRowGroup label="App">
+        {/* Preferences, Theme & Appearance and Home Widgets were three collapsibles inline here
+            (Q-232). */}
         <MoreRow
           icon={Settings}
           label="Notifications, appearance &amp; home layout"
           onClick={() => router.push('/more/settings')}
         />
-      </MoreRowGroup>
-
-      {/* ── Data & About ──────────────────────────────────────────────────── */}
-      {/* These were one block under an "About" heading: the version string, the changelog, and
-          Sync now / Restore from cloud / Export my data (Q-232). Data operations do not belong
-          under a version number — they are their own screen now. */}
-      <MoreRowGroup label="Data">
+        {/* Data operations do not belong under a version number — they were one block with it
+            under an "About" heading (Q-232). */}
         <MoreRow
           icon={CloudDownload}
           label="Data &amp; Sync"
           onClick={() => router.push('/more/data')}
         />
-      </MoreRowGroup>
-
-      <MoreRowGroup label="About">
+        {/* Keep: the version string is how a stale-bundle question gets answered. */}
         <MoreRow
           icon={Info}
           label={`TrainingAI v${CURRENT_VERSION}`}
           onClick={() => router.push('/more/about')}
         />
-      </MoreRowGroup>
-
-      <FeedbackSection />
-
-      {/* ── Admin Console ─────────────────────────────────────────────────── */}
-      {isAdmin && (
-        <MoreRowGroup label="Admin">
+        {/* Admin sits INSIDE this group rather than keeping its own heading — that is how it
+            became a single-row group. `isAdmin` makes it three rows for everyone else and four for
+            the owner, both fine. */}
+        {isAdmin && (
           <MoreRow
             icon={Shield}
             label="Admin Console"
@@ -473,11 +455,14 @@ export function ProfileTab({ user, seasons, equippedTitle, friendCode, onUserSav
               )}
             </>}
           />
-        </MoreRowGroup>
-      )}
+        )}
+      </MoreRowGroup>
 
       {/* ── Actions ───────────────────────────────────────────────────────── */}
+      {/* Feedback opens a sheet rather than navigating, so it sits with the other actions instead
+          of pretending to be an eighth destination. */}
       <div className="space-y-2">
+        <FeedbackSection />
         <EditProfileSheet user={user} onSaved={(updated) => { onUserSaved(updated); invalidateUserProfile().catch(() => {}) }} />
         <Button variant="ghost" className="w-full text-destructive hover:text-destructive"
           onClick={() => { void signOutAndClearDevice(); }}>

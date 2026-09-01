@@ -3,7 +3,6 @@
 import { memo, useState } from 'react'
 import { Info } from 'lucide-react'
 import { CalorieZoneBar } from './calorie-zone-bar'
-import { STEP_BASELINE } from './movement-breakdown'
 import type { EnergyBalanceResponse } from '@/app/api/nutrition/energy-balance/route'
 
 interface Props {
@@ -114,7 +113,7 @@ export const CalorieBalanceBar = memo(function CalorieBalanceBar({ data, isToday
           <p className="text-[10px] text-muted-foreground leading-relaxed">
             <span className="font-semibold text-foreground">Calories out</span> = your resting burn
             ({b.restingBaseKcal.toLocaleString()} kcal) plus measured movement ({b.activeKcal.toLocaleString()} kcal
-            from workouts, activities, and steps above {STEP_BASELINE.toLocaleString()}/day).
+            from workouts, activities, and every step you take).
           </p>
           <p className="text-[10px] text-muted-foreground leading-relaxed">
             <span className="font-semibold text-foreground">On target</span> means your net

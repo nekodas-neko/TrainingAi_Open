@@ -19,6 +19,7 @@ fallback) are what every offline-first domain should copy. See CLAUDE.md, "Offli
 
 ## Reference docs
 
+- [`docs/overview/entries/2026-09-01-blood-panel-storage.md`](../../overview/entries/2026-09-01-blood-panel-storage.md) — **blood panels are stored, de-identified (BF-1, engine half), 2026-09-01.** `blood_panels` + `blood_analytes` (migrations 250/251) with a schema written from the owner's real 63-row report: `<0.2` is a result that is not a number, ranges arrive one-sided in both directions and absent, the date is a month, and **out-of-range is derived from the bounds rather than read off the provider's flag**. The extraction route, the recommendation consumers and the whole UI are still owed.
 - [`docs/superpowers/plans/2026-08-25-unified-day-review.md`](../../superpowers/plans/2026-08-25-unified-day-review.md)
   — **Q-112, the unified day review** (Q-112a–e). Read it instead of Task 27 of the 2026-08-05 batch,
   whose central premise — that no per-day read-through screen exists — stopped being true when Q-110
@@ -224,6 +225,13 @@ Live at the time of writing (2026-07-30):
 
 ## History
 
+- **[`docs/overview/entries/2026-09-01-scan-meal-group.md`](../../overview/entries/2026-09-01-scan-meal-group.md)**
+  — 🆕 **BF-97, engine half**: a scanned meal gets a `meal_group_id` **and** its own
+  `meal_group_name`, because BF-39's grouping names a group from its saved meal and a scan has none.
+  Read it before touching the diary rule: the group is minted **only past one entry** and **only
+  alongside a name**, and both negatives are what stop the fix rebuilding the bug one layer down.
+  **Nothing renders differently yet** — `groupDiaryEntries` still requires a `savedMealId`, and
+  changing that is Lane B's half.
 - **[`docs/handoff-2026-08-31-nutrition-diary-and-swipe-tray.md`](../../handoff-2026-08-31-nutrition-diary-and-swipe-tray.md)**
   — 🆕 the session that shipped BF-39, BF-60/61/62/63, LB-28 and LB-30. **Read its gotchas before
   writing an e2e that taps a coordinate**: `Input.dispatchTouchEvent` performs none of

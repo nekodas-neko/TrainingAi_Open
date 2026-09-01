@@ -14,6 +14,7 @@ import {
   WATER_GOAL_KEY, WATER_GOAL_TYPE_KEY, TARGET_WEIGHT_KEY, TARGET_BF_KEY,
 } from '@/lib/home/home-prefs'
 import { formatDateDisplay, todayInTz } from '@trainingai/shared/date-utils'
+import { displayBodyFat, type BodyFatReading } from '@/components/health/body-fat-display'
 import { cachedFetch, isBodyMetadataFresh } from '@/lib/sqlite/cache'
 import { TTL_MEDIUM } from '@trainingai/shared/cache-ttl'
 import { RequiredInfoSection } from './required-info-section'
@@ -95,7 +96,9 @@ export function GoalsSection({ user, onUserSaved }: GoalsSectionProps) {
 
     cachedFetch('body-metadata', '/api/body-metadata', TTL_MEDIUM, (d: {
         today?: { date: string; steps?: number | null; waterMl?: number | null; calories?: number | null } | null
-        recent?: { date: string; weightKg: number | null; bodyFat: number | null }[]
+        // Displays the DEXA-corrected reading, matching Health and More -> Profile details. Three
+        // screens showing different numbers for one measurement is the defect LA-45 closes.
+        recent?: ({ date: string; weightKg: number | null } & BodyFatReading)[]
         weekToDate?: { steps: number; calories: number; waterMl: number } | null
       } | null) => {
         if (isBodyMetadataFresh(d, user?.timezone)) {
@@ -113,9 +116,10 @@ export function GoalsSection({ user, onUserSaved }: GoalsSectionProps) {
           setLatestWeightLabel(dateLabel(latestWeight.date))
         }
 
-        const latestBf = d?.recent?.find(r => r.bodyFat != null)
-        if (latestBf?.bodyFat != null) {
-          setLatestBfPct(latestBf.bodyFat)
+        const latestBf = d?.recent?.find(r => displayBodyFat(r) != null)
+        const latestBfPct = displayBodyFat(latestBf)
+        if (latestBf && latestBfPct != null) {
+          setLatestBfPct(latestBfPct)
           setLatestBfLabel(dateLabel(latestBf.date))
         }
       })
@@ -285,7 +289,11 @@ export function GoalsSection({ user, onUserSaved }: GoalsSectionProps) {
 
   return (
     <div>
-      <p className="px-1 pb-1.5 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Goals</p>
+      {/* BF-82 §4. This used to carry a `MoreRowGroup`-shaped uppercase heading above the card,
+          copied from the primitive rather than imported — which made an inline disclosure look
+          like the navigation rows below it. The card keeps its own "Goals" title inside the
+          button, the way StatsGrid and TrophyCase title themselves, so nothing is lost. The
+          bordered shell stays: without it Goals is a bare button among cards. */}
       <div className="rounded-2xl bg-muted/40 border border-border overflow-hidden">
         <button
           type="button"

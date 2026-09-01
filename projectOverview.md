@@ -24,8 +24,145 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.417.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Version:** v1.420.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-09-01.
+
+**The screens show the DEXA-corrected body fat now (LA-45).** BF-2 step 4 put
+`bodyFatCorrected`/`bodyFatIsCorrected` on every row of `/api/body-metadata` and `/api/day-log`, plus
+the offset once per response — and **nothing read any of it**, so Health showed the raw 18.4 while the
+calorie goal was already built from the corrected 21.6. Seven surfaces now go through one rule
+(`components/health/body-fat-display.ts`), and the card says why its number differs from the scale:
+`DEXA-corrected +3.2% · 1 scan compared`, with `3 of 4 corrected` on a window that mixes instruments,
+because two thirds of the history is on instruments the offset does not cover. **Two invariants hold
+it and both are easy to reverse:** `bodyFat` stays what the log sheet seeds from (it POSTs at `manual`,
+which outranks `scale_ble`, so a corrected value round-tripped through the edit sheet would overwrite
+the measurement permanently), and "corrected" is never inferred from the values differing, since an
+offset can round to zero. Verified on `pnpm dev` against a hand-seeded DEXA pair — the local seed has
+none, so the whole path is unreachable without one — including the case that matters: the card read
+21.6 while the log sheet seeded 18.4. **Not device-verified**, and the local-store fix inside it is
+only reachable on the APK
+([journal](docs/overview/entries/2026-09-01-feat-la-45-corrected-body-fat-display.md)).
+
+**The More page is two groups, not nine (BF-82).** Owner: *"a review of all the pages/chevrons in
+the More page and reorganize/group things together that can be. It’s very messy and not very
+organized."* `MoreRowGroup` is an uppercase heading plus a bordered container, and **nine of them
+wrapped exactly one row** — seven on the tab, one on the Settings sub-screen, and one hand-written
+copy in `feedback-section.tsx`; `goals-section.tsx` was a tenth copy, which is what made an inline
+disclosure look like the navigating rows below it. Now: `Your setup` and `App`, each covering three
+or four rows; `label` is optional on the primitive so one row can be a plain card; Report an Issue
+moved to the bottom actions where the other sheet-openers are; Goals presents as a card like
+`StatsGrid` and `TrophyCase` above it, with its disclosure untouched.
+`more-row-group-arity.test.ts` fails a labelled group under two rows and was mutation-verified.
+**Destination parity was clicked, not read** — all seven rows still land where they did, admin and
+non-admin. **Not device-verified**, and the bottom actions row moved, so the clearance under Sign Out
+is unseen; BF-82 stays queued on `Verify: device` and nothing else. **The *"sliders"* half is
+answered — the word was loose:** *"yes it wasnt the sliders specifically; more that its messy and
+needs re'organisation."* No control changes, and none should be made off the original wording —
+More and its six sub-screens carry no slider and no `<select>` at all
+([journal](docs/overview/entries/2026-09-01-feat-bf-82-more-page-grouping.md)).
+
+**The Home pill that "moved" had not moved, and a swipe marker nothing read (BF-96, BF-95).** Owner:
+*"I dont like how the temperature/uV pill sits. can we go back to the old way when it was side by
+side."* It was already side by side — it was **wrapping**, because the header row's other item (the
+date) carries `whitespace-nowrap shrink-0` and the chip carried neither, so the chip absorbed every
+shortfall and `UV 5` broke at its own space. Measured against a real render, `EEEE d MMMM` runs
+**12–22** characters (*"Wednesday 30 September"*), correcting the entry's own 12–20 — so *"the old
+way"* is the same code on a shorter date. Separately, `swipe-actions.tsx` declared
+`data-swipe-actions` and the tab navigator's exclusion list never read it: latent rather than
+impossible, since the navigator arms within 24 px of the edge and meal rows reach it. **Neither is
+device-verified, and the chip cannot be — the seeded sandbox has no weather snapshot, so only the
+skeleton renders** ([journal](docs/overview/entries/2026-09-01-chip-wrap-and-swipe-marker.md)).
+
+**A meal section holding one combined meal printed its macros twice (BF-98).** Owner: *"the combined
+item UI doesnt look great with the double macros at the bottom."* The totals footer was gated on
+`logs.length > 1` — the flat list — so a group of three ingredients passed it and the section drew
+the group's own macros and then the identical footer, calories included. It counts **rendered
+entries** now, which is the rule the collapsed branch twelve lines above already followed.
+**⚠ The duplication could not be reproduced in e2e** — `diary-nested-meal.spec.ts` seeds this exact
+case and the footer does not render there on either condition, so a test written against it passed
+with the fix reverted and was deleted rather than kept as a guard that cannot fail. The change is
+right by reading and is held by a mutation-checked source guard; **what differs between the owner's
+diary and that fixture is an open question recorded on the entry.** **Not device-verified**
+([journal](docs/overview/entries/2026-09-01-double-macros-footer.md)).
+
+**The app notices the day changed on resume, without restarting (BF-86).** Owner: *"when I open the
+app in the morning and it just resumes, it doesn't give me the morning check-in."* The cause was
+structural — the tab shell never unmounts, so an effect keyed on `[userId, tz]` ran **once per app
+launch** and nothing re-asked what day it was. `LocalDayProvider` re-evaluates the local date on
+mount and `visibilitychange` and exposes it as a value, so subscribers key an effect on it: the
+workout store's `todayLogged` (which is where the listener came from — it moved up rather than being
+copied), the check-in prompt, and the today-mood read. **The requested "close / full reset" is
+deliberately not built** — BF-80 forbids fixing a resume with a reload, and the signal delivers the
+ask without trading instant paint for a spinner. The e2e test drives Playwright's clock across local
+midnight so the case fires on every run; **its first version passed with the fix reverted**, because
+`isVisible()` is a point-in-time check and not a wait. **Not device-verified**
+([journal](docs/overview/entries/2026-09-01-local-day-rollover.md)).
+
+**A peaking week stops reading as a volume deficit (BF-59, the screen's half).** Owner: *"i did the
+full sessions for the week; and i was nowhere near hitting the reccomended amount of muscle sets"*,
+then the cause in their own words — *"oh yes cause its realization phase its been less sets."* MAV is
+an **accumulation** target, so showing it during a peak tells an athlete that doing the right thing is
+wrong. **Both halves were measured in production first:** the stored targets are a flat binary (15
+rows, all 14 or 10) that ignores both the per-muscle landmark table and the program's `powerbuilding`
+×0.8, and the ten sessions span **three phases at once** — which is what makes "this week's phase"
+unstorable, since phase lives per program session. The Training card's target is now **derived** —
+`volumeLandmarks(goal, muscle)` scaled by the week's phase mix, weighted by sessions actually
+trained — and `/api/weekly-muscle-sets` returns the `phase` block behind it. Multipliers are the
+owner's (accumulation 1.0 · intensification 0.8 · realisation 0.6 · deload 0.5). **Two things are
+owed and both are on the entry:** `signals.ts` still steers the AI's set prescription off the stored
+binary, so **engine and screen now disagree** where before they were wrong together; and the card
+does not print the phase yet, which is Lane B's half and the half the owner explicitly asked for.
+**Not device-verified**
+([journal](docs/overview/entries/2026-09-01-phase-aware-volume-targets.md)).
+
+**A scanned meal now carries a group and a name — the engine half (BF-97, migration 252, local
+SQLite v33).** Owner, with two screenshots: *"looks like saved meals groups the food well; but when
+scanning it doesnt."* BF-39's grouping was right and did not cover this: it names a group from its
+`saved_meal_id`, and `groupDiaryEntries` **refuses to head a group it cannot name** — so a scan, which
+has no saved meal, cannot group. `food_logs.meal_group_name` is that name, denormalised onto every
+row for the same reason `meal_group_id` already is: a group **is** the rows sharing an id, and the
+local store must draw the header offline with no join. `logFoodEntries` mints a group **only**
+alongside a name and **only** past one entry — both negatives are asserted, because a group of one
+renders as a meal for a frame and then does not, and a nameless group rebuilds the bug one layer
+down. Five mutations across the write/delta/push chain, five caught. **Nothing looks different yet
+and that is deliberate:** the rendering rule is Lane B's half, so this cannot half-break the diary.
+**Not device-verified**, and the local-SQLite half is verified by reading rather than running
+([journal](docs/overview/entries/2026-09-01-scan-meal-group.md)).
+
+**Blood panels are stored, de-identified (BF-1, engine half — migrations 250/251).** The schema is
+written from the owner's real 58-analyte report rather than a description, and four shapes in it broke
+every simpler design: `<0.2` is a result that is **not a number** (`value_num` + `value_operator`),
+ranges arrive two-sided, one-sided in both directions and absent (both bounds nullable), the date is
+a **month** (a precision column, or every panel lands on the 1st and lies), and flags are commentary
+— *"Normal (athletic)"* on a creatinine inside its range — so **out-of-range is derived from the
+bounds, never read off the flag**, with `unknown` as a real answer where a bounded result cannot
+decide. Two guards fired and both were right: the `claude_ro` generator refused to emit an unscoped
+view for the child table, and the dead-method check rejected a repo method whose consumer this PR
+does not contain. **The extraction route, the consumers and the whole UI are still owed**
+([journal](docs/overview/entries/2026-09-01-blood-panel-storage.md)).
+
+**21 MB of index for a code path nothing calls (BF-55, migration 249).**
+`oura_heartrate_user_updated` was migration 130's keyset index for `getOuraTimeseriesDelta` — the
+restore pull Q-180 kept with no caller because *"it costs nothing at runtime"*. True of the method;
+the index was never in that accounting. Measured twice a day apart: **`idx_scan` 0, `idx_tup_read`
+0, 21 MB** — a quarter of the database's whole index budget — while the same table's other index
+showed **47,922 scans / 22.7 M tuples**. Dropped with the owner's conditional approval; the method
+and its tests stay, and its doc comment now carries the `CREATE INDEX` the restore driver must run.
+**The entry falsified its own rule and that is the durable part:** `idx_scan` counts reads, not
+constraint enforcement, so three of its four zeros were PK/UNIQUE indexes — `rr_intervals_pkey` read
+0 one day and 5,034 the next ([journal](docs/overview/entries/2026-09-01-drop-unused-hr-index.md)).
+**Steps count from the first one (BF-88, v1.418.0).** The first 3,000 steps of every day used to
+earn nothing, because the resting base already assumed a desk day's walking. The owner asked the
+version of the question that works — *"cant we remove some calories for the base 3000 and have it
+start from 0 steps?"* — and that is what shipped: the credit comes out of the base, the steps are
+counted. **A day at 3,000 steps burns exactly what it did before** (verified live: base 2087 +
+active 110 = 2197, the old base to the kcal); below it the day drops, which is the point. The
+calorie target does not move. `STEP_BASELINE` is renamed `STEP_BASE_CREDIT` because a test pinning
+3,000 cannot notice a change of meaning, and the rename is what found the three copy sites BF-87
+had shipped hours earlier. Two mutations survived their first tests — the credit applied on the
+calibrated path as well, and the credit taken off the maintenance target too, which cuts recommended
+intake by ~100 kcal a day and passes every relative assertion. **Not device-verified**
+([journal](docs/overview/entries/2026-09-01-step-base-credit.md)).
 
 **The E2E harness already looks; what it cannot do is take a photo (BF-91).** The entry read *"58
 specs assert nothing visual"* — **21 of the 58** assert layout, and the four flows it named already

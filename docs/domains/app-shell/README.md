@@ -87,8 +87,13 @@ split is "does it feel slow" vs "is it actually slow at the source".
   navigate-vs-expand affordance already exists (`ChevronRight` vs a rotating `ChevronDown`); the real
   defect is that `goals-section.tsx` **re-implements** `MoreRowGroup` rather than using it; and there
   are no sliders on the screen — five `Switch`es, all booleans, all correct — so the control question
-  is the owner's and the plan decides none of it. **The build is parked behind BF-79 → BF-78 (Lane
-  A)**; §3–§4 are separable if the screen needs fixing sooner.
+  is the owner's and the plan decides none of it.
+  **✅ §3 and §4 SHIPPED 2026-09-01 (v1.419.0)** — two headings (`Your setup`, `App`), `label`
+  optional on the primitive so a lone row is a plain card, `FeedbackSection` moved to the bottom
+  actions, `GoalsSection` presenting as a card. The count was **nine, not eight** — BF-79's Profile
+  group and the hand-written copy in `feedback-section.tsx` were both outside the plan's inventory.
+  `components/more/__tests__/more-row-group-arity.test.ts` holds it. **Still owed:** the owner's
+  answer on §2(c), and one look on the S25.
 - Reviews: [`docs/reviews/2026-08-14-app-ui-flow-ia-review.md`](../../reviews/2026-08-14-app-ui-flow-ia-review.md) — **UI / flow / information-architecture + caching review, 2026-08-14** (owner-requested; the full navigation map with a reachability count for all 39 page routes, the proposed target structure for More/Settings/Devices/Program/Admin, and 13 findings queued as Q-232…Q-244). Its prompt is [`2026-08-14-app-ui-flow-ia-review-prompt.md`](../../reviews/2026-08-14-app-ui-flow-ia-review-prompt.md). **§7 is the separate testing-capability measurement** — the 81 "NOT verified on device" rows split into five gates, only 25 of which need the device, queued as Q-249…Q-254.
 - Handoff: [`docs/handoff-2026-08-14-app-shell-ui-flow-ia-review-and-testing-capability.md`](../../handoff-2026-08-14-app-shell-ui-flow-ia-review-and-testing-capability.md) — **2026-08-14**, both halves of that session: the IA/caching review and the agent-testing cluster, with the decisions (why Q-232 is an umbrella, why Q-249 sits above it, why the whole cluster precedes Q-49) and the traps.
 - Reviews: [`docs/reviews/2026-08-07-full-app-review.md`](../../reviews/2026-08-07-full-app-review.md) — **full-app deep review, 2026-08-07** (saving/caching/performance/logic across all 201 routes and 40 pages; 53 findings queued as Q-117…Q-138, plus root cause for Q-73 and mechanisms for Q-72/Q-107)

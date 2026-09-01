@@ -8,6 +8,7 @@ import { useCachedValue } from '@/lib/hooks/use-cached-value'
 import { invalidateGoalRecommendations, invalidateUserProfile } from '@/lib/cache-groups'
 import { TTL_MEDIUM } from '@trainingai/shared/cache-ttl'
 import { formatDateDisplay, todayInTz } from '@trainingai/shared/date-utils'
+import { displayBodyFat, type BodyFatReading } from '@/components/health/body-fat-display'
 import type { User } from '@trainingai/shared/types'
 
 /**
@@ -24,7 +25,9 @@ import type { User } from '@trainingai/shared/types'
  */
 
 interface BodyMetadata {
-  recent?: { date: string; weightKg: number | null; bodyFat: number | null }[]
+  // `bodyFatCorrected`/`bodyFatIsCorrected` come with every row; this screen DISPLAYS the corrected
+  // value, same as Health does, so the two cannot show different numbers for one measurement (LA-45).
+  recent?: ({ date: string; weightKg: number | null } & BodyFatReading)[]
 }
 
 const EMPTY: PersonalDetailsValues = { displayName: '', heightCm: '', birthYear: '', sex: '' }
@@ -100,7 +103,7 @@ export function DetailsContent() {
   const dateLabel = (date: string) => date === today ? 'Today' : formatDateDisplay(date)
 
   const latestWeight = bodyMeta?.recent?.find(r => r.weightKg != null)
-  const latestBf = bodyMeta?.recent?.find(r => r.bodyFat != null)
+  const latestBf = bodyMeta?.recent?.find(r => displayBodyFat(r) != null)
 
   return (
     <MoreSubScreen title="Profile details">
@@ -121,7 +124,7 @@ export function DetailsContent() {
         onChange={onChange}
         latestWeightKg={latestWeight?.weightKg ?? null}
         latestWeightLabel={latestWeight ? dateLabel(latestWeight.date) : null}
-        latestBfPct={latestBf?.bodyFat ?? null}
+        latestBfPct={displayBodyFat(latestBf)}
         latestBfLabel={latestBf ? dateLabel(latestBf.date) : null}
         saving={saving}
         namePlaceholder={user?.name ?? undefined}

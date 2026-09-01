@@ -5793,7 +5793,151 @@ a lead not a result**, and specifically noted as the *reverse* of the density hy
 days earlier — the two use different quantities, and conflating them is exactly how that refutation
 gets mis-cited.
 
-## 2026-09-01 — backlog → 15440, `projectOverview.md` → 8790, `docs/agents/state/tuning.md` → 375 (Q-507 explained)
+## 2026-09-01 — `projectOverview.md` → 8810, `docs/implementation-backlog.md` → 15176 (BF-86)
+
+One shipped fix, and the backlog entry shrank rather than grew — BF-86's queue text became a `Keep:`
+plus the new `Verify: device`, since what remains is a look on the phone rather than work. The
+status block is 13 lines because two of them are the part a future session needs and neither is the
+bug: the **"close / full reset" the owner asked for is deliberately not built**, and the e2e test's
+first version **passed with the fix reverted**. A shorter block would lose both and invite the reset
+being built next time it is mentioned.
+
+## 2026-09-01 — `projectOverview.md` → 8822, `docs/implementation-backlog.md` → 15196 (BF-98, BF-97)
+
+One shipped fix and one lane annotation. The status block is 12 lines and eleven of them are the
+part that matters: **the reported duplication could not be reproduced**, the e2e written for it
+passed with the fix reverted, and it was deleted rather than kept. A one-line "fixed the double
+macros" would read as verified work and is exactly what a future session must not believe. The
+backlog grew by BF-98's `Verify:` and open-question note plus BF-97's measured lane.
+
+## 2026-09-01 — `projectOverview.md` → 8834, `docs/implementation-backlog.md` → 15063 (BF-1, engine half)
+
+The backlog **shrank by 133 lines**: BF-1's entry had accumulated the whole planning argument —
+which analytes are in the report, why extraction rather than typing, the de-identification decision
+and its reasoning — and all of that is now either shipped or in the plan document. What replaces it
+is the three halves still owed, which is what a queue entry is for.
+
+`projectOverview.md` grew 12 lines for a status block, and the lines are the four shapes the schema
+had to survive rather than a summary of them. A shorter block would read as "blood panels are
+stored" and lose the part a future session needs: that the verdict is **derived from the bounds and
+never read off the provider's flag**, which is the one rule a well-meaning consumer would otherwise
+break by trusting the words the report prints.
+
+## 2026-09-01 — `projectOverview.md` → 8846, `docs/implementation-backlog.md` → 15016 (BF-96, BF-95)
+
+Two shipped fixes. Both entries **stayed** in the queue as `Keep:` plus `Verify: device` rather
+than being deleted, which is the new field's whole point — shipped-but-unseen is debt that should be
+countable, not finished work that vanishes. The status block leads with the fact that the pill never
+moved, because "go back to the old way" invites reverting a layout that was never changed, and with
+the measured 12–22 character range that corrects the entry's own figure.
+
+
+## 2026-09-01 — `projectOverview.md` → 8860, `docs/implementation-backlog.md` → 14993 (BF-97, engine half)
+
+The backlog **shrank by 23 lines**: BF-97's entry carried the three-option decision and the argument
+for each, which is now made — the engine built option 1 — so what is left is the rendering rule and
+the two reasons a future session must not undo it.
+
+(Both numbers are re-derived after merging BF-96/BF-95's own baseline change — a size baseline is a
+measurement of the merged file, never a hunk to splice.)
+
+`projectOverview.md` grew 14 lines, and the lines that could not be cut are the two negatives: a
+group is minted **only** past one entry and **only** alongside a name. Both are what stop the fix
+from rebuilding the bug one layer down, and a status block that said "scans group now" would be
+wrong on top of being shorter — nothing renders differently until Lane B's half lands.
+## 2026-09-01 — `projectOverview.md` → 8878 (BF-82)
+
++18 lines for one status block. It is long for one because a short version of it — "the More page is
+grouped now" — is the version that gets a future session to redo the argument. What the lines buy:
+the count is **nine single-row groups, not the seven the entry claimed**, because two of them were
+outside `profile-tab.tsx` and one was a hand-written copy of the primitive rather than a use of it;
+`label` became optional so a lone row can still be a card; and the *"sliders"* half is
+recorded as **answered** with the owner's own words, because the alternative is a future session
+reading the original request and changing a control nobody asked to change.
+
+The backlog **shrank by 19 lines net** across the same PR — BF-82's entry lost the whole planning
+argument it had accumulated (it is in the plan document, which is where it belongs) and kept only its
+residue, and LB-44 was added.
+
+(8878 rather than the 8864 this branch measured before merging: BF-97's engine half landed 14 lines
+of its own in between. The number is a measurement of the merged file, never the sum of two hunks.)
+
+## 2026-09-01 — `docs/agents/state/implementation-lane-b.md` → 168 (BF-82)
+
++12 net after trimming 7. The run was long — fourteen merges — and what the added lines carry is one
+lesson repeated in four different disguises: **a guard that cannot fail is not a guard.** All four
+passed on the first write and all four were caught only by mutating the fix away; none was visible by
+reading. Compressed to a paragraph rather than four bullets, but not cut, because the *shapes* are
+what a successor pattern-matches on and a one-line version ("mutate your guards") is the version that
+gets nodded at. `BF-79`'s "do not re-litigate" bullet became a "has now been built on" bullet in the
+same pass — BF-82 shipped, so the guard-rail has done its job and only the placement needs carrying.
+
+## 2026-09-01 — compaction sweep: 250 entries → 227, starting `history-2026-09-01.md`
+
+`docs/overview/entries/` crossed the **250-file total ceiling**, which fails the branch that crosses
+it — here a Lane A feature PR whose only offence was adding its own journal entry. The 23 entries no
+durable doc links to were folded oldest-first and `git rm`'d, per the chore in
+[`entries/README.md`](overview/entries/README.md).
+
+**A new history file rather than an append.** `history-2026-08-30.md` was 184 KB and the fold is
+105 KB, which would have put it at **289 KB** — past the ~250 KB rule the README already carries. So
+the batch opens `history-2026-09-01.md` instead.
+
+**No new sweep hazard to record, which is itself worth recording.** The README's four link rules
+(re-express every relative link from `docs/overview/`, not just `](../../`; point a folded sibling at
+`#`; prefix a still-loose target with `entries/`; and fix the inverse — a loose entry linking to one
+you folded) were applied mechanically and `check-doc-links` passed on the first run, against 935
+files. The only rewrite outside the folded set was one loose entry pointing at a folded one, which is
+rule 4 — the case the README calls easy to miss because it lives in a file the sweep does not
+otherwise touch.
+
+## 2026-09-01 — `projectOverview.md` → 8895, `docs/implementation-backlog.md` → 14914 (BF-59, screen half)
+
+The backlog **shrank by 60 lines**: BF-59 carried the whole measurement — three tables of
+stored-vs-landmark numbers and the argument for which fix mattered most — and that measurement is now
+in the journal entry, where a session reads it once rather than every time it scans the queue.
+
+`projectOverview.md` grew 17, and the line that cannot be cut is the one nobody would think to write:
+**the engine and the screen now disagree**, where before this change they were wrong together. A
+status block that stopped at "the target is phase-aware now" would read as finished work and hide the
+inconsistency it introduced — which is precisely what a future session would need to know before
+touching either side.
+
+## 2026-09-01 — `docs/agents/state/implementation-lane-a.md` 208 → 189 (Lane A baton rewrite)
+
+The baton is **rewritten in full** at each handover, never appended, so its length tracks what the
+next session actually needs rather than accumulating. This pass dropped ~19 lines by retiring items
+that are now closed — the database-reclaim section (Q-315, closed), three answered owner questions,
+and a paragraph of traps from entries that have since shipped — while adding the four traps this
+session hit.
+
+Ratcheted down rather than left at 208: a baseline above the file's real length is headroom for
+silent growth, which is the thing these numbers exist to stop.
+
+## 2026-09-01 — `docs/implementation-backlog.md` → 14892 (LB-44 shipped)
+
+A 22-line entry removed and nothing added: LB-44 is a flake fix with no residue, so it leaves the
+queue whole rather than becoming a `Keep:`. Ratcheted down rather than left at the old number,
+because a baseline above the file's real length is headroom for silent growth.
+
+## 2026-09-01 — `projectOverview.md` → 8911 (LA-45)
+
++16 for one status block, and the lines that could not be cut are the two invariants. "Health shows
+the corrected body fat now" is the short version and it is the one that gets the next session to
+reverse one of them: `bodyFat` must stay what the log sheet seeds from — it POSTs at `manual`, which
+outranks `scale_ble`, so a corrected value round-tripped through the edit sheet overwrites the
+measurement permanently and collapses the next calibration toward zero — and "corrected" is never
+inferred from the two values differing, because an offset can round to zero. Both read as pedantic
+until you have written the wrong one, and neither is visible from the screen afterwards.
+
+The line about the hand-seeded DEXA pair is there for the same reason: the local seed has no scan and
+no `source_map`, so the whole feature is unreachable in the sandbox and a session that renders the
+screen and sees a plain number has verified nothing.
+
+(8911, not the 8894 this branch measured before merging: BF-59's screen half landed 17 lines in
+between. A size baseline is a measurement of the merged file, never the sum of two hunks — resolving
+that conflict by picking a side would have been wrong whichever side won.)
+## 2026-09-01 — backlog → 14940, `projectOverview.md` → 8927, `docs/agents/state/tuning.md` → 375 (Q-507 explained)
 
 **A two-week-old finding was reversed, and a reversal has to carry its evidence or it reads as a
 whim.** Q-507 has said since 2026-08-18 that daytime stress correlates the wrong way with readiness
