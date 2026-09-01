@@ -1,0 +1,23 @@
+-- BF-55: drop `oura_heartrate_user_updated`, the largest index in the database, for a code path
+-- nothing calls.
+--
+-- It is the keyset-pagination index from migration 130, built for `getOuraTimeseriesDelta` — whose
+-- own doc comment records the Q-180 decision to keep the method with no production caller, on the
+-- grounds that it "costs nothing at runtime". The method's cost is a paragraph; the index's is not.
+--
+-- **Measured against production, twice, a day apart.** `idx_scan` **0** and `idx_tup_read` **0** at
+-- **21 MB** — a quarter of the database's 84 MB of index budget — while on the same table
+-- `oura_heartrate_user_id_timestamp_key` shows **47,922 scans / 22.7 M tuples read**. So this is not
+-- a quiet table with an idle index; it is an index the planner never chooses, on the app's
+-- highest-volume write path, taking write amplification on every HR insert.
+--
+-- **Q-180's decision stands — only its index goes.** `getOuraTimeseriesDelta` stays, with its tests,
+-- and its doc comment now says the restore driver must recreate this index. Recreating it is one
+-- statement over 9.6 MB of heap, which is what made the owner's approval conditional on
+-- reversibility: *"yes if we are not using it and you are sure its reversible then get rid of it."*
+--
+-- **⚠ Nothing else on these tables is a drop candidate, and `idx_scan = 0` is why.** That counter
+-- records READS, not constraint enforcement: `oura_heartrate_pkey` also reads 0 and is consulted on
+-- every insert to reject a duplicate. `rr_intervals_pkey` read 0 on 2026-08-30 and reads 5,034 now.
+-- Dropping a PRIMARY KEY or UNIQUE index because it is "never scanned" drops the constraint.
+DROP INDEX IF EXISTS oura_heartrate_user_updated;

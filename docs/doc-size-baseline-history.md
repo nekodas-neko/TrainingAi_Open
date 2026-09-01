@@ -5731,3 +5731,64 @@ one clearly was not enough.
 finding's second error, independent of the grep: 32 days against today looked like a broken 30-day
 prune; against the last write it is exactly 30. What looked like the failure was the mechanism
 working.
+
+## 2026-09-01 — BF-92 corrected, and a third trap for the same mistake
+
+The owner confirmed `NEXT_PUBLIC_SENTRY_DSN` is set, which contradicted this entry. Re-measuring
+proved the entry wrong, not the owner: the original check `curl`ed **`/login`**, a **52-byte redirect
+stub**, and a redirect answers "not found" to every grep. Against the real page and its 33 JS chunks
+the DSN is inlined in three of them.
+
+So BF-92 goes from two stacked failures to **one** — the CSP, which is re-verified and still has no
+Sentry host, no wildcard and no bare `https:`. The retraction is kept visibly in the entry rather
+than quietly deleted, because the false half had become an instruction to set a variable that was
+already set.
+
+The correction also buys the entry a sharper test than it had: with the DSN live and only the CSP in
+the way, Sentry should hold **server events and zero browser events**. That asymmetry is one look at
+the dashboard and it distinguishes three hypotheses at once.
+
+The baton gains the third trap of the night in one family — Sentry, the prune, and now this. All
+three were negatives asserted from evidence that could not have shown a positive: a truncated grep
+twice, and a redirect stub once.
+
+## 2026-09-01 — BF-92 answered from the dashboard, and LA-20 confirmed fixed
+
+The owner opened Sentry: **one issue**, the Q-404 setup probe, 13 days old, server-side (US region,
+no url, no browser). That is not one of the three outcomes this entry predicted, and it is better —
+it settles all three at once.
+
+Client events are blocked: **9 client-source `error_events` rows against 0 Sentry browser events**
+over the same 13 days, same app, same device. Same-origin lands, cross-origin does not. Sentry
+holding nothing *else* turns out to be correct rather than a second fault — it only sees uncaught
+escapes, and the window's 34 server rows are all caught-and-reported (31 daytime-stress guard, 3
+aborted disconnects).
+
+The entry also gains the caveat the answer exposed: **0 `captureException` call sites** means Sentry's
+whole view is uncaught escapes — 1 event against `error_events`' 43. A quiet Sentry is not a quiet
+app, and fixing the CSP does not change that.
+
+`projectOverview.md` grows by the LA-20 confirmation, found in the same queries: all **31**
+`daytime-stress` occurrences fall on **2026-08-23**, the day of the fix, with **zero in the nine days
+since**. That entry's `Keep: production not verified` asked for exactly this check and it had never
+been run.
+## 2026-09-01 — backlog → 15376, `projectOverview.md` → 8774, `docs/agents/state/tuning.md` → 359 (TN-20/TN-21, and a retraction)
+
+**TN-20 is a data-integrity finding, and the length is the evidence that it is one.** A completed day
+was observed in **both states within 24 hours** — 2026-08-31 read 113 drained / 3,643 samples, the
+owner screenshotted it, and an hour later it stored 0 / 0 / end = anchor while 3,815 raw samples sat
+untouched in `oura_heartrate`. Nothing logs the prior value, so the before/after table **is** the
+proof; without it the entry is an unfalsifiable claim that a number used to be different. The derived
+row's 55 → 25 / 56 → 15 against a normal 7.83 h summary is the second half, and the three-of-eleven
+signature is what makes it a defect rather than an anecdote.
+
+**It also carries a retraction of this agent's own published evidence.** TN-19 cited 2026-08-26 as
+*"zero HR samples → zero drain"*; that day has **1,954 raw samples**, so the zero was TN-20. Q-521's
+conclusion survives on its own correlations; the illustration does not. A retraction that does not
+show why the original was wrong invites the next reader to reinstate it.
+
+**TN-21** is shorter and mostly one table: the persisted stress series covers all 24 hours and is
+**55% night**, with the two halves carrying opposite signs. Its Q-507 candidate is flagged **n = 9,
+a lead not a result**, and specifically noted as the *reverse* of the density hypothesis refuted six
+days earlier — the two use different quantities, and conflating them is exactly how that refutation
+gets mis-cited.

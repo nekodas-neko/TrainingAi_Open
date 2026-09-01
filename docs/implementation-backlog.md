@@ -14,7 +14,7 @@ silently misdirecting the next session. Update them in the same PR that consumes
 
 | Pointer | Value | Source of truth |
 |---|---|---|
-| Next free Postgres migration | **249** | `lib/data/postgres/migrations/` |
+| Next free Postgres migration | **250** | `lib/data/postgres/migrations/` |
 | Local SQLite schema version | **v32** | `lib/sqlite/migrations.ts`; `lib/sqlite/__tests__/migrations.test.ts` asserts the max |
 
 > **There is no third pointer any more.** Entry IDs are not allocated from a shared counter and
@@ -649,17 +649,22 @@ gates — and it is the reason the parked count still overstates blocking after 
   working. not sure if its being used."* The first half is right — it is connected and the
   integration is good work (Q-404). The second half is the finding.
 
-**Two independent failures, stacked, both measured against production 2026-09-01.**
+**ONE failure, not two — this entry's first draft was wrong and is corrected here (2026-09-01).**
 
-1. **`NEXT_PUBLIC_SENTRY_DSN` is not set.** `curl`ing the deployed `/login` and grepping the client
-   bundle for an ingest host returns **nothing**, so `Sentry.init({ dsn: undefined })` runs and the
-   browser/WebView SDK is a **total no-op**. Not degraded — silent and complete.
-2. **The CSP would block it even once the DSN is set.** The served `Content-Security-Policy` header
-   has `connect-src 'self' … generativelanguage … accounts.google … open-meteo … tile hosts … wss:
-   ws:` and **no Sentry ingest host**. Fixing only the DSN produces a still-empty Sentry and a
-   console full of CSP violations.
+**The CSP blocks every client event.** The served `Content-Security-Policy` has
+`connect-src 'self' … generativelanguage … accounts.google … open-meteo … tile hosts … wss: ws:` —
+**no Sentry ingest host, no wildcard, no bare `https:`**. The bundle's own ingest host
+(`o…​.ingest.us.sentry.io`, inlined from the DSN) is not among them, so every browser/WebView event
+is refused before it leaves the page.
 
-**`instrumentation-client.ts:11` predicted failure 2 in its own comment** — *"a `connect-src` that
+> **⚠ RETRACTED: "`NEXT_PUBLIC_SENTRY_DSN` is not set".** The first draft claimed this, on a `curl`
+> of **`/login`** — which is a **52-byte redirect stub**, not a page. Grepping a redirect answers
+> "not found" to every question. Re-measured against `/sign-in` and its 33 JS chunks: the DSN **is**
+> inlined, in three of them. The owner confirmed the variable independently. **The method error is
+> the lesson: confirm the response you fetched is the thing you meant to search — check its size
+> before grepping it.**
+
+**`instrumentation-client.ts:11` predicted this failure in its own comment** — *"a `connect-src` that
 does not include the ingest host silently drops every client event — the exact failure mode this item
 exists to avoid. Verify on the device, not just in a browser."* The warning was written and the host
 was never added. **That is the lesson worth keeping: a comment describing a hazard is not a guard
@@ -668,9 +673,31 @@ against it.**
 - **What IS plausibly working: the server side.** `sentry.server.config.ts` and
   `sentry.edge.config.ts` read `SENTRY_DSN` (not `NEXT_PUBLIC_`), and server→Sentry is a
   server-to-server call that **no CSP touches**. `instrumentation.ts`'s `onRequestError` hook calls
-  `captureRequestError` for everything escaping a route handler. **Whether `SENTRY_DSN` is set in
-  Railway cannot be checked from outside the deploy** — that is the one open question here and it is
-  the owner's to answer (or a boot-log line, below).
+  `captureRequestError` for everything escaping a route handler. **The owner confirmed `SENTRY_DSN`
+  is set (2026-09-01).** So the server path should be live and collecting.
+- **✅ ANSWERED 2026-09-01 — the owner looked, and the dashboard settles it.** Sentry holds
+  **exactly one issue**: `Q404WiringProbe`, *"Deliberate error proving the Sentry wiring delivers"*,
+  1 event, 13 days old, `url: --`, `transaction: --`, geography **US** (Railway's region, not the
+  owner's). A server-side event — the probe Q-404 fired at setup. Three conclusions:
+  1. **Server → Sentry works.** The probe delivered.
+  2. **Client → Sentry is blocked — now shown rather than argued.** Over the same 13 days
+     `error_events` recorded **9 client-source rows** while Sentry holds **zero** browser events.
+     Same app, same window, same device; the reporter that lands is same-origin and the one that
+     does not is cross-origin. That is the CSP.
+  3. **Sentry holding nothing else is CORRECT, not a second fault.** It only sees what escapes a
+     route handler uncaught, and nothing did: the 34 server rows over that window are **31 ×** the
+     `daytime-stress` constants guard plus **3 ×** `aborted` client disconnects, all caught and
+     reported by the app's own path, which by design never reaches the hook.
+- **⚠ Even with the CSP fixed, Sentry will see a narrow slice.** There are **0** explicit
+  `captureException`/`captureMessage` call sites, so its whole view is uncaught escapes: **1 event
+  against `error_events`' 43** over the same 13 days. Whether to forward caught server faults is a
+  separate decision this entry does not take — but nobody should read a quiet Sentry as a quiet app.
+- **(answered — kept for the reasoning) The deciding observation this entry asked for.** If this entry is right,
+  Sentry holds **server** events and **zero browser** events — the two paths differ only in whether a
+  CSP sits between them. A dashboard with both would refute the CSP diagnosis outright; a dashboard
+  with neither points at the server DSN or the SDK rather than the header. Filter by platform
+  (`node`/`javascript`) or by whether an event carries a URL and a browser name. **One look settles
+  which of the three it is** — cheaper than any further reading of the code.
 - **Nothing reads it either way.** `grep -ci sentry CLAUDE.md` → **0**; `error_events` appears
   **4×**, in the session-start ritual. So no session has ever been told to look at Sentry, which is
   exactly the owner's *"not sure if its being used"*. And there are **0** explicit
@@ -703,8 +730,8 @@ experiment, not an inference.
   maps, and release tagging. Adding the ingest host to `connect-src` stays the fallback if tunnelling
   is rejected for cost or latency.
 - **Recommendation, in this order.** ① Wire `withSentryConfig` with `tunnelRoute` (fallback: add the
-  ingest host to `connect-src` in `lib/security/csp.ts`). ② Set `NEXT_PUBLIC_SENTRY_DSN` in Railway.
-  ③ **Log one line at boot naming whether each DSN was found** — this failure is invisible precisely
+  ingest host to `connect-src` in `lib/security/csp.ts`). ② ~~Set `NEXT_PUBLIC_SENTRY_DSN`~~ — done;
+  it is set and inlined. ③ **Log one line at boot naming whether each DSN was found** — this failure is invisible precisely
   because an unset DSN is indistinguishable from a quiet week. ④ Only then add the session-start read
   to CLAUDE.md beside `error_events`; pointing sessions at an empty dashboard teaches them to ignore
   it.
@@ -2483,94 +2510,33 @@ a finding — it does not by itself explain a plain `GET` hanging beside it.
 - **Keep:** whatever the cause, `connectionTimeoutMillis: 0` on a pool of 10 is worth a decision of
   its own — a bounded wait turns a hang into an error state a card can show.
 
-### [platform] BF-55 — 84 MB of index against 63 MB of table, and the database is growing ~7× its expected trend
+### [platform] BF-55 — the database is growing ~7× its expected trend
 
-- **Lane:** A
-- **Added:** 2026-08-30 · measured against production while checking BF-54. **These are the size
-  columns, read from the filesystem, so they are exact** — unlike the row counts BF-54 is about.
+> **✅ The index half shipped 2026-09-01** (migration 249). `oura_heartrate_user_updated` —
+> `idx_scan` 0, `idx_tup_read` 0, **21 MB**, a quarter of the database's index budget — is dropped,
+> with the owner's conditional approval and both conditions re-verified against production.
+> `getOuraTimeseriesDelta` and its tests stay per Q-180; its doc comment now carries the
+> `CREATE INDEX` the restore driver must run, and a test holds that paragraph in place.
+> [journal](overview/entries/2026-09-01-drop-unused-hr-index.md)
+>
+> - **Keep:** the growth trend, which this did not explain.
 
-**Two readings, both from `pg_stat_user_tables` on 2026-08-30:**
-
-1. **Indexes outweigh the data.** Whole database: **84 MB of index against 63 MB of heap** — 1.33×.
-   Per table it is starker: `oura_raw_samples` 38 MB index on 30 MB heap; `oura_heartrate` **32 MB
-   index on 9 MB heap**, 3.5×. An index set larger than the data it points at is either redundant
-   indexes or bloat, and both are fixable.
-2. **Growth is off trend.** Total is **206 MB**, against the **171 MB baseline of 2026-08-18** —
-   **+35 MB in 12 days, ~2.9 MB/day**, where CLAUDE.md's post-packing expectation is **~0.4 MB/day**.
-   That is roughly seven times trend, and CLAUDE.md says anything materially above it gets recorded
-   the same session. This is that record.
-
-**What this is not.** It is **not** the 0.79 GB premise of Q-549, which was falsified on 2026-08-25
-and is unrelated. And it is not, on this evidence, dead-tuple bloat in the heap: `oura_raw_samples`
-carries 7,333 dead tuples, which is real but small against 180,415 live rows.
-
-- **First move is measurement, not a VACUUM.** List the indexes on `oura_raw_samples` and
-  `oura_heartrate` with their sizes and `idx_scan` from `pg_stat_user_indexes`; an index never
-  scanned is a candidate to drop, and dropping one is cheaper and safer than REINDEX.
-
-**✅ THAT MEASUREMENT IS DONE — 2026-08-30, against production. It found one 18 MB answer and
-falsified the rule it was taken under.**
-
-| Table | Index | `idx_scan` | Size |
-|---|---|---|---|
-| `oura_heartrate` | **`oura_heartrate_user_updated`** | **0** | **18 MB** |
-| `oura_raw_samples` | `…_user_id_ring_timestamp_ds_tag_body_hex_key` | 3,546 | 17 MB |
-| `oura_raw_samples` | `oura_raw_samples_user_tag_ts` | 251 | 15 MB |
-| `oura_heartrate` | `oura_heartrate_user_id_timestamp_key` | 5,991 | 9.4 MB |
-| `oura_raw_samples` | `oura_raw_samples_pkey` | 3,618 | 5.3 MB |
-| `oura_heartrate` | `oura_heartrate_pkey` | 0 | 4.4 MB |
-| `rr_intervals` | `rr_intervals_user_id_at_key` | 0 | 3.5 MB |
-| `rr_intervals` | `rr_intervals_pkey` | 0 | 3.5 MB |
-
-**⚠ "Never scanned is a candidate to drop" is wrong for three of those four zeros, and this entry
-said it.** `idx_scan` counts **reads**, not constraint enforcement. `oura_heartrate_pkey`,
-`rr_intervals_pkey` and `rr_intervals_user_id_at_key` are PRIMARY KEY / UNIQUE indexes: they are
-consulted on **every insert** to reject a duplicate, and that work is invisible to this counter.
-Dropping one drops the constraint. They are not candidates.
-
-**The one real candidate is the largest index in the database, and it belongs to a decision that
-predates this measurement.** `oura_heartrate_user_updated` is
-`(user_id, updated_at, id)` from migration 130 — the keyset-pagination index for
-`getOuraTimeseriesDelta`, whose own doc comment records **Q-180 (decided 2026-08-14)**: the method
-has no production caller, and is kept deliberately because intraday HR reaches a fresh device by no
-other path, the server is the archive, and — in as many words — *"It costs nothing at runtime."*
-
-**It does not cost nothing.** It is **18 MB of the database's 84 MB of index — 21 % — for a code path
-nothing calls**, plus write amplification on every HR insert, which is the highest-volume write in
-the app (87,021 rows today). Q-180 weighed the *method*; the index was never in that accounting, and
-it is 2× the heap of the table it sits on (`oura_heartrate`: 32 MB of index on 9 MB of data).
-
-- **✅ THE OWNER GATE IS CLEARED, 2026-09-01 — the field is removed above, deliberately.** The owner
-  approved the drop: *"yes if we are not using it and you are sure its reversible then get rid of
-  it."* Both conditions were re-verified
-  against production before recording this, rather than resting on the 2026-08-30 table above:
-  - **Unused, and the reading is now stronger.** `oura_heartrate_user_updated` reads
-    **`idx_scan` 0 and `idx_tup_read` 0**, and it has grown to **20 MB**. On the *same table*,
-    `oura_heartrate_user_id_timestamp_key` shows **40,195 scans / 18.6 M tuples read** — so this is
-    not a quiet table, it is an index the planner never chooses.
-  - **No caller.** `getOuraTimeseriesDelta` exists in `slices/oura.ts:700`, `adapter.ts:6293` and the
-    `repository.ts:1203` interface, and **nothing invokes it**; the only other mention is
-    `sync-engine.ts:729` recording that the driver "never was" written.
-  - **Reversible.** A plain btree from `130_oura_heartrate_updated_at.sql` — one `CREATE INDEX` over
-    9.6 MB of heap.
-  - **⚠️ And the entry's own warning held up.** `rr_intervals_pkey` read `idx_scan` 0 on 2026-08-30
-    and reads **5,034** now. Had "never scanned" been treated as a drop rule, that constraint would
-    have gone. **Drop `oura_heartrate_user_updated` and nothing else from that table.**
-- **Lane A takes it from here — this is a migration and the Orchestrator may not number one.** What
-  it owes: the `DROP INDEX`, and a line in `getOuraTimeseriesDelta`'s doc comment saying the restore
-  driver must recreate the index, since Q-180's "it costs nothing at runtime" is what this narrows.
-  **Q-180's decision to keep the *method* stands; only its index goes.**
-- **The alternative** is keeping it so the restore driver finds its index waiting, which is what
-  Q-180 chose. That is defensible if the driver is imminent; it has not been written in the two weeks
-  since, and the index is 21 % of the index budget this entry was opened about.
-
-**Sizes re-confirmed the same day: 206 MB total, 63 MB heap, 84 MB index** — the 1.33× the entry
-opened on, unchanged.
-
+- **Lane:** A.
+- **What is still owed.** Total was **206 MB** against the **171 MB baseline of 2026-08-18** —
+  ~2.9 MB/day where the post-packing expectation is ~0.4 MB/day. Removing 21 MB of index and one
+  write-amplification source does not account for that; the question is what is adding ~2.5 MB/day
+  more than expected, and the answer is most likely in the highest-volume writers rather than in
+  indexes. Re-measure the total before assuming the trend still holds — it has not been read since
+  2026-08-30.
+- **⚠ Do not re-run the index audit expecting more wins, and do not reach for `idx_scan = 0`.** That
+  counter records READS, not constraint enforcement, so every PRIMARY KEY and UNIQUE index can read
+  0 while being consulted on every insert. This entry's own first draft called them drop candidates;
+  `rr_intervals_pkey` read 0 on 2026-08-30 and **5,034** a day later. The one genuine candidate has
+  now been taken.
 - **Cost check before anyone panics:** at Railway's $0.15/GB/month this whole database is about
   **three cents a month**. The reason to act is that a 7× trend compounds, not that the bill hurts.
-- **Verification:** index total drops below the heap total, and a re-read a week later shows growth
-  back near trend.
+- **Added:** 2026-08-30 · measured against production while checking BF-54. **These are the size
+  columns, read from the filesystem, so they are exact** — unlike the row counts BF-54 is about.
 
 ### [nutrition][platform] BF-69 — dosed substances are stored but nothing reads them; make exposure an analysable variable
 
@@ -5391,6 +5357,81 @@ whether the fix is a flag, a correction, or both.
 **Pass test:** a trailing sleep baseline computed with and without 2026-08-19 differs, and the shipped
 one matches the "without" version.
 
+### [readiness][body][devices] TN-20 — a recompute overwrites a completed day with an empty result, and the inputs to rebuild it still exist
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-01 · owner: *"is the battery + stress system working correctly?"*
+- **Lane: A** — the writer, not the model. `body_battery_daily` and `oura_daily_derived`.
+- **Do not batch.** This is data integrity, not calibration, and it is losing days now.
+- **⛔ Do not "fix" this by re-running the recompute** until the mechanism is identified — the recompute *is* what destroys the day.
+
+**Observed in both states within 24 hours**, which is what makes it provable:
+
+| `body_battery_daily` 2026-08-31 | 2026-08-31 ~02:00 UTC | 2026-09-01 |
+|---|---|---|
+| end_value | **0** | **55** |
+| total_drained | **113** | **0** |
+| hr_sample_count | **3,643** | **0** |
+
+The owner's screenshot at 21:45 Brisbane on 08-31 shows *"−113 drained"*, so **the correct value was
+computed and displayed**. `updated_at` is 08-31 12:43 UTC — an hour later — and the row now stores a
+day that never happened. **`oura_heartrate` holds 3,815 samples for that date**; the input was never
+missing.
+
+**The derived row went further.** readiness **55 → 25**, sleep **56 → 15** — against a stored summary
+of **7.83 h, HRV 54.5, RHR 63.9**. Neighbours calibrate it: 08-30 (7.92 h, HRV 72) → **69**;
+09-01 (7.50 h, HRV 65) → **54**. **A normal night is stored as the worst on record.** All four recent
+derived rows were rewritten in one pass on 2026-09-01 03:58–05:13 UTC; two came out sane.
+
+**3 of the last 11 days** carry the signature — raw samples present, stored count **0**, drained
+**0**, end **=** anchor: **2026-08-22 (265 raw), 2026-08-26 (1,954), 2026-08-31 (3,815)**. On healthy
+days the stored count sits slightly *below* raw (waking-hours windowing); **zero against thousands is
+a different failure**.
+
+**First action:** find the writer. Candidates worth checking first are the same delete-before-guard
+shape as **Q-528** (`replaceOuraDailySummary`) and any `fullHistory` path — a recompute that starts by
+clearing and then writes nothing when its input query returns empty. **Nothing stores the prior
+value**, so this is only visible by comparing against the raw tables.
+
+**Pass test:** re-running the recompute on 2026-08-31 restores drain ≈113 from the 3,815 stored
+samples, and no day whose raw HR count is non-zero stores `hr_sample_count = 0`.
+
+### [readiness] TN-21 — "daytime stress" is 55% night buckets, and night and day carry opposite signs
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-01 · found answering the owner's *"is the stress system working correctly?"*
+- **Lane: A** — windowing in the stress model, not the card.
+- **Reference:** this is a **candidate mechanism for Q-507**, which is why it is filed rather than folded in.
+
+TN-3a's persistence half shipped, so the per-bucket series is testable for the first time:
+**230 buckets over 9 days**, 2026-08-24 onward.
+
+**The series covers all 24 hours** — every hour except 07:00 — and **126 of 230 (55%) fall between
+22:00 and 06:00.**
+
+| window | buckets | mean level |
+|---|---|---|
+| night 22:00–06:00 | 126 | **+0.266** (recovered) |
+| day 06:00–22:00 | 104 | **−0.413** (stressed) |
+
+**The two halves point opposite ways and the night half is the majority**, so any daily aggregate is
+governed by the night/day *mix* — which varies with sleep length and ring wear — as much as by
+stress. Daytime is thinly sampled (2 buckets at 08:00, 6 at 09:00) because the ring power-gates its
+PPG when worn-idle; sleep is sampled densely.
+
+**A Q-507 mechanism candidate, opposite in direction to the one already refuted:**
+`corr(total buckets, stress_high_minutes)` = **−0.784** (n = 9). **Fewer buckets → MORE high-stress
+minutes** — 2026-09-01 has 21 buckets and 150 minutes; 2026-08-26 has 29 and zero. Each bucket is
+scored against *the day's own median*, so a sparse day computes that median from fewer points and
+more buckets land far from it.
+
+**⚠ n = 9. Treat the −0.784 as a lead, not a result.** It is worth recording because it is the
+**reverse** of the data-density hypothesis refuted on 2026-08-26 (r = −0.128 against *HR sample
+count*) — sample count and bucket count are different quantities, and the bucket count is the one the
+model divides by.
+
+**Pass test:** the persisted series is restricted to the waking window (or the metric is renamed and
+its consumers re-checked), and after that `stress_high_minutes` no longer correlates with bucket
+count at |r| > 0.4.
+
 ### [readiness][body][app-shell] TN-19 — the Body Battery explainer promises five mechanisms; four are inert or backwards
 
 - **Branch:** _unassigned_ · **Added:** 2026-08-31 · owner, second report on this pillar in six days: *"any work being done for this? still not very usable"*
@@ -5410,8 +5451,12 @@ mechanisms. Measured against production:
 | DRAINS · **Daytime stress** | A metric that **rises on good days** — **+0.386** with readiness, **+0.477** with the sleep score (Q-507). |
 
 **Eight days:** charged 0/1/0/3/0/0/1/1 against drained 113/52/47/70/13/0/76/79; **five of eight end
-at 0 or 2**. **2026-08-26 is the cleanest demonstration of Q-521 available**: zero HR samples → zero
-drain, zero charge, ending exactly at its anchor. **No wear, no change.**
+at 0 or 2**. **⚑ RETRACTED 2026-09-01 — the 2026-08-26 illustration was this agent's error.** It was published
+here as *"the cleanest demonstration of Q-521 available: zero HR samples → zero drain, ending exactly
+at its anchor"*. **That day has 1,954 raw HR samples**; the zero was **TN-20**, a recompute wiping the
+row, not an absence of wear. **Q-521's wear-time conclusion still stands on its own correlations**
+(+0.518 over a longer window) — what falls is the illustration. **A stored counter is a claim about
+the data, not the data**: cross-check the raw table before quoting a zero.
 
 **Why this is filed rather than folded into TN-15.** The explainer is a real usability improvement in
 intent that made things worse in effect: the app now states five **testable** claims beside the
