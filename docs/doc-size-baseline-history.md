@@ -5801,3 +5801,24 @@ status block is 13 lines because two of them are the part a future session needs
 bug: the **"close / full reset" the owner asked for is deliberately not built**, and the e2e test's
 first version **passed with the fix reverted**. A shorter block would lose both and invite the reset
 being built next time it is mentioned.
+
+## 2026-09-01 — `projectOverview.md` → 8822, `docs/implementation-backlog.md` → 15196 (BF-98, BF-97)
+
+One shipped fix and one lane annotation. The status block is 12 lines and eleven of them are the
+part that matters: **the reported duplication could not be reproduced**, the e2e written for it
+passed with the fix reverted, and it was deleted rather than kept. A one-line "fixed the double
+macros" would read as verified work and is exactly what a future session must not believe. The
+backlog grew by BF-98's `Verify:` and open-question note plus BF-97's measured lane.
+
+## 2026-09-01 — `projectOverview.md` → 8834, `docs/implementation-backlog.md` → 15063 (BF-1, engine half)
+
+The backlog **shrank by 133 lines**: BF-1's entry had accumulated the whole planning argument —
+which analytes are in the report, why extraction rather than typing, the de-identification decision
+and its reasoning — and all of that is now either shipped or in the plan document. What replaces it
+is the three halves still owed, which is what a queue entry is for.
+
+`projectOverview.md` grew 12 lines for a status block, and the lines are the four shapes the schema
+had to survive rather than a summary of them. A shorter block would read as "blood panels are
+stored" and lose the part a future session needs: that the verdict is **derived from the bounds and
+never read off the provider's flag**, which is the one rule a well-meaning consumer would otherwise
+break by trusting the words the report prints.

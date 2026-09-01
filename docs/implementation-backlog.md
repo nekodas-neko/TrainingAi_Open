@@ -390,7 +390,12 @@ below threshold and left in place for next time.
 
 ### [nutrition] BF-97 — a scanned meal still lands as N loose rows, which is the case BF-39 was filed for
 
-- **Lane:** B for the diary rule; A if the scan write path has to mint the group id.
+- **Lane: A** — measured 2026-09-01, resolving the conditional this entry was filed with. The scan
+  route only *analyses*; the write is `logFoodEntries` in
+  **`packages/shared/src/nutrition/log-food.ts`**, called from `food-logger-sheet.tsx`. Minting a
+  group id there is `packages/shared/**`, and the recommended option also needs the diary rule in
+  `components/nutrition/diary-groups.ts` (Lane B) — both lanes, so **Lane A, engine half first**,
+  per the standing rule. Lane B can take the rendering follow-up once the ids are written.
 - **Added:** 2026-09-01 · owner, with two screenshots side by side: *"looks like saved meals groups
   the food well; but when scanning it doesnt."*
 
@@ -435,9 +440,24 @@ references to either field. A scan therefore cannot produce a group even in prin
   item count; two scans on one day stay separate rows; and a single-item scan still renders as a
   plain row, per the existing "a group of one buys nothing" rule.
 
-### [nutrition] BF-98 — a section holding one grouped meal draws its macros twice
+### [nutrition] BF-98 — a section holding one grouped meal draws its macros twice (fixed; the reproduction is not understood)
 
-- **Lane:** B — `components/nutrition/meal-card.tsx:145`, one condition.
+- **Lane:** B — `components/nutrition/meal-card.tsx`, one condition. **Shipped 2026-09-01.**
+- **Verify:** device — the owner's screenshot is the only place the duplication has been seen. On
+  the S25, open a meal section holding **only** a scanned or saved group: exactly one macro row and
+  one calorie total. Then add a loose item to that section — the footer returns, with numbers that
+  differ from the group's.
+- **⚠ Keep — the duplication could NOT be reproduced in e2e, and that is unresolved rather than
+  disproved.** `diary-nested-meal.spec.ts`'s fixture is the entry's exact case (one saved meal,
+  three ingredients, alone in its section) and the totals footer **does not render there on either
+  condition** — a test written against it passed with the fix reverted, so it was deleted rather
+  than kept as an assertion that cannot fail. The change is still right by reading: `logs` is the
+  flat list, `entries` is the rendered rows, and the collapsed branch twelve lines above already
+  applies that rule. What differs between the owner's diary and that fixture is the open question —
+  a `savedMeals` map that resolves, a meal type with other content, or the collapsed branch being
+  what was photographed. **Answer it before assuming the report is closed.** The change is held by
+  a source guard in `__tests__/diary-groups.test.ts` (mutation-checked) plus the entry-count cases
+  beside it.
 - **Added:** 2026-09-01 · owner, same message: *"the combined item UI doesnt look great with the
   double macros at the bottom."*
 
