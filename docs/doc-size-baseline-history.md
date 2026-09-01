@@ -5861,3 +5861,14 @@ residue, and LB-44 was added.
 
 (8878 rather than the 8864 this branch measured before merging: BF-97's engine half landed 14 lines
 of its own in between. The number is a measurement of the merged file, never the sum of two hunks.)
+
+## 2026-09-01 — `docs/agents/state/implementation-lane-b.md` → 168 (BF-82)
+
++12 net after trimming 7. The run was long — fourteen merges — and what the added lines carry is one
+lesson repeated in four different disguises: **a guard that cannot fail is not a guard.** All four
+passed on the first write and all four were caught only by mutating the fix away; none was visible by
+reading. Compressed to a paragraph rather than four bullets, but not cut, because the *shapes* are
+what a successor pattern-matches on and a one-line version ("mutate your guards") is the version that
+gets nodded at. `BF-79`'s "do not re-litigate" bullet became a "has now been built on" bullet in the
+same pass — BF-82 shipped, so the guard-rail has done its job and only the placement needs carrying.
+
