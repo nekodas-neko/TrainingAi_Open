@@ -20,7 +20,7 @@ Rewrite this file **in full** — never append — before the session ends or co
   `docs/agents/README.md` §3). Find your next number with
   `grep -rhoE '\bBF-[0-9]+\b' docs/ | sort -t- -k2 -n | tail -1` — **run it, do not trust this line**,
   which was four sessions stale before it was noticed. This role's last band entry was **Q-424**
-  (2026-08-20); everything after it is `BF-`. **Current: `BF-46` filed, next is `BF-47`.**
+  (2026-08-20); everything after it is `BF-`. **Current: `BF-88` filed, next is `BF-89`.**
 - **No migration numbers.** Intake never claims one. If an entry needs a corrective migration or a new
   column, say so in the entry and hand the number to Lane A.
 - **Docs-only PRs, opened and merged without asking** (CLAUDE.md Standing Instructions). CI still has
@@ -85,7 +85,10 @@ will keep changing as the framework does. §3 of the README is where the `BF-` I
 - **A stacked PR conflicts once its parent squash-merges — verify before resolving, never `--ours`
   blind.** Confirm `main`'s side of the hunk is genuinely empty, then check `grep -c "^### .*<ID> —"`
   gives 1 and `git diff --stat origin/main` shows insertions only. A bad splice silently reprioritises
-  someone else's work.
+  someone else's work. **A CLEAN auto-merge needs the same check** — one this session auto-merged with
+  no markers at all while carrying an entry `main` had just deleted. The check that catches it:
+  `diff <(git show origin/main:docs/implementation-backlog.md | grep '^### ') <(grep '^### '
+  docs/implementation-backlog.md)`, which for an amendment-only PR should be **empty**.
 - **A shallow clone re-forms after every container restart** and produces two false alarms: `git
   merge origin/main` refuses with "unrelated histories", and `git diff --stat origin/main` shows
   phantom deletions across untouched files — reads like reverted work, isn't. `git fetch --unshallow
@@ -117,6 +120,18 @@ will keep changing as the framework does. §3 of the README is where the `BF-` I
   known, all-consenting user population as a reason to relax an ownership guard — those are two
   different kinds of "the owner said it's fine", and only one of them changes what the code has to
   check. `BF-9`'s entry states this explicitly because the temptation to conflate them is real.
+- **A refused proposal is not a closed subject — the owner's next one may be right.** Two energy-model
+  changes were proposed an hour apart and they are not the same change (BF-88): the first deleted 265
+  kcal of base and handed back 102; the second removes exactly what it hands back. Measuring the first
+  is what produced the second. **Name the version you measured**, so "we said no to this" cannot be
+  quoted against a better idea later.
+- **Delete a superseded recommendation; never leave it beside its replacement.** When BF-88's advice
+  changed, BF-87's "do not lower `STEP_BASELINE`" was rewritten in the same diff. A stale prohibition
+  that is still obeyed is worse than no entry — that one would have made an implementer refuse a
+  change the owner had approved.
+- **Compute the owner's numbers through the real module, not by hand** — the probe pattern above,
+  then delete the scratch file. Hand arithmetic gave 35 kcal/1,000 steps; `computeActiveEnergy` gave
+  34, and the table is now something an implementer checks against instead of re-deriving Schofield.
 - **A dated regression needs the archived repo, not the live one, once the live repo's own history is
   too short.** See the tool note above — this is now a first move, not a last resort.
 
@@ -151,10 +166,9 @@ stale-but-approved auth fix.
 
 ### 2026-08-25 → 08-27 — the long nutrition + clinical session (BF-10 → BF-46)
 
-**Where the queue stands for this role.** Top of the nutrition cluster, in order:
-**BF-45** and **BF-46** (batched `nutrition-ui-uplift`, Lane B, both `Gate: device`), then **BF-38**,
-then **BF-39**. The clinical cluster is **BF-41** (promoted — the owner asked for upload/save first),
-then **BF-2**, then **BF-33**'s UI + **BF-42**, then **BF-44**, then **BF-43**.
+**Where the queue stood at the time** — superseded, see the 2026-08-31/09-01 entry below. Do not
+work from this paragraph: run `node scripts/next-item.js --lane <A|B>`, which is the only thing that
+knows what is startable right now.
 
 **Owner decisions taken this session — recorded in the entries, do not re-open:**
 
@@ -179,6 +193,38 @@ projected TDEE, implying an activity factor of ≈**1.38**.
 **Two open threads.** BF-46's photo **save failure is unexplained** — every layer reads correct in
 source, so it is device-only; the entry names the candidates and the one check that splits a write
 bug from a render bug. And four shipped items owe a device pass: BF-34, BF-27, BF-24, BF-26.
+
+### 2026-08-31 → 09-01 — the energy-model session (BF-86 → BF-88)
+
+Narrative in [`docs/overview/entries/2026-09-01-energy-model-intake.md`](../../overview/entries/2026-09-01-energy-model-intake.md).
+
+**Filed and merged:** **BF-86** (#714), **BF-87** (#715, amended #721), **BF-88** (#718, amended #721).
+
+**Owner decision — recorded in BF-88, do not re-open:** subtract the first 3,000 steps' worth of kcal
+from the resting base, then count steps from **zero**. Approved 2026-09-01, `Gate: owner` cleared.
+**BF-88 is Lane A's #1 READY item.**
+
+**Numbers not to re-derive** (all in BF-88): step→kcal is **~34 per 1,000** above the floor; the
+*uncompensated* version (multiplier → 1.0) loses on **124 of 124 days**, mean **−177**; the
+*compensated* one is **identical at and above 3,000 steps** — 74 unchanged, 50 moved, **−17 across all
+days**. **102 kcal is the owner's number, not the app's** (`stepKcal(STEP_BASELINE)` at his own
+age/weight/sex) — hardcoding it mis-bases every other account. **50 of 124 days sit below 3,000
+steps**; **45 of 124** carry a plausible food log, which is what makes a TEF-from-intake term
+unusable.
+
+**BF-87 SHIPPED FIRST (#725) AND THE INVERSION LOST THE RACE.** BF-88 was made to precede BF-87
+precisely so the copy would not be written against a threshold about to be removed; Lane B merged
+BF-87 before that PR landed. Three sites now print *"steps above 3,000/day"* and **BF-88 owns
+rewriting them** — it is in the entry, not a follow-up. **The mirror test does not protect this**:
+BF-87 mirrored `STEP_BASELINE` into `components/nutrition/movement-breakdown.ts` (LB-43 is why) and
+the test pins the two *values* equal — but BF-88 can leave the value at 3,000 while changing what it
+means, so the test stays green and the copy becomes a lie. The lesson is general: **a reorder only
+protects work that has not started, and a `Needs:` added after a lane has picked the item up is
+already too late.**
+
+**Owner still owes:** device checks on **BF-61**, **BF-62**, **BF-63**, **BF-45**, **BF-53**; the
+**BF-83** sleep check next morning (note the end time on open, then query the row immediately); and
+the Orchestrator prompt, handed over but never run.
 
 ## What this session learned that the traps list did not already say
 
