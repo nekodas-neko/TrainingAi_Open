@@ -74,7 +74,7 @@ was filed for the gap.
 > empty Meals tab, and the only symptom is a dead button. So the prediction above ("throws") was
 > right about the mechanism and wrong about what a user would see — this would have been reported as
 > *"the button does nothing"*, not as a crash. See
-> [that entry](../history-2026-08-30.md), folded into the batched history.
+> [that entry](../history-2026-09-01.md).
 
 ## Verification
 
