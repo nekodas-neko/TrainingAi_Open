@@ -34,14 +34,13 @@ const KEY_PREFIX = 'ta_scroll:'
 /**
  * How long to keep watching for the container to grow tall enough to hold the saved offset.
  *
- * **Generous on purpose, and it was 3 s until the e2e spec measured that wrong.** Against a warm
- * server the content is tall within a frame or two and any window works; against a cold one — which
- * is what CI and a first app-open are — the route is still compiling well past three seconds, the
- * window closes, and the restore never fires. That failure is silent and looks exactly like the bug.
- *
- * A long window is safe because the timer is not what protects the user from a late jump — the
- * takeover listener is. Any wheel, touch or key cancels the restore immediately, so the only thing
- * this bounds is how long an untouched screen will still settle into place.
+ * **Generous on purpose, and not because anything measured 3 s failing.** It was raised from 3 s on
+ * a hypothesis that turned out to be wrong — a red e2e run was blamed on a cold server outrunning
+ * the window, and the actual cause was the spec tapping a card that opens a sheet instead of a link,
+ * so nothing ever unmounted. The wider value is kept on its own merits rather than that story: a
+ * cold route genuinely can still be compiling seconds in, and the timer is not what protects the
+ * user from a late jump — the takeover listener is. Any wheel, touch or key cancels the restore
+ * immediately, so all this bounds is how long an untouched screen will still settle into place.
  */
 const RESTORE_WINDOW_MS = 15_000
 

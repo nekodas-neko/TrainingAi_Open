@@ -24,7 +24,14 @@ async function scrollDown(page: import('@playwright/test').Page, steps = 7) {
 }
 
 test.describe('scroll position survives a push and back', () => {
-  for (const [route, linkText] of [['/health', /Sleep/], ['/more', /Profile details/]] as const) {
+  // Anchored on an `href`, not on text. `'a, button'` filtered by text was the first version and it
+  // matched the Sleep CARD — which opens a sheet rather than pushing a route, so nothing unmounted,
+  // nothing was saved, and the spec reported "expected 840, received 0" as though the restore were
+  // broken. It was not; the fixture was. That is what the precondition assertions below now catch.
+  for (const [route, linkSel] of [
+    ['/health', 'a[href^="/health/"]'],
+    ['/more', 'a[href^="/more/"]'],
+  ] as const) {
     test(`${route} returns to the same offset`, async ({ page }) => {
       await page.goto(route)
       // These screens seed from cache and revalidate, so give the content its height before
@@ -34,7 +41,9 @@ test.describe('scroll position survives a push and back', () => {
       const before = await page.evaluate(scrollTop())
       expect(before, 'nothing scrolled — the fixture is too short to test restoration').toBeGreaterThan(200)
 
-      await page.locator('a, button').filter({ hasText: linkText }).first().evaluate(el => (el as HTMLElement).click())
+      const link = page.locator(linkSel).first()
+      await expect(link, 'no in-app link to push through').toBeAttached({ timeout: 15_000 })
+      await link.evaluate(el => (el as HTMLElement).click())
       await page.waitForTimeout(2500)
       // Assert the setup actually happened. A spec that does not check its own precondition fails
       // for the wrong reason and sends you debugging the feature instead of the fixture.
