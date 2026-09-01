@@ -6135,13 +6135,64 @@ Two negatives are kept for the same reason as always: the split is in the compon
 `budgetProvenance` (shared, and one combined number is correct for a caller that wants one), and
 neither the `Math.max` floor nor the goal maths was touched — both look like the bug and are not.
 
+## 2026-09-01 — `docs/implementation-backlog.md` 15084 → 15150 (BF-101 the numbers already exist, BF-102 a false prompt)
+
+Two Profile-screen asks, and tracing turned the first into mostly plumbing and the second into a bug.
+
+**BF-101.** The owner guessed the recommended values might not need AI. They do not:
+`calculateBaseline` already returns calories, protein, carbs, fat, water and steps deterministically,
+off the **measured** RMR via `personalRmr`, and the AI route computes that baseline first and then
+adjusts it. The entry's length is the evidence that the button is worth having — Activity Level is
+**Moderate** (steps → 10,000) against a stored Steps Goal of **7,000**, the sedentary value, while
+water tracks moderate to 16 ml. One field follows the recommendation, one does not, and the screen
+says nothing. Plus two guards: sleep has no baseline and must not get an invented one, and an
+incomplete profile must hide the button rather than compute from absent inputs.
+
+**BF-102** starts from the owner being right — the calorie model is measured, not multiplied by the
+picker (Q-401) — and then has to say the harder thing: activity level is **not** dead, it still
+drives the step goal and the water bump, so this is a feature rather than a deletion. The finding
+that earns the entry is a live defect beside it: the recommend route's prompt reads
+*`activity level "moderate"): … TDEE X`*, implying the TDEE was computed for that level when it is
+`bmr × 1.2` regardless. **The model is told something false about its own input**, and that is worth
+fixing whether or not a Calibrated option ever ships.
+
+## 2026-09-01 — `docs/implementation-backlog.md` (BF-103 a label removed twice, BF-104 a multiplier with no setter)
+
+**BF-103 is mostly history the next reader must not repeat.** The owner asked for the Meals tab to
+become "My foods" — which is precisely the label **BF-37** and **BF-60** removed, the second because
+*"`My Foods` against `My Meals` is the pair the owner could not tell apart."* Renaming the tab while
+the page button still says `My Meals` re-creates that pair in the one place the earlier fix left
+alone. But his reason is new and measured: **5 of his 10 saved meals hold exactly one item**, so the
+label is untrue rather than merely confusable. The entry separates those two arguments and
+recommends `Saved` — which names a source alongside Recent and Search, is true of both shapes, and
+collides with nothing.
+
+**BF-104** is short because the storage is already right: every `food_log` carries its own
+`quantity_multiplier` and `logMealFromSaved` copies each item's factor from the definition, so the
+only missing piece is a meal-level scale to multiply through. The length is spent keeping it away
+from `meal-batch-size` — "makes N portions" is definition-time and this is log-time, and the two
+multiply rather than substitute — and on stating the trade in scaling at write time: the rows stay
+self-describing snapshots, at the cost of "I ate 1.5×" not surviving as a fact. BF-3 made the
+opposite call for supplement doses, for a reason that does not apply here.
 ## 2026-09-01 — `docs/implementation-backlog.md` → 15174 (merge resolution)
 
 `docs/owner-decisions-round2`, merging `main`. Re-measured after the merge, not carried across it.
 Both sides of this file's own conflict kept — append-only, so a conflict here is two additions.
 Entry-ID set diffed against the new `origin/main`: **identical, nothing added or lost.**
 
-## 2026-09-01 — `projectOverview.md` → 9013, `docs/implementation-backlog.md` → 15167 (LB-37 shipped)
+## 2026-09-01 — `projectOverview.md` → 9015 (BF-100)
+
++16, and unusually the count of traps is the payload rather than a detail. Ten defects — six in the
+hook, four in the spec — every one of which produced code that runs, does what it says, and achieves
+nothing. Two were StrictMode's double-invoked effect in *different* shapes (a consumed `popstate`
+flag; a cleanup writing 0 over a pending target), which is the reason the second one cost as much as
+the first: the lesson from one did not generalise to the other.
+
+The line about the four spec failures all reporting `expected 840, received 0` is the one that saves
+the most time later. That is what makes a fixture problem indistinguishable from a regression, and
+the fix — a spec that asserts its own preconditions — is worth more than the feature it guards.
+
+## 2026-09-01 — `projectOverview.md` → 9029, `docs/implementation-backlog.md` → 15345 (LB-37 shipped)
 
 The backlog shrank: LB-37's entry carried the whole measurement argument — the method, the error-code
 breakdown, the case for a ratchet over a sweep — and that is now in the journal, where it is read
