@@ -5564,6 +5564,49 @@ value**, so this is only visible by comparing against the raw tables.
 **Pass test:** re-running the recompute on 2026-08-31 restores drain ≈113 from the 3,815 stored
 samples, and no day whose raw HR count is non-zero stores `hr_sample_count = 0`.
 
+### [readiness] TN-22 — the stored `stress_high_minutes` disagrees with the model's own buckets on 8 of 9 days, and that is Q-507
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-01 · owner: *"does this mean stress will work properly soon?"*
+- **Lane: A** — the writer of the daily scalar, not the stress model.
+- **Reference:** [`review`](reviews/2026-09-01-stress-sign-explained.md). **This explains Q-507 and reverses its conclusion.**
+- **Likely the same defect as TN-20** — a later pass recomputing a completed day from an impoverished input. Stated as *likely*: the mechanism is identified in neither.
+
+`stress_high_minutes` is bucket-minutes below `STRESS_HIGH_LEVEL = -0.5`, so with TN-3a's buckets
+persisted it can be **recomputed and compared with what was stored**. Correct direction is negative.
+
+| | vs sleep | vs readiness |
+|---|---|---|
+| **stored `stress_high_minutes`** | **+0.137** | **+0.338** |
+| recomputed from buckets, all hours | **−0.181** | **−0.438** |
+| recomputed, waking window only | **−0.289** | **−0.477** |
+
+**Recomputing the same quantity from the model's own output flips the sign to correct.** Dropping
+2026-08-31 — a known **TN-20** casualty whose readiness/sleep were overwritten to 25/15 — strengthens
+it to **−0.383 / −0.699** (n = 8). The finding is *masked* by the corrupt day, not caused by it.
+
+**8 of 9 days disagree**, and four store **zero** against 210–270 bucket-minutes:
+
+| date | stored | buckets |
+|---|---|---|
+| 08-24 | **0** | 240 |
+| 08-25 | 30 | 270 |
+| 08-26 | **0** | 210 |
+| 08-27 | **0** | 270 |
+| 08-28 | 60 | 120 |
+| 08-29 | **0** | 210 |
+| 08-30 | 30 | 240 |
+| 08-31 | **0** | 240 |
+| **09-01** | **180** | **180 — MATCH** |
+
+**The only day that agrees is the newest.** Same shape as TN-20.
+
+**⚠ What this does NOT establish.** n = 8–9. The waking window is 06:00–22:00 chosen by the review,
+**not the app's definition**. The buckets are written by the same pipeline as the scalar, so *"the
+buckets are right"* rests on their producing the correct sign, not on independent verification.
+
+**Pass test:** for every stored day, `stress_high_minutes` equals the bucket-derived count; and on a
+re-test at **n ≥ 30** the metric correlates negatively with readiness at |r| ≥ 0.3.
+
 ### [readiness] TN-21 — "daytime stress" is 55% night buckets, and night and day carry opposite signs
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-01 · found answering the owner's *"is the stress system working correctly?"*
@@ -5592,10 +5635,15 @@ minutes** — 2026-09-01 has 21 buckets and 150 minutes; 2026-08-26 has 29 and z
 scored against *the day's own median*, so a sparse day computes that median from fewer points and
 more buckets land far from it.
 
-**⚠ n = 9. Treat the −0.784 as a lead, not a result.** It is worth recording because it is the
-**reverse** of the data-density hypothesis refuted on 2026-08-26 (r = −0.128 against *HR sample
-count*) — sample count and bucket count are different quantities, and the bucket count is the one the
-model divides by.
+**⚠⚑ THE Q-507 CANDIDATE ABOVE IS SUPERSEDED — same day, by TN-22.** The backwards sign is **not a
+property of the model**: recomputed from these same buckets, `stress_high_minutes` correlates
+**−0.438** with readiness (**−0.699** waking-only), while the *stored* scalar reads +0.338. So the
+−0.784 bucket-count relation was explaining an artefact of the stored value, exactly as the
+data-density hypothesis (refuted 2026-08-26) had been.
+
+**What survives, and it is the reason this entry stays open: the WINDOW.** The series really is 55%
+night, and restricting it to waking hours moves the readiness correlation from **−0.452 to −0.699**.
+That is a real gain on its own, independent of TN-22.
 
 **Pass test:** the persisted series is restricted to the waking window (or the metric is renamed and
 its consumers re-checked), and after that `stress_high_minutes` no longer correlates with bucket
@@ -10093,6 +10141,22 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   measurable confound without removing the feature.
 - **n = 25 is small** — at that size r = +0.40 sits near the conventional significance boundary, so the
   strength is provisional. The group means are the durable part. Re-measure at n ≈ 60.
+- **✅⚑ EXPLAINED 2026-09-01 — AND THE CONCLUSION IS REVERSED. See TN-22.**
+  ([review](reviews/2026-09-01-stress-sign-explained.md).) **The stress model was never the problem.**
+  `stress_high_minutes` recomputed from the model's own persisted buckets correlates **−0.438** with
+  readiness (**−0.699** on the waking window, n = 8) — the physiologically correct direction — while
+  the **stored** scalar reads **+0.338**. **The stored value disagrees with the buckets on 8 of 9
+  days**, storing zero against 210–270 bucket-minutes on four of them, and agrees only on the newest
+  day. This entry's *"the signal points the wrong way"* is true of the stored scalar and **false of
+  the model**.
+- **⛔ Both previously-proposed mechanisms are superseded, including one filed the same week.** The
+  data-density hypothesis was refuted on 2026-08-26 (r = −0.128 vs HR sample count) and TN-21's
+  bucket-count hypothesis (r = −0.784) is retired here — both tried to explain a phenomenon that is
+  **not a property of the model**. TN-21's *window* finding stands on its own (the series is 55%
+  night; restricting it moves readiness from −0.452 to −0.699).
+- **Do not act on this entry's original recommendation** to swap the override input to
+  `daytime_stress_scaled` or gate on coverage. **Fix TN-22 first, then re-test at n ≥ 30** — everything
+  above rests on 8 days.
 - **⚑ Amended 2026-08-26 — re-measured at n = 33, and it replicates and strengthens.**
   ([pillar review](reviews/2026-08-26-pillar-review.md) §4.) `corr(stress_high_minutes,
   readiness_score)` = **+0.386**, essentially unchanged. **New:** `corr(stress_high_minutes,
