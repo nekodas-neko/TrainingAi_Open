@@ -27,6 +27,20 @@
 **Version:** v1.423.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-09-01.
 
+**Test files are typechecked now, and they never were (LB-37).** `tsconfig.json` excluded
+`**/__tests__/**`, so across ~700 specs a test could reference a type that does not exist or assert
+against an interface that had since changed shape and `tsc` said nothing — which means the sentence
+*"tsc clean"*, the first gate every session runs, **carried no information about any spec**. The
+split is exact: the base project reports **0** errors, the same project with the exclusion dropped
+reports **320 across 90 files**, and every one is in a test. Shipped as a shrink-only per-file
+ratchet (`tsconfig.tests.json` + `scripts/check-test-typecheck.js`), so every NEW spec is checked
+immediately and the 320 come down as files are touched. **A real broken reference is already
+confirmed** — `lib/__tests__/ai-dynamic.test.ts` imports `../types/program`, which does not exist,
+and the spec passes. Two placement calls: a **second tsconfig** rather than editing the one
+`next build` reads, and the step in **Build** rather than Custom Rules, which installs nothing and
+would have failed CI on the entry's own suggestion
+([journal](docs/overview/entries/2026-09-01-typecheck-tests.md)).
+
 **The calorie line called a goal deficit part of the base rate (BF-99).** Owner, with a screenshot:
 *"why is my base rate under the 1350 RMR value."* `budgetProvenance().base` is
 `restingBaseKcal + targetNetKcal` — the resting base with the goal delta already folded in — and the

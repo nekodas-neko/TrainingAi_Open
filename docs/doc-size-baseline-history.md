@@ -6110,3 +6110,14 @@ failure mode from a wrong number, and it is the one a future session will not th
 Two negatives are kept for the same reason as always: the split is in the component and **not** in
 `budgetProvenance` (shared, and one combined number is correct for a caller that wants one), and
 neither the `Math.max` floor nor the goal maths was touched — both look like the bug and are not.
+
+## 2026-09-01 — `projectOverview.md` → 9013, `docs/implementation-backlog.md` → 15057 (LB-37 shipped)
+
+The backlog shrank: LB-37's entry carried the whole measurement argument — the method, the error-code
+breakdown, the case for a ratchet over a sweep — and that is now in the journal, where it is read
+once rather than on every queue scan. What stays is where to start, ordered by consequence.
+
+`projectOverview.md` grew 14, and the line that cannot be cut is the one about the gate itself:
+**"tsc clean" carried no information about any spec**, which is a sentence written in dozens of PR
+bodies in this repository, several of them from the same session that shipped this. A status block
+that said "test files are typechecked now" would read as a small hygiene win and lose why it matters.
