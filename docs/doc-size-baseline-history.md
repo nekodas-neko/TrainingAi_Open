@@ -5872,3 +5872,22 @@ what a successor pattern-matches on and a one-line version ("mutate your guards"
 gets nodded at. `BF-79`'s "do not re-litigate" bullet became a "has now been built on" bullet in the
 same pass — BF-82 shipped, so the guard-rail has done its job and only the placement needs carrying.
 
+
+## 2026-09-01 — compaction sweep: 250 entries → 227, starting `history-2026-09-01.md`
+
+`docs/overview/entries/` crossed the **250-file total ceiling**, which fails the branch that crosses
+it — here a Lane A feature PR whose only offence was adding its own journal entry. The 23 entries no
+durable doc links to were folded oldest-first and `git rm`'d, per the chore in
+[`entries/README.md`](overview/entries/README.md).
+
+**A new history file rather than an append.** `history-2026-08-30.md` was 184 KB and the fold is
+105 KB, which would have put it at **289 KB** — past the ~250 KB rule the README already carries. So
+the batch opens `history-2026-09-01.md` instead.
+
+**No new sweep hazard to record, which is itself worth recording.** The README's four link rules
+(re-express every relative link from `docs/overview/`, not just `](../../`; point a folded sibling at
+`#`; prefix a still-loose target with `entries/`; and fix the inverse — a loose entry linking to one
+you folded) were applied mechanically and `check-doc-links` passed on the first run, against 935
+files. The only rewrite outside the folded set was one loose entry pointing at a folded one, which is
+rule 4 — the case the README calls easy to miss because it lives in a file the sweep does not
+otherwise touch.
