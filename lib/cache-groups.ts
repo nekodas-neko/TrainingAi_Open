@@ -405,6 +405,20 @@ export async function invalidateCheckinAffectsPrescription(): Promise<void> {
   clearLegacyHomeSeeds()
 }
 
+/** BF-84 — the user chose (or un-chose) a rest day, so only today's recommendation moves.
+ *
+ *  Narrower than invalidateCheckinAffectsPrescription on purpose: a rest choice changes what
+ *  `getNextSession` answers and nothing about readiness inputs, muscle recovery or workout data.
+ *  `clearLegacyHomeSeeds()` is still required — `ta_recommendation_v1` survives a plain
+ *  `invalidateCache('next-session')` and would re-paint the pre-choice recommendation on Home. */
+export async function invalidateRestDayChoice(): Promise<void> {
+  await Promise.all([
+    invalidateCache('next-session'),
+    invalidateCache('next-session-prescription'),
+  ])
+  clearLegacyHomeSeeds()
+}
+
 /** Exercise library entry added/edited/deleted (user custom or admin catalogue). */
 export async function invalidateExerciseLibrary(): Promise<void> {
   await invalidateCache('exercise-library')

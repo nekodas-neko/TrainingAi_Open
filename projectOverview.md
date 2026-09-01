@@ -27,6 +27,18 @@
 **Version:** v1.417.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-09-01.
 
+**A chosen rest day is a fact now, not a `localStorage` key (BF-84, engine half).** The route it
+posted to persisted nothing — its own comment said rest is inferred from gaps in workout history —
+so the choice never reached the server, the second device never saw it, it died on a reinstall, and
+refetching `/api/next-session` reverted it. Owner settled it as a fact: *a day with no logged
+workout is also a day you forgot, were ill, or logged late.* `rest_days` (migration 247) holds it,
+tombstoned on withdrawal, written through a new `rest_days` outbox domain so an offline choice is
+carried, and `getNextSession` prefers it over inference — after already-trained, before the
+readiness branch that would otherwise offer a deload on a day you said you were resting. **The
+surface half is Lane B's and still owed**; the storage shipping first is what makes the new button
+safe. **Not device-verified**
+([journal](docs/overview/entries/2026-09-01-rest-day-stored.md)).
+
 **An account with a password could not change it (LB-40).** `EditProfileSheet` initialised
 `hasPassword` to `false` and **nothing fetched it**, so the *Current password* field never rendered,
 the PATCH went up without it, and the route answered *"Current password is required."* — an error
@@ -884,6 +896,24 @@ window, then the newest `history-*.md`. The 157 dated status notes this section 
 > An entry only leaves when **nothing is still owed**: no open work, no pending owner or device
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
+
+### [workouts][platform] ⚠️ The stored rest day is not device-verified, and the button for it is still Lane B's (BF-84, 2026-09-01)
+
+**Shipped, and the half that matters most on this app is the half a sandbox cannot run.** `rest_days`
+(migration 247) plus a `rest_days` outbox domain; the client writes through `chooseRestDay`, which
+queues the outbox row when the local store is there and POSTs when it is not. **The outbox path
+exists only on the APK** — `getLocalStore` returns null in the web/dev sandbox — so the branch that
+carries an offline rest choice to the server has been exercised by unit tests and by
+`pushMutations` against a real Postgres, and never by a device.
+
+**What to check on the S25:** choose rest with the phone in aeroplane mode, restore the network,
+and confirm the choice is on the server (`GET /api/log-rest-day?from=&to=`) without a second tap.
+Then confirm the recommendation still says rest after a pull-to-refresh, which is the exact failure
+the entry was opened for.
+
+**Also still owed:** the surface. The owner asked for the rest button on Home's card *when the app
+has not suggested rest*; today it renders only inside the `deloadOrRestRecommended` branch. That is
+Lane B's, tracked on BF-84, and the storage shipping first is what makes it safe.
 
 ### [readiness][body][app-shell] 🔴 The Body Battery card explains a model the app doesn't implement — and nothing in the chain has shipped (TN-19, 2026-08-31)
 

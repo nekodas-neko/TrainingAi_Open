@@ -19,6 +19,9 @@ export const SYNCED_MUTATION_DOMAINS = [
   // question about a night the ring did not observe: it targets an existing row by date and sets
   // one column that no window, duration or efficiency is ever derived from.
   'manual_bedtime',
+  // BF-84. A rest day the user CHOSE, distinct from one inferred from a gap in workout history.
+  // Payload is `{ resting: boolean }` against `date`; un-choosing tombstones rather than deleting.
+  'rest_days',
 ] as const
 
 export type SyncedMutationDomain = (typeof SYNCED_MUTATION_DOMAINS)[number]

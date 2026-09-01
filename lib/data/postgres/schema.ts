@@ -479,6 +479,29 @@ export const moodLogs = pgTable('mood_logs', {
   deletedAt:    timestamp('deleted_at', { withTimezone: true }),
 }, t => [unique().on(t.userId, t.logDate)])
 
+/**
+ * A rest day the user CHOSE, as opposed to one inferred from a gap in `workout_sessions` (BF-84).
+ *
+ * The distinction is the whole point: a day with no logged workout is also a day you forgot, were
+ * ill, or logged late, and every derived number reads that gap as a *missed* session rather than a
+ * taken one. Only a stored row separates the two, and no display logic recovers a distinction that
+ * was never written down.
+ *
+ * Deliberately NOT a row in `day_checkins`: every column there is a self-report scale keyed by
+ * `(user_id, log_date, phase)`, and the calibration queries filter on those. A rest choice is not
+ * an answer to a check-in question, and putting it there would mean a row with every scale NULL
+ * under an invented phase.
+ */
+export const restDays = pgTable('rest_days', {
+  id:        uuid('id').primaryKey().defaultRandom(),
+  userId:    uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  date:      date('date', { mode: 'string' }).notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  /** Un-choosing rest tombstones rather than deleting; re-choosing resurrects the same row. */
+  deletedAt: timestamp('deleted_at', { withTimezone: true }),
+}, t => [unique().on(t.userId, t.date)])
+
 export const dayCheckins = pgTable('day_checkins', {
   id:                uuid('id').primaryKey().defaultRandom(),
   userId:            uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
