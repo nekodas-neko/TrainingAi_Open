@@ -73,13 +73,34 @@ silently misdirecting the next session. Update them in the same PR that consumes
 > - **`Gate: owner`** / **`Gate: device`** — waiting on an owner decision, or on the S25 smoke run.
 >   Only these two values; anything else fails the check. A dependency on another entry is `Needs:`,
 >   not a gate.
->   **⚠ `Gate: device` means SHIPPED and awaiting a device check — never "will need one when built".**
+>   **⚠ `Gate: device` means BLOCKED — the work cannot start until the device answers** (PS-8's
+>   Phase 0 needs the physical R09 in hand; PS-11 needs the ring worn overnight). Shipped work
+>   awaiting a check is `Verify: device`, below.
+>   **This reverses what this line said until 2026-09-01**, and the reversal is the point: `Gate:`
+>   used to mean "shipped, awaiting a check" — the one gate that did not gate — while entries that
+>   genuinely could not start carried it too. Now every `Gate:` blocks and no `Verify:` does, so the
+>   parking behaviour follows from the field name instead of from a rule nobody re-reads.
 >   A gate **parks** the entry, so putting it on unbuilt work hides that work from `next-item.js`,
 >   which is where an implementer starts. A device requirement on unbuilt work is a **Verification**
 >   line, not a gate. This is not hypothetical and it is not rare: it hid the whole
 >   `nutrition-ui-uplift` batch until BF-45 caught it (2026-08-30), and **LB-26 was filed with the
 >   same mistake later the same day, by a session that had read BF-45's warning** — which is why the
 >   rule now lives here, where entries are written, rather than only inside the entry that found it.
+>
+> - **`Verify: owner` / `Verify: device`** — **shipped, and awaiting a look.** Same two values as
+>   `Gate:`, and the difference from it is the point: a gate says *do not build this yet*; a
+>   `Verify:` says *this is done, see it on the phone when convenient.* `next-item.js` prints these
+>   under their own **VERIFY** heading and does **not** park them, because parking finished work
+>   hides it behind the same wall as unstartable work. Measured 2026-09-01 (BF-90): of 41 gates, 31
+>   were `device` — and **seventeen of those sat on entries that had already shipped**, so a third of
+>   the parked queue was work nobody was blocked on. All seventeen are converted.
+>   The same value in both fields fails the check: they contradict, and the gate would win silently.
+>   Different values are fine — an entry can be blocked on a decision and later owe a device look.
+>   Leave the bullet bare (`- **Verify:** device`) when the entry's `Keep:` already says what to
+>   check; `next-item.js` falls back to it rather than making you write the sentence twice.
+>   **⚠ A `Verify:` is not discharged by reasoning about it.** These are unseen on the canonical
+>   runtime, and the sandbox cannot run the local store at all — "probably fine" is the judgement
+>   that has shipped bugs here before. The field makes the debt countable; only the S25 clears it.
 >
 > - **`Keep: <what is owed>`** — the entry partly shipped and stays queued for the residue.
 >   `next-item.js` routes it to a **KEEP** section headed *"shipped; only the stated residue is owed.
@@ -460,37 +481,38 @@ const inScroller = (e.target as Element)?.closest?.(
   does **not** change tabs — on the device, since the web sandbox does not reproduce the WebView's
   touch behaviour.
 
-### [platform] BF-90 — `Gate: device` means two different things, and a third of them are on finished work
+### [platform] LA-49 — 34 entries carry a `⛔`; only 7 mean blocked, and the tool parks all 34
 
-- **Lane:** A — `scripts/check-backlog-pointers.js` and `scripts/next-item.js`, plus a field sweep
-  across `docs/implementation-backlog.md`.
-- **Added:** 2026-09-01 · owner: *"is there anything we can do to lower that? with our e2e and sentry
-  etc cant you do the testing thats needed?"*
+- **Lane:** A — `scripts/next-item.js`, plus a triage pass over `docs/implementation-backlog.md`.
+- **Added:** 2026-09-01 · found while shipping BF-90, which fixed the same disease in the `Gate:`
+  field and left this half standing.
 
-**Measured 2026-09-01: 41 gates — 31 `device`, 10 `owner`.** The owner's assumption was that his
-decisions are the bottleneck; they are 10 of 41. Device verification is the other 31.
+**Measured 2026-09-01, on the same queue BF-90 measured.** `next-item.js` treats **any** `⛔` in an
+entry body as an unmigrated blocked marker and parks the entry. 34 entries contain one. Only **7**
+use it to mean blocked — and one of those seven, BF-1's, is struck through and marked
+`✅ CLEARED`. The other 27 use it as an emphasis glyph: *"⛔ Do NOT impute the check-in on unlogged
+days"*, *"⛔ Do not touch the 0.3/0.5/1.0 ladder"*, *"⛔ TN-2 does not fix this"*. Every one of
+those is a warning to whoever builds the entry, which is the opposite of a reason not to build it.
 
-**Of those 31, eleven are on work that already shipped** — BF-72, BF-74, BF-73, BF-57, BF-75, BF-71,
-BF-65, BF-46, BF-52, BF-34, Q-406, every one of them phrased *"shipped/fixed; device check owed"*.
-They block nothing. But `Gate:` **parks** an entry, so `next-item.js` files them under PARKED beside
-genuinely blocked work, and the queue reads a third worse than it is.
+**This is strictly larger than the problem BF-90 fixed** — 27 false parks against 17 mis-filed
+gates — and it is the reason the parked count still overstates blocking after BF-90.
 
-- **The field carries two meanings that want opposite handling.** *"Do not build this until the
-  device answers"* (PS-11 cannot start without a worn ring; BF-53 needs a scale) is a real block.
-  *"This is done, look at it on the phone when convenient"* is verification debt — it should be
-  visible, countable and **not** parked, because parking it hides finished work behind the same
-  wall as unstartable work.
-- **Recommendation: add `Verify: device` and leave `Gate: device` to mean blocked.** `Verify:`
-  prints in its own section (the way `Reference:` already does) and does not park. Mechanical to
-  apply: the eleven above are identifiable by their own headings, which already say "shipped". The
-  checker enforces that a `Gate:`/`Verify:` value is one of the known words, same as today.
-- **Why this before any tooling.** It costs the owner nothing and it is the only change here that
-  makes the *count* honest. Automating a check is worth more when you know which checks are real.
-- **⚠ Do not discharge a `Verify:` by writing "probably fine".** The point is that these are unseen
-  on the canonical runtime, and the repo has shipped several bugs invisible in the web sandbox. The
-  field makes the debt legible; it does not clear it.
-- **Verification:** `next-item.js` PARKED shrinks by the eleven, they appear under a VERIFY heading,
-  and the blocked count matches the entries that genuinely cannot start.
+- **The obvious fix, and why it is not obviously safe.** The file's own protocol (near the top)
+  documents the marker as `⛔ blocked: <reason>`, so matching `⛔` followed by the word *block*
+  rather than the bare glyph is the file's own convention rather than a new heuristic. Measured, it
+  moves 27 entries out of PARKED: **16 to READY**, 1 to KEEP, 1 to VERIFY, 9 stay parked on a real
+  `Gate:`/`Needs:`.
+- **⚠ Those 16 are not all startable, and that is the whole problem.** The set includes `BF-14`,
+  whose heading opens *"❌ REFUTED 2026-08-24"*, and `Q-49`, marked 🔴. They are mis-filed today —
+  in the queue with no `Reference:`, no `Keep:`, nothing but a `⛔` holding them out of sight — and
+  narrowing the detector would put them at the top of the work list rather than fixing them.
+  **So the detector change must come second**, after the 16 are triaged; doing it first trades a
+  section nobody reads for a section an implementer starts from, which is the worse failure.
+- **Do it in this order:** (1) triage the 16 — a completed one leaves the queue, a refuted one gets
+  a `Reference:` or leaves, a real block gets a `Gate:`; (2) then narrow the detector and delete the
+  `legacyBlocked` migration path, since the 7 real ones will have proper fields by then.
+- **Verification:** `next-item.js`'s PARKED count matches the entries that genuinely cannot start,
+  and no entry in READY is one whose own heading says it is refuted, shipped or superseded.
 
 ### [platform] BF-93 — `error_events` does not prune, and every doc says it does
 
@@ -1548,7 +1570,7 @@ description will silently drop the field that turns out to matter. **The owner i
 ### [nutrition] BF-72 — the diary's hydration wiped its own meal grouping (fixed; device check owed)
 
 - **Lane:** B · **Batch:** `nutrition-ui-uplift`
-- **Gate:** device
+- **Verify:** device
 - **Keep:** the **device check**, and only that — and here it is not a formality. The whole defect
   lives in `getLocalStore`, which **returns null in the web sandbox**, so the repaired path cannot
   execute off-device at all. What is proven is the mapping (`app/nutrition/food-log-hydration.ts`,
@@ -1578,7 +1600,7 @@ passes. Changing the field would have looked like a fix and been none.
 ### [nutrition][app-shell] BF-74 — the meal photo's ✕ sat in the dismiss corner (fixed; device check owed)
 
 - **Lane:** B · **Batch:** `nutrition-ui-uplift`
-- **Gate:** device
+- **Verify:** device
 - **Keep:** the **device check**. On the S25: tapping the top-right of the meal photo must no longer
   discard it, the bin must read as removal, and the undo toast must be reachable before it dismisses
   — that last one is the part a desktop browser cannot judge, because the toast timeout against a
@@ -1599,7 +1621,7 @@ both regardless.
 ### [nutrition][app-shell] BF-76 — the nutrition safe-area sweep: enumerated, and the hypothesis was wrong
 
 - **Lane:** B · **Batch:** `nutrition-ui-uplift`
-- **Gate:** device
+- **Verify:** device
 - **Keep:** **the device pass itself, which is now the only way forward on this** — and the reason is
   the finding below. All twelve sheets are enumerated with their computed clearance; nothing in
   nutrition is under-padded; and no code changed, because every available change would have made
@@ -1634,7 +1656,7 @@ is a bad deal, and every candidate is within ~24 px of the reference anyway.
 ### [nutrition] BF-73 — bigger capture tiles, and `New` outranks `Delete meals` (shipped; device check owed)
 
 - **Lane:** B · **Batch:** `nutrition-ui-uplift`
-- **Gate:** device
+- **Verify:** device
 - **Keep:** the **device check**. Measured at 412 dp in a browser: tiles **60 px → 79 px**, `New`
   324×48 filling the row, the bin 48×48 beside it. What the phone decides is whether that reads as
   *prominent* rather than merely bigger, and whether the bin still feels reachable at 48 dp in the
@@ -1661,7 +1683,7 @@ deletes nothing on tap, which is what makes an icon-only entry point defensible 
 ### [nutrition][platform] BF-57 — a meal label anyone can scan (shipped; the two-phone print test needs the device)
 
 - **Lane:** B
-- **Gate:** device
+- **Verify:** device
 - **Shipped 2026-08-31**, branch `feat/shared-meal-labels-bf57`. The engine half landed 2026-08-30
   (`packages/shared/src/nutrition/label-payload.ts`); this is the surface that finally emits it.
   Journal: [`2026-08-31-shared-meal-labels.md`](overview/entries/2026-08-31-shared-meal-labels.md).
@@ -1687,7 +1709,7 @@ deletes nothing on tap, which is what makes an icon-only entry point defensible 
 ### [nutrition][app-shell] BF-75 — the nutrition sheets carry the tab's palette (shipped; the contrast check needs the device)
 
 - **Lane:** B
-- **Gate:** device
+- **Verify:** device
 - **Shipped 2026-08-31**, branch `feat/nutrition-sheet-surface-bf75`.
   Journal: [`2026-08-31-nutrition-sheet-surface.md`](overview/entries/2026-08-31-nutrition-sheet-surface.md).
   `SheetContent` gained an opt-in `surface="page"`; the five nutrition sheets named in the entry pass
@@ -2274,7 +2296,7 @@ to repeat that attribution, not to invent one.
 ### [body][nutrition] BF-71 — DEXA and RMR entry (shipped; device check owed)
 
 - **Lane:** B
-- **Gate:** device
+- **Verify:** device
 - **Keep:** the **device check**, and only that. The screen is built and both tables fill —
   `More → Health → DEXA & RMR results`, verified end-to-end against the local database with the real
   2026-08-27 values. What is unverified is how it behaves on the S25: the whole form hangs off
@@ -2907,7 +2929,7 @@ owner has to re-describe in a wizard what the app already knows.
 ### [workouts] BF-65 — the exercise clip on the ready screen (shipped; it must be seen *moving*)
 
 - **Lane:** B
-- **Gate:** device
+- **Verify:** device
 - **Added:** 2026-08-30 · owner: *"id like the exercise gif in the pre session screen so it shows you
   what movement you will be doing."*
 - **Shipped 2026-08-31** — `exercise-media-panel.tsx` renders the clip at 64 px beside the exercise
@@ -3116,7 +3138,7 @@ that handler defers, the way it already defers to a carousel.
 
 - **Lane:** B
 - **Batch:** `nutrition-ui-uplift` — ships with BF-45.
-- **Gate:** device
+- **Verify:** device
 - **Keep:** the **device check**, and only that. All four parts have shipped — ① (a) the single
   picker at the top (v1.402.0), ① (b) the CSP fix that was the save failure's real cause (v1.399.0),
   ② grams-only ingredient rows and ③ Option A (both v1.401.0). **The `Gate: device` above was
@@ -3436,7 +3458,7 @@ the match. `Gate: owner` when it is next picked up.
 ### [nutrition] BF-52 — one AI meal builder entry point (shipped; the label wrap needs the device)
 
 - **Lane:** B
-- **Gate:** device
+- **Verify:** device
 - **Shipped 2026-08-31**, branch `feat/meal-builder-entry-point-bf52`, following its own plan
   [`2026-08-31-ai-meal-builder-entry-point.md`](superpowers/plans/2026-08-31-ai-meal-builder-entry-point.md).
   Journal: [`2026-08-31-meal-builder-entry-point.md`](overview/entries/2026-08-31-meal-builder-entry-point.md).
@@ -3896,7 +3918,7 @@ them, and that is most of the argument for D. Kept because if B is ever revived 
 
 ### [body][devices][platform] BF-53 — every pending weigh-in button is dead: both routes validate a numeric id with a UUID regex
 
-- **Gate:** device
+- **Verify:** device
 - **Keep:** the DEVICE check, and only that. Fixed 2026-08-30 — both routes take `numericRouteId`
   now, and the client reports a failed press instead of swallowing it. Reproduced and re-verified on
   `pnpm dev` against the same real pending row (pre-fix: both buttons `400 Invalid id`, row
@@ -3969,7 +3991,7 @@ real".
 ### [app-shell][nutrition] BF-34 — the dialog that closed on the frame it opened (shipped v1.383.1)
 
 - **Lane:** B
-- **Gate:** device
+- **Verify:** device
 - **Shipped 2026-08-26.** The cause was the one the entry root-caused: `useSheetBackDismiss` marked
   an in-flight `history.back()` **per instance**, so a sheet closing and a dialog opening in the same
   tick could not see each other's flag and the dialog read the sheet's pop as a real back gesture.
@@ -4093,7 +4115,7 @@ P/C/F chips gone. Journal:
 
 - **Branch:** `fix/quantity-sheet-convergence` (merged 2026-08-25)
 - **Lane: B**
-- **Gate: device**
+- **Verify:** device
 - **Spec:** BF-28.
 
 **Shipped.** Both sheets render one `components/nutrition/quantity-editor.tsx`, so the diary sheet
@@ -4200,7 +4222,7 @@ That number is more valuable than either input on its own.
 ### [nutrition][app-shell] Q-406 — the shared food row: all four call sites converted (shipped v1.383.5)
 
 - **Lane:** B
-- **Gate:** device
+- **Verify:** device
 - **Shipped 2026-08-26.** All four call sites now draw `components/nutrition/food-row.tsx`. The last
   one — the external food-database result in `ingredient-search.tsx` — was blocked because the
   decided warning design (option A) moved its sentence to *the food's detail*, and **this surface has
@@ -4875,7 +4897,7 @@ two are app-wide and sit here.*
 
 - **Branch:** `fix/sheet-back-dismiss-sweep` (merged 2026-08-25, v1.372.0)
 - **Lane: B**
-- **Gate: device**
+- **Verify:** device
 - Shipped **not** as the 40-site sweep the entry scoped, but as one component: `SheetContent` and
   `DialogContent` render `components/ui/back-dismiss.tsx`, so the hook covers 45 sheets and 6
   dialogs and every future one, and the five call sites that had it lost it. Rationale, and why the
@@ -5278,7 +5300,7 @@ the day's move-hours total is below the goal.
 
 ### [heart-rate] TN-13 — the HR tile shows a 7-day average of the one signal that best predicts how the owner feels
 
-- **Gate:** device
+- **Verify:** device
 > **✅ SHIPPED 2026-08-30, both halves together — which the entry required.** The tile reads **last
 > night's** resting HR and renders a **delta against the owner's own baseline** ("50 · −7 vs usual")
 > rather than a bare bpm. `restingHrLastNight` + `restingHrLastNightDate` are new on
@@ -5290,7 +5312,7 @@ the day's move-hours total is below the goal.
   tile's type size — **the cue text grew** from one word ("Low") to five ("−7 vs usual"), and the row
   has 20 layout styles. Reaches the phone through a Railway deploy; no new APK.
 
-> **⛔ "Should the tile show HRV instead?" — ASKED AND ANSWERED 2026-08-31. No. Do not re-open.**
+> **✅ "Should the tile show HRV instead?" — ASKED AND ANSWERED 2026-08-31. No. Do not re-open.**
 > ([review](reviews/2026-08-31-hrv-as-a-tile-metric.md).) Measured in contributor form, which is the
 > only fair comparison, against the owner's check-in (`perceived_recovery + sleep_quality_feel`;
 > negative r is correct, `provisional` rows excluded):
@@ -13243,7 +13265,7 @@ per-field merge where an AI write has no honest source rank to claim.
 ### [app-shell] Q-93-followup — the timeline's workout and walk taps have not been pressed on the phone
 
 - **Branch:** `feat/timeline-workout-day-detail` (merged 2026-08-25, v1.371.0) · **Lane: B**
-- **Gate: device**
+- **Verify:** device
 - Built and guarded: `workout` and `walk` cards navigate to `/health/day?date=`, proved by the
   mutation-checked `e2e/timeline-card-navigation.spec.ts`; `bedtime`/`tag` stay inert on purpose
   ([`journal`](overview/entries/2026-08-25-timeline-workout-day-detail.md)).

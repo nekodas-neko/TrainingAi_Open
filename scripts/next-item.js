@@ -26,6 +26,8 @@ const path = require('path');
 const { laneFromLines } = require('./lib/lane');
 const { keepFromLines } = require('./lib/keep');
 const { referenceFromLines } = require('./lib/reference');
+const { verifyFromLines } = require('./lib/verify');
+const { bucketFor } = require('./lib/queue-buckets');
 const { idPattern } = require('./lib/entry-id');
 
 const ROOT = path.resolve(__dirname, '..');
@@ -101,6 +103,7 @@ for (const e of entries) {
   e.lane = laneFromLines(e.laneLines);
   e.keep = keepFromLines(e.laneLines);
   e.reference = referenceFromLines(e.laneLines);
+  e.verify = verifyFromLines(e.laneLines);
 }
 
 const inQueue = new Set(entries.map((e) => e.id));
@@ -120,6 +123,7 @@ const keeps = [];
 const parked = [];
 const unclassified = [];
 const references = [];
+const verifies = [];
 
 for (const e of entries) {
   if (!wantLane(e)) continue;
@@ -134,17 +138,33 @@ for (const e of entries) {
   }
 
   // A Keep's own `Gate:` blocks as hard as a top-level one — the residue IS the gate there.
-  if (e.keep?.gate && !e.gates.includes(e.keep.gate)) reasons.push(`Gate: ${e.keep.gate}`);
+  //
+  // **Unless the entry also carries a `Verify:` for the same thing.** BF-90: eleven shipped
+  // entries wrote the device check in BOTH places, and converting only the top-level field would
+  // have left every one of them parked by its own Keep, which is the bug the field exists to end.
+  if (e.keep?.gate && !e.gates.includes(e.keep.gate) && e.verify?.value !== e.keep.gate) {
+    reasons.push(`Gate: ${e.keep.gate}`);
+  }
 
   // Order matters, and this is the one judgement in the file. A `Gate:`, an unmet `Needs:` or a
   // `Keep:` all say something is OWED; `Reference:` only says there is nothing to BUILD. So a
   // reference entry that also owes a device walk stays visible as the thing it owes — BF-11 is
   // exactly that, a map whose eight phases shipped and whose S25 walk did not. Reference is checked
   // last so it can never hide an obligation.
-  if (reasons.length) parked.push({ e, reasons });
-  else if (e.lane === '?') unclassified.push(e);
-  else if (e.keep) keeps.push(e);
-  else if (e.reference) references.push(e);
+  //
+  // `Verify:` sits above `Keep:` because it is the more specific claim about the SAME debt. All
+  // eleven entries BF-90 measured carry both — a `Verify: device` and a `Keep:` whose residue is
+  // that device check — and `Keep:` says only "residue is owed" where `Verify:` names what kind.
+  // It sits BELOW the park test, so a `Verify:` can never hide a real block.
+  // The order is the judgement, and it lives in `lib/queue-buckets.js` so it can be tested against
+  // cases the real queue does not contain — which is how the ordering below was found to be
+  // untested at all. See that file for why each step sits where it does.
+  const bucket = bucketFor(e, reasons);
+  if (bucket === 'parked') parked.push({ e, reasons });
+  else if (bucket === 'unclassified') unclassified.push(e);
+  else if (bucket === 'verify') verifies.push(e);
+  else if (bucket === 'keep') keeps.push(e);
+  else if (bucket === 'reference') references.push(e);
   else ready.push(e);
 }
 
@@ -197,6 +217,24 @@ if (ready.length > shown) console.log(`      … and ${ready.length - shown} mor
 if (keeps.length) {
   console.log(`\nKEEP (${keeps.length}) — shipped; only the stated residue is owed. Not new work.`);
   keeps.forEach((e) => console.log(`      ${fmt(e)}\n        Keep: ${e.keep.text.slice(0, 110)}`));
+}
+
+// Shipped work awaiting a look — deliberately NOT parked, and deliberately not silent.
+//
+// Printed BEFORE Keep and Reference because this is the number the owner asked for: of 41 gates,
+// only 10 were his decisions, and eleven of the 31 device gates were on finished work. Parking them
+// made the queue read a third worse than it was; hiding them entirely would make it read better
+// than it is. Neither is honest, so they get a heading and a count.
+if (verifies.length) {
+  const byValue = verifies.reduce((acc, e) => ((acc[e.verify.value] = (acc[e.verify.value] ?? 0) + 1), acc), {});
+  const split = Object.entries(byValue).map(([k, n]) => `${n} ${k}`).join(' · ');
+  console.log(`
+VERIFY (${verifies.length}) — shipped; a look is owed, nothing is blocked. ${split}.`);
+  verifies.forEach((e) => {
+    const note = e.verify.note || e.keep?.text || 'no note — say what to look at';
+    console.log(`      ${fmt(e)}
+        Verify ${e.verify.value}: ${note.slice(0, 110)}`);
+  });
 }
 
 if (references.length) {
