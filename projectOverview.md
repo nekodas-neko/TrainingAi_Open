@@ -24,8 +24,18 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.416.3 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Version:** v1.416.4 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-09-01.
+
+**An account with a password could not change it (LB-40).** `EditProfileSheet` initialised
+`hasPassword` to `false` and **nothing fetched it**, so the *Current password* field never rendered,
+the PATCH went up without it, and the route answered *"Current password is required."* — an error
+naming a field that was not on screen. The flow was non-functional for every account with a
+password and worked only for one with none. The flag is fetched now, through the key the More tab
+already warms; **unknown shows the field**, because `cachedFetch` swallows a failed request and
+landing back on `false` would reproduce the bug silently. All four route paths exercised live.
+Found by reading during BF-79, not by looking for it. **Not device-verified**
+([journal](docs/overview/entries/2026-09-01-current-password-field.md)).
 
 **The calorie bar says why zero is zero (BF-87).** Owner: *"is basic steps being counted towards
 calorie burn? It says I've done 1000 but not sure if that's counting towards nutrition."* The app was

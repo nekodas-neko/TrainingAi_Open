@@ -5588,3 +5588,13 @@ against it.**
 The length is mostly ordering and negative space — what not to do (no wildcard `connect-src`, no
 session-start pointer at an empty dashboard) and what genuinely cannot be checked from here
 (`SENTRY_DSN` is server-side and invisible from outside the deploy).
+
+## 2026-09-01 — `projectOverview.md` → 8666, `docs/implementation-backlog.md` → 15133 (LB-40)
+
+One shipped fix recorded; the backlog **shrank**, since LB-40's entry was removed and nothing new
+was filed. The status block is 10 lines because the interesting half is not the bug but the
+direction the fix fails in: `cachedFetch` swallows a failed request, so an unknown flag has to show
+the field rather than hide it, or a cold cache plus a dead network silently reproduces the defect.
+That reasoning is what a future session needs and what a one-line "fixed the password field" would
+lose.
+

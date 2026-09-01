@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.416.4",
+    date: "2026-09-01",
+    changes: [
+      "You can change your password again. The Current password box was never being shown, so the save was rejected for a field that was not on screen \u2014 which meant an account with a password could not change it at all.",
+    ],
+  },
+  {
     version: "1.416.3",
     date: "2026-09-01",
     changes: [
