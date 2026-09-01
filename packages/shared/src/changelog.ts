@@ -6,6 +6,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.417.0",
+    date: "2026-09-01",
+    changes: [
+      "A setting you change now sticks, even if the app reloads before it reaches the server. It used to be overwritten by the server\u0027s older copy \u2014 and offline that happened on every launch, so the change never survived at all. Your other devices still pick it up as soon as there is a connection.",
+      "The Kg / Lbs switch in Edit Profile is gone. It was never connected to anything: nothing in the app showed pounds, and the choice reset every time the sheet was reopened. Removed rather than left offering something it could not do.",
+    ],
+  },
+  {
     version: "1.416.4",
     date: "2026-09-01",
     changes: [

@@ -5606,7 +5606,6 @@ the field rather than hide it, or a cold cache plus a dead network silently repr
 That reasoning is what a future session needs and what a one-line "fixed the password field" would
 lose.
 
-
 ## 2026-09-01 — `docs/implementation-backlog.md` 15133 → 15210 (BF-93, and BF-92 gets a better fix)
 
 Chasing the owner's Sentry question turned up a second thing. **`error_events` does not prune.**
@@ -5646,3 +5645,12 @@ argument for renaming rather than editing in place, and it is stronger after LB-
 
 `Needs: LB-43` is dropped rather than left dangling; the protocol treats an absent target as shipped,
 but saying so beats making the next reader infer it.
+
+## 2026-09-01 — `projectOverview.md` → 8690, `docs/implementation-backlog.md` → 15167 (LB-41, LB-29)
+
+Two shipped fixes recorded; **the backlog shrank**, since both entries were removed and nothing new
+was filed. The status block is 11 lines for two entries because the interesting half of LB-29 is not
+the bug but the promise the owner picked between: *the change follows to other devices* versus
+*a local setting is never clobbered*. Those differ in what the app does, not in how it is written,
+and a one-line "fixed preference sync" would lose the distinction the next session needs.
+
