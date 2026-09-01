@@ -4340,6 +4340,28 @@ place to start rendering pictures.
 
 ### [nutrition][platform] LA-47 — the meal-plan coach's engine half: a plan widget and a named nutrition scope
 
+- **⚑ PIECE 2 SHIPPED 2026-08-31; PIECE 1 IS NOT SEPARABLE BY LANE AND THIS ENTRY WAS WRONG ABOUT
+  THAT.** The scope record is in (`lib/coach/scopes.ts`, wired through `/api/coach`), enforced by
+  withholding exactly as the entry asks: the nutrition scope never receives the training read
+  tools, and `renderChoiceList`'s `source` enum and `proposeChange`'s `domain` enum are rebuilt
+  narrowed per request, so an out-of-scope call is a schema error the SDK retries the model on
+  rather than a request anything downstream has to refuse. Three mutation tests pin that.
+- **⚠ The plan widget cannot ship without its renderer — the split this entry proposes does not
+  compile.** *"Add a member to the union and a row in `WIDGET_TOOL_NAMES`; the registry row and the
+  component are Lane B's half"* was tried and reverted: `components/coach/widget-registry.tsx`
+  narrows by early return and falls through to `change_preview`, so a new union member is a
+  **type error** until a branch handles it. And a branch that renders `null` is worse than none —
+  `widgets.ts` says so itself: a client-side tool call with no result **wedges the whole thread**,
+  because the provider refuses a request containing an unanswered tool call. So piece 1 is one
+  change across two lanes, not two changes.
+  **The design is settled, so whoever takes it does not re-derive it:** the widget carries
+  `{ kind, title, planId? }` and **no meals** — the client renders from the plan it already holds,
+  for the same reason `CHOICE_SOURCES` exists (a nine-row picker the model typed out cost ~554
+  output tokens, and output tokens are essentially all of Coach's latency). The two actions resolve
+  as ordinary `chose` results with fixed ids `save_all` and `redo`, needing **no** new
+  `WidgetResultSchema` member — a card with two buttons is a choice list with a rich body.
+  Save-all calls `savePlanMealsToLibrary` (`@trainingai/shared/nutrition/save-plan-meal`), already
+  shipped and idempotent on `meal_plan_meals.saved_meal_id`.
 - **Lane:** A — `lib/coach/widgets.ts`, `lib/coach/` (the scope record), `app/api/coach/route.ts`
   (the SYSTEM prompt's widget rules, lines 27–59), `app/api/coach/options/route.ts`.
 - **Added:** 2026-08-31 · split out of **Q-407** rather than newly discovered. Q-407's own Lane

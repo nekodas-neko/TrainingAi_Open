@@ -2,6 +2,8 @@ import { tool } from 'ai'
 import { z } from 'zod'
 import type { WorkoutRepository } from '@/lib/data/repository'
 import { ChoiceListSchema, ChangePreviewSchema, HandoffSchema, NumberDialSchema, ChartSchema } from './widgets'
+import { CoachPatchSchema } from './patch'
+import { COACH_SCOPES, pickTools, type CoachScope } from './scopes'
 import { injurySafeAlternatives } from '@trainingai/shared/workout/injury-substitution'
 
 /**
@@ -16,8 +18,36 @@ import { injurySafeAlternatives } from '@trainingai/shared/workout/injury-substi
  * the result back to the model and the turn would continue without ever pausing for the user,
  * which is the opposite of a widget.
  */
-export function buildWidgetTools(repo: WorkoutRepository, userId: string) {
+/**
+ * The scope's narrowed schemas (LA-47).
+ *
+ * Rebuilt per request rather than defined once, because that is what makes a scope a boundary
+ * instead of a suggestion: the SDK validates the model's arguments against whatever schema it was
+ * given and retries on a mismatch, so a nutrition-scoped Coach naming `source: "sessions"` fails
+ * validation — it is not a request anything downstream has to refuse. On the general scope the
+ * narrowed enums equal the full ones, so nothing changes.
+ */
+function scopedSchemas(scope: CoachScope) {
+  const choiceList = ChoiceListSchema.extend({
+    source: z.enum(scope.choiceSources as [string, ...string[]]).optional(),
+  })
+  const patch = CoachPatchSchema.extend({
+    domain: z.enum(scope.patchDomains as [string, ...string[]]),
+  })
   return {
+    choiceList,
+    changePreview: ChangePreviewSchema.extend({ patch }),
+    numberDial: NumberDialSchema.extend({ patch }),
+  }
+}
+
+export function buildWidgetTools(
+  repo: WorkoutRepository,
+  userId: string,
+  scope: CoachScope = COACH_SCOPES.general,
+) {
+  const scoped = scopedSchemas(scope)
+  const all = {
     /**
      * Why this exists: without it the model has no source of real ids and **invents them**.
      * Measured on the first end-to-end run of this route — asked "I want to change my workout",
@@ -175,7 +205,7 @@ export function buildWidgetTools(repo: WorkoutRepository, userId: string) {
         '',
         'Do not use this at all when the user has already been specific enough to act on.',
       ].join(' '),
-      inputSchema: ChoiceListSchema,
+      inputSchema: scoped.choiceList,
     }),
 
     renderChart: tool({
@@ -205,7 +235,7 @@ export function buildWidgetTools(repo: WorkoutRepository, userId: string) {
     askForNumber: tool({
       description:
         'Let the user set a single number on a dial instead of typing it. Use when they asked for a change without saying how much — "bump my calories a bit" has no number in it. If they DID give a number, skip this and use proposeChange. One change only, and `from` must be the current value from getGoalsAndInjuries.',
-      inputSchema: NumberDialSchema,
+      inputSchema: scoped.numberDial,
     }),
 
     proposeChange: tool({
@@ -254,7 +284,12 @@ export function buildWidgetTools(repo: WorkoutRepository, userId: string) {
         '',
         'Do not describe what the change will cost; the app measures that itself and shows it.',
       ].join(' '),
-      inputSchema: ChangePreviewSchema,
+      inputSchema: scoped.changePreview,
     }),
   }
+
+  // `getProgramStructure` and `findSwapCandidates` are read tools that live here rather than in
+  // `lib/ai-chat/tools.ts`, so they are filtered by the same list — a scope that withholds the
+  // widgets that need an exercise id has no use for the tool that supplies one.
+  return pickTools(all, [...scope.widgetTools, ...(scope.readTools ?? Object.keys(all))])
 }
