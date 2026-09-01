@@ -430,51 +430,75 @@ numbers multiply, they do not substitute.
   meal afterwards leaves the logged rows unchanged; and 1× is byte-identical to today's behaviour.
 
 
-### [nutrition] BF-103 — half of "Meals" is single foods, and the label the owner wants was removed twice
+### [nutrition] BF-103 — one label, `My Foods`, on every surface (owner decision, 2026-09-01)
 
-- **Lane:** B — `components/nutrition/saved-meals-sheet.tsx:69-73` (the tab strip) and
-  `components/nutrition/nutrition-action-row.tsx:62` (the page button).
+- **Lane:** B — `components/nutrition/saved-meals-sheet.tsx` (the tab strip) plus **seven other
+  user-visible strings** reading `My Meals`, enumerated below.
 - **Added:** 2026-09-01 · owner: *"can we change Meals to → My foods, so we can have meals + singular
-  items saved."*
+  items saved."* · **decided** same day: *"no I'm happy to rename Saved to → My Foods. the issue was
+  having saved + MyFoods. we only need one. lets go with MyFoods."*
+
+**The decision, and what it settles.** This entry originally recommended `Saved` for the tab with the
+page button left as `My Meals`. The owner read that as introducing a *second* name and rejected it on
+exactly the right grounds — the historical failure was never the wording, it was **two labels for one
+list**. So: **`My Foods` everywhere, `My Meals` and `Saved` nowhere.** One name, one list, no pair to
+tell apart. Do not re-open the naming; implement it.
 
 **He is right about the contents, and the measurement is stark.** Of his 10 saved meals, **5 contain
 exactly one item** — Edamame Block, Rice Block, Protein Pasta Brick and two others. Half the list
 called "Meals" is single foods, saved as one-item meals because that is the only shelf available. The
-label already mis-describes what is in it.
+label already mis-describes what is in it, which is what makes this a correction rather than a
+preference.
 
-**⚠ But the requested label is the one two entries removed on purpose, and an implementer must read
-this before touching it.** The reasoning is in the files:
+**⚠ Why BF-37 and BF-60 do not block this, stated so nobody re-reverts it.** Both entries removed
+`My Foods` — but both were solving *"two labels that differ only in their last word"*:
 
 - `nutrition-action-row.tsx:59` — *"`My Meals`, not `My Foods` (**BF-37**)."*
-- `saved-meals-sheet.tsx:58-61` — *"The tab labels drop the possessive deliberately. `My Foods`
-  against `My Meals` is the pair **the owner could not tell apart**, and two labels that differ only
-  in their last word are hard to tell apart wherever they appear. (`My Meals` survives on the page's
-  own button, where it names one list rather than one of two lookalikes.)"* (**BF-60**)
+- `saved-meals-sheet.tsx:58-61` — *"`My Foods` against `My Meals` is the pair **the owner could not
+  tell apart** … (`My Meals` survives on the page's own button, where it names one list rather than
+  one of two lookalikes.)"* (**BF-60**)
 
-So renaming the tab to `My Foods` while the page button still reads `My Meals` **re-creates exactly
-the pair that was removed** — and lands it in the one place the earlier fix deliberately left alone.
+A single name cannot be confused with itself. Their reasoning is satisfied by unifying, not by
+keeping `My Meals`. **Update those two comments in the same PR** — left as they are, they read as a
+standing prohibition and the next session reverts this on their authority.
 
-- **What has actually changed since those decisions is the CONTENTS, not the wording.** BF-37 and
-  BF-60 were about telling two labels apart. This is about a label being untrue. That is a new
-  argument and it does justify revisiting — it just cannot be settled by taking the old losing label.
-- **Recommendation: rename the tab to `Saved`, and leave the page button alone.** The strip becomes
-  **Recent · Saved · Search**, which names three *sources* rather than three content types — where a
-  thing came from (used lately / you kept it / the database), which is the distinction the user is
-  actually making at that moment. It is true of a one-item entry and a five-item meal equally, and it
-  collides with nothing, so BF-37's button survives untouched.
-- **The alternative, if the owner prefers his own wording:** rename **both** to `My Foods` in the same
-  change. That is coherent, and the cost is that the button and the tab then share a name — which is
-  fine when they open the same list, and is strictly better than the split the request would create.
-  What must not happen is one without the other.
-- **⚠ A label change is not the whole ask.** *"so we can have meals + singular items saved"* implies a
-  way to save a single food **as** a single food, rather than wrapping it in a one-item meal. Today
-  the wrap is the workaround, and `diary-groups.ts` already accommodates it — *"a group of one is a
-  single food wearing a meal's name… it renders as the plain row it already is."* Whether to add a
-  first-class saved-food shelf is a separate, larger decision; **this entry is the label only**, and
-  says so to stop it silently growing into the other thing.
-- **Verification:** the strip reads Recent · Saved · Search; the page button is unchanged; a one-item
-  entry and a multi-item meal sit in the same list without either looking mislabelled; and no string
-  in the app pairs `My Foods` with `My Meals`.
+**⚠ The other half of the history, and the trap in it — read before touching the sheet.** `My Foods`
+was once the name of a **merged** list: v1.382.0 — *"My Meals and your food library are one list now,
+called My Foods"* — and v1.385.0 split it back three versions later, *"Merging them put a recipe you
+built and a single ingredient in the same list, which made 'log this' mean two different things
+depending on the row."* **That revert was about the merge, not the name.** This entry renames the tab
+and changes nothing about what is in it: `Recent` and `Search` stay, the saved list keeps holding what
+it holds. An implementer who reads "My Foods" and re-merges the tabs reintroduces a defect the app
+already paid for.
+
+**Every user-visible site (sibling-surface sweep — the rename is not two files):**
+
+| File | Line | Current | Notes |
+|---|---|---|---|
+| `saved-meals-sheet.tsx` | `LIST_TABS` | `Meals` | the tab; strip becomes Recent · My Foods · Search |
+| `nutrition-action-row.tsx` | 62 | `My Meals` | the page button |
+| `use-plan-meal-saving.ts` | 59–60 | `saved to My Meals` | toast, both singular and plural arms |
+| `my-meals-picker.tsx` | 180, 202 | `in My Meals` / `Nothing in My Meals yet` | hint + empty state |
+| `meal-plan-edit-sheet.tsx` | 326 | `My Meals` | button |
+| `meal-plan-section.tsx` | 235 | `Save all N to My Meals` | button |
+| `plan-meal-row.tsx` | 120, 126, 131 | `In My Meals`, `Save to My Meals`, aria-label | badge + action + a11y |
+
+`plan-meal-row.tsx:126` is an **`aria-label`** — a rename that skips it leaves the screen reader
+saying a name the screen no longer uses. The file *names* (`my-meals-picker.tsx`) are not user-visible
+and are not worth the churn; leave them.
+
+- **⚠ A label change is not the whole ask, and this entry is the label only.** *"so we can have meals
+  + singular items saved"* implies saving a single food **as** a single food rather than wrapping it
+  in a one-item meal. Today the wrap is the workaround, and `diary-groups.ts` already accommodates it
+  — *"a group of one is a single food wearing a meal's name… it renders as the plain row it already
+  is."* A first-class saved-food shelf is a separate, larger decision; the rename makes the current
+  behaviour **honest** rather than fixing it, and says so here to stop it silently growing.
+- **Ships a changelog entry** — user-visible, patch. Say plainly that only the name changed and the
+  lists are unchanged, so the note is not read as the v1.382.0 merge returning.
+- **Verification:** `grep -rn "My Meals" app components` returns comments and changelog history only,
+  no live string; the strip reads Recent · My Foods · Search; the page button and the tab it lands on
+  share one name; the plan surfaces' toast, badge, buttons and aria-label all say `My Foods`; a
+  one-item entry and a multi-item meal sit in the same list without either looking mislabelled.
 
 
 ### [nutrition][body] BF-101 — a "Recommended" button per goal field; the numbers already exist and need no AI
