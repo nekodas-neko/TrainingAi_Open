@@ -24,8 +24,20 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.418.1 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Version:** v1.418.2 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-09-01.
+
+**A meal section holding one combined meal printed its macros twice (BF-98).** Owner: *"the combined
+item UI doesnt look great with the double macros at the bottom."* The totals footer was gated on
+`logs.length > 1` — the flat list — so a group of three ingredients passed it and the section drew
+the group's own macros and then the identical footer, calories included. It counts **rendered
+entries** now, which is the rule the collapsed branch twelve lines above already followed.
+**⚠ The duplication could not be reproduced in e2e** — `diary-nested-meal.spec.ts` seeds this exact
+case and the footer does not render there on either condition, so a test written against it passed
+with the fix reverted and was deleted rather than kept as a guard that cannot fail. The change is
+right by reading and is held by a mutation-checked source guard; **what differs between the owner's
+diary and that fixture is an open question recorded on the entry.** **Not device-verified**
+([journal](docs/overview/entries/2026-09-01-double-macros-footer.md)).
 
 **The app notices the day changed on resume, without restarting (BF-86).** Owner: *"when I open the
 app in the morning and it just resumes, it doesn't give me the morning check-in."* The cause was

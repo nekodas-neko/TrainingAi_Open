@@ -141,8 +141,13 @@ export const MealCard = memo(function MealCard({ mealType, logs, onAdd, onQuickE
                 ))}
               </AnimatePresence>
 
-              {/* Totals footer — only shown when there are 2+ items */}
-              {logs.length > 1 && <MealTotals totals={totals} bordered />}
+              {/* Totals footer — only when there are 2+ RENDERED entries, not 2+ logs (BF-98).
+                  `logs` is the flat list, so a section holding one grouped meal of three
+                  ingredients passed `logs.length > 1` and drew the group's own macros and then the
+                  identical footer beneath them. The rule is already stated twelve lines above and
+                  applied to the collapsed branch: a single row states its own macros, so a footer
+                  repeats it — and a group IS a single row. */}
+              {entries.length > 1 && <MealTotals totals={totals} bordered />}
             </>
           )}
         </div>
