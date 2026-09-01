@@ -40,7 +40,9 @@ export function TabSwipeNavigator() {
       // ancestor — an edge-adjacent horizontal scroller (e.g. Home's metric tiles)
       // must not also trigger a tab swipe on the same gesture.
       const inScroller = (e.target as Element)?.closest?.(
-        "[data-swipe-carousel], .overflow-x-auto, [data-hscroll]"
+        // `[data-swipe-actions]` was declared by `swipe-actions.tsx` and never read here (BF-95):
+        // a swipe-to-delete begun inside the 24 px edge strip ran both gestures from one touch.
+        "[data-swipe-carousel], [data-swipe-actions], .overflow-x-auto, [data-hscroll]"
       );
       if (inScroller) return;
       if (t.clientX <= EDGE_PX) fromEdge = "left";

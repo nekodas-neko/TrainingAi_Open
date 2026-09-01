@@ -491,51 +491,6 @@ computes that as `entries` (`:35`, from `groupDiaryEntries`). One group is one r
   that differ from the group's.
 
 
-### [app-shell] BF-96 — the weather chip wraps because it is the only thing in the header allowed to
-
-- **Lane:** B — `components/weather-chip.tsx:38` (one class pair).
-- **Added:** 2026-09-01 · owner, with a Home screenshot: *"I dont like how the temperature/uV pill
-  sits. can we go back to the old way when it was side by side. you can make it smaller if needed."*
-
-**Nothing changed the layout — the chip is still side by side, and it is WRAPPING.** Its root is
-already `flex items-center gap-1` rendering `21°` `·` `UV 5` inline. What the screenshot shows is
-`UV 5` breaking at its own space, so `5` drops under `UV` and the pill becomes two lines tall.
-
-**The cause is an asymmetry with its sibling**, in `session-select-content.tsx:1071-1076`:
-
-```tsx
-<div className="flex items-center gap-2">
-  <p className="text-xs … whitespace-nowrap shrink-0">   {/* the date: will not wrap, will not shrink */}
-    {formatInTimeZone(new Date(), tz, "EEEE d MMMM")}
-  </p>
-  <WeatherChip />                                         {/* neither class — so it absorbs everything */}
-</div>
-```
-
-The date refuses to give up space, so the chip is the **only** compressible item in the row and takes
-100% of any shortfall.
-
-**Why it looked fine before, measured rather than assumed.** `EEEE d MMMM` ranges from **12 to 20
-characters** across the year. Today is *"Tuesday 1 September"* — **19**, near the maximum. On a
-*"Friday 1 May"* day there are eight characters of slack and nothing wraps. **The old way the owner
-remembers is the same code on a shorter date**, which is also why this will keep coming back on its
-own schedule if only the symptom is nudged.
-
-- **Fix: give the chip the two classes its sibling already has** — `whitespace-nowrap shrink-0` on the
-  root `div`. That is the whole change, and it is the sibling-surface rule: the row already decided
-  how items behave under pressure and one of the two was never told.
-- **On *"you can make it smaller if needed"* — it is not needed, and size is the wrong lever.** The
-  chip is 19 px of text; wrapping is a `white-space` bug, not a width shortage. If the longest dates
-  still overflow after the fix, shorten the **date** (`EEE d MMMM` → *"Tue 1 September"*, −4 chars)
-  rather than the chip: the date is partly recoverable from the phone's own UI, the temperature and
-  UV are not.
-- **⚠ Do not add hex literals.** `uvColor()` already carries five (`#8b5cf6` … `#22c55e`) and
-  `check-hex-literals.js` is shrink-only per file — a fix that adds one must raise that file's number
-  in the same PR.
-- **Verification:** on the S25, the pill is one line on **every** date — check a long one
-  (*Wednesday 30 September*, 20 chars) rather than today's, since today's is not the worst case.
-
-
 ### [workouts][app-shell] BF-94 — swipe the Start button to reveal Rest, instead of a permanent two-button row
 
 - **Lane:** B — `app/session-select/components/recommendation-card.tsx:252-296` and
@@ -596,38 +551,6 @@ one. A swipe on the single Start button adds an affordance that does not current
   change tabs or scroll the page; the first tap on the revealed Rest lands (BF-61); a vertical drag
   still scrolls; the card still reaches Rest in one tap on a deload day; and the choice survives a
   tab switch and an app restart (which is BF-84's half).
-
-### [app-shell] BF-95 — the swipe primitive marks itself `data-swipe-actions` and the tab navigator ignores it
-
-- **Lane:** B — `components/shell/tab-swipe-navigator.tsx:42-43`.
-- **Added:** 2026-09-01 · found while tracing BF-94.
-
-**A declared contract that nothing honours.** `components/ui/swipe-actions.tsx:92` sets
-`data-swipe-actions` on every row, with a comment stating exactly what it is for — *"marks the row as
-owning horizontal gestures that start on it, the way `data-swipe-carousel` already marks a
-carousel"*. The navigator's exclusion list is:
-
-```ts
-const inScroller = (e.target as Element)?.closest?.(
-  "[data-swipe-carousel], .overflow-x-auto, [data-hscroll]"
-);
-```
-
-**`data-swipe-actions` is not in it.** The marker is set and never read.
-
-- **Why it has not bitten yet, and why that is not a reason to leave it.** The navigator only arms a
-  tab swipe when the touch starts within **24 px of a screen edge** (`EDGE_PX`), so it takes a
-  swipe-to-delete begun in that strip to run both gestures from one touch. Meal rows are full-width,
-  so the strip is reachable — this is latent, not impossible, and it is the failure the marker was
-  added to prevent.
-- **The fix is one string.** Add `[data-swipe-actions]` to the selector. It costs nothing and makes
-  the primitive's own comment true.
-- **⚠ Do not instead delete the marker as unused.** It is the correct mechanism and the navigator is
-  the side that is wrong; removing it would make the next swipe surface (BF-94) re-derive the whole
-  problem.
-- **Verification:** a swipe-to-delete started at the far left edge of a meal row opens the tray and
-  does **not** change tabs — on the device, since the web sandbox does not reproduce the WebView's
-  touch behaviour.
 
 ### [platform] LA-49 — 34 entries carry a `⛔`; only 7 mean blocked, and the tool parks all 34
 
@@ -993,6 +916,36 @@ has already recorded that a bulk job bumps `updated_at` without rewriting a valu
   Home one are the same write, not two.
 - **Added:** 2026-09-01 · owner, on Home's Recommended Today card: *"for the training card, I'd like
   a small button for each session to choose 'rest'."*
+
+### [app-shell] BF-96 — the temperature/UV pill wrapped (fixed; the device check is the whole of what is left)
+
+- **Lane:** B
+- **Verify:** device — on the S25, the pill is one line on a **long** date. Today's is not the worst
+  case: `EEEE d MMMM` runs 12–22 characters (measured 2026-09-01, correcting this entry's original
+  "12 to 20"), so check *Wednesday 30 September* rather than whatever today gives.
+- **Keep — nothing to build.** The chip was never moved; it was wrapping, because the header row's
+  other item (the date) carries `whitespace-nowrap shrink-0` and the chip carried neither, so it
+  absorbed every shortfall. It has both now.
+- **Keep — the sandbox cannot show this.** There is no weather snapshot in the seeded DB, so
+  `WeatherChip` renders only its skeleton and the wrap can be neither reproduced nor disproved off
+  the device. The classes are held by a mutation-checked source guard meanwhile.
+- **Keep — if a long date still overflows on device, shorten the DATE, not the chip.** `EEE d MMMM`
+  saves four characters; the date is partly recoverable from the phone's own UI, the temperature and
+  UV are not. Making the chip smaller is the wrong lever: this is `white-space`, not width.
+- **Added:** 2026-09-01 · owner: *"I dont like how the temperature/uV pill sits. can we go back to
+  the old way when it was side by side. you can make it smaller if needed."*
+
+### [app-shell] BF-95 — the swipe marker the tab navigator ignored (fixed; device check owed)
+
+- **Lane:** B
+- **Verify:** device — a swipe-to-delete started at the far **left edge** of a meal row must open the
+  tray and **not** change tab. The web sandbox does not reproduce the WebView's touch behaviour, and
+  the navigator only arms within 24 px of the edge, so the strip has to be hit deliberately.
+- **Keep — nothing to build.** `swipe-actions.tsx` declared `data-swipe-actions` and the navigator's
+  exclusion list did not read it; it does now. A guard asserts the pairing from **both** ends, since
+  deleting the marker as unused would have been the wrong fix and a navigator-only test would have
+  called it a pass.
+- **Added:** 2026-09-01 · found while tracing BF-94.
 
 ### [app-shell] BF-82 — the More page is seven groups of one row each, with one of them behaving differently
 
