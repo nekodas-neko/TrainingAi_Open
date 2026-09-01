@@ -27,6 +27,20 @@
 **Version:** v1.421.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-09-01.
 
+**The e2e README told spec authors the opposite of what was measured (Q-354).** On Nutrition a
+`.click()` is swallowed and gives no clue — no toast, no request, no error, just silence — while a
+touch works every time; the cause is the date-swipe `useDrag` on the scroll container, and it is
+deliberately unfixed because touch is the only input the canonical runtime has. The README said
+*"a real touch sequence does not open the water sheet while a synthesised `click` event does"* —
+Q-309's pre-measurement suspicion, never updated when `water-log-write-path.spec.ts` measured the
+reverse the same week. **A wrong signpost costs more than none, because it is followed:** anyone
+hitting a dead tap would have concluded touch was broken and reached for `dispatchEvent('click')`,
+the workaround that spec had deliberately abandoned. Corrected, along with that spec's own
+*"the gesture code is not implicated"* conclusion, which reasoned about the touch path while
+`useDrag` binds mouse too. **Q-354 is now a `Reference:` entry** — its own text says *do not pursue*,
+and while it sat in READY it headed Lane B's work list, offering every session a build it argues
+against ([journal](docs/overview/entries/2026-09-01-docs-q354-nutrition-tap-gotcha.md)).
+
 **A score-ring arc that could not be drawn is gone (LA-42).** `ScoreDisplay` took a
 `trainingBoostFrom` and drew a second brand-coloured arc for the share of an activity score that came
 from a same-day training blend. `blendActivityScore` went with Q-284, so `adjustment` is a literal 0

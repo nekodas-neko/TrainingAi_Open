@@ -6037,3 +6037,30 @@ while input tokens **rose** 14%, so the r = +0.958 it rested on did not survive 
 close that just said "stopped" would leave the next person to re-derive that. The baton shrinks by
 two lines in the same pass: it listed a photo scan as owner-gated when that gate cleared on
 2026-08-30, which is the stale-premise failure this baton spends a section warning about.
+
+## 2026-09-01 — `projectOverview.md` → 8967 (Q-354)
+
++15 for a docs correction, which is only worth it because of what the short version omits. "Fixed a
+stale note in the e2e README" reads as tidying. What happened is that the note was **backwards**, in
+the file written to stop people falling into that exact trap, so it did not fail to help — it
+actively sent readers to the workaround the relevant spec had deliberately abandoned. That
+distinction is the reusable lesson, and it does not survive compression.
+
+The second half is the queue mechanic: an entry whose own text says *do not pursue* sat at the head
+of READY, so every session in turn was offered a build it argues against and skipped it. `Reference:`
+exists for that and nobody had applied it.
+
+`docs/implementation-backlog.md` → **15040** after merging (+12 from this PR; the rest is BF-4/LA-53 landing alongside): Q-354 keeps its whole body, because
+it is now a reference and the body IS the artefact — the measured input-method table is the thing
+other entries and spec authors read. What was added is the `Reference:` line and the correction note
+recording that the README pointed the wrong way, which is the part a future reader would otherwise
+re-derive by trusting the old text.
+
+## 2026-09-01 — `docs/agents/state/implementation-lane-b.md` → 174 (Q-354 PR)
+
++6 for one gotcha, recorded the moment it happened rather than at wrap-up, because a session can end
+between the two. Running `pnpm check:rules > f; echo $?; git commit && git push` pushed a branch the
+gate had just failed — the push depends on the *commit's* exit status, never the gate's. The baton
+already carried "never check a gate through a pipe"; this is the same mistake in different clothes,
+so it sits directly under it where the pattern is visible rather than as a separate entry that reads
+as unrelated.
