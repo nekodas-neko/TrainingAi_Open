@@ -6249,7 +6249,50 @@ The line about the guard finding twelve e2e specs the entry's own file table mis
 evidence for a general point: a rename's blast radius includes its tests, and a file table written by
 reading will not contain them.
 
-## 2026-09-01 — `projectOverview.md` → 9068 (BF-101)
+## 2026-09-01 — `docs/implementation-backlog.md` 15376 → 15443 (BF-105, walk phase cues)
+
++67 lines for one entry, above the usual because most of it is evidence that the obvious diagnosis is
+wrong. "The phase change isn't signalled" reads like a missing feature; the cue is in fact scheduled,
+on a real HIGH-importance channel with a default sound, on an exact alarm with `allowWhileIdle`. Each
+of those took a check — including the pinned plugin source for what an absent `sound` does, which is
+keep Android's default rather than go silent — and an implementer who skips them builds a cue that
+already exists. The entry also carries two things that would otherwise be found on-device at the cost
+of an APK cycle: a NotificationChannel's sound and vibration are immutable once created, so
+differentiating fast from slow needs new channel ids rather than edited settings; and that work is JS
+in `capacitor-native-init.tsx`, so it ships through Railway despite looking native. The one genuinely
+native piece — a custom sound file in `res/raw/` — is marked as such.
+## 2026-09-03 — backlog → 15102, `projectOverview.md` → 9009, `docs/agents/state/tuning.md` → 388 (TN-23)
+
+One entry, from one owner question about one night — and the length is the **arithmetic that turns an
+opinion into a finding**. The ten stored contributors blend to **76.04**; the app shows **63**. Without
+that reproduction the entry is "the sleep score feels low", which is unactionable and has been asked
+three times.
+
+**TN-23 itself is the new part**: `hrv` and `hr` correlate at **+0.869** across 38 nights, share 75%
+of their variance, and carry **28 of 110** — a quarter of the score on one physiological axis, charged
+twice. The entry spends its lines on the ⛔ **do not delete a contributor**: both curves are provably
+correct for this night, and the combined signal is the score's best recovery evidence, so the naive
+fix would remove the most informative input in the model.
+
+The baton gains the general move — **reproduce a score from its stored contributors before theorising
+about it** — plus the observation that twice now the owner's *"this is too low"* resolved to the
+**display curve** (TN-5, signed off, unshipped) rather than to the model.
+
+## 2026-09-03 — `docs/agents/state/tuning.md` → 395 (the sleep-baseline near-miss)
+
+Seven lines, and they stop a false finding that was one edit from being filed. Asked whether a 100
+sleep score is reachable, this agent compared stored `hrv` contributors against
+`oura_daily_summary.hrv_baseline_mean_x8` and concluded the owner's best nights had been inflated by
+an immature baseline. **The sleep score does not read that column.** `buildSleepAudit` calls
+`sleepScoreBaselines(prior, tz)` — a trailing window over prior nights, excluding the night being
+scored.
+
+The rule *"read which baseline a consumer actually calls"* was already in this baton from three
+earlier instances this week and was walked into anyway, which is the argument for stating it against
+the **specific** consumer rather than in general. The entry also records the positive half: this is
+the one baseline in the codebase built correctly, and TN-6 can copy it rather than invent one.
+
+## 2026-09-01 — `projectOverview.md` → 9078 (BF-101)
 
 +15 for a feature whose whole point is a claim about *numbers*, and the numbers are what has to be in
 the index. The 7,000-against-Moderate drift is the evidence the control exists, and it is the one
@@ -6262,3 +6305,7 @@ for one thing" defect LA-45 and BF-99 each cost a session to close.
 
 The backlog baseline is untouched — BF-101 left the queue as a shipped entry with a `Keep:` line for
 its device check, and LB-48 replaced it in roughly the same number of lines.
+
+**Recomputed from the merged file on rebase**, not spliced: `main` had moved to 9063 while this
+branch sat behind a red base, so the number this branch first wrote (9068, from a 9053 base) was
+stale by exactly the block someone else added. 9078 is the merged file's own count.
