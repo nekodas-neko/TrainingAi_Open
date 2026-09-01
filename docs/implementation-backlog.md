@@ -970,11 +970,18 @@ has already recorded that a bulk job bumps `updated_at` without rewriting a valu
 - **Lane: B** — reassigned 2026-09-01. It was Lane A while the storage was owed; what is left is a
   rendering condition in `app/session-select/components/recommendation-card.tsx`, which is Lane B's
   file and touches no storage.
-- **What is left, precisely.** `recommendation-card.tsx:269` already renders `onRestDay` — inside
-  the `recommendation?.deloadOrRestRecommended` branch, as one of a two-button grid. The owner asked
-  for it to be available when the app has **not** volunteered rest, i.e. his choice rather than only
-  the app's. So: lift it out of that branch, `variant="secondary"` (greyed, per the request, and
-  correct — Start Workout is the primary action), and a Lucide `Moon`/`BedDouble` beside the label.
+- **⚠ BF-94 supersedes the SHAPE of this half — read it before building.** Filed later the same day
+  from a second owner request (*"can we have the full button for workout; that lets you swipe it to
+  turn it to rest?"*), it replaces the two-button row described below with a swipe on the full-width
+  Start button, reusing `components/ui/swipe-actions.tsx`. It carries `Needs: BF-84`, so it is
+  waiting on this entry. **Do not build the greyed second button and then have BF-94 delete it** —
+  settle which shape ships, in one pass, and if it is BF-94's then this entry's remaining half is
+  just "make Rest reachable on an ordinary day", which BF-94 already does.
+- **What is left, precisely (the pre-BF-94 shape).** `recommendation-card.tsx:269` already renders
+  `onRestDay` — inside the `recommendation?.deloadOrRestRecommended` branch, as one of a two-button
+  grid. The owner asked for it to be available when the app has **not** volunteered rest, i.e. his
+  choice rather than only the app's. So: lift it out of that branch, `variant="secondary"` (greyed,
+  per the request), and a Lucide `Moon`/`BedDouble` beside the label.
 - **✅ Lucide icon, not an emoji — confirmed by the owner 2026-09-01** (*"yes use icons not emoji"*),
   after the request originally said "rest + emoji". Recorded as decided so nobody re-opens it from
   the original wording.
