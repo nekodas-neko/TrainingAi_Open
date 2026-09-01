@@ -5336,3 +5336,18 @@ The sweep itself took `docs/overview/entries/` from **250 → 229**, back under 
 that had started failing CI. 22 of the 40 foldable entries, not all 40 — the sweep stopped at
 2026-08-29 so the last two days stay a genuine recent window, which is the thing the directory
 exists to be.
+## 2026-09-01 — `docs/implementation-backlog.md` 14708 → 14761 (BF-88, an answer that had to be measured)
+
+The owner asked whether dropping the step baseline for "RMR + steps + exercise" would be more
+accurate. It reads as obviously right and it is measurably wrong: against 124 days of his own data
+the proposed model gives a **lower** burn on **124 of 124**, mean −177 kcal, because the 0.2 × RMR
+it deletes is worth 265 kcal while the 3,000 steps it gains are worth ~106.
+
+The entry is long because the useful finding is not the answer but what the tracing turned up —
+`STEP_BASELINE` means two different things depending on whether maintenance is calibrated, and in
+the calibrated path it is nearly self-cancelling. One constant with two behaviours and no way to
+tell them apart from the screen is how a reasonable proposal gets to look obviously correct.
+
+It carries its numbers (124 days, 50 below threshold, 45 with plausible intake, the RMR of 1,325)
+because the Tuning rule requires a blast radius and because the next session to be asked this will
+otherwise re-run the same six queries.
