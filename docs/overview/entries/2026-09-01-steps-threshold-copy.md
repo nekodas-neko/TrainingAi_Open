@@ -1,6 +1,6 @@
 # 2026-09-01 — the calorie bar says why zero is zero
 
-**Branch:** `fix/bf-87-steps-threshold-copy` · **Entry:** BF-87 · **Lane:** B · **Version:** v1.416.2
+**Branch:** `fix/bf-87-steps-threshold-copy` · **Entry:** BF-87 · **Lane:** B · **Version:** v1.416.3
 
 ## The report
 

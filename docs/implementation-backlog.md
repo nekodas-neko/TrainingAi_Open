@@ -14,7 +14,7 @@ silently misdirecting the next session. Update them in the same PR that consumes
 
 | Pointer | Value | Source of truth |
 |---|---|---|
-| Next free Postgres migration | **246** | `lib/data/postgres/migrations/` |
+| Next free Postgres migration | **247** | `lib/data/postgres/migrations/` |
 | Local SQLite schema version | **v32** | `lib/sqlite/migrations.ts`; `lib/sqlite/__tests__/migrations.test.ts` asserts the max |
 
 > **There is no third pointer any more.** Entry IDs are not allocated from a shared counter and
@@ -526,6 +526,21 @@ own three lines. So the row offers a choice, appears to take it, and changes not
 
 ### [platform][body] LB-42 — `weight_goal_kg` and `target_weight_kg` are two columns for one goal
 
+- **Keep — RESOLVED 2026-09-01 except one owner decision: whether to DROP the retired column.**
+  `target_weight_kg` won, as the entry predicted — larger reader set, and it is the one on screen.
+  Migration **246** fills it from `weight_goal_kg` **only where it is NULL**, so a value the user
+  cannot see never overwrites one they can, and where both exist and disagree the visible number
+  stands. The API keeps its `weightGoalKg` field name and now reads *and writes*
+  `target_weight_kg`, which is what let both editors converge with **no client change** — the two
+  editors were the whole bug, and repointing one screen would have left the other diverging.
+- **Keep — `weight_goal_kg` is deliberately NOT dropped, and that is the owner's call.** Nothing
+  reads or writes it now; the column and its data are intact, with a `COMMENT ON COLUMN` and a
+  schema comment saying so. Dropping it is the one step here that cannot be undone, and the
+  row-scoped audit view **cannot show other accounts' values**, so what would be lost cannot be
+  checked first. Ask before dropping; do not fold it into a later migration as a tidy-up.
+- **⚠ Measured, and the measurement is narrower than it looks:** the owner's two columns agreed
+  (60 / 60.00), so **no divergence has actually bitten yet** — the entry describes a live hazard
+  rather than an observed wrong number. Other accounts could not be inspected.
 - **Lane:** A — the resolution is a schema and route decision (`lib/data/postgres/schema.ts`,
   `app/api/user/profile`, `app/api/user/goals`), and a corrective migration if the columns are
   merged. Lane B can only move the boxes around.
@@ -690,16 +705,27 @@ has already recorded that a bulk job bumps `updated_at` without rewriting a valu
 
 ### [workouts] BF-84 — a per-session Rest button on the training card, and rest is not stored anywhere
 
-- **Gate: owner** — transcribed 2026-08-31 from this entry's own words below (*"settle it before
-  scheduling"*), not a new judgement. `next-item.js` had it at #2 of Lane A's READY list, where
-  nothing said it was waiting on anything. The engine half is a stored row, a sync domain and the
-  inference path, which is expensive to undo if the answer is "a hint".
+- **✅ THE OWNER GATE IS CLEARED, 2026-09-01 — the field is removed above, deliberately.** Asked
+  *fact or hint?*, the owner answered: *"Happy to continue just having it as 'rest' = no workouts
+  logged so it just changes the display on home card — but also happy to have it in the DB. Whatever
+  would be better in the long run."* That is the call handed back with the criterion attached, so
+  **the answer is FACT — store it**, and the criterion is why:
+  - **Rest days are training data.** If a chosen rest is only ever a display condition, training
+    load, weekly cadence and phase counting all read it as a *missed* session rather than a taken
+    one. Every derived number quietly disagrees with what the owner actually did.
+  - **`no workouts logged` is not the same claim as `I chose to rest`** — a day with no logs is also
+    a day you forgot, or were ill, or logged late. The stored row separates them, and no amount of
+    display logic recovers a distinction that was never written down.
+  - **The current version is worse than it looks** and its failure has not been hit yet: a
+    `localStorage` key, so the second device never sees it, it dies on reinstall, and refetching
+    `/api/next-session` silently reverts the selection. Choosing "hint" keeps all three.
+  - **What it costs:** a migration, a sync domain and the inference path — expensive to undo, which
+    is exactly why it was gated. Taken deliberately, with the owner's "long run" as the reason.
 - **Lane: A** — derived 2026-09-01, so the next reader does not re-derive it. The entry's own
   conclusion is *"ship the button and the storage together"*; the storage half is a row, a sync
   domain and the inference path; and CLAUDE.md sends a both-lanes item to **Lane A, engine first**.
-  Lane B cannot take the surface alone — the same sentence forbids it. **Still open and the
-  owner's: fact or hint?** If "a hint", this collapses to a rendering condition and returns to
-  Lane B, so settle it before scheduling.
+  Lane B cannot take the surface alone — the same sentence forbids it. **Settled 2026-09-01: fact.**
+  It stays Lane A, engine first, and does not collapse back to Lane B.
 - **Added:** 2026-09-01 · owner, on Home's Recommended Today card: *"for the training card, I'd like
   a small button for each session to choose 'rest'."*
 
@@ -8031,7 +8057,16 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 - **Branch:** `perf/oura-raw-row-narrowing`
 - **Lane A.** Migration + `lib/data/**`.
 - **Added:** 2026-08-17
-- **Gate:** owner
+- **Reference:** the 2026-08-25 re-measurement below is the value here, not the work. **Do not
+  start it.**
+- **The `Gate: owner` was removed 2026-09-01, and it had been stale for two weeks in two different
+  ways.** The owner *unblocked* this on 2026-08-17 — the line directly below says so — so the gate
+  was already answered when it was written; and the 2026-08-25 re-measurement then concluded neither
+  half is worth doing. An entry cannot be waiting on an owner who has already replied. It carries
+  `Reference:` instead, which keeps the measurement findable while stopping the runner offering it as
+  Lane A work the entry itself argues against. **Revisit only if `oura_raw_samples` starts growing
+  again** — i.e. if Q-541's automatic packing stops running, which is the assumption the whole
+  re-measurement rests on.
 - ✅ **UNBLOCKED 2026-08-17.** The owner kept D4 as the destination **but with no deadline**, which
   lapses master-plan decision **O1** (*"do not do both"* — it vetoed `bytea` on the grounds the table
   was about to be dropped; a drop that is years out cannot veto a cheap reversible win today).
@@ -8136,9 +8171,33 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 
 ### [app-shell][devices] Q-531 — Q-234 moved the device consoles out of /admin, and in use that made them worse
 
-- **Gate:** owner
+- **✅ THE OWNER GATE IS CLEARED, 2026-09-01 — the field is removed above, deliberately.**
+  Asked where the drain / re-sync / verify flow should live, the owner answered: *"Happy to have it
+  wherever you want; but it should be behind the admin portal — as regular users should not be able
+  to touch it."*
+- **So the decision has a hard half and a soft half, and only the hard half is the owner's.**
+  - **Hard, and it settles Q-234's premise: these consoles go back behind `/admin`.** Q-234 moved
+    them to Settings → Developer on a taxonomic argument — device diagnostics are not user
+    administration — and that argument never weighed *who may reach them*. The app has other users
+    (CLAUDE.md's amended Canonical Runtime section says so outright), and a drain or a re-sync is
+    destructive in the wrong hands. Access control beats taxonomy, so the move is reverted in
+    effect. **`requireAdmin`, not merely an unlinked route** — hiding a page is not gating it.
+  - **Soft, and it is the implementer's: one screen holding the whole flow.** The owner explicitly
+    handed the layout back. Their original complaint was *"everything is spread out sporadically"*,
+    which is about the flow being broken across places rather than about the parent menu — so
+    reverting the location alone would leave the actual grievance intact. **Build the three consoles
+    as one `/admin` Devices screen carrying drain → re-sync → verify end to end**, in the order the
+    runbook uses.
+- **What this does NOT license.** The entry still asks for the owner to walk the flow and say where
+  they expected each step to land, and that is still worth having — but it is no longer a blocker,
+  because the failure it guards against (an agent re-picking the structure on taxonomy alone) is
+  precisely what the "one screen, runbook order" instruction removes. Reversal cost is low: a screen
+  and a route guard, no data.
+- **Lane:** B for the screen; **the `requireAdmin` guard on any route that moves is Lane A.** If the
+  routes stay put and only the UI regroups, it is Lane B alone.
 
-- ⛔ **blocked: needs an owner decision before any code moves.** Skipped by Implementation Lane B on
+- **Superseded context — the block below is what the entry said before the decision.** Skipped by
+  Implementation Lane B on
   2026-08-17 while taking Q-532 below it. This entry asks for the *premise* of a shipped IA decision
   to be re-litigated against a real user's task, and the owner's report is the only evidence of what
   that task actually is. An agent choosing the new structure alone would be repeating exactly the
@@ -11749,15 +11808,19 @@ reason it took an hour is that there is no signal that would have answered it di
 - **Plan:** the shipped half is
   [`plans/2026-08-13-meal-plan-prefill-and-confirmation.md`](superpowers/plans/2026-08-13-meal-plan-prefill-and-confirmation.md);
   this half is explicitly listed there under *Explicitly out of scope*.
-- **Lane:** ? — and it stays unresolved until the gate below clears, because the lane *is* the
-  decision. Re-scaling computed at read time is a surface change (B); one that rewrites the stored
-  plan is Lane A.
-- **Gate:** owner — added 2026-09-01. The three questions below are preferences about how the app
-  should behave, not facts anyone can look up, and building either answer wrong makes the plan worse
-  than a static one. Prose alone was leaving this entry in UNCLASSIFIED where both lanes saw it and
-  neither could start it.
-- **Recommendation, so the gate is a decision rather than a blank page: re-scale at read time,
-  spread across every remaining meal, with a floor — and say so when the floor is hit.**
+- **Lane:** B — settled 2026-09-01 with the gate. The owner chose spread, and spread computed at
+  read time is a surface change; a stored rewrite (which would have been Lane A) was the option not
+  taken.
+- **✅ THE OWNER GATE IS CLEARED, 2026-09-01 — opened and answered the same day.** The owner:
+  *"Happy to spread or take it out of next meal: would be nice to have the option; but if choosing
+  one then spread is fine."* So: **build spread, at read time, with a floor. Lane B.** The
+  recommendation below stands as written and is now the spec.
+- **The "would be nice to have the option" is a SECOND entry, not scope here** — see the follow-up
+  bullet at the end. Building the choice now would mean shipping a preference, a stored value and
+  two code paths before either has been lived with, and the owner said spread is fine if one is
+  picked. Ship one, find out whether the other is ever wanted.
+- **Recommendation, now the agreed shape: re-scale at read time, spread across every remaining
+  meal, with a floor — and say so when the floor is hit.**
   - **Read time, not stored** — the plan stays what the owner chose and only the *display* changes.
     One source of truth, Lane B, and reversible; a stored rewrite loses the original plan.
   - **Spread, not next-meal-only.** Taking a 700 kcal lunch overshoot entirely out of dinner is the
@@ -11769,6 +11832,12 @@ reason it took an hour is that there is no signal that would have answered it di
   - **The alternative** is next-meal-only, better at one real thing: meals you have not reached stay
     untouched, so a plan you already shopped for survives. If shopping to the plan is how it is
     used, that flips the recommendation.
+- **Follow-up, deliberately not built here: let the user choose spread vs next-meal-only.** The owner
+  asked for it (*"would be nice to have the option"*) and it is a real preference — but it is only
+  worth a setting once spread has been used and found wanting in a specific way, and that way is
+  what would decide where the control lives and what it defaults to. **File it as its own entry with
+  `Needs:` pointing here once the spread version ships**, not before: a preference added at the same
+  time as the behaviour it toggles has no evidence behind either branch.
 - **Added:** 2026-08-11 · owner-requested
 - **Owner's words, the part not yet built:** *"then as you input your actuall food it can recalculate
   food based on the macros left. I.e if you eat too much during lunch it will cut some portions for
@@ -13859,6 +13928,12 @@ Two independent findings, both low-urgency:
 
 > **⚑ Owner answered 2026-08-04: willing to wear the Polar H10 overnight for ground truth — *"yes but
 > not tonight."*** Still owner-gated, but the gate is now scheduling rather than consent.
+>
+> **Surfaced 2026-09-01 on the owner's actual worklist** —
+> [`device-verification-queue.md`](device-verification-queue.md) — because a gate that reads
+> "owner decision" when the decision is already **yes** is invisible in the one place the owner
+> looks. Nothing here needs deciding: it needs one night with the strap on. Consent was given
+> almost a month ago and the entry has not moved since.
 
 ⛔ **Owner decision, not a fix.** Owner chose calibrate-against-Polar-H10, but
 production has 23,065 RR rows and only 50 between 00:00–06:00 Brisbane — the strap
