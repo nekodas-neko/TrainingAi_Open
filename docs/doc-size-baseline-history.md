@@ -5984,7 +5984,16 @@ decisions someone would otherwise re-take, and neither is recoverable from the d
 
 The backlog **shrank by 20 lines** — LA-42's entry, removed whole, since nothing is owed.
 
-## 2026-09-01 — `docs/implementation-backlog.md` → 14916 (BF-64 re-classified to Lane B)
+## 2026-09-01 — `docs/implementation-backlog.md` → 14899 (BF-69 planned)
+
+Eight lines replacing three. The growth is one measurement and its consequence, and neither
+compresses: production holds **two supplements, one log ever, no amounts, and no retatrutide row**,
+so BF-69's own framing — *"the storage is done, there is no reader"* — is right about the reader and
+understates the rest. The line that has to survive is the one that reorders the work: the trends
+overlay is gated on **data**, not effort, and building it first would render a chart of one point
+where a broken query and an empty one look identical.
+
+## 2026-09-01 — `docs/implementation-backlog.md` → 14924 (BF-64 re-classified to Lane B)
 
 Seventeen lines, and they are three findings rather than restatement. BF-64 was assigned Lane A on
 the assumption its fix lives in the server pipeline; following its own recommendation, the fix is
