@@ -27,6 +27,17 @@
 **Version:** v1.416.4 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-09-01.
 
+**A gate that did not gate, and the count the owner was given (BF-90).** Asked whether his
+decisions were the bottleneck on the queue, the answer is **10 of 41** — device verification was the
+other 31, and eleven of those sat on entries whose own headings said *"shipped; device check owed"*.
+`Gate:` parks an entry, so finished work was filed beside work that cannot start. `Verify: owner` /
+`Verify: device` is now the second meaning, with its own section that does **not** park; `Gate:`
+means blocked, uniformly. **Seventeen converted, not eleven** — `keepKind` found six more from their
+own `Keep:` residue. PARKED 114 → 97, READY and KEEP unchanged. The larger half is measured and
+deliberately deferred: **34 entries carry a `⛔` and only 7 mean blocked**, but narrowing that
+detector would move 16 untriaged entries into READY, so it is filed as LA-49 with the order to do it
+in ([journal](docs/overview/entries/2026-09-01-verify-vs-gate.md)).
+
 **An account with a password could not change it (LB-40).** `EditProfileSheet` initialised
 `hasPassword` to `false` and **nothing fetched it**, so the *Current password* field never rendered,
 the PATCH went up without it, and the route answered *"Current password is required."* — an error
