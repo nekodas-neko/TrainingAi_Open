@@ -5240,6 +5240,40 @@ whether the fix is a flag, a correction, or both.
 **Pass test:** a trailing sleep baseline computed with and without 2026-08-19 differs, and the shipped
 one matches the "without" version.
 
+### [readiness][body][app-shell] TN-19 — the Body Battery explainer promises five mechanisms; four are inert or backwards
+
+- **Branch:** _unassigned_ · **Added:** 2026-08-31 · owner, second report on this pillar in six days: *"any work being done for this? still not very usable"*
+- **Lane: A** — the defect is in the model, not the card. `components/body-battery-card.tsx` is Lane B and **should not be touched for this**.
+- **Needs: TN-15** — shipping TN-15 is what makes the card true.
+- **⛔ Do NOT "fix" this by rewording the card.** That documents the defect instead of repairing it. The card is **correct about what the model should do** — it is TN-15's specification, rendered.
+
+`body-battery-card.tsx` now renders a **HOW IT MOVES** panel listing two recharge and three drain
+mechanisms. Measured against production:
+
+| the card says | measured |
+|---|---|
+| RECHARGES · **Deep sleep** | **Structurally impossible** — `walkBodyBattery` filters to `tsMs >= wakeTime`; overnight is never simulated. Sleep reaches the number only through the readiness anchor, which the card lists separately. |
+| RECHARGES · **Calm rest** | **6 points across 8 days**, 0 on 2026-08-31. Charging needs HR ≤ `restingHr + 0.05 × reserve` — a time-weighted **0.5%** of the waking day (TN-2). |
+| DRAINS · **Training** | **0.6 points** for a whole workout (Q-521). |
+| DRAINS · **High heart rate** | **The only one that works**, and it tracks *wear time* — `corr(hr_sample_count, drained)` **+0.518** vs `corr(steps, drained)` **−0.153** (Q-521). |
+| DRAINS · **Daytime stress** | A metric that **rises on good days** — **+0.386** with readiness, **+0.477** with the sleep score (Q-507). |
+
+**Eight days:** charged 0/1/0/3/0/0/1/1 against drained 113/52/47/70/13/0/76/79; **five of eight end
+at 0 or 2**. **2026-08-26 is the cleanest demonstration of Q-521 available**: zero HR samples → zero
+drain, zero charge, ending exactly at its anchor. **No wear, no change.**
+
+**Why this is filed rather than folded into TN-15.** The explainer is a real usability improvement in
+intent that made things worse in effect: the app now states five **testable** claims beside the
+number, so the owner can check them against a day they trained and wore the ring for 3,643 samples
+and still saw **+0 charged**. **A wrong number the app explains is worse than a wrong number it does
+not** — the explanation converts a vague doubt into a demonstrated one. That is a distinct harm from
+"the model is miscalibrated", and it is why this pillar reads as *"not very usable"* rather than
+merely inaccurate.
+
+**Pass test:** on a day with a completed workout and normal wear, the card's five mechanisms each
+move the number in the direction and rough magnitude the card claims — specifically `Training`
+contributes ≥10 points of drain and the recharge half exceeds 6 points in a single day.
+
 ### [readiness][body] TN-15 — Body Battery: drain that ignores exercise, and no recharge at all
 
 - **Branch:** _unassigned_ · **Added:** 2026-08-26 · owner: *"as we learn basic exercise/HR/stress through the day we should pick up a drain value — then charge it back up through sleep/rest so it's more usable"*
