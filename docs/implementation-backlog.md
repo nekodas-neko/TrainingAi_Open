@@ -367,6 +367,99 @@ below threshold and left in place for next time.
 > BF-29 (My meals), BF-30 (Meal detail), BF-31 (Edit meal) and BF-26 (Quantity). Two artboards need
 > no entry — `Tap targets` and the `srv/g` studies both shipped in Q-395a.
 
+### [workouts][app-shell] BF-94 — swipe the Start button to reveal Rest, instead of a permanent two-button row
+
+- **Lane:** B — `app/session-select/components/recommendation-card.tsx:252-296` and
+  `components/ui/swipe-actions.tsx`.
+- **Needs:** BF-84
+- **Added:** 2026-09-01 · owner, with a screenshot of the Home training card: *"can we have the full
+  button for workout; that lets you swipe it to turn it to rest? sort of like the swipe to delete
+  button appearing but swipe to rest."*
+- **This is a feature request, not a defect.** Nothing is broken; the entry exists so the interaction
+  is decided once. Per the intake rules it is filed and pointed at a planning session rather than
+  designed here.
+
+**The primitive already exists and must be reused.** `components/ui/swipe-actions.tsx` is the
+swipe-to-delete the owner is describing, live at two call sites (`meal-card.tsx`,
+`saved-meal-card.tsx`). **Do not hand-roll this** — CLAUDE.md names three hand-rolled gesture
+implementations as the ones to copy *away* from, and this repo has twice shipped a custom recognizer
+that swallowed normal scrolling (sessions 150, 152).
+
+**The card has two branches and the owner is looking at the rarer one.** Today's layout:
+
+| condition | today |
+|---|---|
+| `deloadOrRestRecommended` | a 2-up grid: **Rest** and **Full** (`:268-292`) — the screenshot |
+| otherwise | **one full-width Start button** (`:293+`), with **no Rest affordance at all** |
+
+**So the bigger win is the branch the owner did not screenshot.** On an ordinary day there is no way
+to declare a rest from Home — the option appears only when the app has already decided to suggest
+one. A swipe on the single Start button adds an affordance that does not currently exist.
+
+- **⚠ On the deload branch the swipe would make resting HARDER, and that is the design decision.**
+  Rest is **one tap** there today. Swipe-to-reveal costs a swipe *plus* a tap. On the one day the app
+  is actively asking "should you train?", burying one of the two answers behind a gesture is the
+  wrong trade.
+- **Recommendation: swipe on the single-button branch, keep the 2-up grid on the deload branch.** The
+  owner gets what he asked for everywhere it is an improvement, and the day the question actually
+  matters keeps both answers one tap away. If he prefers the swipe on both for consistency, that is
+  a taste call and cheap to reverse — but it should be made knowingly, not by default.
+- **Swipe-to-reveal, not swipe-to-commit.** A gesture that commits without a confirming tap will fire
+  on an accidental horizontal drag over the card's primary action. The primitive is reveal-then-tap
+  and that is the right shape for a destructive-ish, day-scoping choice.
+- **⚠ It inherits BF-61, which is still owed a device check.** `swipe-actions.tsx` carries a
+  documented 220 ms window in which the sliding row still covers the tray and swallows the first tap
+  — the owner reported it as needing two presses and confirmed it by waiting a second. That is
+  tolerable on a meal row; on the **primary action of the Home screen** it will read as the app
+  ignoring you. Do not ship this until BF-61's fast-tap check has been done on the device.
+- **The tab-swipe conflict is real in principle and probably not triggered here — see BF-95.**
+  `tab-swipe-navigator.tsx` only starts a tab swipe within **24 px of a screen edge** (`EDGE_PX`),
+  and this card is inset, so a swipe on the button should not reach it. That is a measurement to
+  confirm on the device, not an assumption to build on — and BF-95 covers the underlying gap.
+- **⚠ `Needs: BF-84` for a reason this session watched go wrong.** BF-84 replaces the `ta_rest_day`
+  `localStorage` flag with a stored fact plus a sync domain — i.e. it rewrites what `onRestDay`
+  *does*. Rebuilding how it is *invoked* first means touching the same call site twice and risks the
+  BF-87/BF-88 shape: shipping a surface against a mechanism that is about to change underneath it.
+- **⚠ Do not add hex/rgba literals.** The existing buttons are inline `rgba(99,102,241,…)` and
+  `#818cf8`; `check-hex-literals.js` holds a shrink-only per-file baseline, so new literals must
+  either be avoided or the file's number raised in the same PR, which puts the growth in the diff.
+- **Verification:** on the S25 APK, a horizontal drag on the Start button reveals Rest and does not
+  change tabs or scroll the page; the first tap on the revealed Rest lands (BF-61); a vertical drag
+  still scrolls; the card still reaches Rest in one tap on a deload day; and the choice survives a
+  tab switch and an app restart (which is BF-84's half).
+
+### [app-shell] BF-95 — the swipe primitive marks itself `data-swipe-actions` and the tab navigator ignores it
+
+- **Lane:** B — `components/shell/tab-swipe-navigator.tsx:42-43`.
+- **Added:** 2026-09-01 · found while tracing BF-94.
+
+**A declared contract that nothing honours.** `components/ui/swipe-actions.tsx:92` sets
+`data-swipe-actions` on every row, with a comment stating exactly what it is for — *"marks the row as
+owning horizontal gestures that start on it, the way `data-swipe-carousel` already marks a
+carousel"*. The navigator's exclusion list is:
+
+```ts
+const inScroller = (e.target as Element)?.closest?.(
+  "[data-swipe-carousel], .overflow-x-auto, [data-hscroll]"
+);
+```
+
+**`data-swipe-actions` is not in it.** The marker is set and never read.
+
+- **Why it has not bitten yet, and why that is not a reason to leave it.** The navigator only arms a
+  tab swipe when the touch starts within **24 px of a screen edge** (`EDGE_PX`), so it takes a
+  swipe-to-delete begun in that strip to run both gestures from one touch. Meal rows are full-width,
+  so the strip is reachable — this is latent, not impossible, and it is the failure the marker was
+  added to prevent.
+- **The fix is one string.** Add `[data-swipe-actions]` to the selector. It costs nothing and makes
+  the primitive's own comment true.
+- **⚠ Do not instead delete the marker as unused.** It is the correct mechanism and the navigator is
+  the side that is wrong; removing it would make the next swipe surface (BF-94) re-derive the whole
+  problem.
+- **Verification:** a swipe-to-delete started at the far left edge of a meal row opens the tray and
+  does **not** change tabs — on the device, since the web sandbox does not reproduce the WebView's
+  touch behaviour.
+
 ### [platform] BF-90 — `Gate: device` means two different things, and a third of them are on finished work
 
 - **Lane:** A — `scripts/check-backlog-pointers.js` and `scripts/next-item.js`, plus a field sweep

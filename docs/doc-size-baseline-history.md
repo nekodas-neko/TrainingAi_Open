@@ -5654,3 +5654,25 @@ the bug but the promise the owner picked between: *the change follows to other d
 *a local setting is never clobbered*. Those differ in what the app does, not in how it is written,
 and a one-line "fixed preference sync" would lose the distinction the next session needs.
 
+
+## 2026-09-01 — `docs/implementation-backlog.md` 15167 → 15260 (BF-94 swipe-to-rest, BF-95 the marker nobody reads)
+
+A feature request that traced into a second, unrelated bug. BF-94 is the owner's *"swipe the full
+button to turn it to rest"*; BF-95 is what tracing its gesture risk turned up.
+
+BF-94's length is two things the request does not contain. **The card has two branches and the owner
+screenshotted the rarer one** — on an ordinary day there is a single Start button and **no rest
+affordance at all**, so the swipe is a bigger win where he was not looking. And on the deload branch
+the swipe would make resting *harder*: Rest is one tap there today, and a gesture plus a tap buries
+one of two answers on the one day the app is actively asking the question. The recommendation splits
+the branches rather than applying the ask uniformly.
+
+It also carries `Needs: BF-84` with the reason attached, because this session watched that exact
+mistake: BF-84 replaces the `localStorage` rest flag with a stored fact, so building the *invocation*
+first repeats the BF-87/BF-88 shape of shipping a surface against a mechanism about to change.
+
+BF-95 is short and is a real defect: `swipe-actions.tsx` sets `data-swipe-actions` with a comment
+saying it marks rows that own horizontal gestures, and `tab-swipe-navigator.tsx` excludes
+`data-swipe-carousel`, `.overflow-x-auto` and `data-hscroll` — **not that one**. The marker is
+written and never read. Latent only because a tab swipe must start within 24 px of an edge; the fix
+is one string in a selector.
