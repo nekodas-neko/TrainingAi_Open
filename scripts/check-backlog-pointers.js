@@ -34,6 +34,7 @@ const { idPattern, idPartsPattern } = require('./lib/entry-id');
 const { announcesCompletion } = require('./lib/completion-words');
 const { referenceFromLines, hasProseMarker, PROSE_MARKERS } = require('./lib/reference');
 const { verifyFromLines, verifyProblem } = require('./lib/verify');
+const { laneDrift } = require('./lib/lane-drift');
 const { keepFromLines } = require('./lib/keep');
 const { keepKind } = require('./lib/keep-kind');
 
@@ -484,6 +485,37 @@ const verifySummary = withVerify
         `heading, which says "Not new work", so an implementer never sees them. Split each into its ` +
         `own entry with \`Needs:\` pointing at the shipped one (OR-100). Advisory, not a failure:\n` +
         builds.map((b) => `      ${b}`).join('\n'),
+    );
+  }
+}
+
+// LA-53. An entry whose `Lane:` still names the lane whose half has already shipped keeps heading
+// THAT lane's READY list, because `next-item.js` reads the field and nothing re-reads it when the
+// remaining work moves lanes. Q-535 sat at the top of Lane A's list for two weeks after its Lane A
+// half landed on 2026-08-18; BF-64 and LA-47 were the same shape found in the same session.
+//
+// **Only the mechanical case is detected, and deliberately so.** BF-64 (filed A, its own recommended
+// fix turned out to be entirely client-side) and LA-47 (its proposed split "does not compile") are
+// judgement, and no phrase-matcher will ever see them. What a script CAN see is one entry
+// contradicting itself: a body line saying the Lane X half shipped while `Lane:` still says X. Both
+// halves are already parsed here, so this is a comparison rather than a new heuristic.
+//
+// Reported, never failed — same posture as the two notes above. A ratchet that fails CI on a
+// phrasing variant costs more than the drift does, and the count is what says whether the phrasing
+// is stable enough to enforce later.
+{
+  const drifted = [];
+  for (const [id, m] of meta) {
+    const line = laneDrift(id, m.lane, m.lines);
+    if (line) drifted.push(`${id} — Lane: ${m.lane}, but: ${line.slice(0, 90)}`);
+  }
+  if (drifted.length) {
+    console.log(
+      `check-backlog-pointers: note — ${drifted.length} entr${drifted.length === 1 ? 'y says' : 'ies say'} ` +
+        `their own \`Lane:\` half has SHIPPED while still claiming that lane, so they keep heading that ` +
+        `lane's READY list (LA-53). Move \`Lane:\` to the lane that still owes work, or add a ` +
+        `\`Needs:\`/\`Keep:\` saying what is left. Advisory, not a failure:\n` +
+        drifted.map((d) => `      ${d}`).join('\n'),
     );
   }
 }

@@ -432,74 +432,27 @@ numbers multiply, they do not substitute.
 
 ### [nutrition] BF-103 — one label, `My Foods`, on every surface (owner decision, 2026-09-01)
 
-- **Lane:** B — `components/nutrition/saved-meals-sheet.tsx` (the tab strip) plus **seven other
-  user-visible strings** reading `My Meals`, enumerated below.
-- **Added:** 2026-09-01 · owner: *"can we change Meals to → My foods, so we can have meals + singular
-  items saved."* · **decided** same day: *"no I'm happy to rename Saved to → My Foods. the issue was
-  having saved + MyFoods. we only need one. lets go with MyFoods."*
-
-**The decision, and what it settles.** This entry originally recommended `Saved` for the tab with the
-page button left as `My Meals`. The owner read that as introducing a *second* name and rejected it on
-exactly the right grounds — the historical failure was never the wording, it was **two labels for one
-list**. So: **`My Foods` everywhere, `My Meals` and `Saved` nowhere.** One name, one list, no pair to
-tell apart. Do not re-open the naming; implement it.
-
-**He is right about the contents, and the measurement is stark.** Of his 10 saved meals, **5 contain
-exactly one item** — Edamame Block, Rice Block, Protein Pasta Brick and two others. Half the list
-called "Meals" is single foods, saved as one-item meals because that is the only shelf available. The
-label already mis-describes what is in it, which is what makes this a correction rather than a
-preference.
-
-**⚠ Why BF-37 and BF-60 do not block this, stated so nobody re-reverts it.** Both entries removed
-`My Foods` — but both were solving *"two labels that differ only in their last word"*:
-
-- `nutrition-action-row.tsx:59` — *"`My Meals`, not `My Foods` (**BF-37**)."*
-- `saved-meals-sheet.tsx:58-61` — *"`My Foods` against `My Meals` is the pair **the owner could not
-  tell apart** … (`My Meals` survives on the page's own button, where it names one list rather than
-  one of two lookalikes.)"* (**BF-60**)
-
-A single name cannot be confused with itself. Their reasoning is satisfied by unifying, not by
-keeping `My Meals`. **Update those two comments in the same PR** — left as they are, they read as a
-standing prohibition and the next session reverts this on their authority.
-
-**⚠ The other half of the history, and the trap in it — read before touching the sheet.** `My Foods`
-was once the name of a **merged** list: v1.382.0 — *"My Meals and your food library are one list now,
-called My Foods"* — and v1.385.0 split it back three versions later, *"Merging them put a recipe you
-built and a single ingredient in the same list, which made 'log this' mean two different things
-depending on the row."* **That revert was about the merge, not the name.** This entry renames the tab
-and changes nothing about what is in it: `Recent` and `Search` stay, the saved list keeps holding what
-it holds. An implementer who reads "My Foods" and re-merges the tabs reintroduces a defect the app
-already paid for.
-
-**Every user-visible site (sibling-surface sweep — the rename is not two files):**
-
-| File | Line | Current | Notes |
-|---|---|---|---|
-| `saved-meals-sheet.tsx` | `LIST_TABS` | `Meals` | the tab; strip becomes Recent · My Foods · Search |
-| `nutrition-action-row.tsx` | 62 | `My Meals` | the page button |
-| `use-plan-meal-saving.ts` | 59–60 | `saved to My Meals` | toast, both singular and plural arms |
-| `my-meals-picker.tsx` | 180, 202 | `in My Meals` / `Nothing in My Meals yet` | hint + empty state |
-| `meal-plan-edit-sheet.tsx` | 326 | `My Meals` | button |
-| `meal-plan-section.tsx` | 235 | `Save all N to My Meals` | button |
-| `plan-meal-row.tsx` | 120, 126, 131 | `In My Meals`, `Save to My Meals`, aria-label | badge + action + a11y |
-
-`plan-meal-row.tsx:126` is an **`aria-label`** — a rename that skips it leaves the screen reader
-saying a name the screen no longer uses. The file *names* (`my-meals-picker.tsx`) are not user-visible
-and are not worth the churn; leave them.
-
-- **⚠ A label change is not the whole ask, and this entry is the label only.** *"so we can have meals
-  + singular items saved"* implies saving a single food **as** a single food rather than wrapping it
-  in a one-item meal. Today the wrap is the workaround, and `diary-groups.ts` already accommodates it
-  — *"a group of one is a single food wearing a meal's name… it renders as the plain row it already
-  is."* A first-class saved-food shelf is a separate, larger decision; the rename makes the current
-  behaviour **honest** rather than fixing it, and says so here to stop it silently growing.
-- **Ships a changelog entry** — user-visible, patch. Say plainly that only the name changed and the
-  lists are unchanged, so the note is not read as the v1.382.0 merge returning.
-- **Verification:** `grep -rn "My Meals" app components` returns comments and changelog history only,
-  no live string; the strip reads Recent · My Foods · Search; the page button and the tab it lands on
-  share one name; the plan surfaces' toast, badge, buttons and aria-label all say `My Foods`; a
-  one-item entry and a multi-item meal sit in the same list without either looking mislabelled.
-
+- **Keep:** one look on the S25. `My Foods` is two characters longer than `Meals` and three tabs
+  share the strip's width, so whether it wraps or truncates at 412 dp is the only thing unchecked.
+- **Verify:** device.
+- **✅ SHIPPED** (`fix/bf-103-my-foods-one-label`, 2026-09-01, v1.425.0). Tab, page button, toast
+  (both arms), picker hint and empty state, two plan buttons, and the plan row's badge, action and
+  **`aria-label`**. The BF-37 and BF-60 comments that read as a standing prohibition on the name are
+  rewritten to say why unifying satisfies their reasoning — left alone, they are what a future
+  session reverts this on.
+- **⚠ The entry's own file table was incomplete, and the guard is what found it.** Twelve **e2e
+  spec files** asserted on `My Meals` — button lookups, an `In My Meals` assertion, a
+  `Save all N to My Meals` regex. A rename that leaves its tests on the old label breaks CI on the
+  next run rather than at review. All swept.
+  `components/nutrition/__tests__/one-saved-list-label.test.ts` covers `app/`, `components/` **and
+  `e2e/`** for exactly that reason.
+- **⚠ Do not re-merge the tab strip.** `My Foods` was once the name of a *merged* list (v1.382.0),
+  split back three versions later because a recipe and a single ingredient in one list made "log
+  this" mean two different things. **That revert was about the merge, not the name.** The guard pins
+  the strip at `Recent · My Foods · Search`; one of its four mutations is the re-merge.
+- **The changelog's historical entries still say `My Meals` and must stay that way** — they describe
+  what shipped at the time.
+- **Added:** 2026-09-01 · owner, deciding it himself: *"we only need one. lets go with MyFoods."*
 
 ### [nutrition][body] BF-101 — a "Recommended" button per goal field; the numbers already exist and need no AI
 
@@ -8149,31 +8102,29 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 - **Verification:** the route is already proven end to end on `pnpm dev` (all four verbs, including
   idempotency and the 401). This item is the affordance only.
 
-### [platform] LA-53 — an entry whose remaining half changed lanes keeps heading the OLD lane's list
+### [platform] LA-53 — split the two lane-drift cases a script cannot see
 
-- **Lane:** A — `scripts/check-backlog-pointers.js` and `scripts/next-item.js`.
+> **✅ THE DETECTION SHIPPED 2026-09-01, advisory as this entry required.**
+> `scripts/lib/lane-drift.js` + a note in `check-backlog-pointers.js`; it reports **0** on the
+> current tree and fires on Q-535's real pre-fix state.
+> [journal](overview/entries/2026-09-01-lane-drift-note.md)
+>
+> - **Keep:** the two cases no phrase-matcher will ever see, and the question of enforcement.
+
+- **Lane:** A
+- **1. The two cases that are judgement, not phrasing.** **BF-64** was filed Lane A because *"the
+  decision lives in `session-data.ts`"*; following its own recommended fix, the work is entirely
+  client-side and Lane B's. **LA-47** says outright that the split it proposes *"does not compile"*,
+  so its remaining piece is cross-lane and unstartable as written. Both need a person to re-read the
+  entry against the code — which is what found them.
+- **2. Whether to enforce.** The note prints a count; if that count is stable at zero across a few
+  weeks, the phrasing is stable enough to fail on. Not before — a ratchet that fails CI on a wording
+  variant costs more than the drift does.
+- **⚠ The rule reported the entry that documents it, twice, for two different reasons** — undated
+  prose describing the shape, and a dated citation of Q-535. Both exclusions are pinned by tests.
+  **Do not remove either to "catch more"**: without them every entry that discusses the pattern
+  reports itself, which is how an advisory note becomes noise nobody reads.
 - **Added:** 2026-09-01 · Lane A, after hitting the same shape three times in one session.
-- **The shape.** `next-item.js` reads the `Lane:` field, and nothing re-reads it when an entry's
-  remaining work moves to the other lane. So an entry whose Lane A half has shipped keeps surfacing
-  at the **top** of Lane A's READY list, and the next implementer spends the read discovering it.
-- **Three in one session, all of them real:**
-  - **Q-535** — Lane A half shipped 2026-08-18; the remaining half is Q-318's, Lane B's. It headed
-    Lane A's list for two weeks.
-  - **BF-64** — filed Lane A because *"the decision lives in `session-data.ts`"*; following its own
-    recommendation the fix is entirely client-side and Lane B's.
-  - **LA-47** — the entry says outright that the split it proposes *"does not compile"*, so its
-    remaining piece is cross-lane and unstartable as written.
-- **What a check can see, and what it cannot.** The first is mechanical: a body line matching
-  *"the Lane A half shipped"* (any case, either lane) while `Lane:` still names that lane is a
-  contradiction inside one entry, and `check-backlog-pointers.js` already parses both. The second and
-  third are judgement and no script will catch them — which is the argument for catching the one that
-  is mechanical rather than for catching none.
-- **⚠ Make it advisory first.** The existing `Keep:`-residue note prints as advice rather than a
-  failure for exactly this reason: a heuristic that fails CI on a phrasing variant costs more than
-  the drift does. Count the hits, print them, and only consider failing once the count is stable at
-  zero.
-- **Verification:** the check names Q-535 before this entry's own fix to it lands, and names nothing
-  after; `next-item.js --lane A` no longer heads its list with an entry whose Lane A half is done.
 
 ### [platform][devices] Q-535 — Redecode reports "failed: 502" for work that succeeded
 

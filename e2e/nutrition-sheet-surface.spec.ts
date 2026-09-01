@@ -38,7 +38,7 @@ test('a nutrition sheet paints the tab palette behind its content, not over it',
   await page.goto('/nutrition')
   await settleRouteBoundary(page)
 
-  const button = page.getByRole('button', { name: 'My Meals', exact: true })
+  const button = page.getByRole('button', { name: 'My Foods', exact: true })
   await expect(button).toBeVisible({ timeout: 60_000 })
   await expect(async () => {
     // Tap only while the sheet is still closed — this button opens Log Food, which then covers the
@@ -103,7 +103,7 @@ test('with the wallpaper off, the sheet is unchanged', async ({ page }) => {
   await page.goto('/nutrition')
   await settleRouteBoundary(page)
 
-  const button = page.getByRole('button', { name: 'My Meals', exact: true })
+  const button = page.getByRole('button', { name: 'My Foods', exact: true })
   await expect(button).toBeVisible({ timeout: 60_000 })
   await expect(async () => {
     if (await page.getByRole('dialog').count() === 0) {
