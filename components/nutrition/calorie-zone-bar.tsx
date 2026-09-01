@@ -32,8 +32,16 @@ export const CalorieZoneBar = memo(function CalorieZoneBar({
   /** Home's card is dense — tighten the bar. */
   compact?: boolean
 }) {
-  const { base, earned, total } = budgetProvenance({ restingBaseKcal, activeKcal, targetNetKcal })
+  const { earned, total } = budgetProvenance({ restingBaseKcal, activeKcal, targetNetKcal })
   const parts = movementSummary({ workoutKcal, activityKcal, stepsKcal })
+  // BF-99. `budgetProvenance().base` is `restingBaseKcal + targetNetKcal` — the resting base with
+  // the GOAL DELTA already folded in — and this line called it "base". On a recomp that prints a
+  // number ~200 below the owner's measured RMR, so he went looking for a broken calculation:
+  // *"why is my base rate under the 1350 RMR value."* Every figure on the screen reconciled; the
+  // word did not. The two are separated here rather than in `budgetProvenance`, which is shared and
+  // whose `base` is the right thing for a caller that wants one number. They still sum to `total`.
+  const restingBase = Math.round(restingBaseKcal)
+  const goalDelta = Math.round(targetNetKcal)
 
   return (
     <>
@@ -47,12 +55,20 @@ export const CalorieZoneBar = memo(function CalorieZoneBar({
           sentence explained cannot arise while any steps exist. What is left is the honest
           remaining case — a day with no movement recorded at all. */}
       <p className={`${compact ? 'mt-1' : 'mt-2'} text-[10px] leading-snug text-muted-foreground tabular-nums`}>
+        {restingBase.toLocaleString()} base
+        {/* Only when there IS one: on `maintain` the delta is 0, and printing "+ 0 for your goal"
+            would be noise. That also satisfies BF-99's check that a maintain user sees the same
+            number under both wordings. */}
+        {goalDelta !== 0 && (
+          <> <span className="text-muted-foreground/70">{goalDelta < 0 ? '−' : '+'}</span>{' '}
+            {Math.abs(goalDelta).toLocaleString()} for your goal</>
+        )}
         {earned > 0
           ? <>
-              {base.toLocaleString()} base <span className="text-muted-foreground/70">+</span> {earned.toLocaleString()} earned from movement
+              {' '}<span className="text-muted-foreground/70">+</span> {earned.toLocaleString()} earned from movement
               {parts && <span className="text-muted-foreground/70"> ({parts})</span>}
             </>
-          : <>{base.toLocaleString()} base — no movement recorded yet today</>}
+          : <> — no movement recorded yet today</>}
       </p>
     </>
   )

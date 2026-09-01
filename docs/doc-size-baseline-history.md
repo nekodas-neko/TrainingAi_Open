@@ -6030,3 +6030,113 @@ The growth is decisions and their reasoning, which is the expensive half to reco
 - **`Q-48` lost its gate without an owner answer**, because it never needed one: F3 and F7 are now
   answered, F8 was fixed in its own PR, and what remains is planning work that had been invisible
   behind a decision field for weeks.
+## 2026-09-01 — `docs/implementation-backlog.md` → 14976 (LA-52 filed, LA-48 re-scoped)
+
+One new entry and a scope correction, both from reading code rather than from a report. The lines
+that cannot be cut are the three consequences of the pacer's speed rung being fed a whole-walk
+cumulative average: the band cannot respond within a segment, `STOPPED_KMH` can never fire once the
+average clears 1.5 km/h, and warmup/fast/slow all band against the same drifting number. Without
+them the entry reads as a preference about smoothing rather than as two of LB-36's device checks
+being unable to pass.
+
+LA-48's correction is shorter but saves more: there is **no migration and no local schema version**
+in it — `segments` is JSONB one side and TEXT the other — and the trap is the **wire schema**, where
+Zod strips an unknown key silently on both write paths.
+
+## 2026-09-01 — baton 189 → 193, `docs/implementation-backlog.md` → 15028 (queue hygiene + BF-4 closed)
+
+Five lines onto the baton, and they are the finding a successor needs before anything else: the
+**startable** Lane A queue is thinner than READY's count, entry by entry, with the reason each of the
+top seven is blocked. A successor that reads "61 READY" and starts at the top spends its first read
+discovering that — which is what happened here.
+
+The backlog grows by LA-53 (proposing a check for the one mechanical case) and by Q-535's lane
+correction. Q-535 headed **Lane A's** list for two weeks after its Lane A half shipped, because
+`next-item.js` reads the `Lane:` field and nothing re-reads it when the remaining work moves lanes.
+
+
+BF-4 rides here too: it was **closed by measurement**, and the closing note is longer than a strike
+because the numbers contradict the entry's own lever — latency fell 36% across the 1024 px bound
+while input tokens **rose** 14%, so the r = +0.958 it rested on did not survive the intervention. A
+close that just said "stopped" would leave the next person to re-derive that. The baton shrinks by
+two lines in the same pass: it listed a photo scan as owner-gated when that gate cleared on
+2026-08-30, which is the stale-premise failure this baton spends a section warning about.
+
+## 2026-09-01 — `projectOverview.md` → 8967 (Q-354)
+
++15 for a docs correction, which is only worth it because of what the short version omits. "Fixed a
+stale note in the e2e README" reads as tidying. What happened is that the note was **backwards**, in
+the file written to stop people falling into that exact trap, so it did not fail to help — it
+actively sent readers to the workaround the relevant spec had deliberately abandoned. That
+distinction is the reusable lesson, and it does not survive compression.
+
+The second half is the queue mechanic: an entry whose own text says *do not pursue* sat at the head
+of READY, so every session in turn was offered a build it argues against and skipped it. `Reference:`
+exists for that and nobody had applied it.
+
+`docs/implementation-backlog.md` → **15040** after merging (+12 from this PR; the rest is BF-4/LA-53 landing alongside): Q-354 keeps its whole body, because
+it is now a reference and the body IS the artefact — the measured input-method table is the thing
+other entries and spec authors read. What was added is the `Reference:` line and the correction note
+recording that the README pointed the wrong way, which is the part a future reader would otherwise
+re-derive by trusting the old text.
+
+## 2026-09-01 — `docs/agents/state/implementation-lane-b.md` → 174 (Q-354 PR)
+
++6 for one gotcha, recorded the moment it happened rather than at wrap-up, because a session can end
+between the two. Running `pnpm check:rules > f; echo $?; git commit && git push` pushed a branch the
+gate had just failed — the push depends on the *commit's* exit status, never the gate's. The baton
+already carried "never check a gate through a pipe"; this is the same mistake in different clothes,
+so it sits directly under it where the pattern is visible rather than as a separate entry that reads
+as unrelated.
+
+## 2026-09-01 — `docs/implementation-backlog.md` 14940 → 14973 (BF-99 a label, BF-100 a missing mechanism)
+
+**BF-99's length is the reconciliation, and it is the point.** The owner asked why his base sits below
+his measured RMR, which reads like a maths bug. It is not: every number on the screen checks out. The
+entry reconstructs the chain against live production values and lands on the screenshot at **three
+independent points** — 1,565 maintenance, 1,264 "base", 163 over target. What it finds is a **label**:
+1,264 is the base *after* the recomp deficit, so a goal choice is presented as a metabolic fact, and
+the real resting base is ~1,464. Without the table an implementer would hunt a calculation error that
+does not exist, and might remove the `Math.max(bmr, …)` floor that is doing its job.
+
+It also answers the half he did not ask: the RMR is **rescaled**, not used raw — 1,325 was measured at
+51.5 kg of lean mass against ~50.6 kg today — which is `personalRmr` working as BF-42 built it, and
+is explained nowhere on screen.
+
+**BF-100 is short because the cause is single.** The app scrolls an inner container
+(`pull-to-sync.tsx:190`, 62 files carrying `overflow-y-auto`), and Next's restoration only handles
+the document scroller. No code has ever saved a position — so *"many pages if not all pages"* is
+exactly right, and one fix in the shell covers every screen. The two warnings are the ones that make
+a naive attempt fail: restoring before the cache-seeded content has height gets clamped to 0 and
+looks identical to the bug, and restoring on forward navigation is wrong.
+
+## 2026-09-01 — `projectOverview.md` → 8984 (BF-64)
+
++17 for an owner-reported bug, and the lines that earn it are the ones a short version would cut
+first. "The Full toggle works now" hides the mechanism — the override was applied inside an `else if`
+that only ran when the exercise was **not already deloaded**, so the pipeline could add a deload and
+never remove one. That asymmetry is the reusable part: a control can be fully wired and still be
+one-way, and the screen will not show you which.
+
+The other two kept lines are negatives. The override keys on an **explicit choice**, because keyed on
+`!deload` it would paint full weights for a frame and snap back — invisible in review, obvious on a
+phone. And the verification line says the fixture was **hand-built**, because the local seed has no
+`ai_dynamic` program and zero prescriptions: a session that renders this screen and sees a toggle has
+verified nothing, and would not know it.
+
+## 2026-09-01 — `projectOverview.md` → 8999 (BF-99)
+
++15, and the sentence that earns most of it is *"every number on the screen reconciled."* A short
+version — "renamed a label" — loses the only thing that makes this instructive: the arithmetic was
+right and the copy sent the owner hunting a calculation bug that did not exist. That is a distinct
+failure mode from a wrong number, and it is the one a future session will not think to look for.
+
+Two negatives are kept for the same reason as always: the split is in the component and **not** in
+`budgetProvenance` (shared, and one combined number is correct for a caller that wants one), and
+neither the `Math.max` floor nor the goal maths was touched — both look like the bug and are not.
+
+## 2026-09-01 — `docs/implementation-backlog.md` → 15174 (merge resolution)
+
+`docs/owner-decisions-round2`, merging `main`. Re-measured after the merge, not carried across it.
+Both sides of this file's own conflict kept — append-only, so a conflict here is two additions.
+Entry-ID set diffed against the new `origin/main`: **identical, nothing added or lost.**

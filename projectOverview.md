@@ -24,8 +24,54 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.421.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Version:** v1.423.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-09-01.
+
+**The calorie line called a goal deficit part of the base rate (BF-99).** Owner, with a screenshot:
+*"why is my base rate under the 1350 RMR value."* `budgetProvenance().base` is
+`restingBaseKcal + targetNetKcal` — the resting base with the goal delta already folded in — and the
+line printed it beside the word *base*. On a recomp that is ~200 below his measured RMR, so a goal
+choice was presented as a metabolic fact. **Every number on the screen reconciled**, which is what
+made it worth fixing rather than explaining: correct maths described incorrectly sends someone
+hunting a bug that does not exist. Now `1,972 base − 200 for your goal + 1 earned from movement`,
+collapsing to `1,972 base + …` on maintain. Split in the component, **not in `budgetProvenance`** —
+that is shared, and one combined number is right for a caller that wants one. **The floor and the
+goal maths were not touched and should not be.** The second half shipped too: the measured RMR is
+re-scaled onto current lean mass rather than used raw, and nothing said so, so a measurement the
+owner paid for looked ignored — one line on the RMR form now says what the app does with it.
+**Not device-verified**; the line gained a clause and Home's copy is `compact`, so wrapping at 412 dp
+is unchecked ([journal](docs/overview/entries/2026-09-01-fix-bf-99-base-label.md)).
+
+**`Full · Override` now overrides something (BF-64).** Owner: *"pressing full or deload doesnt change
+the 'prescription' not sure if its over writing it."* It was overwriting **in one direction only** —
+`session-data.ts` applies the deload override inside an `else if` that runs only when the exercise is
+not already deloaded, so the pipeline could ADD a deload and never remove one, while the toggle
+rendered the word **Override**. Worse than the BF-8 bug it descends from: that was the toggle
+disagreeing with the card, this was a control that did nothing. Session-level `Full` is now the
+per-exercise revert applied to every deloaded exercise — the machinery was already on the device, so
+no LLM call, no 429 budget, works offline. **All three of the entry's warnings held:** the override
+keys on an *explicit* choice (keyed on `!deload` it would flash full weights on first render); an
+exercise with no `preDeload` stays deloaded **and the card names it**; and 1RM accounting follows
+without a separate change, because the revert clears `deloaded` and the completion path already reads
+the reverted array. Five mutations, five failures, including that last one.
+**Verified only against a hand-built fixture — the local seed has no `ai_dynamic` program and zero
+prescriptions, so the path is unreachable out of the box — and NOT on device**, which is where
+completing a set under each toggle position would show the 1RM actually count or not
+([journal](docs/overview/entries/2026-09-01-fix-deload-full-override.md)).
+
+**The e2e README told spec authors the opposite of what was measured (Q-354).** On Nutrition a
+`.click()` is swallowed and gives no clue — no toast, no request, no error, just silence — while a
+touch works every time; the cause is the date-swipe `useDrag` on the scroll container, and it is
+deliberately unfixed because touch is the only input the canonical runtime has. The README said
+*"a real touch sequence does not open the water sheet while a synthesised `click` event does"* —
+Q-309's pre-measurement suspicion, never updated when `water-log-write-path.spec.ts` measured the
+reverse the same week. **A wrong signpost costs more than none, because it is followed:** anyone
+hitting a dead tap would have concluded touch was broken and reached for `dispatchEvent('click')`,
+the workaround that spec had deliberately abandoned. Corrected, along with that spec's own
+*"the gesture code is not implicated"* conclusion, which reasoned about the touch path while
+`useDrag` binds mouse too. **Q-354 is now a `Reference:` entry** — its own text says *do not pursue*,
+and while it sat in READY it headed Lane B's work list, offering every session a build it argues
+against ([journal](docs/overview/entries/2026-09-01-docs-q354-nutrition-tap-gotcha.md)).
 
 **A score-ring arc that could not be drawn is gone (LA-42).** `ScoreDisplay` took a
 `trainingBoostFrom` and drew a second brand-coloured arc for the share of an activity score that came

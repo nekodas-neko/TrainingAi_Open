@@ -388,6 +388,68 @@ below threshold and left in place for next time.
 > BF-29 (My meals), BF-30 (Meal detail), BF-31 (Edit meal) and BF-26 (Quantity). Two artboards need
 > no entry — `Tap targets` and the `srv/g` studies both shipped in Q-395a.
 
+### [nutrition][body] BF-99 — the line says "base" and shows base MINUS the goal deficit, so the owner read his RMR as broken
+
+- **Keep:** one look on the S25. The line gained a clause and Home's copy of the bar is `compact`, so
+  whether it wraps at 412 dp is the only thing unverified.
+- **Verify:** device.
+- **✅ SHIPPED** (`fix/bf-99-base-label`, 2026-09-01, v1.423.0). The line separates the two figures
+  and they still sum to the same budget: `1,972 base − 200 for your goal + 1 earned from movement`,
+  collapsing to `1,972 base + …` on `maintain` — which is this entry's own check that a zero-delta
+  user sees the same number under both wordings. Split in the component, **not in
+  `budgetProvenance`**: that is shared and a single combined number is right for a caller that wants
+  one. Measured at all three goal shapes on `pnpm dev`, not reasoned.
+- **✅ The second half shipped too.** The measured RMR is re-scaled onto current lean mass rather than
+  used raw, and nothing said so, which made a measurement the owner paid for look ignored. The
+  measured-RMR form is the only place the number appears, so one line sits under the fat-free-mass
+  field saying what the app does with it.
+- **⚠ Neither the floor nor the goal maths was touched, and neither should be.** `restingBaseKcal` is
+  `Math.max(Math.round(bmr), …)` on **both** branches (`energy-balance-service.ts:284-286`); that is
+  what stops a base falling below measured resting metabolism, and the displayed number was under
+  1,325 only because the deficit is subtracted after the floor, which is also correct.
+- **Added:** 2026-09-01 · owner, with a Health screenshot: *"why is my base rate under the 1350 RMR
+  value."*
+- **The reconstruction that diagnosed this was arithmetic against live values, not a trace**, and it
+  is preserved in the journal entry rather than here. It matched the screen at three independent
+  points; the fix does not depend on it, because it relabels figures the component already holds.
+
+### [app-shell] BF-100 — back navigation always lands at the top, because the scroll position is not on the document
+
+- **Lane:** B — `components/pull-to-sync.tsx` (which owns the scroll container) plus wherever a route
+  change is observed.
+- **Added:** 2026-09-01 · owner: *"when I scroll down to a button; then click on it and it takes me
+  to a new page; when I press back I want to go back to that page at the same scroll level I was at.
+  It usually starts me at the top of the page. This is on many pages if not all pages."*
+
+**"If not all pages" is right, and there is one reason.** The app does not scroll the document — it
+scrolls an **inner container**. `pull-to-sync.tsx:190` renders the scroller with a `scrollRef`, and
+**62 files** carry `overflow-y-auto`. Next's App Router scroll restoration operates on the
+window/document scroller, so it cannot see, save or restore a nested element's `scrollTop`. Nothing
+in the app does it either: `grep` for `scrollRestoration`, `restoreScroll` or a `sessionStorage`
+scroll key returns **nothing** outside `use-scroll-to-bottom.ts`, which is unrelated.
+
+So this is not a regression and not per-screen — no code has ever existed to do it.
+
+- **Recommendation: save `scrollRef.current.scrollTop` per route key and restore on mount**, in
+  `pull-to-sync.tsx` so every screen using the shell inherits it, rather than 62 separate fixes.
+  `sessionStorage` is the right store — it is per-tab, dies with the app, and a stale offset is
+  worthless anyway.
+- **⚠ Restore AFTER the content has height, or it silently no-ops.** These screens paint from a cache
+  seed and then revalidate, so a restore on first paint sets `scrollTop` on a container that is still
+  short and the browser clamps it to 0 — which looks exactly like the bug. Restore when the content
+  has laid out (a `ResizeObserver` on the inner content, or after the seeded paint), and only once
+  per navigation so a later revalidation cannot yank the user back.
+- **⚠ Do not restore on a forward navigation.** Only a *back* return should land where the user was;
+  arriving fresh should start at the top. That means keying on the route AND clearing the entry when
+  a route is entered forward, or reading the navigation type.
+- **The persistent tab shell cuts both ways here** — a tab that never unmounts keeps its scroll
+  position already, so tab switches are not the complaint. The loss happens on a **push to a new
+  route and back**, which is what unmounts the screen.
+- **Verification:** on the S25, scroll Health well down, tap into a detail screen, press the system
+  back gesture — the page returns at the same offset, on a cold cache and a warm one; and reaching
+  the same screen forward still starts at the top.
+
+
 ### [nutrition] BF-97 — a scanned meal groups in the diary: the rendering half
 
 > **✅ THE ENGINE HALF SHIPPED 2026-09-01** (migration 252 + the `claude_ro` regeneration 253, local
@@ -2558,91 +2620,53 @@ owner has to re-describe in a wizard what the app already knows.
   worker.
 
 
+### [workouts] LB-46 — the AI Prescription card may list pre-deload numbers on a deload prescription
+
+- **Lane:** B — `components/workout/ai-prescription-card.tsx`, or whatever supplies its
+  `prescription` prop if the substitution happens upstream.
+- **Added:** 2026-09-01 by Lane B, incidentally, while device-substituting a fixture for BF-64.
+- **What was seen.** A `session_periodization` row whose prescription carries
+  `Deadlift {sets:3, reps:5, pct:60, deloaded:true, preDeload:{sets:4, reps:5, pct:80}}` renders in
+  the expanded card as **`4×5 @ 128.75kg (80%)`** — the *pre-deload* figures — directly under a
+  subtitle reading **`Deload session`**. The card's own code maps `prescription.exercises` and reads
+  `ex.pct`, so on the stored row it should print `3×5 … (60%)`.
+- **⚠ Attribution is measured, and the caveat is real.** It **reproduces on `main`** with the same
+  row (checked by stashing the BF-64 change and re-rendering), so it is not BF-64's doing. **But the
+  row was hand-built**, not produced by the engine, so the alternative explanation is that the
+  fixture is not a shape the engine emits and the card is fine. **Settle that first**: find a real
+  deloaded prescription in production (`prescription->'exercises' @> '[{"deloaded":true}]'`) and read
+  what the card shows for it before changing any code.
+- **If it is real, it matters more than it looks.** The subtitle and the numbers under it are the
+  two things a lifter reads to decide whether to override, and they would be disagreeing — the same
+  class as BF-8 (toggle disagreed with card) and BF-64 (toggle offered a control that did nothing),
+  one layer further in.
+- **Do not "fix" it by making the card follow the toggle.** BF-64 settled that: the card is a
+  statement about the prescription. If this is real the fix is to show what the prescription stored.
+
 ### [workouts] BF-64 — the Full/Deload toggle can only ADD deload, never remove one, so `Full · Override` overrides nothing
 
-- **Lane: B — RE-CLASSIFIED 2026-09-01 by Lane A, after reading the mechanism its own
-  recommendation names.** The entry assigned A on the assumption the fix lives in
-  `session-data.ts` or the prescribe route. Following its recommendation instead — reuse the
-  per-exercise revert — the fix is **entirely client-side**: `applyDeloadReverts`
-  (`components/workout/utils.ts`) and the overlay call at `components/workout-screen.tsx:238`.
-  Neither is Lane A's, and there is no server change to make. **Three things were verified rather
-  than assumed; read all three before starting.**
-- **1. `applyDeloadReverts` already does the whole per-exercise job**, and session-level Full is it
-  applied to every deloaded exercise. It sets `deloaded: false`, swaps in
-  `preDeloadStyle`/`preDeloadSets`, and — critically — **its own comment says it clears `deloaded`
-  so the log payload and PR paths treat the exercise as full**. So the 1RM/PR hazard this entry
-  flags is already handled by the mechanism it recommends. It also skips any exercise without
-  `preDeloadStyle`, so the optional-`preDeload` case is handled by construction: those stay
-  deloaded, which is the conservative answer, and the card is what has to say so.
-- **2. `preDeloadStyle` carries `useFor1rm: false` on every set, and that is NOT a bug.** It looks
-  like one: `preDeloadStyle = prescriptionStyleForExercise({ ...p, ...p.preDeload })` and
-  `p.preDeload` carries no `deloaded`, so the spread keeps `deloaded: true` and every set comes out
-  `useFor1rm: false`. **`estimateOneRm` treats an ALL-false style as "no per-set preference, use
-  them all"** (`const flagged = style?.some(s => s.useFor1rm)`, then `!flagged || …`), which
-  `1rm.ts` documents deliberately, and `deloaded` is the unambiguous signal instead. **Do not
-  "fix" this** — recorded here because it is exactly the shape someone corrects on sight.
-- **3. ⚠ The overlay must key on an EXPLICIT choice, not on `deload === false`.**
-  `useDeloadChoice` seeds `useState(seedFromUrl)` = false and adopts the prescription's deload in an
-  **effect**, so on first render `deload` is false while the prescription is a deload and the user
-  has chosen nothing. A revert keyed on `!deload` would flash full weights before settling back.
-  The hook already knows the difference — `chosenRef` — but does not expose it; exposing it is part
-  of the work.
-- **Added:** 2026-08-30 · owner, on the Pull pre-workout screen: *"pressing full or deload doesnt
-  change the 'prescription' not sure if its over writing it."* Screenshot: `Full · Override`
-  selected, `Deload suggested` in the corner, and the card below reading `AI Prescription · Deload`.
-
-**The answer to "is it overwriting it" is: in one direction only.** In `session-data.ts:220-250`,
-`aiDeload` is read inside an `else if` — it applies `deloadOverrideForGoal` **only when the
-prescription's exercise is not already deloaded**. So:
-
-| Prescription | Toggle | What runs |
-|---|---|---|
-| full | Deload | deloaded — the override lands (Q-109/Q-175 built exactly this) |
-| deload | Deload | deloaded |
-| deload | **Full** | **still deloaded — nothing in the pipeline un-deloads it** |
-
-There is no code path where choosing Full removes a prescribed deload. The toggle is one-way.
-
-**Which makes the label a promise the engine does not keep.** `use-deload-choice.ts` derives
-`prescribedDeload` from the live prescription, so with a deload prescription the toggle renders
-`Deload · As prescribed` and `Full · Override`. The word **Override** is the app stating it will
-override the prescription. It does not. That is worse than the BF-8 bug it descends from: BF-8 was
-the toggle *disagreeing* with the card, this is the toggle *offering a control that does nothing*.
-
-**And the asymmetry with the picker directly below it is the tell.** `SessionDurationPicker` →
-`handleDurationPresetChange` POSTs `/prescribe` with the new preset, regenerates the plan and
-refetches. `DeloadToggle` → `setDeload`, which is local state that only re-keys the `workout-data`
-fetch. **The prescribe route takes no intensity input at all** (`PrescribeBodySchema` is
-`excludeSessionId` + `durationPreset`), so intensity has no server path even in principle. Two
-controls side by side, one wired to the engine and one not.
-
-- **Recommendation (CONFIRMED against the code 2026-09-01): reuse the per-exercise revert, do not
-  add a second regeneration.** The
-  machinery is already built and already on the device. Every deloaded prescription exercise carries
-  a `preDeload` block, `session-data.ts` unpacks it into `preDeloadStyle`/`preDeloadSets`, and
-  `workout-store.toggleDeloadRevert` + `DeloadInfoSheet` already let the user revert **one** exercise
-  to its full numbers. Session-level `Full` is that revert applied to every deloaded exercise — no
-  LLM call, no rate limit, works offline, and it reuses a path the owner has already exercised.
-  A `/prescribe` round-trip would cost a rebuild and a 429 budget to reach numbers the prescription
-  is already carrying.
-- **⚠ It cannot be all-or-nothing: `preDeload` is optional** — `preDeloadStyle` is set only
-  `if (p.preDeload)`. **`applyDeloadReverts` already skips those**, so the behaviour is decided:
-  they stay deloaded. What is owed is the card SAYING so, rather than silently reverting some
-  exercises and not others with nothing on screen explaining which.
-- **⚠ PR and 1RM accounting must follow the revert, and this is the part that corrupts data if
-  missed.** `workout-screen.tsx:1204` computes `isAnyDeload = deload || phaseStatus.isDeloadActive`
-  and gates the 1RM estimate on it *and* on `ex.deloaded`. A reverted exercise runs full weights, so
-  it must count; an unreverted one must not. Getting this backwards either loses a real PR or writes
-  a PR off deloaded sets — and `fix/deload-provenance-and-previous-1rm` already fixed one bug in this
-  exact area, so it is a known-live hazard rather than a hypothetical.
-- **The card is not lying and should not be "fixed" to match the toggle.** `AI Prescription · Deload`
-  is a true statement about the prescription. Once Full actually overrides, the card needs to say the
-  override is in effect — the prescription is still a deload, the session running is not.
-- **Verification (device, AI-dynamic program, a day with a deload prescription):** pick `Full` → the
-  listed weights rise to the pre-deload numbers and the card says the override is on; pick `Deload`
-  → they drop back; complete a set under `Full` → it counts toward the 1RM/PR; complete one under
+- **Keep:** the device pass, and only that. Everything else shipped.
+- **Verify:** device — **AI-dynamic program, a day with a deload prescription.** Pick `Full`: the
+  listed weights rise to the pre-deload numbers and the card says the override is on. Pick `Deload`:
+  they drop back. Complete a set under `Full` → it counts toward the 1RM/PR; complete one under
   `Deload` → it does not. Then the reverse case, a **full** prescription with `Deload` picked, still
   behaves as Q-109/Q-175 built it — that path works today and must not regress.
+- **✅ SHIPPED** (`fix/deload-full-override-actually-reverts`, 2026-09-01). Session-level `Full` is
+  now the per-exercise revert applied to every deloaded exercise that carries pre-deload numbers, as
+  this entry recommended: no LLM call, no 429 budget, works offline. `isFullOverride`,
+  `deloadRevertNames` and `deloadOverrideBlocked` (`components/workout/utils.ts`) hold the rules;
+  `components/workout/__tests__/deload-full-override.test.ts` pins them, mutation-verified five ways
+  including the 1RM hazard.
+- **All three of this entry's warnings were honoured and are worth keeping:** the override keys on an
+  **explicit choice**, never `deload === false` (the first-render flash); an exercise with no
+  `preDeload` **stays deloaded** and the card names it rather than reverting silently; and 1RM
+  accounting follows without a separate change, because the revert clears `deloaded` and the
+  completion path already reads the reverted array.
+- **Added:** 2026-08-30 · owner, on the Pull pre-workout screen: *"pressing full or deload doesnt
+  change the 'prescription' not sure if its over writing it."*
+- **The `useFor1rm: false` on every `preDeloadStyle` set is still NOT a bug** — `estimateOneRm`
+  treats an all-false style as "no per-set preference, use them all", and `deloaded` is the
+  unambiguous signal. Left exactly as it is; it is the shape someone corrects on sight.
 
 ### [platform][app-shell] LB-32 — `min-h-[Npx]` is inert on every button in the app, and one comment already describes a size that never applied
 
@@ -6403,10 +6427,29 @@ design decision. See the correction at the top of that entry.
 
 - **Lane:** A
 - **✅ Gate: owner CLEARED 2026-08-30 — the scan was run** (device queue S8). Owner: *"took about
-  4 seconds from analysing photo"*, reported without complaint. **Four seconds is not the slowdown
-  this entry was filed about**, so close it against the measured `ai_call_log` figures rather than
-  building anything — and say in the closing note that it stopped rather than that it was fixed,
-  since no diff was ever traced to it.
+  4 seconds from analysing photo"*, reported without complaint.
+- **✅ MEASURED AND CLOSED 2026-09-01 — and the measurement contradicts this entry's own lever.**
+  Five image scans have now run since the 1024 px bound shipped, so `payload_bytes` is populated and
+  the two regimes can be compared directly (`ai_call_log`, `section = 'nutrition-scan'`,
+  `input_tokens > 1000`):
+
+  | | n | avg input tokens | avg latency | range | avg payload |
+  |---|---:|---:|---:|---|---:|
+  | before the bound | 17 | 1,280 | **4,146 ms** | 3,498–5,013 | — |
+  | after the bound | 5 | 1,460 | **2,671 ms** | 1,978–3,828 | 82.8 KB |
+
+  **Latency fell 36% while input tokens ROSE 14%.** So the `r = +0.958` this entry rests on does not
+  survive the intervention: it was measured *within* one regime, where image size moved both numbers
+  together, and across the change they moved in opposite directions. **Input tokens were not the
+  lever.** Same lesson as CLAUDE.md's *A Correlation Across a Model Change Is Not Evidence*, one
+  layer over — a correlation inside a regime is not a prediction about changing the regime.
+- **What is NOT claimed.** n = 5 against 17, and nothing here explains *why* input tokens rose under
+  a bound that shrinks pixels — worth a look if scan latency is ever raised again, but not worth
+  chasing now that the number the owner feels has halved. The owner's *"about 4 seconds"* is also
+  wall-clock and includes the upload and client work; the model call that day measured **2,346 ms**.
+  **It stopped rather than was fixed** in the sense this entry meant — no diff was ever traced to
+  the original slowdown — but the 1024 px bound is a real change and it is what the numbers moved
+  across.
 - **Branch:** `perf/scan-latency` · **Added:** 2026-08-23 from an owner report · re-measured 2026-08-25.
 - **📄 The full investigation is
   [`docs/reviews/2026-08-25-nutrition-scan-latency.md`](reviews/2026-08-25-nutrition-scan-latency.md)** —
@@ -6871,13 +6914,65 @@ screenshot is a **1:39** walk with the screen on, which exercises none of it.
 - **Verification.** HR live on-device with the strap paired, and the stale guard exercised by walking
   out of range. The notification half is **APK-only** and cannot be checked in `pnpm dev` at all.
 
+### [cardio][devices] LA-52 — the walk pacer's speed rung reads the WHOLE-WALK average, so it cannot track effort
+
+- **Lane:** B — `lib/stores/guided-walk-store.ts` is Lane B's. Filed by Lane A while scoping LA-48;
+  the letter records who found it, not who ships it.
+- **Added:** 2026-09-01 · Lane A, from reading the pacer's inputs rather than from a report.
+- **Measured, not inferred.** `appendPoint` sets
+  `currentPaceSecPerKm: computeAvgPaceSecPerKm(distanceKm, elapsedSec)` with **cumulative** distance
+  and **cumulative** elapsed since `startedAtMs`, and `computeAvgPaceSecPerKm` is
+  `durationSec / distanceKm`. `walk-active.tsx` then feeds `kmhFromPace(currentPaceSecPerKm)`
+  straight into `readPacer` as `speedKmh`. So the speed rung's input is the **average speed of the
+  whole walk so far**, not the speed now.
+- **Three consequences, in order of how visible they are:**
+  1. **The band cannot respond within a segment.** Twenty minutes in, a 30-second surge or slow-down
+     moves a cumulative mean by almost nothing — so `Q-410`'s *"go green → amber → red as you slow
+     down"* cannot happen on this rung, whatever `BAND_TOLERANCE` is set to.
+  2. **`STOPPED_KMH` is effectively dead on this rung.** Reading `stopped` needs the whole-walk
+     average below **1.5 km/h**; after a few minutes of walking, standing still cannot get it there.
+     The constant exists for the crossing case (LB-36 check 3) and cannot fire.
+  3. **Warmup, fast and slow all band against the same slowly-drifting number**, so the fast/slow
+     distinction the plan is built on is invisible to the speed rung.
+- **⚠ The e2e passes and is not wrong.** `e2e/walk-pacer-speed-rung.spec.ts` asserts the readout
+  appears, the fallback note names the rung, and a thin history drops the rung — none of which needs
+  the band to *respond*. It also drives a short series, and early in a walk a cumulative mean is
+  still responsive. A test that never changes effort mid-walk cannot see this.
+- **The fix is a windowed speed, and it is a store change.** Derive from the last N seconds of
+  `rawPoints` (the same `haversineDistanceKm` already there) rather than from the cumulative totals,
+  and keep the cumulative figure for the summary, which genuinely wants an average. **Do not "fix" it
+  by widening `BAND_TOLERANCE`** — that treats an inert signal as a noisy one and would make the
+  cadence rung worse in the same move.
+- **Verification:** on a real walk, slow deliberately mid-segment and watch the band move within
+  ~10 s; stop at a crossing and read **Stopped**. Both are already LB-36's device checks — this entry
+  is why two of them would fail today.
+
 ### [cardio][devices] LA-48 — a walk's pacer creates an adherence number and nothing stores it
 
 - **Branch:** none yet
 - **Added:** 2026-08-31 · Lane B, splitting the storage half out of Q-410 when the surface half shipped
-- **Lane:** A — `activity_logs.segments` is a schema edit (`lib/data/postgres/schema.ts`), and per the
-  offline-sync rule the local SQLite mirror, the outbox payload, `getSyncDelta` and `applyDelta` all
-  move in the same PR. Nothing here is reachable from Lane B.
+- **Lane:** A
+- **Needs:** LA-52
+- **⚠ SCOPE CORRECTED 2026-09-01 by Lane A, from reading the code rather than the entry.** Two of the
+  three claims below moved:
+  - **There is NO migration and NO local schema version.** `activity_logs.segments` is `jsonb` on the
+    server (`$type<>` is a TypeScript annotation) and `TEXT` locally, so nothing is a column edit.
+    What must move together is the **type in four places** — `WalkSegmentStat`
+    (`lib/walk/segment-stats.ts`), the `$type<>` in `schema.ts`, `LocalActivityLog`
+    (`lib/local-store/types.ts`), and **`WalkSegmentStatSchema`
+    (`packages/shared/src/validation/activity-log.ts`)**. That last one is the trap: Zod **strips**
+    unknown keys by default, so a field added everywhere except the wire schema is silently dropped
+    on both write paths with no error — the same silent-loss shape that dead-lettered every guided
+    walk in 2026-08-02, in reverse.
+  - **The adherence roll-up needs no Lane B producer.** `readPacer` is pure and every input is
+    already reconstructible from what `computeWalkSegmentStats` receives — cadence from
+    `cadenceSeries`, hr from `hrSamples`, and speed from `rawPoints` via the *same* cumulative
+    formula the live store uses, so a post-hoc reconstruction matches what the walker saw exactly.
+  - **Which is precisely why this now `Needs: LA-52`.** It matches what the walker saw, and what the
+    walker saw on the speed rung is a whole-walk average. Storing adherence computed from that would
+    bake the defect into the archive as an analysis variable — the class BF-59 exists about. **Ship
+    `steps` first if this is split; it is a clean derivation from `cadenceSeries` and depends on
+    nothing.**
 - **Why this exists separately.** Q-410's surface half shipped 2026-08-31: `lib/walk/walk-pacer.ts`
   now decides, once a second, which signal is pacing a segment and which band the walker is in. That
   is a *new* measurement — it did not exist before, so nothing records it — and the owner's ask was
@@ -7811,11 +7906,44 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 - **Verification:** the route is already proven end to end on `pnpm dev` (all four verbs, including
   idempotency and the 401). This item is the affordance only.
 
+### [platform] LA-53 — an entry whose remaining half changed lanes keeps heading the OLD lane's list
+
+- **Lane:** A — `scripts/check-backlog-pointers.js` and `scripts/next-item.js`.
+- **Added:** 2026-09-01 · Lane A, after hitting the same shape three times in one session.
+- **The shape.** `next-item.js` reads the `Lane:` field, and nothing re-reads it when an entry's
+  remaining work moves to the other lane. So an entry whose Lane A half has shipped keeps surfacing
+  at the **top** of Lane A's READY list, and the next implementer spends the read discovering it.
+- **Three in one session, all of them real:**
+  - **Q-535** — Lane A half shipped 2026-08-18; the remaining half is Q-318's, Lane B's. It headed
+    Lane A's list for two weeks.
+  - **BF-64** — filed Lane A because *"the decision lives in `session-data.ts`"*; following its own
+    recommendation the fix is entirely client-side and Lane B's.
+  - **LA-47** — the entry says outright that the split it proposes *"does not compile"*, so its
+    remaining piece is cross-lane and unstartable as written.
+- **What a check can see, and what it cannot.** The first is mechanical: a body line matching
+  *"the Lane A half shipped"* (any case, either lane) while `Lane:` still names that lane is a
+  contradiction inside one entry, and `check-backlog-pointers.js` already parses both. The second and
+  third are judgement and no script will catch them — which is the argument for catching the one that
+  is mechanical rather than for catching none.
+- **⚠ Make it advisory first.** The existing `Keep:`-residue note prints as advice rather than a
+  failure for exactly this reason: a heuristic that fails CI on a phrasing variant costs more than
+  the drift does. Count the hits, print them, and only consider failing once the count is stable at
+  zero.
+- **Verification:** the check names Q-535 before this entry's own fix to it lands, and names nothing
+  after; `next-item.js --lane A` no longer heads its list with an entry whose Lane A half is done.
+
 ### [platform][devices] Q-535 — Redecode reports "failed: 502" for work that succeeded
 
 - **Branch:** `fix/redecode-async-job`
 - **Added:** 2026-08-17, after a redecode reported `redecode failed: 502` while in fact completing.
-- **Lane:** A — classified 2026-08-30 by CLAUDE.md's path rule (*touches `app/api/**` → A*; the fix is in `POST /api/oura-ble/samples/redecode` and its job handling).
+- **Lane:** B — **corrected 2026-09-01.** It was classified A on 2026-08-30 by the path rule, which
+  was right then; the Lane A half shipped on 2026-08-18 (see below) and everything still owed is the
+  poller and the default flip, which is Q-318's and Lane B's.
+- **Needs:** Q-318
+- **⚠ This entry read as READY at the top of LANE A's list for two weeks after its Lane A half
+  shipped**, because `next-item.js` reads the `Lane:` field and nothing re-reads it when the
+  remaining work moves lanes. The date-scoped redecode floated under *"what to do"* is a suggestion,
+  not a commitment, and is not what keeps this open.
 - **What happens.** `POST /api/oura-ble/samples/redecode` hardcodes `fullHistory: true` — there is
   no scoped variant — so it walks all 1.1M rows and then rebuilds **every** daily summary. Q-213
   moved that work off the event loop into the rollup worker, which is why the rest of the process
@@ -11160,6 +11288,9 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 
 ### [app-shell] Q-354 — the date-swipe `useDrag` swallows MOUSE clicks on Nutrition (touch is fine)
 
+- **Reference:** this entry is READ, not built. Its own recommendation is *do not pursue*, and while
+  it sat in the READY list it headed Lane B's work list — offering every session a build its own text
+  argues against. The field is what stops that; the content below is unchanged and still current.
 - **Lane:** B
 - **Branch:** `fix/nutrition-mouse-click-swallowed`
 - **Added:** 2026-08-17 as the residue of Q-309 · **cause located and proven 2026-08-17**
@@ -11194,6 +11325,15 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   saying why. **So the practical cost of leaving this open is a trap for the next spec author**,
   not a user-facing bug — every new e2e assertion that presses something inside the Nutrition
   scroll container has to know about this first, and the failure gives no clue.
+- **✅ The trap is now signposted where a spec author hits it (2026-09-01).** `e2e/README.md` said
+  the **opposite** of what was measured — *"a real touch sequence does not open the water sheet while
+  a synthesised `click` event does"*, which is Q-309's pre-measurement suspicion, never updated when
+  `water-log-write-path.spec.ts` measured the reverse the same week. Anyone hitting a dead tap and
+  consulting the README would have concluded touch was the broken path and reached for
+  `dispatchEvent('click')` — the workaround that spec deliberately moved away from. Corrected, with
+  the measured table and the two specs that carry the reasoning inline. That spec's own
+  *"the gesture code is not implicated"* conclusion is corrected too: it reasoned about the touch
+  path, and `useDrag` binds mouse as well.
 - **Recommendation: do not pursue without a reason.** The only working path is the one that matters,
   a rewrite risks it, and there is no user on the supported runtime who benefits. Revisit if the app
   ever gets genuine desktop use, or if an automated accessibility/interaction scanner starts driving

@@ -6,6 +6,25 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.423.0",
+    date: "2026-09-01",
+    changes: [
+      "The calorie line no longer calls your goal deficit part of your base rate. It read \u00221,264 base\u0022 when your resting base was 1,464 and 200 of that was the recomp target \u2014 which is why the number looked lower than your measured RMR. It now reads \u00221,464 base \u2212 200 for your goal\u0022, and the figures still add up to the same budget.",
+      "On maintain there is no goal line at all, since the deficit is zero.",
+      "The measured-RMR form says what the app does with the number: it re-scales the test onto your current lean mass rather than using it as entered, so the resting rate it works from drifts a little as your body composition changes.",
+    ],
+  },
+  {
+    version: "1.422.0",
+    date: "2026-09-01",
+    changes: [
+      "Picking Full on a deload day now actually runs the full session. It never did \u2014 the toggle said \u0022Full \u00b7 Override\u0022 while nothing in the pipeline could remove a prescribed deload, so the weights stayed light whichever you picked.",
+      "Every deloaded exercise goes back to the weights and sets it had before the deload, and those sets count toward your 1RM again.",
+      "Where the prescription did not record the full numbers for an exercise, it stays deloaded and the card names it, rather than quietly reverting some exercises and not others.",
+      "The prescription card says the override is on. It still shows the prescription as a deload, because it is \u2014 what changed is the session you are about to run.",
+    ],
+  },
+  {
     version: "1.421.0",
     date: "2026-09-01",
     changes: [
