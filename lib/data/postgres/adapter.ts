@@ -115,6 +115,7 @@ const BODY_METRICS_SOURCE_COLS: SourceColumn[] = [
   { prop: 'bmrKcal', col: 'bmr_kcal' }, { prop: 'metabolicAge', col: 'metabolic_age' },
 ]
 import { aestMidnight, toAestDay, todayInTz, todayDayOfWeek, todayMidnightUtc, dateStrMidnightInTz, shiftDateStr, DEFAULT_TZ } from '@trainingai/shared/date-utils'
+import { isTemperatureBaselineCentred } from '@trainingai/shared/health/temperature-baseline-health'
 import { clampWindowStart } from '@trainingai/shared/workout/time-audit'
 import { computeAiDynamicNextSession, TEMP_ALERT_THRESHOLD_C, type AiDynamicInput } from '@trainingai/shared/ai-periodization/ai-dynamic'
 import { computeMuscleRecovery } from '@trainingai/shared/ai-periodization/muscle-recovery'
@@ -1688,12 +1689,19 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
         this.listSleepSessions(userId, from14dStr, todayIso),
         this.listBodyMetrics(userId, from14dStr, todayIso),
         this.getOuraDailyDerived(userId, shiftDateStr(todayIso, -1), todayIso),
-        this.getOuraDailySummary(userId, todayIso, todayIso),
+        // TN-18 widened this from today-only to the same 28-day window `readiness-payload` reads.
+        // The elevated-temp deload needs the trailing deviations, not just today's, because the
+        // question it must answer first is whether the baseline is centred at all. 28 rows of a
+        // table holding ~106 in production; the cost is nil.
+        this.getOuraDailySummary(userId, shiftDateStr(todayIso, -27), todayIso),
         this.getDayCheckin(userId, todayIso, 'morning'),
       ])
 
       const ouraToday = ouraRows[0] ?? null
-      const todaySummary = summaryRows[0] ?? null
+      // Still TODAY's row, found by date rather than taken as the first: the window above is a
+      // range now, so `summaryRows[0]` would silently become the OLDEST night — a 28-day-stale
+      // temperature deviation feeding a deload banner.
+      const todaySummary = summaryRows.find(r => r.date === todayIso) ?? null
       const illnessFlag = latestIllnessFromDerived(derivedRows)?.flag ?? null
       // Daytime stress is a same-day signal, so it must read TODAY's row — not
       // derivedRows[0], which is the earliest (yesterday) since the range is
@@ -1742,6 +1750,10 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       // Baseline maturity for the elevated-temp deload gate (≥30 nights). Only our own summary
       // carries a real accrued baseline; the frozen Cloud fallback reports 0 so it can't fire.
       const temperatureBaselineDays = todaySummary?.nHistory ?? 0
+      // TN-18. The SAME condition the readiness ladder uses, imported rather than re-derived —
+      // two answers to "is temperature trustworthy" is exactly what produced a 80/100 temperature
+      // contributor and a "Body temp elevated" deload banner for one night.
+      const temperatureTrusted = isTemperatureBaselineCentred(summaryRows.map(r => r.tempDevC))
 
       const result = computeAiDynamicNextSession({
         sessions,
@@ -1754,6 +1766,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
         readinessScore: liveReadiness,
         temperatureDeviation,
         temperatureBaselineDays,
+        temperatureTrusted,
         daySummary: ouraToday?.daySummary ?? null,
         sleepTrend,
         energyLevel: moodLog?.energyLevel ?? null,
@@ -1777,6 +1790,10 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
           temperatureDeviation,
           temperatureBaselineDays,
           temperatureAlertThresholdC: TEMP_ALERT_THRESHOLD_C,
+          // Surfaced so the "Why this?" explain page can say the alert is SUSPENDED rather than
+          // showing a deviation over the threshold beside no alert and looking broken (Q-105's
+          // rule: the explain page shows the numbers the recommendation was computed from).
+          temperatureTrusted,
         },
       }
     }
