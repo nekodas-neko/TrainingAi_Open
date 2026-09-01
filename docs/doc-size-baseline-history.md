@@ -5693,3 +5693,24 @@ The entry also answers the owner's *"make it smaller if needed"* with the reason
 lever, and names the fallback that is right if the longest dates still overflow — shorten the date,
 not the chip, because a phone already shows the date elsewhere and shows neither the temperature nor
 the UV.
+
+## 2026-09-01 — `docs/implementation-backlog.md` 15253 → 15336 (BF-97 scans never group, BF-98 macros drawn twice)
+
+Two reports in one message, and the first turns out to be an entry's own motivating case still open.
+`diary-groups.ts` opens by quoting the report behind BF-39 — *"one AI-logged breakfast as eight
+diary rows"* — and grouping requires a resolvable **saved meal**, which a scan cannot have:
+`mealGroupId` is minted in one place, always beside `savedMealId`, and the scan route references
+neither field. BF-39 shipped the saved-meal half; today's screenshot is the same eight-row shape it
+was filed for.
+
+BF-97's length is the decision it refuses to take: **where a scanned group's name comes from**. The
+grouping rule deliberately will not head a group it cannot name, so three options are laid out with
+the recommendation (carry the scan's dish description, keep My Meals clean) and the trap named — do
+not mint a placeholder saved meal to satisfy a display rule.
+
+BF-98 is short because the fix is one variable. `logs.length > 1` gates the section footer on the
+**flat** log count, so a 3-ingredient group passes it and draws macros that the group header already
+drew. The file computes `entries` twelve lines earlier and its own comment states the rule — *"a
+single row already states its own macros, so a footer would repeat it"* — applied to the collapsed
+branch and never to this one. The entry works the condition through all four cases so the fix can be
+checked rather than trusted.
