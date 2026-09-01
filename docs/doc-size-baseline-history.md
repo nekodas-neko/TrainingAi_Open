@@ -6292,8 +6292,26 @@ earlier instances this week and was walked into anyway, which is the argument fo
 the **specific** consumer rather than in general. The entry also records the positive half: this is
 the one baseline in the codebase built correctly, and TN-6 can copy it rather than invent one.
 
+## 2026-09-01 — `projectOverview.md` → 9078 (BF-101)
 
-## 2026-09-01 — `projectOverview.md` → 9078 (LA-52)
++15 for a feature whose whole point is a claim about *numbers*, and the numbers are what has to be in
+the index. The 7,000-against-Moderate drift is the evidence the control exists, and it is the one
+line a future session would otherwise have to re-derive from the owner's screenshot to know whether
+the feature is working.
+
+The measured-RMR sentence is there for a narrower reason: it is the decision most likely to be
+undone as an optimisation. Dropping that fetch looks free and silently reintroduces the "two numbers
+for one thing" defect LA-45 and BF-99 each cost a session to close.
+
+The backlog baseline is untouched — BF-101 left the queue as a shipped entry with a `Keep:` line for
+its device check, and LB-48 replaced it in roughly the same number of lines.
+
+**Recomputed from the merged file on rebase**, not spliced: `main` had moved to 9063 while this
+branch sat behind a red base, so the number this branch first wrote (9068, from a 9053 base) was
+stale by exactly the block someone else added. 9078 is the merged file's own count.
+
+
+## 2026-09-01 — `projectOverview.md` → 9093 (LA-52)
 
 +15 for a defect whose whole content is *which number the screen was showing*. The three
 consequences — the band cannot respond, `STOPPED_KMH` can never fire, warm-up/fast/slow band against
@@ -6305,17 +6323,14 @@ the code comment beside it actively said the opposite, and it is the part a read
 looking at the screen. The e2e line is there because a spec that asserts something now deliberately
 false is the kind of thing a later session "fixes" back.
 
-**The recompute was needed for a different reason first.** `main` moved while this branch sat behind
-a red base (#775, #778, #766), taking the file from 9053 to 9063 — so the 9068 written here against
-the old base was already stale before #776 entered it. 9078 is the merged file's own count,
-recomputed rather than spliced.
+**This number was recomputed twice and the warning it was written under came true.** The branch first
+wrote 9068 against a 9053 base; `main` then moved to 9063 behind a red CI (#775, #778, #766), making
+that stale before anything merged, and #776 (BF-101) landed its own 15-line status block on top.
+9093 is the merged file's own count. Both intermediate numbers were arrived at by recomputing from
+the file rather than splicing the conflict hunks, which is the only resolution that survives a base
+moving twice.
 
-**PR #776 (BF-101) still raises this file by its own 15 lines and is not in this merge**, so whichever
-of the two lands second needs this number recomputed once more, from that merged file. Both branches
-happen to read 9078 today, which is a coincidence of two 15-line blocks against one base and not a
-reason to keep either number.
-
-## 2026-09-01 — `docs/implementation-backlog.md` → 15537 (LA-52 + two splits)
+## 2026-09-01 — `docs/implementation-backlog.md` → 15534 (LA-52 + two splits)
 
 +56, and only about a third of it is LA-52's own shipped entry. The rest is two splits — **LB-49**
 (the meal-log scale argument) and **LB-50** (the measured activity factor plus a prompt string that
