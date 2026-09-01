@@ -8,17 +8,16 @@ live; the original `OR-1` was withdrawn as a duplicate of BF-23, so 1–99 were 
 
 ## Now
 
-**PR open on `docs/owner-decisions-2026-09-01`; merge when green.** Three owner gates cleared
-(**BF-84** rest is a stored fact, **Q-187** spread at read time, **Q-531** consoles back behind
-`/admin`); owner-gated entries down to **11**. **`device-verification-queue.md`'s coverage claim was
-stale** — it said it held every `Gate: device` entry (27, 2026-08-26); there are **39** and **22 were
-absent**. All added, with the sitting's real shape in the header (~25 pressable, 4 need `apk-latest`,
-5 need the Colmi ring, 5 are not presses). **`D7` already answered half of `Q-34`, and `S3` is
-`Q-147`** — both cross-linked, so neither gets re-asked.
+**PR open on `docs/owner-decisions-round2`; merge when green.** A full sweep of all eleven
+`Gate: owner` entries in two rounds. **The queue now holds ZERO unanswered owner questions.** Gates
+11 → 7, and each of the 7 is a decision made (`Q-1b`, `Q-149`), an action deferred to a later batch
+(`Q-11`, `Q-71`), an accepted action (`Q-4`), an explicit hold (`Q-551` — do not re-ask until Q-545),
+or a stop sign (`TN-16`). **Do not re-put any of them to the owner.**
 
-**"B is saying there is no work" has two answers.** The sweep (#708) took Lane B 32 → 8 honestly —
-the 32 was unlabelled rows shown to *both* lanes. But **OR-100** is a defect: four of Lane B's twelve
-`KEEP` entries are builds, so its true depth is ~13.
+**`Q-149` is the one to read.** Its own two premises were falsified against production: the chest
+strap is the dominant HR source (156 rows to the ring's 39; 88% coverage to 54%) and the "~7
+verdicts" figure was stale at **84**. Mean peak 99 bpm, so the textbook 15 bpm bar fails **76%** of
+this owner's sets. Answer is *fit it to the user*; re-gated on signing the number Tuning proposes.
 
 ## Next — in this order
 

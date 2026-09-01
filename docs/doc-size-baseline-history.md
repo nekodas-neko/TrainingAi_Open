@@ -6006,6 +6006,30 @@ reads an all-false style as "use them all".
 A finding that something is *not* broken earns its lines here exactly when the thing looks broken on
 sight, which this does.
 
+## 2026-09-01 — `docs/implementation-backlog.md` 14924 → 15034 (+110)
+
+`docs/owner-decisions-round2`. A full sweep of the eleven `Gate: owner` entries, put to the owner in
+two rounds. **Seven decisions came back and the queue now holds zero unanswered owner questions** —
+the remaining seven gates are a decision already made (`Q-1b`, `Q-149`), an action deferred to a
+later batch (`Q-11`, `Q-71`), an action accepted (`Q-4`), an entry the owner explicitly held
+(`Q-551`), or one whose own text forbids asking (`TN-16`).
+
+The growth is decisions and their reasoning, which is the expensive half to reconstruct:
+
+- **`Q-149` carries a new production measurement that falsifies two of its own premises** — the
+  chest strap is the dominant HR source (156 rows against the ring's 39, and 88% coverage against
+  54%), and the "~7 usable verdicts" figure was stale: there are **84**. With mean peak at 99 bpm,
+  the textbook 15 bpm bar fails **76%** of this owner's sets. That table is why the answer is "fit
+  it to the user" rather than "pick a smaller number", and it is what Tuning starts from.
+- **`Q-294` records four decided failure behaviours**, two signed by the owner and two defaulted,
+  labelled so a reader can tell them apart. The decision *was* the work; it becomes a `Reference:`
+  for Q-249's scenarios.
+- **`LA-50` and `Q-253` are declined**, and each keeps the measurement that argued it — the
+  Chromium-version gap and the Firebase/BrowserStack comparison — as `Reference:` so a future
+  session reads rather than re-derives.
+- **`Q-48` lost its gate without an owner answer**, because it never needed one: F3 and F7 are now
+  answered, F8 was fixed in its own PR, and what remains is planning work that had been invisible
+  behind a decision field for weeks.
 ## 2026-09-01 — `docs/implementation-backlog.md` → 14976 (LA-52 filed, LA-48 re-scoped)
 
 One new entry and a scope correction, both from reading code rather than from a report. The lines
@@ -6110,6 +6134,12 @@ failure mode from a wrong number, and it is the one a future session will not th
 Two negatives are kept for the same reason as always: the split is in the component and **not** in
 `budgetProvenance` (shared, and one combined number is correct for a caller that wants one), and
 neither the `Math.max` floor nor the goal maths was touched — both look like the bug and are not.
+
+## 2026-09-01 — `docs/implementation-backlog.md` → 15174 (merge resolution)
+
+`docs/owner-decisions-round2`, merging `main`. Re-measured after the merge, not carried across it.
+Both sides of this file's own conflict kept — append-only, so a conflict here is two additions.
+Entry-ID set diffed against the new `origin/main`: **identical, nothing added or lost.**
 
 ## 2026-09-01 — `projectOverview.md` → 9015 (BF-100)
 
