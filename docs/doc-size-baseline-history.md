@@ -5822,3 +5822,12 @@ had to survive rather than a summary of them. A shorter block would read as "blo
 stored" and lose the part a future session needs: that the verdict is **derived from the bounds and
 never read off the provider's flag**, which is the one rule a well-meaning consumer would otherwise
 break by trusting the words the report prints.
+
+## 2026-09-01 — `projectOverview.md` → 8846, `docs/implementation-backlog.md` → 15016 (BF-96, BF-95)
+
+Two shipped fixes. Both entries **stayed** in the queue as `Keep:` plus `Verify: device` rather
+than being deleted, which is the new field's whole point — shipped-but-unseen is debt that should be
+countable, not finished work that vanishes. The status block leads with the fact that the pill never
+moved, because "go back to the old way" invites reverting a layout that was never changed, and with
+the measured 12–22 character range that corrects the entry's own figure.
+

@@ -6,6 +6,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.418.3",
+    date: "2026-09-01",
+    changes: [
+      "The temperature and UV pill on Home stays on one line. It was never moved \u2014 it was wrapping, because it was the only thing in that row allowed to give up space and a long date like \u0022Wednesday 30 September\u0022 uses all of it.",
+      "A swipe-to-delete started at the very edge of the screen no longer risks changing tab at the same time.",
+    ],
+  },
+  {
     version: "1.418.2",
     date: "2026-09-01",
     changes: [
