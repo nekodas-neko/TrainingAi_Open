@@ -27,6 +27,15 @@
 **Version:** v1.423.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-09-01.
 
+**The queue tool stops pointing Lane A at another lane's finished work (LA-53).** `next-item.js`
+reads an entry's `Lane:` field and nothing re-reads it when the remaining work moves lanes, so
+**Q-535 headed Lane A's READY list for two weeks** after its Lane A half shipped. An advisory note in
+`check-backlog-pointers` now names any entry that contradicts itself that way — 0 on the current
+tree, and it fires on Q-535's real pre-fix state. **The rule reported its own documentation twice**
+before the two exclusions were added (undated prose describing the shape; a dated citation of another
+entry), which is the concrete reason it prints rather than fails
+([journal](docs/overview/entries/2026-09-01-lane-drift-note.md)).
+
 **The calorie line called a goal deficit part of the base rate (BF-99).** Owner, with a screenshot:
 *"why is my base rate under the 1350 RMR value."* `budgetProvenance().base` is
 `restingBaseKcal + targetNetKcal` — the resting base with the goal delta already folded in — and the

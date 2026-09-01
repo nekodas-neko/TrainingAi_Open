@@ -6140,3 +6140,13 @@ neither the `Math.max` floor nor the goal maths was touched — both look like t
 `docs/owner-decisions-round2`, merging `main`. Re-measured after the merge, not carried across it.
 Both sides of this file's own conflict kept — append-only, so a conflict here is two additions.
 Entry-ID set diffed against the new `origin/main`: **identical, nothing added or lost.**
+
+## 2026-09-01 — `projectOverview.md` → 9008, `docs/implementation-backlog.md` → 15172 (LA-53 shipped)
+
+The backlog shrank: LA-53's entry carried the three worked examples and the design argument, and
+those are now in the journal. What stays is the two cases no script will ever catch — BF-64 and
+LA-47 — and the question of whether the note should ever fail rather than print.
+
+`projectOverview.md` grew 8, and the line that earns them is the one about the rule reporting **its
+own documentation** twice before the exclusions existed. Without it the note reads as ordinary
+caution; with it, the reason it prints rather than fails is a measurement.
