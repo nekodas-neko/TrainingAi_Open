@@ -24,8 +24,23 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.420.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Version:** v1.421.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-09-01.
+
+**The device consoles have one home, and the BLE page is a runbook (Q-531).** Owner, running the
+re-sync: *"it was moved away from the admin section = bad"* and *"everything is spread out
+sporadically."* **The first half was already false and checking it changed the work:** all three
+consoles were routed under `/admin` and `isAdminUser`-gated the whole time — Q-234 moved the *links*
+to Settings → Developer, so the owner went to `/admin`, found nothing listed, and reasonably
+concluded they had left. A **reachability** defect, needing the opposite fix from the one the entry
+proposed; building it as written would have been a no-op dressed as a security fix. `/admin` now has
+a **Devices** tab, `/admin/oura-ble` is six numbered sections in §4-of-the-runbook order instead of
+fourteen stacked consoles, and Settings → Developer keeps Diagnostics only.
+`device-console-access.test.ts` pins the gating, the reachability, the one-home rule and Q-544's
+card ordering — five mutations, five failures. Non-admin redirect verified on all three routes.
+**Not device-verified, and here that is most of the value** — every console below step 2 needs the
+native plugin, so the structure was checked and the flow was not
+([journal](docs/overview/entries/2026-09-01-fix-device-console-ia.md)).
 
 **The screens show the DEXA-corrected body fat now (LA-45).** BF-2 step 4 put
 `bodyFatCorrected`/`bodyFatIsCorrected` on every row of `/api/body-metadata` and `/api/day-log`, plus

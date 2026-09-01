@@ -5956,3 +5956,19 @@ stored value turned out to be lying.
 Caveats are carried at the same weight as the finding: **n = 8–9**, the waking window is this
 review's choice rather than the app's, and re-testing at n ≥ 30 is a precondition for building
 anything on the metric.
+
+## 2026-09-01 — `projectOverview.md` → 8942 (Q-531)
+
++15, and the lines that cannot be cut are the correction rather than the change. "The device
+consoles are grouped better now" is the short version and it loses the only thing a future session
+needs: **the entry's premise was false, and checking it inverted the fix.** The consoles were already
+routed under `/admin` and already gated; Q-234 had moved the links. Written short, the next reader
+sees a tidy-up. Written this way, they see that an owner report can be literally true about the
+navigation and literally false about the routing, and that the difference decides whether you are
+fixing access control or reachability.
+
+The backlog **shrank by 24 lines** — Q-531 carried the whole owner-gate argument and a superseded
+block preserved from before the decision, both of which are now either shipped or in the journal.
+
+(8942, not the 8926 measured before merging: TN-22 landed 16 lines in between. A size baseline is a
+measurement of the merged file, never the sum of two hunks.)
