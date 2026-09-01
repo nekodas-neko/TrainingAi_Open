@@ -388,6 +388,89 @@ below threshold and left in place for next time.
 > BF-29 (My meals), BF-30 (Meal detail), BF-31 (Edit meal) and BF-26 (Quantity). Two artboards need
 > no entry — `Tap targets` and the `srv/g` studies both shipped in Q-395a.
 
+### [nutrition] BF-97 — a scanned meal still lands as N loose rows, which is the case BF-39 was filed for
+
+- **Lane:** B for the diary rule; A if the scan write path has to mint the group id.
+- **Added:** 2026-09-01 · owner, with two screenshots side by side: *"looks like saved meals groups
+  the food well; but when scanning it doesnt."*
+
+**Saved meals group; scans do not — and the docstring for the grouping says why in its own words.**
+`components/nutrition/diary-groups.ts` opens by quoting the report that produced BF-39: *"A
+screenshot showed one AI-logged breakfast as **eight** diary rows — flour, protein powder, baking
+powder, salt, milk, eggs, butter, bacon — filling the whole meal section."* Today's screenshot is
+the same shape: a scanned lunch as **eight** rows — beef, carrots, spinach, cabbage, corn, capsicum,
+cucumber, broccoli. **BF-39 shipped the saved-meal half and the motivating case is still open.**
+
+**Why, exactly.** `groupDiaryEntries` requires *both* ids and a resolvable meal:
+
+```ts
+if (!groupId || !mealId || !knownMealIds.has(mealId)) { out.push({ kind: 'log', … }); continue }
+```
+
+and `mealGroupId` is minted in exactly one place — `packages/shared/src/nutrition/log-meal.ts:58`,
+always alongside `savedMealId: meal.id`. `app/api/nutrition/scan/route.ts` contains **zero**
+references to either field. A scan therefore cannot produce a group even in principle.
+
+- **The decision this needs is where a scanned group's NAME comes from**, and it is why the entry
+  stops here rather than picking. The grouping rule deliberately refuses to head a group it cannot
+  name — *"heading them 'Meal' would be inventing a name the app does not have"* — and that
+  reasoning still holds. Three options:
+  1. **Relax the rule to allow a group with a name but no saved meal.** The scan already produces a
+     dish description; carry it onto the logs and let `DiaryEntry.kind: 'meal'` take a name instead
+     of a `savedMealId`. Least invasive to the user's data — nothing new appears in My Meals.
+  2. **Have a scan create a saved meal.** Grouping then works unchanged, but every scanned lunch
+     becomes a permanent entry in My Meals, which the owner has to prune. Likely unwanted.
+  3. **Group on `mealGroupId` alone, unnamed.** Cheapest, and the rule already argues against it.
+- **Recommendation: option 1**, and note it makes `savedMealId` optional on the `'meal'` entry —
+  a type change the renderer and `diary-meal-group.tsx` both have to follow (the photo comes from
+  the saved meal today; a scan would supply its own image or none).
+- **⚠ Do not "fix" this by making the scan write `savedMealId` to a placeholder meal.** That puts a
+  fake row in the user's meal library to satisfy a display rule, and every screen reading saved
+  meals then has to know about it.
+- **Related, and NOT the same bug:** BF-72 is grouping being **lost** on hydration
+  (`use-food-logs-loader.ts` drops both ids from the `applyDelta` payload). This entry is grouping
+  never being **created**. BF-72 shipped and owes a device check; a scan would still render flat
+  with BF-72 perfect.
+- **Verification:** a scanned multi-item meal draws as one collapsible row with its own name and an
+  item count; two scans on one day stay separate rows; and a single-item scan still renders as a
+  plain row, per the existing "a group of one buys nothing" rule.
+
+### [nutrition] BF-98 — a section holding one grouped meal draws its macros twice
+
+- **Lane:** B — `components/nutrition/meal-card.tsx:145`, one condition.
+- **Added:** 2026-09-01 · owner, same message: *"the combined item UI doesnt look great with the
+  double macros at the bottom."*
+
+**The screenshot shows `P 30g C 7g F 5g` twice, stacked**, under PRE WORKOUT (BREAKFAST) — once as
+the Protein Shake group's own row, then again as the section's totals footer. They are identical
+because the section holds nothing but that group.
+
+**The condition counts the wrong thing:**
+
+```tsx
+{/* Totals footer — only shown when there are 2+ items */}
+{logs.length > 1 && <MealTotals totals={totals} bordered />}
+```
+
+`logs` is the **flat** list; the Protein Shake is 3 logs, so `logs.length > 1` passes. What the
+footer actually needs to know is how many **rendered entries** there are — and the file already
+computes that as `entries` (`:35`, from `groupDiaryEntries`). One group is one row.
+
+- **The rule is already written down twelve lines above, and applied to the other branch.** The
+  collapsed-card comment at `:87` says a footer is suppressed because *"a single row already states
+  its own macros, so a footer would repeat it."* A group is also a single row that states its own
+  macros; the expanded branch was never told.
+- **Fix: `entries.length > 1`.** Checked against every case: one loose row → no footer (unchanged);
+  two loose rows → footer (unchanged); one group + one loose row → footer, and correctly, because
+  the numbers then differ; **one group alone → footer suppressed**, which is the only behaviour that
+  changes and is the report.
+- **The kcal duplicates too** — the group header already shows `196 kcal` and the footer repeats it,
+  so suppressing the footer removes both duplications in one change.
+- **Verification:** a meal section containing only a scanned or saved group shows exactly one macro
+  row and one calorie total; adding a loose item to that section brings the footer back with numbers
+  that differ from the group's.
+
+
 ### [app-shell] BF-96 — the weather chip wraps because it is the only thing in the header allowed to
 
 - **Lane:** B — `components/weather-chip.tsx:38` (one class pair).
@@ -566,17 +649,22 @@ gates — and it is the reason the parked count still overstates blocking after 
   working. not sure if its being used."* The first half is right — it is connected and the
   integration is good work (Q-404). The second half is the finding.
 
-**Two independent failures, stacked, both measured against production 2026-09-01.**
+**ONE failure, not two — this entry's first draft was wrong and is corrected here (2026-09-01).**
 
-1. **`NEXT_PUBLIC_SENTRY_DSN` is not set.** `curl`ing the deployed `/login` and grepping the client
-   bundle for an ingest host returns **nothing**, so `Sentry.init({ dsn: undefined })` runs and the
-   browser/WebView SDK is a **total no-op**. Not degraded — silent and complete.
-2. **The CSP would block it even once the DSN is set.** The served `Content-Security-Policy` header
-   has `connect-src 'self' … generativelanguage … accounts.google … open-meteo … tile hosts … wss:
-   ws:` and **no Sentry ingest host**. Fixing only the DSN produces a still-empty Sentry and a
-   console full of CSP violations.
+**The CSP blocks every client event.** The served `Content-Security-Policy` has
+`connect-src 'self' … generativelanguage … accounts.google … open-meteo … tile hosts … wss: ws:` —
+**no Sentry ingest host, no wildcard, no bare `https:`**. The bundle's own ingest host
+(`o…​.ingest.us.sentry.io`, inlined from the DSN) is not among them, so every browser/WebView event
+is refused before it leaves the page.
 
-**`instrumentation-client.ts:11` predicted failure 2 in its own comment** — *"a `connect-src` that
+> **⚠ RETRACTED: "`NEXT_PUBLIC_SENTRY_DSN` is not set".** The first draft claimed this, on a `curl`
+> of **`/login`** — which is a **52-byte redirect stub**, not a page. Grepping a redirect answers
+> "not found" to every question. Re-measured against `/sign-in` and its 33 JS chunks: the DSN **is**
+> inlined, in three of them. The owner confirmed the variable independently. **The method error is
+> the lesson: confirm the response you fetched is the thing you meant to search — check its size
+> before grepping it.**
+
+**`instrumentation-client.ts:11` predicted this failure in its own comment** — *"a `connect-src` that
 does not include the ingest host silently drops every client event — the exact failure mode this item
 exists to avoid. Verify on the device, not just in a browser."* The warning was written and the host
 was never added. **That is the lesson worth keeping: a comment describing a hazard is not a guard
@@ -585,9 +673,31 @@ against it.**
 - **What IS plausibly working: the server side.** `sentry.server.config.ts` and
   `sentry.edge.config.ts` read `SENTRY_DSN` (not `NEXT_PUBLIC_`), and server→Sentry is a
   server-to-server call that **no CSP touches**. `instrumentation.ts`'s `onRequestError` hook calls
-  `captureRequestError` for everything escaping a route handler. **Whether `SENTRY_DSN` is set in
-  Railway cannot be checked from outside the deploy** — that is the one open question here and it is
-  the owner's to answer (or a boot-log line, below).
+  `captureRequestError` for everything escaping a route handler. **The owner confirmed `SENTRY_DSN`
+  is set (2026-09-01).** So the server path should be live and collecting.
+- **✅ ANSWERED 2026-09-01 — the owner looked, and the dashboard settles it.** Sentry holds
+  **exactly one issue**: `Q404WiringProbe`, *"Deliberate error proving the Sentry wiring delivers"*,
+  1 event, 13 days old, `url: --`, `transaction: --`, geography **US** (Railway's region, not the
+  owner's). A server-side event — the probe Q-404 fired at setup. Three conclusions:
+  1. **Server → Sentry works.** The probe delivered.
+  2. **Client → Sentry is blocked — now shown rather than argued.** Over the same 13 days
+     `error_events` recorded **9 client-source rows** while Sentry holds **zero** browser events.
+     Same app, same window, same device; the reporter that lands is same-origin and the one that
+     does not is cross-origin. That is the CSP.
+  3. **Sentry holding nothing else is CORRECT, not a second fault.** It only sees what escapes a
+     route handler uncaught, and nothing did: the 34 server rows over that window are **31 ×** the
+     `daytime-stress` constants guard plus **3 ×** `aborted` client disconnects, all caught and
+     reported by the app's own path, which by design never reaches the hook.
+- **⚠ Even with the CSP fixed, Sentry will see a narrow slice.** There are **0** explicit
+  `captureException`/`captureMessage` call sites, so its whole view is uncaught escapes: **1 event
+  against `error_events`' 43** over the same 13 days. Whether to forward caught server faults is a
+  separate decision this entry does not take — but nobody should read a quiet Sentry as a quiet app.
+- **(answered — kept for the reasoning) The deciding observation this entry asked for.** If this entry is right,
+  Sentry holds **server** events and **zero browser** events — the two paths differ only in whether a
+  CSP sits between them. A dashboard with both would refute the CSP diagnosis outright; a dashboard
+  with neither points at the server DSN or the SDK rather than the header. Filter by platform
+  (`node`/`javascript`) or by whether an event carries a URL and a browser name. **One look settles
+  which of the three it is** — cheaper than any further reading of the code.
 - **Nothing reads it either way.** `grep -ci sentry CLAUDE.md` → **0**; `error_events` appears
   **4×**, in the session-start ritual. So no session has ever been told to look at Sentry, which is
   exactly the owner's *"not sure if its being used"*. And there are **0** explicit
@@ -620,8 +730,8 @@ experiment, not an inference.
   maps, and release tagging. Adding the ingest host to `connect-src` stays the fallback if tunnelling
   is rejected for cost or latency.
 - **Recommendation, in this order.** ① Wire `withSentryConfig` with `tunnelRoute` (fallback: add the
-  ingest host to `connect-src` in `lib/security/csp.ts`). ② Set `NEXT_PUBLIC_SENTRY_DSN` in Railway.
-  ③ **Log one line at boot naming whether each DSN was found** — this failure is invisible precisely
+  ingest host to `connect-src` in `lib/security/csp.ts`). ② ~~Set `NEXT_PUBLIC_SENTRY_DSN`~~ — done;
+  it is set and inlined. ③ **Log one line at boot naming whether each DSN was found** — this failure is invisible precisely
   because an unset DSN is indistinguishable from a quiet week. ④ Only then add the session-start read
   to CLAUDE.md beside `error_events`; pointing sessions at an empty dashboard teaches them to ignore
   it.
@@ -638,43 +748,31 @@ experiment, not an inference.
   **observed from the APK**; the boot log names both DSNs as found; and the CSP report shows no
   violation for the ingest host.
 
-### [platform] BF-91 — 58 E2E specs run at the S25 viewport and assert nothing visual
+### [platform] LA-50 — pixel baselines need a CI-side job, because a session cannot generate one
 
-- **Lane:** A — `e2e/**` and `playwright.config.ts`.
-- **Needs:** BF-90
-- **Added:** 2026-09-01 · owner, asking whether the existing tooling could take device checks off
-  him: *"with our e2e and sentry etc cant you do the testing thats needed?"*
+- **Lane:** A — `.github/workflows/` and `playwright.config.ts`.
+- **Added:** 2026-09-01 · split out of BF-91, whose recommendation this is the blocked half of.
 
-**The harness is already pointed at the right target and does not look.** `playwright.config.ts`
-loads `devices['Galaxy S9+']` at **412×915**, deliberately — its own comment says testing at a
-desktop viewport *"would walk straight past"* the canonical target. There are **58 spec files**.
-**`grep -rl 'toHaveScreenshot' e2e/` returns 0.** Nothing compares pixels, so every *"does this look
-right"* question falls to the owner's eyes by default.
+**Measured, not assumed.** `playwright.config.ts` runs the sandbox Chromium at a fixed path because
+the managed download is proxy-blocked. That binary is **141.0.7390.37**; `@playwright/test` 1.62.1
+pins revision 1234 — **151.0.7922.34** — which is what CI's `playwright install chromium` fetches.
+Ten major versions of font rasterisation and compositing apart, so a baseline committed from a
+session fails on its first CI run and every one after. This is a property of the sandbox, not of any
+spec, and it will not change by trying harder.
 
-- **Recommendation: add screenshot assertions to the flows the shipped-but-unverified entries care
-  about.** BF-73 (capture tiles and button prominence), BF-75 (sheet palette), BF-52 (label wrap),
-  Q-406 (the shared food row across four call sites) are all layout-and-colour claims a baseline
-  image checks better than a person does, and checks on **every** run rather than once.
-- **⚠ State the limit honestly, in the entry and to the owner: a screenshot test catches CHANGE, not
-  CORRECTNESS.** Someone has to approve the first baseline. So this converts a recurring check into
-  a one-time one — most of the value, but it does not make a device check disappear, and an entry
-  that claims otherwise is selling something.
-- **⚠ It cannot touch safe-area, which is the bug class that keeps recurring.** CLAUDE.md is explicit
-  that the web sandbox renders insets as **0**, so Chromium-under-Playwright is blind to exactly what
-  BF-76 is about. Do not add a screenshot test that appears to cover it — a green check over an
-  invisible failure is worse than no check.
-- **The emulator option, named so it is not re-discovered.** An Android emulator in CI *could* see
-  insets and gesture-nav, and `.github/workflows/android.yml` already builds the APK. It is a
-  project (emulator provisioning, nav-mode config, flake budget), not a quick win, and it should not
-  start before BF-90 and this entry have shown what is left over.
-- **⚠ Sentry exists and does not help here — see BF-92 for why it is also not working.** It is
-  installed and wired (`@sentry/nextjs`, five config files), and it is an **alerting** tool by
-  deliberate design: `tracesSampleRate: 0`, no replay, no profiling. It reports crashes. It cannot
-  tell anyone whether a sheet's padding is right, so it discharges no device gate in this entry.
-  `error_events` is the same shape of answer — "did something break for the owner recently",
-  **pruned at 30 days** and **row-scoped to one user**.
-- **Verification:** the four flows above carry approved baselines; a deliberate padding or colour
-  change fails them; and the suite's runtime stays inside the E2E job's current budget.
+- **What it would take.** A `workflow_dispatch` job running `pnpm e2e --update-snapshots` and
+  committing the images back. Three things to settle before writing it: Actions needs write
+  permission to push (a security decision, not a detail), a human has to review the first images,
+  and the baselines then pin CI's Chromium — so a Playwright bump regenerates every one of them.
+- **⚠ Do not start this expecting it to discharge a device gate.** A baseline proves **change**, not
+  correctness, and it cannot see safe-area insets at all — the sandbox renders them as 0, which is
+  the bug class that actually keeps recurring here. `e2e/README.md` now says both.
+- **The cheaper thing was done first and may be enough.** BF-91 shipped measured layout assertions
+  for the flow that had none; 21 of 58 specs now assert layout or computed style. Read
+  `e2e/meal-library-action-hierarchy.spec.ts` before deciding this entry is still worth its cost —
+  a claim you can state in a sentence beats an image a human has to approve.
+- **Verification:** a deliberate colour or spacing change fails a baseline in CI, and a Playwright
+  version bump has a documented one-command path to regenerate.
 
 ### [nutrition][activity] BF-88 — the energy model runs on two different bases and the card never says which
 

@@ -75,6 +75,21 @@ you will re-assert the default three times and report full coverage.
 from "seeds in 8 s off the network". It catches a card that *never* seeds, which is the failure the
 instant-paint rule is actually about, and it does not catch a regression from instant to sluggish.
 
+**There are no pixel baselines, and a session cannot make one.** `grep -rl toHaveScreenshot e2e/`
+returns 0 — deliberately, and BF-91 is where it was measured. `playwright.config.ts` uses the
+sandbox Chromium at a fixed path because the managed download is proxy-blocked, and that binary is
+**141.0.7390.37** while `@playwright/test` 1.62.1 pins revision 1234 — **151.0.7922.34** — which is
+what CI installs. Ten major versions of font rasterisation apart, so a baseline committed from a
+session fails on its first CI run and every one after. Generating them would need a CI-side
+`--update-snapshots` job that commits its output, which is a project rather than a spec.
+
+**What the specs do instead, and why it is not merely a substitute.** 21 of the 58 assert layout
+through `boundingBox`, `stableBox` or computed style. Those are claims that can be **wrong on the
+first run** — "New is four times the bin", "the bin is square", "these controls render 48 px" —
+whereas a baseline only proves nothing *changed* since a human approved an image. Prefer a measured
+claim you can state in a sentence; reach for a baseline only when the thing you want to protect
+genuinely cannot be stated that way.
+
 **Nothing here touches the S25.** Safe-area insets render as 0, Samsung's WebView compositor is not
 Chromium-on-Linux, and gestures behave differently under a real thumb. Those still need the device.
 

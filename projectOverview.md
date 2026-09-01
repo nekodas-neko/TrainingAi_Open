@@ -27,6 +27,16 @@
 **Version:** v1.417.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-09-01.
 
+**The E2E harness already looks; what it cannot do is take a photo (BF-91).** The entry read *"58
+specs assert nothing visual"* — **21 of the 58** assert layout, and the four flows it named already
+have dedicated specs. What is genuinely absent is pixel baselines, and a session cannot make one:
+the sandbox Chromium is **141** while CI installs **151**, so a committed baseline fails on its first
+run. Split out as LA-50 with what a CI-side job would cost. The real gap was BF-73, whose measured
+numbers sat in its `Keep:` and nowhere else — now pinned as ratios, along with the finding that
+`globals.css`'s bare `button { min-height: 48px }` is what lifts those controls off 44. **Deleting
+that one CSS line turns the spec red**, which no source-level check on the classes would notice
+([journal](docs/overview/entries/2026-09-01-e2e-layout-assertions.md)).
+
 **The prune that was working, and the retraction that matters more than the entry (BF-93).** A
 session reported `error_events` never prunes — no `DELETE`, no cron, no trigger — and wrote that
 into CLAUDE.md, the file every session reads first. The `DELETE` is in `insertErrorEvent` and has
@@ -1122,7 +1132,13 @@ that need an owner, and for the barcode chain.
 
 ### [platform][devices] ⚠️ `/api/body-battery` was 500ing in production; the fix is unverified there (LA-20, 2026-08-23)
 
-**Fixed in this session's deploy, not yet confirmed on production.** `error_events` held 19 live faults — `daytime-stress: constants not set`, first 10:37, latest 12:27, still firing while it was read — from the Q-545 constants port. Boot injects the model constants and sets `OURA_CONSTANTS_DIR`, and **both effects are per-process**; the process that runs boot need not be the one that serves a request. A probe route read `hasDaytimeStressConstants()` as **false** in a handler while boot had logged a successful delivery. Two independent halves: the module instance the route reads is not the one boot wrote to, and where the env var is also not inherited, `constantsDir()` falls through to a tree directory that has held no `.constants.json` since Q-49. `constantsDir()` now prefers the delivered `<cwd>/.oura-constants`, and `getRepository()` injects — the one hook every path that can reach a constants read already goes through, using a non-throwing variant so an unreadable directory cannot take down every DB route ([`journal`](docs/overview/entries/2026-08-23-oura-constants-per-process.md)).
+**✅ CONFIRMED FIXED ON PRODUCTION, 2026-09-01.** Every one of the **31** stored occurrences falls on
+**2026-08-23**, the day of the fix, and there have been **zero in the nine days since** — measured as
+a per-day count over the whole retained window, not a spot check. The `Keep:` below is discharged: the
+check it asked for has now been run. (Found while answering an unrelated Sentry question — the same
+`error_events` read this entry was itself found by.)
+
+**Originally recorded as: fixed in this session's deploy, not yet confirmed on production.** `error_events` held 19 live faults — `daytime-stress: constants not set`, first 10:37, latest 12:27, still firing while it was read — from the Q-545 constants port. Boot injects the model constants and sets `OURA_CONSTANTS_DIR`, and **both effects are per-process**; the process that runs boot need not be the one that serves a request. A probe route read `hasDaytimeStressConstants()` as **false** in a handler while boot had logged a successful delivery. Two independent halves: the module instance the route reads is not the one boot wrote to, and where the env var is also not inherited, `constantsDir()` falls through to a tree directory that has held no `.constants.json` since Q-49. `constantsDir()` now prefers the delivered `<cwd>/.oura-constants`, and `getRepository()` injects — the one hook every path that can reach a constants read already goes through, using a non-throwing variant so an unreadable directory cannot take down every DB route ([`journal`](docs/overview/entries/2026-08-23-oura-constants-per-process.md)).
 - **Keep: production not verified.** The reproduction is a dev-server worker split, which is not proof Railway's split is identical. **The check is `error_events` after this deploys** — and *something stopping is not something fixed*: the count must be zero across a window where `/api/body-battery` was actually called, since the route is only reachable for a user with a daytime-HRV model.
 - **This was not in any backlog entry.** It was found by the session-start `error_events` read that `CLAUDE.md` mandates and I had skipped. No local gate could have caught it: `pnpm dev` never reaches the model path, because the seeded user has no daytime-HRV model and the call is guarded.
 - **⚠️ Superseded figures, and the verification is now UNFALSIFIABLE (Tuning, 2026-08-24).** The
