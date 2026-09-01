@@ -6261,8 +6261,39 @@ of an APK cycle: a NotificationChannel's sound and vibration are immutable once 
 differentiating fast from slow needs new channel ids rather than edited settings; and that work is JS
 in `capacitor-native-init.tsx`, so it ships through Railway despite looking native. The one genuinely
 native piece — a custom sound file in `res/raw/` — is marked as such.
+## 2026-09-03 — backlog → 15102, `projectOverview.md` → 9009, `docs/agents/state/tuning.md` → 388 (TN-23)
 
-## 2026-09-01 — `projectOverview.md` → 9068 (LA-52)
+One entry, from one owner question about one night — and the length is the **arithmetic that turns an
+opinion into a finding**. The ten stored contributors blend to **76.04**; the app shows **63**. Without
+that reproduction the entry is "the sleep score feels low", which is unactionable and has been asked
+three times.
+
+**TN-23 itself is the new part**: `hrv` and `hr` correlate at **+0.869** across 38 nights, share 75%
+of their variance, and carry **28 of 110** — a quarter of the score on one physiological axis, charged
+twice. The entry spends its lines on the ⛔ **do not delete a contributor**: both curves are provably
+correct for this night, and the combined signal is the score's best recovery evidence, so the naive
+fix would remove the most informative input in the model.
+
+The baton gains the general move — **reproduce a score from its stored contributors before theorising
+about it** — plus the observation that twice now the owner's *"this is too low"* resolved to the
+**display curve** (TN-5, signed off, unshipped) rather than to the model.
+
+## 2026-09-03 — `docs/agents/state/tuning.md` → 395 (the sleep-baseline near-miss)
+
+Seven lines, and they stop a false finding that was one edit from being filed. Asked whether a 100
+sleep score is reachable, this agent compared stored `hrv` contributors against
+`oura_daily_summary.hrv_baseline_mean_x8` and concluded the owner's best nights had been inflated by
+an immature baseline. **The sleep score does not read that column.** `buildSleepAudit` calls
+`sleepScoreBaselines(prior, tz)` — a trailing window over prior nights, excluding the night being
+scored.
+
+The rule *"read which baseline a consumer actually calls"* was already in this baton from three
+earlier instances this week and was walked into anyway, which is the argument for stating it against
+the **specific** consumer rather than in general. The entry also records the positive half: this is
+the one baseline in the codebase built correctly, and TN-6 can copy it rather than invent one.
+
+
+## 2026-09-01 — `projectOverview.md` → 9078 (LA-52)
 
 +15 for a defect whose whole content is *which number the screen was showing*. The three
 consequences — the band cannot respond, `STOPPED_KMH` can never fire, warm-up/fast/slow band against
@@ -6274,11 +6305,17 @@ the code comment beside it actively said the opposite, and it is the part a read
 looking at the screen. The e2e line is there because a spec that asserts something now deliberately
 false is the kind of thing a later session "fixes" back.
 
-**If this lands after PR #776 (BF-101), which also raises this file to 9068, the number is wrong on
-the second merge and must be recomputed from the merged file rather than spliced** — the two branches
-add different 15-line blocks, not the same one.
+**The recompute was needed for a different reason first.** `main` moved while this branch sat behind
+a red base (#775, #778, #766), taking the file from 9053 to 9063 — so the 9068 written here against
+the old base was already stale before #776 entered it. 9078 is the merged file's own count,
+recomputed rather than spliced.
 
-## 2026-09-01 — `docs/implementation-backlog.md` → 15499 (LA-52 + two splits)
+**PR #776 (BF-101) still raises this file by its own 15 lines and is not in this merge**, so whichever
+of the two lands second needs this number recomputed once more, from that merged file. Both branches
+happen to read 9078 today, which is a coincidence of two 15-line blocks against one base and not a
+reason to keep either number.
+
+## 2026-09-01 — `docs/implementation-backlog.md` → 15537 (LA-52 + two splits)
 
 +56, and only about a third of it is LA-52's own shipped entry. The rest is two splits — **LB-49**
 (the meal-log scale argument) and **LB-50** (the measured activity factor plus a prompt string that

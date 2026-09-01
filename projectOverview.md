@@ -1208,6 +1208,16 @@ window, then the newest `history-*.md`. The 157 dated status notes this section 
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
+### [sleep] 🟡 A good night scored 63: the display curve, the duration curve, and one autonomic dip counted twice (TN-23, 2026-09-03)
+
+**Measured, nothing fixed. Owner:** *"why would sleep score be so low for this? I'd imagine 80s if not 90s."* 8 h 15 m, 97% efficiency, REM 92, restfulness 95. [`review`](docs/reviews/2026-09-03-why-a-good-night-scored-63.md).
+- **The blend is 76.04 and the app shows 63** — reproduced exactly from the stored contributors and `SLEEP_WEIGHTS`. **The owner's intuition matches the blend**, which is what the ten contributors produced.
+- **Cause 1 — the display curve costs 11.9 points.** That is **TN-5**, signed off 2026-08-24 and **still unshipped**. Largest single factor, and not a judgement about the night.
+- **Cause 2 — 8.25 h scores 81** where `TOTAL_SLEEP`'s own comment three lines above says *"8h is excellent (~92)"*. That is **TN-10**, signed off 2026-08-30. The heaviest contributor (weight 24) disagrees with its own documentation.
+- **Cause 3 — NEW (TN-23): `hrv` and `hr` are the same autonomic event, scored twice.** `r = +0.869`, **75% shared variance** over 38 nights, **28 of 110 = 25%** of the sleep score. Both are computed correctly — HRV 50 ms/0.85× → 42 and HR 63 bpm/1.035× → 58 are exactly what their curves specify — but together they drag this night's blend **12.7 points** for one physiological event.
+- **⛔ Do not fix TN-23 by deleting a contributor.** Both curves are sound and the combined signal is the score's strongest recovery evidence (resting HR is the best predictor of the owner's felt state). **Collapse them into one autonomic contributor, or down-weight the pair to a joint ~14–18.**
+- **What the night should have scored: ~76 today, low-to-mid 80s after TN-5 and TN-10**, with a few points still owed to a genuine HRV dip (50 ms against a 59 ms norm, near the bottom of the owner's 43–71 range). **63 is wrong; 90 would have been too.**
+
 ### [readiness] 🟡 Q-507 explained and REVERSED — the stress model is sound; the stored daily scalar is what points backwards (TN-22, 2026-09-01)
 
 **Measured, not fixed.** Open since 2026-08-18, now with a mechanism. [`review`](docs/reviews/2026-09-01-stress-sign-explained.md).
