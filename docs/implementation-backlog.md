@@ -1947,6 +1947,30 @@ second write path.
   matches `maintenanceKcal / bmr` for the same window; and an under-calibrated account gets the
   reason rather than a number.
 
+### [nutrition][platform] LB-51 — the plan card has no e2e, because the seed has no meal plan
+
+- **Lane:** B — `e2e/`.
+- **Added:** 2026-09-01 · Lane B, while shipping Q-187 without one.
+
+**`scripts/local-db/seed.sql` creates no meal plan and no `food_logs` rows at all**, so every plan-card
+behaviour — the log-all action, the per-meal log and decline, the save-to-My-Foods pair, and now
+Q-187's re-scale — is unreachable from the harness. Q-187 was verified by inserting a plan and a
+logged meal into the local database by hand and driving the screen, which proves it works and leaves
+no regression net.
+
+- **The shape that would work without touching the seed** (which is Lane A's): stub
+  `GET /api/nutrition/meal-plans` with a fixture plan the way `walk-pacer-speed-rung.spec.ts` stubs
+  `segment-stats`, and have the spec log one food item through the UI first, the way
+  `food-logging-complete.spec.ts` does. Both halves are proven patterns in this repo.
+- **⚠ The expand toggle needs `touchscreen.tap()`, not `.click()`.** Measured while building Q-187:
+  a forced `.click()` on *Show N meals* leaves `aria-expanded` at `false`, and a touch tap at the
+  same coordinates opens it every time. That is Q-354 on the Nutrition screen — `useDrag` binds
+  mouse and pointer and swallows the click — and it is the single thing most likely to cost the next
+  author an hour.
+- **The assertion worth making** is the invariant, not a fixed number: the adjusted figures on the
+  remaining rows sum to the day's target minus what was eaten, both read off the card itself. That
+  holds whatever the spec logs.
+
 ### [platform] OR-100 — `Keep:` files buildable work under a heading that tells the lane not to look
 
 - **Keep — THE DETECTION SHIPPED 2026-09-01, ENFORCEMENT OFF as this entry requires; the splits are
@@ -12428,68 +12452,40 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   does not run in the sandbox**, so none of it is verifiable here. It needs the on-device smoke run
   in the same session, not a Known-Issues row.
 
-### [nutrition] Q-187 — Meal Plan (Phase 2): the day recalculates against what was actually eaten
+### [nutrition] Q-187 — the day recalculates against what was actually eaten (shipped; device check owed)
 
-> **All four steps of the original Q-187 have shipped**, the last on 2026-08-31 (v1.412.0): a
-> one-tap **"Log the N meals so far"** on the plan card, bounded by the clock. What is kept here is
-> the owner's **second sentence**, which the plan deliberately held back and which has no design yet.
-
-- **Branch:** none yet
-- **Plan:** the shipped half is
-  [`plans/2026-08-13-meal-plan-prefill-and-confirmation.md`](superpowers/plans/2026-08-13-meal-plan-prefill-and-confirmation.md);
-  this half is explicitly listed there under *Explicitly out of scope*.
-- **Lane:** B — settled 2026-09-01 with the gate. The owner chose spread, and spread computed at
-  read time is a surface change; a stored rewrite (which would have been Lane A) was the option not
-  taken.
-- **✅ THE OWNER GATE IS CLEARED, 2026-09-01 — opened and answered the same day.** The owner:
-  *"Happy to spread or take it out of next meal: would be nice to have the option; but if choosing
-  one then spread is fine."* So: **build spread, at read time, with a floor. Lane B.** The
-  recommendation below stands as written and is now the spec.
-- **The "would be nice to have the option" is a SECOND entry, not scope here** — see the follow-up
-  bullet at the end. Building the choice now would mean shipping a preference, a stored value and
-  two code paths before either has been lived with, and the owner said spread is fine if one is
-  picked. Ship one, find out whether the other is ever wanted.
-- **Recommendation, now the agreed shape: re-scale at read time, spread across every remaining
-  meal, with a floor — and say so when the floor is hit.**
-  - **Read time, not stored** — the plan stays what the owner chose and only the *display* changes.
-    One source of truth, Lane B, and reversible; a stored rewrite loses the original plan.
-  - **Spread, not next-meal-only.** Taking a 700 kcal lunch overshoot entirely out of dinner is the
-    honest arithmetic and produces an absurd dinner, which gets ignored. Spreading makes several
-    meals slightly wrong, which gets followed.
-  - **A floor, with a sentence when it binds.** Below roughly 250 kcal a meal stops being a meal —
-    say the day is over budget rather than print `eat 180 kcal for dinner` (question 3's answer).
-  - **Reversal cost: low** — a computed view; deleting it restores today's behaviour exactly.
-  - **The alternative** is next-meal-only, better at one real thing: meals you have not reached stay
-    untouched, so a plan you already shopped for survives. If shopping to the plan is how it is
-    used, that flips the recommendation.
-- **Follow-up, deliberately not built here: let the user choose spread vs next-meal-only.** The owner
-  asked for it (*"would be nice to have the option"*) and it is a real preference — but it is only
-  worth a setting once spread has been used and found wanting in a specific way, and that way is
-  what would decide where the control lives and what it defaults to. **File it as its own entry with
-  `Needs:` pointing here once the spread version ships**, not before: a preference added at the same
-  time as the behaviour it toggles has no evidence behind either branch.
+- **Keep:** the device check, and one design question the owner can only answer by living with it.
+  On the S25: with food logged, the plan card's expanded rows must show the adjusted figure with
+  `(planned N)` beside it and stay readable at 412 dp — two numbers now share a line that held one.
+  **And the open half of the owner's answer:** he said *"would be nice to have the option"* (spread
+  vs next-meal-only). Spread shipped; whether the option is ever wanted is a question only use can
+  settle, and it decides where the control would live and what it defaults to. **Do not build the
+  preference before that.**
+- **Verify:** device.
+- **✅ SHIPPED** (`feat/q-187-plan-rescale`, 2026-09-01, v1.428.0). `components/nutrition/plan-rescale.ts`
+  spreads the day's overshoot or shortfall across every remaining meal at **read time**; the plan row
+  shows the adjusted figure beside the planned one, and the card carries one sentence when the floor
+  binds. Nothing is stored and nothing is logged.
+- **⚠ The entry pointed at the wrong set, and it is the opposite one.** It said `fillableMeals`
+  *"already answers which meals are still ahead of you, which is exactly the set a re-scale would act
+  on"*. It answers which meals are **due enough to log now** — on today it keeps meals whose hour has
+  already **come**. A re-scale wants what you have **left** to eat, and hour does not enter it:
+  `remainingMeals` is unlogged-and-undeclined, full stop. Using `fillableMeals` would have dropped a
+  skipped lunch out of the remaining budget and handed its calories to dinner.
+- **The floor is per meal, not all-or-nothing.** A meal whose scaled figure falls under
+  `MEAL_FLOOR_KCAL` (250) is left as planned and counted in the sentence; the meals that clear it are
+  still adjusted. Printing *"eat 180 kcal for dinner"* is what the entry says makes a plan ignored.
+- **Macros ride the meal's own factor**, so a meal keeps the split the plan chose for it. Scaling
+  each macro against its own remaining budget would let a day that went over on fat alone quietly
+  rewrite every meal's shape.
+- **⚠ There is no e2e, and the reason is worth recording: the seed creates no meal plan and no food
+  logs.** Verified instead by inserting a plan and a logged meal into the local DB and driving the
+  real screen — see the journal for the three states and their numbers. A committed spec needs a
+  stubbed `/api/nutrition/meal-plans` plus a food log the spec makes itself; filed as **LB-51**.
 - **Added:** 2026-08-11 · owner-requested
-- **Owner's words, the part not yet built:** *"then as you input your actuall food it can recalculate
-  food based on the macros left. I.e if you eat too much during lunch it will cut some portions for
-  other meals or vice versa."*
-- **Why it needs its own design rather than a slice.** Three questions with no obvious answer, and
-  getting any of them wrong makes the plan actively worse than a static one:
-  1. **What gets re-scaled** — every remaining meal proportionally, or the next one only? Spreading a
-     700 kcal lunch overshoot across two remaining meals is gentle and makes both wrong; taking it
-     out of dinner is honest and can make dinner absurd.
-  2. **Whether a floor exists.** A day that ran 900 over by lunch can push the remaining meals below
-     anything edible. A plan that says *"eat 180 kcal for dinner"* will be ignored, and a plan that
-     is ignored once is ignored after.
-  3. **What happens when the remaining macros are unreachable** — under-eaten by 1,200 kcal at 8pm,
-     the honest answer is "you will not catch this up", and the plan has no way to say that today.
-- **What it can build on, all shipped.** The day's actual totals are already computed for the plan
-  card (`eaten`); each planned meal carries its own ingredient snapshot and macros (Q-192); and
-  `fillableMeals` (`components/nutrition/plan-day-fill.ts`) already answers *which meals are still
-  ahead of you*, which is exactly the set a re-scale would act on.
-- **Do not fold this into the prefill.** The prefill's whole property is that nothing enters
-  `food_logs` unconfirmed; a re-scale changes what is *suggested*, not what is logged, and mixing
-  the two is how the illegal state gets reintroduced.
-
+- **Owner's words:** *"then as you input your actuall food it can recalculate food based on the
+  macros left. I.e if you eat too much during lunch it will cut some portions for other meals or
+  vice versa."*
 
 ### [platform] ⏳ Q-181 — a schema per vitest worker: WATCH ONLY, deferral re-confirmed by measurement
 

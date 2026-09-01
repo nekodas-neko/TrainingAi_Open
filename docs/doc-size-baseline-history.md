@@ -6367,7 +6367,23 @@ that describe it accurately, and the queue tool now parks two of them behind the
 instead of offering Lane B a build it cannot begin. LB-50's prompt bug is worth the lines on its own —
 it ships without any feature attached.
 
-## 2026-09-01 — `projectOverview.md` → 9158, `docs/implementation-backlog.md` → 15626 (LB-31 shipped)
+## 2026-09-01 — `projectOverview.md` → 9159, `docs/implementation-backlog.md` → 15659 (Q-187)
+
++14 on the index for a feature whose failure mode is silent. The floor sentence is the line that
+matters: a session reading only "the plan re-scales" would take the floor for a rounding guard and
+delete it, and the whole reason it exists is that a plan telling you to eat 180 kcal for dinner is
+ignored once and then always.
+
+The correction about `fillableMeals` is there because the backlog entry itself asserted the wrong
+set, confidently, and the next reader of that entry would inherit it. Naming the two sets as
+complements is shorter than re-deriving which is which from `plan-day-fill.ts`.
+
+The backlog grows by Q-187's shipped form plus **LB-51**, which records that the seed creates no meal
+plan and no food logs — so the entire plan card, not just this feature, has no e2e reachable from the
+harness. That is worth its own entry rather than a line inside a shipped one, because it blocks four
+existing behaviours as well as this one.
+
+## 2026-09-01 — `projectOverview.md` → 9172, `docs/implementation-backlog.md` → 15622 (LB-31 shipped)
 
 The backlog shrank: LB-31 carried two findings and a long options list, and what is left is the merge
 queue plus the correction to its own mechanism. That correction is the part worth the lines — the

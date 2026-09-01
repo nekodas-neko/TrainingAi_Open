@@ -27,13 +27,29 @@ interface Props {
   /** Copy this meal into My Foods (Q-398). Absent while the plan is still loading. */
   onSave?: (meal: MealPlanMeal) => void
   saving: boolean
+  /**
+   * Q-187: what this meal comes to once the day's overshoot or shortfall is spread across the
+   * meals still to come. Absent means "as planned", which covers the untouched day, a past day, an
+   * already-eaten meal, and a meal the floor protected.
+   *
+   * **Four scalars, not one object.** This row is `memo`ed and rendered inside a `.map()`, where a
+   * fresh `{ calories, … }` literal per render defeats the memo silently and leaves the component
+   * still wearing its `memo(...)` wrapper — the exact shape `check-memo-prop-stability.js` exists
+   * to catch. `meal-macro-bars.tsx` passes its eight macro numbers as scalars for the same reason.
+   */
+  adjustedCalories?: number
+  adjustedProteinG?: number
+  adjustedCarbsG?: number
+  adjustedFatG?: number
 }
 
 export const PlanMealRow = memo(function PlanMealRow({
   meal, accent, logging, busyLogging, logged, declined, onLog, onSetDeclined, onSave, saving,
+  adjustedCalories, adjustedProteinG, adjustedCarbsG, adjustedFatG,
 }: Props) {
   const hasIngredients = meal.ingredients.length > 0
   const saved = meal.savedMealId != null
+  const adjusted = adjustedCalories != null
 
   return (
     <li className="py-2.5">
@@ -44,12 +60,28 @@ export const PlanMealRow = memo(function PlanMealRow({
           )}
           {meal.name}
         </span>
-        <span className="text-xs tabular-nums text-muted-foreground flex-none">
-          {meal.targetCalories.toLocaleString()} kcal
+        {/* The planned figure stays on screen beside the adjusted one. Replacing it outright would
+            make the plan look like it had changed, and it has not — this is a read-time view of a
+            plan that is still exactly what the owner chose. */}
+        <span className="text-xs tabular-nums flex-none">
+          {adjusted ? (
+            <>
+              <span className="font-semibold" style={{ color: accent }}>
+                {adjustedCalories.toLocaleString()} kcal
+              </span>
+              <span className="ml-1 text-muted-foreground/70">
+                (planned {meal.targetCalories.toLocaleString()})
+              </span>
+            </>
+          ) : (
+            <span className="text-muted-foreground">{meal.targetCalories.toLocaleString()} kcal</span>
+          )}
         </span>
       </div>
       <p className="mt-0.5 text-[11px] tabular-nums text-muted-foreground">
-        {Math.round(meal.targetProteinG)}P · {Math.round(meal.targetCarbsG)}C · {Math.round(meal.targetFatG)}F
+        {adjusted
+          ? `${Math.round(adjustedProteinG ?? 0)}P · ${Math.round(adjustedCarbsG ?? 0)}C · ${Math.round(adjustedFatG ?? 0)}F`
+          : `${Math.round(meal.targetProteinG)}P · ${Math.round(meal.targetCarbsG)}C · ${Math.round(meal.targetFatG)}F`}
       </p>
       {/* Plans have stored their ingredients since Q-192; before that this card could only
           say a meal's name and its macros, which is not enough to go and eat it. */}
