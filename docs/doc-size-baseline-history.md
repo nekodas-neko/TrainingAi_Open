@@ -5469,10 +5469,19 @@ BF-87's "do not lower STEP_BASELINE" is rewritten in the same pass. It was corre
 uncompensated version and would have made an implementer refuse the compensated one — a stale
 prohibition being obeyed is the failure mode that needed closing in the same diff that created it.
 
-## 2026-09-01 — `projectOverview.md` → 8646, `docs/implementation-backlog.md` → 14922 (BF-87)
+## 2026-09-01 — `docs/implementation-backlog.md` → 14977
+
+`lane-a/keep-kind` (OR-100). The growth is OR-100 recording that it undercounted its own problem:
+the entry measured **4** buildable `Keep:` residues on one lane, and the classifier finds **13**
+across the queue — two of them written by the same session that then built the check. Also records
+the second drift found on the way (`check-backlog-pointers.js` carried its own `Keep:` regex and
+missed 11 entries `lib/keep.js` sees), so the next reader does not re-derive it.
+
+## 2026-09-01 — `projectOverview.md` → 8646, `docs/implementation-backlog.md` → 14944 (BF-87)
 
 One shipped change recorded, and one entry filed. The status block is 12 lines because the 500 is
 the part a future session needs: **no client component had ever imported `daily-energy`**, so the
 `node:fs/promises` chain behind it had never been tripped, and the next person who wants a constant
 out of it will hit the same wall. The backlog grew by LB-43, which is that fix, minus the removal of
 the shipped BF-87 entry.
+

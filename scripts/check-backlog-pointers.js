@@ -33,6 +33,8 @@ const path = require('path');
 const { idPattern, idPartsPattern } = require('./lib/entry-id');
 const { announcesCompletion } = require('./lib/completion-words');
 const { referenceFromLines, hasProseMarker, PROSE_MARKERS } = require('./lib/reference');
+const { keepFromLines } = require('./lib/keep');
+const { keepKind } = require('./lib/keep-kind');
 
 const ROOT = path.resolve(__dirname, '..');
 const BACKLOG = path.join(ROOT, 'docs/implementation-backlog.md');
@@ -107,7 +109,6 @@ for (let i = 0; i < queue.length; i++) {
       const batch = line.match(/^\s*[-*]\s*\*{0,2}Batch:\*{0,2}\s*`?([^`\s]+)`?/i);
       if (batch && !meta.get(currentId).batch) meta.get(currentId).batch = batch[1];
 
-      if (/^\s*[-*]\s*\*{0,2}Keep:\*{0,2}\s*\S/i.test(line)) meta.get(currentId).keep = true;
 
       // Collected whole so the `Reference:` ratchet below sees the same lines `next-item.js` does.
       meta.get(currentId).lines.push(line);
@@ -279,12 +280,19 @@ for (const [id, m] of meta) {
 // `next-item.js`) and Q-27 (closed three weeks earlier). The list now lives in
 // `lib/completion-words.js` so its two delicate properties can be tested: it is case-SENSITIVE,
 // and `ANSWERED` is deliberately not in it. See that file for why both matter.
+// `keep` comes from `lib/keep.js`, not a second regex (OR-100). This file used to carry its own —
+// colon-only and bullet-anchored — which missed the em-dash form and anything stated inside a
+// blockquote banner: **11 entries** the shared reader sees and this one did not. None of them
+// happened to also announce completion in a heading, so the drift was latent rather than a live
+// failure; the next one would not have been.
+for (const [id, m] of meta) m.keep = keepFromLines(m.lines);
+
 const COMPLETED_HEADING_BASELINE = new Set([]);
 {
   const flagged = [];
   for (const [id, heading] of seen) {
     if (!announcesCompletion(heading)) continue;
-    if (meta.get(id)?.keep) continue;
+    if (meta.get(id)?.keep) continue;   // a stated residue is why the heading may say it shipped
     if (COMPLETED_HEADING_BASELINE.has(id)) continue;
     flagged.push(`${id} — ${heading.slice(4, 110)}`);
   }
@@ -408,6 +416,33 @@ if (failures.length) {
 
 const withNeeds = [...meta.values()].filter((m) => m.needs.length).length;
 const withGate = [...meta.values()].filter((m) => m.gates.length).length;
+
+// OR-100: a `Keep:` whose residue is a BUILD hides startable work under a heading that reads
+// "Not new work". Reported, never failed — the entry is explicit that enforcement stays off until
+// the known cases are split, or CI goes red on entries nobody has triaged. The list is the point:
+// a count with no ids is a number nobody can act on.
+{
+  const builds = [];
+  let checks = 0;
+  let unclear = 0;
+  for (const [id, m] of meta) {
+    if (!m.keep) continue;
+    const kind = m.keep.gate ? 'check' : keepKind(m.keep.text);
+    if (kind === 'build') builds.push(`${id} — ${m.keep.text.slice(0, 90)}`);
+    else if (kind === 'check') checks++;
+    else unclear++;
+  }
+  if (builds.length) {
+    console.log(
+      `check-backlog-pointers: note — ${builds.length} \`Keep:\` residues read as BUILDABLE work, ` +
+        `not a check (${checks} are checks, ${unclear} unclear). They sit under next-item's KEEP ` +
+        `heading, which says "Not new work", so an implementer never sees them. Split each into its ` +
+        `own entry with \`Needs:\` pointing at the shipped one (OR-100). Advisory, not a failure:\n` +
+        builds.map((b) => `      ${b}`).join('\n'),
+    );
+  }
+}
+
 console.log(
   `check-backlog-pointers: OK — ${seen.size} entries, no duplicates, all tagged; ` +
     `${withNeeds} with Needs: (no cycles, all targets known), ${withGate} with Gate:; ` +

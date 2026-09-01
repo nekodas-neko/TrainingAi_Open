@@ -1465,6 +1465,28 @@ deletes nothing on tap, which is what makes an icon-only entry point defensible 
 
 ### [platform] OR-100 — `Keep:` files buildable work under a heading that tells the lane not to look
 
+- **Keep — THE DETECTION SHIPPED 2026-09-01, ENFORCEMENT OFF as this entry requires; the splits are
+  what is owed.** `scripts/lib/keep-kind.js` classifies a residue as `check` / `build` / `unclear`,
+  and `check-backlog-pointers.js` prints the builds by id as a **note, never a failure** — the
+  entry is explicit that CI must not go red on entries nobody has triaged.
+  **It found Q-519 on its own**, which is the case this entry was written about, so the classifier
+  is not just restating the four ids that were already known.
+- **⚠ The number is 13, not 4 — the entry undercounted its own problem by measuring one lane.**
+  Across the whole queue: **13 read as buildable, 52 as checks, 23 unclear.** Beyond the four named
+  here, it surfaces `BF-83`, `BF-67`, `BF-41`, `BF-35`, `BF-33`, `PS-15`, `TN-3a`, `Q-476`, `Q-501`,
+  `Q-71`, `Q-11`. Two of those (`BF-83`, `BF-67`) were written **this same session**, which is the
+  argument for a check rather than a habit.
+- **⚑ A second drift was found and fixed on the way.** `check-backlog-pointers.js` carried its
+  **own** `Keep:` regex — colon-only, bullet-anchored — missing the em-dash form and anything
+  stated inside a blockquote banner: **11 entries** `lib/keep.js` sees and it did not. It suppresses
+  the "announces its own completion" failure, so a missed Keep is a false CI failure. None of the 11
+  happened to also announce completion in a heading, so it was latent rather than live; both now
+  read through `lib/keep.js`.
+- **Keep — what is owed is the splitting**, entry by entry: each build becomes its own entry with
+  `Needs:` pointing at the shipped one, and the original keeps a `Keep:` naming only its check.
+  Then, and only then, the note can become a failure. Not done here, deliberately — this entry says
+  not to batch a queue sweep with the runner change, because the verification is "run both lanes
+  before and after and diff the sections" and a sweep makes that diff unreadable.
 - **Lane:** A — `scripts/next-item.js` and `scripts/check-backlog-pointers.js`.
 - **Added:** 2026-09-01 · Orchestrator, while answering *"B is still saying there is no work for it"*.
 - **Measured, on Lane B's own queue.** 12 entries route to **KEEP**, whose heading reads *"shipped;
