@@ -77,6 +77,23 @@ BF-42. Those are different quantities and the factors were never validated again
 this owner measured (1,325) sits below predicted (1,481), so the direction is not clearly an
 over-count; filed as a known imprecision, not touched here.
 
+## The E2E failure this caused, and what it says about the harness
+
+`one-calorie-budget.spec.ts` went red in CI on the first run — its assertion pins the day's earned
+figure, and its own comment says that figure should be the strength session and nothing else. That
+was true for free while steps counted only above 3,000: a small step count another spec left on the
+shared day contributed zero and was invisible. Counting from the first step made it visible.
+
+**It does not reproduce in isolation** — alone the day is undisturbed and the spec passes with or
+without a fix. It needs the full serial suite against one shared database, which is a 22-minute run.
+So the pin was shipped as fixture hygiene with its uncertainty stated in the comment, and the
+evidence arrived afterwards: the same CI run that failed twice on the unpinned commit went green on
+the pinned one. The precise writer was never identified and does not need to be; the fixture should
+not have depended on one.
+
+Worth carrying: **a change that makes a previously-inert input load-bearing turns shared-fixture
+sloppiness into order-dependent failures**, and those look like flakes.
+
 ## Verification
 
 Full suite **717 files / 6,118 tests** green; `pnpm check:rules` **Ran 67 of 67**. Five mutations,

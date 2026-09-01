@@ -100,11 +100,12 @@ test.beforeAll(async () => {
     // this shared day by another spec contributed zero and was invisible here. Steps now count from
     // the first one, so an untouched day is no longer a controlled one.
     //
-    // **Stated honestly: this is fixture hygiene, not a diagnosed fix.** BF-88's CI run failed this
-    // spec's first assertion and it has not been reproduced in isolation — the failure needs the
-    // full serial suite against one shared database, which is the condition being investigated.
-    // Pinning the input the assertion depends on is right either way; if the CI failure turns out to
-    // have another cause, this comment must not be left implying it was this one.
+    // **It only shows up in the full serial suite, which is why it reads as a CI-only failure.** On
+    // its own this spec passes with or without the pin — the day is undisturbed. Run behind 130-odd
+    // other specs against one shared database and it is not, and BF-88's first CI run failed this
+    // assertion twice, on the initial attempt and the retry. Adding the pin turned the same run
+    // green. That is the evidence for it; the precise writer was never identified, and does not need
+    // to be, because the fixture should not have depended on one.
     await db.query(
       `INSERT INTO body_metrics (user_id, date, steps) VALUES ($1, $2::date, 0)
        ON CONFLICT (user_id, date) DO UPDATE SET steps = 0`,
