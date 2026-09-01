@@ -165,9 +165,20 @@ describe.skipIf(!canRun)('BF-2 — every consumer of a stored body fat sees the 
     const onRaw = personalRmr(measured, bodyComposition(WEIGHT_KG, SCALE_PCT)!.ffmKg)!
     expect(Math.round(onRaw)).toBeGreaterThan(Math.round(onCorrected))
 
+    // BF-88: the formula resting base is `RMR × 1.2` **minus** the first 3,000 steps' energy, which
+    // now comes back through `activeKcal` instead. Computed with the same function and the same
+    // profile the service builds, so this stays an exact assertion rather than becoming a band —
+    // the two candidate bases here differ by only ~50 kcal and a direction check passes for both.
+    const { stepEnergyKcal, STEP_BASE_CREDIT } = await import('@trainingai/shared/health/daily-energy')
+    const { ageFromDob } = await import('@trainingai/shared/date-utils')
+    const credit = stepEnergyKcal(
+      { ageYears: ageFromDob('1993-06-15', new Date()), weightKg: WEIGHT_KG, sex: 'male' }, STEP_BASE_CREDIT,
+    )
+    expect(credit, 'the credit must be real, or this test silently reverts to the old assertion').toBeGreaterThan(0)
+
     const res = await computeEnergyBalance(repo, USER, 'Australia/Brisbane', '2026-08-27')
-    expect(res.balance.restingBaseKcal).toBe(Math.round(onCorrected * SEDENTARY_MULTIPLIER))
-    expect(res.balance.restingBaseKcal).not.toBe(Math.round(onRaw * SEDENTARY_MULTIPLIER))
+    expect(res.balance.restingBaseKcal).toBe(Math.round(onCorrected * SEDENTARY_MULTIPLIER) - credit)
+    expect(res.balance.restingBaseKcal).not.toBe(Math.round(onRaw * SEDENTARY_MULTIPLIER) - credit)
     await pool.query(`DELETE FROM measured_rmr WHERE user_id = $1`, [USER])
   })
 

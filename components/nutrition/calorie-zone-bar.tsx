@@ -3,7 +3,7 @@
 import { memo } from 'react'
 import { budgetProvenance } from '@trainingai/shared/nutrition/calorie-balance'
 import { CalorieProgressBar } from '@/components/nutrition/calorie-progress-bar'
-import { movementSummary, STEP_BASELINE } from '@/components/nutrition/movement-breakdown'
+import { movementSummary } from '@/components/nutrition/movement-breakdown'
 
 /**
  * The day's calorie progress, and a line saying where the budget came from.
@@ -41,17 +41,18 @@ export const CalorieZoneBar = memo(function CalorieZoneBar({
 
       {/* Q-401 point 4. A budget that grows during the day reads as a bug unless it says why —
           which is literally how this entry started ("why are these values different?"). */}
-      {/* BF-87. "Nothing earned from movement yet today" was true and unexplainable: the owner had
-          1,196 steps on the same screen and no way to know that only steps above the baseline
-          count. The threshold is what answers it — naming the shortfall alone does not, because a
-          user with a 7,000 step goal still cannot tell how many of those convert. */}
+      {/* BF-87 put a threshold in this line, because the owner had 1,196 steps on screen beside
+          "nothing earned from movement" and no way to know that only steps above 3,000 counted.
+          BF-88 removed the threshold instead: steps earn from the first one, so the situation that
+          sentence explained cannot arise while any steps exist. What is left is the honest
+          remaining case — a day with no movement recorded at all. */}
       <p className={`${compact ? 'mt-1' : 'mt-2'} text-[10px] leading-snug text-muted-foreground tabular-nums`}>
         {earned > 0
           ? <>
               {base.toLocaleString()} base <span className="text-muted-foreground/70">+</span> {earned.toLocaleString()} earned from movement
               {parts && <span className="text-muted-foreground/70"> ({parts})</span>}
             </>
-          : <>{base.toLocaleString()} base — nothing earned from movement yet; steps count above {STEP_BASELINE.toLocaleString()}/day</>}
+          : <>{base.toLocaleString()} base — no movement recorded yet today</>}
       </p>
     </>
   )

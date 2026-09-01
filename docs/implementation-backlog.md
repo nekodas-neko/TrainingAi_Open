@@ -724,6 +724,11 @@ experiment, not an inference.
 ### [platform] LA-50 — pixel baselines need a CI-side job, because a session cannot generate one
 
 - **Lane:** A — `.github/workflows/` and `playwright.config.ts`.
+- **Gate:** owner — a baseline job has to **push commits from Actions**, which means granting the
+  workflow write permission to the repository. That is a decision about the blast radius of a
+  compromised action, not an implementation detail, and it is the first thing to settle. It also
+  inherited BF-91's queue position when that entry was split; the gate is what stops it heading the
+  work list on a priority it was never given.
 - **Added:** 2026-09-01 · split out of BF-91, whose recommendation this is the blocked half of.
 
 **Measured, not assumed.** `playwright.config.ts` runs the sandbox Chromium at a fixed path because
@@ -746,119 +751,6 @@ spec, and it will not change by trying harder.
   a claim you can state in a sentence beats an image a human has to approve.
 - **Verification:** a deliberate colour or spacing change fails a baseline in CI, and a Playwright
   version bump has a documented one-command path to regenerate.
-
-### [nutrition][activity] BF-88 — the energy model runs on two different bases and the card never says which
-
-- **Lane:** A — `lib/health/energy-balance-service.ts:227-265` and the two constants in
-  `packages/shared/src/health/{energy-baseline,daily-energy}.ts`. **The copy is now Lane A's too, in
-  this entry** — see the shipped-copy note below.
-- **DECIDED 2026-09-01 — the owner approved the shift and asked for it to ship.** *"yes that sounds
-  good lets ship that."* The `Gate: owner` this entry carried is **cleared**; the sign-off a scoring
-  change needs has been given, against the blast radius restated below (74 of 124 days unchanged
-  exactly, 50 moved, −17 averaged across all days). **Ready for Lane A.** The direction was the
-  owner's own: *"cant we remove some calories for the base 3000 and have it start from 0 steps?"*
-- **Added:** 2026-09-01 · owner: *"is it possible to get rid of the baseline; and have it reference
-  steps + exercise only? that would be more accurate right? rmr + activity?"*
-
-**The question was answered "no, and here is why", but tracing it found a real gap.** The model has
-two paths and they behave differently under exactly the change that was proposed:
-
-| | resting base | what `STEP_BASELINE` does |
-|---|---|---|
-| **fallback** (`source !== 'calibrated'`) | `bmr × 1.2` | changes total burn directly |
-| **calibrated** | `max(bmr, maintenanceKcal − avgActiveKcal)` | **nearly self-cancelling** |
-
-In the calibrated path the same steps are added to today's `activeKcal` *and* to the
-`avgActiveKcal` that gets subtracted out of maintenance, so dropping the threshold moves the
-resting/active **split** on the card while barely moving the total. In the fallback path the same
-edit is worth **−177 kcal/day**. One constant, two meanings, and nothing on screen distinguishes
-them — which is how a reasonable proposal ("drop the baseline, count all steps") can look
-obviously right and be measurably wrong.
-
-**Measured against 124 days of the owner's own data (2026-09-01).** Dropping `STEP_BASELINE` to 0
-and `SEDENTARY_MULTIPLIER` to 1.0 gives a **lower** burn on **124 of 124 days**: mean −177 kcal,
-range −159 to −249, zero days higher. The asymmetry is arithmetic — 0.2 × RMR is 265 kcal, while
-3,000 steps at the walking MET are ~106. Distribution: 50 of 124 days sit below 3,000 steps and so
-currently earn nothing from stepping at all; mean 5,716, median bucket 2–4k.
-
-- **Recommendation: make the shift the owner proposed — subtract the first 3,000 steps' worth of
-  kcal from the resting base, then count steps from zero.** *"cant we remove some calories for the
-  base 3000 and have it start from 0 steps?"* — yes, and this is the version that works, because it
-  **conserves** rather than deletes. The earlier proposal (drop the multiplier to 1.0, count all
-  steps) removed 265 kcal of base and handed back 102, which is why it lost on all 124 days. This
-  one removes exactly what it hands back.
-
-  Measured through `computeActiveEnergy` for the owner's profile:
-
-  | steps | 0 | 1,196 | 2,000 | 3,000 | 5,000 | 7,000 | 10,000 | 15,000 |
-  |---|---|---|---|---|---|---|---|---|
-  | current total | 1590 | 1590 | 1590 | 1590 | 1658 | 1726 | 1827 | 1997 |
-  | proposed total | 1488 | 1529 | 1556 | 1590 | 1658 | 1725 | 1827 | 1997 |
-  | delta | −102 | −61 | −34 | **0** | **0** | −1 | **0** | **0** |
-
-  **Identical at and above 3,000 steps** — it is a reparameterisation there, not a re-scoring. Below
-  it the total drops, which is the intent: a day with no walking should not be paid for incidental
-  walking that did not happen. Blast radius over 124 days: **74 unchanged exactly**, 50 moved, mean
-  −43 on the moved days, worst −86, **−17 averaged across all days**. Against −177 on every day for
-  the earlier version.
-
-  And it delivers BF-87's ask as a side effect: with the floor at zero the rate is **one number**,
-  ~34 kcal per 1,000 steps, linear from the first step. No threshold left to explain.
-- **⚠ BF-87 SHIPPED FIRST (#725, 2026-09-01) AND ITS COPY IS WHAT THIS ENTRY FALSIFIES.** The
-  dependency between the two was inverted for exactly this reason and the inversion did not land in
-  time — BF-87 merged first. Three live sites now print *"steps above 3,000/day"*, and this entry
-  makes steps count from zero:
-
-  | site | line |
-  |---|---|
-  | `components/nutrition/calorie-zone-bar.tsx` | `:54` — *"nothing earned from movement yet; steps count above 3,000/day"* |
-  | `components/nutrition/energy-card.tsx` | `:276` — *"from workouts, activities, and steps above 3,000/day"* |
-  | `components/nutrition/calorie-balance-bar.tsx` | `:117` — same sentence |
-
-  **Rewriting all three is part of THIS entry, not a follow-up.** After the shift the true sentence
-  is the simpler one BF-87 was originally asked for: a single rate, ~34 kcal per 1,000 steps, from
-  the first step. **The zero-state line disappears entirely** — there is no longer a case where
-  movement has earned nothing while steps exist.
-- **⚠ THE VALUE CAN STAY 3,000 WHILE ITS MEANING CHANGES, AND NOTHING WOULD CATCH THAT.** This entry
-  does not necessarily change the number: `STEP_BASELINE` may keep sitting at 3,000 as *the amount
-  subtracted from the resting base* while the step term counts from zero. Same value, every test
-  green, and the three copy sites above quietly become false. **A test that pins a value cannot
-  notice a change of meaning.** So rename it — `STEP_BASE_CREDIT` for the base subtraction, and
-  nothing at all for a threshold that no longer exists — and let the rename break every consumer on
-  purpose.
-- **LB-43 shipped first (#729) and made this easier, not harder.** The constants moved to the
-  dependency-free leaf (`packages/shared/src/health/energy-baseline`) and
-  `components/nutrition/movement-breakdown.ts` now **re-exports** it rather than carrying its own
-  copy. There is exactly **one** `STEP_BASELINE` again, so the rename above is a single edit with the
-  compiler finding every caller — which is the argument for a rename over an edit in place. The
-  earlier version of this entry warned about editing the number in two places under a test that only
-  checked they matched; that hazard is gone and the bullet is replaced rather than left to be obeyed.
-- **⚠ The subtraction is COMPUTED, never a constant — 102 is this owner's number, not the app's.**
-  It is `stepKcal(STEP_BASELINE)` at the user's own age/weight/sex, so a lighter or heavier user
-  gets a different figure. Hardcoding 102 silently mis-bases every other account, and this app now
-  has more than one.
-- **⚠ The two paths need DIFFERENT treatment, which is the finding above being load-bearing.** On
-  the **formula** path the base is `bmr × 1.2` and must have the step-baseline equivalent subtracted.
-  On the **calibrated** path it must not: the base there is `maintenance − avgActiveKcal`, and
-  `maintenance` is measured, so lowering the step floor raises `avgActiveKcal` and the subtraction
-  happens by itself. Applying the correction to both double-subtracts it. An implementer who reads
-  only the constant, and not which path consumes it, will get this wrong.
-- **⚠ Still NOT licensed: a TEF term computed from logged intake.** The genuinely more accurate
-  version of all of this, and unusable at current logging density — **45 of 124 days** carry a
-  plausible intake, so it would vanish on two-thirds of days and make burn swing on whether food was
-  logged, which is worse than a constant.
-- **One real mismatch, recorded and deliberately not acted on.** `SEDENTARY_MULTIPLIER` is a
-  *Mifflin-St Jeor BMR* activity factor, and since BF-42 it is applied to a *measured RMR*
-  (1,325 kcal, FFM 51.5 kg, 2026-08-27). Those are different quantities and the factors were never
-  validated against the second. For this owner the direction is not clearly an over-count —
-  measured 1,325 sits **below** predicted 1,481 — so it is filed as a known imprecision rather than
-  a defect. Anyone revisiting it needs a source for an RMR-based factor, not a re-derivation.
-- **Verification:** a day at or above 3,000 steps reports **exactly** the total it reported before —
-  that equality is the test that the shift conserved rather than re-scored, and it should be a unit
-  test, not an eyeball. A day below 3,000 reports less, by the computed amount. The burn explanation
-  names its basis on both paths. And a second profile (different weight) gets a different
-  subtraction, proving it was computed.
-
 
 ### [platform][body] LB-42 — `weight_goal_kg` and `target_weight_kg` are two columns for one goal
 
