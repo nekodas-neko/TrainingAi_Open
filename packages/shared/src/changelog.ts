@@ -6,6 +6,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.423.0",
+    date: "2026-09-01",
+    changes: [
+      "The calorie line no longer calls your goal deficit part of your base rate. It read \u00221,264 base\u0022 when your resting base was 1,464 and 200 of that was the recomp target \u2014 which is why the number looked lower than your measured RMR. It now reads \u00221,464 base \u2212 200 for your goal\u0022, and the figures still add up to the same budget.",
+      "On maintain there is no goal line at all, since the deficit is zero.",
+      "The measured-RMR form says what the app does with the number: it re-scales the test onto your current lean mass rather than using it as entered, so the resting rate it works from drifts a little as your body composition changes.",
+    ],
+  },
+  {
     version: "1.422.0",
     date: "2026-09-01",
     changes: [

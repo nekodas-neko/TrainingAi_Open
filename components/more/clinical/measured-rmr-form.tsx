@@ -111,6 +111,17 @@ export function MeasuredRmrForm({ onSaved }: { onSaved: (record: MeasuredRmrReco
         hint="From the DEXA taken with it (Lean + BMC). Without this the measurement cannot be re-scaled as your lean mass changes, so it ages instead of tracking you."
       />
 
+      {/* BF-99, second half. The owner asked *"why is my base rate under the 1350 RMR value"* and
+          part of the answer is that the app never uses the measured number raw — it re-scales it
+          onto today's lean mass, so the figure it works from is not the figure he typed. Nothing on
+          any screen said so, which makes a measurement he paid for look ignored. The FFM field's
+          hint explains why the input is needed; this explains what the app then does with it. */}
+      <p className="-mt-1 text-[11px] leading-snug text-muted-foreground">
+        The app works from this test re-scaled onto your current lean mass, not the number as
+        entered, so the resting rate it uses day to day drifts a little above or below it as your
+        body composition changes.
+      </p>
+
       <CollapsibleSection title="Other details">
         <div className="flex flex-col gap-3 pt-1">
           <NumberField

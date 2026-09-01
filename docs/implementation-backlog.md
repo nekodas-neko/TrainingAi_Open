@@ -390,48 +390,28 @@ below threshold and left in place for next time.
 
 ### [nutrition][body] BF-99 — the line says "base" and shows base MINUS the goal deficit, so the owner read his RMR as broken
 
-- **Lane:** B — the Energy Balance card's subtitle (`components/nutrition/energy-card.tsx`,
-  `calorie-balance-bar.tsx`, `calorie-zone-bar.tsx` — the same three BF-87/BF-88 rewrote).
+- **Keep:** one look on the S25. The line gained a clause and Home's copy of the bar is `compact`, so
+  whether it wraps at 412 dp is the only thing unverified.
+- **Verify:** device.
+- **✅ SHIPPED** (`fix/bf-99-base-label`, 2026-09-01, v1.423.0). The line separates the two figures
+  and they still sum to the same budget: `1,972 base − 200 for your goal + 1 earned from movement`,
+  collapsing to `1,972 base + …` on `maintain` — which is this entry's own check that a zero-delta
+  user sees the same number under both wordings. Split in the component, **not in
+  `budgetProvenance`**: that is shared and a single combined number is right for a caller that wants
+  one. Measured at all three goal shapes on `pnpm dev`, not reasoned.
+- **✅ The second half shipped too.** The measured RMR is re-scaled onto current lean mass rather than
+  used raw, and nothing said so, which made a measurement the owner paid for look ignored. The
+  measured-RMR form is the only place the number appears, so one line sits under the fat-free-mass
+  field saying what the app does with it.
+- **⚠ Neither the floor nor the goal maths was touched, and neither should be.** `restingBaseKcal` is
+  `Math.max(Math.round(bmr), …)` on **both** branches (`energy-balance-service.ts:284-286`); that is
+  what stops a base falling below measured resting metabolism, and the displayed number was under
+  1,325 only because the deficit is subtracted after the floor, which is also correct.
 - **Added:** 2026-09-01 · owner, with a Health screenshot: *"why is my base rate under the 1350 RMR
   value."*
-
-**The maths is right — every number on that screen reconciles — and the label is wrong.** That is
-what makes this worth an entry: the owner went looking for a calculation error because the copy
-described the figure incorrectly.
-
-**Reconstructed against production data, and it matches the screenshot to the kcal:**
-
-| step | value |
-|---|---|
-| measured RMR (2026-08-27, at FFM 51.5 kg) | 1,325 |
-| today's weight / raw scale body fat | 71.7 kg / 26.3% |
-| DEXA-corrected body fat → FFM | ≈ 29.5% → **≈ 50.6 kg** |
-| `personalRmr` rescaled onto today's FFM | **≈ 1,304** |
-| `formulaBaseline` = `bmr × 1.2` | **1,565** ← screen: *"Estimated maintenance 1,565"* ✓ |
-| − `stepEnergyKcal(profile, STEP_BASE_CREDIT)` | ≈ 101 |
-| `restingBaseKcal` = `max(bmr, …)` | **≈ 1,464** |
-| − goal delta, `recomp: −200` | **1,264** ← screen: *"1,264 base"* ✓ |
-| + earned from movement (4,435 steps) | 150 → budget 1,414; eaten 1,577 → **163 over** ✓ |
-
-**So the resting base is ~1,464, comfortably above the measured RMR.** The 1,264 on screen is the
-base *after* the recomp deficit — a goal choice presented as a metabolic fact.
-
-- **Fix: name it what it is.** *"1,264 target"*, or split it — *"1,464 base − 200 recomp goal"*. The
-  card already knows `goalDeltaKcal`; nothing new has to be computed.
-- **⚠ Do not "fix" this by removing the floor or changing the goal maths.** `restingBaseKcal` is
-  `Math.max(Math.round(bmr), …)` on **both** branches (`energy-balance-service.ts:284-286`), which is
-  correct and is what stops a base falling below measured resting metabolism. The displayed number
-  is below 1,325 only because the deficit is subtracted after the floor, which is also correct.
-- **The second half of his question is unanswered anywhere on screen, and is not a bug.** The RMR is
-  **rescaled, not used raw**: 1,325 was measured at 51.5 kg of lean mass and he is carrying ~50.6 kg
-  today, so his personalised figure is ~1,304. That is `personalRmr` doing exactly what BF-42 built
-  it for. **But nothing tells him that**, so a measured number he paid for appears to have been
-  ignored. Worth one line of copy wherever the RMR is shown.
-- **⚠ The reconstruction above is arithmetic against live values, not a line-by-line trace.** It
-  matches the screen at three independent points (1,565 · 1,264 · 163 over), which is strong, but an
-  implementer should confirm the DEXA-correction step rather than inherit it.
-- **Verification:** the figure labelled "base" equals `restingBaseKcal`, or the label names the
-  deficit; and a user on `maintain` (delta 0) sees the same number under both wordings.
+- **The reconstruction that diagnosed this was arithmetic against live values, not a trace**, and it
+  is preserved in the journal entry rather than here. It matched the screen at three independent
+  points; the fix does not depend on it, because it relabels figures the component already holds.
 
 ### [app-shell] BF-100 — back navigation always lands at the top, because the scroll position is not on the document
 

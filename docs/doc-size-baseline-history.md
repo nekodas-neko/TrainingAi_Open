@@ -6099,3 +6099,14 @@ The other two kept lines are negatives. The override keys on an **explicit choic
 phone. And the verification line says the fixture was **hand-built**, because the local seed has no
 `ai_dynamic` program and zero prescriptions: a session that renders this screen and sees a toggle has
 verified nothing, and would not know it.
+
+## 2026-09-01 — `projectOverview.md` → 8999 (BF-99)
+
++15, and the sentence that earns most of it is *"every number on the screen reconciled."* A short
+version — "renamed a label" — loses the only thing that makes this instructive: the arithmetic was
+right and the copy sent the owner hunting a calculation bug that did not exist. That is a distinct
+failure mode from a wrong number, and it is the one a future session will not think to look for.
+
+Two negatives are kept for the same reason as always: the split is in the component and **not** in
+`budgetProvenance` (shared, and one combined number is correct for a caller that wants one), and
+neither the `Math.max` floor nor the goal maths was touched — both look like the bug and are not.
