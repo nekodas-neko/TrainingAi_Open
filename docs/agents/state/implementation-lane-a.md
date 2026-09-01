@@ -19,8 +19,8 @@ directory. Local SQLite **v33**.
 **⚠ The startable Lane A queue is THINNER than READY's count suggests, and this is the thing to know
 first.** Scanned 2026-09-01: of the top seven, **BF-69** was planned this session so its build is a
 later session's by protocol, **BF-77** is owner-gated planning, **LB-18** is Lane B by name,
-**LA-47** says outright that its own proposed split *"does not compile"*, **BF-4** needs one photo
-scan from the owner, **LA-48** is now parked behind LA-52, and **Q-535**'s remaining half is Lane
+**LA-47** says outright that its own proposed split *"does not compile"*, **BF-4** is measured and
+closed (2026-09-01), **LA-48** is now parked behind LA-52, and **Q-535**'s remaining half is Lane
 B's. From position 8 the list is the Tuning calibration block, which is owner-gated. **That is not a
 shortage of work — it is what a scan says today. Do not manufacture an item, and do not start a
 gated one to look busy.**
@@ -131,7 +131,6 @@ Do not chase these; do not start one to look busy. **Answered 2026-09-01:** BF-5
 - **LA-50** — a pixel-baseline job must push commits from Actions, which needs workflow write
   permission. `Gate: owner`, and the only thing blocking that entry.
 - **Add `E2E` to `main`'s required checks.** Nothing in this repository can make it required.
-- **One photo scan in the app** — unblocks BF-4 entirely.
 - **The Tuning calibration cluster** — owner signs off, then Lane A implements.
 - **Q-388 SpO₂** — one night without the measurement sequence: a Kotlin change and a new APK.
 - **Q-549 / Q-551** — Railway cost and hosting decisions.

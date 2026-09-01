@@ -6006,7 +6006,7 @@ reads an all-false style as "use them all".
 A finding that something is *not* broken earns its lines here exactly when the thing looks broken on
 sight, which this does.
 
-## 2026-09-01 — baton 189 → 194, `docs/implementation-backlog.md` → 14957 (queue hygiene)
+## 2026-09-01 — baton 189 → 193, `docs/implementation-backlog.md` → 14976 (queue hygiene + BF-4 closed)
 
 Five lines onto the baton, and they are the finding a successor needs before anything else: the
 **startable** Lane A queue is thinner than READY's count, entry by entry, with the reason each of the
@@ -6016,3 +6016,11 @@ discovering that — which is what happened here.
 The backlog grows by LA-53 (proposing a check for the one mechanical case) and by Q-535's lane
 correction. Q-535 headed **Lane A's** list for two weeks after its Lane A half shipped, because
 `next-item.js` reads the `Lane:` field and nothing re-reads it when the remaining work moves lanes.
+
+
+BF-4 rides here too: it was **closed by measurement**, and the closing note is longer than a strike
+because the numbers contradict the entry's own lever — latency fell 36% across the 1024 px bound
+while input tokens **rose** 14%, so the r = +0.958 it rested on did not survive the intervention. A
+close that just said "stopped" would leave the next person to re-derive that. The baton shrinks by
+two lines in the same pass: it listed a photo scan as owner-gated when that gate cleared on
+2026-08-30, which is the stale-premise failure this baton spends a section warning about.
