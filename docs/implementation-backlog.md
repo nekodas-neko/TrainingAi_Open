@@ -638,43 +638,31 @@ experiment, not an inference.
   **observed from the APK**; the boot log names both DSNs as found; and the CSP report shows no
   violation for the ingest host.
 
-### [platform] BF-91 — 58 E2E specs run at the S25 viewport and assert nothing visual
+### [platform] LA-50 — pixel baselines need a CI-side job, because a session cannot generate one
 
-- **Lane:** A — `e2e/**` and `playwright.config.ts`.
-- **Needs:** BF-90
-- **Added:** 2026-09-01 · owner, asking whether the existing tooling could take device checks off
-  him: *"with our e2e and sentry etc cant you do the testing thats needed?"*
+- **Lane:** A — `.github/workflows/` and `playwright.config.ts`.
+- **Added:** 2026-09-01 · split out of BF-91, whose recommendation this is the blocked half of.
 
-**The harness is already pointed at the right target and does not look.** `playwright.config.ts`
-loads `devices['Galaxy S9+']` at **412×915**, deliberately — its own comment says testing at a
-desktop viewport *"would walk straight past"* the canonical target. There are **58 spec files**.
-**`grep -rl 'toHaveScreenshot' e2e/` returns 0.** Nothing compares pixels, so every *"does this look
-right"* question falls to the owner's eyes by default.
+**Measured, not assumed.** `playwright.config.ts` runs the sandbox Chromium at a fixed path because
+the managed download is proxy-blocked. That binary is **141.0.7390.37**; `@playwright/test` 1.62.1
+pins revision 1234 — **151.0.7922.34** — which is what CI's `playwright install chromium` fetches.
+Ten major versions of font rasterisation and compositing apart, so a baseline committed from a
+session fails on its first CI run and every one after. This is a property of the sandbox, not of any
+spec, and it will not change by trying harder.
 
-- **Recommendation: add screenshot assertions to the flows the shipped-but-unverified entries care
-  about.** BF-73 (capture tiles and button prominence), BF-75 (sheet palette), BF-52 (label wrap),
-  Q-406 (the shared food row across four call sites) are all layout-and-colour claims a baseline
-  image checks better than a person does, and checks on **every** run rather than once.
-- **⚠ State the limit honestly, in the entry and to the owner: a screenshot test catches CHANGE, not
-  CORRECTNESS.** Someone has to approve the first baseline. So this converts a recurring check into
-  a one-time one — most of the value, but it does not make a device check disappear, and an entry
-  that claims otherwise is selling something.
-- **⚠ It cannot touch safe-area, which is the bug class that keeps recurring.** CLAUDE.md is explicit
-  that the web sandbox renders insets as **0**, so Chromium-under-Playwright is blind to exactly what
-  BF-76 is about. Do not add a screenshot test that appears to cover it — a green check over an
-  invisible failure is worse than no check.
-- **The emulator option, named so it is not re-discovered.** An Android emulator in CI *could* see
-  insets and gesture-nav, and `.github/workflows/android.yml` already builds the APK. It is a
-  project (emulator provisioning, nav-mode config, flake budget), not a quick win, and it should not
-  start before BF-90 and this entry have shown what is left over.
-- **⚠ Sentry exists and does not help here — see BF-92 for why it is also not working.** It is
-  installed and wired (`@sentry/nextjs`, five config files), and it is an **alerting** tool by
-  deliberate design: `tracesSampleRate: 0`, no replay, no profiling. It reports crashes. It cannot
-  tell anyone whether a sheet's padding is right, so it discharges no device gate in this entry.
-  `error_events` is the same shape of answer — "did something break for the owner recently",
-  **pruned at 30 days** and **row-scoped to one user**.
-- **Verification:** the four flows above carry approved baselines; a deliberate padding or colour
-  change fails them; and the suite's runtime stays inside the E2E job's current budget.
+- **What it would take.** A `workflow_dispatch` job running `pnpm e2e --update-snapshots` and
+  committing the images back. Three things to settle before writing it: Actions needs write
+  permission to push (a security decision, not a detail), a human has to review the first images,
+  and the baselines then pin CI's Chromium — so a Playwright bump regenerates every one of them.
+- **⚠ Do not start this expecting it to discharge a device gate.** A baseline proves **change**, not
+  correctness, and it cannot see safe-area insets at all — the sandbox renders them as 0, which is
+  the bug class that actually keeps recurring here. `e2e/README.md` now says both.
+- **The cheaper thing was done first and may be enough.** BF-91 shipped measured layout assertions
+  for the flow that had none; 21 of 58 specs now assert layout or computed style. Read
+  `e2e/meal-library-action-hierarchy.spec.ts` before deciding this entry is still worth its cost —
+  a claim you can state in a sentence beats an image a human has to approve.
+- **Verification:** a deliberate colour or spacing change fails a baseline in CI, and a Playwright
+  version bump has a documented one-command path to regenerate.
 
 ### [nutrition][activity] BF-88 — the energy model runs on two different bases and the card never says which
 

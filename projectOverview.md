@@ -27,6 +27,16 @@
 **Version:** v1.417.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-09-01.
 
+**The E2E harness already looks; what it cannot do is take a photo (BF-91).** The entry read *"58
+specs assert nothing visual"* — **21 of the 58** assert layout, and the four flows it named already
+have dedicated specs. What is genuinely absent is pixel baselines, and a session cannot make one:
+the sandbox Chromium is **141** while CI installs **151**, so a committed baseline fails on its first
+run. Split out as LA-50 with what a CI-side job would cost. The real gap was BF-73, whose measured
+numbers sat in its `Keep:` and nowhere else — now pinned as ratios, along with the finding that
+`globals.css`'s bare `button { min-height: 48px }` is what lifts those controls off 44. **Deleting
+that one CSS line turns the spec red**, which no source-level check on the classes would notice
+([journal](docs/overview/entries/2026-09-01-e2e-layout-assertions.md)).
+
 **The prune that was working, and the retraction that matters more than the entry (BF-93).** A
 session reported `error_events` never prunes — no `DELETE`, no cron, no trigger — and wrote that
 into CLAUDE.md, the file every session reads first. The `DELETE` is in `insertErrorEvent` and has
