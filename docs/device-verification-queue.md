@@ -498,6 +498,37 @@ firmware), `PS-10` (ring gestures for workout navigation, an unproven idea).
 These need hardware in hand and none is a check of shipped app behaviour — they are experiments.
 Listed together so they are not mistaken for part of the sitting.
 
+# Owner actions that are not presses, and were invisible — added 2026-09-01
+
+These two sit in the backlog as **`Gate: owner`**, which reads as *"a decision is owed"*. In both
+cases the decision was made weeks ago and what is actually owed is an **action only the owner can
+take**. Filed here because this is the list the owner works from, and a settled decision wearing a
+decision-gate is invisible in it.
+
+## O1. One night with the Polar H10 on — Q-4
+`respiratory_rate` is persisted from an estimator its own documentation calls uncalibrated, and
+there is no ground truth to calibrate it against: production holds 23,065 RR rows and **50** between
+00:00 and 06:00 Brisbane, so the strap is essentially never worn asleep.
+
+**The owner already agreed on 2026-08-04** — *"yes but not tonight."* Nothing needs deciding.
+**Action:** wear the H10 for one full night. One night unblocks the calibration; a few make it good.
+
+## O2. Run the historical redecode — Q-71
+Stored `sleep_sessions` rows still carry single-anchor times, which is why one night's bedtime read
+three different values across three re-runs (23:46:54 → 23:30:05 → 22:50:07). The **code** fix
+shipped 2026-08-12 and corrects future rollups only; the stored history is untouched.
+
+**The owner decided on 2026-08-12 to rewrite stored history**, and the re-scope condition it waited
+on (Q-139's non-interpolating offset) **shipped 2026-08-08**. So both conditions are met.
+
+**Action:** `POST /api/oura-ble/samples/redecode` with **no `date` param** (which forces
+`fullHistory: true`), from a logged-in session. It is session-auth-gated with no bearer path, so a
+session cannot do it — **only the owner, or an agent holding their login**.
+
+**Before pressing:** this rewrites stored ring history. The archive it re-decodes from
+(`oura_raw_samples.body_hex` on the server) is not mutated, so the operation is repeatable — that is
+what makes it safe to run rather than a one-way door.
+
 # Gated on a device but NOT a press
 
 Listed so nobody goes looking for a button. These need a device to *exist*, not to be tapped.

@@ -8027,7 +8027,16 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 - **Branch:** `perf/oura-raw-row-narrowing`
 - **Lane A.** Migration + `lib/data/**`.
 - **Added:** 2026-08-17
-- **Gate:** owner
+- **Reference:** the 2026-08-25 re-measurement below is the value here, not the work. **Do not
+  start it.**
+- **The `Gate: owner` was removed 2026-09-01, and it had been stale for two weeks in two different
+  ways.** The owner *unblocked* this on 2026-08-17 — the line directly below says so — so the gate
+  was already answered when it was written; and the 2026-08-25 re-measurement then concluded neither
+  half is worth doing. An entry cannot be waiting on an owner who has already replied. It carries
+  `Reference:` instead, which keeps the measurement findable while stopping the runner offering it as
+  Lane A work the entry itself argues against. **Revisit only if `oura_raw_samples` starts growing
+  again** — i.e. if Q-541's automatic packing stops running, which is the assumption the whole
+  re-measurement rests on.
 - ✅ **UNBLOCKED 2026-08-17.** The owner kept D4 as the destination **but with no deadline**, which
   lapses master-plan decision **O1** (*"do not do both"* — it vetoed `bytea` on the grounds the table
   was about to be dropped; a drop that is years out cannot veto a cheap reversible win today).
@@ -13889,6 +13898,12 @@ Two independent findings, both low-urgency:
 
 > **⚑ Owner answered 2026-08-04: willing to wear the Polar H10 overnight for ground truth — *"yes but
 > not tonight."*** Still owner-gated, but the gate is now scheduling rather than consent.
+>
+> **Surfaced 2026-09-01 on the owner's actual worklist** —
+> [`device-verification-queue.md`](device-verification-queue.md) — because a gate that reads
+> "owner decision" when the decision is already **yes** is invisible in the one place the owner
+> looks. Nothing here needs deciding: it needs one night with the strap on. Consent was given
+> almost a month ago and the entry has not moved since.
 
 ⛔ **Owner decision, not a fix.** Owner chose calibrate-against-Polar-H10, but
 production has 23,065 RR rows and only 50 between 00:00–06:00 Brisbane — the strap

@@ -5408,3 +5408,20 @@ the only way to get this right when the other side is also growing.
 than carried across it, and both sides of this file's own conflict were kept — it is append-only, so
 a conflict here is two *additions*, the opposite of the backlog's. Entry-ID set diffed against the
 new `origin/main`: **identical, nothing added or lost.**
+
+## 2026-09-01 — `docs/implementation-backlog.md` 14877 → 14892 (+15)
+
+Same branch, second pass: an audit of the 11 remaining `Gate: owner` entries for the failure the
+Orchestrator baton warns about — *a decision the owner already made, with the gate left on*. Three of
+eleven had it.
+
+- **Q-540** carried `Gate: owner` on the line directly above *"✅ UNBLOCKED 2026-08-17"*, and was
+  then superseded by its own 2026-08-25 re-measurement (Q-541's packing made the table it narrows
+  stop growing). It becomes `Reference:` — the measurement stays findable, the runner stops offering
+  work the entry argues against.
+- **Q-4** and **Q-71** are owner *actions*, not decisions: consent for the first was given
+  2026-08-04, and the second's decision plus its re-scope condition were both settled by 2026-08-12.
+  Both are cross-linked into `device-verification-queue.md`, which is the list the owner actually
+  works from — a settled decision wearing a decision-gate is invisible there.
+
+The growth is three entries gaining the sentence that says why they are not what their field claims.
