@@ -5598,3 +5598,27 @@ the field rather than hide it, or a cold cache plus a dead network silently repr
 That reasoning is what a future session needs and what a one-line "fixed the password field" would
 lose.
 
+
+## 2026-09-01 — `docs/implementation-backlog.md` 15133 → 15210 (BF-93, and BF-92 gets a better fix)
+
+Chasing the owner's Sentry question turned up a second thing. **`error_events` does not prune.**
+CLAUDE.md says it does, `lib/export/export-map.ts:167` says it does, and there is no `DELETE`
+outside tests, no `pg_cron`, no trigger — with the data agreeing: the owner's oldest row is 32 days
+old against a claimed 30. The table is now **52 MB on 728 kB of index**, second-largest in the
+database, so it is payload rather than bloat. Q-539 already halved the message cap going forward;
+the historical rows were never rewritten and still measure `avg 1904` against `max 2000`.
+
+BF-93 carries the measurements and, more usefully, the two things not to do: do not delete rows to
+improve a number (they are the only record of faults nobody saw), and do not confuse this with
+BF-55, which is the inverse problem — indexes outweighing heap.
+
+BF-92 grew because the recommendation **changed**. `withSentryConfig` turns out not to be wired at
+all, and its `tunnelRoute` sends client events **same-origin**, which `connect-src 'self'` already
+allows — so one change fixes the client blackout, source maps and release tagging together, and
+cannot be re-broken by a future CSP edit. The CSP-host fix is now the fallback. The entry also
+gained a natural experiment rather than an inference: 4 `source: client` rows reached `error_events`
+from the same WebView, in the same week, that Sentry recorded nothing from. Same app, same errors,
+different origin.
+
+CLAUDE.md is corrected in place at no net line cost — the false half of the sentence is replaced by
+the measurement and the reason the rule still stands.
