@@ -5342,3 +5342,19 @@ tell them apart from the screen is how a reasonable proposal gets to look obviou
 It carries its numbers (124 days, 50 below threshold, 45 with plausible intake, the RMR of 1,325)
 because the Tuning rule requires a blast radius and because the next session to be asked this will
 otherwise re-run the same six queries.
+
+## 2026-09-01 — `docs/implementation-backlog.md` 14783 → 14803 (BF-87 gains the rate it was missing)
+
+Same entry, sharper requirement. Told the model was correct, the owner restated what he actually
+wanted: *"i would like to see steps = calories so I know roughly how much effort translates to how
+much."* BF-87 had argued for showing the *threshold*; the ask is the **rate**, and those are
+different deliverables.
+
+The growth is a measured table — 1,196 → 0 kcal through 15,000 → 407, driven through
+`computeActiveEnergy` rather than approximated, so an implementer can check against it instead of
+re-deriving Schofield by hand. Plus the trap it implies: "steps = calories" is two numbers here, and
+a single rate is wrong below 3,000 — where 50 of the owner's last 124 days sit. Shipping the bare
+rate would move the confusion rather than fix it.
+
+No new entry, because this is the same piece of work and BF-88 already points at BF-87 with
+`Needs:`. Splitting it would have made two entries that must be read together.

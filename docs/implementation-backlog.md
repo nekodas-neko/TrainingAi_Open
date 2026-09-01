@@ -373,7 +373,10 @@ below threshold and left in place for next time.
   consumer) and the Nutrition "why two numbers" block that says the same thing.
 - **Batch:** `nutrition-ui-uplift`
 - **Added:** 2026-09-01 · owner: *"is basic steps being counted towards calorie burn? It says I've
-  done 1000 but not sure if that's counting towards nutrition."*
+  done 1000 but not sure if that's counting towards nutrition."* — then, having been told the model
+  is correct: *"if its base metabolism thats fine. but i would like to see steps = calories so I know
+  roughly how much effort translates to how much."* **That second sentence is the requirement.** The
+  ask is not a number on a card; it is an exchange rate the owner can hold in his head.
 
 **The app is correct and the screen cannot say why.** The owner's screenshot holds both halves of the
 contradiction he is reporting: **STEPS 1,196 Today** beside *"1,365 base — nothing earned from
@@ -399,6 +402,22 @@ card gives the honest answer without the reason.
   only **4,000** steps convert — roughly 40 minutes of walking at the model's 100 steps/min. A user
   who thinks all 7,000 count will read the burn as too low and go looking for a bug, which is this
   report one step later.
+- **The rate, measured through the real estimator for the owner's profile (2026-09-01).** Not
+  approximated — driven through `computeActiveEnergy` itself, so an implementation can be checked
+  against it:
+
+  | steps | 1,196 | 3,000 | 5,000 | 7,000 | 10,000 | 15,000 |
+  |---|---|---|---|---|---|---|
+  | kcal | 0 | 0 | 68 | 136 | 237 | 407 |
+
+  **≈ 34 kcal per 1,000 steps, above the first 3,000.** Linear above the threshold, because the
+  estimator is `minutes × (MET − 1.5) × BMR/min` and minutes are `steps / 100`.
+- **⚠ "Steps = calories" is TWO numbers here, and shipping one of them is the bug this entry is
+  about.** A bare *"1,000 steps ≈ 34 kcal"* is wrong at the bottom of the range — precisely where
+  the owner was standing when he asked, and where **50 of his last 124 days** sit. The pair that is
+  actually true: *nothing below 3,000, then ~34 per 1,000.* Whatever the surface ends up being (a
+  line under the steps tile, a tooltip, a row in the burn breakdown), it has to carry both halves or
+  it recreates the confusion in a new place.
 - **The two other addends are silent in the same way.** `workoutKcal` and `activityKcal` also roll
   into one "earned from movement" figure with no breakdown at the point of confusion —
   `activeBreakdown` already returns all three separately (Q-391 made sure the parts sum to the
@@ -410,7 +429,8 @@ card gives the honest answer without the reason.
   days it moves.
 - **Verification:** on a morning below the threshold the card says why and names the number; above it,
   the earned figure appears and the explanation stops; and the three addends shown never disagree
-  with the total.
+  with the total. **And the owner can answer "how many steps for 100 kcal?" from the screen alone**
+  — that is the test this entry is really for; the numbers above say the answer is about 6,000.
 
 ### [nutrition][activity] BF-88 — the energy model runs on two different bases and the card never says which
 
