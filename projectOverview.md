@@ -27,6 +27,19 @@
 **Version:** v1.424.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-09-01.
 
+**A CI flake had a cause, and `main` gets a nightly (LB-31).** `anchor-source.test.ts` failed once
+on CI and nowhere else; an hour had already gone into it. The entry's diagnosis was half right — the
+second test's own sleep row does let the route build and persist a readiness that out-ranks the rung
+under test — and the missing half is what made it unreproducible: the build is also gated on
+`!todaySnapshot`, and **the route's snapshot write is fire-and-forget**, so the whole file was
+passing on a race between an unawaited write and the next test. **Reproduced on demand** by running
+the second test alone, where test 1's snapshot never exists. Separately, `ci.yml` now runs `Tests`
+against `main` nightly (every other job skipped on that trigger, so a night costs one job) — a PR is
+green against the `main` it was cut from, and nothing re-checked the combination after several
+landed; a failure now names `main` and the merge window instead of the next contributor's PR. **The
+no-`push` decision is untouched**
+([journal](docs/overview/entries/2026-09-01-verify-main-nightly.md)).
+
 **The queue tool stops pointing Lane A at another lane's finished work (LA-53).** `next-item.js`
 reads an entry's `Lane:` field and nothing re-reads it when the remaining work moves lanes, so
 **Q-535 headed Lane A's READY list for two weeks** after its Lane A half shipped. An advisory note in

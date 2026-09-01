@@ -6236,3 +6236,14 @@ LA-47 — and the question of whether the note should ever fail rather than prin
 `projectOverview.md` grew 8, and the line that earns them is the one about the rule reporting **its
 own documentation** twice before the exclusions existed. Without it the note reads as ordinary
 caution; with it, the reason it prints rather than fails is a measurement.
+
+## 2026-09-01 — `projectOverview.md` → 9053, `docs/implementation-backlog.md` → 15378 (LB-31 shipped)
+
+The backlog shrank: LB-31 carried two findings and a long options list, and what is left is the merge
+queue plus the correction to its own mechanism. That correction is the part worth the lines — the
+entry's account was half right, and the missing half (an unawaited snapshot write racing the next
+test) is the whole reason an hour failed to reproduce it.
+
+`projectOverview.md` grew 13. The line that cannot be cut is that **the file was passing on a race**,
+not that a flaky test was fixed: the same shape — an assertion whose setup depends on a fire-and-
+forget write from a previous test — is reachable anywhere else the pattern appears.
