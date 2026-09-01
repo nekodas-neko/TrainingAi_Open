@@ -388,6 +388,51 @@ below threshold and left in place for next time.
 > BF-29 (My meals), BF-30 (Meal detail), BF-31 (Edit meal) and BF-26 (Quantity). Two artboards need
 > no entry — `Tap targets` and the `srv/g` studies both shipped in Q-395a.
 
+### [app-shell] BF-96 — the weather chip wraps because it is the only thing in the header allowed to
+
+- **Lane:** B — `components/weather-chip.tsx:38` (one class pair).
+- **Added:** 2026-09-01 · owner, with a Home screenshot: *"I dont like how the temperature/uV pill
+  sits. can we go back to the old way when it was side by side. you can make it smaller if needed."*
+
+**Nothing changed the layout — the chip is still side by side, and it is WRAPPING.** Its root is
+already `flex items-center gap-1` rendering `21°` `·` `UV 5` inline. What the screenshot shows is
+`UV 5` breaking at its own space, so `5` drops under `UV` and the pill becomes two lines tall.
+
+**The cause is an asymmetry with its sibling**, in `session-select-content.tsx:1071-1076`:
+
+```tsx
+<div className="flex items-center gap-2">
+  <p className="text-xs … whitespace-nowrap shrink-0">   {/* the date: will not wrap, will not shrink */}
+    {formatInTimeZone(new Date(), tz, "EEEE d MMMM")}
+  </p>
+  <WeatherChip />                                         {/* neither class — so it absorbs everything */}
+</div>
+```
+
+The date refuses to give up space, so the chip is the **only** compressible item in the row and takes
+100% of any shortfall.
+
+**Why it looked fine before, measured rather than assumed.** `EEEE d MMMM` ranges from **12 to 20
+characters** across the year. Today is *"Tuesday 1 September"* — **19**, near the maximum. On a
+*"Friday 1 May"* day there are eight characters of slack and nothing wraps. **The old way the owner
+remembers is the same code on a shorter date**, which is also why this will keep coming back on its
+own schedule if only the symptom is nudged.
+
+- **Fix: give the chip the two classes its sibling already has** — `whitespace-nowrap shrink-0` on the
+  root `div`. That is the whole change, and it is the sibling-surface rule: the row already decided
+  how items behave under pressure and one of the two was never told.
+- **On *"you can make it smaller if needed"* — it is not needed, and size is the wrong lever.** The
+  chip is 19 px of text; wrapping is a `white-space` bug, not a width shortage. If the longest dates
+  still overflow after the fix, shorten the **date** (`EEE d MMMM` → *"Tue 1 September"*, −4 chars)
+  rather than the chip: the date is partly recoverable from the phone's own UI, the temperature and
+  UV are not.
+- **⚠ Do not add hex literals.** `uvColor()` already carries five (`#8b5cf6` … `#22c55e`) and
+  `check-hex-literals.js` is shrink-only per file — a fix that adds one must raise that file's number
+  in the same PR.
+- **Verification:** on the S25, the pill is one line on **every** date — check a long one
+  (*Wednesday 30 September*, 20 chars) rather than today's, since today's is not the worst case.
+
+
 ### [workouts][app-shell] BF-94 — swipe the Start button to reveal Rest, instead of a permanent two-button row
 
 - **Lane:** B — `app/session-select/components/recommendation-card.tsx:252-296` and

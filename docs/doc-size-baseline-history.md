@@ -5676,3 +5676,20 @@ saying it marks rows that own horizontal gestures, and `tab-swipe-navigator.tsx`
 `data-swipe-carousel`, `.overflow-x-auto` and `data-hscroll` — **not that one**. The marker is
 written and never read. Latent only because a tab swipe must start within 24 px of an edge; the fix
 is one string in a selector.
+
+## 2026-09-01 — `docs/implementation-backlog.md` 15208 → 15253 (BF-96, a wrap mistaken for a layout)
+
+The owner asked to *"go back to the old way when it was side by side."* It never stopped being side
+by side — `weather-chip.tsx` renders `21° · UV 5` inline and the pill is **wrapping** at the space
+inside `UV 5`.
+
+Most of the entry is the measurement that makes the report make sense. The chip's sibling date is
+`whitespace-nowrap shrink-0`; the chip has neither, so it absorbs every pixel of shortfall in the
+row. And `EEEE d MMMM` runs **12 to 20 characters** across the year — today's *"Tuesday 1
+September"* is 19. **The old way is the same code on a shorter date.** Without that, the obvious fix
+is to shrink the chip, which would hide the wrap on most days and let it return each September.
+
+The entry also answers the owner's *"make it smaller if needed"* with the reason it is the wrong
+lever, and names the fallback that is right if the longest dates still overflow — shorten the date,
+not the chip, because a phone already shows the date elsewhere and shows neither the temperature nor
+the UV.
