@@ -4,161 +4,135 @@
 > is how six concurrent sessions stay tellable apart; a renamed successor is a lost thread even with a
 > perfect baton.
 
-**Updated:** 2026-08-31 · **By:** the twelfth session to run as Lane A · **Next ID:** `LA-46`
+**Updated:** 2026-09-01 · **By:** the thirteenth session to run as Lane A · **Next ID:** `LA-51`
 (`grep -rhoE '\bLA-[0-9]+\b' docs/ | sort -t- -k2 -n | tail -1` is the authority, not this line)
-**Migrations:** directory head **246**, next free **247** — claim against open PRs too, not just the
-directory. Local SQLite **v32**.
+**Migrations:** directory head **253**, next free **254** — claim against open PRs too, not just the
+directory. Local SQLite **v33**.
 
 ## Now
 
-**BF-42, BF-81 (divergence half), BF-78, BF-70 and BF-2 shipped. BF-81 KEEPS an owner decision (recomputing 38 stored stress days — only 8 are re-derivable without a wide pass, so the naive version makes the column more mixed); the other three entries are REMOVED. BF-2 read as READY #3 for hours after shipping** — `check-backlog-pointers.js` looks for completion words in HEADINGS and BF-2's were in its body, so nothing caught it. **Re-run `next-item.js` after striking an entry; do not trust the edit.** What is left is **LA-45** only (Lane B: a screen that reads `bodyFatCorrected`) — **LA-44 was superseded by BF-71 (#681)** hours after it was filed, and the chain is verified end to end: a scan entered through BF-71's form moves the calorie goal with no other action, and a second scan re-derives the offset on its own. **Merge `main` before starting any queue item; two entries this session were already built by another agent.** **Two entries were investigated rather than built, findings on them:** BF-80 — cause (1) ruled out from the service worker, and its claim that a null render "would leave a row" is wrong, so an absent `error_events` row does NOT distinguish it from renderer death; the diagnostic needs `adb logcat`. BF-83 — cause (2) ruled out (the sleep screen always revalidates), **which settles its lane as A**: the deliverable is defining when a night is complete, not adding a refresh.
+**Four PRs merged: #747 (BF-1 blood-panel storage), #750 (BF-97 scanned-meal groups), #751 (a
+compaction chore), #752 (BF-59 phase-aware volume targets).** Start with
+`node scripts/next-item.js --lane A` and read its real output.
 
-**Do not refactor the per-consumer correction back into `listBodyMetrics`**: the Health log sheet seeds from that read and POSTs back at rank `manual`, so a corrected value there overwrites the raw archive. `check-body-fat-correction.js` holds the line.
+**Two of the four left a `Keep:` that a successor should read before touching the area:**
 
-`docs/implementation-backlog.md` is
-**220 entries** — it grows while a session shrinks it, because five agents file into it concurrently.
+- **BF-59 introduced a live inconsistency, deliberately.** The Training card's weekly target is now
+  derived from `volumeLandmarks(goal, muscle)` scaled by the week's phase mix; **`signals.ts` still
+  builds the AI's `volumeBudgetPerMuscleGroup` from the stored `program_volume_targets` number**,
+  which is the flat 14/10 binary the card stopped reading. Before the change both were wrong
+  together; now only the prescription is. It is the entry's first `Keep:` and it needs a device pass,
+  because it changes prescribed sets rather than a display.
+- **BF-97 writes a group nothing renders yet.** `food_logs.meal_group_name` is written by all three
+  paths, and `groupDiaryEntries` still requires a `savedMealId`, so a scan draws exactly as before.
+  That is the safe half of the split, not an oversight — the rendering rule is Lane B's.
 
-**This session told the owner the Lane A queue was nearly exhausted; it was not** — re-running `next-item.js` showed **69 READY** with an entirely different top. The queue is scanned, never remembered.
+**BF-1's storage half shipped; the extraction route and the consumers are still Lane A's.**
+`latestAnalytes` was written for the consumers and **removed again**, because
+`check-dead-repo-methods` correctly rejects a method with no caller. Bring it back in the same PR as
+its reader, not before.
 
-Start with `node scripts/next-item.js --lane A` and read its real output — see the next section.
+**The queue is scanned, never remembered** — a previous baton told the owner Lane A was nearly
+exhausted when 69 entries were READY. Re-run the tool.
 
-**⚠️ This baton used to call the remaining work "almost entirely owner- or device-gated". Wrong, and
-it propagated — a session read the ~21 scoring entries at the top of READY, called the queue blocked,
-then shipped six startable items from below them. Scroll past the scoring block.** Owner, 2026-08-26:
-*leave the stuff gated on me for later and continue working through the queue of what you can do*.
-Top of READY:
-
-- **Q-289 / Q-290 / Q-272 / Q-507 / Q-508 / Q-422 / TN-10** — scoring calibrations. *Tuning proposes
-  → owner signs off → Lane A implements.* Not Lane A's to start.
-- **Q-388** — needs a night on the S25 with the pending APK. Owner-only.
-- **Q-549 / Q-551** — Railway cost and hosting decisions.
-- **13 entries** waiting on the device run the owner has agreed to make as written.
-
-Do not manufacture an item to avoid saying so, and do not start a gated one to look busy.
-
-## Read this before you trust the queue tool
-
-`next-item.js` has mis-reported startability **three** times — LB-11's KEEP bucket, LA-23's dash-form
-`Keep —` parse (#473), and LA-29, which listed at READY #4 an entry whose own heading read
-`CLOSED 2026-08-25`: `check-backlog-pointers.js` had a rule for exactly that and its word list simply
-had no `CLOSED` (Q-27 sat in the queue on that one word for three weeks; the list now lives in
-`scripts/lib/completion-words.js` with a test). Every one was found by reading the tool's real output;
-its tests passed throughout.
-
-**Run it, read its output for your own lane, and distrust a top entry you recognise as done.**
+**⚠️ Scroll past the scoring block at the top of READY.** Owner, 2026-08-26: *leave the stuff gated
+on me for later and continue working through the queue of what you can do*. The ~7 Tuning
+calibrations, the device-gated entries and the Railway decisions all sit above startable work.
 
 ## The habit that has now paid on every entry it has been applied to
 
 **Re-verify an entry's premise against current `main` or production before building it, and write
-down what you checked.** Of the eight entries taken this session, **six** had a stale or wrong
-premise — including two written by this session. Q-501's own "5 of 33 disagree" was really 7 of 42,
-with 27 of the "disagreements" simply carrying the *previous* model anchor. Q-403's recommended fix
-(an injury gate) turned out unnecessary because the in-workout swap already mutates local state only.
-The earlier session's six were Q-540 (sizing), Q-403 (tier), Q-295 (latency), Q-304b (method *and*
-blast radius), BF-4 (hypotheses already answered), and the "add an admin button" request (the buttons
-had shipped two days earlier).
+down what you checked.** This session it paid four times in four entries:
 
-Two shapes: *the evidence is stale*, and *the evidence was never true*. Q-295 is the one to remember — a review doc had carried the corrected number for a week while claiming it *"corroborates Q-295 exactly"*, and nobody propagated it. **Q-304b is the sharpest case.** The owner authorised recomputing 30 rows; measuring first found the specified method moves **zero** rows by construction, the real blast radius is **277**, and **76 of those** would silently substitute a since-edited prescription. The authorisation was real and the work would still have been wrong. (BF-81 repeated the shape on 2026-08-31: its recommended recompute reaches 8 of 38 rows and would leave the column more mixed.)
+- **BF-59** claimed the stored targets were a flat binary and the goal multiplier was ignored. One
+  `claude_ro` query confirmed both (15 rows, all 14 or 10; program is `powerbuilding` = ×0.8) — and a
+  second found the thing the entry could not have known mattered: the sessions span **three phases at
+  once**, which is what makes "this week's phase" unstorable and reshaped the whole fix.
+- **BF-59's own corrective-migration proposal was wrong** and the measurement is why: a SQL migration
+  would need the landmark table expressed in SQL, i.e. a second copy of the formula — the exact class
+  the entry is filed under. Deriving at read time was the answer instead.
+- **BF-97** asked whether the scan write path could mint a group. Reading it showed the *decision* the
+  entry framed as open (where the name comes from) was already settled by the diary rule's own
+  docstring.
+- **The analyte table looked complete and was six short.** `ANALYTE_KEYS` named 52 of the report's 58;
+  the other six slugged to exactly the right key **by accident**. Found only by counting the panel to
+  correct a number in prose.
 
-## Shipped this session
-
-**2026-08-30/31:** Q-311, Q-225, Q-297, Q-527, Q-211, LA-40, LB-14, Q-214, Q-284, LB-25, LA-43 (#672), BF-2 all four steps (#676, filed LA-45), BF-70 (#687), BF-78/BF-81/BF-42 batched (#691). Details in `docs/overview/entries/2026-08-3{0,1}-*.md`.
-
-**LA-43 is the ninth moved premise this session** — filed against an unreachable `??` fallback; the
-live defect was the exact-name filter above it silently deleting every paraphrase. **Two guards in
-the fix were written and then measured away**: both survived every mutation and changed nothing
-against the real catalogue, because the transform is symmetric. A clause that reads as protection
-while providing none is worse than its absence.
-
-Earlier sessions' PRs are in the journal entries; this list stays to the current session.
-
-## Standing constraints
-
-- **The local gate is `pnpm check:rules`** — quote its `Ran N of N`, never the word "pass". **63 of
-  63** now. Never hardcode it; the runner reads it from `ci.yml`, which is the point.
-- **The clone is depth 1.** `git fetch --deepen=300 origin main` before any `git merge origin/main`,
-  or it refuses as "unrelated histories". Hit repeatedly; it is not optional.
-- **`get_check_runs` at `total_count: 0`** right after a push is registration lag, not a stale base
-  — tell them apart with `git merge-base --is-ancestor origin/main HEAD`.
-- **E2E is not a required check.** The five that gate a merge are Lint, Tests, Build, Custom Rules,
-  Migration Check.
-- **A check run that dies in seconds with no logs is GitHub Actions infrastructure**, not your diff.
-  #511 failed on a DNS error fetching `pnpm/action-setup`. One re-run is sanctioned; a second failure
-  is real.
-- **`pnpm dev` works.** `test@local.dev` / `testpass123` via `/api/auth/callback/credentials` with the
-  CSRF token from `/api/auth/csrf`. The `MODEL ASSETS UNAVAILABLE — SignatureDoesNotMatch (403)` line
-  at boot is the known Q-49 sandbox limit, not a fault.
-- **Nothing has run on the S25 for four sessions.** Anything touching offline-first, native,
-  safe-area, gestures or notifications needs the device smoke run or an explicit Known-Issues row.
+**The general shape: a hand-copied list can only ever agree with itself.** Both fixes this session
+replaced one — the analyte coverage test now reads its labels out of the report, and BF-59's target
+reads the landmark table rather than a copy seeded from it.
 
 ## Traps this session walked into, so you do not
 
-- **`doc-size-baseline.json` is gone — LA-33 split it into one `docs/doc-size/<path>.size` file per
-  tracked doc**, because every PR raising a number edited the same two lines of one shared JSON and
-  so conflicted *by construction*. Two PRs raising two different docs now touch no common line; two
-  raising the **same** doc still conflict, which is correct — they genuinely disagree about one
-  number. Re-derive from the merged file's real length (**`grep -c "" <file>` + 1**, the convention
-  the script uses), never by picking a side. `docs/doc-size-baseline-history.md` beside it stays
-  append-only; there, keeping both sides *is* the resolution.
-- **A backlog conflict is usually TWO DELETIONS — keep neither side.** Read the headings inside the
-  hunk, then check `git diff --numstat origin/main -- docs/implementation-backlog.md`.
-- **A mutation test that injects nothing reports a pass.** One did here: the anchor `sed` patched had
-  changed, so nothing was mutated and the green suite "confirmed" a property it never tested.
-  **Assert the mutation applied before believing the result** — one that does not mutate certifies.
-- **`Gate:` must start its own bullet** — on one line after `Lane:` it is not read as a gate, and the
-  entry stays READY while reading as gated. `check-backlog-pointers.js` catches it; do not eyeball it.
-- **Relative links break when prose moves a directory deeper**; a stale `.next/types/validator.ts`
-  makes `tsc` report a missing module for a deleted route. Clear it before diagnosing either.
-- **A mutation can be semantically equivalent and still be a coverage gap.** Two survived this
-  session's Q-501 pass and both were real: a pass-through storing `Math.round(input)` re-derives to
-  the same score, so nothing noticed, while reporting an input the day never had; and the audit's
-  "INPUT change" note firing *alongside* "MODEL moved" gives two contradictory verdicts, which leaves
-  the reader exactly where the finding found them. **A surviving mutation is a question about the
-  test, not a licence to stop.**
-- **An entry's own stated invariant is a claim, not a fact — and Q-519's was false.** It said duration
-  and efficiency are stored columns rather than derived from the span, and warned what would happen
-  if anything ever derived them. `aggregateNight` already did. **When an entry names the assumption
-  its design rests on, that sentence is the thing to go and check**, not the part to take on trust.
-- **Two counts of the same thing can live on two tables.** `recovery_index_hours` exists on both
-  `oura_daily_derived` (always NULL) and `oura_daily_summary` (populated, 50 of 51 rows). Querying
-  the first nearly filed a finding that an estimator had never produced anything — contradicted by
-  another entry's own `n = 42`. Same class as the `n_live_tup` error below: **when a count implies
-  something drastic, check you are reading the table that holds the data.**
-- **Inherited and still true:** `git reset --soft origin/main` does **not** merge — diff
-  `--name-only` against `origin/main` before every push. Commit, push, *then* switch branches. Never
-  slice a generated file by string index. A count moving further than your change explains is the bug.
+- **`pnpm check:rules | tail` swallows the exit code.** A gate failure was masked by an `&&` chain and
+  a PR went out with *No shared test-user UUIDs* red. **Redirect to a file, echo `$?`, then read the
+  file** — never pipe the gate into anything.
+- **An invalid UUID in a DB test reports as SKIPPED, not failed.** A fix for that collision used an
+  11-hex-char last group; Postgres rejected it as `invalid input syntax for type uuid` and vitest
+  printed **7 skipped**. The check's own message warns about this and it still happened. **Count the
+  tests that RAN**, not the ones that did not fail.
+- **`docs/overview/entries/` has a 250-file ceiling, and it fails whichever branch crosses it** —
+  here a feature PR whose only offence was adding its own journal entry. The remedy is the compaction
+  chore in `entries/README.md`, not a ceiling raise. Folding the 23 uncited entries took it to 227;
+  `check-doc-links` passed first run against 935 files with the README's four link rules applied
+  mechanically. **Budget half an hour for it if the count is near 250 when you start.**
+- **Running the suite on a branch that lacks the newest `claude_ro` views migration CLOBBERS the local
+  views**, and `migrate.js` will not restore them — the file is already recorded as applied, so it is
+  skipped forever. That is the "editing an applied migration" trap in its local form. Symptom:
+  `db-snapshot-integration` fails with *Snapshot drift: column X is in neither its claude_ro view nor
+  _meta_withheld_columns* while the migration file plainly contains the column. Fix:
+  `psql "$DATABASE_URL" -f lib/data/postgres/migrations/<N>_claude_ro_views_*.sql`.
+- **`psql` is NOT blocked** — an earlier baton said the command classifier refuses it. It ran fine all
+  session, against `postgresql://postgres:postgres@localhost:5433/trainingai_dev`. **`tsx` has no
+  `.bin` shim** but is installed: `node node_modules/.pnpm/tsx@*/node_modules/tsx/dist/cli.mjs`.
+- **`DATABASE_URL` is EMPTY in a fresh shell**, so `npx vitest run` silently skips every DB test —
+  1,013 of them, reported as "skipped" beside a green summary. Export the TCP form yourself before
+  believing a DB-backed run.
+- **A mutation that moves BOTH sides of a relative assertion survives.** Fixed by anchoring on
+  something the mutation cannot move — a recomputed absolute value, or a literal the source does not
+  contain (BF-59's route test stores a target of **999** and asserts the response never contains it,
+  which is the only assertion that can tell *derived* from *read*).
+- **Inherited and still true:** a backlog conflict is usually TWO DELETIONS — keep neither side, read
+  the headings. `doc-size-baseline-history.md` is append-only, so there keeping both *is* the
+  resolution. Re-derive a `.size` from the merged file (`awk 'END{print NR+1}'`), never by picking a
+  side. Commit before switching branches; never `git add -A` straight after a checkout that carried
+  changes.
 
-## The database reclaim — closed
+## Standing constraints
 
-**Q-315 is closed** — the owner pressed the button and it correctly reclaimed **0 B**, because
-`error_events` was never bloated (6,168 real rows, 5,928 of them one already-fixed burst that ages
-out of the 30-day prune by ~2026-09-12). The "4 live rows in 49 MB" that started it was `n_live_tup`,
-repeated through five documents including this one.
-
-**Still binding: no bearer path on `/api/admin/vacuum` without an explicit yes — it is an auth
-change.** The real gap is discoverability (a general DB control behind a row labelled for Oura, and
-no maintenance tab on `/admin`): **Q-531**, filed, owner-gated, Lane B's.
+- **The local gate is `pnpm check:rules`** — quote its `Ran N of N`, never the word "pass". **67 of
+  67** on 2026-09-01. Never hardcode it; the runner reads it from `ci.yml`, which is the point.
+- **The clone is depth 1.** `git fetch --deepen=50 origin main` before any `git merge origin/main`, or
+  it refuses as "unrelated histories". Hit three times this session; it is not optional, and a plain
+  `git fetch origin main` does **not** deepen.
+- **E2E is not a required check.** The five that gate a merge are Lint, Tests, Build, Custom Rules,
+  Migration Check. All five report within ~4 minutes; Tests is the slowest at ~3.5.
+- **`get_check_runs` at `total_count: 0`** several minutes after a push is a stale base, not slow CI.
+- **A check run that dies in seconds with no logs is GitHub Actions infrastructure**, not your diff.
+  One re-run is sanctioned; a second failure is real.
+- **`pnpm dev` works, and exercising the changed route on it is the merge gate.** `test@local.dev` /
+  `testpass123` via `/api/auth/callback/credentials` with the CSRF token from `/api/auth/csrf`. Both
+  route changes this session were driven end to end that way and both found nothing — which is the
+  point: it is cheap, and it is the only thing that catches a validation or serialisation bug.
+- **Nothing has run on the S25 for five sessions.** Anything touching offline-first, native,
+  safe-area, gestures or notifications needs the device smoke run or an explicit Known-Issues row.
 
 ## Waiting on the owner
 
-The owner said on 2026-08-26 to *leave the stuff gated on me for later*. Do not chase these; do not
-start one to look busy. **Answered since:** Q-403 (swap only on request), the readiness calibration
-cluster (*"do it"*), the device run (*"it's fine — I'll run it as written"*).
+Do not chase these; do not start one to look busy. **Answered 2026-09-01:** BF-59's phase multipliers
+— *scale the target AND say why*, accumulation 1.0 · intensification 0.8 · realisation 0.6 · deload
+0.5. The scale is shipped; the "say why" is Lane B's render.
 
-- **Add `E2E` to `main`'s required checks.** LA-22 made the job always run and always report; nothing
-  in this repository can make it required. Until it is, the gate is the five in Standing constraints.
-- **One photo scan in the app** — unblocks BF-4 entirely (the nutrition scan-latency question).
-- **Q-289 / Q-290 / Q-272 / Q-507 / Q-508 / Q-422 / TN-10** — Tuning-originated calibrations; owner
-  signs off, then Lane A implements.
-- **Q-388 SpO₂** — needs one night *without* the measurement sequence: a Kotlin change and a new APK.
-  The owner's read is that sampling rate, not SpO₂ itself, is the likelier cost — worth measuring
-  before changing anything.
+- **LA-50** — a pixel-baseline job must push commits from Actions, which needs workflow write
+  permission. `Gate: owner`, and the only thing blocking that entry.
+- **Add `E2E` to `main`'s required checks.** Nothing in this repository can make it required.
+- **One photo scan in the app** — unblocks BF-4 entirely.
+- **The Tuning calibration cluster** — owner signs off, then Lane A implements.
+- **Q-388 SpO₂** — one night without the measurement sequence: a Kotlin change and a new APK.
 - **Q-549 / Q-551** — Railway cost and hosting decisions.
 - **The device run: 13 entries**, the owner has agreed to run the checklist as written.
-- **Null the corrupt `body_comp` snapshot (2026-07-29)?** Q-527's guard is forward-only, so the row
-  survives and Q-521 will read it. Recommended; the measurement stays in `body_metrics` either way.
-- **Drop `oura_heartrate_user_updated`?** 18 MB, zero scans; reverses part of Q-180. It is Q-283's
-  only material candidate, so that entry cannot finish without this call.
+- **Null the corrupt `body_comp` snapshot (2026-07-29)?** Recommended; the measurement stays in
+  `body_metrics` either way.
 
 ## Claimed paths
 
@@ -167,40 +141,48 @@ cluster (*"do it"*), the device run (*"it's fine — I'll run it as written"*).
   `packages/shared/src/workout/derive-session-rpe.ts`,
   `packages/shared/src/health/workout-energy.ts` — Lane A's.
 - `scripts/` sits in neither lane's path list and the rule does not decide it. Claim per PR, release
-  on merge — LB-11, #473, #507 and #509 all did.
-- `components/nutrition/meal-label-*` is **Lane B's**.
+  on merge.
+- `components/nutrition/meal-label-*` is **Lane B's**. BF-97's engine half touched
+  `components/nutrition/food-logger-sheet.tsx` for one argument, engine-half-first per the rule; that
+  claim is released.
 
 ## Findings, so they are not re-derived
 
 *The raw-frame half lives in [`docs/oura-ble-operations.md`](../../oura-ble-operations.md) §5. Keep
 it there.*
 
-- **The exercise catalogue:** `muscles` is jsonb and order is **not** load-bearing (consumers filter
-  on `role`, none indexes the array); the tallies read it in a **live subquery**, so a correction
-  re-derives history rather than applying only forward. Some rows are Title Case — fold case in any
-  guard. The device mirror re-hydrates from `/api/workout-data` — **no APK for a catalogue change**.
+- **`program_volume_targets` is now a ROSTER, not a target.** Its `muscle_group` says which muscles a
+  program trains; its `target_sets_per_week` is read by nothing the user sees. Re-seeding those
+  numbers recreates the second source of truth BF-59 removed. Whether the column becomes a
+  per-program override or is dropped is an open question and neither is urgent.
+- **A week has no phase.** `session_periodization.phase` is per **program session**, and production
+  shows ten sessions across three phases simultaneously. Anything that needs "the current phase" has
+  to average over the sessions actually trained.
+- **The exercise catalogue:** `muscles` is jsonb and order is **not** load-bearing; the tallies read
+  it in a **live subquery**, so a correction re-derives history. Some rows are Title Case — fold case
+  in any guard. The device mirror re-hydrates from `/api/workout-data` — **no APK for a catalogue
+  change**.
 - **Ownership on the sync-push path is not missing.** `pushMutations` →
-  `logExerciseFromPayload(userId, …)` → `ensureWorkoutSession(userId, …)`, which is user-scoped,
-  refuses another user's session id, and **404s rather than 403 to avoid a membership oracle**. This
-  is what let LA-28 delete `getWorkoutSessionOwners`/`getExerciseLogOwners`; do not re-add them
-  reflexively.
+  `logExerciseFromPayload(userId, …)` → `ensureWorkoutSession(userId, …)`, which is user-scoped and
+  **404s rather than 403 to avoid a membership oracle**. Do not re-add `getWorkoutSessionOwners`.
 - **Security:** the `VACUUM FULL` allowlist is a boundary, not validation — `hasOwnProperty`, never
   `in`. **DNS rebinding is NOT closed in `fetchPublicUrl`**: the address is validated, then the
   hostname is connected to by name.
 - **`claude_ro` is row-scoped to ONE user** — every count from `/api/admin/db-query` is *the owner's*.
-  Write findings as "none of the owner's", never "nothing is failing". Views scope on
-  `current_setting('app.claude_ro_owner', true)` (set by `bootstrapClaudeRoOwner()`) — no manual step.
-  **The generator reads the LIVE LOCAL SCHEMA, not `schema.ts`**, so stacked view regens are
-  order-dependent.
+  Write findings as "none of the owner's", never "nothing is failing". **The generator reads the LIVE
+  LOCAL SCHEMA, not `schema.ts`**, so stacked view regens are order-dependent, and a new column needs
+  a NEW migration number — never an edit to the last one.
 - **`pg_stat_user_tables` sizes are exact; `n_live_tup` is a stale planner estimate** (`last_analyze`
-  is NULL on every table). `n_tup_ins` is a lifetime counter and trustworthy — it proved
-  `running_baselines` never held a row. To ask whether a table is empty, `count(*)`.
+  is NULL on every table). To ask whether a table is empty, `count(*)`.
+- **`error_events` DOES prune at 30 days** — the 2026-09-01 amendment claiming otherwise was wrong and
+  is retracted in CLAUDE.md (BF-93). A prune fired from a write path only runs when something is
+  written, so the oldest row ages past the cutoff between faults. Read "oldest row" against the **last
+  write**, not against today.
 - **The MODEL is reachable from this sandbox** — `GOOGLE_GENERATIVE_AI_API_KEY` is set and
-  `generateObject` works through the proxy, so AI behaviour can be **measured**. No `tsx` — drive
-  probes as throwaway `*.test.ts` under vitest (it resolves `@/`). Gate any shipped live test on
-  `RUN_LIVE_AI_TESTS=1`, never on the key alone, or CI pays for it.
-- **Sandbox limits:** the rollup cannot execute here (it needs the constants Q-49 removed), so a
-  rollup pass is owner-only. `psql` and direct `pg` access are blocked by the command classifier —
-  use `pnpm db:local` or a `.cjs` probe at the repo root. A stale local DB looks like a code defect;
-  drop `/var/lib/postgresql/local-dev`. `npx next lint` is **not** `pnpm lint`. Drizzle will not
-  marshal a JS array into `unnest(...)` in a raw `sql` template.
+  `generateObject` works through the proxy. Gate any shipped live test on `RUN_LIVE_AI_TESTS=1`, never
+  on the key alone, or CI pays for it.
+- **Sandbox limits:** the rollup cannot execute here (it needs the constants Q-49 removed). A stale
+  local DB looks like a code defect; drop `/var/lib/postgresql/local-dev`. `npx next lint` is **not**
+  `pnpm lint`. Drizzle will not marshal a JS array into `unnest(...)` in a raw `sql` template, and it
+  cannot name a **functional** unique index (`COALESCE(col,'')`) as an `onConflictDoUpdate` target —
+  select-then-branch inside a transaction instead.
