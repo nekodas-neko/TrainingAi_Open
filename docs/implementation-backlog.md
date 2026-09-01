@@ -2822,28 +2822,69 @@ owner has to re-describe in a wizard what the app already knows.
   worker.
 
 
-### [workouts] LB-46 — the AI Prescription card may list pre-deload numbers on a deload prescription
+### [workouts] LB-47 — BF-64's `Full` override may do nothing on a REAL session-level deload
 
-- **Lane:** B — `components/workout/ai-prescription-card.tsx`, or whatever supplies its
-  `prescription` prop if the substitution happens upstream.
-- **Added:** 2026-09-01 by Lane B, incidentally, while device-substituting a fixture for BF-64.
-- **What was seen.** A `session_periodization` row whose prescription carries
-  `Deadlift {sets:3, reps:5, pct:60, deloaded:true, preDeload:{sets:4, reps:5, pct:80}}` renders in
-  the expanded card as **`4×5 @ 128.75kg (80%)`** — the *pre-deload* figures — directly under a
-  subtitle reading **`Deload session`**. The card's own code maps `prescription.exercises` and reads
-  `ex.pct`, so on the stored row it should print `3×5 … (60%)`.
-- **⚠ Attribution is measured, and the caveat is real.** It **reproduces on `main`** with the same
-  row (checked by stashing the BF-64 change and re-rendering), so it is not BF-64's doing. **But the
-  row was hand-built**, not produced by the engine, so the alternative explanation is that the
-  fixture is not a shape the engine emits and the card is fine. **Settle that first**: find a real
-  deloaded prescription in production (`prescription->'exercises' @> '[{"deloaded":true}]'`) and read
-  what the card shows for it before changing any code.
-- **If it is real, it matters more than it looks.** The subtitle and the numbers under it are the
-  two things a lifter reads to decide whether to override, and they would be disagreeing — the same
-  class as BF-8 (toggle disagreed with card) and BF-64 (toggle offered a control that did nothing),
-  one layer further in.
-- **Do not "fix" it by making the card follow the toggle.** BF-64 settled that: the card is a
-  statement about the prescription. If this is real the fix is to show what the prescription stored.
+- **Lane:** B — `components/workout/utils.ts` (`deloadRevertNames`), and possibly Lane A if the
+  answer is that a session deload needs a revert target the prescription does not currently carry.
+- **Added:** 2026-09-01 by Lane B, against its own shipped work (BF-64, #764, v1.422.0).
+- **⚠ This questions a fix that has already merged. It is not a regression — nothing got worse — but
+  the central claim may not hold, and it was verified against a fixture that misrepresents
+  production.**
+- **What BF-64 shipped.** Picking `Full` over a deload prescription reverts every deloaded exercise
+  to its `preDeload` numbers. The entry's premise, quoted: *"Every deloaded prescription exercise
+  carries a `preDeload` block."*
+- **What production actually holds.** Of **5** stored prescriptions: **1** has a session-level
+  `deload: true`, **2** have per-exercise `deloaded: true`, and **0 have both**. So on the only real
+  session-level deload, no exercise carries `deloaded`/`preDeload` — `deloadRevertNames` returns an
+  empty list and **the override reverts nothing.** The toggle would behave exactly as it did before
+  BF-64, which is the defect BF-64 was filed to fix.
+- **Why the two do not overlap.** A **session** deload has its low intensities baked into the LLM's
+  own `pct` values at generation. A **per-exercise** deload is an overlay applied afterwards by
+  `reevaluateForToday`, which stores the original in `preDeload` precisely so it can be undone. Only
+  the second has anything to revert *to*. BF-64 reused the second mechanism to implement the first.
+- **So the open question is what `Full` should mean on a session deload**, and it is not obvious:
+  the pre-deload numbers were never computed, so there is nothing stored to go back to. Candidates —
+  regenerate via `/prescribe` (which BF-64 rejected on cost, and the route takes no intensity input
+  anyway); scale the pcts back up by a fixed factor (invents numbers the engine did not choose); or
+  **disable the toggle on a session deload and say why**, which is honest and cheap. That last one is
+  probably right and is a Lane B change.
+- **⚠ Do not revert BF-64.** Its per-exercise path is correct and does work: `applyDeloadReverts` and
+  the blocked-exercise card copy are exercised by the mixed case, which production does produce. What
+  is unproven is the session-level case, which is the one the owner reported.
+- **⚠ And re-read BF-64's verification with this in mind.** It was measured against a hand-built
+  fixture combining session-level and per-exercise deloads — a pair production has not produced (see
+  LB-46). The reverts observed were real; whether they can ever fire on the owner's own data is what
+  this entry asks.
+- **n = 5.** Small. Confirm against a larger sample, or by asking the owner to report the next time a
+  deload day appears, before designing around it.
+
+### [workouts] LB-46 — how a deload reaches the AI Prescription card, and why a hand-built fixture misleads
+
+- **✅ CLOSED 2026-09-01 by measurement against production.** No code change. Kept as a
+  **`Reference:`** because the measurement is what the next reader needs, not the conclusion.
+- **Reference:** what the AI Prescription card can and cannot say, and why a hand-built prescription
+  fixture misleads.
+- **What I filed, and why it looked like a bug.** A card showed `4×5 @ 128.75kg (80%)` for an
+  exercise I had stored as `3×5 @ 60%` — the *pre-deload* figures under a `Deload session` subtitle.
+- **What actually happened.** `reevaluateForToday` (`packages/shared/src/ai-periodization/reevaluate.ts`)
+  **self-reverts** a per-exercise deload when the soreness that caused it clears: it swaps the
+  `preDeload` values back in, sets `deloaded: false` and **drops the `preDeload` block**. My fixture
+  had no mood log, so the reverts fired on the first read. Measured through the API:
+  `Deadlift: 4x5 @80% deloaded=false pre=none`. **The card was rendering the prescription faithfully.**
+  The tell was already on screen and I missed it — the card suppresses its intensity-zone chip when
+  `ex.deloaded`, and the chip was showing.
+- **The fixture was the unrealistic part, exactly as the entry warned it might be.** It combined a
+  session-level `deload: true` with per-exercise `deloaded: true` + `preDeload`. Production has never
+  produced that pair: of **5** stored prescriptions, **1** has a session-level deload, **2** have
+  per-exercise deloads, and **0 have both**. A session deload bakes its low intensities into the
+  LLM's own `pct` values; a per-exercise deload is an overlay with something to revert to. They are
+  different mechanisms and the fixture merged them.
+- **⚠ One latent inconsistency is real and stays open, in LANE A's file.** `reevaluate` returns
+  `{ ...prescription, exercises }` and never touches the top-level `deload` flag. So *if* both were
+  ever set and every per-exercise deload reverted, the subtitle would read `Deload session` over
+  full-intensity numbers. **n = 5, so "production has never produced it" is not "it cannot" —** the
+  guard against it would be in `reevaluate.ts`, which is Lane A's.
+- **Added:** 2026-09-01 by Lane B · closed the same day.
 
 ### [workouts] BF-64 — the Full/Deload toggle can only ADD deload, never remove one, so `Full · Override` overrides nothing
 

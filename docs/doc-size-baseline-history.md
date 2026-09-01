@@ -6205,3 +6205,24 @@ carry: `My Foods` was already the name of a **merged** list in v1.382.0 and the 
 v1.385.0, so an implementer reading the new label could reasonably re-merge the tabs and reintroduce
 a defect the app has already paid for. Both are the kind of thing that is cheap here and expensive in
 review.
+
+## 2026-09-01 — `projectOverview.md` → 9031, `docs/implementation-backlog.md` → 15417 (LB-46 closed, LB-47 filed)
+
++16 for a finding with no code change, which is the unusual case where that is clearly worth it: it
+records that a fix **already merged this session** may not do anything on the data it was built for.
+Burying that in a backlog entry and leaving the status block silent would be the version that costs
+something later.
+
+The measurement is the durable part — 5 prescriptions, 1 session deload, 2 per-exercise, **0 both** —
+because it is what distinguishes the two deload mechanisms, and conflating them is what produced both
+the false finding and the doubtful fix.
+
+## 2026-09-01 — `docs/agents/state/implementation-lane-b.md` → 179 (conflict-marker staging slip)
+
++5 for a gotcha found the same session it was needed. `git add -A; git status | grep '^UU'` always
+reports no conflicts, because staging clears the UU state — so the check that was meant to confirm a
+clean merge confirmed nothing, on a file `git merge` had genuinely left conflicted. `check:rules`
+caught it at the `No unresolved conflict markers` step.
+
+It sits next to the two existing gate gotchas because all three are the same mistake: reading a
+signal that has already been destroyed by the command before it.
