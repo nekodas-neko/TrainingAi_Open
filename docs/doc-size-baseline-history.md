@@ -6291,3 +6291,18 @@ The rule *"read which baseline a consumer actually calls"* was already in this b
 earlier instances this week and was walked into anyway, which is the argument for stating it against
 the **specific** consumer rather than in general. The entry also records the positive half: this is
 the one baseline in the codebase built correctly, and TN-6 can copy it rather than invent one.
+
+## 2026-09-01 — `projectOverview.md` → 9099, `docs/implementation-backlog.md` → 15499 (BF-69 stage 1 shipped)
+
+Both grew, and the backlog's growth is the kind this file exists to argue about: BF-69 stayed in the
+queue rather than being removed, because only stage 1 of four shipped. Its `Keep:` block is longer
+than a `Keep:` usually is because the entry's own `Lane:` line says "A for the read model and any
+schema" — a reader who stops there would take stage 4 next, which is gated on data that does not
+exist. The block names which stage is next and which lane owns it, which is the only thing that stops
+that.
+
+`projectOverview.md` grew for two reasons, and the Known-Issues row is the one that had to be
+written: local v34 rebuilds a table rather than adding a column, and every prior local migration that
+killed this app killed it by throwing on retry. A row that just said "not device-verified" would read
+like the eight others above it and get the same weight; what makes this one different is *which*
+statement is unverified.

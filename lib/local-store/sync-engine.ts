@@ -499,6 +499,9 @@ export async function pullDelta(userId: string, force = false, fullResync = fals
     dose:            r.dose ? String(r.dose) : null,
     defaultAmount:   typeof r.defaultAmount === 'number' ? r.defaultAmount : null,
     unit:            r.unit ? String(r.unit) : null,
+    startedOn:       r.startedOn ? String(r.startedOn) : null,
+    stoppedOn:       r.stoppedOn ? String(r.stoppedOn) : null,
+    dosePrompt:      Boolean(r.dosePrompt),
     reminderEnabled: Boolean(r.reminderEnabled),
     reminderTime:    r.reminderTime ? String(r.reminderTime) : null,
     sortOrder:       Number(r.sortOrder),
@@ -517,6 +520,11 @@ export async function pullDelta(userId: string, force = false, fullResync = fals
     amount:       typeof r.amount === 'number' ? r.amount : null,
     unit:         r.unit ? String(r.unit) : null,
     doseText:     r.doseText ? String(r.doseText) : null,
+    // BF-69 — which act of taking it this row is. Dropping it here would collapse every meal
+    // contribution into the manual one on the same day, since that is the branch applyDelta takes
+    // when `source` is absent.
+    source:       r.source === 'meal' ? ('meal' as const) : ('manual' as const),
+    sourceRef:    r.sourceRef ? String(r.sourceRef) : null,
     updatedAt:    toIso(r.updatedAt),
     deletedAt:    r.deletedAt ? toIso(r.deletedAt) : null,
     syncStatus:   'synced' as const,
@@ -781,7 +789,9 @@ async function enrichPayload(
   if (typeof m.payload.supplementId !== 'string') return m.payload;
   try {
     const rows = await store!.getSupplementLogs(String(m.payload.logDate ?? m.date));
-    const row = rows.find(r => r.supplementId === m.payload.supplementId);
+    // BF-69 — the manual contribution specifically. A day can hold a meal's dose too, and a bare
+    // `find` on supplementId would enrich the tick's mutation with the meal's amount.
+    const row = rows.find(r => r.supplementId === m.payload.supplementId && (r.source ?? 'manual') === 'manual');
     if (!row) return m.payload;
     return {
       ...m.payload,
@@ -937,7 +947,7 @@ export async function pushMutations(userId: string): Promise<{ pushed: number } 
       if (rec) await store.upsertFoodLog({ ...rec, syncStatus: 'synced' });
     } else if (m.domain === 'supplement_logs') {
       const recs = await store.getSupplementLogs(m.date);
-      const rec = recs.find(r => r.supplementId === (m.payload.supplementId as string));
+      const rec = recs.find(r => r.supplementId === (m.payload.supplementId as string) && (r.source ?? 'manual') === 'manual');
       if (rec) await store.upsertSupplementLog({ ...rec, syncStatus: 'synced' });
     } else if (m.domain === 'supplements') {
       // Flip the local row back to synced so the next pull is allowed to update it again —

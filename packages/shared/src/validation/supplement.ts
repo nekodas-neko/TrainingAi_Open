@@ -12,6 +12,15 @@ const FIELDS = {
   // (mg, ml, IU, scoops, capsules) — an enum here would refuse whatever the next substance uses.
   defaultAmount:   z.number().min(0).max(1_000_000).nullable(),
   unit:            z.string().max(20).nullable(),
+  // BF-69 — the presence window. Both separators, because a client filling a date param from
+  // `localDateString()` emits `YYYY/MM/DD`; a dash-only regex would reject every such request
+  // before the handler ran, which is the failure that cost ai-chat a full release.
+  // The transform is what keeps a slash form off the `date` column: Postgres reads `2026/09/01`
+  // under whatever DateStyle the session has, so normalising here rather than at each call site is
+  // the difference between one rule and two routes that must both remember it.
+  windowDate:      z.string().regex(/^\d{4}[-/]\d{2}[-/]\d{2}$/)
+                     .transform(v => v.replace(/\//g, '-')).nullable(),
+  dosePrompt:      z.boolean(),
   reminderEnabled: z.boolean(),
   reminderTime:    z.string().max(20).nullable(),
   sortOrder:       z.number().int().min(0).max(10_000),
@@ -23,6 +32,9 @@ export const SupplementPatchSchema = z.object({
   dose:            FIELDS.dose.optional(),
   defaultAmount:   FIELDS.defaultAmount.optional(),
   unit:            FIELDS.unit.optional(),
+  startedOn:       FIELDS.windowDate.optional(),
+  stoppedOn:       FIELDS.windowDate.optional(),
+  dosePrompt:      FIELDS.dosePrompt.optional(),
   reminderEnabled: FIELDS.reminderEnabled.optional(),
   reminderTime:    FIELDS.reminderTime.optional(),
   sortOrder:       FIELDS.sortOrder.optional(),
@@ -35,6 +47,9 @@ export const SupplementCreateSchema = z.object({
   dose:            FIELDS.dose.optional(),
   defaultAmount:   FIELDS.defaultAmount.optional(),
   unit:            FIELDS.unit.optional(),
+  startedOn:       FIELDS.windowDate.optional(),
+  stoppedOn:       FIELDS.windowDate.optional(),
+  dosePrompt:      FIELDS.dosePrompt.optional(),
   reminderEnabled: FIELDS.reminderEnabled.optional(),
   reminderTime:    FIELDS.reminderTime.optional(),
   sortOrder:       FIELDS.sortOrder.optional(),

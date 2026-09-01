@@ -1,8 +1,19 @@
 # BF-69 — dosed substances as an analysable exposure variable
 
-**Status:** plan only. Nothing here is built. The storage model was decided by the owner on
-2026-08-30 and is not re-litigated; what this document adds is **the sequence**, the presence model,
-and the split between the lanes.
+**Status:** **stage 1 shipped 2026-09-01** (migrations 254 + 255, local SQLite v34) — stages 2-4
+are not built. The storage model was decided by the owner on 2026-08-30 and is not re-litigated;
+what this document adds is **the sequence**, the presence model, and the split between the lanes.
+
+**One thing §3 got wrong, corrected here rather than left to be re-derived.** §3 warns against
+replacing the whole-day unique constraint with a narrower one, and that warning is right about the
+constraint it names — a three-column unique on `(supplement_id, log_date, source)` would cap meal
+contributions at one per day. What shipped is a *partial* index over `source = 'manual'` alone,
+which is a different object: meal rows are outside it entirely and add without limit, while the
+supplements page's tick stays idempotent under a double-tap or a replayed outbox mutation. Its
+predicate deliberately covers soft-deleted rows, so an untick-then-re-tick revives one row rather
+than leaving two — which is what lets `applyDelta` keep addressing a manual row by its natural key,
+the reconciliation that has always bridged the different ids a local write and its server row
+carry.
 
 ---
 
@@ -143,7 +154,7 @@ only where the number comes from differs.
 
 | stage | lane | what | gate |
 |---|---|---|---|
-| 1. contributions + windows + the sync chain | **A** | §3 | none — build it first |
+| 1. contributions + windows + the sync chain | **A** | §3 | ✅ **shipped 2026-09-01**, not device-verified |
 | 2. an amount on the supplements page, and `dose_prompt` | **B** | logging a real number, which is the thing that does not exist today | `Needs:` stage 1 |
 | 3. meal attachment UI | **B** | §4 | `Needs:` stage 2 |
 | 4. the exposure series + trends overlay | **A** | the reader BF-69 is named for | **`Gate:` data** — see below |

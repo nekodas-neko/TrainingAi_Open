@@ -6,6 +6,16 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.426.0",
+    date: "2026-09-01",
+    changes: [
+      "A supplement can be taken more than once in a day now, and the day adds them up instead of keeping only the last one. Until now a day held a single record, so a second dose overwrote the first.",
+      "Removing one dose leaves the others alone. Before this, unticking a supplement cleared the whole day.",
+      "A supplement can carry the dates you started and stopped taking it. That is what lets a day with no record mean \u0022not taking it\u0022 rather than \u0022forgot to log it\u0022 \u2014 the two used to look identical, and a run of forgotten days would read as a run of zeros.",
+      "Nothing on screen has changed yet: entering an amount, and attaching a supplement to a meal, come next.",
+    ],
+  },
+  {
     version: "1.425.0",
     date: "2026-09-01",
     changes: [

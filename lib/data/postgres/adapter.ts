@@ -3961,6 +3961,8 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       this.db.select({
         id: s.supplements.id, name: s.supplements.name, dose: s.supplements.dose,
         defaultAmount: s.supplements.defaultAmount, unit: s.supplements.unit,
+        startedOn: s.supplements.startedOn, stoppedOn: s.supplements.stoppedOn,
+        dosePrompt: s.supplements.dosePrompt,
         reminderEnabled: s.supplements.reminderEnabled, reminderTime: s.supplements.reminderTime,
         sortOrder: s.supplements.sortOrder, active: s.supplements.active,
         updatedAt: s.supplements.updatedAt, deletedAt: s.supplements.deletedAt,
@@ -3971,6 +3973,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
         logDate: s.supplementLogs.logDate,
         amount: s.supplementLogs.amount, unit: s.supplementLogs.unit,
         doseText: s.supplementLogs.doseText,
+        source: s.supplementLogs.source, sourceRef: s.supplementLogs.sourceRef,
         updatedAt: s.supplementLogs.updatedAt,
         deletedAt: s.supplementLogs.deletedAt,
       }).from(s.supplementLogs)
@@ -4610,6 +4613,9 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
               defaultAmount:   typeof p.defaultAmount === 'number' ? p.defaultAmount : null,
               unit:            typeof p.unit === 'string' ? p.unit : null,
               reminderEnabled: Boolean(p.reminderEnabled),
+              startedOn:       typeof p.startedOn === 'string' ? p.startedOn : null,
+              stoppedOn:       typeof p.stoppedOn === 'string' ? p.stoppedOn : null,
+              dosePrompt:      Boolean(p.dosePrompt),
               reminderTime:    p.reminderTime ? String(p.reminderTime) : null,
               sortOrder:       typeof p.sortOrder === 'number' ? p.sortOrder : 0,
               active:          p.active !== false,
@@ -5100,6 +5106,9 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       dose: r.dose ?? null,
       defaultAmount: r.defaultAmount ?? null,
       unit: r.unit ?? null,
+      startedOn: r.startedOn ?? null,
+      stoppedOn: r.stoppedOn ?? null,
+      dosePrompt: r.dosePrompt,
       reminderEnabled: r.reminderEnabled,
       reminderTime: r.reminderTime ?? null,
       sortOrder: r.sortOrder,
@@ -6296,6 +6305,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     const logs = await this.db.select({
       supplementId: s.supplementLogs.supplementId,
       amount: s.supplementLogs.amount, unit: s.supplementLogs.unit, doseText: s.supplementLogs.doseText,
+      source: s.supplementLogs.source,
     })
       .from(s.supplementLogs)
       .where(and(
@@ -6306,15 +6316,40 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     // BF-3: the LOG's dose, never the definition's. A screen reading the definition shows what you
     // would take now; a log has to show what you actually took, and the difference is the whole
     // point of stamping it.
-    const byId = new Map(logs.map(l => [l.supplementId, l]))
+    //
+    // BF-69: there can now be SEVERAL live contributions on one day, so `loggedDose` cannot be
+    // "the row" any more. `loggedAmount` is the day's exposure — the SUM, derived on read rather
+    // than stored, per the Stored Counters rule. `loggedDose` keeps its meaning for the single
+    // manual contribution the supplements page ticks, which is what that screen shows and unticks.
+    const manual = new Map<string, { amount: number | null; unit: string | null; doseText: string | null }>()
+    const summed = new Map<string, { amount: number | null; unit: string | null; count: number }>()
+    for (const l of logs) {
+      if (l.source === 'manual') {
+        manual.set(l.supplementId, { amount: l.amount ?? null, unit: l.unit ?? null, doseText: l.doseText ?? null })
+      }
+      const acc = summed.get(l.supplementId) ?? { amount: null as number | null, unit: null as string | null, count: 0 }
+      if (l.amount != null) acc.amount = (acc.amount ?? 0) + l.amount
+      acc.unit ??= l.unit ?? null
+      acc.count += 1
+      summed.set(l.supplementId, acc)
+    }
     return rows.map(r => {
-      const log = byId.get(r.id)
+      const log = manual.get(r.id)
+      const total = summed.get(r.id)
       return {
         ...this.rowToSupplement(r),
+        // `loggedToday` tracks the MANUAL contribution specifically, not "was it taken today".
+        // It is the checked state of the supplements page's tick, and that tick writes and removes
+        // exactly the manual row — so a meal's dose turning it on would leave a control that
+        // refuses to turn off. What answers "was it taken today" is `loggedAmount`, which counts
+        // every contribution.
         loggedToday: log != null,
-        loggedDose: log
-          ? { amount: log.amount ?? null, unit: log.unit ?? null, doseText: log.doseText ?? null }
-          : null,
+        loggedDose: log ?? null,
+        // Present whenever the day has ANY live contribution; its `amount` is null when none of
+        // them carried a number. Reporting that as 0 would be the "unknown coerced to zero" mistake
+        // the presence model exists to prevent, one level down: a tick means "taken", not "took
+        // none of it".
+        loggedAmount: total ? { amount: total.amount, unit: total.unit, contributions: total.count } : null,
       }
     })
   }
@@ -6349,6 +6384,9 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     if (data.dose !== undefined) set.dose = data.dose
     if (data.defaultAmount !== undefined) set.defaultAmount = data.defaultAmount
     if (data.unit !== undefined) set.unit = data.unit
+    if (data.startedOn !== undefined) set.startedOn = data.startedOn
+    if (data.stoppedOn !== undefined) set.stoppedOn = data.stoppedOn
+    if (data.dosePrompt !== undefined) set.dosePrompt = data.dosePrompt
     if (data.reminderEnabled !== undefined) set.reminderEnabled = data.reminderEnabled
     if (data.reminderTime !== undefined) set.reminderTime = data.reminderTime
     if (data.sortOrder !== undefined) set.sortOrder = data.sortOrder
@@ -6400,20 +6438,35 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       doseText: dose?.doseText ?? owns.dose ?? null,
     }
 
-    // onConflictDoUpdate (not DoNothing): a prior unlog on this same date soft-deleted
-    // the row via the (supplement_id, log_date) unique constraint — re-logging must
-    // revive it (clear deleted_at), not silently no-op.
+    // BF-69 — this writes the MANUAL contribution, and only that one.
+    //
+    // The conflict target is the partial unique index over `source = 'manual'` (migration 254),
+    // not the old whole-day unique constraint. Two consequences, both deliberate: a meal
+    // contribution on the same day is untouched and keeps adding, and a re-tick still revives the
+    // soft-deleted manual row rather than duplicating it — a double-tap or a replayed outbox
+    // mutation re-stamps instead of recording the dose twice.
+    //
+    // Re-logging re-stamps because the row is one act of taking it: if the dose was corrected
+    // between the untick and the re-tick, the second value is the true one.
     await this.db.insert(s.supplementLogs)
-      .values({ supplementId, userId, logDate: date, ...stamped })
+      .values({ supplementId, userId, logDate: date, source: 'manual', ...stamped })
       .onConflictDoUpdate({
         target: [s.supplementLogs.supplementId, s.supplementLogs.logDate],
-        // Re-logging the same day re-stamps: the row is one act of taking it, and if the dose was
-        // corrected between the untick and the re-tick the second value is the true one.
+        targetWhere: eq(s.supplementLogs.source, 'manual'),
         set: { deletedAt: null, updatedAt: new Date(), ...stamped },
         setWhere: eq(s.supplementLogs.userId, userId),
       })
   }
 
+  /**
+   * BF-69 — removes the MANUAL contribution only.
+   *
+   * Under the old whole-day unique constraint this soft-deleted "the row for that day" with no
+   * notion of who wrote it, so unticking on the supplements page would have wiped a dose that a
+   * meal had contributed, and deleting a meal would have wiped a hand-logged dose. That is the
+   * silent data loss the contribution rows exist to prevent, and it is the assertion to look for
+   * first when reviewing this: a meal's contribution must still be there afterwards.
+   */
   async unlogSupplement(supplementId: string, userId: string, date: string): Promise<void> {
     await this.db.update(s.supplementLogs)
       .set({ deletedAt: new Date(), updatedAt: new Date() })
@@ -6421,6 +6474,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
         eq(s.supplementLogs.supplementId, supplementId),
         eq(s.supplementLogs.userId, userId),
         eq(s.supplementLogs.logDate, date),
+        eq(s.supplementLogs.source, 'manual'),
       ))
   }
 
