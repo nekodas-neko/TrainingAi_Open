@@ -606,55 +606,6 @@ currently earn nothing from stepping at all; mean 5,716, median bucket 2–4k.
   names its basis on both paths. And a second profile (different weight) gets a different
   subtraction, proving it was computed.
 
-### [platform][nutrition] LB-43 — a client component cannot import `daily-energy`, so a display constant is mirrored
-
-- **✅ FIXED 2026-09-01. The mirror is gone and `/nutrition` returns 200.** `STEP_BASELINE`,
-  `WALKING_CADENCE_SPM` and `STEPS_PER_KM` now live beside `SEDENTARY_MULTIPLIER` in the leaf
-  module; `daily-energy.ts` re-exports all four, so every server-side importer is untouched.
-- **⚑ The entry's file name was wrong, and the reason matters: THE LEAF MODULE ALREADY EXISTED.**
-  It proposed *"something like `packages/shared/src/health/energy-constants.ts`"* —
-  `energy-baseline.ts` already was that module, created for the **identical failure one node
-  builtin earlier** (Q-401: the same chain reaching `node:path`, breaking the same tab, through
-  `goal-recommendation` → `calorie-balance` → `calorie-zone-bar`). Adding a second leaf module for
-  one purpose is the drift the one-formula rule is about, so the constants moved into the existing
-  one and its doc now carries both incidents. **The lesson is in the module, not just here: this
-  chain has now broken the Nutrition tab twice, with a different builtin each time.**
-- **⚠ The drift test that guarded the mirror is now tautological, and was replaced rather than
-  kept.** `expect(STEP_BASELINE).toBe(SHARED_STEP_BASELINE)` cannot fail once one re-exports the
-  other, and a test that cannot fail is worse than none. What replaced it is the invariant nothing
-  else checks: **`energy-baseline.ts` imports nothing at all** — no `import`, no `require`. That is
-  the only thing keeping it client-importable, and `tsc` would say nothing if it changed.
-- **Lane:** A — the fix edits `packages/shared/**`. Lane B can only mirror the value, which is what
-  BF-87 did.
-- **Added:** 2026-09-01 · found by BF-87, which needed `STEP_BASELINE` for **copy** and took the
-  whole Nutrition tab to a 500 getting it.
-
-**The chain, measured rather than guessed.** `packages/shared/src/health/daily-energy.ts` imports
-`workout-energy.ts`, which imports `@/lib/oura-models/constants`, which reads `node:fs/promises`.
-Turbopack fails the client chunk outright — *"the chunking context (unknown) does not support
-external modules (request: node:fs/promises)"* — and `/nutrition` returns 500. **No client component
-had ever imported `daily-energy`**, so nothing had tripped it before; BF-87's was the first, and it
-only wanted one number to print.
-
-**What BF-87 shipped instead.** `components/nutrition/movement-breakdown.ts` declares its own
-`STEP_BASELINE = 3_000` with the reason written above it, and
-`__tests__/movement-breakdown.test.ts` imports the shared constant — tests run in node, where the
-chain is harmless — and fails if the two disagree. So it cannot drift silently. It is still a second
-copy of a number, which the one-formula rule is against, and this entry is how it stops being one.
-
-- **The fix is a leaf module, not a refactor of the maths.** `STEP_BASELINE`, `SEDENTARY_MULTIPLIER`,
-  `STEPS_PER_KM` and `WALKING_CADENCE_SPM` are plain constants with no dependencies; moved into
-  something like `packages/shared/src/health/energy-constants.ts` and re-exported from
-  `daily-energy.ts`, every existing importer is unaffected and a client component can take the
-  constant without the chain. Then delete the mirror and point the test at the real thing.
-- **⚠ Do not "fix" it by making `oura-models` client-safe.** That module reads model files off disk
-  on purpose; the problem is not that it is server-only, it is that a display constant is behind it.
-- **The blast radius is worth measuring first.** `daily-energy.ts` is imported by the energy service,
-  the AI tools and the meal-plan routes — all server-side — so the move should be additive and
-  invisible to them. Confirm with `grep -rn "shared/health/daily-energy"` before and after.
-- **Verification:** a client component imports the constant and `/nutrition` still returns 200;
-  `movement-breakdown.ts` no longer declares its own; the shared module's own tests are unchanged.
-
 ### [platform] LB-41 — the Weight Units toggle is a control with no consumer
 
 - **Lane:** B — `components/profile/edit-profile-sheet.tsx`.
