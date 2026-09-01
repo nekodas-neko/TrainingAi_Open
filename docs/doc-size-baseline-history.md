@@ -5370,3 +5370,20 @@ broken link, which is how the first sweep broke 48 of them.
 Nothing was banked. The alternative to raising was leaving a shipped feature unrecorded in the file
 every session reads first, which is the failure the ratchet is not for.
 
+
+## 2026-09-01 — `docs/implementation-backlog.md` 14816 → 14861 (+45)
+
+`docs/owner-decisions-2026-09-01`. Three owner gates cleared in one sitting, and the growth is the
+decisions themselves rather than new work: **BF-84** (rest is a stored fact, not a display hint),
+**Q-187** (spread the overshoot, at read time, with a floor) and **Q-531** (the device consoles go
+back behind `/admin`, and the layout was handed back to the implementer).
+
+Each records the owner's own words and the reasoning, because two of the three were answered with
+*"whatever is better in the long run"* / *"wherever you want"* — a call handed back with a criterion
+attached. Writing only the verdict would leave the next reader unable to tell a decision from a
+preference, and this queue has already re-litigated settled questions that way.
+
+`Q-187` also gained an explicit **not-in-scope** bullet: the owner asked for the choice between
+spread and next-meal-only to be offered as an option, and that is deferred to its own entry until
+the spread version has been lived with. A preference shipped alongside the behaviour it toggles has
+no evidence behind either branch.

@@ -675,16 +675,27 @@ has already recorded that a bulk job bumps `updated_at` without rewriting a valu
 
 ### [workouts] BF-84 — a per-session Rest button on the training card, and rest is not stored anywhere
 
-- **Gate: owner** — transcribed 2026-08-31 from this entry's own words below (*"settle it before
-  scheduling"*), not a new judgement. `next-item.js` had it at #2 of Lane A's READY list, where
-  nothing said it was waiting on anything. The engine half is a stored row, a sync domain and the
-  inference path, which is expensive to undo if the answer is "a hint".
+- **✅ THE OWNER GATE IS CLEARED, 2026-09-01 — the field is removed above, deliberately.** Asked
+  *fact or hint?*, the owner answered: *"Happy to continue just having it as 'rest' = no workouts
+  logged so it just changes the display on home card — but also happy to have it in the DB. Whatever
+  would be better in the long run."* That is the call handed back with the criterion attached, so
+  **the answer is FACT — store it**, and the criterion is why:
+  - **Rest days are training data.** If a chosen rest is only ever a display condition, training
+    load, weekly cadence and phase counting all read it as a *missed* session rather than a taken
+    one. Every derived number quietly disagrees with what the owner actually did.
+  - **`no workouts logged` is not the same claim as `I chose to rest`** — a day with no logs is also
+    a day you forgot, or were ill, or logged late. The stored row separates them, and no amount of
+    display logic recovers a distinction that was never written down.
+  - **The current version is worse than it looks** and its failure has not been hit yet: a
+    `localStorage` key, so the second device never sees it, it dies on reinstall, and refetching
+    `/api/next-session` silently reverts the selection. Choosing "hint" keeps all three.
+  - **What it costs:** a migration, a sync domain and the inference path — expensive to undo, which
+    is exactly why it was gated. Taken deliberately, with the owner's "long run" as the reason.
 - **Lane: A** — derived 2026-09-01, so the next reader does not re-derive it. The entry's own
   conclusion is *"ship the button and the storage together"*; the storage half is a row, a sync
   domain and the inference path; and CLAUDE.md sends a both-lanes item to **Lane A, engine first**.
-  Lane B cannot take the surface alone — the same sentence forbids it. **Still open and the
-  owner's: fact or hint?** If "a hint", this collapses to a rendering condition and returns to
-  Lane B, so settle it before scheduling.
+  Lane B cannot take the surface alone — the same sentence forbids it. **Settled 2026-09-01: fact.**
+  It stays Lane A, engine first, and does not collapse back to Lane B.
 - **Added:** 2026-09-01 · owner, on Home's Recommended Today card: *"for the training card, I'd like
   a small button for each session to choose 'rest'."*
 
@@ -8105,9 +8116,33 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 
 ### [app-shell][devices] Q-531 — Q-234 moved the device consoles out of /admin, and in use that made them worse
 
-- **Gate:** owner
+- **✅ THE OWNER GATE IS CLEARED, 2026-09-01 — the field is removed above, deliberately.**
+  Asked where the drain / re-sync / verify flow should live, the owner answered: *"Happy to have it
+  wherever you want; but it should be behind the admin portal — as regular users should not be able
+  to touch it."*
+- **So the decision has a hard half and a soft half, and only the hard half is the owner's.**
+  - **Hard, and it settles Q-234's premise: these consoles go back behind `/admin`.** Q-234 moved
+    them to Settings → Developer on a taxonomic argument — device diagnostics are not user
+    administration — and that argument never weighed *who may reach them*. The app has other users
+    (CLAUDE.md's amended Canonical Runtime section says so outright), and a drain or a re-sync is
+    destructive in the wrong hands. Access control beats taxonomy, so the move is reverted in
+    effect. **`requireAdmin`, not merely an unlinked route** — hiding a page is not gating it.
+  - **Soft, and it is the implementer's: one screen holding the whole flow.** The owner explicitly
+    handed the layout back. Their original complaint was *"everything is spread out sporadically"*,
+    which is about the flow being broken across places rather than about the parent menu — so
+    reverting the location alone would leave the actual grievance intact. **Build the three consoles
+    as one `/admin` Devices screen carrying drain → re-sync → verify end to end**, in the order the
+    runbook uses.
+- **What this does NOT license.** The entry still asks for the owner to walk the flow and say where
+  they expected each step to land, and that is still worth having — but it is no longer a blocker,
+  because the failure it guards against (an agent re-picking the structure on taxonomy alone) is
+  precisely what the "one screen, runbook order" instruction removes. Reversal cost is low: a screen
+  and a route guard, no data.
+- **Lane:** B for the screen; **the `requireAdmin` guard on any route that moves is Lane A.** If the
+  routes stay put and only the UI regroups, it is Lane B alone.
 
-- ⛔ **blocked: needs an owner decision before any code moves.** Skipped by Implementation Lane B on
+- **Superseded context — the block below is what the entry said before the decision.** Skipped by
+  Implementation Lane B on
   2026-08-17 while taking Q-532 below it. This entry asks for the *premise* of a shipped IA decision
   to be re-litigated against a real user's task, and the owner's report is the only evidence of what
   that task actually is. An agent choosing the new structure alone would be repeating exactly the
@@ -11718,15 +11753,19 @@ reason it took an hour is that there is no signal that would have answered it di
 - **Plan:** the shipped half is
   [`plans/2026-08-13-meal-plan-prefill-and-confirmation.md`](superpowers/plans/2026-08-13-meal-plan-prefill-and-confirmation.md);
   this half is explicitly listed there under *Explicitly out of scope*.
-- **Lane:** ? — and it stays unresolved until the gate below clears, because the lane *is* the
-  decision. Re-scaling computed at read time is a surface change (B); one that rewrites the stored
-  plan is Lane A.
-- **Gate:** owner — added 2026-09-01. The three questions below are preferences about how the app
-  should behave, not facts anyone can look up, and building either answer wrong makes the plan worse
-  than a static one. Prose alone was leaving this entry in UNCLASSIFIED where both lanes saw it and
-  neither could start it.
-- **Recommendation, so the gate is a decision rather than a blank page: re-scale at read time,
-  spread across every remaining meal, with a floor — and say so when the floor is hit.**
+- **Lane:** B — settled 2026-09-01 with the gate. The owner chose spread, and spread computed at
+  read time is a surface change; a stored rewrite (which would have been Lane A) was the option not
+  taken.
+- **✅ THE OWNER GATE IS CLEARED, 2026-09-01 — opened and answered the same day.** The owner:
+  *"Happy to spread or take it out of next meal: would be nice to have the option; but if choosing
+  one then spread is fine."* So: **build spread, at read time, with a floor. Lane B.** The
+  recommendation below stands as written and is now the spec.
+- **The "would be nice to have the option" is a SECOND entry, not scope here** — see the follow-up
+  bullet at the end. Building the choice now would mean shipping a preference, a stored value and
+  two code paths before either has been lived with, and the owner said spread is fine if one is
+  picked. Ship one, find out whether the other is ever wanted.
+- **Recommendation, now the agreed shape: re-scale at read time, spread across every remaining
+  meal, with a floor — and say so when the floor is hit.**
   - **Read time, not stored** — the plan stays what the owner chose and only the *display* changes.
     One source of truth, Lane B, and reversible; a stored rewrite loses the original plan.
   - **Spread, not next-meal-only.** Taking a 700 kcal lunch overshoot entirely out of dinner is the
@@ -11738,6 +11777,12 @@ reason it took an hour is that there is no signal that would have answered it di
   - **The alternative** is next-meal-only, better at one real thing: meals you have not reached stay
     untouched, so a plan you already shopped for survives. If shopping to the plan is how it is
     used, that flips the recommendation.
+- **Follow-up, deliberately not built here: let the user choose spread vs next-meal-only.** The owner
+  asked for it (*"would be nice to have the option"*) and it is a real preference — but it is only
+  worth a setting once spread has been used and found wanting in a specific way, and that way is
+  what would decide where the control lives and what it defaults to. **File it as its own entry with
+  `Needs:` pointing here once the spread version ships**, not before: a preference added at the same
+  time as the behaviour it toggles has no evidence behind either branch.
 - **Added:** 2026-08-11 · owner-requested
 - **Owner's words, the part not yet built:** *"then as you input your actuall food it can recalculate
   food based on the macros left. I.e if you eat too much during lunch it will cut some portions for

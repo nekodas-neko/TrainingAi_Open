@@ -8,24 +8,26 @@ live; the original `OR-1` was withdrawn as a duplicate of BF-23, so 1–99 were 
 
 ## Now
 
-**PR #713 is open, docs-only; merge when green.** It began as BF-55's owner-gate clearing and grew
-to unblock four entries — its body lists them. Nothing else in flight. The queue reads **238 entries
-· Lane A 67 READY · Lane B 9 READY · 1 UNCLASSIFIED** (`PS-4`, correctly so).
+**PR open on `docs/owner-decisions-2026-09-01`; merge when green.** Three owner gates cleared
+(**BF-84** rest is a stored fact, **Q-187** spread at read time, **Q-531** consoles back behind
+`/admin`); owner-gated entries down to **11**. **`device-verification-queue.md`'s coverage claim was
+stale** — it said it held every `Gate: device` entry (27, 2026-08-26); there are **39** and **22 were
+absent**. All added, with the sitting's real shape in the header (~25 pressable, 4 need `apk-latest`,
+5 need the Colmi ring, 5 are not presses). **`D7` already answered half of `Q-34`, and `S3` is
+`Q-147`** — both cross-linked, so neither gets re-asked.
 
-**"B is still saying there is no work for it" has two answers.** The sweep (#708) took Lane B 32 → 8
-honestly — the 32 was unlabelled rows shown to *both* lanes, and the queue really is mostly engine
-work. But **OR-100** is a defect: four of Lane B's twelve `KEEP` entries are builds, so its true
-buildable depth is ~13.
+**"B is saying there is no work" has two answers.** The sweep (#708) took Lane B 32 → 8 honestly —
+the 32 was unlabelled rows shown to *both* lanes. But **OR-100** is a defect: four of Lane B's twelve
+`KEEP` entries are builds, so its true depth is ~13.
 
 ## Next — in this order
 
-1. **Merge #713**, then re-run both lanes and confirm the sections match this baton.
+1. **Merge the open PR**, then re-run both lanes and confirm the sections match this baton.
 2. **OR-100** — split the four `KEEP`-hidden builds (`Q-519`, `Q-300`, `Q-491`, `Q-403`) into their
    own entries with `Needs:` at the shipped half, then add the check. Lane A's, and it is queued.
-3. **The device pass is the largest single blocker** — **35 entries** shipped and waiting only on
-   the S25 smoke run, 13 `[nutrition]`. Put it to the owner as one batch, not entry by entry.
-4. **Sweeps 2 and 4, still unrun.** `Q-49` sits at 🔴 describing a public-repo migration that has
-   already happened; **44 foldable journal entries** against a 20-file chore threshold.
+3. **The device checklist is written** — `device-verification-queue.md`, all 39, one sitting. Chase
+   the results; do not re-derive it.
+4. **Sweeps 2 and 4, unrun** — `Q-49` is 🔴 over a migration that happened; 44 foldable entries.
 
 ## Do not re-litigate
 
@@ -41,19 +43,17 @@ buildable depth is ~13.
 
 ## Gotchas worth carrying
 
-- **The clone is shallow** (`git fetch --deepen=300 origin main` before any merge) and
-  **`total_count: 0` minutes after opening a PR is a stale base, not slow CI** — both hit every
-  session; the fix for both is fetch-deepen-merge-push.
+- **The clone is shallow** (`git fetch --deepen=300 origin main` first) and **`total_count: 0`
+  minutes after a push is a stale base, not slow CI** — fetch-deepen-merge-push fixes both.
 - **A baseline raise computed before a rebase is a guess** — measure after merging `main`.
-- **The two conflict files resolve in OPPOSITE directions and look identical.**
-  `doc-size-baseline-history.md` is append-only, so keep both sides; `implementation-backlog.md`
-  conflicts are two *deletions*, where keeping both resurrects shipped entries. Read the headings.
-- **Your own prose can defeat `next-item.js`** — a `⛔` anywhere in a body parks the entry. This
-  session re-parked `Q-250` by writing the character inside the note explaining it. Re-run the lane
-  query after every edit.
+- **The two conflict files resolve in OPPOSITE directions and look identical.** History is
+  append-only (keep both sides); backlog conflicts are two *deletions*, where keeping both
+  resurrects shipped entries. Read the headings.
+- **Your own prose can defeat `next-item.js`** — a `⛔` anywhere in a body parks the entry; one
+  session re-parked `Q-250` by writing the character inside the note explaining it.
 - **`Gate: device` means SHIPPED and awaiting a check — never "will need one when built."** Already
-  in the backlog's field rules with three outbreaks; `LA-45` was a fourth. Unbuilt work that will
-  need a device gets a **Verification** line, not a gate.
+  in the field rules with three outbreaks; `LA-45` was a fourth. Unbuilt work gets a **Verification**
+  line, not a gate.
 - **Confirm a completion claim against a merged diff or a production read**, never the entry's own
   text — ten of seventeen failed that in sweep 1.
 - **A blocker written as prose is not a blocker** — `TN-16`'s "NOT SIGNABLE" was prose for weeks

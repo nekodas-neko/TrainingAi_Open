@@ -15,11 +15,24 @@ in the PR that acts on the answer.
 **Build to test against:** the current `apk-latest` release, or a Railway deploy if the item is
 marked **JS** — those need no new APK, just a fresh app open.
 
-**Coverage.** Every `Gate: device` entry in the Lane B queue is represented below (27 on
-2026-08-26). **A first full pass ran 2026-08-29/30** — struck items carry the owner's own words and
-the date. Three of them are **not** presses and are listed at the end so nobody hunts for a
-button that does not exist. **S8 and S9 were added 2026-08-30** — they are Lane A entries whose gate
-is also a device, added here because the cost is picking the phone up and they ride along free.
+**Coverage — re-measured 2026-09-01, and the old claim had gone stale.** This file said it held
+*every* `Gate: device` entry in the Lane B queue (27 on 2026-08-26). The queue now carries **39**,
+across both lanes, and **22 of them were not here** — so the sentence that made this file
+trustworthy had quietly stopped being true. They are added below in §§ M1–M12 and in the
+not-a-press list. **A first full pass ran 2026-08-29/30** — struck items carry the owner's own words
+and the date. **S8 and S9 were added 2026-08-30** — Lane A entries whose gate is also a device,
+added here because the cost is picking the phone up and they ride along free.
+
+**The 39 are not 39 checks, and the sitting goes badly if that is not said up front:**
+
+| | count | what it is |
+|---|---:|---|
+| **Presses you can run now** | **~25** | Shipped; look and say yes or no. |
+| **Needs a fresh `apk-latest` first** | 4 | `Q-537`, `Q-533`, `Q-418`, `LB-36` — native. |
+| **Needs the Colmi ring in hand** | 5 | `PS-8`, `PS-9`, `PS-10`, `PS-12`, `PS-16`. Skip if it is not with you. |
+| **Not a press at all** | 5 | Listed at the end. |
+
+Everything marked **JS** needs only a fresh app open after a Railway deploy — no APK.
 
 **Start with N4.** The Log Food screen was rebuilt on 2026-08-26 and has never been seen on the
 phone; several other items in this section are reached *through* it, so if it is wrong they are all
@@ -408,6 +421,83 @@ Plan: `docs/superpowers/plans/2026-07-30-scale-stored-measurement-drain-and-scan
 
 ---
 
+# Added 2026-09-01 — the 22 that were missing
+
+These were carrying `Gate: device` in the backlog while not appearing here at all. Grouped by where
+you already are, same as the rest of the file.
+
+## M1. The nutrition sheets over a wallpaper — BF-75 · **JS**
+Wallpapers **on**. Open Log Food, the meal builder, meal detail, the quantity sheet and quick-edit.
+**Pass:** body and secondary text stay comfortably readable over the gradient. The dense sheets —
+macro numbers, ingredient rows — are the ones to judge; if any of them needs squinting, that is a
+fail and worth a screenshot.
+
+## M2. The AI meal-builder tiles — BF-52 · **JS**
+**Pass:** `Photo · Barcode · Describe or enter` — the long label wraps to two lines rather than
+clipping, and three tiles plus the expanded input still read as one row rather than a jumble.
+
+## M3. A food photo, viewed offline — LA-36 · **JS**
+Add a food with a photo. Airplane mode. Reopen it.
+**Pass:** the image renders. **Fail:** blank — which is the whole point of the entry, since the
+image is written to the device and may be read back by nothing.
+
+## M4. The meal share code, two phones — BF-57 · **JS, and needs a second device**
+On the S25 and a second device signed into a second account: share a label for a 3-ingredient meal,
+then scan it **in airplane mode**.
+**Pass:** the copy carries the same portions and macros. This is the only item here that cannot be
+done alone.
+
+## M5. Nutrition parity — Q-395 · **RUN THIS LAST**
+The sign-off for the whole nutrition rework. **Do not tick it until N1–N9 and M1–M3 have come out
+clean** — its own entry says confirming parity before the screens beneath it have been walked is
+signing off a drawing against a screen nobody has seen.
+
+## M6. The Heart Rate tile — TN-13 · **JS**
+Health screen.
+**Pass:** the tile shows a number that has moved since yesterday plus a signed cue beside it
+(`−7 vs usual`). **The cue grew from one word to five**, so the thing to judge is whether it is
+legible at the tile's type size and whether the row still fits at 412 dp.
+
+## M7. The Home timeline's row taps — Q-93 · **JS**
+Tap a workout row and a walk row on the Home timeline.
+**Pass:** each opens, the row does not fight pull-to-refresh under a real finger, and `/health/day`'s
+back control returns you to Home rather than stranding you on a navless route.
+*(Related to A2, which failed and became BF-49 — this is the other half.)*
+
+## M8. Back up the ring key — Q-537 · **NEEDS `apk-latest`. DO THIS BEFORE ANYTHING ELSE ON A NEW APK.**
+`/admin/oura-ble` → reveal / export the key.
+**Pass:** you have a second copy. **Until this is exercised the key has exactly one copy**, in
+Android SharedPreferences, and an uninstall destroys it. The affordance shipped 2026-08-23 and has
+never been used on the ring's own phone.
+
+## M9. The re-sync completion notification — Q-533 · **NEEDS `apk-latest`**
+Trigger a full re-sync (drain from zero).
+**Pass:** a notification reads *"Ring re-sync complete · N batches pulled and saved"*, or
+*"finished with errors"*. It has never been observed firing.
+
+## M10. The free walk's Android pill — Q-418 · **NEEDS `apk-latest`**
+Start a free walk, background the app.
+**Pass:** the pill shows elapsed time.
+
+## M11. The guided walk's cadence pacer — LB-36 · **NEEDS `apk-latest`, and the strap paired**
+One guided walk with the Polar H10 paired.
+**Pass:** the pacer actually runs — it has never run on a device.
+
+## M12. Sleep staging — Q-34 · **half already answered, do not re-ask that half**
+**D7 above answered one of this entry's two questions on 2026-08-30:** `spo2V` *is* populated
+(owner: *"in the device metrics I see values for it"*). Nobody linked that back, so Q-34 still reads
+as fully blocked and the next session would ask again.
+**What is genuinely still owed:** whether `spo2V` *separates* — i.e. whether the values differ
+between stages rather than merely existing — and the device Redecode, **which D4 records as having
+failed**. So Q-34 is blocked behind D4, not behind a fresh press. Do not tune `W_SPO2` until both.
+
+## The Colmi ring items — PS-8, PS-9, PS-10, PS-12, PS-16 · **skip unless the ring is with you**
+`PS-11` (first overnight sync), `PS-12` (three-device baseline), `PS-16` (are the activity buckets
+cumulative — needs a counted walk), `PS-8` (learning-mode ingest), `PS-9` (raw accelerometer on stock
+firmware), `PS-10` (ring gestures for workout navigation, an unproven idea).
+These need hardware in hand and none is a check of shipped app behaviour — they are experiments.
+Listed together so they are not mistaken for part of the sitting.
+
 # Gated on a device but NOT a press
 
 Listed so nobody goes looking for a button. These need a device to *exist*, not to be tapped.
@@ -424,6 +514,16 @@ Listed so nobody goes looking for a button. These need a device to *exist*, not 
 - **Q-7b** — ten device-owned `oura_daily_derived` columns have no producer. A missing writer, not a
   check.
 - **Q-168** — AI Coach follow-ups. A feature, not a verification.
+- **Q-545** — moving the Oura rollup onto the device. Every remaining task needs the S25 to *build*
+  against, not to press. Implementer work. *Added 2026-09-01.*
+- **Q-476** — the write-time half of the schema-rejected-mutation fix. Sits on the local store's
+  write path at 36 call sites; marking a *good* mutation failed is the worst case, which is why it
+  is device-gated — but it is code to write, not a button. *Added 2026-09-01.*
+- **BF-22** — slow loads that clear on a force restart. Needs a device **profile** (JS heap across
+  five screens), not an observation; nobody can pass or fail it by looking. *Added 2026-09-01.*
+- **Q-147** — cold app start. **S3 above is this item**, answered *"loads fast"* with no number.
+  The entry asks for a measurement, so it is not closed — but re-asking for a stopwatch was judged
+  not worth it, and BF-19's client-side reporter is what will produce a figure. *Linked 2026-09-01.*
 - **LB-5** — the Devices card against a keyless BLE service. Reaching that state means removing the
   ring key, which is the one action that must never be taken (it lives only in SharedPreferences).
   Verify in code or against a test double. *Moved here 2026-08-30.*
