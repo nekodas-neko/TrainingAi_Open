@@ -6,13 +6,32 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: "1.426.0",
+    version: "1.428.0",
     date: "2026-09-01",
     changes: [
       "A supplement can be taken more than once in a day now, and the day adds them up instead of keeping only the last one. Until now a day held a single record, so a second dose overwrote the first.",
       "Removing one dose leaves the others alone. Before this, unticking a supplement cleared the whole day.",
       "A supplement can carry the dates you started and stopped taking it. That is what lets a day with no record mean \u0022not taking it\u0022 rather than \u0022forgot to log it\u0022 \u2014 the two used to look identical, and a run of forgotten days would read as a run of zeros.",
       "Nothing on screen has changed yet: entering an amount, and attaching a supplement to a meal, come next.",
+    ],
+  },
+  {
+    version: "1.427.0",
+    date: "2026-09-01",
+    changes: [
+      "The speed on the guided-walk screen is now your speed right now, over the last twenty seconds. It was your average since the walk started \u2014 so twenty minutes in, speeding up or slowing down barely moved it, and the pacer bar could not react to a fast or slow block at all.",
+      "Stopping at a crossing now reads Stopped. It never could before: standing still cannot drag a whole-walk average below the 1.5 km/h it takes to say so.",
+      "The min/km figure beside it is unchanged and is now labelled avg, because it is still the average for the whole walk \u2014 that is the unit your splits are in. The two are different numbers on purpose.",
+    ],
+  },
+  {
+    version: "1.426.0",
+    date: "2026-09-01",
+    changes: [
+      "Each goal on the Profile form now shows its recommended value, and one tap fills it in \u2014 steps, water and calories, plus protein, carbs and fat in Macro Targets. Under each one is where the number comes from, like \u002233 ml per kg of body weight, plus your activity bump\u0022.",
+      "It also tells you when a goal already matches, which is the point: your steps goal was 7,000 \u2014 the sedentary figure \u2014 while your activity level said Moderate, whose target is 10,000. Nothing on screen said so.",
+      "No AI is involved. The numbers come from the same calculation the AI recommendation starts from, so they are instant, free and the same every time \u2014 and if you have had a resting-rate test, the calorie figure uses it rather than an estimate. Get AI Recommendation still does its own thing.",
+      "Sleep has no recommended value, because there is no formula behind one. It is left blank rather than guessed at, and the whole set hides until your height, birth year, sex, weight, activity level and fitness goal are all filled in.",
     ],
   },
   {

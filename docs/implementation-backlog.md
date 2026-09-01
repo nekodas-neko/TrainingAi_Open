@@ -388,6 +388,135 @@ below threshold and left in place for next time.
 > BF-29 (My meals), BF-30 (Meal detail), BF-31 (Edit meal) and BF-26 (Quantity). Two artboards need
 > no entry — `Tap targets` and the `srv/g` studies both shipped in Q-395a.
 
+### [activity] BF-107 — the walk summary has no calories tile, and the number it would show does not exist yet on that screen
+
+- **Lane:** A — the value has to reach the client before Lane B can render it; the tile itself is
+  trivial once it does.
+- **Added:** 2026-09-01 · owner, on a completed guided walk: *"the final screen doesnt show calories
+  burned."*
+- **Verify:** device
+
+**The walk is not missing its calories — the summary screen is.** `walk-summary.tsx:239-241` renders
+exactly three tiles, Duration / Avg HR / Max HR. The screenshot confirms it: 30m, 100, 117, and no
+energy anywhere on a screen that otherwise carries per-interval cadence, a heart-rate chart, time in
+zone and Session Load.
+
+**⚠ The reason is structural, and an implementer who just adds a `<Stat label="Calories">` will render
+a dash.** The client write passes `caloriesBurned: null` deliberately — `walk-summary.tsx:150-151`
+says so: *"Calories are derived server-side in saveActivityLog — the MET table behind `estWorkoutKcal`
+is read through `node:path`, so it cannot be imported into a client bundle."* And that is real:
+`adapter.ts:2121` reads `data.caloriesBurned ?? await this.deriveActivityKcal(...)`. So the number is
+computed, correctly, **after** the screen that wants to show it has already painted — and the walk
+summary never re-reads the saved row.
+
+- **Recommendation: return the derived kcal from the save and show it when it lands.** `saveActivityLog`
+  already computes it; having the write **return** the value costs nothing, and the summary can paint
+  the tile as `—` and fill it in, which is honest about a value that genuinely is not known at first
+  paint. Do not reach for the instant-paint cache-seed pattern here: there is no prior value to seed
+  from, the walk having just happened.
+- **The alternative, and why it loses:** port the MET table so `estWorkoutKcal` runs client-side. That
+  would make the tile instant and work offline — genuinely better on both counts — but it duplicates a
+  formula that One Formula, One Place says must live once, and the `node:path` read is exactly the
+  coupling that keeps it server-side. Not worth it for one tile; revisit only if a second surface needs
+  the same number before its write completes.
+- **⚠ Offline, there is no number at all.** The device write path queues through the outbox, so a walk
+  finished with no signal has no server-derived kcal until it syncs. The tile must render `—` rather
+  than `0` — a zero is a claim, a dash is not — and this is the case to check on device, because it is
+  the one the sandbox cannot produce.
+- **Sibling surfaces to check in the same PR:** `done-activity-screen.tsx` takes the same write path
+  (`walk-summary.tsx:155` says it mirrors that contract exactly), so if the free-activity done screen
+  shows calories today it is worth knowing how; if it does not, it has the same gap and should be fixed
+  with it rather than left as the next report.
+
+
+### [activity] BF-108 — finishing a walk lands you on a pre-armed "start this activity" screen, titled from a walk you already did
+
+- **Lane:** B — `components/guided-walk/walk-summary.tsx:288`,
+  `components/activity/activity-screen.tsx:20-21`, `lib/stores/activity-store.ts`.
+- **Added:** 2026-09-01 · owner: *"after closing it - it still opens with the activity naming
+  screen"*, with a screenshot of the Walk / Title *"Walk Home From Train"* / **Start** screen.
+- **Verify:** device
+
+**Two stores, and the wrong one is driving the screen you land on.** `Done` on the walk summary runs
+`onDone()` — which resets the **guided-walk** store, correctly — and then
+`router.push('/activity')`. `/activity` renders from the **activity** store, a different store that
+the guided walk never touched: `activity-screen.tsx` shows `PreActivityScreen` whenever `mode` is
+`'pre'` and `activityType` is non-null. That store is `persist`ed with **no `partialize`**, so
+`activityType` and `title` survive from whenever a free-tracked activity was last set up.
+
+So the app's response to "you finished a 30-minute walk" is a screen offering to **start** a walk,
+pre-titled with one the owner already completed. Nothing is broken in the sense of a thrown error, and
+nothing about it is intentional either — it is where the router happens to point.
+
+- **⚠ This is the persisted-store class `CLAUDE.md` already names**, which is the argument for fixing
+  the store rather than only the destination: *"screen modes, in-flight flags, and per-screen payloads
+  never survive a reload."* A `title` the user typed for a finished activity is a per-screen payload.
+  Four incidents are listed under that rule; this is the fifth shape.
+- **Recommendation: fix both halves, they are different bugs wearing one symptom.**
+  1. **Destination** — `Done` should land on the activity's own record or the day view, not on a
+     start-a-new-activity screen. The walk was just saved; showing it is the useful ending and it is
+     what the summary's own `router.prefetch('/activity')` was reaching for.
+  2. **Stale title** — clear `title` (and reconsider `activityType`) once an activity reaches `done`
+     and is saved, so a genuine visit to `/activity` starts clean instead of inheriting last week's
+     name. `startActivity` already resets from `INITIAL_STATE`, so the gap is only on the completion
+     side.
+- **Fixing only the destination leaves the bug.** Opening `/activity` from the tab bar shows the same
+  pre-armed screen; the owner reached it via the walk, but that is the route, not the cause.
+- **⚠ Do not fix it by clearing the store on rehydrate wholesale.** `activity-screen.tsx:17-19` carries
+  a deliberate guard from Q-450 — an in-flight session with a missing type keeps its own screen rather
+  than being thrown back to the picker, because the picker would drop the recording. Anything that
+  resets `activityType` must not reach a session that is `'active'`.
+- **Verification:** finish a guided walk → Done lands somewhere that shows the walk, not a Start
+  button; open `/activity` cold from the tab bar → the type picker or an empty title, never a previous
+  walk's name; and an interrupted in-progress activity still returns to its own screen after an app
+  restart (the Q-450 case, which is the one a careless fix breaks).
+
+
+### [platform] BF-106 — press the `VACUUM FULL` on `oura_raw_samples`; the packer freed the space and nothing returned it
+
+- **Lane:** none — this is an **owner action against production**, not a code change. Filed so it is
+  not lost, and so the reading that follows it has somewhere to land.
+- **Gate:** owner
+- **Added:** 2026-09-01 · found in the session-start database-size read, following up the third
+  reading that `projectOverview.md`'s growth row asked for.
+
+**The measurement.** `sum(pg_total_relation_size)` over the user tables: **171 MB (08-18) → 182 MB
+(08-25) → 198 MB (09-01)**, i.e. 1.6 then **2.3 MB/day** against a stated ~0.4. Nearly all of it is
+`oura_raw_samples` at 50 → 58 → **73 MB**.
+
+**It is not data and it is not bloat** — both were tested rather than assumed:
+
+- ingest is flat (~24k frames/day, 19,323–25,598 over the last 8 days) and the table holds exactly its
+  designed window: `HOT_WINDOW_DS` is **7 days**, and rows older than 8 days count **0**;
+- `n_dead_tup = 0` with `last_autovacuum` at 2026-09-01T17:57 — autovacuum reaches this table and
+  there is nothing dead in it.
+
+**It is the follow-up the packer's own docstring names.** Pack-and-delete frees space inside the file;
+Postgres returns it to the OS only on a `VACUUM FULL`, which `lib/data/postgres/slices/oura-raw-pack.ts`
+calls "a single press" once the backlog is absorbed. The backlog has been absorbed since ~2026-08-25
+(the docstring predicted "a day and a bit" from 08-24). Live rows have fallen **318,183 → 191,454**
+while the file has not.
+
+**The action:** `GET /api/admin/vacuum` (lists allowlisted tables and their current sizes), then
+`POST` it for `oura_raw_samples`, then the same GET again. The two GETs are the result.
+
+- **⚠ Do not predict the reclaim, and do not treat a small one as a failure.** Rows fell ~40% while
+  the file fell ~21%, which is *consistent* with slack but is not a measurement of it. **Q-315 is the
+  precedent that matters:** the identical argument about `error_events` predicted a large reclaim and
+  the button returned **0 B**, because the input figure had been a stale planner estimate the whole
+  time. A 0 B result here is an equally valid outcome and would mean the 73 MB is live data — in which
+  case the thing to correct is `CLAUDE.md`'s 0.4 MB/day, not the database.
+- **⚠ A `VACUUM FULL` needs free disk equal to the table's current size** and takes an exclusive lock
+  for its duration — the route's own error handling says so, because "it failed" and "there was no
+  room" look alike. 73 MB against a 5 GB volume is not close, but the lock means BLE ingest writes
+  block while it runs, so press it when the ring is not mid-drain rather than during the night's sync.
+- **Not urgent, and the entry should not imply otherwise.** Storage bills on use at $0.15/GB/month, so
+  the entire 198 MB is about **three cents a month**. This is filed because the growth rate is a
+  signal worth keeping honest, not because the bytes cost anything.
+- **What to record after:** the before/after GET figures in the `projectOverview.md` row, and either a
+  fourth size reading confirming the trend line is flat, or a correction to `CLAUDE.md`'s 0.4 MB/day.
+
+
 ### [activity][app-shell] BF-105 — the interval-walk phase change fires one generic ping and nothing in-app
 
 - **Lane:** B — `components/guided-walk/walk-active.tsx`, `lib/walk/walk-cues.ts`,
@@ -465,8 +594,12 @@ The two-channel split is the second half and only pays off when the screen is of
 
 ### [nutrition] BF-104 — log a meal at 0.5× / 1× / 1.5×; the storage supports it and nothing sets it
 
-- **Lane:** B for the picker on the meal sheet; A for the one argument through
-  `packages/shared/src/nutrition/log-meal.ts`.
+- **Lane:** B — the picker on the meal sheet, and only that. **The engine argument it needs is
+  LB-49**, which is Lane A's: `logMealFromSaved` lives in `packages/shared` and is called from the
+  web route and the `pushMutations` branch, so a lane that cannot edit either cannot thread a
+  parameter through it. Split on 2026-09-01 by Lane B, which reached this entry at the top of its
+  queue and could not start it.
+- **Needs:** LB-49
 - **Added:** 2026-09-01 · owner: *"when logging food/meals we should be able to choose how much of the
   meal; i.e full at 1x or 1.5 or 0.5 etc."*
 
@@ -529,52 +662,34 @@ numbers multiply, they do not substitute.
   what shipped at the time.
 - **Added:** 2026-09-01 · owner, deciding it himself: *"we only need one. lets go with MyFoods."*
 
-### [nutrition][body] BF-101 — a "Recommended" button per goal field; the numbers already exist and need no AI
+### [nutrition][body] BF-101 — a "Recommended" value per goal field, computed rather than generated
 
-- **Lane:** B — the Profile goals form (`app/more/…` profile tab) reading an existing shared function.
-  A for a non-AI endpoint if the values are not already reachable client-side.
+- **Keep:** one look on the S25. Six new controls land inside an already-dense collapsible, and the
+  offer button carries two lines of text at 412 dp — whether it crowds the fields around it, and
+  whether the macro pane still reads as a form, is the only thing unchecked.
+- **Verify:** device.
+- **✅ SHIPPED** (`feat/bf-101-recommended-values`, 2026-09-01, v1.426.0). Steps, water and calories
+  on the goals form; calories, protein, carbs and fat in the macro pane. No route, no model: it
+  assembles the same `BaselineInput` `/api/nutrition-goals/recommend` assembles and calls the same
+  `calculateBaseline`, so the button and the AI sheet's starting point cannot disagree.
+- **The measured RMR is carried through, and that was the one real decision.** `calculateBaseline`
+  routes it via `personalRmr` (BF-33), so omitting it would have quoted a *predicted* resting rate
+  on a screen whose Health card shows the measured one — the "two numbers for one thing" class
+  LA-45 and BF-99 both closed. It costs one `GET /api/measured-rmr` on the profile tab.
+- **Sleep and fiber have no button, deliberately** — `BaselineResult` carries no figure for either,
+  and an invented one would sit unsourced beside seven sourced ones. Both are pinned by the guard.
 - **Added:** 2026-09-01 · owner, on the Profile goal fields: *"maybe each should have a button under
   it that says (Recommended value) — id assume we use AI here to choose but maybe we could have some
   logic to decide so not using the ai if not needed?"*
 
-**The logic already exists and the AI is layered on top of it, not instead of it.**
-`calculateBaseline` (`packages/shared/src/nutrition/goal-recommendation.ts:166`) already returns a
-deterministic value for **every field on that screen except sleep**:
-
-```ts
-return { bmr, tdee, calories, proteinG, carbsG, fatG, waterMl, stepsGoal, leanMassKg }
-```
-
-Calories are `bmr × SEDENTARY_MULTIPLIER + CALORIE_ADJUSTMENT_BY_GOAL[goal]`; protein is dosed per kg
-of lean mass; water is `weightKg × 33 + WATER_BUMP_BY_ACTIVITY[level]`; steps are
-`STEP_GOAL_BY_ACTIVITY[level]`. **The `bmr` is the measured RMR** when one exists — `calculateBaseline`
-calls `personalRmr` (BF-33), the same function the daily energy model uses, so the wizard and the
-Health card cannot disagree about resting rate. `/api/nutrition-goals/recommend` computes this
-baseline and then runs `generateObject` to *adjust* it. **So the owner's instinct is right and the
-work is mostly plumbing: surface the baseline, skip the model.**
-
-- **The drift a per-field button would surface is already live.** Activity Level is **Moderate**,
-  whose `STEP_GOAL_BY_ACTIVITY` is **10,000** — and the stored Steps Goal is **7,000**, the
-  *sedentary* number. Water tracks it correctly (71.7 kg × 33 + 250 = **2,616** against a stored
-  **2,600**). One field follows the recommendation, another does not, and nothing on screen says
-  which. That is the value of the button in one screenshot.
-- **⚠ Sleep has no baseline and an implementer must not invent one.** `BaselineResult` carries no
-  sleep field. Either leave sleep without a button or add a heuristic **deliberately**, as its own
-  decision — silently inventing one puts an unsourced number next to six sourced ones.
-- **⚠ It must hide, not guess, on an incomplete profile.** `calculateBaseline` needs weight, height,
-  age and sex; the recommend route already gates on a `missing` list. A button that renders a number
-  computed from absent inputs is worse than no button.
-- **Recommendation: a non-AI path, and keep the AI button as the second thing.** The deterministic
-  value is instant, free, reproducible and explainable ("33 ml/kg + your activity bump"); the AI pass
-  earns its place only where it adjusts for something the formula cannot see. Two buttons with
-  different promises beats one that sometimes calls a model.
-- **Verification:** each field's Recommended value equals `calculateBaseline`'s for the same profile;
-  tapping it fills the field without saving until the user saves; and no network call to an AI route
-  is made by the deterministic path.
-
 ### [nutrition][platform] BF-102 — "Calibrated" activity level, and a prompt that tells the model something false
 
-- **Lane:** B for the option; A for the measured factor and the prompt string.
+- **Lane:** B — the `Calibrated` option in the activity-level picker
+  (`components/profile/required-info-section.tsx`) and its not-enough-data state. **The factor it
+  displays is LB-50**, Lane A's: it is computed from the energy model and the recommend route's
+  prompt string, neither of which Lane B owns. An option that shows a band name and no number is
+  not this feature. Split on 2026-09-01 by Lane B, which reached this entry and could not start it.
+- **Needs:** LB-50
 - **Added:** 2026-09-01 · owner: *"for the activity level there should be a button to choose
   'Calibrated Level' which would be what we are using now right — rather than the default response."*
 
@@ -1756,6 +1871,81 @@ deletes nothing on tap, which is what makes an icon-only entry point defensible 
   beside a changed nutrition sheet is not. **Nothing about the wallpaper can be judged in the
   sandbox** — the feature is off by default there, so the e2e has to switch it on to assert anything
   at all.
+
+### [nutrition][platform] LB-48 — saving a measured RMR does not evict the cache key two screens read
+
+- **Lane:** A — the fix is one key added to a group in `lib/cache-groups.ts`, which Lane A owns.
+- **Added:** 2026-09-01 · found while building BF-101, which made the key load-bearing on a second
+  screen.
+
+`POST /api/measured-rmr` (`components/more/clinical/measured-rmr-form.tsx`) invalidates nothing, and
+`measured-rmr` is in no group. Two screens read that key: the clinical console, which does not need
+the eviction because `onSaved(record)` updates it locally, and — since BF-101 — the Profile goals
+form, whose Recommended calories are computed from it via `personalRmr`.
+
+- **The blast radius is small and worth stating exactly, because it is smaller than the rule
+  implies.** Both reads revalidate over the network (neither passes `freshWithinTtl`), so this is
+  not hard staleness. What it costs is one app session: the goals section's fetch is keyed on
+  `user?.id` inside the persistent tab shell, so after saving an RMR test the Recommended calories
+  quote the previous resting rate until the app is restarted.
+- **The fix:** add `measured-rmr` to `invalidateGoalRecommendations()` and call that group from the
+  RMR form's success path. The group already exists and the form already has a success path.
+- **Do not "fix" it with a shorter TTL** — an effect that runs once never consults one.
+
+### [nutrition] LB-49 — the meal-log scale argument, through the one shared write function
+
+- **Lane:** A — `packages/shared/src/nutrition/log-meal.ts`, plus the web route and the
+  `pushMutations` branch that both call it.
+- **Added:** 2026-09-01 · Lane B, splitting BF-104 so its surface half is startable. The letter
+  records who found it, not who ships it.
+
+**One optional argument, and the reason it is not Lane B's is the reason it is worth doing carefully:
+`logMealFromSaved` is the single shared write function both server paths call**, which is the
+Canonical-Runtime rule the push branch is CI-gated on. A scale threaded anywhere else would be a
+second write path.
+
+- **The change:** `logMealFromSaved(meal, …, scale = 1)` writing
+  `quantityMultiplier: item.quantityMultiplier * scale` at all three sites (`log-meal.ts:83, 96, 131`).
+  **No schema change** — `food_logs.quantity_multiplier` is already per-row.
+- **Scale at WRITE time; do not store the factor.** The rows are already point-in-time snapshots —
+  `logMealFromSaved` copies the definition's multipliers rather than referencing them — so a log
+  survives the meal being edited afterwards. A meal-level factor every reader had to remember to
+  apply would break that and put a second multiplier in the system (Q-401's two TDEE models,
+  BF-88's two meanings for one constant).
+- **The cost of that, stated so it is chosen rather than discovered:** *"I ate 1.5×"* is not
+  recoverable afterwards — only the scaled per-item amounts are. BF-3 went the other way for
+  supplement doses, because a titrating dose is the datum; here the datum is the food.
+- **The outbox payload carries it too**, or the APK logs 1× while the web logs 1.5× — the drift
+  class the sync rules exist for. Local table column, `queueMutation` payload, `pushMutations`
+  branch and pull mapping in the same PR.
+- **Verification:** `logMealFromSaved(cruskitPB, …, 1.5)` writes two rows whose per-item grams are
+  each 1.5× the definition and whose calories total **365** against 243 at 1×; `scale = 1` is
+  byte-identical to today's output; and the web route and the push branch produce the same rows for
+  the same payload.
+
+### [nutrition][platform] LB-50 — the measured activity factor, and a prompt that tells the model something false
+
+- **Lane:** A — `app/api/nutrition-goals/recommend/route.ts` and the energy model.
+- **Added:** 2026-09-01 · Lane B, splitting BF-102 so its picker half has a number to show.
+
+**Two things, and the first should ship on its own whether or not the picker ever does.**
+
+- **⚠ A REAL BUG.** `app/api/nutrition-goals/recommend/route.ts:111-112` builds the prompt as
+  *`Baseline (Katch-McArdle, lean mass Xkg, activity level "moderate"): BMR X, TDEE X…`* — which
+  reads as though the TDEE were computed **for** that activity level. It was not: `calculateBaseline`
+  computes `tdee = bmr × SEDENTARY_MULTIPLIER` regardless, because Q-401 deleted `ACTIVITY_MULTIPLIERS`
+  to stop a self-report double-counting against measured movement. **The model is being told
+  something false about its own input** and may adjust as if the baseline already contained a
+  moderate multiplier. One string, no feature attached.
+- **The factor itself.** On the calibrated path `maintenanceKcal / bmr` **is** the activity factor;
+  on the formula path `(restingBase + avgActiveKcal) / bmr` is its measured equivalent. Expose it
+  with its window so BF-102 can render *"Calibrated · 1.38×, from your last 14 days"*.
+- **⚠ It needs the not-enough-data state the maintenance figure already has** (*"Log food on 8 more
+  days to calibrate"*). A calibrated factor that silently falls back to a guess is a worse picker
+  than the one it replaces.
+- **Verification:** the prompt no longer implies the TDEE is activity-scaled; the exposed factor
+  matches `maintenanceKcal / bmr` for the same window; and an under-calibrated account gets the
+  reason rather than a number.
 
 ### [platform] OR-100 — `Keep:` files buildable work under a heading that tells the lane not to look
 
@@ -7241,38 +7431,30 @@ screenshot is a **1:39** walk with the screen on, which exercises none of it.
 - **Verification.** HR live on-device with the strap paired, and the stale guard exercised by walking
   out of range. The notification half is **APK-only** and cannot be checked in `pnpm dev` at all.
 
-### [cardio][devices] LA-52 — the walk pacer's speed rung reads the WHOLE-WALK average, so it cannot track effort
+### [cardio][devices] LA-52 — the walk pacer's speed rung read the WHOLE-WALK average (fixed; device check owed)
 
-- **Lane:** B — `lib/stores/guided-walk-store.ts` is Lane B's. Filed by Lane A while scoping LA-48;
-  the letter records who found it, not who ships it.
+- **Keep:** the device check, and only that — and it is the whole point of the fix, so it matters.
+  On a real walk: slow deliberately mid-segment and the band must move within ~10 s; stop at a
+  crossing and the readout must say **Stopped**. Both are already LB-36's device checks 2 and 3,
+  which could not have passed before this.
+- **Verify:** device.
+- **✅ SHIPPED** (`fix/la-52-windowed-walk-speed`, 2026-09-01, v1.427.0). `windowedSpeedKmh` in
+  `lib/walk/walk-pacer.ts` reads the last `SPEED_WINDOW_SEC` (20 s) of `rawPoints`; the store carries
+  it as `recentSpeedKmh` and `walk-active.tsx` feeds **that** to `readPacer` and to the big km/h
+  number. `currentPaceSecPerKm` stays cumulative for the summary, which genuinely wants an average.
+- **⚠ The screen's big km/h readout was the average too, and the entry did not say so.** It came off
+  the same `currentPaceSecPerKm`, with a code comment claiming *"Both come off the one pace series —
+  there is no second computation"*. So the walker reading `4.8 km/h` mid-walk was reading their
+  average since starting. That is now live, and the min/km beside it is labelled **`avg`** — two
+  numbers side by side with nothing saying which is which is how the cumulative one came to be
+  trusted as "now".
+- **⚠ `e2e/walk-pacer-speed-rung.spec.ts` asserted the two were one number in two units**, and that
+  claim is now false by design. Updated in the same PR rather than left to break: the `avg` label is
+  the assertion, and the unit agreement moved to a fixture that can hold effort constant.
+- **A GPS dropout freezes the reading** rather than decaying it to zero — the same exposure the
+  cumulative figure already had. Deliberate: a wall clock would read "Stopped" in a tunnel, and the
+  store only recomputes when a point arrives anyway.
 - **Added:** 2026-09-01 · Lane A, from reading the pacer's inputs rather than from a report.
-- **Measured, not inferred.** `appendPoint` sets
-  `currentPaceSecPerKm: computeAvgPaceSecPerKm(distanceKm, elapsedSec)` with **cumulative** distance
-  and **cumulative** elapsed since `startedAtMs`, and `computeAvgPaceSecPerKm` is
-  `durationSec / distanceKm`. `walk-active.tsx` then feeds `kmhFromPace(currentPaceSecPerKm)`
-  straight into `readPacer` as `speedKmh`. So the speed rung's input is the **average speed of the
-  whole walk so far**, not the speed now.
-- **Three consequences, in order of how visible they are:**
-  1. **The band cannot respond within a segment.** Twenty minutes in, a 30-second surge or slow-down
-     moves a cumulative mean by almost nothing — so `Q-410`'s *"go green → amber → red as you slow
-     down"* cannot happen on this rung, whatever `BAND_TOLERANCE` is set to.
-  2. **`STOPPED_KMH` is effectively dead on this rung.** Reading `stopped` needs the whole-walk
-     average below **1.5 km/h**; after a few minutes of walking, standing still cannot get it there.
-     The constant exists for the crossing case (LB-36 check 3) and cannot fire.
-  3. **Warmup, fast and slow all band against the same slowly-drifting number**, so the fast/slow
-     distinction the plan is built on is invisible to the speed rung.
-- **⚠ The e2e passes and is not wrong.** `e2e/walk-pacer-speed-rung.spec.ts` asserts the readout
-  appears, the fallback note names the rung, and a thin history drops the rung — none of which needs
-  the band to *respond*. It also drives a short series, and early in a walk a cumulative mean is
-  still responsive. A test that never changes effort mid-walk cannot see this.
-- **The fix is a windowed speed, and it is a store change.** Derive from the last N seconds of
-  `rawPoints` (the same `haversineDistanceKm` already there) rather than from the cumulative totals,
-  and keep the cumulative figure for the summary, which genuinely wants an average. **Do not "fix" it
-  by widening `BAND_TOLERANCE`** — that treats an inert signal as a noisy one and would make the
-  cadence rung worse in the same move.
-- **Verification:** on a real walk, slow deliberately mid-segment and watch the band move within
-  ~10 s; stop at a crossing and read **Stopped**. Both are already LB-36's device checks — this entry
-  is why two of them would fail today.
 
 ### [cardio][devices] LA-48 — a walk's pacer creates an adherence number and nothing stores it
 

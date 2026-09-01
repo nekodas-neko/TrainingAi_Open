@@ -8,16 +8,16 @@ import { settleRouteBoundary } from './fixtures'
  * are not tested here: both come from a Polar H10 over BLE, which does not exist in a browser or in
  * `pnpm dev`. What this spec proves is the middle rung and the two things around it:
  *
- *   1. the live readout leads with **km/h** (the unit the owner asked for by name) and the km/h and
- *      the min/km beside it are the same number in two units — the One Formula claim, checked
- *      rather than asserted in a comment;
+ *   1. the live readout leads with **km/h** (the unit the owner asked for by name) and the min/km
+ *      beside it is **labelled as the average**, because since LA-52 they are two different
+ *      readings — a windowed speed and a cumulative pace;
  *   2. with no cadence source the pacer **falls to speed and says so**, rather than silently
  *      changing what the screen means;
  *   3. a history too thin to derive a speed target from drops the rung instead of inventing one.
  *
  * **Mutation-checked.** Making `speedTargetsFromHistory` ignore `MIN_SEGMENTS_FOR_SPEED_TARGET`
  * fails assertion 3; deleting the `fallbackNote` fails assertion 2; leading with min/km again fails
- * assertion 1.
+ * assertion 1, as does dropping the `avg` label.
  */
 
 // The pacer's speed rung is stubbed through `/api/guided-walk/segment-stats`, and the service
@@ -62,7 +62,7 @@ async function walkNorth(page: import('@playwright/test').Page, steps: number) {
   }
 }
 
-test('the live readout leads with km/h, and it is the pace beside it in another unit', async ({ page }) => {
+test('the live readout leads with km/h, and the pace beside it is labelled as the average', async ({ page }) => {
   await startWalk(page, USABLE_HISTORY)
   await walkNorth(page, 5)
 
@@ -71,15 +71,23 @@ test('the live readout leads with km/h, and it is the pace beside it in another 
 
   const row = page.locator('div').filter({ has: kmh }).last()
   const text = (await row.innerText()).replace(/\s+/g, ' ')
-  // e.g. "5.2 km/h · 11:32 /km"
-  const m = text.match(/([\d.]+) km\/h · (\d+):(\d{2}) \/km/)
-  expect(m, `expected a "N km/h · M:SS /km" pair, got ${JSON.stringify(text)}`).not.toBeNull()
+  // e.g. "5.2 km/h · avg 11:32 /km"
+  const m = text.match(/([\d.]+) km\/h · avg (\d+):(\d{2}) \/km/)
+  expect(m, `expected a "N km/h · avg M:SS /km" pair, got ${JSON.stringify(text)}`).not.toBeNull()
 
-  const shown = Number(m![1])
-  const paceSec = Number(m![2]) * 60 + Number(m![3])
-  // Both come off the one pace series, so they must agree. The tolerance is the rounding the two
-  // formats apply (1dp of km/h, whole seconds of pace), not slack for a second computation.
-  expect(Math.abs(shown - 3600 / paceSec)).toBeLessThan(0.15)
+  // **This used to assert the two were the same number in two units, and that claim is now false on
+  // purpose (LA-52).** The km/h is the last `SPEED_WINDOW_SEC`; the min/km is the average since the
+  // walk started, which is what the summary's splits are in. They diverge the moment effort
+  // changes — and they diverge here too, because the cumulative elapsed counts the seconds between
+  // tapping Start and the first GPS fix, which the window does not.
+  //
+  // So the word `avg` is the assertion. Two numbers side by side, one live and one cumulative, with
+  // nothing saying which is which, is how the cumulative one came to be read as "now" in the first
+  // place. The agreement that IS still a property — that a windowed speed matches the speed it was
+  // built from — is checked against known inputs in `lib/walk/__tests__/windowed-speed.test.ts`,
+  // where a fixture can hold effort constant; a browser walking real geolocation cannot.
+  expect(Number(m![1]), 'the km/h must be a plausible live walking speed').toBeGreaterThan(0)
+  expect(Number(m![1])).toBeLessThan(25)
 })
 
 test('with no cadence source the pacer falls to speed and says which signal is pacing', async ({ page }) => {

@@ -6292,7 +6292,82 @@ earlier instances this week and was walked into anyway, which is the argument fo
 the **specific** consumer rather than in general. The entry also records the positive half: this is
 the one baseline in the codebase built correctly, and TN-6 can copy it rather than invent one.
 
-## 2026-09-01 — `projectOverview.md` → 9099, `docs/implementation-backlog.md` → 15499 (BF-69 stage 1 shipped)
+## 2026-09-01 — three docs raised for the fault beat and two walk reports (BF-106/107/108)
+
+`docs/implementation-backlog.md` 15481 → 15610, `projectOverview.md` 9063 → 9115, `CLAUDE.md`
+1198 → 1204.
+
+The backlog gains three entries. **BF-106** is the third database-size reading `projectOverview.md`
+asked for, and it costs its length by ruling things out rather than asserting: ingest is flat, the
+7-day window holds, `n_dead_tup` is 0 with autovacuum having just run — so the above-trend growth is
+neither data nor bloat but an un-pressed `VACUUM FULL` the packer's own docstring already calls "a
+single press". The Q-315 precedent is written in beside it, because the identical argument about
+`error_events` predicted a large reclaim and the button returned 0 B. **BF-107** and **BF-108** are two
+owner reports from one walk; each names the trap that makes the obvious fix wrong — adding a calories
+tile renders a dash, because the value is derived server-side after the screen paints; and fixing only
+the Done destination leaves the stale title, which is reachable from the tab bar anyway.
+
+`projectOverview.md` replaces the growth row with its resolution (the superseded reading is folded
+into a `<details>` rather than deleted) and adds a production confirmation to the LA-37 row that
+narrows the device check from "does the fix work" to "press the button".
+
+`CLAUDE.md`'s +6 lines are a correction, not an addition: it stated `last_analyze`/`last_autovacuum`
+are "NULL on every table", which was true on 2026-08-20 and is false now. The rule it justified — use
+`count(*)` — survives and is more important than before, because coverage is now *partial*:
+`oura_raw_samples` reads exactly right while `oura_raw_packed` still reads 55 against 1,051, and
+nothing in the output says which side a table is on.
+## 2026-09-01 — `projectOverview.md` → 9078 (BF-101)
+
++15 for a feature whose whole point is a claim about *numbers*, and the numbers are what has to be in
+the index. The 7,000-against-Moderate drift is the evidence the control exists, and it is the one
+line a future session would otherwise have to re-derive from the owner's screenshot to know whether
+the feature is working.
+
+The measured-RMR sentence is there for a narrower reason: it is the decision most likely to be
+undone as an optimisation. Dropping that fetch looks free and silently reintroduces the "two numbers
+for one thing" defect LA-45 and BF-99 each cost a session to close.
+
+The backlog baseline is untouched — BF-101 left the queue as a shipped entry with a `Keep:` line for
+its device check, and LB-48 replaced it in roughly the same number of lines.
+
+**Recomputed from the merged file on rebase**, not spliced: `main` had moved to 9063 while this
+branch sat behind a red base, so the number this branch first wrote (9068, from a 9053 base) was
+stale by exactly the block someone else added. 9078 is the merged file's own count.
+
+
+## 2026-09-01 — `projectOverview.md` → 9145 (LA-52)
+
++15 for a defect whose whole content is *which number the screen was showing*. The three
+consequences — the band cannot respond, `STOPPED_KMH` can never fire, warm-up/fast/slow band against
+one drifting figure — are what a future session needs to not re-derive from the pacer's source, and
+they are the argument for the window existing at all.
+
+The sentence about the on-screen km/h earns its line separately: the entry did not name that half,
+the code comment beside it actively said the opposite, and it is the part a reader can check by
+looking at the screen. The e2e line is there because a spec that asserts something now deliberately
+false is the kind of thing a later session "fixes" back.
+
+**This number was recomputed three times and the warning it was written under came true.** The branch first
+wrote 9068 against a 9053 base; `main` then moved to 9063 behind a red CI (#775, #778, #766), making
+that stale before anything merged; #776 (BF-101) then landed its own 15-line status block on top, and
+#780 (BF-106) another after that.
+9145 is the merged file's own count. All three intermediate numbers were arrived at by recomputing from
+the file rather than splicing the conflict hunks, which is the only resolution that survives a base
+moving twice.
+
+## 2026-09-01 — `docs/implementation-backlog.md` → 15663 (LA-52 + two splits)
+
++56, and only about a third of it is LA-52's own shipped entry. The rest is two splits — **LB-49**
+(the meal-log scale argument) and **LB-50** (the measured activity factor plus a prompt string that
+tells the model something false) — carved out of BF-104 and BF-102 so their surface halves stop
+reading as startable to a lane that cannot start them.
+
+That is the trade this file exists to make visible: two entries that looked like work became four
+that describe it accurately, and the queue tool now parks two of them behind their engine halves
+instead of offering Lane B a build it cannot begin. LB-50's prompt bug is worth the lines on its own —
+it ships without any feature attached.
+
+## 2026-09-01 — `projectOverview.md` → 9184, `docs/implementation-backlog.md` → 15681 (BF-69 stage 1 shipped)
 
 Both grew, and the backlog's growth is the kind this file exists to argue about: BF-69 stayed in the
 queue rather than being removed, because only stage 1 of four shipped. Its `Keep:` block is longer
