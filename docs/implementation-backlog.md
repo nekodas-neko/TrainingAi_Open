@@ -388,6 +388,99 @@ below threshold and left in place for next time.
 > BF-29 (My meals), BF-30 (Meal detail), BF-31 (Edit meal) and BF-26 (Quantity). Two artboards need
 > no entry — `Tap targets` and the `srv/g` studies both shipped in Q-395a.
 
+### [workouts][app-shell] BF-94 — swipe the Start button to reveal Rest, instead of a permanent two-button row
+
+- **Lane:** B — `app/session-select/components/recommendation-card.tsx:252-296` and
+  `components/ui/swipe-actions.tsx`.
+- **Needs:** BF-84
+- **Added:** 2026-09-01 · owner, with a screenshot of the Home training card: *"can we have the full
+  button for workout; that lets you swipe it to turn it to rest? sort of like the swipe to delete
+  button appearing but swipe to rest."*
+- **This is a feature request, not a defect.** Nothing is broken; the entry exists so the interaction
+  is decided once. Per the intake rules it is filed and pointed at a planning session rather than
+  designed here.
+
+**The primitive already exists and must be reused.** `components/ui/swipe-actions.tsx` is the
+swipe-to-delete the owner is describing, live at two call sites (`meal-card.tsx`,
+`saved-meal-card.tsx`). **Do not hand-roll this** — CLAUDE.md names three hand-rolled gesture
+implementations as the ones to copy *away* from, and this repo has twice shipped a custom recognizer
+that swallowed normal scrolling (sessions 150, 152).
+
+**The card has two branches and the owner is looking at the rarer one.** Today's layout:
+
+| condition | today |
+|---|---|
+| `deloadOrRestRecommended` | a 2-up grid: **Rest** and **Full** (`:268-292`) — the screenshot |
+| otherwise | **one full-width Start button** (`:293+`), with **no Rest affordance at all** |
+
+**So the bigger win is the branch the owner did not screenshot.** On an ordinary day there is no way
+to declare a rest from Home — the option appears only when the app has already decided to suggest
+one. A swipe on the single Start button adds an affordance that does not currently exist.
+
+- **⚠ On the deload branch the swipe would make resting HARDER, and that is the design decision.**
+  Rest is **one tap** there today. Swipe-to-reveal costs a swipe *plus* a tap. On the one day the app
+  is actively asking "should you train?", burying one of the two answers behind a gesture is the
+  wrong trade.
+- **Recommendation: swipe on the single-button branch, keep the 2-up grid on the deload branch.** The
+  owner gets what he asked for everywhere it is an improvement, and the day the question actually
+  matters keeps both answers one tap away. If he prefers the swipe on both for consistency, that is
+  a taste call and cheap to reverse — but it should be made knowingly, not by default.
+- **Swipe-to-reveal, not swipe-to-commit.** A gesture that commits without a confirming tap will fire
+  on an accidental horizontal drag over the card's primary action. The primitive is reveal-then-tap
+  and that is the right shape for a destructive-ish, day-scoping choice.
+- **⚠ It inherits BF-61, which is still owed a device check.** `swipe-actions.tsx` carries a
+  documented 220 ms window in which the sliding row still covers the tray and swallows the first tap
+  — the owner reported it as needing two presses and confirmed it by waiting a second. That is
+  tolerable on a meal row; on the **primary action of the Home screen** it will read as the app
+  ignoring you. Do not ship this until BF-61's fast-tap check has been done on the device.
+- **The tab-swipe conflict is real in principle and probably not triggered here — see BF-95.**
+  `tab-swipe-navigator.tsx` only starts a tab swipe within **24 px of a screen edge** (`EDGE_PX`),
+  and this card is inset, so a swipe on the button should not reach it. That is a measurement to
+  confirm on the device, not an assumption to build on — and BF-95 covers the underlying gap.
+- **⚠ `Needs: BF-84` for a reason this session watched go wrong.** BF-84 replaces the `ta_rest_day`
+  `localStorage` flag with a stored fact plus a sync domain — i.e. it rewrites what `onRestDay`
+  *does*. Rebuilding how it is *invoked* first means touching the same call site twice and risks the
+  BF-87/BF-88 shape: shipping a surface against a mechanism that is about to change underneath it.
+- **⚠ Do not add hex/rgba literals.** The existing buttons are inline `rgba(99,102,241,…)` and
+  `#818cf8`; `check-hex-literals.js` holds a shrink-only per-file baseline, so new literals must
+  either be avoided or the file's number raised in the same PR, which puts the growth in the diff.
+- **Verification:** on the S25 APK, a horizontal drag on the Start button reveals Rest and does not
+  change tabs or scroll the page; the first tap on the revealed Rest lands (BF-61); a vertical drag
+  still scrolls; the card still reaches Rest in one tap on a deload day; and the choice survives a
+  tab switch and an app restart (which is BF-84's half).
+
+### [app-shell] BF-95 — the swipe primitive marks itself `data-swipe-actions` and the tab navigator ignores it
+
+- **Lane:** B — `components/shell/tab-swipe-navigator.tsx:42-43`.
+- **Added:** 2026-09-01 · found while tracing BF-94.
+
+**A declared contract that nothing honours.** `components/ui/swipe-actions.tsx:92` sets
+`data-swipe-actions` on every row, with a comment stating exactly what it is for — *"marks the row as
+owning horizontal gestures that start on it, the way `data-swipe-carousel` already marks a
+carousel"*. The navigator's exclusion list is:
+
+```ts
+const inScroller = (e.target as Element)?.closest?.(
+  "[data-swipe-carousel], .overflow-x-auto, [data-hscroll]"
+);
+```
+
+**`data-swipe-actions` is not in it.** The marker is set and never read.
+
+- **Why it has not bitten yet, and why that is not a reason to leave it.** The navigator only arms a
+  tab swipe when the touch starts within **24 px of a screen edge** (`EDGE_PX`), so it takes a
+  swipe-to-delete begun in that strip to run both gestures from one touch. Meal rows are full-width,
+  so the strip is reachable — this is latent, not impossible, and it is the failure the marker was
+  added to prevent.
+- **The fix is one string.** Add `[data-swipe-actions]` to the selector. It costs nothing and makes
+  the primitive's own comment true.
+- **⚠ Do not instead delete the marker as unused.** It is the correct mechanism and the navigator is
+  the side that is wrong; removing it would make the next swipe surface (BF-94) re-derive the whole
+  problem.
+- **Verification:** a swipe-to-delete started at the far left edge of a meal row opens the tray and
+  does **not** change tabs — on the device, since the web sandbox does not reproduce the WebView's
+  touch behaviour.
+
 ### [platform] LA-49 — 34 entries carry a `⛔`; only 7 mean blocked, and the tool parks all 34
 
 - **Lane:** A — `scripts/next-item.js`, plus a triage pass over `docs/implementation-backlog.md`.
@@ -753,26 +846,6 @@ copy of a number, which the one-formula rule is against, and this entry is how i
 - **Verification:** a client component imports the constant and `/nutrition` still returns 200;
   `movement-breakdown.ts` no longer declares its own; the shared module's own tests are unchanged.
 
-### [platform] LB-41 — the Weight Units toggle is a control with no consumer
-
-- **Lane:** B — `components/profile/edit-profile-sheet.tsx`.
-- **Gate:** owner
-- **Added:** 2026-09-01 · found during BF-79's read of the same sheet.
-
-`units` is local `useState('kg')`. It is never persisted, never read by anything, and is not even
-restored by `resetFromUser`, so it silently returns to `kg` every time the sheet is reopened. Nothing
-else in the app mentions `lbs`: `grep -rn "'lbs'" app components lib packages` finds only this file's
-own three lines. So the row offers a choice, appears to take it, and changes nothing anywhere.
-
-- **Two honest options, and the second is smaller than it looks.** *Remove the row* — one control,
-  no storage, no migration, and it stops the app claiming a setting it does not have. Or *implement
-  it*, which is a display-unit pass across every weight the app renders (body metrics, the dial, PRs,
-  goals, the chart axes) plus a stored preference; that is a real feature, not a fix.
-  **Recommendation: remove it, and file the display-unit feature separately if the owner wants it.**
-  Reversal is cheap either way — the row is nine lines.
-- **⚠ Do not delete it without asking** — hence the gate above. It is a visible affordance the owner
-  may have been using and believing; the point of this entry is that it never worked, which is the
-  owner's to hear before the row disappears.
 
 ### [platform][body] LB-42 — `weight_goal_kg` and `target_weight_kg` are two columns for one goal
 
@@ -2496,44 +2569,6 @@ deliberate choice, on a session where the absence of a Primary is the design.
 - **Verification:** swap an exercise in a session with no Primary; the incoming exercise takes the
   outgoing one's role, the prescribed sets and percentages are unchanged, and the session still has
   no Primary afterwards.
-
-### [platform] LB-29 — a preference chosen and then reloaded can be overwritten by the server's older copy
-
-- **Lane:** B
-- **Added:** 2026-08-30 · Lane B, from a CI flake on `meal-label.spec.ts` in PR #643's run.
-- **Reference:** the mechanism is Q-392's, shipped the same day
-  ([journal](overview/entries/2026-08-30-preferences-read-sites.md)).
-
-**The observation.** `meal-label.spec.ts › the chosen label style is remembered` failed with
-`aria-checked="false"` for the full 10 s and passed on retry. It is an assertion failure, not
-infrastructure — and it is the same spec that caught Q-392's first rule being wrong.
-
-**The mechanism, from the code rather than a reproduction.** `savePreference` writes `localStorage`
-synchronously and PATCHes the server fire-and-forget. The spec taps a style and **reloads
-immediately**. On the new page `hydrateUserPreferences` GETs the bag and writes every key it
-carries, unconditionally — so if the PATCH has not landed, the response still holds the *previous*
-style and overwrites the choice the user just made. The sheet then reads the old value.
-
-**Offline it is not a race, it is permanent.** The PATCH never lands, so every launch re-writes the
-server's old value over the device's. That is the same reasoning that retired the first version of
-this rule; the delete case was fixed and the overwrite case was not.
-
-**Recommended fix — a dirty mark, not an outbox.** `savePreferences` records the key as unsynced in
-`localStorage` (so it survives the reload) and clears it when its PATCH resolves. Hydration skips a
-marked key and **re-PATCHes the local value instead of taking the server's**, which also self-heals
-the offline case on the next launch. ~20 lines, no queue and no table, so it does not reopen the
-"not an outbox domain" decision.
-
-- **Two alternatives, and why they lose.** *Seed-if-absent* (hydration only writes a key the device
-  lacks) cannot clobber and exactly satisfies the owner's report — *"a new install or open on
-  computer loses all the saved preferences"* — but gives up cross-device **updates**: change a
-  setting on the phone and the laptop keeps its own forever. *A session-scoped "written here" set*
-  does not work at all, because the reload is what loses the value and the set does not survive it.
-- **Keep:** whether cross-device update is wanted at all is the owner's call, and it decides between
-  the recommendation and seed-if-absent. Ask before building — the two differ in what they promise,
-  not just in how they are written.
-- **Verification:** with the PATCH stubbed to hang, pick a style, reload, and it is still chosen;
-  and with the network off, it survives a second launch.
 
 ### [platform] LB-27 — one extra request during launch strands several for over a minute, and nothing explains why
 

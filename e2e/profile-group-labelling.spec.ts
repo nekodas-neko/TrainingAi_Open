@@ -17,8 +17,9 @@ import { settleRouteBoundary } from './fixtures'
  * **Mutation-checked, per the Q-259 lesson that a guard which cannot fail is not a guard.**
  * Measured by reverting each site in turn: dropping `role="radiogroup"`/`aria-labelledby` from
  * `goal-targets-section.tsx` fails the Fitness Goal assertion and nothing else; the same on
- * `edit-profile-sheet.tsx`'s units row fails only the Weight Units assertion. The five group cases
- * are independent, and each one is covered by exactly one assertion that dies with it.
+ * `edit-profile-sheet.tsx`'s Food Region row fails only the Food Region assertion. The group cases
+ * are independent, and each one is covered by exactly one assertion that dies with it. (The Weight
+ * Units row was the fifth; LB-41 removed it as a control with no consumer.)
  *
  * **What it does not cover.** Playwright reads Chromium's accessibility tree, not TalkBack's. It
  * proves the name and the checked state are exposed; it cannot prove how Samsung's screen reader
@@ -80,17 +81,19 @@ test('the Edit Profile rows expose names for their groups and their lone action'
 
   await page.getByRole('button', { name: 'Edit Profile' }).click()
 
-  // Unlike the three above, Weight Units cannot be cleared — it is kg or lbs — so exactly one
-  // option is checked at all times. That makes it the one site where the checked state itself is
-  // deterministic enough to assert.
-  const units = page.getByRole('radiogroup', { name: 'Weight Units' })
-  await expect(units).toBeVisible({ timeout: 60_000 })
-  await expect(units.getByRole('radio')).toHaveCount(2)
-  await expect(units.getByRole('radio', { checked: true })).toHaveCount(1)
-
+  // Food Region cannot be cleared — it is one of four — so exactly one option is checked at all
+  // times, which makes it the one site where the checked state itself is deterministic enough to
+  // assert. **Weight Units used to be that site and is gone (LB-41):** it was local state nothing
+  // read, so the row offered a choice, appeared to take it, and changed nothing. Removed on the
+  // owner's decision rather than implemented, since real unit display is a pass across every weight
+  // the app renders.
   const foodRegion = page.getByRole('radiogroup', { name: 'Food Region' })
-  await expect(foodRegion).toBeVisible()
+  await expect(foodRegion).toBeVisible({ timeout: 60_000 })
   await expect(foodRegion.getByRole('radio')).toHaveCount(4)
+  await expect(foodRegion.getByRole('radio', { checked: true })).toHaveCount(1)
+
+  // And it must stay gone: a re-added inert toggle is the thing the entry decided against.
+  await expect(page.getByRole('radiogroup', { name: 'Weight Units' })).toHaveCount(0)
 
   // The Timezone row is the one case that is NOT a group: its label fronted a static value plus an
   // unrelated action, so `<Label>` was dropped rather than re-pointed. What was left behind was a

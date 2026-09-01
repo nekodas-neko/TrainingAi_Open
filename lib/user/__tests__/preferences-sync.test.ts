@@ -148,3 +148,100 @@ describe('writePreferenceLocally', () => {
     expect(fetch).not.toHaveBeenCalled()
   })
 })
+
+/**
+ * LB-29 — a change the server has not seen must survive the reload that reveals it.
+ *
+ * `savePreference` writes `localStorage` and PATCHes in the background. Before this, hydration on
+ * the next load wrote **every** key the bag carried, so if the PATCH had not landed the response
+ * still held the *previous* value and overwrote the choice just made. Offline it was not a race
+ * but permanent: the PATCH never lands, so every launch re-wrote the old value.
+ *
+ * The owner chose "the change follows to my other devices" over the simpler "never overwrite a
+ * local setting", which is why the fix re-sends rather than merely declining to seed.
+ */
+describe('LB-29 — an unacknowledged local change beats the server copy', () => {
+  /** A fetch that never settles, which is the in-flight window the bug lived in. */
+  function hangingFetch() {
+    const f = vi.fn(() => new Promise<Response>(() => {}))
+    vi.stubGlobal('fetch', f)
+    return f
+  }
+
+  it('hydration does not overwrite a key whose PATCH is still in flight', () => {
+    hangingFetch()
+    savePreference('mealLabelStyle', 'deli')
+    expect(store.get('ta_meal_label_style')).toBe('deli')
+
+    // The reload: the server answers with what it had before the tap.
+    hydrateUserPreferences({ mealLabelStyle: 'classic' })
+    expect(store.get('ta_meal_label_style')).toBe('deli')
+  })
+
+  it('and it re-sends that value rather than leaving the server behind', () => {
+    hangingFetch()
+    savePreference('mealLabelStyle', 'deli')
+
+    const resend = vi.fn(() => Promise.resolve({ ok: true } as Response))
+    vi.stubGlobal('fetch', resend)
+    hydrateUserPreferences({ mealLabelStyle: 'classic' })
+
+    expect(resend).toHaveBeenCalledTimes(1)
+    expect(JSON.parse((resend.mock.calls[0][1] as RequestInit).body as string))
+      .toEqual({ mealLabelStyle: 'deli' })
+  })
+
+  it('once the server acknowledges, it wins again', async () => {
+    savePreference('mealLabelStyle', 'deli')
+    await Promise.resolve(); await Promise.resolve()
+
+    hydrateUserPreferences({ mealLabelStyle: 'classic' })
+    expect(store.get('ta_meal_label_style')).toBe('classic')
+  })
+
+  it('a rejected PATCH keeps the mark, so the device keeps winning', async () => {
+    vi.stubGlobal('fetch', vi.fn(() => Promise.resolve({ ok: false } as Response)))
+    savePreference('mealLabelStyle', 'deli')
+    await Promise.resolve(); await Promise.resolve()
+
+    hydrateUserPreferences({ mealLabelStyle: 'classic' })
+    expect(store.get('ta_meal_label_style')).toBe('deli')
+  })
+
+  it('survives the launch after an offline change — the mark is on disk, not in memory', () => {
+    vi.stubGlobal('fetch', vi.fn(() => Promise.reject(new Error('offline'))))
+    savePreference('weightLookback', 30)
+
+    // A fresh launch reads the same `localStorage`; nothing in module memory carries over.
+    hydrateUserPreferences({ weightLookback: 7 })
+    expect(store.get('ta_weight_lookback')).toBe('30')
+  })
+
+  it('re-sends each encoding in the shape the schema expects, not as a string', () => {
+    hangingFetch()
+    savePreferences({ weightLookback: 30, mealReminders: false, homeWidgets: ['steps'] })
+
+    const resend = vi.fn(() => Promise.resolve({ ok: true } as Response))
+    vi.stubGlobal('fetch', resend)
+    hydrateUserPreferences({})
+
+    const body = JSON.parse((resend.mock.calls[0][1] as RequestInit).body as string)
+    // Decoded back to real types — a re-send of `"30"` or `"false"` would fail the route's schema.
+    expect(body).toEqual({ weightLookback: 30, mealReminders: false, homeWidgets: ['steps'] })
+  })
+
+  it('does not clear a mutually-exclusive partner that is itself in flight', () => {
+    hangingFetch()
+    savePreference('brandHue', 210)
+
+    hydrateUserPreferences({ brandTheme: 'purple' })
+    // The server's older preset must not delete the hue the user has just chosen.
+    expect(store.get('ta_brand_hue')).toBe('210')
+  })
+
+  it('leaves nothing behind once everything is acknowledged', async () => {
+    savePreference('mealLabelStyle', 'deli')
+    await Promise.resolve(); await Promise.resolve()
+    expect(store.has('ta_prefs_unsynced')).toBe(false)
+  })
+})
