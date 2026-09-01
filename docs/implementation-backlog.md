@@ -415,40 +415,55 @@ below threshold and left in place for next time.
 
 ### [app-shell] BF-100 — back navigation always lands at the top, because the scroll position is not on the document
 
-- **Lane:** B — `components/pull-to-sync.tsx` (which owns the scroll container) plus wherever a route
-  change is observed.
+- **Lane:** B · **Branch:** `feat/bf-100-scroll-restoration` (pushed, **no PR — the fix is incomplete**)
 - **Added:** 2026-09-01 · owner: *"when I scroll down to a button; then click on it and it takes me
   to a new page; when I press back I want to go back to that page at the same scroll level I was at.
   It usually starts me at the top of the page. This is on many pages if not all pages."*
 
-**"If not all pages" is right, and there is one reason.** The app does not scroll the document — it
-scrolls an **inner container**. `pull-to-sync.tsx:190` renders the scroller with a `scrollRef`, and
-**62 files** carry `overflow-y-auto`. Next's App Router scroll restoration operates on the
-window/document scroller, so it cannot see, save or restore a nested element's `scrollTop`. Nothing
-in the app does it either: `grep` for `scrollRestoration`, `restoreScroll` or a `sessionStorage`
-scroll key returns **nothing** outside `use-scroll-to-bottom.ts`, which is unrelated.
+**The diagnosis in this entry is confirmed by measurement.** `/health` reads 600 on its inner
+container after scrolling, the document reads 0 throughout, and a push-and-back returns 0. Next's
+restoration watches the window scroller; this app scrolls an inner div; nothing bridged them.
 
-So this is not a regression and not per-screen — no code has ever existed to do it.
+**⚠ THE HALF-BUILT FIX WORKS FOR SUB-ROUTES AND NOT FOR TAB-TO-TAB. Read the cause before
+continuing — it invalidates the design, not just the code.** `lib/hooks/use-scroll-restoration.ts`
+keys the saved offset on `usePathname()`. **That is unsound here, because the tab screens do not
+unmount when you leave them.** Instrumented on 2026-09-01, navigating `/health` → `/nutrition` via
+the bottom nav:
 
-- **Recommendation: save `scrollRef.current.scrollTop` per route key and restore on mount**, in
-  `pull-to-sync.tsx` so every screen using the shell inherits it, rather than 62 separate fixes.
-  `sessionStorage` is the right store — it is per-tab, dies with the app, and a stale offset is
-  worthless anyway.
-- **⚠ Restore AFTER the content has height, or it silently no-ops.** These screens paint from a cache
-  seed and then revalidate, so a restore on first paint sets `scrollTop` on a container that is still
-  short and the browser clamps it to 0 — which looks exactly like the bug. Restore when the content
-  has laid out (a `ResizeObserver` on the inner content, or after the seeded paint), and only once
-  per navigation so a later revalidation cannot yank the user back.
-- **⚠ Do not restore on a forward navigation.** Only a *back* return should land where the user was;
-  arriving fresh should start at the top. That means keying on the route AND clearing the entry when
-  a route is entered forward, or reading the navigation type.
-- **The persistent tab shell cuts both ways here** — a tab that never unmounts keeps its scroll
-  position already, so tab switches are not the complaint. The loss happens on a **push to a new
-  route and back**, which is what unmounts the screen.
+```
+[SR] mount /nutrition#body      <- these are HEALTH's three panels,
+[SR] mount /nutrition#training     still mounted, re-keyed to the new pathname
+[SR] mount /nutrition#progress
+saved: {"ta_scroll:/health#training":"840"}   <- the cleanup did save, under the old key
+after back: 0                                  <- and no mount fired on the return at all
+```
+
+So the component instance outlives the route, `usePathname()` changes under it, and the effect
+re-keys rather than remounting. **The key has to identify the SCREEN, not the current path** — passed
+down from the screen that owns the scroller, or derived from something that does not move when the
+user navigates away.
+
+- **What is measured working:** `/health` and `/more`, scrolled, pushed to a **sub-route**
+  (`/health/sleep`, `/more/details`), back — restores the **exact** offset, drift 0, on both. And a
+  fresh forward arrival still starts at the top.
+- **What is measured broken:** the same screens pushed to another **tab** and back. `e2e/scroll-restoration.spec.ts`
+  drives exactly that and is **red**; it is committed red on the branch, deliberately.
+- **⚠ Four traps are already paid for and are written into the hook's comments. Do not re-derive
+  them:** (1) gating the restore on a `popstate` flag breaks under StrictMode, whose double-invoked
+  effect consumes it; (2) reading `el.scrollTop` in the cleanup saves **0**, because React has
+  already detached the node — track it from a `scroll` listener instead; (3) setting the offset once
+  lands **144–231 px past it**, because content keeps arriving above and scroll anchoring pushes it
+  down, so it must be re-asserted; (4) deciding the user has taken over by comparing the offset to
+  what you set treats that same settling as a finger and yields every time — takeover is an **input
+  event** (`wheel`/`touchstart`/`keydown`).
+- **⚠ And three spec traps, which cost more than the code did.** All three reported
+  `expected 840, received 0`, identical to the feature being broken: text-matching *Sleep* hits a
+  card that opens a **sheet**; `a[href^="/health/"]` matches nothing, because these screens navigate
+  from `router.push` **buttons**; the bottom nav is the reliable handle, since it renders real
+  `<Link>`s. **The spec's precondition assertions are what tell these apart — keep them.**
 - **Verification:** on the S25, scroll Health well down, tap into a detail screen, press the system
   back gesture — the page returns at the same offset, on a cold cache and a warm one; and reaching
-  the same screen forward still starts at the top.
-
+  the same screen forward still starts at the top. Then the tab-to-tab case, which is the open half.
 
 ### [nutrition] BF-97 — a scanned meal groups in the diary: the rendering half
 
