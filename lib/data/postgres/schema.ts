@@ -672,6 +672,10 @@ export const foodLogs = pgTable('food_logs', {
   // deleting a recipe must not erase the history of having eaten it, nor be blocked by it.
   savedMealId:        uuid('saved_meal_id').references(() => savedMeals.id, { onDelete: 'set null' }),
   mealGroupId:        uuid('meal_group_id'),
+  // BF-97 (migration 252). A scan's group has no saved meal to be named from, so it carries its
+  // own name on every row of the group — a group is the rows sharing an id, there is no group
+  // table, and the local store has to render the header with no join available.
+  mealGroupName:      text('meal_group_name'),
   quantityMultiplier: doublePrecision('quantity_multiplier').notNull().default(1.0),
   loggedAt:           timestamp('logged_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt:          timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),

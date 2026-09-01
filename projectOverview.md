@@ -52,6 +52,20 @@ midnight so the case fires on every run; **its first version passed with the fix
 `isVisible()` is a point-in-time check and not a wait. **Not device-verified**
 ([journal](docs/overview/entries/2026-09-01-local-day-rollover.md)).
 
+**A scanned meal now carries a group and a name — the engine half (BF-97, migration 252, local
+SQLite v33).** Owner, with two screenshots: *"looks like saved meals groups the food well; but when
+scanning it doesnt."* BF-39's grouping was right and did not cover this: it names a group from its
+`saved_meal_id`, and `groupDiaryEntries` **refuses to head a group it cannot name** — so a scan, which
+has no saved meal, cannot group. `food_logs.meal_group_name` is that name, denormalised onto every
+row for the same reason `meal_group_id` already is: a group **is** the rows sharing an id, and the
+local store must draw the header offline with no join. `logFoodEntries` mints a group **only**
+alongside a name and **only** past one entry — both negatives are asserted, because a group of one
+renders as a meal for a frame and then does not, and a nameless group rebuilds the bug one layer
+down. Five mutations across the write/delta/push chain, five caught. **Nothing looks different yet
+and that is deliberate:** the rendering rule is Lane B's half, so this cannot half-break the diary.
+**Not device-verified**, and the local-SQLite half is verified by reading rather than running
+([journal](docs/overview/entries/2026-09-01-scan-meal-group.md)).
+
 **Blood panels are stored, de-identified (BF-1, engine half — migrations 250/251).** The schema is
 written from the owner's real 58-analyte report rather than a description, and four shapes in it broke
 every simpler design: `<0.2` is a result that is **not a number** (`value_num` + `value_operator`),

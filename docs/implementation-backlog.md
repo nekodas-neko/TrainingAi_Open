@@ -14,8 +14,8 @@ silently misdirecting the next session. Update them in the same PR that consumes
 
 | Pointer | Value | Source of truth |
 |---|---|---|
-| Next free Postgres migration | **252** | `lib/data/postgres/migrations/` |
-| Local SQLite schema version | **v32** | `lib/sqlite/migrations.ts`; `lib/sqlite/__tests__/migrations.test.ts` asserts the max |
+| Next free Postgres migration | **254** | `lib/data/postgres/migrations/` |
+| Local SQLite schema version | **v33** | `lib/sqlite/migrations.ts`; `lib/sqlite/__tests__/migrations.test.ts` asserts the max |
 
 > **There is no third pointer any more.** Entry IDs are not allocated from a shared counter and
 > never were safely: a next-free pointer is a *floor*, not an authority, because it cannot see an
@@ -388,57 +388,34 @@ below threshold and left in place for next time.
 > BF-29 (My meals), BF-30 (Meal detail), BF-31 (Edit meal) and BF-26 (Quantity). Two artboards need
 > no entry — `Tap targets` and the `srv/g` studies both shipped in Q-395a.
 
-### [nutrition] BF-97 — a scanned meal still lands as N loose rows, which is the case BF-39 was filed for
+### [nutrition] BF-97 — a scanned meal groups in the diary: the rendering half
 
-- **Lane: A** — measured 2026-09-01, resolving the conditional this entry was filed with. The scan
-  route only *analyses*; the write is `logFoodEntries` in
-  **`packages/shared/src/nutrition/log-food.ts`**, called from `food-logger-sheet.tsx`. Minting a
-  group id there is `packages/shared/**`, and the recommended option also needs the diary rule in
-  `components/nutrition/diary-groups.ts` (Lane B) — both lanes, so **Lane A, engine half first**,
-  per the standing rule. Lane B can take the rendering follow-up once the ids are written.
+> **✅ THE ENGINE HALF SHIPPED 2026-09-01** (migration 252 + the `claude_ro` regeneration 253, local
+> SQLite **v33**). `food_logs.meal_group_name`, threaded through both write paths, the sync delta,
+> the outbox payload and the local store; `logFoodEntries` mints a group for a multi-item scan and
+> `food-logger-sheet` passes the dish name the user confirmed.
+> [journal](overview/entries/2026-09-01-scan-meal-group.md)
+>
+> - **Keep:** the rendering rule, and nothing else. **Nothing looks different yet** — the ids and the
+>   name are written and `groupDiaryEntries` still requires a `savedMealId`, so a scan renders
+>   exactly as it did. That is deliberate: the engine half cannot half-break a screen.
+
+- **Lane: B** — `components/nutrition/diary-groups.ts` and the two renderers, per the entry's own
+  split. The engine half was A's because it needed a migration.
+- **What is owed, precisely.** `groupDiaryEntries` gates on `!groupId || !mealId ||
+  !knownMealIds.has(mealId)`. **Option 1 was the recommendation and it is what the engine built:**
+  a group may have a name *instead of* a saved meal. So the gate becomes "a group id **and** a way
+  to name it — a resolvable `savedMealId`, or a `mealGroupName`", and `DiaryEntry.kind: 'meal'`
+  takes `savedMealId?: string | null` plus a name. `diary-meal-group.tsx` and `meal-card.tsx` both
+  follow the type: the photo comes from the saved meal today, and a scanned group has none.
+- **⚠ Do not head a group with a name the app invented.** The existing rule — *"heading them 'Meal'
+  would be inventing a name the app does not have"* — is still right and is why the engine mints a
+  group **only** alongside a name. A group id with no name should keep rendering flat.
+- **Verify:** device — scan a multi-item meal on the S25 and confirm it draws as one collapsible row
+  with the dish name and an item count; two scans on one day stay two rows; a single-item scan is
+  still a plain row.
 - **Added:** 2026-09-01 · owner, with two screenshots side by side: *"looks like saved meals groups
   the food well; but when scanning it doesnt."*
-
-**Saved meals group; scans do not — and the docstring for the grouping says why in its own words.**
-`components/nutrition/diary-groups.ts` opens by quoting the report that produced BF-39: *"A
-screenshot showed one AI-logged breakfast as **eight** diary rows — flour, protein powder, baking
-powder, salt, milk, eggs, butter, bacon — filling the whole meal section."* Today's screenshot is
-the same shape: a scanned lunch as **eight** rows — beef, carrots, spinach, cabbage, corn, capsicum,
-cucumber, broccoli. **BF-39 shipped the saved-meal half and the motivating case is still open.**
-
-**Why, exactly.** `groupDiaryEntries` requires *both* ids and a resolvable meal:
-
-```ts
-if (!groupId || !mealId || !knownMealIds.has(mealId)) { out.push({ kind: 'log', … }); continue }
-```
-
-and `mealGroupId` is minted in exactly one place — `packages/shared/src/nutrition/log-meal.ts:58`,
-always alongside `savedMealId: meal.id`. `app/api/nutrition/scan/route.ts` contains **zero**
-references to either field. A scan therefore cannot produce a group even in principle.
-
-- **The decision this needs is where a scanned group's NAME comes from**, and it is why the entry
-  stops here rather than picking. The grouping rule deliberately refuses to head a group it cannot
-  name — *"heading them 'Meal' would be inventing a name the app does not have"* — and that
-  reasoning still holds. Three options:
-  1. **Relax the rule to allow a group with a name but no saved meal.** The scan already produces a
-     dish description; carry it onto the logs and let `DiaryEntry.kind: 'meal'` take a name instead
-     of a `savedMealId`. Least invasive to the user's data — nothing new appears in My Meals.
-  2. **Have a scan create a saved meal.** Grouping then works unchanged, but every scanned lunch
-     becomes a permanent entry in My Meals, which the owner has to prune. Likely unwanted.
-  3. **Group on `mealGroupId` alone, unnamed.** Cheapest, and the rule already argues against it.
-- **Recommendation: option 1**, and note it makes `savedMealId` optional on the `'meal'` entry —
-  a type change the renderer and `diary-meal-group.tsx` both have to follow (the photo comes from
-  the saved meal today; a scan would supply its own image or none).
-- **⚠ Do not "fix" this by making the scan write `savedMealId` to a placeholder meal.** That puts a
-  fake row in the user's meal library to satisfy a display rule, and every screen reading saved
-  meals then has to know about it.
-- **Related, and NOT the same bug:** BF-72 is grouping being **lost** on hydration
-  (`use-food-logs-loader.ts` drops both ids from the `applyDelta` payload). This entry is grouping
-  never being **created**. BF-72 shipped and owes a device check; a scan would still render flat
-  with BF-72 perfect.
-- **Verification:** a scanned multi-item meal draws as one collapsible row with its own name and an
-  item count; two scans on one day stay separate rows; and a single-item scan still renders as a
-  plain row, per the existing "a group of one buys nothing" rule.
 
 ### [nutrition] BF-98 — a section holding one grouped meal draws its macros twice (fixed; the reproduction is not understood)
 

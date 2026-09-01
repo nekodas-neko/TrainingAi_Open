@@ -1,0 +1,15 @@
+-- BF-97 — a scanned meal groups in the diary, and the group carries its own name.
+--
+-- BF-39 shipped grouping for SAVED meals: rows share a `meal_group_id`, and the group's name comes
+-- from the `saved_meal_id` it also carries. A scan has no saved meal — deliberately, since making
+-- one would put a row in the user's meal library to satisfy a display rule — so it has nowhere to
+-- get a name, and the grouping rule refuses to head a group it cannot name.
+--
+-- This column is that name. It is denormalised onto every row of the group, the same way
+-- `meal_group_id` already is: there is no group table, a group IS the rows sharing an id, and the
+-- local store must be able to render the header offline without a join it does not have.
+--
+-- NULL for every existing row, and that is correct rather than a back-fill waiting to happen: a
+-- saved-meal group still takes its name from its meal, and a pre-BF-97 scan genuinely has no name
+-- to recover.
+ALTER TABLE food_logs ADD COLUMN IF NOT EXISTS meal_group_name text;

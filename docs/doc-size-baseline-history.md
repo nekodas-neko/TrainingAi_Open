@@ -5822,3 +5822,14 @@ had to survive rather than a summary of them. A shorter block would read as "blo
 stored" and lose the part a future session needs: that the verdict is **derived from the bounds and
 never read off the provider's flag**, which is the one rule a well-meaning consumer would otherwise
 break by trusting the words the report prints.
+
+## 2026-09-01 — `projectOverview.md` → 8848, `docs/implementation-backlog.md` → 15040 (BF-97, engine half)
+
+The backlog **shrank by 23 lines**: BF-97's entry carried the three-option decision and the argument
+for each, which is now made — the engine built option 1 — so what is left is the rendering rule and
+the two reasons a future session must not undo it.
+
+`projectOverview.md` grew 14 lines, and the lines that could not be cut are the two negatives: a
+group is minted **only** past one entry and **only** alongside a name. Both are what stop the fix
+from rebuilding the bug one layer down, and a status block that said "scans group now" would be
+wrong on top of being shorter — nothing renders differently until Lane B's half lands.

@@ -45,6 +45,7 @@ export function rowToFoodLog(r: typeof s.foodLogs.$inferSelect): FoodLog {
     id: r.id, userId: r.userId, date: r.date,
     mealTypeId: r.mealTypeId, foodItemId: r.foodItemId,
     savedMealId: r.savedMealId ?? null, mealGroupId: r.mealGroupId ?? null,
+    mealGroupName: r.mealGroupName ?? null,
     quantityMultiplier: r.quantityMultiplier, loggedAt: r.loggedAt,
   }
 }
@@ -312,6 +313,7 @@ export async function listFoodLogs(db: Db, userId: string, date: string): Promis
     loggedAt:      s.foodLogs.loggedAt,
     savedMealId:   s.foodLogs.savedMealId,
     mealGroupId:   s.foodLogs.mealGroupId,
+    mealGroupName: s.foodLogs.mealGroupName,
     item:          s.foodItems,
   })
     .from(s.foodLogs)
@@ -319,7 +321,7 @@ export async function listFoodLogs(db: Db, userId: string, date: string): Promis
     .where(and(eq(s.foodLogs.userId, userId), eq(s.foodLogs.date, date), isNull(s.foodLogs.deletedAt)))
     .orderBy(asc(s.foodLogs.loggedAt))
 
-  return rows.map(({ item, logId, logUserId, logDate, logMealTypeId, logFoodItemId, logQty, loggedAt, savedMealId, mealGroupId }) => {
+  return rows.map(({ item, logId, logUserId, logDate, logMealTypeId, logFoodItemId, logQty, loggedAt, savedMealId, mealGroupId, mealGroupName }) => {
     const foodItem = rowToFoodItem(item)
     return {
       id: logId, userId: logUserId, date: logDate,
@@ -327,6 +329,8 @@ export async function listFoodLogs(db: Db, userId: string, date: string): Promis
       // BF-39. The diary groups on `mealGroupId`; without it here the rows arrive as siblings and
       // the grouping has to be re-derived from nothing.
       savedMealId: savedMealId ?? null, mealGroupId: mealGroupId ?? null,
+      // BF-97. A scan's group is named from here rather than from a saved meal it does not have.
+      mealGroupName: mealGroupName ?? null,
       quantityMultiplier: logQty, loggedAt,
       foodItem,
       ...computeLogMacros(foodItem, logQty),
@@ -383,7 +387,7 @@ export async function createFoodLog(
   db: Db,
   userId: string,
   data: Pick<FoodLog, 'date' | 'mealTypeId' | 'foodItemId' | 'quantityMultiplier'>
-    & { id?: string; loggedAt?: Date; savedMealId?: string | null; mealGroupId?: string | null },
+    & { id?: string; loggedAt?: Date; savedMealId?: string | null; mealGroupId?: string | null; mealGroupName?: string | null },
 ): Promise<FoodLog> {
   const { id, loggedAt, ...rest } = data
   // The client's `loggedAt` is a CANDIDATE, not an answer — an offline replay carries the instant
@@ -413,6 +417,7 @@ export async function createFoodLog(
         quantityMultiplier: rest.quantityMultiplier,
         ...(rest.savedMealId !== undefined ? { savedMealId: rest.savedMealId } : {}),
         ...(rest.mealGroupId !== undefined ? { mealGroupId: rest.mealGroupId } : {}),
+        ...(rest.mealGroupName !== undefined ? { mealGroupName: rest.mealGroupName } : {}),
         updatedAt: new Date(),
       },
       setWhere: eq(s.foodLogs.userId, userId),
