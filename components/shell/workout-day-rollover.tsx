@@ -1,8 +1,7 @@
 'use client'
 
 import { useEffect } from 'react'
-import { todayInTz } from '@trainingai/shared/date-utils'
-import { useUserTimezone } from '@/components/shell/user-timezone-provider'
+import { useLocalDay } from '@/components/shell/local-day-provider'
 import { useWorkoutStore } from '@/lib/stores/workout-store'
 
 /**
@@ -26,24 +25,20 @@ import { useWorkoutStore } from '@/lib/stores/workout-store'
  * it back behind a mounted `workout-screen.tsx` would leave a user who opens the app on Session
  * Select after midnight looking at yesterday's ticks — the exact WK-13 symptom, moved.
  *
- * Renders nothing. Mount plus `visibilitychange`, no interval: an app left open across local
- * midnight rolls over on the next resume, which is the first moment the state is looked at.
+ * Renders nothing. **The mount-plus-`visibilitychange` listener that used to live here is now
+ * `LocalDayProvider`'s** (BF-86): this was the app's only day-rollover signal and a second consumer
+ * needed it, so rather than a second copy of the same listener the mechanism moved up and this
+ * became its first subscriber. The behaviour is unchanged — an app left open across local midnight
+ * still rolls over on the next resume, which is the first moment the state is looked at.
  */
 export function WorkoutDayRollover() {
-  const tz = useUserTimezone()
+  const today = useLocalDay()
 
   useEffect(() => {
-    const check = () => {
-      if (document.visibilityState !== 'visible') return
-      const today = todayInTz(tz)
-      if (useWorkoutStore.getState().storedDate !== today) {
-        useWorkoutStore.getState().rolloverDay(today)
-      }
+    if (useWorkoutStore.getState().storedDate !== today) {
+      useWorkoutStore.getState().rolloverDay(today)
     }
-    check()
-    document.addEventListener('visibilitychange', check)
-    return () => document.removeEventListener('visibilitychange', check)
-  }, [tz])
+  }, [today])
 
   return null
 }

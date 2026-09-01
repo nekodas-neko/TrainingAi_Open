@@ -24,7 +24,7 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.417.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Version:** v1.417.1 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-09-01.
 
 **An account with a password could not change it (LB-40).** `EditProfileSheet` initialised

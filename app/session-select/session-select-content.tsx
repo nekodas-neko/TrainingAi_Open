@@ -3,6 +3,8 @@
 import { useEffect, useLayoutEffect, useRef, useState, useCallback, useMemo } from "react";
 import { savePreference } from '@/lib/user/preferences-sync'
 import { useUserTimezone } from "@/components/shell/user-timezone-provider";
+import { useLocalDay } from '@/components/shell/local-day-provider';
+import { isMorningCheckinPromptDone, markMorningCheckinPromptDone } from '@/app/session-select/morning-checkin-marker';
 import { useSearchParams } from "next/navigation";
 import { useTransitionRouter } from "@/lib/view-transition";
 import type { ProgramSession, Program, NextSessionRecommendation } from "@trainingai/shared/types/program";
@@ -100,19 +102,6 @@ function getGreeting(name: string, tz: string): string {
 }
 
 
-// First-open-of-day morning check-in prompt. Marker is date-stamped so it fires
-// once per day; set on save OR dismiss so a "not now" doesn't re-nag all day.
-const MORNING_CHECKIN_KEY = 'ta_morning_checkin';
-
-function isMorningCheckinPromptDone(tz: string): boolean {
-  if (typeof window === 'undefined') return true;
-  try { return localStorage.getItem(MORNING_CHECKIN_KEY) === todayInTz(tz); } catch { return true; }
-}
-function markMorningCheckinPromptDone(tz: string): void {
-  if (typeof window === 'undefined') return;
-  try { localStorage.setItem(MORNING_CHECKIN_KEY, todayInTz(tz)); } catch { /* ignore */ }
-}
-
 export default function SessionSelectContent({ userId, isAdmin }: { userId?: string; isAdmin?: boolean }) {
   const router = useTransitionRouter();
   // Q-112a: the weekly reminder deep-links straight to the recap instead of landing on bare Home.
@@ -149,6 +138,7 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
   const [workoutCardEpoch, setWorkoutCardEpoch] = useState(0);
   const [activeSessions, setActiveSessions] = useState<ProgramSession[]>([]);
   const tz = useUserTimezone();
+  const localDay = useLocalDay();
   // Bound once so the identity is stable for the children that take it as a prop.
   const dayKey = useCallback((daysAgo = 0) => dayKeyInTz(tz, daysAgo), [tz]);
   const [displayName, setDisplayName] = useState<string | null>(null);
@@ -767,7 +757,7 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
     return () => { cancelled = true; };
   }, [userId]);
 
-  useEffect(() => { loadTodayMood(); }, [loadTodayMood]);
+  useEffect(() => { loadTodayMood(); }, [loadTodayMood, localDay]);
 
   // The persistent shell re-shows this tab without remounting it — re-run the
   // mount refresh pass (same cachedFetch-backed reads a remount used to run).
@@ -780,7 +770,8 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
 
   // Prompt the morning check-in on the first app open of the day. Local store is
   // checked first so a check-in saved on another device (or before a reinstall)
-  // suppresses the prompt.
+  // suppresses the prompt. `localDay` is what re-offers it after midnight without a remount —
+  // see `local-day-provider.tsx` (BF-86); the marker is date-stamped, so re-running is idempotent.
   useEffect(() => {
     if (isMorningCheckinPromptDone(tz)) return;
     let cancelled = false;
@@ -796,7 +787,7 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
       setMorningCheckinOpen(true);
     })();
     return () => { cancelled = true; };
-  }, [userId, tz]);
+  }, [userId, tz, localDay]);
 
   useEffect(() => {
     cachedFetchToday<import('@/app/api/body-battery/route').BodyBatteryResponse>(
