@@ -6005,3 +6005,28 @@ reads an all-false style as "use them all".
 
 A finding that something is *not* broken earns its lines here exactly when the thing looks broken on
 sight, which this does.
+
+## 2026-09-01 — `docs/implementation-backlog.md` 14924 → 15034 (+110)
+
+`docs/owner-decisions-round2`. A full sweep of the eleven `Gate: owner` entries, put to the owner in
+two rounds. **Seven decisions came back and the queue now holds zero unanswered owner questions** —
+the remaining seven gates are a decision already made (`Q-1b`, `Q-149`), an action deferred to a
+later batch (`Q-11`, `Q-71`), an action accepted (`Q-4`), an entry the owner explicitly held
+(`Q-551`), or one whose own text forbids asking (`TN-16`).
+
+The growth is decisions and their reasoning, which is the expensive half to reconstruct:
+
+- **`Q-149` carries a new production measurement that falsifies two of its own premises** — the
+  chest strap is the dominant HR source (156 rows against the ring's 39, and 88% coverage against
+  54%), and the "~7 usable verdicts" figure was stale: there are **84**. With mean peak at 99 bpm,
+  the textbook 15 bpm bar fails **76%** of this owner's sets. That table is why the answer is "fit
+  it to the user" rather than "pick a smaller number", and it is what Tuning starts from.
+- **`Q-294` records four decided failure behaviours**, two signed by the owner and two defaulted,
+  labelled so a reader can tell them apart. The decision *was* the work; it becomes a `Reference:`
+  for Q-249's scenarios.
+- **`LA-50` and `Q-253` are declined**, and each keeps the measurement that argued it — the
+  Chromium-version gap and the Firebase/BrowserStack comparison — as `Reference:` so a future
+  session reads rather than re-derives.
+- **`Q-48` lost its gate without an owner answer**, because it never needed one: F3 and F7 are now
+  answered, F8 was fixed in its own PR, and what remains is planning work that had been invisible
+  behind a decision field for weeks.

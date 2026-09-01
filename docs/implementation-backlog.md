@@ -671,11 +671,19 @@ experiment, not an inference.
 ### [platform] LA-50 — pixel baselines need a CI-side job, because a session cannot generate one
 
 - **Lane:** A — `.github/workflows/` and `playwright.config.ts`.
-- **Gate:** owner — a baseline job has to **push commits from Actions**, which means granting the
-  workflow write permission to the repository. That is a decision about the blast radius of a
-  compromised action, not an implementation detail, and it is the first thing to settle. It also
-  inherited BF-91's queue position when that entry was split; the gate is what stops it heading the
-  work list on a priority it was never given.
+- **✅ DECLINED BY THE OWNER, 2026-09-01. Do not build this.** Asked whether to grant GitHub Actions
+  write permission to the repository so a job could push generated baselines, the owner said **no**.
+  The reasoning they were given, and which stands as the record:
+  - **A pixel baseline proves a screen *changed*, not that it is *correct*** — and it **cannot see
+    safe-area insets at all**, because the sandbox renders them as 0. That is this repo's most
+    persistent bug class (10+ regressions), so the check misses the failure it would be bought for.
+  - **The cheaper half already shipped.** BF-91 added measured layout assertions to the flow that
+    had none; **21 of 58 specs** now assert layout or computed style.
+  - So the trade was a wider repository write surface against a check that does not cover the real
+    risk. **Reversal cost is low** — the permission is one line in a workflow — so if unintended
+    visual drift ever becomes a live problem, re-file with the drift as evidence.
+- **Reference:** the Chromium-version measurement below is the durable value here. **Do not restart
+  this entry as work.**
 - **Added:** 2026-09-01 · split out of BF-91, whose recommendation this is the blocked half of.
 
 **Measured, not assumed.** `playwright.config.ts` runs the sandbox Chromium at a fixed path because
@@ -9166,7 +9174,9 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 ### [platform][app-shell] Q-294 — the failure cells whose intended behaviour is undefined
 
 - **Branch:** folded into Q-249's E2E scenario list — **no branch of its own**
-- **Gate:** owner
+- **Reference:** read by **Q-249** for its failure scenarios. **Not independent work** — and the
+  `Gate: owner` is removed 2026-09-01 because all four decisions it was waiting on are recorded
+  below.
 - **Plan:** none · **this is a note against Q-249, not independent work**
 - **Why the gate, added 2026-08-26:** this sat at READY #3 of Lane A's queue while its own body says
   *"Do not start this as a standalone item"*. It is not startable and it never was — each of the four
@@ -9181,17 +9191,32 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 - **Most failure modes are handled**, and much of `CLAUDE.md` exists because of them: poison-pill
   outbox quarantine, local-SQLite open-path recovery, cursor pagination, `pool.on('error')`,
   `reconcileSchema` as the post-partial-upgrade authority. Not restated.
-- **The cells where the *intended* behaviour is undefined:**
+- **✅ ALL FOUR CELLS ARE NOW DECIDED, 2026-09-01 — this entry's blocker is gone.** Two came from the
+  owner directly; two were defaulted by the Orchestrator as cheap-and-reversible, and are marked as
+  such so a reader can tell a signed decision from a sensible default.
 
-  | failure | state |
-  |---|---|
-  | JWT expires mid-workout | no recorded decision on whether the in-progress session survives |
-  | Service worker serves a stale shell after deploy | build-stamped cache name handles the cold case; the **in-session** case is undefined |
-  | Device clock skewed hours from the server | ingest tolerances exist; no user-visible signal |
-  | Gemini rate-limited during a prescription generate | undefined — does the workout proceed on last-known numbers? |
-- **What to do with this:** when **Q-249** (the E2E harness) is built, these four become scenarios.
-  Each needs a decision on intended behaviour *before* a test can assert anything, so the decision is
-  the work, not the test. Do not start this as a standalone item.
+  | failure | **decided behaviour** | who |
+  |---|---|---|
+  | JWT expires mid-workout | **The workout survives.** Set logs keep writing to the local store and queue in the outbox; the push happens after re-auth. | owner |
+  | Gemini rate-limited during a prescription generate | **Proceed on last-known numbers, and say so on screen.** Never block the workout; never present stale numbers as fresh. | owner |
+  | Service worker serves a stale shell in-session | **Do not hot-swap. Finish the session on the shell that is running, and apply the new one on next cold start.** | default |
+  | Device clock skewed hours from the server | **Ingest keeps its existing tolerances; add one visible line where the skew would change a date.** | default |
+
+- **Why the owner's two are right, so they are not re-litigated.** *Token expiry:* offline-first
+  already queues writes when the network is gone, so an expired token becomes one more reason the
+  push waits — **no new code path**. Losing a logged workout to a token clock is the worst outcome
+  available. *AI unavailable:* the free tier is ~1,500 requests/day, so an outage is a when rather
+  than an if, and blocking training on it is indefensible; showing the previous numbers **with their
+  provenance stated** matches the existing rule that no AI-reported value is displayed as fact.
+- **Why the two defaults went the way they did** — say so if you disagree, both are one-line
+  reversals. *Stale shell:* swapping the shell under a running workout is the mechanism behind the
+  "phantom state" class this repo keeps hitting; the build-stamped cache name already handles the
+  cold case, and deferring to next cold start costs a user nothing they can perceive. *Clock skew:*
+  a silent tolerance is how a set lands on yesterday and nobody finds out — but a modal for a
+  condition that is nearly always benign is worse than the bug, so it gets a line, not a dialog.
+- **What to do with this now:** these are **four E2E scenarios with stated expectations**, ready for
+  **Q-249** to assert. The decision *was* the work, and it is done — this entry no longer blocks
+  anything, and it is a `Reference:` for Q-249 rather than an item of its own.
 
 ### [sleep][devices] Q-274 — fragment "nights" reach the sleep score, and on two dates the fragment is the ONLY record
 
@@ -11458,7 +11483,18 @@ reason it took an hour is that there is no signal that would have answered it di
 
 ### [platform][app-shell] Q-253 — a real-hardware device-farm run, for the Samsung-specific rendering and safe-area rows
 
-- **Gate:** owner
+- **✅ DECLINED FOR NOW BY THE OWNER, 2026-09-01 — which is the outcome this entry was filed
+  expecting** (*"filed to be decided, possibly declined"*). Not withdrawn: the case for it is
+  unchanged and it revives the moment its prerequisite lands.
+- **Why it lost:** of the ~25 hardware-gated rows, **15–18 are BLE** — ring, strap, scale — and no
+  device farm gives an agent the owner's Ring 5 speaking our own re-keyed protocol. It closes a named
+  minority, never "device verification". And **its prerequisite `Q-250` is not built**: paying per
+  run before the free CI emulator tier has caught the Android-runtime failures is the wrong order.
+- **Re-open it when `Q-250` ships and its emulator run is stable** — at that point what remains
+  uncovered is exactly the Samsung-WebView-compositor and real-safe-area minority this buys, and the
+  question becomes worth its per-run cost.
+- **Reference:** the options comparison below (Firebase Test Lab vs BrowserStack App Live) is what a
+  future session should read rather than re-derive. **Not startable work.**
 - **Branch:** `feat/device-farm-smoke`
 - **Added:** 2026-08-14 · same owner ask
 - **This is the lowest-value item in the cluster and is filed to be decided, possibly declined.**
@@ -13395,14 +13431,22 @@ passes and the inventory is explicit rather than forgotten.
 
 ### [platform][app-shell] 🟠 Q-48 — roadmap gaps found by the 2026-08-02 native-convergence review
 
-- **Gate:** owner
+- **The `Gate: owner` was removed 2026-09-01 — nothing here is the owner's any more.** F1, F2, F3
+  and F7 are all answered (dates and quotes in the table below); F8 was fixed in this entry's own
+  PR. What is left is **F4** and **F5**, both planning passes, and **F6**, a sequencing line Q-49
+  overtook. Unassigned planning work is not an owner gate, and filing it as one kept three
+  perfectly startable planning tasks off every work list.
 - **Branch:** `docs/native-roadmap-corrections` (docs-only; each sub-item may spawn its own build entry)
 - **Review:** [`docs/reviews/2026-08-02-native-convergence-roadmap-review.md`](reviews/2026-08-02-native-convergence-roadmap-review.md)
 - **Added:** 2026-08-02 · **renumbered from Q-46**, which run-1 claimed the same day (#1003)
 - **F1/F6 are now actioned by Q-49 above** — the rest stand.
 - **Why here:** these are gaps in the *plan*, not the code, so each one costs a stage-sized mistake
   later rather than a bug now. Four of the eight findings are one-line edits and are already applied
-  (F8 drift). The four below need an owner decision or a short planning pass, and none has an owner.
+  (F8 drift). **Re-counted 2026-09-01: F3 and F7 are now answered by the owner, so what remains is
+  F4, F5 and F6 — and none of the three is an owner decision.** F4 (a table-residency matrix) and F5
+  (a parity harness before the sync rewrite) are **planning passes**; F6 is a one-line sequencing
+  edit that Q-49 has already overtaken. So this entry is **not owner-gated any more** — it is
+  unassigned planning work, which is a different thing and was hiding behind the same field.
 
 | Ref | Gap | Recommended edit |
 |---|---|---|
@@ -13412,7 +13456,7 @@ passes and the inventory is explicit rather than forgotten.
 | **F4** | Stage 1 is called "the spine" and defines no schema — 70 `pgTable` vs 37 local tables with no residency/ownership record. Stage 5 generates Room entities from it. Q-44 Phase 3's 22-table rename is unsequenced against it and must land *at* Stage 1 or never | Stage 1's deliverable becomes a table-by-table residency matrix (device/server/both, writer, retention tier, derived?) + the `oura_*` rename go/no-go |
 | **F5** | Stage 5 re-implements the subsystem with the worst incident history in the repo (#47/#74/#82) with no plan, no parity harness, an unowned native replacement for `scripts/check-push-mutations.js`, and a transitional *third* write path per domain | Stage 5 opens with a golden-vector parity harness driving both implementations; add the native one-write-path guard as a named task; add a "Stage 5 without Stage 6" off-ramp |
 | **F6** | Q-31/Q-32 gate on Q-1, which the owner deferred — so Stage 4 is transitively parked and nothing says so. The gate is a sequencing preference, not a technical dependency, and a Play Store listing does not require a public repo | State the deferral on Q-32; decide whether the Q-1 gate survives |
-| **F7** | Push is web-push/VAPID through the service worker with no FCM anywhere; `output: 'export'` already disables `next.config.ts` headers, and E6 (server-side scheduler) has never been built — nothing can notify a user who has not opened the app that day | Add push to Stage 2's exit criteria; add an FCM decision point at Stage 5/6 |
+| ~~**F7**~~ | ✅ **ANSWERED by the owner 2026-09-01: keep web-push, build the scheduler.** The transport already works once the app has been opened; what is missing is the **server-side scheduler (E6)** that decides when to send, and that is needed under *either* transport — so it is the half that cannot be wasted. **FCM is deferred, not rejected:** it is the right answer for a Play Store listing and for reaching a closed app reliably, but migrating first would mean a Capacitor plugin, a Firebase project, native config and a new APK *and still leave the scheduler unbuilt*. Build E6, learn whether notifications earn their place, then revisit FCM with that evidence. **The gap stands and is not fixed by this decision** — until E6 exists nothing can notify anyone on a day they have not opened the app. | Build E6 (server-side scheduler) on the existing web-push transport; keep the FCM decision point at Stage 5/6, now with a stated default of "revisit after E6" |
 
 **F8 (five drifted doc claims) is already fixed in the same PR as this entry** — do not re-file it.
 
@@ -13472,7 +13516,20 @@ passes and the inventory is explicit rather than forgotten.
 - **Scope:** the bearer-token client + an `apiUrl()` indirection so every fetch can target either
   origin. **Not** the workspace split, **not** `output: 'export'` — those are Q-1b.
 
-### [app-shell] ⛔ Q-1b — native ("Swift-like") feel: Phase 3 (bundle the shell into the APK) — measurement says drop it, the owner has not said so
+### [app-shell] Q-1b — native ("Swift-like") feel: Phase 3 (bundle the shell into the APK) — HELD by the owner, who has now seen the measurement
+
+> **⏸ HELD BY THE OWNER, 2026-09-01 — and this time with the evidence in front of them, which is
+> what the entry said was missing.** Shown the 472 ms / 439 ms / 1.5 s numbers below and asked
+> whether to drop it, the owner chose **keep it deferred as-is**. Same answer as 2026-08-02, but no
+> longer an uninformed one — **the contradiction this entry existed to resolve is resolved.**
+>
+> **Do not re-put this to the owner**, and do not build it, unless one of these changes: the app
+> starts *feeling* slow to open (a judgement no number replaces), or the Railway round trip stops
+> being optional — leaving Railway, or going offline-first-on-open, makes that 439 ms the whole
+> story rather than a third of it.
+>
+> The marker on this heading was downgraded from the no-entry sign at the same time: `next-item.js`
+> parks on that character, and the hold below is what keeps this out of the work list.
 
 - **Lane:** A
 - **Keep:** the two halves of this entry contradict each other and only the owner can resolve it.
@@ -13931,6 +13988,12 @@ Two independent findings, both low-urgency:
 > **⚑ Owner answered 2026-08-04: willing to wear the Polar H10 overnight for ground truth — *"yes but
 > not tonight."*** Still owner-gated, but the gate is now scheduling rather than consent.
 >
+> **⚑ ACCEPTED BY THE OWNER 2026-09-01 — they chose this off a list of four possible actions, so it
+> is committed rather than merely consented to.** Nothing is owed by anyone else until a night's data
+> exists. **When it lands, the next session's first job is to check whether it did:**
+> `SELECT count(*) FROM rr_intervals WHERE measured_at::time BETWEEN '00:00' AND '06:00'` — it read
+> **50** across the entire database on 2026-09-01, so any real movement is unmissable.
+>
 > **Surfaced 2026-09-01 on the owner's actual worklist** —
 > [`device-verification-queue.md`](device-verification-queue.md) — because a gate that reads
 > "owner decision" when the decision is already **yes** is invisible in the one place the owner
@@ -14154,7 +14217,50 @@ indefinitely.
 
 ### [heart-rate][workouts] Q-149 — is 15 bpm the right HRR bar for this user?
 
-- **Gate:** owner
+- **✅ THE OWNER GATE IS CLEARED, 2026-09-01 — and the answer is "fit it to me".** Owner: *"I mostly
+  wear the chest strap while training. Let's have it specific to the user."* So the bar is
+  **personalised, not re-picked as another constant**, and the measured `hrr1` requirement stays.
+- **Lane:** A to implement — but **Tuning proposes the fit and the owner signs the number first.**
+- **Gate:** owner — **and this is a DIFFERENT gate from the one cleared above, not a re-park.** The
+  owner settled the *direction* on 2026-09-01 (fit it to the user). What is still owed is a
+  signature on **the fitted number itself**, which cannot be asked for until Tuning has produced
+  one. Per CLAUDE.md, Tuning never ships a scoring change and this one **re-scores months of
+  history**, so Lane A must not take it straight off the READY list. The gate is what stops that.
+- **⚠ TWO PREMISES IN THIS ENTRY WERE WRONG, and production says so. Re-measured 2026-09-01 against
+  `claude_ro.set_hr_stats`.**
+  - **"The ring power-gates, so end-of-set HR is never chest-strap-grade" — the strap is in fact the
+    DOMINANT source, and has been since 2026-08-05.** By `source`: **`chest_strap` 156 rows**,
+    `ble` 39, `mixed` 4, and 598 older rows with no attribution (pre-2026-08-05). Strap coverage is
+    also far better — `coverage_ok` on **137 of 156 (88%)** against **21 of 39 (54%)** for the ring.
+    The owner's own statement matches the data.
+  - **"Coverage drops to ~7 verdicts" is a stale figure from 2026-08-08.** There are now **84
+    chest-strap rows carrying `drop_60s`**. That is enough to fit to, which is what makes the owner's
+    answer actionable rather than aspirational.
+- **The measurement Tuning starts from — and it explains why 15 was never right *for this user*:**
+
+  | | strap rows with `drop_60s`, n = 84 |
+  |---|---|
+  | median `drop_60s` | **8 bpm** |
+  | p25 · p75 | 2 · 14 |
+  | p10 | **−1** (heart rate still climbing a minute into rest) |
+  | min · max | −13 · 39 |
+  | **reach the 15 bpm bar** | **20 of 84 — 24%** |
+  | mean peak · mean trough | **99** · 79 bpm |
+
+  **So the textbook bar fails 76% of this owner's sets.** A verdict that fires on three-quarters of
+  sets carries almost no information. The cause is visible in the last row: **mean peak is 99 bpm**,
+  so 15 bpm is a ~15% drawdown here, where the textbook number assumes peaks of 150–180 and a much
+  smaller fraction. The bar was never wrong in the abstract — it was calibrated for a different
+  physiology.
+- **What Tuning owes before the owner signs** (CLAUDE.md: a proposal is incomplete until it states
+  how much history it moves): the fitted bar, the rule that produces it (a percentile of this user's
+  own distribution rather than a hand-picked integer, so it re-fits as data accrues), **and the count
+  of verdicts that flip** — at the median it is roughly 22 of 84, and every one is a historical
+  re-score.
+- **Do not simply set the constant to 8.** That repeats the original mistake with a friendlier
+  number: still one integer, still fixed, still needing re-picking whenever the source or the
+  owner's fitness changes. `set_hr_stats.source` has been populated since 2026-08-06 precisely so
+  the fit can be per-source.
 - **The shipped half is verified in source** (`hr-analysis.ts:94` — `adequate = hrr1 != null ?
   hrr1 >= ADEQUATE_HRR1_BPM : null`; the `bpmAtLog < 120` shortcut is gone, checked 2026-08-20).
   **What is left is the calibration question the fix deliberately left open:** 15 bpm of
@@ -14188,6 +14294,10 @@ indefinitely.
   has landed since the 2026-07-22 run — the Defect B fix prevents *new* gaps and does not close
   old ones. Admin → Tools → "Backfill per-set HR stats" is the button; only the owner can press it.
 - **Gate:** owner
+- **⚑ OFFERED AND NOT TAKEN, 2026-09-01.** Put to the owner alongside three other owner-only actions;
+  they took the Polar H10 night (Q-4) and left this one. **That is a scheduling answer, not a
+  refusal** — the entry is unchanged and still owed. Do not re-ask it on its own; fold it into the
+  next batch of owner actions so it costs one decision rather than a nag.
 
 > **⚑ 2026-08-05 — this now BLOCKS an analysis, which raises its value.** The
 > [data-analysis review](reviews/2026-08-05-data-analysis-opportunities.md) §4 B2 went looking for
