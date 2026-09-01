@@ -575,7 +575,6 @@ right"* question falls to the owner's eyes by default.
 - **Lane:** A — `lib/health/energy-balance-service.ts:227-265` and the two constants in
   `packages/shared/src/health/{energy-baseline,daily-energy}.ts`. **The copy is now Lane A's too, in
   this entry** — see the shipped-copy note below.
-- **Needs:** LB-43
 - **DECIDED 2026-09-01 — the owner approved the shift and asked for it to ship.** *"yes that sounds
   good lets ship that."* The `Gate: owner` this entry carried is **cleared**; the sign-off a scoring
   change needs has been given, against the blast radius restated below (74 of 124 days unchanged
@@ -643,20 +642,20 @@ currently earn nothing from stepping at all; mean 5,716, median bucket 2–4k.
   is the simpler one BF-87 was originally asked for: a single rate, ~34 kcal per 1,000 steps, from
   the first step. **The zero-state line disappears entirely** — there is no longer a case where
   movement has earned nothing while steps exist.
-- **⚠ THE MIRROR TEST CANNOT CATCH THIS, AND THAT IS THE TRAP.** BF-87 mirrored the constant into
-  `components/nutrition/movement-breakdown.ts` (`STEP_BASELINE = 3_000`) because importing
-  `daily-energy` into a client component 500s the Nutrition tab — LB-43 is that story. Its test
-  compares the mirror against the shared constant, so the two cannot drift **in value**. But this
-  entry does not necessarily change the value: `STEP_BASELINE` may keep sitting at 3,000 as *the
-  amount subtracted from the resting base* while the step term counts from zero. **The number stays
-  equal, the test stays green, and the copy silently becomes a lie.** A test that pins a value cannot
-  notice a change of meaning. So: rename it, or split it into the two things it is now
-  (`STEP_BASE_CREDIT` for the base subtraction, and nothing at all for a threshold that no longer
-  exists), and let the rename break every consumer on purpose.
-- **Sequencing: take LB-43 first, or take it inside this entry.** LB-43 moves the constants to a
-  dependency-free leaf so a client component can import them and the mirror can be deleted. Doing
-  this entry on top of the mirror means editing the number in two places under a test that only
-  checks they match — which is the shape above. LB-43 is Lane A as well, so there is no lane handoff.
+- **⚠ THE VALUE CAN STAY 3,000 WHILE ITS MEANING CHANGES, AND NOTHING WOULD CATCH THAT.** This entry
+  does not necessarily change the number: `STEP_BASELINE` may keep sitting at 3,000 as *the amount
+  subtracted from the resting base* while the step term counts from zero. Same value, every test
+  green, and the three copy sites above quietly become false. **A test that pins a value cannot
+  notice a change of meaning.** So rename it — `STEP_BASE_CREDIT` for the base subtraction, and
+  nothing at all for a threshold that no longer exists — and let the rename break every consumer on
+  purpose.
+- **LB-43 shipped first (#729) and made this easier, not harder.** The constants moved to the
+  dependency-free leaf (`packages/shared/src/health/energy-baseline`) and
+  `components/nutrition/movement-breakdown.ts` now **re-exports** it rather than carrying its own
+  copy. There is exactly **one** `STEP_BASELINE` again, so the rename above is a single edit with the
+  compiler finding every caller — which is the argument for a rename over an edit in place. The
+  earlier version of this entry warned about editing the number in two places under a test that only
+  checked they matched; that hazard is gone and the bullet is replaced rather than left to be obeyed.
 - **⚠ The subtraction is COMPUTED, never a constant — 102 is this owner's number, not the app's.**
   It is `stepKcal(STEP_BASELINE)` at the user's own age/weight/sex, so a lighter or heavier user
   gets a different figure. Hardcoding 102 silently mis-bases every other account, and this app now
@@ -685,6 +684,22 @@ currently earn nothing from stepping at all; mean 5,716, median bucket 2–4k.
 
 ### [platform][nutrition] LB-43 — a client component cannot import `daily-energy`, so a display constant is mirrored
 
+- **✅ FIXED 2026-09-01. The mirror is gone and `/nutrition` returns 200.** `STEP_BASELINE`,
+  `WALKING_CADENCE_SPM` and `STEPS_PER_KM` now live beside `SEDENTARY_MULTIPLIER` in the leaf
+  module; `daily-energy.ts` re-exports all four, so every server-side importer is untouched.
+- **⚑ The entry's file name was wrong, and the reason matters: THE LEAF MODULE ALREADY EXISTED.**
+  It proposed *"something like `packages/shared/src/health/energy-constants.ts`"* —
+  `energy-baseline.ts` already was that module, created for the **identical failure one node
+  builtin earlier** (Q-401: the same chain reaching `node:path`, breaking the same tab, through
+  `goal-recommendation` → `calorie-balance` → `calorie-zone-bar`). Adding a second leaf module for
+  one purpose is the drift the one-formula rule is about, so the constants moved into the existing
+  one and its doc now carries both incidents. **The lesson is in the module, not just here: this
+  chain has now broken the Nutrition tab twice, with a different builtin each time.**
+- **⚠ The drift test that guarded the mirror is now tautological, and was replaced rather than
+  kept.** `expect(STEP_BASELINE).toBe(SHARED_STEP_BASELINE)` cannot fail once one re-exports the
+  other, and a test that cannot fail is worse than none. What replaced it is the invariant nothing
+  else checks: **`energy-baseline.ts` imports nothing at all** — no `import`, no `require`. That is
+  the only thing keeping it client-importable, and `tsc` would say nothing if it changed.
 - **Lane:** A — the fix edits `packages/shared/**`. Lane B can only mirror the value, which is what
   BF-87 did.
 - **Added:** 2026-09-01 · found by BF-87, which needed `STEP_BASELINE` for **copy** and took the

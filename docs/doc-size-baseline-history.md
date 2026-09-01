@@ -5513,6 +5513,14 @@ would leave 30 on the old producer and make the column's provenance harder to re
 easier. BF-84's *fact or hint* was asked too and turned out to be **already answered** in a PR that
 merged while this branch was open — the answer matched, and nothing needed changing.
 
+## 2026-09-01 — `docs/implementation-backlog.md` → 15013, `projectOverview.md` → 8668 (LB-43)
+
+The backlog growth is LB-43 recording the two things its own text could not have known: the leaf
+module it proposed creating **already existed** (`energy-baseline.ts`, built for the identical
+failure one node builtin earlier), and the drift test guarding the mirror became **tautological**
+once the mirror was deleted, so it was replaced rather than kept. Both belong on the entry: the
+first stops the next reader creating the duplicate file, the second explains why a test changed
+shape in a PR that was supposed to only move constants.
 
 ## 2026-09-01 — `docs/implementation-backlog.md` 14977 → 14986 (BF-88 approved: gate cleared, order swapped, dependency inverted)
 
@@ -5622,3 +5630,19 @@ different origin.
 
 CLAUDE.md is corrected in place at no net line cost — the false half of the sentence is replaced by
 the measurement and the reason the rule still stands.
+
+## 2026-09-01 — `docs/implementation-backlog.md` (BF-88 loses a hazard that LB-43 removed)
+
+LB-43 shipped while this PR was open (#729): the energy constants moved to the dependency-free leaf
+and `movement-breakdown.ts` now re-exports rather than mirroring. BF-88's "the mirror test cannot
+catch this" bullet and its sequencing bullet both described a two-copy world that no longer exists,
+so they are **replaced, not annotated** — a warning about a file state that is gone is a warning that
+gets obeyed anyway.
+
+What survives is the part that got sharper: the value can stay at 3,000 while its *meaning* changes
+from a threshold to a base credit, and no test that pins a number can notice. With one constant left
+instead of two, the recommended rename is now a single edit the compiler propagates — which is the
+argument for renaming rather than editing in place, and it is stronger after LB-43 than before it.
+
+`Needs: LB-43` is dropped rather than left dangling; the protocol treats an absent target as shipped,
+but saying so beats making the next reader infer it.
