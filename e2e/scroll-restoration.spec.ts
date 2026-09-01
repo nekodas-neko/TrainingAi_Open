@@ -36,6 +36,12 @@ test.describe('scroll position survives a push and back', () => {
 
       await page.locator('a, button').filter({ hasText: linkText }).first().evaluate(el => (el as HTMLElement).click())
       await page.waitForTimeout(2500)
+      // Assert the setup actually happened. A spec that does not check its own precondition fails
+      // for the wrong reason and sends you debugging the feature instead of the fixture.
+      expect(new URL(page.url()).pathname, 'the tap did not navigate').not.toBe(route)
+      const saved = await page.evaluate(() => JSON.stringify(Object.fromEntries(
+        Object.keys(sessionStorage).filter(k => k.startsWith('ta_scroll:')).map(k => [k, sessionStorage.getItem(k)]))))
+      expect(saved, 'nothing was saved on unmount').toContain('ta_scroll:')
       await page.goBack()
 
       // `toPass` rather than a fixed wait: the restore fires when the content reaches the saved
