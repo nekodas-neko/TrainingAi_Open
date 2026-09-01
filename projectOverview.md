@@ -851,6 +851,16 @@ window, then the newest `history-*.md`. The 157 dated status notes this section 
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
+### [readiness][body][app-shell] 🔴 The Body Battery card explains a model the app doesn't implement — and nothing in the chain has shipped (TN-19, 2026-08-31)
+
+**Found, not fixed. Owner's second report on this pillar in six days** — *"any work being done for this? still not very usable"*, screenshot showing **Drained 0 · started at 55 · +0 charged · −113 drained**. [`review`](docs/reviews/2026-08-31-battery-explainer-promises-inert-mechanisms.md).
+- **Nothing has shipped.** Verified on `main` 2026-08-31: **TN-15, TN-18, TN-6a, TN-6 and TN-2 are all still queued**, no commit in the last 40 touches them, and they sit at **queue positions 75–83 of 235**. **Nothing is blocked** — TN-6a, TN-18 and TN-15 all carry owner sign-off. Priority is queue position, so **this is a prioritisation decision and only the owner can make it.**
+- **The new HOW IT MOVES card lists five mechanisms; four are inert or backwards.** `Deep sleep` is **structurally impossible** (`walkBodyBattery` filters to `tsMs >= wakeTime`); `Calm rest` produced **6 points across 8 days**; `Training` moves the end value **0.6 points** (Q-521); `Daytime stress` **rises on good days** (Q-507). Only `High heart rate` works, and it tracks **wear time**.
+- **⛔ Do not reword the card.** It is TN-15's specification rendered — softening it documents the defect instead of repairing it. **Ship TN-15 and the card becomes true.**
+- **Why it now reads worse than before the card existed:** the app states five **testable** claims beside the number, so a day with a workout and 3,643 HR samples still reading **+0 charged** is a *demonstrated* failure rather than a vague doubt. **A wrong number the app explains is worse than one it does not.**
+- **2026-08-26 is the cleanest Q-521 evidence in the data** — **0 HR samples → 0 drained, 0 charged, ending exactly at its anchor.** No wear, no change.
+- **Order that would change the screenshot:** TN-6a (lifts the mean anchor **64.8 → 76.8**) → TN-18 → TN-2 (the `+0 charged` line itself) → TN-15. **The first three are small and specified.**
+
 ### [readiness][devices] 🔴 TN-6a's temperature suspension covers the readiness ladder but not the deload banner (TN-18, 2026-08-31)
 
 **Found, not fixed.** Owner screenshot 06:43 Brisbane: *"Body temp elevated — rest or deload recommended"* while readiness scores temperature **80/100** — same night, same baseline object. [`review`](docs/reviews/2026-08-31-four-tiles-at-55.md).

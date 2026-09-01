@@ -5476,8 +5476,20 @@ the entry measured **4** buildable `Keep:` residues on one lane, and the classif
 across the queue — two of them written by the same session that then built the check. Also records
 the second drift found on the way (`check-backlog-pointers.js` carried its own `Keep:` regex and
 missed 11 entries `lib/keep.js` sees), so the next reader does not re-derive it.
+## 2026-08-31 — backlog raised to 14551 , `docs/agents/state/tuning.md` to 338 and `projectOverview.md` to 8524 (TN-19, the battery explainer)
 
-## 2026-09-01 — `projectOverview.md` → 8646, `docs/implementation-backlog.md` → 14944 (BF-87)
+One entry, from the owner's second report on this pillar in six days. The length is the five-row
+table, and the table is the entry: the card names five mechanisms and **four are inert or backwards**
+— `Deep sleep` cannot fire at all, `Calm rest` produced 6 points in 8 days, `Training` moves the
+number 0.6 points, `Daytime stress` rises on good days. Naming them one at a time is what stops the
+fix being "reword the card", which would document the defect rather than repair it.
+
+The entry also carries the distinction that makes it worth filing separately from TN-15: **a wrong
+number the app explains is worse than a wrong number it does not**, because the explanation converts
+a vague doubt into a demonstrated one. That is why this pillar reads as unusable rather than merely
+miscalibrated, and it is not something TN-15's own text says.
+
+## 2026-09-01 — `projectOverview.md` → 8656, `docs/implementation-backlog.md` → 14978 (BF-87)
 
 One shipped change recorded, and one entry filed. The status block is 12 lines because the 500 is
 the part a future session needs: **no client component had ever imported `daily-energy`**, so the
