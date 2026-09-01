@@ -5468,3 +5468,11 @@ rather than descriptive.
 BF-87's "do not lower STEP_BASELINE" is rewritten in the same pass. It was correct about the
 uncompensated version and would have made an implementer refuse the compensated one — a stale
 prohibition being obeyed is the failure mode that needed closing in the same diff that created it.
+
+## 2026-09-01 — `docs/implementation-backlog.md` → 14968 (BF-1's plan pointer)
+
+`lane-a/blood-panel-plan`. BF-1 gained the link to its implementation plan plus the findings that
+drove the schema — that `<0.2` is a result which is not a number, that reference ranges arrive in
+four shapes, and that the flag is commentary sitting on values inside their range, so out-of-range
+has to be derived. Those belong on the entry rather than only in the plan: the entry is what an
+implementer reads before deciding whether to start.

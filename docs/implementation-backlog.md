@@ -1073,6 +1073,19 @@ brings it back.** It fits every part of the report:
   schema from it: reference ranges arrive as `low-high`, one-sided (`<25`, `>59`) and absent; one
   result is `<0.2` and not a number; flags are free text carrying commentary; the date is a month.
 
+- **⚑ PLANNED 2026-09-01 — [`2026-09-01-blood-panel-import.md`](superpowers/plans/2026-09-01-blood-panel-import.md).**
+  The schema is written from the real 41-analyte panel rather than a description, which is what the
+  entry asked for. The shapes that drove it: `<0.2` is a result that is **not a number** (so
+  `value_num` + `value_operator`, never a number column alone), reference ranges come two-sided,
+  one-sided in both directions, and absent (so `ref_low`/`ref_high` both nullable), the date is a
+  **month** (so a precision column, or every panel lands on the 1st and lies), and flags are
+  commentary — *"Normal (athletic)"* on a creatinine inside its range — so **out-of-range is derived
+  from the bounds, never taken from the flag**.
+  The plan also answers the entry's own hardest question — *name two or three markers and what they
+  would change* — from the owner's numbers: **urea 9.2** against a protein target the app already
+  sets, **LDL 3.57 / non-HDL 3.93 high with triglycerides optimal** (a fat-*quality* signal, not a
+  quantity one), and **fasting insulin 4 / glucose 4.8**, whose value is negative — it removes a
+  hedge from the carbohydrate recommendation.
 - **Lane:** A — classified 2026-08-30 by CLAUDE.md's path rule (*touches storage or `app/api/**` → A; both halves → A, engine first*). New table plus extraction route is the engine and needs a migration, which only **A** may number; the upload/review surface follows as **B**.
 
 
