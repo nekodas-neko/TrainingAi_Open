@@ -6064,3 +6064,17 @@ gate had just failed — the push depends on the *commit's* exit status, never t
 already carried "never check a gate through a pipe"; this is the same mistake in different clothes,
 so it sits directly under it where the pattern is visible rather than as a separate entry that reads
 as unrelated.
+
+## 2026-09-01 — `projectOverview.md` → 8984 (BF-64)
+
++17 for an owner-reported bug, and the lines that earn it are the ones a short version would cut
+first. "The Full toggle works now" hides the mechanism — the override was applied inside an `else if`
+that only ran when the exercise was **not already deloaded**, so the pipeline could add a deload and
+never remove one. That asymmetry is the reusable part: a control can be fully wired and still be
+one-way, and the screen will not show you which.
+
+The other two kept lines are negatives. The override keys on an **explicit choice**, because keyed on
+`!deload` it would paint full weights for a frame and snap back — invisible in review, obvious on a
+phone. And the verification line says the fixture was **hand-built**, because the local seed has no
+`ai_dynamic` program and zero prescriptions: a session that renders this screen and sees a toggle has
+verified nothing, and would not know it.

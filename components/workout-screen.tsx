@@ -20,6 +20,8 @@ import {
   weightStepFor,
   defaultRpeFromPct,
   applyDeloadReverts,
+  deloadRevertNames,
+  deloadOverrideBlocked,
   exerciseSetCount,
   sessionContextLabel,
 } from "@/components/workout/utils";
@@ -218,7 +220,7 @@ export default function WorkoutScreen({ sessionType, userId, aiDeload, wasOverri
     signals: { exercises: Array<{ sessionExerciseId: string; name: string; current1rm: number | null; role: string; rm1Trend: 'up' | 'flat' | 'down'; rm1ChangeKg: number }> };
   } | null>(null);
   const [periodizationLoading, setPeriodizationLoading] = useState(false);
-  const { deload, setDeload, recommended: deloadRecommended, prescribedDeload } = useDeloadChoice(!!aiDeload, periodization?.state);
+  const { deload, setDeload, recommended: deloadRecommended, prescribedDeload, overrideFull } = useDeloadChoice(!!aiDeload, periodization?.state);
   // Guards the stale-session-id self-heal (below) against a loop: records the id we've already
   // tried to re-resolve after an AI 404, so we re-resolve each dead id at most once.
   const staleSessionIdRecoveredRef = useRef<string | null>(null);
@@ -234,9 +236,18 @@ export default function WorkoutScreen({ sessionType, userId, aiDeload, wasOverri
   // per-exercise; a mid-exercise app remount simply drops it (prep is a nice-to-have).
   const prepSecRef = useRef<number | null>(null);
   const sessionKey = programSessionId ?? sessionType.toLowerCase();
+  // BF-64: `deloadRevertNames` / `deloadOverrideBlocked` (workout/utils.ts) carry the rules and the
+  // reason 1RM accounting follows for free.
   const effectiveExercises = useMemo(
-    () => applyDeloadReverts(exercises, store.revertedDeloads[sessionKey] ?? []),
-    [exercises, store.revertedDeloads, sessionKey],
+    () => applyDeloadReverts(
+      exercises,
+      deloadRevertNames(exercises, store.revertedDeloads[sessionKey] ?? [], overrideFull),
+    ),
+    [exercises, store.revertedDeloads, sessionKey, overrideFull],
+  );
+  const overrideBlockedNames = useMemo(
+    () => deloadOverrideBlocked(exercises, overrideFull),
+    [exercises, overrideFull],
   );
   // Full set-by-set order for the session, honoring supersetGroup alternation.
   // AI-dynamic programs already arrive with supersetGroup nulled (workout-data
@@ -1631,6 +1642,8 @@ export default function WorkoutScreen({ sessionType, userId, aiDeload, wasOverri
         onDurationPresetChange={programPhaseMode === 'ai_dynamic' ? handleDurationPresetChange : undefined}
         deload={deload}
         deloadRecommended={deloadRecommended}
+        overrideFull={overrideFull}
+        overrideBlockedNames={overrideBlockedNames}
         onDeloadChange={programPhaseMode === 'ai_dynamic' ? setDeload : undefined}
         onPrescriptionStatusChange={(newStatus) => {
           if (periodization) {

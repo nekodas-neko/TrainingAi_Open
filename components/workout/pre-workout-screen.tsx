@@ -76,6 +76,10 @@ interface PreWorkoutScreenProps {
   onDeloadChange?: (next: boolean) => void;
   /** The readiness engine is asking for a deload today — labels the toggle rather than gating it. */
   deloadRecommended?: boolean;
+  /** BF-64: `Full` was explicitly chosen over a deload prescription, so the revert is running. */
+  overrideFull?: boolean;
+  /** Deloaded exercises the override could not revert — no `preDeload` block was recorded. */
+  overrideBlockedNames?: string[];
   onPrescriptionStatusChange?: (status: PrescriptionStatus) => void;
   onPhaseChanged?: () => void;
   onToggleDeloadRevert?: (name: string) => void;
@@ -103,6 +107,8 @@ export function PreWorkoutScreen({
   deload = false,
   onDeloadChange,
   deloadRecommended = false,
+  overrideFull = false,
+  overrideBlockedNames = [],
   onPrescriptionStatusChange,
   onPhaseChanged,
   onToggleDeloadRevert,
@@ -262,6 +268,8 @@ export function PreWorkoutScreen({
                 sessionId={periodization.state.programSessionId}
                 onStatusChange={onPrescriptionStatusChange ?? (() => {})}
                 onPhaseChanged={onPhaseChanged}
+                overrideFull={overrideFull}
+                overrideBlockedNames={overrideBlockedNames}
               />
               </>
             ) : null}
