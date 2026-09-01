@@ -39,6 +39,7 @@ import { DayCheckinScalesSchema, DayCheckinExtrasSchema, dayCheckinHasAnswers } 
 import { MoodFieldsSchema } from '@trainingai/shared/validation/mood-log'
 import { FoodItemPushSchema } from '@trainingai/shared/validation/food-item'
 import { sanitiseNutrition } from '@trainingai/shared/nutrition/scan-totals'
+import { normalizeMealGroupName } from '@trainingai/shared/nutrition/meal-group-name'
 import { OuraDailySummaryPushSchema, OuraDailyDerivedPushSchema } from '@trainingai/shared/validation/oura-summary'
 import { SessionRpeSchema } from '@trainingai/shared/validation/session-rpe'
 import {
@@ -3535,7 +3536,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   async searchFoodItems(userId: string, query: string) { return n.searchFoodItems(this.db, userId, query) }
   async listFoodLogs(userId: string, date: string) { return n.listFoodLogs(this.db, userId, date) }
   async createFoodLog(userId: string, data: Pick<FoodLog, 'date' | 'mealTypeId' | 'foodItemId' | 'quantityMultiplier'>
-    & { id?: string; loggedAt?: Date; savedMealId?: string | null; mealGroupId?: string | null }) { return n.createFoodLog(this.db, userId, data) }
+    & { id?: string; loggedAt?: Date; savedMealId?: string | null; mealGroupId?: string | null; mealGroupName?: string | null }) { return n.createFoodLog(this.db, userId, data) }
   async foodLogRefsValid(userId: string, mealTypeId: string, foodItemId: string, savedMealId?: string | null) { return n.foodLogRefsValid(this.db, userId, mealTypeId, foodItemId, savedMealId) }
   async updateFoodLog(id: string, userId: string, quantityMultiplier: number) { return n.updateFoodLog(this.db, id, userId, quantityMultiplier) }
   async deleteFoodLog(id: string, userId: string) { return n.deleteFoodLog(this.db, id, userId) }
@@ -3952,6 +3953,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
         // BF-39. In the delta because the diary groups on it: a device that pulled these rows
         // without the grouping would render the ingredients as siblings again.
         savedMealId: s.foodLogs.savedMealId, mealGroupId: s.foodLogs.mealGroupId,
+        mealGroupName: s.foodLogs.mealGroupName,
         loggedAt: s.foodLogs.loggedAt, updatedAt: s.foodLogs.updatedAt, deletedAt: s.foodLogs.deletedAt,
       }).from(s.foodLogs)
         .where(and(eq(s.foodLogs.userId, userId), gt(s.foodLogs.updatedAt, effectiveSince)))
@@ -4550,6 +4552,10 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
             // poison pill the outbox quarantines, costing the whole log over an optional field.
             const savedMealId = typeof p.savedMealId === 'string' ? p.savedMealId : null
             const mealGroupId = typeof p.mealGroupId === 'string' ? p.mealGroupId : null
+            // BF-97. Through the same helper the web route uses, so the two write paths cannot
+            // disagree about what a name is — and it truncates rather than rejecting, because a 4xx
+            // here quarantines the mutation and costs the whole log over a display string.
+            const mealGroupName = normalizeMealGroupName(p.mealGroupName)
             // Same ownership check as the web route, savedMealId included — the sibling-surface
             // rule: a check the route makes and the push branch skips is how the two drift.
             if (!(await this.foodLogRefsValid(userId, String(p.mealTypeId), String(p.foodItemId), savedMealId))) {
@@ -4565,6 +4571,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
               loggedAt:           p.loggedAt ? new Date(String(p.loggedAt)) : undefined,
               savedMealId,
               mealGroupId,
+              mealGroupName,
             })
           }
           processed++

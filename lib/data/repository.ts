@@ -865,7 +865,7 @@ export interface WorkoutRepository {
   getRequiredMealTypeLogDays(userId: string, from: string, to: string): Promise<{ requiredMealTypeCount: number; loggedByDay: { date: string; requiredMealTypesLogged: number }[] }>
   listRecentFoodItemsForMealType(userId: string, mealTypeId: string, limit: number): Promise<FoodItem[]>
   createFoodLog(userId: string, data: Pick<FoodLog, 'date' | 'mealTypeId' | 'foodItemId' | 'quantityMultiplier'>
-    & { id?: string; loggedAt?: Date; savedMealId?: string | null; mealGroupId?: string | null }): Promise<FoodLog>
+    & { id?: string; loggedAt?: Date; savedMealId?: string | null; mealGroupId?: string | null; mealGroupName?: string | null }): Promise<FoodLog>
   /** BF-39: `savedMealId` is optional and ownership-checked when present — a client-supplied row
    *  id gets the same treatment as the other two. */
   foodLogRefsValid(userId: string, mealTypeId: string, foodItemId: string, savedMealId?: string | null): Promise<boolean>

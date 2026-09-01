@@ -184,7 +184,11 @@ export function FoodLoggerSheet({ open, preselectedMealTypeId = null, onClose, o
       }
 
       const today = logDate ?? todayInTz(tz)
-      const logs = await logFoodEntries(entries, today, mealTypeId, userId, tz)
+      // BF-97. A multi-ingredient scan is the case BF-39 was filed for and did not cover: it has no
+      // saved meal to be named from, so the dish name the user just confirmed in the form is what
+      // heads its group. Single entries pass nothing — a group of one buys nothing.
+      const groupName = ingredients.length > 1 && !libraryItemId ? form.name.trim() : null
+      const logs = await logFoodEntries(entries, today, mealTypeId, userId, tz, groupName)
 
       hapticLight()
       toast.success(entries.length > 1 ? `${entries.length} items logged` : `${form.name} logged`)

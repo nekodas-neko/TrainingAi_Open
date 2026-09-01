@@ -5832,7 +5832,20 @@ moved, because "go back to the old way" invites reverting a layout that was neve
 the measured 12–22 character range that corrects the entry's own figure.
 
 
-## 2026-09-01 — `projectOverview.md` → 8864 (BF-82)
+## 2026-09-01 — `projectOverview.md` → 8860, `docs/implementation-backlog.md` → 14993 (BF-97, engine half)
+
+The backlog **shrank by 23 lines**: BF-97's entry carried the three-option decision and the argument
+for each, which is now made — the engine built option 1 — so what is left is the rendering rule and
+the two reasons a future session must not undo it.
+
+(Both numbers are re-derived after merging BF-96/BF-95's own baseline change — a size baseline is a
+measurement of the merged file, never a hunk to splice.)
+
+`projectOverview.md` grew 14 lines, and the lines that could not be cut are the two negatives: a
+group is minted **only** past one entry and **only** alongside a name. Both are what stop the fix
+from rebuilding the bug one layer down, and a status block that said "scans group now" would be
+wrong on top of being shorter — nothing renders differently until Lane B's half lands.
+## 2026-09-01 — `projectOverview.md` → 8878 (BF-82)
 
 +18 lines for one status block. It is long for one because a short version of it — "the More page is
 grouped now" — is the version that gets a future session to redo the argument. What the lines buy:
@@ -5845,3 +5858,6 @@ reading the original request and changing a control nobody asked to change.
 The backlog **shrank by 19 lines net** across the same PR — BF-82's entry lost the whole planning
 argument it had accumulated (it is in the plan document, which is where it belongs) and kept only its
 residue, and LB-44 was added.
+
+(8878 rather than the 8864 this branch measured before merging: BF-97's engine half landed 14 lines
+of its own in between. The number is a measurement of the merged file, never the sum of two hunks.)

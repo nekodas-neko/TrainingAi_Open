@@ -485,6 +485,7 @@ export async function pullDelta(userId: string, force = false, fullResync = fals
     // here would re-render a logged meal as loose ingredients after every pull.
     savedMealId:        r.savedMealId ? String(r.savedMealId) : null,
     mealGroupId:        r.mealGroupId ? String(r.mealGroupId) : null,
+    mealGroupName:      r.mealGroupName ? String(r.mealGroupName) : null,
     quantityMultiplier: Number(r.quantityMultiplier),
     loggedAt:           toIso(r.loggedAt),
     updatedAt:          toIso(r.updatedAt),
