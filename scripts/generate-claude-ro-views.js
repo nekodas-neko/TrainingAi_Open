@@ -133,6 +133,10 @@ const VIA = {
   // which is why it is written out here rather than left to the reader.
   meal_plan_variants:     t => `EXISTS (SELECT 1 FROM public.meal_plans mp WHERE mp.id = ${t}.meal_plan_id AND mp.user_id = $OWNER)`,
   meal_plan_meals:        t => `EXISTS (SELECT 1 FROM public.meal_plan_variants v JOIN public.meal_plans mp ON mp.id = v.meal_plan_id WHERE v.id = ${t}.variant_id AND mp.user_id = $OWNER)`,
+  // BF-1. Results hang off the panel and have no user of their own — the same shape as
+  // `saved_meal_items` and `dexa_scan_regions` above. Scoped through `blood_panels`, which is the
+  // only FK there is, so there is no second path to choose wrongly.
+  blood_analytes:         t => `EXISTS (SELECT 1 FROM public.blood_panels bp WHERE bp.id = ${t}.panel_id AND bp.user_id = $OWNER)`,
   users:                  t => `${t}.id = $OWNER`,
   friendships:            t => `${t}.requester_id = $OWNER OR ${t}.addressee_id = $OWNER`,
 }

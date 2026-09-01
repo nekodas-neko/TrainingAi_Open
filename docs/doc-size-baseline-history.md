@@ -5810,10 +5810,24 @@ passed with the fix reverted, and it was deleted rather than kept. A one-line "f
 macros" would read as verified work and is exactly what a future session must not believe. The
 backlog grew by BF-98's `Verify:` and open-question note plus BF-97's measured lane.
 
-## 2026-09-01 — `projectOverview.md` → 8834, `docs/implementation-backlog.md` → 15149 (BF-96, BF-95)
+## 2026-09-01 — `projectOverview.md` → 8834, `docs/implementation-backlog.md` → 15063 (BF-1, engine half)
+
+The backlog **shrank by 133 lines**: BF-1's entry had accumulated the whole planning argument —
+which analytes are in the report, why extraction rather than typing, the de-identification decision
+and its reasoning — and all of that is now either shipped or in the plan document. What replaces it
+is the three halves still owed, which is what a queue entry is for.
+
+`projectOverview.md` grew 12 lines for a status block, and the lines are the four shapes the schema
+had to survive rather than a summary of them. A shorter block would read as "blood panels are
+stored" and lose the part a future session needs: that the verdict is **derived from the bounds and
+never read off the provider's flag**, which is the one rule a well-meaning consumer would otherwise
+break by trusting the words the report prints.
+
+## 2026-09-01 — `projectOverview.md` → 8846, `docs/implementation-backlog.md` → 15016 (BF-96, BF-95)
 
 Two shipped fixes. Both entries **stayed** in the queue as `Keep:` plus `Verify: device` rather
 than being deleted, which is the new field's whole point — shipped-but-unseen is debt that should be
 countable, not finished work that vanishes. The status block leads with the fact that the pill never
 moved, because "go back to the old way" invites reverting a layout that was never changed, and with
 the measured 12–22 character range that corrects the entry's own figure.
+
