@@ -971,27 +971,27 @@ has already recorded that a bulk job bumps `updated_at` without rewriting a valu
 
 ### [app-shell] BF-82 — the More page is seven groups of one row each, with one of them behaving differently
 
-- **Keep:** the owner's answer to the *"sliders"* half, and one look on the S25. **The grouping and
-  interaction half SHIPPED** (`feat/bf-82-more-page-grouping`, 2026-09-01) — nine single-row groups
-  became two headings of four and three or four rows, `Feedback` moved to the bottom actions where
-  the other sheet-openers live, `Developer` on the Settings sub-screen lost its heading, and `Goals`
-  stopped wearing `MoreRowGroup`'s chrome. `components/more/__tests__/more-row-group-arity.test.ts`
-  is what stops the next one; it was mutation-verified against a restored `label="Developer"`.
+- **Keep:** one look on the S25. Nothing else is owed.
 - **Verify:** device.
 - **Lane:** B.
-- **The residue is a DECISION, not a build.** The owner wrote *"some items could be changed from
-  sliders to text or buttons etc."* — and there are no sliders on this screen. The Settings
-  sub-screen has five `Switch`es (calendar sync, day-review reminders, health alerts, rest chip, run
-  chip), all booleans, where a switch is correct; the controls that fit the description are the
-  **typed goal fields** in the Goals accordion (`71.5 kg · Today → [60] kg`). **A switch is right for
-  on/off and wrong for a value, and swapping either way for the wrong reason is a regression**, so
-  nothing changes until the owner names the control. If the answer is "change them", that is a NEW
-  entry per the split rule — do not build it under this one.
-- **Plan:** [`2026-08-31-more-page-grouping-and-interaction-model.md`](superpowers/plans/2026-08-31-more-page-grouping-and-interaction-model.md).
-  §3 and §4 are built. §2(c) is the residue above; §5's device line is the `Verify:`.
+- **✅ The grouping and interaction half SHIPPED** (`feat/bf-82-more-page-grouping`, PR #749,
+  2026-09-01, v1.419.0) — nine single-row groups became two headings of three or four rows,
+  `Feedback` moved to the bottom actions where the other sheet-openers live, `Developer` on the
+  Settings sub-screen lost its heading, and `Goals` stopped wearing `MoreRowGroup`'s chrome.
+  `components/more/__tests__/more-row-group-arity.test.ts` is what stops the next one; it was
+  mutation-verified against a restored `label="Developer"`.
+- **✅ The "sliders" question is ANSWERED and there is no control change to make.** Asked directly on
+  2026-09-01; the owner: *"yes it wasnt the sliders specifically; more that its messy and needs
+  re'organisation."* So the word was loose and the complaint was the layout, which is what shipped.
+  **Do not change any control on this screen off the original wording** — measured the same day,
+  More and its six sub-screens carry **no slider and no `<select>` at all**: the value controls are
+  typed number boxes, and activity level and fitness goal are already roving radio-button groups.
 - **Added:** 2026-08-31 · owner: *"a review of all the pages/chevrons in the More page and
   reorganize/group things together that can be. It's very messy and not very organized. Some items
   could be changed from sliders to text or buttons etc. All needs to be reviewed."*
+- **If the device look says it is still messy**, that is a new entry against what the owner points
+  at, not a re-opening of this one — the plan's §3/§4 are built and the parity is enumerated in #749.
+- **Plan:** [`2026-08-31-more-page-grouping-and-interaction-model.md`](superpowers/plans/2026-08-31-more-page-grouping-and-interaction-model.md).
 
 ### [readiness][devices] BF-81 — two producers write the daytime-stress metric and they disagree on every day measured
 

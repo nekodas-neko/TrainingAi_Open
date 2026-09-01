@@ -39,8 +39,10 @@ moved to the bottom actions where the other sheet-openers are; Goals presents as
 `more-row-group-arity.test.ts` fails a labelled group under two rows and was mutation-verified.
 **Destination parity was clicked, not read** — all seven rows still land where they did, admin and
 non-admin. **Not device-verified**, and the bottom actions row moved, so the clearance under Sign Out
-is unseen; BF-82 stays queued on `Verify: device` and on the owner’s *"sliders"* question, which is a
-decision the plan deliberately does not make — there are no sliders on the screen
+is unseen; BF-82 stays queued on `Verify: device` and nothing else. **The *"sliders"* half is
+answered — the word was loose:** *"yes it wasnt the sliders specifically; more that its messy and
+needs re'organisation."* No control changes, and none should be made off the original wording —
+More and its six sub-screens carry no slider and no `<select>` at all
 ([journal](docs/overview/entries/2026-09-01-feat-bf-82-more-page-grouping.md)).
 
 **The Home pill that "moved" had not moved, and a swipe marker nothing read (BF-96, BF-95).** Owner:

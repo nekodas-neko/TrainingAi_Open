@@ -5832,14 +5832,15 @@ moved, because "go back to the old way" invites reverting a layout that was neve
 the measured 12–22 character range that corrects the entry's own figure.
 
 
-## 2026-09-01 — `projectOverview.md` → 8862 (BF-82)
+## 2026-09-01 — `projectOverview.md` → 8864 (BF-82)
 
-+16 lines for one status block. It is long for one because a short version of it — "the More page is
++18 lines for one status block. It is long for one because a short version of it — "the More page is
 grouped now" — is the version that gets a future session to redo the argument. What the lines buy:
 the count is **nine single-row groups, not the seven the entry claimed**, because two of them were
 outside `profile-tab.tsx` and one was a hand-written copy of the primitive rather than a use of it;
-`label` became optional so a lone row can still be a card; and the *"sliders"* half is a decision
-that stays with the owner, which reads as an omission unless the reason is on the page.
+`label` became optional so a lone row can still be a card; and the *"sliders"* half is
+recorded as **answered** with the owner's own words, because the alternative is a future session
+reading the original request and changing a control nobody asked to change.
 
 The backlog **shrank by 19 lines net** across the same PR — BF-82's entry lost the whole planning
 argument it had accumulated (it is in the plan document, which is where it belongs) and kept only its

@@ -63,12 +63,20 @@ only place the result can be judged. Safe-area insets render as 0 in the sandbox
 actions row moved, so the spacing under Sign Out is unverified on-device. `BF-82` stays queued with
 `Verify: device`.
 
-## Left open, deliberately
+## The "sliders" question — asked and answered, no control change
 
-The owner's *"some items could be changed from sliders to text or buttons etc."* is a decision, not a
-build, and the plan explicitly does not make it: there are no sliders on this screen. The five
-Settings `Switch`es are booleans, where a switch is correct; the likely referent is the typed goal
-fields in the Goals accordion. Nothing changed. The question is with the owner and BF-82 keeps it.
+The plan deliberately made no control decision, because the owner's *"some items could be changed
+from sliders to text or buttons etc."* did not match the screen: there are no sliders on it. Asked
+directly on 2026-09-01, and the answer was that the word was loose — *"yes it wasnt the sliders
+specifically; more that its messy and needs re'organisation."* Which is what this PR does, so
+**nothing changes and no follow-up entry is owed.**
+
+Worth recording because it is what stops the next session acting on the original wording: More and
+its six sub-screens carry **no slider and no `<select>` anywhere**, measured by rendering each one
+and enumerating its controls. The value controls are typed number boxes (goal targets, birth year,
+height, the clinical figures); activity level and fitness goal are already roving radio-button
+groups; the five Settings toggles are `Switch`es over booleans, where a switch is correct. The one
+`input[range]` in the whole tree is the accent-colour hue picker, which is a hue and wants a slider.
 
 ## Filed while here
 
