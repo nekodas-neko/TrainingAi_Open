@@ -6152,3 +6152,14 @@ the first: the lesson from one did not generalise to the other.
 The line about the four spec failures all reporting `expected 840, received 0` is the one that saves
 the most time later. That is what makes a fixture problem indistinguishable from a regression, and
 the fix — a spec that asserts its own preconditions — is worth more than the feature it guards.
+
+## 2026-09-01 — `projectOverview.md` → 9031 (LB-46 closed, LB-47 filed)
+
++16 for a finding with no code change, which is the unusual case where that is clearly worth it: it
+records that a fix **already merged this session** may not do anything on the data it was built for.
+Burying that in a backlog entry and leaving the status block silent would be the version that costs
+something later.
+
+The measurement is the durable part — 5 prescriptions, 1 session deload, 2 per-exercise, **0 both** —
+because it is what distinguishes the two deload mechanisms, and conflating them is what produced both
+the false finding and the doubtful fix.
