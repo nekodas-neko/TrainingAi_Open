@@ -399,6 +399,60 @@ genuinely blocked work, and the queue reads a third worse than it is.
 - **Verification:** `next-item.js` PARKED shrinks by the eleven, they appear under a VERIFY heading,
   and the blocked count matches the entries that genuinely cannot start.
 
+### [platform] BF-93 — `error_events` does not prune, and every doc says it does
+
+- **Lane:** A — `lib/observability/request-error.ts` (or a new retention path), `lib/export/export-map.ts`,
+  and the CLAUDE.md session-start rule.
+- **Added:** 2026-09-01 · found while answering the owner's Sentry question; the two are connected,
+  see BF-92.
+
+**The claim is everywhere and the code is nowhere.** CLAUDE.md's session-start rule says
+*"it prunes at 30 days, so a fault that stops on its own vanishes unrecorded"*, and
+`lib/export/export-map.ts:167` repeats *"fault telemetry, pruned at 30 days"*. Searched 2026-09-01:
+**no `DELETE FROM error_events` outside tests, no `pg_cron`, no retention trigger** — the migrations
+touching the table only define `claude_ro` views. Corroborated by the data: the owner's oldest row is
+**2026-07-31, 32 days old**, past the retention that supposedly enforces 30.
+
+**Two consequences, opposite in direction, and the second is the expensive one.**
+
+1. **Every session has been reasoning about a data loss that is not happening.** The rule exists to
+   make sessions urgent about faults that "vanish unrecorded". Nothing vanishes. The urgency was
+   real; its stated cause was not.
+2. **The table grows without bound.** `error_events` is now **52 MB total** — the **second-largest
+   object in the database**, behind only `oura_raw_samples` — on **728 kB of index**, so it is
+   payload, not bloat: ~12 MB heap and ~39 MB TOAST of message text.
+
+**Why it is so large, and the half that is already fixed.** Q-539 found the mechanism and fixed it
+forward: `MESSAGE_MAX_CHARS` dropped **2,000 → 1,000** and an in-process dedupe
+(`shouldRecordRequestError`) was added. **The historical rows were never rewritten.** Measured across
+the owner's 6,102 rows on 2026-09-01: `avg(length(message)) = 1904` against `max = 2000` — i.e.
+essentially every stored row is still a full-width 2 kB message. **A forward-only cap does not
+reclaim anything**, which is the same shape as the Postgres-seed rule in CLAUDE.md: a fix that
+governs new writes never corrects drifted rows.
+
+- **Recommendation: decide the retention, then implement it or delete the claim — not neither.**
+  Either add a real prune (a `DELETE … WHERE created_at < now() - interval '30 days'` on an existing
+  request path, since there is no cron layer — see `docs/module-map.md` §0) **or** change the two
+  docs to say the table is retained indefinitely. What must not survive this entry is a documented
+  guarantee that nothing implements.
+- **A one-off `UPDATE … SET message = left(message, 1000)` reclaims most of the 39 MB** and is
+  independent of the retention decision. TOAST space returns to the table's free-space map on
+  rewrite; `VACUUM FULL` would return it to the filesystem but takes an exclusive lock, so measure
+  before reaching for it.
+- **⚠ Do not delete history to make a number look better.** These are the only record of faults that
+  reached nobody, and BF-92 may be about to reveal that Sentry has been the *other* half of that
+  record all along. Truncating over-long **messages** is safe; dropping **rows** is a retention
+  decision that belongs to the owner.
+- **This is a distinct contributor to BF-55's growth-off-trend and is not what BF-55 describes.**
+  BF-55 is about indexes outweighing heap (1.33× database-wide, 3.5× on `oura_heartrate`).
+  `error_events` is the inverse — 52 MB on 728 kB of index. Both are real; the fixes do not overlap.
+- **⚠ `n_live_tup` reads `1` for this table while the owner alone has 6,102 rows.** A live instance of
+  the CLAUDE.md warning that the row counters are stale estimates (`last_analyze` NULL everywhere).
+  The **size** columns used above are read from the filesystem and are exact; do not mix them.
+- **Verification:** the docs and the code agree about retention, whichever way it is decided;
+  `pg_total_relation_size('error_events')` falls materially after the message truncation; and a
+  freshly written row is ≤ 1,000 chars.
+
 ### [platform] BF-92 — Sentry is connected, correctly written, and receiving nothing from the client
 
 - **Lane:** A — `lib/security/csp.ts` and the Railway environment. No application code is wrong.
@@ -435,18 +489,41 @@ against it.**
   uncaught. A route that catches its own error and returns a 500 — the common shape — reaches
   `error_events` and never Sentry.
 
-- **Recommendation, in this order.** ① Add the ingest host to `connect-src` in `lib/security/csp.ts`
-  (the CSP is the half that is in the repo and reviewable). ② Set `NEXT_PUBLIC_SENTRY_DSN` in
-  Railway, and confirm `SENTRY_DSN` is set while there. ③ **Log one line at boot naming whether each
-  DSN was found** — the failure this entry describes is invisible precisely because an unset DSN is
-  indistinguishable from a quiet week. ④ Only then add the session-start read to CLAUDE.md, beside
-  `error_events`; pointing sessions at an empty dashboard teaches them to ignore it.
+**The owner states `SENTRY_DSN` IS set** (2026-09-01, asked directly). Recorded as his statement, not
+as a verification — the entry's whole point is that an unset DSN is invisible from outside, and that
+cuts both ways. If it is set, **server-side capture has been live all along and nobody has looked**:
+there may be weeks of real server errors in the dashboard right now, which is the cheapest thing to
+check here and needs no code.
+
+**Live proof of the CSP diagnosis, from the app's own data (2026-09-01).** `error_events` over the
+last 7 days holds 6 groups, **4 of them `source: client`** — from the same WebView, on the same
+device, at the same time Sentry's client SDK was recording nothing. The homegrown reporter POSTs
+**same-origin** to `/api/…`, which `connect-src 'self'` allows; Sentry POSTs **cross-origin**, which
+the header does not. Same app, same errors, different origin, opposite outcome. That is a natural
+experiment, not an inference.
+
+- **`withSentryConfig` is NOT wired into `next.config.ts`** — checked 2026-09-01. Two consequences:
+  **no source-map upload**, so a server stack trace in Sentry points at built output rather than the
+  file you would edit; and **no release tagging**, so an error cannot be attributed to a deploy.
+  Neither blocks capture, and neither is why the client is silent — but both make what does arrive
+  much less useful, which matters if the server side has been quietly collecting.
+- **⚠ Recommendation CHANGED: prefer `tunnelRoute` over adding the ingest host.** `withSentryConfig`'s
+  `tunnelRoute` (e.g. `/monitoring`) makes the browser POST events **same-origin**, through the app,
+  which `connect-src 'self'` **already allows** — no CSP edit, and it is immune to the next CSP change
+  breaking it silently again. One change then fixes three things at once: the client blackout, source
+  maps, and release tagging. Adding the ingest host to `connect-src` stays the fallback if tunnelling
+  is rejected for cost or latency.
+- **Recommendation, in this order.** ① Wire `withSentryConfig` with `tunnelRoute` (fallback: add the
+  ingest host to `connect-src` in `lib/security/csp.ts`). ② Set `NEXT_PUBLIC_SENTRY_DSN` in Railway.
+  ③ **Log one line at boot naming whether each DSN was found** — this failure is invisible precisely
+  because an unset DSN is indistinguishable from a quiet week. ④ Only then add the session-start read
+  to CLAUDE.md beside `error_events`; pointing sessions at an empty dashboard teaches them to ignore
+  it.
+- **⚠ Do not widen `connect-src` to a wildcard.** Add the specific host, or tunnel. The CSP file's
+  comments show it has been reasoned about host by host; a `*` would undo that for one vendor.
 - **⚠ Verify ② and ① on the DEVICE, not a browser.** The canonical runtime is a WebView loading the
   Railway URL, and its CSP behaviour is what matters. This is the entry's own `Gate: device` and it
   is the honest kind — a real check that cannot be automated, not verification debt.
-- **⚠ Do not widen `connect-src` to a wildcard to make this work.** Add the specific ingest host.
-  The CSP file's existing comments show it has been reasoned about host by host; a `*` here would
-  undo that for one vendor's convenience.
 - **Do not treat this as a reason to distrust the integration.** `beforeSend: scrubEvent`,
   `sendDefaultPii: false`, `tracesSampleRate: 0` and no replay are all deliberate and all correct for
   a health app. The code is right; the environment and one header are not.
@@ -498,7 +575,6 @@ right"* question falls to the owner's eyes by default.
 - **Lane:** A — `lib/health/energy-balance-service.ts:227-265` and the two constants in
   `packages/shared/src/health/{energy-baseline,daily-energy}.ts`. **The copy is now Lane A's too, in
   this entry** — see the shipped-copy note below.
-- **Needs:** LB-43
 - **DECIDED 2026-09-01 — the owner approved the shift and asked for it to ship.** *"yes that sounds
   good lets ship that."* The `Gate: owner` this entry carried is **cleared**; the sign-off a scoring
   change needs has been given, against the blast radius restated below (74 of 124 days unchanged
@@ -566,20 +642,20 @@ currently earn nothing from stepping at all; mean 5,716, median bucket 2–4k.
   is the simpler one BF-87 was originally asked for: a single rate, ~34 kcal per 1,000 steps, from
   the first step. **The zero-state line disappears entirely** — there is no longer a case where
   movement has earned nothing while steps exist.
-- **⚠ THE MIRROR TEST CANNOT CATCH THIS, AND THAT IS THE TRAP.** BF-87 mirrored the constant into
-  `components/nutrition/movement-breakdown.ts` (`STEP_BASELINE = 3_000`) because importing
-  `daily-energy` into a client component 500s the Nutrition tab — LB-43 is that story. Its test
-  compares the mirror against the shared constant, so the two cannot drift **in value**. But this
-  entry does not necessarily change the value: `STEP_BASELINE` may keep sitting at 3,000 as *the
-  amount subtracted from the resting base* while the step term counts from zero. **The number stays
-  equal, the test stays green, and the copy silently becomes a lie.** A test that pins a value cannot
-  notice a change of meaning. So: rename it, or split it into the two things it is now
-  (`STEP_BASE_CREDIT` for the base subtraction, and nothing at all for a threshold that no longer
-  exists), and let the rename break every consumer on purpose.
-- **Sequencing: take LB-43 first, or take it inside this entry.** LB-43 moves the constants to a
-  dependency-free leaf so a client component can import them and the mirror can be deleted. Doing
-  this entry on top of the mirror means editing the number in two places under a test that only
-  checks they match — which is the shape above. LB-43 is Lane A as well, so there is no lane handoff.
+- **⚠ THE VALUE CAN STAY 3,000 WHILE ITS MEANING CHANGES, AND NOTHING WOULD CATCH THAT.** This entry
+  does not necessarily change the number: `STEP_BASELINE` may keep sitting at 3,000 as *the amount
+  subtracted from the resting base* while the step term counts from zero. Same value, every test
+  green, and the three copy sites above quietly become false. **A test that pins a value cannot
+  notice a change of meaning.** So rename it — `STEP_BASE_CREDIT` for the base subtraction, and
+  nothing at all for a threshold that no longer exists — and let the rename break every consumer on
+  purpose.
+- **LB-43 shipped first (#729) and made this easier, not harder.** The constants moved to the
+  dependency-free leaf (`packages/shared/src/health/energy-baseline`) and
+  `components/nutrition/movement-breakdown.ts` now **re-exports** it rather than carrying its own
+  copy. There is exactly **one** `STEP_BASELINE` again, so the rename above is a single edit with the
+  compiler finding every caller — which is the argument for a rename over an edit in place. The
+  earlier version of this entry warned about editing the number in two places under a test that only
+  checked they matched; that hazard is gone and the bullet is replaced rather than left to be obeyed.
 - **⚠ The subtraction is COMPUTED, never a constant — 102 is this owner's number, not the app's.**
   It is `stepKcal(STEP_BASELINE)` at the user's own age/weight/sex, so a lighter or heavier user
   gets a different figure. Hardcoding 102 silently mis-bases every other account, and this app now
