@@ -47,14 +47,34 @@ const RESTORE_WINDOW_MS = 15_000
 /** Below this, restoring is indistinguishable from not bothering, and the entry is noise. */
 const MIN_OFFSET_PX = 40
 
-function take(key: string): number | null {
+/**
+ * Read the saved offset **without consuming it**.
+ *
+ * Consuming on read was the first design and StrictMode ate it, in a shape worth spelling out
+ * because it is not the obvious one. React runs effect → cleanup → effect in dev. Pass one took the
+ * value, found the container still too short to hold it, and waited. Pass one's *cleanup* then wrote
+ * the current offset — 0, since nothing had been restored yet — over the pending target. Pass two,
+ * the one that survives, read 0, discarded it as below the floor, and never restored anything. The
+ * trace that caught it, from a cold-server harness run:
+ *
+ *     [SR] mount /more target 1051 gap 766   <- pass 1 takes 1051, waits for the content to grow
+ *     [SR] save  /more 0                     <- pass 1's cleanup overwrites it
+ *     [SR] mount /more target null gap 766   <- pass 2 finds nothing
+ *
+ * So the entry is cleared when the restore actually lands, and a cleanup with nothing to save leaves
+ * a pending target alone.
+ */
+function peek(key: string): number | null {
   try {
     const raw = sessionStorage.getItem(KEY_PREFIX + key)
     if (raw == null) return null
-    sessionStorage.removeItem(KEY_PREFIX + key)
     const n = Number(raw)
     return Number.isFinite(n) && n >= MIN_OFFSET_PX ? n : null
   } catch { return null }
+}
+
+function clear(key: string) {
+  try { sessionStorage.removeItem(KEY_PREFIX + key) } catch { /* private mode */ }
 }
 
 export function useScrollRestoration(ref: RefObject<HTMLElement | null>, keySuffix?: string) {
@@ -67,7 +87,7 @@ export function useScrollRestoration(ref: RefObject<HTMLElement | null>, keySuff
     const el = ref.current
     if (!el) return
 
-    const target = take(key)
+    const target = peek(key)
     let done = target == null
     let observer: ResizeObserver | null = null
     let timer: ReturnType<typeof setTimeout> | null = null
@@ -82,11 +102,15 @@ export function useScrollRestoration(ref: RefObject<HTMLElement | null>, keySuff
       // keeps arriving above it, and the browser's scroll anchoring pushes the offset down to keep
       // the anchored element still. Which is the right instinct in general and wrong here — we are
       // trying to hold a position the anchoring does not know about.
+      const land = (to: number) => {
+        el.scrollTop = to
+        lastTop.current = to
+        clear(key)
+      }
       const attempt = () => {
         if (done) return
         if (el.scrollHeight - el.clientHeight < target) return
-        el.scrollTop = target
-        lastTop.current = target
+        land(target)
       }
       attempt()
       observer = new ResizeObserver(attempt)
@@ -94,7 +118,19 @@ export function useScrollRestoration(ref: RefObject<HTMLElement | null>, keySuff
       for (const child of Array.from(el.children)) observer.observe(child)
       // Give up rather than hold forever: past this the user has moved on, and a jump would be
       // worse than starting at the top.
-      timer = setTimeout(() => { done = true; observer?.disconnect() }, RESTORE_WINDOW_MS)
+      timer = setTimeout(() => {
+        // **Land as close as the page allows rather than giving up.** A screen can legitimately come
+        // back shorter than it was — a card that has not re-fetched, a list that renders fewer rows
+        // — and abandoning the restore then drops the user at the top, which is the bug. Measured:
+        // `target 1051` against a container whose scrollable range was 766.
+        if (!done) {
+          const gap = el.scrollHeight - el.clientHeight
+          if (gap >= MIN_OFFSET_PX) land(Math.min(target, gap))
+          else clear(key)
+        }
+        done = true
+        observer?.disconnect()
+      }, RESTORE_WINDOW_MS)
     }
 
     // **The offset is tracked while scrolling, not read on unmount.** Reading `el.scrollTop` in the
@@ -128,11 +164,15 @@ export function useScrollRestoration(ref: RefObject<HTMLElement | null>, keySuff
       for (const type of ['wheel', 'touchstart', 'keydown'] as const) el.removeEventListener(type, stop)
       observer?.disconnect()
       if (timer) clearTimeout(timer)
-      try {
-        const top = Math.round(lastTop.current)
-        if (top >= MIN_OFFSET_PX) sessionStorage.setItem(KEY_PREFIX + key, String(top))
-        else sessionStorage.removeItem(KEY_PREFIX + key)
-      } catch { /* private mode, or storage full — a lost offset is not worth throwing over */ }
+      const top = Math.round(lastTop.current)
+      if (top >= MIN_OFFSET_PX) {
+        try { sessionStorage.setItem(KEY_PREFIX + key, String(top)) } catch { /* private mode */ }
+      } else if (target == null) {
+        // Nothing to save AND nothing pending: the screen was never scrolled, so drop any stale
+        // entry. When a restore IS pending and has not landed, leave it — writing 0 over it is
+        // exactly what StrictMode's first cleanup did, and it is why nothing ever restored.
+        clear(key)
+      }
     }
   }, [ref, key])
 }

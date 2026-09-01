@@ -6110,3 +6110,15 @@ failure mode from a wrong number, and it is the one a future session will not th
 Two negatives are kept for the same reason as always: the split is in the component and **not** in
 `budgetProvenance` (shared, and one combined number is correct for a caller that wants one), and
 neither the `Math.max` floor nor the goal maths was touched — both look like the bug and are not.
+
+## 2026-09-01 — `projectOverview.md` → 9015 (BF-100)
+
++16, and unusually the count of traps is the payload rather than a detail. Ten defects — six in the
+hook, four in the spec — every one of which produced code that runs, does what it says, and achieves
+nothing. Two were StrictMode's double-invoked effect in *different* shapes (a consumed `popstate`
+flag; a cleanup writing 0 over a pending target), which is the reason the second one cost as much as
+the first: the lesson from one did not generalise to the other.
+
+The line about the four spec failures all reporting `expected 840, received 0` is the one that saves
+the most time later. That is what makes a fixture problem indistinguishable from a regression, and
+the fix — a spec that asserts its own preconditions — is worth more than the feature it guards.

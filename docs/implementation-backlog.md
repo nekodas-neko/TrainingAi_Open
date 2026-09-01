@@ -421,30 +421,34 @@ below threshold and left in place for next time.
   cache and a warm one; and that reaching the same screen forward still starts at the top.
 - **✅ SHIPPED** (`feat/bf-100-scroll-restoration`, 2026-09-01).
   `lib/hooks/use-scroll-restoration.ts`, called once from `pull-to-sync.tsx` so every screen using
-  the shell inherits it instead of 62 separate fixes. Measured end to end: `/more` scrolled to 840 →
-  push to `/more/details` → `ta_scroll:/more = 840` saved → back → **840 restored, exactly**.
-- **⚠ A PREVIOUS VERSION OF THIS ENTRY CLAIMED TAB-TO-TAB WAS BROKEN. That was wrong and is
-  retracted.** Navigating `/health` → `/nutrition` and back is not affected at all: the tab shell
-  keeps every tab screen mounted, so the container holds its own `scrollTop` with no help —
-  **measured**, with Health's container still reading 840 while the URL was `/nutrition`. The
-  "evidence" for the retracted claim was a red e2e run whose real cause was `page.goBack()` landing
-  on **`about:blank`** after a bottom-nav Link click, plus a misreading of instrumentation: the
-  `[SR] mount /nutrition#…` lines are the same live component re-keying, which is what a
-  `usePathname()` key does on a screen that does not unmount, and is harmless.
-- **⚠ Four implementation traps are paid for and written into the hook's comments. Do not
-  re-derive them:** (1) gating the restore on a `popstate` flag breaks under StrictMode, whose
-  double-invoked effect consumes it; (2) reading `el.scrollTop` in the cleanup saves **0**, because
-  React has already detached the node — track it from a `scroll` listener instead; (3) setting the
-  offset once lands **144–231 px past it**, because content keeps arriving above and scroll anchoring
-  pushes it down, so it must be re-asserted; (4) deciding the user has taken over by comparing the
-  offset to what you set treats that same settling as a finger and yields every time — takeover is an
-  **input event** (`wheel`/`touchstart`/`keydown`).
-- **⚠ And four spec traps, which cost more than the code did.** All four reported
+  the shell inherits it rather than 62 separate fixes. `e2e/scroll-restoration.spec.ts` is **green**
+  against a cold harness server.
+- **⚠ An earlier version of this entry claimed tab-to-tab was broken. Retracted.** A tab-to-tab move
+  loses nothing: the shell keeps every tab screen mounted, so the container holds its own `scrollTop`
+  unaided — measured, with Health's container still reading 840 while the URL was `/nutrition`. The
+  "evidence" was a red run whose real cause was `page.goBack()` landing on **`about:blank`** after a
+  bottom-nav Link click.
+- **⚠ SIX implementation traps are paid for and written into the hook. Do not re-derive them:**
+  (1) gating the restore on a `popstate` flag breaks under StrictMode, whose double-invoked effect
+  consumes it; (2) reading `el.scrollTop` in the cleanup saves **0**, because React has already
+  detached the node — track it from a `scroll` listener; (3) setting the offset once lands
+  **144–231 px past it**, because content keeps arriving above and scroll anchoring pushes it down,
+  so it must be re-asserted; (4) deciding the user has taken over by comparing the offset to what you
+  set treats that settling as a finger and yields every time — takeover is an **input event**;
+  (5) **consuming the saved value on read** is eaten by StrictMode a second way — pass one takes it,
+  finds the container too short, waits; pass one's cleanup writes 0 over the pending target; pass two
+  reads 0 and discards it. Read without consuming; clear when the restore lands; and never write 0
+  over a target that has not landed. (6) A screen can come back **shorter** than it was, so the
+  window must land at `min(target, available)` rather than abandon the restore.
+- **⚠ And four SPEC traps, which cost more than the code did.** All four reported
   `expected 840, received 0`, identical to a broken feature: text-matching *Sleep* hits a card that
   opens a **sheet**; `Sleep details →` does too; `a[href^="/health/"]` matches nothing, because these
-  screens navigate from `router.push` **buttons**; and driving the push through the bottom nav makes
-  `goBack()` land on `about:blank`. `/more` → *Profile details* → back is the verified path.
-  **The spec's precondition assertions are what separate these from a regression — keep them.**
+  screens navigate from `router.push` **buttons**; the bottom nav makes `goBack()` land on
+  `about:blank`. **`/more` → *Profile details* → back is the verified path**, and the spec's
+  precondition assertions are what separate a fixture problem from a regression — keep them.
+- **The timer was NOT the cause of the cold-server failure**, though it looked like it twice. Raised
+  to 120 s as a controlled experiment: still red. That is what forced the instrumented run that found
+  trap (5).
 - **Added:** 2026-09-01 · owner: *"when I scroll down to a button; then click on it and it takes me
   to a new page; when I press back I want to go back to that page at the same scroll level I was at.
   It usually starts me at the top of the page. This is on many pages if not all pages."*
