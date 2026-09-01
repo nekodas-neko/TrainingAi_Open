@@ -5379,3 +5379,8 @@ broken link, which is how the first sweep broke 48 of them.
 Nothing was banked. The alternative to raising was leaving a shipped feature unrecorded in the file
 every session reads first, which is the failure the ratchet is not for.
 
+## 2026-09-01 — `docs/implementation-backlog.md` → 14832, `projectOverview.md` → 8619
+
+`lane-a/deload-temp-gate` (TN-18), re-derived after merging a `main` that had moved five times while
+the branch was open. Both numbers are the merged files counted, not a spliced arithmetic — which is
+the only way to get this right when the other side is also growing.
