@@ -1,6 +1,6 @@
 # 2026-09-01 — the personal details are one screen, and one writer
 
-**Branch:** `feat/bf-79-personal-details` · **Entry:** BF-79 · **Lane:** B
+**Branch:** `feat/bf-79-personal-details` · **Entry:** BF-79 · **Lane:** B · **Version:** v1.416.0
 
 ## The request
 
@@ -83,3 +83,34 @@ contract requires.
 **Not exercised: the device.** The screen is web-verified only — safe-area clearance under
 `MoreSubScreen`'s floored padding, the tap targets on the sex row, and the two measurement buttons at
 S25 width are all unchecked on hardware.
+
+## The compaction sweep rode along, because the ceiling made it blocking
+
+Adding this entry took `docs/overview/entries/` to **251**, one over its 250 total ceiling, and that
+is a `check-doc-index-size` **failure** rather than the note it prints at the 20-file chore
+threshold. So the sweep the check has been asking for since 20 happened here rather than waiting for
+an Orchestrator pass: the **22 oldest unlinked** entries folded into
+`docs/overview/history-2026-08-30.md` (110 KB → 184 KB, still under the ~250 KB rule), leaving
+**229 total, 21 foldable**.
+
+**Only unlinked entries were folded**, per the rule the first sweep learned the hard way — a durable
+doc citing a folded path is a broken link, and 48 of them once broke at once, several inside another
+lane's baton. Every relative link in a folded body loses exactly one level (`](../../x)` → `](../x)`,
+`](../x)` → `](x)`), and a link to a sibling entry that this same sweep was folding is re-pointed at
+the history file rather than left dangling. `check-doc-links` passes on 933 files.
+
+## Three merges, and each conflict was a different shape
+
+`main` moved three times while this was in CI (#712/#710, #714/#715, #713/#716), and the resolutions
+are worth recording because the repo's rules disagree with each other by file:
+
+- **`docs/implementation-backlog.md`** — twice a pure **two-additions** conflict (my LB-40/41/42
+  against BF-87), so both sides were kept. The standing "a backlog conflict is two deletions" rule is
+  a common case, not the rule; read the headings.
+- **`docs/doc-size-baseline-history.md`** — append-only, so both sides kept, main's first.
+- **`docs/doc-size/*.size`** — the one genuine disagreement, twice. Two PRs raising the *same*
+  document do not have a mergeable answer, and neither side was right: `projectOverview.md`'s
+  baseline was **8593** on this branch and **8586** on main (main had *shrunk* it), with the merged
+  file needing **8606**. Recomputed from the merged document each time, never picked.
+- **`package.json` / `changelog.ts`** — rebuilt from `git show origin/main:…`, never spliced. The
+  version moved v1.413.3 → v1.414.2 → v1.415.0 → **v1.416.0** as other PRs claimed each one.

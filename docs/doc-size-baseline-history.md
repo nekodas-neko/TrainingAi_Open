@@ -18,6 +18,23 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
+## 2026-09-01 — `docs/implementation-backlog.md` 14506 → 14521 (BF-55's owner gate cleared)
+
+Fifteen lines recording the owner's approval to drop `oura_heartrate_user_updated`, and the
+re-verification it was conditioned on — *"if we are not using it and you are sure its reversible"*.
+Both conditions were checked against production rather than taken from the entry's 2026-08-30 table,
+which is the point of the length: `idx_scan` and `idx_tup_read` are still 0 while the sibling index
+on the same table shows 40,195 scans, and `getOuraTimeseriesDelta` has no caller in any of the three
+places it is defined.
+
+**The check caught a real mistake while this was written, and it is worth recording.** The cleared
+gate was first written as a struck-through `~~**Gate: owner**~~` at the head of its bullet, and
+`check-backlog-pointers.js` failed it: a `Gate:` in field position is read as a field whatever
+decoration is around it, so the strike-through would have left the entry parked while reading as
+cleared. The field is now removed and the clearance narrated in prose that does not begin with the
+word. That is the inverse of LB-18's lesson — there a cleared gate was narrated but never struck;
+here striking it in place would have been just as wrong.
+
 ## 2026-08-26 — `docs/implementation-backlog.md` 11882 → 11903 (Q-406 blocked at `Gate: owner`)
 
 Q-406's warning-row decision was taken to be built and turned out not to be buildable. Option A moves
@@ -5199,6 +5216,68 @@ none of that entry's three levers touch and which the file's own header tells se
 instance of what the note above describes, raised rather than hidden. Trimming it is Orchestrator's
 sweep, not a native-fix PR's.
 
+## 2026-08-31 — `docs/implementation-backlog.md` 14528 → 14730, `projectOverview.md` 8572 → 8586
+
+`lane-a/coach-nutrition-scope` (LA-47 piece 2). The backlog growth is LA-47 recording that its own
+proposed lane split for the plan widget **does not compile** — a new `CoachWidgetSchema` member is
+a type error until `widget-registry.tsx` handles it, and a branch rendering `null` wedges the
+thread — together with the settled widget design, so whoever pairs on it does not re-derive it.
+Cheaper here than a second entry. Re-derived twice while the branch was open, in both directions:
+LB-12 and BF-85 landing on `main` took more lines away than LA-47 added, and BF-86 then put more
+back. Which is the argument for re-deriving from the merged file rather than splicing a number.
+
+`projectOverview.md` is again the Current Status blurb, which is the growth the note added to Q-220
+earlier today describes. Third raise of the evening from the same cause; the retention rule is
+Orchestrator's sweep.
+## 2026-09-01 — `docs/implementation-backlog.md` 14528 → 14507 (shrink)
+
+`docs/bf55-owner-decision`. Two independent raises collided in this file and both are now moot. The
+lane sweep (#708) raised it to 14521 for 52 added `Lane:`/`Gate:` fields; `lane-a/renderer-recovery`
+raised it to 14528 the same day. Merging `main` in produced a conflict between those two numbers,
+and neither is the count — the real file after both landed plus BF-55's gate-clearing is **14507**,
+because #708 also struck LB-12 and main has since cleared entries the raises were sized against.
+
+The pattern is worth stating once, since it has now cost two withdrawn raises: **a baseline raise
+computed before a rebase is a guess.** Re-measure after merging `main`, not before, and expect the
+answer to be lower than either side of the conflict.
+
+## 2026-09-01 — `docs/implementation-backlog.md` 14507 → 14547
+
+`docs/bf55-owner-decision`, second commit. Three entries gained the thing that was blocking them,
+and in each case the missing piece was a number or a field rather than prose:
+
+- **LB-37** asked outright for a count and said a session that measures it without recording it
+  leaves the next one to measure again. It is **282 errors across 83 test files** (289 raw minus a
+  7-error sandbox baseline that touches no test file). That decides the shape — a ratchet, not a
+  one-PR fix — so the measurement is what makes the entry startable, not commentary on it.
+- **Q-250** lost a `Gate: device` that was circular: the entry exists to *close* device-gated rows
+  and was parked behind the bottleneck it relieves. Its replacement text is longer than the field
+  it removed, deliberately, so nobody re-adds the gate.
+- **Q-187** gained `Gate: owner` and a recommendation, because its lane genuinely *is* the pending
+  decision and it was sitting in UNCLASSIFIED where both lanes saw it and neither could start it.
+
+Both long blocks were cut roughly in half before this number was taken (LB-37 by 14 lines, Q-187 by
+5); +40 is what remains after that trim.
+
+**Amended to 14557 in the same PR (+10).** `LA-45` lost a `Gate: device` for the same reason Q-250
+did: it was parking work nobody had built yet. The gate means *waiting on* the smoke run, which fits
+a shipped entry; LA-45 is waiting on an implementer, and its stated reason — "a Health-screen change
+on the canonical runtime" — is true of every Lane B item, so gating on it parks the lane. The
+replacement text records that the other 39 device-gated entries were checked and **only this one is
+of that kind**, so the next session does not re-audit all 40.
+
+**Amended again to 14603 (+46).** Chasing LA-45 turned up that this file's field rules *already*
+forbid `Gate: device` on unbuilt work, in terms, with three recorded outbreaks — so LA-45 was a
+straggler under an existing rule rather than a new finding, and its note now cites the rule instead
+of re-deriving it. The same audit found the identical failure one section over: `Keep:` routes an
+entry into a **KEEP** heading reading *"not new work"*, and four of Lane B's twelve were builds,
+including `Q-519`'s entire UI half. `Keep:` was documented nowhere, so that is now written into the
+field rules (+9) and filed as **OR-100** (+33) with the split-and-enforce recommendation. `Q-519`
+also lost a stale no-entry marker that was hiding it outright.
+
+The growth here is the queue learning a rule it did not have. If OR-100 ships, the four split
+entries will grow this file again — that is the correct direction, and worth saying now so the next
+raise is not read as drift.
 ## 2026-09-01 — `docs/implementation-backlog.md` (BF-86, and the fix is three lines above the bug)
 
 The owner asked for the app to reset itself on the first open of a new day, and gave the symptom that
@@ -5236,21 +5315,41 @@ proposal with a stated blast radius rather than an implementation detail.
 Also notes that `activeBreakdown` already returns all three addends separately, so a one-line
 breakdown needs no new data.
 
-## 2026-09-01 — `projectOverview.md` 8572 → 8593, `docs/implementation-backlog.md` 14557 → 14584 (BF-79)
+## 2026-09-01 — `docs/implementation-backlog.md` → 14708 (merge resolution)
 
-**`projectOverview.md` (+21).** Two shipped changes had to be recorded and only one of them was
-this PR's: BF-85 merged in #711 **without a status block**, so its paragraph lands here alongside
-BF-79's. Both were tightened before the raise — the BF-85 block came down from seven lines to five
-and BF-79's from ten to nine — and what is left is the two features plus the three findings BF-79
-turned up and filed (LB-40, LB-41, LB-42), one of which is a live bug on `main`.
+`docs/bf55-owner-decision`, merging `main` after #714 and #715 landed. Both sides of this file's
+conflict were kept, which is correct here and is the opposite of the backlog's rule: this file is
+**append-only**, so a conflict is two *additions* and dropping either loses a note; the backlog's
+conflicts are two *deletions*, where keeping both resurrects shipped entries. Same markers, opposite
+resolution — read the headings before choosing.
 
-**`docs/implementation-backlog.md` → 14630 after merging BF-87.** Both PRs raised this one file, which
+The number is re-measured after the merge rather than carried across it, per the note above. The
+entry-ID set was diffed against the new `origin/main`: **OR-100 added, nothing lost**, so the
+auto-merge resurrected none of what #714 and #715 removed.
+
+## 2026-09-01 — `projectOverview.md` → 8606, `docs/implementation-backlog.md` → 14763 (BF-79)
+
+**`projectOverview.md` 8572 → 8606, and BOTH numbers moved under it.** Main shrank the baseline to
+**8586** in the same window (#713/#716) while this branch raised it to 8593, so neither side of the
+conflict was the answer — the figure is recomputed from the merged document, like the backlog one
+below. Two shipped changes had to be recorded and only one of them was this PR's: BF-85 merged in
+#711 **without a status block**, so its paragraph lands here alongside BF-79's. Both blocks were
+tightened twice before the raise; what is left is the two features and a one-clause mention of each
+finding, with the detail in the backlog where it belongs. One of those findings, LB-40, is a live
+bug on `main`.
+
+**`docs/implementation-backlog.md` → 14763, recomputed twice.** Both PRs raised this one file, which
 is the size conflict that is a real disagreement rather than two additions — resolved by recomputing
 from the merged document, never by taking a side. BF-79's own share is **+27**: net of removing the
-shipped BF-79 entry (43 lines) and
-adding those three (76). LB-42 is the long one deliberately: it has to say which column each reader
+shipped BF-79 entry (43 lines) and adding LB-40/41/42 (76). LB-42 is the long one deliberately: it has to say which column each reader
 uses before anyone can choose which survives, and that is the whole of the decision it is asking
 for.
+
+**And `docs/overview/entries/` crossed its 250 total ceiling** at 251, which is a failure rather
+than the chore *note* it prints at 20 foldable. So the compaction sweep ran in this PR: the 22
+oldest **unlinked** entries folded into `history-2026-08-30.md` (110 KB → 184 KB), leaving 229
+total and 21 foldable. Linked entries were left alone — a durable doc citing a folded path is a
+broken link, which is how the first sweep broke 48 of them.
 
 Nothing was banked. The alternative to raising was leaving a shipped feature unrecorded in the file
 every session reads first, which is the failure the ratchet is not for.

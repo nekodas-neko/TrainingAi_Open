@@ -378,6 +378,17 @@ Live at the time of writing (2026-07-30):
 
 ## Gotchas specific to this domain
 
+- **Coach's nutrition scope is enforced by withholding, and a new widget cannot ship on its own
+  (LA-47).** `lib/coach/scopes.ts` gives the Nutrition entry point a Coach with the meal-plan and
+  intake tools and **without** the training ones — plus `renderChoiceList`'s `source` and
+  `proposeChange`'s `domain` enums rebuilt narrowed per request, so an out-of-scope call is a schema
+  error the SDK retries rather than a request to refuse. Do not "add a prompt line" to scope
+  something; that is the version this replaced. And when adding a widget: a new
+  `CoachWidgetSchema` member is a **type error** until `components/coach/widget-registry.tsx`
+  handles it, and a branch that renders `null` is worse than none — an unanswered client-side tool
+  call wedges the whole thread, because the provider refuses a request containing one. Schema and
+  renderer land together or not at all.
+
 - **`food_logs` storing only a `food_item_id` was the #1 data-loss bug.** A log table must hold
   (or locally mirror) everything needed to *render* the row offline — the reference table has to be
   pulled too.

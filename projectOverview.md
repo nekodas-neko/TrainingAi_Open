@@ -24,7 +24,7 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.415.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Version:** v1.416.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-09-01.
 
 **The personal details are one screen, and one writer (BF-79).** Owner: *"can we combine all the
@@ -35,18 +35,31 @@ details` (`app/more/details/`) now holds all four, with **weight and body fat re
 link to where they are logged — an input there would open a second write path into `body_metrics`.
 Targets and activity level stayed in Goals, so the split closed rather than moved, and Goals gained
 an *Open Profile details* button because it still demands fields it can no longer edit. Reading the
-same two components filed three findings rather than fixing them: **LB-40**, a user who already has
-a password *cannot change it* (the form never renders the Current password field the route
-requires); **LB-42**, `weight_goal_kg` and `target_weight_kg` are two columns for one goal with
-different readers, so the number the user sees and the one the AI is told can differ (Lane A — a
-schema decision); **LB-41**, a Weight Units toggle with no consumer. **Not device-verified**
-([journal](docs/overview/entries/2026-09-01-personal-details-consolidation.md)).
+same two components filed three findings rather than fixing them — **LB-40** (a user who already has
+a password *cannot change it*: the form never renders the field the route requires), **LB-42** (two
+columns for one weight goal, with different readers, so the number the user sees and the one the AI
+is told can differ — Lane A), **LB-41** (a Weight Units toggle with no consumer). **Not
+device-verified** ([journal](docs/overview/entries/2026-09-01-personal-details-consolidation.md)).
 
 **The quantity box on Assign to Meal centres (BF-85).** Chromium draws the spin button inside the
 box, so `text-center` sat left of centre; and `text-sm` was inert under `globals.css`'s
 `input { font-size: 16px !important }`. The entry's own fix — use the shared `Input` primitive —
 was wrong: **1 of 28** `type="number"` inputs uses it, and neither quantity control does. **Not
 device-verified** ([journal](docs/overview/entries/2026-09-01-quantity-box-spinner-reset.md)).
+
+**Coach can be scoped to one subject, and the scope is made of what it never receives (LA-47).**
+Opening Coach from Nutrition will give it the meal plan, intake and targets — and **not** the
+training tools, so a program question produces a hand-off instead of a guess. Enforced three ways
+the model cannot argue with: the training tools are absent, and `renderChoiceList`'s `source` and
+`proposeChange`'s `domain` enums are **rebuilt narrowed per request**, so an out-of-scope call is a
+schema error the SDK retries rather than a request anything downstream has to refuse. Verified
+against a real Gemini turn in both directions. `general` withholds nothing, so every existing
+caller is unchanged. **A bug the tests caught and review would not have:** `value in COACH_SCOPES`
+walks the prototype chain, so `scope: "toString"` resolved to `Object.prototype.toString` and would
+have crashed the request. **The plan-widget half did NOT ship** — the entry proposes splitting it
+across lanes and that split does not compile, since a new widget-union member is a type error until
+the registry handles it, and a branch rendering `null` wedges the thread outright
+([journal](docs/overview/entries/2026-08-31-coach-nutrition-scope.md)).
 
 **A dead WebView renderer is handled instead of fatal, and it now leaves evidence (BF-80).** The
 owner's *"tab back into the app and the pages often crash and display a blank page"* had **nothing**
