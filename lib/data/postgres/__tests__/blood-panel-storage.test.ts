@@ -16,8 +16,8 @@ import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest'
 import { rangeVerdict } from '@trainingai/shared/health/analyte-keys'
 
 const canRun = !!process.env.DATABASE_URL
-const USER = '00000000-0000-4000-8000-0000000000b1'
-const OTHER = '00000000-0000-4000-8000-0000000000b2'
+const USER = '00000000-0000-4000-8000-00000000bf01'
+const OTHER = '00000000-0000-4000-8000-00000000bf02'
 
 /** Straight from the report — the shapes, not a sample of convenience. */
 const ANALYTES = [
