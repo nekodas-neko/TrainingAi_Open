@@ -934,6 +934,11 @@ two screens, and a user who sets one has no way to know the other exists.
 ### [app-shell][platform] BF-86 — the morning check-in never re-prompts (fixed; the "close/reset" half is answered, not built)
 
 - **Lane:** B
+- **Verify:** device — leave the app open overnight on the S25 and resume it after midnight: the
+  morning check-in prompts once, yesterday's ticks are gone, and no reload or spinner happens.
+  Resume again ten minutes later and nothing re-prompts. Playwright's clock proves the logic; it
+  cannot prove Android's process lifecycle, and a WebView that was evicted and restored is a
+  different path from a resume.
 - **Keep — nothing to build; this records the decision so it is not re-opened.** The check-in half
   shipped: `LocalDayProvider` (`components/shell/local-day-provider.tsx`) re-evaluates the local date
   on mount and `visibilitychange`, and three consumers subscribe — the workout store's `todayLogged`,

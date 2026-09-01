@@ -27,6 +27,19 @@
 **Version:** v1.417.1 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-09-01.
 
+**The app notices the day changed on resume, without restarting (BF-86).** Owner: *"when I open the
+app in the morning and it just resumes, it doesn't give me the morning check-in."* The cause was
+structural — the tab shell never unmounts, so an effect keyed on `[userId, tz]` ran **once per app
+launch** and nothing re-asked what day it was. `LocalDayProvider` re-evaluates the local date on
+mount and `visibilitychange` and exposes it as a value, so subscribers key an effect on it: the
+workout store's `todayLogged` (which is where the listener came from — it moved up rather than being
+copied), the check-in prompt, and the today-mood read. **The requested "close / full reset" is
+deliberately not built** — BF-80 forbids fixing a resume with a reload, and the signal delivers the
+ask without trading instant paint for a spinner. The e2e test drives Playwright's clock across local
+midnight so the case fires on every run; **its first version passed with the fix reverted**, because
+`isVisible()` is a point-in-time check and not a wait. **Not device-verified**
+([journal](docs/overview/entries/2026-09-01-local-day-rollover.md)).
+
 **21 MB of index for a code path nothing calls (BF-55, migration 249).**
 `oura_heartrate_user_updated` was migration 130's keyset index for `getOuraTimeseriesDelta` — the
 restore pull Q-180 kept with no caller because *"it costs nothing at runtime"*. True of the method;

@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.417.1",
+    date: "2026-09-01",
+    changes: [
+      "Opening the app in the morning gives you the check-in again. If you left it open overnight it just resumed and never noticed the date had changed, so the prompt \u2014 and yesterday\u0027s ticks \u2014 stayed as they were. It now catches up the moment you look at it, with no restart and no loading screen.",
+    ],
+  },
+  {
     version: "1.417.0",
     date: "2026-09-01",
     changes: [
