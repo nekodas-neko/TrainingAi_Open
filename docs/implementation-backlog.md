@@ -10985,26 +10985,6 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   deliberate archival policy and is explicitly **out of scope** here (see
   `docs/db-volume-cleanup-handover.md`).
 
-### [app-shell][activity] LA-42 — `trainingBoostFrom` can never be non-null, now structurally
-
-- **Branch:** _unassigned_ · **Lane: B** — `components/health/health-score-detail.tsx`
-- **Added:** 2026-08-30 · Lane A, from Q-284's removal.
-- `health-score-detail.tsx:205` computes
-  `trainingBoostFrom={… data.activityBlend.adjustment > 0 ? data.activityBlend.base : null}`.
-  Q-284 deleted `blendActivityScore`, so `adjustment` is now a literal `0` in
-  `readiness-payload.ts` and that ternary can only ever take its null arm.
-- **Not a regression, and that distinction matters for how urgent this is.** The prop was already
-  dead in practice — the blend last had an Oura score to adjust on **2026-07-07**, the re-key day —
-  so nothing changes for a user. Q-284 turned "dead in practice" into "dead by construction", which
-  is what makes it safe to delete rather than merely unused today.
-- **The fix is a deletion**, in Lane B's file: drop the prop and whatever `ScoreRing` does with it,
-  unless that path has another caller. The sibling banner this pairs with (`activity-content.tsx`'s
-  *"Oura 56 · +10 training → 66"*, named in the 2026-07-02 plan) is **already gone** — a grep for
-  `.adjustment` across `app/` and `components/` returns this one line and nothing else.
-- **Low priority.** No user-visible fault; it is dead-weight removal on a surface that already
-  renders correctly.
-
-
 > **⚑ Q-232 … Q-244 are one cluster** — the 2026-08-14 UI/flow/IA + caching review, requested by the
 > owner ("a good review on the ui and flow/location mainly … alongside that have a look at caching
 > and cache busting"). Full evidence, the navigation map and the proposed target structure:

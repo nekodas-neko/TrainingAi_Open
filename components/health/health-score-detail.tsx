@@ -29,7 +29,15 @@ function bandColor(score: number | null, scheme: ColorScheme) {
   return scoreBand(score).color;
 }
 
-function ScoreDisplay({ score, label, trainingBoostFrom }: { score: number | null; label: string; trainingBoostFrom?: number | null }) {
+/** The hero ring.
+ *
+ *  LA-42: this used to take a `trainingBoostFrom` and draw a second brand-coloured arc for the part
+ *  of an activity score that came from a same-day training blend. `blendActivityScore` is gone
+ *  (Q-284), so `activityBlend.adjustment` is a literal 0 at both of this payload's construction
+ *  sites and the arc could not be reached. **Not a regression:** the blend last had an Oura score to
+ *  adjust on 2026-07-07, the re-key day — Q-284 only turned "dead in practice" into "dead by
+ *  construction", which is what made it safe to remove rather than merely unused. */
+function ScoreDisplay({ score, label }: { score: number | null; label: string }) {
   const scheme = useHeroColorScheme();
   const color = bandColor(score, scheme);
   const trackColor = scheme === "light" ? "rgba(0,0,0,0.08)" : "rgba(255,255,255,0.12)";
@@ -37,9 +45,6 @@ function ScoreDisplay({ score, label, trainingBoostFrom }: { score: number | nul
   const r = 52;
   const circumference = 2 * Math.PI * r;
   const offset = score != null ? circumference * (1 - score / 100) : circumference;
-  const hasBoost = score != null && trainingBoostFrom != null && score > trainingBoostFrom;
-  const baseFrac = hasBoost ? trainingBoostFrom / 100 : 0;
-  const boostFrac = hasBoost ? (score - trainingBoostFrom) / 100 : 0;
   const displayScore = useCountUp(score);
   const bandLabel = score != null ? scoreBand(score).label : null;
   return (
@@ -48,15 +53,6 @@ function ScoreDisplay({ score, label, trainingBoostFrom }: { score: number | nul
         <circle cx="60" cy="60" r={r} fill="none" strokeWidth="8" stroke={trackColor} />
         <circle cx="60" cy="60" r={r} fill="none" strokeWidth="8"
           style={{ stroke: color, strokeDasharray: circumference, strokeDashoffset: offset, strokeLinecap: "round" }} />
-        {hasBoost && (
-          <circle cx="60" cy="60" r={r} fill="none" strokeWidth="8"
-            style={{
-              stroke: "var(--color-brand)",
-              strokeDasharray: `${boostFrac * circumference} ${circumference}`,
-              strokeDashoffset: -baseFrac * circumference,
-              strokeLinecap: "round",
-            }} />
-        )}
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
         <span className="text-4xl font-bold tabular-nums" style={{ color }}>{displayScore != null ? Math.round(displayScore) : "—"}</span>
@@ -213,7 +209,6 @@ export function HealthScoreDetail({
         <ScoreDisplay
           score={score}
           label={title === "Readiness" ? "Readiness Score" : `${title} Score`}
-          trainingBoostFrom={theme === "activity" && data?.activityBlend && data.activityBlend.adjustment > 0 ? data.activityBlend.base : null}
         />
       </DetailHero>
 
