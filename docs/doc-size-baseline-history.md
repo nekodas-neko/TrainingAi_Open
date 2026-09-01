@@ -6248,3 +6248,17 @@ merge, not the name — an implementer who conflates the two reintroduces a defe
 The line about the guard finding twelve e2e specs the entry's own file table missed is there as
 evidence for a general point: a rename's blast radius includes its tests, and a file table written by
 reading will not contain them.
+
+## 2026-09-01 — `projectOverview.md` → 9068 (BF-101)
+
++15 for a feature whose whole point is a claim about *numbers*, and the numbers are what has to be in
+the index. The 7,000-against-Moderate drift is the evidence the control exists, and it is the one
+line a future session would otherwise have to re-derive from the owner's screenshot to know whether
+the feature is working.
+
+The measured-RMR sentence is there for a narrower reason: it is the decision most likely to be
+undone as an optimisation. Dropping that fetch looks free and silently reintroduces the "two numbers
+for one thing" defect LA-45 and BF-99 each cost a session to close.
+
+The backlog baseline is untouched — BF-101 left the queue as a shipped entry with a `Keep:` line for
+its device check, and LB-48 replaced it in roughly the same number of lines.

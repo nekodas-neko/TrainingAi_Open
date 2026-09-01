@@ -24,8 +24,23 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.425.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Version:** v1.426.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-09-01.
+
+**A Recommended value under every goal field, and no model behind it (BF-101).** The owner asked
+for one and assumed AI: *"id assume we use AI here to choose but maybe we could have some logic to
+decide so not using the ai if not needed?"* It needs none — `calculateBaseline` already returns a
+deterministic figure for every field on that screen except sleep, and the AI route computes that
+same baseline before asking a model to *adjust* it. The control now sits under steps, water and
+calories, plus protein, carbs and fat in Macro Targets, each naming where its number comes from.
+**The matching state is half the feature:** the entry was filed on live drift — the steps goal held
+**7,000**, the *sedentary* figure, while the activity level said Moderate, whose target is
+**10,000**, and nothing on screen said which fields followed the recommendation. **The measured RMR
+is carried through** rather than dropped, so the button cannot quote a predicted resting rate on a
+screen whose Health card shows a measured one. **Sleep and fiber get no button** — `BaselineResult`
+carries no figure for either, and the guard pins that. **Not device-verified** — six controls land
+in an already-dense collapsible at 412 dp
+([journal](docs/overview/entries/2026-09-01-feat-bf-101-recommended-values.md)).
 
 **One name for the saved list — `My Foods`, everywhere (BF-103).** The owner overrode the entry's own
 proposal and was right to: it suggested `Saved` for the tab with `My Meals` left on the button, which
