@@ -422,11 +422,12 @@ card gives the honest answer without the reason.
   into one "earned from movement" figure with no breakdown at the point of confusion —
   `activeBreakdown` already returns all three separately (Q-391 made sure the parts sum to the
   total), so the data for a one-line breakdown is already in hand.
-- **⚠ Do not "fix" this by lowering or removing `STEP_BASELINE`.** It is the guard against
-  double-counting against the 1.2 multiplier, it is documented as such, and changing it silently
-  re-scores every historical day — the class this repo has a standing rule about. If the threshold is
-  ever revisited it is a Tuning proposal with the owner's sign-off, and it must state how many past
-  days it moves.
+- **⚠ Do not "fix" this by lowering or removing `STEP_BASELINE` on its own** — uncompensated, it
+  deletes the double-count guard and costs 177 kcal/day across every one of the owner's 124 days
+  (measured, BF-88). **But see BF-88: the owner has since proposed the compensated version** —
+  subtract the first 3,000 steps' worth from the resting base and count from zero — which is
+  identical at and above 3,000 steps and gives this entry its single linear rate for free. If BF-88
+  ships first, this entry's copy gets simpler, not harder: one rate, no threshold sentence.
 - **Verification:** on a morning below the threshold the card says why and names the number; above it,
   the earned figure appears and the explanation stops; and the three addends shown never disagree
   with the total. **And the owner can answer "how many steps for 100 kcal?" from the screen alone**
@@ -463,27 +464,54 @@ range −159 to −249, zero days higher. The asymmetry is arithmetic — 0.2 ×
 3,000 steps at the walking MET are ~106. Distribution: 50 of 124 days sit below 3,000 steps and so
 currently earn nothing from stepping at all; mean 5,716, median bucket 2–4k.
 
-- **Recommendation: leave both constants alone and make the path legible instead.** The pair is
-  internally consistent — 1.2 is BMR + TEF + non-step NEAT, and the 3,000 threshold is the
-  deduction that stops the NEAT half being counted twice. What is missing is that a reader (owner
-  or session) cannot tell which base produced today's number. Surface `source` where the burn is
-  explained, so "calibrated from your last 14 days" and "estimated from your RMR" are
-  distinguishable. That is also the honest answer to *"is this measured or assumed?"*, which is the
-  question underneath the owner's.
-- **⚠ Two things this entry is NOT licensing.** Lowering `STEP_BASELINE`: it is the double-count
-  guard and the measurement above says which way that moves. And a TEF term computed from logged
-  intake — the genuinely more accurate version of the owner's idea — is unusable at current logging
-  density: **45 of 124 days** carry a plausible intake, so the term would vanish on two-thirds of
-  days and make burn swing on whether food was logged, which is worse than a constant.
+- **Recommendation: make the shift the owner proposed — subtract the first 3,000 steps' worth of
+  kcal from the resting base, then count steps from zero.** *"cant we remove some calories for the
+  base 3000 and have it start from 0 steps?"* — yes, and this is the version that works, because it
+  **conserves** rather than deletes. The earlier proposal (drop the multiplier to 1.0, count all
+  steps) removed 265 kcal of base and handed back 102, which is why it lost on all 124 days. This
+  one removes exactly what it hands back.
+
+  Measured through `computeActiveEnergy` for the owner's profile:
+
+  | steps | 0 | 1,196 | 2,000 | 3,000 | 5,000 | 7,000 | 10,000 | 15,000 |
+  |---|---|---|---|---|---|---|---|---|
+  | current total | 1590 | 1590 | 1590 | 1590 | 1658 | 1726 | 1827 | 1997 |
+  | proposed total | 1488 | 1529 | 1556 | 1590 | 1658 | 1725 | 1827 | 1997 |
+  | delta | −102 | −61 | −34 | **0** | **0** | −1 | **0** | **0** |
+
+  **Identical at and above 3,000 steps** — it is a reparameterisation there, not a re-scoring. Below
+  it the total drops, which is the intent: a day with no walking should not be paid for incidental
+  walking that did not happen. Blast radius over 124 days: **74 unchanged exactly**, 50 moved, mean
+  −43 on the moved days, worst −86, **−17 averaged across all days**. Against −177 on every day for
+  the earlier version.
+
+  And it delivers BF-87's ask as a side effect: with the floor at zero the rate is **one number**,
+  ~34 kcal per 1,000 steps, linear from the first step. No threshold left to explain.
+- **⚠ The subtraction is COMPUTED, never a constant — 102 is this owner's number, not the app's.**
+  It is `stepKcal(STEP_BASELINE)` at the user's own age/weight/sex, so a lighter or heavier user
+  gets a different figure. Hardcoding 102 silently mis-bases every other account, and this app now
+  has more than one.
+- **⚠ The two paths need DIFFERENT treatment, which is the finding above being load-bearing.** On
+  the **formula** path the base is `bmr × 1.2` and must have the step-baseline equivalent subtracted.
+  On the **calibrated** path it must not: the base there is `maintenance − avgActiveKcal`, and
+  `maintenance` is measured, so lowering the step floor raises `avgActiveKcal` and the subtraction
+  happens by itself. Applying the correction to both double-subtracts it. An implementer who reads
+  only the constant, and not which path consumes it, will get this wrong.
+- **⚠ Still NOT licensed: a TEF term computed from logged intake.** The genuinely more accurate
+  version of all of this, and unusable at current logging density — **45 of 124 days** carry a
+  plausible intake, so it would vanish on two-thirds of days and make burn swing on whether food was
+  logged, which is worse than a constant.
 - **One real mismatch, recorded and deliberately not acted on.** `SEDENTARY_MULTIPLIER` is a
   *Mifflin-St Jeor BMR* activity factor, and since BF-42 it is applied to a *measured RMR*
   (1,325 kcal, FFM 51.5 kg, 2026-08-27). Those are different quantities and the factors were never
   validated against the second. For this owner the direction is not clearly an over-count —
   measured 1,325 sits **below** predicted 1,481 — so it is filed as a known imprecision rather than
   a defect. Anyone revisiting it needs a source for an RMR-based factor, not a re-derivation.
-- **Verification:** the burn explanation names its basis on both paths; a day on the calibrated path
-  and a day on the fallback are distinguishable from the UI alone; and no constant changed, so no
-  historical day moves.
+- **Verification:** a day at or above 3,000 steps reports **exactly** the total it reported before —
+  that equality is the test that the shift conserved rather than re-scored, and it should be a unit
+  test, not an eyeball. A day below 3,000 reports less, by the computed amount. The burn explanation
+  names its basis on both paths. And a second profile (different weight) gets a different
+  subtraction, proving it was computed.
 
 ### [app-shell][platform] BF-86 — the morning check-in never re-prompts, because its effect runs once per app launch
 
