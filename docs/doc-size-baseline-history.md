@@ -5606,12 +5606,51 @@ the field rather than hide it, or a cold cache plus a dead network silently repr
 That reasoning is what a future session needs and what a one-line "fixed the password field" would
 lose.
 
-## 2026-09-01 — `projectOverview.md` → 8690, `docs/implementation-backlog.md` → 15091 (LB-41, LB-29)
+## 2026-09-01 — `docs/implementation-backlog.md` 15133 → 15210 (BF-93, and BF-92 gets a better fix)
+
+Chasing the owner's Sentry question turned up a second thing. **`error_events` does not prune.**
+CLAUDE.md says it does, `lib/export/export-map.ts:167` says it does, and there is no `DELETE`
+outside tests, no `pg_cron`, no trigger — with the data agreeing: the owner's oldest row is 32 days
+old against a claimed 30. The table is now **52 MB on 728 kB of index**, second-largest in the
+database, so it is payload rather than bloat. Q-539 already halved the message cap going forward;
+the historical rows were never rewritten and still measure `avg 1904` against `max 2000`.
+
+BF-93 carries the measurements and, more usefully, the two things not to do: do not delete rows to
+improve a number (they are the only record of faults nobody saw), and do not confuse this with
+BF-55, which is the inverse problem — indexes outweighing heap.
+
+BF-92 grew because the recommendation **changed**. `withSentryConfig` turns out not to be wired at
+all, and its `tunnelRoute` sends client events **same-origin**, which `connect-src 'self'` already
+allows — so one change fixes the client blackout, source maps and release tagging together, and
+cannot be re-broken by a future CSP edit. The CSP-host fix is now the fallback. The entry also
+gained a natural experiment rather than an inference: 4 `source: client` rows reached `error_events`
+from the same WebView, in the same week, that Sentry recorded nothing from. Same app, same errors,
+different origin.
+
+CLAUDE.md is corrected in place at no net line cost — the false half of the sentence is replaced by
+the measurement and the reason the rule still stands.
+
+## 2026-09-01 — `docs/implementation-backlog.md` (BF-88 loses a hazard that LB-43 removed)
+
+LB-43 shipped while this PR was open (#729): the energy constants moved to the dependency-free leaf
+and `movement-breakdown.ts` now re-exports rather than mirroring. BF-88's "the mirror test cannot
+catch this" bullet and its sequencing bullet both described a two-copy world that no longer exists,
+so they are **replaced, not annotated** — a warning about a file state that is gone is a warning that
+gets obeyed anyway.
+
+What survives is the part that got sharper: the value can stay at 3,000 while its *meaning* changes
+from a threshold to a base credit, and no test that pins a number can notice. With one constant left
+instead of two, the recommended rename is now a single edit the compiler propagates — which is the
+argument for renaming rather than editing in place, and it is stronger after LB-43 than before it.
+
+`Needs: LB-43` is dropped rather than left dangling; the protocol treats an absent target as shipped,
+but saying so beats making the next reader infer it.
+
+## 2026-09-01 — `projectOverview.md` → 8690, `docs/implementation-backlog.md` → 15167 (LB-41, LB-29)
 
 Two shipped fixes recorded; **the backlog shrank**, since both entries were removed and nothing new
 was filed. The status block is 11 lines for two entries because the interesting half of LB-29 is not
 the bug but the promise the owner picked between: *the change follows to other devices* versus
 *a local setting is never clobbered*. Those differ in what the app does, not in how it is written,
 and a one-line "fixed preference sync" would lose the distinction the next session needs.
-
 
