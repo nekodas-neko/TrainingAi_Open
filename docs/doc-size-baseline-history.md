@@ -5914,7 +5914,77 @@ session hit.
 Ratcheted down rather than left at 208: a baseline above the file's real length is headroom for
 silent growth, which is the thing these numbers exist to stop.
 
-## 2026-09-01 — `docs/implementation-backlog.md` → 14922 (BF-69 planned)
+## 2026-09-01 — `docs/implementation-backlog.md` → 14892 (LB-44 shipped)
+
+A 22-line entry removed and nothing added: LB-44 is a flake fix with no residue, so it leaves the
+queue whole rather than becoming a `Keep:`. Ratcheted down rather than left at the old number,
+because a baseline above the file's real length is headroom for silent growth.
+
+## 2026-09-01 — `projectOverview.md` → 8911 (LA-45)
+
++16 for one status block, and the lines that could not be cut are the two invariants. "Health shows
+the corrected body fat now" is the short version and it is the one that gets the next session to
+reverse one of them: `bodyFat` must stay what the log sheet seeds from — it POSTs at `manual`, which
+outranks `scale_ble`, so a corrected value round-tripped through the edit sheet overwrites the
+measurement permanently and collapses the next calibration toward zero — and "corrected" is never
+inferred from the two values differing, because an offset can round to zero. Both read as pedantic
+until you have written the wrong one, and neither is visible from the screen afterwards.
+
+The line about the hand-seeded DEXA pair is there for the same reason: the local seed has no scan and
+no `source_map`, so the whole feature is unreachable in the sandbox and a session that renders the
+screen and sees a plain number has verified nothing.
+
+(8911, not the 8894 this branch measured before merging: BF-59's screen half landed 17 lines in
+between. A size baseline is a measurement of the merged file, never the sum of two hunks — resolving
+that conflict by picking a side would have been wrong whichever side won.)
+## 2026-09-01 — backlog → 14940, `projectOverview.md` → 8927, `docs/agents/state/tuning.md` → 375 (Q-507 explained)
+
+**A two-week-old finding was reversed, and a reversal has to carry its evidence or it reads as a
+whim.** Q-507 has said since 2026-08-18 that daytime stress correlates the wrong way with readiness
+and cannot be built on. Recomputed from the model's own persisted buckets it correlates **−0.438**
+(−0.699 waking-only) — the correct direction — while the stored scalar reads +0.338. The nine-row
+stored-vs-buckets table is the proof, and the fact that **only the newest day agrees** is what ties it
+to TN-20.
+
+**The entry also retires two mechanisms, one of which this agent filed hours earlier**, and says so
+plainly: both explained an artefact of the stored value rather than a property of the model. Without
+that, the next reader finds three candidate explanations in the queue and no indication which
+survived. The baton gains the general rule — **check the stored number is the number the model
+produced before explaining why a metric behaves strangely** — which is the third time this session a
+stored value turned out to be lying.
+
+Caveats are carried at the same weight as the finding: **n = 8–9**, the waking window is this
+review's choice rather than the app's, and re-testing at n ≥ 30 is a precondition for building
+anything on the metric.
+
+## 2026-09-01 — `projectOverview.md` → 8942 (Q-531)
+
++15, and the lines that cannot be cut are the correction rather than the change. "The device
+consoles are grouped better now" is the short version and it loses the only thing a future session
+needs: **the entry's premise was false, and checking it inverted the fix.** The consoles were already
+routed under `/admin` and already gated; Q-234 had moved the links. Written short, the next reader
+sees a tidy-up. Written this way, they see that an owner report can be literally true about the
+navigation and literally false about the routing, and that the difference decides whether you are
+fixing access control or reachability.
+
+The backlog **shrank by 24 lines** — Q-531 carried the whole owner-gate argument and a superseded
+block preserved from before the decision, both of which are now either shipped or in the journal.
+
+(8942, not the 8926 measured before merging: TN-22 landed 16 lines in between. A size baseline is a
+measurement of the merged file, never the sum of two hunks.)
+
+## 2026-09-01 — `projectOverview.md` → 8953 (LA-42)
+
++11 for a deletion, which looks disproportionate until you ask what a shorter version would say.
+"Removed an unused prop" invites the next reader to wonder whether it was safe. The lines that earn
+their place are the two negatives — **no guard** (the invariant lives in Lane A's file and a test
+pinning it would block the revival it is meant to protect) and **no version bump** (nothing visible
+changed, and a changelog line for an invisible change is a claim the owner cannot check). Both are
+decisions someone would otherwise re-take, and neither is recoverable from the diff.
+
+The backlog **shrank by 20 lines** — LA-42's entry, removed whole, since nothing is owed.
+
+## 2026-09-01 — `docs/implementation-backlog.md` → 14899 (BF-69 planned)
 
 Eight lines replacing three. The growth is one measurement and its consequence, and neither
 compresses: production holds **two supplements, one log ever, no amounts, and no retatrutide row**,

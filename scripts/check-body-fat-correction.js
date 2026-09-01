@@ -24,7 +24,11 @@ const ROOT = path.resolve(__dirname, '..')
 const DERIVERS = /\b(bodyComposition|bodyCompSnapshot|cunninghamBmr)\s*\(/
 const READS_LIST = /\blistBodyMetrics\s*\(/
 const READS_FIELD = /\bbodyFatPct\b/
-const CALIBRATION_IMPORT = /body-fat-calibration/
+// A file "handles the correction" either by computing it (`body-fat-calibration`) or by consuming a
+// value some route already corrected (`body-fat-display`, LA-45). The second is how every SCREEN
+// does it: correcting client-side would need the calibration on the device, and the raw reading has
+// to stay reachable anyway so the log sheet can seed from it.
+const CALIBRATION_IMPORT = /body-fat-(calibration|display)/
 
 // Each entry states why the file derives body composition without correcting — never "it is fine".
 const EXEMPT = {
@@ -33,9 +37,6 @@ const EXEMPT = {
   'packages/shared/src/nutrition/goal-recommendation.ts':
     'derives from `input.bodyFatPct`, a value its caller supplies — the correction is applied at ' +
     'app/api/nutrition-goals/recommend/route.ts before the input is built',
-  'app/health/health-sections.tsx':
-    'Lane B display surface; it renders what the payload gives it and does not read the store. ' +
-    'Step 4 of the plan gives it a corrected value plus a per-reading `corrected` flag',
 }
 
 // Rule 2 only. These read a stored body fat and pass it on for DISPLAY OR EDITING, where the raw

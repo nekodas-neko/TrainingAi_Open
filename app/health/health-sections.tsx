@@ -7,6 +7,8 @@ import { accentCardStyle } from "@trainingai/shared/utils";
 import { goalProgressPct, evaluateWeightRateVsGoalBand } from "@trainingai/shared/health/long-term-goal-progress";
 import { scoreBand } from "@trainingai/shared/health/score-band";
 import { bodyComposition } from "@trainingai/shared/health/body-composition";
+import { displayBodyFat, type BodyFatCalibrationMeta } from "@/components/health/body-fat-display";
+import { BodyFatCard } from "@/components/health/body-fat-card";
 import { Sparkline } from "@/components/ui/sparkline";
 import { WeeklyStatsHub } from "@/components/stats/weekly-stats-hub";
 import { CalendarWidget } from "@/components/calendar-widget";
@@ -139,6 +141,8 @@ export interface HealthSectionsCtx {
   // Fetched once by the parent (PERF-4) and passed down to the three cards that
   // otherwise each independently fetch the same 'health-trends-summary' key.
   healthTrends?: HealthTrendsResponse['trends'];
+  /** The DEXA offset, once per payload — null when no scan has ever been paired (LA-45). */
+  bodyFatCalibration?: BodyFatCalibrationMeta | null;
 }
 
 export function getHealthSections(ctx: HealthSectionsCtx) {
@@ -150,13 +154,13 @@ export function getHealthSections(ctx: HealthSectionsCtx) {
     weightTrendKgPerWeek, energyBalanceKcal, energyBalance, trainingLoad, sleepCorr, injuries,
     setInjuries, userId, recoveryMuscles, handleDayClick, weeklyStats,
     activeSessions, trainingGoal, muscleSets, strengthTrend, weekToDate, userGoals,
-    progressSummary, bodyBaseline, healthTrends,
+    progressSummary, bodyBaseline, healthTrends, bodyFatCalibration,
   } = ctx;
 
   function isSectionVisible(key: string): boolean {
     switch (key) {
       case "bodyFat":            return latestBf != null;
-      case "leanMass":           return metaRecent.filter(r => r.weightKg != null && r.bodyFat != null).length >= 2;
+      case "leanMass":           return metaRecent.filter(r => r.weightKg != null && displayBodyFat(r) != null).length >= 2;
       case "bodyComposition":    return metaRecent.some(r => r.skeletalMusclePct != null);
       case "sleepVsPerformance": return sleepCorr != null;
       // Always show the slot — when the budget can't compute (missing profile fields) we render a
@@ -231,68 +235,36 @@ export function getHealthSections(ctx: HealthSectionsCtx) {
       );
       }
 
-      case "bodyFat": {
-        const bfPoints = [...metaRecent].reverse().map(r => r.bodyFat).filter((v): v is number => v != null);
-        const latestBfVal = bfPoints[bfPoints.length - 1] ?? null;
-        if (latestBfVal == null) return null;
+      case "bodyFat":
         return (
-          <div key="bodyFat" className="rounded-2xl p-4 relative overflow-hidden w-full" style={accentCardStyle('#f43f5e')}>
-            <div className="absolute -top-4 -right-4 w-20 h-20 rounded-full pointer-events-none" style={{ background: "#f43f5e", filter: "blur(28px)", opacity: 0.15 }} />
-            <div className="flex items-start justify-between mb-2">
-              <button onClick={() => setMetricSheet("bodyFat")} className="text-left flex-1">
-                <p className="text-xs font-semibold uppercase tracking-widest mb-1" style={{ color: "#f43f5e" }}>Body Fat ↗</p>
-                {metaLoading ? (
-                  <div className="h-8 w-20 animate-pulse rounded-lg bg-muted" />
-                ) : (
-                  <p className="text-3xl font-bold tabular-nums">
-                    {latestBfVal.toFixed(1)}<span className="text-base font-semibold text-muted-foreground ml-1">%</span>
-                  </p>
-                )}
-              </button>
-              <div className="flex items-center gap-2 ml-2 flex-none">
-                {bfPoints.length >= 2 && (
-                  <span className="text-[11px] rounded-full px-2.5 py-1 font-semibold" style={{ background: "rgba(244,63,94,0.3)", color: "#f43f5e" }}>
-                    {(latestBfVal - bfPoints[0]).toFixed(1) >= "0" ? "+" : ""}{(latestBfVal - bfPoints[0]).toFixed(1)}%
-                  </span>
-                )}
-                <button
-                  onClick={() => openLog("bodyFat", "Body Fat", "%", 0.1)}
-                  className="rounded-xl bg-muted px-3 py-1.5 text-xs font-semibold hover:bg-muted/80 transition-colors"
-                >
-                  Log
-                </button>
-              </div>
-            </div>
-            {bfPoints.length >= 2 && (
-              <Sparkline values={bfPoints} width={260} height={44} color="#f43f5e" showDots fill responsive />
-            )}
-            <p className="text-[10px] text-muted-foreground mt-1">From {bfPoints.length} reading{bfPoints.length !== 1 ? "s" : ""}</p>
-            {targetBfPct != null && latestBfVal != null && (() => {
-              const diff = parseFloat((latestBfVal - targetBfPct).toFixed(1))
-              return (
-                <p className="text-xs font-semibold mt-1" style={{ color: diff <= 0 ? '#22c55e' : '#f43f5e' }}>
-                  {diff <= 0 ? '✓ Goal reached' : `↓ ${diff}% to go`}
-                </p>
-              )
-            })()}
-          </div>
+          <BodyFatCard
+            key="bodyFat"
+            metaRecent={metaRecent}
+            metaLoading={metaLoading}
+            targetBfPct={targetBfPct}
+            calibration={bodyFatCalibration ?? null}
+            setMetricSheet={setMetricSheet}
+            openLog={openLog}
+          />
         );
-      }
 
       case "leanMass": {
         // Body composition (fat-free mass + fat mass + Cunningham BMR) via the shared core —
         // One-Formula-One-Place (lib/health/body-composition.ts), not an inline weight×(1−bf%).
-        const valid = [...metaRecent].reverse().filter(r => r.weightKg != null && r.bodyFat != null);
+        const valid = [...metaRecent].reverse().filter(r => r.weightKg != null && displayBodyFat(r) != null);
         const round1 = (x: number) => parseFloat(x.toFixed(1));
-        const latestComp = valid.length ? bodyComposition(valid[valid.length - 1].weightKg, valid[valid.length - 1].bodyFat) : null;
-        const oldestComp = valid.length ? bodyComposition(valid[0].weightKg, valid[0].bodyFat) : null;
+        // Corrected, so the lean-mass and BMR tiles agree with the calorie goal, which is already
+        // computed from the corrected value (BF-2 step 4). `check-body-fat-correction.js` exempted
+        // this file pending exactly this change; the exemption goes in the same PR.
+        const latestComp = valid.length ? bodyComposition(valid[valid.length - 1].weightKg, displayBodyFat(valid[valid.length - 1])) : null;
+        const oldestComp = valid.length ? bodyComposition(valid[0].weightKg, displayBodyFat(valid[0])) : null;
         const leanKg = latestComp ? round1(latestComp.ffmKg) : null;
         const fatKg = latestComp ? round1(latestComp.fatMassKg) : null;
         const bmr = latestComp ? Math.round(latestComp.bmrKcal) : null;
         const oldestLean = oldestComp ? round1(oldestComp.ffmKg) : null;
         const delta = (leanKg != null && oldestLean != null) ? round1(leanKg - oldestLean) : null;
         const leanSeries = valid
-          .map(r => bodyComposition(r.weightKg, r.bodyFat))
+          .map(r => bodyComposition(r.weightKg, displayBodyFat(r)))
           .filter((c): c is NonNullable<typeof c> => c != null)
           .map(c => round1(c.ffmKg));
         return (

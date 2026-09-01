@@ -5,15 +5,16 @@ import Image from 'next/image'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { toast } from 'sonner'
-import { UserCheck, UserX, Trash2, Plus, Loader2, ArrowLeft } from 'lucide-react'
+import { UserCheck, UserX, Trash2, Plus, Loader2, ArrowLeft, Bluetooth, Footprints, ClipboardList } from 'lucide-react'
 import { cn } from '@trainingai/shared/utils'
 import type { User } from '@trainingai/shared/types'
 import { invalidateAdminPendingCount } from '@/lib/cache-groups'
 import ExerciseManager from '@/components/admin/exercise-manager'
 import ActivityTypeManager from '@/components/admin/activity-type-manager'
+import { MoreRow, MoreRowGroup } from '@/components/more/more-row'
 import { useTransitionRouter } from "@/lib/view-transition";
 
-type Tab = 'users' | 'invites' | 'exercises' | 'activities' | 'feedback'
+type Tab = 'users' | 'invites' | 'exercises' | 'activities' | 'feedback' | 'devices'
 
 export default function AdminContent() {
   const router = useTransitionRouter()
@@ -160,7 +161,7 @@ export default function AdminContent() {
 
         {/* Tab bar */}
         <div className="flex gap-1 rounded-lg bg-muted p-1 overflow-x-auto scrollbar-hide">
-          {(['users', 'invites', 'exercises', 'activities', 'feedback'] as Tab[]).map(t => (
+          {(['users', 'invites', 'exercises', 'activities', 'feedback', 'devices'] as Tab[]).map(t => (
             <button
               key={t}
               onClick={() => setTab(t)}
@@ -231,6 +232,18 @@ export default function AdminContent() {
               )}
             </div>
           </div>
+        )}
+
+        {/* Q-531. The three device consoles were already routed under `/admin` and already
+            `isAdminUser`-gated — what Q-234 moved was the LINKS, out to Settings → Developer, which
+            is where the owner went looking and did not find them: *"it was moved away from the admin
+            section = bad"*. They are listed here now, in the order the operations runbook uses. */}
+        {tab === 'devices' && (
+          <MoreRowGroup label="Ring, strap & capture">
+            <MoreRow icon={Bluetooth} label="Oura BLE — drain, verify, validate" onClick={() => router.push('/admin/oura-ble')} />
+            <MoreRow icon={Footprints} label="Cadence calibration" onClick={() => router.push('/admin/cadence')} />
+            <MoreRow icon={ClipboardList} label="Device data capture" onClick={() => router.push('/admin/data-capture')} />
+          </MoreRowGroup>
         )}
 
         {tab === 'exercises' && (

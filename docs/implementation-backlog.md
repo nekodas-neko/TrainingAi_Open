@@ -924,28 +924,6 @@ has already recorded that a bulk job bumps `updated_at` without rewriting a valu
   called it a pass.
 - **Added:** 2026-09-01 · found while tracing BF-94.
 
-### [platform] LB-44 — a test that writes a real file into `lib/` races every test that walks `lib/`
-
-- **Lane:** A — the fix is in `scripts/__tests__/dead-repo-methods.test.ts`, and `scripts/**` is not
-  Lane B's. Filed by Lane B because that is where it fired.
-- **Added:** 2026-09-01, from a full-suite run on `feat/bf-82-more-page-grouping`.
-- **What happened.** The suite came back `1 failed | 553 passed`, and the failure named a file that
-  has nothing to do with the diff:
-  `lib/media/__tests__/no-data-url-fetch.test.ts` → `ENOENT: no such file or directory, open
-  'lib/zz-dead-repo-methods-probe.ts'`. That file is written and deleted inside
-  `scripts/__tests__/dead-repo-methods.test.ts` (~line 100), which proves `sourceFileList()` sees
-  untracked files. Any test running concurrently that walks `app`/`components`/`lib` and reads every
-  file it finds can list the probe and then read it after the `unlinkSync`. Both files pass alone.
-- **Why it matters more than a re-run.** The failure surfaces in an unrelated file, on an unrelated
-  branch, with a message that reads like a missing source file — so the first reaction is to go
-  looking in the diff. It cost about ten minutes here and it will cost the same every time.
-- **The fix is to stop writing into the tree.** Point the probe at a temp directory the walkers do
-  not cover, or give it a name the walkers skip (`sourceFileList()` would need the same exclusion,
-  which weakens what the test proves), or serialise it. Prefer the first — `sourceFileList()` takes
-  the directory it lists, so the probe can prove the untracked-file behaviour somewhere private.
-- **Do not "fix" it by widening the reader.** `no-data-url-fetch.test.ts` reading every file under
-  `lib/` is correct; the defect is the writer.
-
 ### [app-shell] BF-82 — the More page is seven groups of one row each, with one of them behaving differently
 
 - **Keep:** one look on the S25. Nothing else is owed.
@@ -2075,45 +2053,29 @@ Lane A's.
 
 ### [body][app-shell] LA-45 — the DEXA-corrected body fat is in the payload and no screen reads it
 
-- **Branch:** _unassigned_ · **Lane: B** — `app/health/health-sections.tsx`, `app/health/health-content.tsx`, the day-detail body row.
-- **Added:** 2026-08-31 · Lane A, on shipping BF-2 step 4.
-- **The engine is done and invisible.** `/api/body-metadata` and `/api/day-log` now carry
-  **`bodyFatCorrected`** and **`bodyFatIsCorrected`** per reading, and `body-metadata` also returns
-  `bodyFatCalibration: { offsetPct, pairCount, source } | null` once per response. Every screen
-  still renders `bodyFat`, which is the RAW scale value — so the owner's Health screen shows 25.3
-  while their calorie goal is already computed from the corrected 28.5. **The two disagreeing on
-  screen is worse than neither being corrected**, which is why this is filed rather than left.
-- **`bodyFat` must stay raw and must stay the value the log sheet seeds from.** `openLog`
-  (`health-content.tsx:493`) and `log-value-sheet.tsx:32` pre-fill the body-fat input from it and
-  POST it back at source `manual`, a rank that outranks `scale_ble`. Seed from `bodyFat`, display
-  `bodyFatCorrected`. Getting this backwards lets the user overwrite their own measurement by saving
-  a field they never touched, and collapses the next calibration toward zero.
-- **Mark the boundary, do not hide it.** Two thirds of the owner's history is on instruments the
-  calibration does not cover (no provenance to 2026-06-23, `health_connect` to 08-01, `scale_ble`
-  from 07-29), so a 90-day body-fat trend contains both kinds and has a ~3.2-point step at the
-  changeover. `bodyFatIsCorrected` is per reading precisely so the chart can say why rather than
-  draw an unexplained jump. **Do not infer it from `bodyFatCorrected !== bodyFat`** — an offset can
-  round to zero, and "corrected by 0.0" and "not corrected" are different claims.
-- **Show the offset; the owner asked for it.** *"so it shows Body fat on the current scale as per a
-  dexa result"* — `offsetPct` with `pairCount` beside it. At `pairCount: 1` an offset and a ratio
-  are the same number, so it must not be presented as a settled calibration.
-- **`health-sections.tsx` derives `bodyComposition(r.weightKg, r.bodyFat)`** at three sites for the
-  lean-mass and BMR tiles. Those should move to `bodyFatCorrected`, which is what makes the panel
-  agree with the calorie goal. It is exempt in `scripts/check-body-fat-correction.js` with that
-  reason — **remove the exemption in the same PR**, or the check keeps asserting a decision that has
-  been made.
-- **The `Gate: device` was removed 2026-09-01 — it was the documented mistake, made a third time.**
-  This file's own field rules say it outright: *"`Gate: device` means SHIPPED and awaiting a device
-  check — never 'will need one when built'"*, because a gate **parks** the entry and hides it from
-  `next-item.js`. Nothing here is built. The stated reason — "a Health-screen change on the canonical
-  runtime" — is true of every Lane B item, so gating on it parks the lane. **The device check is
-  still owed**; per CLAUDE.md's Canonical Runtime rule it is satisfied at merge by the smoke run *or*
-  a Known-Issues row marking the change not-yet-device-verified. That is a **Verification** line, not
-  a gate.
-- **The other 39 device-gated entries were checked and this is the only one of its kind** — 35 are
-  shipped-and-awaiting-their-check, and `PS-9`/`PS-10`/`PS-12`/`PS-16` need the Colmi ring in hand.
-  So the rule is holding now; this was a straggler, not a fourth outbreak.
-
+- **Keep:** one look on the S25, and only that.
+- **Verify:** device — and here it is not a formality. `health-content.tsx`'s local-store seed and the
+  network fetch race, and a local row carries the raw reading with no calibration; the fix that stops
+  the seed clobbering the correction is **unreachable on web**, where `getLocalStore` returns null.
+  On the S25: open Health → Body offline and after a sync, and confirm the body-fat number does not
+  flick back to the scale's value. Also confirm the **week-day sheet's `% BF` chip**, which is the one
+  surface that could not be driven in the browser.
+- **✅ SHIPPED** (`feat/la-45-corrected-body-fat-display`, 2026-09-01, v1.420.0). Seven surfaces read
+  the corrected value through one rule (`components/health/body-fat-display.ts`); the card states the
+  offset and its pair count and marks a mixed window;
+  `components/health/__tests__/body-fat-display-sites.test.ts` pins every site and the inverse (the
+  log sheet still seeds raw), mutation-verified eight ways. `check-body-fat-correction.js`'s
+  `health-sections.tsx` exemption is gone, as this entry asked.
+- **⚠ The local seed has no DEXA scan and no `source_map`, so the feature is UNREACHABLE in the
+  sandbox** — every reading returns `corrected: false` and a session that renders the screen and sees
+  a plain number has verified nothing. A fixture was seeded by hand into the local DB (one scan at
+  21.2% on 2026-08-25, `scale_ble` provenance on the newest four readings) and left there, so the
+  path stays testable. It is fabricated, like the rest of that seed.
+- **`bodyFat` must stay raw and must stay the value the log sheet seeds from.** `openLog` POSTs it
+  back at source `manual`, a rank that outranks `scale_ble`. Seed from `bodyFat`, display
+  `displayBodyFat`. Getting this backwards lets the user overwrite their own measurement by saving a
+  field they never touched, and collapses the next calibration toward zero. The guard's last case is
+  exactly this, and it fails when the seed is switched to the corrected value.
 
 ### [workouts] BF-59 — the AI's set prescription still steers off the flat binary
 
@@ -5110,6 +5072,49 @@ value**, so this is only visible by comparing against the raw tables.
 **Pass test:** re-running the recompute on 2026-08-31 restores drain ≈113 from the 3,815 stored
 samples, and no day whose raw HR count is non-zero stores `hr_sample_count = 0`.
 
+### [readiness] TN-22 — the stored `stress_high_minutes` disagrees with the model's own buckets on 8 of 9 days, and that is Q-507
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-01 · owner: *"does this mean stress will work properly soon?"*
+- **Lane: A** — the writer of the daily scalar, not the stress model.
+- **Reference:** [`review`](reviews/2026-09-01-stress-sign-explained.md). **This explains Q-507 and reverses its conclusion.**
+- **Likely the same defect as TN-20** — a later pass recomputing a completed day from an impoverished input. Stated as *likely*: the mechanism is identified in neither.
+
+`stress_high_minutes` is bucket-minutes below `STRESS_HIGH_LEVEL = -0.5`, so with TN-3a's buckets
+persisted it can be **recomputed and compared with what was stored**. Correct direction is negative.
+
+| | vs sleep | vs readiness |
+|---|---|---|
+| **stored `stress_high_minutes`** | **+0.137** | **+0.338** |
+| recomputed from buckets, all hours | **−0.181** | **−0.438** |
+| recomputed, waking window only | **−0.289** | **−0.477** |
+
+**Recomputing the same quantity from the model's own output flips the sign to correct.** Dropping
+2026-08-31 — a known **TN-20** casualty whose readiness/sleep were overwritten to 25/15 — strengthens
+it to **−0.383 / −0.699** (n = 8). The finding is *masked* by the corrupt day, not caused by it.
+
+**8 of 9 days disagree**, and four store **zero** against 210–270 bucket-minutes:
+
+| date | stored | buckets |
+|---|---|---|
+| 08-24 | **0** | 240 |
+| 08-25 | 30 | 270 |
+| 08-26 | **0** | 210 |
+| 08-27 | **0** | 270 |
+| 08-28 | 60 | 120 |
+| 08-29 | **0** | 210 |
+| 08-30 | 30 | 240 |
+| 08-31 | **0** | 240 |
+| **09-01** | **180** | **180 — MATCH** |
+
+**The only day that agrees is the newest.** Same shape as TN-20.
+
+**⚠ What this does NOT establish.** n = 8–9. The waking window is 06:00–22:00 chosen by the review,
+**not the app's definition**. The buckets are written by the same pipeline as the scalar, so *"the
+buckets are right"* rests on their producing the correct sign, not on independent verification.
+
+**Pass test:** for every stored day, `stress_high_minutes` equals the bucket-derived count; and on a
+re-test at **n ≥ 30** the metric correlates negatively with readiness at |r| ≥ 0.3.
+
 ### [readiness] TN-21 — "daytime stress" is 55% night buckets, and night and day carry opposite signs
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-01 · found answering the owner's *"is the stress system working correctly?"*
@@ -5138,10 +5143,15 @@ minutes** — 2026-09-01 has 21 buckets and 150 minutes; 2026-08-26 has 29 and z
 scored against *the day's own median*, so a sparse day computes that median from fewer points and
 more buckets land far from it.
 
-**⚠ n = 9. Treat the −0.784 as a lead, not a result.** It is worth recording because it is the
-**reverse** of the data-density hypothesis refuted on 2026-08-26 (r = −0.128 against *HR sample
-count*) — sample count and bucket count are different quantities, and the bucket count is the one the
-model divides by.
+**⚠⚑ THE Q-507 CANDIDATE ABOVE IS SUPERSEDED — same day, by TN-22.** The backwards sign is **not a
+property of the model**: recomputed from these same buckets, `stress_high_minutes` correlates
+**−0.438** with readiness (**−0.699** waking-only), while the *stored* scalar reads +0.338. So the
+−0.784 bucket-count relation was explaining an artefact of the stored value, exactly as the
+data-density hypothesis (refuted 2026-08-26) had been.
+
+**What survives, and it is the reason this entry stays open: the WINDOW.** The series really is 55%
+night, and restricting it to waking hours moves the readiness correlation from **−0.452 to −0.699**.
+That is a real gain on its own, independent of TN-22.
 
 **Pass test:** the persisted series is restricted to the waking window (or the metric is renamed and
 its consumers re-checked), and after that `stress_high_minutes` no longer correlates with bucket
@@ -8171,61 +8181,32 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 
 ### [app-shell][devices] Q-531 — Q-234 moved the device consoles out of /admin, and in use that made them worse
 
-- **✅ THE OWNER GATE IS CLEARED, 2026-09-01 — the field is removed above, deliberately.**
-  Asked where the drain / re-sync / verify flow should live, the owner answered: *"Happy to have it
-  wherever you want; but it should be behind the admin portal — as regular users should not be able
-  to touch it."*
-- **So the decision has a hard half and a soft half, and only the hard half is the owner's.**
-  - **Hard, and it settles Q-234's premise: these consoles go back behind `/admin`.** Q-234 moved
-    them to Settings → Developer on a taxonomic argument — device diagnostics are not user
-    administration — and that argument never weighed *who may reach them*. The app has other users
-    (CLAUDE.md's amended Canonical Runtime section says so outright), and a drain or a re-sync is
-    destructive in the wrong hands. Access control beats taxonomy, so the move is reverted in
-    effect. **`requireAdmin`, not merely an unlinked route** — hiding a page is not gating it.
-  - **Soft, and it is the implementer's: one screen holding the whole flow.** The owner explicitly
-    handed the layout back. Their original complaint was *"everything is spread out sporadically"*,
-    which is about the flow being broken across places rather than about the parent menu — so
-    reverting the location alone would leave the actual grievance intact. **Build the three consoles
-    as one `/admin` Devices screen carrying drain → re-sync → verify end to end**, in the order the
-    runbook uses.
-- **What this does NOT license.** The entry still asks for the owner to walk the flow and say where
-  they expected each step to land, and that is still worth having — but it is no longer a blocker,
-  because the failure it guards against (an agent re-picking the structure on taxonomy alone) is
-  precisely what the "one screen, runbook order" instruction removes. Reversal cost is low: a screen
-  and a route guard, no data.
-- **Lane:** B for the screen; **the `requireAdmin` guard on any route that moves is Lane A.** If the
-  routes stay put and only the UI regroups, it is Lane B alone.
-
-- **Superseded context — the block below is what the entry said before the decision.** Skipped by
-  Implementation Lane B on
-  2026-08-17 while taking Q-532 below it. This entry asks for the *premise* of a shipped IA decision
-  to be re-litigated against a real user's task, and the owner's report is the only evidence of what
-  that task actually is. An agent choosing the new structure alone would be repeating exactly the
-  mistake the entry describes — Q-234 reasoned taxonomically, correctly on paper, and was wrong in
-  use. What unblocks it: the owner walking the drain/re-sync/verify flow start to finish and saying
-  where they expected each step to live. That is a planning session's output (a plan doc), not a
-  Lane B implementation item.
-- **Branch:** `fix/device-console-ia`
+- **Keep:** the owner walking the drain → re-sync → verify flow on the S25 and saying whether the
+  section order matches what they actually do. That was never a blocker and is not one now; it is the
+  only part that cannot be answered from the sandbox.
+- **Verify:** device.
+- **✅ SHIPPED** (`fix/device-console-ia`, 2026-09-01, v1.421.0). `/admin` grew a **Devices** tab;
+  `/admin/oura-ble` is six numbered sections in §4-of-the-runbook order rather than fourteen stacked
+  consoles; Settings → Developer lost its device rows and kept Diagnostics.
+  `app/admin/__tests__/device-console-access.test.ts` pins the gating, the reachability, the one-home
+  rule and Q-544's card ordering — five mutations, five failures.
+- **⚠ THE ENTRY'S HARD HALF WAS ALREADY TRUE, AND THAT CHANGED THE WORK.** It reads as though the
+  consoles needed moving back behind `/admin` under `requireAdmin`. They were already there:
+  `/admin/oura-ble`, `/admin/cadence` and `/admin/data-capture` all call `isAdminUser` and redirect,
+  and always did — **Q-234 moved the LINKS, not the routes.** So the owner's *"it was moved away from
+  the admin section"* was true of the navigation and false of the routing: they went to `/admin`, the
+  consoles were not listed, and they concluded the consoles had left. **A reachability defect, which
+  needs the opposite fix from the one this entry proposed.** Implementing it as written would have
+  been a no-op dressed as a security fix.
+- **Lane:** B. No route moved, which is what the entry's own lane rule makes the deciding question.
+- **Do not re-add a device row to Settings → Developer.** Two homes is what *"everything is spread
+  out sporadically"* meant, and the taxonomy argument that put them there (Q-234: device diagnostics
+  are not user administration) is sound on paper and was wrong in use. The owner: *"it should be
+  behind the admin portal — as regular users should not be able to touch it."*
+- **Related, and still open:** Q-537 (the ring key has one copy — its placement half, nesting the key
+  field behind something deliberate so it cannot be edited by accident, is still unbuilt) and Q-532
+  (the scan auto-recentre).
 - **Added:** 2026-08-17, from an owner report while running the Oura re-sync runbook.
-- **This is feedback on a shipped change, not a new idea.** Q-234 landed 2026-08-15 (v1.313.0):
-  `/admin` kept user administration, diagnostics moved to **Settings → Developer**, and the three
-  device consoles became rows there. Its journal records that as done and correct. The owner, using
-  it under real conditions for the first time, reports the opposite: *"it was moved away from the
-  admin section to the diagnostic section = bad"*, and *"everything is spread out sporadically,
-  needs organisation"*.
-- **Why the disagreement is the useful part.** Q-234's reasoning was taxonomic — device diagnostics
-  are not user administration, so they belong apart. That is sound on paper and appears to be wrong
-  in use, because the operations these screens support (drain, re-sync, verify) are a **single task**
-  that now spans two locations. Re-litigate the premise before re-arranging anything; a second
-  reorganisation chosen the same way will land in the same place.
-- **What to do.** Read the Q-234 entry and its journal first, then treat this as an IA question with
-  a real user's task in hand: what does someone actually *do* on these screens, start to finish, and
-  where should that live. The answer may be that diagnostics belong back under `/admin`, or that
-  the split is right but the destination is wrong. Decide it deliberately and write down why.
-- **Related:** Q-537 (ring key has one copy) and Q-532 (the scan auto-recentre) both live on these
-  screens. Q-537's placement half — the key field should be nested behind something deliberate so it
-  cannot be edited by accident — is best solved as part of this, not separately.
-- **Verification:** device-only. None of it is checkable from the sandbox.
 
 ### [workouts][app-shell][platform] Q-461 — the workout flow cannot be automated past set 1: the Start Set button animates forever, so Playwright never sees it as stable
 
@@ -9639,6 +9620,22 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   measurable confound without removing the feature.
 - **n = 25 is small** — at that size r = +0.40 sits near the conventional significance boundary, so the
   strength is provisional. The group means are the durable part. Re-measure at n ≈ 60.
+- **✅⚑ EXPLAINED 2026-09-01 — AND THE CONCLUSION IS REVERSED. See TN-22.**
+  ([review](reviews/2026-09-01-stress-sign-explained.md).) **The stress model was never the problem.**
+  `stress_high_minutes` recomputed from the model's own persisted buckets correlates **−0.438** with
+  readiness (**−0.699** on the waking window, n = 8) — the physiologically correct direction — while
+  the **stored** scalar reads **+0.338**. **The stored value disagrees with the buckets on 8 of 9
+  days**, storing zero against 210–270 bucket-minutes on four of them, and agrees only on the newest
+  day. This entry's *"the signal points the wrong way"* is true of the stored scalar and **false of
+  the model**.
+- **⛔ Both previously-proposed mechanisms are superseded, including one filed the same week.** The
+  data-density hypothesis was refuted on 2026-08-26 (r = −0.128 vs HR sample count) and TN-21's
+  bucket-count hypothesis (r = −0.784) is retired here — both tried to explain a phenomenon that is
+  **not a property of the model**. TN-21's *window* finding stands on its own (the series is 55%
+  night; restricting it moves readiness from −0.452 to −0.699).
+- **Do not act on this entry's original recommendation** to swap the override input to
+  `daytime_stress_scaled` or gate on coverage. **Fix TN-22 first, then re-test at n ≥ 30** — everything
+  above rests on 8 days.
 - **⚑ Amended 2026-08-26 — re-measured at n = 33, and it replicates and strengthens.**
   ([pillar review](reviews/2026-08-26-pillar-review.md) §4.) `corr(stress_high_minutes,
   readiness_score)` = **+0.386**, essentially unchanged. **New:** `corr(stress_high_minutes,
@@ -10995,26 +10992,6 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   fault. Worth a glance at what is stored per row. `oura_raw_samples` at **341 MB** is the
   deliberate archival policy and is explicitly **out of scope** here (see
   `docs/db-volume-cleanup-handover.md`).
-
-### [app-shell][activity] LA-42 — `trainingBoostFrom` can never be non-null, now structurally
-
-- **Branch:** _unassigned_ · **Lane: B** — `components/health/health-score-detail.tsx`
-- **Added:** 2026-08-30 · Lane A, from Q-284's removal.
-- `health-score-detail.tsx:205` computes
-  `trainingBoostFrom={… data.activityBlend.adjustment > 0 ? data.activityBlend.base : null}`.
-  Q-284 deleted `blendActivityScore`, so `adjustment` is now a literal `0` in
-  `readiness-payload.ts` and that ternary can only ever take its null arm.
-- **Not a regression, and that distinction matters for how urgent this is.** The prop was already
-  dead in practice — the blend last had an Oura score to adjust on **2026-07-07**, the re-key day —
-  so nothing changes for a user. Q-284 turned "dead in practice" into "dead by construction", which
-  is what makes it safe to delete rather than merely unused today.
-- **The fix is a deletion**, in Lane B's file: drop the prop and whatever `ScoreRing` does with it,
-  unless that path has another caller. The sibling banner this pairs with (`activity-content.tsx`'s
-  *"Oura 56 · +10 training → 66"*, named in the 2026-07-02 plan) is **already gone** — a grep for
-  `.adjustment` across `app/` and `components/` returns this one line and nothing else.
-- **Low priority.** No user-visible fault; it is dead-weight removal on a surface that already
-  renders correctly.
-
 
 > **⚑ Q-232 … Q-244 are one cluster** — the 2026-08-14 UI/flow/IA + caching review, requested by the
 > owner ("a good review on the ui and flow/location mainly … alongside that have a look at caching

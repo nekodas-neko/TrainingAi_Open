@@ -6,6 +6,26 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.421.0",
+    date: "2026-09-01",
+    changes: [
+      "The device consoles are listed in the admin console again. They were always routed there and always admin-only \u2014 what moved was the link, out to Settings \u2192 Developer, so going to the admin console and finding nothing was the whole problem.",
+      "The Oura BLE screen is in the order the runbook uses instead of fourteen panels in the order they were written: check there is room, drain, confirm what landed, validate it, then the probes and the two things that write.",
+      "Each section says when you would be on it, since a panel's title tells you what it reads and never when to read it.",
+      "Settings \u2192 Developer keeps the app diagnostics \u2014 error log, AI usage, day review \u2014 and no longer lists the device screens as well.",
+    ],
+  },
+  {
+    version: "1.420.0",
+    date: "2026-09-01",
+    changes: [
+      "Health, the day sheet, Profile details and Goals all show your DEXA-corrected body fat now. The correction already fed your calorie goal and protein target \u2014 the screens were still showing the scale's raw number, so the two disagreed with nothing to say which was which.",
+      "The Body Fat card says why its number differs from the scale: the offset, and how many scans it came from. One scan is one comparison, not a settled calibration, so it says that rather than hiding it.",
+      "Where a stretch of readings is on an instrument the scan does not cover, the card says how many of them are corrected, instead of letting the chart draw the changeover as an unexplained step.",
+      "Logging body fat still starts from the scale's raw reading, not the corrected one \u2014 saving a corrected number back would overwrite the measurement for good.",
+    ],
+  },
+  {
     version: "1.419.0",
     date: "2026-09-01",
     changes: [

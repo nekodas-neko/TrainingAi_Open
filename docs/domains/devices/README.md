@@ -23,6 +23,15 @@ documentation cluster in the repo (~45 known issues, ~38 plans, 300+ model files
 
 ## Reference docs — read in this order
 
+- [`docs/overview/entries/2026-09-01-fix-device-console-ia.md`](../../overview/entries/2026-09-01-fix-device-console-ia.md)
+  — **where the device consoles live, and why they are ordered the way they are (Q-531, 2026-09-01).**
+  All three (`/admin/oura-ble`, `/admin/cadence`, `/admin/data-capture`) are routed under `/admin`
+  and `isAdminUser`-gated, and always were; they are listed from the `/admin` **Devices** tab and
+  **deliberately not** from Settings → Developer, which keeps app diagnostics only. `/admin/oura-ble`
+  is six numbered sections in §4-of-the-runbook order. **Two things not to undo:** re-adding a device
+  row to Developer (two homes was the original complaint), and moving `DbFootprintCard` /
+  `DeviceMetricsPanel` below `OuraBleDebug` (Q-544 — they answer on a desktop, which is the point
+  when the APK is the thing that is broken). `device-console-access.test.ts` fails on either.
 - [`docs/superpowers/plans/2026-08-26-camera-form-capture.md`](../../superpowers/plans/2026-08-26-camera-form-capture.md)
   — **design only, nothing built or measured (PS-7, 2026-08-26).** Proposes the phone camera as a
   sensor: `@mediapipe/tasks-vision` in the WebView (self-hosted — the documented CDN path is

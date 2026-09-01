@@ -24,8 +24,50 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.419.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Version:** v1.421.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-09-01.
+
+**A score-ring arc that could not be drawn is gone (LA-42).** `ScoreDisplay` took a
+`trainingBoostFrom` and drew a second brand-coloured arc for the share of an activity score that came
+from a same-day training blend. `blendActivityScore` went with Q-284, so `adjustment` is a literal 0
+at **both** of that payload's construction sites and the branch was unreachable. **Not a
+regression** — the blend last had an Oura score to adjust on 2026-07-07, the re-key day, so it had
+been dead in practice for two months; Q-284 made it dead by construction, which is the difference
+that licenses a deletion. **No guard and no version bump, both deliberate:** the invariant a test
+could pin lives in Lane A's file and would block the revival it is meant to protect, and nothing a
+user can see changed. All three score screens re-rendered with their rings intact
+([journal](docs/overview/entries/2026-09-01-chore-la-42-drop-dead-training-boost.md)).
+
+**The device consoles have one home, and the BLE page is a runbook (Q-531).** Owner, running the
+re-sync: *"it was moved away from the admin section = bad"* and *"everything is spread out
+sporadically."* **The first half was already false and checking it changed the work:** all three
+consoles were routed under `/admin` and `isAdminUser`-gated the whole time — Q-234 moved the *links*
+to Settings → Developer, so the owner went to `/admin`, found nothing listed, and reasonably
+concluded they had left. A **reachability** defect, needing the opposite fix from the one the entry
+proposed; building it as written would have been a no-op dressed as a security fix. `/admin` now has
+a **Devices** tab, `/admin/oura-ble` is six numbered sections in §4-of-the-runbook order instead of
+fourteen stacked consoles, and Settings → Developer keeps Diagnostics only.
+`device-console-access.test.ts` pins the gating, the reachability, the one-home rule and Q-544's
+card ordering — five mutations, five failures. Non-admin redirect verified on all three routes.
+**Not device-verified, and here that is most of the value** — every console below step 2 needs the
+native plugin, so the structure was checked and the flow was not
+([journal](docs/overview/entries/2026-09-01-fix-device-console-ia.md)).
+
+**The screens show the DEXA-corrected body fat now (LA-45).** BF-2 step 4 put
+`bodyFatCorrected`/`bodyFatIsCorrected` on every row of `/api/body-metadata` and `/api/day-log`, plus
+the offset once per response — and **nothing read any of it**, so Health showed the raw 18.4 while the
+calorie goal was already built from the corrected 21.6. Seven surfaces now go through one rule
+(`components/health/body-fat-display.ts`), and the card says why its number differs from the scale:
+`DEXA-corrected +3.2% · 1 scan compared`, with `3 of 4 corrected` on a window that mixes instruments,
+because two thirds of the history is on instruments the offset does not cover. **Two invariants hold
+it and both are easy to reverse:** `bodyFat` stays what the log sheet seeds from (it POSTs at `manual`,
+which outranks `scale_ble`, so a corrected value round-tripped through the edit sheet would overwrite
+the measurement permanently), and "corrected" is never inferred from the values differing, since an
+offset can round to zero. Verified on `pnpm dev` against a hand-seeded DEXA pair — the local seed has
+none, so the whole path is unreachable without one — including the case that matters: the card read
+21.6 while the log sheet seeded 18.4. **Not device-verified**, and the local-store fix inside it is
+only reachable on the APK
+([journal](docs/overview/entries/2026-09-01-feat-la-45-corrected-body-fat-display.md)).
 
 **The More page is two groups, not nine (BF-82).** Owner: *"a review of all the pages/chevrons in
 the More page and reorganize/group things together that can be. It’s very messy and not very
@@ -1050,6 +1092,22 @@ window, then the newest `history-*.md`. The 157 dated status notes this section 
 > An entry only leaves when **nothing is still owed**: no open work, no pending owner or device
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
+
+### [readiness] 🟡 Q-507 explained and REVERSED — the stress model is sound; the stored daily scalar is what points backwards (TN-22, 2026-09-01)
+
+**Measured, not fixed.** Open since 2026-08-18, now with a mechanism. [`review`](docs/reviews/2026-09-01-stress-sign-explained.md).
+- `stress_high_minutes` is bucket-minutes below −0.5, so TN-3a's persisted buckets allow it to be **recomputed and compared with what was stored**. Correct direction is negative.
+
+  | | vs sleep | vs readiness |
+  |---|---|---|
+  | **stored** | +0.137 | **+0.338** |
+  | recomputed, all hours | −0.181 | **−0.438** |
+  | recomputed, waking only | −0.289 | **−0.477** |
+
+  Dropping 2026-08-31 (a **TN-20** casualty) strengthens it to **−0.383 / −0.699** (n=8) — the finding is *masked* by the corrupt day, not caused by it.
+- **8 of 9 days disagree**, four storing **zero** against 210–270 bucket-minutes; **the only day that agrees is the newest.** Same shape as **TN-20**, and plausibly the same defect — stated as *plausibly*, since neither mechanism is identified.
+- **Q-507's conclusion is reversed:** *"the signal points the wrong way"* is true of the stored scalar and **false of the model**. **Both previously-proposed mechanisms are superseded** — the refuted data-density one and TN-21's bucket-count one — because both explained an artefact. **TN-21's window finding survives** (55% night; restricting it is worth −0.452 → −0.699).
+- **⚠ n = 8–9, the waking window is this review's choice not the app's, and the buckets are written by the same pipeline as the scalar.** **Re-test at n ≥ 30 before anything is built on the metric.** TN-16 stays parked, but its blocker is now a persistence bug with a route rather than an open research question.
 
 ### [readiness][body][devices] 🔴 A recompute overwrites a completed day with an empty result — the inputs to rebuild it still exist (TN-20, 2026-09-01)
 
