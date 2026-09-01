@@ -24,7 +24,7 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.425.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Version:** v1.427.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-09-01.
 
 **A CI flake had a cause, and `main` gets a nightly (LB-31).** `anchor-source.test.ts` failed once
@@ -39,6 +39,36 @@ green against the `main` it was cut from, and nothing re-checked the combination
 landed; a failure now names `main` and the merge window instead of the next contributor's PR. **The
 no-`push` decision is untouched**
 ([journal](docs/overview/entries/2026-09-01-verify-main-nightly.md)).
+
+**The walk pacer reads speed now rather than the whole walk (LA-52).** `appendPoint` set
+`currentPaceSecPerKm` from cumulative distance over cumulative elapsed and the screen fed that
+straight into `readPacer`, so the speed rung's input was the **average speed of the walk so far**.
+Twenty minutes in, a surge or a slow-down moved it by almost nothing; `STOPPED_KMH` could never fire,
+because standing still cannot drag a whole-walk average below 1.5 km/h; and warm-up, fast and slow
+all banded against one drifting number. `windowedSpeedKmh` now reads the last **20 s** of
+`rawPoints`, carried on the store as `recentSpeedKmh`. **The entry missed half of it: the big
+on-screen km/h was the average too** — under a comment claiming both figures came off one series —
+so a walker reading 4.8 km/h mid-walk was reading their average since starting. That number is live
+now and the min/km beside it is labelled `avg`. **`e2e/walk-pacer-speed-rung.spec.ts` asserted the
+two were one number in two units and was updated in the same PR**, since that claim is now false by
+design. **Not device-verified** — slowing mid-segment and stopping at a crossing are LB-36's device
+checks 2 and 3, which could not have passed before this
+([journal](docs/overview/entries/2026-09-01-fix-la-52-windowed-walk-speed.md)).
+
+**A Recommended value under every goal field, and no model behind it (BF-101).** The owner asked
+for one and assumed AI: *"id assume we use AI here to choose but maybe we could have some logic to
+decide so not using the ai if not needed?"* It needs none — `calculateBaseline` already returns a
+deterministic figure for every field on that screen except sleep, and the AI route computes that
+same baseline before asking a model to *adjust* it. The control now sits under steps, water and
+calories, plus protein, carbs and fat in Macro Targets, each naming where its number comes from.
+**The matching state is half the feature:** the entry was filed on live drift — the steps goal held
+**7,000**, the *sedentary* figure, while the activity level said Moderate, whose target is
+**10,000**, and nothing on screen said which fields followed the recommendation. **The measured RMR
+is carried through** rather than dropped, so the button cannot quote a predicted resting rate on a
+screen whose Health card shows a measured one. **Sleep and fiber get no button** — `BaselineResult`
+carries no figure for either, and the guard pins that. **Not device-verified** — six controls land
+in an already-dense collapsible at 412 dp
+([journal](docs/overview/entries/2026-09-01-feat-bf-101-recommended-values.md)).
 
 **One name for the saved list — `My Foods`, everywhere (BF-103).** The owner overrode the entry's own
 proposal and was right to: it suggested `Saved` for the tab with `My Meals` left on the button, which
@@ -1206,6 +1236,16 @@ window, then the newest `history-*.md`. The 157 dated status notes this section 
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
+### [sleep] 🟡 A good night scored 63: the display curve, the duration curve, and one autonomic dip counted twice (TN-23, 2026-09-03)
+
+**Measured, nothing fixed. Owner:** *"why would sleep score be so low for this? I'd imagine 80s if not 90s."* 8 h 15 m, 97% efficiency, REM 92, restfulness 95. [`review`](docs/reviews/2026-09-03-why-a-good-night-scored-63.md).
+- **The blend is 76.04 and the app shows 63** — reproduced exactly from the stored contributors and `SLEEP_WEIGHTS`. **The owner's intuition matches the blend**, which is what the ten contributors produced.
+- **Cause 1 — the display curve costs 11.9 points.** That is **TN-5**, signed off 2026-08-24 and **still unshipped**. Largest single factor, and not a judgement about the night.
+- **Cause 2 — 8.25 h scores 81** where `TOTAL_SLEEP`'s own comment three lines above says *"8h is excellent (~92)"*. That is **TN-10**, signed off 2026-08-30. The heaviest contributor (weight 24) disagrees with its own documentation.
+- **Cause 3 — NEW (TN-23): `hrv` and `hr` are the same autonomic event, scored twice.** `r = +0.869`, **75% shared variance** over 38 nights, **28 of 110 = 25%** of the sleep score. Both are computed correctly — HRV 50 ms/0.85× → 42 and HR 63 bpm/1.035× → 58 are exactly what their curves specify — but together they drag this night's blend **12.7 points** for one physiological event.
+- **⛔ Do not fix TN-23 by deleting a contributor.** Both curves are sound and the combined signal is the score's strongest recovery evidence (resting HR is the best predictor of the owner's felt state). **Collapse them into one autonomic contributor, or down-weight the pair to a joint ~14–18.**
+- **What the night should have scored: ~76 today, low-to-mid 80s after TN-5 and TN-10**, with a few points still owed to a genuine HRV dip (50 ms against a 59 ms norm, near the bottom of the owner's 43–71 range). **63 is wrong; 90 would have been too.**
+
 ### [readiness] 🟡 Q-507 explained and REVERSED — the stress model is sound; the stored daily scalar is what points backwards (TN-22, 2026-09-01)
 
 **Measured, not fixed.** Open since 2026-08-18, now with a mechanism. [`review`](docs/reviews/2026-09-01-stress-sign-explained.md).
@@ -1334,6 +1374,14 @@ than flipping silently back to "Voice".
 
 JS-only — it reaches the phone on the next Railway deploy, no APK rebuild.
 
+**Confirmed fixed in production 2026-09-01 (BF-106's fault beat), which narrows what the device still
+owes.** The fault fired on **6 of the 8 workout days** before the fix — 7 rows across 5 sessions,
+2026-08-23 → 2026-08-30T02:06, that last one being the row LA-37 was opened on. Since the fix there
+has been **one workout, 2026-09-01, and zero rows**. So the promise settles now; the hang is gone.
+**That is n=1 and it only proves the negative** — no unhandled rejection — which is exactly the half
+that was observable remotely. Whether the button is *drawn* and whether pressing it logs a set are
+still unobserved, so the smoke step above stands unchanged.
+
 ### [workouts][devices] ⚠️ The exercise clip is on the ready screen; nobody has seen it move (BF-65, v1.405.0)
 
 The clip renders at 64 px beside the exercise name, tapping it opens a full-width strip, and an
@@ -1418,9 +1466,53 @@ that need an owner, and for the barcode chain.
 
 **No action, and it resolves itself.** The 30-day prune is working (oldest row is exactly 30 days back), so those burst days age out between now and ~2026-09-12 and the table returns to a few MB. Last 7 days hold **39 rows total**. Nothing is owed.
 
-### [platform] 🟡 The database is growing ~4x faster than `CLAUDE.md` predicts — measured, not yet a problem (Orchestrator, 2026-08-25)
+### [platform] 🟢 The database's above-trend growth is an un-pressed `VACUUM FULL`, not a growth problem (BF-106, 2026-09-01)
+
+**The third reading this row asked for, taken 2026-09-01, and it resolves the question rather than
+extending it.** `sum(pg_total_relation_size)` reads **198 MB** — so the series is **171 MB
+(08-18) → 182 MB (08-25) → 198 MB (09-01)**, i.e. 1.6 then **2.3 MB/day**. The rate is not settling,
+it is rising, which rules out the "compacted heap regrowing slack" reading this row was resting on.
+
+**Nearly all of it is `oura_raw_samples`: 50 → 58 → 73 MB.** Two hypotheses were tested against
+production and both are wrong:
+
+- **Not more data.** Ingest is flat at ~24k frames/day (19,323–25,598 across the last 8 days), and the
+  table holds exactly its intended window — `HOT_WINDOW_DS` is **7 days**, and a count of rows older
+  than 8 days returns **0**. The packer's backlog is fully absorbed.
+- **Not bloat.** `oura_raw_samples` reports `n_dead_tup = 0` with `last_autovacuum` at
+  2026-09-01T17:57 — autovacuum is running on it and there is nothing dead to reclaim.
+
+**What is left is the one thing the packer's own docstring already names.** Pack-and-delete frees
+space *inside* the file; Postgres does not hand it back to the OS without a `VACUUM FULL`, which
+`lib/data/postgres/slices/oura-raw-pack.ts` describes as "a single press" once the backlog is gone.
+The backlog has been gone since roughly 2026-08-25 — the docstring predicted "a day and a bit" from
+2026-08-24 — and the press has not happened. So the file is sitting at its high-water mark while the
+live rows have fallen 318,183 → 191,454.
+
+**⚠ How much comes back is not known and should not be guessed.** Rows fell ~40% while the file fell
+~21%, which is consistent with slack but is not a measurement of it. `GET /api/admin/vacuum` lists
+each allowlisted table's current size precisely so the reclaim can be read before and after — that
+GET is the number, not this row's arithmetic. Q-315 is the cautionary precedent: the same reasoning
+about `error_events` predicted a large reclaim and the button returned **0 B**, because the figure
+had been a stale planner estimate all along.
+
+**Owed:** the owner presses `POST /api/admin/vacuum` for `oura_raw_samples` and reads the GET either
+side. Tracked as **BF-106**. Not urgent — the volume is 5 GB, storage bills at $0.15/GB/month, and
+even the whole 198 MB is about three cents.
+
+**⚠ And a `CLAUDE.md` fact this reading falsifies.** That file states `last_analyze` and
+`last_autovacuum` are "**NULL on every table**", measured 2026-08-20, and uses it to argue
+`n_live_tup` can be arbitrarily stale. Autovacuum and autoanalyze now run: `oura_raw_samples`
+autoanalyzed at 20:17 and its `n_live_tup` of **191,454** matches `count(*)` exactly. **The rule
+survives, its reason does not** — `oura_raw_packed`, which autoanalyze has *not* reached, still reads
+`n_live_tup = 55` against **1,051** real rows. So: keep using `count(*)`, because coverage is partial
+and you cannot tell which side a table is on without checking. Corrected in `CLAUDE.md` in this PR.
+
+<details><summary>The 2026-08-25 reading this supersedes</summary>
 
 **Measured, filed because the rule says to, explicitly not an alarm.** `CLAUDE.md` states a **171 MB** baseline (2026-08-18) and ~0.4 MB/day expected. Like-for-like on 2026-08-25 — `sum(pg_total_relation_size)` over 87 user tables, which is what that baseline measured, **not** `pg_database_size`'s 197 MB — reads **182 MB**: **11 MB in 7 days ≈ 1.6 MB/day, ~4x the stated trend**. Almost all of it is `oura_raw_samples` (50 → **58 MB**, ≈1.1 MB/day), the BLE ingest accumulating normally. **⚠️ Two readings are not a trend and the baseline is the weak one** — 171 MB was taken immediately after both the repack and the `disk_full` incident, so a compacted heap regrowing slack inflates any rate off it. **Action: a third reading next session**; if ~1.6 holds, correct `CLAUDE.md`'s 0.4, not the database. Not urgent — ~8 years of volume headroom, ~3 cents/month. **`error_events` is NOT bloat and never was** — see the row above; it is 52 MB of live rows and shrinks on its own as one already-fixed burst ages past the 30-day prune. [`readings`](docs/reviews/2026-08-25-railway-and-db-readings.md) §5.
+
+</details>
 
 ### [platform][devices] ⚠️ `/api/body-battery` was 500ing in production; the fix is unverified there (LA-20, 2026-08-23)
 

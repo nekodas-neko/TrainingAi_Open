@@ -6261,8 +6261,113 @@ of an APK cycle: a NotificationChannel's sound and vibration are immutable once 
 differentiating fast from slow needs new channel ids rather than edited settings; and that work is JS
 in `capacitor-native-init.tsx`, so it ships through Railway despite looking native. The one genuinely
 native piece — a custom sound file in `res/raw/` — is marked as such.
+## 2026-09-03 — backlog → 15102, `projectOverview.md` → 9009, `docs/agents/state/tuning.md` → 388 (TN-23)
 
-## 2026-09-01 — `projectOverview.md` → 9066, `docs/implementation-backlog.md` → 15406 (LB-31 shipped)
+One entry, from one owner question about one night — and the length is the **arithmetic that turns an
+opinion into a finding**. The ten stored contributors blend to **76.04**; the app shows **63**. Without
+that reproduction the entry is "the sleep score feels low", which is unactionable and has been asked
+three times.
+
+**TN-23 itself is the new part**: `hrv` and `hr` correlate at **+0.869** across 38 nights, share 75%
+of their variance, and carry **28 of 110** — a quarter of the score on one physiological axis, charged
+twice. The entry spends its lines on the ⛔ **do not delete a contributor**: both curves are provably
+correct for this night, and the combined signal is the score's best recovery evidence, so the naive
+fix would remove the most informative input in the model.
+
+The baton gains the general move — **reproduce a score from its stored contributors before theorising
+about it** — plus the observation that twice now the owner's *"this is too low"* resolved to the
+**display curve** (TN-5, signed off, unshipped) rather than to the model.
+
+## 2026-09-03 — `docs/agents/state/tuning.md` → 395 (the sleep-baseline near-miss)
+
+Seven lines, and they stop a false finding that was one edit from being filed. Asked whether a 100
+sleep score is reachable, this agent compared stored `hrv` contributors against
+`oura_daily_summary.hrv_baseline_mean_x8` and concluded the owner's best nights had been inflated by
+an immature baseline. **The sleep score does not read that column.** `buildSleepAudit` calls
+`sleepScoreBaselines(prior, tz)` — a trailing window over prior nights, excluding the night being
+scored.
+
+The rule *"read which baseline a consumer actually calls"* was already in this baton from three
+earlier instances this week and was walked into anyway, which is the argument for stating it against
+the **specific** consumer rather than in general. The entry also records the positive half: this is
+the one baseline in the codebase built correctly, and TN-6 can copy it rather than invent one.
+
+## 2026-09-01 — three docs raised for the fault beat and two walk reports (BF-106/107/108)
+
+`docs/implementation-backlog.md` 15481 → 15610, `projectOverview.md` 9063 → 9115, `CLAUDE.md`
+1198 → 1204.
+
+The backlog gains three entries. **BF-106** is the third database-size reading `projectOverview.md`
+asked for, and it costs its length by ruling things out rather than asserting: ingest is flat, the
+7-day window holds, `n_dead_tup` is 0 with autovacuum having just run — so the above-trend growth is
+neither data nor bloat but an un-pressed `VACUUM FULL` the packer's own docstring already calls "a
+single press". The Q-315 precedent is written in beside it, because the identical argument about
+`error_events` predicted a large reclaim and the button returned 0 B. **BF-107** and **BF-108** are two
+owner reports from one walk; each names the trap that makes the obvious fix wrong — adding a calories
+tile renders a dash, because the value is derived server-side after the screen paints; and fixing only
+the Done destination leaves the stale title, which is reachable from the tab bar anyway.
+
+`projectOverview.md` replaces the growth row with its resolution (the superseded reading is folded
+into a `<details>` rather than deleted) and adds a production confirmation to the LA-37 row that
+narrows the device check from "does the fix work" to "press the button".
+
+`CLAUDE.md`'s +6 lines are a correction, not an addition: it stated `last_analyze`/`last_autovacuum`
+are "NULL on every table", which was true on 2026-08-20 and is false now. The rule it justified — use
+`count(*)` — survives and is more important than before, because coverage is now *partial*:
+`oura_raw_samples` reads exactly right while `oura_raw_packed` still reads 55 against 1,051, and
+nothing in the output says which side a table is on.
+## 2026-09-01 — `projectOverview.md` → 9078 (BF-101)
+
++15 for a feature whose whole point is a claim about *numbers*, and the numbers are what has to be in
+the index. The 7,000-against-Moderate drift is the evidence the control exists, and it is the one
+line a future session would otherwise have to re-derive from the owner's screenshot to know whether
+the feature is working.
+
+The measured-RMR sentence is there for a narrower reason: it is the decision most likely to be
+undone as an optimisation. Dropping that fetch looks free and silently reintroduces the "two numbers
+for one thing" defect LA-45 and BF-99 each cost a session to close.
+
+The backlog baseline is untouched — BF-101 left the queue as a shipped entry with a `Keep:` line for
+its device check, and LB-48 replaced it in roughly the same number of lines.
+
+**Recomputed from the merged file on rebase**, not spliced: `main` had moved to 9063 while this
+branch sat behind a red base, so the number this branch first wrote (9068, from a 9053 base) was
+stale by exactly the block someone else added. 9078 is the merged file's own count.
+
+
+## 2026-09-01 — `projectOverview.md` → 9145 (LA-52)
+
++15 for a defect whose whole content is *which number the screen was showing*. The three
+consequences — the band cannot respond, `STOPPED_KMH` can never fire, warm-up/fast/slow band against
+one drifting figure — are what a future session needs to not re-derive from the pacer's source, and
+they are the argument for the window existing at all.
+
+The sentence about the on-screen km/h earns its line separately: the entry did not name that half,
+the code comment beside it actively said the opposite, and it is the part a reader can check by
+looking at the screen. The e2e line is there because a spec that asserts something now deliberately
+false is the kind of thing a later session "fixes" back.
+
+**This number was recomputed three times and the warning it was written under came true.** The branch first
+wrote 9068 against a 9053 base; `main` then moved to 9063 behind a red CI (#775, #778, #766), making
+that stale before anything merged; #776 (BF-101) then landed its own 15-line status block on top, and
+#780 (BF-106) another after that.
+9145 is the merged file's own count. All three intermediate numbers were arrived at by recomputing from
+the file rather than splicing the conflict hunks, which is the only resolution that survives a base
+moving twice.
+
+## 2026-09-01 — `docs/implementation-backlog.md` → 15663 (LA-52 + two splits)
+
++56, and only about a third of it is LA-52's own shipped entry. The rest is two splits — **LB-49**
+(the meal-log scale argument) and **LB-50** (the measured activity factor plus a prompt string that
+tells the model something false) — carved out of BF-104 and BF-102 so their surface halves stop
+reading as startable to a lane that cannot start them.
+
+That is the trade this file exists to make visible: two entries that looked like work became four
+that describe it accurately, and the queue tool now parks two of them behind their engine halves
+instead of offering Lane B a build it cannot begin. LB-50's prompt bug is worth the lines on its own —
+it ships without any feature attached.
+
+## 2026-09-01 — `projectOverview.md` → 9158, `docs/implementation-backlog.md` → 15626 (LB-31 shipped)
 
 The backlog shrank: LB-31 carried two findings and a long options list, and what is left is the merge
 queue plus the correction to its own mechanism. That correction is the part worth the lines — the

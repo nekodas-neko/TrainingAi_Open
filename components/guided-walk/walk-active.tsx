@@ -21,7 +21,7 @@ import { useCachedValue } from '@/lib/hooks/use-cached-value'
 import { WALK_SEGMENT_STATS_TTL } from '@trainingai/shared/cache-ttl'
 import type { KindAggregate } from '@/lib/walk/segment-stats'
 import { WalkPacerBar } from './walk-pacer-bar'
-import { resolveCadenceTargets, speedTargetsFromHistory, kmhFromPace } from '@/lib/walk/walk-pacer'
+import { resolveCadenceTargets, speedTargetsFromHistory } from '@/lib/walk/walk-pacer'
 
 const ActivityRouteMap = dynamic(
   () => import('@/components/activity/activity-route-map').then(m => m.ActivityRouteMap),
@@ -38,8 +38,9 @@ export function WalkActive({ userProfile, onFinish }: {
 }) {
   const config = useGuidedWalkStore(s => s.config)
   const startedAtMs = useGuidedWalkStore(s => s.startedAtMs)
-  const { rawPoints, distanceKm, currentPaceSecPerKm } = useGuidedWalkStore(useShallow(s => ({
+  const { rawPoints, distanceKm, currentPaceSecPerKm, recentSpeedKmh } = useGuidedWalkStore(useShallow(s => ({
     rawPoints: s.rawPoints, distanceKm: s.distanceKm, currentPaceSecPerKm: s.currentPaceSecPerKm,
+    recentSpeedKmh: s.recentSpeedKmh,
   })))
   const plan = useMemo(() => buildIntervalPlan(config), [config])
   const samplesRef = useRef<WalkHrSample[]>([])
@@ -69,7 +70,10 @@ export function WalkActive({ userProfile, onFinish }: {
     'walk-segment-stats', '/api/guided-walk/segment-stats', WALK_SEGMENT_STATS_TTL,
   )
   const speedTargets = useMemo(() => speedTargetsFromHistory(segmentStats), [segmentStats])
-  const speedKmh = kmhFromPace(currentPaceSecPerKm)
+  // LA-52: the speed rung and the big readout are both "now", from a trailing window. Deriving
+  // either from `currentPaceSecPerKm` reads the average since the walk started, which cannot
+  // respond to a surge mid-segment and can never fall below `STOPPED_KMH`.
+  const speedKmh = recentSpeedKmh
 
   // Live-HR lifecycle + sample collection. This screen owns start()/stop().
   useEffect(() => {
@@ -183,12 +187,15 @@ export function WalkActive({ userProfile, onFinish }: {
         <>
           {/* km/h leads (owner asked for speed by name, and it is the natural reading for a walk);
               min/km stays beside it because that is the unit the summary's splits and best efforts
-              are in. Both come off the one pace series — there is no second computation. */}
+              are in. They are two different readings since LA-52 and the label has to say so: the
+              km/h is the last 20 seconds, the min/km is the average since the walk started. Showing
+              a live figure and a cumulative one side by side without the word `avg` is how the
+              cumulative one got mistaken for the live one in the first place. */}
           <div className="flex items-baseline gap-2">
             <span className="text-3xl font-bold tabular-nums">{speedKmh.toFixed(1)}</span>
             <span className="text-sm text-muted-foreground">km/h</span>
             <span className="text-sm tabular-nums text-muted-foreground">
-              · {Math.floor(currentPaceSecPerKm / 60)}:{String(Math.round(currentPaceSecPerKm % 60)).padStart(2, '0')} /km
+              · avg {Math.floor(currentPaceSecPerKm / 60)}:{String(Math.round(currentPaceSecPerKm % 60)).padStart(2, '0')} /km
             </span>
           </div>
           <div className="flex items-baseline gap-2" style={{ opacity: hrLive ? 1 : 0.5 }}>
