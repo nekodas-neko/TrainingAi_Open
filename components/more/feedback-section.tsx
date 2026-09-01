@@ -2,33 +2,22 @@
 
 import { useState } from "react";
 import { MessageSquarePlusIcon } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { FeedbackSheet } from "./feedback-sheet";
 
+/** BF-82: this used to be a hand-written copy of `MoreRowGroup` — a "FEEDBACK" heading over a
+ *  bordered card holding one button — which is the single-row-group shape the More tab had seven
+ *  more of. It opens a sheet rather than navigating, so it belongs with the other bottom actions
+ *  (Edit profile, Sign out), not among the navigation rows. */
 export function FeedbackSection() {
   const [open, setOpen] = useState(false);
 
   return (
     <>
-      <div>
-        <p className="px-1 pb-1.5 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
-          Feedback
-        </p>
-        <div className="rounded-2xl bg-muted/40 border border-border overflow-hidden">
-          <button
-            type="button"
-            onClick={() => setOpen(true)}
-            className="flex w-full items-center gap-3 px-4 py-3 hover:bg-muted/60 transition"
-          >
-            <div className="w-8 h-8 rounded-xl flex items-center justify-center bg-muted shrink-0">
-              <MessageSquarePlusIcon className="h-4 w-4 text-muted-foreground" />
-            </div>
-            <div className="text-left">
-              <p className="text-sm font-semibold">Report an Issue</p>
-              <p className="text-[10px] text-muted-foreground">Found a bug or have a feature idea? Let us know.</p>
-            </div>
-          </button>
-        </div>
-      </div>
+      <Button variant="ghost" className="w-full" onClick={() => setOpen(true)}>
+        <MessageSquarePlusIcon className="w-4 h-4 mr-2" />
+        Report an Issue
+      </Button>
 
       <FeedbackSheet open={open} onOpenChange={setOpen} />
     </>
