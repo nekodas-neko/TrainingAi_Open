@@ -6333,3 +6333,36 @@ its device check, and LB-48 replaced it in roughly the same number of lines.
 **Recomputed from the merged file on rebase**, not spliced: `main` had moved to 9063 while this
 branch sat behind a red base, so the number this branch first wrote (9068, from a 9053 base) was
 stale by exactly the block someone else added. 9078 is the merged file's own count.
+
+
+## 2026-09-01 — `projectOverview.md` → 9145 (LA-52)
+
++15 for a defect whose whole content is *which number the screen was showing*. The three
+consequences — the band cannot respond, `STOPPED_KMH` can never fire, warm-up/fast/slow band against
+one drifting figure — are what a future session needs to not re-derive from the pacer's source, and
+they are the argument for the window existing at all.
+
+The sentence about the on-screen km/h earns its line separately: the entry did not name that half,
+the code comment beside it actively said the opposite, and it is the part a reader can check by
+looking at the screen. The e2e line is there because a spec that asserts something now deliberately
+false is the kind of thing a later session "fixes" back.
+
+**This number was recomputed three times and the warning it was written under came true.** The branch first
+wrote 9068 against a 9053 base; `main` then moved to 9063 behind a red CI (#775, #778, #766), making
+that stale before anything merged; #776 (BF-101) then landed its own 15-line status block on top, and
+#780 (BF-106) another after that.
+9145 is the merged file's own count. All three intermediate numbers were arrived at by recomputing from
+the file rather than splicing the conflict hunks, which is the only resolution that survives a base
+moving twice.
+
+## 2026-09-01 — `docs/implementation-backlog.md` → 15663 (LA-52 + two splits)
+
++56, and only about a third of it is LA-52's own shipped entry. The rest is two splits — **LB-49**
+(the meal-log scale argument) and **LB-50** (the measured activity factor plus a prompt string that
+tells the model something false) — carved out of BF-104 and BF-102 so their surface halves stop
+reading as startable to a lane that cannot start them.
+
+That is the trade this file exists to make visible: two entries that looked like work became four
+that describe it accurately, and the queue tool now parks two of them behind their engine halves
+instead of offering Lane B a build it cannot begin. LB-50's prompt bug is worth the lines on its own —
+it ships without any feature attached.
