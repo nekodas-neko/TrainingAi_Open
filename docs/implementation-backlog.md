@@ -367,6 +367,132 @@ below threshold and left in place for next time.
 > BF-29 (My meals), BF-30 (Meal detail), BF-31 (Edit meal) and BF-26 (Quantity). Two artboards need
 > no entry — `Tap targets` and the `srv/g` studies both shipped in Q-395a.
 
+### [platform] BF-90 — `Gate: device` means two different things, and a third of them are on finished work
+
+- **Lane:** A — `scripts/check-backlog-pointers.js` and `scripts/next-item.js`, plus a field sweep
+  across `docs/implementation-backlog.md`.
+- **Added:** 2026-09-01 · owner: *"is there anything we can do to lower that? with our e2e and sentry
+  etc cant you do the testing thats needed?"*
+
+**Measured 2026-09-01: 41 gates — 31 `device`, 10 `owner`.** The owner's assumption was that his
+decisions are the bottleneck; they are 10 of 41. Device verification is the other 31.
+
+**Of those 31, eleven are on work that already shipped** — BF-72, BF-74, BF-73, BF-57, BF-75, BF-71,
+BF-65, BF-46, BF-52, BF-34, Q-406, every one of them phrased *"shipped/fixed; device check owed"*.
+They block nothing. But `Gate:` **parks** an entry, so `next-item.js` files them under PARKED beside
+genuinely blocked work, and the queue reads a third worse than it is.
+
+- **The field carries two meanings that want opposite handling.** *"Do not build this until the
+  device answers"* (PS-11 cannot start without a worn ring; BF-53 needs a scale) is a real block.
+  *"This is done, look at it on the phone when convenient"* is verification debt — it should be
+  visible, countable and **not** parked, because parking it hides finished work behind the same
+  wall as unstartable work.
+- **Recommendation: add `Verify: device` and leave `Gate: device` to mean blocked.** `Verify:`
+  prints in its own section (the way `Reference:` already does) and does not park. Mechanical to
+  apply: the eleven above are identifiable by their own headings, which already say "shipped". The
+  checker enforces that a `Gate:`/`Verify:` value is one of the known words, same as today.
+- **Why this before any tooling.** It costs the owner nothing and it is the only change here that
+  makes the *count* honest. Automating a check is worth more when you know which checks are real.
+- **⚠ Do not discharge a `Verify:` by writing "probably fine".** The point is that these are unseen
+  on the canonical runtime, and the repo has shipped several bugs invisible in the web sandbox. The
+  field makes the debt legible; it does not clear it.
+- **Verification:** `next-item.js` PARKED shrinks by the eleven, they appear under a VERIFY heading,
+  and the blocked count matches the entries that genuinely cannot start.
+
+### [platform] BF-92 — Sentry is connected, correctly written, and receiving nothing from the client
+
+- **Lane:** A — `lib/security/csp.ts` and the Railway environment. No application code is wrong.
+- **Added:** 2026-09-01 · owner: *"have a look into sentry.io we did connect this and have it
+  working. not sure if its being used."* The first half is right — it is connected and the
+  integration is good work (Q-404). The second half is the finding.
+
+**Two independent failures, stacked, both measured against production 2026-09-01.**
+
+1. **`NEXT_PUBLIC_SENTRY_DSN` is not set.** `curl`ing the deployed `/login` and grepping the client
+   bundle for an ingest host returns **nothing**, so `Sentry.init({ dsn: undefined })` runs and the
+   browser/WebView SDK is a **total no-op**. Not degraded — silent and complete.
+2. **The CSP would block it even once the DSN is set.** The served `Content-Security-Policy` header
+   has `connect-src 'self' … generativelanguage … accounts.google … open-meteo … tile hosts … wss:
+   ws:` and **no Sentry ingest host**. Fixing only the DSN produces a still-empty Sentry and a
+   console full of CSP violations.
+
+**`instrumentation-client.ts:11` predicted failure 2 in its own comment** — *"a `connect-src` that
+does not include the ingest host silently drops every client event — the exact failure mode this item
+exists to avoid. Verify on the device, not just in a browser."* The warning was written and the host
+was never added. **That is the lesson worth keeping: a comment describing a hazard is not a guard
+against it.**
+
+- **What IS plausibly working: the server side.** `sentry.server.config.ts` and
+  `sentry.edge.config.ts` read `SENTRY_DSN` (not `NEXT_PUBLIC_`), and server→Sentry is a
+  server-to-server call that **no CSP touches**. `instrumentation.ts`'s `onRequestError` hook calls
+  `captureRequestError` for everything escaping a route handler. **Whether `SENTRY_DSN` is set in
+  Railway cannot be checked from outside the deploy** — that is the one open question here and it is
+  the owner's to answer (or a boot-log line, below).
+- **Nothing reads it either way.** `grep -ci sentry CLAUDE.md` → **0**; `error_events` appears
+  **4×**, in the session-start ritual. So no session has ever been told to look at Sentry, which is
+  exactly the owner's *"not sure if its being used"*. And there are **0** explicit
+  `captureException`/`captureMessage` call sites: Sentry sees only what escapes a route handler
+  uncaught. A route that catches its own error and returns a 500 — the common shape — reaches
+  `error_events` and never Sentry.
+
+- **Recommendation, in this order.** ① Add the ingest host to `connect-src` in `lib/security/csp.ts`
+  (the CSP is the half that is in the repo and reviewable). ② Set `NEXT_PUBLIC_SENTRY_DSN` in
+  Railway, and confirm `SENTRY_DSN` is set while there. ③ **Log one line at boot naming whether each
+  DSN was found** — the failure this entry describes is invisible precisely because an unset DSN is
+  indistinguishable from a quiet week. ④ Only then add the session-start read to CLAUDE.md, beside
+  `error_events`; pointing sessions at an empty dashboard teaches them to ignore it.
+- **⚠ Verify ② and ① on the DEVICE, not a browser.** The canonical runtime is a WebView loading the
+  Railway URL, and its CSP behaviour is what matters. This is the entry's own `Gate: device` and it
+  is the honest kind — a real check that cannot be automated, not verification debt.
+- **⚠ Do not widen `connect-src` to a wildcard to make this work.** Add the specific ingest host.
+  The CSP file's existing comments show it has been reasoned about host by host; a `*` here would
+  undo that for one vendor's convenience.
+- **Do not treat this as a reason to distrust the integration.** `beforeSend: scrubEvent`,
+  `sendDefaultPii: false`, `tracesSampleRate: 0` and no replay are all deliberate and all correct for
+  a health app. The code is right; the environment and one header are not.
+- **Gate:** device
+- **Verification:** a deliberate client-side throw in production appears in Sentry within a minute,
+  **observed from the APK**; the boot log names both DSNs as found; and the CSP report shows no
+  violation for the ingest host.
+
+### [platform] BF-91 — 58 E2E specs run at the S25 viewport and assert nothing visual
+
+- **Lane:** A — `e2e/**` and `playwright.config.ts`.
+- **Needs:** BF-90
+- **Added:** 2026-09-01 · owner, asking whether the existing tooling could take device checks off
+  him: *"with our e2e and sentry etc cant you do the testing thats needed?"*
+
+**The harness is already pointed at the right target and does not look.** `playwright.config.ts`
+loads `devices['Galaxy S9+']` at **412×915**, deliberately — its own comment says testing at a
+desktop viewport *"would walk straight past"* the canonical target. There are **58 spec files**.
+**`grep -rl 'toHaveScreenshot' e2e/` returns 0.** Nothing compares pixels, so every *"does this look
+right"* question falls to the owner's eyes by default.
+
+- **Recommendation: add screenshot assertions to the flows the shipped-but-unverified entries care
+  about.** BF-73 (capture tiles and button prominence), BF-75 (sheet palette), BF-52 (label wrap),
+  Q-406 (the shared food row across four call sites) are all layout-and-colour claims a baseline
+  image checks better than a person does, and checks on **every** run rather than once.
+- **⚠ State the limit honestly, in the entry and to the owner: a screenshot test catches CHANGE, not
+  CORRECTNESS.** Someone has to approve the first baseline. So this converts a recurring check into
+  a one-time one — most of the value, but it does not make a device check disappear, and an entry
+  that claims otherwise is selling something.
+- **⚠ It cannot touch safe-area, which is the bug class that keeps recurring.** CLAUDE.md is explicit
+  that the web sandbox renders insets as **0**, so Chromium-under-Playwright is blind to exactly what
+  BF-76 is about. Do not add a screenshot test that appears to cover it — a green check over an
+  invisible failure is worse than no check.
+- **The emulator option, named so it is not re-discovered.** An Android emulator in CI *could* see
+  insets and gesture-nav, and `.github/workflows/android.yml` already builds the APK. It is a
+  project (emulator provisioning, nav-mode config, flake budget), not a quick win, and it should not
+  start before BF-90 and this entry have shown what is left over.
+- **⚠ Sentry exists and does not help here — see BF-92 for why it is also not working.** It is
+  installed and wired (`@sentry/nextjs`, five config files), and it is an **alerting** tool by
+  deliberate design: `tracesSampleRate: 0`, no replay, no profiling. It reports crashes. It cannot
+  tell anyone whether a sheet's padding is right, so it discharges no device gate in this entry.
+  `error_events` is the same shape of answer — "did something break for the owner recently",
+  **pruned at 30 days** and **row-scoped to one user**.
+- **Verification:** the four flows above carry approved baselines; a deliberate padding or colour
+  change fails them; and the suite's runtime stays inside the E2E job's current budget.
+
 ### [nutrition][activity] BF-88 — the energy model runs on two different bases and the card never says which
 
 - **Lane:** A — `lib/health/energy-balance-service.ts:227-265` and the two constants in
@@ -482,6 +608,22 @@ currently earn nothing from stepping at all; mean 5,716, median bucket 2–4k.
 
 ### [platform][nutrition] LB-43 — a client component cannot import `daily-energy`, so a display constant is mirrored
 
+- **✅ FIXED 2026-09-01. The mirror is gone and `/nutrition` returns 200.** `STEP_BASELINE`,
+  `WALKING_CADENCE_SPM` and `STEPS_PER_KM` now live beside `SEDENTARY_MULTIPLIER` in the leaf
+  module; `daily-energy.ts` re-exports all four, so every server-side importer is untouched.
+- **⚑ The entry's file name was wrong, and the reason matters: THE LEAF MODULE ALREADY EXISTED.**
+  It proposed *"something like `packages/shared/src/health/energy-constants.ts`"* —
+  `energy-baseline.ts` already was that module, created for the **identical failure one node
+  builtin earlier** (Q-401: the same chain reaching `node:path`, breaking the same tab, through
+  `goal-recommendation` → `calorie-balance` → `calorie-zone-bar`). Adding a second leaf module for
+  one purpose is the drift the one-formula rule is about, so the constants moved into the existing
+  one and its doc now carries both incidents. **The lesson is in the module, not just here: this
+  chain has now broken the Nutrition tab twice, with a different builtin each time.**
+- **⚠ The drift test that guarded the mirror is now tautological, and was replaced rather than
+  kept.** `expect(STEP_BASELINE).toBe(SHARED_STEP_BASELINE)` cannot fail once one re-exports the
+  other, and a test that cannot fail is worse than none. What replaced it is the invariant nothing
+  else checks: **`energy-baseline.ts` imports nothing at all** — no `import`, no `require`. That is
+  the only thing keeping it client-importable, and `tsc` would say nothing if it changed.
 - **Lane:** A — the fix edits `packages/shared/**`. Lane B can only mirror the value, which is what
   BF-87 did.
 - **Added:** 2026-09-01 · found by BF-87, which needed `STEP_BASELINE` for **copy** and took the
@@ -512,29 +654,6 @@ copy of a number, which the one-formula rule is against, and this entry is how i
   invisible to them. Confirm with `grep -rn "shared/health/daily-energy"` before and after.
 - **Verification:** a client component imports the constant and `/nutrition` still returns 200;
   `movement-breakdown.ts` no longer declares its own; the shared module's own tests are unchanged.
-
-### [platform] LB-40 — a user who already has a password cannot change it: the form never asks for the current one
-
-- **Lane:** B — `components/profile/edit-profile-sheet.tsx`. The route is correct; only the client
-  is wrong.
-- **Added:** 2026-09-01 · found while consolidating the personal details (BF-79), reading the sheet
-  rather than looking for this.
-
-**The whole defect is one initialiser.** `EditProfileSheet` holds
-`const [hasPassword, setHasPassword] = useState(false)` and **never fetches it** — the only thing
-that ever sets it true is a *successful* password save, later in the same session. The "Current
-password" field renders behind `{hasPassword && …}`, so for a user who already has one it is never
-on screen, `currentPassword` goes up as `undefined`, and `app/api/user/password/route.ts:38-41`
-rejects it because `user.passwordHash` exists. The user sees the route's error and no field to fill.
-
-**`GET /api/user/profile` already returns `hasPassword`** — it is in the same payload the sheet's
-parent reads (`{ user, hasPassword, workoutCount }`), so nothing new has to be built or fetched.
-Thread it in, or read it from `more-user-profile`.
-
-- **Verification:** with the seeded user (who has a bcrypt hash), open More → Edit Profile → Change
-  Password. The **Current password** field must be present; entering the wrong one must fail and the
-  right one must succeed. Then confirm the field is *absent* for an OAuth-only account, which is the
-  case the flag exists for.
 
 ### [platform] LB-41 — the Weight Units toggle is a control with no consumer
 

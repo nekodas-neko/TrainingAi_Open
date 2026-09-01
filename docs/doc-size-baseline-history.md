@@ -5513,6 +5513,14 @@ would leave 30 on the old producer and make the column's provenance harder to re
 easier. BF-84's *fact or hint* was asked too and turned out to be **already answered** in a PR that
 merged while this branch was open — the answer matched, and nothing needed changing.
 
+## 2026-09-01 — `docs/implementation-backlog.md` → 15013, `projectOverview.md` → 8668 (LB-43)
+
+The backlog growth is LB-43 recording the two things its own text could not have known: the leaf
+module it proposed creating **already existed** (`energy-baseline.ts`, built for the identical
+failure one node builtin earlier), and the drift test guarding the mirror became **tautological**
+once the mirror was deleted, so it was replaced rather than kept. Both belong on the entry: the
+first stops the next reader creating the duplicate file, the second explains why a test changed
+shape in a PR that was supposed to only move constants.
 
 ## 2026-09-01 — `docs/implementation-backlog.md` 14977 → 14986 (BF-88 approved: gate cleared, order swapped, dependency inverted)
 
@@ -5566,3 +5574,35 @@ copy. The entry now asks for the rename that breaks every consumer on purpose.
 The baton and the journal entry both carried the old claim that the inversion protected BF-87. Both
 are corrected in the same diff rather than left to read as a success — the general lesson replacing
 it is that **a reorder only protects work that has not started**.
+
+## 2026-09-01 — `docs/implementation-backlog.md` 15030 → 15156 (three entries on why the owner is the bottleneck)
+
+The owner asked whether tooling could lower his gate load. Measuring it first changed the answer:
+**31 `Gate: device` against 10 `Gate: owner`**, and **11 of the 31 sit on work that already shipped**.
+So the largest single win is a field split (BF-90) that costs no owner time at all — `Gate:` parks an
+entry, which buries finished-but-unseen work behind the same wall as unstartable work.
+
+BF-91 records the automation headroom and, more usefully, its two limits: a screenshot test catches
+**change, not correctness**, and it is **blind to safe-area** because the web sandbox reports insets
+as 0 — a green check over that class would be worse than none.
+
+BF-92 is the entry this session did not expect to write. The owner said Sentry was connected and he
+was right; **it is receiving nothing from the client**, for two independent reasons measured against
+production — no `NEXT_PUBLIC_SENTRY_DSN` in the deployed bundle, and no ingest host in the served
+CSP's `connect-src`. `instrumentation-client.ts:11` predicted the second in its own comment and the
+host was never added, which is the durable lesson: **a comment describing a hazard is not a guard
+against it.**
+
+The length is mostly ordering and negative space — what not to do (no wildcard `connect-src`, no
+session-start pointer at an empty dashboard) and what genuinely cannot be checked from here
+(`SENTRY_DSN` is server-side and invisible from outside the deploy).
+
+## 2026-09-01 — `projectOverview.md` → 8666, `docs/implementation-backlog.md` → 15133 (LB-40)
+
+One shipped fix recorded; the backlog **shrank**, since LB-40's entry was removed and nothing new
+was filed. The status block is 10 lines because the interesting half is not the bug but the
+direction the fix fails in: `cachedFetch` swallows a failed request, so an unknown flag has to show
+the field rather than hide it, or a cold cache plus a dead network silently reproduces the defect.
+That reasoning is what a future session needs and what a one-line "fixed the password field" would
+lose.
+
