@@ -5497,3 +5497,12 @@ the part a future session needs: **no client component had ever imported `daily-
 out of it will hit the same wall. The backlog grew by LB-43, which is that fix, minus the removal of
 the shipped BF-87 entry.
 
+
+## 2026-09-01 — `projectOverview.md` → 8666, `docs/implementation-backlog.md` → 14955 (LB-40)
+
+One shipped fix recorded; the backlog **shrank**, since LB-40's entry was removed and nothing new
+was filed. The status block is 10 lines because the interesting half is not the bug but the
+direction the fix fails in: `cachedFetch` swallows a failed request, so an unknown flag has to show
+the field rather than hide it, or a cold cache plus a dead network silently reproduces the defect.
+That reasoning is what a future session needs and what a one-line "fixed the password field" would
+lose.
