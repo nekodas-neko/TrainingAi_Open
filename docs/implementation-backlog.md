@@ -415,55 +415,39 @@ below threshold and left in place for next time.
 
 ### [app-shell] BF-100 — back navigation always lands at the top, because the scroll position is not on the document
 
-- **Lane:** B · **Branch:** `feat/bf-100-scroll-restoration` (pushed, **no PR — the fix is incomplete**)
+- **Keep:** the device pass, and only that.
+- **Verify:** device — on the S25, scroll a tab screen well down, tap into a detail screen, press the
+  **system back gesture** (not a UI back button), and confirm it returns to the same offset on a cold
+  cache and a warm one; and that reaching the same screen forward still starts at the top.
+- **✅ SHIPPED** (`feat/bf-100-scroll-restoration`, 2026-09-01).
+  `lib/hooks/use-scroll-restoration.ts`, called once from `pull-to-sync.tsx` so every screen using
+  the shell inherits it instead of 62 separate fixes. Measured end to end: `/more` scrolled to 840 →
+  push to `/more/details` → `ta_scroll:/more = 840` saved → back → **840 restored, exactly**.
+- **⚠ A PREVIOUS VERSION OF THIS ENTRY CLAIMED TAB-TO-TAB WAS BROKEN. That was wrong and is
+  retracted.** Navigating `/health` → `/nutrition` and back is not affected at all: the tab shell
+  keeps every tab screen mounted, so the container holds its own `scrollTop` with no help —
+  **measured**, with Health's container still reading 840 while the URL was `/nutrition`. The
+  "evidence" for the retracted claim was a red e2e run whose real cause was `page.goBack()` landing
+  on **`about:blank`** after a bottom-nav Link click, plus a misreading of instrumentation: the
+  `[SR] mount /nutrition#…` lines are the same live component re-keying, which is what a
+  `usePathname()` key does on a screen that does not unmount, and is harmless.
+- **⚠ Four implementation traps are paid for and written into the hook's comments. Do not
+  re-derive them:** (1) gating the restore on a `popstate` flag breaks under StrictMode, whose
+  double-invoked effect consumes it; (2) reading `el.scrollTop` in the cleanup saves **0**, because
+  React has already detached the node — track it from a `scroll` listener instead; (3) setting the
+  offset once lands **144–231 px past it**, because content keeps arriving above and scroll anchoring
+  pushes it down, so it must be re-asserted; (4) deciding the user has taken over by comparing the
+  offset to what you set treats that same settling as a finger and yields every time — takeover is an
+  **input event** (`wheel`/`touchstart`/`keydown`).
+- **⚠ And four spec traps, which cost more than the code did.** All four reported
+  `expected 840, received 0`, identical to a broken feature: text-matching *Sleep* hits a card that
+  opens a **sheet**; `Sleep details →` does too; `a[href^="/health/"]` matches nothing, because these
+  screens navigate from `router.push` **buttons**; and driving the push through the bottom nav makes
+  `goBack()` land on `about:blank`. `/more` → *Profile details* → back is the verified path.
+  **The spec's precondition assertions are what separate these from a regression — keep them.**
 - **Added:** 2026-09-01 · owner: *"when I scroll down to a button; then click on it and it takes me
   to a new page; when I press back I want to go back to that page at the same scroll level I was at.
   It usually starts me at the top of the page. This is on many pages if not all pages."*
-
-**The diagnosis in this entry is confirmed by measurement.** `/health` reads 600 on its inner
-container after scrolling, the document reads 0 throughout, and a push-and-back returns 0. Next's
-restoration watches the window scroller; this app scrolls an inner div; nothing bridged them.
-
-**⚠ THE HALF-BUILT FIX WORKS FOR SUB-ROUTES AND NOT FOR TAB-TO-TAB. Read the cause before
-continuing — it invalidates the design, not just the code.** `lib/hooks/use-scroll-restoration.ts`
-keys the saved offset on `usePathname()`. **That is unsound here, because the tab screens do not
-unmount when you leave them.** Instrumented on 2026-09-01, navigating `/health` → `/nutrition` via
-the bottom nav:
-
-```
-[SR] mount /nutrition#body      <- these are HEALTH's three panels,
-[SR] mount /nutrition#training     still mounted, re-keyed to the new pathname
-[SR] mount /nutrition#progress
-saved: {"ta_scroll:/health#training":"840"}   <- the cleanup did save, under the old key
-after back: 0                                  <- and no mount fired on the return at all
-```
-
-So the component instance outlives the route, `usePathname()` changes under it, and the effect
-re-keys rather than remounting. **The key has to identify the SCREEN, not the current path** — passed
-down from the screen that owns the scroller, or derived from something that does not move when the
-user navigates away.
-
-- **What is measured working:** `/health` and `/more`, scrolled, pushed to a **sub-route**
-  (`/health/sleep`, `/more/details`), back — restores the **exact** offset, drift 0, on both. And a
-  fresh forward arrival still starts at the top.
-- **What is measured broken:** the same screens pushed to another **tab** and back. `e2e/scroll-restoration.spec.ts`
-  drives exactly that and is **red**; it is committed red on the branch, deliberately.
-- **⚠ Four traps are already paid for and are written into the hook's comments. Do not re-derive
-  them:** (1) gating the restore on a `popstate` flag breaks under StrictMode, whose double-invoked
-  effect consumes it; (2) reading `el.scrollTop` in the cleanup saves **0**, because React has
-  already detached the node — track it from a `scroll` listener instead; (3) setting the offset once
-  lands **144–231 px past it**, because content keeps arriving above and scroll anchoring pushes it
-  down, so it must be re-asserted; (4) deciding the user has taken over by comparing the offset to
-  what you set treats that same settling as a finger and yields every time — takeover is an **input
-  event** (`wheel`/`touchstart`/`keydown`).
-- **⚠ And three spec traps, which cost more than the code did.** All three reported
-  `expected 840, received 0`, identical to the feature being broken: text-matching *Sleep* hits a
-  card that opens a **sheet**; `a[href^="/health/"]` matches nothing, because these screens navigate
-  from `router.push` **buttons**; the bottom nav is the reliable handle, since it renders real
-  `<Link>`s. **The spec's precondition assertions are what tell these apart — keep them.**
-- **Verification:** on the S25, scroll Health well down, tap into a detail screen, press the system
-  back gesture — the page returns at the same offset, on a cold cache and a warm one; and reaching
-  the same screen forward still starts at the top. Then the tab-to-tab case, which is the open half.
 
 ### [nutrition] BF-97 — a scanned meal groups in the diary: the rendering half
 
