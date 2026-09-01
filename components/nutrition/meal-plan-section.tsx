@@ -47,7 +47,7 @@ interface Props {
   nowHour?: number | null
   /** A bulk log is running, so no other logging control should be live. */
   bulkLogging?: boolean
-  /** Copy a planned meal into My Meals (Q-398). */
+  /** Copy a planned meal into My Foods (Q-398). */
   onSaveMeal?: (meal: MealPlanMeal) => void
   /** Copy every meal that is not already saved, in one action. */
   onSaveAllMeals?: (meals: MealPlanMeal[]) => void
@@ -232,7 +232,7 @@ export const MealPlanSection = memo(function MealPlanSection({
             >
               {busySaving
                 ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Saving…</>
-                : <><BookmarkPlus className="w-3.5 h-3.5" /> Save all {unsaved.length} to My Meals</>}
+                : <><BookmarkPlus className="w-3.5 h-3.5" /> Save all {unsaved.length} to My Foods</>}
             </button>
           )}
         </>

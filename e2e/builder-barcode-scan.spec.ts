@@ -18,7 +18,7 @@ import { settleRouteBoundary, stableBox } from './fixtures'
 async function openBuilder(page: Page) {
   await page.goto('/nutrition')
   await settleRouteBoundary(page)
-  const button = page.getByRole('button', { name: 'My Meals', exact: true })
+  const button = page.getByRole('button', { name: 'My Foods', exact: true })
   await expect(button).toBeVisible({ timeout: 60_000 })
   await expect(async () => {
     if (await page.getByRole('dialog').count() === 0) {

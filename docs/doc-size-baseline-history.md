@@ -6236,3 +6236,15 @@ LA-47 — and the question of whether the note should ever fail rather than prin
 `projectOverview.md` grew 8, and the line that earns them is the one about the rule reporting **its
 own documentation** twice before the exclusions existed. Without it the note reads as ordinary
 caution; with it, the reason it prints rather than fails is a measurement.
+
+## 2026-09-01 — `projectOverview.md` → 9053 (BF-103)
+
++13 for a rename, which only earns it because two of the lines are about *not* undoing it. The
+comments BF-37 and BF-60 left behind read as a standing prohibition on the name `My Foods`, and the
+next session reverts this on their authority unless the record says why unifying satisfies them. The
+other is the merge: `My Foods` was once a merged list, and the revert that split it was about the
+merge, not the name — an implementer who conflates the two reintroduces a defect already paid for.
+
+The line about the guard finding twelve e2e specs the entry's own file table missed is there as
+evidence for a general point: a rename's blast radius includes its tests, and a file table written by
+reading will not contain them.

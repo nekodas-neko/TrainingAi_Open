@@ -76,7 +76,7 @@ test.afterAll(async () => {
 async function openLibrary(page: Page): Promise<void> {
   await page.goto('/nutrition')
   await settleRouteBoundary(page)
-  const button = page.getByRole('button', { name: 'My Meals', exact: true })
+  const button = page.getByRole('button', { name: 'My Foods', exact: true })
   await expect(button).toBeVisible({ timeout: 60_000 })
   await expect(async () => {
     // Tap only while the sheet is still CLOSED. Since Q-395c this button opens Log Food, which then

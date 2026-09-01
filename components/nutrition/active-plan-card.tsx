@@ -13,7 +13,7 @@ import { hourFromTzDatetime } from './plan-day-fill'
  *
  * Extracted from `nutrition-content.tsx` when Q-187's "log the meals so far" action pushed that
  * orchestrator past the 800-line limit. The seam is a real one rather than a size dodge: logging a
- * planned meal, declining one, and copying one into My Meals are the plan's own concerns, and the
+ * planned meal, declining one, and copying one into My Foods are the plan's own concerns, and the
  * tab that hosts the card never reads any of their state. What crosses the boundary is the day, the
  * plan, and the one callback that tells the tab a food log was written.
  */

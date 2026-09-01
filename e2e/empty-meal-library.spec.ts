@@ -31,7 +31,7 @@ async function openEmptyMealsTab(page: import('@playwright/test').Page) {
 
   await page.goto('/nutrition')
   await settleRouteBoundary(page)
-  const button = page.getByRole('button', { name: 'My Meals', exact: true })
+  const button = page.getByRole('button', { name: 'My Foods', exact: true })
   await expect(button).toBeVisible({ timeout: 60_000 })
   await expect(async () => {
     // Tap only while the sheet is still closed — this button opens Log Food, which then covers the

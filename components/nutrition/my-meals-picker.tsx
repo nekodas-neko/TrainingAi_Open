@@ -177,7 +177,7 @@ export function MyMealsPicker({
             <span className="block text-sm font-medium">Use my saved meals</span>
             <span className="mt-0.5 block text-[11px] leading-snug text-muted-foreground">
               The plan fills a slot from your library whenever one fits, and writes something new
-              when none does. Tag a meal in My Meals to say which times of day it suits.
+              when none does. Tag a meal in My Foods to say which times of day it suits.
             </span>
           </span>
         </label>
@@ -199,7 +199,7 @@ export function MyMealsPicker({
           </div>
         ) : meals.length === 0 ? (
           <p className="text-[11px] leading-snug text-muted-foreground">
-            Nothing in My Meals yet. Anything you save from a food scan or from a plan shows up
+            Nothing in My Foods yet. Anything you save from a food scan or from a plan shows up
             here next time.
           </p>
         ) : (
