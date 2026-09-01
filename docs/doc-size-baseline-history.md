@@ -5469,15 +5469,6 @@ BF-87's "do not lower STEP_BASELINE" is rewritten in the same pass. It was corre
 uncompensated version and would have made an implementer refuse the compensated one — a stale
 prohibition being obeyed is the failure mode that needed closing in the same diff that created it.
 
-<<<<<<< HEAD
-## 2026-09-01 — `docs/implementation-backlog.md` → 14991 (BF-1's plan pointer)
-
-`lane-a/blood-panel-plan`. BF-1 gained the link to its implementation plan plus the findings that
-drove the schema — that `<0.2` is a result which is not a number, that reference ranges arrive in
-four shapes, and that the flag is commentary sitting on values inside their range, so out-of-range
-has to be derived. Those belong on the entry rather than only in the plan: the entry is what an
-implementer reads before deciding whether to start.
-=======
 ## 2026-09-01 — `docs/implementation-backlog.md` → 14977
 
 `lane-a/keep-kind` (OR-100). The growth is OR-100 recording that it undercounted its own problem:
@@ -5506,4 +5497,18 @@ the part a future session needs: **no client component had ever imported `daily-
 out of it will hit the same wall. The backlog grew by LB-43, which is that fix, minus the removal of
 the shipped BF-87 entry.
 
->>>>>>> origin/main
+## 2026-09-01 — `docs/implementation-backlog.md` → 14991 (BF-1's plan pointer)
+
+`lane-a/blood-panel-plan`. BF-1 gained the link to its implementation plan plus the findings that
+drove the schema — that `<0.2` is a result which is not a number, that reference ranges arrive in
+four shapes, and that the flag is commentary sitting on values inside their range, so out-of-range
+has to be derived. Those belong on the entry rather than only in the plan: the entry is what an
+implementer reads before deciding whether to start.
+
+Also carries two owner decisions taken in the same session, recorded on their entries rather than
+left in a chat: **BF-59** — label a peaking week, do not scale the target, because nobody has
+calibrated a per-phase multiplier and the owner's sessions span three phases at once; and
+**BF-81** — leave the 38 mixed-producer rows alone, since re-deriving the 8 that can be re-derived
+would leave 30 on the old producer and make the column's provenance harder to reason about, not
+easier. BF-84's *fact or hint* was asked too and turned out to be **already answered** in a PR that
+merged while this branch was open — the answer matched, and nothing needed changing.

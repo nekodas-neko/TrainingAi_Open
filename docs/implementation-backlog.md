@@ -850,7 +850,13 @@ sex — right on the page.
 > bare deletion, would have left all three columns with no writer at all and `weekly-digest` reads
 > `stressHighMinutes`. Re-measured before fixing: **6 of 8** days disagreed on sign, not 5.
 >
-> - **Keep — the history recompute is the owner's call, and the entry's version would make it
+> - **✅ DECIDED BY THE OWNER 2026-09-01 — leave the 38 rows alone; nothing is owed on the data.**
+>   Asked with all three options and their costs, the owner chose no recompute. Re-deriving the 8
+>   that can be re-derived would leave 30 on the old producer and make the column's provenance
+>   *harder* to reason about; the full wide pass is long, irreversible and device-gated. The forward
+>   path is fixed, so the mixture stops growing — but **a future correlation over this column must
+>   still split on producer**, which is the standing rule this entry sits under.
+> - **Keep — the history recompute WAS the owner's call and is now answered; the entry's version would make it
 >   worse.** 38 rows carry `daytime_stress_scaled`; only **8** of them have buckets to re-derive
 >   from. Recomputing those 8 leaves 30 rows on the old producer, so the column would be *more*
 >   mixed, not less. Doing it properly means a wide rollup pass re-deriving buckets from the packed
