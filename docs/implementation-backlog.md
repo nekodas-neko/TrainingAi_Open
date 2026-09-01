@@ -367,72 +367,6 @@ below threshold and left in place for next time.
 > BF-29 (My meals), BF-30 (Meal detail), BF-31 (Edit meal) and BF-26 (Quantity). Two artboards need
 > no entry — `Tap targets` and the `srv/g` studies both shipped in Q-395a.
 
-### [activity][nutrition] BF-87 — "nothing earned from movement yet today" is true and unexplainable, so the owner had to ask
-
-- **Lane:** B — the Energy Balance card's copy (`components/health/…`, the `activeBreakdown`
-  consumer) and the Nutrition "why two numbers" block that says the same thing.
-- **Batch:** `nutrition-ui-uplift`
-- **Added:** 2026-09-01 · owner: *"is basic steps being counted towards calorie burn? It says I've
-  done 1000 but not sure if that's counting towards nutrition."* — then, having been told the model
-  is correct: *"if its base metabolism thats fine. but i would like to see steps = calories so I know
-  roughly how much effort translates to how much."* **That second sentence is the requirement.** The
-  ask is not a number on a card; it is an exchange rate the owner can hold in his head.
-
-**The app is correct and the screen cannot say why.** The owner's screenshot holds both halves of the
-contradiction he is reporting: **STEPS 1,196 Today** beside *"1,365 base — nothing earned from
-movement yet today"*. Both are true, because of one constant:
-
-```ts
-// packages/shared/src/health/daily-energy.ts
-export const STEP_BASELINE = 3000
-const netSteps = Math.max(0, ped - STEP_BASELINE - loggedOutdoorSteps)
-if (netSteps > 0) stepsKcal = est(14, netSteps / WALKING_CADENCE_SPM)
-```
-
-**Only steps above 3,000 earn calories**, deliberately: the sedentary base is BMR × 1.2, and a desk
-day's incidental stepping is already inside that multiplier. Counting every step would double-count
-it. The constant's own comment says exactly this. At 1,196 steps the honest answer is zero, and the
-card gives the honest answer without the reason.
-
-- **This is not a maths fix — it is a copy fix, and a small one.** The card already knows both
-  numbers. *"Steps add to your burn above 3,000/day — 1,196 so far"* answers the question on the
-  screen that raised it. Same for the Nutrition tab's "why two numbers" block, which repeats the
-  phrase.
-- **⚠ Show the threshold, not just the shortfall.** The owner's step goal is 7,000, so on a good day
-  only **4,000** steps convert — roughly 40 minutes of walking at the model's 100 steps/min. A user
-  who thinks all 7,000 count will read the burn as too low and go looking for a bug, which is this
-  report one step later.
-- **The rate, measured through the real estimator for the owner's profile (2026-09-01).** Not
-  approximated — driven through `computeActiveEnergy` itself, so an implementation can be checked
-  against it:
-
-  | steps | 1,196 | 3,000 | 5,000 | 7,000 | 10,000 | 15,000 |
-  |---|---|---|---|---|---|---|
-  | kcal | 0 | 0 | 68 | 136 | 237 | 407 |
-
-  **≈ 34 kcal per 1,000 steps, above the first 3,000.** Linear above the threshold, because the
-  estimator is `minutes × (MET − 1.5) × BMR/min` and minutes are `steps / 100`.
-- **⚠ "Steps = calories" is TWO numbers here, and shipping one of them is the bug this entry is
-  about.** A bare *"1,000 steps ≈ 34 kcal"* is wrong at the bottom of the range — precisely where
-  the owner was standing when he asked, and where **50 of his last 124 days** sit. The pair that is
-  actually true: *nothing below 3,000, then ~34 per 1,000.* Whatever the surface ends up being (a
-  line under the steps tile, a tooltip, a row in the burn breakdown), it has to carry both halves or
-  it recreates the confusion in a new place.
-- **The two other addends are silent in the same way.** `workoutKcal` and `activityKcal` also roll
-  into one "earned from movement" figure with no breakdown at the point of confusion —
-  `activeBreakdown` already returns all three separately (Q-391 made sure the parts sum to the
-  total), so the data for a one-line breakdown is already in hand.
-- **⚠ Do not "fix" this by lowering or removing `STEP_BASELINE` on its own** — uncompensated, it
-  deletes the double-count guard and costs 177 kcal/day across every one of the owner's 124 days
-  (measured, BF-88). **But see BF-88: the owner has since proposed the compensated version** —
-  subtract the first 3,000 steps' worth from the resting base and count from zero — which is
-  identical at and above 3,000 steps and gives this entry its single linear rate for free. If BF-88
-  ships first, this entry's copy gets simpler, not harder: one rate, no threshold sentence.
-- **Verification:** on a morning below the threshold the card says why and names the number; above it,
-  the earned figure appears and the explanation stops; and the three addends shown never disagree
-  with the total. **And the owner can answer "how many steps for 100 kcal?" from the screen alone**
-  — that is the test this entry is really for; the numbers above say the answer is about 6,000.
-
 ### [nutrition][activity] BF-88 — the energy model runs on two different bases and the card never says which
 
 - **Lane:** A — `lib/health/energy-balance-service.ts:227-265` and the two constants in
@@ -512,6 +446,39 @@ currently earn nothing from stepping at all; mean 5,716, median bucket 2–4k.
   test, not an eyeball. A day below 3,000 reports less, by the computed amount. The burn explanation
   names its basis on both paths. And a second profile (different weight) gets a different
   subtraction, proving it was computed.
+
+### [platform][nutrition] LB-43 — a client component cannot import `daily-energy`, so a display constant is mirrored
+
+- **Lane:** A — the fix edits `packages/shared/**`. Lane B can only mirror the value, which is what
+  BF-87 did.
+- **Added:** 2026-09-01 · found by BF-87, which needed `STEP_BASELINE` for **copy** and took the
+  whole Nutrition tab to a 500 getting it.
+
+**The chain, measured rather than guessed.** `packages/shared/src/health/daily-energy.ts` imports
+`workout-energy.ts`, which imports `@/lib/oura-models/constants`, which reads `node:fs/promises`.
+Turbopack fails the client chunk outright — *"the chunking context (unknown) does not support
+external modules (request: node:fs/promises)"* — and `/nutrition` returns 500. **No client component
+had ever imported `daily-energy`**, so nothing had tripped it before; BF-87's was the first, and it
+only wanted one number to print.
+
+**What BF-87 shipped instead.** `components/nutrition/movement-breakdown.ts` declares its own
+`STEP_BASELINE = 3_000` with the reason written above it, and
+`__tests__/movement-breakdown.test.ts` imports the shared constant — tests run in node, where the
+chain is harmless — and fails if the two disagree. So it cannot drift silently. It is still a second
+copy of a number, which the one-formula rule is against, and this entry is how it stops being one.
+
+- **The fix is a leaf module, not a refactor of the maths.** `STEP_BASELINE`, `SEDENTARY_MULTIPLIER`,
+  `STEPS_PER_KM` and `WALKING_CADENCE_SPM` are plain constants with no dependencies; moved into
+  something like `packages/shared/src/health/energy-constants.ts` and re-exported from
+  `daily-energy.ts`, every existing importer is unaffected and a client component can take the
+  constant without the chain. Then delete the mirror and point the test at the real thing.
+- **⚠ Do not "fix" it by making `oura-models` client-safe.** That module reads model files off disk
+  on purpose; the problem is not that it is server-only, it is that a display constant is behind it.
+- **The blast radius is worth measuring first.** `daily-energy.ts` is imported by the energy service,
+  the AI tools and the meal-plan routes — all server-side — so the move should be additive and
+  invisible to them. Confirm with `grep -rn "shared/health/daily-energy"` before and after.
+- **Verification:** a client component imports the constant and `/nutrition` still returns 200;
+  `movement-breakdown.ts` no longer declares its own; the shared module's own tests are unchanged.
 
 ### [platform] LB-40 — a user who already has a password cannot change it: the form never asks for the current one
 

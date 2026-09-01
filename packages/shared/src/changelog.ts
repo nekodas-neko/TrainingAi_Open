@@ -6,6 +6,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.416.2",
+    date: "2026-09-01",
+    changes: [
+      "The calorie bar now says why movement has earned you nothing yet: steps only count above 3,000 a day. They always did \u2014 the sedentary base already assumes a desk day\u0027s walking, so counting every step would count it twice \u2014 but the screen never said so, which is why 1,196 steps beside \u0022nothing earned from movement\u0022 looked wrong.",
+      "When movement has earned something, the bar breaks it down \u2014 workouts, activity and steps \u2014 instead of showing one figure. The parts always add up to the total shown.",
+      "The \u0022calories out\u0022 explainer names the same 3,000 threshold instead of saying \u0022above a baseline\u0022.",
+    ],
+  },
+  {
     version: "1.416.1",
     date: "2026-09-01",
     changes: [

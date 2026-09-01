@@ -5421,3 +5421,11 @@ rather than descriptive.
 BF-87's "do not lower STEP_BASELINE" is rewritten in the same pass. It was correct about the
 uncompensated version and would have made an implementer refuse the compensated one — a stale
 prohibition being obeyed is the failure mode that needed closing in the same diff that created it.
+
+## 2026-09-01 — `projectOverview.md` → 8631, `docs/implementation-backlog.md` → 14847 (BF-87)
+
+One shipped change recorded, and one entry filed. The status block is 12 lines because the 500 is
+the part a future session needs: **no client component had ever imported `daily-energy`**, so the
+`node:fs/promises` chain behind it had never been tripped, and the next person who wants a constant
+out of it will hit the same wall. The backlog grew by LB-43, which is that fix, minus the removal of
+the shipped BF-87 entry.

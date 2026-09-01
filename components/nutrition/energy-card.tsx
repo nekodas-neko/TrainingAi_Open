@@ -6,6 +6,7 @@ import { MACRO_COLORS } from '@trainingai/shared/nutrition/macro-colors'
 import type { NutritionTargets } from '@trainingai/shared/types/nutrition'
 import type { EnergyBalanceResponse } from '@/app/api/nutrition/energy-balance/route'
 import { CalorieZoneBar } from './calorie-zone-bar'
+import { STEP_BASELINE } from './movement-breakdown'
 import { macroShares } from './macro-energy'
 
 interface Props {
@@ -66,6 +67,9 @@ export const EnergyCard = memo(function EnergyCard({
   }
 
   const b = data?.balance ?? null
+  // `b` can only be non-null when `data` is, but that is not a narrowing tsc can follow through the
+  // optional chain — the file already reaches for `data!` two lines below for the same reason.
+  const breakdown = data?.activeBreakdown ?? null
 
   // The denominator the donut fills against, and the number beside it. `remainingKcal` is the
   // shared, tested subtraction; where there is no balance the caller's goal is all there is, so the
@@ -186,6 +190,9 @@ export const EnergyCard = memo(function EnergyCard({
             restingBaseKcal={b.restingBaseKcal}
             activeKcal={b.activeKcal}
             targetNetKcal={b.targetNetKcal}
+            workoutKcal={breakdown?.workoutKcal ?? 0}
+            activityKcal={breakdown?.activityKcal ?? 0}
+            stepsKcal={breakdown?.stepsKcal ?? 0}
           />
 
           {showInfo && <EnergyDetail data={data!} />}
@@ -266,7 +273,7 @@ function EnergyDetail({ data }: { data: EnergyBalanceResponse }) {
         <p className="text-[10px] leading-relaxed text-muted-foreground">
           <span className="font-semibold text-foreground">Calories out</span> = your resting burn
           ({b.restingBaseKcal.toLocaleString()} kcal) plus measured movement ({b.activeKcal.toLocaleString()} kcal
-          from workouts, activities and steps above a baseline).
+          from workouts, activities, and steps above {STEP_BASELINE.toLocaleString()}/day).
         </p>
         <p className="text-[10px] leading-relaxed text-muted-foreground">
           <span className="font-semibold text-foreground">On target</span> means your net
