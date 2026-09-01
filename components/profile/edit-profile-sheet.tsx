@@ -31,7 +31,6 @@ export function EditProfileSheet({ user, onSaved }: EditProfileSheetProps) {
 
   const [weightGoalKg, setWeightGoalKg] = useState(user?.weightGoalKg?.toString() ?? '')
   const [timezone, setTimezone] = useState(user?.timezone ?? 'Australia/Brisbane')
-  const [units, setUnits] = useState<'kg' | 'lbs'>('kg')
   const [foodRegion, setFoodRegion] = useState('AU')
 
   const [hasPassword, setHasPassword] = useState(false)
@@ -42,8 +41,7 @@ export function EditProfileSheet({ user, onSaved }: EditProfileSheetProps) {
   const [isPasswordExpanded, setIsPasswordExpanded] = useState(false)
 
   const [saving, setSaving] = useState(false)
-  // Both are always-selected groups, so `hasSelection` is unconditionally true.
-  const unitsGroup = useRovingRadioGroup(true)
+  // Always-selected, so `hasSelection` is unconditionally true.
   const regionGroup = useRovingRadioGroup(true)
 
   function resetFromUser(u: User | null) {
@@ -174,30 +172,6 @@ export function EditProfileSheet({ user, onSaved }: EditProfileSheetProps) {
               >
                 Auto-detect
               </button>
-            </div>
-
-            <Divider />
-
-            {/* Weight Units */}
-            <div className="flex items-center justify-between px-4 py-3">
-              <div>
-                <p id="ep-units-label" className="flex items-center gap-2 text-xs leading-none font-medium text-muted-foreground select-none">Weight Units</p>
-                <p className="text-sm font-medium mt-0.5">Kg / Lbs</p>
-              </div>
-              <div className="flex items-center gap-0.5 rounded-xl bg-muted p-0.5 text-xs font-semibold" {...unitsGroup.groupProps} aria-labelledby="ep-units-label">
-                <button
-                  type="button"
-                  {...unitsGroup.getRadioProps(units === 'kg', 0)}
-                  onClick={() => setUnits('kg')}
-                  className={`rounded-lg px-3 py-1.5 transition ${units === 'kg' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground'}`}
-                >kg</button>
-                <button
-                  type="button"
-                  {...unitsGroup.getRadioProps(units === 'lbs', 1)}
-                  onClick={() => setUnits('lbs')}
-                  className={`rounded-lg px-3 py-1.5 transition ${units === 'lbs' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground'}`}
-                >lbs</button>
-              </div>
             </div>
 
             <Divider />

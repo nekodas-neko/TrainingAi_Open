@@ -5566,3 +5566,11 @@ copy. The entry now asks for the rename that breaks every consumer on purpose.
 The baton and the journal entry both carried the old claim that the inversion protected BF-87. Both
 are corrected in the same diff rather than left to read as a success — the general lesson replacing
 it is that **a reorder only protects work that has not started**.
+
+## 2026-09-01 — `projectOverview.md` → 8667, `docs/implementation-backlog.md` → 14971 (LB-41, LB-29)
+
+Two shipped fixes recorded; **the backlog shrank**, since both entries were removed and nothing new
+was filed. The status block is 11 lines for two entries because the interesting half of LB-29 is not
+the bug but the promise the owner picked between: *the change follows to other devices* versus
+*a local setting is never clobbered*. Those differ in what the app does, not in how it is written,
+and a one-line "fixed preference sync" would lose the distinction the next session needs.
