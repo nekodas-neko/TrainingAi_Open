@@ -6064,3 +6064,24 @@ gate had just failed — the push depends on the *commit's* exit status, never t
 already carried "never check a gate through a pipe"; this is the same mistake in different clothes,
 so it sits directly under it where the pattern is visible rather than as a separate entry that reads
 as unrelated.
+
+## 2026-09-01 — `docs/implementation-backlog.md` 14940 → 14973 (BF-99 a label, BF-100 a missing mechanism)
+
+**BF-99's length is the reconciliation, and it is the point.** The owner asked why his base sits below
+his measured RMR, which reads like a maths bug. It is not: every number on the screen checks out. The
+entry reconstructs the chain against live production values and lands on the screenshot at **three
+independent points** — 1,565 maintenance, 1,264 "base", 163 over target. What it finds is a **label**:
+1,264 is the base *after* the recomp deficit, so a goal choice is presented as a metabolic fact, and
+the real resting base is ~1,464. Without the table an implementer would hunt a calculation error that
+does not exist, and might remove the `Math.max(bmr, …)` floor that is doing its job.
+
+It also answers the half he did not ask: the RMR is **rescaled**, not used raw — 1,325 was measured at
+51.5 kg of lean mass against ~50.6 kg today — which is `personalRmr` working as BF-42 built it, and
+is explained nowhere on screen.
+
+**BF-100 is short because the cause is single.** The app scrolls an inner container
+(`pull-to-sync.tsx:190`, 62 files carrying `overflow-y-auto`), and Next's restoration only handles
+the document scroller. No code has ever saved a position — so *"many pages if not all pages"* is
+exactly right, and one fix in the shell covers every screen. The two warnings are the ones that make
+a naive attempt fail: restoring before the cache-seeded content has height gets clamped to 0 and
+looks identical to the bug, and restoring on forward navigation is wrong.

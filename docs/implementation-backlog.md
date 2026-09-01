@@ -388,6 +388,88 @@ below threshold and left in place for next time.
 > BF-29 (My meals), BF-30 (Meal detail), BF-31 (Edit meal) and BF-26 (Quantity). Two artboards need
 > no entry — `Tap targets` and the `srv/g` studies both shipped in Q-395a.
 
+### [nutrition][body] BF-99 — the line says "base" and shows base MINUS the goal deficit, so the owner read his RMR as broken
+
+- **Lane:** B — the Energy Balance card's subtitle (`components/nutrition/energy-card.tsx`,
+  `calorie-balance-bar.tsx`, `calorie-zone-bar.tsx` — the same three BF-87/BF-88 rewrote).
+- **Added:** 2026-09-01 · owner, with a Health screenshot: *"why is my base rate under the 1350 RMR
+  value."*
+
+**The maths is right — every number on that screen reconciles — and the label is wrong.** That is
+what makes this worth an entry: the owner went looking for a calculation error because the copy
+described the figure incorrectly.
+
+**Reconstructed against production data, and it matches the screenshot to the kcal:**
+
+| step | value |
+|---|---|
+| measured RMR (2026-08-27, at FFM 51.5 kg) | 1,325 |
+| today's weight / raw scale body fat | 71.7 kg / 26.3% |
+| DEXA-corrected body fat → FFM | ≈ 29.5% → **≈ 50.6 kg** |
+| `personalRmr` rescaled onto today's FFM | **≈ 1,304** |
+| `formulaBaseline` = `bmr × 1.2` | **1,565** ← screen: *"Estimated maintenance 1,565"* ✓ |
+| − `stepEnergyKcal(profile, STEP_BASE_CREDIT)` | ≈ 101 |
+| `restingBaseKcal` = `max(bmr, …)` | **≈ 1,464** |
+| − goal delta, `recomp: −200` | **1,264** ← screen: *"1,264 base"* ✓ |
+| + earned from movement (4,435 steps) | 150 → budget 1,414; eaten 1,577 → **163 over** ✓ |
+
+**So the resting base is ~1,464, comfortably above the measured RMR.** The 1,264 on screen is the
+base *after* the recomp deficit — a goal choice presented as a metabolic fact.
+
+- **Fix: name it what it is.** *"1,264 target"*, or split it — *"1,464 base − 200 recomp goal"*. The
+  card already knows `goalDeltaKcal`; nothing new has to be computed.
+- **⚠ Do not "fix" this by removing the floor or changing the goal maths.** `restingBaseKcal` is
+  `Math.max(Math.round(bmr), …)` on **both** branches (`energy-balance-service.ts:284-286`), which is
+  correct and is what stops a base falling below measured resting metabolism. The displayed number
+  is below 1,325 only because the deficit is subtracted after the floor, which is also correct.
+- **The second half of his question is unanswered anywhere on screen, and is not a bug.** The RMR is
+  **rescaled, not used raw**: 1,325 was measured at 51.5 kg of lean mass and he is carrying ~50.6 kg
+  today, so his personalised figure is ~1,304. That is `personalRmr` doing exactly what BF-42 built
+  it for. **But nothing tells him that**, so a measured number he paid for appears to have been
+  ignored. Worth one line of copy wherever the RMR is shown.
+- **⚠ The reconstruction above is arithmetic against live values, not a line-by-line trace.** It
+  matches the screen at three independent points (1,565 · 1,264 · 163 over), which is strong, but an
+  implementer should confirm the DEXA-correction step rather than inherit it.
+- **Verification:** the figure labelled "base" equals `restingBaseKcal`, or the label names the
+  deficit; and a user on `maintain` (delta 0) sees the same number under both wordings.
+
+### [app-shell] BF-100 — back navigation always lands at the top, because the scroll position is not on the document
+
+- **Lane:** B — `components/pull-to-sync.tsx` (which owns the scroll container) plus wherever a route
+  change is observed.
+- **Added:** 2026-09-01 · owner: *"when I scroll down to a button; then click on it and it takes me
+  to a new page; when I press back I want to go back to that page at the same scroll level I was at.
+  It usually starts me at the top of the page. This is on many pages if not all pages."*
+
+**"If not all pages" is right, and there is one reason.** The app does not scroll the document — it
+scrolls an **inner container**. `pull-to-sync.tsx:190` renders the scroller with a `scrollRef`, and
+**62 files** carry `overflow-y-auto`. Next's App Router scroll restoration operates on the
+window/document scroller, so it cannot see, save or restore a nested element's `scrollTop`. Nothing
+in the app does it either: `grep` for `scrollRestoration`, `restoreScroll` or a `sessionStorage`
+scroll key returns **nothing** outside `use-scroll-to-bottom.ts`, which is unrelated.
+
+So this is not a regression and not per-screen — no code has ever existed to do it.
+
+- **Recommendation: save `scrollRef.current.scrollTop` per route key and restore on mount**, in
+  `pull-to-sync.tsx` so every screen using the shell inherits it, rather than 62 separate fixes.
+  `sessionStorage` is the right store — it is per-tab, dies with the app, and a stale offset is
+  worthless anyway.
+- **⚠ Restore AFTER the content has height, or it silently no-ops.** These screens paint from a cache
+  seed and then revalidate, so a restore on first paint sets `scrollTop` on a container that is still
+  short and the browser clamps it to 0 — which looks exactly like the bug. Restore when the content
+  has laid out (a `ResizeObserver` on the inner content, or after the seeded paint), and only once
+  per navigation so a later revalidation cannot yank the user back.
+- **⚠ Do not restore on a forward navigation.** Only a *back* return should land where the user was;
+  arriving fresh should start at the top. That means keying on the route AND clearing the entry when
+  a route is entered forward, or reading the navigation type.
+- **The persistent tab shell cuts both ways here** — a tab that never unmounts keeps its scroll
+  position already, so tab switches are not the complaint. The loss happens on a **push to a new
+  route and back**, which is what unmounts the screen.
+- **Verification:** on the S25, scroll Health well down, tap into a detail screen, press the system
+  back gesture — the page returns at the same offset, on a cold cache and a warm one; and reaching
+  the same screen forward still starts at the top.
+
+
 ### [nutrition] BF-97 — a scanned meal groups in the diary: the rendering half
 
 > **✅ THE ENGINE HALF SHIPPED 2026-09-01** (migration 252 + the `claude_ro` regeneration 253, local
