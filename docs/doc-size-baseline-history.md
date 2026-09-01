@@ -6019,6 +6019,25 @@ LA-48's correction is shorter but saves more: there is **no migration and no loc
 in it — `segments` is JSONB one side and TEXT the other — and the trap is the **wire schema**, where
 Zod strips an unknown key silently on both write paths.
 
+## 2026-09-01 — baton 189 → 193, `docs/implementation-backlog.md` → 15028 (queue hygiene + BF-4 closed)
+
+Five lines onto the baton, and they are the finding a successor needs before anything else: the
+**startable** Lane A queue is thinner than READY's count, entry by entry, with the reason each of the
+top seven is blocked. A successor that reads "61 READY" and starts at the top spends its first read
+discovering that — which is what happened here.
+
+The backlog grows by LA-53 (proposing a check for the one mechanical case) and by Q-535's lane
+correction. Q-535 headed **Lane A's** list for two weeks after its Lane A half shipped, because
+`next-item.js` reads the `Lane:` field and nothing re-reads it when the remaining work moves lanes.
+
+
+BF-4 rides here too: it was **closed by measurement**, and the closing note is longer than a strike
+because the numbers contradict the entry's own lever — latency fell 36% across the 1024 px bound
+while input tokens **rose** 14%, so the r = +0.958 it rested on did not survive the intervention. A
+close that just said "stopped" would leave the next person to re-derive that. The baton shrinks by
+two lines in the same pass: it listed a photo scan as owner-gated when that gate cleared on
+2026-08-30, which is the stale-premise failure this baton spends a section warning about.
+
 ## 2026-09-01 — `docs/implementation-backlog.md` 14940 → 14973 (BF-99 a label, BF-100 a missing mechanism)
 
 **BF-99's length is the reconciliation, and it is the point.** The owner asked why his base sits below
