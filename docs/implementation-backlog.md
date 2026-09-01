@@ -388,6 +388,205 @@ below threshold and left in place for next time.
 > BF-29 (My meals), BF-30 (Meal detail), BF-31 (Edit meal) and BF-26 (Quantity). Two artboards need
 > no entry — `Tap targets` and the `srv/g` studies both shipped in Q-395a.
 
+### [nutrition] BF-104 — log a meal at 0.5× / 1× / 1.5×; the storage supports it and nothing sets it
+
+- **Lane:** B for the picker on the meal sheet; A for the one argument through
+  `packages/shared/src/nutrition/log-meal.ts`.
+- **Added:** 2026-09-01 · owner: *"when logging food/meals we should be able to choose how much of the
+  meal; i.e full at 1x or 1.5 or 0.5 etc."*
+
+**Every food log already carries its own multiplier — the meal path just never scales it.**
+`logMealFromSaved` writes `quantityMultiplier: item.quantityMultiplier` (`log-meal.ts:83, 96, 131`),
+taking each item's factor straight from the saved definition. There is no meal-level factor anywhere
+between the "Log this meal" button and the rows it writes, so the button can only ever log exactly
+one portion.
+
+**⚠ This is NOT the "makes N portions" control, and conflating them would be the wrong fix.**
+`components/nutrition/meal-batch-size.tsx` sets *"how many portions a saved meal makes"* — a
+**definition-time** property that divides a recipe into servings (the screenshot's *"One portion · 2
+ingredients"* against Edamame Block's *"makes 2 portions"*). This request is **log-time**: how much
+of one portion was eaten today. A meal can make 4 portions and be eaten 1.5 at a sitting; the two
+numbers multiply, they do not substitute.
+
+- **The change is one argument, threaded.** `logMealFromSaved(meal, …, scale = 1)` writing
+  `quantityMultiplier: item.quantityMultiplier * scale`. No schema change — `food_logs.quantity_multiplier`
+  is already per-row.
+- **Recommendation: scale at WRITE time, do not store the factor separately.** The rows are already
+  point-in-time snapshots — `logMealFromSaved` copies the definition's multipliers rather than
+  referencing them — so a log survives the meal being edited afterwards. Adding a meal-level factor
+  that every reader must remember to apply would break that property and put a second multiplier in
+  the system, which is the shape this repo has been bitten by before (Q-401's two TDEE models,
+  BF-88's two meanings for one constant).
+- **The cost of that choice, stated so it is chosen rather than discovered:** "I ate 1.5×" is not
+  recoverable as a fact afterwards — only the scaled per-item amounts are. That is the same trade
+  BF-3 made for supplement doses and it went the other way there, because a titrating drug's dose is
+  the datum. Here the datum is the food eaten, and the factor is how it was entered.
+- **⚠ Whatever the picker is, it must not be a free-number field.** The owner named 0.5 / 1 / 1.5 —
+  discrete taps, not a keyboard. `components/nutrition/quantity-editor.tsx` already exists for
+  per-item amounts and its comment notes *"serving still needs qualifying against the meal's own
+  portions"*, so reuse rather than adding a third quantity control.
+- **Verification:** logging Cruskit + PB at 1.5× writes 243 → **365 kcal** across two rows whose
+  per-item grams are each 1.5× the definition; the diary groups them as one meal; editing the saved
+  meal afterwards leaves the logged rows unchanged; and 1× is byte-identical to today's behaviour.
+
+
+### [nutrition] BF-103 — one label, `My Foods`, on every surface (owner decision, 2026-09-01)
+
+- **Lane:** B — `components/nutrition/saved-meals-sheet.tsx` (the tab strip) plus **seven other
+  user-visible strings** reading `My Meals`, enumerated below.
+- **Added:** 2026-09-01 · owner: *"can we change Meals to → My foods, so we can have meals + singular
+  items saved."* · **decided** same day: *"no I'm happy to rename Saved to → My Foods. the issue was
+  having saved + MyFoods. we only need one. lets go with MyFoods."*
+
+**The decision, and what it settles.** This entry originally recommended `Saved` for the tab with the
+page button left as `My Meals`. The owner read that as introducing a *second* name and rejected it on
+exactly the right grounds — the historical failure was never the wording, it was **two labels for one
+list**. So: **`My Foods` everywhere, `My Meals` and `Saved` nowhere.** One name, one list, no pair to
+tell apart. Do not re-open the naming; implement it.
+
+**He is right about the contents, and the measurement is stark.** Of his 10 saved meals, **5 contain
+exactly one item** — Edamame Block, Rice Block, Protein Pasta Brick and two others. Half the list
+called "Meals" is single foods, saved as one-item meals because that is the only shelf available. The
+label already mis-describes what is in it, which is what makes this a correction rather than a
+preference.
+
+**⚠ Why BF-37 and BF-60 do not block this, stated so nobody re-reverts it.** Both entries removed
+`My Foods` — but both were solving *"two labels that differ only in their last word"*:
+
+- `nutrition-action-row.tsx:59` — *"`My Meals`, not `My Foods` (**BF-37**)."*
+- `saved-meals-sheet.tsx:58-61` — *"`My Foods` against `My Meals` is the pair **the owner could not
+  tell apart** … (`My Meals` survives on the page's own button, where it names one list rather than
+  one of two lookalikes.)"* (**BF-60**)
+
+A single name cannot be confused with itself. Their reasoning is satisfied by unifying, not by
+keeping `My Meals`. **Update those two comments in the same PR** — left as they are, they read as a
+standing prohibition and the next session reverts this on their authority.
+
+**⚠ The other half of the history, and the trap in it — read before touching the sheet.** `My Foods`
+was once the name of a **merged** list: v1.382.0 — *"My Meals and your food library are one list now,
+called My Foods"* — and v1.385.0 split it back three versions later, *"Merging them put a recipe you
+built and a single ingredient in the same list, which made 'log this' mean two different things
+depending on the row."* **That revert was about the merge, not the name.** This entry renames the tab
+and changes nothing about what is in it: `Recent` and `Search` stay, the saved list keeps holding what
+it holds. An implementer who reads "My Foods" and re-merges the tabs reintroduces a defect the app
+already paid for.
+
+**Every user-visible site (sibling-surface sweep — the rename is not two files):**
+
+| File | Line | Current | Notes |
+|---|---|---|---|
+| `saved-meals-sheet.tsx` | `LIST_TABS` | `Meals` | the tab; strip becomes Recent · My Foods · Search |
+| `nutrition-action-row.tsx` | 62 | `My Meals` | the page button |
+| `use-plan-meal-saving.ts` | 59–60 | `saved to My Meals` | toast, both singular and plural arms |
+| `my-meals-picker.tsx` | 180, 202 | `in My Meals` / `Nothing in My Meals yet` | hint + empty state |
+| `meal-plan-edit-sheet.tsx` | 326 | `My Meals` | button |
+| `meal-plan-section.tsx` | 235 | `Save all N to My Meals` | button |
+| `plan-meal-row.tsx` | 120, 126, 131 | `In My Meals`, `Save to My Meals`, aria-label | badge + action + a11y |
+
+`plan-meal-row.tsx:126` is an **`aria-label`** — a rename that skips it leaves the screen reader
+saying a name the screen no longer uses. The file *names* (`my-meals-picker.tsx`) are not user-visible
+and are not worth the churn; leave them.
+
+- **⚠ A label change is not the whole ask, and this entry is the label only.** *"so we can have meals
+  + singular items saved"* implies saving a single food **as** a single food rather than wrapping it
+  in a one-item meal. Today the wrap is the workaround, and `diary-groups.ts` already accommodates it
+  — *"a group of one is a single food wearing a meal's name… it renders as the plain row it already
+  is."* A first-class saved-food shelf is a separate, larger decision; the rename makes the current
+  behaviour **honest** rather than fixing it, and says so here to stop it silently growing.
+- **Ships a changelog entry** — user-visible, patch. Say plainly that only the name changed and the
+  lists are unchanged, so the note is not read as the v1.382.0 merge returning.
+- **Verification:** `grep -rn "My Meals" app components` returns comments and changelog history only,
+  no live string; the strip reads Recent · My Foods · Search; the page button and the tab it lands on
+  share one name; the plan surfaces' toast, badge, buttons and aria-label all say `My Foods`; a
+  one-item entry and a multi-item meal sit in the same list without either looking mislabelled.
+
+
+### [nutrition][body] BF-101 — a "Recommended" button per goal field; the numbers already exist and need no AI
+
+- **Lane:** B — the Profile goals form (`app/more/…` profile tab) reading an existing shared function.
+  A for a non-AI endpoint if the values are not already reachable client-side.
+- **Added:** 2026-09-01 · owner, on the Profile goal fields: *"maybe each should have a button under
+  it that says (Recommended value) — id assume we use AI here to choose but maybe we could have some
+  logic to decide so not using the ai if not needed?"*
+
+**The logic already exists and the AI is layered on top of it, not instead of it.**
+`calculateBaseline` (`packages/shared/src/nutrition/goal-recommendation.ts:166`) already returns a
+deterministic value for **every field on that screen except sleep**:
+
+```ts
+return { bmr, tdee, calories, proteinG, carbsG, fatG, waterMl, stepsGoal, leanMassKg }
+```
+
+Calories are `bmr × SEDENTARY_MULTIPLIER + CALORIE_ADJUSTMENT_BY_GOAL[goal]`; protein is dosed per kg
+of lean mass; water is `weightKg × 33 + WATER_BUMP_BY_ACTIVITY[level]`; steps are
+`STEP_GOAL_BY_ACTIVITY[level]`. **The `bmr` is the measured RMR** when one exists — `calculateBaseline`
+calls `personalRmr` (BF-33), the same function the daily energy model uses, so the wizard and the
+Health card cannot disagree about resting rate. `/api/nutrition-goals/recommend` computes this
+baseline and then runs `generateObject` to *adjust* it. **So the owner's instinct is right and the
+work is mostly plumbing: surface the baseline, skip the model.**
+
+- **The drift a per-field button would surface is already live.** Activity Level is **Moderate**,
+  whose `STEP_GOAL_BY_ACTIVITY` is **10,000** — and the stored Steps Goal is **7,000**, the
+  *sedentary* number. Water tracks it correctly (71.7 kg × 33 + 250 = **2,616** against a stored
+  **2,600**). One field follows the recommendation, another does not, and nothing on screen says
+  which. That is the value of the button in one screenshot.
+- **⚠ Sleep has no baseline and an implementer must not invent one.** `BaselineResult` carries no
+  sleep field. Either leave sleep without a button or add a heuristic **deliberately**, as its own
+  decision — silently inventing one puts an unsourced number next to six sourced ones.
+- **⚠ It must hide, not guess, on an incomplete profile.** `calculateBaseline` needs weight, height,
+  age and sex; the recommend route already gates on a `missing` list. A button that renders a number
+  computed from absent inputs is worse than no button.
+- **Recommendation: a non-AI path, and keep the AI button as the second thing.** The deterministic
+  value is instant, free, reproducible and explainable ("33 ml/kg + your activity bump"); the AI pass
+  earns its place only where it adjusts for something the formula cannot see. Two buttons with
+  different promises beats one that sometimes calls a model.
+- **Verification:** each field's Recommended value equals `calculateBaseline`'s for the same profile;
+  tapping it fills the field without saving until the user saves; and no network call to an AI route
+  is made by the deterministic path.
+
+### [nutrition][platform] BF-102 — "Calibrated" activity level, and a prompt that tells the model something false
+
+- **Lane:** B for the option; A for the measured factor and the prompt string.
+- **Added:** 2026-09-01 · owner: *"for the activity level there should be a button to choose
+  'Calibrated Level' which would be what we are using now right — rather than the default response."*
+
+**He is right about the model and it is worth being exact about why.** The calorie baseline does
+**not** multiply by the self-reported activity level: `calculateBaseline` computes
+`tdee = bmr × SEDENTARY_MULTIPLIER`, and Q-401 deleted `ACTIVITY_MULTIPLIERS` precisely because
+folding a self-report in there double-counted against the movement the app *measures* and adds.
+So "what we are using now" is **measured**, not calibrated-from-a-picker.
+
+**Activity level is NOT a dead control, though — it still drives two things**, which is why this is a
+feature and not a deletion like LB-41:
+
+| consumer | effect |
+|---|---|
+| `STEP_GOAL_BY_ACTIVITY` | sedentary 7,000 → moderate 10,000 → active 12,000 |
+| `WATER_BUMP_BY_ACTIVITY` | +0 / +250 / +400 / +600 ml |
+| AI prompt, `cardio-week`, `training-stress`, `health-insight` | context only |
+
+- **⚠ A REAL BUG, independent of the feature.** `app/api/nutrition-goals/recommend/route.ts:111-112`
+  builds the prompt as *`Baseline (Katch-McArdle, lean mass Xkg, activity level "moderate"): BMR X,
+  TDEE X…`* — which reads as though the TDEE were computed **for** that activity level. It was not;
+  it is `bmr × 1.2` regardless. **The model is being told something false about its own input** and
+  may well adjust as if the baseline already contained a moderate multiplier. Fix the string whether
+  or not the calibrated option ships.
+- **Recommendation: compute the real factor and offer it as an option.** The app already has the
+  inputs — on the calibrated path `maintenanceKcal / bmr` is exactly the activity factor, and on the
+  formula path `(restingBase + avgActiveKcal) / bmr` is its measured equivalent. Show the number
+  ("Calibrated · 1.38×, from your last 14 days") rather than only a band name, and let it drive the
+  water and step goals that activity level genuinely feeds.
+- **⚠ It needs the same not-enough-data state the maintenance figure has.** The energy card already
+  says *"Log food on 8 more days to calibrate"*; a Calibrated option that silently falls back to a
+  guess would be the worse version of the picker it replaces.
+- **⚠ Do not delete the manual bands.** A calibrated factor is unavailable on a new account and
+  wrong after a life change until the window catches up; the self-report is the fallback and the
+  override.
+- **Verification:** the Calibrated option shows a factor derived from the user's own data and states
+  its window; picking it moves the step and water goals; an under-calibrated account sees the reason
+  rather than a number; and the recommend-route prompt no longer implies the TDEE is activity-scaled.
+
+
 ### [nutrition][body] BF-99 — the line says "base" and shows base MINUS the goal deficit, so the owner read his RMR as broken
 
 - **Keep:** one look on the S25. The line gained a clause and Home's copy of the bar is `compact`, so
@@ -415,40 +614,43 @@ below threshold and left in place for next time.
 
 ### [app-shell] BF-100 — back navigation always lands at the top, because the scroll position is not on the document
 
-- **Lane:** B — `components/pull-to-sync.tsx` (which owns the scroll container) plus wherever a route
-  change is observed.
+- **Keep:** the device pass, and only that.
+- **Verify:** device — on the S25, scroll a tab screen well down, tap into a detail screen, press the
+  **system back gesture** (not a UI back button), and confirm it returns to the same offset on a cold
+  cache and a warm one; and that reaching the same screen forward still starts at the top.
+- **✅ SHIPPED** (`feat/bf-100-scroll-restoration`, 2026-09-01).
+  `lib/hooks/use-scroll-restoration.ts`, called once from `pull-to-sync.tsx` so every screen using
+  the shell inherits it rather than 62 separate fixes. `e2e/scroll-restoration.spec.ts` is **green**
+  against a cold harness server.
+- **⚠ An earlier version of this entry claimed tab-to-tab was broken. Retracted.** A tab-to-tab move
+  loses nothing: the shell keeps every tab screen mounted, so the container holds its own `scrollTop`
+  unaided — measured, with Health's container still reading 840 while the URL was `/nutrition`. The
+  "evidence" was a red run whose real cause was `page.goBack()` landing on **`about:blank`** after a
+  bottom-nav Link click.
+- **⚠ SIX implementation traps are paid for and written into the hook. Do not re-derive them:**
+  (1) gating the restore on a `popstate` flag breaks under StrictMode, whose double-invoked effect
+  consumes it; (2) reading `el.scrollTop` in the cleanup saves **0**, because React has already
+  detached the node — track it from a `scroll` listener; (3) setting the offset once lands
+  **144–231 px past it**, because content keeps arriving above and scroll anchoring pushes it down,
+  so it must be re-asserted; (4) deciding the user has taken over by comparing the offset to what you
+  set treats that settling as a finger and yields every time — takeover is an **input event**;
+  (5) **consuming the saved value on read** is eaten by StrictMode a second way — pass one takes it,
+  finds the container too short, waits; pass one's cleanup writes 0 over the pending target; pass two
+  reads 0 and discards it. Read without consuming; clear when the restore lands; and never write 0
+  over a target that has not landed. (6) A screen can come back **shorter** than it was, so the
+  window must land at `min(target, available)` rather than abandon the restore.
+- **⚠ And four SPEC traps, which cost more than the code did.** All four reported
+  `expected 840, received 0`, identical to a broken feature: text-matching *Sleep* hits a card that
+  opens a **sheet**; `Sleep details →` does too; `a[href^="/health/"]` matches nothing, because these
+  screens navigate from `router.push` **buttons**; the bottom nav makes `goBack()` land on
+  `about:blank`. **`/more` → *Profile details* → back is the verified path**, and the spec's
+  precondition assertions are what separate a fixture problem from a regression — keep them.
+- **The timer was NOT the cause of the cold-server failure**, though it looked like it twice. Raised
+  to 120 s as a controlled experiment: still red. That is what forced the instrumented run that found
+  trap (5).
 - **Added:** 2026-09-01 · owner: *"when I scroll down to a button; then click on it and it takes me
   to a new page; when I press back I want to go back to that page at the same scroll level I was at.
   It usually starts me at the top of the page. This is on many pages if not all pages."*
-
-**"If not all pages" is right, and there is one reason.** The app does not scroll the document — it
-scrolls an **inner container**. `pull-to-sync.tsx:190` renders the scroller with a `scrollRef`, and
-**62 files** carry `overflow-y-auto`. Next's App Router scroll restoration operates on the
-window/document scroller, so it cannot see, save or restore a nested element's `scrollTop`. Nothing
-in the app does it either: `grep` for `scrollRestoration`, `restoreScroll` or a `sessionStorage`
-scroll key returns **nothing** outside `use-scroll-to-bottom.ts`, which is unrelated.
-
-So this is not a regression and not per-screen — no code has ever existed to do it.
-
-- **Recommendation: save `scrollRef.current.scrollTop` per route key and restore on mount**, in
-  `pull-to-sync.tsx` so every screen using the shell inherits it, rather than 62 separate fixes.
-  `sessionStorage` is the right store — it is per-tab, dies with the app, and a stale offset is
-  worthless anyway.
-- **⚠ Restore AFTER the content has height, or it silently no-ops.** These screens paint from a cache
-  seed and then revalidate, so a restore on first paint sets `scrollTop` on a container that is still
-  short and the browser clamps it to 0 — which looks exactly like the bug. Restore when the content
-  has laid out (a `ResizeObserver` on the inner content, or after the seeded paint), and only once
-  per navigation so a later revalidation cannot yank the user back.
-- **⚠ Do not restore on a forward navigation.** Only a *back* return should land where the user was;
-  arriving fresh should start at the top. That means keying on the route AND clearing the entry when
-  a route is entered forward, or reading the navigation type.
-- **The persistent tab shell cuts both ways here** — a tab that never unmounts keeps its scroll
-  position already, so tab switches are not the complaint. The loss happens on a **push to a new
-  route and back**, which is what unmounts the screen.
-- **Verification:** on the S25, scroll Health well down, tap into a detail screen, press the system
-  back gesture — the page returns at the same offset, on a cold cache and a warm one; and reaching
-  the same screen forward still starts at the top.
-
 
 ### [nutrition] BF-97 — a scanned meal groups in the diary: the rendering half
 
@@ -2620,28 +2822,69 @@ owner has to re-describe in a wizard what the app already knows.
   worker.
 
 
-### [workouts] LB-46 — the AI Prescription card may list pre-deload numbers on a deload prescription
+### [workouts] LB-47 — BF-64's `Full` override may do nothing on a REAL session-level deload
 
-- **Lane:** B — `components/workout/ai-prescription-card.tsx`, or whatever supplies its
-  `prescription` prop if the substitution happens upstream.
-- **Added:** 2026-09-01 by Lane B, incidentally, while device-substituting a fixture for BF-64.
-- **What was seen.** A `session_periodization` row whose prescription carries
-  `Deadlift {sets:3, reps:5, pct:60, deloaded:true, preDeload:{sets:4, reps:5, pct:80}}` renders in
-  the expanded card as **`4×5 @ 128.75kg (80%)`** — the *pre-deload* figures — directly under a
-  subtitle reading **`Deload session`**. The card's own code maps `prescription.exercises` and reads
-  `ex.pct`, so on the stored row it should print `3×5 … (60%)`.
-- **⚠ Attribution is measured, and the caveat is real.** It **reproduces on `main`** with the same
-  row (checked by stashing the BF-64 change and re-rendering), so it is not BF-64's doing. **But the
-  row was hand-built**, not produced by the engine, so the alternative explanation is that the
-  fixture is not a shape the engine emits and the card is fine. **Settle that first**: find a real
-  deloaded prescription in production (`prescription->'exercises' @> '[{"deloaded":true}]'`) and read
-  what the card shows for it before changing any code.
-- **If it is real, it matters more than it looks.** The subtitle and the numbers under it are the
-  two things a lifter reads to decide whether to override, and they would be disagreeing — the same
-  class as BF-8 (toggle disagreed with card) and BF-64 (toggle offered a control that did nothing),
-  one layer further in.
-- **Do not "fix" it by making the card follow the toggle.** BF-64 settled that: the card is a
-  statement about the prescription. If this is real the fix is to show what the prescription stored.
+- **Lane:** B — `components/workout/utils.ts` (`deloadRevertNames`), and possibly Lane A if the
+  answer is that a session deload needs a revert target the prescription does not currently carry.
+- **Added:** 2026-09-01 by Lane B, against its own shipped work (BF-64, #764, v1.422.0).
+- **⚠ This questions a fix that has already merged. It is not a regression — nothing got worse — but
+  the central claim may not hold, and it was verified against a fixture that misrepresents
+  production.**
+- **What BF-64 shipped.** Picking `Full` over a deload prescription reverts every deloaded exercise
+  to its `preDeload` numbers. The entry's premise, quoted: *"Every deloaded prescription exercise
+  carries a `preDeload` block."*
+- **What production actually holds.** Of **5** stored prescriptions: **1** has a session-level
+  `deload: true`, **2** have per-exercise `deloaded: true`, and **0 have both**. So on the only real
+  session-level deload, no exercise carries `deloaded`/`preDeload` — `deloadRevertNames` returns an
+  empty list and **the override reverts nothing.** The toggle would behave exactly as it did before
+  BF-64, which is the defect BF-64 was filed to fix.
+- **Why the two do not overlap.** A **session** deload has its low intensities baked into the LLM's
+  own `pct` values at generation. A **per-exercise** deload is an overlay applied afterwards by
+  `reevaluateForToday`, which stores the original in `preDeload` precisely so it can be undone. Only
+  the second has anything to revert *to*. BF-64 reused the second mechanism to implement the first.
+- **So the open question is what `Full` should mean on a session deload**, and it is not obvious:
+  the pre-deload numbers were never computed, so there is nothing stored to go back to. Candidates —
+  regenerate via `/prescribe` (which BF-64 rejected on cost, and the route takes no intensity input
+  anyway); scale the pcts back up by a fixed factor (invents numbers the engine did not choose); or
+  **disable the toggle on a session deload and say why**, which is honest and cheap. That last one is
+  probably right and is a Lane B change.
+- **⚠ Do not revert BF-64.** Its per-exercise path is correct and does work: `applyDeloadReverts` and
+  the blocked-exercise card copy are exercised by the mixed case, which production does produce. What
+  is unproven is the session-level case, which is the one the owner reported.
+- **⚠ And re-read BF-64's verification with this in mind.** It was measured against a hand-built
+  fixture combining session-level and per-exercise deloads — a pair production has not produced (see
+  LB-46). The reverts observed were real; whether they can ever fire on the owner's own data is what
+  this entry asks.
+- **n = 5.** Small. Confirm against a larger sample, or by asking the owner to report the next time a
+  deload day appears, before designing around it.
+
+### [workouts] LB-46 — how a deload reaches the AI Prescription card, and why a hand-built fixture misleads
+
+- **✅ CLOSED 2026-09-01 by measurement against production.** No code change. Kept as a
+  **`Reference:`** because the measurement is what the next reader needs, not the conclusion.
+- **Reference:** what the AI Prescription card can and cannot say, and why a hand-built prescription
+  fixture misleads.
+- **What I filed, and why it looked like a bug.** A card showed `4×5 @ 128.75kg (80%)` for an
+  exercise I had stored as `3×5 @ 60%` — the *pre-deload* figures under a `Deload session` subtitle.
+- **What actually happened.** `reevaluateForToday` (`packages/shared/src/ai-periodization/reevaluate.ts`)
+  **self-reverts** a per-exercise deload when the soreness that caused it clears: it swaps the
+  `preDeload` values back in, sets `deloaded: false` and **drops the `preDeload` block**. My fixture
+  had no mood log, so the reverts fired on the first read. Measured through the API:
+  `Deadlift: 4x5 @80% deloaded=false pre=none`. **The card was rendering the prescription faithfully.**
+  The tell was already on screen and I missed it — the card suppresses its intensity-zone chip when
+  `ex.deloaded`, and the chip was showing.
+- **The fixture was the unrealistic part, exactly as the entry warned it might be.** It combined a
+  session-level `deload: true` with per-exercise `deloaded: true` + `preDeload`. Production has never
+  produced that pair: of **5** stored prescriptions, **1** has a session-level deload, **2** have
+  per-exercise deloads, and **0 have both**. A session deload bakes its low intensities into the
+  LLM's own `pct` values; a per-exercise deload is an overlay with something to revert to. They are
+  different mechanisms and the fixture merged them.
+- **⚠ One latent inconsistency is real and stays open, in LANE A's file.** `reevaluate` returns
+  `{ ...prescription, exercises }` and never touches the top-level `deload` flag. So *if* both were
+  ever set and every per-exercise deload reverted, the subtitle would read `Deload session` over
+  full-intensity numbers. **n = 5, so "production has never produced it" is not "it cannot" —** the
+  guard against it would be in `reevaluate.ts`, which is Lane A's.
+- **Added:** 2026-09-01 by Lane B · closed the same day.
 
 ### [workouts] BF-64 — the Full/Deload toggle can only ADD deload, never remove one, so `Full · Override` overrides nothing
 
