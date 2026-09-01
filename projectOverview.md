@@ -41,7 +41,7 @@ midnight so the case fires on every run; **its first version passed with the fix
 ([journal](docs/overview/entries/2026-09-01-local-day-rollover.md)).
 
 **Blood panels are stored, de-identified (BF-1, engine half — migrations 250/251).** The schema is
-written from the owner's real 63-row report rather than a description, and four shapes in it broke
+written from the owner's real 58-analyte report rather than a description, and four shapes in it broke
 every simpler design: `<0.2` is a result that is **not a number** (`value_num` + `value_operator`),
 ranges arrive two-sided, one-sided in both directions and absent (both bounds nullable), the date is
 a **month** (a precision column, or every panel lands on the 1st and lies), and flags are commentary

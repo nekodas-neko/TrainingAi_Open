@@ -6,7 +6,7 @@ No native change. **Not device-verified.**
 ## The schema comes from a real report, and that is the whole method
 
 BF-41's rule is that a schema be written from an actual document rather than a description, and
-`docs/clinical-baseline-2026-08-27.md` — the owner's de-identified 2026-04 panel, 63 rows — is that
+`docs/clinical-baseline-2026-08-27.md` — the owner's de-identified 2026-04 panel, 58 analytes — is that
 document. Four shapes in it break a simpler design, and each one is a column here:
 
 | shape in the report | what a simpler schema does | what this does |
@@ -28,6 +28,19 @@ bounds decide the colour.
 100 could be 60 or 600, so the answer is `unknown` rather than `in` — returning `in` there would be
 the same failure the entry is about, one layer down. Asserted both ways: `<0.2` against a floor of 1
 **is** resolved (`low`), because it is below the floor whatever the true value is.
+
+## Six keys were missing and the slug hid it
+
+`ANALYTE_KEYS` named 52 of the report's 58 analytes. The other six — MCHC, RDW, platelets, MPV, WBC,
+neutrophils — fell through to `slugAnalyte`, which for those six happens to produce exactly the key
+the table would have. Accidental correctness, and indistinguishable from the real thing until one of
+them slugged badly. The fix is the six entries; the guard is that the coverage assertion now reads
+the labels **out of the report** rather than from a list retyped in the test, because a hand-copied
+list moves whenever the table moves and can only ever agree with itself. Verified by deleting a key:
+the test names the analyte it can no longer find.
+
+**Found by cross-checking a number, not by reading the code.** Three docs said the panel had 63 rows
+and the plan said 41; it has 58. Counting it to correct the prose is what surfaced the gap.
 
 Fifteen rows of the real panel are asserted individually — urea, ALT, cholesterol, LDL, non-HDL and
 the total/HDL ratio out; creatinine, eGFR, HDL, triglycerides, glucose and growth hormone in; MCH

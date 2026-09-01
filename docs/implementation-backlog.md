@@ -1229,7 +1229,7 @@ brings it back.** It fits every part of the report:
 ### [nutrition][body] 🔵 BF-1 — blood panels: the extraction route, the consumers and the UI
 
 > **✅ THE STORAGE HALF SHIPPED 2026-09-01** (migrations 250 + 251). `blood_panels` +
-> `blood_analytes`, written from the real 63-row report; `packages/shared/src/health/analyte-keys.ts`
+> `blood_analytes`, written from the real 58-analyte report; `packages/shared/src/health/analyte-keys.ts`
 > (a leaf module, importing nothing) with `rangeVerdict`, `parseResult`, `parseReference` and the
 > key table; `POST/GET/DELETE /api/blood-panel`, the manual path, `.strict()` so an identifier field
 > is a 400. [journal](overview/entries/2026-09-01-blood-panel-storage.md)

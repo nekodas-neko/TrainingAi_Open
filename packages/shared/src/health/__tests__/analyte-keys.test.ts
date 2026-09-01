@@ -12,6 +12,7 @@
  * self-reported judgement as fact, so the bounds decide and the words are displayed as the words.
  */
 import { describe, it, expect } from 'vitest'
+import { readFileSync } from 'node:fs'
 import { rangeVerdict, parseResult, parseReference, analyteKey, slugAnalyte, ANALYTE_KEYS } from '../analyte-keys'
 
 /** Straight from the report: label, unit, reference as printed, result as printed. */
@@ -120,5 +121,38 @@ describe('analyte keys', () => {
     const keys = Object.values(ANALYTE_KEYS)
     expect(new Set(keys).size, `duplicate analyte key: ${keys.filter((k, i) => keys.indexOf(k) !== i)}`)
       .toBe(keys.length)
+  })
+
+  /**
+   * **Read from the report rather than from a list retyped here.** A hand-copied list of labels
+   * moves whenever the table moves, so it can only ever agree with itself — the assertion has to
+   * anchor on something this module cannot edit. `docs/clinical-baseline-2026-08-27.md` is that
+   * anchor: it is the de-identified panel the schema was written from, and if a label is added to
+   * it without a key, `analyteKey` silently falls through to `slugAnalyte` and the coverage claim
+   * in the docs quietly stops being true. That is exactly how six haematology markers (MCHC, RDW,
+   * platelets, MPV, WBC, neutrophils) sat outside the table while their slugs happened to come out
+   * right — accidental correctness, indistinguishable from the real thing until something slugged
+   * badly.
+   */
+  it('covers every analyte the real panel prints, by name rather than by lucky slug', () => {
+    const doc = readFileSync(
+      new URL('../../../../../docs/clinical-baseline-2026-08-27.md', import.meta.url),
+      'utf8',
+    )
+    const section = doc.split(/^## \d+\. Blood panel/m)[1]?.split(/^## /m)[0]
+    expect(section, 'the blood-panel section moved or was renamed').toBeTruthy()
+
+    const labels = section!
+      .split('\n')
+      .filter(l => l.startsWith('| ') && !/^\|[ -]*-{3,}/.test(l) && !/^\| *Test *\|/.test(l))
+      .map(l => l.split('|')[1].trim())
+
+    expect(labels.length, 'the panel table did not parse').toBeGreaterThan(40)
+
+    const missing = labels.filter(l => !(l.toLowerCase() in ANALYTE_KEYS))
+    expect(missing, `analytes in the report with no key in the table: ${missing.join(', ')}`).toEqual([])
+
+    const keys = labels.map(analyteKey)
+    expect(new Set(keys).size, 'two of the report\'s own labels collide onto one key').toBe(keys.length)
   })
 })
