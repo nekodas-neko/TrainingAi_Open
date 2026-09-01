@@ -388,6 +388,95 @@ below threshold and left in place for next time.
 > BF-29 (My meals), BF-30 (Meal detail), BF-31 (Edit meal) and BF-26 (Quantity). Two artboards need
 > no entry — `Tap targets` and the `srv/g` studies both shipped in Q-395a.
 
+### [nutrition] BF-104 — log a meal at 0.5× / 1× / 1.5×; the storage supports it and nothing sets it
+
+- **Lane:** B for the picker on the meal sheet; A for the one argument through
+  `packages/shared/src/nutrition/log-meal.ts`.
+- **Added:** 2026-09-01 · owner: *"when logging food/meals we should be able to choose how much of the
+  meal; i.e full at 1x or 1.5 or 0.5 etc."*
+
+**Every food log already carries its own multiplier — the meal path just never scales it.**
+`logMealFromSaved` writes `quantityMultiplier: item.quantityMultiplier` (`log-meal.ts:83, 96, 131`),
+taking each item's factor straight from the saved definition. There is no meal-level factor anywhere
+between the "Log this meal" button and the rows it writes, so the button can only ever log exactly
+one portion.
+
+**⚠ This is NOT the "makes N portions" control, and conflating them would be the wrong fix.**
+`components/nutrition/meal-batch-size.tsx` sets *"how many portions a saved meal makes"* — a
+**definition-time** property that divides a recipe into servings (the screenshot's *"One portion · 2
+ingredients"* against Edamame Block's *"makes 2 portions"*). This request is **log-time**: how much
+of one portion was eaten today. A meal can make 4 portions and be eaten 1.5 at a sitting; the two
+numbers multiply, they do not substitute.
+
+- **The change is one argument, threaded.** `logMealFromSaved(meal, …, scale = 1)` writing
+  `quantityMultiplier: item.quantityMultiplier * scale`. No schema change — `food_logs.quantity_multiplier`
+  is already per-row.
+- **Recommendation: scale at WRITE time, do not store the factor separately.** The rows are already
+  point-in-time snapshots — `logMealFromSaved` copies the definition's multipliers rather than
+  referencing them — so a log survives the meal being edited afterwards. Adding a meal-level factor
+  that every reader must remember to apply would break that property and put a second multiplier in
+  the system, which is the shape this repo has been bitten by before (Q-401's two TDEE models,
+  BF-88's two meanings for one constant).
+- **The cost of that choice, stated so it is chosen rather than discovered:** "I ate 1.5×" is not
+  recoverable as a fact afterwards — only the scaled per-item amounts are. That is the same trade
+  BF-3 made for supplement doses and it went the other way there, because a titrating drug's dose is
+  the datum. Here the datum is the food eaten, and the factor is how it was entered.
+- **⚠ Whatever the picker is, it must not be a free-number field.** The owner named 0.5 / 1 / 1.5 —
+  discrete taps, not a keyboard. `components/nutrition/quantity-editor.tsx` already exists for
+  per-item amounts and its comment notes *"serving still needs qualifying against the meal's own
+  portions"*, so reuse rather than adding a third quantity control.
+- **Verification:** logging Cruskit + PB at 1.5× writes 243 → **365 kcal** across two rows whose
+  per-item grams are each 1.5× the definition; the diary groups them as one meal; editing the saved
+  meal afterwards leaves the logged rows unchanged; and 1× is byte-identical to today's behaviour.
+
+
+### [nutrition] BF-103 — half of "Meals" is single foods, and the label the owner wants was removed twice
+
+- **Lane:** B — `components/nutrition/saved-meals-sheet.tsx:69-73` (the tab strip) and
+  `components/nutrition/nutrition-action-row.tsx:62` (the page button).
+- **Added:** 2026-09-01 · owner: *"can we change Meals to → My foods, so we can have meals + singular
+  items saved."*
+
+**He is right about the contents, and the measurement is stark.** Of his 10 saved meals, **5 contain
+exactly one item** — Edamame Block, Rice Block, Protein Pasta Brick and two others. Half the list
+called "Meals" is single foods, saved as one-item meals because that is the only shelf available. The
+label already mis-describes what is in it.
+
+**⚠ But the requested label is the one two entries removed on purpose, and an implementer must read
+this before touching it.** The reasoning is in the files:
+
+- `nutrition-action-row.tsx:59` — *"`My Meals`, not `My Foods` (**BF-37**)."*
+- `saved-meals-sheet.tsx:58-61` — *"The tab labels drop the possessive deliberately. `My Foods`
+  against `My Meals` is the pair **the owner could not tell apart**, and two labels that differ only
+  in their last word are hard to tell apart wherever they appear. (`My Meals` survives on the page's
+  own button, where it names one list rather than one of two lookalikes.)"* (**BF-60**)
+
+So renaming the tab to `My Foods` while the page button still reads `My Meals` **re-creates exactly
+the pair that was removed** — and lands it in the one place the earlier fix deliberately left alone.
+
+- **What has actually changed since those decisions is the CONTENTS, not the wording.** BF-37 and
+  BF-60 were about telling two labels apart. This is about a label being untrue. That is a new
+  argument and it does justify revisiting — it just cannot be settled by taking the old losing label.
+- **Recommendation: rename the tab to `Saved`, and leave the page button alone.** The strip becomes
+  **Recent · Saved · Search**, which names three *sources* rather than three content types — where a
+  thing came from (used lately / you kept it / the database), which is the distinction the user is
+  actually making at that moment. It is true of a one-item entry and a five-item meal equally, and it
+  collides with nothing, so BF-37's button survives untouched.
+- **The alternative, if the owner prefers his own wording:** rename **both** to `My Foods` in the same
+  change. That is coherent, and the cost is that the button and the tab then share a name — which is
+  fine when they open the same list, and is strictly better than the split the request would create.
+  What must not happen is one without the other.
+- **⚠ A label change is not the whole ask.** *"so we can have meals + singular items saved"* implies a
+  way to save a single food **as** a single food, rather than wrapping it in a one-item meal. Today
+  the wrap is the workaround, and `diary-groups.ts` already accommodates it — *"a group of one is a
+  single food wearing a meal's name… it renders as the plain row it already is."* Whether to add a
+  first-class saved-food shelf is a separate, larger decision; **this entry is the label only**, and
+  says so to stop it silently growing into the other thing.
+- **Verification:** the strip reads Recent · Saved · Search; the page button is unchanged; a one-item
+  entry and a multi-item meal sit in the same list without either looking mislabelled; and no string
+  in the app pairs `My Foods` with `My Meals`.
+
+
 ### [nutrition][body] BF-101 — a "Recommended" button per goal field; the numbers already exist and need no AI
 
 - **Lane:** B — the Profile goals form (`app/more/…` profile tab) reading an existing shared function.
