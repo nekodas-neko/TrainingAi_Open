@@ -412,6 +412,59 @@ card gives the honest answer without the reason.
   the earned figure appears and the explanation stops; and the three addends shown never disagree
   with the total.
 
+### [nutrition][activity] BF-88 — the energy model runs on two different bases and the card never says which
+
+- **Lane:** A — `lib/health/energy-balance-service.ts:227-265` and the two constants in
+  `packages/shared/src/health/{energy-baseline,daily-energy}.ts`. Surface copy is B, and is BF-87.
+- **Needs:** BF-87
+- **Gate:** owner — this is a scoring change, so it is a Tuning-shaped proposal even though BugFix
+  found it. Nothing here ships without the sign-off and a restated blast radius.
+- **Added:** 2026-09-01 · owner: *"is it possible to get rid of the baseline; and have it reference
+  steps + exercise only? that would be more accurate right? rmr + activity?"*
+
+**The question was answered "no, and here is why", but tracing it found a real gap.** The model has
+two paths and they behave differently under exactly the change that was proposed:
+
+| | resting base | what `STEP_BASELINE` does |
+|---|---|---|
+| **fallback** (`source !== 'calibrated'`) | `bmr × 1.2` | changes total burn directly |
+| **calibrated** | `max(bmr, maintenanceKcal − avgActiveKcal)` | **nearly self-cancelling** |
+
+In the calibrated path the same steps are added to today's `activeKcal` *and* to the
+`avgActiveKcal` that gets subtracted out of maintenance, so dropping the threshold moves the
+resting/active **split** on the card while barely moving the total. In the fallback path the same
+edit is worth **−177 kcal/day**. One constant, two meanings, and nothing on screen distinguishes
+them — which is how a reasonable proposal ("drop the baseline, count all steps") can look
+obviously right and be measurably wrong.
+
+**Measured against 124 days of the owner's own data (2026-09-01).** Dropping `STEP_BASELINE` to 0
+and `SEDENTARY_MULTIPLIER` to 1.0 gives a **lower** burn on **124 of 124 days**: mean −177 kcal,
+range −159 to −249, zero days higher. The asymmetry is arithmetic — 0.2 × RMR is 265 kcal, while
+3,000 steps at the walking MET are ~106. Distribution: 50 of 124 days sit below 3,000 steps and so
+currently earn nothing from stepping at all; mean 5,716, median bucket 2–4k.
+
+- **Recommendation: leave both constants alone and make the path legible instead.** The pair is
+  internally consistent — 1.2 is BMR + TEF + non-step NEAT, and the 3,000 threshold is the
+  deduction that stops the NEAT half being counted twice. What is missing is that a reader (owner
+  or session) cannot tell which base produced today's number. Surface `source` where the burn is
+  explained, so "calibrated from your last 14 days" and "estimated from your RMR" are
+  distinguishable. That is also the honest answer to *"is this measured or assumed?"*, which is the
+  question underneath the owner's.
+- **⚠ Two things this entry is NOT licensing.** Lowering `STEP_BASELINE`: it is the double-count
+  guard and the measurement above says which way that moves. And a TEF term computed from logged
+  intake — the genuinely more accurate version of the owner's idea — is unusable at current logging
+  density: **45 of 124 days** carry a plausible intake, so the term would vanish on two-thirds of
+  days and make burn swing on whether food was logged, which is worse than a constant.
+- **One real mismatch, recorded and deliberately not acted on.** `SEDENTARY_MULTIPLIER` is a
+  *Mifflin-St Jeor BMR* activity factor, and since BF-42 it is applied to a *measured RMR*
+  (1,325 kcal, FFM 51.5 kg, 2026-08-27). Those are different quantities and the factors were never
+  validated against the second. For this owner the direction is not clearly an over-count —
+  measured 1,325 sits **below** predicted 1,481 — so it is filed as a known imprecision rather than
+  a defect. Anyone revisiting it needs a source for an RMR-based factor, not a re-derivation.
+- **Verification:** the burn explanation names its basis on both paths; a day on the calibrated path
+  and a day on the fallback are distinguishable from the UI alone; and no constant changed, so no
+  historical day moves.
+
 ### [platform] LB-40 — a user who already has a password cannot change it: the form never asks for the current one
 
 - **Lane:** B — `components/profile/edit-profile-sheet.tsx`. The route is correct; only the client
