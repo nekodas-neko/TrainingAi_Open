@@ -109,6 +109,14 @@ will keep changing as the framework does. §3 of the README is where the `BF-` I
   (#737). **A claim that something does not exist requires the COMPLETE result set** — pipe to
   `wc -l`, or drop the `head`, and read the count before writing the sentence. `head` is for
   previewing a positive finding, never for establishing an absence.
+- **⛔ CONFIRM THE RESPONSE YOU FETCHED IS THE PAGE YOU MEANT. Third false negative of 2026-09-01,
+  same family as the two above.** *"`NEXT_PUBLIC_SENTRY_DSN` is not set"* came from `curl`ing
+  `/login` and grepping for an ingest host. `/login` is a **52-byte redirect stub**. A redirect
+  answers "not found" to every grep, and the claim went into a backlog entry telling an implementer
+  to set a variable that was already set. Re-measured with `curl -sL` against the real page and its
+  **33 JS chunks**, the DSN is inlined in three of them. **Check `wc -c` on what you downloaded
+  before you search it** — and remember `NEXT_PUBLIC_*` lands in the JS chunks, not the HTML, so the
+  page alone is never enough.
 - **⛔ Measure a retention window from the LAST WRITE, not from `now()`, when the prune fires off a
   write path.** The same 2026-09-01 finding had a second, independent error: *"oldest row is 32 days
   old against a claimed 30"* compared the row against **today**. The prune runs inside
