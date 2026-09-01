@@ -6226,3 +6226,13 @@ caught it at the `No unresolved conflict markers` step.
 
 It sits next to the two existing gate gotchas because all three are the same mistake: reading a
 signal that has already been destroyed by the command before it.
+
+## 2026-09-01 — `projectOverview.md` → 9040, `docs/implementation-backlog.md` → 15415 (LA-53 shipped)
+
+The backlog shrank: LA-53's entry carried the three worked examples and the design argument, and
+those are now in the journal. What stays is the two cases no script will ever catch — BF-64 and
+LA-47 — and the question of whether the note should ever fail rather than print.
+
+`projectOverview.md` grew 8, and the line that earns them is the one about the rule reporting **its
+own documentation** twice before the exclusions existed. Without it the note reads as ordinary
+caution; with it, the reason it prints rather than fails is a measurement.
