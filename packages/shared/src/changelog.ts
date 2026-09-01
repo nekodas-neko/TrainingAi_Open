@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.418.2",
+    date: "2026-09-01",
+    changes: [
+      "A meal section holding just one combined meal no longer prints its macros and calories twice. The totals row underneath was counting ingredients rather than rows, so a three-ingredient meal on its own repeated the numbers the meal already showed.",
+    ],
+  },
+  {
     version: "1.418.1",
     date: "2026-09-01",
     changes: [
