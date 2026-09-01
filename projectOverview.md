@@ -24,7 +24,7 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.416.1 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Version:** v1.416.2 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-09-01.
 
 **The personal details are one screen, and one writer (BF-79).** Owner: *"can we combine all the
@@ -46,6 +46,18 @@ box, so `text-center` sat left of centre; and `text-sm` was inert under `globals
 `input { font-size: 16px !important }`. The entry's own fix — use the shared `Input` primitive —
 was wrong: **1 of 28** `type="number"` inputs uses it, and neither quantity control does. **Not
 device-verified** ([journal](docs/overview/entries/2026-09-01-quantity-box-spinner-reset.md)).
+
+**One weight goal, one column (LB-42).** `users` carried **two** columns for one goal:
+`weight_goal_kg`, edited on the profile sheet and quoted to the nutrition coach as *"goal weight"*,
+and `target_weight_kg`, edited in Goals and the one the Health page actually renders. The number the
+user sees and the number the AI is told could differ with nothing reconciling them. Migration 246
+fills the survivor **only where it is NULL** — a value the user cannot see never overwrites one they
+can — and the API keeps its `weightGoalKg` field name while reading and writing
+`target_weight_kg`, which is what let both editors converge with **no client change**. **The retired
+column is NOT dropped**: nothing reads it, but dropping is irreversible and the row-scoped audit
+view cannot show other accounts' values, so that is the owner's call. Honest about the evidence —
+the owner's two columns **agreed**, so this closes a hazard rather than an observed wrong number
+([journal](docs/overview/entries/2026-09-01-one-weight-goal.md)).
 
 **The deload banner stops firing off a temperature baseline that is known to be wrong (TN-18).**
 The owner's 06:43 screenshot held both halves of the same broken baseline for one night: the

@@ -351,7 +351,11 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       displayName: r.displayName ?? undefined,
       heightCm: r.heightCm ?? undefined,
       dateOfBirth: r.dateOfBirth ?? undefined,
-      weightGoalKg: r.weightGoalKg ?? undefined,
+      // LB-42. The API field keeps its name and now reads the ONE column: `target_weight_kg`, the
+      // one the Health page renders. `weight_goal_kg` has no reader left. Keeping the field name
+      // is what lets the Edit Profile sheet and the Goals accordion converge on one value without
+      // a coordinated client change — the two editors were the whole bug.
+      weightGoalKg: r.targetWeightKg ?? undefined,
       avatar: r.avatar ?? undefined,
       timezone: r.timezone ?? DEFAULT_TZ,
       sex: r.sex ?? undefined,
@@ -661,9 +665,14 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     // it — and height feeds the BMR fallback, so the damage would have reached the calorie model
     // rather than stopping at the profile screen.
     const set: Record<string, unknown> = {}
-    for (const key of ['displayName', 'heightCm', 'dateOfBirth', 'weightGoalKg', 'sex', 'activityLevel', 'fitnessGoal'] as const) {
+    for (const key of ['displayName', 'heightCm', 'dateOfBirth', 'sex', 'activityLevel', 'fitnessGoal'] as const) {
       if (key in profile) set[key] = profile[key] ?? null
     }
+    // LB-42. `weightGoalKg` writes `target_weight_kg` — the column the Health page renders and the
+    // Goals accordion edits. Two editors filling two columns is what let the goal the user saw and
+    // the goal the AI was told diverge with nothing reconciling them. Presence-guarded like the
+    // rest (BF-78), so an omitted field still leaves the value alone.
+    if ('weightGoalKg' in profile) set.targetWeightKg = profile.weightGoalKg ?? null
     // Timezone is the one field a null must NOT clear: it keys every day window in the app, and a
     // user with no timezone has no "today". Absent and null both leave it alone.
     if (profile.timezone) set.timezone = profile.timezone
