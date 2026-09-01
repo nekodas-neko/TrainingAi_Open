@@ -3,7 +3,7 @@
 > **Successor sessions are titled `🎶 Tuning Agent 🟢`** — exactly, both emoji. Leading emoji = role,
 > trailing = this session's status, set by the session itself. See `docs/agents/README.md` §4.
 
-**Updated:** 2026-08-26 · **By:** `session_01VVfZtbCftbwaUHtBLJoxVr` · **Next ID:** `TN-23`.
+**Updated:** 2026-08-26 · **By:** `session_01VVfZtbCftbwaUHtBLJoxVr` · **Next ID:** `TN-24`.
 Find next free: `grep -rhoE '\bTN-[0-9]+\b' docs/ | sort -t- -k2 -n | tail -1`. Legacy `Q-` numbers
 stay valid. **Rewritten in full, never appended** — narrative lives in the linked reviews.
 
@@ -46,6 +46,7 @@ Filed this session, all propose-only, all in the queue:
 | **TN-20** | a recompute **overwrites a completed day with an empty result** | data integrity, do not batch, do not re-run to "fix" |
 | **TN-21** | "daytime stress" is **55% night buckets**, night/day opposite signs | window finding stands; its Q-507 candidate superseded by TN-22 |
 | **TN-22** | stored `stress_high_minutes` disagrees with the model's own buckets, **8 of 9 days** | **explains Q-507 and reverses it**; likely same defect as TN-20 |
+| **TN-23** | sleep's `hrv` + `hr` are one autonomic event scored twice, **25% of the score** | r=+0.869; ⛔ don't delete a contributor — collapse or down-weight |
 
 **Owner decisions, 2026-08-24 — recorded on the entries, nothing gated on them.** TN-5 and TN-6
 signed off; **TN-6a** added (suspend the temperature penalty on a self-clearing condition, outside the
@@ -232,6 +233,25 @@ sleep ✅ · readiness ✅ · activity ✅ · body ✅ · devices ✅ · workout
 - **⛔ `step_live_windows` is effectively empty — 8 rows across 6 days, 7,745 steps total.** It is the
   obvious intraday step source and it reads a flat zero. `body_metrics.steps` is a **running daily
   total** (`updated_at` moves through the day), which is what any intraday step question should use.
+- **A sleep score can be reproduced EXACTLY from its stored contributors — do this before theorising.**
+  2026-09-02: the ten contributors blend to **76.04**, `SCORE_CALIBRATION` ships **63**. Two minutes of
+  arithmetic separated *"the model is wrong"* from *"the display curve costs 11.9 points"*.
+  [`review`](../../reviews/2026-09-03-why-a-good-night-scored-63.md).
+- **⛔ The SLEEP score's autonomic baseline is NOT `hrv_baseline_mean_x8`.** `buildSleepAudit` calls
+  `sleepScoreBaselines(prior, tz)` (`sleep-score.ts:359`) — a **trailing window over prior nights'
+  own readings**, newest last, excluding the night being scored. Comparing a stored `hrv`/`hr`
+  contributor against the `×8` EMA proves nothing; it nearly produced a false *"your best nights were
+  inflated"* finding on 2026-09-03. **It is also the one baseline in this codebase built the RIGHT
+  way** — self-correcting, excludes the night under judgement, untouched by BF-13's zero seed. The
+  construction TN-6 wants for temperature already exists here; copy it.
+- **⛔ `hrv` and `hr` in the sleep score are ONE signal (TN-23)** — `r = +0.869`, **75% shared
+  variance** over 38 nights, carrying **28 of 110 = 25%** of the score. A single autonomic dip is
+  charged twice. **Both curves are correct** (HRV 50 ms/0.85× → 42 and HR 63/1.035× → 58 are exactly
+  what `HRV_RATIO`/`HR_RATIO` specify), so **do not delete a contributor** — collapse them or
+  down-weight the pair to a joint ~14–18.
+- **When the owner says a score is too low, the answer is usually the DISPLAY CURVE, not the model.**
+  Twice now: a 73.15 blend shown as 57, a 76.04 blend shown as 63. **TN-5 is signed off and unshipped**
+  and is the largest single factor in both. Quote the blend before quoting the contributors.
 - **✅ Q-507 IS EXPLAINED, AND ITS CONCLUSION IS REVERSED (TN-22, 2026-09-01). The stress model was
   never the problem.** Recomputed from the model's own persisted buckets, `stress_high_minutes`
   correlates **−0.438** with readiness (**−0.699** waking-only, n=8) — the correct direction — while

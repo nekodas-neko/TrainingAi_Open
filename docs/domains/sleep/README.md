@@ -22,6 +22,7 @@ canonical-display-source table in the same section).
 
 ## Reference docs
 
+- [`docs/reviews/2026-09-03-why-a-good-night-scored-63.md`](../../reviews/2026-09-03-why-a-good-night-scored-63.md) — **why an 8 h 15 m night at 97% efficiency scored 63, 2026-09-03 (TN-23).** The **blend is 76.04** and `SCORE_CALIBRATION` ships **63** — reproduced exactly from the stored contributors. **Three causes, two already queued:** the display curve costs **11.9 points** (**TN-5**, approved 2026-08-24, unshipped); 8.25 h scores **81** where `TOTAL_SLEEP`'s own comment says ~92 (**TN-10**); and **NEW — `hrv` and `hr` are one autonomic event scored twice**, `r = +0.869` / **75% shared variance** across 38 nights, carrying **28 of 110 = 25%** of the score and dragging this night's blend **12.7 points**. **⛔ Do not delete one contributor** — both curves are correct and the combined signal is the score's strongest recovery evidence; collapse or down-weight the pair instead. **Honest answer: ~76 today, low-to-mid 80s after TN-5 and TN-10, with a few points still owed to a real HRV dip (50 ms against a 59 ms norm).**
 - [`docs/reviews/2026-08-26-manual-bedtime-write-audit.md`](../../reviews/2026-08-26-manual-bedtime-write-audit.md)
   — **what reads the sleep WINDOW, as opposed to the stored duration columns, 2026-08-26** (Q-519's own
   commissioned audit, which falsified Q-519's design). Three consumers derive behaviour from
