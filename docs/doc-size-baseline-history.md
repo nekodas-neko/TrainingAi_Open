@@ -5914,6 +5914,12 @@ session hit.
 Ratcheted down rather than left at 208: a baseline above the file's real length is headroom for
 silent growth, which is the thing these numbers exist to stop.
 
+## 2026-09-01 — `docs/implementation-backlog.md` → 14892 (LB-44 shipped)
+
+A 22-line entry removed and nothing added: LB-44 is a flake fix with no residue, so it leaves the
+queue whole rather than becoming a `Keep:`. Ratcheted down rather than left at the old number,
+because a baseline above the file's real length is headroom for silent growth.
+
 ## 2026-09-01 — `projectOverview.md` → 8911 (LA-45)
 
 +16 for one status block, and the lines that could not be cut are the two invariants. "Health shows

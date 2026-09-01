@@ -924,28 +924,6 @@ has already recorded that a bulk job bumps `updated_at` without rewriting a valu
   called it a pass.
 - **Added:** 2026-09-01 · found while tracing BF-94.
 
-### [platform] LB-44 — a test that writes a real file into `lib/` races every test that walks `lib/`
-
-- **Lane:** A — the fix is in `scripts/__tests__/dead-repo-methods.test.ts`, and `scripts/**` is not
-  Lane B's. Filed by Lane B because that is where it fired.
-- **Added:** 2026-09-01, from a full-suite run on `feat/bf-82-more-page-grouping`.
-- **What happened.** The suite came back `1 failed | 553 passed`, and the failure named a file that
-  has nothing to do with the diff:
-  `lib/media/__tests__/no-data-url-fetch.test.ts` → `ENOENT: no such file or directory, open
-  'lib/zz-dead-repo-methods-probe.ts'`. That file is written and deleted inside
-  `scripts/__tests__/dead-repo-methods.test.ts` (~line 100), which proves `sourceFileList()` sees
-  untracked files. Any test running concurrently that walks `app`/`components`/`lib` and reads every
-  file it finds can list the probe and then read it after the `unlinkSync`. Both files pass alone.
-- **Why it matters more than a re-run.** The failure surfaces in an unrelated file, on an unrelated
-  branch, with a message that reads like a missing source file — so the first reaction is to go
-  looking in the diff. It cost about ten minutes here and it will cost the same every time.
-- **The fix is to stop writing into the tree.** Point the probe at a temp directory the walkers do
-  not cover, or give it a name the walkers skip (`sourceFileList()` would need the same exclusion,
-  which weakens what the test proves), or serialise it. Prefer the first — `sourceFileList()` takes
-  the directory it lists, so the probe can prove the untracked-file behaviour somewhere private.
-- **Do not "fix" it by widening the reader.** `no-data-url-fetch.test.ts` reading every file under
-  `lib/` is correct; the defect is the writer.
-
 ### [app-shell] BF-82 — the More page is seven groups of one row each, with one of them behaving differently
 
 - **Keep:** one look on the S25. Nothing else is owed.
