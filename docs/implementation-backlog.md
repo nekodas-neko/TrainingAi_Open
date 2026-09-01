@@ -388,6 +388,92 @@ below threshold and left in place for next time.
 > BF-29 (My meals), BF-30 (Meal detail), BF-31 (Edit meal) and BF-26 (Quantity). Two artboards need
 > no entry — `Tap targets` and the `srv/g` studies both shipped in Q-395a.
 
+### [nutrition][body] BF-101 — a "Recommended" button per goal field; the numbers already exist and need no AI
+
+- **Lane:** B — the Profile goals form (`app/more/…` profile tab) reading an existing shared function.
+  A for a non-AI endpoint if the values are not already reachable client-side.
+- **Added:** 2026-09-01 · owner, on the Profile goal fields: *"maybe each should have a button under
+  it that says (Recommended value) — id assume we use AI here to choose but maybe we could have some
+  logic to decide so not using the ai if not needed?"*
+
+**The logic already exists and the AI is layered on top of it, not instead of it.**
+`calculateBaseline` (`packages/shared/src/nutrition/goal-recommendation.ts:166`) already returns a
+deterministic value for **every field on that screen except sleep**:
+
+```ts
+return { bmr, tdee, calories, proteinG, carbsG, fatG, waterMl, stepsGoal, leanMassKg }
+```
+
+Calories are `bmr × SEDENTARY_MULTIPLIER + CALORIE_ADJUSTMENT_BY_GOAL[goal]`; protein is dosed per kg
+of lean mass; water is `weightKg × 33 + WATER_BUMP_BY_ACTIVITY[level]`; steps are
+`STEP_GOAL_BY_ACTIVITY[level]`. **The `bmr` is the measured RMR** when one exists — `calculateBaseline`
+calls `personalRmr` (BF-33), the same function the daily energy model uses, so the wizard and the
+Health card cannot disagree about resting rate. `/api/nutrition-goals/recommend` computes this
+baseline and then runs `generateObject` to *adjust* it. **So the owner's instinct is right and the
+work is mostly plumbing: surface the baseline, skip the model.**
+
+- **The drift a per-field button would surface is already live.** Activity Level is **Moderate**,
+  whose `STEP_GOAL_BY_ACTIVITY` is **10,000** — and the stored Steps Goal is **7,000**, the
+  *sedentary* number. Water tracks it correctly (71.7 kg × 33 + 250 = **2,616** against a stored
+  **2,600**). One field follows the recommendation, another does not, and nothing on screen says
+  which. That is the value of the button in one screenshot.
+- **⚠ Sleep has no baseline and an implementer must not invent one.** `BaselineResult` carries no
+  sleep field. Either leave sleep without a button or add a heuristic **deliberately**, as its own
+  decision — silently inventing one puts an unsourced number next to six sourced ones.
+- **⚠ It must hide, not guess, on an incomplete profile.** `calculateBaseline` needs weight, height,
+  age and sex; the recommend route already gates on a `missing` list. A button that renders a number
+  computed from absent inputs is worse than no button.
+- **Recommendation: a non-AI path, and keep the AI button as the second thing.** The deterministic
+  value is instant, free, reproducible and explainable ("33 ml/kg + your activity bump"); the AI pass
+  earns its place only where it adjusts for something the formula cannot see. Two buttons with
+  different promises beats one that sometimes calls a model.
+- **Verification:** each field's Recommended value equals `calculateBaseline`'s for the same profile;
+  tapping it fills the field without saving until the user saves; and no network call to an AI route
+  is made by the deterministic path.
+
+### [nutrition][platform] BF-102 — "Calibrated" activity level, and a prompt that tells the model something false
+
+- **Lane:** B for the option; A for the measured factor and the prompt string.
+- **Added:** 2026-09-01 · owner: *"for the activity level there should be a button to choose
+  'Calibrated Level' which would be what we are using now right — rather than the default response."*
+
+**He is right about the model and it is worth being exact about why.** The calorie baseline does
+**not** multiply by the self-reported activity level: `calculateBaseline` computes
+`tdee = bmr × SEDENTARY_MULTIPLIER`, and Q-401 deleted `ACTIVITY_MULTIPLIERS` precisely because
+folding a self-report in there double-counted against the movement the app *measures* and adds.
+So "what we are using now" is **measured**, not calibrated-from-a-picker.
+
+**Activity level is NOT a dead control, though — it still drives two things**, which is why this is a
+feature and not a deletion like LB-41:
+
+| consumer | effect |
+|---|---|
+| `STEP_GOAL_BY_ACTIVITY` | sedentary 7,000 → moderate 10,000 → active 12,000 |
+| `WATER_BUMP_BY_ACTIVITY` | +0 / +250 / +400 / +600 ml |
+| AI prompt, `cardio-week`, `training-stress`, `health-insight` | context only |
+
+- **⚠ A REAL BUG, independent of the feature.** `app/api/nutrition-goals/recommend/route.ts:111-112`
+  builds the prompt as *`Baseline (Katch-McArdle, lean mass Xkg, activity level "moderate"): BMR X,
+  TDEE X…`* — which reads as though the TDEE were computed **for** that activity level. It was not;
+  it is `bmr × 1.2` regardless. **The model is being told something false about its own input** and
+  may well adjust as if the baseline already contained a moderate multiplier. Fix the string whether
+  or not the calibrated option ships.
+- **Recommendation: compute the real factor and offer it as an option.** The app already has the
+  inputs — on the calibrated path `maintenanceKcal / bmr` is exactly the activity factor, and on the
+  formula path `(restingBase + avgActiveKcal) / bmr` is its measured equivalent. Show the number
+  ("Calibrated · 1.38×, from your last 14 days") rather than only a band name, and let it drive the
+  water and step goals that activity level genuinely feeds.
+- **⚠ It needs the same not-enough-data state the maintenance figure has.** The energy card already
+  says *"Log food on 8 more days to calibrate"*; a Calibrated option that silently falls back to a
+  guess would be the worse version of the picker it replaces.
+- **⚠ Do not delete the manual bands.** A calibrated factor is unavailable on a new account and
+  wrong after a life change until the window catches up; the self-report is the fallback and the
+  override.
+- **Verification:** the Calibrated option shows a factor derived from the user's own data and states
+  its window; picking it moves the step and water goals; an under-calibrated account sees the reason
+  rather than a number; and the recommend-route prompt no longer implies the TDEE is activity-scaled.
+
+
 ### [nutrition][body] BF-99 — the line says "base" and shows base MINUS the goal deficit, so the owner read his RMR as broken
 
 - **Keep:** one look on the S25. The line gained a clause and Home's copy of the bar is `compact`, so
