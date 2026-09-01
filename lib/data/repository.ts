@@ -308,7 +308,8 @@ export type MutationDomain =
   | 'oura_daily_derived'
   | 'sleep_session'
   | 'plan_meal_answers'
-  | 'manual_bedtime';
+  | 'manual_bedtime'
+  | 'rest_days';
 
 export interface FitnessTest {
   id: string
@@ -783,6 +784,19 @@ export interface WorkoutRepository {
    *  and filling in the evening check-in are separate acts on the same row, and this upsert
    *  overwrites every column it names. Pass `null` to undo; omit to preserve. */
   saveDayCheckin(userId: string, checkin: Omit<import('@trainingai/shared/types/day-checkin').DayCheckin, 'id' | 'userId' | 'createdAt' | 'updatedAt' | 'foodLoggingCompletedAt'> & { foodLoggingCompletedAt?: Date | null }): Promise<import('@trainingai/shared/types/day-checkin').DayCheckin>
+
+  // ── Rest days ──────────────────────────────────────────────────────────────
+  /**
+   * A rest day the user chose, as a stored fact rather than an inference from a gap (BF-84).
+   *
+   * `setRestDay(..., false)` tombstones rather than deleting — un-choosing is the undo for a
+   * mistap that is now durable, and re-choosing resurrects the same row.
+   */
+  setRestDay(userId: string, date: string, resting: boolean): Promise<void>
+  /** Whether this user chose to rest on this date. */
+  isRestDayChosen(userId: string, date: string): Promise<boolean>
+  /** The chosen rest days in `[from, to]`, ascending — dates only, `YYYY-MM-DD`. */
+  listRestDays(userId: string, from: string, to: string): Promise<string[]>
 
   countWorkoutSessions(userId: string): Promise<number>
 
