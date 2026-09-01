@@ -5872,7 +5872,6 @@ what a successor pattern-matches on and a one-line version ("mutate your guards"
 gets nodded at. `BF-79`'s "do not re-litigate" bullet became a "has now been built on" bullet in the
 same pass — BF-82 shipped, so the guard-rail has done its job and only the placement needs carrying.
 
-
 ## 2026-09-01 — compaction sweep: 250 entries → 227, starting `history-2026-09-01.md`
 
 `docs/overview/entries/` crossed the **250-file total ceiling**, which fails the branch that crosses
@@ -5892,7 +5891,19 @@ files. The only rewrite outside the folded set was one loose entry pointing at a
 rule 4 — the case the README calls easy to miss because it lives in a file the sweep does not
 otherwise touch.
 
-## 2026-09-01 — `projectOverview.md` → 8894 (LA-45)
+## 2026-09-01 — `projectOverview.md` → 8895, `docs/implementation-backlog.md` → 14914 (BF-59, screen half)
+
+The backlog **shrank by 60 lines**: BF-59 carried the whole measurement — three tables of
+stored-vs-landmark numbers and the argument for which fix mattered most — and that measurement is now
+in the journal entry, where a session reads it once rather than every time it scans the queue.
+
+`projectOverview.md` grew 17, and the line that cannot be cut is the one nobody would think to write:
+**the engine and the screen now disagree**, where before this change they were wrong together. A
+status block that stopped at "the target is phase-aware now" would read as finished work and hide the
+inconsistency it introduced — which is precisely what a future session would need to know before
+touching either side.
+
+## 2026-09-01 — `projectOverview.md` → 8911 (LA-45)
 
 +16 for one status block, and the lines that could not be cut are the two invariants. "Health shows
 the corrected body fat now" is the short version and it is the one that gets the next session to
@@ -5905,3 +5916,7 @@ until you have written the wrong one, and neither is visible from the screen aft
 The line about the hand-seeded DEXA pair is there for the same reason: the local seed has no scan and
 no `source_map`, so the whole feature is unreachable in the sandbox and a session that renders the
 screen and sees a plain number has verified nothing.
+
+(8911, not the 8894 this branch measured before merging: BF-59's screen half landed 17 lines in
+between. A size baseline is a measurement of the merged file, never the sum of two hunks — resolving
+that conflict by picking a side would have been wrong whichever side won.)

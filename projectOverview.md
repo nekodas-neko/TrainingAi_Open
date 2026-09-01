@@ -98,6 +98,23 @@ midnight so the case fires on every run; **its first version passed with the fix
 `isVisible()` is a point-in-time check and not a wait. **Not device-verified**
 ([journal](docs/overview/entries/2026-09-01-local-day-rollover.md)).
 
+**A peaking week stops reading as a volume deficit (BF-59, the screen's half).** Owner: *"i did the
+full sessions for the week; and i was nowhere near hitting the reccomended amount of muscle sets"*,
+then the cause in their own words — *"oh yes cause its realization phase its been less sets."* MAV is
+an **accumulation** target, so showing it during a peak tells an athlete that doing the right thing is
+wrong. **Both halves were measured in production first:** the stored targets are a flat binary (15
+rows, all 14 or 10) that ignores both the per-muscle landmark table and the program's `powerbuilding`
+×0.8, and the ten sessions span **three phases at once** — which is what makes "this week's phase"
+unstorable, since phase lives per program session. The Training card's target is now **derived** —
+`volumeLandmarks(goal, muscle)` scaled by the week's phase mix, weighted by sessions actually
+trained — and `/api/weekly-muscle-sets` returns the `phase` block behind it. Multipliers are the
+owner's (accumulation 1.0 · intensification 0.8 · realisation 0.6 · deload 0.5). **Two things are
+owed and both are on the entry:** `signals.ts` still steers the AI's set prescription off the stored
+binary, so **engine and screen now disagree** where before they were wrong together; and the card
+does not print the phase yet, which is Lane B's half and the half the owner explicitly asked for.
+**Not device-verified**
+([journal](docs/overview/entries/2026-09-01-phase-aware-volume-targets.md)).
+
 **A scanned meal now carries a group and a name — the engine half (BF-97, migration 252, local
 SQLite v33).** Owner, with two screenshots: *"looks like saved meals groups the food well; but when
 scanning it doesnt."* BF-39's grouping was right and did not cover this: it names a group from its
