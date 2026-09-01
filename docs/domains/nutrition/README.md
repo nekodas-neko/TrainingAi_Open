@@ -225,6 +225,13 @@ Live at the time of writing (2026-07-30):
 
 ## History
 
+- **[`docs/overview/entries/2026-09-01-scan-meal-group.md`](../../overview/entries/2026-09-01-scan-meal-group.md)**
+  — 🆕 **BF-97, engine half**: a scanned meal gets a `meal_group_id` **and** its own
+  `meal_group_name`, because BF-39's grouping names a group from its saved meal and a scan has none.
+  Read it before touching the diary rule: the group is minted **only past one entry** and **only
+  alongside a name**, and both negatives are what stop the fix rebuilding the bug one layer down.
+  **Nothing renders differently yet** — `groupDiaryEntries` still requires a `savedMealId`, and
+  changing that is Lane B's half.
 - **[`docs/handoff-2026-08-31-nutrition-diary-and-swipe-tray.md`](../../handoff-2026-08-31-nutrition-diary-and-swipe-tray.md)**
   — 🆕 the session that shipped BF-39, BF-60/61/62/63, LB-28 and LB-30. **Read its gotchas before
   writing an e2e that taps a coordinate**: `Input.dispatchTouchEvent` performs none of

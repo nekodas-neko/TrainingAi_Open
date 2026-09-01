@@ -4,6 +4,7 @@ import { pushThenRevalidate } from '@/lib/local-store/push-then-revalidate'
 import { cancelMealReminder } from '@/lib/meal-reminders'
 import { invalidateNutritionWrite } from '@/lib/cache-groups'
 import { resolveLocalEatenAt } from './local-eaten-at'
+import { normalizeMealGroupName } from './meal-group-name'
 import { DEFAULT_TZ } from '../date-utils'
 
 /**
@@ -155,6 +156,8 @@ interface LogShape {
   foodItemId: string
   quantityMultiplier: number
   loggedAt: string
+  mealGroupId?: string | null
+  mealGroupName?: string | null
 }
 
 function toWithItem(entry: NewFoodEntry, log: LogShape): FoodLogWithItem {
@@ -167,6 +170,10 @@ function toWithItem(entry: NewFoodEntry, log: LogShape): FoodLogWithItem {
     foodItemId: log.foodItemId,
     quantityMultiplier: q,
     loggedAt: new Date(log.loggedAt),
+    // BF-97. The optimistic row carries the grouping, or the diary draws the scan flat until the
+    // next read — which is the whole reported symptom, just for a few seconds.
+    mealGroupId: log.mealGroupId ?? null,
+    mealGroupName: log.mealGroupName ?? null,
     foodItem: {
       id: log.foodItemId,
       userId: log.userId,
@@ -198,6 +205,11 @@ function toWithItem(entry: NewFoodEntry, log: LogShape): FoodLogWithItem {
  * meals appear as separate, individually-editable rows. Uses the offline-first
  * local store when available and falls back to the API otherwise. Returns the
  * optimistic log entries for immediate UI updates.
+ *
+ * **`groupName` is what makes a multi-item scan one diary row (BF-97).** BF-39 shipped grouping for
+ * saved meals, where the name comes from the meal; a scan has no saved meal — deliberately, since
+ * creating one would put a row in the user's library to satisfy a display rule — so it supplies its
+ * own name and the group is minted here.
  */
 export async function logFoodEntries(
   entries: NewFoodEntry[],
@@ -205,10 +217,18 @@ export async function logFoodEntries(
   mealTypeId: string,
   userId?: string,
   tz: string = DEFAULT_TZ,
+  groupName?: string | null,
 ): Promise<FoodLogWithItem[]> {
   const store = userId ? getLocalStore(userId) : null
   const now = new Date().toISOString()
   const optimistic: FoodLogWithItem[] = []
+
+  // A group of one buys nothing — `groupDiaryEntries` collapses it back to a plain row — so a
+  // single entry mints no id, and neither does a batch with nothing to head it with. Minting only
+  // alongside a name is what keeps the diary's own rule true: it never has to head a group it
+  // cannot name.
+  const mealGroupName = entries.length > 1 ? normalizeMealGroupName(groupName) : null
+  const mealGroupId = mealGroupName ? crypto.randomUUID() : null
 
   if (store) {
     try {
@@ -255,6 +275,7 @@ export async function logFoodEntries(
         const logId = crypto.randomUUID()
         await store.upsertFoodLog({
           id: logId, date, mealTypeId, foodItemId,
+          mealGroupId, mealGroupName,
           quantityMultiplier: entry.quantityMultiplier,
           loggedAt: eatenAt, updatedAt: now, deletedAt: null, syncStatus: 'pending',
         })
@@ -262,9 +283,11 @@ export async function logFoodEntries(
           userId: userId!,
           domain: 'food_logs',
           date,
-          payload: { id: logId, mealTypeId, foodItemId, quantityMultiplier: entry.quantityMultiplier, loggedAt: eatenAt },
+          // The outbox payload carries every field the web route accepts, per the offline-sync rule
+          // — a field added to the route and not to this payload is a field the APK cannot write.
+          payload: { id: logId, mealTypeId, foodItemId, quantityMultiplier: entry.quantityMultiplier, loggedAt: eatenAt, mealGroupId, mealGroupName },
         })
-        optimistic.push(toWithItem(entry, { id: logId, userId: userId!, date, mealTypeId, foodItemId, quantityMultiplier: entry.quantityMultiplier, loggedAt: eatenAt }))
+        optimistic.push(toWithItem(entry, { id: logId, userId: userId!, date, mealTypeId, foodItemId, quantityMultiplier: entry.quantityMultiplier, loggedAt: eatenAt, mealGroupId, mealGroupName }))
       }
       await cancelMealReminder(mealTypeId)
       // Twice, deliberately: now so this device's screens repaint at once (and because offline
@@ -290,7 +313,7 @@ export async function logFoodEntries(
       const res = await fetch('/api/nutrition/food-logs', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ date, mealTypeId, foodItemId, quantityMultiplier: entry.quantityMultiplier }),
+        body: JSON.stringify({ date, mealTypeId, foodItemId, quantityMultiplier: entry.quantityMultiplier, mealGroupId, mealGroupName }),
       })
       if (!res.ok) throw new Error('Failed to log item')
       const log = await res.json()
@@ -299,6 +322,7 @@ export async function logFoodEntries(
         id: log.id, userId: log.userId ?? '', date, mealTypeId, foodItemId,
         quantityMultiplier: log.quantityMultiplier ?? entry.quantityMultiplier,
         loggedAt: log.loggedAt ?? now,
+        mealGroupId, mealGroupName,
       }))
     }
     await cancelMealReminder(mealTypeId)

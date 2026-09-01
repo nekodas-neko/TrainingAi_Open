@@ -3,6 +3,7 @@ import { auth } from '@/auth'
 import { getRepository } from '@/lib/data'
 import { formatInTimeZone } from 'date-fns-tz'
 import { DEFAULT_TZ, normalizeDateParamIso } from '@trainingai/shared/date-utils'
+import { normalizeMealGroupName } from '@trainingai/shared/nutrition/meal-group-name'
 import { rateLimit } from '@/lib/rate-limit'
 import { readJsonLimited } from '@trainingai/shared/http/request-guards'
 
@@ -39,7 +40,7 @@ export async function POST(req: Request) {
       : NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
   }
   const body = read.body as Record<string, unknown>
-  const { date: rawBodyDate, mealTypeId, foodItemId, quantityMultiplier, savedMealId, mealGroupId } = body
+  const { date: rawBodyDate, mealTypeId, foodItemId, quantityMultiplier, savedMealId, mealGroupId, mealGroupName } = body
   // Typed explicitly now the body is `unknown` rather than `any`. Both ids went straight into
   // `foodLogRefsValid` and `createFoodLog` with only a truthiness check before this.
   if (!rawBodyDate || typeof mealTypeId !== 'string' || typeof foodItemId !== 'string') {
@@ -72,6 +73,9 @@ export async function POST(req: Request) {
     quantityMultiplier: qm,
     savedMealId: savedMealId ?? null,
     mealGroupId: mealGroupId ?? null,
+    // BF-97. Normalised rather than type-checked-and-rejected, and through the same helper the push
+    // branch uses — a name is a display string, and no length of one makes the log wrong.
+    mealGroupName: normalizeMealGroupName(mealGroupName),
   })
   return NextResponse.json(log, { status: 201 })
 }
