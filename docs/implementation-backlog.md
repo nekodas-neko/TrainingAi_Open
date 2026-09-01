@@ -370,10 +370,14 @@ below threshold and left in place for next time.
 ### [nutrition][activity] BF-88 — the energy model runs on two different bases and the card never says which
 
 - **Lane:** A — `lib/health/energy-balance-service.ts:227-265` and the two constants in
-  `packages/shared/src/health/{energy-baseline,daily-energy}.ts`. Surface copy is B, and is BF-87.
-- **Needs:** BF-87
-- **Gate:** owner — this is a scoring change, so it is a Tuning-shaped proposal even though BugFix
-  found it. Nothing here ships without the sign-off and a restated blast radius.
+  `packages/shared/src/health/{energy-baseline,daily-energy}.ts`. **The copy is now Lane A's too, in
+  this entry** — see the shipped-copy note below.
+- **Needs:** LB-43
+- **DECIDED 2026-09-01 — the owner approved the shift and asked for it to ship.** *"yes that sounds
+  good lets ship that."* The `Gate: owner` this entry carried is **cleared**; the sign-off a scoring
+  change needs has been given, against the blast radius restated below (74 of 124 days unchanged
+  exactly, 50 moved, −17 averaged across all days). **Ready for Lane A.** The direction was the
+  owner's own: *"cant we remove some calories for the base 3000 and have it start from 0 steps?"*
 - **Added:** 2026-09-01 · owner: *"is it possible to get rid of the baseline; and have it reference
   steps + exercise only? that would be more accurate right? rmr + activity?"*
 
@@ -421,6 +425,35 @@ currently earn nothing from stepping at all; mean 5,716, median bucket 2–4k.
 
   And it delivers BF-87's ask as a side effect: with the floor at zero the rate is **one number**,
   ~34 kcal per 1,000 steps, linear from the first step. No threshold left to explain.
+- **⚠ BF-87 SHIPPED FIRST (#725, 2026-09-01) AND ITS COPY IS WHAT THIS ENTRY FALSIFIES.** The
+  dependency between the two was inverted for exactly this reason and the inversion did not land in
+  time — BF-87 merged first. Three live sites now print *"steps above 3,000/day"*, and this entry
+  makes steps count from zero:
+
+  | site | line |
+  |---|---|
+  | `components/nutrition/calorie-zone-bar.tsx` | `:54` — *"nothing earned from movement yet; steps count above 3,000/day"* |
+  | `components/nutrition/energy-card.tsx` | `:276` — *"from workouts, activities, and steps above 3,000/day"* |
+  | `components/nutrition/calorie-balance-bar.tsx` | `:117` — same sentence |
+
+  **Rewriting all three is part of THIS entry, not a follow-up.** After the shift the true sentence
+  is the simpler one BF-87 was originally asked for: a single rate, ~34 kcal per 1,000 steps, from
+  the first step. **The zero-state line disappears entirely** — there is no longer a case where
+  movement has earned nothing while steps exist.
+- **⚠ THE MIRROR TEST CANNOT CATCH THIS, AND THAT IS THE TRAP.** BF-87 mirrored the constant into
+  `components/nutrition/movement-breakdown.ts` (`STEP_BASELINE = 3_000`) because importing
+  `daily-energy` into a client component 500s the Nutrition tab — LB-43 is that story. Its test
+  compares the mirror against the shared constant, so the two cannot drift **in value**. But this
+  entry does not necessarily change the value: `STEP_BASELINE` may keep sitting at 3,000 as *the
+  amount subtracted from the resting base* while the step term counts from zero. **The number stays
+  equal, the test stays green, and the copy silently becomes a lie.** A test that pins a value cannot
+  notice a change of meaning. So: rename it, or split it into the two things it is now
+  (`STEP_BASE_CREDIT` for the base subtraction, and nothing at all for a threshold that no longer
+  exists), and let the rename break every consumer on purpose.
+- **Sequencing: take LB-43 first, or take it inside this entry.** LB-43 moves the constants to a
+  dependency-free leaf so a client component can import them and the mirror can be deleted. Doing
+  this entry on top of the mirror means editing the number in two places under a test that only
+  checks they match — which is the shape above. LB-43 is Lane A as well, so there is no lane handoff.
 - **⚠ The subtraction is COMPUTED, never a constant — 102 is this owner's number, not the app's.**
   It is `stepKcal(STEP_BASELINE)` at the user's own age/weight/sex, so a lighter or heavier user
   gets a different figure. Hardcoding 102 silently mis-bases every other account, and this app now
