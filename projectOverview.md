@@ -52,6 +52,18 @@ midnight so the case fires on every run; **its first version passed with the fix
 `isVisible()` is a point-in-time check and not a wait. **Not device-verified**
 ([journal](docs/overview/entries/2026-09-01-local-day-rollover.md)).
 
+**Blood panels are stored, de-identified (BF-1, engine half — migrations 250/251).** The schema is
+written from the owner's real 58-analyte report rather than a description, and four shapes in it broke
+every simpler design: `<0.2` is a result that is **not a number** (`value_num` + `value_operator`),
+ranges arrive two-sided, one-sided in both directions and absent (both bounds nullable), the date is
+a **month** (a precision column, or every panel lands on the 1st and lies), and flags are commentary
+— *"Normal (athletic)"* on a creatinine inside its range — so **out-of-range is derived from the
+bounds, never read off the flag**, with `unknown` as a real answer where a bounded result cannot
+decide. Two guards fired and both were right: the `claude_ro` generator refused to emit an unscoped
+view for the child table, and the dead-method check rejected a repo method whose consumer this PR
+does not contain. **The extraction route, the consumers and the whole UI are still owed**
+([journal](docs/overview/entries/2026-09-01-blood-panel-storage.md)).
+
 **21 MB of index for a code path nothing calls (BF-55, migration 249).**
 `oura_heartrate_user_updated` was migration 130's keyset index for `getOuraTimeseriesDelta` — the
 restore pull Q-180 kept with no caller because *"it costs nothing at runtime"*. True of the method;

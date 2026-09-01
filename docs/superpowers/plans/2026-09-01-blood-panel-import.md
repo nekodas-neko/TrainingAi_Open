@@ -11,7 +11,7 @@ protocol puts planning and building in separate PRs. This is PR 1.
 ## 1. The schema is written from a real report, not from a description
 
 The de-identified panel in [`docs/clinical-baseline-2026-08-27.md`](../../clinical-baseline-2026-08-27.md)
-is 41 analytes from April 2026, and every awkward shape the schema must survive is already in it.
+is 58 analytes from April 2026, and every awkward shape the schema must survive is already in it.
 Reading it rather than imagining it is the difference between a table that holds this report and one
 that holds a description of one:
 
@@ -61,7 +61,7 @@ qualifier that must not become a boolean.
 
 **`analyte_key` is normalised; `label` is not.** The key is what a consumer greps for; the label is
 what the lab called it, and labs disagree ("LDL (calculated)" vs "LDL-C"). Keeping both means a
-provider change does not orphan history. The normalisation table starts from the 41 keys in the real
+provider change does not orphan history. The normalisation table names all 58 keys in the real
 panel and lives in `packages/shared/src/health/analyte-keys.ts` — one place, per One Formula One
 Place, because the extraction route and the manual form must agree on it.
 

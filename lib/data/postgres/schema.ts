@@ -480,6 +480,50 @@ export const moodLogs = pgTable('mood_logs', {
 }, t => [unique().on(t.userId, t.logDate)])
 
 /**
+ * A blood panel and its results (BF-1). De-identified by construction — no column here holds a
+ * name, a date of birth or a provider's patient reference, and none may be added.
+ *
+ * `collected_on` + `date_precision` because the real report's date is a **month**: storing the 1st
+ * without saying so makes the record claim a day it does not know.
+ */
+export const bloodPanels = pgTable('blood_panels', {
+  id:            uuid('id').primaryKey().defaultRandom(),
+  userId:        uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  collectedOn:   date('collected_on', { mode: 'string' }).notNull(),
+  /** `'day'` | `'month'` — a month-precision panel stores the 1st and is rendered as a month. */
+  datePrecision: text('date_precision').notNull().default('day'),
+  labName:       text('lab_name'),
+  /** `'manual'` | `'extracted'`. A fully manual panel must work with no extraction call at all. */
+  source:        text('source').notNull().default('manual'),
+  createdAt:     timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt:     timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  deletedAt:     timestamp('deleted_at', { withTimezone: true }),
+})
+
+/**
+ * One result. `valueNum` + `valueOperator` rather than a text blob — `<0.2` is a real measurement
+ * below the assay's detection limit, and neither `'<0.2'` as text nor `0.2` alone is right.
+ *
+ * `flagText` is the provider's commentary and is displayed verbatim; **whether the value is out of
+ * range is derived from the bounds** by `rangeVerdict`, never read off the flag. The report says
+ * *"Normal (athletic)"* on a creatinine inside its range — a clinician's reading, not a boolean.
+ */
+export const bloodAnalytes = pgTable('blood_analytes', {
+  id:            uuid('id').primaryKey().defaultRandom(),
+  panelId:       uuid('panel_id').notNull().references(() => bloodPanels.id, { onDelete: 'cascade' }),
+  analyteKey:    text('analyte_key').notNull(),
+  label:         text('label').notNull(),
+  unit:          text('unit'),
+  valueNum:      doublePrecision('value_num'),
+  /** `'<'` or `'>'` when the result is bounded rather than exact. Applies to the value, not the range. */
+  valueOperator: text('value_operator'),
+  refLow:        doublePrecision('ref_low'),
+  refHigh:       doublePrecision('ref_high'),
+  flagText:      text('flag_text'),
+  createdAt:     timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, t => [unique().on(t.panelId, t.analyteKey)])
+
+/**
  * A rest day the user CHOSE, as opposed to one inferred from a gap in `workout_sessions` (BF-84).
  *
  * The distinction is the whole point: a day with no logged workout is also a day you forgot, were
