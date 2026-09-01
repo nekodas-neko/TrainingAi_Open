@@ -58,7 +58,7 @@ import {
 import { sleepImplausibleReason } from '@trainingai/shared/validation/plausibility'
 import { ActivityLogBody, deriveEndTime } from '@trainingai/shared/validation/activity-log'
 import { describeZodFailure } from './push-error-detail'
-import type { WorkoutRepository, UserGoals, EnsuredWorkoutSession, SessionLoad, YearReviewTotals, YearReviewTopExercise, UnitFixResult, SyncDelta, IncomingMutation, PushResult, OuraRawSampleInput, OuraRawSampleSummary, OuraRawSampleLatest, OuraRawSampleRow, FitnessTest, RunningPlan, PrescribedRun, PrescribedRunUpdate, AiCallLogInput, AiCallUsageSummary, ScaleRawSampleInput, ScalePendingSample, LastRealOneRm } from '../repository'
+import type { WorkoutRepository, UserGoals, EnsuredWorkoutSession, SessionLoad, YearReviewTotals, YearReviewTopExercise, UnitFixResult, SyncDelta, IncomingMutation, PushResult, OuraRawSampleInput, OuraRawSampleSummary, OuraRawSampleLatest, OuraRawSampleRow, FitnessTest, RunningPlan, PrescribedRun, PrescribedRunUpdate, AiCallLogInput, AiCallUsageSummary, ScaleRawSampleInput, ScalePendingSample, LastRealOneRm, BloodPanel, BloodPanelInput, BloodAnalyte } from '../repository'
 import { FitnessTestBody } from '@trainingai/shared/validation/fitness-test'
 import { PrescribedRunPatchBody } from '@trainingai/shared/validation/prescribed-run'
 import type {
@@ -327,6 +327,26 @@ const BATTERY_POLL_PRUNE_THROTTLE_MS = 24 * 60 * 60 * 1000
 // throttled + fire-and-forget like its siblings.
 let lastAccelChunkPrune = 0
 const ACCEL_CHUNK_PRUNE_THROTTLE_MS = 24 * 60 * 60 * 1000
+
+/**
+ * BF-1. One mapper for both read paths, per the standing rule that a missed field in a row→object
+ * map fails silently as "the save does not persist" — and this shape has eight nullable columns.
+ */
+function rowToAnalyte(r: {
+  analyteKey: string; label: string; unit: string | null; valueNum: number | null
+  valueOperator: string | null; refLow: number | null; refHigh: number | null; flagText: string | null
+}): BloodAnalyte {
+  return {
+    analyteKey: r.analyteKey,
+    label: r.label,
+    unit: r.unit,
+    valueNum: r.valueNum,
+    valueOperator: r.valueOperator === '<' || r.valueOperator === '>' ? r.valueOperator : null,
+    refLow: r.refLow,
+    refHigh: r.refHigh,
+    flagText: r.flagText,
+  }
+}
 
 export class PostgresWorkoutRepository implements WorkoutRepository {
   /** Last daytime-HRV refit ATTEMPT per user (see maybeRefitDaytimeHrvModel). Static because the
@@ -3056,6 +3076,98 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       journal: r.journal, foodLoggingCompletedAt: r.foodLoggingCompletedAt,
       createdAt: r.createdAt, updatedAt: r.updatedAt,
     }
+  }
+
+  // ── Blood panels ───────────────────────────────────────────────────────────
+
+  /**
+   * BF-1. One transaction: the panel, then its analytes, replacing any that were there.
+   *
+   * **Replace rather than append**, because this is the confirm target of a correct-then-save flow.
+   * Extraction prefills, the owner fixes a misread decimal, and saves again — appending would leave
+   * the wrong row beside the right one under the same key, and the unique constraint would reject
+   * the corrected one rather than the stale one.
+   */
+  async saveBloodPanel(userId: string, panel: BloodPanelInput): Promise<BloodPanel> {
+    return await this.db.transaction(async tx => {
+      // Look up, then update or insert. The unique index is on `COALESCE(lab_name, '')` — a
+      // FUNCTIONAL index, which `onConflictDoUpdate` cannot name as a target — and reaching for raw
+      // SQL to express it would put the ownership scope in a string. Inside this transaction the
+      // read and the write cannot interleave, so the explicit branch is both correct and legible.
+      const [existing] = await tx.select({ id: s.bloodPanels.id }).from(s.bloodPanels)
+        .where(and(
+          eq(s.bloodPanels.userId, userId),
+          eq(s.bloodPanels.collectedOn, panel.collectedOn),
+          panel.labName == null ? isNull(s.bloodPanels.labName) : eq(s.bloodPanels.labName, panel.labName),
+        ))
+        .limit(1)
+
+      const [row] = existing
+        ? await tx.update(s.bloodPanels)
+            .set({ datePrecision: panel.datePrecision, source: panel.source, updatedAt: new Date(), deletedAt: null })
+            // Scoped by user as well as by id: an id reached from a client is never the only guard.
+            .where(and(eq(s.bloodPanels.id, existing.id), eq(s.bloodPanels.userId, userId)))
+            .returning()
+        : await tx.insert(s.bloodPanels)
+            .values({
+              userId,
+              collectedOn:   panel.collectedOn,
+              datePrecision: panel.datePrecision,
+              labName:       panel.labName,
+              source:        panel.source,
+            })
+            .returning()
+
+      await tx.delete(s.bloodAnalytes).where(eq(s.bloodAnalytes.panelId, row.id))
+      if (panel.analytes.length > 0) {
+        await tx.insert(s.bloodAnalytes).values(panel.analytes.map((a: BloodAnalyte) => ({
+          panelId:       row.id,
+          analyteKey:    a.analyteKey,
+          label:         a.label,
+          unit:          a.unit,
+          valueNum:      a.valueNum,
+          valueOperator: a.valueOperator,
+          refLow:        a.refLow,
+          refHigh:       a.refHigh,
+          flagText:      a.flagText,
+        })))
+      }
+      return { ...panel, id: row.id }
+    })
+  }
+
+  async listBloodPanels(userId: string, limit = 20): Promise<BloodPanel[]> {
+    const panels = await this.db.select().from(s.bloodPanels)
+      .where(and(eq(s.bloodPanels.userId, userId), isNull(s.bloodPanels.deletedAt)))
+      .orderBy(desc(s.bloodPanels.collectedOn))
+      .limit(limit)
+    if (panels.length === 0) return []
+
+    const rows = await this.db.select().from(s.bloodAnalytes)
+      .where(inArray(s.bloodAnalytes.panelId, panels.map(p => p.id)))
+      .orderBy(asc(s.bloodAnalytes.analyteKey))
+
+    const byPanel = new Map<string, BloodAnalyte[]>()
+    for (const r of rows) {
+      if (!byPanel.has(r.panelId)) byPanel.set(r.panelId, [])
+      byPanel.get(r.panelId)!.push(rowToAnalyte(r))
+    }
+    return panels.map(p => ({
+      id: p.id,
+      collectedOn: p.collectedOn,
+      datePrecision: p.datePrecision as 'day' | 'month',
+      labName: p.labName,
+      source: p.source as 'manual' | 'extracted',
+      analytes: byPanel.get(p.id) ?? [],
+    }))
+  }
+
+  async deleteBloodPanel(userId: string, panelId: string): Promise<boolean> {
+    const res = await this.db.update(s.bloodPanels)
+      .set({ deletedAt: new Date(), updatedAt: new Date() })
+      .where(and(eq(s.bloodPanels.id, panelId), eq(s.bloodPanels.userId, userId), isNull(s.bloodPanels.deletedAt)))
+      .returning({ id: s.bloodPanels.id })
+    return res.length > 0
   }
 
   // ── Rest days ──────────────────────────────────────────────────────────────

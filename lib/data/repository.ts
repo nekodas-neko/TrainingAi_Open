@@ -288,6 +288,33 @@ export interface SyncDelta {
   hasMore?:           boolean;
 }
 
+/** One result on a panel, as stored (BF-1). */
+export interface BloodAnalyte {
+  analyteKey: string
+  label: string
+  unit: string | null
+  valueNum: number | null
+  valueOperator: '<' | '>' | null
+  refLow: number | null
+  refHigh: number | null
+  /** The provider's own words. Displayed verbatim; never parsed into a verdict. */
+  flagText: string | null
+  /** Only on `latestAnalytes`, so a caller can say how old the reading is. */
+  collectedOn?: string
+}
+
+export interface BloodPanel {
+  id: string
+  collectedOn: string
+  /** `'day'` | `'month'` — the real report's date is a month, and the record must not claim a day. */
+  datePrecision: 'day' | 'month'
+  labName: string | null
+  source: 'manual' | 'extracted'
+  analytes: BloodAnalyte[]
+}
+
+export type BloodPanelInput = Omit<BloodPanel, 'id'> & { id?: string }
+
 export type MutationDomain =
   | 'body_metrics'
   | 'mood_logs'
@@ -784,6 +811,18 @@ export interface WorkoutRepository {
    *  and filling in the evening check-in are separate acts on the same row, and this upsert
    *  overwrites every column it names. Pass `null` to undo; omit to preserve. */
   saveDayCheckin(userId: string, checkin: Omit<import('@trainingai/shared/types/day-checkin').DayCheckin, 'id' | 'userId' | 'createdAt' | 'updatedAt' | 'foodLoggingCompletedAt'> & { foodLoggingCompletedAt?: Date | null }): Promise<import('@trainingai/shared/types/day-checkin').DayCheckin>
+
+  // ── Blood panels ───────────────────────────────────────────────────────────
+  /**
+   * Save a panel and its results in one transaction (BF-1). Re-saving the same
+   * `(user_id, collected_on, lab_name)` replaces its analytes rather than appending, so the
+   * correct-then-save flow does not leave the pre-correction rows behind.
+   */
+  saveBloodPanel(userId: string, panel: BloodPanelInput): Promise<BloodPanel>
+  /** Panels newest first, each with its analytes. */
+  listBloodPanels(userId: string, limit?: number): Promise<BloodPanel[]>
+  /** Soft-delete a panel. Scoped to the user; returns false when it is not theirs. */
+  deleteBloodPanel(userId: string, panelId: string): Promise<boolean>
 
   // ── Rest days ──────────────────────────────────────────────────────────────
   /**

@@ -46,6 +46,7 @@ export const SOFT_DELETED: Record<string, string> = {
   meal_types: 'deleted_at',
   mood_logs: 'deleted_at',
   plan_meal_answers: 'deleted_at',
+  blood_panels: 'deleted_at',
   prescribed_runs: 'deleted_at',
   rest_days: 'deleted_at',
   set_logs: 'deleted_at',
@@ -92,6 +93,7 @@ export const EXPORTED: Record<string, ExportScope> = {
   plan_meal_answers: { kind: 'user_id' },
   prescribed_runs: { kind: 'user_id' },
   programs: { kind: 'user_id' },
+  blood_panels: { kind: 'user_id' },
   progression_styles: { kind: 'user_id' },
   rest_days: { kind: 'user_id' },
   running_plans: { kind: 'user_id' },
@@ -124,6 +126,9 @@ export const EXPORTED: Record<string, ExportScope> = {
 
   // ── Reachable only through a parent. Predicates mirror generate-claude-ro-views.js's `VIA`,
   //    which is where these FK paths were worked out and commented. ────────────
+  // BF-1. Results hang off the panel and have no user of their own — one FK, so no second path to
+  // choose wrongly. Same shape as `dexa_scan_regions` below.
+  blood_analytes: { kind: 'via', predicate: 'EXISTS (SELECT 1 FROM public.blood_panels bp WHERE bp.id = t.panel_id AND bp.user_id = $1)' },
   dexa_scan_regions: { kind: 'via', predicate: 'EXISTS (SELECT 1 FROM public.dexa_scans d WHERE d.id = t.scan_id AND d.user_id = $1)' },
   exercise_logs: { kind: 'via', predicate: 'EXISTS (SELECT 1 FROM public.workout_sessions p WHERE p.id = t.workout_session_id AND p.user_id = $1)' },
   set_logs: { kind: 'via', predicate: 'EXISTS (SELECT 1 FROM public.exercise_logs e JOIN public.workout_sessions p ON p.id = e.workout_session_id WHERE e.id = t.exercise_log_id AND p.user_id = $1)' },
