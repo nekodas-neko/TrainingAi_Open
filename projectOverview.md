@@ -24,8 +24,23 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.422.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Version:** v1.423.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-09-01.
+
+**The calorie line called a goal deficit part of the base rate (BF-99).** Owner, with a screenshot:
+*"why is my base rate under the 1350 RMR value."* `budgetProvenance().base` is
+`restingBaseKcal + targetNetKcal` — the resting base with the goal delta already folded in — and the
+line printed it beside the word *base*. On a recomp that is ~200 below his measured RMR, so a goal
+choice was presented as a metabolic fact. **Every number on the screen reconciled**, which is what
+made it worth fixing rather than explaining: correct maths described incorrectly sends someone
+hunting a bug that does not exist. Now `1,972 base − 200 for your goal + 1 earned from movement`,
+collapsing to `1,972 base + …` on maintain. Split in the component, **not in `budgetProvenance`** —
+that is shared, and one combined number is right for a caller that wants one. **The floor and the
+goal maths were not touched and should not be.** The second half shipped too: the measured RMR is
+re-scaled onto current lean mass rather than used raw, and nothing said so, so a measurement the
+owner paid for looked ignored — one line on the RMR form now says what the app does with it.
+**Not device-verified**; the line gained a clause and Home's copy is `compact`, so wrapping at 412 dp
+is unchecked ([journal](docs/overview/entries/2026-09-01-fix-bf-99-base-label.md)).
 
 **`Full · Override` now overrides something (BF-64).** Owner: *"pressing full or deload doesnt change
 the 'prescription' not sure if its over writing it."* It was overwriting **in one direction only** —
