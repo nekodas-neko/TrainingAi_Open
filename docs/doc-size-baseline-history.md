@@ -5654,3 +5654,141 @@ the bug but the promise the owner picked between: *the change follows to other d
 *a local setting is never clobbered*. Those differ in what the app does, not in how it is written,
 and a one-line "fixed preference sync" would lose the distinction the next session needs.
 
+
+## 2026-09-01 — `docs/implementation-backlog.md` 15167 → 15260 (BF-94 swipe-to-rest, BF-95 the marker nobody reads)
+
+A feature request that traced into a second, unrelated bug. BF-94 is the owner's *"swipe the full
+button to turn it to rest"*; BF-95 is what tracing its gesture risk turned up.
+
+BF-94's length is two things the request does not contain. **The card has two branches and the owner
+screenshotted the rarer one** — on an ordinary day there is a single Start button and **no rest
+affordance at all**, so the swipe is a bigger win where he was not looking. And on the deload branch
+the swipe would make resting *harder*: Rest is one tap there today, and a gesture plus a tap buries
+one of two answers on the one day the app is actively asking the question. The recommendation splits
+the branches rather than applying the ask uniformly.
+
+It also carries `Needs: BF-84` with the reason attached, because this session watched that exact
+mistake: BF-84 replaces the `localStorage` rest flag with a stored fact, so building the *invocation*
+first repeats the BF-87/BF-88 shape of shipping a surface against a mechanism about to change.
+
+BF-95 is short and is a real defect: `swipe-actions.tsx` sets `data-swipe-actions` with a comment
+saying it marks rows that own horizontal gestures, and `tab-swipe-navigator.tsx` excludes
+`data-swipe-carousel`, `.overflow-x-auto` and `data-hscroll` — **not that one**. The marker is
+written and never read. Latent only because a tab swipe must start within 24 px of an edge; the fix
+is one string in a selector.
+
+## 2026-09-01 — `docs/implementation-backlog.md` 15208 → 15253 (BF-96, a wrap mistaken for a layout)
+
+The owner asked to *"go back to the old way when it was side by side."* It never stopped being side
+by side — `weather-chip.tsx` renders `21° · UV 5` inline and the pill is **wrapping** at the space
+inside `UV 5`.
+
+Most of the entry is the measurement that makes the report make sense. The chip's sibling date is
+`whitespace-nowrap shrink-0`; the chip has neither, so it absorbs every pixel of shortfall in the
+row. And `EEEE d MMMM` runs **12 to 20 characters** across the year — today's *"Tuesday 1
+September"* is 19. **The old way is the same code on a shorter date.** Without that, the obvious fix
+is to shrink the chip, which would hide the wrap on most days and let it return each September.
+
+The entry also answers the owner's *"make it smaller if needed"* with the reason it is the wrong
+lever, and names the fallback that is right if the longest dates still overflow — shorten the date,
+not the chip, because a phone already shows the date elsewhere and shows neither the temperature nor
+the UV.
+
+## 2026-09-01 — `docs/implementation-backlog.md` 15253 → 15336 (BF-97 scans never group, BF-98 macros drawn twice)
+
+Two reports in one message, and the first turns out to be an entry's own motivating case still open.
+`diary-groups.ts` opens by quoting the report behind BF-39 — *"one AI-logged breakfast as eight
+diary rows"* — and grouping requires a resolvable **saved meal**, which a scan cannot have:
+`mealGroupId` is minted in one place, always beside `savedMealId`, and the scan route references
+neither field. BF-39 shipped the saved-meal half; today's screenshot is the same eight-row shape it
+was filed for.
+
+BF-97's length is the decision it refuses to take: **where a scanned group's name comes from**. The
+grouping rule deliberately will not head a group it cannot name, so three options are laid out with
+the recommendation (carry the scan's dish description, keep My Meals clean) and the trap named — do
+not mint a placeholder saved meal to satisfy a display rule.
+
+BF-98 is short because the fix is one variable. `logs.length > 1` gates the section footer on the
+**flat** log count, so a 3-ingredient group passes it and draws macros that the group header already
+drew. The file computes `entries` twelve lines earlier and its own comment states the rule — *"a
+single row already states its own macros, so a footer would repeat it"* — applied to the collapsed
+branch and never to this one. The entry works the condition through all four cases so the fix can be
+checked rather than trusted.
+
+## 2026-09-01 — `docs/agents/state/bugfix.md` 251 → 269 (two traps that each produced a false finding tonight)
+
+Both are this role's own errors from this session, and one of them reached the file every agent reads
+before anything else, so they go in the traps list rather than a journal entry.
+
+**`grep … | head -N` cannot establish an absence.** It produced *"there is no Sentry"* (five
+substring matches inside `MuscleSetsEntry`; `package.json` was below the cut) and then, an hour later
+and unlearned, *"`error_events` never prunes"* (`head -5` showed two unrelated `prune` functions
+while `adapter.ts:5093` holds the `DELETE`). The second was written into CLAUDE.md and Lane A had to
+retract it in #737. The rule is stated as a hard never, with both instances named, because the first
+one clearly was not enough.
+
+**A write-triggered retention window is measured from the last write, not from `now()`.** The same
+finding's second error, independent of the grep: 32 days against today looked like a broken 30-day
+prune; against the last write it is exactly 30. What looked like the failure was the mechanism
+working.
+
+## 2026-09-01 — BF-92 corrected, and a third trap for the same mistake
+
+The owner confirmed `NEXT_PUBLIC_SENTRY_DSN` is set, which contradicted this entry. Re-measuring
+proved the entry wrong, not the owner: the original check `curl`ed **`/login`**, a **52-byte redirect
+stub**, and a redirect answers "not found" to every grep. Against the real page and its 33 JS chunks
+the DSN is inlined in three of them.
+
+So BF-92 goes from two stacked failures to **one** — the CSP, which is re-verified and still has no
+Sentry host, no wildcard and no bare `https:`. The retraction is kept visibly in the entry rather
+than quietly deleted, because the false half had become an instruction to set a variable that was
+already set.
+
+The correction also buys the entry a sharper test than it had: with the DSN live and only the CSP in
+the way, Sentry should hold **server events and zero browser events**. That asymmetry is one look at
+the dashboard and it distinguishes three hypotheses at once.
+
+The baton gains the third trap of the night in one family — Sentry, the prune, and now this. All
+three were negatives asserted from evidence that could not have shown a positive: a truncated grep
+twice, and a redirect stub once.
+
+## 2026-09-01 — BF-92 answered from the dashboard, and LA-20 confirmed fixed
+
+The owner opened Sentry: **one issue**, the Q-404 setup probe, 13 days old, server-side (US region,
+no url, no browser). That is not one of the three outcomes this entry predicted, and it is better —
+it settles all three at once.
+
+Client events are blocked: **9 client-source `error_events` rows against 0 Sentry browser events**
+over the same 13 days, same app, same device. Same-origin lands, cross-origin does not. Sentry
+holding nothing *else* turns out to be correct rather than a second fault — it only sees uncaught
+escapes, and the window's 34 server rows are all caught-and-reported (31 daytime-stress guard, 3
+aborted disconnects).
+
+The entry also gains the caveat the answer exposed: **0 `captureException` call sites** means Sentry's
+whole view is uncaught escapes — 1 event against `error_events`' 43. A quiet Sentry is not a quiet
+app, and fixing the CSP does not change that.
+
+`projectOverview.md` grows by the LA-20 confirmation, found in the same queries: all **31**
+`daytime-stress` occurrences fall on **2026-08-23**, the day of the fix, with **zero in the nine days
+since**. That entry's `Keep: production not verified` asked for exactly this check and it had never
+been run.
+## 2026-09-01 — backlog → 15376, `projectOverview.md` → 8774, `docs/agents/state/tuning.md` → 359 (TN-20/TN-21, and a retraction)
+
+**TN-20 is a data-integrity finding, and the length is the evidence that it is one.** A completed day
+was observed in **both states within 24 hours** — 2026-08-31 read 113 drained / 3,643 samples, the
+owner screenshotted it, and an hour later it stored 0 / 0 / end = anchor while 3,815 raw samples sat
+untouched in `oura_heartrate`. Nothing logs the prior value, so the before/after table **is** the
+proof; without it the entry is an unfalsifiable claim that a number used to be different. The derived
+row's 55 → 25 / 56 → 15 against a normal 7.83 h summary is the second half, and the three-of-eleven
+signature is what makes it a defect rather than an anecdote.
+
+**It also carries a retraction of this agent's own published evidence.** TN-19 cited 2026-08-26 as
+*"zero HR samples → zero drain"*; that day has **1,954 raw samples**, so the zero was TN-20. Q-521's
+conclusion survives on its own correlations; the illustration does not. A retraction that does not
+show why the original was wrong invites the next reader to reinstate it.
+
+**TN-21** is shorter and mostly one table: the persisted stress series covers all 24 hours and is
+**55% night**, with the two halves carrying opposite signs. Its Q-507 candidate is flagged **n = 9,
+a lead not a result**, and specifically noted as the *reverse* of the density hypothesis refuted six
+days earlier — the two use different quantities, and conflating them is exactly how that refutation
+gets mis-cited.

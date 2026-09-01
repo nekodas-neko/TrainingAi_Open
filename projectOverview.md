@@ -27,6 +27,62 @@
 **Version:** v1.417.1 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-09-01.
 
+**21 MB of index for a code path nothing calls (BF-55, migration 249).**
+`oura_heartrate_user_updated` was migration 130's keyset index for `getOuraTimeseriesDelta` — the
+restore pull Q-180 kept with no caller because *"it costs nothing at runtime"*. True of the method;
+the index was never in that accounting. Measured twice a day apart: **`idx_scan` 0, `idx_tup_read`
+0, 21 MB** — a quarter of the database's whole index budget — while the same table's other index
+showed **47,922 scans / 22.7 M tuples**. Dropped with the owner's conditional approval; the method
+and its tests stay, and its doc comment now carries the `CREATE INDEX` the restore driver must run.
+**The entry falsified its own rule and that is the durable part:** `idx_scan` counts reads, not
+constraint enforcement, so three of its four zeros were PK/UNIQUE indexes — `rr_intervals_pkey` read
+0 one day and 5,034 the next ([journal](docs/overview/entries/2026-09-01-drop-unused-hr-index.md)).
+
+**The E2E harness already looks; what it cannot do is take a photo (BF-91).** The entry read *"58
+specs assert nothing visual"* — **21 of the 58** assert layout, and the four flows it named already
+have dedicated specs. What is genuinely absent is pixel baselines, and a session cannot make one:
+the sandbox Chromium is **141** while CI installs **151**, so a committed baseline fails on its first
+run. Split out as LA-50 with what a CI-side job would cost. The real gap was BF-73, whose measured
+numbers sat in its `Keep:` and nowhere else — now pinned as ratios, along with the finding that
+`globals.css`'s bare `button { min-height: 48px }` is what lifts those controls off 44. **Deleting
+that one CSS line turns the spec red**, which no source-level check on the classes would notice
+([journal](docs/overview/entries/2026-09-01-e2e-layout-assertions.md)).
+
+**The prune that was working, and the retraction that matters more than the entry (BF-93).** A
+session reported `error_events` never prunes — no `DELETE`, no cron, no trigger — and wrote that
+into CLAUDE.md, the file every session reads first. The `DELETE` is in `insertErrorEvent` and has
+been there since the initial public snapshot. **The evidence for the finding was the prune working:**
+it fires from a write path, not a scheduler, so it runs only when a fault is recorded, and faults are
+now rare — measured, last write **2026-08-30**, oldest row **2026-07-31**, span exactly **30 days**,
+the cutoff computed from the last write to the day. Reading the age against *today* instead is the
+whole mistake. CLAUDE.md is retracted, `export-map.ts` was right and is untouched, and a behavioural
+test now pins it because **a grep is what failed the first time**. Owner confirmed: leave the prune,
+skip the message truncation — under a working prune those rows age out on their own
+([journal](docs/overview/entries/2026-09-01-error-events-prune-refuted.md)).
+
+**A chosen rest day is a fact now, not a `localStorage` key (BF-84, engine half).** The route it
+posted to persisted nothing — its own comment said rest is inferred from gaps in workout history —
+so the choice never reached the server, the second device never saw it, it died on a reinstall, and
+refetching `/api/next-session` reverted it. Owner settled it as a fact: *a day with no logged
+workout is also a day you forgot, were ill, or logged late.* `rest_days` (migration 247) holds it,
+tombstoned on withdrawal, written through a new `rest_days` outbox domain so an offline choice is
+carried, and `getNextSession` prefers it over inference — after already-trained, before the
+readiness branch that would otherwise offer a deload on a day you said you were resting. **The
+surface half is Lane B's and still owed**; the storage shipping first is what makes the new button
+safe. **Not device-verified**
+([journal](docs/overview/entries/2026-09-01-rest-day-stored.md)).
+
+**A gate that did not gate, and the count the owner was given (BF-90).** Asked whether his
+decisions were the bottleneck on the queue, the answer is **10 of 41** — device verification was the
+other 31, and eleven of those sat on entries whose own headings said *"shipped; device check owed"*.
+`Gate:` parks an entry, so finished work was filed beside work that cannot start. `Verify: owner` /
+`Verify: device` is now the second meaning, with its own section that does **not** park; `Gate:`
+means blocked, uniformly. **Seventeen converted, not eleven** — `keepKind` found six more from their
+own `Keep:` residue. PARKED 114 → 97, READY and KEEP unchanged. The larger half is measured and
+deliberately deferred: **34 entries carry a `⛔` and only 7 mean blocked**, but narrowing that
+detector would move 16 untriaged entries into READY, so it is filed as LA-49 with the order to do it
+in ([journal](docs/overview/entries/2026-09-01-verify-vs-gate.md)).
+
 **An account with a password could not change it (LB-40).** `EditProfileSheet` initialised
 `hasPassword` to `false` and **nothing fetched it**, so the *Current password* field never rendered,
 the PATCH went up without it, and the route answered *"Current password is required."* — an error
@@ -885,6 +941,39 @@ window, then the newest `history-*.md`. The 157 dated status notes this section 
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
+### [readiness][body][devices] 🔴 A recompute overwrites a completed day with an empty result — the inputs to rebuild it still exist (TN-20, 2026-09-01)
+
+**Found, not fixed. Data integrity, not calibration.** [`review`](docs/reviews/2026-09-01-recompute-wipes-completed-days.md).
+- **Observed in BOTH states within 24 hours**, which is what makes it provable. 2026-08-31's `body_battery_daily` read **end 0 · drained 113 · 3,643 samples**; the owner's 21:45 screenshot showed *"−113 drained"*; an hour later (`updated_at` 12:43 UTC) it stores **end 55 · drained 0 · 0 samples**. **`oura_heartrate` holds 3,815 samples for that date** — the input was never missing.
+- **The derived row went further:** readiness **55 → 25**, sleep **56 → 15**, against a stored summary of **7.83 h, HRV 54.5, RHR 63.9**. Neighbours calibrate it — 08-30 (7.92 h, HRV 72) → **69**, 09-01 (7.50 h, HRV 65) → **54**. **A normal night is stored as the worst on record.**
+- **3 of the last 11 days** carry the signature (raw samples present, stored count **0**, drained **0**, end **=** anchor): **08-22 (265 raw), 08-26 (1,954), 08-31 (3,815)**. On healthy days the stored count sits slightly *below* raw — waking-hours windowing — so **zero against thousands is a different failure**.
+- **First action: find the writer.** Same delete-before-guard shape as **Q-528** is the first candidate, plus any `fullHistory` path. **⛔ Do not re-run the recompute to "fix" a day** — the recompute is what destroys it.
+- **⚑ This retracts an illustration this agent published on 2026-08-31 in TN-19**: 2026-08-26 was cited as *"zero HR samples → zero drain"*; it has **1,954 raw samples**. **Q-521's wear-time conclusion stands on its own correlations**; the illustration does not. **A stored counter is a claim about the data, not the data.**
+
+### [readiness] 🟡 "Daytime stress" is 55% night buckets, and night and day carry opposite signs (TN-21, 2026-09-01)
+
+**Measured for the first time** — TN-3a's persistence half shipped, so the per-bucket series exists: **230 buckets over 9 days**. [`review`](docs/reviews/2026-09-01-recompute-wipes-completed-days.md).
+- **The series covers all 24 hours** (every hour except 07:00) and **126 of 230 — 55% — fall between 22:00 and 06:00**. Night mean **+0.266** (recovered) against day **−0.413** (stressed): **opposite signs, night in the majority**, so any daily aggregate is governed by the night/day mix as much as by stress.
+- **A Q-507 mechanism candidate, and it is the REVERSE of the one already refuted**: `corr(total buckets, stress_high_minutes)` = **−0.784** (n=9) — *fewer* buckets produce *more* high-stress minutes, because each bucket is scored against the day's own median. **n = 9; treat as a lead, not a result.** The refuted hypothesis used *HR sample count* (r = −0.128); bucket count is the quantity the model actually divides by.
+
+### [workouts][platform] ⚠️ The stored rest day is not device-verified, and the button for it is still Lane B's (BF-84, 2026-09-01)
+
+**Shipped, and the half that matters most on this app is the half a sandbox cannot run.** `rest_days`
+(migration 247) plus a `rest_days` outbox domain; the client writes through `chooseRestDay`, which
+queues the outbox row when the local store is there and POSTs when it is not. **The outbox path
+exists only on the APK** — `getLocalStore` returns null in the web/dev sandbox — so the branch that
+carries an offline rest choice to the server has been exercised by unit tests and by
+`pushMutations` against a real Postgres, and never by a device.
+
+**What to check on the S25:** choose rest with the phone in aeroplane mode, restore the network,
+and confirm the choice is on the server (`GET /api/log-rest-day?from=&to=`) without a second tap.
+Then confirm the recommendation still says rest after a pull-to-refresh, which is the exact failure
+the entry was opened for.
+
+**Also still owed:** the surface. The owner asked for the rest button on Home's card *when the app
+has not suggested rest*; today it renders only inside the `deloadOrRestRecommended` branch. That is
+Lane B's, tracked on BF-84, and the storage shipping first is what makes it safe.
+
 ### [readiness][body][app-shell] 🔴 The Body Battery card explains a model the app doesn't implement — and nothing in the chain has shipped (TN-19, 2026-08-31)
 
 **Found, not fixed. Owner's second report on this pillar in six days** — *"any work being done for this? still not very usable"*, screenshot showing **Drained 0 · started at 55 · +0 charged · −113 drained**. [`review`](docs/reviews/2026-08-31-battery-explainer-promises-inert-mechanisms.md).
@@ -1054,7 +1143,13 @@ that need an owner, and for the barcode chain.
 
 ### [platform][devices] ⚠️ `/api/body-battery` was 500ing in production; the fix is unverified there (LA-20, 2026-08-23)
 
-**Fixed in this session's deploy, not yet confirmed on production.** `error_events` held 19 live faults — `daytime-stress: constants not set`, first 10:37, latest 12:27, still firing while it was read — from the Q-545 constants port. Boot injects the model constants and sets `OURA_CONSTANTS_DIR`, and **both effects are per-process**; the process that runs boot need not be the one that serves a request. A probe route read `hasDaytimeStressConstants()` as **false** in a handler while boot had logged a successful delivery. Two independent halves: the module instance the route reads is not the one boot wrote to, and where the env var is also not inherited, `constantsDir()` falls through to a tree directory that has held no `.constants.json` since Q-49. `constantsDir()` now prefers the delivered `<cwd>/.oura-constants`, and `getRepository()` injects — the one hook every path that can reach a constants read already goes through, using a non-throwing variant so an unreadable directory cannot take down every DB route ([`journal`](docs/overview/entries/2026-08-23-oura-constants-per-process.md)).
+**✅ CONFIRMED FIXED ON PRODUCTION, 2026-09-01.** Every one of the **31** stored occurrences falls on
+**2026-08-23**, the day of the fix, and there have been **zero in the nine days since** — measured as
+a per-day count over the whole retained window, not a spot check. The `Keep:` below is discharged: the
+check it asked for has now been run. (Found while answering an unrelated Sentry question — the same
+`error_events` read this entry was itself found by.)
+
+**Originally recorded as: fixed in this session's deploy, not yet confirmed on production.** `error_events` held 19 live faults — `daytime-stress: constants not set`, first 10:37, latest 12:27, still firing while it was read — from the Q-545 constants port. Boot injects the model constants and sets `OURA_CONSTANTS_DIR`, and **both effects are per-process**; the process that runs boot need not be the one that serves a request. A probe route read `hasDaytimeStressConstants()` as **false** in a handler while boot had logged a successful delivery. Two independent halves: the module instance the route reads is not the one boot wrote to, and where the env var is also not inherited, `constantsDir()` falls through to a tree directory that has held no `.constants.json` since Q-49. `constantsDir()` now prefers the delivered `<cwd>/.oura-constants`, and `getRepository()` injects — the one hook every path that can reach a constants read already goes through, using a non-throwing variant so an unreadable directory cannot take down every DB route ([`journal`](docs/overview/entries/2026-08-23-oura-constants-per-process.md)).
 - **Keep: production not verified.** The reproduction is a dev-server worker split, which is not proof Railway's split is identical. **The check is `error_events` after this deploys** — and *something stopping is not something fixed*: the count must be zero across a window where `/api/body-battery` was actually called, since the route is only reachable for a user with a daytime-HRV model.
 - **This was not in any backlog entry.** It was found by the session-start `error_events` read that `CLAUDE.md` mandates and I had skipped. No local gate could have caught it: `pnpm dev` never reaches the model path, because the seeded user has no daytime-HRV model and the call is guarded.
 - **⚠️ Superseded figures, and the verification is now UNFALSIFIABLE (Tuning, 2026-08-24).** The

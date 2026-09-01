@@ -81,7 +81,7 @@ import {
   loadStepsGoal, loadStepsGoalType, loadSleepGoal, loadWaterGoal, loadWaterGoalType,
   loadHiddenSections, buildDefaultOrder, loadSectionOrder,
 } from "@/lib/home/home-prefs";
-import { markRestDayChosen, withRestDayOverride } from "@/lib/home/rest-day";
+import { chooseRestDay, withRestDayOverride } from "@/lib/home/rest-day";
 import { fetchWithRetry } from "@trainingai/shared/fetch-with-retry";
 import type { HrSleepWindow } from "@trainingai/shared/health/hr-sleep-band";
 
@@ -212,9 +212,9 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
         // (or a stale prior-day one) and is ignored rather than trusted, so a
         // resident app can't flash yesterday's rest-day/deload banner across midnight.
         const stamped = JSON.parse(recRaw) as { date: string; data: NextSessionRecommendation }
-        if (stamped?.date === todayInTz(tz) && stamped.data) seededRec = withRestDayOverride(stamped.data)
+        if (stamped?.date === todayInTz(tz) && stamped.data) seededRec = withRestDayOverride(stamped.data, tz)
       }
-      if (!seededRec) seededRec = withRestDayOverride(readTodayCacheSync<NextSessionRecommendation>('next-session'))
+      if (!seededRec) seededRec = withRestDayOverride(readTodayCacheSync<NextSessionRecommendation>('next-session'), tz)
       setRecommendation(seededRec)
     } catch { /* leave recommendation null */ }
     setMoodLog(readCacheSync<import("@trainingai/shared/types/mood").MoodLog | null>(`mood:${todayInTz(tz)}`) ?? undefined)
@@ -286,10 +286,10 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
       const recRaw = sessionStorage.getItem("ta_recommendation_v1");
       const stamped = recRaw ? (JSON.parse(recRaw) as { date: string; data: NextSessionRecommendation }) : null;
       if (stamped?.date === todayInTz(tz) && stamped.data) {
-        setRecommendation(withRestDayOverride(stamped.data));
+        setRecommendation(withRestDayOverride(stamped.data, tz));
       } else {
         const cached = readTodayCacheSync<NextSessionRecommendation>('next-session');
-        if (cached) setRecommendation(withRestDayOverride(cached));
+        if (cached) setRecommendation(withRestDayOverride(cached, tz));
       }
     } catch { /* ignore */ }
 
@@ -551,7 +551,7 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
         cachedFetchToday<NextSessionRecommendation>(
           'next-session', '/api/next-session', NEXT_SESSION_TTL,
           (rec) => {
-            const adjusted = withRestDayOverride(rec) ?? rec;
+            const adjusted = withRestDayOverride(rec, tz) ?? rec;
             setRecommendation(adjusted);
             try { sessionStorage.setItem("ta_recommendation_v1", JSON.stringify({ date: todayInTz(tz), data: adjusted })); } catch { /* ignore */ }
           },
@@ -968,14 +968,13 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
 
   // ai_dynamic: user chose Rest Day
   const handleRestDay = useCallback(() => {
-    // Persist the choice for today, then optimistically show the rest-day card.
-    // Do NOT refetch /api/next-session here — it persists no rest-day state and would
-    // just recompute the prompt, reverting the selection (the "doesn't select / glitches"
-    // bug). The marker keeps the choice across navigation; isRestDayChosen() re-applies it.
-    markRestDayChosen();
+    // BF-84 — one write for the whole app: outbox row when the local store is there, POST when it
+    // is not, both ending at `setRestDay`. Still no refetch here, but for a new reason — the route
+    // now agrees rather than reverting the choice, it just may not have the pushed row yet. The
+    // optimistic flip plus the marker cover that gap.
+    chooseRestDay(userId, { tz });
     setRecommendation(prev => prev ? { ...prev, isRestDay: true, deloadOrRestRecommended: false } : prev);
-    fetch('/api/log-rest-day', { method: 'POST' }).catch(() => {});
-  }, []);
+  }, [userId, tz]);
 
   const visibleDefs = useMemo(() => WIDGET_DEFS.filter((d) => activeWidgets.includes(d.key)), [activeWidgets]);
 

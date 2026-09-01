@@ -33,6 +33,7 @@ const path = require('path');
 const { idPattern, idPartsPattern } = require('./lib/entry-id');
 const { announcesCompletion } = require('./lib/completion-words');
 const { referenceFromLines, hasProseMarker, PROSE_MARKERS } = require('./lib/reference');
+const { verifyFromLines, verifyProblem } = require('./lib/verify');
 const { keepFromLines } = require('./lib/keep');
 const { keepKind } = require('./lib/keep-kind');
 
@@ -93,16 +94,21 @@ for (let i = 0; i < queue.length; i++) {
       const gate = line.match(/^\s*[-*]\s*\*{0,2}Gate:\*{0,2}\s*([a-z]+)/i);
       if (gate) meta.get(currentId).gates.push(gate[1].toLowerCase());
 
+      // BF-90. `Verify:` is matched here only so the inline-field guard below can see it; the value
+      // itself is read from `lines` by `verifyFromLines`, the same function `next-item.js` calls,
+      // so the two can never disagree about what the field says.
+      const verify = line.match(/^\s*[-*]\s*\*{0,2}Verify:\*{0,2}\s*([a-z]+)/i);
+
       // A field written INLINE — `- **Added:** … · **Gate: owner**` — is not a field. The two
       // matchers above anchor at the start of a bullet, so an inline one is silently ignored and
       // the entry stays READY, which is the exact opposite of what writing it was meant to do.
       // Filed after making this mistake twice in two days: `Needs:` on 2026-08-20 and `Gate:` on
       // 2026-08-23, both by appending to the `Added:` line. Only the **bolded** form is flagged, so
       // prose that merely mentions the word is untouched.
-      if (/\*\*(Gate|Needs):/i.test(line) && !needs && !gate) {
+      if (/\*\*(Gate|Needs|Verify):/i.test(line) && !needs && !gate && !verify) {
         failures.push(
-          `${currentId}: a \`Gate:\`/\`Needs:\` field is written inline and will be IGNORED — it ` +
-            `must start its own bullet, or the entry stays READY:\n    ${line.trim().slice(0, 120)}`,
+          `${currentId}: a \`Gate:\`/\`Needs:\`/\`Verify:\` field is written inline and will be ` +
+            `IGNORED — it must start its own bullet, or the entry stays READY:\n    ${line.trim().slice(0, 120)}`,
         );
       }
 
@@ -225,6 +231,33 @@ for (const [id, m] of meta) {
           `A dependency on another entry is \`Needs:\`, not a gate.`,
       );
     }
+  }
+}
+
+// ---- 2c: Verify values, and Gate/Verify contradictions ---------------------
+//
+// BF-90. `Gate:` carried two meanings — "cannot start" and "is done, look at it" — and a gate
+// PARKS the entry, so the second kind sat beside genuinely blocked work. Measured 2026-09-01: 31 of
+// 41 gates were `device`, and ELEVEN of those were on entries whose own headings said "shipped;
+// device check owed". `Verify:` is the second meaning, given its own field and its own section.
+//
+// Same two values as `Gate:` deliberately — one vocabulary to remember, and `Verify: owner` is a
+// real thing (an owner looking at a shipped tuning change, not deciding whether to build it).
+for (const [id, m] of meta) {
+  const problem = verifyProblem(m.gates, verifyFromLines(m.lines));
+  if (!problem) continue;
+  if (problem.kind === 'unknown-value') {
+    failures.push(
+      `${id} has \`Verify: ${problem.value}\`, which is not something this project resolves. ` +
+        `Use \`Verify: device\` (the S25 smoke run on shipped work) or \`Verify: owner\` ` +
+        `(the owner looking at shipped work). If the work cannot START yet, that is \`Gate:\`.`,
+    );
+  } else {
+    failures.push(
+      `${id} has both \`Gate: ${problem.value}\` and \`Verify: ${problem.value}\`. They contradict — ` +
+        `a gate says this cannot start, a verify says it has shipped. Keep one: \`Gate:\` if the work ` +
+        `is blocked, \`Verify:\` if it is done and awaiting a look. The gate would win silently.`,
+    );
   }
 }
 
@@ -416,6 +449,18 @@ if (failures.length) {
 
 const withNeeds = [...meta.values()].filter((m) => m.needs.length).length;
 const withGate = [...meta.values()].filter((m) => m.gates.length).length;
+// Counted and printed because the count IS the finding: the owner's question was whether his
+// decisions are the bottleneck, and separating verification debt from blocked work is what makes
+// that answerable at a glance instead of by hand-scanning 41 gates (BF-90).
+const verifyCounts = [...meta.values()].reduce((acc, m) => {
+  const v = verifyFromLines(m.lines);
+  if (v) acc[v.value] = (acc[v.value] ?? 0) + 1;
+  return acc;
+}, {});
+const withVerify = Object.values(verifyCounts).reduce((a, n) => a + n, 0);
+const verifySummary = withVerify
+  ? `${withVerify} with Verify: (${Object.entries(verifyCounts).map(([k, n]) => `${n} ${k}`).join(', ')})`
+  : 'none with Verify:';
 
 // OR-100: a `Keep:` whose residue is a BUILD hides startable work under a heading that reads
 // "Not new work". Reported, never failed — the entry is explicit that enforcement stays off until
@@ -443,9 +488,35 @@ const withGate = [...meta.values()].filter((m) => m.gates.length).length;
   }
 }
 
+// BF-90, the half that keeps the split true after today. A `Gate: device` whose own `Keep:` says a
+// CHECK is owed has shipped — so it is verification debt wearing a gate, and the gate parks it.
+//
+// Reported, never failed, and deliberately using `keepKind` rather than a new heuristic: the signal
+// is already defined and already tested (OR-100), and a fuzzy new one would be exactly the
+// prose-detection this file's fields exist to replace. Seventeen entries were converted on
+// 2026-09-01 — eleven BF-90 named from their headings, six more this same rule found — so an empty
+// list here is the current state rather than an untested branch.
+{
+  const stragglers = [];
+  for (const [id, m] of meta) {
+    if (!m.gates.includes('device') || !m.keep) continue;
+    const kind = m.keep.gate ? 'check' : keepKind(m.keep.text);
+    if (kind === 'check') stragglers.push(`${id} — ${m.keep.text.slice(0, 90)}`);
+  }
+  if (stragglers.length) {
+    console.log(
+      `check-backlog-pointers: note — ${stragglers.length} \`Gate: device\` entr${stragglers.length === 1 ? 'y' : 'ies'} ` +
+        `whose own \`Keep:\` says a CHECK is owed. That is shipped work, so the gate PARKS it beside ` +
+        `work that genuinely cannot start — the thing BF-90 measured. Convert to \`Verify: device\`, ` +
+        `which prints in its own section and does not park. Advisory, not a failure:\n` +
+        stragglers.map((r) => `      ${r}`).join('\n'),
+    );
+  }
+}
+
 console.log(
   `check-backlog-pointers: OK — ${seen.size} entries, no duplicates, all tagged; ` +
-    `${withNeeds} with Needs: (no cycles, all targets known), ${withGate} with Gate:; ` +
+    `${withNeeds} with Needs: (no cycles, all targets known), ${withGate} with Gate:, ${verifySummary}; ` +
     `batches [${batchSummary || 'none'}]; ${completedSummary}; ` +
     `migration ${nextMigration}, SQLite v${Math.max(...versions)} match source.`,
 );
