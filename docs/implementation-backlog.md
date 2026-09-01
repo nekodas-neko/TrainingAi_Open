@@ -7803,11 +7803,44 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 - **Verification:** the route is already proven end to end on `pnpm dev` (all four verbs, including
   idempotency and the 401). This item is the affordance only.
 
+### [platform] LA-53 — an entry whose remaining half changed lanes keeps heading the OLD lane's list
+
+- **Lane:** A — `scripts/check-backlog-pointers.js` and `scripts/next-item.js`.
+- **Added:** 2026-09-01 · Lane A, after hitting the same shape three times in one session.
+- **The shape.** `next-item.js` reads the `Lane:` field, and nothing re-reads it when an entry's
+  remaining work moves to the other lane. So an entry whose Lane A half has shipped keeps surfacing
+  at the **top** of Lane A's READY list, and the next implementer spends the read discovering it.
+- **Three in one session, all of them real:**
+  - **Q-535** — Lane A half shipped 2026-08-18; the remaining half is Q-318's, Lane B's. It headed
+    Lane A's list for two weeks.
+  - **BF-64** — filed Lane A because *"the decision lives in `session-data.ts`"*; following its own
+    recommendation the fix is entirely client-side and Lane B's.
+  - **LA-47** — the entry says outright that the split it proposes *"does not compile"*, so its
+    remaining piece is cross-lane and unstartable as written.
+- **What a check can see, and what it cannot.** The first is mechanical: a body line matching
+  *"the Lane A half shipped"* (any case, either lane) while `Lane:` still names that lane is a
+  contradiction inside one entry, and `check-backlog-pointers.js` already parses both. The second and
+  third are judgement and no script will catch them — which is the argument for catching the one that
+  is mechanical rather than for catching none.
+- **⚠ Make it advisory first.** The existing `Keep:`-residue note prints as advice rather than a
+  failure for exactly this reason: a heuristic that fails CI on a phrasing variant costs more than
+  the drift does. Count the hits, print them, and only consider failing once the count is stable at
+  zero.
+- **Verification:** the check names Q-535 before this entry's own fix to it lands, and names nothing
+  after; `next-item.js --lane A` no longer heads its list with an entry whose Lane A half is done.
+
 ### [platform][devices] Q-535 — Redecode reports "failed: 502" for work that succeeded
 
 - **Branch:** `fix/redecode-async-job`
 - **Added:** 2026-08-17, after a redecode reported `redecode failed: 502` while in fact completing.
-- **Lane:** A — classified 2026-08-30 by CLAUDE.md's path rule (*touches `app/api/**` → A*; the fix is in `POST /api/oura-ble/samples/redecode` and its job handling).
+- **Lane:** B — **corrected 2026-09-01.** It was classified A on 2026-08-30 by the path rule, which
+  was right then; the Lane A half shipped on 2026-08-18 (see below) and everything still owed is the
+  poller and the default flip, which is Q-318's and Lane B's.
+- **Needs:** Q-318
+- **⚠ This entry read as READY at the top of LANE A's list for two weeks after its Lane A half
+  shipped**, because `next-item.js` reads the `Lane:` field and nothing re-reads it when the
+  remaining work moves lanes. The date-scoped redecode floated under *"what to do"* is a suggestion,
+  not a commitment, and is not what keeps this open.
 - **What happens.** `POST /api/oura-ble/samples/redecode` hardcodes `fullHistory: true` — there is
   no scoped variant — so it walks all 1.1M rows and then rebuilds **every** daily summary. Q-213
   moved that work off the event loop into the rollup worker, which is why the rest of the process

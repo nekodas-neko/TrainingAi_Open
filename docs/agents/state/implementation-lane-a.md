@@ -11,33 +11,38 @@ directory. Local SQLite **v33**.
 
 ## Now
 
-**Four PRs merged: #747 (BF-1 blood-panel storage), #750 (BF-97 scanned-meal groups), #751 (a
-compaction chore), #752 (BF-59 phase-aware volume targets).** Start with
+**Ten PRs merged this session:** #747 (BF-1 blood-panel storage), #750 (BF-97 scanned-meal groups),
+#751 (a compaction chore), #752 (BF-59 phase-aware volume targets), #754 (this baton), #755 (LB-44),
+#756 (BF-69 planned), #760 (BF-64 re-classified), #762 (LA-52 filed). Start with
 `node scripts/next-item.js --lane A` and read its real output.
 
-**Two of the four left a `Keep:` that a successor should read before touching the area:**
+**⚠ The startable Lane A queue is THINNER than READY's count suggests, and this is the thing to know
+first.** Scanned 2026-09-01: of the top seven, **BF-69** was planned this session so its build is a
+later session's by protocol, **BF-77** is owner-gated planning, **LB-18** is Lane B by name,
+**LA-47** says outright that its own proposed split *"does not compile"*, **BF-4** needs one photo
+scan from the owner, **LA-48** is now parked behind LA-52, and **Q-535**'s remaining half is Lane
+B's. From position 8 the list is the Tuning calibration block, which is owner-gated. **That is not a
+shortage of work — it is what a scan says today. Do not manufacture an item, and do not start a
+gated one to look busy.**
 
-- **BF-59 introduced a live inconsistency, deliberately.** The Training card's weekly target is now
-  derived from `volumeLandmarks(goal, muscle)` scaled by the week's phase mix; **`signals.ts` still
-  builds the AI's `volumeBudgetPerMuscleGroup` from the stored `program_volume_targets` number**,
-  which is the flat 14/10 binary the card stopped reading. Before the change both were wrong
-  together; now only the prescription is. It is the entry's first `Keep:` and it needs a device pass,
-  because it changes prescribed sets rather than a display.
+**Two entries carry a `Keep:` a successor must read before touching the area:**
+
+- **BF-59 introduced a live inconsistency, deliberately.** The Training card's weekly target is
+  derived from `volumeLandmarks` scaled by the week's phase mix; **`signals.ts` still builds the AI's
+  `volumeBudgetPerMuscleGroup` from the stored `program_volume_targets` number**, which is the flat
+  14/10 binary the card stopped reading. Before the change both were wrong together; now only the
+  prescription is. It needs a device pass, because it changes prescribed sets.
 - **BF-97 writes a group nothing renders yet.** `food_logs.meal_group_name` is written by all three
-  paths, and `groupDiaryEntries` still requires a `savedMealId`, so a scan draws exactly as before.
-  That is the safe half of the split, not an oversight — the rendering rule is Lane B's.
+  paths and `groupDiaryEntries` still requires a `savedMealId`, so a scan draws as before. The safe
+  half of the split, not an oversight.
 
 **BF-1's storage half shipped; the extraction route and the consumers are still Lane A's.**
-`latestAnalytes` was written for the consumers and **removed again**, because
-`check-dead-repo-methods` correctly rejects a method with no caller. Bring it back in the same PR as
-its reader, not before.
+`latestAnalytes` was written for the consumers and **removed again** — `check-dead-repo-methods`
+rejects a method with no caller. Bring it back in the same PR as its reader.
 
-**The queue is scanned, never remembered** — a previous baton told the owner Lane A was nearly
-exhausted when 69 entries were READY. Re-run the tool.
-
-**⚠️ Scroll past the scoring block at the top of READY.** Owner, 2026-08-26: *leave the stuff gated
-on me for later and continue working through the queue of what you can do*. The ~7 Tuning
-calibrations, the device-gated entries and the Railway decisions all sit above startable work.
+**Three entries were re-classified or re-scoped rather than built, and LA-53 proposes catching the
+mechanical case.** An entry whose Lane A half has shipped keeps heading Lane A's list, because
+`next-item.js` reads the `Lane:` field and nothing re-reads it when the remaining work moves lanes.
 
 ## The habit that has now paid on every entry it has been applied to
 

@@ -6005,3 +6005,14 @@ reads an all-false style as "use them all".
 
 A finding that something is *not* broken earns its lines here exactly when the thing looks broken on
 sight, which this does.
+
+## 2026-09-01 — baton 189 → 194, `docs/implementation-backlog.md` → 14957 (queue hygiene)
+
+Five lines onto the baton, and they are the finding a successor needs before anything else: the
+**startable** Lane A queue is thinner than READY's count, entry by entry, with the reason each of the
+top seven is blocked. A successor that reads "61 READY" and starts at the top spends its first read
+discovering that — which is what happened here.
+
+The backlog grows by LA-53 (proposing a check for the one mechanical case) and by Q-535's lane
+correction. Q-535 headed **Lane A's** list for two weeks after its Lane A half shipped, because
+`next-item.js` reads the `Lane:` field and nothing re-reads it when the remaining work moves lanes.
