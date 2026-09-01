@@ -24,7 +24,7 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.424.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Version:** v1.425.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-09-01.
 
 **A CI flake had a cause, and `main` gets a nightly (LB-31).** `anchor-source.test.ts` failed once
@@ -39,6 +39,19 @@ green against the `main` it was cut from, and nothing re-checked the combination
 landed; a failure now names `main` and the merge window instead of the next contributor's PR. **The
 no-`push` decision is untouched**
 ([journal](docs/overview/entries/2026-09-01-verify-main-nightly.md)).
+
+**One name for the saved list — `My Foods`, everywhere (BF-103).** The owner overrode the entry's own
+proposal and was right to: it suggested `Saved` for the tab with `My Meals` left on the button, which
+is a *second* name, and **the historical failure was never the wording — it was two labels for one
+list.** *"we only need one. lets go with MyFoods."* It also describes the contents honestly: 5 of his
+10 saved meals hold exactly one item. Eight files carry the strings, including an **`aria-label`** a
+rename would leave saying a name the screen no longer uses. **The two comments from BF-37 and BF-60
+that read as a standing prohibition on the name are rewritten** — left alone, they are what the next
+session reverts this on. **The guard found what the entry's file table missed: twelve e2e spec files
+asserting `My Meals`**, which would have broken CI on the next run rather than at review. It also
+pins the strip at `Recent · My Foods · Search`, because `My Foods` was once a *merged* list and that
+revert was about the merge, not the name. **Not device-verified** — `My Foods` is longer than `Meals`
+and three tabs share the width ([journal](docs/overview/entries/2026-09-01-fix-bf-103-my-foods.md)).
 
 **The queue tool stops pointing Lane A at another lane's finished work (LA-53).** `next-item.js`
 reads an entry's `Lane:` field and nothing re-reads it when the remaining work moves lanes, so

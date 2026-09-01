@@ -51,7 +51,7 @@ interface Props {
  * **The thumbnail arrived in BF-32**, on the owner's instruction. It was deferred because an
  * `<img>` for an arbitrary user photo URL costs a `no-img-element` exemption and a loader decision;
  * a saved meal's photo is a `data:` URI capped at 128 px, so neither applies. It is opt-in per call
- * site — the artboards put tiles on meal-level rows only (the day screen, My Meals), never on the
+ * site — the artboards put tiles on meal-level rows only (the day screen, My Foods), never on the
  * ingredient rows inside a meal — and `meal-thumb.tsx` carries the rest of the reasoning.
  *
  * **Props are scalars, not objects.** The row renders inside `.map()`, where hooks are unavailable,
