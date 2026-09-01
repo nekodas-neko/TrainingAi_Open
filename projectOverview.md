@@ -24,8 +24,20 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.418.2 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Version:** v1.418.3 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-09-01.
+
+**The Home pill that "moved" had not moved, and a swipe marker nothing read (BF-96, BF-95).** Owner:
+*"I dont like how the temperature/uV pill sits. can we go back to the old way when it was side by
+side."* It was already side by side — it was **wrapping**, because the header row's other item (the
+date) carries `whitespace-nowrap shrink-0` and the chip carried neither, so the chip absorbed every
+shortfall and `UV 5` broke at its own space. Measured against a real render, `EEEE d MMMM` runs
+**12–22** characters (*"Wednesday 30 September"*), correcting the entry's own 12–20 — so *"the old
+way"* is the same code on a shorter date. Separately, `swipe-actions.tsx` declared
+`data-swipe-actions` and the tab navigator's exclusion list never read it: latent rather than
+impossible, since the navigator arms within 24 px of the edge and meal rows reach it. **Neither is
+device-verified, and the chip cannot be — the seeded sandbox has no weather snapshot, so only the
+skeleton renders** ([journal](docs/overview/entries/2026-09-01-chip-wrap-and-swipe-marker.md)).
 
 **A meal section holding one combined meal printed its macros twice (BF-98).** Owner: *"the combined
 item UI doesnt look great with the double macros at the bottom."* The totals footer was gated on
