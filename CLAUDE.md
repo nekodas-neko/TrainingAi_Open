@@ -27,11 +27,17 @@
   **But its SIZE columns and its ROW columns are not equally trustworthy, and conflating them cost a
   session (2026-08-19/20).** `pg_total_relation_size`/`pg_relation_size`/`pg_indexes_size` are read from
   the filesystem and are exact. **`n_live_tup`/`n_dead_tup` are planner ESTIMATES** maintained by
-  autovacuum and `ANALYZE` — and on this database `last_analyze` and `last_autovacuum` are **NULL on
-  every table**, so they can be arbitrarily stale. Measured 2026-08-20: `n_live_tup` read **0** against
-  `oura_raw_packed`'s **764** real rows, and **1** against an `oura_daily_summary` holding **45** — the
-  latter was filed as a data-loss incident (Q-528) that had never happened. **To ask whether a table is
-  empty, run `count(*)`;** where the worry is that a `claude_ro` view hides other users' rows, write the
+  autovacuum and `ANALYZE`, so they can be arbitrarily stale. Measured 2026-08-20: `n_live_tup` read
+  **0** against `oura_raw_packed`'s **764** real rows, and **1** against an `oura_daily_summary`
+  holding **45** — the latter was filed as a data-loss incident (Q-528) that had never happened.
+  **⚠ The reason this line used to give — that `last_analyze`/`last_autovacuum` are "NULL on every
+  table" — was true on 2026-08-20 and is FALSE now (BF-106, 2026-09-01), which makes the rule more
+  dangerous rather than less.** Autovacuum and autoanalyze do run on the high-churn tables:
+  `oura_raw_samples` autoanalyzed at 20:17 that day and its `n_live_tup` of **191,454** matched
+  `count(*)` exactly. Coverage is **partial**, not restored — `oura_raw_packed`, which autoanalyze has
+  not reached, still read **55** against **1,051** real rows in the same query. So an accurate reading
+  on one table is no evidence about the next one, and nothing in the output tells you which side a
+  table is on. **To ask whether a table is empty, run `count(*)`;** where the worry is that a `claude_ro` view hides other users' rows, write the
   finding as "none of the owner's" rather than reaching for a counter that cannot see them either.
   **Baseline: 171 MB total on 2026-08-18**, after the packing work took `oura_raw_samples` from 563 MB to
   50 MB. Growth should now be ~0.4 MB/day. Anything materially above that trend gets a Known-Issues row the

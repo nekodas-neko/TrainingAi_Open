@@ -388,6 +388,135 @@ below threshold and left in place for next time.
 > BF-29 (My meals), BF-30 (Meal detail), BF-31 (Edit meal) and BF-26 (Quantity). Two artboards need
 > no entry — `Tap targets` and the `srv/g` studies both shipped in Q-395a.
 
+### [activity] BF-107 — the walk summary has no calories tile, and the number it would show does not exist yet on that screen
+
+- **Lane:** A — the value has to reach the client before Lane B can render it; the tile itself is
+  trivial once it does.
+- **Added:** 2026-09-01 · owner, on a completed guided walk: *"the final screen doesnt show calories
+  burned."*
+- **Verify:** device
+
+**The walk is not missing its calories — the summary screen is.** `walk-summary.tsx:239-241` renders
+exactly three tiles, Duration / Avg HR / Max HR. The screenshot confirms it: 30m, 100, 117, and no
+energy anywhere on a screen that otherwise carries per-interval cadence, a heart-rate chart, time in
+zone and Session Load.
+
+**⚠ The reason is structural, and an implementer who just adds a `<Stat label="Calories">` will render
+a dash.** The client write passes `caloriesBurned: null` deliberately — `walk-summary.tsx:150-151`
+says so: *"Calories are derived server-side in saveActivityLog — the MET table behind `estWorkoutKcal`
+is read through `node:path`, so it cannot be imported into a client bundle."* And that is real:
+`adapter.ts:2121` reads `data.caloriesBurned ?? await this.deriveActivityKcal(...)`. So the number is
+computed, correctly, **after** the screen that wants to show it has already painted — and the walk
+summary never re-reads the saved row.
+
+- **Recommendation: return the derived kcal from the save and show it when it lands.** `saveActivityLog`
+  already computes it; having the write **return** the value costs nothing, and the summary can paint
+  the tile as `—` and fill it in, which is honest about a value that genuinely is not known at first
+  paint. Do not reach for the instant-paint cache-seed pattern here: there is no prior value to seed
+  from, the walk having just happened.
+- **The alternative, and why it loses:** port the MET table so `estWorkoutKcal` runs client-side. That
+  would make the tile instant and work offline — genuinely better on both counts — but it duplicates a
+  formula that One Formula, One Place says must live once, and the `node:path` read is exactly the
+  coupling that keeps it server-side. Not worth it for one tile; revisit only if a second surface needs
+  the same number before its write completes.
+- **⚠ Offline, there is no number at all.** The device write path queues through the outbox, so a walk
+  finished with no signal has no server-derived kcal until it syncs. The tile must render `—` rather
+  than `0` — a zero is a claim, a dash is not — and this is the case to check on device, because it is
+  the one the sandbox cannot produce.
+- **Sibling surfaces to check in the same PR:** `done-activity-screen.tsx` takes the same write path
+  (`walk-summary.tsx:155` says it mirrors that contract exactly), so if the free-activity done screen
+  shows calories today it is worth knowing how; if it does not, it has the same gap and should be fixed
+  with it rather than left as the next report.
+
+
+### [activity] BF-108 — finishing a walk lands you on a pre-armed "start this activity" screen, titled from a walk you already did
+
+- **Lane:** B — `components/guided-walk/walk-summary.tsx:288`,
+  `components/activity/activity-screen.tsx:20-21`, `lib/stores/activity-store.ts`.
+- **Added:** 2026-09-01 · owner: *"after closing it - it still opens with the activity naming
+  screen"*, with a screenshot of the Walk / Title *"Walk Home From Train"* / **Start** screen.
+- **Verify:** device
+
+**Two stores, and the wrong one is driving the screen you land on.** `Done` on the walk summary runs
+`onDone()` — which resets the **guided-walk** store, correctly — and then
+`router.push('/activity')`. `/activity` renders from the **activity** store, a different store that
+the guided walk never touched: `activity-screen.tsx` shows `PreActivityScreen` whenever `mode` is
+`'pre'` and `activityType` is non-null. That store is `persist`ed with **no `partialize`**, so
+`activityType` and `title` survive from whenever a free-tracked activity was last set up.
+
+So the app's response to "you finished a 30-minute walk" is a screen offering to **start** a walk,
+pre-titled with one the owner already completed. Nothing is broken in the sense of a thrown error, and
+nothing about it is intentional either — it is where the router happens to point.
+
+- **⚠ This is the persisted-store class `CLAUDE.md` already names**, which is the argument for fixing
+  the store rather than only the destination: *"screen modes, in-flight flags, and per-screen payloads
+  never survive a reload."* A `title` the user typed for a finished activity is a per-screen payload.
+  Four incidents are listed under that rule; this is the fifth shape.
+- **Recommendation: fix both halves, they are different bugs wearing one symptom.**
+  1. **Destination** — `Done` should land on the activity's own record or the day view, not on a
+     start-a-new-activity screen. The walk was just saved; showing it is the useful ending and it is
+     what the summary's own `router.prefetch('/activity')` was reaching for.
+  2. **Stale title** — clear `title` (and reconsider `activityType`) once an activity reaches `done`
+     and is saved, so a genuine visit to `/activity` starts clean instead of inheriting last week's
+     name. `startActivity` already resets from `INITIAL_STATE`, so the gap is only on the completion
+     side.
+- **Fixing only the destination leaves the bug.** Opening `/activity` from the tab bar shows the same
+  pre-armed screen; the owner reached it via the walk, but that is the route, not the cause.
+- **⚠ Do not fix it by clearing the store on rehydrate wholesale.** `activity-screen.tsx:17-19` carries
+  a deliberate guard from Q-450 — an in-flight session with a missing type keeps its own screen rather
+  than being thrown back to the picker, because the picker would drop the recording. Anything that
+  resets `activityType` must not reach a session that is `'active'`.
+- **Verification:** finish a guided walk → Done lands somewhere that shows the walk, not a Start
+  button; open `/activity` cold from the tab bar → the type picker or an empty title, never a previous
+  walk's name; and an interrupted in-progress activity still returns to its own screen after an app
+  restart (the Q-450 case, which is the one a careless fix breaks).
+
+
+### [platform] BF-106 — press the `VACUUM FULL` on `oura_raw_samples`; the packer freed the space and nothing returned it
+
+- **Lane:** none — this is an **owner action against production**, not a code change. Filed so it is
+  not lost, and so the reading that follows it has somewhere to land.
+- **Gate:** owner
+- **Added:** 2026-09-01 · found in the session-start database-size read, following up the third
+  reading that `projectOverview.md`'s growth row asked for.
+
+**The measurement.** `sum(pg_total_relation_size)` over the user tables: **171 MB (08-18) → 182 MB
+(08-25) → 198 MB (09-01)**, i.e. 1.6 then **2.3 MB/day** against a stated ~0.4. Nearly all of it is
+`oura_raw_samples` at 50 → 58 → **73 MB**.
+
+**It is not data and it is not bloat** — both were tested rather than assumed:
+
+- ingest is flat (~24k frames/day, 19,323–25,598 over the last 8 days) and the table holds exactly its
+  designed window: `HOT_WINDOW_DS` is **7 days**, and rows older than 8 days count **0**;
+- `n_dead_tup = 0` with `last_autovacuum` at 2026-09-01T17:57 — autovacuum reaches this table and
+  there is nothing dead in it.
+
+**It is the follow-up the packer's own docstring names.** Pack-and-delete frees space inside the file;
+Postgres returns it to the OS only on a `VACUUM FULL`, which `lib/data/postgres/slices/oura-raw-pack.ts`
+calls "a single press" once the backlog is absorbed. The backlog has been absorbed since ~2026-08-25
+(the docstring predicted "a day and a bit" from 08-24). Live rows have fallen **318,183 → 191,454**
+while the file has not.
+
+**The action:** `GET /api/admin/vacuum` (lists allowlisted tables and their current sizes), then
+`POST` it for `oura_raw_samples`, then the same GET again. The two GETs are the result.
+
+- **⚠ Do not predict the reclaim, and do not treat a small one as a failure.** Rows fell ~40% while
+  the file fell ~21%, which is *consistent* with slack but is not a measurement of it. **Q-315 is the
+  precedent that matters:** the identical argument about `error_events` predicted a large reclaim and
+  the button returned **0 B**, because the input figure had been a stale planner estimate the whole
+  time. A 0 B result here is an equally valid outcome and would mean the 73 MB is live data — in which
+  case the thing to correct is `CLAUDE.md`'s 0.4 MB/day, not the database.
+- **⚠ A `VACUUM FULL` needs free disk equal to the table's current size** and takes an exclusive lock
+  for its duration — the route's own error handling says so, because "it failed" and "there was no
+  room" look alike. 73 MB against a 5 GB volume is not close, but the lock means BLE ingest writes
+  block while it runs, so press it when the ring is not mid-drain rather than during the night's sync.
+- **Not urgent, and the entry should not imply otherwise.** Storage bills on use at $0.15/GB/month, so
+  the entire 198 MB is about **three cents a month**. This is filed because the growth rate is a
+  signal worth keeping honest, not because the bytes cost anything.
+- **What to record after:** the before/after GET figures in the `projectOverview.md` row, and either a
+  fourth size reading confirming the trend line is flat, or a correction to `CLAUDE.md`'s 0.4 MB/day.
+
+
 ### [activity][app-shell] BF-105 — the interval-walk phase change fires one generic ping and nothing in-app
 
 - **Lane:** B — `components/guided-walk/walk-active.tsx`, `lib/walk/walk-cues.ts`,
