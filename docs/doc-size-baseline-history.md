@@ -6226,3 +6226,15 @@ caught it at the `No unresolved conflict markers` step.
 
 It sits next to the two existing gate gotchas because all three are the same mistake: reading a
 signal that has already been destroyed by the command before it.
+
+## 2026-09-01 — `projectOverview.md` → 9044 (BF-103)
+
++13 for a rename, which only earns it because two of the lines are about *not* undoing it. The
+comments BF-37 and BF-60 left behind read as a standing prohibition on the name `My Foods`, and the
+next session reverts this on their authority unless the record says why unifying satisfies them. The
+other is the merge: `My Foods` was once a merged list, and the revert that split it was about the
+merge, not the name — an implementer who conflates the two reintroduces a defect already paid for.
+
+The line about the guard finding twelve e2e specs the entry's own file table missed is there as
+evidence for a general point: a rename's blast radius includes its tests, and a file table written by
+reading will not contain them.
