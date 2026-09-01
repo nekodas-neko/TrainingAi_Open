@@ -5937,3 +5937,22 @@ screen and sees a plain number has verified nothing.
 (8911, not the 8894 this branch measured before merging: BF-59's screen half landed 17 lines in
 between. A size baseline is a measurement of the merged file, never the sum of two hunks — resolving
 that conflict by picking a side would have been wrong whichever side won.)
+## 2026-09-01 — backlog → 14940, `projectOverview.md` → 8927, `docs/agents/state/tuning.md` → 375 (Q-507 explained)
+
+**A two-week-old finding was reversed, and a reversal has to carry its evidence or it reads as a
+whim.** Q-507 has said since 2026-08-18 that daytime stress correlates the wrong way with readiness
+and cannot be built on. Recomputed from the model's own persisted buckets it correlates **−0.438**
+(−0.699 waking-only) — the correct direction — while the stored scalar reads +0.338. The nine-row
+stored-vs-buckets table is the proof, and the fact that **only the newest day agrees** is what ties it
+to TN-20.
+
+**The entry also retires two mechanisms, one of which this agent filed hours earlier**, and says so
+plainly: both explained an artefact of the stored value rather than a property of the model. Without
+that, the next reader finds three candidate explanations in the queue and no indication which
+survived. The baton gains the general rule — **check the stored number is the number the model
+produced before explaining why a metric behaves strangely** — which is the third time this session a
+stored value turned out to be lying.
+
+Caveats are carried at the same weight as the finding: **n = 8–9**, the waking window is this
+review's choice rather than the app's, and re-testing at n ≥ 30 is a precondition for building
+anything on the metric.

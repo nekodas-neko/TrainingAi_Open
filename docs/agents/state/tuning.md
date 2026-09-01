@@ -3,7 +3,7 @@
 > **Successor sessions are titled `🎶 Tuning Agent 🟢`** — exactly, both emoji. Leading emoji = role,
 > trailing = this session's status, set by the session itself. See `docs/agents/README.md` §4.
 
-**Updated:** 2026-08-26 · **By:** `session_01VVfZtbCftbwaUHtBLJoxVr` · **Next ID:** `TN-22`.
+**Updated:** 2026-08-26 · **By:** `session_01VVfZtbCftbwaUHtBLJoxVr` · **Next ID:** `TN-23`.
 Find next free: `grep -rhoE '\bTN-[0-9]+\b' docs/ | sort -t- -k2 -n | tail -1`. Legacy `Q-` numbers
 stay valid. **Rewritten in full, never appended** — narrative lives in the linked reviews.
 
@@ -44,7 +44,8 @@ Filed this session, all propose-only, all in the queue:
 | **TN-18** | TN-6a gated the readiness ladder, NOT the deload banner — the surface the owner reads | one condition, Lane A, do not batch |
 | **TN-19** | the HOW IT MOVES card promises 5 mechanisms; **4 inert or backwards** | `Needs: TN-15`; ⛔ do not reword the card |
 | **TN-20** | a recompute **overwrites a completed day with an empty result** | data integrity, do not batch, do not re-run to "fix" |
-| **TN-21** | "daytime stress" is **55% night buckets**, night/day opposite signs | Q-507 candidate; n=9, a lead |
+| **TN-21** | "daytime stress" is **55% night buckets**, night/day opposite signs | window finding stands; its Q-507 candidate superseded by TN-22 |
+| **TN-22** | stored `stress_high_minutes` disagrees with the model's own buckets, **8 of 9 days** | **explains Q-507 and reverses it**; likely same defect as TN-20 |
 
 **Owner decisions, 2026-08-24 — recorded on the entries, nothing gated on them.** TN-5 and TN-6
 signed off; **TN-6a** added (suspend the temperature penalty on a self-clearing condition, outside the
@@ -231,6 +232,21 @@ sleep ✅ · readiness ✅ · activity ✅ · body ✅ · devices ✅ · workout
 - **⛔ `step_live_windows` is effectively empty — 8 rows across 6 days, 7,745 steps total.** It is the
   obvious intraday step source and it reads a flat zero. `body_metrics.steps` is a **running daily
   total** (`updated_at` moves through the day), which is what any intraday step question should use.
+- **✅ Q-507 IS EXPLAINED, AND ITS CONCLUSION IS REVERSED (TN-22, 2026-09-01). The stress model was
+  never the problem.** Recomputed from the model's own persisted buckets, `stress_high_minutes`
+  correlates **−0.438** with readiness (**−0.699** waking-only, n=8) — the correct direction — while
+  the **stored** scalar reads **+0.338**. **Stored disagrees with buckets on 8 of 9 days**, storing
+  **zero** against 210–270 bucket-minutes on four, and **agreeing only on the newest day**.
+  [`review`](../../reviews/2026-09-01-stress-sign-explained.md).
+- **⛔ THREE mechanisms have now been proposed for Q-507 and two were wrong — stop proposing them.**
+  Data-density (refuted 2026-08-26, r = −0.128 vs HR sample count) and TN-21's bucket-count
+  (r = −0.784) both explained an **artefact of the stored value**, not a property of the model. The
+  general lesson: **before explaining why a metric behaves strangely, check that the stored number is
+  the number the model produced.**
+- **⚠ Do NOT treat Q-507 as settled enough to build on. n = 8–9**, the waking window is a review
+  choice not the app's, and the buckets come from the same pipeline as the scalar. **Re-test at
+  n ≥ 30 after TN-22 lands.** TN-16 stays parked — but its blocker is now a persistence bug with a
+  route, not open research.
 - **⛔⛔ A STORED COUNTER IS A CLAIM ABOUT THE DATA, NOT THE DATA — and this agent published a wrong
   finding off one.** TN-19 cited 2026-08-26 as *"zero HR samples → zero drain"*; that day holds
   **1,954 raw samples in `oura_heartrate`**. The zero was **TN-20**. **Cross-check the raw table
