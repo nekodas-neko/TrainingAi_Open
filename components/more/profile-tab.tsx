@@ -10,7 +10,7 @@ import { TTL_MEDIUM, TTL_SHORT } from '@trainingai/shared/cache-ttl'
 import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
 import {
-  Bluetooth, Camera, Check, CloudDownload, Copy, Dumbbell, Info, LogOut, Scan, Settings, Shield, Sparkles,
+  Bluetooth, Camera, Check, CloudDownload, Copy, Dumbbell, Info, LogOut, Scan, Settings, Shield, Sparkles, UserRound,
 } from 'lucide-react'
 import { signOutAndClearDevice } from '@/lib/sign-out'
 import type { AchievementResult } from '@/components/profile/achievements-grid'
@@ -370,6 +370,19 @@ export function ProfileTab({ user, seasons, equippedTitle, friendCode, onUserSav
 
       {/* ── Goals ─────────────────────────────────────────────────────────── */}
       <GoalsSection user={user} onUserSaved={onUserSaved} />
+
+      {/* ── Profile details ───────────────────────────────────────────────── */}
+      {/* BF-79. Name, biological sex, birth year and height used to be split between the Edit
+          Profile sheet and the Goals accordion — two places to look for one row of the users
+          table. They are one screen now, alongside the weight and body-fat measurements as
+          read-only readings. */}
+      <MoreRowGroup label="Profile">
+        <MoreRow
+          icon={UserRound}
+          label="Name, body facts &amp; measurements"
+          onClick={() => router.push('/more/details')}
+        />
+      </MoreRowGroup>
 
       {/* ── Program ───────────────────────────────────────────────────────── */}
       {/* The Program Builder used to be a More sub-tab literally named "Workout", colliding with

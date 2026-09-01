@@ -9,6 +9,7 @@ import { rateLimit } from '@/lib/rate-limit'
 import { DEFAULT_TZ, todayInTz } from '@trainingai/shared/date-utils'
 import { buildChatTools } from '@/lib/ai-chat/tools'
 import { buildWidgetTools } from '@/lib/coach/tools'
+import { coachScope, pickTools } from '@/lib/coach/scopes'
 import { resolveDanglingWidgetCalls } from '@/lib/coach/dangling-widgets'
 import { errorLog } from '@trainingai/shared/logger'
 import { readJsonLimited } from '@trainingai/shared/http/request-guards'
@@ -28,6 +29,16 @@ const MAX_BODY_BYTES = 8 * 1024 * 1024
 
 const BodySchema = z.object({
   messages: z.array(z.unknown()).min(1).max(60),
+  /**
+   * Which named scope this conversation runs in (LA-47) — the Nutrition tab opens Coach in
+   * `nutrition`, everything else in `general`.
+   *
+   * A loose `string` rather than an enum on purpose: `coachScope` widens an unknown id to
+   * `general`, and a client on a build that names a scope this one has not shipped should get a
+   * working Coach rather than a 400. The scopes are a routing convenience, not a security
+   * boundary — every tool a narrow scope withholds is one the general scope offers anyway.
+   */
+  scope: z.string().max(40).optional(),
 })
 
 const SYSTEM = `
@@ -172,6 +183,7 @@ export async function POST(req: Request) {
     const parsed = BodySchema.safeParse(read.body)
     if (!parsed.success) return NextResponse.json({ error: 'Invalid request body' }, { status: 400 })
 
+    const scope = coachScope(parsed.data.scope)
     const tz = session.user?.timezone ?? DEFAULT_TZ
     const todayIso = todayInTz(tz)
     const repo = await getRepositoryAsync()
@@ -187,11 +199,17 @@ export async function POST(req: Request) {
       { section: 'coach', userId, model: COACH_MODEL_ID },
       {
         model: coachModel(),
-        system: SYSTEM.replace('TODAY_ISO', todayIso),
+        system: scope.systemSection
+          ? `${SYSTEM.replace('TODAY_ISO', todayIso)}\n\n${scope.systemSection}`
+          : SYSTEM.replace('TODAY_ISO', todayIso),
         messages: modelMessages,
         tools: {
-          ...buildChatTools(repo, userId, tz, todayIso),
-          ...buildWidgetTools(repo, userId),
+          // Scoped by WITHHOLDING, never by instructing (LA-47): a prompt saying "do not read
+          // workout data" is a request a model will occasionally ignore; a tool it never receives
+          // is a boundary it cannot cross. The general scope withholds nothing, so this is a no-op
+          // for every caller that does not name one.
+          ...pickTools(buildChatTools(repo, userId, tz, todayIso), scope.readTools),
+          ...buildWidgetTools(repo, userId, scope),
           // Grounding for research answers. `useSearchGrounding` was removed in @ai-sdk/google v3 —
           // it is a provider tool now. Measured 2026-08-08 that Gemini accepts it **alongside**
           // function declarations and still returns sources (3 and 7 on two probe prompts), which

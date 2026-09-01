@@ -29,7 +29,10 @@ render the band's label/icon alongside its colour (CLAUDE.md, One Formula One Pl
 - [`docs/reviews/2026-08-15-comprehensive-app-review.md`](../../reviews/2026-08-15-comprehensive-app-review.md)
   — **the first review to measure all five scoring pillars together, on the same production days.**
   Readiness is structurally blind to training load (Q-275); readiness and Body Battery share no
-  variance (Q-276); and only Body Battery stamps a `model_version`, so mixed-model correlations are
+  variance (**Q-276 — resolved 2026-08-31, v1.413.0**: the owner settled them as two different
+  questions, so each surface now names its own where it is read;
+  [`journal`](../../overview/entries/2026-08-31-recovery-scores-name-their-question.md)); and only
+  Body Battery stamps a `model_version`, so mixed-model correlations are
   undetectable elsewhere (Q-273). Start here before touching any score — **but read its §1.3 against
   the calibration doc below, which found that finding (Q-271) was measured over eight days and does
   not hold over the series.**

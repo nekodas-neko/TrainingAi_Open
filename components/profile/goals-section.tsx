@@ -1,8 +1,9 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { ChevronDown, Loader2, Sparkles, Target } from 'lucide-react'
+import { ArrowUpRight, ChevronDown, Loader2, Sparkles, Target } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import type { User } from '@trainingai/shared/types'
 import type { ActivityLevel, FitnessGoal } from '@trainingai/shared/types/user'
@@ -12,7 +13,7 @@ import {
   STEPS_GOAL_KEY, STEPS_GOAL_TYPE_KEY, SLEEP_GOAL_KEY, CALORIE_GOAL_KEY, CALORIE_TYPE_KEY,
   WATER_GOAL_KEY, WATER_GOAL_TYPE_KEY, TARGET_WEIGHT_KEY, TARGET_BF_KEY,
 } from '@/lib/home/home-prefs'
-import { todayInTz } from '@trainingai/shared/date-utils'
+import { formatDateDisplay, todayInTz } from '@trainingai/shared/date-utils'
 import { cachedFetch, isBodyMetadataFresh } from '@/lib/sqlite/cache'
 import { TTL_MEDIUM } from '@trainingai/shared/cache-ttl'
 import { RequiredInfoSection } from './required-info-section'
@@ -26,8 +27,8 @@ interface GoalsSectionProps {
 }
 
 export function GoalsSection({ user, onUserSaved }: GoalsSectionProps) {
+  const router = useRouter()
   const goalsPatchTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const profilePatchTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const [saving, setSaving] = useState(false)
   const [recommending, setRecommending] = useState(false)
@@ -36,10 +37,6 @@ export function GoalsSection({ user, onUserSaved }: GoalsSectionProps) {
   const [macroRefreshKey, setMacroRefreshKey] = useState(0)
   const [expanded, setExpanded] = useState(false)
 
-  // Required Information — local editable copies of profile fields
-  const [heightCm, setHeightCm] = useState('')
-  const [birthYear, setBirthYear] = useState('')
-  const [sex, setSex] = useState('')
   const [latestWeightKg, setLatestWeightKg] = useState<number | null>(null)
   const [latestWeightLabel, setLatestWeightLabel] = useState<string | null>(null)
   const [latestBfPct, setLatestBfPct] = useState<number | null>(null)
@@ -59,12 +56,6 @@ export function GoalsSection({ user, onUserSaved }: GoalsSectionProps) {
   const [weekToDate, setWeekToDate] = useState<{ steps: number; calories: number; waterMl: number } | null>(null)
 
   useEffect(() => {
-    if (user) {
-      setHeightCm(user.heightCm?.toString() ?? '')
-      setBirthYear(user.dateOfBirth ? user.dateOfBirth.slice(0, 4) : '')
-      setSex(user.sex ?? '')
-    }
-
     // Seed from the device copy so the fields are filled on the first frame, then let the server
     // payload below correct them. Before Q-241 the seed was all there was, so opening Profile on a
     // second device — or after a re-install — offered to edit blank goals while the server held the
@@ -112,9 +103,9 @@ export function GoalsSection({ user, onUserSaved }: GoalsSectionProps) {
           setWeekToDate(d?.weekToDate ?? null)
         }
         const today = todayInTz(user?.timezone)
-        const dateLabel = (date: string) => date === today
-          ? 'Today'
-          : new Date(`${date}T00:00:00`).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })
+        // Same label as `More → Profile details`, through the same shared helper. This site used a
+        // bare `toLocaleDateString`, which renders in the device's timezone rather than the user's.
+        const dateLabel = (date: string) => date === today ? 'Today' : formatDateDisplay(date)
 
         const latestWeight = d?.recent?.find(r => r.weightKg != null)
         if (latestWeight?.weightKg != null) {
@@ -135,22 +126,15 @@ export function GoalsSection({ user, onUserSaved }: GoalsSectionProps) {
   async function patchProfile(patch: Record<string, unknown>) {
     setSaving(true)
     try {
-      // /api/user/profile nulls out any field omitted from the body (it isn't a
-      // true partial update), so the full current profile must be sent alongside
-      // the patched field(s) to avoid wiping unrelated fields.
+      // BF-79. This section now owns only activity level and fitness goal, so it sends only what
+      // the caller patched. It used to send height, date of birth and sex alongside — first because
+      // the route nulled anything omitted (fixed in BF-78), then out of habit; all three are edited
+      // on `More → Profile details` now, and resending a stale copy of them from here would
+      // overwrite a change made there.
       const res = await fetch('/api/user/profile', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          displayName: user?.displayName,
-          heightCm: heightCm ? Number(heightCm) : null,
-          dateOfBirth: birthYear ? `${birthYear}-01-01` : null,
-          weightGoalKg: user?.weightGoalKg,
-          sex: sex || null,
-          activityLevel: user?.activityLevel,
-          fitnessGoal: user?.fitnessGoal,
-          ...patch,
-        }),
+        body: JSON.stringify(patch),
       })
       if (!res.ok) throw new Error()
       const data = await res.json()
@@ -161,27 +145,6 @@ export function GoalsSection({ user, onUserSaved }: GoalsSectionProps) {
     } finally {
       setSaving(false)
     }
-  }
-
-  function handleHeightChange(value: string) {
-    setHeightCm(value)
-    if (profilePatchTimer.current) clearTimeout(profilePatchTimer.current)
-    profilePatchTimer.current = setTimeout(() => {
-      patchProfile({ heightCm: value ? Number(value) : null })
-    }, 800)
-  }
-
-  function handleBirthYearChange(value: string) {
-    setBirthYear(value)
-    if (profilePatchTimer.current) clearTimeout(profilePatchTimer.current)
-    profilePatchTimer.current = setTimeout(() => {
-      patchProfile({ dateOfBirth: value ? `${value}-01-01` : null })
-    }, 800)
-  }
-
-  function handleSexChange(value: string) {
-    setSex(value)
-    patchProfile({ sex: value || null })
   }
 
   function handleActivityLevelChange(level: ActivityLevel | null) {
@@ -280,12 +243,17 @@ export function GoalsSection({ user, onUserSaved }: GoalsSectionProps) {
     else if (value.trim() === '') patchGoalsDebounced({ targetBfPct: null })
   }
 
-  const missingFields: string[] = []
-  if (!heightCm) missingFields.push('Height')
-  if (!birthYear) missingFields.push('Birth Year')
-  if (!sex) missingFields.push('Biological Sex')
-  if (!user?.activityLevel) missingFields.push('Activity Level')
-  if (!user?.fitnessGoal) missingFields.push('Fitness Goal')
+  // Height, birth year and sex are edited on `More → Profile details` since BF-79, so a missing one
+  // cannot be fixed from here. Splitting the list is what lets the button below say where to go
+  // instead of naming a field this screen no longer offers.
+  const missingDetails: string[] = []
+  if (!user?.heightCm) missingDetails.push('Height')
+  if (!user?.dateOfBirth) missingDetails.push('Birth Year')
+  if (!user?.sex) missingDetails.push('Biological Sex')
+  const missingHere: string[] = []
+  if (!user?.activityLevel) missingHere.push('Activity Level')
+  if (!user?.fitnessGoal) missingHere.push('Fitness Goal')
+  const missingFields = [...missingDetails, ...missingHere]
 
   async function getRecommendation() {
     setRecommending(true)
@@ -348,12 +316,6 @@ export function GoalsSection({ user, onUserSaved }: GoalsSectionProps) {
               latestBfLabel={latestBfLabel}
               targetBfStr={targetBfStr}
               onTargetBfChange={handleTargetBfChange}
-              heightCm={heightCm}
-              onHeightChange={handleHeightChange}
-              birthYear={birthYear}
-              onBirthYearChange={handleBirthYearChange}
-              sex={sex}
-              onSexChange={handleSexChange}
               activityLevel={user?.activityLevel}
               onActivityLevelChange={handleActivityLevelChange}
               saving={saving}
@@ -391,6 +353,18 @@ export function GoalsSection({ user, onUserSaved }: GoalsSectionProps) {
                 <p className="text-[10px] text-muted-foreground text-center">
                   Complete your profile first: {missingFields.join(', ')}
                 </p>
+              )}
+              {/* Naming a field the user cannot reach from here is the failure mode BF-79 creates
+                  by moving them, so the way there ships with the move. */}
+              {missingDetails.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => router.push('/more/details')}
+                  className="mx-auto flex items-center gap-1 rounded-lg border border-border px-3 py-1.5 text-[11px] font-medium hover:bg-muted transition"
+                >
+                  Open Profile details
+                  <ArrowUpRight className="h-3 w-3" />
+                </button>
               )}
             </div>
           </div>

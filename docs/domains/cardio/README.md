@@ -86,6 +86,14 @@ Live at the time of writing (2026-07-30):
   v1.266.6)** — `dispatchGate()`'s existing workout-in-progress suppression now also checks
   `isGuidedWalkActive`/`isActivityActive`. Not confirmed on a real device against a live
   significant-motion/ring-cadence trigger.
+- **Q-410 shipped 2026-08-31 (v1.411.0):** the guided walk leads with **km/h**, and its verdict line
+  became a **banded pacer** against a cadence pair set in the walk config — a floor for fast blocks,
+  a ceiling for slow ones, banded by *signed* distance so overshooting the right way stays green. The
+  signal is a ladder (cadence → speed → heart rate) and the screen names the rung it is on; the speed
+  pair is derived from the walker's own past segments rather than configured. Formula:
+  [`lib/walk/walk-pacer.ts`](../../../lib/walk/walk-pacer.ts). Outcome:
+  [`journal`](../../overview/entries/2026-08-31-walk-cadence-pacer.md). **Only the speed rung has ever
+  executed** — the other two need a Polar H10 (LB-36); per-segment adherence storage is LA-48.
 - Guided walk GPS/pace, per-segment stats, the elevation profile, the run execution screen, the
   cardio hub/trends/picker and the baseline fitness tests are all shipped but **not
   device-verified**; several were only ever exercised on single-week or single-run data.

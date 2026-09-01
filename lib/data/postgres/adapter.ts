@@ -24,7 +24,7 @@ import { measuredAtMs, dsFromMeasuredAtMs, cadenceSecFromDs, decodeEventBody, he
  *  (812k rows). Exported so callers size their own lookback against it rather than asking for more
  *  and being silently clamped, which is what `maybeRefitDaytimeHrvModel` was doing at 60 days. */
 export const MAX_RAW_SAMPLE_WINDOW_DAYS = 31
-import { classifyClockRegression, resolveDsToMs, resolveMsToDs, type ClockAnchor } from '@/lib/oura-ble/clock'
+import { classifyClockRegression, currentEpoch, resolveDsToMs, resolveMsToDs, type ClockAnchor } from '@/lib/oura-ble/clock'
 import { spo2PctFromR } from '@/lib/oura-ble/spo2'
 import { STEP_FEATURE_TAGS, STEP_MOTION_TAG } from '@/lib/oura-ble/rollup-consumed-tags'
 import { mergeStepCounterWithLive, type StepCountWindow } from '@trainingai/shared/health/step-estimate'
@@ -115,6 +115,7 @@ const BODY_METRICS_SOURCE_COLS: SourceColumn[] = [
   { prop: 'bmrKcal', col: 'bmr_kcal' }, { prop: 'metabolicAge', col: 'metabolic_age' },
 ]
 import { aestMidnight, toAestDay, todayInTz, todayDayOfWeek, todayMidnightUtc, dateStrMidnightInTz, shiftDateStr, DEFAULT_TZ } from '@trainingai/shared/date-utils'
+import { isTemperatureBaselineCentred } from '@trainingai/shared/health/temperature-baseline-health'
 import { clampWindowStart } from '@trainingai/shared/workout/time-audit'
 import { computeAiDynamicNextSession, TEMP_ALERT_THRESHOLD_C, type AiDynamicInput } from '@trainingai/shared/ai-periodization/ai-dynamic'
 import { computeMuscleRecovery } from '@trainingai/shared/ai-periodization/muscle-recovery'
@@ -350,7 +351,11 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       displayName: r.displayName ?? undefined,
       heightCm: r.heightCm ?? undefined,
       dateOfBirth: r.dateOfBirth ?? undefined,
-      weightGoalKg: r.weightGoalKg ?? undefined,
+      // LB-42. The API field keeps its name and now reads the ONE column: `target_weight_kg`, the
+      // one the Health page renders. `weight_goal_kg` has no reader left. Keeping the field name
+      // is what lets the Edit Profile sheet and the Goals accordion converge on one value without
+      // a coordinated client change — the two editors were the whole bug.
+      weightGoalKg: r.targetWeightKg ?? undefined,
       avatar: r.avatar ?? undefined,
       timezone: r.timezone ?? DEFAULT_TZ,
       sex: r.sex ?? undefined,
@@ -653,16 +658,31 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   }
 
   async updateUserProfile(userId: string, profile: Partial<Pick<User, 'displayName' | 'heightCm' | 'dateOfBirth' | 'weightGoalKg' | 'timezone' | 'sex' | 'activityLevel' | 'fitnessGoal'>>): Promise<User> {
-    const set: Record<string, unknown> = {
-      displayName: profile.displayName ?? null,
-      heightCm: profile.heightCm ?? null,
-      dateOfBirth: profile.dateOfBirth ?? null,
-      weightGoalKg: profile.weightGoalKg ?? null,
+    // BF-78. EVERY column is presence-guarded. Four of them used to be written unconditionally as
+    // `?? null`, which made this a PUT wearing a PATCH's name: any body that omitted display name,
+    // height, date of birth or weight goal erased them. One caller already sent a one-field body
+    // (accepting an activity-level recommendation), so a single tap would have taken height with
+    // it — and height feeds the BMR fallback, so the damage would have reached the calorie model
+    // rather than stopping at the profile screen.
+    const set: Record<string, unknown> = {}
+    for (const key of ['displayName', 'heightCm', 'dateOfBirth', 'sex', 'activityLevel', 'fitnessGoal'] as const) {
+      if (key in profile) set[key] = profile[key] ?? null
     }
+    // LB-42. `weightGoalKg` writes `target_weight_kg` — the column the Health page renders and the
+    // Goals accordion edits. Two editors filling two columns is what let the goal the user saw and
+    // the goal the AI was told diverge with nothing reconciling them. Presence-guarded like the
+    // rest (BF-78), so an omitted field still leaves the value alone.
+    if ('weightGoalKg' in profile) set.targetWeightKg = profile.weightGoalKg ?? null
+    // Timezone is the one field a null must NOT clear: it keys every day window in the app, and a
+    // user with no timezone has no "today". Absent and null both leave it alone.
     if (profile.timezone) set.timezone = profile.timezone
-    if ('sex' in profile) set.sex = profile.sex ?? null
-    if ('activityLevel' in profile) set.activityLevel = profile.activityLevel ?? null
-    if ('fitnessGoal' in profile) set.fitnessGoal = profile.fitnessGoal ?? null
+
+    // A PATCH naming no known field is a no-op, not an empty UPDATE — Drizzle rejects `.set({})`.
+    if (Object.keys(set).length === 0) {
+      const [current] = await this.db.select().from(s.users).where(eq(s.users.id, userId)).limit(1)
+      return this.rowToUser(current)
+    }
+
     const [r] = await this.db.update(s.users)
       .set(set)
       .where(eq(s.users.id, userId))
@@ -1678,12 +1698,19 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
         this.listSleepSessions(userId, from14dStr, todayIso),
         this.listBodyMetrics(userId, from14dStr, todayIso),
         this.getOuraDailyDerived(userId, shiftDateStr(todayIso, -1), todayIso),
-        this.getOuraDailySummary(userId, todayIso, todayIso),
+        // TN-18 widened this from today-only to the same 28-day window `readiness-payload` reads.
+        // The elevated-temp deload needs the trailing deviations, not just today's, because the
+        // question it must answer first is whether the baseline is centred at all. 28 rows of a
+        // table holding ~106 in production; the cost is nil.
+        this.getOuraDailySummary(userId, shiftDateStr(todayIso, -27), todayIso),
         this.getDayCheckin(userId, todayIso, 'morning'),
       ])
 
       const ouraToday = ouraRows[0] ?? null
-      const todaySummary = summaryRows[0] ?? null
+      // Still TODAY's row, found by date rather than taken as the first: the window above is a
+      // range now, so `summaryRows[0]` would silently become the OLDEST night — a 28-day-stale
+      // temperature deviation feeding a deload banner.
+      const todaySummary = summaryRows.find(r => r.date === todayIso) ?? null
       const illnessFlag = latestIllnessFromDerived(derivedRows)?.flag ?? null
       // Daytime stress is a same-day signal, so it must read TODAY's row — not
       // derivedRows[0], which is the earliest (yesterday) since the range is
@@ -1732,6 +1759,10 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       // Baseline maturity for the elevated-temp deload gate (≥30 nights). Only our own summary
       // carries a real accrued baseline; the frozen Cloud fallback reports 0 so it can't fire.
       const temperatureBaselineDays = todaySummary?.nHistory ?? 0
+      // TN-18. The SAME condition the readiness ladder uses, imported rather than re-derived —
+      // two answers to "is temperature trustworthy" is exactly what produced a 80/100 temperature
+      // contributor and a "Body temp elevated" deload banner for one night.
+      const temperatureTrusted = isTemperatureBaselineCentred(summaryRows.map(r => r.tempDevC))
 
       const result = computeAiDynamicNextSession({
         sessions,
@@ -1744,6 +1775,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
         readinessScore: liveReadiness,
         temperatureDeviation,
         temperatureBaselineDays,
+        temperatureTrusted,
         daySummary: ouraToday?.daySummary ?? null,
         sleepTrend,
         energyLevel: moodLog?.energyLevel ?? null,
@@ -1767,6 +1799,10 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
           temperatureDeviation,
           temperatureBaselineDays,
           temperatureAlertThresholdC: TEMP_ALERT_THRESHOLD_C,
+          // Surfaced so the "Why this?" explain page can say the alert is SUSPENDED rather than
+          // showing a deviation over the threshold beside no alert and looking broken (Q-105's
+          // rule: the explain page shows the numbers the recommendation was computed from).
+          temperatureTrusted,
         },
       }
     }
@@ -5225,6 +5261,24 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       rawByTag,
       hasAnchor: !!anchor,
     }
+  }
+
+  /** How far the BLE rollup's derivation has reached, in wall-clock time.
+   *
+   *  The watermark is `anchor.anchorDs` written by a run that COMPLETED, which is what makes it
+   *  the right measure for BF-83's provisional badge: `max(oura_raw_samples.measured_at)` says
+   *  what has been ingested, and on 2026-09-01 that was already 6:38 while the sleep row still
+   *  ended at 4:46, because the rollup had not re-derived from the batch yet. Resolved through
+   *  `resolveDsToMs` rather than a stored timestamp so it cannot go stale when the clock model
+   *  changes — the same reason `getOuraRawSamples` stopped reading `measured_at`. */
+  async getSleepCoverageEnd(userId: string): Promise<Date | null> {
+    const anchors = await this.getOuraClockAnchors(userId)
+    const epoch = currentEpoch(anchors)
+    if (epoch == null) return null
+    const ds = await oura.getOuraRollupWatermark(this.db, userId, epoch)
+    if (ds == null) return null
+    const ms = resolveDsToMs(ds, anchors, epoch)
+    return ms == null ? null : new Date(ms)
   }
 
   async getDaytimeTagCoverage(userId: string, tz: string, days: number): Promise<import('../repository').DaytimeTagCoverage> {

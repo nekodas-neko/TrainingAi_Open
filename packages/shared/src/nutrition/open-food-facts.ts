@@ -96,6 +96,8 @@ export function offProductToNutrition(p: OffProduct): NutritionScanResult | null
     satFatG: perServing(n['saturated-fat_serving'], n['saturated-fat_100g']) || undefined,
     confidence: 'high',
     notes: 'From Open Food Facts',
+    // Shared by both OFF routes; the barcode route narrows it to 'barcode' after this returns.
+    origin: 'search',
   }
 }
 

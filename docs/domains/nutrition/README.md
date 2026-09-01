@@ -105,6 +105,43 @@ fallback) are what every offline-first domain should copy. See CLAUDE.md, "Offli
   ([`journal`](../../overview/entries/2026-08-19-square-label-canvas.md)). ⚠ That gain holds only if
   the owner's circle template **crops**; if it **scales**, the default lands at 0.397 — worse than
   what it replaced. Unresolved until one test print — [`journal`](../../overview/entries/2026-08-19-label-line-budget.md).
+- [`docs/overview/entries/2026-08-30-feat-self-contained-meal-label.md`](../../overview/entries/2026-08-30-feat-self-contained-meal-label.md)
+  — **BF-57 engine half: the meal travels IN the code, not as a pointer to it.** Positional JSON, so
+  a label scans offline for a user with no account, as a copy. Ids were deliberately **not** made
+  globally resolvable — a photo of a label would become read access to someone's meal. **The totals
+  are sacred:** the tail rolls into one remainder entry carrying its combined macros rather than
+  anything being dropped.
+- [`docs/overview/entries/2026-08-31-shared-meal-labels.md`](../../overview/entries/2026-08-31-shared-meal-labels.md)
+  — **BF-57 surface half, and the measurement that reversed its plan.** The entry asked for the code
+  to be given ~30 mm so version 11 fits every style; the five print styles are each **already** at
+  the largest code that clears their content by 6 units, and four of the six cannot hold 62 bytes —
+  below which the encoder trims the meal's **name**. Two payloads ship instead: the print styles keep
+  the private bookmark, and a new **`share`** style spends the label on a 34.4 mm code. Read it
+  before changing any `codeUnits`: `mealLabelShareBudget` derives the payload budget from the
+  geometry, so shrinking a code silently shrinks what its label can carry. ⚠ **0.49 mm per module is
+  a convention, not a measurement** — no label of any style has been through a printer.
+- [`docs/overview/entries/2026-08-31-nutrition-sheet-surface.md`](../../overview/entries/2026-08-31-nutrition-sheet-surface.md)
+  — **BF-75: the sheets carry the tab's palette.** Read before making any sheet translucent: the
+  wallpaper is `z-[-1]` while `SheetOverlay` and `SheetContent` are both `z-50`, so transparency
+  reveals the overlay's `bg-black/50`, not the tab. The palette is painted *inside* the sheet behind
+  an opt-in `surface="page"` prop. ⚠ **Wallpapers ship `enabled: false`**, so the sandbox shows
+  nothing by default and the e2e has to switch them on before it can assert anything — the
+  passes-because-the-feature-is-off trap. The contrast check on the S25 is still owed.
+- [`docs/superpowers/plans/2026-08-31-ai-meal-builder-entry-point.md`](../../superpowers/plans/2026-08-31-ai-meal-builder-entry-point.md)
+  — **BF-52: the meal builder's inputs all work and three share one slot.** Read before touching
+  `ingredient-search.tsx`: the recipe-photo button, the URL import and the AI estimate are **mutually
+  exclusive renders of the same slot**, chosen by what is typed into a field labelled *"Search your
+  foods or the food database…"* — so the field advertises search and behaves as a mode switch, which
+  is the whole of *"I dont see a URL option"*. `/api/nutrition/scan` already takes all three shapes
+  (`image`+`mimeType`, `url`, `text`) in one handler, so the fix is an entry point and not an engine.
+  The plan **declines** BF-52's instruction to absorb BF-63's barcode into the new row, and says why:
+  photo and URL produce a whole ingredient list, the barcode and the estimate produce one ingredient.
+- [`docs/overview/entries/2026-08-31-meal-builder-entry-point.md`](../../overview/entries/2026-08-31-meal-builder-entry-point.md)
+  — **BF-52 shipped: the builder's source row.** Two findings bind future work here. The URL branch in
+  `ingredient-search.tsx` is a **guard**, not just an affordance — delete it and a pasted link falls to
+  the AI estimate, which produces a food called "https" with invented macros. And `runRecipeImport`
+  now lives in `recipe-import-run.ts` with tests: the `recipeYield` refusal, the multi-candidate
+  branch and the 0.01 floor were prose-only until two callers forced the extraction.
 - No standalone system reference exists for this pillar yet; the offline-first section of
   [`CLAUDE.md`](../../../CLAUDE.md) and [`docs/module-map.md`](../../module-map.md) §3 carry the
   load-bearing rules.
@@ -283,11 +320,16 @@ Live at the time of writing (2026-07-30):
 - **[`docs/handoff-2026-08-13-nutrition-meal-plan-build-out.md`](../../handoff-2026-08-13-nutrition-meal-plan-build-out.md)**
   — 🆕 the Meal Plan build-out, Phase 1 through one-tap "I ate this" (v1.282.0 → v1.299.0, fifteen
   merged PRs, migrations 177–183, local SQLite v23–v25). **Start here for anything meal-plan.**
-  What it leaves: **Q-187** (prefill the day from the plan — the owner's actual ask, and fully
-  unblocked, **plan written 2026-08-13**:
-  [`plans/2026-08-13-meal-plan-prefill-and-confirmation.md`](../../superpowers/plans/2026-08-13-meal-plan-prefill-and-confirmation.md)
-  — keep unconfirmed prefills out of `food_logs` rather than filtering a column across its 24 readers)
-  and ~~**Q-201**~~ (meal times schedule nothing — **decided 2026-08-24: they stay labels and
+  What it left: **Q-187**, whose four steps have now all shipped — the last on 2026-08-31 (v1.412.0),
+  a one-tap **"Log the N meals so far"** on the plan card, **bounded by the clock** so pressing it at
+  9am cannot log a dinner that has not happened. Selector:
+  [`components/nutrition/plan-day-fill.ts`](../../../components/nutrition/plan-day-fill.ts); outcome:
+  [`journal`](../../overview/entries/2026-08-31-meal-plan-day-fill.md). The design that made it cheap
+  is in the plan
+  ([`plans/2026-08-13-meal-plan-prefill-and-confirmation.md`](../../superpowers/plans/2026-08-13-meal-plan-prefill-and-confirmation.md))
+  — keep unconfirmed prefills out of `food_logs` rather than filtering a column across its 24 readers.
+  **Q-187 is re-scoped to the owner's second sentence** (the day re-calculating against what was
+  actually eaten), which has no design yet and is `Lane: ?` until one exists. Also left: ~~**Q-201**~~ (meal times schedule nothing — **decided 2026-08-24: they stay labels and
   schedule nothing.** See *Decided, and deliberately not built* below; the entry is out of the queue).
   Carry-forwards worth more than the features: portion sizing is arithmetic, never the model's job;
   an OFF **503** is usually our own rate limiting, but a **502 is a real outage** (measured
@@ -335,6 +377,17 @@ Live at the time of writing (2026-07-30):
   real annoyance; building it later is a repository function and a route parameter.
 
 ## Gotchas specific to this domain
+
+- **Coach's nutrition scope is enforced by withholding, and a new widget cannot ship on its own
+  (LA-47).** `lib/coach/scopes.ts` gives the Nutrition entry point a Coach with the meal-plan and
+  intake tools and **without** the training ones — plus `renderChoiceList`'s `source` and
+  `proposeChange`'s `domain` enums rebuilt narrowed per request, so an out-of-scope call is a schema
+  error the SDK retries rather than a request to refuse. Do not "add a prompt line" to scope
+  something; that is the version this replaced. And when adding a widget: a new
+  `CoachWidgetSchema` member is a **type error** until `components/coach/widget-registry.tsx`
+  handles it, and a branch that renders `null` is worse than none — an unanswered client-side tool
+  call wedges the whole thread, because the provider refuses a request containing one. Schema and
+  renderer land together or not at all.
 
 - **`food_logs` storing only a `food_item_id` was the #1 data-loss bug.** A log table must hold
   (or locally mirror) everything needed to *render* the row offline — the reference table has to be

@@ -114,7 +114,7 @@ export function QuickEditLogSheet({ log, onClose, onSaved, onDelete, userId }: P
 
   return (
     <Sheet open={!!log} onOpenChange={o => !o && onClose()}>
-      <SheetContent side="bottom" className="rounded-t-2xl flex flex-col gap-0 p-0">
+      <SheetContent side="bottom" surface="page" className="rounded-t-2xl flex flex-col gap-0 p-0">
         <SheetTitle className="sr-only">Edit Serving</SheetTitle>
         <div className="flex items-start justify-between px-4 pt-4 pb-3">
           <div>

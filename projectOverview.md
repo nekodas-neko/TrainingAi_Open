@@ -24,11 +24,97 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.405.2 · **Branch:** `main` · Railway auto-deploys on push to `main`.
-**Last updated:** 2026-08-31.
+**Version:** v1.416.2 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Last updated:** 2026-09-01.
 
-**Version:** v1.406.1 · **Branch:** `main` · Railway auto-deploys on push to `main`.
-**Last updated:** 2026-08-31.
+**The personal details are one screen, and one writer (BF-79).** Owner: *"can we combine all the
+personal information fields into 1 section in the more/details."* They were split between the Edit
+Profile sheet (display name) and the Goals accordion (height, birth year, biological sex) — and
+until BF-78 each editor resent the other's fields from a possibly stale copy. `More → Profile
+details` (`app/more/details/`) now holds all four, with **weight and body fat read-only** beside a
+link to where they are logged — an input there would open a second write path into `body_metrics`.
+Targets and activity level stayed in Goals, so the split closed rather than moved, and Goals gained
+an *Open Profile details* button because it still demands fields it can no longer edit. Reading the
+same two components filed three findings rather than fixing them — **LB-40** (a user who already has
+a password *cannot change it*: the form never renders the field the route requires), **LB-42** (two
+columns for one weight goal, with different readers, so the number the user sees and the one the AI
+is told can differ — Lane A), **LB-41** (a Weight Units toggle with no consumer). **Not
+device-verified** ([journal](docs/overview/entries/2026-09-01-personal-details-consolidation.md)).
+
+**The quantity box on Assign to Meal centres (BF-85).** Chromium draws the spin button inside the
+box, so `text-center` sat left of centre; and `text-sm` was inert under `globals.css`'s
+`input { font-size: 16px !important }`. The entry's own fix — use the shared `Input` primitive —
+was wrong: **1 of 28** `type="number"` inputs uses it, and neither quantity control does. **Not
+device-verified** ([journal](docs/overview/entries/2026-09-01-quantity-box-spinner-reset.md)).
+
+**One weight goal, one column (LB-42).** `users` carried **two** columns for one goal:
+`weight_goal_kg`, edited on the profile sheet and quoted to the nutrition coach as *"goal weight"*,
+and `target_weight_kg`, edited in Goals and the one the Health page actually renders. The number the
+user sees and the number the AI is told could differ with nothing reconciling them. Migration 246
+fills the survivor **only where it is NULL** — a value the user cannot see never overwrites one they
+can — and the API keeps its `weightGoalKg` field name while reading and writing
+`target_weight_kg`, which is what let both editors converge with **no client change**. **The retired
+column is NOT dropped**: nothing reads it, but dropping is irreversible and the row-scoped audit
+view cannot show other accounts' values, so that is the owner's call. Honest about the evidence —
+the owner's two columns **agreed**, so this closes a hazard rather than an observed wrong number
+([journal](docs/overview/entries/2026-09-01-one-weight-goal.md)).
+
+**The deload banner stops firing off a temperature baseline that is known to be wrong (TN-18).**
+The owner's 06:43 screenshot held both halves of the same broken baseline for one night: the
+readiness contributor scored temperature **80/100** off `temp_dev_c` = 0.519 °C, while the deload
+banner read the same number and said *"Body temp elevated — rest or deload recommended"*. TN-6a
+suspended the ladder in readiness and its own entry said the suspension must cover all three
+consumers; it covered one, and it was the path the owner does not read. The banner now takes the
+same `isTemperatureBaselineCentred` condition — imported, not re-derived, since two answers to "is
+temperature trustworthy" is what produced the disagreement — and the threshold is untouched, because
+raising it is the Q-504 mistake. **The fix needed the adapter's summary read widened to 28 days,
+which turned `summaryRows[0]` from *today* into *the oldest of 28 nights*; the first version of the
+new test file passed with a month-stale deviation feeding the banner.** Self-clearing: it lifts on
+its own once a re-derivation centres the deviations
+([journal](docs/overview/entries/2026-08-31-deload-temp-gate.md)).
+**Coach can be scoped to one subject, and the scope is made of what it never receives (LA-47).**
+Opening Coach from Nutrition will give it the meal plan, intake and targets — and **not** the
+training tools, so a program question produces a hand-off instead of a guess. Enforced three ways
+the model cannot argue with: the training tools are absent, and `renderChoiceList`'s `source` and
+`proposeChange`'s `domain` enums are **rebuilt narrowed per request**, so an out-of-scope call is a
+schema error the SDK retries rather than a request anything downstream has to refuse. Verified
+against a real Gemini turn in both directions. `general` withholds nothing, so every existing
+caller is unchanged. **A bug the tests caught and review would not have:** `value in COACH_SCOPES`
+walks the prototype chain, so `scope: "toString"` resolved to `Object.prototype.toString` and would
+have crashed the request. **The plan-widget half did NOT ship** — the entry proposes splitting it
+across lanes and that split does not compile, since a new widget-union member is a type error until
+the registry handles it, and a branch rendering `null` wedges the thread outright
+([journal](docs/overview/entries/2026-08-31-coach-nutrition-scope.md)).
+
+**A dead WebView renderer is handled instead of fatal, and it now leaves evidence (BF-80).** The
+owner's *"tab back into the app and the pages often crash and display a blank page"* had **nothing**
+in `error_events`, and that silence is the finding: `app/error.tsx` would have painted a fallback
+and filed a row for a JS exception. Reading the pinned Capacitor source settled the rest — its
+`BridgeWebViewClient` **already** forwards `onRenderProcessGone`, so the app was never missing a
+`WebViewClient` (which is why grepping `android/` for `RenderProcess` came back empty while the
+behaviour persisted); what was missing was a listener, and the default answer it left in place is
+the documented *"kill the app"* one. The handler now returns `true`, records the death with
+`didCrash`, and posts `recreate()` — posted, because the callback runs with the dying WebView on
+the stack, and `reload()` cannot work on a WebView whose renderer is gone. The recorded death
+becomes an `error_events` row on the next boot. **Not verified: this needs an APK on the S25**, and
+until that first row appears the diagnosis is still a hypothesis — but the behaviour it replaces is
+process termination, so the handler is right either way
+([journal](docs/overview/entries/2026-08-31-renderer-recovery.md)).
+
+**A night that is still filling now says so, and the program builder knows you are injured
+(BF-83, BF-68).** The owner sent two screenshots of the **same night four minutes apart** — 6 h 15 m
+then 7 h 40 m, with the 30-night average it was compared against moving too. The entry offered two
+mechanisms; the answer was a third. Production shows the batch covering the missing 82 minutes was
+**recorded at 6:42**, two minutes before the earlier screenshot: the raw data was there and the
+*row* was stale. So the measure is the **rollup watermark**, which only advances when a run
+completes — a test against the newest ingested sample would have called that night settled four
+minutes before it grew. `/api/sleep-sessions` returns `provisional` per row; the badge and
+excluding a provisional night from its own average are Lane B's. Separately, `injur` appeared
+**zero times** in the whole program-builder path. Both builder routes now filter the **candidate
+list** — not the prompt — with the predicate the mid-workout swap sheet already substitutes by, so
+the builder cannot program an exercise the swap sheet would offer to replace, and a Good Morning
+(a hamstring exercise that loads the back in a secondary role) is excluded where an instruction
+would have missed it ([journal](docs/overview/entries/2026-08-31-lane-a-sleep-provisional.md)).
 
 **A logged meal stops breaking apart, and two nutrition controls stop meaning the wrong thing (BF-72/73/74/76).** The owner's *"it starts as the meal with the image, then breaks into its ingredients"* was the diary hydrating from the server and **omitting `savedMealId`/`mealGroupId`** — a local upsert overwrites every column it is given, so the screen stripped its own grouping and then rendered the stripped copy. There are exactly two `applyDelta` callers and the sync engine's was already correct, so this was the one site BF-39's audit did not reach. The meal photo's ✕ **sat where the sheet's close button would be** — and the sheet passes `hideCloseButton`, so it was the only ✕ on screen: a reach for dismiss deleted the photo. It is a bin at the bottom-right now, with undo. Capture tiles went **60 px → 79 px** and `New` now outranks a small delete bin. **Two findings came out of it that outlive the batch.** `min-h-[Npx]` **does nothing on a `<button>`** — a bare `button { min-height: 48px }` in `globals.css` beats the utility (measured: 48 px on a button, 84 px on a div), so BF-50's documented "62 px" tile actually measured 60; filed as LB-32. And **BF-76's safe-area sweep found the opposite of what it expected** — nothing in nutrition is under-padded, three sheets are *over*-padded by declaring the inset on both the content and the footer, and the `vh`→`dvh` hypothesis is not the mechanism at all, since a bottom sheet is `fixed bottom-0` and its height moves only its top edge. No padding changed: every available fix costs more than the 12–24 px it saves ([journal](docs/overview/entries/2026-08-31-nutrition-uplift.md)).
 
@@ -41,6 +127,14 @@
 **Three sheets said their own name twice (LB-23).** Radix needs a `SheetTitle` for the dialog's accessible name, so each carried an `sr-only` one *beside* the visible `<h2>` — read once as the panel's name, again as a heading. `<SheetTitle asChild><h2>` is one node that is both. `quick-edit-log-sheet` keeps its `sr-only` title and is correct: its visible header is the food's name, a different string, which is why the new guard matches on the **text** rather than the class — banning `sr-only` outright would have failed a working file ([journal](docs/overview/entries/2026-08-31-sheet-title-duplication.md)).
 
 **The exercise clip reaches the ready screen, and the fetch behind it stopped multiplying (BF-65).** The owner wanted the movement shown on the screen where they are about to do it. The work was the *fetch*: the same `/api/exercise-gif` call was hand-rolled in **four** places, so this would have been the fifth — `lib/hooks/use-exercise-media.ts` is now the only one and all four are converted. **The shared `exercise-media:<name>` key is the feature**, not plumbing: the warm-up screen fetches every exercise in the session and then unmounts, so the ready screen paints from its cache instead of showing a spinner for a file downloaded sixty seconds ago. The layout question the entry flagged answered itself — at 64 px beside the name, **`SET TARGETS` is now fully visible**, where the owner's screenshot had it cut off behind the action row. **Nothing animated was rendered at any point:** the dataset host is dropped by the sandbox proxy, so every clip here is blank — including the warm-up screen's own untouched thumbnails, which is how that was established as the environment rather than the change ([journal](docs/overview/entries/2026-08-31-exercise-clip-ready-screen.md)).
+
+**Energy Balance was estimating a resting rate you had measured (BF-42).** You entered your RMR test on the S25 today — 1325 kcal at 51.5 kg fat-free mass — and the goal wizard started using it while the Energy Balance card kept predicting **1481**. Two screens, two resting rates. **The estimate was also the floor** under the calibrated maintenance, so it clamped the calibration up by 156 kcal: it could not report a lower number even when your own data said so. Both now use the measurement, re-scaled onto today's **DEXA-corrected** lean mass — the two sides of that re-scaling have to be on one instrument, and the raw scale reading would credit fat-free mass you don't have. **My first test for that could not have failed**: it asserted a direction on a pure function rather than what the service does, and the mutation survived it; it now asserts the exact number through the service ([journal](docs/overview/entries/2026-08-31-measured-rmr-daily-model.md)).
+
+**Your stress strip and your stress number were two different calculations, and they disagreed about the day (BF-81).** You asked what was happening with the stress indicator. The pipeline runs — 9–14.5 hours of coverage a day, current to today — but the strip came from the rollup and the number came from `/api/body-battery`, each building its own series from a different heart-rate baseline. Re-measured before fixing: **the sign disagreed on 6 of the last 8 days**, and high-stress minutes by 4–8× (the strip saying 2–4.5 hours where the number said none). One producer writes both now. **The filed fix would have been worse than the bug**: deleting the route's write, as the entry recommended, would have left all three columns with *no* writer — the rollup only ever stored the strip — and the weekly digest reads one of them. **Two things stay open for you**: correcting the days already stored needs a full re-read of the ring's history (only 8 of 38 rows can be re-derived without it, which would leave the column more mixed, not less), and `chronic_stress_score` has never been produced on any of 106 rows — that is its documented 21-night gate needing a wide pass, not a fault ([journal](docs/overview/entries/2026-08-31-stress-one-producer.md)).
+
+**Saving one profile field would have erased four others, and it had not fired yet (BF-78).** `/api/user/profile` is a PATCH by name and was a PUT by behaviour: display name, height, date of birth and weight goal were written unconditionally as `?? null`, so any body omitting them nulled them — and accepting an activity-level recommendation sends exactly one field. Height feeds the BMR fallback, so a single tap would have moved your calorie targets, not just cleared a profile line. **Confirmed latent**: production still holds all four. **The entry's fix would have been half of one**: the route mapped every field through `?? undefined`, collapsing "sent as null" into "omitted", so guarding the adapter alone would have traded a wipe-everything bug for a clear-nothing one. Both halves are fixed, `timezone` is explicitly the column a null must not clear (a user without one has no "today"), and **both defensive resends are deleted** — one of which was itself a hazard, resending your name from a possibly stale prop. Verified through the real route: one-field PATCH touches one field, `heightCm: null` clears, empty body is a no-op ([journal](docs/overview/entries/2026-08-31-profile-partial-patch.md)).
+
+**The barcode picture was fetched every time and thrown away five times (BF-70).** Your scan of `LOADED MAC & CHEESE` logged with a placeholder tile — and the thumbnail had been downloaded successfully before that happened. The entry traced four layers that discard it; there was a **fifth** it had not found, the web save path. **Why it survived:** `create-food-item.ts` read the image off the sanitiser's return, which *declares* the field and never sets it — so the line that dropped the picture compiled cleanly and its own comment said it carried one. Deleting that declaration is what makes the mistake a compile error, and a new check keeps it deleted. **A `@ts-expect-error` in a test could not have held it**: `tsconfig.json` excludes every `__tests__` folder from typechecking, so type assertions written there are inert while reading as guards — worth knowing beyond this fix. Barcode scans are also recorded as `barcode` now rather than `ai`, which is why only 3 of 221 rows had ever carried the right label. **Proven against the real Open Food Facts API**: a live lookup stores a 5,359-character thumbnail and `source = barcode` ([journal](docs/overview/entries/2026-08-31-barcode-image-chain.md)).
 
 **The DEXA correction is finished and the chain works end to end — but no screen shows it yet (BF-2, all four steps).** The correction is **+3.2 points**, derived from pairs pulled out of `dexa_scans` × `body_metrics` rather than stored, so **no new table and no migration** — and a second scan re-derives on its own: verified, offset **3.2 → 2.6** and `pairCount` 1 → 2 with no entry step, which is the accumulation you asked for. It is an **offset, not a ratio**: with one pair they agree on the measured point and diverge everywhere else, and only the offset makes no claim about readings never observed. **Entering a scan through BF-71's new form (More › Health › DEXA & RMR) makes it live with no other action** — one POST moved resting burn **1832 → 1773 kcal/day** and the calorie goal **1961 → 1889**, with `body_metrics.body_fat_pct` still reading the raw 25.3. **The safe-looking design was the wrong one:** correcting inside the shared `listBodyMetrics` read would make a missed consumer impossible, but the Health log sheet seeds from that read and POSTs back at source `manual`, which **outranks `scale_ble`** — so saving an untouched field would overwrite your own measurement and collapse the next calibration toward zero. It is applied per consumer instead, with `check-body-fat-correction.js` (Custom Rules, 64) failing CI on one that forgets — **two rules, because the calorie goal never calls a deriver at all**. The payload carries `bodyFat` (raw), `bodyFatCorrected` and `bodyFatIsCorrected` per reading, plus the offset itself. **No screen reads any of it yet — LA-45**, so your Health card shows 25.3 while your calorie goal already uses 28.5, and two numbers disagreeing on screen is worse than neither being corrected ([engine](docs/overview/entries/2026-08-31-dexa-body-fat-calibration.md), [consumers](docs/overview/entries/2026-08-31-dexa-correction-consumers.md), [payload](docs/overview/entries/2026-08-31-dexa-corrected-payload.md), [end to end](docs/overview/entries/2026-08-31-dexa-chain-end-to-end.md)).
 
@@ -65,13 +159,7 @@
 
 **Settings follow the account now (Q-392).** The owner's *"when i do a new install or open on computer - it loses all the saved preferences"* was still true in full: the engine (`users.preferences`, `GET`/`PATCH /api/user/preferences`) had shipped and **no read site called it**. `lib/user/preferences-sync.ts` connects them — `hydrateUserPreferences` seeds every device key from the server bag on launch, `savePreference` writes both. Proved by `e2e/preferences-survive-reinstall.spec.ts`, which is the owner's sentence as a test: PATCH three preferences, `localStorage.clear()`, reload, and all three come back in their right encodings — and it fails with the hydration replaced by a no-op. **The rule that was wrong, and CI found it:** hydration first cleared any key the bag did not carry — right for a settled system, wrong in the window between a tap and its PATCH landing. `meal-label.spec.ts` caught it wiping a label style mid-flight, and **offline it reverts every change on the next launch**. Hydration now deletes nothing; the one thing the app clears, the mutually-exclusive brand preset / hue pair, is resolved by `EXCLUSIVE_GROUPS`. The earlier `backgroundSettings` catch was the same rule failing at its extreme, and treating it as one key needing an exclusion would have left the race in place for every other ([journal](docs/overview/entries/2026-08-30-preferences-read-sites.md)).
 
-**A logged food swipes to Delete, and the day stopped moving with it (BF-45 ⑤).** The diary reuses
-the meal list's `SwipeActions` tray, routed to the confirmation the edit sheet's bin already raises.
-What earns the index is the collision: `nutrition-content.tsx`'s scroll container owns a horizontal
-drag that steps the **day**, so one touch fed both gestures — and it is **invisible on today**, since
-that handler refuses to step past today. `SwipeActions` marks itself `[data-swipe-actions]` and the
-day handler defers, as `tab-swipe-navigator.tsx` already does for a carousel. **Not device-verified**
-([journal](docs/overview/entries/2026-08-30-food-log-swipe-delete.md)).
+**A logged food swipes to Delete, and the day stopped moving with it (BF-45 ⑤).** The diary reuses the meal list's `SwipeActions` tray, routed to the confirmation the edit sheet's bin already raises. What earns the index is the collision: `nutrition-content.tsx`'s scroll container owns a horizontal drag that steps the **day**, so one touch fed both gestures — and it is **invisible on today**, since that handler refuses to step past today. `SwipeActions` marks itself `[data-swipe-actions]` and the day handler defers, as `tab-swipe-navigator.tsx` already does for a carousel. **Not device-verified** ([journal](docs/overview/entries/2026-08-30-food-log-swipe-delete.md)).
 
 **Home's APK-banner link was a 33 px tap target, and the gate that hid the entry was self-inflicted (LB-26).** The link rendered **258×33** against the 48 dp floor — an `<a>`, which `globals.css` excludes on purpose so an inline prose link is not forced to 48 px. It takes the floor locally instead of widening the selector, and the reasoning moved beside the CSS rule rather than sitting in the banner's JSX, which is not where someone tempted to widen it would look. **The spec's allowlist is now empty** — an allowlist that never empties is a backlog wearing a test's clothes. Proved both ways: removing the floor fails the spec with the exact reported measurement. **The process half is the more useful one:** LB-26 carried `Gate: device` on work that had never been built, filed by the session that had read BF-45's warning about that exact mistake hours earlier — a gate parks an entry, so it hid it from `next-item.js`. The rule now sits in the backlog's protocol header where entries are written, not only inside the entry that found it ([journal](docs/overview/entries/2026-08-30-apk-banner-tap-target.md)).
 
@@ -85,16 +173,7 @@ day handler defers, as `tab-swipe-navigator.tsx` already does for a carousel. **
 
 **The accessibility scanner that would have passed a 12 px button (Q-282).** `@axe-core/playwright` was installed, measured and removed: WCAG 2.5.8 exempts a *spaced* undersized control, so a deliberately-shrunk **12×12** button (confirmed by `boundingBox`) came back a **pass**, and `color-contrast` cannot read this app at all — it fails to parse the `oklch` tokens (*"Could not parse color string oklab(…)"*) and **evaluated no nodes on Home**. `e2e/touch-target-size.spec.ts` ships instead: DOM geometry against **this repo's 48 dp bar**, covering the roles `globals.css`'s `button, [role="button"]` floor cannot (`<a>`, `role="tab"`, `role="radio"`). It fails on the mutation axe passed. One real finding, **LB-26**: Home's APK-banner link is 258×33 ([journal](docs/overview/entries/2026-08-30-touch-target-gate.md)).
 
-**The Heart Rate tile shows last night, as a delta (TN-13).** It read the **7-day mean** and printed
-it as a bare bpm — in the signal that best predicts how you feel (r = +0.557 against your own
-check-in, best of nine). Re-measured over 71 production nights: the nightly value changes on **61 of
-70** night-pairs, the rounded mean on **29**, so the tile stood still nearly six days in ten and
-discarded 77 % of the daily movement. And a bare number says nothing: expressing the reading as a
-deviation from your own baseline roughly **doubles** its correlation with felt state, which is why it
-now reads `50 · −7 vs usual`. Both halves shipped together because the entry required it — half a fix
-here is the one that looks like progress. **Still owed: the S25 check** — the cue grew from one word
-to five across 20 layout styles
-([journal](docs/overview/entries/2026-08-30-feat-hr-tile-nightly-resting.md)).
+**The Heart Rate tile shows last night, as a delta (TN-13).** It read the **7-day mean** and printed it as a bare bpm — in the signal that best predicts how you feel (r = +0.557 against your own check-in, best of nine). Re-measured over 71 production nights: the nightly value changes on **61 of 70** night-pairs, the rounded mean on **29**, so the tile stood still nearly six days in ten and discarded 77 % of the daily movement. And a bare number says nothing: expressing the reading as a deviation from your own baseline roughly **doubles** its correlation with felt state, which is why it now reads `50 · −7 vs usual`. Both halves shipped together because the entry required it — half a fix here is the one that looks like progress. **Still owed: the S25 check** — the cue grew from one word to five across 20 layout styles ([journal](docs/overview/entries/2026-08-30-feat-hr-tile-nightly-resting.md)).
 
 **Changing a supplement's dose no longer rewrites every log you already made (BF-3, gap 1).** The
 dose lived on the definition and not on the log, so raising retatrutide from 2 mg to 4 mg made last
@@ -107,16 +186,32 @@ empty Nutrition tab is the signature of a dead local store. Gaps 2 and 3 (twice 
 cadence) and the dose-entry UI stay queued
 ([journal](docs/overview/entries/2026-08-30-feat-supplement-dose-on-log.md)).
 
-**A shared meal label now carries the meal, not a pointer to it (BF-57, engine half).** Scanning
-someone else's label said *"That saved meal no longer exists"* — the QR held a `saved_meals.id` and
-the scan resolved it against the scanner's own meals, so it was never going to be found. Making ids
-globally resolvable was rejected: a photo of a label would become read access to someone's meal, on
-an app heading for a Play Store health-data declaration. The owner's design instead puts the whole
-meal in the code, so it scans offline, for a user with no account, as a copy. **Nothing is dropped to
-fit** — the tail rolls into one remainder line carrying its macros, so a trimmed copy's totals match
-the original to the gram. **No user-visible change yet:** the label layout and the scan branch are
-Lane B's and unbuilt, and the QR needs ~30 mm of the 50 mm label before any of it prints legibly
-([journal](docs/overview/entries/2026-08-30-feat-self-contained-meal-label.md)).
+**A meal label can be handed to someone now (BF-57, both halves).** Scanning someone else's said
+*"That saved meal no longer exists"* — the QR held a `saved_meals.id` resolved against the scanner's
+own meals. Making ids globally resolvable was rejected (a photo of a label would become read access
+to someone's meal, on an app heading for a Play Store health-data declaration); the meal travels in
+the code instead, so it scans offline, for a user with no account, as a copy, and **nothing is
+dropped to fit** — the tail rolls into one remainder carrying its macros, exact to the gram. The
+~30 mm the entry asked for is **not available** on the five print styles: four cannot hold 62 bytes,
+below which the encoder trims the meal's **name**, so they keep the private bookmark and a new
+**Share code** style spends the label on a 34.4 mm code. A scan saves a copy, never logs it.
+**Still owed: the two-phone check, and a printer**
+([engine](docs/overview/entries/2026-08-30-feat-self-contained-meal-label.md) ·
+[surface](docs/overview/entries/2026-08-31-shared-meal-labels.md)).
+
+**The nutrition sheets carry the tab's palette, and the obvious fix could never have worked (BF-75).**
+A translucent sheet reveals `SheetOverlay`'s `bg-black/50`, not the wallpaper — that sits at `z-[-1]`
+while the sheet and its overlay are both `z-50` — so the palette is painted *inside* the sheet, behind
+an opt-in `surface="page"` five nutrition sheets pass and nothing else does. **⚠ Wallpapers ship
+`enabled: false`**, so it is invisible until switched on; the owner has them on. **Still owed: the
+≥4.5:1 contrast check on the S25** ([journal](docs/overview/entries/2026-08-31-nutrition-sheet-surface.md)).
+
+**The meal builder's three whole-meal inputs are findable (BF-52).** *"I dont see a URL option"* — it
+did not exist until you had pasted the URL: the recipe photo, the URL import and the AI estimate were
+mutually exclusive renders of one slot inside a search field. A `Recipe photo · Recipe link ·
+Describe it` row sits above the collapsed picker now. The barcode is **not** in it, against the
+entry's own instruction: those three build a whole ingredient list, a barcode names one product
+([journal](docs/overview/entries/2026-08-31-meal-builder-entry-point.md)).
 
 **Both pending weigh-in buttons were dead in production (BF-53).** `scale_raw_samples.id` is a
 `bigserial` and both routes validated it with a UUID regex, so every press of "Not me" or "Yes,
@@ -967,6 +1062,28 @@ that need an owner, and for the barcode chain.
 **Measured, nothing to fix in the volatility.** Owner: *"the scores have been very varied lately"*. Stored day-to-day |Δ| went **9.2 → 21.2** at the recalibration — but the **pre-calibration blend moved 9.15 → 9.27, unchanged**, so the sleep is genuinely that variable and the model reads it correctly. Two things landed together on 2026-08-19: the calibration began applying at all (before it the stored score *is* the raw blend), and the blend mean fell 87.1 → 71.1 into the curve's steep zone. **The real defect is `SCORE_CALIBRATION`'s gain spread** — 4.00× display points per blend point at blend 79 against 0.50× at 92, so the same improvement is worth eight times as much in one place as another. [`review`](docs/reviews/2026-08-24-sleep-score-volatility.md).
 - **⛔ Flattening the curve does NOT reduce volatility — tested.** Night-to-night |Δ| goes **13.53 → 13.75**; a calibration curve's total rise is conserved, so flattening one segment steepens another. The baton's old advice to do exactly that has been replaced. TN-5 is filed as an **interpretability** fix and must not be sold as a jitter fix.
 - **Owner signed off 2026-08-24**, told plainly that it does not reduce the jumpiness. Proposed curve holds the displayed mean (87.0 → 85.5, not a lift) and the `LOW_SLEEP_SCORE` firing rate (2/41 either way) — **re-verify both against the shipped TypeScript**, not the Python replay. **History policy: leave stored days alone, stamp the new model.**
+
+### [nutrition][devices] ⚠️ A re-scanned meal label stops duplicating; no camera has scanned one (LB-34, v1.413.1)
+
+**Fixed.** A shared label is a physical object and gets scanned by whoever picks it up — the same one scanned twice used to mint a second identical meal with nothing marking either as the copy. The scan now asks `findDuplicateMeal` first (normalised name **and** macros within `DUPLICATE_MAX_FIT_DISTANCE`, both required, so two different recipes sharing a name still both save) and offers **Save a copy** rather than writing ([`journal`](docs/overview/entries/2026-08-31-shared-label-rescan-duplicate.md)). The library read is local-first and makes no network call — a shared label's whole point is working with no signal.
+- **Keep: nothing has scanned a real label.** The branch needs a camera (Capacitor on device, `getUserMedia` on web), so it is guarded at the source and by unit tests only — mutation-checked eight ways between them, but never executed from a scan. `getLocalStore` is null off-device too, so the local-store read took its cache-seed fallback on every run.
+
+### [nutrition] ⚠️ The meal plan can fill the day in one tap; the device write path has not run (Q-187, v1.412.0)
+
+**Shipped — and this closes all four steps of Q-187.** The plan card offers **"Log the N meals so far"**, which writes every planned meal you have not already logged or declined, through the same path the per-meal button uses ([`journal`](docs/overview/entries/2026-08-31-meal-plan-day-fill.md)).
+- **It stops at the current hour, and that is the design rather than a nicety.** What the earlier phases protect is that the day's totals never count food nobody ate — which is why unconfirmed prefills stay out of `food_logs` entirely instead of being filtered out of its 24 readers. A button that logged the *whole* day would hand that back: press it at 9am and the macro bars report a dinner that has not happened. A past day offers everything, which is the retrospective case; a future day offers nothing; a meal whose time cannot be resolved is not offered on today, because guessing costs food nobody ate.
+- **Keep: the device write path has not run.** `getLocalStore` returns null on web, so every exercised path — including the `plan_meal_answers` decline that suppresses a meal from the offer — took the `/api/nutrition/food-logs` fallback rather than the SQLite write plus outbox a real tap takes. `e2e/plan-day-fill.spec.ts` covers the selection and the write end to end, and all ten guards in the selector are mutation-checked, but on the web path only. The button has not been seen on the S25.
+- **Q-354 is a live trap for spec authors, not just a curiosity.** The new spec's `locator.click()` did nothing at all — no toast, no request, no error — because the Nutrition scroll container's date-swipe `useDrag` swallows mouse input, which is what Playwright sends. `tap()` works and is the faithful input anyway. Every future e2e assertion that presses something on this screen has to know this first, and the failure gives no clue.
+- **Q-187 is re-scoped, not struck.** What remains is the owner's second sentence — the day re-calculating remaining meals against what was actually eaten — which has no design and three open questions (what gets re-scaled, whether a floor exists, what to say when the remaining macros are unreachable).
+
+### [cardio][devices] ⚠️ The guided walk paces you by cadence now; no strap has ever driven it (Q-410, v1.411.0)
+
+**Shipped.** The interval walk leads with **km/h** (the unit the owner asked for by name, with min/km beside it off the same pace series) and its verdict line became a **banded pacer**: a bar, a mark and a sentence against a **cadence pair** you set in the walk config — a floor for the fast blocks, a ceiling for the slow ones, because a slow block walked too hard is what stops the fast one being fast. The band is chosen by **signed** distance, so on a fast block faster than the floor stays green however far above; ±10% out is amber, beyond that red ([`journal`](docs/overview/entries/2026-08-31-walk-cadence-pacer.md)).
+- **The signal is a ladder — cadence → speed → heart rate — and the screen says which rung it is on.** Cadence responds the instant the legs do; heart rate takes 30–60 s, so a prompt driven by it arrives after the moment it is about. But cadence needs a strap, so when there is none the pacer falls to speed against a pair **derived from your own past fast/slow blocks** (`/api/guided-walk/segment-stats`, ~3 years) rather than asking for a third target to configure, and to heart rate indoors. A user paced by heart rate while believing it is cadence cannot understand why the prompt is late, so the note naming the rung is not optional.
+- **Standing still no longer scores a perfect slow block.** "Under the ceiling" would make 0 spm the best possible slow segment; below `STOPPED_SPM` the pacer reads **Stopped** in neutral — it does not scold a pause at a crossing and it does not congratulate one.
+- **Keep: only the speed rung has ever executed.** `e2e/walk-pacer-speed-rung.spec.ts` drives a real geolocation series and is mutation-checked, and every guard in `lib/walk/walk-pacer.ts` is too — but **the cadence and heart-rate rungs both need a Polar H10 over BLE**, which does not exist in the sandbox or in `pnpm dev`. So the bands moving with the legs, the Stopped state, the strap-drop fallback and the band colours' contrast at arm's length are all verified by reading. **LB-36** holds the device pass; `BAND_TOLERANCE = 0.10` is a proposal, not a measurement, and is one named constant so a real walk can move it.
+- **The ring cannot pace this and must not be made to.** `RING_CADENCE_VALIDATED = false` still holds (`packages/shared/src/health/cadence.ts`) — the ring signal is octave-ambiguous, not broken, and shipping it uncorrected gives a number wrong by 2×, which is worse than showing none. That correction is Lane A's.
+- **The number the pacer creates is not stored yet.** Per-segment adherence, steps and which signal paced the segment are additions to `activity_logs.segments`, which is a schema edit — filed as **LA-48**.
 
 ### [cardio][devices] ⚠️ The free walk shows heart rate at last, but no device has seen it (Q-418, 2026-08-23)
 
@@ -2809,10 +2926,10 @@ one backlog entry per finding, **Q-271 … Q-284**.
   ceiling-pinning and overshot: charge 10.5/day vs drain 52.4/day, **ends at its daily minimum on 10
   of 12 days**, hits 0 on 3. Across all 40 days it never rises above its waking value on a third of
   them. Garmin's equivalent recovers during waking rest — that is the feature's headline behaviour.
-- **🟠 Readiness and Body Battery share no variance (Q-276).** Readiness ↔ battery *anchor* r = +0.93
-  (the anchor **is** readiness); readiness ↔ *end value* r = **+0.12**. Two headline numbers both read
-  as "how recovered am I", sharing nothing. Needs an owner decision on whether they are different
-  questions or one is wrong.
+- **✅ Readiness and Body Battery share no variance (Q-276) — resolved 2026-08-31 (v1.413.0).**
+  Anchor r = +0.93 (it **is** readiness), end-of-day r = +0.12. Owner settled them as two different
+  questions, so it was presentation: each now names its own where it is read — the battery card's
+  explainer rendered only in the *no-data* state, so nobody saw it on an ordinary day. No model change ([`journal`](docs/overview/entries/2026-08-31-recovery-scores-name-their-question.md)).
 
 **And one correction to a claim already in this file.** The Body Battery v5 row below records
 end-of-day battery vs next-day readiness at **r = −0.06** as evidence the model has no outcome

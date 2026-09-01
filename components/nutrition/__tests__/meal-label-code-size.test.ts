@@ -1,8 +1,9 @@
 import { describe, it, expect } from 'vitest'
 import {
   mealLabelCodeMetrics, MEAL_LABEL_STYLES, DEFAULT_MEAL_LABEL_STYLE,
-  centredStackLineBudget, mealLabelStyleSpec,
-} from '../meal-label-render'
+  centredStackLineBudget, mealLabelStyleSpec, mealLabelShareBudget, mealLabelCarriesRecipe,
+  MIN_MM_PER_MODULE,
+} from '../meal-label-geometry'
 
 /**
  * Q-397 asks for the printed code size to be asserted rather than trusted: *"the preview's own size
@@ -23,8 +24,70 @@ describe('meal label code size', () => {
    */
   it('every style has a code, and none is smaller than the tightest shipped one', () => {
     for (const s of MEAL_LABEL_STYLES) {
-      const { mmPerModule } = mealLabelCodeMetrics(s.value)
+      // **25, explicitly, and that is the point of the argument (BF-57).** This assertion is about
+      // the LAYOUT — whether `codeUnits` gives a code enough millimetres — so it has to hold the
+      // module count still. Letting it default would make it read the budget, which is chosen to
+      // clear this floor by construction: the test would pass forever and assert nothing.
+      const { mmPerModule } = mealLabelCodeMetrics(s.value, 25)
       expect(mmPerModule, `${s.value}`).toBeGreaterThanOrEqual(0.49)
+    }
+  })
+
+  /**
+   * **The measurement that reconciled BF-57's plan with the label** — and the reason two payloads
+   * ship instead of one.
+   *
+   * The entry asked for every label's code to carry the recipe. At 0.49 mm per module, four of the
+   * six print styles cannot hold even 62 bytes: `encodeSharedMeal`'s documented last resort is to
+   * **trim the meal's name**, so forcing it would have shipped labels with eaten titles — a change
+   * that renders, scans, and is quietly wrong. This is that finding as an assertion, so a later
+   * "why not just share from every style?" is answered by CI rather than re-argued.
+   */
+  it('most print styles are too small to carry a recipe at all', () => {
+    const tooSmall = MEAL_LABEL_STYLES.filter(s => !mealLabelShareBudget(s.value).shareable).map(s => s.value)
+    expect(tooSmall).toEqual(['inlineCentred', 'band', 'editorial', 'ticket'])
+    // Including the default, which is the half that decides it: a shareable-only-sometimes default
+    // is worse than a clearly separate style.
+    expect(tooSmall).toContain(DEFAULT_MEAL_LABEL_STYLE)
+  })
+
+  /**
+   * `plaque` and `square` DO clear the 62-byte floor, and still carry the private token — see
+   * `mealLabelCarriesRecipe`. They would name about two ingredients and roll the rest, which looks
+   * like sharing and produces a visibly poorer copy than the style built for it. One clearly
+   * labelled answer beats three partial ones.
+   */
+  it('only the share style carries the recipe, including over styles that could', () => {
+    expect(MEAL_LABEL_STYLES.filter(s => mealLabelCarriesRecipe(s.value)).map(s => s.value)).toEqual(['share'])
+    expect(mealLabelShareBudget('plaque').shareable).toBe(true)
+    expect(mealLabelCarriesRecipe('plaque')).toBe(false)
+  })
+
+  it('every style prints its own payload legibly', () => {
+    for (const s of MEAL_LABEL_STYLES) {
+      // The default module count follows the payload the style actually draws: the budgeted version
+      // where the code carries a recipe, version 2's 25 where it carries the token.
+      expect(mealLabelCodeMetrics(s.value).mmPerModule, `${s.value}`).toBeGreaterThanOrEqual(MIN_MM_PER_MODULE)
+    }
+  })
+
+  /**
+   * **The whole of BF-57 item 1, as one assertion.** The entry asked for the code to be given ~30 mm
+   * so version 11's 251 bytes — the entire recipe, no rolling — would fit. No style carrying a
+   * calorie block can reach that: they are each already at the largest `codeUnits` that clears their
+   * content by 6 units, and 30 mm is 128 of the 171 usable units. `share` reaches it by printing
+   * nothing the code already carries.
+   */
+  it('the share style is the one that reaches version 11', () => {
+    const { version, maxBytes, mmPerModule } = mealLabelShareBudget('share')
+    expect(version).toBe(11)
+    expect(maxBytes).toBe(251)
+    expect(mmPerModule).toBeGreaterThanOrEqual(MIN_MM_PER_MODULE)
+    expect(mealLabelCodeMetrics('share').boxMm).toBeGreaterThan(30)
+
+    // And no other style does — if one ever could, this feature would not have needed a new layout.
+    for (const s of MEAL_LABEL_STYLES.filter(s => s.value !== 'share')) {
+      expect(mealLabelShareBudget(s.value).version, `${s.value}`).toBeLessThan(11)
     }
   })
 
@@ -34,8 +97,10 @@ describe('meal label code size', () => {
    * If a later layout tweak ever reverses that, this fails rather than a print run failing.
    */
   it('the default prints a bigger module than the style it replaced', () => {
-    const now = mealLabelCodeMetrics(DEFAULT_MEAL_LABEL_STYLE).mmPerModule
-    const before = mealLabelCodeMetrics('band').mmPerModule
+    // Both at 25 modules: this compares two LAYOUTS, and the shipped figures below were measured
+    // when every label drew a version-2 code (BF-57).
+    const now = mealLabelCodeMetrics(DEFAULT_MEAL_LABEL_STYLE, 25).mmPerModule
+    const before = mealLabelCodeMetrics('band', 25).mmPerModule
     expect(DEFAULT_MEAL_LABEL_STYLE).toBe('inlineCentred')
     expect(now).toBeGreaterThan(before)
     expect(now).toBeCloseTo(0.561, 3)
@@ -43,7 +108,7 @@ describe('meal label code size', () => {
   })
 
   it('reports the symbol as 25/33 of the drawn box, since the quiet zone sits inside it', () => {
-    const { boxMm, symbolMm, mmPerModule } = mealLabelCodeMetrics('inlineCentred')
+    const { boxMm, symbolMm, mmPerModule } = mealLabelCodeMetrics('inlineCentred', 25)
     expect(symbolMm).toBeCloseTo(boxMm * 25 / 33, 6)
     expect(symbolMm / 25).toBeCloseTo(mmPerModule, 6)
     expect(symbolMm).toBeCloseTo(14.0, 1)   // Q-411's square-canvas B2

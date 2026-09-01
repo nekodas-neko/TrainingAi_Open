@@ -6,6 +6,143 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.416.2",
+    date: "2026-09-01",
+    changes: [
+      "Your goal weight is one number again. It was stored in two places — one edited on the profile sheet, one in the Goals section — and the Health page showed one of them while the nutrition coach was told the other. Both screens now read and write the same value, and nothing you had set was lost.",
+    ],
+  },
+  {
+    version: "1.416.1",
+    date: "2026-09-01",
+    changes: [
+      "The \"Body temp elevated — rest or deload recommended\" prompt no longer fires while your temperature baseline is still off. It was reading the same number readiness was scoring 80/100 and reaching the opposite conclusion, because the baseline it compares against is not centred yet. It comes back on its own once the baseline settles — nothing to switch back.",
+    ],
+  },
+  {
+    version: "1.416.0",
+    date: "2026-09-01",
+    changes: [
+      "Your personal details are one screen now — More \u2192 Profile details. Your name, biological sex, birth year and height were split between the Edit Profile sheet and the Goals section; they are together, and each one saves on its own.",
+      "Weight and body fat appear there as your latest reading with the day it was taken, and a button to the Health page, rather than as boxes to type into. They are measurements, not profile settings.",
+      "Goals still asks for height, birth year and sex before it will recommend anything, and now takes you to where they are edited instead of naming fields that are no longer on that screen.",
+    ],
+  },
+  {
+    version: "1.415.0",
+    date: "2026-08-31",
+    changes: [
+      "Coach can now be opened for one subject at a time. Opening it from Nutrition gives it your meal plan, your intake and your targets — and not your training, so it stays on topic instead of wandering into your program. Ask it about a workout there and it points you at the right screen rather than guessing.",
+    ],
+  },
+  {
+    version: "1.414.2",
+    date: "2026-09-01",
+    changes: [
+      "The quantity box on Assign to Meal is centred properly. It was pushed off-centre by the number spinner Chromium draws inside the box, and its text was rendering a size larger than the \u00d71/\u00d72 chips beside it.",
+    ],
+  },
+  {
+    version: "1.414.1",
+    date: "2026-08-31",
+    changes: [
+      "The blank page after tabbing back into the app should now reload itself instead of staying blank. Android had been ending the app's display process to free memory, and nothing was set up to bring it back — the app is also now told to survive that rather than be shut down.",
+      "And when it does happen it gets recorded, so there is finally something to look at. Nothing was being logged before, which is why the cause could only be guessed at.",
+    ],
+  },
+  {
+    version: "1.414.0",
+    date: "2026-08-31",
+    changes: [
+      "Last night's sleep no longer looks final while it is still filling in. The ring delivers a night in batches, so the same night read 6 h 15 m and then 7 h 40 m four minutes later, with the 30-night average moving under it too. The app now knows which nights are still settling.",
+      "Building a program takes your logged injuries into account. Every exercise that loads an injured area is removed before the coach sees the list, so it cannot pick one — and it says which area it worked around. The same applies when you ask the builder chat for a swap.",
+      "If you mention an injury in the builder chat and none is logged, it now tells you to log it — otherwise the constraint only lasts for that conversation and your daily workout keeps prescribing the same movement.",
+    ],
+  },
+  {
+    version: "1.413.2",
+    date: "2026-08-31",
+    changes: [
+      "Energy Balance now uses your measured resting rate instead of estimating one. It was predicting 1481 where your test says 1325, and that estimate was also the floor under the calibrated maintenance — so the calibration could not report a lower number even when your own data said so.",
+      "The daytime stress strip and the stress number beside it are now the same calculation. They were two, and they disagreed about whether the day was stressful at all on six of the last eight days.",
+      "Saving one profile field no longer erases the others. Accepting an activity-level recommendation would have wiped your name, height, date of birth and weight goal. It had not happened yet.",
+      "Clearing a profile field now works: an empty height clears the height, where before it was indistinguishable from not touching it.",
+    ],
+  },
+  {
+    version: "1.413.1",
+    date: "2026-08-31",
+    changes: [
+      "Scanning the same shared meal label twice no longer adds a second copy \u2014 it tells you the meal is already saved, with a Save a copy button if you want one anyway.",
+    ],
+  },
+  {
+    version: "1.413.0",
+    date: "2026-08-31",
+    changes: [
+      "Body Battery and Readiness now each say what they are for, so they stop reading as the same number.",
+      "Body Battery: energy left right now \u2014 it opens at your readiness and drains as you use it.",
+      "Readiness: how your day is likely to go, set in the morning from last night's sleep and yesterday. It does not move as you use energy.",
+    ],
+  },
+  {
+    version: "1.412.0",
+    date: "2026-08-31",
+    changes: [
+      "Your meal plan can now log the day for you: one tap on the plan card records every planned meal you haven't already logged or said no to.",
+      "It only offers the meals whose time has come \u2014 press it at 9am and it logs breakfast, not tonight's dinner. On an earlier day it offers the lot.",
+      "Meals you already logged, and ones you declined, are left alone.",
+    ],
+  },
+  {
+    version: "1.411.0",
+    date: "2026-08-31",
+    changes: [
+      "The interval walk now shows your speed in km/h, with the min/km pace beside it.",
+      "It also paces you: a bar under the timer tells you to walk faster on a fast block or ease off on a slow one, with green for on pace, amber for slightly out and red for well off.",
+      "Set your own step-rate targets in the walk setup \u2014 a floor for the fast blocks and a ceiling for the slow ones.",
+      "It paces by step rate when the chest strap is on, by speed when it isn't, and by heart rate indoors \u2014 and it always says which one it is using, so a late prompt is never a mystery.",
+      "Stopping at a crossing now reads Stopped rather than counting as a perfect slow block.",
+    ],
+  },
+  {
+    version: "1.410.0",
+    date: "2026-08-31",
+    changes: [
+      "The meal builder now starts with Recipe photo \u00b7 Recipe link \u00b7 Describe it, above the ingredient list. All three already worked \u2014 they were hidden inside the ingredient search box, so the URL option only appeared once you had already pasted a link.",
+      "Describe it is new here: type what is in the meal and it works out the ingredients.",
+      "The barcode scanner stays with the ingredient search, where it belongs \u2014 it adds one product, not a whole meal.",
+    ],
+  },
+  {
+    version: "1.409.0",
+    date: "2026-08-31",
+    changes: [
+      "The Log Food, meal builder, meal detail, quantity and quick-edit pull-ups now carry the Nutrition tab's own background instead of a plain dark panel.",
+      "This only shows if you have wallpapers turned on \u2014 More \u203a Settings \u203a Appearance. With them off the sheets look exactly as before, on purpose: a coloured sheet over a plain page would look worse than the plain one.",
+      "Sheets in Health, Workout and More are unchanged.",
+    ],
+  },
+  {
+    version: "1.408.0",
+    date: "2026-08-31",
+    changes: [
+      "A meal label can now be shared with someone. Pick the new Share code style and the whole recipe travels in the code \u2014 whoever scans it gets the meal added to their own app, with no account and no signal needed.",
+      "Scanning a shared label saves the meal to your library rather than logging it, so it is there to cook again.",
+      "The other label styles are unchanged and still print the ingredient list. Their code is a private bookmark that logs the meal on your own phone, and the label screen now says so \u2014 handing one of those to a friend never worked.",
+      "Scanning a label that is not yours used to say the meal no longer exists, which was wrong. It now says it is not in your library and points at the shareable kind.",
+      "Where a long recipe does not fit the code, the label says how many ingredients were grouped together. The calories and macros are always exact.",
+    ],
+  },
+  {
+    version: "1.407.1",
+    date: "2026-08-31",
+    changes: [
+      "A barcode-scanned food now keeps the product picture from the barcode database instead of falling back to a placeholder tile. The picture was always being fetched — five layers between the scan and the saved food were dropping it.",
+      "A barcode-scanned food is also recorded as scanned by barcode rather than by AI, which is what it had been labelled since the feature shipped.",
+    ],
+  },
+  {
     version: "1.407.0",
     date: "2026-08-31",
     changes: [

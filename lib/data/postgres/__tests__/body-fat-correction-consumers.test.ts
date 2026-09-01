@@ -123,6 +123,54 @@ describe.skipIf(!canRun)('BF-2 — every consumer of a stored body fat sees the 
     expect(delta).toBeLessThanOrEqual(70)
   })
 
+  // BF-42. The daily energy model computed its own BMR and never read the measurement, so the goal
+  // wizard and the Energy Balance card would have shown two resting rates for one person. Worse,
+  // that predicted BMR is also the FLOOR under the calibrated maintenance, so it clamped the
+  // calibration up to a number the measurement contradicts.
+  it('uses the measured resting rate rather than predicting one', async () => {
+    const { computeEnergyBalance } = await import('@/lib/health/energy-balance-service')
+    await addScan()
+    await pool.query(`DELETE FROM measured_rmr WHERE user_id = $1`, [USER])
+    const predicted = await computeEnergyBalance(repo, USER, 'Australia/Brisbane', '2026-08-27')
+
+    // The owner's real test: 1325 kcal at 51.5 kg fat-free mass.
+    await pool.query(
+      `INSERT INTO measured_rmr (user_id, measured_on, rmr_kcal, ffm_kg_at_test, weight_kg_at_test)
+       VALUES ($1, '2026-08-27', 1325, 51.5, 72.1)`, [USER])
+    const measured = await computeEnergyBalance(repo, USER, 'Australia/Brisbane', '2026-08-27')
+
+    // Cunningham over-predicts for this person, so the measurement pulls the resting burn DOWN.
+    expect(measured.balance.restingBaseKcal).toBeLessThan(predicted.balance.restingBaseKcal)
+    await pool.query(`DELETE FROM measured_rmr WHERE user_id = $1`, [USER])
+  })
+
+  // The measurement ages by how much the body changed, not by the calendar — and both sides of that
+  // re-scaling must be on the same instrument. `ffm_kg_at_test` is the DEXA's, so today's has to be
+  // the DEXA-corrected scale reading, not the raw one (BF-2 × BF-42).
+  //
+  // Asserted against the exact expected number rather than a direction, because the two paths differ
+  // by only ~50 kcal here and a `toBeLessThan` passes for both.
+  it('re-scales the measurement onto the CORRECTED fat-free mass, in the service', async () => {
+    const { computeEnergyBalance } = await import('@/lib/health/energy-balance-service')
+    const { personalRmr, bodyComposition } = await import('@trainingai/shared/health/body-composition')
+    const { SEDENTARY_MULTIPLIER } = await import('@trainingai/shared/health/energy-baseline')
+    await addScan()
+    await pool.query(`DELETE FROM measured_rmr WHERE user_id = $1`, [USER])
+    await pool.query(
+      `INSERT INTO measured_rmr (user_id, measured_on, rmr_kcal, ffm_kg_at_test, weight_kg_at_test)
+       VALUES ($1, '2026-08-27', 1325, 51.5, 72.1)`, [USER])
+
+    const measured = { rmrKcal: 1325, ffmKgAtTest: 51.5 }
+    const onCorrected = personalRmr(measured, bodyComposition(WEIGHT_KG, DEXA_PCT)!.ffmKg)!
+    const onRaw = personalRmr(measured, bodyComposition(WEIGHT_KG, SCALE_PCT)!.ffmKg)!
+    expect(Math.round(onRaw)).toBeGreaterThan(Math.round(onCorrected))
+
+    const res = await computeEnergyBalance(repo, USER, 'Australia/Brisbane', '2026-08-27')
+    expect(res.balance.restingBaseKcal).toBe(Math.round(onCorrected * SEDENTARY_MULTIPLIER))
+    expect(res.balance.restingBaseKcal).not.toBe(Math.round(onRaw * SEDENTARY_MULTIPLIER))
+    await pool.query(`DELETE FROM measured_rmr WHERE user_id = $1`, [USER])
+  })
+
   // A reading from an instrument the calibration does not cover must be untouched at every
   // consumer, not just at `correctBodyFatPct`.
   it('leaves an uncalibrated instrument alone all the way through', async () => {

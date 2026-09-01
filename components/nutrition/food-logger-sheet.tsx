@@ -7,11 +7,14 @@ import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet'
 import { ReviewStep, type EditableNutrition } from './review-step'
 import { AssignStep } from './assign-step'
 import { SavedMealsSheet } from './saved-meals-sheet'
+import { findDuplicateMeal } from './meal-duplicate'
 import type { NutritionScanResult, NutritionIngredient, FoodItem, FoodLogWithItem, SavedMeal, MealType } from '@trainingai/shared/types/nutrition'
+import type { SharedMeal } from '@trainingai/shared/nutrition/label-payload'
+import { saveSharedMealToLibrary, sharedMealTotals } from './save-shared-meal'
 import { todayInTz } from '@trainingai/shared/date-utils'
 import { mealTypeForHour } from '@trainingai/shared/nutrition/log-plan-meal'
 import { logMealItems } from '@trainingai/shared/nutrition/log-meal'
-import { logFoodEntries, ingredientsToEntries, type NewFoodEntry } from '@trainingai/shared/nutrition/log-food'
+import { scanOriginToSource, logFoodEntries, ingredientsToEntries, type NewFoodEntry } from '@trainingai/shared/nutrition/log-food'
 import { readCacheSync } from '@/lib/sqlite/cache'
 import { getLocalStore } from '@/lib/local-store'
 import { hapticLight } from '@/lib/haptics'
@@ -51,6 +54,7 @@ function scanToEditable(s: NutritionScanResult): EditableNutrition {
     sugarG: s.sugarG ?? 0,
     sodiumMg: s.sodiumMg ?? 0,
     satFatG: s.satFatG ?? 0,
+    imageDataUri: s.imageDataUri ?? null,
   }
 }
 
@@ -173,7 +177,9 @@ export function FoodLoggerSheet({ open, preselectedMealTypeId = null, onClose, o
           servingSizeG: form.servingSizeG, calories: form.calories,
           proteinG: form.proteinG, carbsG: form.carbsG, fatG: form.fatG,
           fiberG: form.fiberG, sugarG: form.sugarG, sodiumMg: form.sodiumMg, satFatG: form.satFatG,
-          source: scanResult?.confidence ? 'ai' : 'manual', quantityMultiplier: quantity,
+          source: scanOriginToSource(scanResult?.origin, scanResult?.confidence),
+          quantityMultiplier: quantity,
+          imageDataUri: form.imageDataUri ?? null,
         }]
       }
 
@@ -212,9 +218,18 @@ export function FoodLoggerSheet({ open, preselectedMealTypeId = null, onClose, o
           meal = list.find(m => m.id === mealId) ?? null
         }
       }
-      // A physical label outlives the row behind it. Say so, rather than falling through to a
-      // barcode "not found" that names the wrong thing.
-      if (!meal) { toast.error('That saved meal no longer exists'); return }
+      // **Two different things land here and the old copy asserted the wrong one** (BF-57). This
+      // branch resolves an id against the SCANNING user's own meals, so it is reached both when the
+      // owner deleted their meal and when someone else's pre-BF-57 label is scanned — where the meal
+      // exists perfectly well and simply is not theirs. "No longer exists" is false in the second
+      // case, and it is the case that matters now that labels get handed to people. Name both, and
+      // point at the fix: a re-printed label carries the meal itself and needs no account at all.
+      if (!meal) {
+        toast.error('That meal is not in your library', {
+          description: 'It was deleted, or the label was printed by someone else. Newer labels carry the whole meal — ask them to share a fresh one.',
+        })
+        return
+      }
 
       // The same cache key the nutrition screens fill (TTL_LONG), so this is warm offline. The
       // local store's own getMealTypes returns a narrower row type than mealTypeForHour wants.
@@ -238,12 +253,72 @@ export function FoodLoggerSheet({ open, preselectedMealTypeId = null, onClose, o
     }
   }
 
+  /**
+   * A scanned label that carries the whole recipe (BF-57).
+   *
+   * Nothing is fetched and nothing is resolved: the payload *is* the meal, which is what makes this
+   * work in a kitchen with no signal and for someone who has never had an account here. It saves a
+   * COPY into the scanner's own library rather than logging it, because the two are different asks
+   * — a shared recipe is something you keep and cook again, and logging it immediately would put a
+   * meal in today's diary that nobody said they had eaten.
+   */
+  async function handleScannedSharedMeal(shared: SharedMeal, force = false) {
+    try {
+      // **A label is a physical object, so the same one gets scanned more than once** (LB-34) — a
+      // partner checking the fridge on Tuesday and again on Friday used to get two identical meals
+      // with nothing marking either as the copy. `findDuplicateMeal` is the same test a save
+      // already uses: a normalised name match AND macros within `DUPLICATE_MAX_FIT_DISTANCE`, both
+      // required, so two genuinely different recipes that share a name still both save.
+      //
+      // **Read local-first and never block on the network.** The whole point of a shared label is
+      // that it works in a kitchen with no signal; a duplicate check that needed a fetch would
+      // trade the feature's main property for a nicety. With no local store and no warm cache the
+      // scan just saves — under-matching is the documented preference here, because a duplicate is
+      // a nuisance and a wrongly-suppressed save is a lost recipe.
+      if (!force) {
+        const store = userId ? getLocalStore(userId) : null
+        const library = store
+          ? await store.getSavedMeals().catch(() => [] as SavedMeal[])
+          : readCacheSync<SavedMeal[]>('saved-meals') ?? []
+        const dup = findDuplicateMeal({ name: shared.name, totals: sharedMealTotals(shared) }, library)
+        if (dup) {
+          hapticLight()
+          // An action, not an Undo. LB-34 guessed Undo by analogy with the photo remove, but that
+          // shape fits an action that already happened — nothing has been written here, so the
+          // honest offer is the one the user might still want.
+          toast(`${dup.name} is already in your meals`, {
+            description: 'Scanned before, or someone shared the same recipe.',
+            action: { label: 'Save a copy', onClick: () => { void handleScannedSharedMeal(shared, true) } },
+          })
+          reset()
+          onClose()
+          return
+        }
+      }
+      const { name } = await saveSharedMealToLibrary(shared, userId, tz)
+      hapticLight()
+      toast.success(`${name} saved to your meals`, {
+        description: shared.rolled > 0
+          // Said out loud rather than buried: the numbers are exact, but a scanner who later opens
+          // the meal will find fewer ingredient rows than the author's, and finding that out by
+          // surprise reads as data loss.
+          ? `Calories and macros are exact. ${shared.rolled} ingredient${shared.rolled === 1 ? '' : 's'} arrived grouped into one entry.`
+          : undefined,
+      })
+      reset()
+      onClose()
+    } catch (err) {
+      console.error('Shared meal save failed:', err)
+      toast.error('Could not save that meal')
+    }
+  }
+
   return (
     <>
       {/* Not `open` — `step !== 'capture'`. The capture screen is the sheet below, so opening this
           one too would stack an empty shell behind it and cost a back press to get through. */}
       <Sheet open={open && step !== 'capture'} onOpenChange={o => !o && handleClose()}>
-        <SheetContent side="bottom" className="rounded-t-2xl max-h-[90vh] flex flex-col p-0 bg-secondary border-t border-border/70" hideCloseButton>
+        <SheetContent side="bottom" surface="page" className="rounded-t-2xl max-h-[90vh] flex flex-col p-0 bg-secondary border-t border-border/70" hideCloseButton>
           <div className="flex items-center justify-between px-4 pt-4 pb-2 shrink-0">
             <SheetTitle asChild><h2 className="text-base font-semibold">{STEP_LABELS[step]}</h2></SheetTitle>
             <button onClick={handleClose} aria-label="Close" className="p-2.5 text-muted-foreground hover:text-foreground">
@@ -304,6 +379,7 @@ export function FoodLoggerSheet({ open, preselectedMealTypeId = null, onClose, o
         onScanResult={handleScanResult}
         onManual={handleManual}
         onScannedSavedMeal={handleScannedSavedMeal}
+        onScannedSharedMeal={handleScannedSharedMeal}
         openOnMeals={openLibrary}
       />
     </>

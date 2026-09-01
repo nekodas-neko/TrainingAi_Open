@@ -2,17 +2,17 @@
 
 import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
-import type { FoodItem, NutritionIngredient, NutritionScanResult } from '@trainingai/shared/types/nutrition'
-import { ingredientToEntry } from '@trainingai/shared/nutrition/log-plan-meal'
+import type { FoodItem, NutritionScanResult } from '@trainingai/shared/types/nutrition'
 import { createFoodItem } from '@trainingai/shared/nutrition/create-food-item'
 import { getLocalStore } from '@/lib/local-store'
 import { AddFoodByHandForm, type AddFoodByHandValues } from './add-food-by-hand-form'
 import { IngredientSearch } from './ingredient-search'
 import { hostOf } from './recipe-url'
 import type { RecipeCandidate } from './recipe-candidates'
+import { runRecipeImport, offlineHint } from './recipe-import-run'
 import { useFoodDatabaseSearch, type ExternalFood } from '@/lib/hooks/use-food-database-search'
 import { BarcodeScanner } from './barcode-scanner'
-import { decodeMealLabelToken } from '@trainingai/shared/nutrition/label-payload'
+import { decodeMealLabelScan } from '@trainingai/shared/nutrition/label-payload'
 
 interface Props {
   /** Whether the picker's screen is on. Both searches idle when it is not. */
@@ -86,19 +86,6 @@ export function IngredientPicker({ active, userId, onAdd, onImportRecipe, onReci
     return () => { cancelled = true; clearTimeout(t) }
   }, [query, active, userId])
 
-  /**
-   * A network-only failure, said plainly.
-   *
-   * Adding a food by hand works offline now (it goes through the outbox), but an Open Food Facts
-   * hit and an AI estimate both need the network by nature — so a generic "could not add" while
-   * offline reads as a bug rather than a fact about where you are.
-   */
-  function offlineHint(): string | null {
-    return typeof navigator !== 'undefined' && navigator.onLine === false
-      ? 'That needs a connection — search your own foods, or add it by hand.'
-      : null
-  }
-
   function accept(item: FoodItem) {
     onAdd(item)
     setQuery('')
@@ -153,9 +140,14 @@ export function IngredientPicker({ active, userId, onAdd, onImportRecipe, onReci
   async function addScannedFood(code: string) {
     setScanning(false)
     // A printed meal label is a saved meal, not a product, and scanned inside a builder it would
-    // mean "nest this meal as an ingredient" — which does not exist. Say so, rather than handing a
-    // 22-character token to a product lookup that can only 400 it.
-    if (decodeMealLabelToken(code)) {
+    // mean "nest this meal as an ingredient" — which does not exist. Say so, rather than handing the
+    // payload to a product lookup that can only 400 it.
+    //
+    // `decodeMealLabelScan`, not `decodeMealLabelToken` (BF-57): labels now carry the whole recipe,
+    // which is a ~250-character string that the token check does not recognise — so without this the
+    // newer labels are the ones that fall through to the barcode route. Sibling surface to the same
+    // swap in `capture-actions.tsx`; the two are the only places a camera reaches a meal label.
+    if (decodeMealLabelScan(code)) {
       toast.error('That is a meal label. Scan a product barcode to add it as an ingredient.')
       return
     }
@@ -209,72 +201,27 @@ export function IngredientPicker({ active, userId, onAdd, onImportRecipe, onReci
   }
 
   /**
-   * A recipe from a SCREENSHOT rather than a link (BF-40).
+   * This screen's half of an import: the spinner, the message, and clearing the search box.
    *
-   * The owner's case is a Google AI overview: the ingredients are rendered into Google's own results
-   * page with the source behind a chip, so there is no recipe URL to paste and the image is the only
-   * handle on that content.
-   *
-   * `imageKind: 'recipe'` is the entire difference at the route — without it the model is asked to
-   * estimate a finished plate from a picture of a word list. **`recipeYield` still comes back null**,
-   * because a screenshot carries no JSON-LD and nothing here invents one: the builder's batch-size
-   * field asks, which is the same refusal the URL path makes and for the same reason.
-   */
-  async function importRecipeImage(image: string, mimeType: string) {
-    return importRecipeFrom({ image, mimeType, imageKind: 'recipe' }, 'Recipe', 'No recipe could be read from that image')
-  }
-
-  /**
-   * Everything both import paths do, which is everything except the request body.
-   *
-   * Extracted rather than copied: the multi-candidate branch, the serial minting, the 0.01 floor and
-   * the `recipeYield` refusal below are the parts that took two entries to get right, and a second
-   * copy of them is a second place for them to drift.
+   * **The work itself moved to `recipe-import-run.ts` with BF-52**, because the builder's own
+   * `Recipe photo · Recipe link · Describe` row runs the same import from outside this component.
+   * The multi-candidate branch, the serial minting, the 0.01 floor and the `recipeYield` refusal
+   * took two entries to get right, and a second copy of them is a second place for them to drift —
+   * which is what this comment said when the two paths were the URL and the image, and is more true
+   * now that there are four.
    */
   async function importRecipeFrom(payload: Record<string, unknown>, fallbackName: string, emptyMessage: string) {
     setImporting(true)
     try {
-      const res = await fetch('/api/nutrition/scan', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      })
-      const body = res.ok ? await res.json() : null
-      const ingredients: NutritionIngredient[] = Array.isArray(body?.ingredients) ? body.ingredients : []
-      if (ingredients.length === 0) {
-        toast.error(offlineHint() ?? emptyMessage)
-        return
-      }
-      // Several dishes: ask which, before minting anything. The top level is `candidates[0]`, so
-      // taking it and stopping would silently drop the rest of the page.
-      const candidates: RecipeCandidate[] = Array.isArray(body.candidates)
-        ? body.candidates.filter((c: RecipeCandidate) => Array.isArray(c?.ingredients) && c.ingredients.length > 0)
-        : []
-      if (candidates.length > 1) {
-        onRecipeCandidates(candidates)
-        setQuery('')
-        setSearchResults([])
-        return
-      }
-      // Serial, not `Promise.all`: each one writes the same local table and queues its own outbox
-      // row, and a nine-ingredient recipe is not worth racing them for. Same reasoning, same shape
-      // as `savePlanMealToLibrary`.
-      const entries: { item: FoodItem; qty: number }[] = []
-      for (const ing of ingredients) {
-        const entry = ingredientToEntry(ing)
-        const item = await createFoodItem(entry, userId)
-        // The schema floor is 0.01, and a sub-gram garnish rounds to 0.00 two decimals in.
-        entries.push({ item, qty: Math.max(0.01, entry.quantityMultiplier) })
-      }
-      onImportRecipe({
-        name: typeof body.name === 'string' ? body.name : fallbackName,
-        entries,
-        recipeYield: typeof body.recipeYield === 'number' ? body.recipeYield : null,
-      })
+      const outcome = await runRecipeImport(payload, fallbackName, userId)
+      if (outcome.kind === 'empty') { toast.error(offlineHint() ?? emptyMessage); return }
+      if (outcome.kind === 'error') { toast.error(offlineHint() ?? 'Could not read that recipe'); return }
+      if (outcome.kind === 'candidates') { onRecipeCandidates(outcome.candidates) }
+      else { onImportRecipe(outcome.recipe) }
+      // Both success shapes clear the field: the query that produced them is spent either way, and
+      // leaving a pasted URL in the box re-offers an import that has already happened.
       setQuery('')
       setSearchResults([])
-    } catch {
-      toast.error(offlineHint() ?? 'Could not read that recipe')
     } finally {
       setImporting(false)
     }
@@ -356,7 +303,6 @@ export function IngredientPicker({ active, userId, onAdd, onImportRecipe, onReci
         onEstimate={() => void estimateAndAdd()}
         importing={importing}
         onImportRecipe={url => void importRecipe(url)}
-        onImportRecipeImage={(image, mimeType) => void importRecipeImage(image, mimeType)}
         dbResults={dbResults}
         dbSearching={dbSearching}
         dbUnavailable={dbUnavailable}

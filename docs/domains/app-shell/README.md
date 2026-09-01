@@ -58,7 +58,37 @@ split is "does it feel slow" vs "is it actually slow at the source".
   **Fully implemented 2026-08-15** — `/more/{devices,settings,data,about}`, `/program`, and
   Settings → Developer. `components/more/sub-screen.tsx` is the navless takeover shell every More
   sub-route uses, and `components/more/more-row.tsx` is the grouped-list row. `profile-tab.tsx` went
-  845 → 465 lines and is off the `check-component-size.js` baseline.
+  845 → 465 lines and is off the `check-component-size.js` baseline. **Its 2026-08-16 owner decision
+  is still binding and is the one people re-open by accident:** `GoalsSection`, `StatsGrid`,
+  `TrophyCase`, `AchievementsSection`, "Your Year" and the season badges **stay inline on More**, and
+  `/more/goals` and `/more/achievements` were never built and are not going to be.
+- [`docs/overview/entries/2026-09-01-personal-details-consolidation.md`](../../overview/entries/2026-09-01-personal-details-consolidation.md)
+  — **BF-79: `More → Profile details` (`app/more/details/`), the ninth sub-route.** Display name,
+  biological sex, birth year and height are edited there and **nowhere else**; weight and body fat
+  appear as read-only measurements, because an input would open a second write path into
+  `body_metrics`. Targets and activity level deliberately stayed in Goals, whose missing-field notice
+  now links here rather than naming fields it cannot edit. **BF-82 inherits this placement** — moving
+  the section is a route rename, but do not re-scatter the fields while regrouping. A source guard
+  (`components/profile/__tests__/personal-details-one-editor.test.ts`) holds the one-writer rule; it
+  extracts the request-body spans rather than matching the whole file, because the first version
+  could not tell a write from a form seed.
+- [`docs/overview/entries/2026-08-31-nutrition-sheet-surface.md`](../../overview/entries/2026-08-31-nutrition-sheet-surface.md)
+  — **BF-75: `SheetContent` gained an opt-in `surface="page"`.** The app-wide sheet primitive changed,
+  so this is app-shell's as much as nutrition's. Two things bind any future work on it: the layer is
+  `-z-10` because `SheetContent` is `fixed z-50` and therefore a stacking context — without it the
+  gradient paints over every row of the sheet — and **a hit test cannot detect that**, because the
+  layer is `pointer-events-none` and `elementFromPoint` skips it whatever its paint order. Assert the
+  computed z-index. Five nutrition sheets opt in; a test holds that nothing else does.
+- **[`docs/superpowers/plans/2026-08-31-more-page-grouping-and-interaction-model.md`](../../superpowers/plans/2026-08-31-more-page-grouping-and-interaction-model.md)**
+  — **BF-82: what that migration left behind.** The rows are right; the container around them is
+  degenerate — **eight `MoreRowGroup`s wrap exactly one row each**, and the only two that group
+  anything are on the Developer sub-screen. Proposes seven headings → two, each covering three or
+  more rows, and one interaction model. Carries three corrections to the entry's premises: the
+  navigate-vs-expand affordance already exists (`ChevronRight` vs a rotating `ChevronDown`); the real
+  defect is that `goals-section.tsx` **re-implements** `MoreRowGroup` rather than using it; and there
+  are no sliders on the screen — five `Switch`es, all booleans, all correct — so the control question
+  is the owner's and the plan decides none of it. **The build is parked behind BF-79 → BF-78 (Lane
+  A)**; §3–§4 are separable if the screen needs fixing sooner.
 - Reviews: [`docs/reviews/2026-08-14-app-ui-flow-ia-review.md`](../../reviews/2026-08-14-app-ui-flow-ia-review.md) — **UI / flow / information-architecture + caching review, 2026-08-14** (owner-requested; the full navigation map with a reachability count for all 39 page routes, the proposed target structure for More/Settings/Devices/Program/Admin, and 13 findings queued as Q-232…Q-244). Its prompt is [`2026-08-14-app-ui-flow-ia-review-prompt.md`](../../reviews/2026-08-14-app-ui-flow-ia-review-prompt.md). **§7 is the separate testing-capability measurement** — the 81 "NOT verified on device" rows split into five gates, only 25 of which need the device, queued as Q-249…Q-254.
 - Handoff: [`docs/handoff-2026-08-14-app-shell-ui-flow-ia-review-and-testing-capability.md`](../../handoff-2026-08-14-app-shell-ui-flow-ia-review-and-testing-capability.md) — **2026-08-14**, both halves of that session: the IA/caching review and the agent-testing cluster, with the decisions (why Q-232 is an umbrella, why Q-249 sits above it, why the whole cluster precedes Q-49) and the traps.
 - Reviews: [`docs/reviews/2026-08-07-full-app-review.md`](../../reviews/2026-08-07-full-app-review.md) — **full-app deep review, 2026-08-07** (saving/caching/performance/logic across all 201 routes and 40 pages; 53 findings queued as Q-117…Q-138, plus root cause for Q-73 and mechanisms for Q-72/Q-107)
@@ -310,6 +340,18 @@ Live at the time of writing (2026-07-30):
   screens; NOT device-verified).
 
 ## Gotchas specific to this domain
+
+- **A dead WebView render process is FATAL by default, not silent (BF-80).** Capacitor's
+  `BridgeWebViewClient` already forwards `onRenderProcessGone` to its `WebViewListener`s, and
+  `WebViewListener`'s own default returns `false` — which the platform reads as "kill the app". So
+  grepping `android/` for `RenderProcess` finding nothing does **not** mean the event is unhandled
+  plumbing waiting to be added; it means the default answer is in force.
+  `RenderProcessRecovery.java` is the listener that changes it: `return true`, record the death,
+  and **post** `activity.recreate()` — posted because the callback runs on the UI thread with the
+  dying WebView on the stack, and `recreate()` rather than `reload()` because a WebView whose
+  renderer has gone is permanently unusable. Anything that reports a fault has to record it
+  natively: the JS reporter dies with the renderer, which is why a repeatedly-reported blank screen
+  had never produced a single `error_events` row.
 
 - **A bare `toLocaleDateString`/`toLocaleTimeString` call with no `timeZone` option is a hydration
   mismatch waiting to happen, not just a wrong-answer bug** — Railway sets no `TZ` env var, so the

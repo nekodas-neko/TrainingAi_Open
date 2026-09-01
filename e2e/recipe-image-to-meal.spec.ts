@@ -82,8 +82,13 @@ test('a recipe picture becomes ingredients, and the builder asks how many it ser
 
   await openBuilder(page)
 
-  const pick = page.getByRole('button', { name: /Build from a recipe picture/ })
-  await expect(pick, 'the affordance is offered on an empty search').toBeVisible()
+  // **`Recipe photo`, and it is in the builder's source row now (BF-52).** It used to be a
+  // full-width `Build from a recipe picture` button rendered into the ingredient search's slot, and
+  // only on an EMPTY search — one of three mutually exclusive renders of one place, which is why
+  // the owner could not find any of them. The picking code is unchanged; the chrome around it is a
+  // tile, and it is always visible.
+  const pick = page.getByRole('button', { name: 'Recipe photo' })
+  await expect(pick, 'the source row offers a recipe picture').toBeVisible()
 
   // **By name, not by type.** BF-46 ①a put the meal's photo picker at the top of this same builder,
   // so `input[type="file"]` reaches that one first and the recipe picture went to it — silently,
@@ -107,18 +112,32 @@ test('a recipe picture becomes ingredients, and the builder asks how many it ser
   await expect(page.getByText(/didn.t say how many this serves/i)).toBeVisible()
 })
 
-test('the affordance yields to a typed query and to a pasted link', async ({ page }) => {
+/**
+ * **Rewritten by BF-52, because the behaviour it asserted was deliberately removed.**
+ *
+ * It used to check that the picture button *yielded* to a typed query and to a pasted link. That
+ * yielding was the defect: the photo button, the URL import and the AI estimate were three
+ * mutually exclusive renders of one slot, so each existed only while the others did not — and the
+ * owner reported *"I dont see a URL option"* because it did not exist until they had already pasted
+ * the URL. The photo tile is in the source row now and yields to nothing.
+ *
+ * **What survives is the half that was never about layout:** a pasted link must still offer the
+ * import. Without that branch it falls through to the AI estimate, and an estimate over the text of
+ * a URL produces a food called "https" with invented macros. It is a guard, not an affordance.
+ */
+test('the photo tile no longer yields, and a pasted link still offers the import', async ({ page }) => {
   await openBuilder(page)
-  const pick = page.getByRole('button', { name: /Build from a recipe picture/ })
+  const pick = page.getByRole('button', { name: 'Recipe photo' })
   await expect(pick).toBeVisible()
 
-  // A typed query means the estimate row instead — a picture button competing with it would crowd
-  // the one control that matters on this screen.
   const search = page.getByPlaceholder(/search/i).first()
   await search.fill('chicken')
-  await expect(pick).toHaveCount(0)
+  await expect(pick, 'the tile is no longer competing for the search slot').toBeVisible()
 
   await search.fill('https://example.com/recipe')
-  await expect(pick).toHaveCount(0)
-  await expect(page.getByText(/Import the recipe from example\.com/)).toBeVisible()
+  await expect(pick).toBeVisible()
+  await expect(
+    page.getByText(/Import the recipe from example\.com/),
+    'a pasted link must not fall through to the AI estimate',
+  ).toBeVisible()
 })
