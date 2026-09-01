@@ -2115,103 +2115,43 @@ Lane A's.
   So the rule is holding now; this was a straggler, not a fourth outbreak.
 
 
-### [workouts] BF-59 — the weekly set targets are a flat large/small binary, ignoring both the app's own landmark table and the program's goal
+### [workouts] BF-59 — the AI's set prescription still steers off the flat binary
 
-- **Lane:** A — `packages/shared/src/ai-periodization/volume-targets.ts` is the source of truth;
-  `program_volume_targets` is what the screen reads, and it disagrees.
+> **✅ THE SCREEN'S HALF SHIPPED 2026-09-01.** The Training card's weekly targets are **derived**
+> from `volumeLandmarks(goal, muscle)` scaled by the week's phase mix, not read from
+> `program_volume_targets.target_sets_per_week`. `/api/weekly-muscle-sets` also returns a `phase`
+> block — scale, dominant phase and the session counts behind it — so the card can say *why* the
+> target is low. **Owner decision, 2026-09-01:** scale the target **and** print the reason;
+> multipliers accumulation 1.0 · intensification 0.8 · realisation 0.6 · deload 0.5.
+> [journal](overview/entries/2026-09-01-phase-aware-volume-targets.md)
+>
+> - **Keep:** two things, and the first is a live inconsistency rather than a nicety.
+
+- **Lane:** A for 1; B for 2.
+- **1. `signals.ts` still reads the stored number, so the ENGINE and the SCREEN now disagree.**
+  `packages/shared/src/ai-periodization/signals.ts:399` builds `volumeBudgetPerMuscleGroup` from
+  `vt.targetSetsPerWeek` — the same flat 14/10 the screen has stopped reading. Before this change
+  both were wrong together; now only the prescription is. Point it at `weeklyVolumeTarget` with the
+  session's own phase. **Deliberately not done in the same PR:** it changes prescribed sets on the
+  device, which is a behavioural change needing a device pass, where the card is a display change
+  that can be read on a screenshot.
+- **2. The card must PRINT the phase, Lane B.** The route returns `phase: { scale, dominant, counts }`
+  and nothing renders it yet, so today the target simply moved with no explanation — which is the
+  option the owner explicitly did **not** pick. One line on the Training card: *"peaking — volume is
+  meant to be low"* when `dominant` is `realisation`, and the equivalent for `deload`. Until it
+  lands, the shipped half is only two thirds of the answer.
+- **⚠ Do not re-seed `program_volume_targets` to "fix" the numbers.** The stored rows are now the
+  **roster** — which muscles the program trains — and nothing reads their number. Re-seeding
+  recreates the second source of truth this removed. Deciding whether the column becomes a per-program
+  override or is dropped is its own entry, and neither is urgent.
+- **Verify:** device — with a peaking week logged, the Training card reads at-or-near target instead
+  of red, and says why. Two owner-visible checks the sandbox cannot make: that the reduced numbers
+  feel right on their own training, and that a `strength` program's targets look visibly lower than a
+  `hypertrophy` one's.
 - **Added:** 2026-08-30 · owner, with the Health → Training screen after a full week: *"i did the
   full sessions for the week; and i was nowhere near hitting the reccomended amount of muscle sets.
-  are we aiming too high; is it calculating wrong? whats the issue?"*
-
-> **⚑ THE OWNER SUPPLIED THE MISSING CAUSE, 2026-08-30: *"oh yes cause its realization phase its
-> been less sets."*** This reframes the entry and **the framing below is incomplete without it.** In a
-> realisation/peaking block, low volume is the *prescription* — the app's own `explain.ts` calls it
-> *"peak strength — heaviest load, lowest reps"*, and `autoregulation.ts` refuses rep pushes in it.
-> **So the owner's week was correct training, and the screen painted correct training red.**
->
-> **MAV is an ACCUMULATION target.** Showing it during a peak and colouring the shortfall as failure
-> tells an athlete that doing the right thing is wrong — which is worse than a wrong number, because
-> the wrong number is at least ignorable.
->
-> **And it is not one phase per week.** Phase lives in `session_periodization`, **per program
-> session**, and production shows the owner's sessions spanning three at once — `accumulation`,
-> `intensification` and `realisation`, all with recent `updated_at`. So "this week's volume target"
-> is a computation over the phases the week's sessions are actually in, not a constant that can be
-> stored anywhere.
->
-> **What this makes the real fix**, in order of how much it matters:
-> 1. **The target must take the phase.** A realisation week should show a reduced target, or the
->    progress bar should say *"peaking — volume is meant to be low"* rather than showing a deficit.
-> 2. The per-muscle landmarks and the goal multiplier (below) — real, but second-order beside this.
->
-> **⚠ Do not ship (2) alone and call this closed.** Correcting 128 → ≈106 still paints a peaking week
-> red; it just paints it slightly less red.
-
-**The counting is right. The target is wrong — for three reasons, and the entry originally found only
-two.** Measured from the owner's screen and production:
-
-| | |
-|---|---|
-| Sessions completed | 5 — the full week, nothing skipped |
-| Sets actually logged | **50** |
-| Muscle-set credits awarded | **79** (secondary muscles at 0.5, as designed) |
-| Sum of displayed targets | **128** |
-
-Reaching 128 credits at the observed 1.58 credits-per-set ratio needs **~81 real sets a week** —
-**62% more than the program prescribed**, or ~16 sets per session across five 52-minute sessions.
-**The target is not reachable by completing the program**, which is the complaint.
-
-**Root cause: `program_volume_targets` holds a flat binary — 14 for seven "large" muscles, 10 for the
-small ones.** Every stored row read from production is one of those two numbers. That is exactly what
-the app's own landmark table says it does not do; `volume-targets.ts` opens with:
-
-> *"Landmarks are per-muscle rather than a large/small binary — muscle size alone doesn't predict
-> volume tolerance."*
-
-**Two things the stored targets throw away:**
-
-1. **The per-muscle landmarks.** Stored vs `MUSCLE_LANDMARKS` MAV: chest 14 **vs 16**, lats 14 **vs
-   16**, shoulders 14 **vs 16**, hamstrings 14 **vs 12**, glutes 14 **vs 10**, biceps 10 **vs 14**,
-   triceps 10 **vs 12**, lower back 10 **vs 8**. Only quads and upper back agree.
-2. **The goal multiplier.** The owner's active program `Shikai` is **`powerbuilding` = ×0.8**, and
-   nothing in the stored targets reflects it. Applying both fixes moves the week from **128 to ≈106**.
-
-**What that does to the owner's week — the part worth telling them:**
-
-| Muscle | Logged | Shown | Goal-adjusted MAV | Verdict |
-|---|---|---|---|---|
-| Glutes | 9 | 14 | **8** | **exceeded** |
-| Hamstrings | 10 | 14 | **10** | **met** |
-| Lower back | 7 | 10 | **6** | **exceeded** |
-| Triceps | 9 | 10 | 10 | nearly met |
-| Chest | 8 | 14 | 13 | genuinely short |
-| Lats | 6 | 14 | 13 | genuinely short |
-
-They are **not** under-training the way the screen says — on several muscles they are at or past the
-sweet spot. Real gaps remain (chest, lats, quads, upper back, shoulders, biceps); the point is the
-screen cannot currently tell the two apart.
-
-- **This is a One-Formula-One-Place violation**, the class CLAUDE.md names: two implementations of
-  weekly volume targets, and the one the user sees is the cruder one. Derive
-  `program_volume_targets` from `volumeLandmarks(trainingGoal, muscle)` instead of a binary.
-- **⚠ Seeding is not enough — these rows exist and are wrong.** `ON CONFLICT DO NOTHING` never
-  corrects a drifted row (CLAUDE.md, Postgres data migrations), so this needs an explicit idempotent
-  `UPDATE … WHERE` or every existing program keeps the flat numbers forever.
-- **Do not silently overwrite a target the owner set by hand.** If the schema cannot tell a seeded
-  target from an edited one, say so and ask before the corrective migration runs.
-- ~~**A second question: does the program prescribe enough volume to reach MAV at all?**~~
-  **Withdrawn 2026-08-30 — the owner answered it before it was asked.** 50 sets is short of MAV
-  because it is a **peaking block**, which is what a peaking block is for. There is no volume
-  shortfall to explain. *(Kept struck rather than deleted: the question was reasonable on the data
-  available and would be re-asked by the next person who looks at 50-against-106 without knowing the
-  phase — which is itself the argument for putting the phase on the screen.)*
-- **Verification:** **a week of realisation sessions does not read as a deficit** — either the target
-  drops or the card says why it is low; displayed targets match `volumeLandmarks` for the active
-  program's goal; a `strength` program (×0.65) shows visibly lower targets than a `hypertrophy` one
-  (×1.0); and an accumulation week reads at-or-near target on the muscles the table says it should.
-- **Do not "fix" this by lowering the numbers until they match.** The owner's week was correct
-  training; the target was measuring the wrong thing for that week. A target tuned until nothing ever
-  reads red measures nothing at all.
+  are we aiming too high; is it calculating wrong? whats the issue?"* — then the cause, in their own
+  words: *"oh yes cause its realization phase its been less sets."*
 
 ### [workouts] BF-56 — swapping an exercise silently changes its role, which changes the prescribed sets and percentages
 
