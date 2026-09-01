@@ -6127,3 +6127,17 @@ fix would remove the most informative input in the model.
 The baton gains the general move — **reproduce a score from its stored contributors before theorising
 about it** — plus the observation that twice now the owner's *"this is too low"* resolved to the
 **display curve** (TN-5, signed off, unshipped) rather than to the model.
+
+## 2026-09-03 — `docs/agents/state/tuning.md` → 395 (the sleep-baseline near-miss)
+
+Seven lines, and they stop a false finding that was one edit from being filed. Asked whether a 100
+sleep score is reachable, this agent compared stored `hrv` contributors against
+`oura_daily_summary.hrv_baseline_mean_x8` and concluded the owner's best nights had been inflated by
+an immature baseline. **The sleep score does not read that column.** `buildSleepAudit` calls
+`sleepScoreBaselines(prior, tz)` — a trailing window over prior nights, excluding the night being
+scored.
+
+The rule *"read which baseline a consumer actually calls"* was already in this baton from three
+earlier instances this week and was walked into anyway, which is the argument for stating it against
+the **specific** consumer rather than in general. The entry also records the positive half: this is
+the one baseline in the codebase built correctly, and TN-6 can copy it rather than invent one.

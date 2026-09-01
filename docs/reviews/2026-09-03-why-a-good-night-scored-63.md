@@ -91,6 +91,27 @@ double count). All three are independent; none blocks another.
 
 ---
 
+## ⚑ A near-miss: the sleep score does NOT use `hrv_baseline_mean_x8`
+
+Answering a follow-up about whether a 100 is reachable, this review nearly filed a second finding:
+that the owner's best nights (97 on 2026-07-23, 96 on 08-05) carried **inflated** `hrv` contributors,
+because their ratios against `oura_daily_summary.hrv_baseline_mean_x8` (1.19, 1.07) map to 92 and 80
+on `HRV_RATIO` while the stored contributors read 100 and 98.
+
+**That was the wrong baseline.** `buildSleepAudit` calls `sleepScoreBaselines(prior, tz)`
+(`sleep-score.ts:359`), a **trailing window over the prior nights' own readings**
+(`SLEEP_AUTONOMIC_BASELINE_WINDOW_NIGHTS`, newest last), excluding the night being scored. It never
+reads the `×8` EMA. The two are different objects with different values, and comparing a stored
+contributor against the EMA proves nothing.
+
+**Worth stating positively, because it is the exception in this codebase:** the sleep score's
+autonomic baseline is a **self-correcting trailing window that excludes the night under judgement**
+— the construction the TN-6 review recommended for temperature and could not find anywhere. It is
+untouched by `updateBaseline`'s zero-seed defect (BF-13).
+
+**The general rule** — already in the baton from three earlier instances this week, and walked into
+again: **read which baseline a consumer actually calls before comparing anything to a stored one.**
+
 ## Failure surfaces not exercised
 
 No code ran — SQL against production plus source reading. No `pnpm dev`, no device, no APK. The blend

@@ -237,6 +237,13 @@ sleep ✅ · readiness ✅ · activity ✅ · body ✅ · devices ✅ · workout
   2026-09-02: the ten contributors blend to **76.04**, `SCORE_CALIBRATION` ships **63**. Two minutes of
   arithmetic separated *"the model is wrong"* from *"the display curve costs 11.9 points"*.
   [`review`](../../reviews/2026-09-03-why-a-good-night-scored-63.md).
+- **⛔ The SLEEP score's autonomic baseline is NOT `hrv_baseline_mean_x8`.** `buildSleepAudit` calls
+  `sleepScoreBaselines(prior, tz)` (`sleep-score.ts:359`) — a **trailing window over prior nights'
+  own readings**, newest last, excluding the night being scored. Comparing a stored `hrv`/`hr`
+  contributor against the `×8` EMA proves nothing; it nearly produced a false *"your best nights were
+  inflated"* finding on 2026-09-03. **It is also the one baseline in this codebase built the RIGHT
+  way** — self-correcting, excludes the night under judgement, untouched by BF-13's zero seed. The
+  construction TN-6 wants for temperature already exists here; copy it.
 - **⛔ `hrv` and `hr` in the sleep score are ONE signal (TN-23)** — `r = +0.869`, **75% shared
   variance** over 38 nights, carrying **28 of 110 = 25%** of the score. A single autonomic dip is
   charged twice. **Both curves are correct** (HRV 50 ms/0.85× → 42 and HR 63/1.035× → 58 are exactly
