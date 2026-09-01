@@ -6006,6 +6006,19 @@ reads an all-false style as "use them all".
 A finding that something is *not* broken earns its lines here exactly when the thing looks broken on
 sight, which this does.
 
+## 2026-09-01 — `docs/implementation-backlog.md` → 14976 (LA-52 filed, LA-48 re-scoped)
+
+One new entry and a scope correction, both from reading code rather than from a report. The lines
+that cannot be cut are the three consequences of the pacer's speed rung being fed a whole-walk
+cumulative average: the band cannot respond within a segment, `STOPPED_KMH` can never fire once the
+average clears 1.5 km/h, and warmup/fast/slow all band against the same drifting number. Without
+them the entry reads as a preference about smoothing rather than as two of LB-36's device checks
+being unable to pass.
+
+LA-48's correction is shorter but saves more: there is **no migration and no local schema version**
+in it — `segments` is JSONB one side and TEXT the other — and the trap is the **wire schema**, where
+Zod strips an unknown key silently on both write paths.
+
 ## 2026-09-01 — `docs/implementation-backlog.md` 14940 → 14973 (BF-99 a label, BF-100 a missing mechanism)
 
 **BF-99's length is the reconciliation, and it is the point.** The owner asked why his base sits below
