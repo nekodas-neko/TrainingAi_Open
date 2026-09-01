@@ -5526,6 +5526,81 @@ whether the fix is a flag, a correction, or both.
 **Pass test:** a trailing sleep baseline computed with and without 2026-08-19 differs, and the shipped
 one matches the "without" version.
 
+### [readiness][body][devices] TN-20 — a recompute overwrites a completed day with an empty result, and the inputs to rebuild it still exist
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-01 · owner: *"is the battery + stress system working correctly?"*
+- **Lane: A** — the writer, not the model. `body_battery_daily` and `oura_daily_derived`.
+- **Do not batch.** This is data integrity, not calibration, and it is losing days now.
+- **⛔ Do not "fix" this by re-running the recompute** until the mechanism is identified — the recompute *is* what destroys the day.
+
+**Observed in both states within 24 hours**, which is what makes it provable:
+
+| `body_battery_daily` 2026-08-31 | 2026-08-31 ~02:00 UTC | 2026-09-01 |
+|---|---|---|
+| end_value | **0** | **55** |
+| total_drained | **113** | **0** |
+| hr_sample_count | **3,643** | **0** |
+
+The owner's screenshot at 21:45 Brisbane on 08-31 shows *"−113 drained"*, so **the correct value was
+computed and displayed**. `updated_at` is 08-31 12:43 UTC — an hour later — and the row now stores a
+day that never happened. **`oura_heartrate` holds 3,815 samples for that date**; the input was never
+missing.
+
+**The derived row went further.** readiness **55 → 25**, sleep **56 → 15** — against a stored summary
+of **7.83 h, HRV 54.5, RHR 63.9**. Neighbours calibrate it: 08-30 (7.92 h, HRV 72) → **69**;
+09-01 (7.50 h, HRV 65) → **54**. **A normal night is stored as the worst on record.** All four recent
+derived rows were rewritten in one pass on 2026-09-01 03:58–05:13 UTC; two came out sane.
+
+**3 of the last 11 days** carry the signature — raw samples present, stored count **0**, drained
+**0**, end **=** anchor: **2026-08-22 (265 raw), 2026-08-26 (1,954), 2026-08-31 (3,815)**. On healthy
+days the stored count sits slightly *below* raw (waking-hours windowing); **zero against thousands is
+a different failure**.
+
+**First action:** find the writer. Candidates worth checking first are the same delete-before-guard
+shape as **Q-528** (`replaceOuraDailySummary`) and any `fullHistory` path — a recompute that starts by
+clearing and then writes nothing when its input query returns empty. **Nothing stores the prior
+value**, so this is only visible by comparing against the raw tables.
+
+**Pass test:** re-running the recompute on 2026-08-31 restores drain ≈113 from the 3,815 stored
+samples, and no day whose raw HR count is non-zero stores `hr_sample_count = 0`.
+
+### [readiness] TN-21 — "daytime stress" is 55% night buckets, and night and day carry opposite signs
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-01 · found answering the owner's *"is the stress system working correctly?"*
+- **Lane: A** — windowing in the stress model, not the card.
+- **Reference:** this is a **candidate mechanism for Q-507**, which is why it is filed rather than folded in.
+
+TN-3a's persistence half shipped, so the per-bucket series is testable for the first time:
+**230 buckets over 9 days**, 2026-08-24 onward.
+
+**The series covers all 24 hours** — every hour except 07:00 — and **126 of 230 (55%) fall between
+22:00 and 06:00.**
+
+| window | buckets | mean level |
+|---|---|---|
+| night 22:00–06:00 | 126 | **+0.266** (recovered) |
+| day 06:00–22:00 | 104 | **−0.413** (stressed) |
+
+**The two halves point opposite ways and the night half is the majority**, so any daily aggregate is
+governed by the night/day *mix* — which varies with sleep length and ring wear — as much as by
+stress. Daytime is thinly sampled (2 buckets at 08:00, 6 at 09:00) because the ring power-gates its
+PPG when worn-idle; sleep is sampled densely.
+
+**A Q-507 mechanism candidate, opposite in direction to the one already refuted:**
+`corr(total buckets, stress_high_minutes)` = **−0.784** (n = 9). **Fewer buckets → MORE high-stress
+minutes** — 2026-09-01 has 21 buckets and 150 minutes; 2026-08-26 has 29 and zero. Each bucket is
+scored against *the day's own median*, so a sparse day computes that median from fewer points and
+more buckets land far from it.
+
+**⚠ n = 9. Treat the −0.784 as a lead, not a result.** It is worth recording because it is the
+**reverse** of the data-density hypothesis refuted on 2026-08-26 (r = −0.128 against *HR sample
+count*) — sample count and bucket count are different quantities, and the bucket count is the one the
+model divides by.
+
+**Pass test:** the persisted series is restricted to the waking window (or the metric is renamed and
+its consumers re-checked), and after that `stress_high_minutes` no longer correlates with bucket
+count at |r| > 0.4.
+
 ### [readiness][body][app-shell] TN-19 — the Body Battery explainer promises five mechanisms; four are inert or backwards
 
 - **Branch:** _unassigned_ · **Added:** 2026-08-31 · owner, second report on this pillar in six days: *"any work being done for this? still not very usable"*
@@ -5545,8 +5620,12 @@ mechanisms. Measured against production:
 | DRAINS · **Daytime stress** | A metric that **rises on good days** — **+0.386** with readiness, **+0.477** with the sleep score (Q-507). |
 
 **Eight days:** charged 0/1/0/3/0/0/1/1 against drained 113/52/47/70/13/0/76/79; **five of eight end
-at 0 or 2**. **2026-08-26 is the cleanest demonstration of Q-521 available**: zero HR samples → zero
-drain, zero charge, ending exactly at its anchor. **No wear, no change.**
+at 0 or 2**. **⚑ RETRACTED 2026-09-01 — the 2026-08-26 illustration was this agent's error.** It was published
+here as *"the cleanest demonstration of Q-521 available: zero HR samples → zero drain, ending exactly
+at its anchor"*. **That day has 1,954 raw HR samples**; the zero was **TN-20**, a recompute wiping the
+row, not an absence of wear. **Q-521's wear-time conclusion still stands on its own correlations**
+(+0.518 over a longer window) — what falls is the illustration. **A stored counter is a claim about
+the data, not the data**: cross-check the raw table before quoting a zero.
 
 **Why this is filed rather than folded into TN-15.** The explainer is a real usability improvement in
 intent that made things worse in effect: the app now states five **testable** claims beside the
