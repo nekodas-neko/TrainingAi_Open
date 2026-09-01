@@ -61,7 +61,15 @@ constants alone"; BF-87 carried "do not lower `STEP_BASELINE`". Both were correc
 uncompensated change and would have made an implementer refuse the approved one. They were rewritten
 in the same diff that created the new recommendation.
 
-**A `Needs:` can invert.** BF-88 waited on BF-87 while it was only "make the path legible". Now that
-it changes the model, BF-87 waits on BF-88 — ship the copy first and you write a threshold sentence
-onto a card that is about to stop having a threshold. Worth re-checking direction after any amendment
-that changes an entry's recommendation.
+**A `Needs:` can invert — and inverting it after work has started is too late.** BF-88 waited on
+BF-87 while it was only "make the path legible"; once it changed the model, the copy should have
+waited on it instead. The reorder was written and **lost the race**: Lane B merged BF-87 (#725) first,
+so three sites now print *"steps above 3,000/day"* against a model about to count from zero. BF-88
+absorbed the rewrite rather than spawning a follow-up.
+
+The sharper half is that **the guard BF-87 shipped cannot catch it**. Importing `daily-energy` into a
+client component 500s the Nutrition tab (LB-43), so the constant is mirrored in
+`components/nutrition/movement-breakdown.ts` with a test pinning it equal to the shared one. BF-88 can
+leave `STEP_BASELINE` at 3,000 as the base-subtraction amount while the step term starts at zero —
+**equal value, green test, false sentence.** A test that pins a number cannot notice the number
+changing meaning. BF-88 now calls for the rename that breaks every consumer on purpose.

@@ -5476,6 +5476,27 @@ the entry measured **4** buildable `Keep:` residues on one lane, and the classif
 across the queue — two of them written by the same session that then built the check. Also records
 the second drift found on the way (`check-backlog-pointers.js` carried its own `Keep:` regex and
 missed 11 entries `lib/keep.js` sees), so the next reader does not re-derive it.
+## 2026-08-31 — backlog raised to 14551 , `docs/agents/state/tuning.md` to 338 and `projectOverview.md` to 8524 (TN-19, the battery explainer)
+
+One entry, from the owner's second report on this pillar in six days. The length is the five-row
+table, and the table is the entry: the card names five mechanisms and **four are inert or backwards**
+— `Deep sleep` cannot fire at all, `Calm rest` produced 6 points in 8 days, `Training` moves the
+number 0.6 points, `Daytime stress` rises on good days. Naming them one at a time is what stops the
+fix being "reword the card", which would document the defect rather than repair it.
+
+The entry also carries the distinction that makes it worth filing separately from TN-15: **a wrong
+number the app explains is worse than a wrong number it does not**, because the explanation converts
+a vague doubt into a demonstrated one. That is why this pillar reads as unusable rather than merely
+miscalibrated, and it is not something TN-15's own text says.
+
+## 2026-09-01 — `projectOverview.md` → 8656, `docs/implementation-backlog.md` → 14978 (BF-87)
+
+One shipped change recorded, and one entry filed. The status block is 12 lines because the 500 is
+the part a future session needs: **no client component had ever imported `daily-energy`**, so the
+`node:fs/promises` chain behind it had never been tripped, and the next person who wants a constant
+out of it will hit the same wall. The backlog grew by LB-43, which is that fix, minus the removal of
+the shipped BF-87 entry.
+
 
 ## 2026-09-01 — `docs/implementation-backlog.md` 14977 → 14986 (BF-88 approved: gate cleared, order swapped, dependency inverted)
 
@@ -5511,3 +5532,21 @@ holds again.**
 What is left is a session's state block and three method notes, which is what this file is for. The
 baton rule is *state only, rewritten in full* — the accretion this check catches is exactly what that
 rule exists to prevent, and it caught it twice here before the number moved.
+
+## 2026-09-01 — `docs/implementation-backlog.md` 14978 → 15011, `docs/agents/state/bugfix.md` 244 → 251 (BF-87 won the race; BF-88 absorbs the consequence)
+
+The dependency inversion filed an hour earlier existed to stop BF-87's copy being written against a
+threshold BF-88 removes. **It lost the race** — Lane B merged BF-87 (#725) first — so this PR stops
+being a reorder and becomes a correction.
+
+Most of the backlog growth is two warnings inside BF-88, and the second is the one worth the lines.
+Three shipped sites now print *"steps above 3,000/day"*, and rewriting them is in BF-88 rather than a
+follow-up, because a follow-up is how a card ships a false sentence for a release. **And the guard
+BF-87 shipped cannot catch the falsehood**: the constant is mirrored into a client module (LB-43 is
+why — importing `daily-energy` 500s the Nutrition tab) with a test pinning the two values equal, and
+BF-88 can leave the value at 3,000 while changing what it *means*. Equal value, green test, false
+copy. The entry now asks for the rename that breaks every consumer on purpose.
+
+The baton and the journal entry both carried the old claim that the inversion protected BF-87. Both
+are corrected in the same diff rather than left to read as a success — the general lesson replacing
+it is that **a reorder only protects work that has not started**.

@@ -24,8 +24,23 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.416.2 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Version:** v1.416.3 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-09-01.
+
+**The calorie bar says why zero is zero (BF-87).** Owner: *"is basic steps being counted towards
+calorie burn? It says I've done 1000 but not sure if that's counting towards nutrition."* The app was
+right and the screen could not say why — only steps above 3,000 earn calories, because the sedentary
+base is already BMR × 1.2 and a desk day's stepping sits inside it. The zero line now names the
+threshold, the earned line breaks into workouts/activity/steps, and both "calories out" explainers
+quote the same number instead of "a baseline". The breakdown was first built with largest-remainder
+apportionment; re-reading `daily-energy.ts` showed `computeActiveEnergy` **already rounds all three
+parts** and `total` is their sum, so that was guarding a case its producer cannot produce — deleted,
+and replaced by a test pinning that guarantee against the real function.
+Importing the constant took `/nutrition` to a **500** — `daily-energy` → `workout-energy` →
+`oura-models` reads `node:fs/promises`, and no client component had ever imported it — so the value
+is mirrored with a test that fails if it drifts, and **LB-43** (Lane A) proposes the leaf-module split
+that deletes the mirror. **Not device-verified**
+([journal](docs/overview/entries/2026-09-01-steps-threshold-copy.md)).
 
 **The personal details are one screen, and one writer (BF-79).** Owner: *"can we combine all the
 personal information fields into 1 section in the more/details."* They were split between the Edit
@@ -835,6 +850,16 @@ window, then the newest `history-*.md`. The 157 dated status notes this section 
 > An entry only leaves when **nothing is still owed**: no open work, no pending owner or device
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
+
+### [readiness][body][app-shell] 🔴 The Body Battery card explains a model the app doesn't implement — and nothing in the chain has shipped (TN-19, 2026-08-31)
+
+**Found, not fixed. Owner's second report on this pillar in six days** — *"any work being done for this? still not very usable"*, screenshot showing **Drained 0 · started at 55 · +0 charged · −113 drained**. [`review`](docs/reviews/2026-08-31-battery-explainer-promises-inert-mechanisms.md).
+- **Nothing has shipped.** Verified on `main` 2026-08-31: **TN-15, TN-18, TN-6a, TN-6 and TN-2 are all still queued**, no commit in the last 40 touches them, and they sit at **queue positions 75–83 of 235**. **Nothing is blocked** — TN-6a, TN-18 and TN-15 all carry owner sign-off. Priority is queue position, so **this is a prioritisation decision and only the owner can make it.**
+- **The new HOW IT MOVES card lists five mechanisms; four are inert or backwards.** `Deep sleep` is **structurally impossible** (`walkBodyBattery` filters to `tsMs >= wakeTime`); `Calm rest` produced **6 points across 8 days**; `Training` moves the end value **0.6 points** (Q-521); `Daytime stress` **rises on good days** (Q-507). Only `High heart rate` works, and it tracks **wear time**.
+- **⛔ Do not reword the card.** It is TN-15's specification rendered — softening it documents the defect instead of repairing it. **Ship TN-15 and the card becomes true.**
+- **Why it now reads worse than before the card existed:** the app states five **testable** claims beside the number, so a day with a workout and 3,643 HR samples still reading **+0 charged** is a *demonstrated* failure rather than a vague doubt. **A wrong number the app explains is worse than one it does not.**
+- **2026-08-26 is the cleanest Q-521 evidence in the data** — **0 HR samples → 0 drained, 0 charged, ending exactly at its anchor.** No wear, no change.
+- **Order that would change the screenshot:** TN-6a (lifts the mean anchor **64.8 → 76.8**) → TN-18 → TN-2 (the `+0 charged` line itself) → TN-15. **The first three are small and specified.**
 
 ### [readiness][devices] 🔴 TN-6a's temperature suspension covers the readiness ladder but not the deload banner (TN-18, 2026-08-31)
 

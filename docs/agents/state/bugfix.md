@@ -212,8 +212,15 @@ age/weight/sex) — hardcoding it mis-bases every other account. **50 of 124 day
 steps**; **45 of 124** carry a plausible food log, which is what makes a TEF-from-intake term
 unusable.
 
-**BF-87 now `Needs:` BF-88 — the direction inverted mid-session.** Ship the copy first and you write
-*"steps count above 3,000"* onto a card BF-88 makes count from zero.
+**BF-87 SHIPPED FIRST (#725) AND THE INVERSION LOST THE RACE.** BF-88 was made to precede BF-87
+precisely so the copy would not be written against a threshold about to be removed; Lane B merged
+BF-87 before that PR landed. Three sites now print *"steps above 3,000/day"* and **BF-88 owns
+rewriting them** — it is in the entry, not a follow-up. **The mirror test does not protect this**:
+BF-87 mirrored `STEP_BASELINE` into `components/nutrition/movement-breakdown.ts` (LB-43 is why) and
+the test pins the two *values* equal — but BF-88 can leave the value at 3,000 while changing what it
+means, so the test stays green and the copy becomes a lie. The lesson is general: **a reorder only
+protects work that has not started, and a `Needs:` added after a lane has picked the item up is
+already too late.**
 
 **Owner still owes:** device checks on **BF-61**, **BF-62**, **BF-63**, **BF-45**, **BF-53**; the
 **BF-83** sleep check next morning (note the end time on open, then query the row immediately); and

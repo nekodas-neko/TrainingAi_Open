@@ -370,7 +370,9 @@ below threshold and left in place for next time.
 ### [nutrition][activity] BF-88 — the energy model runs on two different bases and the card never says which
 
 - **Lane:** A — `lib/health/energy-balance-service.ts:227-265` and the two constants in
-  `packages/shared/src/health/{energy-baseline,daily-energy}.ts`. Surface copy is B, and is BF-87.
+  `packages/shared/src/health/{energy-baseline,daily-energy}.ts`. **The copy is now Lane A's too, in
+  this entry** — see the shipped-copy note below.
+- **Needs:** LB-43
 - **DECIDED 2026-09-01 — the owner approved the shift and asked for it to ship.** *"yes that sounds
   good lets ship that."* The `Gate: owner` this entry carried is **cleared**; the sign-off a scoring
   change needs has been given, against the blast radius restated below (74 of 124 days unchanged
@@ -423,6 +425,35 @@ currently earn nothing from stepping at all; mean 5,716, median bucket 2–4k.
 
   And it delivers BF-87's ask as a side effect: with the floor at zero the rate is **one number**,
   ~34 kcal per 1,000 steps, linear from the first step. No threshold left to explain.
+- **⚠ BF-87 SHIPPED FIRST (#725, 2026-09-01) AND ITS COPY IS WHAT THIS ENTRY FALSIFIES.** The
+  dependency between the two was inverted for exactly this reason and the inversion did not land in
+  time — BF-87 merged first. Three live sites now print *"steps above 3,000/day"*, and this entry
+  makes steps count from zero:
+
+  | site | line |
+  |---|---|
+  | `components/nutrition/calorie-zone-bar.tsx` | `:54` — *"nothing earned from movement yet; steps count above 3,000/day"* |
+  | `components/nutrition/energy-card.tsx` | `:276` — *"from workouts, activities, and steps above 3,000/day"* |
+  | `components/nutrition/calorie-balance-bar.tsx` | `:117` — same sentence |
+
+  **Rewriting all three is part of THIS entry, not a follow-up.** After the shift the true sentence
+  is the simpler one BF-87 was originally asked for: a single rate, ~34 kcal per 1,000 steps, from
+  the first step. **The zero-state line disappears entirely** — there is no longer a case where
+  movement has earned nothing while steps exist.
+- **⚠ THE MIRROR TEST CANNOT CATCH THIS, AND THAT IS THE TRAP.** BF-87 mirrored the constant into
+  `components/nutrition/movement-breakdown.ts` (`STEP_BASELINE = 3_000`) because importing
+  `daily-energy` into a client component 500s the Nutrition tab — LB-43 is that story. Its test
+  compares the mirror against the shared constant, so the two cannot drift **in value**. But this
+  entry does not necessarily change the value: `STEP_BASELINE` may keep sitting at 3,000 as *the
+  amount subtracted from the resting base* while the step term counts from zero. **The number stays
+  equal, the test stays green, and the copy silently becomes a lie.** A test that pins a value cannot
+  notice a change of meaning. So: rename it, or split it into the two things it is now
+  (`STEP_BASE_CREDIT` for the base subtraction, and nothing at all for a threshold that no longer
+  exists), and let the rename break every consumer on purpose.
+- **Sequencing: take LB-43 first, or take it inside this entry.** LB-43 moves the constants to a
+  dependency-free leaf so a client component can import them and the mirror can be deleted. Doing
+  this entry on top of the mirror means editing the number in two places under a test that only
+  checks they match — which is the shape above. LB-43 is Lane A as well, so there is no lane handoff.
 - **⚠ The subtraction is COMPUTED, never a constant — 102 is this owner's number, not the app's.**
   It is `stepKcal(STEP_BASELINE)` at the user's own age/weight/sex, so a lighter or heavier user
   gets a different figure. Hardcoding 102 silently mis-bases every other account, and this app now
@@ -449,78 +480,38 @@ currently earn nothing from stepping at all; mean 5,716, median bucket 2–4k.
   names its basis on both paths. And a second profile (different weight) gets a different
   subtraction, proving it was computed.
 
-### [activity][nutrition] BF-87 — "nothing earned from movement yet today" is true and unexplainable, so the owner had to ask
+### [platform][nutrition] LB-43 — a client component cannot import `daily-energy`, so a display constant is mirrored
 
-- **Lane:** B — the Energy Balance card's copy (`components/health/…`, the `activeBreakdown`
-  consumer) and the Nutrition "why two numbers" block that says the same thing.
-- **Batch:** `nutrition-ui-uplift`
-- **Needs:** BF-88
-- **⚠ The dependency runs THIS way round, and it used to run the other way.** While BF-88 was only
-  "make the path legible", it waited on this entry's copy. Now that BF-88 changes the model, the
-  copy waits on it: ship this first and you write *"steps count above 3,000"* onto a card that BF-88
-  is about to make count from zero — the sentence would be wrong within a release, on the exact
-  screen this entry exists to make trustworthy. After BF-88, the copy gets **simpler**: one rate,
-  no threshold clause.
-- **Added:** 2026-09-01 · owner: *"is basic steps being counted towards calorie burn? It says I've
-  done 1000 but not sure if that's counting towards nutrition."* — then, having been told the model
-  is correct: *"if its base metabolism thats fine. but i would like to see steps = calories so I know
-  roughly how much effort translates to how much."* **That second sentence is the requirement.** The
-  ask is not a number on a card; it is an exchange rate the owner can hold in his head.
+- **Lane:** A — the fix edits `packages/shared/**`. Lane B can only mirror the value, which is what
+  BF-87 did.
+- **Added:** 2026-09-01 · found by BF-87, which needed `STEP_BASELINE` for **copy** and took the
+  whole Nutrition tab to a 500 getting it.
 
-**The app is correct and the screen cannot say why.** The owner's screenshot holds both halves of the
-contradiction he is reporting: **STEPS 1,196 Today** beside *"1,365 base — nothing earned from
-movement yet today"*. Both are true, because of one constant:
+**The chain, measured rather than guessed.** `packages/shared/src/health/daily-energy.ts` imports
+`workout-energy.ts`, which imports `@/lib/oura-models/constants`, which reads `node:fs/promises`.
+Turbopack fails the client chunk outright — *"the chunking context (unknown) does not support
+external modules (request: node:fs/promises)"* — and `/nutrition` returns 500. **No client component
+had ever imported `daily-energy`**, so nothing had tripped it before; BF-87's was the first, and it
+only wanted one number to print.
 
-```ts
-// packages/shared/src/health/daily-energy.ts
-export const STEP_BASELINE = 3000
-const netSteps = Math.max(0, ped - STEP_BASELINE - loggedOutdoorSteps)
-if (netSteps > 0) stepsKcal = est(14, netSteps / WALKING_CADENCE_SPM)
-```
+**What BF-87 shipped instead.** `components/nutrition/movement-breakdown.ts` declares its own
+`STEP_BASELINE = 3_000` with the reason written above it, and
+`__tests__/movement-breakdown.test.ts` imports the shared constant — tests run in node, where the
+chain is harmless — and fails if the two disagree. So it cannot drift silently. It is still a second
+copy of a number, which the one-formula rule is against, and this entry is how it stops being one.
 
-**Only steps above 3,000 earn calories**, deliberately: the sedentary base is BMR × 1.2, and a desk
-day's incidental stepping is already inside that multiplier. Counting every step would double-count
-it. The constant's own comment says exactly this. At 1,196 steps the honest answer is zero, and the
-card gives the honest answer without the reason.
-
-- **This is not a maths fix — it is a copy fix, and a small one.** The card already knows both
-  numbers. *"Steps add to your burn above 3,000/day — 1,196 so far"* answers the question on the
-  screen that raised it. Same for the Nutrition tab's "why two numbers" block, which repeats the
-  phrase.
-- **⚠ Show the threshold, not just the shortfall.** The owner's step goal is 7,000, so on a good day
-  only **4,000** steps convert — roughly 40 minutes of walking at the model's 100 steps/min. A user
-  who thinks all 7,000 count will read the burn as too low and go looking for a bug, which is this
-  report one step later.
-- **The rate, measured through the real estimator for the owner's profile (2026-09-01).** Not
-  approximated — driven through `computeActiveEnergy` itself, so an implementation can be checked
-  against it:
-
-  | steps | 1,196 | 3,000 | 5,000 | 7,000 | 10,000 | 15,000 |
-  |---|---|---|---|---|---|---|
-  | kcal | 0 | 0 | 68 | 136 | 237 | 407 |
-
-  **≈ 34 kcal per 1,000 steps, above the first 3,000.** Linear above the threshold, because the
-  estimator is `minutes × (MET − 1.5) × BMR/min` and minutes are `steps / 100`.
-- **⚠ "Steps = calories" is TWO numbers here, and shipping one of them is the bug this entry is
-  about.** A bare *"1,000 steps ≈ 34 kcal"* is wrong at the bottom of the range — precisely where
-  the owner was standing when he asked, and where **50 of his last 124 days** sit. The pair that is
-  actually true: *nothing below 3,000, then ~34 per 1,000.* Whatever the surface ends up being (a
-  line under the steps tile, a tooltip, a row in the burn breakdown), it has to carry both halves or
-  it recreates the confusion in a new place.
-- **The two other addends are silent in the same way.** `workoutKcal` and `activityKcal` also roll
-  into one "earned from movement" figure with no breakdown at the point of confusion —
-  `activeBreakdown` already returns all three separately (Q-391 made sure the parts sum to the
-  total), so the data for a one-line breakdown is already in hand.
-- **⚠ Do not "fix" this by lowering or removing `STEP_BASELINE` on its own** — uncompensated, it
-  deletes the double-count guard and costs 177 kcal/day across every one of the owner's 124 days
-  (measured, BF-88). **But see BF-88: the owner has since proposed the compensated version** —
-  subtract the first 3,000 steps' worth from the resting base and count from zero — which is
-  identical at and above 3,000 steps and gives this entry its single linear rate for free. If BF-88
-  ships first, this entry's copy gets simpler, not harder: one rate, no threshold sentence.
-- **Verification:** on a morning below the threshold the card says why and names the number; above it,
-  the earned figure appears and the explanation stops; and the three addends shown never disagree
-  with the total. **And the owner can answer "how many steps for 100 kcal?" from the screen alone**
-  — that is the test this entry is really for; the numbers above say the answer is about 6,000.
+- **The fix is a leaf module, not a refactor of the maths.** `STEP_BASELINE`, `SEDENTARY_MULTIPLIER`,
+  `STEPS_PER_KM` and `WALKING_CADENCE_SPM` are plain constants with no dependencies; moved into
+  something like `packages/shared/src/health/energy-constants.ts` and re-exported from
+  `daily-energy.ts`, every existing importer is unaffected and a client component can take the
+  constant without the chain. Then delete the mirror and point the test at the real thing.
+- **⚠ Do not "fix" it by making `oura-models` client-safe.** That module reads model files off disk
+  on purpose; the problem is not that it is server-only, it is that a display constant is behind it.
+- **The blast radius is worth measuring first.** `daily-energy.ts` is imported by the energy service,
+  the AI tools and the meal-plan routes — all server-side — so the move should be additive and
+  invisible to them. Confirm with `grep -rn "shared/health/daily-energy"` before and after.
+- **Verification:** a client component imports the constant and `/nutrition` still returns 200;
+  `movement-breakdown.ts` no longer declares its own; the shared module's own tests are unchanged.
 
 ### [platform] LB-40 — a user who already has a password cannot change it: the form never asks for the current one
 
@@ -5248,6 +5239,40 @@ whether the fix is a flag, a correction, or both.
 
 **Pass test:** a trailing sleep baseline computed with and without 2026-08-19 differs, and the shipped
 one matches the "without" version.
+
+### [readiness][body][app-shell] TN-19 — the Body Battery explainer promises five mechanisms; four are inert or backwards
+
+- **Branch:** _unassigned_ · **Added:** 2026-08-31 · owner, second report on this pillar in six days: *"any work being done for this? still not very usable"*
+- **Lane: A** — the defect is in the model, not the card. `components/body-battery-card.tsx` is Lane B and **should not be touched for this**.
+- **Needs: TN-15** — shipping TN-15 is what makes the card true.
+- **⛔ Do NOT "fix" this by rewording the card.** That documents the defect instead of repairing it. The card is **correct about what the model should do** — it is TN-15's specification, rendered.
+
+`body-battery-card.tsx` now renders a **HOW IT MOVES** panel listing two recharge and three drain
+mechanisms. Measured against production:
+
+| the card says | measured |
+|---|---|
+| RECHARGES · **Deep sleep** | **Structurally impossible** — `walkBodyBattery` filters to `tsMs >= wakeTime`; overnight is never simulated. Sleep reaches the number only through the readiness anchor, which the card lists separately. |
+| RECHARGES · **Calm rest** | **6 points across 8 days**, 0 on 2026-08-31. Charging needs HR ≤ `restingHr + 0.05 × reserve` — a time-weighted **0.5%** of the waking day (TN-2). |
+| DRAINS · **Training** | **0.6 points** for a whole workout (Q-521). |
+| DRAINS · **High heart rate** | **The only one that works**, and it tracks *wear time* — `corr(hr_sample_count, drained)` **+0.518** vs `corr(steps, drained)` **−0.153** (Q-521). |
+| DRAINS · **Daytime stress** | A metric that **rises on good days** — **+0.386** with readiness, **+0.477** with the sleep score (Q-507). |
+
+**Eight days:** charged 0/1/0/3/0/0/1/1 against drained 113/52/47/70/13/0/76/79; **five of eight end
+at 0 or 2**. **2026-08-26 is the cleanest demonstration of Q-521 available**: zero HR samples → zero
+drain, zero charge, ending exactly at its anchor. **No wear, no change.**
+
+**Why this is filed rather than folded into TN-15.** The explainer is a real usability improvement in
+intent that made things worse in effect: the app now states five **testable** claims beside the
+number, so the owner can check them against a day they trained and wore the ring for 3,643 samples
+and still saw **+0 charged**. **A wrong number the app explains is worse than a wrong number it does
+not** — the explanation converts a vague doubt into a demonstrated one. That is a distinct harm from
+"the model is miscalibrated", and it is why this pillar reads as *"not very usable"* rather than
+merely inaccurate.
+
+**Pass test:** on a day with a completed workout and normal wear, the card's five mechanisms each
+move the number in the direction and rough magnitude the card claims — specifically `Training`
+contributes ≥10 points of drain and the recharge half exceeds 6 points in a single day.
 
 ### [readiness][body] TN-15 — Body Battery: drain that ignores exercise, and no recharge at all
 
