@@ -18,6 +18,7 @@ import { ErrorReporter } from "@/components/error-reporter";
 import { NavTimingProbe } from "@/components/perf/nav-timing-probe";
 import { BRAND_THEME_STORAGE_KEY, CUSTOM_HUE_STORAGE_KEY } from "@trainingai/shared/brand-themes";
 import { UserTimezoneProvider } from "@/components/shell/user-timezone-provider";
+import { LocalDayProvider } from "@/components/shell/local-day-provider";
 import { WorkoutDayRollover } from "@/components/shell/workout-day-rollover";
 import { auth } from "@/auth";
 import "./globals.css";
@@ -147,24 +148,26 @@ export default async function RootLayout({
             default is what every user resolves to. Reversing this is still deleting props. */}
         <ThemeProvider attribute="class" forcedTheme="dark" defaultTheme="dark" enableSystem={false}>
           <UserTimezoneProvider timezone={timezone}>
-          <MotionConfig reducedMotion="user">
-            <DynamicBackground />
-            <ErrorReporter />
-            <NavTimingProbe />
-            <main className="relative z-[1] h-full">{children}</main>
-            <Toaster />
-            <OfflineIndicator />
-            <LocalStoreDeadBanner />
-            <ServiceWorkerRegistration />
-            <HealthConnectProvider />
-            <MobileAuthHandler hasSession={!!userId} />
-            <SyncProvider userId={userId} />
-            <TabSwipeNavigator />
-            <WorkoutDayRollover />
-            <CapacitorNativeInit />
-            <AutoDetectionProvider />
-            <LiveHrAmbientProvider />
-          </MotionConfig>
+            <LocalDayProvider>
+              <MotionConfig reducedMotion="user">
+              <DynamicBackground />
+              <ErrorReporter />
+              <NavTimingProbe />
+              <main className="relative z-[1] h-full">{children}</main>
+              <Toaster />
+              <OfflineIndicator />
+              <LocalStoreDeadBanner />
+              <ServiceWorkerRegistration />
+              <HealthConnectProvider />
+              <MobileAuthHandler hasSession={!!userId} />
+              <SyncProvider userId={userId} />
+              <TabSwipeNavigator />
+              <WorkoutDayRollover />
+              <CapacitorNativeInit />
+              <AutoDetectionProvider />
+              <LiveHrAmbientProvider />
+              </MotionConfig>
+            </LocalDayProvider>
           </UserTimezoneProvider>
         </ThemeProvider>
       </body>

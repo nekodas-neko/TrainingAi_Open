@@ -5792,3 +5792,12 @@ show why the original was wrong invites the next reader to reinstate it.
 a lead not a result**, and specifically noted as the *reverse* of the density hypothesis refuted six
 days earlier — the two use different quantities, and conflating them is exactly how that refutation
 gets mis-cited.
+
+## 2026-09-01 — `projectOverview.md` → 8810, `docs/implementation-backlog.md` → 15176 (BF-86)
+
+One shipped fix, and the backlog entry shrank rather than grew — BF-86's queue text became a `Keep:`
+plus the new `Verify: device`, since what remains is a look on the phone rather than work. The
+status block is 13 lines because two of them are the part a future session needs and neither is the
+bug: the **"close / full reset" the owner asked for is deliberately not built**, and the e2e test's
+first version **passed with the fix reverted**. A shorter block would lose both and invite the reset
+being built next time it is mentioned.
