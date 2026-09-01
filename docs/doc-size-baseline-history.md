@@ -6292,6 +6292,30 @@ earlier instances this week and was walked into anyway, which is the argument fo
 the **specific** consumer rather than in general. The entry also records the positive half: this is
 the one baseline in the codebase built correctly, and TN-6 can copy it rather than invent one.
 
+## 2026-09-01 — three docs raised for the fault beat and two walk reports (BF-106/107/108)
+
+`docs/implementation-backlog.md` 15481 → 15610, `projectOverview.md` 9063 → 9115, `CLAUDE.md`
+1198 → 1204.
+
+The backlog gains three entries. **BF-106** is the third database-size reading `projectOverview.md`
+asked for, and it costs its length by ruling things out rather than asserting: ingest is flat, the
+7-day window holds, `n_dead_tup` is 0 with autovacuum having just run — so the above-trend growth is
+neither data nor bloat but an un-pressed `VACUUM FULL` the packer's own docstring already calls "a
+single press". The Q-315 precedent is written in beside it, because the identical argument about
+`error_events` predicted a large reclaim and the button returned 0 B. **BF-107** and **BF-108** are two
+owner reports from one walk; each names the trap that makes the obvious fix wrong — adding a calories
+tile renders a dash, because the value is derived server-side after the screen paints; and fixing only
+the Done destination leaves the stale title, which is reachable from the tab bar anyway.
+
+`projectOverview.md` replaces the growth row with its resolution (the superseded reading is folded
+into a `<details>` rather than deleted) and adds a production confirmation to the LA-37 row that
+narrows the device check from "does the fix work" to "press the button".
+
+`CLAUDE.md`'s +6 lines are a correction, not an addition: it stated `last_analyze`/`last_autovacuum`
+are "NULL on every table", which was true on 2026-08-20 and is false now. The rule it justified — use
+`count(*)` — survives and is more important than before, because coverage is now *partial*:
+`oura_raw_samples` reads exactly right while `oura_raw_packed` still reads 55 against 1,051, and
+nothing in the output says which side a table is on.
 ## 2026-09-01 — `projectOverview.md` → 9078 (BF-101)
 
 +15 for a feature whose whole point is a claim about *numbers*, and the numbers are what has to be in
@@ -6311,7 +6335,7 @@ branch sat behind a red base, so the number this branch first wrote (9068, from 
 stale by exactly the block someone else added. 9078 is the merged file's own count.
 
 
-## 2026-09-01 — `projectOverview.md` → 9093 (LA-52)
+## 2026-09-01 — `projectOverview.md` → 9145 (LA-52)
 
 +15 for a defect whose whole content is *which number the screen was showing*. The three
 consequences — the band cannot respond, `STOPPED_KMH` can never fire, warm-up/fast/slow band against
@@ -6323,14 +6347,15 @@ the code comment beside it actively said the opposite, and it is the part a read
 looking at the screen. The e2e line is there because a spec that asserts something now deliberately
 false is the kind of thing a later session "fixes" back.
 
-**This number was recomputed twice and the warning it was written under came true.** The branch first
+**This number was recomputed three times and the warning it was written under came true.** The branch first
 wrote 9068 against a 9053 base; `main` then moved to 9063 behind a red CI (#775, #778, #766), making
-that stale before anything merged, and #776 (BF-101) landed its own 15-line status block on top.
-9093 is the merged file's own count. Both intermediate numbers were arrived at by recomputing from
+that stale before anything merged; #776 (BF-101) then landed its own 15-line status block on top, and
+#780 (BF-106) another after that.
+9145 is the merged file's own count. All three intermediate numbers were arrived at by recomputing from
 the file rather than splicing the conflict hunks, which is the only resolution that survives a base
 moving twice.
 
-## 2026-09-01 — `docs/implementation-backlog.md` → 15534 (LA-52 + two splits)
+## 2026-09-01 — `docs/implementation-backlog.md` → 15663 (LA-52 + two splits)
 
 +56, and only about a third of it is LA-52's own shipped entry. The rest is two splits — **LB-49**
 (the meal-log scale argument) and **LB-50** (the measured activity factor plus a prompt string that
