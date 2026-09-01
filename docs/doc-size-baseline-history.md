@@ -5693,3 +5693,24 @@ The entry also answers the owner's *"make it smaller if needed"* with the reason
 lever, and names the fallback that is right if the longest dates still overflow — shorten the date,
 not the chip, because a phone already shows the date elsewhere and shows neither the temperature nor
 the UV.
+
+## 2026-09-01 — backlog → 15278, `projectOverview.md` → 8758, `docs/agents/state/tuning.md` → 359 (TN-20/TN-21, and a retraction)
+
+**TN-20 is a data-integrity finding, and the length is the evidence that it is one.** A completed day
+was observed in **both states within 24 hours** — 2026-08-31 read 113 drained / 3,643 samples, the
+owner screenshotted it, and an hour later it stored 0 / 0 / end = anchor while 3,815 raw samples sat
+untouched in `oura_heartrate`. Nothing logs the prior value, so the before/after table **is** the
+proof; without it the entry is an unfalsifiable claim that a number used to be different. The derived
+row's 55 → 25 / 56 → 15 against a normal 7.83 h summary is the second half, and the three-of-eleven
+signature is what makes it a defect rather than an anecdote.
+
+**It also carries a retraction of this agent's own published evidence.** TN-19 cited 2026-08-26 as
+*"zero HR samples → zero drain"*; that day has **1,954 raw samples**, so the zero was TN-20. Q-521's
+conclusion survives on its own correlations; the illustration does not. A retraction that does not
+show why the original was wrong invites the next reader to reinstate it.
+
+**TN-21** is shorter and mostly one table: the persisted stress series covers all 24 hours and is
+**55% night**, with the two halves carrying opposite signs. Its Q-507 candidate is flagged **n = 9,
+a lead not a result**, and specifically noted as the *reverse* of the density hypothesis refuted six
+days earlier — the two use different quantities, and conflating them is exactly how that refutation
+gets mis-cited.
