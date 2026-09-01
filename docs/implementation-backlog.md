@@ -5254,7 +5254,23 @@ established. Until one is, this stays parked.
 
 ### [readiness] TN-18 — TN-6a's suspension covers the readiness ladder but NOT the deload banner, which is the one the owner sees
 
-- **Branch:** _unassigned_ · **Added:** 2026-08-31 · owner screenshot, 2026-08-31 06:43 Brisbane
+- **Keep — FIXED 2026-08-31; what is owed is the owner seeing a quiet morning.** `computeDeloadStrength`
+  now takes a `temperatureTrusted` flag and the adapter computes it with `isTemperatureBaselineCentred`
+  — the same function readiness uses, imported rather than re-derived. `TEMP_ALERT_THRESHOLD_C` is
+  untouched. An absent flag suppresses, matching how an absent baseline count already behaves, and
+  the flag rides in `signals` so the explain page can say *suspended* rather than showing a
+  deviation over the threshold beside no alert.
+  **The fix needed a second change the entry did not anticipate, and it introduced its own hazard:**
+  judging centredness needs the trailing deviations, so the adapter's summary read widened from
+  today-only to the same 28-day window readiness uses — which turned `summaryRows[0]` from *today*
+  into *the oldest of 28 nights*. A month-stale deviation feeding a deload banner would have been a
+  worse bug than the one being fixed, and the first version of the new test file passed with it in
+  place. `todaySummary` is found by date now, pinned by its own case.
+  **What is owed is only the observation:** the pass test is a morning where the banner stays quiet
+  on an over-threshold night, and that is the owner's to see. The third consumer the entry names
+  (`tempZ` / the illness radar) was **not** touched — it is not firing wrongly, it cannot fire at
+  all while the sd is 12x too wide, and that is TN-6's subject rather than this one's.
+- **Branch:** `lane-a/deload-temp-gate` · **Added:** 2026-08-31 · owner screenshot, 2026-08-31 06:43 Brisbane
 - **Lane: A** — `packages/shared/src/ai-periodization/ai-dynamic.ts:184`
 - **Do not batch** — it is one condition, and it un-does a daily false alarm the owner has reported twice.
 

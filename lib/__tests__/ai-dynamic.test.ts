@@ -98,9 +98,12 @@ describe('computeAiDynamicNextSession', () => {
     expect(result.deloadStrength).toBe('strong')
   })
 
+  // `temperatureTrusted: true` was added to this case by TN-18, not to make a failure go away: the
+  // case is about baseline MATURITY (a different axis) and it has to hold the other axis fixed to
+  // still test one thing. The suppression it now has to clear is the next block down.
   it('flags recommended deload on temperature alert once the baseline is mature', () => {
     const history = makeHistory(['Push'], [1])
-    const result = computeAiDynamicNextSession({ ...baseInput, history, temperatureDeviation: 0.7, temperatureBaselineDays: 30 })
+    const result = computeAiDynamicNextSession({ ...baseInput, history, temperatureDeviation: 0.7, temperatureBaselineDays: 30, temperatureTrusted: true })
     expect(result.deloadOrRestRecommended).toBe(true)
     expect(result.temperatureAlert).toBe(true)
     expect(result.consecutiveTrainingDays).toBe(1)
@@ -108,9 +111,59 @@ describe('computeAiDynamicNextSession', () => {
 
   it('does NOT fire the temperature deload until the baseline is mature (≥30 nights)', () => {
     const history = makeHistory(['Push'], [1])
-    const result = computeAiDynamicNextSession({ ...baseInput, history, temperatureDeviation: 0.7, temperatureBaselineDays: 12 })
+    const result = computeAiDynamicNextSession({ ...baseInput, history, temperatureDeviation: 0.7, temperatureBaselineDays: 12, temperatureTrusted: true })
     expect(result.temperatureAlert).toBe(false)
     expect(result.deloadOrRestRecommended).toBe(false)
+  })
+
+  // TN-18. TN-6a suspended the temperature ladder in readiness and said it "must cover all three
+  // consumers"; it covered one — and it was the path the owner does not read. This is the path
+  // behind the original report: "its often triggering deload days. its not trustable yet."
+  //
+  // The owner's 2026-08-31 screenshot held both halves for one night: `temp_dev_c` = 0.519 °C, so
+  // this banner said "Body temp elevated — rest or deload recommended", while the readiness
+  // contributor scored temperature 80/100 off the same number, because the baseline sd is 12x too
+  // wide. Two paths, one broken baseline, opposite verdicts.
+  it('does NOT fire the temperature deload while the baseline is not centred, even at 30 nights', () => {
+    const history = makeHistory(['Push'], [1])
+    const result = computeAiDynamicNextSession({ ...baseInput, history, temperatureDeviation: 0.7, temperatureBaselineDays: 30, temperatureTrusted: false })
+    expect(result.temperatureAlert).toBe(false)
+    expect(result.deloadOrRestRecommended).toBe(false)
+  })
+
+  // The owner's exact night, to three decimals — over the 0.5 threshold and mature, so maturity
+  // alone would have fired it. Only the centredness condition suppresses this one.
+  it('suppresses the owner\'s 0.519 °C night', () => {
+    const history = makeHistory(['Push'], [1])
+    const result = computeAiDynamicNextSession({ ...baseInput, history, temperatureDeviation: 0.519, temperatureBaselineDays: 34, temperatureTrusted: false })
+    expect(result.temperatureAlert).toBe(false)
+  })
+
+  // Omitting it must suppress, not fire. The safe direction, and the same way `temperatureBaselineDays`
+  // behaves when absent — both unknowns fail closed rather than one of them opening the gate.
+  it('treats an absent trust flag as not trusted', () => {
+    const history = makeHistory(['Push'], [1])
+    const result = computeAiDynamicNextSession({ ...baseInput, history, temperatureDeviation: 0.7, temperatureBaselineDays: 30 })
+    expect(result.temperatureAlert).toBe(false)
+  })
+
+  // The suspension must not swallow the signal it exists to protect. A fever still deloads, from a
+  // different branch entirely — TN-6a's stated cost was fever detection *through the ladder*, and
+  // this is the path that does not go through it.
+  it('still deloads on a fever while temperature is suspended', () => {
+    const history = makeHistory(['Push'], [1])
+    const result = computeAiDynamicNextSession({ ...baseInput, history, temperatureDeviation: 0.7, temperatureBaselineDays: 30, temperatureTrusted: false, illnessFlag: 'fever' })
+    expect(result.deloadOrRestRecommended).toBe(true)
+    expect(result.deloadStrength).toBe('strong')
+  })
+
+  // And the OTHER deload reasons are untouched: the suspension is one condition on one alert, not
+  // a mute on the banner.
+  it('still deloads on a stressful day while temperature is suspended', () => {
+    const history = makeHistory(['Push'], [1])
+    const result = computeAiDynamicNextSession({ ...baseInput, history, temperatureDeviation: 0.7, temperatureBaselineDays: 30, temperatureTrusted: false, daySummary: 'very_stressful' })
+    expect(result.deloadOrRestRecommended).toBe(true)
+    expect(result.temperatureAlert).toBe(false)
   })
 
   it('flags recommended deload on very_stressful day summary', () => {
