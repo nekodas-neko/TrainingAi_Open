@@ -5476,3 +5476,38 @@ the entry measured **4** buildable `Keep:` residues on one lane, and the classif
 across the queue — two of them written by the same session that then built the check. Also records
 the second drift found on the way (`check-backlog-pointers.js` carried its own `Keep:` regex and
 missed 11 entries `lib/keep.js` sees), so the next reader does not re-derive it.
+
+## 2026-09-01 — `docs/implementation-backlog.md` 14977 → 14986 (BF-88 approved: gate cleared, order swapped, dependency inverted)
+
+The owner approved the compensated shift — *"yes that sounds good lets ship that"* — so BF-88's
+`Gate: owner` is cleared and it becomes Lane A's #1 READY item. Three edits, and the growth is
+almost entirely the third.
+
+The gate line is replaced by a **DECIDED** line carrying the owner's words and the blast radius the
+sign-off was given against, so the approval and what was approved cannot drift apart.
+
+BF-88 moves above BF-87 in the queue, and **the `Needs:` between them inverts**. That is the part
+worth the words: BF-88 waited on BF-87 while it was only "make the path legible", and now that it
+changes the model, the copy waits on it. Shipping BF-87 first writes *"steps count above 3,000"* onto
+a card BF-88 is about to make count from zero — a wrong sentence within a release, on the exact
+screen BF-87 exists to make trustworthy. The inversion is explained in the entry rather than just
+performed, because a reader who remembers the old direction will otherwise assume it is a mistake.
+
+## 2026-09-01 — `docs/agents/state/bugfix.md` 205 → 244 (a session's state, after two rounds of putting things elsewhere)
+
+The first draft was **57 over** and the check was right to refuse it: most of it was narrative about
+how the owner's three questions improved, which is journal material. That went to
+`docs/overview/entries/2026-09-01-energy-model-intake.md` and the baton kept the state — decision,
+numbers, the inverted `Needs:`, what the owner still owes. **−16 lines.**
+
+The second pass fixed a structural mistake rather than a size one. Four lessons had been prepended
+into *"What this session learned that the traps list did not already say"* — a heading that names a
+**different** session, so two sessions were merging under one title. Three moved to **Method notes
+worth reusing**, which is the permanent section they were always for; the fourth is a trap and folded
+into the existing stacked-PR bullet, which already covered the marker-conflict case and now covers
+the clean-auto-merge case that actually fired this session. **−2 lines, and the file's own structure
+holds again.**
+
+What is left is a session's state block and three method notes, which is what this file is for. The
+baton rule is *state only, rewritten in full* — the accretion this check catches is exactly what that
+rule exists to prevent, and it caught it twice here before the number moved.

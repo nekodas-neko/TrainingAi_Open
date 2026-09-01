@@ -367,79 +367,15 @@ below threshold and left in place for next time.
 > BF-29 (My meals), BF-30 (Meal detail), BF-31 (Edit meal) and BF-26 (Quantity). Two artboards need
 > no entry — `Tap targets` and the `srv/g` studies both shipped in Q-395a.
 
-### [activity][nutrition] BF-87 — "nothing earned from movement yet today" is true and unexplainable, so the owner had to ask
-
-- **Lane:** B — the Energy Balance card's copy (`components/health/…`, the `activeBreakdown`
-  consumer) and the Nutrition "why two numbers" block that says the same thing.
-- **Batch:** `nutrition-ui-uplift`
-- **Added:** 2026-09-01 · owner: *"is basic steps being counted towards calorie burn? It says I've
-  done 1000 but not sure if that's counting towards nutrition."* — then, having been told the model
-  is correct: *"if its base metabolism thats fine. but i would like to see steps = calories so I know
-  roughly how much effort translates to how much."* **That second sentence is the requirement.** The
-  ask is not a number on a card; it is an exchange rate the owner can hold in his head.
-
-**The app is correct and the screen cannot say why.** The owner's screenshot holds both halves of the
-contradiction he is reporting: **STEPS 1,196 Today** beside *"1,365 base — nothing earned from
-movement yet today"*. Both are true, because of one constant:
-
-```ts
-// packages/shared/src/health/daily-energy.ts
-export const STEP_BASELINE = 3000
-const netSteps = Math.max(0, ped - STEP_BASELINE - loggedOutdoorSteps)
-if (netSteps > 0) stepsKcal = est(14, netSteps / WALKING_CADENCE_SPM)
-```
-
-**Only steps above 3,000 earn calories**, deliberately: the sedentary base is BMR × 1.2, and a desk
-day's incidental stepping is already inside that multiplier. Counting every step would double-count
-it. The constant's own comment says exactly this. At 1,196 steps the honest answer is zero, and the
-card gives the honest answer without the reason.
-
-- **This is not a maths fix — it is a copy fix, and a small one.** The card already knows both
-  numbers. *"Steps add to your burn above 3,000/day — 1,196 so far"* answers the question on the
-  screen that raised it. Same for the Nutrition tab's "why two numbers" block, which repeats the
-  phrase.
-- **⚠ Show the threshold, not just the shortfall.** The owner's step goal is 7,000, so on a good day
-  only **4,000** steps convert — roughly 40 minutes of walking at the model's 100 steps/min. A user
-  who thinks all 7,000 count will read the burn as too low and go looking for a bug, which is this
-  report one step later.
-- **The rate, measured through the real estimator for the owner's profile (2026-09-01).** Not
-  approximated — driven through `computeActiveEnergy` itself, so an implementation can be checked
-  against it:
-
-  | steps | 1,196 | 3,000 | 5,000 | 7,000 | 10,000 | 15,000 |
-  |---|---|---|---|---|---|---|
-  | kcal | 0 | 0 | 68 | 136 | 237 | 407 |
-
-  **≈ 34 kcal per 1,000 steps, above the first 3,000.** Linear above the threshold, because the
-  estimator is `minutes × (MET − 1.5) × BMR/min` and minutes are `steps / 100`.
-- **⚠ "Steps = calories" is TWO numbers here, and shipping one of them is the bug this entry is
-  about.** A bare *"1,000 steps ≈ 34 kcal"* is wrong at the bottom of the range — precisely where
-  the owner was standing when he asked, and where **50 of his last 124 days** sit. The pair that is
-  actually true: *nothing below 3,000, then ~34 per 1,000.* Whatever the surface ends up being (a
-  line under the steps tile, a tooltip, a row in the burn breakdown), it has to carry both halves or
-  it recreates the confusion in a new place.
-- **The two other addends are silent in the same way.** `workoutKcal` and `activityKcal` also roll
-  into one "earned from movement" figure with no breakdown at the point of confusion —
-  `activeBreakdown` already returns all three separately (Q-391 made sure the parts sum to the
-  total), so the data for a one-line breakdown is already in hand.
-- **⚠ Do not "fix" this by lowering or removing `STEP_BASELINE` on its own** — uncompensated, it
-  deletes the double-count guard and costs 177 kcal/day across every one of the owner's 124 days
-  (measured, BF-88). **But see BF-88: the owner has since proposed the compensated version** —
-  subtract the first 3,000 steps' worth from the resting base and count from zero — which is
-  identical at and above 3,000 steps and gives this entry its single linear rate for free. If BF-88
-  ships first, this entry's copy gets simpler, not harder: one rate, no threshold sentence.
-- **Verification:** on a morning below the threshold the card says why and names the number; above it,
-  the earned figure appears and the explanation stops; and the three addends shown never disagree
-  with the total. **And the owner can answer "how many steps for 100 kcal?" from the screen alone**
-  — that is the test this entry is really for; the numbers above say the answer is about 6,000.
-
 ### [nutrition][activity] BF-88 — the energy model runs on two different bases and the card never says which
 
 - **Lane:** A — `lib/health/energy-balance-service.ts:227-265` and the two constants in
   `packages/shared/src/health/{energy-baseline,daily-energy}.ts`. Surface copy is B, and is BF-87.
-- **Needs:** BF-87
-- **Gate:** owner — this is a scoring change, so it is a Tuning-shaped proposal even though BugFix
-  found it. Nothing here ships without the sign-off and a restated blast radius.
+- **DECIDED 2026-09-01 — the owner approved the shift and asked for it to ship.** *"yes that sounds
+  good lets ship that."* The `Gate: owner` this entry carried is **cleared**; the sign-off a scoring
+  change needs has been given, against the blast radius restated below (74 of 124 days unchanged
+  exactly, 50 moved, −17 averaged across all days). **Ready for Lane A.** The direction was the
+  owner's own: *"cant we remove some calories for the base 3000 and have it start from 0 steps?"*
 - **Added:** 2026-09-01 · owner: *"is it possible to get rid of the baseline; and have it reference
   steps + exercise only? that would be more accurate right? rmr + activity?"*
 
@@ -512,6 +448,79 @@ currently earn nothing from stepping at all; mean 5,716, median bucket 2–4k.
   test, not an eyeball. A day below 3,000 reports less, by the computed amount. The burn explanation
   names its basis on both paths. And a second profile (different weight) gets a different
   subtraction, proving it was computed.
+
+### [activity][nutrition] BF-87 — "nothing earned from movement yet today" is true and unexplainable, so the owner had to ask
+
+- **Lane:** B — the Energy Balance card's copy (`components/health/…`, the `activeBreakdown`
+  consumer) and the Nutrition "why two numbers" block that says the same thing.
+- **Batch:** `nutrition-ui-uplift`
+- **Needs:** BF-88
+- **⚠ The dependency runs THIS way round, and it used to run the other way.** While BF-88 was only
+  "make the path legible", it waited on this entry's copy. Now that BF-88 changes the model, the
+  copy waits on it: ship this first and you write *"steps count above 3,000"* onto a card that BF-88
+  is about to make count from zero — the sentence would be wrong within a release, on the exact
+  screen this entry exists to make trustworthy. After BF-88, the copy gets **simpler**: one rate,
+  no threshold clause.
+- **Added:** 2026-09-01 · owner: *"is basic steps being counted towards calorie burn? It says I've
+  done 1000 but not sure if that's counting towards nutrition."* — then, having been told the model
+  is correct: *"if its base metabolism thats fine. but i would like to see steps = calories so I know
+  roughly how much effort translates to how much."* **That second sentence is the requirement.** The
+  ask is not a number on a card; it is an exchange rate the owner can hold in his head.
+
+**The app is correct and the screen cannot say why.** The owner's screenshot holds both halves of the
+contradiction he is reporting: **STEPS 1,196 Today** beside *"1,365 base — nothing earned from
+movement yet today"*. Both are true, because of one constant:
+
+```ts
+// packages/shared/src/health/daily-energy.ts
+export const STEP_BASELINE = 3000
+const netSteps = Math.max(0, ped - STEP_BASELINE - loggedOutdoorSteps)
+if (netSteps > 0) stepsKcal = est(14, netSteps / WALKING_CADENCE_SPM)
+```
+
+**Only steps above 3,000 earn calories**, deliberately: the sedentary base is BMR × 1.2, and a desk
+day's incidental stepping is already inside that multiplier. Counting every step would double-count
+it. The constant's own comment says exactly this. At 1,196 steps the honest answer is zero, and the
+card gives the honest answer without the reason.
+
+- **This is not a maths fix — it is a copy fix, and a small one.** The card already knows both
+  numbers. *"Steps add to your burn above 3,000/day — 1,196 so far"* answers the question on the
+  screen that raised it. Same for the Nutrition tab's "why two numbers" block, which repeats the
+  phrase.
+- **⚠ Show the threshold, not just the shortfall.** The owner's step goal is 7,000, so on a good day
+  only **4,000** steps convert — roughly 40 minutes of walking at the model's 100 steps/min. A user
+  who thinks all 7,000 count will read the burn as too low and go looking for a bug, which is this
+  report one step later.
+- **The rate, measured through the real estimator for the owner's profile (2026-09-01).** Not
+  approximated — driven through `computeActiveEnergy` itself, so an implementation can be checked
+  against it:
+
+  | steps | 1,196 | 3,000 | 5,000 | 7,000 | 10,000 | 15,000 |
+  |---|---|---|---|---|---|---|
+  | kcal | 0 | 0 | 68 | 136 | 237 | 407 |
+
+  **≈ 34 kcal per 1,000 steps, above the first 3,000.** Linear above the threshold, because the
+  estimator is `minutes × (MET − 1.5) × BMR/min` and minutes are `steps / 100`.
+- **⚠ "Steps = calories" is TWO numbers here, and shipping one of them is the bug this entry is
+  about.** A bare *"1,000 steps ≈ 34 kcal"* is wrong at the bottom of the range — precisely where
+  the owner was standing when he asked, and where **50 of his last 124 days** sit. The pair that is
+  actually true: *nothing below 3,000, then ~34 per 1,000.* Whatever the surface ends up being (a
+  line under the steps tile, a tooltip, a row in the burn breakdown), it has to carry both halves or
+  it recreates the confusion in a new place.
+- **The two other addends are silent in the same way.** `workoutKcal` and `activityKcal` also roll
+  into one "earned from movement" figure with no breakdown at the point of confusion —
+  `activeBreakdown` already returns all three separately (Q-391 made sure the parts sum to the
+  total), so the data for a one-line breakdown is already in hand.
+- **⚠ Do not "fix" this by lowering or removing `STEP_BASELINE` on its own** — uncompensated, it
+  deletes the double-count guard and costs 177 kcal/day across every one of the owner's 124 days
+  (measured, BF-88). **But see BF-88: the owner has since proposed the compensated version** —
+  subtract the first 3,000 steps' worth from the resting base and count from zero — which is
+  identical at and above 3,000 steps and gives this entry its single linear rate for free. If BF-88
+  ships first, this entry's copy gets simpler, not harder: one rate, no threshold sentence.
+- **Verification:** on a morning below the threshold the card says why and names the number; above it,
+  the earned figure appears and the explanation stops; and the three addends shown never disagree
+  with the total. **And the owner can answer "how many steps for 100 kcal?" from the screen alone**
+  — that is the test this entry is really for; the numbers above say the answer is about 6,000.
 
 ### [platform] LB-40 — a user who already has a password cannot change it: the form never asks for the current one
 
