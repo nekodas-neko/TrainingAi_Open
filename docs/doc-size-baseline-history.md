@@ -5326,3 +5326,13 @@ resolution — read the headings before choosing.
 The number is re-measured after the merge rather than carried across it, per the note above. The
 entry-ID set was diffed against the new `origin/main`: **OR-100 added, nothing lost**, so the
 auto-merge resurrected none of what #714 and #715 removed.
+
+## 2026-09-01 — `projectOverview.md` 8586 → 8587 (the compaction sweep's own Document Map row)
+
+`chore/fold-journal-entries`. One line, and it is the line that makes the new batch findable: a
+history file nothing points at is a file the next session will not read.
+
+The sweep itself took `docs/overview/entries/` from **250 → 229**, back under the 250 total ceiling
+that had started failing CI. 22 of the 40 foldable entries, not all 40 — the sweep stopped at
+2026-08-29 so the last two days stay a genuine recent window, which is the thing the directory
+exists to be.
