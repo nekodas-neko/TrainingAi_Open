@@ -5384,3 +5384,11 @@ every session reads first, which is the failure the ratchet is not for.
 `lane-a/deload-temp-gate` (TN-18), re-derived after merging a `main` that had moved five times while
 the branch was open. Both numbers are the merged files counted, not a spliced arithmetic — which is
 the only way to get this right when the other side is also growing.
+
+## 2026-09-01 — `docs/implementation-backlog.md` → 14847, `projectOverview.md` → 8631
+
+`lane-a/one-weight-goal` (LB-42). The backlog growth is the entry recording the half that did NOT
+ship and why: `weight_goal_kg` is retired but **not dropped**, because dropping is irreversible and
+the row-scoped audit view cannot show other accounts' values, so what would be lost cannot be
+checked first. Left as prose rather than a `Gate: owner` field, since the entry's work is done and
+only the deletion is owed.

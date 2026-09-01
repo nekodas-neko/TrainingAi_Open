@@ -24,6 +24,10 @@ export const users = pgTable('users', {
   displayName:  text('display_name'),
   heightCm:     integer('height_cm'),
   dateOfBirth:  date('date_of_birth', { mode: 'string' }),
+  /** LB-42, migration 246: SUPERSEDED by `targetWeightKg` and no longer read or written. Kept
+   *  rather than dropped because dropping a column is irreversible and this database holds accounts
+   *  whose rows the row-scoped audit view cannot show, so their values cannot be checked first.
+   *  The API still exposes a `weightGoalKg` field; it reads and writes `target_weight_kg`. */
   weightGoalKg: doublePrecision('weight_goal_kg'),
   avatar:       text('avatar'),
   passwordHash: text('password_hash'),

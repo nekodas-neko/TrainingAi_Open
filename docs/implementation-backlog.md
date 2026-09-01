@@ -14,7 +14,7 @@ silently misdirecting the next session. Update them in the same PR that consumes
 
 | Pointer | Value | Source of truth |
 |---|---|---|
-| Next free Postgres migration | **246** | `lib/data/postgres/migrations/` |
+| Next free Postgres migration | **247** | `lib/data/postgres/migrations/` |
 | Local SQLite schema version | **v32** | `lib/sqlite/migrations.ts`; `lib/sqlite/__tests__/migrations.test.ts` asserts the max |
 
 > **There is no third pointer any more.** Entry IDs are not allocated from a shared counter and
@@ -511,6 +511,21 @@ own three lines. So the row offers a choice, appears to take it, and changes not
 
 ### [platform][body] LB-42 — `weight_goal_kg` and `target_weight_kg` are two columns for one goal
 
+- **Keep — RESOLVED 2026-09-01 except one owner decision: whether to DROP the retired column.**
+  `target_weight_kg` won, as the entry predicted — larger reader set, and it is the one on screen.
+  Migration **246** fills it from `weight_goal_kg` **only where it is NULL**, so a value the user
+  cannot see never overwrites one they can, and where both exist and disagree the visible number
+  stands. The API keeps its `weightGoalKg` field name and now reads *and writes*
+  `target_weight_kg`, which is what let both editors converge with **no client change** — the two
+  editors were the whole bug, and repointing one screen would have left the other diverging.
+- **Keep — `weight_goal_kg` is deliberately NOT dropped, and that is the owner's call.** Nothing
+  reads or writes it now; the column and its data are intact, with a `COMMENT ON COLUMN` and a
+  schema comment saying so. Dropping it is the one step here that cannot be undone, and the
+  row-scoped audit view **cannot show other accounts' values**, so what would be lost cannot be
+  checked first. Ask before dropping; do not fold it into a later migration as a tidy-up.
+- **⚠ Measured, and the measurement is narrower than it looks:** the owner's two columns agreed
+  (60 / 60.00), so **no divergence has actually bitten yet** — the entry describes a live hazard
+  rather than an observed wrong number. Other accounts could not be inspected.
 - **Lane:** A — the resolution is a schema and route decision (`lib/data/postgres/schema.ts`,
   `app/api/user/profile`, `app/api/user/goals`), and a corrective migration if the columns are
   merged. Lane B can only move the boxes around.
