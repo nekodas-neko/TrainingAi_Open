@@ -590,40 +590,43 @@ feature and not a deletion like LB-41:
 
 ### [app-shell] BF-100 — back navigation always lands at the top, because the scroll position is not on the document
 
-- **Lane:** B — `components/pull-to-sync.tsx` (which owns the scroll container) plus wherever a route
-  change is observed.
+- **Keep:** the device pass, and only that.
+- **Verify:** device — on the S25, scroll a tab screen well down, tap into a detail screen, press the
+  **system back gesture** (not a UI back button), and confirm it returns to the same offset on a cold
+  cache and a warm one; and that reaching the same screen forward still starts at the top.
+- **✅ SHIPPED** (`feat/bf-100-scroll-restoration`, 2026-09-01).
+  `lib/hooks/use-scroll-restoration.ts`, called once from `pull-to-sync.tsx` so every screen using
+  the shell inherits it rather than 62 separate fixes. `e2e/scroll-restoration.spec.ts` is **green**
+  against a cold harness server.
+- **⚠ An earlier version of this entry claimed tab-to-tab was broken. Retracted.** A tab-to-tab move
+  loses nothing: the shell keeps every tab screen mounted, so the container holds its own `scrollTop`
+  unaided — measured, with Health's container still reading 840 while the URL was `/nutrition`. The
+  "evidence" was a red run whose real cause was `page.goBack()` landing on **`about:blank`** after a
+  bottom-nav Link click.
+- **⚠ SIX implementation traps are paid for and written into the hook. Do not re-derive them:**
+  (1) gating the restore on a `popstate` flag breaks under StrictMode, whose double-invoked effect
+  consumes it; (2) reading `el.scrollTop` in the cleanup saves **0**, because React has already
+  detached the node — track it from a `scroll` listener; (3) setting the offset once lands
+  **144–231 px past it**, because content keeps arriving above and scroll anchoring pushes it down,
+  so it must be re-asserted; (4) deciding the user has taken over by comparing the offset to what you
+  set treats that settling as a finger and yields every time — takeover is an **input event**;
+  (5) **consuming the saved value on read** is eaten by StrictMode a second way — pass one takes it,
+  finds the container too short, waits; pass one's cleanup writes 0 over the pending target; pass two
+  reads 0 and discards it. Read without consuming; clear when the restore lands; and never write 0
+  over a target that has not landed. (6) A screen can come back **shorter** than it was, so the
+  window must land at `min(target, available)` rather than abandon the restore.
+- **⚠ And four SPEC traps, which cost more than the code did.** All four reported
+  `expected 840, received 0`, identical to a broken feature: text-matching *Sleep* hits a card that
+  opens a **sheet**; `Sleep details →` does too; `a[href^="/health/"]` matches nothing, because these
+  screens navigate from `router.push` **buttons**; the bottom nav makes `goBack()` land on
+  `about:blank`. **`/more` → *Profile details* → back is the verified path**, and the spec's
+  precondition assertions are what separate a fixture problem from a regression — keep them.
+- **The timer was NOT the cause of the cold-server failure**, though it looked like it twice. Raised
+  to 120 s as a controlled experiment: still red. That is what forced the instrumented run that found
+  trap (5).
 - **Added:** 2026-09-01 · owner: *"when I scroll down to a button; then click on it and it takes me
   to a new page; when I press back I want to go back to that page at the same scroll level I was at.
   It usually starts me at the top of the page. This is on many pages if not all pages."*
-
-**"If not all pages" is right, and there is one reason.** The app does not scroll the document — it
-scrolls an **inner container**. `pull-to-sync.tsx:190` renders the scroller with a `scrollRef`, and
-**62 files** carry `overflow-y-auto`. Next's App Router scroll restoration operates on the
-window/document scroller, so it cannot see, save or restore a nested element's `scrollTop`. Nothing
-in the app does it either: `grep` for `scrollRestoration`, `restoreScroll` or a `sessionStorage`
-scroll key returns **nothing** outside `use-scroll-to-bottom.ts`, which is unrelated.
-
-So this is not a regression and not per-screen — no code has ever existed to do it.
-
-- **Recommendation: save `scrollRef.current.scrollTop` per route key and restore on mount**, in
-  `pull-to-sync.tsx` so every screen using the shell inherits it, rather than 62 separate fixes.
-  `sessionStorage` is the right store — it is per-tab, dies with the app, and a stale offset is
-  worthless anyway.
-- **⚠ Restore AFTER the content has height, or it silently no-ops.** These screens paint from a cache
-  seed and then revalidate, so a restore on first paint sets `scrollTop` on a container that is still
-  short and the browser clamps it to 0 — which looks exactly like the bug. Restore when the content
-  has laid out (a `ResizeObserver` on the inner content, or after the seeded paint), and only once
-  per navigation so a later revalidation cannot yank the user back.
-- **⚠ Do not restore on a forward navigation.** Only a *back* return should land where the user was;
-  arriving fresh should start at the top. That means keying on the route AND clearing the entry when
-  a route is entered forward, or reading the navigation type.
-- **The persistent tab shell cuts both ways here** — a tab that never unmounts keeps its scroll
-  position already, so tab switches are not the complaint. The loss happens on a **push to a new
-  route and back**, which is what unmounts the screen.
-- **Verification:** on the S25, scroll Health well down, tap into a detail screen, press the system
-  back gesture — the page returns at the same offset, on a cold cache and a warm one; and reaching
-  the same screen forward still starts at the top.
-
 
 ### [nutrition] BF-97 — a scanned meal groups in the diary: the rendering half
 

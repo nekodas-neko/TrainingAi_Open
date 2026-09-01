@@ -24,8 +24,24 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.423.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Version:** v1.424.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-09-01.
+
+**Back navigation returns to where you were (BF-100).** Owner: *"when I press back I want to go back
+to that page at the same scroll level I was at. It usually starts me at the top of the page. This is
+on many pages if not all pages."* **"If not all pages" was right, and there was one cause** — the app
+scrolls an inner container, Next's restoration watches the window scroller, and nothing bridged them.
+One hook in `pull-to-sync.tsx`, so every screen on the shell inherits it. **Six implementation traps
+and four spec traps are written into the entry and the code**, because every one produced something
+that runs and achieves nothing: two separate StrictMode double-invoke failures (a consumed `popstate`
+flag; a cleanup writing 0 over a pending target), `scrollTop` reading 0 on a node React has already
+detached, scroll anchoring pushing the restore 144–231 px past the mark, a takeover check that
+mistook that settling for a finger, and a page that comes back shorter than it left. **All four spec
+failures reported the same line a broken feature would**, which is why the spec now asserts its own
+preconditions. `e2e/scroll-restoration.spec.ts` is green on a cold server. **Not device-verified** —
+the system back gesture is not `page.goBack()`, and WebView scroll anchoring may differ from
+Chromium's, which matters because anchoring was one of the traps
+([journal](docs/overview/entries/2026-09-01-feat-bf-100-scroll-restoration.md)).
 
 **The calorie line called a goal deficit part of the base rate (BF-99).** Owner, with a screenshot:
 *"why is my base rate under the 1350 RMR value."* `budgetProvenance().base` is
