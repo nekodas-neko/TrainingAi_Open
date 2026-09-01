@@ -1082,6 +1082,22 @@ window, then the newest `history-*.md`. The 157 dated status notes this section 
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
+### [readiness] 🟡 Q-507 explained and REVERSED — the stress model is sound; the stored daily scalar is what points backwards (TN-22, 2026-09-01)
+
+**Measured, not fixed.** Open since 2026-08-18, now with a mechanism. [`review`](docs/reviews/2026-09-01-stress-sign-explained.md).
+- `stress_high_minutes` is bucket-minutes below −0.5, so TN-3a's persisted buckets allow it to be **recomputed and compared with what was stored**. Correct direction is negative.
+
+  | | vs sleep | vs readiness |
+  |---|---|---|
+  | **stored** | +0.137 | **+0.338** |
+  | recomputed, all hours | −0.181 | **−0.438** |
+  | recomputed, waking only | −0.289 | **−0.477** |
+
+  Dropping 2026-08-31 (a **TN-20** casualty) strengthens it to **−0.383 / −0.699** (n=8) — the finding is *masked* by the corrupt day, not caused by it.
+- **8 of 9 days disagree**, four storing **zero** against 210–270 bucket-minutes; **the only day that agrees is the newest.** Same shape as **TN-20**, and plausibly the same defect — stated as *plausibly*, since neither mechanism is identified.
+- **Q-507's conclusion is reversed:** *"the signal points the wrong way"* is true of the stored scalar and **false of the model**. **Both previously-proposed mechanisms are superseded** — the refuted data-density one and TN-21's bucket-count one — because both explained an artefact. **TN-21's window finding survives** (55% night; restricting it is worth −0.452 → −0.699).
+- **⚠ n = 8–9, the waking window is this review's choice not the app's, and the buckets are written by the same pipeline as the scalar.** **Re-test at n ≥ 30 before anything is built on the metric.** TN-16 stays parked, but its blocker is now a persistence bug with a route rather than an open research question.
+
 ### [readiness][body][devices] 🔴 A recompute overwrites a completed day with an empty result — the inputs to rebuild it still exist (TN-20, 2026-09-01)
 
 **Found, not fixed. Data integrity, not calibration.** [`review`](docs/reviews/2026-09-01-recompute-wipes-completed-days.md).
