@@ -2,6 +2,7 @@
 
 import { HealthMetricSheet, type SleepDetailReading } from "@/components/health-metric-sheet";
 import type { BodyMetaRow } from "@/app/api/body-metadata/route";
+import { displayBodyFat } from "./body-fat-display";
 
 interface Props {
   metricSheet: string | null;
@@ -32,7 +33,9 @@ export function MetricSheets({ metricSheet, onClose, metaRecentReversed, sleepRe
         title="Body Fat"
         unit="%"
         color="var(--color-brand)"
-        readings={metaRecentReversed.map(r => ({ date: r.date, value: r.bodyFat }))}
+        // The corrected reading, matching the card that opens this sheet (LA-45). A sheet that
+        // disagreed with the card it was opened from would be the same defect one layer down.
+        readings={metaRecentReversed.map(r => ({ date: r.date, value: displayBodyFat(r) }))}
         formatValue={v => v.toFixed(1)}
       />
       <HealthMetricSheet

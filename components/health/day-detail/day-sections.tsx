@@ -9,6 +9,7 @@ import type { ActivityLog } from "@trainingai/shared/types";
 import { shortSessionName } from "@trainingai/shared/utils";
 import type { EnergyBalanceResponse } from "@/app/api/nutrition/energy-balance/route";
 import { energyDaySummary, type SessionKcal } from "@/components/health/day-detail/energy-summary";
+import { displayBodyFat } from "@/components/health/body-fat-display";
 
 /** Section heading — letterspaced micro-caps, matching the treatment chosen for the day screen. */
 export function SectionLabel({ children }: { children: React.ReactNode }) {
@@ -381,7 +382,9 @@ export const BodySection = memo(function BodySection({ body }: { body: DayBodyMe
   const push = (label: string, v: number | null, unit: string, dp = 1) => {
     if (v != null) rows.push([label, `${dp === 0 ? Math.round(v) : v.toFixed(dp)}${unit}`]);
   };
-  push("Body fat", body.bodyFat, "%");
+  // The corrected reading (LA-45) — `body.bodyFat` is the raw stored value and stays reachable for
+  // the log sheet, which seeds from it and must keep seeding from it.
+  push("Body fat", displayBodyFat(body), "%");
   push("Skeletal muscle", body.skeletalMusclePct, "%");
   push("Muscle mass", body.muscleMassKg, "kg");
   push("Body water", body.bodyWaterPct, "%");

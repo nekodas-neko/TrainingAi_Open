@@ -5919,3 +5919,21 @@ silent growth, which is the thing these numbers exist to stop.
 A 22-line entry removed and nothing added: LB-44 is a flake fix with no residue, so it leaves the
 queue whole rather than becoming a `Keep:`. Ratcheted down rather than left at the old number,
 because a baseline above the file's real length is headroom for silent growth.
+
+## 2026-09-01 — `projectOverview.md` → 8911 (LA-45)
+
++16 for one status block, and the lines that could not be cut are the two invariants. "Health shows
+the corrected body fat now" is the short version and it is the one that gets the next session to
+reverse one of them: `bodyFat` must stay what the log sheet seeds from — it POSTs at `manual`, which
+outranks `scale_ble`, so a corrected value round-tripped through the edit sheet overwrites the
+measurement permanently and collapses the next calibration toward zero — and "corrected" is never
+inferred from the two values differing, because an offset can round to zero. Both read as pedantic
+until you have written the wrong one, and neither is visible from the screen afterwards.
+
+The line about the hand-seeded DEXA pair is there for the same reason: the local seed has no scan and
+no `source_map`, so the whole feature is unreachable in the sandbox and a session that renders the
+screen and sees a plain number has verified nothing.
+
+(8911, not the 8894 this branch measured before merging: BF-59's screen half landed 17 lines in
+between. A size baseline is a measurement of the merged file, never the sum of two hunks — resolving
+that conflict by picking a side would have been wrong whichever side won.)

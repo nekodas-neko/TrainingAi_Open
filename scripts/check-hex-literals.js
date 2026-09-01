@@ -39,7 +39,12 @@ const BASELINE = {
   'app/apple-icon.tsx': 8,
   'app/health/activity/activity-content.tsx': 7,
   'app/health/day/day-detail-content.tsx': 4,
-  'app/health/health-sections.tsx': 50,
+  // LA-45 moved the Body Fat card into components/health/body-fat-card.tsx: 50 -> 43 here, 2 there,
+  // net -5 because the extraction folded five repeats of the card's rose into one BF_COLOR const.
+  // The per-card health palette is literals throughout this file and tokenising one card while its
+  // siblings keep theirs would be worse than either; that is a palette job, not this entry's.
+  'app/health/health-sections.tsx': 43,
+  'components/health/body-fat-card.tsx': 2,
   'app/health/heart-rate/page.tsx': 6,
   'app/health/readiness/readiness-content.tsx': 1,
   'app/health/sleep/sleep-content.tsx': 2,
