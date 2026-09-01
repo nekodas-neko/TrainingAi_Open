@@ -5589,11 +5589,21 @@ The length is mostly ordering and negative space — what not to do (no wildcard
 session-start pointer at an empty dashboard) and what genuinely cannot be checked from here
 (`SENTRY_DSN` is server-side and invisible from outside the deploy).
 
-## 2026-09-01 — `projectOverview.md` → 8667, `docs/implementation-backlog.md` → 15097 (LB-41, LB-29)
+## 2026-09-01 — `projectOverview.md` → 8666, `docs/implementation-backlog.md` → 15133 (LB-40)
+
+One shipped fix recorded; the backlog **shrank**, since LB-40's entry was removed and nothing new
+was filed. The status block is 10 lines because the interesting half is not the bug but the
+direction the fix fails in: `cachedFetch` swallows a failed request, so an unknown flag has to show
+the field rather than hide it, or a cold cache plus a dead network silently reproduces the defect.
+That reasoning is what a future session needs and what a one-line "fixed the password field" would
+lose.
+
+## 2026-09-01 — `projectOverview.md` → 8678, `docs/implementation-backlog.md` → 15075 (LB-41, LB-29)
 
 Two shipped fixes recorded; **the backlog shrank**, since both entries were removed and nothing new
 was filed. The status block is 11 lines for two entries because the interesting half of LB-29 is not
 the bug but the promise the owner picked between: *the change follows to other devices* versus
 *a local setting is never clobbered*. Those differ in what the app does, not in how it is written,
 and a one-line "fixed preference sync" would lose the distinction the next session needs.
+
 

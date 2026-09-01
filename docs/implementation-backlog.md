@@ -639,28 +639,6 @@ copy of a number, which the one-formula rule is against, and this entry is how i
 - **Verification:** a client component imports the constant and `/nutrition` still returns 200;
   `movement-breakdown.ts` no longer declares its own; the shared module's own tests are unchanged.
 
-### [platform] LB-40 — a user who already has a password cannot change it: the form never asks for the current one
-
-- **Lane:** B — `components/profile/edit-profile-sheet.tsx`. The route is correct; only the client
-  is wrong.
-- **Added:** 2026-09-01 · found while consolidating the personal details (BF-79), reading the sheet
-  rather than looking for this.
-
-**The whole defect is one initialiser.** `EditProfileSheet` holds
-`const [hasPassword, setHasPassword] = useState(false)` and **never fetches it** — the only thing
-that ever sets it true is a *successful* password save, later in the same session. The "Current
-password" field renders behind `{hasPassword && …}`, so for a user who already has one it is never
-on screen, `currentPassword` goes up as `undefined`, and `app/api/user/password/route.ts:38-41`
-rejects it because `user.passwordHash` exists. The user sees the route's error and no field to fill.
-
-**`GET /api/user/profile` already returns `hasPassword`** — it is in the same payload the sheet's
-parent reads (`{ user, hasPassword, workoutCount }`), so nothing new has to be built or fetched.
-Thread it in, or read it from `more-user-profile`.
-
-- **Verification:** with the seeded user (who has a bcrypt hash), open More → Edit Profile → Change
-  Password. The **Current password** field must be present; entering the wrong one must fail and the
-  right one must succeed. Then confirm the field is *absent* for an OAuth-only account, which is the
-  case the flag exists for.
 
 ### [platform][body] LB-42 — `weight_goal_kg` and `target_weight_kg` are two columns for one goal
 

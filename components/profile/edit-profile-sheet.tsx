@@ -2,6 +2,8 @@
 
 import { useState } from 'react'
 import { savePreference } from '@/lib/user/preferences-sync'
+import { cachedFetch } from '@/lib/sqlite/cache'
+import { TTL_MEDIUM } from '@trainingai/shared/cache-ttl'
 import { toast } from 'sonner'
 import { ChevronDown, KeyRound, Loader2, Settings } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -33,7 +35,22 @@ export function EditProfileSheet({ user, onSaved }: EditProfileSheetProps) {
   const [timezone, setTimezone] = useState(user?.timezone ?? 'Australia/Brisbane')
   const [foodRegion, setFoodRegion] = useState('AU')
 
-  const [hasPassword, setHasPassword] = useState(false)
+  /**
+   * Whether this account already has a password — `null` until we know (LB-40).
+   *
+   * This used to be `useState(false)`, **fetched by nothing**, and set true only by a successful
+   * save later in the same session. So for anyone who already had a password the *Current password*
+   * field never rendered, the PATCH went up without `currentPassword`, and
+   * `app/api/user/password` answered *"Current password is required."* — an error with no field on
+   * screen to satisfy it. **A user with a password could not change it at all.**
+   *
+   * **Unknown shows the field, deliberately.** `cachedFetch` swallows a failed request, so a cold
+   * cache plus a dead network would otherwise land back on `false` and reproduce the bug silently.
+   * Of the two ways to be wrong, an OAuth-only account seeing one optional field it can ignore is
+   * recoverable; a password account being unable to change its password is not. The route is the
+   * authority either way — it ignores `currentPassword` when there is no hash.
+   */
+  const [hasPassword, setHasPassword] = useState<boolean | null>(null)
   const [currentPassword, setCurrentPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
@@ -55,7 +72,15 @@ export function EditProfileSheet({ user, onSaved }: EditProfileSheetProps) {
   }
 
   function handleOpenChange(nextOpen: boolean) {
-    if (nextOpen) resetFromUser(user)
+    if (nextOpen) {
+      resetFromUser(user)
+      // The same key and TTL the More tab already warms, so this is a cache read on the common
+      // path rather than a new request — and it revalidates, which is what makes it right after a
+      // password is set on another device.
+      cachedFetch<{ hasPassword?: boolean }>('more-user-profile', '/api/user/profile', TTL_MEDIUM,
+        d => { if (d) setHasPassword(!!d.hasPassword) },
+      ).catch(() => {})
+    }
     setOpen(nextOpen)
   }
 
@@ -212,7 +237,7 @@ export function EditProfileSheet({ user, onSaved }: EditProfileSheetProps) {
 
               {isPasswordExpanded && (
                 <div className="space-y-3 px-4 pb-4">
-                  {hasPassword && (
+                  {hasPassword !== false && (
                     <div className="space-y-1">
                       <Label htmlFor="ep-currentPassword" className="text-xs text-muted-foreground">Current password</Label>
                       <Input
@@ -250,7 +275,9 @@ export function EditProfileSheet({ user, onSaved }: EditProfileSheetProps) {
                   </div>
                   <Button
                     onClick={savePassword}
-                    disabled={savingPassword || !newPassword || !confirmPassword}
+                    // `hasPassword === true` only — an account with no password, or one whose
+                    // flag has not resolved, must not be blocked by a field it may not need.
+                    disabled={savingPassword || !newPassword || !confirmPassword || (hasPassword === true && !currentPassword)}
                     variant="outline"
                     className="w-full h-9"
                   >

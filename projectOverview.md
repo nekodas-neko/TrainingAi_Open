@@ -27,6 +27,16 @@
 **Version:** v1.417.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-09-01.
 
+**An account with a password could not change it (LB-40).** `EditProfileSheet` initialised
+`hasPassword` to `false` and **nothing fetched it**, so the *Current password* field never rendered,
+the PATCH went up without it, and the route answered *"Current password is required."* — an error
+naming a field that was not on screen. The flow was non-functional for every account with a
+password and worked only for one with none. The flag is fetched now, through the key the More tab
+already warms; **unknown shows the field**, because `cachedFetch` swallows a failed request and
+landing back on `false` would reproduce the bug silently. All four route paths exercised live.
+Found by reading during BF-79, not by looking for it. **Not device-verified**
+([journal](docs/overview/entries/2026-09-01-current-password-field.md)).
+
 **Two settings that did nothing, both decided by the owner (LB-41, LB-29).** The **Kg / Lbs switch**
 was `useState('kg')` — never persisted, never read, reset on every reopen, and nothing in the app
 renders pounds; removed rather than left offering what it could not do, with real unit display
@@ -37,6 +47,7 @@ change follows to other devices* over the simpler never-clobber rule, so hydrati
 whose PATCH is unacknowledged and **re-sends** it, which self-heals offline on the first launch with
 a network. Verified in a browser with the PATCH held open: the choice survives the reload. **Not
 device-verified** ([journal](docs/overview/entries/2026-09-01-settings-that-did-nothing.md)).
+
 
 **The calorie bar says why zero is zero (BF-87).** Owner: *"is basic steps being counted towards
 calorie burn? It says I've done 1000 but not sure if that's counting towards nutrition."* The app was
