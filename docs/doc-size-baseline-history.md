@@ -5731,3 +5731,23 @@ one clearly was not enough.
 finding's second error, independent of the grep: 32 days against today looked like a broken 30-day
 prune; against the last write it is exactly 30. What looked like the failure was the mechanism
 working.
+
+## 2026-09-01 — BF-92 corrected, and a third trap for the same mistake
+
+The owner confirmed `NEXT_PUBLIC_SENTRY_DSN` is set, which contradicted this entry. Re-measuring
+proved the entry wrong, not the owner: the original check `curl`ed **`/login`**, a **52-byte redirect
+stub**, and a redirect answers "not found" to every grep. Against the real page and its 33 JS chunks
+the DSN is inlined in three of them.
+
+So BF-92 goes from two stacked failures to **one** — the CSP, which is re-verified and still has no
+Sentry host, no wildcard and no bare `https:`. The retraction is kept visibly in the entry rather
+than quietly deleted, because the false half had become an instruction to set a variable that was
+already set.
+
+The correction also buys the entry a sharper test than it had: with the DSN live and only the CSP in
+the way, Sentry should hold **server events and zero browser events**. That asymmetry is one look at
+the dashboard and it distinguishes three hypotheses at once.
+
+The baton gains the third trap of the night in one family — Sentry, the prune, and now this. All
+three were negatives asserted from evidence that could not have shown a positive: a truncated grep
+twice, and a redirect stub once.

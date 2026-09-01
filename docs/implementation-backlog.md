@@ -649,17 +649,22 @@ gates — and it is the reason the parked count still overstates blocking after 
   working. not sure if its being used."* The first half is right — it is connected and the
   integration is good work (Q-404). The second half is the finding.
 
-**Two independent failures, stacked, both measured against production 2026-09-01.**
+**ONE failure, not two — this entry's first draft was wrong and is corrected here (2026-09-01).**
 
-1. **`NEXT_PUBLIC_SENTRY_DSN` is not set.** `curl`ing the deployed `/login` and grepping the client
-   bundle for an ingest host returns **nothing**, so `Sentry.init({ dsn: undefined })` runs and the
-   browser/WebView SDK is a **total no-op**. Not degraded — silent and complete.
-2. **The CSP would block it even once the DSN is set.** The served `Content-Security-Policy` header
-   has `connect-src 'self' … generativelanguage … accounts.google … open-meteo … tile hosts … wss:
-   ws:` and **no Sentry ingest host**. Fixing only the DSN produces a still-empty Sentry and a
-   console full of CSP violations.
+**The CSP blocks every client event.** The served `Content-Security-Policy` has
+`connect-src 'self' … generativelanguage … accounts.google … open-meteo … tile hosts … wss: ws:` —
+**no Sentry ingest host, no wildcard, no bare `https:`**. The bundle's own ingest host
+(`o…​.ingest.us.sentry.io`, inlined from the DSN) is not among them, so every browser/WebView event
+is refused before it leaves the page.
 
-**`instrumentation-client.ts:11` predicted failure 2 in its own comment** — *"a `connect-src` that
+> **⚠ RETRACTED: "`NEXT_PUBLIC_SENTRY_DSN` is not set".** The first draft claimed this, on a `curl`
+> of **`/login`** — which is a **52-byte redirect stub**, not a page. Grepping a redirect answers
+> "not found" to every question. Re-measured against `/sign-in` and its 33 JS chunks: the DSN **is**
+> inlined, in three of them. The owner confirmed the variable independently. **The method error is
+> the lesson: confirm the response you fetched is the thing you meant to search — check its size
+> before grepping it.**
+
+**`instrumentation-client.ts:11` predicted this failure in its own comment** — *"a `connect-src` that
 does not include the ingest host silently drops every client event — the exact failure mode this item
 exists to avoid. Verify on the device, not just in a browser."* The warning was written and the host
 was never added. **That is the lesson worth keeping: a comment describing a hazard is not a guard
@@ -668,9 +673,14 @@ against it.**
 - **What IS plausibly working: the server side.** `sentry.server.config.ts` and
   `sentry.edge.config.ts` read `SENTRY_DSN` (not `NEXT_PUBLIC_`), and server→Sentry is a
   server-to-server call that **no CSP touches**. `instrumentation.ts`'s `onRequestError` hook calls
-  `captureRequestError` for everything escaping a route handler. **Whether `SENTRY_DSN` is set in
-  Railway cannot be checked from outside the deploy** — that is the one open question here and it is
-  the owner's to answer (or a boot-log line, below).
+  `captureRequestError` for everything escaping a route handler. **The owner confirmed `SENTRY_DSN`
+  is set (2026-09-01).** So the server path should be live and collecting.
+- **⭐ THE DECIDING OBSERVATION, and it needs one look at the dashboard.** If this entry is right,
+  Sentry holds **server** events and **zero browser** events — the two paths differ only in whether a
+  CSP sits between them. A dashboard with both would refute the CSP diagnosis outright; a dashboard
+  with neither points at the server DSN or the SDK rather than the header. Filter by platform
+  (`node`/`javascript`) or by whether an event carries a URL and a browser name. **One look settles
+  which of the three it is** — cheaper than any further reading of the code.
 - **Nothing reads it either way.** `grep -ci sentry CLAUDE.md` → **0**; `error_events` appears
   **4×**, in the session-start ritual. So no session has ever been told to look at Sentry, which is
   exactly the owner's *"not sure if its being used"*. And there are **0** explicit
@@ -703,8 +713,8 @@ experiment, not an inference.
   maps, and release tagging. Adding the ingest host to `connect-src` stays the fallback if tunnelling
   is rejected for cost or latency.
 - **Recommendation, in this order.** ① Wire `withSentryConfig` with `tunnelRoute` (fallback: add the
-  ingest host to `connect-src` in `lib/security/csp.ts`). ② Set `NEXT_PUBLIC_SENTRY_DSN` in Railway.
-  ③ **Log one line at boot naming whether each DSN was found** — this failure is invisible precisely
+  ingest host to `connect-src` in `lib/security/csp.ts`). ② ~~Set `NEXT_PUBLIC_SENTRY_DSN`~~ — done;
+  it is set and inlined. ③ **Log one line at boot naming whether each DSN was found** — this failure is invisible precisely
   because an unset DSN is indistinguishable from a quiet week. ④ Only then add the session-start read
   to CLAUDE.md beside `error_events`; pointing sessions at an empty dashboard teaches them to ignore
   it.
