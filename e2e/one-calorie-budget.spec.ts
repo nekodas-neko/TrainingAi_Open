@@ -93,6 +93,25 @@ test.beforeAll(async () => {
          carbs_g = EXCLUDED.carbs_g, fat_g = EXCLUDED.fat_g`,
       [userId, BASE.calories, BASE.proteinG, BASE.carbsG, BASE.fatG],
     )
+    // BF-88: pin today's steps, because the whole point of this fixture is that its active energy
+    // is the strength session and nothing else — the comment on the assertion below says so.
+    //
+    // It used to be pinned for free. Steps only counted above 3,000, so a small step count left on
+    // this shared day by another spec contributed zero and was invisible here. Steps now count from
+    // the first one, so an untouched day is no longer a controlled one.
+    //
+    // **It only shows up in the full serial suite, which is why it reads as a CI-only failure.** On
+    // its own this spec passes with or without the pin — the day is undisturbed. Run behind 130-odd
+    // other specs against one shared database and it is not, and BF-88's first CI run failed this
+    // assertion twice, on the initial attempt and the retry. Adding the pin turned the same run
+    // green. That is the evidence for it; the precise writer was never identified, and does not need
+    // to be, because the fixture should not have depended on one.
+    await db.query(
+      `INSERT INTO body_metrics (user_id, date, steps) VALUES ($1, $2::date, 0)
+       ON CONFLICT (user_id, date) DO UPDATE SET steps = 0`,
+      [userId, today],
+    )
+
     expect(today, 'sanity: the fixture day resolved').toMatch(/^\d{4}-\d{2}-\d{2}$/)
   })
 })

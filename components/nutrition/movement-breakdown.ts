@@ -9,10 +9,15 @@
  * reason, so the reason had to be asked for.
  */
 
-// LB-43: the mirror is gone. `STEP_BASELINE` now comes from the dependency-free leaf module, so
-// this is the shared constant rather than a copy of it — and `energy-baseline` reaches no node
-// builtin, which is what makes it importable from a client component at all.
-export { STEP_BASELINE } from '@trainingai/shared/health/energy-baseline'
+// BF-88 removed the re-export that used to sit here. `STEP_BASELINE` was a threshold three copy
+// sites printed — *"steps count above 3,000/day"* — and there is no threshold any more: steps count
+// from the first one, and the same 3,000 steps' energy is credited out of the resting base instead.
+// The constant survives as `STEP_BASE_CREDIT` in the shared leaf module, but nothing on this side
+// needs it: no sentence here refers to a number of steps.
+//
+// LB-43's reason for the re-export still holds for anything that DOES need a constant from there —
+// `energy-baseline` reaches no node builtin, which is what makes it importable from a client
+// component at all, and importing `daily-energy` for a number took the tab to a 500 twice.
 
 export interface MovementParts {
   workoutKcal: number

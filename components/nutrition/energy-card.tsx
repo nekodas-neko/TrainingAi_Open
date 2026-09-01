@@ -6,7 +6,6 @@ import { MACRO_COLORS } from '@trainingai/shared/nutrition/macro-colors'
 import type { NutritionTargets } from '@trainingai/shared/types/nutrition'
 import type { EnergyBalanceResponse } from '@/app/api/nutrition/energy-balance/route'
 import { CalorieZoneBar } from './calorie-zone-bar'
-import { STEP_BASELINE } from './movement-breakdown'
 import { macroShares } from './macro-energy'
 
 interface Props {
@@ -273,7 +272,7 @@ function EnergyDetail({ data }: { data: EnergyBalanceResponse }) {
         <p className="text-[10px] leading-relaxed text-muted-foreground">
           <span className="font-semibold text-foreground">Calories out</span> = your resting burn
           ({b.restingBaseKcal.toLocaleString()} kcal) plus measured movement ({b.activeKcal.toLocaleString()} kcal
-          from workouts, activities, and steps above {STEP_BASELINE.toLocaleString()}/day).
+          from workouts, activities, and every step you take).
         </p>
         <p className="text-[10px] leading-relaxed text-muted-foreground">
           <span className="font-semibold text-foreground">On target</span> means your net

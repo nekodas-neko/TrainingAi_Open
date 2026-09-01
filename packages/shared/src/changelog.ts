@@ -6,6 +6,16 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.418.0",
+    date: "2026-09-01",
+    changes: [
+      "Every step counts towards calories burned now, from the first one. The first 3,000 used to earn nothing \u2014 the resting figure already assumed a desk day\u0027s walking \u2014 so instead of skipping those steps, that walking is taken out of the resting figure and the steps are counted properly.",
+      "A day at about 3,000 steps burns exactly what it did before; this changes how the number is split between resting and moving, not the total. A day with almost no walking now reads lower, which is the point \u2014 you were being credited for walking that did not happen.",
+      "Your calorie target is unchanged. Only the burn breakdown moved.",
+      "The screens no longer mention a 3,000-step threshold, because there is not one any more.",
+    ],
+  },
+  {
     version: "1.417.0",
     date: "2026-09-01",
     changes: [
