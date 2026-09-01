@@ -6036,3 +6036,12 @@ it is now a reference and the body IS the artefact — the measured input-method
 other entries and spec authors read. What was added is the `Reference:` line and the correction note
 recording that the README pointed the wrong way, which is the part a future reader would otherwise
 re-derive by trusting the old text.
+
+## 2026-09-01 — `docs/agents/state/implementation-lane-b.md` → 174 (Q-354 PR)
+
++6 for one gotcha, recorded the moment it happened rather than at wrap-up, because a session can end
+between the two. Running `pnpm check:rules > f; echo $?; git commit && git push` pushed a branch the
+gate had just failed — the push depends on the *commit's* exit status, never the gate's. The baton
+already carried "never check a gate through a pipe"; this is the same mistake in different clothes,
+so it sits directly under it where the pattern is visible rather than as a separate entry that reads
+as unrelated.

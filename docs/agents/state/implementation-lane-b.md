@@ -125,6 +125,12 @@ None held.
   histories`. Fix with `git fetch --unshallow origin`. It happens **every** session.
 - **Never check a gate through a pipe** — `pnpm check:rules | tail` exits with tail's status. This
   cost a push onto a RED check once; do not repeat it.
+- **And do not chain the push onto the same line as the gate.** Running
+  `pnpm check:rules > f; echo $?; git commit && git push` pushes whatever the gate said, because the
+  push depends on the *commit's* status and not the gate's. Done here on 2026-09-01: the gate printed
+  `RULES=1` and the branch went out anyway (a doc-size baseline, caught and fixed on the next commit).
+  The pipe rule and this one are the same mistake wearing different clothes — **read the gate's
+  result, then decide, in a separate call.**
 - **A backlog conflict can be BOTH shapes at once.** BF-79's was my three additions plus main's
   deletion of a shipped entry, in one hunk. Read every heading in the span; do not apply a rule about
   "two deletions" to a hunk you have not read.
