@@ -465,6 +465,79 @@ currently earn nothing from stepping at all; mean 5,716, median bucket 2–4k.
   and a day on the fallback are distinguishable from the UI alone; and no constant changed, so no
   historical day moves.
 
+### [platform] LB-40 — a user who already has a password cannot change it: the form never asks for the current one
+
+- **Lane:** B — `components/profile/edit-profile-sheet.tsx`. The route is correct; only the client
+  is wrong.
+- **Added:** 2026-09-01 · found while consolidating the personal details (BF-79), reading the sheet
+  rather than looking for this.
+
+**The whole defect is one initialiser.** `EditProfileSheet` holds
+`const [hasPassword, setHasPassword] = useState(false)` and **never fetches it** — the only thing
+that ever sets it true is a *successful* password save, later in the same session. The "Current
+password" field renders behind `{hasPassword && …}`, so for a user who already has one it is never
+on screen, `currentPassword` goes up as `undefined`, and `app/api/user/password/route.ts:38-41`
+rejects it because `user.passwordHash` exists. The user sees the route's error and no field to fill.
+
+**`GET /api/user/profile` already returns `hasPassword`** — it is in the same payload the sheet's
+parent reads (`{ user, hasPassword, workoutCount }`), so nothing new has to be built or fetched.
+Thread it in, or read it from `more-user-profile`.
+
+- **Verification:** with the seeded user (who has a bcrypt hash), open More → Edit Profile → Change
+  Password. The **Current password** field must be present; entering the wrong one must fail and the
+  right one must succeed. Then confirm the field is *absent* for an OAuth-only account, which is the
+  case the flag exists for.
+
+### [platform] LB-41 — the Weight Units toggle is a control with no consumer
+
+- **Lane:** B — `components/profile/edit-profile-sheet.tsx`.
+- **Gate:** owner
+- **Added:** 2026-09-01 · found during BF-79's read of the same sheet.
+
+`units` is local `useState('kg')`. It is never persisted, never read by anything, and is not even
+restored by `resetFromUser`, so it silently returns to `kg` every time the sheet is reopened. Nothing
+else in the app mentions `lbs`: `grep -rn "'lbs'" app components lib packages` finds only this file's
+own three lines. So the row offers a choice, appears to take it, and changes nothing anywhere.
+
+- **Two honest options, and the second is smaller than it looks.** *Remove the row* — one control,
+  no storage, no migration, and it stops the app claiming a setting it does not have. Or *implement
+  it*, which is a display-unit pass across every weight the app renders (body metrics, the dial, PRs,
+  goals, the chart axes) plus a stored preference; that is a real feature, not a fix.
+  **Recommendation: remove it, and file the display-unit feature separately if the owner wants it.**
+  Reversal is cheap either way — the row is nine lines.
+- **⚠ Do not delete it without asking** — hence the gate above. It is a visible affordance the owner
+  may have been using and believing; the point of this entry is that it never worked, which is the
+  owner's to hear before the row disappears.
+
+### [platform][body] LB-42 — `weight_goal_kg` and `target_weight_kg` are two columns for one goal
+
+- **Lane:** A — the resolution is a schema and route decision (`lib/data/postgres/schema.ts`,
+  `app/api/user/profile`, `app/api/user/goals`), and a corrective migration if the columns are
+  merged. Lane B can only move the boxes around.
+- **Added:** 2026-09-01 · found while consolidating the personal details (BF-79), which had to
+  decide where a "weight goal" belongs and discovered there are two of them.
+
+**Both are on `users`, and each has a different reader.** `weight_goal_kg` is edited in the Edit
+Profile sheet and read by exactly one consumer — `app/api/nutrition-goals/recommend`, which puts it
+in the prompt as *"goal weight"*. `target_weight_kg` is edited in the Goals accordion, stored through
+`/api/user/goals`, and is what the **Health page actually renders** as the goal, including the
+progress bar and the weight-rate band.
+
+**So the number the user sees as their goal and the number the AI is told is their goal can differ,
+and nothing reconciles them.** Neither field is wrong on its own; there are simply two, filled from
+two screens, and a user who sets one has no way to know the other exists.
+
+- **What this entry has to decide first:** which column survives. `target_weight_kg` has the larger
+  reader set and is the one the user sees, which makes it the likely winner — but the recommendation
+  route would then need repointing, and existing `weight_goal_kg` values have to be migrated rather
+  than dropped.
+- **Not fixed in BF-79 deliberately.** That entry is a UI consolidation and this is a data question;
+  moving both fields onto one screen would have made the duplication *more* visible without
+  resolving it, and picking a winner from a UI PR is exactly the shape the lane rule exists to stop.
+- **Verification:** one column, one editor, one reader set; every existing `weight_goal_kg` value
+  accounted for; the recommendation prompt quotes the same number the Health page shows.
+
+
 ### [app-shell][platform] BF-86 — the morning check-in never re-prompts, because its effect runs once per app launch
 
 - **Lane:** B for the check-in and the rollover signal; A only if a day-scoped server read turns out
@@ -665,10 +738,13 @@ owner is asking for it on Home. Adding a second client-side caller would make tw
 
 - **Lane:** B — `components/more/profile-tab.tsx`, `components/more/settings-panel.tsx`,
   `components/more/more-row.tsx`, and the sub-screens under `app/more/`.
-- **Needs:** BF-79 — this entry decides where the personal-details section LIVES and BF-79 decides
-  what is in it; built independently they disagree about where height and biological sex belong.
-  Stated in prose below since 2026-08-31 and as a field since the plan was written, which is what
-  let `next-item.js` offer this at the head of Lane B while its content half was parked.
+- **Unblocked 2026-09-01 — BF-79 shipped, and it made a placement decision this entry now inherits
+  rather than chooses.** The personal details are one screen at **`app/more/details/`**, reached
+  from a `Profile` group on the tab, and a `Profile details` row is what the grouping proposal has
+  to absorb. That was BF-79's own recommendation and it went first because this entry waited on it;
+  if the plan's grouping wants that section somewhere else, moving it is a route rename, not a
+  redesign. **What is settled: height, birth year, biological sex and the display name are on that
+  screen and nowhere else** — do not re-scatter them while regrouping.
 - **Plan:** [`2026-08-31-more-page-grouping-and-interaction-model.md`](superpowers/plans/2026-08-31-more-page-grouping-and-interaction-model.md)
   — **written 2026-08-31, so the planning half of this entry is DONE and what remains is the build.**
   It carries the inventory (eight single-row groups, not seven — `Developer` on the Settings
@@ -698,10 +774,10 @@ sex — right on the page.
   And **Goals staying inline is a 2026-08-16 OWNER DECISION** (`/more/goals` "was never built and is
   not going to be"), so it is not a thing to fix by moving. See plan §2 and §4.
 
-- **⚠ Overlaps BF-79 and should be sequenced with it, not against it.** BF-79 gathers the personal
-  details into one section; this entry decides where that section *lives* and how it is reached. If
-  both are built independently they will disagree about where height and sex belong. **Recommendation:
-  BF-79 decides the content, this decides the placement, and they ship in that order or together.**
+- **✅ The BF-79 overlap is resolved — it shipped first, as this entry asked.** Its content decision
+  stands (identity and body facts together; weight and body fat read-only as measurements; targets
+  and activity level left in Goals). The `Profile` group it added is one more single-row group for
+  the inventory below, which now reads **nine**, not eight.
 - **⚠ The "sliders" question is the OWNER'S and the plan does not decide it** — it proposes no control
   change at all. See below for why.
 - **On the "sliders" — there are none on this screen, and the real answer is better.** The settings
@@ -1181,49 +1257,6 @@ description will silently drop the field that turns out to matter. **The owner i
   deliberately wrong extraction is caught at the confirm step and not stored; and no model-reported
   number is ever displayed as fact before the owner confirms it (CLAUDE.md — a model handed a score
   of 80 called it *"perfect"*).
-
-### [platform][body] BF-79 — the personal details are split across two editors that each resend the other's fields
-
-- **Lane:** B — `components/profile/edit-profile-sheet.tsx`, `goals-section.tsx`,
-  `required-info-section.tsx`, and the More profile tab that mounts them.
-- **Unblocked 2026-08-31** — this used to carry `Needs: BF-78`, which has shipped.
-  `/api/user/profile` is a real partial update now: it forwards only the keys a request actually
-  sent, and the adapter presence-guards every column. Consolidating no longer builds on a route that
-  nulls what it is not told about.
-- **Added:** 2026-08-31 · owner: *"can we combine all the personal information fields into 1 section
-  in the more/details. Like height/weight/bodyfat etc."*
-
-**Where they live today, which is the argument for the request:**
-
-| Field | Edited in |
-|---|---|
-| Display name, weight goal, timezone | `EditProfileSheet` |
-| Height, birth year, biological sex, body fat % | `GoalsSection` → `RequiredInfoSection` |
-| Weight, body fat (latest reading) | read-only in `GoalsSection`, logged elsewhere |
-| DEXA, measured RMR | `More → Health → DEXA & RMR results` (BF-71) |
-
-- **The split used to be dangerous as well as untidy, and BF-78 removed the danger.** Two editors of
-  the same row each had to resend the other's values, and `EditProfileSheet` carried a comment
-  saying so. **Both resends are now deleted** — each sheet sends only what it owns. What is left for
-  this entry is the mess: two places to look for one row's fields. Note the resends were not merely
-  redundant, they were a second hazard, since `goals-section` resent `displayName` and
-  `weightGoalKg` from a possibly stale `user` prop and could overwrite a change made elsewhere.
-- **Decide what belongs, because "personal information" has an edge.** *Identity and body facts*
-  (name, sex, date of birth, height) are stable and belong together. *Weight and body fat* are
-  **measurements with a history** — they are logged daily and the profile only shows the latest, so
-  they should appear read-only with a link to logging, never as editable profile fields. Making them
-  editable here would create a second write path to `body_metrics`, which is the shape the
-  offline-first rules exist to prevent.
-- **Goals are a third thing** — a step goal or a calorie target is not a personal detail. Keep them
-  in Goals or the split just moves.
-- **Where:** the owner said More → details. `BF-71` put the clinical screen at `More → Health`, so a
-  sibling `More → Profile details` is consistent and leaves the tab itself uncluttered.
-- **➜ BF-82 decides where this section lives** — it is the More page's information-architecture
-  pass, and the two will disagree about where height and sex belong if built independently. This
-  entry owns the content; that one owns the placement.
-- **Verification:** every profile column is editable in exactly one place; saving one field leaves
-  the rest unchanged (BF-78's behaviour, now shipped and tested — re-verify it through the UI); weight and body fat read as
-  measurements with their date, not as inputs.
 
 ### [nutrition] BF-72 — the diary's hydration wiped its own meal grouping (fixed; device check owed)
 

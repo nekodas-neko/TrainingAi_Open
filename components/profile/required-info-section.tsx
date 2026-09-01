@@ -7,6 +7,15 @@ import { Label } from '@/components/ui/label'
 import { useRovingRadioGroup } from '@/lib/hooks/use-roving-radio-group'
 import { ACTIVITY_LEVELS, type ActivityLevel } from '@trainingai/shared/types/user'
 
+/**
+ * The goal-side half of what used to be "Required Information".
+ *
+ * Height, birth year and biological sex left this component in BF-79 — they are personal details
+ * and now live on `More → Profile details`, so a profile column is edited in exactly one place.
+ * What stays is what is genuinely a goal or an input to one: the two body targets, each shown
+ * against its latest measurement, and activity level.
+ */
+
 const ACTIVITY_LABELS: Record<ActivityLevel, { label: string; description: string }> = {
   sedentary:    { label: 'Sedentary',    description: 'Little to no exercise, desk job' },
   light:        { label: 'Light',        description: 'Light exercise 1-3 days/week' },
@@ -24,12 +33,6 @@ interface RequiredInfoSectionProps {
   latestBfLabel: string | null
   targetBfStr: string
   onTargetBfChange: (value: string) => void
-  heightCm: string
-  onHeightChange: (value: string) => void
-  birthYear: string
-  onBirthYearChange: (value: string) => void
-  sex: string
-  onSexChange: (value: string) => void
   activityLevel: ActivityLevel | null | undefined
   onActivityLevelChange: (level: ActivityLevel | null) => void
   saving: boolean
@@ -44,24 +47,17 @@ export function RequiredInfoSection({
   latestBfLabel,
   targetBfStr,
   onTargetBfChange,
-  heightCm,
-  onHeightChange,
-  birthYear,
-  onBirthYearChange,
-  sex,
-  onSexChange,
   activityLevel,
   onActivityLevelChange,
   saving,
 }: RequiredInfoSectionProps) {
-  const sexGroup = useRovingRadioGroup(!!sex)
   const activityGroup = useRovingRadioGroup(activityLevel != null)
   const router = useRouter()
 
   return (
     <div className="rounded-2xl bg-muted/40 border border-border overflow-hidden divide-y divide-border">
       <div className="px-4 pt-3 pb-1.5">
-        <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60">Required Information</p>
+        <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60">Targets &amp; Activity</p>
       </div>
 
       {/* Weight — latest weigh-in -> target */}
@@ -140,65 +136,6 @@ export function RequiredInfoSection({
         >
           Log body fat % on the Health page
         </button>
-      </div>
-
-      {/* Height */}
-      <div className="px-4 py-3">
-        <Label htmlFor="goals-height" className="text-xs text-muted-foreground">Height (cm)</Label>
-        <Input
-          id="goals-height"
-          type="number"
-          value={heightCm}
-          onChange={e => onHeightChange(e.target.value)}
-          placeholder="175"
-          min={50}
-          max={300}
-          disabled={saving}
-          className="mt-0.5 border-0 bg-transparent p-0 h-auto text-sm font-medium focus-visible:ring-0 focus-visible:ring-offset-0 placeholder:text-muted-foreground/50"
-        />
-      </div>
-
-      {/* Biological Sex */}
-      <div className="px-4 py-3 space-y-1.5">
-        <p id="goals-sex-label" className="flex items-center gap-2 text-xs leading-none font-medium text-muted-foreground select-none">Biological Sex</p>
-        <div className="flex gap-2" {...sexGroup.groupProps} aria-labelledby="goals-sex-label">
-          {(['male', 'female', 'other'] as const).map((opt, i) => (
-            <button
-              key={opt}
-              type="button"
-              {...sexGroup.getRadioProps(sex === opt, i)}
-              // See the note in goal-targets-section.tsx — `disabled` drops keyboard focus mid-save
-              // (Q-355), so the in-flight guard moves into the handler.
-              aria-disabled={saving}
-              onClick={() => { if (saving) return; onSexChange(sex === opt ? '' : opt) }}
-              className={[
-                'flex-1 rounded-xl border px-3 py-2 text-xs font-semibold capitalize transition',
-                sex === opt
-                  ? 'bg-foreground text-background border-foreground'
-                  : 'bg-muted border-transparent text-muted-foreground',
-              ].join(' ')}
-            >
-              {opt === 'male' ? 'Male' : opt === 'female' ? 'Female' : 'Other'}
-            </button>
-          ))}
-        </div>
-        <p className="text-[10px] text-muted-foreground">Used for BMI and energy balance estimates</p>
-      </div>
-
-      {/* Birth Year */}
-      <div className="px-4 py-3">
-        <Label htmlFor="goals-birthYear" className="text-xs text-muted-foreground">Birth Year</Label>
-        <Input
-          id="goals-birthYear"
-          type="number"
-          value={birthYear}
-          onChange={e => onBirthYearChange(e.target.value)}
-          placeholder="1990"
-          min={1920}
-          max={new Date().getFullYear() - 10}
-          disabled={saving}
-          className="mt-0.5 border-0 bg-transparent p-0 h-auto text-sm font-medium focus-visible:ring-0 focus-visible:ring-offset-0 placeholder:text-muted-foreground/50"
-        />
       </div>
 
       {/* Activity Level */}
