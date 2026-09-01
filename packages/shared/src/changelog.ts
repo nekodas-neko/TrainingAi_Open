@@ -6,6 +6,22 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.425.0",
+    date: "2026-09-01",
+    changes: [
+      "The saved list is called My Foods everywhere now \u2014 the tab, the button that opens it, the toasts, the plan buttons. It was Meals in one place and My Meals in another, and half of what is in it is single foods anyway.",
+      "The tabs are unchanged: Recent, My Foods and Search are still three separate lists.",
+    ],
+  },
+  {
+    version: "1.424.0",
+    date: "2026-09-01",
+    changes: [
+      "Pressing back returns you to where you were on the page, instead of the top. It never did \u2014 the app scrolls an inner panel rather than the page itself, and nothing had ever saved that position.",
+      "Arriving at a screen fresh still starts at the top, and if you start scrolling while it is settling, it leaves you alone.",
+    ],
+  },
+  {
     version: "1.423.0",
     date: "2026-09-01",
     changes: [

@@ -388,6 +388,233 @@ below threshold and left in place for next time.
 > BF-29 (My meals), BF-30 (Meal detail), BF-31 (Edit meal) and BF-26 (Quantity). Two artboards need
 > no entry — `Tap targets` and the `srv/g` studies both shipped in Q-395a.
 
+### [activity][app-shell] BF-105 — the interval-walk phase change fires one generic ping and nothing in-app
+
+- **Lane:** B — `components/guided-walk/walk-active.tsx`, `lib/walk/walk-cues.ts`,
+  `components/capacitor-native-init.tsx` (channel definitions). **No APK needed** — see the native
+  note below, which is the part that looks like it needs one and doesn't.
+- **Added:** 2026-09-01 · owner, mid-walk screenshot: *"there isn't enough of a queue to indicate
+  session phase changed. needs more sound and possible visually cues."*
+- **Verify:** device — notification sound, vibration and channel behaviour are all invisible in the
+  web sandbox and in `pnpm dev`.
+
+**The cue exists and fires on time — this is not a missing feature or a timing bug, and an implementer
+should not go looking for one.** `scheduleWalkCues` (`lib/walk/walk-cues.ts`) schedules one local
+notification per segment boundary, up front, at walk start. Checked end to end:
+
+- the `workout-timers` channel **is** created — `components/capacitor-native-init.tsx:147`, importance
+  **4 (HIGH)**, `vibration: true`. No custom `sound`, and per the pinned plugin source
+  (`NotificationChannelManager.java:90-101`) an absent sound means `setSound` is never called, so the
+  channel keeps Android's **default notification sound**. It is audible, not silent.
+- timing is exact: `USE_EXACT_ALARM` is granted in the manifest (`AndroidManifest.xml:132`) and the
+  plugin takes the `setExactAndAllowWhileIdle` branch, with `allowWhileIdle: true` set on every cue.
+
+**So what is actually wrong is that the cue carries no information.** Two findings, and the second is
+the one that matches the screenshot:
+
+1. **Every transition sounds identical.** `cueTitle` varies the *text* — "Fast — push the pace" against
+   "Slow — ease off" — but sound, vibration and importance belong to the **channel**, and there is one
+   channel for all of them. Walking with the phone in a pocket, "a notification fired" is the whole
+   signal; which way the pace just changed is unrecoverable without taking the phone out and reading
+   it, which is the thing the cue exists to avoid.
+2. **There is no in-app cue at all.** `walk-active.tsx` calls `hapticSuccess()` at exactly one place —
+   line 130, `e >= plan.totalSec`, the end of the entire walk. Nothing fires on a segment boundary. So
+   with the app open and in hand (as in the report), the screen's whole response to a phase change is
+   **one word swapping and changing colour**, plus the countdown resetting — no haptic, no flash, no
+   motion. Everything else on screen (bpm, spm, steps, the pacer bar) is unchanged. It is easy to miss
+   while walking and looking up.
+
+**⚠ `walk-cues.ts:44` says the opposite, and that comment is why this reads as handled.** Its catch
+block is annotated *"the in-app timer still drives cues when foregrounded"* — **there is no such
+path.** Delete or correct that comment in the same PR; left standing it will send the next reader
+looking for an in-app cue that does not exist, exactly as it did here.
+
+**⚠ The native constraint that will otherwise be discovered on-device: a NotificationChannel's sound
+and vibration are immutable once created.** `createChannel` on an existing id is a no-op for those
+fields, and the owner's phone already has `workout-timers`. So giving fast and slow different sounds
+means **new channel ids** (`walk-cue-fast` / `walk-cue-slow`), not edited settings — and the old
+channel should be deleted so the app's notification settings don't accumulate a dead row. All of that
+is JS in `capacitor-native-init.tsx`, so despite being notification-channel work it **ships through a
+Railway deploy with no APK**.
+
+**Recommendation — do the in-app half first; it is where the reported failure is and it is cheap.**
+Fire on `active.segment.index` change, not on a timer: a distinct haptic per kind (`hapticSuccess` for
+fast, `hapticLight` for slow — different enough to tell apart through a pocket) plus a visual
+transition the peripheral vision catches, which is a brief full-bleed colour wash and the phase word
+scaling in rather than swapping. `motion` v12 is installed and is the tool for it; do not hand-roll.
+The two-channel split is the second half and only pays off when the screen is off.
+
+- **Sound beyond the notification is a bigger ask than it looks.** There is no TTS in the app — Q-189
+  deleted that route — and the one beep generator, `playBeep()`, is a private function inside
+  `components/workout-screen.tsx:86`; sharing it means extracting to `lib/` first, per One Formula One
+  Place. It also cannot replace the notification: Web Audio is suspended in a backgrounded WebView, so
+  an in-app beep only supplements the foreground case. **A custom notification sound per channel is the
+  version that works with the screen off**, and it needs an audio file in `android/app/src/main/res/raw/`
+  — which *is* an APK change, and is the one piece of this entry that is.
+- **Adjacent, not part of this:** a guided walk never sets `AndroidScreen.setKeepAwake` — only
+  `workout-screen.tsx:1373` does — so the screen sleeps mid-walk and the notification is the primary
+  channel by default. That is arguably correct for a 30-minute walk and is not being changed here, but
+  it is why finding 1 matters more than finding 2 in practice.
+- **Verification (device):** with the app foregrounded, a fast→slow boundary produces a haptic and a
+  visible transition without the phone being raised; with the screen off and the phone pocketed, the
+  two directions are distinguishable by sound or vibration alone; the cue still fires at the right
+  second after the app has been backgrounded for several minutes (the exact-alarm path, worth
+  re-confirming rather than assuming); and the walk's cues are cancelled on leaving so a stopped walk
+  does not keep pinging.
+
+
+### [nutrition] BF-104 — log a meal at 0.5× / 1× / 1.5×; the storage supports it and nothing sets it
+
+- **Lane:** B for the picker on the meal sheet; A for the one argument through
+  `packages/shared/src/nutrition/log-meal.ts`.
+- **Added:** 2026-09-01 · owner: *"when logging food/meals we should be able to choose how much of the
+  meal; i.e full at 1x or 1.5 or 0.5 etc."*
+
+**Every food log already carries its own multiplier — the meal path just never scales it.**
+`logMealFromSaved` writes `quantityMultiplier: item.quantityMultiplier` (`log-meal.ts:83, 96, 131`),
+taking each item's factor straight from the saved definition. There is no meal-level factor anywhere
+between the "Log this meal" button and the rows it writes, so the button can only ever log exactly
+one portion.
+
+**⚠ This is NOT the "makes N portions" control, and conflating them would be the wrong fix.**
+`components/nutrition/meal-batch-size.tsx` sets *"how many portions a saved meal makes"* — a
+**definition-time** property that divides a recipe into servings (the screenshot's *"One portion · 2
+ingredients"* against Edamame Block's *"makes 2 portions"*). This request is **log-time**: how much
+of one portion was eaten today. A meal can make 4 portions and be eaten 1.5 at a sitting; the two
+numbers multiply, they do not substitute.
+
+- **The change is one argument, threaded.** `logMealFromSaved(meal, …, scale = 1)` writing
+  `quantityMultiplier: item.quantityMultiplier * scale`. No schema change — `food_logs.quantity_multiplier`
+  is already per-row.
+- **Recommendation: scale at WRITE time, do not store the factor separately.** The rows are already
+  point-in-time snapshots — `logMealFromSaved` copies the definition's multipliers rather than
+  referencing them — so a log survives the meal being edited afterwards. Adding a meal-level factor
+  that every reader must remember to apply would break that property and put a second multiplier in
+  the system, which is the shape this repo has been bitten by before (Q-401's two TDEE models,
+  BF-88's two meanings for one constant).
+- **The cost of that choice, stated so it is chosen rather than discovered:** "I ate 1.5×" is not
+  recoverable as a fact afterwards — only the scaled per-item amounts are. That is the same trade
+  BF-3 made for supplement doses and it went the other way there, because a titrating drug's dose is
+  the datum. Here the datum is the food eaten, and the factor is how it was entered.
+- **⚠ Whatever the picker is, it must not be a free-number field.** The owner named 0.5 / 1 / 1.5 —
+  discrete taps, not a keyboard. `components/nutrition/quantity-editor.tsx` already exists for
+  per-item amounts and its comment notes *"serving still needs qualifying against the meal's own
+  portions"*, so reuse rather than adding a third quantity control.
+- **Verification:** logging Cruskit + PB at 1.5× writes 243 → **365 kcal** across two rows whose
+  per-item grams are each 1.5× the definition; the diary groups them as one meal; editing the saved
+  meal afterwards leaves the logged rows unchanged; and 1× is byte-identical to today's behaviour.
+
+
+### [nutrition] BF-103 — one label, `My Foods`, on every surface (owner decision, 2026-09-01)
+
+- **Keep:** one look on the S25. `My Foods` is two characters longer than `Meals` and three tabs
+  share the strip's width, so whether it wraps or truncates at 412 dp is the only thing unchecked.
+- **Verify:** device.
+- **✅ SHIPPED** (`fix/bf-103-my-foods-one-label`, 2026-09-01, v1.425.0). Tab, page button, toast
+  (both arms), picker hint and empty state, two plan buttons, and the plan row's badge, action and
+  **`aria-label`**. The BF-37 and BF-60 comments that read as a standing prohibition on the name are
+  rewritten to say why unifying satisfies their reasoning — left alone, they are what a future
+  session reverts this on.
+- **⚠ The entry's own file table was incomplete, and the guard is what found it.** Twelve **e2e
+  spec files** asserted on `My Meals` — button lookups, an `In My Meals` assertion, a
+  `Save all N to My Meals` regex. A rename that leaves its tests on the old label breaks CI on the
+  next run rather than at review. All swept.
+  `components/nutrition/__tests__/one-saved-list-label.test.ts` covers `app/`, `components/` **and
+  `e2e/`** for exactly that reason.
+- **⚠ Do not re-merge the tab strip.** `My Foods` was once the name of a *merged* list (v1.382.0),
+  split back three versions later because a recipe and a single ingredient in one list made "log
+  this" mean two different things. **That revert was about the merge, not the name.** The guard pins
+  the strip at `Recent · My Foods · Search`; one of its four mutations is the re-merge.
+- **The changelog's historical entries still say `My Meals` and must stay that way** — they describe
+  what shipped at the time.
+- **Added:** 2026-09-01 · owner, deciding it himself: *"we only need one. lets go with MyFoods."*
+
+### [nutrition][body] BF-101 — a "Recommended" button per goal field; the numbers already exist and need no AI
+
+- **Lane:** B — the Profile goals form (`app/more/…` profile tab) reading an existing shared function.
+  A for a non-AI endpoint if the values are not already reachable client-side.
+- **Added:** 2026-09-01 · owner, on the Profile goal fields: *"maybe each should have a button under
+  it that says (Recommended value) — id assume we use AI here to choose but maybe we could have some
+  logic to decide so not using the ai if not needed?"*
+
+**The logic already exists and the AI is layered on top of it, not instead of it.**
+`calculateBaseline` (`packages/shared/src/nutrition/goal-recommendation.ts:166`) already returns a
+deterministic value for **every field on that screen except sleep**:
+
+```ts
+return { bmr, tdee, calories, proteinG, carbsG, fatG, waterMl, stepsGoal, leanMassKg }
+```
+
+Calories are `bmr × SEDENTARY_MULTIPLIER + CALORIE_ADJUSTMENT_BY_GOAL[goal]`; protein is dosed per kg
+of lean mass; water is `weightKg × 33 + WATER_BUMP_BY_ACTIVITY[level]`; steps are
+`STEP_GOAL_BY_ACTIVITY[level]`. **The `bmr` is the measured RMR** when one exists — `calculateBaseline`
+calls `personalRmr` (BF-33), the same function the daily energy model uses, so the wizard and the
+Health card cannot disagree about resting rate. `/api/nutrition-goals/recommend` computes this
+baseline and then runs `generateObject` to *adjust* it. **So the owner's instinct is right and the
+work is mostly plumbing: surface the baseline, skip the model.**
+
+- **The drift a per-field button would surface is already live.** Activity Level is **Moderate**,
+  whose `STEP_GOAL_BY_ACTIVITY` is **10,000** — and the stored Steps Goal is **7,000**, the
+  *sedentary* number. Water tracks it correctly (71.7 kg × 33 + 250 = **2,616** against a stored
+  **2,600**). One field follows the recommendation, another does not, and nothing on screen says
+  which. That is the value of the button in one screenshot.
+- **⚠ Sleep has no baseline and an implementer must not invent one.** `BaselineResult` carries no
+  sleep field. Either leave sleep without a button or add a heuristic **deliberately**, as its own
+  decision — silently inventing one puts an unsourced number next to six sourced ones.
+- **⚠ It must hide, not guess, on an incomplete profile.** `calculateBaseline` needs weight, height,
+  age and sex; the recommend route already gates on a `missing` list. A button that renders a number
+  computed from absent inputs is worse than no button.
+- **Recommendation: a non-AI path, and keep the AI button as the second thing.** The deterministic
+  value is instant, free, reproducible and explainable ("33 ml/kg + your activity bump"); the AI pass
+  earns its place only where it adjusts for something the formula cannot see. Two buttons with
+  different promises beats one that sometimes calls a model.
+- **Verification:** each field's Recommended value equals `calculateBaseline`'s for the same profile;
+  tapping it fills the field without saving until the user saves; and no network call to an AI route
+  is made by the deterministic path.
+
+### [nutrition][platform] BF-102 — "Calibrated" activity level, and a prompt that tells the model something false
+
+- **Lane:** B for the option; A for the measured factor and the prompt string.
+- **Added:** 2026-09-01 · owner: *"for the activity level there should be a button to choose
+  'Calibrated Level' which would be what we are using now right — rather than the default response."*
+
+**He is right about the model and it is worth being exact about why.** The calorie baseline does
+**not** multiply by the self-reported activity level: `calculateBaseline` computes
+`tdee = bmr × SEDENTARY_MULTIPLIER`, and Q-401 deleted `ACTIVITY_MULTIPLIERS` precisely because
+folding a self-report in there double-counted against the movement the app *measures* and adds.
+So "what we are using now" is **measured**, not calibrated-from-a-picker.
+
+**Activity level is NOT a dead control, though — it still drives two things**, which is why this is a
+feature and not a deletion like LB-41:
+
+| consumer | effect |
+|---|---|
+| `STEP_GOAL_BY_ACTIVITY` | sedentary 7,000 → moderate 10,000 → active 12,000 |
+| `WATER_BUMP_BY_ACTIVITY` | +0 / +250 / +400 / +600 ml |
+| AI prompt, `cardio-week`, `training-stress`, `health-insight` | context only |
+
+- **⚠ A REAL BUG, independent of the feature.** `app/api/nutrition-goals/recommend/route.ts:111-112`
+  builds the prompt as *`Baseline (Katch-McArdle, lean mass Xkg, activity level "moderate"): BMR X,
+  TDEE X…`* — which reads as though the TDEE were computed **for** that activity level. It was not;
+  it is `bmr × 1.2` regardless. **The model is being told something false about its own input** and
+  may well adjust as if the baseline already contained a moderate multiplier. Fix the string whether
+  or not the calibrated option ships.
+- **Recommendation: compute the real factor and offer it as an option.** The app already has the
+  inputs — on the calibrated path `maintenanceKcal / bmr` is exactly the activity factor, and on the
+  formula path `(restingBase + avgActiveKcal) / bmr` is its measured equivalent. Show the number
+  ("Calibrated · 1.38×, from your last 14 days") rather than only a band name, and let it drive the
+  water and step goals that activity level genuinely feeds.
+- **⚠ It needs the same not-enough-data state the maintenance figure has.** The energy card already
+  says *"Log food on 8 more days to calibrate"*; a Calibrated option that silently falls back to a
+  guess would be the worse version of the picker it replaces.
+- **⚠ Do not delete the manual bands.** A calibrated factor is unavailable on a new account and
+  wrong after a life change until the window catches up; the self-report is the fallback and the
+  override.
+- **Verification:** the Calibrated option shows a factor derived from the user's own data and states
+  its window; picking it moves the step and water goals; an under-calibrated account sees the reason
+  rather than a number; and the recommend-route prompt no longer implies the TDEE is activity-scaled.
+
+
 ### [nutrition][body] BF-99 — the line says "base" and shows base MINUS the goal deficit, so the owner read his RMR as broken
 
 - **Keep:** one look on the S25. The line gained a clause and Home's copy of the bar is `compact`, so
@@ -415,40 +642,43 @@ below threshold and left in place for next time.
 
 ### [app-shell] BF-100 — back navigation always lands at the top, because the scroll position is not on the document
 
-- **Lane:** B — `components/pull-to-sync.tsx` (which owns the scroll container) plus wherever a route
-  change is observed.
+- **Keep:** the device pass, and only that.
+- **Verify:** device — on the S25, scroll a tab screen well down, tap into a detail screen, press the
+  **system back gesture** (not a UI back button), and confirm it returns to the same offset on a cold
+  cache and a warm one; and that reaching the same screen forward still starts at the top.
+- **✅ SHIPPED** (`feat/bf-100-scroll-restoration`, 2026-09-01).
+  `lib/hooks/use-scroll-restoration.ts`, called once from `pull-to-sync.tsx` so every screen using
+  the shell inherits it rather than 62 separate fixes. `e2e/scroll-restoration.spec.ts` is **green**
+  against a cold harness server.
+- **⚠ An earlier version of this entry claimed tab-to-tab was broken. Retracted.** A tab-to-tab move
+  loses nothing: the shell keeps every tab screen mounted, so the container holds its own `scrollTop`
+  unaided — measured, with Health's container still reading 840 while the URL was `/nutrition`. The
+  "evidence" was a red run whose real cause was `page.goBack()` landing on **`about:blank`** after a
+  bottom-nav Link click.
+- **⚠ SIX implementation traps are paid for and written into the hook. Do not re-derive them:**
+  (1) gating the restore on a `popstate` flag breaks under StrictMode, whose double-invoked effect
+  consumes it; (2) reading `el.scrollTop` in the cleanup saves **0**, because React has already
+  detached the node — track it from a `scroll` listener; (3) setting the offset once lands
+  **144–231 px past it**, because content keeps arriving above and scroll anchoring pushes it down,
+  so it must be re-asserted; (4) deciding the user has taken over by comparing the offset to what you
+  set treats that settling as a finger and yields every time — takeover is an **input event**;
+  (5) **consuming the saved value on read** is eaten by StrictMode a second way — pass one takes it,
+  finds the container too short, waits; pass one's cleanup writes 0 over the pending target; pass two
+  reads 0 and discards it. Read without consuming; clear when the restore lands; and never write 0
+  over a target that has not landed. (6) A screen can come back **shorter** than it was, so the
+  window must land at `min(target, available)` rather than abandon the restore.
+- **⚠ And four SPEC traps, which cost more than the code did.** All four reported
+  `expected 840, received 0`, identical to a broken feature: text-matching *Sleep* hits a card that
+  opens a **sheet**; `Sleep details →` does too; `a[href^="/health/"]` matches nothing, because these
+  screens navigate from `router.push` **buttons**; the bottom nav makes `goBack()` land on
+  `about:blank`. **`/more` → *Profile details* → back is the verified path**, and the spec's
+  precondition assertions are what separate a fixture problem from a regression — keep them.
+- **The timer was NOT the cause of the cold-server failure**, though it looked like it twice. Raised
+  to 120 s as a controlled experiment: still red. That is what forced the instrumented run that found
+  trap (5).
 - **Added:** 2026-09-01 · owner: *"when I scroll down to a button; then click on it and it takes me
   to a new page; when I press back I want to go back to that page at the same scroll level I was at.
   It usually starts me at the top of the page. This is on many pages if not all pages."*
-
-**"If not all pages" is right, and there is one reason.** The app does not scroll the document — it
-scrolls an **inner container**. `pull-to-sync.tsx:190` renders the scroller with a `scrollRef`, and
-**62 files** carry `overflow-y-auto`. Next's App Router scroll restoration operates on the
-window/document scroller, so it cannot see, save or restore a nested element's `scrollTop`. Nothing
-in the app does it either: `grep` for `scrollRestoration`, `restoreScroll` or a `sessionStorage`
-scroll key returns **nothing** outside `use-scroll-to-bottom.ts`, which is unrelated.
-
-So this is not a regression and not per-screen — no code has ever existed to do it.
-
-- **Recommendation: save `scrollRef.current.scrollTop` per route key and restore on mount**, in
-  `pull-to-sync.tsx` so every screen using the shell inherits it, rather than 62 separate fixes.
-  `sessionStorage` is the right store — it is per-tab, dies with the app, and a stale offset is
-  worthless anyway.
-- **⚠ Restore AFTER the content has height, or it silently no-ops.** These screens paint from a cache
-  seed and then revalidate, so a restore on first paint sets `scrollTop` on a container that is still
-  short and the browser clamps it to 0 — which looks exactly like the bug. Restore when the content
-  has laid out (a `ResizeObserver` on the inner content, or after the seeded paint), and only once
-  per navigation so a later revalidation cannot yank the user back.
-- **⚠ Do not restore on a forward navigation.** Only a *back* return should land where the user was;
-  arriving fresh should start at the top. That means keying on the route AND clearing the entry when
-  a route is entered forward, or reading the navigation type.
-- **The persistent tab shell cuts both ways here** — a tab that never unmounts keeps its scroll
-  position already, so tab switches are not the complaint. The loss happens on a **push to a new
-  route and back**, which is what unmounts the screen.
-- **Verification:** on the S25, scroll Health well down, tap into a detail screen, press the system
-  back gesture — the page returns at the same offset, on a cold cache and a warm one; and reaching
-  the same screen forward still starts at the top.
-
 
 ### [nutrition] BF-97 — a scanned meal groups in the diary: the rendering half
 
@@ -733,11 +963,19 @@ experiment, not an inference.
 ### [platform] LA-50 — pixel baselines need a CI-side job, because a session cannot generate one
 
 - **Lane:** A — `.github/workflows/` and `playwright.config.ts`.
-- **Gate:** owner — a baseline job has to **push commits from Actions**, which means granting the
-  workflow write permission to the repository. That is a decision about the blast radius of a
-  compromised action, not an implementation detail, and it is the first thing to settle. It also
-  inherited BF-91's queue position when that entry was split; the gate is what stops it heading the
-  work list on a priority it was never given.
+- **✅ DECLINED BY THE OWNER, 2026-09-01. Do not build this.** Asked whether to grant GitHub Actions
+  write permission to the repository so a job could push generated baselines, the owner said **no**.
+  The reasoning they were given, and which stands as the record:
+  - **A pixel baseline proves a screen *changed*, not that it is *correct*** — and it **cannot see
+    safe-area insets at all**, because the sandbox renders them as 0. That is this repo's most
+    persistent bug class (10+ regressions), so the check misses the failure it would be bought for.
+  - **The cheaper half already shipped.** BF-91 added measured layout assertions to the flow that
+    had none; **21 of 58 specs** now assert layout or computed style.
+  - So the trade was a wider repository write surface against a check that does not cover the real
+    risk. **Reversal cost is low** — the permission is one line in a workflow — so if unintended
+    visual drift ever becomes a live problem, re-file with the drift as evidence.
+- **Reference:** the Chromium-version measurement below is the durable value here. **Do not restart
+  this entry as work.**
 - **Added:** 2026-09-01 · split out of BF-91, whose recommendation this is the blocked half of.
 
 **Measured, not assumed.** `playwright.config.ts` runs the sandbox Chromium at a fixed path because
@@ -2612,28 +2850,69 @@ owner has to re-describe in a wizard what the app already knows.
   worker.
 
 
-### [workouts] LB-46 — the AI Prescription card may list pre-deload numbers on a deload prescription
+### [workouts] LB-47 — BF-64's `Full` override may do nothing on a REAL session-level deload
 
-- **Lane:** B — `components/workout/ai-prescription-card.tsx`, or whatever supplies its
-  `prescription` prop if the substitution happens upstream.
-- **Added:** 2026-09-01 by Lane B, incidentally, while device-substituting a fixture for BF-64.
-- **What was seen.** A `session_periodization` row whose prescription carries
-  `Deadlift {sets:3, reps:5, pct:60, deloaded:true, preDeload:{sets:4, reps:5, pct:80}}` renders in
-  the expanded card as **`4×5 @ 128.75kg (80%)`** — the *pre-deload* figures — directly under a
-  subtitle reading **`Deload session`**. The card's own code maps `prescription.exercises` and reads
-  `ex.pct`, so on the stored row it should print `3×5 … (60%)`.
-- **⚠ Attribution is measured, and the caveat is real.** It **reproduces on `main`** with the same
-  row (checked by stashing the BF-64 change and re-rendering), so it is not BF-64's doing. **But the
-  row was hand-built**, not produced by the engine, so the alternative explanation is that the
-  fixture is not a shape the engine emits and the card is fine. **Settle that first**: find a real
-  deloaded prescription in production (`prescription->'exercises' @> '[{"deloaded":true}]'`) and read
-  what the card shows for it before changing any code.
-- **If it is real, it matters more than it looks.** The subtitle and the numbers under it are the
-  two things a lifter reads to decide whether to override, and they would be disagreeing — the same
-  class as BF-8 (toggle disagreed with card) and BF-64 (toggle offered a control that did nothing),
-  one layer further in.
-- **Do not "fix" it by making the card follow the toggle.** BF-64 settled that: the card is a
-  statement about the prescription. If this is real the fix is to show what the prescription stored.
+- **Lane:** B — `components/workout/utils.ts` (`deloadRevertNames`), and possibly Lane A if the
+  answer is that a session deload needs a revert target the prescription does not currently carry.
+- **Added:** 2026-09-01 by Lane B, against its own shipped work (BF-64, #764, v1.422.0).
+- **⚠ This questions a fix that has already merged. It is not a regression — nothing got worse — but
+  the central claim may not hold, and it was verified against a fixture that misrepresents
+  production.**
+- **What BF-64 shipped.** Picking `Full` over a deload prescription reverts every deloaded exercise
+  to its `preDeload` numbers. The entry's premise, quoted: *"Every deloaded prescription exercise
+  carries a `preDeload` block."*
+- **What production actually holds.** Of **5** stored prescriptions: **1** has a session-level
+  `deload: true`, **2** have per-exercise `deloaded: true`, and **0 have both**. So on the only real
+  session-level deload, no exercise carries `deloaded`/`preDeload` — `deloadRevertNames` returns an
+  empty list and **the override reverts nothing.** The toggle would behave exactly as it did before
+  BF-64, which is the defect BF-64 was filed to fix.
+- **Why the two do not overlap.** A **session** deload has its low intensities baked into the LLM's
+  own `pct` values at generation. A **per-exercise** deload is an overlay applied afterwards by
+  `reevaluateForToday`, which stores the original in `preDeload` precisely so it can be undone. Only
+  the second has anything to revert *to*. BF-64 reused the second mechanism to implement the first.
+- **So the open question is what `Full` should mean on a session deload**, and it is not obvious:
+  the pre-deload numbers were never computed, so there is nothing stored to go back to. Candidates —
+  regenerate via `/prescribe` (which BF-64 rejected on cost, and the route takes no intensity input
+  anyway); scale the pcts back up by a fixed factor (invents numbers the engine did not choose); or
+  **disable the toggle on a session deload and say why**, which is honest and cheap. That last one is
+  probably right and is a Lane B change.
+- **⚠ Do not revert BF-64.** Its per-exercise path is correct and does work: `applyDeloadReverts` and
+  the blocked-exercise card copy are exercised by the mixed case, which production does produce. What
+  is unproven is the session-level case, which is the one the owner reported.
+- **⚠ And re-read BF-64's verification with this in mind.** It was measured against a hand-built
+  fixture combining session-level and per-exercise deloads — a pair production has not produced (see
+  LB-46). The reverts observed were real; whether they can ever fire on the owner's own data is what
+  this entry asks.
+- **n = 5.** Small. Confirm against a larger sample, or by asking the owner to report the next time a
+  deload day appears, before designing around it.
+
+### [workouts] LB-46 — how a deload reaches the AI Prescription card, and why a hand-built fixture misleads
+
+- **✅ CLOSED 2026-09-01 by measurement against production.** No code change. Kept as a
+  **`Reference:`** because the measurement is what the next reader needs, not the conclusion.
+- **Reference:** what the AI Prescription card can and cannot say, and why a hand-built prescription
+  fixture misleads.
+- **What I filed, and why it looked like a bug.** A card showed `4×5 @ 128.75kg (80%)` for an
+  exercise I had stored as `3×5 @ 60%` — the *pre-deload* figures under a `Deload session` subtitle.
+- **What actually happened.** `reevaluateForToday` (`packages/shared/src/ai-periodization/reevaluate.ts`)
+  **self-reverts** a per-exercise deload when the soreness that caused it clears: it swaps the
+  `preDeload` values back in, sets `deloaded: false` and **drops the `preDeload` block**. My fixture
+  had no mood log, so the reverts fired on the first read. Measured through the API:
+  `Deadlift: 4x5 @80% deloaded=false pre=none`. **The card was rendering the prescription faithfully.**
+  The tell was already on screen and I missed it — the card suppresses its intensity-zone chip when
+  `ex.deloaded`, and the chip was showing.
+- **The fixture was the unrealistic part, exactly as the entry warned it might be.** It combined a
+  session-level `deload: true` with per-exercise `deloaded: true` + `preDeload`. Production has never
+  produced that pair: of **5** stored prescriptions, **1** has a session-level deload, **2** have
+  per-exercise deloads, and **0 have both**. A session deload bakes its low intensities into the
+  LLM's own `pct` values; a per-exercise deload is an overlay with something to revert to. They are
+  different mechanisms and the fixture merged them.
+- **⚠ One latent inconsistency is real and stays open, in LANE A's file.** `reevaluate` returns
+  `{ ...prescription, exercises }` and never touches the top-level `deload` flag. So *if* both were
+  ever set and every per-exercise deload reverted, the subtitle would read `Deload session` over
+  full-intensity numbers. **n = 5, so "production has never produced it" is not "it cannot" —** the
+  guard against it would be in `reevaluate.ts`, which is Lane A's.
+- **Added:** 2026-09-01 by Lane B · closed the same day.
 
 ### [workouts] BF-64 — the Full/Deload toggle can only ADD deload, never remove one, so `Full · Override` overrides nothing
 
@@ -7936,31 +8215,29 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 - **Verification:** the route is already proven end to end on `pnpm dev` (all four verbs, including
   idempotency and the 401). This item is the affordance only.
 
-### [platform] LA-53 — an entry whose remaining half changed lanes keeps heading the OLD lane's list
+### [platform] LA-53 — split the two lane-drift cases a script cannot see
 
-- **Lane:** A — `scripts/check-backlog-pointers.js` and `scripts/next-item.js`.
+> **✅ THE DETECTION SHIPPED 2026-09-01, advisory as this entry required.**
+> `scripts/lib/lane-drift.js` + a note in `check-backlog-pointers.js`; it reports **0** on the
+> current tree and fires on Q-535's real pre-fix state.
+> [journal](overview/entries/2026-09-01-lane-drift-note.md)
+>
+> - **Keep:** the two cases no phrase-matcher will ever see, and the question of enforcement.
+
+- **Lane:** A
+- **1. The two cases that are judgement, not phrasing.** **BF-64** was filed Lane A because *"the
+  decision lives in `session-data.ts`"*; following its own recommended fix, the work is entirely
+  client-side and Lane B's. **LA-47** says outright that the split it proposes *"does not compile"*,
+  so its remaining piece is cross-lane and unstartable as written. Both need a person to re-read the
+  entry against the code — which is what found them.
+- **2. Whether to enforce.** The note prints a count; if that count is stable at zero across a few
+  weeks, the phrasing is stable enough to fail on. Not before — a ratchet that fails CI on a wording
+  variant costs more than the drift does.
+- **⚠ The rule reported the entry that documents it, twice, for two different reasons** — undated
+  prose describing the shape, and a dated citation of Q-535. Both exclusions are pinned by tests.
+  **Do not remove either to "catch more"**: without them every entry that discusses the pattern
+  reports itself, which is how an advisory note becomes noise nobody reads.
 - **Added:** 2026-09-01 · Lane A, after hitting the same shape three times in one session.
-- **The shape.** `next-item.js` reads the `Lane:` field, and nothing re-reads it when an entry's
-  remaining work moves to the other lane. So an entry whose Lane A half has shipped keeps surfacing
-  at the **top** of Lane A's READY list, and the next implementer spends the read discovering it.
-- **Three in one session, all of them real:**
-  - **Q-535** — Lane A half shipped 2026-08-18; the remaining half is Q-318's, Lane B's. It headed
-    Lane A's list for two weeks.
-  - **BF-64** — filed Lane A because *"the decision lives in `session-data.ts`"*; following its own
-    recommendation the fix is entirely client-side and Lane B's.
-  - **LA-47** — the entry says outright that the split it proposes *"does not compile"*, so its
-    remaining piece is cross-lane and unstartable as written.
-- **What a check can see, and what it cannot.** The first is mechanical: a body line matching
-  *"the Lane A half shipped"* (any case, either lane) while `Lane:` still names that lane is a
-  contradiction inside one entry, and `check-backlog-pointers.js` already parses both. The second and
-  third are judgement and no script will catch them — which is the argument for catching the one that
-  is mechanical rather than for catching none.
-- **⚠ Make it advisory first.** The existing `Keep:`-residue note prints as advice rather than a
-  failure for exactly this reason: a heuristic that fails CI on a phrasing variant costs more than
-  the drift does. Count the hits, print them, and only consider failing once the count is stable at
-  zero.
-- **Verification:** the check names Q-535 before this entry's own fix to it lands, and names nothing
-  after; `next-item.js --lane A` no longer heads its list with an entry whose Lane A half is done.
 
 ### [platform][devices] Q-535 — Redecode reports "failed: 502" for work that succeeded
 
@@ -9332,7 +9609,9 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 ### [platform][app-shell] Q-294 — the failure cells whose intended behaviour is undefined
 
 - **Branch:** folded into Q-249's E2E scenario list — **no branch of its own**
-- **Gate:** owner
+- **Reference:** read by **Q-249** for its failure scenarios. **Not independent work** — and the
+  `Gate: owner` is removed 2026-09-01 because all four decisions it was waiting on are recorded
+  below.
 - **Plan:** none · **this is a note against Q-249, not independent work**
 - **Why the gate, added 2026-08-26:** this sat at READY #3 of Lane A's queue while its own body says
   *"Do not start this as a standalone item"*. It is not startable and it never was — each of the four
@@ -9347,17 +9626,32 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 - **Most failure modes are handled**, and much of `CLAUDE.md` exists because of them: poison-pill
   outbox quarantine, local-SQLite open-path recovery, cursor pagination, `pool.on('error')`,
   `reconcileSchema` as the post-partial-upgrade authority. Not restated.
-- **The cells where the *intended* behaviour is undefined:**
+- **✅ ALL FOUR CELLS ARE NOW DECIDED, 2026-09-01 — this entry's blocker is gone.** Two came from the
+  owner directly; two were defaulted by the Orchestrator as cheap-and-reversible, and are marked as
+  such so a reader can tell a signed decision from a sensible default.
 
-  | failure | state |
-  |---|---|
-  | JWT expires mid-workout | no recorded decision on whether the in-progress session survives |
-  | Service worker serves a stale shell after deploy | build-stamped cache name handles the cold case; the **in-session** case is undefined |
-  | Device clock skewed hours from the server | ingest tolerances exist; no user-visible signal |
-  | Gemini rate-limited during a prescription generate | undefined — does the workout proceed on last-known numbers? |
-- **What to do with this:** when **Q-249** (the E2E harness) is built, these four become scenarios.
-  Each needs a decision on intended behaviour *before* a test can assert anything, so the decision is
-  the work, not the test. Do not start this as a standalone item.
+  | failure | **decided behaviour** | who |
+  |---|---|---|
+  | JWT expires mid-workout | **The workout survives.** Set logs keep writing to the local store and queue in the outbox; the push happens after re-auth. | owner |
+  | Gemini rate-limited during a prescription generate | **Proceed on last-known numbers, and say so on screen.** Never block the workout; never present stale numbers as fresh. | owner |
+  | Service worker serves a stale shell in-session | **Do not hot-swap. Finish the session on the shell that is running, and apply the new one on next cold start.** | default |
+  | Device clock skewed hours from the server | **Ingest keeps its existing tolerances; add one visible line where the skew would change a date.** | default |
+
+- **Why the owner's two are right, so they are not re-litigated.** *Token expiry:* offline-first
+  already queues writes when the network is gone, so an expired token becomes one more reason the
+  push waits — **no new code path**. Losing a logged workout to a token clock is the worst outcome
+  available. *AI unavailable:* the free tier is ~1,500 requests/day, so an outage is a when rather
+  than an if, and blocking training on it is indefensible; showing the previous numbers **with their
+  provenance stated** matches the existing rule that no AI-reported value is displayed as fact.
+- **Why the two defaults went the way they did** — say so if you disagree, both are one-line
+  reversals. *Stale shell:* swapping the shell under a running workout is the mechanism behind the
+  "phantom state" class this repo keeps hitting; the build-stamped cache name already handles the
+  cold case, and deferring to next cold start costs a user nothing they can perceive. *Clock skew:*
+  a silent tolerance is how a set lands on yesterday and nobody finds out — but a modal for a
+  condition that is nearly always benign is worse than the bug, so it gets a line, not a dialog.
+- **What to do with this now:** these are **four E2E scenarios with stated expectations**, ready for
+  **Q-249** to assert. The decision *was* the work, and it is done — this entry no longer blocks
+  anything, and it is a `Reference:` for Q-249 rather than an item of its own.
 
 ### [sleep][devices] Q-274 — fragment "nights" reach the sleep score, and on two dates the fragment is the ONLY record
 
@@ -11636,7 +11930,18 @@ reason it took an hour is that there is no signal that would have answered it di
 
 ### [platform][app-shell] Q-253 — a real-hardware device-farm run, for the Samsung-specific rendering and safe-area rows
 
-- **Gate:** owner
+- **✅ DECLINED FOR NOW BY THE OWNER, 2026-09-01 — which is the outcome this entry was filed
+  expecting** (*"filed to be decided, possibly declined"*). Not withdrawn: the case for it is
+  unchanged and it revives the moment its prerequisite lands.
+- **Why it lost:** of the ~25 hardware-gated rows, **15–18 are BLE** — ring, strap, scale — and no
+  device farm gives an agent the owner's Ring 5 speaking our own re-keyed protocol. It closes a named
+  minority, never "device verification". And **its prerequisite `Q-250` is not built**: paying per
+  run before the free CI emulator tier has caught the Android-runtime failures is the wrong order.
+- **Re-open it when `Q-250` ships and its emulator run is stable** — at that point what remains
+  uncovered is exactly the Samsung-WebView-compositor and real-safe-area minority this buys, and the
+  question becomes worth its per-run cost.
+- **Reference:** the options comparison below (Firebase Test Lab vs BrowserStack App Live) is what a
+  future session should read rather than re-derive. **Not startable work.**
 - **Branch:** `feat/device-farm-smoke`
 - **Added:** 2026-08-14 · same owner ask
 - **This is the lowest-value item in the cluster and is filed to be decided, possibly declined.**
@@ -13573,14 +13878,22 @@ passes and the inventory is explicit rather than forgotten.
 
 ### [platform][app-shell] 🟠 Q-48 — roadmap gaps found by the 2026-08-02 native-convergence review
 
-- **Gate:** owner
+- **The `Gate: owner` was removed 2026-09-01 — nothing here is the owner's any more.** F1, F2, F3
+  and F7 are all answered (dates and quotes in the table below); F8 was fixed in this entry's own
+  PR. What is left is **F4** and **F5**, both planning passes, and **F6**, a sequencing line Q-49
+  overtook. Unassigned planning work is not an owner gate, and filing it as one kept three
+  perfectly startable planning tasks off every work list.
 - **Branch:** `docs/native-roadmap-corrections` (docs-only; each sub-item may spawn its own build entry)
 - **Review:** [`docs/reviews/2026-08-02-native-convergence-roadmap-review.md`](reviews/2026-08-02-native-convergence-roadmap-review.md)
 - **Added:** 2026-08-02 · **renumbered from Q-46**, which run-1 claimed the same day (#1003)
 - **F1/F6 are now actioned by Q-49 above** — the rest stand.
 - **Why here:** these are gaps in the *plan*, not the code, so each one costs a stage-sized mistake
   later rather than a bug now. Four of the eight findings are one-line edits and are already applied
-  (F8 drift). The four below need an owner decision or a short planning pass, and none has an owner.
+  (F8 drift). **Re-counted 2026-09-01: F3 and F7 are now answered by the owner, so what remains is
+  F4, F5 and F6 — and none of the three is an owner decision.** F4 (a table-residency matrix) and F5
+  (a parity harness before the sync rewrite) are **planning passes**; F6 is a one-line sequencing
+  edit that Q-49 has already overtaken. So this entry is **not owner-gated any more** — it is
+  unassigned planning work, which is a different thing and was hiding behind the same field.
 
 | Ref | Gap | Recommended edit |
 |---|---|---|
@@ -13590,7 +13903,7 @@ passes and the inventory is explicit rather than forgotten.
 | **F4** | Stage 1 is called "the spine" and defines no schema — 70 `pgTable` vs 37 local tables with no residency/ownership record. Stage 5 generates Room entities from it. Q-44 Phase 3's 22-table rename is unsequenced against it and must land *at* Stage 1 or never | Stage 1's deliverable becomes a table-by-table residency matrix (device/server/both, writer, retention tier, derived?) + the `oura_*` rename go/no-go |
 | **F5** | Stage 5 re-implements the subsystem with the worst incident history in the repo (#47/#74/#82) with no plan, no parity harness, an unowned native replacement for `scripts/check-push-mutations.js`, and a transitional *third* write path per domain | Stage 5 opens with a golden-vector parity harness driving both implementations; add the native one-write-path guard as a named task; add a "Stage 5 without Stage 6" off-ramp |
 | **F6** | Q-31/Q-32 gate on Q-1, which the owner deferred — so Stage 4 is transitively parked and nothing says so. The gate is a sequencing preference, not a technical dependency, and a Play Store listing does not require a public repo | State the deferral on Q-32; decide whether the Q-1 gate survives |
-| **F7** | Push is web-push/VAPID through the service worker with no FCM anywhere; `output: 'export'` already disables `next.config.ts` headers, and E6 (server-side scheduler) has never been built — nothing can notify a user who has not opened the app that day | Add push to Stage 2's exit criteria; add an FCM decision point at Stage 5/6 |
+| ~~**F7**~~ | ✅ **ANSWERED by the owner 2026-09-01: keep web-push, build the scheduler.** The transport already works once the app has been opened; what is missing is the **server-side scheduler (E6)** that decides when to send, and that is needed under *either* transport — so it is the half that cannot be wasted. **FCM is deferred, not rejected:** it is the right answer for a Play Store listing and for reaching a closed app reliably, but migrating first would mean a Capacitor plugin, a Firebase project, native config and a new APK *and still leave the scheduler unbuilt*. Build E6, learn whether notifications earn their place, then revisit FCM with that evidence. **The gap stands and is not fixed by this decision** — until E6 exists nothing can notify anyone on a day they have not opened the app. | Build E6 (server-side scheduler) on the existing web-push transport; keep the FCM decision point at Stage 5/6, now with a stated default of "revisit after E6" |
 
 **F8 (five drifted doc claims) is already fixed in the same PR as this entry** — do not re-file it.
 
@@ -13650,7 +13963,20 @@ passes and the inventory is explicit rather than forgotten.
 - **Scope:** the bearer-token client + an `apiUrl()` indirection so every fetch can target either
   origin. **Not** the workspace split, **not** `output: 'export'` — those are Q-1b.
 
-### [app-shell] ⛔ Q-1b — native ("Swift-like") feel: Phase 3 (bundle the shell into the APK) — measurement says drop it, the owner has not said so
+### [app-shell] Q-1b — native ("Swift-like") feel: Phase 3 (bundle the shell into the APK) — HELD by the owner, who has now seen the measurement
+
+> **⏸ HELD BY THE OWNER, 2026-09-01 — and this time with the evidence in front of them, which is
+> what the entry said was missing.** Shown the 472 ms / 439 ms / 1.5 s numbers below and asked
+> whether to drop it, the owner chose **keep it deferred as-is**. Same answer as 2026-08-02, but no
+> longer an uninformed one — **the contradiction this entry existed to resolve is resolved.**
+>
+> **Do not re-put this to the owner**, and do not build it, unless one of these changes: the app
+> starts *feeling* slow to open (a judgement no number replaces), or the Railway round trip stops
+> being optional — leaving Railway, or going offline-first-on-open, makes that 439 ms the whole
+> story rather than a third of it.
+>
+> The marker on this heading was downgraded from the no-entry sign at the same time: `next-item.js`
+> parks on that character, and the hold below is what keeps this out of the work list.
 
 - **Lane:** A
 - **Keep:** the two halves of this entry contradict each other and only the owner can resolve it.
@@ -14109,6 +14435,12 @@ Two independent findings, both low-urgency:
 > **⚑ Owner answered 2026-08-04: willing to wear the Polar H10 overnight for ground truth — *"yes but
 > not tonight."*** Still owner-gated, but the gate is now scheduling rather than consent.
 >
+> **⚑ ACCEPTED BY THE OWNER 2026-09-01 — they chose this off a list of four possible actions, so it
+> is committed rather than merely consented to.** Nothing is owed by anyone else until a night's data
+> exists. **When it lands, the next session's first job is to check whether it did:**
+> `SELECT count(*) FROM rr_intervals WHERE measured_at::time BETWEEN '00:00' AND '06:00'` — it read
+> **50** across the entire database on 2026-09-01, so any real movement is unmissable.
+>
 > **Surfaced 2026-09-01 on the owner's actual worklist** —
 > [`device-verification-queue.md`](device-verification-queue.md) — because a gate that reads
 > "owner decision" when the decision is already **yes** is invisible in the one place the owner
@@ -14332,7 +14664,50 @@ indefinitely.
 
 ### [heart-rate][workouts] Q-149 — is 15 bpm the right HRR bar for this user?
 
-- **Gate:** owner
+- **✅ THE OWNER GATE IS CLEARED, 2026-09-01 — and the answer is "fit it to me".** Owner: *"I mostly
+  wear the chest strap while training. Let's have it specific to the user."* So the bar is
+  **personalised, not re-picked as another constant**, and the measured `hrr1` requirement stays.
+- **Lane:** A to implement — but **Tuning proposes the fit and the owner signs the number first.**
+- **Gate:** owner — **and this is a DIFFERENT gate from the one cleared above, not a re-park.** The
+  owner settled the *direction* on 2026-09-01 (fit it to the user). What is still owed is a
+  signature on **the fitted number itself**, which cannot be asked for until Tuning has produced
+  one. Per CLAUDE.md, Tuning never ships a scoring change and this one **re-scores months of
+  history**, so Lane A must not take it straight off the READY list. The gate is what stops that.
+- **⚠ TWO PREMISES IN THIS ENTRY WERE WRONG, and production says so. Re-measured 2026-09-01 against
+  `claude_ro.set_hr_stats`.**
+  - **"The ring power-gates, so end-of-set HR is never chest-strap-grade" — the strap is in fact the
+    DOMINANT source, and has been since 2026-08-05.** By `source`: **`chest_strap` 156 rows**,
+    `ble` 39, `mixed` 4, and 598 older rows with no attribution (pre-2026-08-05). Strap coverage is
+    also far better — `coverage_ok` on **137 of 156 (88%)** against **21 of 39 (54%)** for the ring.
+    The owner's own statement matches the data.
+  - **"Coverage drops to ~7 verdicts" is a stale figure from 2026-08-08.** There are now **84
+    chest-strap rows carrying `drop_60s`**. That is enough to fit to, which is what makes the owner's
+    answer actionable rather than aspirational.
+- **The measurement Tuning starts from — and it explains why 15 was never right *for this user*:**
+
+  | | strap rows with `drop_60s`, n = 84 |
+  |---|---|
+  | median `drop_60s` | **8 bpm** |
+  | p25 · p75 | 2 · 14 |
+  | p10 | **−1** (heart rate still climbing a minute into rest) |
+  | min · max | −13 · 39 |
+  | **reach the 15 bpm bar** | **20 of 84 — 24%** |
+  | mean peak · mean trough | **99** · 79 bpm |
+
+  **So the textbook bar fails 76% of this owner's sets.** A verdict that fires on three-quarters of
+  sets carries almost no information. The cause is visible in the last row: **mean peak is 99 bpm**,
+  so 15 bpm is a ~15% drawdown here, where the textbook number assumes peaks of 150–180 and a much
+  smaller fraction. The bar was never wrong in the abstract — it was calibrated for a different
+  physiology.
+- **What Tuning owes before the owner signs** (CLAUDE.md: a proposal is incomplete until it states
+  how much history it moves): the fitted bar, the rule that produces it (a percentile of this user's
+  own distribution rather than a hand-picked integer, so it re-fits as data accrues), **and the count
+  of verdicts that flip** — at the median it is roughly 22 of 84, and every one is a historical
+  re-score.
+- **Do not simply set the constant to 8.** That repeats the original mistake with a friendlier
+  number: still one integer, still fixed, still needing re-picking whenever the source or the
+  owner's fitness changes. `set_hr_stats.source` has been populated since 2026-08-06 precisely so
+  the fit can be per-source.
 - **The shipped half is verified in source** (`hr-analysis.ts:94` — `adequate = hrr1 != null ?
   hrr1 >= ADEQUATE_HRR1_BPM : null`; the `bpmAtLog < 120` shortcut is gone, checked 2026-08-20).
   **What is left is the calibration question the fix deliberately left open:** 15 bpm of
@@ -14366,6 +14741,10 @@ indefinitely.
   has landed since the 2026-07-22 run — the Defect B fix prevents *new* gaps and does not close
   old ones. Admin → Tools → "Backfill per-set HR stats" is the button; only the owner can press it.
 - **Gate:** owner
+- **⚑ OFFERED AND NOT TAKEN, 2026-09-01.** Put to the owner alongside three other owner-only actions;
+  they took the Polar H10 night (Q-4) and left this one. **That is a scheduling answer, not a
+  refusal** — the entry is unchanged and still owed. Do not re-ask it on its own; fold it into the
+  next batch of owner actions so it costs one decision rather than a nag.
 
 > **⚑ 2026-08-05 — this now BLOCKS an analysis, which raises its value.** The
 > [data-analysis review](reviews/2026-08-05-data-analysis-opportunities.md) §4 B2 went looking for

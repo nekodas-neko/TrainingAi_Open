@@ -593,6 +593,7 @@ export default function HealthContent({ userId, sex: sexProp, heightCm: heightCm
           <div key="body" className="h-full flex flex-col">
             <PullToSync
               onSync={handlePullSync}
+              scrollKey="body"
               scrollClassName="flex-1 overflow-y-auto pb-nav-safe px-4 pt-4 space-y-4"
               className="flex-1 flex flex-col overflow-hidden"
             >
@@ -623,6 +624,7 @@ export default function HealthContent({ userId, sex: sexProp, heightCm: heightCm
           <div key="training" className="h-full flex flex-col">
             <PullToSync
               onSync={handlePullSync}
+              scrollKey="training"
               scrollClassName="flex-1 overflow-y-auto pb-nav-safe px-4 pt-4 space-y-4"
               className="flex-1 flex flex-col overflow-hidden"
             >
@@ -636,6 +638,7 @@ export default function HealthContent({ userId, sex: sexProp, heightCm: heightCm
           <div key="progress" className="h-full flex flex-col">
             <PullToSync
               onSync={handlePullSync}
+              scrollKey="progress"
               scrollClassName="flex-1 overflow-y-auto pb-nav-safe px-4 pt-4 space-y-4"
               className="flex-1 flex flex-col overflow-hidden"
             >

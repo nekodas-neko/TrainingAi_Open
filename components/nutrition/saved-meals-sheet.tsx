@@ -55,20 +55,27 @@ type SheetTab = 'meals' | 'build'
  * separately-reached sheets never did. `Frequent` is still cut: it was a second ordering of
  * `Recent`.
  *
- * **The tab labels drop the possessive deliberately.** `My Foods` against `My Meals` is the pair the
- * owner could not tell apart, and two labels that differ only in their last word are hard to tell
- * apart wherever they appear. (`My Meals` survives on the page's own button, where it names one
- * list rather than one of two lookalikes.)
+ * **One name, `My Foods`, everywhere (BF-103, owner decision 2026-09-01).** This tab and the page
+ * button used to read `Meals` and `My Meals`; the pair the owner could not tell apart was
+ * `My Foods` against `My Meals`, and BF-60 broke it by dropping the possessive here. The owner's
+ * own fix is better: *"we only need one. lets go with MyFoods."* A single name cannot be confused
+ * with itself, and it describes the list more honestly — half of his saved meals contain exactly
+ * one item, saved that way because it was the only shelf available.
+ *
+ * **⚠ This renames the tab and nothing else.** `My Foods` was once the name of a *merged* list
+ * (v1.382.0), split back three versions later because putting a recipe and a single ingredient in
+ * one list made "log this" mean two different things. That revert was about the merge, not the
+ * name. `Recent` and `Search` stay; the list keeps holding what it holds. Do not re-merge them.
  *
  * **`Search`, not `Single foods` (BF-60).** The old label named a composition against one thing, and
  * it was right until BF-48 gave that tab the food database — a tab reaching outside your own data is
- * not "your single foods" any more. `Meals` has a search box too, so the two are worded to keep the
- * distinction the label rests on: Meals **filters** a list you already own, this tab **searches**
+ * not "your single foods" any more. `My Foods` has a search box too, so the two are worded to keep the
+ * distinction the label rests on: My Foods **filters** a list you already own, this tab **searches**
  * beyond it.
  */
 const LIST_TABS = [
   { value: 'recent' as const, label: 'Recent' },
-  { value: 'meals' as const, label: 'Meals' },
+  { value: 'meals' as const, label: 'My Foods' },
   { value: 'foods' as const, label: 'Search' },
 ]
 type ListTab = (typeof LIST_TABS)[number]['value']
@@ -95,7 +102,7 @@ interface Props {
   /** A scanned saved-meal label (Q-389); the parent owns the logging. */
   onScannedSavedMeal?: (mealId: string) => void
   onScannedSharedMeal?: (meal: SharedMeal) => void
-  /** Open on `Meals` rather than `Recent` — set when the entry point was the page's My Meals button. */
+  /** Open on `My Foods` rather than `Recent` — set when the entry point was the page's My Foods button. */
   openOnMeals?: boolean
 }
 

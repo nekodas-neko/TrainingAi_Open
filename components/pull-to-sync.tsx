@@ -6,6 +6,7 @@ import { RefreshCwIcon } from 'lucide-react';
 import { cn } from '@trainingai/shared/utils';
 import { hapticLight, hapticSuccess } from '@/lib/haptics';
 import { syncOuraRing } from '@/lib/oura-ble/sync';
+import { useScrollRestoration } from '@/lib/hooks/use-scroll-restoration';
 
 const THRESHOLD = 100;  // indicator px needed to trigger sync (200px physical drag)
 const MAX_PULL = 130;   // max indicator height
@@ -25,6 +26,9 @@ interface PullToSyncProps {
   scrollStyle?: React.CSSProperties;
   /** className for the outer container (default: 'flex-1 flex flex-col') */
   className?: string;
+  /** Distinguishes two scrollers on one route (BF-100). Health renders three — one per tab — so
+   *  without this they would share a saved offset and restore each other's. */
+  scrollKey?: string;
 }
 
 export function PullToSync({
@@ -33,8 +37,13 @@ export function PullToSync({
   scrollClassName,
   scrollStyle,
   className = 'flex-1 flex flex-col overflow-hidden',
+  scrollKey,
 }: PullToSyncProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
+  // BF-100. The app scrolls this container, not the document, so Next's own restoration cannot see
+  // it — measured: on a push-and-back the container reads 0 while the document reads 0 throughout.
+  // Here rather than in 62 screens, because every screen using the shell inherits it.
+  useScrollRestoration(scrollRef, scrollKey);
   const isPulling = useRef(false);
   const isSyncing = useRef(false);
   const phaseRef = useRef<Phase>('idle');

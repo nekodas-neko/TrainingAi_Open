@@ -48,7 +48,7 @@ export function NutritionActionRow({
       </button>
 
       {/* BF-45 ①: `col-span-2` is a CONSEQUENCE of the row being three buttons in a two-column
-          grid, not a design decision about My Meals. Row 2 held one button and dead space beside
+          grid, not a design decision about My Foods. Row 2 held one button and dead space beside
           it. A fourth action reclaims that slot and this span comes off — which is why it is worth
           saying so here rather than leaving the next person to guess it was deliberate. */}
       <button
@@ -56,10 +56,10 @@ export function NutritionActionRow({
         className="col-span-2 min-h-[48px] flex items-center gap-2.5 rounded-2xl border border-border bg-muted/60 px-3 py-3 active:bg-muted/20 transition-colors"
       >
         <UtensilsCrossed className="w-4 h-4 text-muted-foreground flex-none" />
-        {/* `My Meals`, not `My Foods` (BF-37). It lands on the Meals tab, and the old label named
-            the other one — the pair the owner could not tell apart. `Search` is one tab across from
-            wherever this opens, so nothing became unreachable. */}
-        <span className="text-sm font-semibold flex-1 text-left">My Meals</span>
+        {/* `My Foods`, matching the tab it lands on (BF-103). BF-37 put `My Meals` here to break up
+            the `My Foods`/`My Meals` pair the owner could not tell apart; unifying on one name
+            satisfies that reasoning rather than contradicting it. Do not split them again. */}
+        <span className="text-sm font-semibold flex-1 text-left">My Foods</span>
       </button>
     </div>
   )

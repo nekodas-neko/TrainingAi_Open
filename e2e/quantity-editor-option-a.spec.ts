@@ -115,7 +115,7 @@ async function openBuilder(page: Page) {
     }).toPass({ timeout: 90_000 })
   }
 
-  await step(library, () => tap(page, page.getByRole('button', { name: /^My Meals$/ })))
+  await step(library, () => tap(page, page.getByRole('button', { name: /^My Foods$/ })))
   await step(editButton, () => tap(page, page.getByRole('button', { name: new RegExp(`^${MEAL_NAME}`) }).first()))
   await step(builder, () => tap(page, editButton))
 }

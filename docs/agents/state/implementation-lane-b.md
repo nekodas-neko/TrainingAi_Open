@@ -125,6 +125,11 @@ None held.
   histories`. Fix with `git fetch --unshallow origin`. It happens **every** session.
 - **Never check a gate through a pipe** — `pnpm check:rules | tail` exits with tail's status. This
   cost a push onto a RED check once; do not repeat it.
+- **Check for conflict markers BEFORE `git add -A`, not after.** `git status | grep '^UU'` reports
+  nothing once you have staged them, so the sequence `git add -A; git status | grep UU` always says
+  "no conflicts" — it did on 2026-09-01, on a file `git merge` had genuinely left conflicted. The
+  `No unresolved conflict markers` step of `check:rules` is what caught it. Either grep the markers
+  themselves (`grep -rn '^<<<<<<< '`) or check `git status` before staging.
 - **And do not chain the push onto the same line as the gate.** Running
   `pnpm check:rules > f; echo $?; git commit && git push` pushes whatever the gate said, because the
   push depends on the *commit's* status and not the gate's. Done here on 2026-09-01: the gate printed

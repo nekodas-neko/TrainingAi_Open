@@ -24,8 +24,62 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.423.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Version:** v1.425.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-09-01.
+
+**One name for the saved list — `My Foods`, everywhere (BF-103).** The owner overrode the entry's own
+proposal and was right to: it suggested `Saved` for the tab with `My Meals` left on the button, which
+is a *second* name, and **the historical failure was never the wording — it was two labels for one
+list.** *"we only need one. lets go with MyFoods."* It also describes the contents honestly: 5 of his
+10 saved meals hold exactly one item. Eight files carry the strings, including an **`aria-label`** a
+rename would leave saying a name the screen no longer uses. **The two comments from BF-37 and BF-60
+that read as a standing prohibition on the name are rewritten** — left alone, they are what the next
+session reverts this on. **The guard found what the entry's file table missed: twelve e2e spec files
+asserting `My Meals`**, which would have broken CI on the next run rather than at review. It also
+pins the strip at `Recent · My Foods · Search`, because `My Foods` was once a *merged* list and that
+revert was about the merge, not the name. **Not device-verified** — `My Foods` is longer than `Meals`
+and three tabs share the width ([journal](docs/overview/entries/2026-09-01-fix-bf-103-my-foods.md)).
+
+**The queue tool stops pointing Lane A at another lane's finished work (LA-53).** `next-item.js`
+reads an entry's `Lane:` field and nothing re-reads it when the remaining work moves lanes, so
+**Q-535 headed Lane A's READY list for two weeks** after its Lane A half shipped. An advisory note in
+`check-backlog-pointers` now names any entry that contradicts itself that way — 0 on the current
+tree, and it fires on Q-535's real pre-fix state. **The rule reported its own documentation twice**
+before the two exclusions were added (undated prose describing the shape; a dated citation of another
+entry), which is the concrete reason it prints rather than fails
+([journal](docs/overview/entries/2026-09-01-lane-drift-note.md)).
+
+**A fixture that misrepresented production closed one finding and opened a doubt about a shipped fix
+(LB-46, LB-47).** LB-46 — the AI Prescription card showing pre-deload numbers — **is not a bug**:
+`reevaluateForToday` self-reverts a per-exercise deload once the soreness clears, and the card was
+rendering the result faithfully. The tell was on screen and missed: the card suppresses its
+intensity-zone chip when an exercise is deloaded, and the chip was showing. **The fixture merged two
+mechanisms production keeps apart** — of 5 stored prescriptions, 1 has a session-level deload, 2 have
+per-exercise deloads, **0 have both**. A session deload bakes low intensities into the LLM's own
+pcts; a per-exercise deload is an overlay with a `preDeload` to undo. **⚠ Which means BF-64's
+override, shipped hours earlier, may revert nothing on a real session-level deload** — it reused the
+per-exercise mechanism for the session-level case, and on the only real such row there is no
+`preDeload` to go back to. Not reverted: nothing regressed and the per-exercise path works. Filed as
+**LB-47** with three candidate answers, the cheapest being to disable the toggle on a session deload
+and say why. **The lesson is cheap and was available all along:** check a hand-built fixture's shape
+against production *before* verification leans on it — the `db-query` call that settled this took two
+minutes ([journal](docs/overview/entries/2026-09-01-docs-lb-46-closed-lb-47-filed.md)).
+
+**Back navigation returns to where you were (BF-100).** Owner: *"when I press back I want to go back
+to that page at the same scroll level I was at. It usually starts me at the top of the page. This is
+on many pages if not all pages."* **"If not all pages" was right, and there was one cause** — the app
+scrolls an inner container, Next's restoration watches the window scroller, and nothing bridged them.
+One hook in `pull-to-sync.tsx`, so every screen on the shell inherits it. **Six implementation traps
+and four spec traps are written into the entry and the code**, because every one produced something
+that runs and achieves nothing: two separate StrictMode double-invoke failures (a consumed `popstate`
+flag; a cleanup writing 0 over a pending target), `scrollTop` reading 0 on a node React has already
+detached, scroll anchoring pushing the restore 144–231 px past the mark, a takeover check that
+mistook that settling for a finger, and a page that comes back shorter than it left. **All four spec
+failures reported the same line a broken feature would**, which is why the spec now asserts its own
+preconditions. `e2e/scroll-restoration.spec.ts` is green on a cold server. **Not device-verified** —
+the system back gesture is not `page.goBack()`, and WebView scroll anchoring may differ from
+Chromium's, which matters because anchoring was one of the traps
+([journal](docs/overview/entries/2026-09-01-feat-bf-100-scroll-restoration.md)).
 
 **The calorie line called a goal deficit part of the base rate (BF-99).** Owner, with a screenshot:
 *"why is my base rate under the 1350 RMR value."* `budgetProvenance().base` is

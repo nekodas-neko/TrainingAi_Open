@@ -6006,6 +6006,30 @@ reads an all-false style as "use them all".
 A finding that something is *not* broken earns its lines here exactly when the thing looks broken on
 sight, which this does.
 
+## 2026-09-01 — `docs/implementation-backlog.md` 14924 → 15034 (+110)
+
+`docs/owner-decisions-round2`. A full sweep of the eleven `Gate: owner` entries, put to the owner in
+two rounds. **Seven decisions came back and the queue now holds zero unanswered owner questions** —
+the remaining seven gates are a decision already made (`Q-1b`, `Q-149`), an action deferred to a
+later batch (`Q-11`, `Q-71`), an action accepted (`Q-4`), an entry the owner explicitly held
+(`Q-551`), or one whose own text forbids asking (`TN-16`).
+
+The growth is decisions and their reasoning, which is the expensive half to reconstruct:
+
+- **`Q-149` carries a new production measurement that falsifies two of its own premises** — the
+  chest strap is the dominant HR source (156 rows against the ring's 39, and 88% coverage against
+  54%), and the "~7 usable verdicts" figure was stale: there are **84**. With mean peak at 99 bpm,
+  the textbook 15 bpm bar fails **76%** of this owner's sets. That table is why the answer is "fit
+  it to the user" rather than "pick a smaller number", and it is what Tuning starts from.
+- **`Q-294` records four decided failure behaviours**, two signed by the owner and two defaulted,
+  labelled so a reader can tell them apart. The decision *was* the work; it becomes a `Reference:`
+  for Q-249's scenarios.
+- **`LA-50` and `Q-253` are declined**, and each keeps the measurement that argued it — the
+  Chromium-version gap and the Firebase/BrowserStack comparison — as `Reference:` so a future
+  session reads rather than re-derives.
+- **`Q-48` lost its gate without an owner answer**, because it never needed one: F3 and F7 are now
+  answered, F8 was fixed in its own PR, and what remains is planning work that had been invisible
+  behind a decision field for weeks.
 ## 2026-09-01 — `docs/implementation-backlog.md` → 14976 (LA-52 filed, LA-48 re-scoped)
 
 One new entry and a scope correction, both from reading code rather than from a report. The lines
@@ -6111,6 +6135,132 @@ Two negatives are kept for the same reason as always: the split is in the compon
 `budgetProvenance` (shared, and one combined number is correct for a caller that wants one), and
 neither the `Math.max` floor nor the goal maths was touched — both look like the bug and are not.
 
+## 2026-09-01 — `docs/implementation-backlog.md` 15084 → 15150 (BF-101 the numbers already exist, BF-102 a false prompt)
+
+Two Profile-screen asks, and tracing turned the first into mostly plumbing and the second into a bug.
+
+**BF-101.** The owner guessed the recommended values might not need AI. They do not:
+`calculateBaseline` already returns calories, protein, carbs, fat, water and steps deterministically,
+off the **measured** RMR via `personalRmr`, and the AI route computes that baseline first and then
+adjusts it. The entry's length is the evidence that the button is worth having — Activity Level is
+**Moderate** (steps → 10,000) against a stored Steps Goal of **7,000**, the sedentary value, while
+water tracks moderate to 16 ml. One field follows the recommendation, one does not, and the screen
+says nothing. Plus two guards: sleep has no baseline and must not get an invented one, and an
+incomplete profile must hide the button rather than compute from absent inputs.
+
+**BF-102** starts from the owner being right — the calorie model is measured, not multiplied by the
+picker (Q-401) — and then has to say the harder thing: activity level is **not** dead, it still
+drives the step goal and the water bump, so this is a feature rather than a deletion. The finding
+that earns the entry is a live defect beside it: the recommend route's prompt reads
+*`activity level "moderate"): … TDEE X`*, implying the TDEE was computed for that level when it is
+`bmr × 1.2` regardless. **The model is told something false about its own input**, and that is worth
+fixing whether or not a Calibrated option ever ships.
+
+## 2026-09-01 — `docs/implementation-backlog.md` (BF-103 a label removed twice, BF-104 a multiplier with no setter)
+
+**BF-103 is mostly history the next reader must not repeat.** The owner asked for the Meals tab to
+become "My foods" — which is precisely the label **BF-37** and **BF-60** removed, the second because
+*"`My Foods` against `My Meals` is the pair the owner could not tell apart."* Renaming the tab while
+the page button still says `My Meals` re-creates that pair in the one place the earlier fix left
+alone. But his reason is new and measured: **5 of his 10 saved meals hold exactly one item**, so the
+label is untrue rather than merely confusable. The entry separates those two arguments and
+recommends `Saved` — which names a source alongside Recent and Search, is true of both shapes, and
+collides with nothing.
+
+**BF-104** is short because the storage is already right: every `food_log` carries its own
+`quantity_multiplier` and `logMealFromSaved` copies each item's factor from the definition, so the
+only missing piece is a meal-level scale to multiply through. The length is spent keeping it away
+from `meal-batch-size` — "makes N portions" is definition-time and this is log-time, and the two
+multiply rather than substitute — and on stating the trade in scaling at write time: the rows stay
+self-describing snapshots, at the cost of "I ate 1.5×" not surviving as a fact. BF-3 made the
+opposite call for supplement doses, for a reason that does not apply here.
+## 2026-09-01 — `docs/implementation-backlog.md` → 15174 (merge resolution)
+
+`docs/owner-decisions-round2`, merging `main`. Re-measured after the merge, not carried across it.
+Both sides of this file's own conflict kept — append-only, so a conflict here is two additions.
+Entry-ID set diffed against the new `origin/main`: **identical, nothing added or lost.**
+
+## 2026-09-01 — `projectOverview.md` → 9015 (BF-100)
+
++16, and unusually the count of traps is the payload rather than a detail. Ten defects — six in the
+hook, four in the spec — every one of which produced code that runs, does what it says, and achieves
+nothing. Two were StrictMode's double-invoked effect in *different* shapes (a consumed `popstate`
+flag; a cleanup writing 0 over a pending target), which is the reason the second one cost as much as
+the first: the lesson from one did not generalise to the other.
+
+The line about the four spec failures all reporting `expected 840, received 0` is the one that saves
+the most time later. That is what makes a fixture problem indistinguishable from a regression, and
+the fix — a spec that asserts its own preconditions — is worth more than the feature it guards.
+
+## 2026-09-01 — `docs/implementation-backlog.md` 15352 → 15376 (BF-103 rewritten on an owner decision)
+
++24 lines, all inside one existing entry — no new entry, no new heading. The owner rejected BF-103's
+`Saved` recommendation in favour of `My Foods` on every surface, on the grounds that the historical
+failure was two labels for one list rather than the wording of either. Rewriting the entry to record
+that cost more lines than it saved because the sweep that came with it is the substance: `My Meals`
+turned out to be **eight** user-visible strings across five files, not the two the entry named — a
+toast with two arms, an empty state, three buttons, a badge and an `aria-label` — and a table naming
+each is what stops the rename shipping half-done. The other addition is a warning the entry did not
+carry: `My Foods` was already the name of a **merged** list in v1.382.0 and the merge was reverted in
+v1.385.0, so an implementer reading the new label could reasonably re-merge the tabs and reintroduce
+a defect the app has already paid for. Both are the kind of thing that is cheap here and expensive in
+review.
+
+## 2026-09-01 — `projectOverview.md` → 9031, `docs/implementation-backlog.md` → 15417 (LB-46 closed, LB-47 filed)
+
++16 for a finding with no code change, which is the unusual case where that is clearly worth it: it
+records that a fix **already merged this session** may not do anything on the data it was built for.
+Burying that in a backlog entry and leaving the status block silent would be the version that costs
+something later.
+
+The measurement is the durable part — 5 prescriptions, 1 session deload, 2 per-exercise, **0 both** —
+because it is what distinguishes the two deload mechanisms, and conflating them is what produced both
+the false finding and the doubtful fix.
+
+## 2026-09-01 — `docs/agents/state/implementation-lane-b.md` → 179 (conflict-marker staging slip)
+
++5 for a gotcha found the same session it was needed. `git add -A; git status | grep '^UU'` always
+reports no conflicts, because staging clears the UU state — so the check that was meant to confirm a
+clean merge confirmed nothing, on a file `git merge` had genuinely left conflicted. `check:rules`
+caught it at the `No unresolved conflict markers` step.
+
+It sits next to the two existing gate gotchas because all three are the same mistake: reading a
+signal that has already been destroyed by the command before it.
+
+## 2026-09-01 — `projectOverview.md` → 9040, `docs/implementation-backlog.md` → 15415 (LA-53 shipped)
+
+The backlog shrank: LA-53's entry carried the three worked examples and the design argument, and
+those are now in the journal. What stays is the two cases no script will ever catch — BF-64 and
+LA-47 — and the question of whether the note should ever fail rather than print.
+
+`projectOverview.md` grew 8, and the line that earns them is the one about the rule reporting **its
+own documentation** twice before the exclusions existed. Without it the note reads as ordinary
+caution; with it, the reason it prints rather than fails is a measurement.
+
+## 2026-09-01 — `projectOverview.md` → 9053 (BF-103)
+
++13 for a rename, which only earns it because two of the lines are about *not* undoing it. The
+comments BF-37 and BF-60 left behind read as a standing prohibition on the name `My Foods`, and the
+next session reverts this on their authority unless the record says why unifying satisfies them. The
+other is the merge: `My Foods` was once a merged list, and the revert that split it was about the
+merge, not the name — an implementer who conflates the two reintroduces a defect already paid for.
+
+The line about the guard finding twelve e2e specs the entry's own file table missed is there as
+evidence for a general point: a rename's blast radius includes its tests, and a file table written by
+reading will not contain them.
+
+## 2026-09-01 — `docs/implementation-backlog.md` 15376 → 15443 (BF-105, walk phase cues)
+
++67 lines for one entry, above the usual because most of it is evidence that the obvious diagnosis is
+wrong. "The phase change isn't signalled" reads like a missing feature; the cue is in fact scheduled,
+on a real HIGH-importance channel with a default sound, on an exact alarm with `allowWhileIdle`. Each
+of those took a check — including the pinned plugin source for what an absent `sound` does, which is
+keep Android's default rather than go silent — and an implementer who skips them builds a cue that
+already exists. The entry also carries two things that would otherwise be found on-device at the cost
+of an APK cycle: a NotificationChannel's sound and vibration are immutable once created, so
+differentiating fast from slow needs new channel ids rather than edited settings; and that work is JS
+in `capacitor-native-init.tsx`, so it ships through Railway despite looking native. The one genuinely
+native piece — a custom sound file in `res/raw/` — is marked as such.
 ## 2026-09-03 — backlog → 15102, `projectOverview.md` → 9009, `docs/agents/state/tuning.md` → 388 (TN-23)
 
 One entry, from one owner question about one night — and the length is the **arithmetic that turns an
