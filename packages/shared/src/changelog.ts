@@ -6,6 +6,16 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.426.0",
+    date: "2026-09-01",
+    changes: [
+      "Each goal on the Profile form now shows its recommended value, and one tap fills it in \u2014 steps, water and calories, plus protein, carbs and fat in Macro Targets. Under each one is where the number comes from, like \u002233 ml per kg of body weight, plus your activity bump\u0022.",
+      "It also tells you when a goal already matches, which is the point: your steps goal was 7,000 \u2014 the sedentary figure \u2014 while your activity level said Moderate, whose target is 10,000. Nothing on screen said so.",
+      "No AI is involved. The numbers come from the same calculation the AI recommendation starts from, so they are instant, free and the same every time \u2014 and if you have had a resting-rate test, the calorie figure uses it rather than an estimate. Get AI Recommendation still does its own thing.",
+      "Sleep has no recommended value, because there is no formula behind one. It is left blank rather than guessed at, and the whole set hides until your height, birth year, sex, weight, activity level and fitness goal are all filled in.",
+    ],
+  },
+  {
     version: "1.425.0",
     date: "2026-09-01",
     changes: [

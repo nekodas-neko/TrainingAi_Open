@@ -5,6 +5,8 @@ import { useRovingRadioGroup } from '@/lib/hooks/use-roving-radio-group'
 import { Label } from '@/components/ui/label'
 import { FITNESS_GOALS, type FitnessGoal } from '@trainingai/shared/types/user'
 import { GoalProgressBar } from '@/components/health/goal-progress-bar'
+import type { BaselineResult } from '@trainingai/shared/nutrition/goal-recommendation'
+import { RecommendedValue } from './recommended-value'
 import { MacroTargetsPane } from './macro-targets-pane'
 
 const FITNESS_GOAL_LABELS: Record<FitnessGoal, { label: string; description: string }> = {
@@ -40,6 +42,8 @@ interface GoalTargetsSectionProps {
   todayMeta: { steps: number | null; waterMl: number | null; calories: number | null } | null
   weekToDate: { steps: number; calories: number; waterMl: number } | null
   macroRefreshKey: number
+  /** BF-101: the deterministic per-field recommendation, or `null` on an incomplete profile. */
+  baseline: BaselineResult | null
 }
 
 export function GoalTargetsSection({
@@ -48,7 +52,7 @@ export function GoalTargetsSection({
   sleepGoalStr, onSleepGoalChange,
   calorieGoalStr, onCalorieGoalChange, calorieGoalType, onCalorieGoalTypeChange,
   waterGoalStr, onWaterGoalChange, waterGoalType, onWaterGoalTypeChange,
-  todayMeta, weekToDate, macroRefreshKey,
+  todayMeta, weekToDate, macroRefreshKey, baseline,
 }: GoalTargetsSectionProps) {
   const fitnessGoalGroup = useRovingRadioGroup(fitnessGoal != null)
   return (
@@ -109,6 +113,15 @@ export function GoalTargetsSection({
           <button type="button" onClick={() => onStepsGoalTypeChange('weekly')}
             className={`rounded-lg px-4 py-1.5 transition ${stepsGoalType === 'weekly' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground'}`}>Weekly</button>
         </div>
+        {/* The stored figure is the DAILY goal in both modes — the weekly toggle multiplies it by 7
+            for the bar below rather than changing what the field holds — so one recommendation is
+            correct for either. */}
+        <RecommendedValue
+          recommended={baseline?.stepsGoal ?? null}
+          current={parseInt(stepsGoalStr) || null}
+          why="your activity level's step target"
+          onApply={v => onStepsGoalChange(String(v))}
+        />
         {(() => {
           const weekly = stepsGoalType === 'weekly'
           const goalNum = parseInt(stepsGoalStr) || null
@@ -158,6 +171,13 @@ export function GoalTargetsSection({
           <button type="button" onClick={() => onWaterGoalTypeChange('weekly')}
             className={`rounded-lg px-4 py-1.5 transition ${waterGoalType === 'weekly' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground'}`}>Weekly</button>
         </div>
+        <RecommendedValue
+          recommended={baseline?.waterMl ?? null}
+          current={parseInt(waterGoalStr) || null}
+          unit="ml"
+          why="33 ml per kg of body weight, plus your activity bump"
+          onApply={v => onWaterGoalChange(String(v))}
+        />
         {(() => {
           const weekly = waterGoalType === 'weekly'
           const goalNum = parseInt(waterGoalStr) || null
@@ -190,6 +210,13 @@ export function GoalTargetsSection({
           <button type="button" onClick={() => onCalorieGoalTypeChange('weekly')}
             className={`rounded-lg px-4 py-1.5 transition ${calorieGoalType === 'weekly' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground'}`}>Weekly</button>
         </div>
+        <RecommendedValue
+          recommended={baseline?.calories ?? null}
+          current={parseInt(calorieGoalStr) || null}
+          unit="kcal"
+          why="your resting rate on a rest day, adjusted for your fitness goal"
+          onApply={v => onCalorieGoalChange(String(v))}
+        />
         {(() => {
           const weekly = calorieGoalType === 'weekly'
           const goalNum = parseInt(calorieGoalStr) || null
@@ -205,7 +232,7 @@ export function GoalTargetsSection({
       </div>
 
       {/* Macro Targets — collapsible, auto-filled by AI recommendations */}
-      <MacroTargetsPane refreshKey={macroRefreshKey} />
+      <MacroTargetsPane refreshKey={macroRefreshKey} baseline={baseline} />
     </div>
   )
 }

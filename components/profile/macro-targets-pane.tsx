@@ -9,19 +9,31 @@ import { cachedFetch, readCacheSync } from '@/lib/sqlite/cache'
 import { TTL_LONG } from '@trainingai/shared/cache-ttl'
 import {
   carbsFromRemainder, caloriesFromMacros, MACRO_GOAL_TOLERANCE_KCAL,
+  type BaselineResult,
 } from '@trainingai/shared/nutrition/goal-recommendation'
+import { RecommendedValue } from './recommended-value'
 
 interface MacroTargetsPaneProps {
   // Bumped after an AI recommendation is applied so the form re-fetches the
   // newly-written targets instead of showing stale values.
   refreshKey?: number
+  /** BF-101: the deterministic per-field recommendation, or `null` on an incomplete profile. */
+  baseline: BaselineResult | null
 }
 
-const FIELDS: { label: string; key: 'calories' | 'proteinG' | 'carbsG' | 'fatG' | 'fiberG'; unit: string }[] = [
-  { label: 'Calories', key: 'calories', unit: 'kcal' },
-  { label: 'Protein', key: 'proteinG', unit: 'g' },
-  { label: 'Carbohydrates', key: 'carbsG', unit: 'g' },
-  { label: 'Fat', key: 'fatG', unit: 'g' },
+// `why` is absent for fiber deliberately: `BaselineResult` carries no fiber figure, and inventing
+// one would put an unsourced number beside four sourced ones (BF-101). Same rule as Sleep.
+const FIELDS: {
+  label: string
+  key: 'calories' | 'proteinG' | 'carbsG' | 'fatG' | 'fiberG'
+  unit: string
+  baselineKey?: 'calories' | 'proteinG' | 'carbsG' | 'fatG'
+  why?: string
+}[] = [
+  { label: 'Calories', key: 'calories', unit: 'kcal', baselineKey: 'calories', why: "your resting rate on a rest day, adjusted for your fitness goal" },
+  { label: 'Protein', key: 'proteinG', unit: 'g', baselineKey: 'proteinG', why: 'dosed per kg of lean mass for your goal' },
+  { label: 'Carbohydrates', key: 'carbsG', unit: 'g', baselineKey: 'carbsG', why: 'whatever is left of the calorie target after protein and fat' },
+  { label: 'Fat', key: 'fatG', unit: 'g', baselineKey: 'fatG', why: '25% of the calorie target' },
   { label: 'Fiber', key: 'fiberG', unit: 'g' },
 ]
 
@@ -35,7 +47,7 @@ function targetsToForm(t: NutritionTargets) {
   }
 }
 
-export function MacroTargetsPane({ refreshKey }: MacroTargetsPaneProps) {
+export function MacroTargetsPane({ refreshKey, baseline }: MacroTargetsPaneProps) {
   const [expanded, setExpanded] = useState(false)
   const [form, setForm] = useState({ calories: '', proteinG: '', carbsG: '', fatG: '', fiberG: '' })
   const [loading, setLoading] = useState(true)
@@ -123,19 +135,30 @@ export function MacroTargetsPane({ refreshKey }: MacroTargetsPaneProps) {
           ) : (
             <>
               {FIELDS.map(f => (
-                <div key={f.key} className="flex items-center gap-3">
-                  <span className="text-sm text-muted-foreground flex-1">{f.label}</span>
-                  <div className="flex items-center gap-1.5">
-                    <input
-                      type="number"
-                      min={0}
-                      value={form[f.key]}
-                      onChange={e => setForm(prev => ({ ...prev, [f.key]: e.target.value }))}
-                      placeholder="—"
-                      className="w-24 rounded-xl border bg-background px-3 py-2 text-sm text-right tabular-nums"
-                    />
-                    <span className="text-xs text-muted-foreground w-8">{f.unit}</span>
+                <div key={f.key} className="space-y-1.5">
+                  <div className="flex items-center gap-3">
+                    <span className="text-sm text-muted-foreground flex-1">{f.label}</span>
+                    <div className="flex items-center gap-1.5">
+                      <input
+                        type="number"
+                        min={0}
+                        value={form[f.key]}
+                        onChange={e => setForm(prev => ({ ...prev, [f.key]: e.target.value }))}
+                        placeholder="—"
+                        className="w-24 rounded-xl border bg-background px-3 py-2 text-sm text-right tabular-nums"
+                      />
+                      <span className="text-xs text-muted-foreground w-8">{f.unit}</span>
+                    </div>
                   </div>
+                  {f.baselineKey && f.why && (
+                    <RecommendedValue
+                      recommended={baseline?.[f.baselineKey] ?? null}
+                      current={parseFloat(form[f.key]) || null}
+                      unit={f.unit}
+                      why={f.why}
+                      onApply={v => setForm(prev => ({ ...prev, [f.key]: String(v) }))}
+                    />
+                  )}
                 </div>
               ))}
               {mismatched && (
