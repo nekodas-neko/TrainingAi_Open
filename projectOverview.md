@@ -27,6 +27,17 @@
 **Version:** v1.421.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-09-01.
 
+**A score-ring arc that could not be drawn is gone (LA-42).** `ScoreDisplay` took a
+`trainingBoostFrom` and drew a second brand-coloured arc for the share of an activity score that came
+from a same-day training blend. `blendActivityScore` went with Q-284, so `adjustment` is a literal 0
+at **both** of that payload's construction sites and the branch was unreachable. **Not a
+regression** — the blend last had an Oura score to adjust on 2026-07-07, the re-key day, so it had
+been dead in practice for two months; Q-284 made it dead by construction, which is the difference
+that licenses a deletion. **No guard and no version bump, both deliberate:** the invariant a test
+could pin lives in Lane A's file and would block the revival it is meant to protect, and nothing a
+user can see changed. All three score screens re-rendered with their rings intact
+([journal](docs/overview/entries/2026-09-01-chore-la-42-drop-dead-training-boost.md)).
+
 **The device consoles have one home, and the BLE page is a runbook (Q-531).** Owner, running the
 re-sync: *"it was moved away from the admin section = bad"* and *"everything is spread out
 sporadically."* **The first half was already false and checking it changed the work:** all three

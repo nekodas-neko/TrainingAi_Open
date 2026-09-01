@@ -5972,3 +5972,14 @@ block preserved from before the decision, both of which are now either shipped o
 
 (8942, not the 8926 measured before merging: TN-22 landed 16 lines in between. A size baseline is a
 measurement of the merged file, never the sum of two hunks.)
+
+## 2026-09-01 — `projectOverview.md` → 8953 (LA-42)
+
++11 for a deletion, which looks disproportionate until you ask what a shorter version would say.
+"Removed an unused prop" invites the next reader to wonder whether it was safe. The lines that earn
+their place are the two negatives — **no guard** (the invariant lives in Lane A's file and a test
+pinning it would block the revival it is meant to protect) and **no version bump** (nothing visible
+changed, and a changelog line for an invisible change is a claim the owner cannot check). Both are
+decisions someone would otherwise re-take, and neither is recoverable from the diff.
+
+The backlog **shrank by 20 lines** — LA-42's entry, removed whole, since nothing is owed.
