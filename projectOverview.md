@@ -41,6 +41,22 @@ and the spec passes. Two placement calls: a **second tsconfig** rather than edit
 would have failed CI on the entry's own suggestion
 ([journal](docs/overview/entries/2026-09-01-typecheck-tests.md)).
 
+**A fixture that misrepresented production closed one finding and opened a doubt about a shipped fix
+(LB-46, LB-47).** LB-46 — the AI Prescription card showing pre-deload numbers — **is not a bug**:
+`reevaluateForToday` self-reverts a per-exercise deload once the soreness clears, and the card was
+rendering the result faithfully. The tell was on screen and missed: the card suppresses its
+intensity-zone chip when an exercise is deloaded, and the chip was showing. **The fixture merged two
+mechanisms production keeps apart** — of 5 stored prescriptions, 1 has a session-level deload, 2 have
+per-exercise deloads, **0 have both**. A session deload bakes low intensities into the LLM's own
+pcts; a per-exercise deload is an overlay with a `preDeload` to undo. **⚠ Which means BF-64's
+override, shipped hours earlier, may revert nothing on a real session-level deload** — it reused the
+per-exercise mechanism for the session-level case, and on the only real such row there is no
+`preDeload` to go back to. Not reverted: nothing regressed and the per-exercise path works. Filed as
+**LB-47** with three candidate answers, the cheapest being to disable the toggle on a session deload
+and say why. **The lesson is cheap and was available all along:** check a hand-built fixture's shape
+against production *before* verification leans on it — the `db-query` call that settled this took two
+minutes ([journal](docs/overview/entries/2026-09-01-docs-lb-46-closed-lb-47-filed.md)).
+
 **Back navigation returns to where you were (BF-100).** Owner: *"when I press back I want to go back
 to that page at the same scroll level I was at. It usually starts me at the top of the page. This is
 on many pages if not all pages."* **"If not all pages" was right, and there was one cause** — the app

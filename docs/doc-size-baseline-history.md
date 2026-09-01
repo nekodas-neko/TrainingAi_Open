@@ -6192,7 +6192,42 @@ The line about the four spec failures all reporting `expected 840, received 0` i
 the most time later. That is what makes a fixture problem indistinguishable from a regression, and
 the fix — a spec that asserts its own preconditions — is worth more than the feature it guards.
 
-## 2026-09-01 — `projectOverview.md` → 9029, `docs/implementation-backlog.md` → 15345 (LB-37 shipped)
+## 2026-09-01 — `docs/implementation-backlog.md` 15352 → 15376 (BF-103 rewritten on an owner decision)
+
++24 lines, all inside one existing entry — no new entry, no new heading. The owner rejected BF-103's
+`Saved` recommendation in favour of `My Foods` on every surface, on the grounds that the historical
+failure was two labels for one list rather than the wording of either. Rewriting the entry to record
+that cost more lines than it saved because the sweep that came with it is the substance: `My Meals`
+turned out to be **eight** user-visible strings across five files, not the two the entry named — a
+toast with two arms, an empty state, three buttons, a badge and an `aria-label` — and a table naming
+each is what stops the rename shipping half-done. The other addition is a warning the entry did not
+carry: `My Foods` was already the name of a **merged** list in v1.382.0 and the merge was reverted in
+v1.385.0, so an implementer reading the new label could reasonably re-merge the tabs and reintroduce
+a defect the app has already paid for. Both are the kind of thing that is cheap here and expensive in
+review.
+
+## 2026-09-01 — `projectOverview.md` → 9031, `docs/implementation-backlog.md` → 15417 (LB-46 closed, LB-47 filed)
+
++16 for a finding with no code change, which is the unusual case where that is clearly worth it: it
+records that a fix **already merged this session** may not do anything on the data it was built for.
+Burying that in a backlog entry and leaving the status block silent would be the version that costs
+something later.
+
+The measurement is the durable part — 5 prescriptions, 1 session deload, 2 per-exercise, **0 both** —
+because it is what distinguishes the two deload mechanisms, and conflating them is what produced both
+the false finding and the doubtful fix.
+
+## 2026-09-01 — `docs/agents/state/implementation-lane-b.md` → 179 (conflict-marker staging slip)
+
++5 for a gotcha found the same session it was needed. `git add -A; git status | grep '^UU'` always
+reports no conflicts, because staging clears the UU state — so the check that was meant to confirm a
+clean merge confirmed nothing, on a file `git merge` had genuinely left conflicted. `check:rules`
+caught it at the `No unresolved conflict markers` step.
+
+It sits next to the two existing gate gotchas because all three are the same mistake: reading a
+signal that has already been destroyed by the command before it.
+
+## 2026-09-01 — `projectOverview.md` → 9045, `docs/implementation-backlog.md` → 15410 (LB-37 shipped)
 
 The backlog shrank: LB-37's entry carried the whole measurement argument — the method, the error-code
 breakdown, the case for a ratchet over a sweep — and that is now in the journal, where it is read

@@ -430,51 +430,75 @@ numbers multiply, they do not substitute.
   meal afterwards leaves the logged rows unchanged; and 1× is byte-identical to today's behaviour.
 
 
-### [nutrition] BF-103 — half of "Meals" is single foods, and the label the owner wants was removed twice
+### [nutrition] BF-103 — one label, `My Foods`, on every surface (owner decision, 2026-09-01)
 
-- **Lane:** B — `components/nutrition/saved-meals-sheet.tsx:69-73` (the tab strip) and
-  `components/nutrition/nutrition-action-row.tsx:62` (the page button).
+- **Lane:** B — `components/nutrition/saved-meals-sheet.tsx` (the tab strip) plus **seven other
+  user-visible strings** reading `My Meals`, enumerated below.
 - **Added:** 2026-09-01 · owner: *"can we change Meals to → My foods, so we can have meals + singular
-  items saved."*
+  items saved."* · **decided** same day: *"no I'm happy to rename Saved to → My Foods. the issue was
+  having saved + MyFoods. we only need one. lets go with MyFoods."*
+
+**The decision, and what it settles.** This entry originally recommended `Saved` for the tab with the
+page button left as `My Meals`. The owner read that as introducing a *second* name and rejected it on
+exactly the right grounds — the historical failure was never the wording, it was **two labels for one
+list**. So: **`My Foods` everywhere, `My Meals` and `Saved` nowhere.** One name, one list, no pair to
+tell apart. Do not re-open the naming; implement it.
 
 **He is right about the contents, and the measurement is stark.** Of his 10 saved meals, **5 contain
 exactly one item** — Edamame Block, Rice Block, Protein Pasta Brick and two others. Half the list
 called "Meals" is single foods, saved as one-item meals because that is the only shelf available. The
-label already mis-describes what is in it.
+label already mis-describes what is in it, which is what makes this a correction rather than a
+preference.
 
-**⚠ But the requested label is the one two entries removed on purpose, and an implementer must read
-this before touching it.** The reasoning is in the files:
+**⚠ Why BF-37 and BF-60 do not block this, stated so nobody re-reverts it.** Both entries removed
+`My Foods` — but both were solving *"two labels that differ only in their last word"*:
 
 - `nutrition-action-row.tsx:59` — *"`My Meals`, not `My Foods` (**BF-37**)."*
-- `saved-meals-sheet.tsx:58-61` — *"The tab labels drop the possessive deliberately. `My Foods`
-  against `My Meals` is the pair **the owner could not tell apart**, and two labels that differ only
-  in their last word are hard to tell apart wherever they appear. (`My Meals` survives on the page's
-  own button, where it names one list rather than one of two lookalikes.)"* (**BF-60**)
+- `saved-meals-sheet.tsx:58-61` — *"`My Foods` against `My Meals` is the pair **the owner could not
+  tell apart** … (`My Meals` survives on the page's own button, where it names one list rather than
+  one of two lookalikes.)"* (**BF-60**)
 
-So renaming the tab to `My Foods` while the page button still reads `My Meals` **re-creates exactly
-the pair that was removed** — and lands it in the one place the earlier fix deliberately left alone.
+A single name cannot be confused with itself. Their reasoning is satisfied by unifying, not by
+keeping `My Meals`. **Update those two comments in the same PR** — left as they are, they read as a
+standing prohibition and the next session reverts this on their authority.
 
-- **What has actually changed since those decisions is the CONTENTS, not the wording.** BF-37 and
-  BF-60 were about telling two labels apart. This is about a label being untrue. That is a new
-  argument and it does justify revisiting — it just cannot be settled by taking the old losing label.
-- **Recommendation: rename the tab to `Saved`, and leave the page button alone.** The strip becomes
-  **Recent · Saved · Search**, which names three *sources* rather than three content types — where a
-  thing came from (used lately / you kept it / the database), which is the distinction the user is
-  actually making at that moment. It is true of a one-item entry and a five-item meal equally, and it
-  collides with nothing, so BF-37's button survives untouched.
-- **The alternative, if the owner prefers his own wording:** rename **both** to `My Foods` in the same
-  change. That is coherent, and the cost is that the button and the tab then share a name — which is
-  fine when they open the same list, and is strictly better than the split the request would create.
-  What must not happen is one without the other.
-- **⚠ A label change is not the whole ask.** *"so we can have meals + singular items saved"* implies a
-  way to save a single food **as** a single food, rather than wrapping it in a one-item meal. Today
-  the wrap is the workaround, and `diary-groups.ts` already accommodates it — *"a group of one is a
-  single food wearing a meal's name… it renders as the plain row it already is."* Whether to add a
-  first-class saved-food shelf is a separate, larger decision; **this entry is the label only**, and
-  says so to stop it silently growing into the other thing.
-- **Verification:** the strip reads Recent · Saved · Search; the page button is unchanged; a one-item
-  entry and a multi-item meal sit in the same list without either looking mislabelled; and no string
-  in the app pairs `My Foods` with `My Meals`.
+**⚠ The other half of the history, and the trap in it — read before touching the sheet.** `My Foods`
+was once the name of a **merged** list: v1.382.0 — *"My Meals and your food library are one list now,
+called My Foods"* — and v1.385.0 split it back three versions later, *"Merging them put a recipe you
+built and a single ingredient in the same list, which made 'log this' mean two different things
+depending on the row."* **That revert was about the merge, not the name.** This entry renames the tab
+and changes nothing about what is in it: `Recent` and `Search` stay, the saved list keeps holding what
+it holds. An implementer who reads "My Foods" and re-merges the tabs reintroduces a defect the app
+already paid for.
+
+**Every user-visible site (sibling-surface sweep — the rename is not two files):**
+
+| File | Line | Current | Notes |
+|---|---|---|---|
+| `saved-meals-sheet.tsx` | `LIST_TABS` | `Meals` | the tab; strip becomes Recent · My Foods · Search |
+| `nutrition-action-row.tsx` | 62 | `My Meals` | the page button |
+| `use-plan-meal-saving.ts` | 59–60 | `saved to My Meals` | toast, both singular and plural arms |
+| `my-meals-picker.tsx` | 180, 202 | `in My Meals` / `Nothing in My Meals yet` | hint + empty state |
+| `meal-plan-edit-sheet.tsx` | 326 | `My Meals` | button |
+| `meal-plan-section.tsx` | 235 | `Save all N to My Meals` | button |
+| `plan-meal-row.tsx` | 120, 126, 131 | `In My Meals`, `Save to My Meals`, aria-label | badge + action + a11y |
+
+`plan-meal-row.tsx:126` is an **`aria-label`** — a rename that skips it leaves the screen reader
+saying a name the screen no longer uses. The file *names* (`my-meals-picker.tsx`) are not user-visible
+and are not worth the churn; leave them.
+
+- **⚠ A label change is not the whole ask, and this entry is the label only.** *"so we can have meals
+  + singular items saved"* implies saving a single food **as** a single food rather than wrapping it
+  in a one-item meal. Today the wrap is the workaround, and `diary-groups.ts` already accommodates it
+  — *"a group of one is a single food wearing a meal's name… it renders as the plain row it already
+  is."* A first-class saved-food shelf is a separate, larger decision; the rename makes the current
+  behaviour **honest** rather than fixing it, and says so here to stop it silently growing.
+- **Ships a changelog entry** — user-visible, patch. Say plainly that only the name changed and the
+  lists are unchanged, so the note is not read as the v1.382.0 merge returning.
+- **Verification:** `grep -rn "My Meals" app components` returns comments and changelog history only,
+  no live string; the strip reads Recent · My Foods · Search; the page button and the tab it lands on
+  share one name; the plan surfaces' toast, badge, buttons and aria-label all say `My Foods`; a
+  one-item entry and a multi-item meal sit in the same list without either looking mislabelled.
 
 
 ### [nutrition][body] BF-101 — a "Recommended" button per goal field; the numbers already exist and need no AI
@@ -2798,28 +2822,69 @@ owner has to re-describe in a wizard what the app already knows.
   worker.
 
 
-### [workouts] LB-46 — the AI Prescription card may list pre-deload numbers on a deload prescription
+### [workouts] LB-47 — BF-64's `Full` override may do nothing on a REAL session-level deload
 
-- **Lane:** B — `components/workout/ai-prescription-card.tsx`, or whatever supplies its
-  `prescription` prop if the substitution happens upstream.
-- **Added:** 2026-09-01 by Lane B, incidentally, while device-substituting a fixture for BF-64.
-- **What was seen.** A `session_periodization` row whose prescription carries
-  `Deadlift {sets:3, reps:5, pct:60, deloaded:true, preDeload:{sets:4, reps:5, pct:80}}` renders in
-  the expanded card as **`4×5 @ 128.75kg (80%)`** — the *pre-deload* figures — directly under a
-  subtitle reading **`Deload session`**. The card's own code maps `prescription.exercises` and reads
-  `ex.pct`, so on the stored row it should print `3×5 … (60%)`.
-- **⚠ Attribution is measured, and the caveat is real.** It **reproduces on `main`** with the same
-  row (checked by stashing the BF-64 change and re-rendering), so it is not BF-64's doing. **But the
-  row was hand-built**, not produced by the engine, so the alternative explanation is that the
-  fixture is not a shape the engine emits and the card is fine. **Settle that first**: find a real
-  deloaded prescription in production (`prescription->'exercises' @> '[{"deloaded":true}]'`) and read
-  what the card shows for it before changing any code.
-- **If it is real, it matters more than it looks.** The subtitle and the numbers under it are the
-  two things a lifter reads to decide whether to override, and they would be disagreeing — the same
-  class as BF-8 (toggle disagreed with card) and BF-64 (toggle offered a control that did nothing),
-  one layer further in.
-- **Do not "fix" it by making the card follow the toggle.** BF-64 settled that: the card is a
-  statement about the prescription. If this is real the fix is to show what the prescription stored.
+- **Lane:** B — `components/workout/utils.ts` (`deloadRevertNames`), and possibly Lane A if the
+  answer is that a session deload needs a revert target the prescription does not currently carry.
+- **Added:** 2026-09-01 by Lane B, against its own shipped work (BF-64, #764, v1.422.0).
+- **⚠ This questions a fix that has already merged. It is not a regression — nothing got worse — but
+  the central claim may not hold, and it was verified against a fixture that misrepresents
+  production.**
+- **What BF-64 shipped.** Picking `Full` over a deload prescription reverts every deloaded exercise
+  to its `preDeload` numbers. The entry's premise, quoted: *"Every deloaded prescription exercise
+  carries a `preDeload` block."*
+- **What production actually holds.** Of **5** stored prescriptions: **1** has a session-level
+  `deload: true`, **2** have per-exercise `deloaded: true`, and **0 have both**. So on the only real
+  session-level deload, no exercise carries `deloaded`/`preDeload` — `deloadRevertNames` returns an
+  empty list and **the override reverts nothing.** The toggle would behave exactly as it did before
+  BF-64, which is the defect BF-64 was filed to fix.
+- **Why the two do not overlap.** A **session** deload has its low intensities baked into the LLM's
+  own `pct` values at generation. A **per-exercise** deload is an overlay applied afterwards by
+  `reevaluateForToday`, which stores the original in `preDeload` precisely so it can be undone. Only
+  the second has anything to revert *to*. BF-64 reused the second mechanism to implement the first.
+- **So the open question is what `Full` should mean on a session deload**, and it is not obvious:
+  the pre-deload numbers were never computed, so there is nothing stored to go back to. Candidates —
+  regenerate via `/prescribe` (which BF-64 rejected on cost, and the route takes no intensity input
+  anyway); scale the pcts back up by a fixed factor (invents numbers the engine did not choose); or
+  **disable the toggle on a session deload and say why**, which is honest and cheap. That last one is
+  probably right and is a Lane B change.
+- **⚠ Do not revert BF-64.** Its per-exercise path is correct and does work: `applyDeloadReverts` and
+  the blocked-exercise card copy are exercised by the mixed case, which production does produce. What
+  is unproven is the session-level case, which is the one the owner reported.
+- **⚠ And re-read BF-64's verification with this in mind.** It was measured against a hand-built
+  fixture combining session-level and per-exercise deloads — a pair production has not produced (see
+  LB-46). The reverts observed were real; whether they can ever fire on the owner's own data is what
+  this entry asks.
+- **n = 5.** Small. Confirm against a larger sample, or by asking the owner to report the next time a
+  deload day appears, before designing around it.
+
+### [workouts] LB-46 — how a deload reaches the AI Prescription card, and why a hand-built fixture misleads
+
+- **✅ CLOSED 2026-09-01 by measurement against production.** No code change. Kept as a
+  **`Reference:`** because the measurement is what the next reader needs, not the conclusion.
+- **Reference:** what the AI Prescription card can and cannot say, and why a hand-built prescription
+  fixture misleads.
+- **What I filed, and why it looked like a bug.** A card showed `4×5 @ 128.75kg (80%)` for an
+  exercise I had stored as `3×5 @ 60%` — the *pre-deload* figures under a `Deload session` subtitle.
+- **What actually happened.** `reevaluateForToday` (`packages/shared/src/ai-periodization/reevaluate.ts`)
+  **self-reverts** a per-exercise deload when the soreness that caused it clears: it swaps the
+  `preDeload` values back in, sets `deloaded: false` and **drops the `preDeload` block**. My fixture
+  had no mood log, so the reverts fired on the first read. Measured through the API:
+  `Deadlift: 4x5 @80% deloaded=false pre=none`. **The card was rendering the prescription faithfully.**
+  The tell was already on screen and I missed it — the card suppresses its intensity-zone chip when
+  `ex.deloaded`, and the chip was showing.
+- **The fixture was the unrealistic part, exactly as the entry warned it might be.** It combined a
+  session-level `deload: true` with per-exercise `deloaded: true` + `preDeload`. Production has never
+  produced that pair: of **5** stored prescriptions, **1** has a session-level deload, **2** have
+  per-exercise deloads, and **0 have both**. A session deload bakes its low intensities into the
+  LLM's own `pct` values; a per-exercise deload is an overlay with something to revert to. They are
+  different mechanisms and the fixture merged them.
+- **⚠ One latent inconsistency is real and stays open, in LANE A's file.** `reevaluate` returns
+  `{ ...prescription, exercises }` and never touches the top-level `deload` flag. So *if* both were
+  ever set and every per-exercise deload reverted, the subtitle would read `Deload session` over
+  full-intensity numbers. **n = 5, so "production has never produced it" is not "it cannot" —** the
+  guard against it would be in `reevaluate.ts`, which is Lane A's.
+- **Added:** 2026-09-01 by Lane B · closed the same day.
 
 ### [workouts] BF-64 — the Full/Deload toggle can only ADD deload, never remove one, so `Full · Override` overrides nothing
 
