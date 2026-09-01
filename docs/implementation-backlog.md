@@ -2544,9 +2544,33 @@ owner has to re-describe in a wizard what the app already knows.
 
 ### [workouts] BF-64 — the Full/Deload toggle can only ADD deload, never remove one, so `Full · Override` overrides nothing
 
-- **Lane:** A — the decision lives in `packages/shared/src/workout/session-data.ts` and
-  `/api/ai-periodization/session/[sessionId]/prescribe`; the surface (`deload-toggle.tsx`,
-  `use-deload-choice.ts`) is only reporting it correctly.
+- **Lane: B — RE-CLASSIFIED 2026-09-01 by Lane A, after reading the mechanism its own
+  recommendation names.** The entry assigned A on the assumption the fix lives in
+  `session-data.ts` or the prescribe route. Following its recommendation instead — reuse the
+  per-exercise revert — the fix is **entirely client-side**: `applyDeloadReverts`
+  (`components/workout/utils.ts`) and the overlay call at `components/workout-screen.tsx:238`.
+  Neither is Lane A's, and there is no server change to make. **Three things were verified rather
+  than assumed; read all three before starting.**
+- **1. `applyDeloadReverts` already does the whole per-exercise job**, and session-level Full is it
+  applied to every deloaded exercise. It sets `deloaded: false`, swaps in
+  `preDeloadStyle`/`preDeloadSets`, and — critically — **its own comment says it clears `deloaded`
+  so the log payload and PR paths treat the exercise as full**. So the 1RM/PR hazard this entry
+  flags is already handled by the mechanism it recommends. It also skips any exercise without
+  `preDeloadStyle`, so the optional-`preDeload` case is handled by construction: those stay
+  deloaded, which is the conservative answer, and the card is what has to say so.
+- **2. `preDeloadStyle` carries `useFor1rm: false` on every set, and that is NOT a bug.** It looks
+  like one: `preDeloadStyle = prescriptionStyleForExercise({ ...p, ...p.preDeload })` and
+  `p.preDeload` carries no `deloaded`, so the spread keeps `deloaded: true` and every set comes out
+  `useFor1rm: false`. **`estimateOneRm` treats an ALL-false style as "no per-set preference, use
+  them all"** (`const flagged = style?.some(s => s.useFor1rm)`, then `!flagged || …`), which
+  `1rm.ts` documents deliberately, and `deloaded` is the unambiguous signal instead. **Do not
+  "fix" this** — recorded here because it is exactly the shape someone corrects on sight.
+- **3. ⚠ The overlay must key on an EXPLICIT choice, not on `deload === false`.**
+  `useDeloadChoice` seeds `useState(seedFromUrl)` = false and adopts the prescription's deload in an
+  **effect**, so on first render `deload` is false while the prescription is a deload and the user
+  has chosen nothing. A revert keyed on `!deload` would flash full weights before settling back.
+  The hook already knows the difference — `chosenRef` — but does not expose it; exposing it is part
+  of the work.
 - **Added:** 2026-08-30 · owner, on the Pull pre-workout screen: *"pressing full or deload doesnt
   change the 'prescription' not sure if its over writing it."* Screenshot: `Full · Override`
   selected, `Deload suggested` in the corner, and the card below reading `AI Prescription · Deload`.
@@ -2576,7 +2600,8 @@ fetch. **The prescribe route takes no intensity input at all** (`PrescribeBodySc
 `excludeSessionId` + `durationPreset`), so intensity has no server path even in principle. Two
 controls side by side, one wired to the engine and one not.
 
-- **Recommendation: reuse the per-exercise revert, do not add a second regeneration.** The
+- **Recommendation (CONFIRMED against the code 2026-09-01): reuse the per-exercise revert, do not
+  add a second regeneration.** The
   machinery is already built and already on the device. Every deloaded prescription exercise carries
   a `preDeload` block, `session-data.ts` unpacks it into `preDeloadStyle`/`preDeloadSets`, and
   `workout-store.toggleDeloadRevert` + `DeloadInfoSheet` already let the user revert **one** exercise
@@ -2584,10 +2609,10 @@ controls side by side, one wired to the engine and one not.
   LLM call, no rate limit, works offline, and it reuses a path the owner has already exercised.
   A `/prescribe` round-trip would cost a rebuild and a 429 budget to reach numbers the prescription
   is already carrying.
-- **⚠ It cannot be all-or-nothing: `preDeload` is optional.** `preDeloadStyle` is set only
-  `if (p.preDeload)`, so an exercise deloaded without one has no full version to return to. Decide
-  what Full means for those — leave them deloaded and say so on the card, rather than silently
-  reverting some exercises and not others with nothing on screen explaining which.
+- **⚠ It cannot be all-or-nothing: `preDeload` is optional** — `preDeloadStyle` is set only
+  `if (p.preDeload)`. **`applyDeloadReverts` already skips those**, so the behaviour is decided:
+  they stay deloaded. What is owed is the card SAYING so, rather than silently reverting some
+  exercises and not others with nothing on screen explaining which.
 - **⚠ PR and 1RM accounting must follow the revert, and this is the part that corrupts data if
   missed.** `workout-screen.tsx:1204` computes `isAnyDeload = deload || phaseStatus.isDeloadActive`
   and gates the 1RM estimate on it *and* on `ex.deloaded`. A reverted exercise runs full weights, so

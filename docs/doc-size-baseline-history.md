@@ -5983,3 +5983,16 @@ changed, and a changelog line for an invisible change is a claim the owner canno
 decisions someone would otherwise re-take, and neither is recoverable from the diff.
 
 The backlog **shrank by 20 lines** — LA-42's entry, removed whole, since nothing is owed.
+
+## 2026-09-01 — `docs/implementation-backlog.md` → 14916 (BF-64 re-classified to Lane B)
+
+Seventeen lines, and they are three findings rather than restatement. BF-64 was assigned Lane A on
+the assumption its fix lives in the server pipeline; following its own recommendation, the fix is
+entirely client-side and Lane B's. The two lines that would otherwise cost the implementer a day
+each: `applyDeloadReverts` **already** clears `deloaded` so the PR path treats a reverted exercise
+as full — the hazard the entry flags is handled by the mechanism it recommends — and
+`preDeloadStyle`'s all-false `useFor1rm` **looks like a bug and is not**, because `estimateOneRm`
+reads an all-false style as "use them all".
+
+A finding that something is *not* broken earns its lines here exactly when the thing looks broken on
+sight, which this does.
