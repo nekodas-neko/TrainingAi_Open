@@ -1331,6 +1331,14 @@ than flipping silently back to "Voice".
 
 JS-only — it reaches the phone on the next Railway deploy, no APK rebuild.
 
+**Confirmed fixed in production 2026-09-01 (BF-106's fault beat), which narrows what the device still
+owes.** The fault fired on **6 of the 8 workout days** before the fix — 7 rows across 5 sessions,
+2026-08-23 → 2026-08-30T02:06, that last one being the row LA-37 was opened on. Since the fix there
+has been **one workout, 2026-09-01, and zero rows**. So the promise settles now; the hang is gone.
+**That is n=1 and it only proves the negative** — no unhandled rejection — which is exactly the half
+that was observable remotely. Whether the button is *drawn* and whether pressing it logs a set are
+still unobserved, so the smoke step above stands unchanged.
+
 ### [workouts][devices] ⚠️ The exercise clip is on the ready screen; nobody has seen it move (BF-65, v1.405.0)
 
 The clip renders at 64 px beside the exercise name, tapping it opens a full-width strip, and an
@@ -1415,9 +1423,53 @@ that need an owner, and for the barcode chain.
 
 **No action, and it resolves itself.** The 30-day prune is working (oldest row is exactly 30 days back), so those burst days age out between now and ~2026-09-12 and the table returns to a few MB. Last 7 days hold **39 rows total**. Nothing is owed.
 
-### [platform] 🟡 The database is growing ~4x faster than `CLAUDE.md` predicts — measured, not yet a problem (Orchestrator, 2026-08-25)
+### [platform] 🟢 The database's above-trend growth is an un-pressed `VACUUM FULL`, not a growth problem (BF-106, 2026-09-01)
+
+**The third reading this row asked for, taken 2026-09-01, and it resolves the question rather than
+extending it.** `sum(pg_total_relation_size)` reads **198 MB** — so the series is **171 MB
+(08-18) → 182 MB (08-25) → 198 MB (09-01)**, i.e. 1.6 then **2.3 MB/day**. The rate is not settling,
+it is rising, which rules out the "compacted heap regrowing slack" reading this row was resting on.
+
+**Nearly all of it is `oura_raw_samples`: 50 → 58 → 73 MB.** Two hypotheses were tested against
+production and both are wrong:
+
+- **Not more data.** Ingest is flat at ~24k frames/day (19,323–25,598 across the last 8 days), and the
+  table holds exactly its intended window — `HOT_WINDOW_DS` is **7 days**, and a count of rows older
+  than 8 days returns **0**. The packer's backlog is fully absorbed.
+- **Not bloat.** `oura_raw_samples` reports `n_dead_tup = 0` with `last_autovacuum` at
+  2026-09-01T17:57 — autovacuum is running on it and there is nothing dead to reclaim.
+
+**What is left is the one thing the packer's own docstring already names.** Pack-and-delete frees
+space *inside* the file; Postgres does not hand it back to the OS without a `VACUUM FULL`, which
+`lib/data/postgres/slices/oura-raw-pack.ts` describes as "a single press" once the backlog is gone.
+The backlog has been gone since roughly 2026-08-25 — the docstring predicted "a day and a bit" from
+2026-08-24 — and the press has not happened. So the file is sitting at its high-water mark while the
+live rows have fallen 318,183 → 191,454.
+
+**⚠ How much comes back is not known and should not be guessed.** Rows fell ~40% while the file fell
+~21%, which is consistent with slack but is not a measurement of it. `GET /api/admin/vacuum` lists
+each allowlisted table's current size precisely so the reclaim can be read before and after — that
+GET is the number, not this row's arithmetic. Q-315 is the cautionary precedent: the same reasoning
+about `error_events` predicted a large reclaim and the button returned **0 B**, because the figure
+had been a stale planner estimate all along.
+
+**Owed:** the owner presses `POST /api/admin/vacuum` for `oura_raw_samples` and reads the GET either
+side. Tracked as **BF-106**. Not urgent — the volume is 5 GB, storage bills at $0.15/GB/month, and
+even the whole 198 MB is about three cents.
+
+**⚠ And a `CLAUDE.md` fact this reading falsifies.** That file states `last_analyze` and
+`last_autovacuum` are "**NULL on every table**", measured 2026-08-20, and uses it to argue
+`n_live_tup` can be arbitrarily stale. Autovacuum and autoanalyze now run: `oura_raw_samples`
+autoanalyzed at 20:17 and its `n_live_tup` of **191,454** matches `count(*)` exactly. **The rule
+survives, its reason does not** — `oura_raw_packed`, which autoanalyze has *not* reached, still reads
+`n_live_tup = 55` against **1,051** real rows. So: keep using `count(*)`, because coverage is partial
+and you cannot tell which side a table is on without checking. Corrected in `CLAUDE.md` in this PR.
+
+<details><summary>The 2026-08-25 reading this supersedes</summary>
 
 **Measured, filed because the rule says to, explicitly not an alarm.** `CLAUDE.md` states a **171 MB** baseline (2026-08-18) and ~0.4 MB/day expected. Like-for-like on 2026-08-25 — `sum(pg_total_relation_size)` over 87 user tables, which is what that baseline measured, **not** `pg_database_size`'s 197 MB — reads **182 MB**: **11 MB in 7 days ≈ 1.6 MB/day, ~4x the stated trend**. Almost all of it is `oura_raw_samples` (50 → **58 MB**, ≈1.1 MB/day), the BLE ingest accumulating normally. **⚠️ Two readings are not a trend and the baseline is the weak one** — 171 MB was taken immediately after both the repack and the `disk_full` incident, so a compacted heap regrowing slack inflates any rate off it. **Action: a third reading next session**; if ~1.6 holds, correct `CLAUDE.md`'s 0.4, not the database. Not urgent — ~8 years of volume headroom, ~3 cents/month. **`error_events` is NOT bloat and never was** — see the row above; it is 52 MB of live rows and shrinks on its own as one already-fixed burst ages past the 30-day prune. [`readings`](docs/reviews/2026-08-25-railway-and-db-readings.md) §5.
+
+</details>
 
 ### [platform][devices] ⚠️ `/api/body-battery` was 500ing in production; the fix is unverified there (LA-20, 2026-08-23)
 
