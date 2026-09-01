@@ -388,6 +388,89 @@ below threshold and left in place for next time.
 > BF-29 (My meals), BF-30 (Meal detail), BF-31 (Edit meal) and BF-26 (Quantity). Two artboards need
 > no entry — `Tap targets` and the `srv/g` studies both shipped in Q-395a.
 
+### [nutrition] BF-97 — a scanned meal still lands as N loose rows, which is the case BF-39 was filed for
+
+- **Lane:** B for the diary rule; A if the scan write path has to mint the group id.
+- **Added:** 2026-09-01 · owner, with two screenshots side by side: *"looks like saved meals groups
+  the food well; but when scanning it doesnt."*
+
+**Saved meals group; scans do not — and the docstring for the grouping says why in its own words.**
+`components/nutrition/diary-groups.ts` opens by quoting the report that produced BF-39: *"A
+screenshot showed one AI-logged breakfast as **eight** diary rows — flour, protein powder, baking
+powder, salt, milk, eggs, butter, bacon — filling the whole meal section."* Today's screenshot is
+the same shape: a scanned lunch as **eight** rows — beef, carrots, spinach, cabbage, corn, capsicum,
+cucumber, broccoli. **BF-39 shipped the saved-meal half and the motivating case is still open.**
+
+**Why, exactly.** `groupDiaryEntries` requires *both* ids and a resolvable meal:
+
+```ts
+if (!groupId || !mealId || !knownMealIds.has(mealId)) { out.push({ kind: 'log', … }); continue }
+```
+
+and `mealGroupId` is minted in exactly one place — `packages/shared/src/nutrition/log-meal.ts:58`,
+always alongside `savedMealId: meal.id`. `app/api/nutrition/scan/route.ts` contains **zero**
+references to either field. A scan therefore cannot produce a group even in principle.
+
+- **The decision this needs is where a scanned group's NAME comes from**, and it is why the entry
+  stops here rather than picking. The grouping rule deliberately refuses to head a group it cannot
+  name — *"heading them 'Meal' would be inventing a name the app does not have"* — and that
+  reasoning still holds. Three options:
+  1. **Relax the rule to allow a group with a name but no saved meal.** The scan already produces a
+     dish description; carry it onto the logs and let `DiaryEntry.kind: 'meal'` take a name instead
+     of a `savedMealId`. Least invasive to the user's data — nothing new appears in My Meals.
+  2. **Have a scan create a saved meal.** Grouping then works unchanged, but every scanned lunch
+     becomes a permanent entry in My Meals, which the owner has to prune. Likely unwanted.
+  3. **Group on `mealGroupId` alone, unnamed.** Cheapest, and the rule already argues against it.
+- **Recommendation: option 1**, and note it makes `savedMealId` optional on the `'meal'` entry —
+  a type change the renderer and `diary-meal-group.tsx` both have to follow (the photo comes from
+  the saved meal today; a scan would supply its own image or none).
+- **⚠ Do not "fix" this by making the scan write `savedMealId` to a placeholder meal.** That puts a
+  fake row in the user's meal library to satisfy a display rule, and every screen reading saved
+  meals then has to know about it.
+- **Related, and NOT the same bug:** BF-72 is grouping being **lost** on hydration
+  (`use-food-logs-loader.ts` drops both ids from the `applyDelta` payload). This entry is grouping
+  never being **created**. BF-72 shipped and owes a device check; a scan would still render flat
+  with BF-72 perfect.
+- **Verification:** a scanned multi-item meal draws as one collapsible row with its own name and an
+  item count; two scans on one day stay separate rows; and a single-item scan still renders as a
+  plain row, per the existing "a group of one buys nothing" rule.
+
+### [nutrition] BF-98 — a section holding one grouped meal draws its macros twice
+
+- **Lane:** B — `components/nutrition/meal-card.tsx:145`, one condition.
+- **Added:** 2026-09-01 · owner, same message: *"the combined item UI doesnt look great with the
+  double macros at the bottom."*
+
+**The screenshot shows `P 30g C 7g F 5g` twice, stacked**, under PRE WORKOUT (BREAKFAST) — once as
+the Protein Shake group's own row, then again as the section's totals footer. They are identical
+because the section holds nothing but that group.
+
+**The condition counts the wrong thing:**
+
+```tsx
+{/* Totals footer — only shown when there are 2+ items */}
+{logs.length > 1 && <MealTotals totals={totals} bordered />}
+```
+
+`logs` is the **flat** list; the Protein Shake is 3 logs, so `logs.length > 1` passes. What the
+footer actually needs to know is how many **rendered entries** there are — and the file already
+computes that as `entries` (`:35`, from `groupDiaryEntries`). One group is one row.
+
+- **The rule is already written down twelve lines above, and applied to the other branch.** The
+  collapsed-card comment at `:87` says a footer is suppressed because *"a single row already states
+  its own macros, so a footer would repeat it."* A group is also a single row that states its own
+  macros; the expanded branch was never told.
+- **Fix: `entries.length > 1`.** Checked against every case: one loose row → no footer (unchanged);
+  two loose rows → footer (unchanged); one group + one loose row → footer, and correctly, because
+  the numbers then differ; **one group alone → footer suppressed**, which is the only behaviour that
+  changes and is the report.
+- **The kcal duplicates too** — the group header already shows `196 kcal` and the footer repeats it,
+  so suppressing the footer removes both duplications in one change.
+- **Verification:** a meal section containing only a scanned or saved group shows exactly one macro
+  row and one calorie total; adding a loose item to that section brings the footer back with numbers
+  that differ from the group's.
+
+
 ### [app-shell] BF-96 — the weather chip wraps because it is the only thing in the header allowed to
 
 - **Lane:** B — `components/weather-chip.tsx:38` (one class pair).

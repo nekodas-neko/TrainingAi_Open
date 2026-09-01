@@ -99,6 +99,24 @@ will keep changing as the framework does. §3 of the README is where the `BF-` I
 - **Merging someone else's open PR needs its own explicit go-ahead**, even under a broad "go with your
   recommendation" — that covers this role's own entries, not another session's branch. Ask once,
   specifically.
+- **⛔ NEVER CONCLUDE A NEGATIVE FROM `grep … | head -N`. This cost two false findings on 2026-09-01,
+  and one of them reached CLAUDE.md.** First: *"there is no Sentry"* — five component files matched
+  the substring inside `MuscleSets**Entry**`, `package.json` was further down the truncated list, and
+  `@sentry/nextjs` was installed all along. Then, an hour later and unlearned: *"`error_events` never
+  prunes"* — `head -5` showed `pruneExpired` and `pruneOldThreads`, while
+  `adapter.ts:5093` holds `DELETE FROM error_events WHERE created_at < now() - interval '30 days'`.
+  That one was written into the session-start rule every agent reads, and Lane A had to retract it
+  (#737). **A claim that something does not exist requires the COMPLETE result set** — pipe to
+  `wc -l`, or drop the `head`, and read the count before writing the sentence. `head` is for
+  previewing a positive finding, never for establishing an absence.
+- **⛔ Measure a retention window from the LAST WRITE, not from `now()`, when the prune fires off a
+  write path.** The same 2026-09-01 finding had a second, independent error: *"oldest row is 32 days
+  old against a claimed 30"* compared the row against **today**. The prune runs inside
+  `insertErrorEvent`, throttled to once a day, so it only fires when something is written — and with
+  faults rare, the oldest row ages past the window between writes. Measured properly: last write
+  2026-08-30, oldest row 2026-07-31, span **exactly 30 days**. **The evidence that looked like a
+  broken prune is what a working write-triggered prune looks like.** Before calling any retention
+  broken, find what triggers it and measure against that.
 - **A `send_later` check-in can fire stale.** Verify checks and base freshness before acting on it.
 
 ## Method notes worth reusing

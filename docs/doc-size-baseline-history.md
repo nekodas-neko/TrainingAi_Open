@@ -5693,3 +5693,41 @@ The entry also answers the owner's *"make it smaller if needed"* with the reason
 lever, and names the fallback that is right if the longest dates still overflow — shorten the date,
 not the chip, because a phone already shows the date elsewhere and shows neither the temperature nor
 the UV.
+
+## 2026-09-01 — `docs/implementation-backlog.md` 15253 → 15336 (BF-97 scans never group, BF-98 macros drawn twice)
+
+Two reports in one message, and the first turns out to be an entry's own motivating case still open.
+`diary-groups.ts` opens by quoting the report behind BF-39 — *"one AI-logged breakfast as eight
+diary rows"* — and grouping requires a resolvable **saved meal**, which a scan cannot have:
+`mealGroupId` is minted in one place, always beside `savedMealId`, and the scan route references
+neither field. BF-39 shipped the saved-meal half; today's screenshot is the same eight-row shape it
+was filed for.
+
+BF-97's length is the decision it refuses to take: **where a scanned group's name comes from**. The
+grouping rule deliberately will not head a group it cannot name, so three options are laid out with
+the recommendation (carry the scan's dish description, keep My Meals clean) and the trap named — do
+not mint a placeholder saved meal to satisfy a display rule.
+
+BF-98 is short because the fix is one variable. `logs.length > 1` gates the section footer on the
+**flat** log count, so a 3-ingredient group passes it and draws macros that the group header already
+drew. The file computes `entries` twelve lines earlier and its own comment states the rule — *"a
+single row already states its own macros, so a footer would repeat it"* — applied to the collapsed
+branch and never to this one. The entry works the condition through all four cases so the fix can be
+checked rather than trusted.
+
+## 2026-09-01 — `docs/agents/state/bugfix.md` 251 → 269 (two traps that each produced a false finding tonight)
+
+Both are this role's own errors from this session, and one of them reached the file every agent reads
+before anything else, so they go in the traps list rather than a journal entry.
+
+**`grep … | head -N` cannot establish an absence.** It produced *"there is no Sentry"* (five
+substring matches inside `MuscleSetsEntry`; `package.json` was below the cut) and then, an hour later
+and unlearned, *"`error_events` never prunes"* (`head -5` showed two unrelated `prune` functions
+while `adapter.ts:5093` holds the `DELETE`). The second was written into CLAUDE.md and Lane A had to
+retract it in #737. The rule is stated as a hard never, with both instances named, because the first
+one clearly was not enough.
+
+**A write-triggered retention window is measured from the last write, not from `now()`.** The same
+finding's second error, independent of the grep: 32 days against today looked like a broken 30-day
+prune; against the last write it is exactly 30. What looked like the failure was the mechanism
+working.
