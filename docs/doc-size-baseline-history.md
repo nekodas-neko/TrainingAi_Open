@@ -5903,6 +5903,17 @@ status block that stopped at "the target is phase-aware now" would read as finis
 inconsistency it introduced — which is precisely what a future session would need to know before
 touching either side.
 
+## 2026-09-01 — `docs/agents/state/implementation-lane-a.md` 208 → 189 (Lane A baton rewrite)
+
+The baton is **rewritten in full** at each handover, never appended, so its length tracks what the
+next session actually needs rather than accumulating. This pass dropped ~19 lines by retiring items
+that are now closed — the database-reclaim section (Q-315, closed), three answered owner questions,
+and a paragraph of traps from entries that have since shipped — while adding the four traps this
+session hit.
+
+Ratcheted down rather than left at 208: a baseline above the file's real length is headroom for
+silent growth, which is the thing these numbers exist to stop.
+
 ## 2026-09-01 — `projectOverview.md` → 8911 (LA-45)
 
 +16 for one status block, and the lines that could not be cut are the two invariants. "Health shows
