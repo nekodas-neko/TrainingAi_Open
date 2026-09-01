@@ -19,6 +19,13 @@ fallback) are what every offline-first domain should copy. See CLAUDE.md, "Offli
 
 ## Reference docs
 
+- **[`docs/superpowers/plans/2026-09-01-dosed-substance-exposure.md`](../../superpowers/plans/2026-09-01-dosed-substance-exposure.md)**
+  — 🆕 **BF-69**, the plan: dosed substances (creatine, retatrutide) as an analysable exposure
+  variable. Read it before touching `supplement_logs` — the unique constraint on
+  `(supplement_id, log_date)` is what has to go, a day's exposure is a **sum of contributions**
+  rather than a stored total, and `unknown` (inside the window, nothing logged) must be excluded
+  from aggregates rather than counted as zero.
+
 - [`docs/overview/entries/2026-09-01-blood-panel-storage.md`](../../overview/entries/2026-09-01-blood-panel-storage.md) — **blood panels are stored, de-identified (BF-1, engine half), 2026-09-01.** `blood_panels` + `blood_analytes` (migrations 250/251) with a schema written from the owner's real 63-row report: `<0.2` is a result that is not a number, ranges arrive one-sided in both directions and absent, the date is a month, and **out-of-range is derived from the bounds rather than read off the provider's flag**. The extraction route, the recommendation consumers and the whole UI are still owed.
 - [`docs/superpowers/plans/2026-08-25-unified-day-review.md`](../../superpowers/plans/2026-08-25-unified-day-review.md)
   — **Q-112, the unified day review** (Q-112a–e). Read it instead of Task 27 of the 2026-08-05 batch,

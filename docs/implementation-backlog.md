@@ -2210,9 +2210,17 @@ a finding — it does not by itself explain a plain `GET` hanging beside it.
 ### [nutrition][platform] BF-69 — dosed substances are stored but nothing reads them; make exposure an analysable variable
 
 - **Lane:** A for the read model and any schema; B for the supplements-page UI and the trends surface.
-- **Planning item — but narrower now.** The storage model is DECIDED (see *Decisions* below);
-  what still needs a planning session is the presence model (unknown vs zero), the trends overlay
-  and the supplements-page UI.
+- **✅ PLANNED 2026-09-01 — [`2026-09-01-dosed-substance-exposure.md`](superpowers/plans/2026-09-01-dosed-substance-exposure.md).**
+  The plan settles the presence model (**a `started_on`/`stopped_on` window per substance; a date
+  outside it is a true zero, a date inside it with no contribution is `unknown` and is EXCLUDED from
+  any aggregate, never coerced to 0**) and sequences the four stages.
+  **⚠ It also reframes the entry, from a measurement this entry could not have made.** Production
+  holds **2 supplements, 1 log ever (2026-06-21, `amount` NULL), `default_amount`/`unit` empty on
+  both, and no retatrutide row at all** — so there is no reader *and* nothing to read. The trends
+  overlay is therefore **stage 4 and gated on data**, not on effort: built today it renders one
+  point, and a broken query is indistinguishable from an empty one. **Stage 1 (Lane A) is the
+  contribution rows + the window columns + the whole sync chain; stage 2 (Lane B) is an amount on
+  the supplements page — the thing that does not exist today and without which no series can start.**
 - **Added:** 2026-08-30 · owner, on starting retatrutide: *"I'd like it to be a value that can be
   correlated to all data… this week I will put it as Reta = 0 so it has a baseline - then next week
   add a dosage; so all that data is compared against its associated value… So I could see periods
