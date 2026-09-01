@@ -6110,3 +6110,20 @@ failure mode from a wrong number, and it is the one a future session will not th
 Two negatives are kept for the same reason as always: the split is in the component and **not** in
 `budgetProvenance` (shared, and one combined number is correct for a caller that wants one), and
 neither the `Math.max` floor nor the goal maths was touched — both look like the bug and are not.
+
+## 2026-09-03 — backlog → 15102, `projectOverview.md` → 9009, `docs/agents/state/tuning.md` → 388 (TN-23)
+
+One entry, from one owner question about one night — and the length is the **arithmetic that turns an
+opinion into a finding**. The ten stored contributors blend to **76.04**; the app shows **63**. Without
+that reproduction the entry is "the sleep score feels low", which is unactionable and has been asked
+three times.
+
+**TN-23 itself is the new part**: `hrv` and `hr` correlate at **+0.869** across 38 nights, share 75%
+of their variance, and carry **28 of 110** — a quarter of the score on one physiological axis, charged
+twice. The entry spends its lines on the ⛔ **do not delete a contributor**: both curves are provably
+correct for this night, and the combined signal is the score's best recovery evidence, so the naive
+fix would remove the most informative input in the model.
+
+The baton gains the general move — **reproduce a score from its stored contributors before theorising
+about it** — plus the observation that twice now the owner's *"this is too low"* resolved to the
+**display curve** (TN-5, signed off, unshipped) rather than to the model.

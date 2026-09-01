@@ -4793,6 +4793,44 @@ apart with no new overnight data — which the check-in half alone does not achi
   still right — because its weight is 10% and the score must be settled — but **not** because it is
   redundant. It is worth keeping and using elsewhere.
 
+### [sleep] TN-23 — `hrv` and `hr` are the same autonomic event scored twice, for 25% of the sleep score
+
+- **Branch:** _unassigned_ · **Added:** 2026-09-03 · owner: *"why would sleep score be so low for this? I'd imagine 80s if not 90s"*
+- **Lane: A** — `packages/shared/src/health/sleep-score.ts`, `SLEEP_WEIGHTS`.
+- **Sequence after TN-5 and TN-10.** All three are independent, but those two are larger and already signed off; changing three sleep inputs at once makes none of them evaluable.
+- **Reference:** [`review`](reviews/2026-09-03-why-a-good-night-scored-63.md) — reproduces the owner's 63 exactly from the stored contributors.
+
+Measured over **38 nights** carrying both contributors:
+
+| | |
+|---|---|
+| `corr(hrv contributor, hr contributor)` | **+0.869** |
+| shared variance | **75%** |
+| combined weight | **28 of 110 — 25% of the sleep score** |
+
+**A quarter of the sleep score rides on one physiological axis, entered twice.** HRV falling and
+overnight HR rising on the same night is one autonomic signal; the score charges for it in both
+columns.
+
+**Worked example — the night that prompted this.** 2026-09-02: 8 h 15 m, 97% efficiency, REM 92,
+restfulness 95, and `hrv` **42** / `hr` **58**. Both are computed correctly — HRV 50 ms against a
+~59 ms baseline is ratio 0.85, which `HRV_RATIO` maps to exactly 42; overnight HR 63 against ~61 is
+1.035, which `HR_RATIO` maps to 58. **Neither is a bug.** Together they drag the blend **12.7 points**
+of the 24 it is below 100.
+
+**⛔ Do NOT fix this by deleting one contributor.** Both curves are sound, and the combined signal is
+the strongest recovery evidence the score has — the [check-in lookback](reviews/2026-08-26-checkin-lookback.md)
+found resting HR the single best predictor of the owner's felt state. **The fix is to stop paying
+twice:** collapse them into one autonomic contributor at roughly the weight of one, or down-weight the
+pair so their joint contribution is ~14–18 rather than 28.
+
+**Counterfactual, as a bound rather than a proposal:** with both at this night's median (81) the blend
+is 83.9 and the display 88. The dip is real and should cost something; this only bounds how much of
+the 63 is the double count.
+
+**Pass test:** over the stored history, no two sleep contributors correlating above +0.8 carry a
+combined weight above ~18 of 110; and the 2026-09-02 night's blend rises by 5–8 points, not 8.
+
 ### [sleep] TN-10 — `TOTAL_SLEEP`'s comment and its curve disagree by ~15 points, on the heaviest contributor
 
 - **Branch:** _unassigned_
