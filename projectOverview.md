@@ -24,8 +24,23 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.416.2 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Version:** v1.416.3 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-09-01.
+
+**The calorie bar says why zero is zero (BF-87).** Owner: *"is basic steps being counted towards
+calorie burn? It says I've done 1000 but not sure if that's counting towards nutrition."* The app was
+right and the screen could not say why — only steps above 3,000 earn calories, because the sedentary
+base is already BMR × 1.2 and a desk day's stepping sits inside it. The zero line now names the
+threshold, the earned line breaks into workouts/activity/steps, and both "calories out" explainers
+quote the same number instead of "a baseline". The breakdown was first built with largest-remainder
+apportionment; re-reading `daily-energy.ts` showed `computeActiveEnergy` **already rounds all three
+parts** and `total` is their sum, so that was guarding a case its producer cannot produce — deleted,
+and replaced by a test pinning that guarantee against the real function.
+Importing the constant took `/nutrition` to a **500** — `daily-energy` → `workout-energy` →
+`oura-models` reads `node:fs/promises`, and no client component had ever imported it — so the value
+is mirrored with a test that fails if it drifts, and **LB-43** (Lane A) proposes the leaf-module split
+that deletes the mirror. **Not device-verified**
+([journal](docs/overview/entries/2026-09-01-steps-threshold-copy.md)).
 
 **The personal details are one screen, and one writer (BF-79).** Owner: *"can we combine all the
 personal information fields into 1 section in the more/details."* They were split between the Edit
