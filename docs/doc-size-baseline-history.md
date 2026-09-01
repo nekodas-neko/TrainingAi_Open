@@ -5497,8 +5497,77 @@ the part a future session needs: **no client component had ever imported `daily-
 out of it will hit the same wall. The backlog grew by LB-43, which is that fix, minus the removal of
 the shipped BF-87 entry.
 
+## 2026-09-01 — `docs/implementation-backlog.md` → 14991 (BF-1's plan pointer)
 
-## 2026-09-01 — `projectOverview.md` → 8666, `docs/implementation-backlog.md` → 14955 (LB-40)
+`lane-a/blood-panel-plan`. BF-1 gained the link to its implementation plan plus the findings that
+drove the schema — that `<0.2` is a result which is not a number, that reference ranges arrive in
+four shapes, and that the flag is commentary sitting on values inside their range, so out-of-range
+has to be derived. Those belong on the entry rather than only in the plan: the entry is what an
+implementer reads before deciding whether to start.
+
+Also carries two owner decisions taken in the same session, recorded on their entries rather than
+left in a chat: **BF-59** — label a peaking week, do not scale the target, because nobody has
+calibrated a per-phase multiplier and the owner's sessions span three phases at once; and
+**BF-81** — leave the 38 mixed-producer rows alone, since re-deriving the 8 that can be re-derived
+would leave 30 on the old producer and make the column's provenance harder to reason about, not
+easier. BF-84's *fact or hint* was asked too and turned out to be **already answered** in a PR that
+merged while this branch was open — the answer matched, and nothing needed changing.
+
+
+## 2026-09-01 — `docs/implementation-backlog.md` 14977 → 14986 (BF-88 approved: gate cleared, order swapped, dependency inverted)
+
+The owner approved the compensated shift — *"yes that sounds good lets ship that"* — so BF-88's
+`Gate: owner` is cleared and it becomes Lane A's #1 READY item. Three edits, and the growth is
+almost entirely the third.
+
+The gate line is replaced by a **DECIDED** line carrying the owner's words and the blast radius the
+sign-off was given against, so the approval and what was approved cannot drift apart.
+
+BF-88 moves above BF-87 in the queue, and **the `Needs:` between them inverts**. That is the part
+worth the words: BF-88 waited on BF-87 while it was only "make the path legible", and now that it
+changes the model, the copy waits on it. Shipping BF-87 first writes *"steps count above 3,000"* onto
+a card BF-88 is about to make count from zero — a wrong sentence within a release, on the exact
+screen BF-87 exists to make trustworthy. The inversion is explained in the entry rather than just
+performed, because a reader who remembers the old direction will otherwise assume it is a mistake.
+
+## 2026-09-01 — `docs/agents/state/bugfix.md` 205 → 244 (a session's state, after two rounds of putting things elsewhere)
+
+The first draft was **57 over** and the check was right to refuse it: most of it was narrative about
+how the owner's three questions improved, which is journal material. That went to
+`docs/overview/entries/2026-09-01-energy-model-intake.md` and the baton kept the state — decision,
+numbers, the inverted `Needs:`, what the owner still owes. **−16 lines.**
+
+The second pass fixed a structural mistake rather than a size one. Four lessons had been prepended
+into *"What this session learned that the traps list did not already say"* — a heading that names a
+**different** session, so two sessions were merging under one title. Three moved to **Method notes
+worth reusing**, which is the permanent section they were always for; the fourth is a trap and folded
+into the existing stacked-PR bullet, which already covered the marker-conflict case and now covers
+the clean-auto-merge case that actually fired this session. **−2 lines, and the file's own structure
+holds again.**
+
+What is left is a session's state block and three method notes, which is what this file is for. The
+baton rule is *state only, rewritten in full* — the accretion this check catches is exactly what that
+rule exists to prevent, and it caught it twice here before the number moved.
+
+## 2026-09-01 — `docs/implementation-backlog.md` 14978 → 15011, `docs/agents/state/bugfix.md` 244 → 251 (BF-87 won the race; BF-88 absorbs the consequence)
+
+The dependency inversion filed an hour earlier existed to stop BF-87's copy being written against a
+threshold BF-88 removes. **It lost the race** — Lane B merged BF-87 (#725) first — so this PR stops
+being a reorder and becomes a correction.
+
+Most of the backlog growth is two warnings inside BF-88, and the second is the one worth the lines.
+Three shipped sites now print *"steps above 3,000/day"*, and rewriting them is in BF-88 rather than a
+follow-up, because a follow-up is how a card ships a false sentence for a release. **And the guard
+BF-87 shipped cannot catch the falsehood**: the constant is mirrored into a client module (LB-43 is
+why — importing `daily-energy` 500s the Nutrition tab) with a test pinning the two values equal, and
+BF-88 can leave the value at 3,000 while changing what it *means*. Equal value, green test, false
+copy. The entry now asks for the rename that breaks every consumer on purpose.
+
+The baton and the journal entry both carried the old claim that the inversion protected BF-87. Both
+are corrected in the same diff rather than left to read as a success — the general lesson replacing
+it is that **a reorder only protects work that has not started**.
+
+## 2026-09-01 — `projectOverview.md` → 8666, `docs/implementation-backlog.md` → 15007 (LB-40)
 
 One shipped fix recorded; the backlog **shrank**, since LB-40's entry was removed and nothing new
 was filed. The status block is 10 lines because the interesting half is not the bug but the
@@ -5506,3 +5575,4 @@ direction the fix fails in: `cachedFetch` swallows a failed request, so an unkno
 the field rather than hide it, or a cold cache plus a dead network silently reproduces the defect.
 That reasoning is what a future session needs and what a one-line "fixed the password field" would
 lose.
+
