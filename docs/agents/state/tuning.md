@@ -3,7 +3,7 @@
 > **Successor sessions are titled `🎶 Tuning Agent 🟢`** — exactly, both emoji. Leading emoji = role,
 > trailing = this session's status, set by the session itself. See `docs/agents/README.md` §4.
 
-**Updated:** 2026-08-26 · **By:** `session_01VVfZtbCftbwaUHtBLJoxVr` · **Next ID:** `TN-20`.
+**Updated:** 2026-08-26 · **By:** `session_01VVfZtbCftbwaUHtBLJoxVr` · **Next ID:** `TN-22`.
 Find next free: `grep -rhoE '\bTN-[0-9]+\b' docs/ | sort -t- -k2 -n | tail -1`. Legacy `Q-` numbers
 stay valid. **Rewritten in full, never appended** — narrative lives in the linked reviews.
 
@@ -43,6 +43,8 @@ Filed this session, all propose-only, all in the queue:
 | **TN-17** | Activity as a pace-to-goal score (owner's design) | mechanic sound; `Needs: Q-524`, `Gate: owner` — the goals make it punishing |
 | **TN-18** | TN-6a gated the readiness ladder, NOT the deload banner — the surface the owner reads | one condition, Lane A, do not batch |
 | **TN-19** | the HOW IT MOVES card promises 5 mechanisms; **4 inert or backwards** | `Needs: TN-15`; ⛔ do not reword the card |
+| **TN-20** | a recompute **overwrites a completed day with an empty result** | data integrity, do not batch, do not re-run to "fix" |
+| **TN-21** | "daytime stress" is **55% night buckets**, night/day opposite signs | Q-507 candidate; n=9, a lead |
 
 **Owner decisions, 2026-08-24 — recorded on the entries, nothing gated on them.** TN-5 and TN-6
 signed off; **TN-6a** added (suspend the temperature penalty on a self-clearing condition, outside the
@@ -229,6 +231,25 @@ sleep ✅ · readiness ✅ · activity ✅ · body ✅ · devices ✅ · workout
 - **⛔ `step_live_windows` is effectively empty — 8 rows across 6 days, 7,745 steps total.** It is the
   obvious intraday step source and it reads a flat zero. `body_metrics.steps` is a **running daily
   total** (`updated_at` moves through the day), which is what any intraday step question should use.
+- **⛔⛔ A STORED COUNTER IS A CLAIM ABOUT THE DATA, NOT THE DATA — and this agent published a wrong
+  finding off one.** TN-19 cited 2026-08-26 as *"zero HR samples → zero drain"*; that day holds
+  **1,954 raw samples in `oura_heartrate`**. The zero was **TN-20**. **Cross-check the raw table
+  before quoting any zero**, and expect `body_battery_daily.hr_sample_count` in particular to lie.
+  Q-521's wear-time conclusion survives on its own correlations; only the illustration fell.
+- **TN-20: completed days are being overwritten with empty recomputes.** 2026-08-31 read 113 drained
+  / 3,643 samples, the owner screenshotted it, and an hour later it stored **0 / 0 / end = anchor**
+  with **3,815 raw samples** still present. The derived row went **55 → 25** readiness and
+  **56 → 15** sleep against a normal **7.83 h / HRV 54.5** summary. **3 of the last 11 days.**
+  **Nothing logs the prior value** — this is only visible by diffing stored counts against
+  `oura_heartrate`. **Do a raw-vs-stored comparison before trusting ANY derived history.**
+- **The stress series is NOT daytime-only — it is 55% night** (126 of 230 buckets between 22:00 and
+  06:00, all 24 hours covered except 07:00). Night mean **+0.266**, day **−0.413** — **opposite
+  signs, night in the majority**, so a daily aggregate tracks the night/day mix. That is TN-21 and a
+  live candidate for Q-507's backwards sign.
+- **⚠ The Q-507 candidate is the REVERSE of the refuted one — do not conflate them.**
+  `corr(total buckets, stress_high_minutes)` = **−0.784** (n=9): *fewer* buckets → *more* high-stress
+  minutes, because each bucket scores against the day's own median. The refuted hypothesis used **HR
+  sample count** (r = −0.128). Different quantities; the bucket count is what the model divides by.
 - **⚠ THE BATTERY CHAIN HAS SHIPPED NOTHING, and the owner has now reported it twice** (2026-08-26,
   2026-08-31 *"still not very usable"*). Verified on `main` 2026-08-31: TN-15/18/6a/6/2 all still
   queued, at **positions 75–83 of 235**. Nothing is blocked — TN-6a, TN-18 and TN-15 all carry owner

@@ -941,6 +941,21 @@ window, then the newest `history-*.md`. The 157 dated status notes this section 
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
+### [readiness][body][devices] 🔴 A recompute overwrites a completed day with an empty result — the inputs to rebuild it still exist (TN-20, 2026-09-01)
+
+**Found, not fixed. Data integrity, not calibration.** [`review`](docs/reviews/2026-09-01-recompute-wipes-completed-days.md).
+- **Observed in BOTH states within 24 hours**, which is what makes it provable. 2026-08-31's `body_battery_daily` read **end 0 · drained 113 · 3,643 samples**; the owner's 21:45 screenshot showed *"−113 drained"*; an hour later (`updated_at` 12:43 UTC) it stores **end 55 · drained 0 · 0 samples**. **`oura_heartrate` holds 3,815 samples for that date** — the input was never missing.
+- **The derived row went further:** readiness **55 → 25**, sleep **56 → 15**, against a stored summary of **7.83 h, HRV 54.5, RHR 63.9**. Neighbours calibrate it — 08-30 (7.92 h, HRV 72) → **69**, 09-01 (7.50 h, HRV 65) → **54**. **A normal night is stored as the worst on record.**
+- **3 of the last 11 days** carry the signature (raw samples present, stored count **0**, drained **0**, end **=** anchor): **08-22 (265 raw), 08-26 (1,954), 08-31 (3,815)**. On healthy days the stored count sits slightly *below* raw — waking-hours windowing — so **zero against thousands is a different failure**.
+- **First action: find the writer.** Same delete-before-guard shape as **Q-528** is the first candidate, plus any `fullHistory` path. **⛔ Do not re-run the recompute to "fix" a day** — the recompute is what destroys it.
+- **⚑ This retracts an illustration this agent published on 2026-08-31 in TN-19**: 2026-08-26 was cited as *"zero HR samples → zero drain"*; it has **1,954 raw samples**. **Q-521's wear-time conclusion stands on its own correlations**; the illustration does not. **A stored counter is a claim about the data, not the data.**
+
+### [readiness] 🟡 "Daytime stress" is 55% night buckets, and night and day carry opposite signs (TN-21, 2026-09-01)
+
+**Measured for the first time** — TN-3a's persistence half shipped, so the per-bucket series exists: **230 buckets over 9 days**. [`review`](docs/reviews/2026-09-01-recompute-wipes-completed-days.md).
+- **The series covers all 24 hours** (every hour except 07:00) and **126 of 230 — 55% — fall between 22:00 and 06:00**. Night mean **+0.266** (recovered) against day **−0.413** (stressed): **opposite signs, night in the majority**, so any daily aggregate is governed by the night/day mix as much as by stress.
+- **A Q-507 mechanism candidate, and it is the REVERSE of the one already refuted**: `corr(total buckets, stress_high_minutes)` = **−0.784** (n=9) — *fewer* buckets produce *more* high-stress minutes, because each bucket is scored against the day's own median. **n = 9; treat as a lead, not a result.** The refuted hypothesis used *HR sample count* (r = −0.128); bucket count is the quantity the model actually divides by.
+
 ### [workouts][platform] ⚠️ The stored rest day is not device-verified, and the button for it is still Lane B's (BF-84, 2026-09-01)
 
 **Shipped, and the half that matters most on this app is the half a sandbox cannot run.** `rest_days`
