@@ -16,22 +16,14 @@
  */
 import { estSessionKcal, estWorkoutKcal, MAX_PLAUSIBLE_SESSION_MIN, type Intensity, type Sex } from '@trainingai/shared/health/workout-energy'
 
-// Defined in a dependency-free leaf module and re-exported here, so a caller that needs only the
-// number does not pull in this file's `workout-energy` → `oura-models` → `node:path` chain. Every
-// existing import of `SEDENTARY_MULTIPLIER` from this module keeps working.
-export { SEDENTARY_MULTIPLIER } from './energy-baseline'
-
-/** Steps assumed already covered by the sedentary base (a desk-job day's incidental stepping). Only
- *  steps above this count as extra movement, so we don't double-count the baseline against BMR×1.2. */
-export const STEP_BASELINE = 3000
-
-/** Walking cadence for turning a step count into minutes. Tudor-Locke: ~100 steps/min ≈ the
- *  moderate-intensity walking threshold, which matches the walking MET (4.3) used below. */
-export const WALKING_CADENCE_SPM = 100
-
-/** Steps per km for converting a logged outdoor activity's distance to a step-equivalent (~0.77 m
- *  stride). Used only to REMOVE steps already attributed to logged walks/runs from the passive total. */
-export const STEPS_PER_KM = 1300
+// All four live in a dependency-free leaf module and are re-exported here, so a caller that needs
+// only a number does not pull in this file's `workout-energy` → `oura-models` → `node:path` /
+// `node:fs/promises` chain. Every existing import from this module keeps working.
+//
+// LB-43: three of them used to be declared here, which made `STEP_BASELINE` unreachable from a
+// client component — BF-87 took the Nutrition tab to a 500 importing it for a line of copy.
+export { SEDENTARY_MULTIPLIER, STEP_BASELINE, WALKING_CADENCE_SPM, STEPS_PER_KM } from './energy-baseline'
+import { STEP_BASELINE, WALKING_CADENCE_SPM, STEPS_PER_KM } from './energy-baseline'
 
 
 // App activityType string → Oura MET-table id (`energy-expenditure-features.json` activity_type_dict).

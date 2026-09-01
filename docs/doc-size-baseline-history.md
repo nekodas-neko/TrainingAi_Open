@@ -5512,3 +5512,12 @@ calibrated a per-phase multiplier and the owner's sessions span three phases at 
 would leave 30 on the old producer and make the column's provenance harder to reason about, not
 easier. BF-84's *fact or hint* was asked too and turned out to be **already answered** in a PR that
 merged while this branch was open — the answer matched, and nothing needed changing.
+
+## 2026-09-01 — `docs/implementation-backlog.md` → 15013, `projectOverview.md` → 8668 (LB-43)
+
+The backlog growth is LB-43 recording the two things its own text could not have known: the leaf
+module it proposed creating **already existed** (`energy-baseline.ts`, built for the identical
+failure one node builtin earlier), and the drift test guarding the mirror became **tautological**
+once the mirror was deleted, so it was replaced rather than kept. Both belong on the entry: the
+first stops the next reader creating the duplicate file, the second explains why a test changed
+shape in a PR that was supposed to only move constants.

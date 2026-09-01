@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { movementParts, movementSummary, STEP_BASELINE } from '../movement-breakdown'
 import { computeActiveEnergy } from '@trainingai/shared/health/daily-energy'
-import { STEP_BASELINE as SHARED_STEP_BASELINE } from '@trainingai/shared/health/daily-energy'
+import { STEP_BASELINE as SHARED_STEP_BASELINE } from '@trainingai/shared/health/energy-baseline'
 
 /**
  * BF-87 — the breakdown under the calorie bar, and the threshold that explains a zero.
@@ -110,19 +110,31 @@ describe('the parts the service hands us already add up', () => {
 })
 
 describe('the threshold is quoted, never restated', () => {
-  /**
-   * The display constant is a **mirror**, not an import — importing `daily-energy` into a client
-   * component pulls `node:fs/promises` through `oura-models` and 500s the Nutrition tab, which is
-   * how this was found. This test is the whole of what keeps the mirror honest, and it runs in
-   * node, where that chain costs nothing.
-   */
-  it('matches the constant the maths actually uses', () => {
+  // LB-43 removed the mirror, so this pair no longer asks whether two copies agree — a re-export
+  // cannot disagree with itself, and a test that cannot fail is worse than none. What it asks now
+  // is whether the constant is still the shared one and still reachable from a client component.
+  it('is the shared constant, not a copy of it', () => {
     expect(STEP_BASELINE).toBe(SHARED_STEP_BASELINE)
+    expect(codeWithImports('components/nutrition/movement-breakdown.ts')).toMatch(/energy-baseline/)
   })
 
   it('does not import the shared module into the client bundle', () => {
     // The import is what broke; a comment explaining it is not, so comments go and imports stay.
     expect(codeWithImports('components/nutrition/movement-breakdown.ts')).not.toMatch(/daily-energy/)
+  })
+
+  /**
+   * THE invariant now, and the one nothing else checks. `energy-baseline` is importable from a
+   * client component only while it reaches no node builtin — and the reason it exists is that
+   * `daily-energy` → `workout-energy` → `oura-models/constants` reaches two of them (`node:path`
+   * for Q-401, `node:fs/promises` for BF-87, which took the Nutrition tab to a 500 fetching a
+   * number for a line of copy). An import added to this leaf module would break the same tab
+   * again, and `tsc` would say nothing.
+   */
+  it('the leaf module the constants live in imports nothing at all', () => {
+    const src = codeWithImports('packages/shared/src/health/energy-baseline.ts')
+    expect(src).not.toMatch(/^\s*import\s/m)
+    expect(src).not.toMatch(/require\s*\(/)
   })
 
   it('the zero-earned line names the threshold, not just the shortfall', () => {

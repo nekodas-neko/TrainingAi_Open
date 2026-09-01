@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.416.4",
+    date: "2026-09-01",
+    changes: [
+      "Internal tidy-up behind the Nutrition tab's movement breakdown — the step threshold it prints is now the same value the calculation uses rather than a copy of it. Nothing on screen changes.",
+    ],
+  },
+  {
     version: "1.416.3",
     date: "2026-09-01",
     changes: [
