@@ -207,6 +207,12 @@ Live at the time of writing (2026-07-30):
 
 ## History
 
+- **[`docs/overview/entries/2026-09-01-phase-aware-volume-targets.md`](../../overview/entries/2026-09-01-phase-aware-volume-targets.md)**
+  — 🆕 **BF-59**: the Training card's weekly set targets are **derived** from `volumeLandmarks` scaled
+  by the week's phase mix, not read from `program_volume_targets`. Read it before touching volume
+  targets anywhere: the stored rows are now a **roster** and re-seeding their numbers recreates the
+  second source of truth this removed, and **`signals.ts` still steers off the old stored number**, so
+  the engine and the screen currently disagree.
 - **[`docs/overview/entries/2026-08-31-voice-filler-words.md`](../../overview/entries/2026-08-31-voice-filler-words.md)**
   — 🆕 BF-66: `parseVoice` stripped every character outside `[0-9.\s kgreps×x]`, a denylist that keeps
   the `r` of `for` and the `es` of `times` — so **`60 by 6` and `60 at 6` worked and `60 for 6` and

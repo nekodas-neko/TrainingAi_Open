@@ -5844,3 +5844,15 @@ measurement of the merged file, never a hunk to splice.)
 group is minted **only** past one entry and **only** alongside a name. Both are what stop the fix
 from rebuilding the bug one layer down, and a status block that said "scans group now" would be
 wrong on top of being shorter — nothing renders differently until Lane B's half lands.
+
+## 2026-09-01 — `projectOverview.md` → 8877, `docs/implementation-backlog.md` → 14933 (BF-59, screen half)
+
+The backlog **shrank by 60 lines**: BF-59 carried the whole measurement — three tables of
+stored-vs-landmark numbers and the argument for which fix mattered most — and that measurement is now
+in the journal entry, where a session reads it once rather than every time it scans the queue.
+
+`projectOverview.md` grew 17, and the line that cannot be cut is the one nobody would think to write:
+**the engine and the screen now disagree**, where before this change they were wrong together. A
+status block that stopped at "the target is phase-aware now" would read as finished work and hide the
+inconsistency it introduced — which is precisely what a future session would need to know before
+touching either side.
