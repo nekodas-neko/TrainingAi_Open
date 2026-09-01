@@ -5425,3 +5425,39 @@ eleven had it.
   works from — a settled decision wearing a decision-gate is invisible there.
 
 The growth is three entries gaining the sentence that says why they are not what their field claims.
+## 2026-09-01 — `docs/implementation-backlog.md` 14783 → 14803 (BF-87 gains the rate it was missing)
+
+Same entry, sharper requirement. Told the model was correct, the owner restated what he actually
+wanted: *"i would like to see steps = calories so I know roughly how much effort translates to how
+much."* BF-87 had argued for showing the *threshold*; the ask is the **rate**, and those are
+different deliverables.
+
+The growth is a measured table — 1,196 → 0 kcal through 15,000 → 407, driven through
+`computeActiveEnergy` rather than approximated, so an implementer can check against it instead of
+re-deriving Schofield by hand. Plus the trap it implies: "steps = calories" is two numbers here, and
+a single rate is wrong below 3,000 — where 50 of the owner's last 124 days sit. Shipping the bare
+rate would move the confusion rather than fix it.
+
+No new entry, because this is the same piece of work and BF-88 already points at BF-87 with
+`Needs:`. Splitting it would have made two entries that must be read together.
+
+## 2026-09-01 — `docs/implementation-backlog.md` 14803 → 14831 (BF-88 gets a decided change, BF-87 loses a stale ban)
+
+The owner's second proposal is not the one measured and rejected an hour earlier. *"cant we remove
+some calories for the base 3000 and have it start from 0 steps?"* **conserves** where the first
+deleted: it subtracts exactly the 102 kcal it hands back, so every day at or above 3,000 steps
+reports an identical total and only the 50 sub-3,000 days move, mean −43. The first version cost
+−177 on all 124.
+
+So BF-88's recommendation is replaced rather than appended to — "leave both constants alone" is no
+longer the advice, and leaving it beside the new one would let an implementer pick either.
+
+The growth is mostly two hazards that a reader would otherwise hit: the subtraction is **computed
+per profile** (102 is the owner's number, and the app has more than one account now), and the two
+paths need **opposite** treatment — the calibrated path self-corrects, so applying the subtraction
+there double-subtracts it. That second one is BF-88's own finding turning out to be load-bearing
+rather than descriptive.
+
+BF-87's "do not lower STEP_BASELINE" is rewritten in the same pass. It was correct about the
+uncompensated version and would have made an implementer refuse the compensated one — a stale
+prohibition being obeyed is the failure mode that needed closing in the same diff that created it.
