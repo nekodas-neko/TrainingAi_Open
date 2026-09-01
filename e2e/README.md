@@ -117,11 +117,27 @@ Chromium-on-Linux, and gestures behave differently under a real thumb. Those sti
   the only thing refusing the action, and that is usually the thing worth testing. Click it with
   `{ force: true }` and assert the *outcome*, not the attribute: an attribute assertion passes with
   the handler's guard deleted. `nutrition-day-navigation.spec.ts`'s today guard is the reference.
-- **If a tap does nothing, suspect a gesture handler before you suspect hydration.** On Nutrition a
-  real touch sequence does not open the water sheet while a synthesised `click` event does — filed
-  as Q-309, with the workaround and its reasoning in `water-log-write-path.spec.ts`. A spec that
-  cannot tap the way a user taps is testing something adjacent to the product, so it is a finding to
-  chase rather than a pattern to copy.
+- **On Nutrition, `.click()` does nothing and gives you no clue. Use a touch.** Inside that screen's
+  scrolling container a `locator.click()` — or a raw `page.mouse.click()`, or a 0 ms down/up — is
+  swallowed: no toast, no request, no error, no timeout, just silence. `touchscreen.tap()` and
+  `locator.tap()` work every time. **The cause is measured**, not suspected: the date-swipe
+  `useDrag` bound to that container (`nutrition-content.tsx`); removing `{...bindDateSwipe()}` makes
+  every input method work, and `pointer: { touch: true, mouse: false }` does **not** fix it. Open as
+  **Q-354**, deliberately unfixed — touch is the only input the canonical runtime has, so the working
+  path is the one that matters and a rewrite would risk it. Two specs carry the reasoning inline:
+  `water-log-write-path.spec.ts` and `plan-day-fill.spec.ts`.
+
+  **This entry said the opposite until 2026-09-01, and would have sent you the wrong way.** It read
+  *"a real touch sequence does not open the water sheet while a synthesised `click` event does"* —
+  Q-309's original suspicion, written before anyone measured, and never updated when
+  `water-log-write-path.spec.ts` measured the reverse the same week. Reaching for
+  `dispatchEvent('click')` on a dead tap is the workaround that spec deliberately moved away from.
+
+- **A tap that does nothing can still be hydration, so rule that out too.** A touch fired before
+  React attaches the handler is silently ignored, and CI starts the dev server cold. Retry with
+  `toPass` where the handler is idempotent — and only there: `water-log-write-path.spec.ts` notes
+  that a retried *toggle* closes what the first tap opened, which is how an earlier version of it
+  defeated itself.
 
 - **Stubbing an `/api/` route needs `test.use({ serviceWorkers: 'block' })`.** `public/sw-template.js`
   re-issues **every** `/api/` request — no method filter — so once the worker controls the page the

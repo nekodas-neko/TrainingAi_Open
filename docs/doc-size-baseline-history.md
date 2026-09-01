@@ -5983,3 +5983,15 @@ changed, and a changelog line for an invisible change is a claim the owner canno
 decisions someone would otherwise re-take, and neither is recoverable from the diff.
 
 The backlog **shrank by 20 lines** — LA-42's entry, removed whole, since nothing is owed.
+
+## 2026-09-01 — `projectOverview.md` → 8967 (Q-354)
+
++15 for a docs correction, which is only worth it because of what the short version omits. "Fixed a
+stale note in the e2e README" reads as tidying. What happened is that the note was **backwards**, in
+the file written to stop people falling into that exact trap, so it did not fail to help — it
+actively sent readers to the workaround the relevant spec had deliberately abandoned. That
+distinction is the reusable lesson, and it does not survive compression.
+
+The second half is the queue mechanic: an entry whose own text says *do not pursue* sat at the head
+of READY, so every session in turn was offered a build it argues against and skipped it. `Reference:`
+exists for that and nobody had applied it.

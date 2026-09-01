@@ -11102,6 +11102,9 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 
 ### [app-shell] Q-354 — the date-swipe `useDrag` swallows MOUSE clicks on Nutrition (touch is fine)
 
+- **Reference:** this entry is READ, not built. Its own recommendation is *do not pursue*, and while
+  it sat in the READY list it headed Lane B's work list — offering every session a build its own text
+  argues against. The field is what stops that; the content below is unchanged and still current.
 - **Lane:** B
 - **Branch:** `fix/nutrition-mouse-click-swallowed`
 - **Added:** 2026-08-17 as the residue of Q-309 · **cause located and proven 2026-08-17**
@@ -11136,6 +11139,15 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   saying why. **So the practical cost of leaving this open is a trap for the next spec author**,
   not a user-facing bug — every new e2e assertion that presses something inside the Nutrition
   scroll container has to know about this first, and the failure gives no clue.
+- **✅ The trap is now signposted where a spec author hits it (2026-09-01).** `e2e/README.md` said
+  the **opposite** of what was measured — *"a real touch sequence does not open the water sheet while
+  a synthesised `click` event does"*, which is Q-309's pre-measurement suspicion, never updated when
+  `water-log-write-path.spec.ts` measured the reverse the same week. Anyone hitting a dead tap and
+  consulting the README would have concluded touch was the broken path and reached for
+  `dispatchEvent('click')` — the workaround that spec deliberately moved away from. Corrected, with
+  the measured table and the two specs that carry the reasoning inline. That spec's own
+  *"the gesture code is not implicated"* conclusion is corrected too: it reasoned about the touch
+  path, and `useDrag` binds mouse as well.
 - **Recommendation: do not pursue without a reason.** The only working path is the one that matters,
   a rewrite risks it, and there is no user on the supported runtime who benefits. Revisit if the app
   ever gets genuine desktop use, or if an automated accessibility/interaction scanner starts driving

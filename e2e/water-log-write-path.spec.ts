@@ -50,11 +50,17 @@ test('logging water updates the Nutrition row without a reload', async ({ page }
   //                           lostpointercapture, click. Sheet opens, first time, every time.
   //   dispatchEvent(click) -> opens it (the old workaround).
   //
-  // So the tap path is fine and the gesture code is not implicated: the failing case never produces
-  // a touch event for `filterTaps` to filter. Polling the DOM 20× over 2 s after `.click()` shows
-  // the sheet never appears at all, so it is not an open-then-close either. What remains unexplained
-  // is why the mouse path specifically fails on this screen when it works on `/more` — filed as
-  // Q-354, and irrelevant to a touch-only product except that it made this spec lie.
+  // So the tap path is fine. Polling the DOM 20× over 2 s after `.click()` shows the sheet never
+  // appears at all, so it is not an open-then-close either.
+  //
+  // **The "gesture code is not implicated" half of this note was wrong, and Q-354 measured it the
+  // same week.** The reasoning here — the failing case never produces a touch event for
+  // `filterTaps` to filter — is about the TOUCH path, and `useDrag` binds mouse and pointer too.
+  // Removing `{...bindDateSwipe()}` from the scroll container makes `.click()`, `page.mouse.click()`
+  // and a 0 ms down/up all work; `pointer: { touch: true, mouse: false }` does not. So Q-309 named
+  // the right component by the wrong mechanism, and this note then cleared it on reasoning that only
+  // covered half the binding. Q-354 stays open deliberately: touch is the only input the canonical
+  // runtime has, so the working path is the one that matters and a rewrite would risk it.
   //
   // Retried because a tap fired before React has attached the handler does nothing, silently, and
   // CI starts the dev server cold. Safe here specifically: the handler is `setWaterLogOpen(true)`,
