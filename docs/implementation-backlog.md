@@ -938,7 +938,7 @@ one. A swipe on the single Start button adds an affordance that does not current
   `tab-swipe-navigator.tsx` only starts a tab swipe within **24 px of a screen edge** (`EDGE_PX`),
   and this card is inset, so a swipe on the button should not reach it. That is a measurement to
   confirm on the device, not an assumption to build on — and BF-95 covers the underlying gap.
-- **⚠ `Needs: BF-84` for a reason this session watched go wrong.** BF-84 replaces the `ta_rest_day`
+- ⚠ **That dependency is there for a reason this session watched go wrong.** BF-84 replaces the `ta_rest_day`
   `localStorage` flag with a stored fact plus a sync domain — i.e. it rewrites what `onRestDay`
   *does*. Rebuilding how it is *invoked* first means touching the same call site twice and risks the
   BF-87/BF-88 shape: shipping a surface against a mechanism that is about to change underneath it.
@@ -5765,7 +5765,7 @@ the bar to beat, not to assume).
 - **Branch:** _unassigned_ · **Added:** 2026-08-26 · owner request
 - **Lane: B**
 - **Needs: Q-507** — deliberately. Read the next paragraph before starting.
-- **⛔ Gate: owner — NOT SIGNABLE, and a blanket sign-off does not clear it.** Offered one on
+- ⛔ **That owner gate is NOT SIGNABLE, and a blanket sign-off does not clear it.** Offered one on
   2026-08-30 as part of a tuning batch and **deliberately not applied here.** This gate is a stop
   sign, not a request for approval: the entry's own measurement (n = 33) is that stress-high minutes
   correlate the *wrong way*, so **a warning built on today's metric would fire on the owner's best
@@ -7226,7 +7226,7 @@ tapping. Observed set-RPE range is 6–10, mean 7.48.
 
 ### [workouts][nutrition] Q-422 — calibrate the burn estimate against the owner's own energy balance
 
-- **⚠ Gate: owner — held 2026-08-30, `Needs: Q-420` is not yet clear.** The owner signed off the
+- ⚠ **That owner gate is held as of 2026-08-30, and Q-420 is not yet clear.** The owner signed off the
   tuning batch, and this entry is a legitimate scoring sign-off in principle — but Q-420 sets the
   intensity scale this calibration multiplies, so approving the multiplier before its input is fixed
   approves an unknown. **Re-offer it the moment Q-420 lands**; nothing else about it is blocked. Added
@@ -8846,7 +8846,7 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 ### [devices][heart-rate] Q-388 — the ring runs SpO₂ permanently at ~3.5× stock drain; the decision is binary
 
 - **Lane:** A
-- **⚠ Gate: owner — VOID AS WRITTEN, not answered.** It asked the owner to choose SpO₂ on or off;
+- **Gate:** device — ⚠ **the owner gate this used to carry is VOID AS WRITTEN, not answered.** It asked the owner to choose SpO₂ on or off;
   they refused the question and were right to (*"It was on on the oura ring software too and it
   wasnt this bad"*). **There is nothing for the owner to decide until the measurement below is
   redone on the current APK** — which is device queue **S9**. Treat this as blocked on a device
