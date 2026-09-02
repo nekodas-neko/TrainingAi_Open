@@ -253,6 +253,15 @@ Live at the time of writing (2026-07-30):
 ## History
 
 
+
+- **[`../../reviews/2026-09-02-colmi-spo2-temp-stages.md`](../../reviews/2026-09-02-colmi-spo2-temp-stages.md)**
+  — 🆕 **PS-19's three uncompared Colmi metrics, measured 2026-09-02.** Oura's SpO₂ lives in
+  `body_metrics.spo2_pct` (the `oura_bucket` blocker was a wrong table — that one is empty *by
+  design*, being the server backup of the unbuilt on-device rollup, **Q-545**). **Neither SpO₂
+  (+2.70, r −0.33) nor nocturnal temperature (+0.88 °C, r −0.44, half the spread) tracks Oura** —
+  the offset is corrigible, the missing correlation is the finding. The sleep-stage mapping looks
+  **swapped** (3 = REM, 4 = deep: combined MAE 70 vs 86, means 65/94 vs Oura 58/109) but **n = 4**,
+  so do not rewrite the schema comment. Two nights were unusable because of PS-17's phantoms.
 - **[`../../reviews/2026-09-02-recovery-index-ble-smoothing-experiment.md`](../../reviews/2026-09-02-recovery-index-ble-smoothing-experiment.md)**
   — 🆕 **Q-509's pre-registered experiment, run 2026-09-02 — and it FAILED its pass test.**
   Smoothing the BLE overnight series before `computeRecoveryIndex`'s argmin recovers **0.487 h of

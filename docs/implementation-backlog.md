@@ -2123,6 +2123,29 @@ makes "did this night change?" answerable. Replacing rows silently does not.
 
 - **Lane:** A (analysis; no product code)
 - **Added:** 2026-08-30 · a gap in the validation, not in the ring
+- **✅ ALL THREE COMPARISONS RUN 2026-09-02** —
+  [review](reviews/2026-09-02-colmi-spo2-temp-stages.md). Seven days now, not four (SpO₂ **110**
+  readings, temperature **218**). **SpO₂'s blocker is answered: Oura's lives in
+  `body_metrics.spo2_pct`, 7/7 days**, and `oura_bucket` is empty *by design* — it is the server
+  backup of a device-computed table the unbuilt on-device rollup (**Q-545**) would fill, so nothing
+  is broken there.
+- **Keep:** the two questions the measurement raises but four-to-seven nights cannot settle.
+  1. **The stage mapping looks wrong and the sample is too small to change it.** Swapping 3 and 4
+     beats the documented mapping on combined MAE (**70 vs 86**) and the means are decisive-looking —
+     documented gives Colmi 94 min deep vs Oura 58 and 65 REM vs 109; **swapped gives 65 vs 58 and 94
+     vs 109**. Light agrees either way (321 vs 298). **Do not rewrite the schema comment on n=4** —
+     re-run at a few weeks of overlap. **And 2 of 7 nights were unusable because of PS-17**: on 08-29
+     and 08-30 Oura's only stored session is the daytime phantom, so the comparison gets cleaner
+     after that back-fill runs.
+  2. **Neither SpO₂ nor temperature tracks Oura, and that is the finding — not the offset.** SpO₂
+     runs **+2.70** with **r = −0.33**; nocturnal temperature **+0.88 °C** with **r = −0.44**, at
+     **0.51×** Oura's spread. An offset is trivially corrigible; the absence of positive tracking is
+     what would stop Colmi substituting for either. **n = 7 and n = 6 cannot establish a correlation
+     and these do not** — what they rule out is the optimistic case. Worth re-running with more data
+     before any decision to use or drop these two feeds.
+  3. **An undocumented stage 0 carrying 765 minutes appeared on 2026-09-02** — longer than any night,
+     in no part of the documented four-code mapping. Not diagnosed; recorded so nobody treats the
+     known codes as complete.
 
 Four days of Colmi data exist and the comparison covered heart rate, sleep timing and stress. These
 were never looked at:
