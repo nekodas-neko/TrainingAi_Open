@@ -6984,3 +6984,17 @@ which is an APK change and moves the whole second half behind a device gate.
 Neither is visible from the diff that shipped, because the diff is the *other* half. A reader picking
 this up later reads the entry, not the journal, which is why the `Gate:` and the correction sit in the
 queue entry rather than only here.
+
+## 2026-09-02 — `projectOverview.md` → (see .size), `docs/implementation-backlog.md` → (see .size) (BF-55, Q-283)
+
+Both grow, and the line paying for the rest is the date: **`oura_raw_packed`'s first pack is
+2026-08-18, the same day as the 171 MB baseline.** Without it the archive reads as unexplained
+growth and the next session goes looking for a leak in a table that is behaving exactly as designed
+— and `body_hex` is a table CLAUDE.md forbids pruning, so "finding" it would be worse than not
+looking.
+
+Q-283's block is longer than the entry it corrects because the correction is arithmetic a reader
+would otherwise redo: 117 zero-scan indexes at 7,528 kB collapses to **30 / 800 kB** once primary
+keys and unique constraints come out, and its one real candidate was already taken by BF-55's own
+migration 249. The `stats_reset = NULL` line is there because it cuts the *opposite* way to how it
+reads — it strengthens "never scanned" while leaving constraint indexes exactly as undroppable.

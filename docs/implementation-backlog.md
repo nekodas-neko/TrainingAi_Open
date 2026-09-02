@@ -2788,6 +2788,20 @@ a finding — it does not by itself explain a plain `GET` hanging beside it.
 > - **Keep:** the growth trend, which this did not explain.
 
 - **Lane:** A.
+- **⚑ RE-READ 2026-09-02, AS THIS ENTRY ASKS: total is now 200 MB**, down from 206 because
+  migration 249 landed on 09-01 and took the 21 MB index with it (verified: `oura_heartrate` now
+  carries exactly two indexes). [review](reviews/2026-09-02-db-growth-archive-attribution.md).
+- **⚑ ~62% OF THE EXCESS IS THE ARCHIVE, AND IT MUST NOT BE "FIXED".** `oura_raw_packed` holds
+  **1,072 rows / 18 MB**, and its FIRST PACK IS DATED **2026-08-18 — the same day as the baseline**.
+  So it has grown **18 MB in 15 days (~1.2 MB/day)** and is never pruned, because `body_hex` is the
+  archival source of truth. **The ~0.4 MB/day expectation cannot have included it:** the packing work
+  that produced the 171 MB figure created a new permanent writer on the same day, at a rate nothing
+  had yet observed. Part of the "7× trend" is an expectation that was never re-baselined.
+  The trade is working: `oura_raw_samples` is a rolling window (`ring_timestamp_ds` spans **7.58
+  days**, 189,406 rows, 73 MB) and the archive takes the overflow at about an eighth of the size —
+  ~440 MB/year, permanent, on a 5 GB volume.
+- **Keep — what is still owed is the REMAINDER, ~0.7–1.7 MB/day**, and the archive should be
+  excluded from the next attempt rather than counted again.
 - **What is still owed.** Total was **206 MB** against the **171 MB baseline of 2026-08-18** —
   ~2.9 MB/day where the post-packing expectation is ~0.4 MB/day. Removing 21 MB of index and one
   write-amplification source does not account for that; the question is what is adding ~2.5 MB/day
@@ -11939,6 +11953,22 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 ### [platform] Q-283 — ~11 MB of indexes have never served a scan, on a DB where index bloat already caused an incident
 
 - **Branch:** `chore/drop-unused-indexes`
+- **Gate:** owner
+- **⚠ RE-MEASURED 2026-09-02 — THE HEADLINE IS STALE BY ~14×, AND THIS SHOULD PROBABLY BE CLOSED
+  RATHER THAN IMPLEMENTED.** [review](reviews/2026-09-02-db-growth-archive-attribution.md).
+  1. **Its one real candidate is gone.** `oura_heartrate_user_updated` (5.7 MB) was dropped by
+     BF-55's index half in **migration 249** on 2026-09-01. `oura_heartrate` now carries exactly two
+     indexes: the `(user_id, timestamp)` unique key (84,909 scans) and its primary key.
+  2. **What is left is 800 kB, not 11 MB.** Zero-scan indexes total **117 / 7,528 kB**, but
+     excluding primary keys and unique constraints — which this entry already says must never be
+     dropped — the droppable remainder is **30 indexes totalling 800 kB**, the largest a 128 kB
+     `db_query_log_created_at_idx`. That is **0.4% of a 200 MB database**, for a destructive
+     migration.
+  3. **One reading strengthens the existing caveat rather than weakening it:**
+     `pg_stat_database.stats_reset` is **NULL**, so the counters cover the database's lifetime. That
+     makes "never scanned" a stronger claim and still does not make a constraint index droppable —
+     BF-55's counter-example holds today, `rr_intervals_pkey` read 0 on 08-30 and **10,930** now.
+  **Closing it is a queue decision, so it is gated rather than struck.**
 - **Plan:** none needed
 - **Added:** 2026-08-15 · from the comprehensive review §4
 - **Lane:** A — derived 2026-08-31 by the path rule while selecting Lane B's next item: dropping an index is a migration, and Postgres migration numbers belong to Lane A alone.
