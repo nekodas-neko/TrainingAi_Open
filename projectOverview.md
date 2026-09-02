@@ -56,6 +56,16 @@ and the spec passes. Two placement calls: a **second tsconfig** rather than edit
 would have failed CI on the entry's own suggestion
 ([journal](docs/overview/entries/2026-09-01-typecheck-tests.md)).
 
+**⚠ One decision is waiting on the owner: whether the E2E job becomes a required check (Q-297).**
+**Measured rather than read — it is NOT required today:** PR #776 merged while its E2E job was still
+`in_progress`. LA-22 has since made the job always-run and always-report specifically so it is safe
+to require, so the only remaining question is whether to, and it is **branch protection** — a shared
+system, not a lane's to change. E2E takes 15–40 minutes and catches real bugs; requiring it makes
+every merge wait for it. Alongside this, `e2e/plan-rescale.spec.ts` closes **LB-51** (the plan card
+had no e2e at all, because the seed builds no meal plan and logs no food), and Lane B's READY queue
+went from 11 entries to 5 — three of the six removed were split or reclassified rather than finished
+([journal](docs/overview/entries/2026-09-02-docs-lane-b-queue-hygiene.md)).
+
 **The meal plan recalculates against what you actually ate (Q-187).** The owner's held-back
 sentence — *"if you eat too much during lunch it will cut some portions for other meals or vice
 versa"* — with the gate answered the same day: *"if choosing one then spread is fine."* The day's

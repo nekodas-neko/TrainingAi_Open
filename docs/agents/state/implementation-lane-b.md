@@ -3,176 +3,156 @@
 > **Successor sessions are titled `🚧 Implementation Agent (B) 🟢`** — exactly. A renamed successor
 > is a lost thread.
 
-**Updated:** 2026-09-01 · **By:** the twentieth Lane B run · **Next ID:** `LB-45`
+**Updated:** 2026-09-02 · **By:** the twenty-first Lane B run · **Next ID:** `LB-52`
 
 ## Now
-**Merged this run: Q-410 (#699), Q-187 (#700), Q-276 (#701), LB-34 (#702), LB-33 + LB-38 (#704),
-BF-84 lane (#707), BF-85 (#711), BF-79, BF-87, LB-40 + LB-41, LB-29, BF-86, BF-98, BF-96 + BF-95
-(#748). BF-82 is the open PR (#749, v1.419.0).** Nothing has been near a device.
 
-**A GUARD THAT CANNOT FAIL IS NOT A GUARD — four shipped this run before it became a habit**, each
-passing on the first write and each caught only by *mutating the fix away*, never by reading:
-it matched a **form seed** rather than the write (BF-79 — `heightCm:` appears in both, fixed by
-extracting the `JSON.stringify({…})`/`patch({…})` spans); it matched the **loading skeleton**
-(BF-96 — the chip's placeholder is a `rounded-full bg-muted/60` box); the **fixture never reached the
-branch** (BF-86's `isVisible()` is point-in-time against a `dynamic(ssr:false)` sheet; BF-98's
-fixture does not render the footer on *either* condition, so that spec was **deleted** and the
-difference from the owner's diary is recorded as open); and the **reader stripped what it checked**
-(BF-87 — a guard about an import, using a helper that strips imports).
-**Mutate every assertion before you believe it**, and assert the matcher *found* something —
-`more-row-group-arity.test.ts` does, because a matcher that matches nothing passes forever.
+**Merged this run:** BF-82, LA-45, Q-531, BF-64, BF-99, BF-100, LB-46, BF-103 (#773), BF-101 (#776),
+LA-52 (#779), Q-187 (#782). `main` is at **v1.428.0**. **Nothing has been near a device** — the owed
+list is now ~17 screens.
 
-**Importing a constant can 500 a page that `tsc` says is fine** (BF-87, LB-43). Pulling
-`STEP_BASELINE` from `daily-energy` dragged in `workout-energy` → `oura-models/constants`, which
-reads `node:fs/promises`. Typecheck was clean; only `pnpm dev` found it. The constant is **mirrored**
-with a drift test. **Run the page, not just the compiler.**
+**Also this run, and worth as much as the code:** BF-104 and BF-102 were split into **LB-49** and
+**LB-50** because their Lane B halves each needed Lane A engine work first; **Q-297** was closed down
+to two residues, one of them the owner's; **Q-138** was reclassified `Reference:`. Lane B's READY
+list went from **11 entries to 5**, and the five are genuinely startable.
 
-**Read an entry by anchoring on `^### ` plus the id**, never a bare grep — `grep -n 'BF-79 —'`
-matched *another entry's `Needs:` line* 40 lines earlier and produced a false "the queue head is
-exhausted". And **an entry naming another as a blocker may be the blocker, not the blocked.**
+### The habit that mattered most: mutate every assertion before believing it
 
-**⚠ `tsc` TYPECHECKS NOTHING UNDER `__tests__` — LB-37, and it changes what "TSC_OK" means.**
-`tsconfig.json` excludes `**/__tests__/**`, so a spec can reference a type that does not exist and
-nothing says so. **`e2e/` is NOT excluded** and is checked normally.
+Four guards this run passed on first write and were **wrong**, each caught only by mutating the fix
+away:
 
-**Custom Rules caught a real bug in code I had COPIED from a passing file.** A bare
-`toLocaleDateString` in `goals-section.tsx` was grandfathered; the copy in a new file was not. **A
-pattern being present in the repo is not evidence it is allowed.**
+- `.map(displayBodyFat)` **point-free survived a sed** that changed nothing — a mutation that does
+  not change the file is not a mutation. Re-mutated as `.map(r => r.bodyFat)`, which fails.
+- The Q-187 wiring guard matched `/rescaleRemaining\(\{/` **anywhere in the file**, so
+  `const rescale = null && rescaleRemaining({…})` passed it: text present, feature dead. **Anchor on
+  the assignment**, not on the call appearing.
+- A `check-*.js`-shaped scan **found its own matcher and its own test name** (#773 → #775), and
+  `main` went red on it. A source scan's first finding is very often its own documentation.
+- An e2e spec passed **once** and would then have failed forever, because its own successful run left
+  the value it asserted on already correct (BF-101's steps goal at 10,000). **Drive the field to a
+  known-different value first**, and run the spec twice before believing it.
 
-**Reading two components for a consolidation found three defects nobody was looking for** — LB-40
-(a user with a password *cannot change it*), LB-41 (a Weight Units toggle with no consumer), LB-42
-(two columns for one weight goal — Lane A). **A consolidation is a free audit; write down what you
-see.**
+### A spec that fails for its own reasons looks exactly like a broken feature
 
-**The check:rules count moved 65 → 66 → 67 in one session**, twice from other agents' merges. Never
-hardcode it, never quote "pass" — quote `Ran N of N`.
+BF-100 cost four spec traps and six implementation traps, all reporting the same
+`expected 840, received 0`. And I published a wrong finding from one — "tab-to-tab scroll is broken"
+— which was never true: the shell keeps tab screens mounted, so Health's container read 840 while the
+URL said `/nutrition`. **Instrument the run before drawing a conclusion from it.**
 
-**Ask the owner rather than inferring from their wording.** BF-82's *"some items could be changed
-from sliders to text or buttons"* did not match the screen — there are no sliders on More and no
-`<select>` on any of its six sub-screens. Asked directly: *"yes it wasnt the sliders specifically;
-more that its messy and needs re'organisation."* One question retired a whole speculative branch of
-work. The answer is on the entry so nobody re-reads the original request and acts on it.
+### Measure production before designing around a fixture
+
+`/api/admin/db-query` settled LB-46 in two minutes (**not a bug** — `reevaluateForToday` self-reverts
+per-exercise deloads, and the card was faithful). The same query then showed **BF-64, merged hours
+earlier, may revert nothing on a real session-level deload**: of 5 stored prescriptions, 1 has a
+session deload, 2 have per-exercise, **0 have both**, and BF-64 reused the second mechanism to
+implement the first. Filed as **LB-47**, not reverted. **A hand-built fixture combining two
+mechanisms production keeps apart is not evidence.**
+
+### An entry can be confidently wrong about its own code
+
+Q-187 said `fillableMeals` *"already answers which meals are still ahead of you, which is exactly the
+set a re-scale would act on."* It answers the **opposite** — meals whose hour has already *come*,
+because logging food nobody ate is what it exists to prevent. Using it would have handed a skipped
+lunch's calories to dinner. **Read the helper, not the entry's description of it.**
 
 ## Do not re-litigate
-- **`lib/coach/**`, `packages/shared/**`, `app/api/**`, `lib/data/**`, `lib/sqlite/**` are Lane A**
-  whatever the edit looks like — the **path**, not the nature of the edit. `lib/health/*` counts when
-  an API route reaches it. `lib/walk/interval-plan.ts` does **not** — only `segment-stats.ts` is
-  API-reached. `scripts/**` is the Orchestrator's — **except a shrink-only baseline line the check
-  itself demands you remove**, which is part of your change, like a doc-size raise.
-- **BF-79's placement, which BF-82 has now built on:** identity and body facts together on
-  `app/more/details/`, reached from the `Your setup` group; weight and body fat **read-only** there
-  (an input is a second write path into `body_metrics`); targets and activity level stay in Goals.
+
+- **`lib/coach/**`, `packages/shared/**`, `app/api/**`, `lib/data/**`, `lib/sqlite/**`,
+  `lib/cache-groups.ts` are Lane A** whatever the edit looks like — the **path**, not the nature of
+  the edit. `lib/health/*` counts when an API route reaches it. Under `lib/walk/`, only
+  `segment-stats.ts` is API-reached: `walk-pacer.ts` and `interval-plan.ts` are **Lane B's**.
+  `scripts/**` is the Orchestrator's — except a shrink-only baseline line the check itself demands
+  you remove.
+- **A Lane B half that needs a Lane A argument is TWO entries.** Do not build across the line and do
+  not skip the entry — split it, `Needs:` the engine half, and the queue tool parks it correctly.
+  LB-49 and LB-50 are the worked examples.
 - **Q-354 is live and is a trap for spec authors, not a user bug.** `locator.click()` does **nothing**
-  on the Nutrition screen — the date-swipe `useDrag` swallows mouse input, which is what Playwright
-  sends. Use `tap()`. **On More, `.click()` works fine** — the trap is Nutrition-specific.
-- **`stableBox`/`tapCentre` (`e2e/fixtures.ts`) before any coordinate dispatch OR geometry
-  assertion** — neither `touchscreen.tap` nor `Input.dispatchTouchEvent` checks actionability.
-- **`hydrateUserPreferences` NEVER deletes a key the bag lacks**; the one pair the app clears is brand
-  preset / custom hue via `EXCLUSIVE_GROUPS`.
-- **A mirror effect uses `usePersistedPreference`, never `savePreference`** — the same line is a PATCH
-  on every mount. **The guard compares the VALUE**: StrictMode spends a first-run ref.
-- **A `fetch()` of a `data:` URL is a `connect-src` request** and the CSP forbids it.
-- **A `SwipeActions` row owns horizontal gestures starting on it**; the nutrition container's own drag
-  steps the DAY and is invisible on today — test on a past day.
-- **BF-39's grouping rule** — `meal_group_id`, never `saved_meal_id`; one row is not nested.
-- **Back-dismissal's logic is [`sheet-back-stack.ts`](../../../lib/hooks/sheet-back-stack.ts)** —
-  depth and a module-level self-pop counter, both load-bearing. Never call `useSheetBackDismiss` at a
-  call site.
-- **`EndOfDayReview` renders unconditionally**; **Log Food is one sheet per screen**.
+  on the Nutrition screen — the date-swipe `useDrag` binds mouse and pointer and swallows it, which is
+  what Playwright sends. Use `tapCentre`. Measured again on Q-187: a *forced* click on `Show N meals`
+  leaves `aria-expanded` at `false`; a touch tap at the same coordinates opens it every time.
+  **On More, `.click()` works fine** — the trap is Nutrition-specific.
+- **An e2e spec CAN talk to Postgres** — `new Client({ connectionString: process.env.DATABASE_URL })`,
+  as `food-logging-complete.spec.ts` and `plan-rescale.spec.ts` do. This is usually better than
+  stubbing a route: it works on CI's fresh database and it exercises the page's own pipeline.
+  **`scripts/local-db/seed.sql` creates no meal plan and no `food_logs`**, so anything touching those
+  builds its own fixture and tears it down in `afterAll`.
+- **A `memo`ed row inside a `.map()` takes SCALARS.** A hook is not allowed there and an object
+  literal is re-created every render, defeating the memo while the component keeps its wrapper.
+  `meal-macro-bars.tsx` and `plan-meal-row.tsx` are the references; `check-memo-prop-stability.js`
+  enforces it.
+- **BF-79's placement:** identity and body facts on `app/more/details/`; weight and body fat
+  **read-only** there (an input is a second write path into `body_metrics`); targets and activity
+  level stay in Goals.
+- **`stableBox`/`tapCentre` before any coordinate dispatch OR geometry assertion** — neither
+  `touchscreen.tap` nor `Input.dispatchTouchEvent` checks actionability.
+- **`hydrateUserPreferences` NEVER deletes a key the bag lacks.** **A mirror effect uses
+  `usePersistedPreference`, never `savePreference`.** **A `fetch()` of a `data:` URL is a
+  `connect-src` request** and the CSP forbids it.
 - **`min-h-[Npx]` does nothing on a `<button>` or `role="button"`** — a bare element-selector floor in
-  `globals.css` beats the utility. Drive height with padding (LB-32). **A bottom sheet is
-  `fixed bottom-0`**, so its height moves only its TOP edge.
+  `globals.css` beats the utility. Drive height with padding.
 - **A route with no caller fails no test** — when an entry says a storage half shipped, grep for a
   client caller before believing the feature exists.
-- **The sandbox renders no exercise clip** (`raw.githubusercontent.com` is proxy-dropped) — verify
-  with same-origin substitutes asserting `naturalWidth > 0`.
-- **`/more` SSRs a skeleton** — a `curl` of it finds none of the tab content and that is not a bug.
-  Verify More-tab work with Playwright, or by fetching the sub-route directly (`/more/details` does
-  render server-side).
+- **`/more` SSRs a skeleton** — a `curl` finds none of the tab content and that is not a bug. Use
+  Playwright, or fetch the sub-route directly.
 
 ## Owed (device / physical)
-**Nothing from the last seven runs is device-verified.**
+
+**Nothing from the last eight runs is device-verified.**
 [`device-verification-queue.md`](../../device-verification-queue.md) groups by screen — work a
-section, not an entry. The whole **Nutrition** section is owed and is best done in one sitting.
+section, not an entry.
 
-Added this run — **~ten screens, and the device-verification queue is the way to work them**:
-- **BF-82:** the whole More tab re-grouped and the **bottom actions row moved**, so clearance under
-  Sign Out against the gesture bar is unchecked. Insets render as 0 in the sandbox.
-- **BF-86:** `LocalDayProvider` fires on `visibilitychange`; the resume path is the thing to check,
-  and it needs the app backgrounded across a real local midnight.
-- **BF-96:** cannot be device-verified as-is — the seeded sandbox has no weather snapshot, so only
-  the chip's skeleton renders. **BF-95:** the swipe/tab-edge interaction needs a thumb.
-- **LB-29 / LB-40 / LB-41 / BF-87 / BF-98:** all web-verified only.
-- **BF-79:** `More → Profile details` is web-verified only. Safe-area clearance under
-  `MoreSubScreen`'s floored padding, the three sex buttons and the two measurement buttons at S25
-  width are unchecked on hardware.
-- **BF-85:** the centred quantity box and its size beside the ×1/×2 chips are a rendering claim, and
-  both vitest projects run `environment: 'node'`.
-- **Q-410:** only the pacer's SPEED rung has ever executed — cadence and heart rate need a **Polar
-  H10**. **LB-36** holds it. `BAND_TOLERANCE = 0.10` is a proposal, not a measurement.
-- **Q-187:** `getLocalStore` is null on web, so the day-fill took the API fallback, never the SQLite
-  write plus outbox. **LB-34:** nothing has scanned a real label — the branch needs a camera.
+Added this run: **BF-82** (the whole More tab re-grouped, bottom actions row moved — clearance under
+Sign Out is unchecked); **LA-45** (the body-fat card extracted); **Q-531**; **BF-64** (and see LB-47
+before trusting it); **BF-99**; **BF-100** (scroll restoration — the whole feature is a device claim);
+**BF-103** (`My Foods` is longer than `Meals` and three tabs share 412 dp); **BF-101** (six controls
+in an already-dense collapsible, offer button two lines tall); **LA-52** (slowing mid-segment and
+stopping at a crossing — LB-36's device checks 2 and 3, which could not have passed before it);
+**Q-187** (two numbers now share a line that held one).
 
-Carried: BF-57 needs **two phones, two accounts and a printer**; BF-75's ≥4.5:1 contrast; BF-52's
-tile wrap; Q-467, Q-499, Q-538, Q-305 at S25 width, Q-477 across local midnight, BF-10, LB-5,
-Q-328/Q-321/Q-486, Q-389, a TalkBack pass. **Q-315 needs a DESKTOP.**
+Carried: BF-57 needs **two phones, two accounts and a printer**; BF-75's contrast; Q-410's cadence and
+HR rungs need a **Polar H10**; LB-34 needs a camera; Q-315 needs a **desktop**; a TalkBack pass.
 
 ## Claimed paths
+
 None held.
 
 ## Gotchas worth carrying
+
 - **`git fetch origin main` RE-SHALLOWS this clone** — the tell is `refusing to merge unrelated
-  histories`. Fix with `git fetch --unshallow origin`. It happens **every** session.
-- **Never check a gate through a pipe** — `pnpm check:rules | tail` exits with tail's status. This
-  cost a push onto a RED check once; do not repeat it.
-- **Check for conflict markers BEFORE `git add -A`, not after.** `git status | grep '^UU'` reports
-  nothing once you have staged them, so the sequence `git add -A; git status | grep UU` always says
-  "no conflicts" — it did on 2026-09-01, on a file `git merge` had genuinely left conflicted. The
-  `No unresolved conflict markers` step of `check:rules` is what caught it. Either grep the markers
-  themselves (`grep -rn '^<<<<<<< '`) or check `git status` before staging.
-- **And do not chain the push onto the same line as the gate.** Running
-  `pnpm check:rules > f; echo $?; git commit && git push` pushes whatever the gate said, because the
-  push depends on the *commit's* status and not the gate's. Done here on 2026-09-01: the gate printed
-  `RULES=1` and the branch went out anyway (a doc-size baseline, caught and fixed on the next commit).
-  The pipe rule and this one are the same mistake wearing different clothes — **read the gate's
-  result, then decide, in a separate call.**
-- **A backlog conflict can be BOTH shapes at once.** BF-79's was my three additions plus main's
-  deletion of a shipped entry, in one hunk. Read every heading in the span; do not apply a rule about
-  "two deletions" to a hunk you have not read.
-- **`awk`/`grep` on an entry id matches SUBSTRINGS and other entries' `Needs:` lines.** Anchor on
-  `^### ` plus the id.
-- **A PR can merge without its `projectOverview.md` status block** — #711 did. When you merge main
-  and find the previous PR unrecorded, record it in yours; that is the only place it will happen.
-- **An e2e spec that writes real rows must use unique-per-run names** and clean up in `afterAll`.
-- **Before moving a user-visible affordance, `grep -rln` its OLD accessible name across `e2e/`** —
-  `profile-group-labelling.spec.ts` asserted "Biological Sex" on the screen BF-79 moved it off. The
-  assertion followed the control rather than being deleted with it.
-- **`get_check_runs` and a run's `updated_at` lag by 20+ minutes; a job-log fetch 404s either way;
-  the E2E artifact upload is `if: failure()`, so zero artifacts means passed OR still running.**
-  Attempting the merge is the reliable read of the *required* checks.
-- **E2E takes 15–40 min, is NOT required, and CATCHES REAL BUGS.** Never dismiss a red E2E without
-  reading the log — but a failure reproduced on clean `main` is not your PR's.
-- **A killed background run exits 143/144, which reads like a failure and is not** — a `pkill` in the
-  same compound command will do it to your own suite.
-- **`git add -A` with two items in flight sweeps the other into your commit.** Stage paths.
-- **`docs/doc-size-baseline-history.md` is APPEND-ONLY** — a conflict there is two *additions*.
-  **Rebuild `package.json`/`changelog.ts` from `git show origin/main:...`; never splice a hunk.**
+  histories`, and also `git log origin/main` printing **one** commit and `merge-base --is-ancestor`
+  answering `no`. Fix with `git fetch --unshallow origin`. It happened repeatedly this run, and once
+  made me misread the merge order and report that a PR had merged over a red `main` when it had not.
+- **Never check a gate through a pipe** (`pnpm check:rules | tail` exits with tail's status) **and
+  never chain the push onto the same line as the gate** — `check:rules > f; git commit && git push`
+  pushes whatever the gate said, because the push depends on the *commit's* status. Read the result,
+  then decide, in a separate call.
+- **Check for conflict markers BEFORE `git add -A`.** `git status | grep '^UU'` reports nothing once
+  they are staged, so `git add -A; git status | grep UU` always says clean.
+- **After every merge, diff the `^### ` headings against `origin/main`** (`comm -13` / `comm -23`).
+  That answers "did I resurrect or drop an entry" in one command and does not depend on getting the
+  two-deletions rule right by reading. A backlog conflict can be **both** shapes in one hunk.
+- **`docs/doc-size-baseline-history.md` is APPEND-ONLY** — a conflict there is two *additions*, keep
+  both. **Recompute every `.size` from the merged file; never keep either side of the conflict.** On
+  one branch this run the number was recomputed **three times** as the base moved underneath it, and
+  neither side of any conflict was ever right.
+- **Rebuild `package.json`/`changelog.ts` from `git show origin/main:…`; never splice a hunk** — the
+  conflict falls inside a `changes:` array and both sides share the version header above the marker.
+- **`get_check_runs` lags by 20+ minutes and can read `total_count: 0` on a PR whose CI is running.**
+  `0` several minutes after a push usually means a **stale base** — fetch, merge, push. When it looks
+  frozen, **attempt the merge**: it validates against real branch protection and refuses if a
+  required check has not passed. That is the reliable read, and it worked three times this run.
+- **E2E is NOT a required check** — measured 2026-09-01, PR #776 merged with its E2E job still
+  `in_progress`. Making it required is branch protection, which is the owner's call (Q-297).
 - **Playwright needs `DATABASE_URL` prefixed in** — the session-start hook unsets it.
-- **Never merge `main` or edit the tree while a local e2e run is live** — the tell is
-  `Parsing ecmascript source code failed` with tests at **0ms**.
-- **Piping a run through `grep` without `--line-buffered` hides its output until it exits.** Check
-  `ps` before believing a hang.
-- **`expect.poll` over a canvas is pathological** — ~5.5 M numbers over CDP per read. Bounded retry.
-  But `expect.poll` over a **DB row** is exactly right, and beats sleeping past a debounce.
-- **The chips and Body Battery card render on `/`, not `/session-select`.**
-- **A `<select>` is not the only thing that reads as a dropdown, and there are none here** — More and
-  its six sub-screens carry no slider and no `<select>` at all. The one `input[range]` in the tree is
-  the accent-colour hue picker. Enumerate the controls by rendering the screen before believing a
-  description of them.
-- **`scripts/__tests__/dead-repo-methods.test.ts` writes a real `lib/zz-dead-repo-methods-probe.ts`
-  and deletes it** (LB-44). Any concurrent test that walks `lib/` and reads every file can list it
-  then fail `ENOENT` on it — surfacing in an unrelated file with a message that reads like a missing
-  source. Both files pass alone. **A one-file suite failure naming a `zz-` path is this, not you.**
-- **A backlog conflict where nothing was deleted needs no thought** — diff the `^### ` headings
-  against `origin/main` (`comm -13`) after any merge; that answers "did I resurrect an entry" in one
-  command, which is faster than reading the hunk and does not depend on getting the rule right.
+- **A backgrounded shell dies when the tool call returns.** A long mutation sweep must run in the
+  foreground with an explicit timeout, or it is silently truncated part-way — and it will leave a
+  mutation applied to your working tree. Diff against a snapshot afterwards.
+- **`tsc` TYPECHECKS NOTHING UNDER `__tests__`** (LB-37) — `e2e/` **is** checked normally.
+- **Importing a constant can 500 a page that `tsc` says is fine** — a transitive `node:fs/promises`.
+  Run the page, not just the compiler. Traverse the import graph before pulling from a new module.
+- **Custom Rules catches real bugs in code COPIED from a passing file** — a grandfathered pattern is
+  not an allowed one.
+- **`scripts/__tests__/dead-repo-methods.test.ts` writes a real `lib/zz-…-probe.ts` and deletes it.**
+  A one-file suite failure naming a `zz-` path is that, not you.
+- **The check:rules count is `Ran N of N` and moves** — never hardcode it, never quote "pass". It was
+  **67 of 67** for this entire run.
