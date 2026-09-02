@@ -6439,6 +6439,22 @@ test) is the whole reason an hour failed to reproduce it.
 not that a flaky test was fixed: the same shape — an assertion whose setup depends on a fire-and-
 forget write from a previous test — is reachable anywhere else the pattern appears.
 
+## 2026-09-02 — `projectOverview.md` → 9247, `docs/implementation-backlog.md` → 15640 (Q-111)
+
++15 on the index, and most of it is a **correction to a claim the index itself would otherwise keep
+propagating**: Q-111 said its ring half was already on the Home header, and it was not. The next
+session to read that entry would have skipped the ring chip entirely. The strap correction is the
+same shape in the other direction — the entry said nothing read the strap battery when a pairing
+screen reads and displays it, so the real defect was two numbers in two screens rather than a
+missing read.
+
+The two owner items are the rest: the scale needs Kotlin BLE work that no lane here can do, and the
+manual refresh button question now carries its measurement — it does **not** bump `refreshTick`, so
+it is strictly narrower than pull-to-sync rather than redundant with it. Both were sitting inside a
+long entry where an owner would never find them.
+
+The backlog is flat on net: Q-111's shipped form replaced a body of roughly the same length.
+
 ## 2026-09-02 — `docs/implementation-backlog.md` → 15560 (BF-4 and Q-156 removed; a ratchet DOWN)
 
 The first entry in this file that lowers a baseline rather than raising one, which is the direction

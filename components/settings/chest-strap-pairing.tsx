@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { getPairedStrap, setPairedStrap, type PairedStrap } from '@/lib/live-hr/paired-strap'
 import { HR_SERVICE, getChestStrapLinkStatus, type StrapLinkStatus } from '@/lib/live-hr/chest-strap-source'
 import { strapLinkLabel } from '@/lib/live-hr/strap-link-label'
+import { writeStrapBattery } from '@/lib/stores/strap-battery'
 import { getLiveHrManager } from '@/lib/live-hr/manager'
 import { useRefreshOnTabShow } from '@/components/shell/tab-visibility'
 
@@ -90,7 +91,14 @@ export function ChestStrapPairing() {
       try {
         await BleClient.connect(device.deviceId)
         const batt = await BleClient.read(device.deviceId, BATTERY_SERVICE, BATTERY_LEVEL)
-        setBattery(new Uint8Array(batt.buffer)[0] ?? null)
+        const level = new Uint8Array(batt.buffer)[0] ?? null
+        setBattery(level)
+        // Q-111: the same store the Home chip reads. At pairing time the native service is not
+        // running, so `PolarBleStatus.battery` has nothing yet and this direct characteristic read
+        // is the only source there is — which is why it stays. What changes is that it stops being
+        // a second number displayed in a second place: one store, two writers, so the chip has a
+        // value from the first pairing onward instead of waiting for a workout.
+        writeStrapBattery(level)
         const fw = await BleClient.read(device.deviceId, DEVICE_INFO_SERVICE, FIRMWARE_REVISION)
         setFirmware(new TextDecoder().decode(fw.buffer).replace(/\0+$/, ''))
         await BleClient.disconnect(device.deviceId)
