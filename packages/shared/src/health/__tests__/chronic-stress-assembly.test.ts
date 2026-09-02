@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   computeChronicStress,
   chronicStressScoreToInt,
+  usableGranularNights,
   type ChronicStressNightSignals,
 } from '../chronic-stress-assembly'
 import type { DailySummaryRow } from '../daily-summary'
@@ -101,5 +102,43 @@ describe('computeChronicStress assembly', () => {
     expect(chronicStressScoreToInt(NaN)).toBeNull()
     expect(chronicStressScoreToInt(42.6)).toBe(43)
     expect(chronicStressScoreToInt(Infinity)).toBeNull()
+  })
+})
+
+// TN-1: the score has been NULL on every row since the model shipped, and the refusal is inside
+// the granular layer, which persists no reason. This count is the reason, and it is the whole
+// point that it is produced whether or not the model scores.
+describe('usableGranularNights', () => {
+  const rows = (n: number) => Array.from({ length: n }, (_, i) => makeRow(i))
+  const signals = (dates: string[], over: Partial<ChronicStressNightSignals> = {}) =>
+    new Map(dates.map(d => [d, { ...makeSignals(0), ...over }]))
+
+  it('counts only nights that actually have a stash', () => {
+    const r = rows(31)
+    expect(usableGranularNights(r, signals(r.slice(0, 27).map(x => x.date)))).toBe(27)
+    expect(usableGranularNights(r, new Map())).toBe(0)
+  })
+
+  it('refuses a night whose hypnogram, rMSSD series or skin-temp run is empty', () => {
+    const r = rows(31)
+    const dates = r.map(x => x.date)
+    expect(usableGranularNights(r, signals(dates, { sleepPhase30Sec: [] }))).toBe(0)
+    expect(usableGranularNights(r, signals(dates, { hrvItems: [] }))).toBe(0)
+    expect(usableGranularNights(r, signals(dates, { tempSkin: [] }))).toBe(0)
+  })
+
+  it('looks at the model\'s own 31-night window, not the whole history handed to it', () => {
+    // 40 rows of summary, every one stashed: the count is the window, not 40.
+    const r = rows(40)
+    expect(usableGranularNights(r, signals(r.map(x => x.date)))).toBe(31)
+    // A stash only on the OLDEST nights falls outside the window entirely.
+    expect(usableGranularNights(r, signals(r.slice(0, 5).map(x => x.date)))).toBe(0)
+  })
+
+  it('is independent of whether the model scores — which is why it exists', () => {
+    const r = rows(31)
+    // Two usable nights is far below the model's own 21-night gate, so nothing can score here;
+    // the count still reports what was found.
+    expect(usableGranularNights(r, signals(r.slice(-2).map(x => x.date)))).toBe(2)
   })
 })

@@ -46,6 +46,35 @@ export interface ChronicStressNightSignals {
 const num = (v: number | null | undefined): number => (v == null ? NaN : v)
 
 /**
+ * How many nights in the model's own 31-night window carry granular signals it can actually use.
+ *
+ * TN-1. `chronic_stress_score` has been NULL on every row since the model shipped, and both gates
+ * countable from stored data pass — a `fullHistory` pass built 43 summary rows against a threshold
+ * of 21, and 27 of 31 nights in the trailing window are complete at the summary level. The refusal
+ * is below that, in the granular layer: a night with no stash, or with an empty hypnogram / rMSSD
+ * series / skin-temp run, contributes all-NaN intermediates and cannot support a score. Those
+ * intermediates are recomputed in memory by design (no stored intermediate that could drift), so
+ * without this count there is no way to see the refusal from outside.
+ *
+ * Deliberately NOT a gate — it changes no behaviour. `CHRONIC_STRESS_MIN_DAYS` must not be relaxed
+ * before this number says what the input distribution actually is (the Q-504 mistake).
+ */
+export function usableGranularNights(
+  summaryRows: DailySummaryRow[],
+  signalsByDate: Map<string, ChronicStressNightSignals>,
+): number {
+  return summaryRows
+    .slice(-CHRONIC_STRESS_WINDOW)
+    .filter((r) => {
+      const sig = signalsByDate.get(r.date)
+      return sig != null
+        && sig.sleepPhase30Sec.length > 0
+        && sig.hrvItems.length > 0
+        && sig.tempSkin.length > 0
+    }).length
+}
+
+/**
  * Compute the chronic-stress score + contributors for the most recent night in `summaryRows`
  * (ascending, oldest first). Returns the raw model result — the caller maps NaN → null and rounds
  * the score to the INTEGER column. Never throws (the model's error path returns all-NaN).

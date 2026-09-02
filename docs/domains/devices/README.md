@@ -23,6 +23,7 @@ documentation cluster in the repo (~45 known issues, ~38 plans, 300+ model files
 
 ## Reference docs — read in this order
 
+- [`docs/overview/entries/2026-09-02-tn1-chronic-stress-count.md`](../../overview/entries/2026-09-02-tn1-chronic-stress-count.md) — **the chronic-stress refusal now leaves a number behind, 2026-09-02 (TN-1).** `chronic_stress_score` has been NULL on every row since the model shipped, and both gates countable from stored data pass (43 summary rows against a threshold of 21; 27 of 31 nights complete at the summary level), so the refusal is in the **granular** layer — which recomputes its intermediates in memory by design and records no reason. `chronic_stress_granular_nights` counts the nights in the model's own 31-night window carrying a non-empty hypnogram, rMSSD series **and** skin-temp run (migrations **258 + 259**, local SQLite **v36**). **The gate is untouched** — `CHRONIC_STRESS_MIN_DAYS` does not move and nothing consults the count. **⚠ Only a hand-triggered `fullHistory` pass reaches the model**, so the column stays NULL until the owner runs one; ≥ 21 with a null score then puts the fault inside the vendored model, < 21 names the granular stash.
 - [`docs/overview/entries/2026-09-01-fix-device-console-ia.md`](../../overview/entries/2026-09-01-fix-device-console-ia.md)
   — **where the device consoles live, and why they are ordered the way they are (Q-531, 2026-09-01).**
   All three (`/admin/oura-ble`, `/admin/cadence`, `/admin/data-capture`) are routed under `/admin`

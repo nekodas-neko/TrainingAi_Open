@@ -14,8 +14,8 @@ silently misdirecting the next session. Update them in the same PR that consumes
 
 | Pointer | Value | Source of truth |
 |---|---|---|
-| Next free Postgres migration | **258** | `lib/data/postgres/migrations/` |
-| Local SQLite schema version | **v35** | `lib/sqlite/migrations.ts`; `lib/sqlite/__tests__/migrations.test.ts` asserts the max |
+| Next free Postgres migration | **260** | `lib/data/postgres/migrations/` |
+| Local SQLite schema version | **v36** | `lib/sqlite/migrations.ts`; `lib/sqlite/__tests__/migrations.test.ts` asserts the max |
 
 > **There is no third pointer any more.** Entry IDs are not allocated from a shared counter and
 > never were safely: a next-free pointer is a *floor*, not an authority, because it cannot see an
@@ -11380,6 +11380,12 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   That pass wrote **23** derived rows, illness scored on all 23, chronic stress on **0**. **The
   refusal is inside the granular layer** (`signalsByDate` → `computeNightIntermediates`), which is
   recomputed in memory by design and **persists no reason for a null**. Follow-up filed as **TN-1**.
+- **⚑ THE INSTRUMENTATION SHIPPED 2026-09-02 as TN-1** — `chronic_stress_granular_nights` on
+  `oura_daily_derived` (migrations 258 + 259, local SQLite v36). **This entry is now waiting on the
+  owner for exactly one thing: a hand-triggered `fullHistory` rollup pass**, which is the only path
+  that reaches the model, and therefore the only path that will write a number. Until that runs the
+  column is NULL everywhere and nothing more can be concluded here.
+- **Gate:** owner
 - **First action:** **instrument, do not relax.** Log the count of complete granular nights the pass
   actually assembled. Relaxing `CHRONIC_STRESS_MIN_DAYS` without that is Q-504's mistake — loosening a
   threshold whose input has not been checked.
@@ -11393,6 +11399,28 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 ### [devices][readiness] TN-1 — chronic stress refuses inside the granular layer, and records no reason why
 
 - **Branch:** `feat/chronic-stress-null-reason` · **Lane:** A
+- **⚑ SHIPPED 2026-09-02** — migrations **258** (column) + **259** (regenerated `claude_ro` views,
+  without which the number is invisible to the audit endpoint that motivates it), local SQLite
+  **v36**. `usableGranularNights(summaryRows, signalsByDate)` counts nights in the model's own
+  31-night window whose stash carries a non-empty hypnogram, rMSSD series AND skin-temp run, and
+  `oura_daily_derived.chronic_stress_granular_nights` records it.
+  **The gate is untouched** — `CHRONIC_STRESS_MIN_DAYS` does not move, and the count is not
+  consulted by anything. **NULL means NOT EVALUATED**, never zero usable nights: the step still
+  returns before the model on any pass carrying fewer than 21 summary rows, which is every routine
+  incremental pass, so a sparse pass cannot write a meaningless count.
+  **What the entry did not say and it mattered:** the write was skipped on `score == null`, which is
+  *always*, so the count had to be written on a path that previously wrote nothing at all. The
+  upsert COALESCEs, so writing the count alone can never clobber a prior good score.
+  **The entry's `adapter.ts:5706` reference is stale** — the step moved to
+  `lib/oura-ble/rollup/run.ts` with the rollup extraction.
+  [journal](overview/entries/2026-09-02-tn1-chronic-stress-count.md).
+- **⚠ Keep — AND IT NEEDS THE OWNER TO PRODUCE THE NUMBER.** The instrumentation is live but
+  **nothing will write it until a `fullHistory` rollup pass is triggered by hand**, which is
+  owner/device-gated and is the same gate Q-525 names. Until then the column stays NULL on every
+  row, and that is the expected state rather than a defect. Once a number exists: **≥ 21 with the
+  score still null means the fault is inside the vendored model** and this entry has done its job;
+  **< 21 means the granular stash is the constraint**, and whether to relax anything is Tuning's
+  and then the owner's, never a unilateral threshold nudge (the Q-504 mistake).
 - **Plan:** none needed — it is a count and a log line. Evidence:
   [`docs/reviews/2026-08-20-daily-summary-wipe-retracted.md`](reviews/2026-08-20-daily-summary-wipe-retracted.md) §4.
 - **Added:** 2026-08-20 · Tuning agent.
