@@ -24,8 +24,23 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.428.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
-**Last updated:** 2026-09-01.
+**Version:** v1.429.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Last updated:** 2026-09-02.
+
+**A day's dose is a sum of contributions, not a tick (BF-69 stage 1).** `supplement_logs` held one
+row per substance per day, enforced by a unique constraint — so a dose carried by a logged meal and
+one ticked by hand were **last-writer-wins**, and unticking wiped the day whoever had written it.
+That is silent data loss the moment a second writer exists, and the meal attachment is that second
+writer. Each act of taking something is now its own row with a `source` and, for a meal, the
+`food_logs` row it came from; the day's amount is **derived on read**, never stored. What replaced
+the constraint is a *partial* unique over `source = 'manual'` — the tick stays idempotent under a
+double-tap or a replayed outbox mutation, while the same meal logged twice counts twice, correctly.
+`supplements` also gained `started_on`/`stopped_on`, which is what makes **"forgot to log it"
+distinguishable from "did not take it"**: outside the window is a true zero, inside it with no
+contribution is *unknown* and must be excluded rather than counted as 0. **Nothing can write a
+number yet** — that is stage 2, Lane B's, and until it ships production still holds 2 supplements and
+1 log ever. **⚠ Not device-verified**, and the local v34 migration rebuilds a table rather than
+adding a column ([journal](docs/overview/entries/2026-09-01-supplement-contributions.md)).
 
 **⚠ One decision is waiting on the owner: whether the E2E job becomes a required check (Q-297).**
 **Measured rather than read — it is NOT required today:** PR #776 merged while its E2E job was still
@@ -1287,6 +1302,27 @@ window, then the newest `history-*.md`. The 157 dated status notes this section 
 **Measured for the first time** — TN-3a's persistence half shipped, so the per-bucket series exists: **230 buckets over 9 days**. [`review`](docs/reviews/2026-09-01-recompute-wipes-completed-days.md).
 - **The series covers all 24 hours** (every hour except 07:00) and **126 of 230 — 55% — fall between 22:00 and 06:00**. Night mean **+0.266** (recovered) against day **−0.413** (stressed): **opposite signs, night in the majority**, so any daily aggregate is governed by the night/day mix as much as by stress.
 - **A Q-507 mechanism candidate, and it is the REVERSE of the one already refuted**: `corr(total buckets, stress_high_minutes)` = **−0.784** (n=9) — *fewer* buckets produce *more* high-stress minutes, because each bucket is scored against the day's own median. **n = 9; treat as a lead, not a result.** The refuted hypothesis used *HR sample count* (r = −0.128); bucket count is the quantity the model actually divides by.
+
+### [nutrition][devices] ⚠️ Local SQLite v34 rebuilds a table, and no device has opened it (BF-69, 2026-09-01)
+
+**Shipped, and the riskiest statement in it is one a sandbox cannot run.** BF-69 stage 1 removed
+`supplement_logs`' whole-day `UNIQUE(supplement_id, log_date)`, and **SQLite cannot drop an inline
+table constraint** — the only way off it is a rebuild. So local v34 does what no local migration in
+this repo has done before: it creates a second table, copies every row across, drops the original
+and renames. Every other version in that file only adds columns.
+- **Why the risk is specific rather than general:** the two local migrations that have killed this
+  app both did so by *throwing on retry* and leaving `open()` throwing forever (#27's PRAGMA, #85's
+  non-idempotent `ADD COLUMN`), and a rebuild has more ways to half-apply than an `ADD COLUMN` does.
+  v34 is written so any prefix of it can be re-run to completion — a resurrection stub before the
+  copy, `INSERT OR IGNORE` on the primary key, and a `SELECT` naming only columns present in both
+  shapes — and `RECONCILE_COLUMNS` carries all five new columns plus the replacement partial index.
+  **That reasoning is not a device run.**
+- **What to check on the S25:** install, open Nutrition, confirm the supplements list renders and a
+  tick round-trips. A dead local store shows the `LocalStoreDeadBanner`; an empty supplements list
+  with no banner is the other tell.
+- **The JS half needs no APK** — this PR touches no Kotlin, so the server and client changes reach
+  the device through Railway. Only the SQLite upgrade runs on-device, and it runs on the existing
+  APK at next open.
 
 ### [workouts][platform] ⚠️ The stored rest day is not device-verified, and the button for it is still Lane B's (BF-84, 2026-09-01)
 

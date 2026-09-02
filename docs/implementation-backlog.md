@@ -14,8 +14,8 @@ silently misdirecting the next session. Update them in the same PR that consumes
 
 | Pointer | Value | Source of truth |
 |---|---|---|
-| Next free Postgres migration | **254** | `lib/data/postgres/migrations/` |
-| Local SQLite schema version | **v33** | `lib/sqlite/migrations.ts`; `lib/sqlite/__tests__/migrations.test.ts` asserts the max |
+| Next free Postgres migration | **256** | `lib/data/postgres/migrations/` |
+| Local SQLite schema version | **v34** | `lib/sqlite/migrations.ts`; `lib/sqlite/__tests__/migrations.test.ts` asserts the max |
 
 > **There is no third pointer any more.** Entry IDs are not allocated from a shared counter and
 > never were safely: a next-free pointer is a *floor*, not an authority, because it cannot see an
@@ -2724,6 +2724,24 @@ a finding — it does not by itself explain a plain `GET` hanging beside it.
 
 ### [nutrition][platform] BF-69 — dosed substances are stored but nothing reads them; make exposure an analysable variable
 
+- **Keep — STAGE 1 SHIPPED 2026-09-01 (migrations 254 + 255, local SQLite v34). Stages 2-4 are what
+  is owed, and stage 2 is the one that matters.** The storage half is done: `supplement_logs` is
+  contribution-rows now (its whole-day `unique (supplement_id, log_date)` is gone, replaced by a
+  partial unique over `source = 'manual'` so the page's tick stays idempotent while meal
+  contributions add), `supplements` carries `started_on`/`stopped_on`/`dose_prompt`, and the full
+  offline chain moved with it — local table, v34 rebuild, `RECONCILE_COLUMNS`, `getSyncDelta`,
+  `pullDelta`, `applyDelta`, the outbox payload and the `pushMutations` branch. `listSupplements`
+  returns `loggedAmount` (the day's sum with a contribution count) beside the unchanged
+  `loggedDose`. **`loggedToday` deliberately still tracks the MANUAL contribution only** — it is the
+  tick's checked state, and a meal's dose turning it on would leave a control that refuses to turn
+  off.
+  - **⚠ NOT VERIFIED ON DEVICE.** The v34 statements rebuild a table rather than adding a column,
+    which is the riskiest local migration this repo has written, and native SQLite does not run in
+    the sandbox. See the `projectOverview.md` Known-Issues row.
+  - **Stage 2 (Lane B) is the gate on everything after it:** an amount and `dose_prompt` on the
+    supplements page. Nothing can write a number today, so the series still cannot start — production
+    holds 2 supplements and 1 log ever. Stage 3 is the meal attachment UI (Lane B); stage 4, the
+    trends overlay, stays `Gate: data` until ~4 weeks of real doses exist.
 - **Lane:** A for the read model and any schema; B for the supplements-page UI and the trends surface.
 - **✅ PLANNED 2026-09-01 — [`2026-09-01-dosed-substance-exposure.md`](superpowers/plans/2026-09-01-dosed-substance-exposure.md).**
   The plan settles the presence model (**a `started_on`/`stopped_on` window per substance; a date
