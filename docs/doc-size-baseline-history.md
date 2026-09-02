@@ -6798,3 +6798,13 @@ The index grows by 15, and the line that earns it is the **product note**: the a
 same decoder, so ~4% of labels may be unreadable upright by the app that printed them. It is untested
 on a camera and flagged rather than claimed, which is exactly the kind of thing that vanishes if it
 lives only in a journal entry nobody opens.
+## 2026-09-02 — `docs/implementation-backlog.md` → (see .size) (PS-20)
+
+PS-20's copy half shipped and its decode half advanced without finishing, so the entry converts to a
+`Keep:` carrying the structure that was established and the semantics that were not.
+
+The lines earn their place by *correcting* the entry rather than adding to it: the three frames it
+reasoned from were one sub-type of a container, and its central ratio ("~0.77 in all three") is an
+artefact of those three sitting in one unwrapped run of a counter that wraps at 256. Leaving that in
+place would send the next session looking for a relationship that is not there. The measurement is in
+[`docs/reviews/2026-09-02-colmi-0x73-frame-structure.md`](reviews/2026-09-02-colmi-0x73-frame-structure.md).
