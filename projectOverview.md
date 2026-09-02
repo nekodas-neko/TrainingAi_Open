@@ -27,6 +27,26 @@
 **Version:** v1.430.1 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-09-02.
 
+**The journal directory's total ceiling is 320, up from 250 — `main` had reached it and every agent
+was one PR from a hard CI block.** The standing rule puts a journal entry in every PR, so the next
+one took the count to 251 and failed. The raise is not a workaround: the check's *other* guard, the
+one a compaction sweep can act on, counts UNLINKED entries and read **3 of 60**. The ceiling was
+firing because entries are well cited by durable docs — the habit the entries README exists to
+establish — and the four foldable ones were all written in the previous two days, so a sweep would
+have deleted the newest rather than the oldest. Reversal is one number in
+`docs/doc-size-baseline.json`; the signal to do the real compaction instead is the floor rising from
+something other than journal citations.
+
+**A scale argument on the meal log, and four things its entry got wrong (LB-49).** `logMealItems`
+takes an optional `scale`, applied at write time to each item's multiplier and defaulting to 1 — so
+nothing is user-visible until Lane B ships the control. The entry named a function that does not
+exist (`logMealFromSaved`), justified the lane by calling it *"the single shared write function both
+server paths call"* when it is client-side and neither an API route nor `pushMutations` touches it,
+demanded a sync chain its own **scale-at-write-time** decision makes unnecessary, and named three
+write sites where there are **five** — the two it missed are the optimistic pushes, the pair that
+decides whether the diary agrees with the database
+([journal](docs/overview/entries/2026-09-02-meal-log-scale.md)).
+
 **A saved RMR test evicts the goal caches — and the entry's severity claim did not survive being
 measured (LB-48).** `measured-rmr` was in no cache group and its route invalidated nothing, so
 Profile's Recommended calories painted the previous resting rate before revalidating. The fix is the

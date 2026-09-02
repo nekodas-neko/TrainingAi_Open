@@ -15,8 +15,13 @@ function r1(n: number) { return Math.round(n * 10) / 10 }
 export function savedMealItemToWithItem(
   item: SavedMealItem,
   log: { id: string; date: string; mealTypeId: string; loggedAt: string; savedMealId?: string | null; mealGroupId?: string | null },
+  /** LB-49. How much of the meal was eaten. Defaults to a whole serving, so every existing caller
+   *  is unchanged. It belongs here rather than only at the write sites because this builds the
+   *  OPTIMISTIC row: scale the stored multiplier and not this one and the diary shows a single
+   *  serving while the database holds one and a half. */
+  scale = 1,
 ): FoodLogWithItem {
-  const q = item.quantityMultiplier
+  const q = item.quantityMultiplier * scale
   const fi = item.foodItem
   return {
     id: log.id,
@@ -48,6 +53,10 @@ export async function logMealItems(
   mealTypeId: string,
   userId?: string,
   tz: string = DEFAULT_TZ,
+  /** LB-49. How much of the meal was actually eaten — 1.5 for a serving and a half. Applied at
+   *  WRITE time to each item's multiplier; the factor is never stored. Defaults to 1, so this is
+   *  byte-identical to the previous behaviour until a caller passes one. */
+  scale = 1,
 ): Promise<FoodLogWithItem[]> {
   const store = userId ? getLocalStore(userId) : null
   const optimistic: FoodLogWithItem[] = []
@@ -80,7 +89,7 @@ export async function logMealItems(
         await store.upsertFoodLog({
           id: logId, date, mealTypeId, foodItemId: item.foodItemId,
           savedMealId: meal.id, mealGroupId,
-          quantityMultiplier: item.quantityMultiplier,
+          quantityMultiplier: item.quantityMultiplier * scale,
           loggedAt: eatenAt, updatedAt: now, deletedAt: null, syncStatus: 'pending',
         })
         await store.queueMutation({
@@ -93,10 +102,16 @@ export async function logMealItems(
           payload: {
             id: logId, mealTypeId, foodItemId: item.foodItemId,
             savedMealId: meal.id, mealGroupId,
-            quantityMultiplier: item.quantityMultiplier, loggedAt: eatenAt,
+            // LB-49 — the SCALED amount, because the factor itself is deliberately not stored.
+            // The rows are point-in-time snapshots (this function copies the definition's
+            // multipliers rather than referencing them), so a meal-level factor every reader had
+            // to remember to apply would put a second multiplier in the system. The cost, stated
+            // rather than discovered: "I ate 1.5x" is not recoverable afterwards — only the scaled
+            // per-item amounts are.
+            quantityMultiplier: item.quantityMultiplier * scale, loggedAt: eatenAt,
           },
         })
-        optimistic.push(savedMealItemToWithItem(item, { id: logId, date, mealTypeId, loggedAt: eatenAt, savedMealId: meal.id, mealGroupId }))
+        optimistic.push(savedMealItemToWithItem(item, { id: logId, date, mealTypeId, loggedAt: eatenAt, savedMealId: meal.id, mealGroupId }, scale))
       }
       await cancelMealReminder(mealTypeId)
       // Twice, deliberately: now so this device's screens repaint at once (and because offline
@@ -128,7 +143,7 @@ export async function logMealItems(
           body: JSON.stringify({
             date, mealTypeId, foodItemId: item.foodItemId,
             savedMealId: meal.id, mealGroupId,
-            quantityMultiplier: item.quantityMultiplier,
+            quantityMultiplier: item.quantityMultiplier * scale,
           }),
         })
         if (!res.ok) throw new Error('Failed to log item')
@@ -155,7 +170,7 @@ export async function logMealItems(
       optimistic.push(savedMealItemToWithItem(item, {
         id: log.id, date, mealTypeId, loggedAt: log.loggedAt ?? new Date().toISOString(),
         savedMealId: meal.id, mealGroupId,
-      }))
+      }, scale))
     }
     await cancelMealReminder(mealTypeId)
     await invalidateNutritionWrite()

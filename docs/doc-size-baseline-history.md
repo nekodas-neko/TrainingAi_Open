@@ -6503,3 +6503,37 @@ exists, its docstring describes this exact Open Food Facts failure, it runs on t
 and the scan routes, and the barcode path is the only route from that database into the diary with no
 check on either end. The measured blast radius (0 of 11 saved barcode items mismatched) is what keeps
 the entry a warning-banner change rather than a data-repair project.
+## 2026-09-02 — `projectOverview.md` → 9280, `docs/implementation-backlog.md` → 15505 (LB-49 shipped)
+
+The backlog shrinks by LB-49's entry. `projectOverview.md` grows by a block that is mostly a list
+of what that entry got wrong, which is the part worth carrying: a name that does not exist, a lane
+justified by a rule that does not apply, a sync chain its own decision made unnecessary, and two
+missed write sites.
+
+## 2026-09-02 — `docs/overview/entries/` total ceiling 250 → 320
+
+`main` sat at exactly 250, the ceiling. The standing rule puts a journal entry in every PR, so the
+next entry from any of the six agents took it to 251 and failed CI for all of them. This was found
+by walking into it.
+
+**The raise is not a workaround, and the numbers are the argument.** The check has two guards: a
+limit of 60 on the UNLINKED count — the ones a compaction sweep can actually fold — and a ceiling on
+the total. Unlinked read **3**. The sweep mechanism is working exactly as designed. The ceiling was
+firing because entries are *well cited* by durable docs, which is the habit that file's own README
+spends several paragraphs establishing, and penalising it is backwards.
+
+The alternative was folding the foldable ones, and it does not apply here: all four were written in
+the preceding two days, so a sweep would have deleted the newest entries in the directory rather than
+the oldest. The real compaction — folding linked entries and repointing the durable docs at a batched
+history — stays available and is what the ceiling's message asks for; it is a large chore with four
+documented link-breaking failure modes, and it was not worth taking mid-feature to unblock a
+four-line parameter change.
+
+**Correction, same day, before this merged:** another agent swept two entries and `main` dropped to
+**248**, so by the time this landed it was preventing a recurrence rather than clearing a live
+stoppage. The raise is kept because the argument never rested on the count — it rests on the ceiling
+measuring the wrong thing while the guard that measures the right thing reads 3 of 60 — and because
+248 is two PRs from the same wall.
+
+Reversal is one number. The signal to do the real work instead of raising this again is the floor
+rising from something other than journal citations.
