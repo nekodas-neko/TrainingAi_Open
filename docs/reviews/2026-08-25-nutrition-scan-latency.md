@@ -238,3 +238,33 @@ regression.
 - **Railway cold start** — still untestable from a sandbox.
 - **Not device-verified:** only the gallery path ran here. A wrong field pair downscales silently
   never, which looks exactly like "the fix did not help".
+
+---
+
+## 2026-09-01 — closed by measurement, and it contradicts this document's own lever
+
+Five image scans ran after the 1024 px bound shipped, so `payload_bytes` is populated and the two
+regimes can be compared directly (`ai_call_log`, `section = 'nutrition-scan'`, `input_tokens > 1000`):
+
+| | n | avg input tokens | avg latency | range | avg payload |
+|---|---:|---:|---:|---|---:|
+| before the bound | 17 | 1,280 | **4,146 ms** | 3,498–5,013 | — |
+| after the bound | 5 | 1,460 | **2,671 ms** | 1,978–3,828 | 82.8 KB |
+
+**Latency fell 36% while input tokens ROSE 14%.** The `r = +0.958` between latency and input tokens
+that this investigation rests on does not survive the intervention: it was measured *within* one
+regime, where image size moved both numbers together, and across the change they moved in opposite
+directions. **Input tokens were not the lever.** Same lesson as CLAUDE.md's *A Correlation Across a
+Model Change Is Not Evidence*, one layer over — a correlation inside a regime is not a prediction
+about changing the regime.
+
+**What is not claimed.** n = 5 against 17. Nothing here explains *why* input tokens rose under a
+bound that shrinks pixels; worth a look if scan latency is ever raised again, not worth chasing now
+that the number the owner feels has halved. The owner's *"took about 4 seconds from analysing photo"*
+(2026-08-30, reported without complaint) is wall-clock and includes the upload and client work; the
+model call that day measured **2,346 ms**. In the sense the original report meant, this **stopped
+rather than was fixed** — no diff was ever traced to the original slowdown — but the 1024 px bound is
+a real change and it is what the numbers moved across.
+
+Backlog entry BF-4 carried this measurement and was removed from the queue on 2026-09-02, with
+nothing owed.
