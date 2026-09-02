@@ -6398,7 +6398,26 @@ killed this app killed it by throwing on retry. A row that just said "not device
 like the eight others above it and get the same weight; what makes this one different is *which*
 statement is unverified.
 
-## 2026-09-01 — `projectOverview.md` → 9208, `docs/implementation-backlog.md` → 15640 (LB-31 shipped)
+## 2026-09-02 — `projectOverview.md` → 9205, `docs/implementation-backlog.md` → 15689 (LB-51 + queue hygiene)
+
+The index grows by one block and it is a **question for the owner**, which is the one thing this file
+is unambiguously for: whether the E2E job becomes a required check. It carries the measurement that
+settles the half nobody had checked — E2E is *not* required today, proven by a PR merging with its
+E2E job still in progress — so the owner is deciding rather than investigating.
+
+The backlog **shrinks** on net despite three entries being rewritten: Q-297 lost most of its body to
+things that had shipped under other numbers, Q-138 became a `Reference:` with its stale line numbers
+flagged, and LB-51 went from a proposal to a shipped entry whose useful content is that its own
+proposed shape was wrong — a spec here can reach Postgres directly and does not need to stub a route.
+
+The +19 on top of that is **Q-111's two corrections**, and they are the most load-bearing lines in
+this diff. The entry claims a shipped ring chip on the Home header that **is not in the tree**, and
+claims nothing in JS reads the strap battery when a pairing screen reads and displays it by a second
+route. An implementer taking the entry at its word would build the strap half against a false picture
+of both ends. Git cannot arbitrate the first — history starts at the public snapshot, after the
+claimed date — so the correction states what is observable and stops there.
+
+## 2026-09-01 — `projectOverview.md` → 9218, `docs/implementation-backlog.md` → 15652 (LB-31 shipped)
 
 The backlog shrank: LB-31 carried two findings and a long options list, and what is left is the merge
 queue plus the correction to its own mechanism. That correction is the part worth the lines — the

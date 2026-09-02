@@ -1947,29 +1947,30 @@ second write path.
   matches `maintenanceKcal / bmr` for the same window; and an under-calibrated account gets the
   reason rather than a number.
 
-### [nutrition][platform] LB-51 — the plan card has no e2e, because the seed has no meal plan
+### [nutrition][platform] LB-51 — the plan card had no e2e, because the seed has no meal plan (fixed)
 
-- **Lane:** B — `e2e/`.
+- **✅ SHIPPED** (`docs/lane-b-queue-hygiene`, 2026-09-02 — no version bump; a spec and queue
+  edits change nothing a user can see). `e2e/plan-rescale.spec.ts`
+  covers Q-187's two states: the remaining meals re-scaled to what is left of the day, and the floor
+  leaving them as planned with its sentence. **Four mutations kill it** — removing the re-scale,
+  removing the floor, next-meal-only, and dropping the `(planned N)` figure from the row.
+- **⚠ This entry's own recommendation was the wrong shape, and the correction is the useful part.**
+  It proposed stubbing `GET /api/nutrition/meal-plans` the way `walk-pacer-speed-rung.spec.ts` stubs
+  `segment-stats`. **A spec here can talk to Postgres directly** — `food-logging-complete.spec.ts`
+  opens a `pg` `Client` on `process.env.DATABASE_URL` — so the fixture is built in the database and
+  torn down in `afterAll`, which works on CI's fresh instance with no stub at all. A stubbed plan
+  against real food would have tested half the sum anyway: `eaten` comes from the day's real
+  `food_logs` through the page's own pipeline.
+- **The assertion is the invariant, not a number:** the adjusted figures sum to the target minus what
+  was eaten, **both read off the card**, so the fixture's calories can change without touching it.
+  It also asserts the direction — scaled *down* when the day is over its share — because "different
+  from planned" would pass against an arbitrary rewrite.
+- **⚠ The tap gotcha is now written into the spec itself.** `Show N meals` needs `tapCentre`; a
+  forced `.click()` leaves `aria-expanded` at `false`. That is Q-354 on the Nutrition screen, and it
+  cost the most time of anything in Q-187.
+- **Keep:** the rest of the plan card is still uncovered — the log-all action, the per-meal log and
+  decline, and save-to-My-Foods. The fixture in this spec is the hard part and they can reuse it.
 - **Added:** 2026-09-01 · Lane B, while shipping Q-187 without one.
-
-**`scripts/local-db/seed.sql` creates no meal plan and no `food_logs` rows at all**, so every plan-card
-behaviour — the log-all action, the per-meal log and decline, the save-to-My-Foods pair, and now
-Q-187's re-scale — is unreachable from the harness. Q-187 was verified by inserting a plan and a
-logged meal into the local database by hand and driving the screen, which proves it works and leaves
-no regression net.
-
-- **The shape that would work without touching the seed** (which is Lane A's): stub
-  `GET /api/nutrition/meal-plans` with a fixture plan the way `walk-pacer-speed-rung.spec.ts` stubs
-  `segment-stats`, and have the spec log one food item through the UI first, the way
-  `food-logging-complete.spec.ts` does. Both halves are proven patterns in this repo.
-- **⚠ The expand toggle needs `touchscreen.tap()`, not `.click()`.** Measured while building Q-187:
-  a forced `.click()` on *Show N meals* leaves `aria-expanded` at `false`, and a touch tap at the
-  same coordinates opens it every time. That is Q-354 on the Nutrition screen — `useDrag` binds
-  mouse and pointer and swallows the click — and it is the single thing most likely to cost the next
-  author an hour.
-- **The assertion worth making** is the invariant, not a fixed number: the adjusted figures on the
-  remaining rows sum to the day's target minus what was eaten, both read off the card itself. That
-  holds whatever the spec logs.
 
 ### [platform] OR-100 — `Keep:` files buildable work under a heading that tells the lane not to look
 
@@ -11871,50 +11872,34 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   mouse input. (Q-282 shipped as `e2e/touch-target-size.spec.ts` and does **not** — it measures
   rendered geometry from the DOM and never clicks, so it does not revive this.)
 
-### [platform] Q-297 — cover Nutrition's day navigation; the write-path specs it asked for have shipped
+### [platform] Q-297 — cover Nutrition's day navigation (done; two residues, one of them owner's)
 
-- **Lane:** B
-- **Branch:** `feat/e2e-specs-round-2`
-- **Added:** 2026-08-15 · follow-up to Q-249, which shipped the harness. Read
-  [`e2e/README.md`](../e2e/README.md) first — it records what a green run does and does not prove.
-- **⚠️ RE-VERIFIED 2026-08-30 and most of this entry was stale.** Read this block before planning;
-  four of the five things it asked for are in `e2e/` already, under other entries' numbers.
-  - *"log a set … assert it appears without a reload"* → **`workout-set-loop.spec.ts`** (Q-461).
-  - *"a food entry"* → **`food-logging-complete.spec.ts`** (Q-387).
-  - *"a water entry"* → **`water-log-write-path.spec.ts`**, whose header names Q-297 outright:
-    *"the first write-path spec: a logged value must appear on the screen that triggered it,
-    without a reload."*
-  - *"change a goal and assert the Health tab reflects it (the Q-240 regression)"* →
-    **`goal-round-trip.spec.ts`** covers the write reaching another screen, and
-    **`goal-invalidation.spec.ts`** establishes by mutation that **no guard can exist** for the
-    Q-240 path specifically: `cachedFetchCore` always revalidates unless `freshWithinTtl` is set,
-    and the stale flash comes from Health's retained React state rather than the cache. That is a
-    settled negative result, not an outstanding item.
-  - *"Nutrition's date swipe and any other tabbed surface"* → **there is no other tabbed surface.**
-    `SwipeCarousel` is used by exactly one screen (`health-content.tsx`) plus two pickers
-    (`walk-config`, `run-type-carousel`), so `health-tabs-instant-paint.spec.ts` already covers the
-    whole population. Nutrition has a **day**, not tabs.
-- **Nutrition's day navigation is covered as of 2026-08-30** — `e2e/nutrition-day-navigation.spec.ts`
-  pins the two entry points to each other (the header chevrons and the `?date=` deep link the Home
-  timeline's meal cards use), the today guard on Next day, and instant paint on returning to a day
-  already viewed. **Driven by the chevrons, not the swipe**, because `useDrag` on this screen
-  swallows mouse input (**Q-354**, open) and mouse is what Playwright sends — a swipe-driven spec
-  would assert against a known-broken path. Cover the swipe when Q-354 lands.
-- **What is genuinely left, and it is small:**
-  - The **20 s skeleton budget cannot tell "seeds instantly from cache" from "seeds in 8 s off the
-    network"**, because the harness runs `pnpm dev` and route handlers compile on first call. It
-    catches a card that *never* seeds, not a regression from instant to sluggish. Measuring the
-    second needs a warmed server and a much tighter budget, and is its own piece of work.
-  - **Whether the E2E job should become a required check.** This entry said keep it optional until
-    it has a track record; LA-22 has since made it always-run and always-report specifically so it
-    is safe to require. Its current branch-protection state was not checked here — check before
-    changing anything.
+- **Keep — TWO things, and neither is ordinary implementation work:**
+  1. **A warmed-server instant-paint budget.** The 20 s skeleton budget catches a card that *never*
+     seeds; it cannot tell "seeds instantly from cache" from "seeds in 8 s off the network", because
+     the harness runs `pnpm dev` and route handlers compile on first call. Measuring the second wants
+     a warm server and a tight timing budget — and a tight timing budget on a shared CI runner is a
+     flaky-test generator, which this repo treats as a real cost. Worth doing deliberately or not at
+     all.
+  2. **Whether the E2E job becomes a required check — this is the owner's, not a lane's.** It is a
+     **branch-protection** change, which is a shared system. **Measured 2026-09-01 rather than read:
+     E2E is NOT required today** — PR #776 merged while its E2E job was still `in_progress`. LA-22
+     has since made the job always-run and always-report specifically so it is safe to require, so
+     the remaining question is only whether to.
+- **Gate:** owner
+- **✅ Everything buildable in this entry has shipped**, four of the five under other numbers —
+  `workout-set-loop.spec.ts` (Q-461), `food-logging-complete.spec.ts` (Q-387),
+  `water-log-write-path.spec.ts`, `goal-round-trip.spec.ts` + `goal-invalidation.spec.ts` (which
+  established by mutation that no guard can exist for the Q-240 path specifically), and
+  `nutrition-day-navigation.spec.ts` for the day navigation itself.
+- **"Nutrition's date swipe and any other tabbed surface" was a false premise** — `SwipeCarousel` is
+  used by one screen plus two pickers, so `health-tabs-instant-paint.spec.ts` already covers the whole
+  population, and Nutrition has a **day**, not tabs. Cover the swipe itself only when Q-354 lands;
+  driving it with mouse today would assert against a known-broken path.
 - **Do not chase a skeleton into a "fix" without checking which panel it is on.** The Q-249 session
-  found the Injuries card stuck loading, traced it to `injuries` being fetched only by the Body tab's
-  group, changed `health-content.tsx` — then reverted on discovering the card is off-screen in an
-  inactive carousel panel and loads on swipe, exactly as designed. The milder real behaviour is that
-  arriving on Body or Progress for the first time shows a brief skeleton, because nothing has written
-  the cache the mount seed reads. That may be worth fixing; it is not the bug it first looked like.
+  found the Injuries card stuck loading, changed `health-content.tsx`, then reverted on discovering
+  the card is off-screen in an inactive carousel panel and loads on swipe, exactly as designed.
+- **Added:** 2026-08-15 · follow-up to Q-249, which shipped the harness.
 
 ### [platform][devices] Q-250 — an Android emulator job in CI, to close the 17 rows that need an Android runtime and nothing else
 
@@ -13313,11 +13298,19 @@ per-field merge where an AI write has no honest source rank to claim.
 
 ### [platform][app-shell] Q-138 — component-size hotspots, with concrete extractions
 
+- **Reference:** the extraction map for the four files over the 800-line limit. **Read when you are
+  already in one of them; never take this as a work item.**
 - **Branch:** `refactor/component-size-hotspots`
 - **Added:** 2026-08-07 · [review §4](reviews/2026-08-07-full-app-review.md)
 - **Lane: B.** `components/**` + `app/**` extractions only.
-- Low priority individually; the rule exists because these files absorb every new feature by default.
-  Take them opportunistically when already touching the file, not as a dedicated PR.
+- **⚠ Re-classified `Reference:` on 2026-09-02, because it was heading Lane B's work list while its
+  own text says not to do it.** *"Take them opportunistically when already touching the file, not as
+  a dedicated PR"* — an entry that offers a build it argues against costs every session that reaches
+  it a read. Same shape as Q-354, reclassified the same way the day before. `check-component-size.js`
+  is what actually holds the line; this is the map, not the enforcement.
+- **Re-measured 2026-09-02:** `workout-screen.tsx` **1833**, `session-select-content.tsx` **1448**,
+  `config-screen.tsx` **997**, `program-editor-sheet.tsx` **963**. The first two have drifted from the
+  numbers in the table below, so treat its line ranges as approximate.
 - **⚠️ RE-MEASURED 2026-08-25 — two of the six rows were already done, and their line numbers now
   point at nothing.** `health-content.tsx` **991 → 651** and `profile-tab.tsx` **849 → 476**, both
   under the 800 limit. The other four are unchanged or slightly smaller (`workout-screen` 1851 →
@@ -13557,11 +13550,30 @@ per-field merge where an AI write has no honest source rank to claim.
   literals now on theme tokens. Readings older than 3h render muted and say "last seen Nh ago" in
   the aria-label rather than looking current. **The strap and scale halves below are untouched and
   are what keeps this entry open.**
+- **⚠ TWO CORRECTIONS, 2026-09-02, from reading the tree rather than the entry. Do not plan off the
+  two bullets above without them.**
+  1. **The ring half's stated outcome is not in the tree.** There is no `oura-battery-chip.tsx` and
+     **no battery chip on the Home header** — `session-select-content.tsx` renders `WeatherChip` and
+     nothing else beside the date. The ring battery renders on **Health** and **More**
+     (`components/health/oura-section.tsx`, `components/more/oura-section.tsx`), which is where the
+     v1.270.30 fix actually landed; the changelog's own wording — *"The chip existed but was reading
+     the Oura Cloud value"* — fits a chip in the Oura section rather than a new one on Home.
+     **Git cannot settle whether it regressed or never reached Home:** history begins at the public
+     snapshot (2026-08-16), after the 2026-08-08 claim. Either way the header is empty today, so
+     treat the ring half as **open** and re-read the plan's Task 26 before building.
+  2. **The strap battery IS already read and displayed — during pairing, by a different route.**
+     `components/settings/chest-strap-pairing.tsx:87-139` reads the standard Battery Service
+     characteristic over browser BLE and renders `Battery N%`. So the claim below ("no JS call site
+     reads it") is wrong as stated: what is true is that **nothing reads `PolarBleStatus.battery`**
+     — the native service's value, delivered by `getStatus()` and the `polarStatus` listener — and
+     nothing persists either number. **That is a second source for one value**, which is the class
+     this repo keeps paying for; the chip must take the native one, and the pairing screen should be
+     made to agree rather than left as a parallel read.
 - **Very different starting points per device.** Strap: a live `battery` value already exists natively
-  (`PolarStrapService.onBattery`, exposed via `getStatus()`) but **no JS call site reads it and
-  nothing persists it** — needs wiring + a "last seen" store, genuinely new work. Scale: **no
+  (`PolarStrapService.onBattery`, exposed via `getStatus()`), and **nothing reads it or persists it**
+  — needs wiring + a "last seen" store, genuinely new work (see correction 2). Scale: **no
   battery capability exists anywhere**, not even a one-shot native read — new BLE work, correctly
-  flagged by the owner as a stretch/"if that comes up" item.
+  flagged by the owner as a stretch/"if that comes up" item, and **native, so not Lane B's**.
 - **⚑ Concrete answer to the refresh-button question, not just an opinion**: checked what each
   does — pull-to-sync bumps `refreshTick`, which is what drives Body Battery/training-load/
   muscle-recovery/HR-chart refresh; the manual header button does **not** bump `refreshTick` at all,
