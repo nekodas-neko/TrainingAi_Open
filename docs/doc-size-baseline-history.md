@@ -6971,3 +6971,16 @@ without the entries going stale with it.
 Q-521 was added to the same sweep after the fact, when reading it turned up the identical prose-only
 *"Do Q-515 first"*. That is five instances of one class in the entries read in a single sitting,
 which is the argument for the fields over the sentences.
+
+## 2026-09-02 — `projectOverview.md` → 9580, `docs/implementation-backlog.md` → 15868 (BF-105)
+
+Both grow, and in both the lines that earn their cost are the two corrections to the entry's own
+plan. It says to delete the `workout-timers` channel as a dead row; `lib/notifications.ts:76` posts
+the workout rest-timer alert to it, so following that instruction silences every rest alert in the
+app. And it treats the fast/slow channel split as JS-only, when the plugin's per-channel `vibration`
+is a boolean rather than a pattern — making the two tellable apart needs a sound file in `res/raw/`,
+which is an APK change and moves the whole second half behind a device gate.
+
+Neither is visible from the diff that shipped, because the diff is the *other* half. A reader picking
+this up later reads the entry, not the journal, which is why the `Gate:` and the correction sit in the
+queue entry rather than only here.

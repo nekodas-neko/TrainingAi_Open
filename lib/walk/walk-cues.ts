@@ -40,7 +40,13 @@ export async function scheduleWalkCues(plan: IntervalPlan, startedAtMs: number):
       channelId: WORKOUT_TIMERS_CHANNEL,
     })
     if (notifications.length) await LocalNotifications.schedule({ notifications })
-  } catch { /* not native / plugin missing — the in-app timer still drives cues when foregrounded */ }
+  } catch {
+    // Nothing scheduled. There is no fallback path to name here: the in-app cue in
+    // `walk-active.tsx` is driven by the segment index and runs whether or not this
+    // succeeded, and it only reaches a walker with the app open. A failure here means the
+    // screen-off case has no cue at all. This comment used to claim the in-app timer covered
+    // it, which sent a reader looking for a path that did not exist (BF-105).
+  }
 }
 
 export async function cancelWalkCues(plan: IntervalPlan): Promise<void> {

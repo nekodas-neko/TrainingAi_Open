@@ -26,7 +26,7 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.435.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Version:** v1.436.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-09-02.
 
 **The chronic-stress refusal now leaves a number behind (TN-1).** `chronic_stress_score` has been
@@ -39,6 +39,21 @@ nothing consults the count** — relaxing a threshold before knowing its input d
 Q-504 mistake. **NULL means NOT EVALUATED**, and **only a hand-triggered `fullHistory` pass will ever
 write a value**, which is the owner's to run
 ([journal](docs/overview/entries/2026-09-02-tn1-chronic-stress-count.md)).
+
+**A guided walk's phase change now lands on the screen (BF-105).** The owner, mid-walk: *"there isn't
+enough of a queue to indicate session phase changed."* The notification was firing correctly and on
+time — what did not exist was any in-app response: `walk-active.tsx` called `hapticSuccess()` once, at
+the end of the whole walk, so a boundary moved one word and nothing else. Now a haptic per boundary
+(`hapticSuccess` for fast, `hapticLight` for slow, so the two are tellable apart through a pocket),
+keyed on the segment index so it fires once per change and **never on mount** — the screen mounts with
+an active segment when a walk in progress is reopened. Plus a vignette wash of the incoming phase's
+colour, which keeps the centre clear because peripheral vision is what has to catch it.
+**⚠ Two corrections to the entry's second half, both measured:** `workout-timers` is NOT dead and must
+not be deleted (the workout rest timer posts to it), and the plugin's per-channel `vibration` is a
+boolean rather than a pattern — so a fast/slow channel split needs a sound file in `res/raw/`, making
+that half **APK-gated**, not the JS-only work the entry described. **Not device-verified**, and the
+device owns the haptic, which is the half the report is about
+([journal](docs/overview/entries/2026-09-02-bf-105-walk-phase-cue.md)).
 
 **A finished walk no longer arms the Start screen (BF-108).** The owner: *"after closing it - it still
 opens with the activity naming screen"*, titled from a walk they had just done. **The entry blamed the

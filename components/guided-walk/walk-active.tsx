@@ -2,13 +2,14 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import dynamic from 'next/dynamic'
 import { useShallow } from 'zustand/react/shallow'
+import { motion, useReducedMotion } from 'motion/react'
 import { Button } from '@/components/ui/button'
 import { useGuidedWalkStore } from '@/lib/stores/guided-walk-store'
 import { buildIntervalPlan, segmentAt } from '@/lib/walk/interval-plan'
 import { scheduleWalkCues, cancelWalkCues } from '@/lib/walk/walk-cues'
 import { getLiveHrManager } from '@/lib/live-hr/manager'
 import { hrReserveTarget } from '@trainingai/shared/health/hr-zones'
-import { hapticSuccess } from '@/lib/haptics'
+import { hapticSuccess, hapticLight } from '@/lib/haptics'
 import type { LiveHrSample } from '@/lib/live-hr/types'
 import { LeaveWalkDialog } from './leave-walk-dialog'
 import { CadenceTracker } from '@/lib/activity/cadence-tracker'
@@ -21,6 +22,8 @@ import { useCachedValue } from '@/lib/hooks/use-cached-value'
 import { WALK_SEGMENT_STATS_TTL } from '@trainingai/shared/cache-ttl'
 import type { KindAggregate } from '@/lib/walk/segment-stats'
 import { WalkPacerBar } from './walk-pacer-bar'
+import { PhaseChangeFlash } from './phase-change-flash'
+import { shouldCuePhaseChange, phaseCueHaptic } from '@/lib/walk/walk-phase-cue'
 import { resolveCadenceTargets, speedTargetsFromHistory } from '@/lib/walk/walk-pacer'
 
 const ActivityRouteMap = dynamic(
@@ -55,6 +58,9 @@ export function WalkActive({ userProfile, onFinish }: {
   const [liveBpm, setLiveBpm] = useState<number | null>(null)
   const [lastBeatAt, setLastBeatAt] = useState<number | null>(null)
   const [confirmEndOpen, setConfirmEndOpen] = useState(false)
+  const [cue, setCue] = useState<{ index: number; color: string } | null>(null)
+  const cuedIndexRef = useRef<number | null>(null)
+  const reducedMotion = useReducedMotion()
 
   const hrMax = userProfile.hrMax
   const targets = useMemo(() => ({
@@ -170,14 +176,37 @@ export function WalkActive({ userProfile, onFinish }: {
   }, [startedAtMs, active?.segment.index, phaseLabel])
   useEffect(() => () => stopRunChip(), [])
 
+  // The in-app half of the phase cue. The scheduled notification (walk-cues.ts) is the
+  // screen-off channel and cannot help here: with the app open and the phone in hand, the
+  // whole of the old response to a phase change was one word swapping colour, which is easy
+  // to miss while walking and looking up. Keyed on the segment index rather than a timer, so
+  // it fires exactly once per boundary however often the 1 Hz tick re-renders.
+  const segmentIndex = active?.segment.index ?? null
+  useEffect(() => {
+    if (segmentIndex == null || kind == null) return
+    if (shouldCuePhaseChange(cuedIndexRef.current, segmentIndex)) {
+      if (phaseCueHaptic(kind) === 'strong') hapticSuccess(); else hapticLight()
+      setCue({ index: segmentIndex, color: phaseColor })
+    }
+    cuedIndexRef.current = segmentIndex
+  }, [segmentIndex, kind, phaseColor])
+
   return (
-    <div className="flex h-full flex-col items-center justify-center gap-6 px-6 pt-safe pb-safe-action-lg text-center">
+    <div className="relative flex h-full flex-col items-center justify-center gap-6 px-6 pt-safe pb-safe-action-lg text-center">
+      <PhaseChangeFlash cueKey={cue?.index ?? null} color={cue?.color ?? phaseColor} />
       <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
         {active && active.segment.setNumber ? `Set ${active.segment.setNumber} of ${totalFast}` : active ? '—' : 'Finishing…'}
       </p>
-      <p className="text-5xl font-black uppercase" style={{ color: phaseColor }}>
+      <motion.p
+        key={segmentIndex ?? 'none'}
+        className="text-5xl font-black uppercase"
+        style={{ color: phaseColor }}
+        initial={reducedMotion ? false : { scale: 0.72, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        transition={{ type: 'spring', stiffness: 420, damping: 24 }}
+      >
         {kind === 'fast' ? 'Fast' : kind === 'slow' ? 'Slow' : kind === 'warmup' ? 'Warm up' : kind === 'cooldown' ? 'Cool down' : '—'}
-      </p>
+      </motion.p>
       <p className="text-6xl font-bold tabular-nums">{mm}:{String(ss).padStart(2, '0')}</p>
 
       {/* Pace-primary once GPS pace exists (owner decision: pace is the real fast/slow
