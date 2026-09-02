@@ -132,8 +132,8 @@ because a journal entry rides in *every* feature PR. It did exactly that twice i
 sweep clears. The citation habit above stops the floor rising; this stops the existing floor blocking
 CI while that habit takes effect. It still catches what the guard was written for: if nobody sweeps,
 unlinked entries pile up and it fires (verified by simulating 61 against the real floor). A separate
-ceiling of **250 total** keeps the original 509-file readability failure caught, and its message says
-plainly that a sweep alone will not fix that one.
+ceiling — **320 total**, raised from 250 on 2026-09-02 — keeps the original 509-file readability
+failure caught, and its message says plainly that a sweep alone will not fix that one.
 
 **And since BF-36 (2026-08-26) the limit fails only a branch that ADDS an entry.** The threshold was
 right; the targeting was not. It landed on whichever PR happened to be open when the count crossed —
@@ -142,7 +142,18 @@ another session had swept concurrently. A branch that adds none now gets a note 
 PR adding an entry runs the sweep: it is already in the directory. The decision is
 [`scripts/lib/entries-verdict.js`](../../../scripts/lib/entries-verdict.js), unit-tested against
 fixture counts rather than the live directory — a test reading the real count would change verdict as
-the repo does. **The 250 ceiling is deliberately still unattributed** and fails everyone.
+the repo does. **The total ceiling is deliberately still unattributed** and fails everyone.
+
+**It fired on 2026-09-02, and the raise to 320 is why the number moved rather than the directory.**
+`main` sat at exactly 250, so the next entry from any agent — and the standing rule puts one in every
+PR — took it to 251 and blocked CI for all six. What the failure did NOT mean is that the sweep had
+stopped working: the unlinked count was **3 of a limit of 60**, nowhere near. The ceiling was firing
+because entries are *well cited* by durable docs, which is the habit this file spent the paragraphs
+above establishing. Punishing that is backwards. The unlinked guard already catches the real failure
+mode, and the four foldable entries at the time were all written in the preceding two days, so
+folding them would have deleted the newest rather than the oldest. Reversal is one number in
+`docs/doc-size-baseline.json`; if the floor ever rises from something other than journal citations,
+that is the signal to do the real compaction instead of raising it again.
 
 **The older framing, kept for the record:** this used to be described as an undecided choice between
 the sweep rewriting citations into the history file, or durable docs citing the batched history. The

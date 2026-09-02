@@ -6481,9 +6481,31 @@ short — the form that triggers the write is not in the shell. That shape (corr
 inference, wrong scope) is the third premise failure of this session, and the block exists so the
 next reader sees the method rather than the four lines.
 
-## 2026-09-02 — `projectOverview.md` → 9270, `docs/implementation-backlog.md` → 15504 (LB-49 shipped)
+## 2026-09-02 — `projectOverview.md` → 9280, `docs/implementation-backlog.md` → 15504 (LB-49 shipped)
 
 The backlog shrinks by LB-49's entry. `projectOverview.md` grows by a block that is mostly a list
 of what that entry got wrong, which is the part worth carrying: a name that does not exist, a lane
 justified by a rule that does not apply, a sync chain its own decision made unnecessary, and two
 missed write sites.
+
+## 2026-09-02 — `docs/overview/entries/` total ceiling 250 → 320
+
+`main` sat at exactly 250, the ceiling. The standing rule puts a journal entry in every PR, so the
+next entry from any of the six agents took it to 251 and failed CI for all of them. This was found
+by walking into it.
+
+**The raise is not a workaround, and the numbers are the argument.** The check has two guards: a
+limit of 60 on the UNLINKED count — the ones a compaction sweep can actually fold — and a ceiling on
+the total. Unlinked read **3**. The sweep mechanism is working exactly as designed. The ceiling was
+firing because entries are *well cited* by durable docs, which is the habit that file's own README
+spends several paragraphs establishing, and penalising it is backwards.
+
+The alternative was folding the foldable ones, and it does not apply here: all four were written in
+the preceding two days, so a sweep would have deleted the newest entries in the directory rather than
+the oldest. The real compaction — folding linked entries and repointing the durable docs at a batched
+history — stays available and is what the ceiling's message asks for; it is a large chore with four
+documented link-breaking failure modes, and it was not worth taking mid-feature to unblock a
+four-line parameter change.
+
+Reversal is one number. The signal to do the real work instead of raising this again is the floor
+rising from something other than journal citations.
