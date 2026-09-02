@@ -16,7 +16,9 @@ import {
   computeAvgPaceSecPerKm,
 } from '@/lib/activity/activity-metrics'
 
-interface ActivityState {
+// Exported because `reconcileRehydratedActivity` and `clearActivitySetup` take it — an exported
+// function whose parameter type is private cannot be called from anywhere that has to name it.
+export interface ActivityState {
   activitySessionId: string
   prescribedRunId: string | null
   activityType: string | null
