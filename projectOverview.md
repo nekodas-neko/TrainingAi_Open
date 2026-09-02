@@ -24,8 +24,20 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.432.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Version:** v1.433.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-09-02.
+
+**Nutrition's plan button opens the coach, in the nutrition scope (Q-407).** LA-47's plan card
+unblocked this, and the Lane B half was exactly what the entry said: `/coach` takes `?scope=`,
+`CoachContent` forwards it in the request body, and `Build a meal plan` goes to
+`/coach?scope=nutrition`. **The scope is the point, not the navigation** — it decides the coach's tool
+subset, and *a tool it never receives is a boundary it cannot cross*, as against a prompt asking the
+model not to read workout data. **The stepper sits beside the conversation, not behind it:** the entry
+warns that a flow stalling with no fallback is worse than seven screens that finish, and Rebuild —
+the only other route to the sheet — does not exist until a plan does, so the no-plan user is the one
+who would have been stranded. **Still owed, and it is Lane A's:** the coach does not yet open by
+stating what it already knows instead of asking. **No real Gemini turn was made and the device is
+untouched** ([journal](docs/overview/entries/2026-09-02-q-407-nutrition-coach-entry.md)).
 
 **AI Coach draws the meal plan, and one button puts every meal in My Foods (LA-47).** The owner's
 review is the acceptance test — *"I want it to make the meal plan; then add each item to the saved

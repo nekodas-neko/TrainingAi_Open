@@ -5004,6 +5004,20 @@ place to start rendering pictures.
   **Lane B**. The schema change lands first — the component cannot render a flag the schema does
   not carry.
 
+- **✅ THE ENTRY POINT AND SCOPE SHIPPED 2026-09-02** (`feat/q-407-nutrition-coach-entry`).
+  `/coach` takes `?scope=`, `CoachContent` forwards it in the request body, and Nutrition's
+  `Build a meal plan` opens `/coach?scope=nutrition`. **The stepper is kept beside the conversation,
+  not behind it:** a `Prefer the step-by-step setup?` control sits under the same button, because
+  Rebuild — the only other route to the sheet — does not exist until a plan does, so the no-plan user
+  is exactly the one who would have been stranded.
+- **Still owed here: the conversation's own shape.** Points 1 and 2 of *The conversation shape* are
+  not built as flow — the widgets exist (`ChoiceList` multi-select, `plan_card`) and the model can now
+  reach them inside the nutrition scope, but nothing yet makes the coach *open* by stating what it
+  already knows instead of asking. That is prompt and tool-ordering work in `lib/coach/**` and
+  `app/api/coach/route.ts`, which are **Lane A**. Nothing in Lane B is blocking it.
+- **Do not delete the stepper yet** — the entry's own condition is that the conversation has been used
+  on-device for a plan the owner actually keeps, and that has not happened.
+
 - **Verification.** The multi-select half is testable in the sandbox: a widget rendered with
   `multi: true` returns every checked id, Select all toggles all six, and an existing single-select
   call site still resolves to one option (that regression is the actual risk). The **conversation

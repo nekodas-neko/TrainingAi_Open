@@ -6669,3 +6669,13 @@ requires: it ships unexercised by any radio, and the row states the one observat
 confirm it.
 
 Raised to 9420 rather than the exact 9417 so the next small row does not need its own note.
+
+## 2026-09-02 — `projectOverview.md` → 9429, `docs/implementation-backlog.md` → 15585 (Q-407)
+
+Both grow. The index line that earns its cost is the one about the **fallback**: the entry says keep
+the stepper reachable, and the obvious way to satisfy that — leave Rebuild as the route back — does not
+work, because Rebuild only exists once a plan does. A future reader tidying the second control away
+would re-strand exactly the user it was put there for, and nothing in the code says so.
+
+The other is that the scope decides the **tool subset** rather than the prompt. Without it the next
+change to this entry point reads `?scope=nutrition` as cosmetic routing and drops it.

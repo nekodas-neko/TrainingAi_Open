@@ -254,6 +254,12 @@ Live at the time of writing (2026-07-30):
   Q-398's idempotent write path. Its two buttons are ordinary `chose` results, not a new result
   type. **Q-407's `Needs:` is cleared by it** — the conversation itself is what is left, and the
   plan card is not to be rebuilt.
+- **[`docs/overview/entries/2026-09-02-q-407-nutrition-coach-entry.md`](../../overview/entries/2026-09-02-q-407-nutrition-coach-entry.md)**
+  — **Q-407, entry point + scope (2026-09-02).** `Build a meal plan` opens `/coach?scope=nutrition`;
+  `CoachContent` forwards the scope in the request body. **The scope decides the coach's tool subset,
+  not its prompt** — read that before treating the param as cosmetic routing. The seven-step stepper is
+  deliberately kept as a visible second control in the same empty state, because Rebuild does not exist
+  until a plan does. The conversation's own opening shape is still owed and is Lane A's.
 - **[`docs/overview/entries/2026-09-02-fix-bf-109-macro-calorie-warning.md`](../../overview/entries/2026-09-02-fix-bf-109-macro-calorie-warning.md)**
   — **BF-109 (2026-09-02).** `MacroCalorieWarning` under the Calories field in `ReviewStep`, so the
   barcode, photo-scan and manual roads all cross-check macros against stated calories. **Read this
