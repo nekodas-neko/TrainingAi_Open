@@ -1051,6 +1051,21 @@ export const supplements = pgTable('supplements', {
   dose:            text('dose'),
   defaultAmount:   doublePrecision('default_amount'),
   unit:            text('unit'),
+  /**
+   * The presence window (BF-69, migration 254). A date OUTSIDE it is a TRUE ZERO — the substance
+   * was not being taken. A date INSIDE it with no contribution is UNKNOWN, and must be excluded
+   * from an aggregate rather than counted as 0: today a row exists only on days something was
+   * logged, so "did not take it" and "forgot to log it" are otherwise the same absence, and a run
+   * of forgotten days read as zeros invents an effect.
+   *
+   * Both ends nullable: an open-ended course has no `stoppedOn`, and a substance nobody has dated
+   * says nothing rather than claiming a window.
+   */
+  startedOn:       date('started_on', { mode: 'string' }),
+  stoppedOn:       date('stopped_on', { mode: 'string' }),
+  /** "Ask me when logging" — the variable-dose half. Creatine is 5 g every time; a titrating drug
+   *  is not, and its whole story is the number changing week to week. One flag, not a second flow. */
+  dosePrompt:      boolean('dose_prompt').notNull().default(false),
   reminderEnabled: boolean('reminder_enabled').notNull().default(false),
   reminderTime:    text('reminder_time'),
   sortOrder:       integer('sort_order').notNull().default(0),
@@ -1079,10 +1094,27 @@ export const supplementLogs = pgTable('supplement_logs', {
   amount:       doublePrecision('amount'),
   unit:         text('unit'),
   doseText:     text('dose_text'),
+  /**
+   * WHERE THIS CONTRIBUTION CAME FROM (BF-69, migration 254) — `'manual'` | `'meal'`.
+   *
+   * A row is one ACT of taking something, not one day. Two doses on a day are independent events
+   * that ADD, so the old `unique (supplement_id, log_date)` is gone: under it a meal carrying
+   * creatine and a hand-tick on the supplements page were last-writer-wins, and unticking wiped
+   * the day whoever had written it.
+   *
+   * What replaced it is a PARTIAL unique index over `source = 'manual' AND deleted_at IS NULL`
+   * only, so meal contributions stay unconstrained (the same meal logged twice is two doses,
+   * correctly) while the page's tick stays idempotent under a double-tap or an outbox replay.
+   */
+  source:       text('source').notNull().default('manual'),
+  /** The `food_logs` row a `'meal'` contribution came from. Not an FK on purpose — the meal path
+   *  resolves its own contribution by this id, and an FK would turn a hard delete of a log into a
+   *  cascade over exposure history. */
+  sourceRef:    uuid('source_ref'),
   createdAt:    timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt:    timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   deletedAt:    timestamp('deleted_at', { withTimezone: true }),
-}, t => [unique().on(t.supplementId, t.logDate)])
+})
 
 export const sessionPeriodization = pgTable('session_periodization', {
   id:                       uuid('id').primaryKey().defaultRandom(),

@@ -578,6 +578,12 @@ export interface LocalSupplement {
   dose:            string | null;
   defaultAmount?:  number | null;
   unit?:           string | null;
+  // BF-69 presence window. A date outside it is a TRUE ZERO; a date inside it with no contribution
+  // is UNKNOWN and must be excluded from an aggregate, never counted as 0.
+  startedOn?:      string | null;
+  stoppedOn?:      string | null;
+  /** "Ask me when logging" — the variable-dose flag for a substance on a titration schedule. */
+  dosePrompt?:     boolean;
   reminderEnabled: boolean;
   reminderTime:    string | null;
   sortOrder:       number;
@@ -599,6 +605,12 @@ export interface LocalSupplementLog {
   amount?:      number | null;
   unit?:        string | null;
   doseText?:    string | null;
+  // BF-69 — a row is one ACT of taking something, not one day. `'manual'` is the supplements-page
+  // tick; `'meal'` is a dose carried by a logged meal, with `sourceRef` naming the `food_logs` row.
+  // Optional on the type because every existing writer constructs one without them;
+  // `upsertSupplementLog` defaults to `'manual'`, which is what every writer today is.
+  source?:      'manual' | 'meal';
+  sourceRef?:   string | null;
   updatedAt:    string;
   deletedAt:    string | null;
   syncStatus:   'pending' | 'synced';
