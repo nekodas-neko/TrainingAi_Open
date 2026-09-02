@@ -6842,3 +6842,16 @@ lands on top of v34's table rebuild, so a device upgrading from v33 runs both in
 the combination nobody has opened.
 
 The row leaves whole when the S25 walk happens.
+
+## 2026-09-02 — `docs/implementation-backlog.md` → (see .size) (Q-509)
+
+Q-509 gains two blocks and loses none, which is the right trade only because both are *results*: bin
+occupancy is closed with a measured 0.000 h, and the reconstruction that produced it is validated
+against the shipped number for the first time. The second block is the one that earns its lines —
+the three rules (decode raw frames, bin in `ds`, take the already-clamped window from
+`sleep_sessions`) are what two previous sessions lacked, and a reader who does not have them repeats
+the 4.27-against-2.653 caveat rather than the measurement.
+
+The entry's `First action` becomes `Superseded first action` rather than being deleted: its
+pre-registered pass test is still the pass test for anything that touches the estimator, and losing
+that would let the next session re-open a question this one narrowed.
