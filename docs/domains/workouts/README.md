@@ -207,6 +207,14 @@ Live at the time of writing (2026-07-30):
 
 ## History
 
+- **[`docs/overview/entries/2026-09-02-lb-47-deload-override-honesty.md`](../../overview/entries/2026-09-02-lb-47-deload-override-honesty.md)**
+  — **LB-47 (2026-09-02).** `deloadOverrideOutcome` and the card's `nothing-to-revert` copy. **Read
+  this before reasoning about the `Full` override on a session-level deload:** the toggle is not
+  rendered at all in that state (`phase: 'deload'` → `isDeloadActive` → `pre-workout-screen` gates the
+  whole control on it), so an entry concluding "the override does nothing" has the measurement right
+  and the mechanism wrong. What the fix corrects is a card that *claimed* a revert when
+  `deloadRevertNames` and `deloadOverrideBlocked` both returned empty. Latent — it needs a
+  prescription whose `deload` flag and `phase` disagree, 0 of 5 in production.
 - **[`docs/overview/entries/2026-09-01-phase-aware-volume-targets.md`](../../overview/entries/2026-09-01-phase-aware-volume-targets.md)**
   — 🆕 **BF-59**: the Training card's weekly set targets are **derived** from `volumeLandmarks` scaled
   by the week's phase mix, not read from `program_volume_targets`. Read it before touching volume
