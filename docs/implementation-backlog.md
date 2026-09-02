@@ -3669,8 +3669,12 @@ the match. `Gate: owner` when it is next picked up.
 ### [nutrition][platform] BF-77 — sharing meals with a partner: copies work today, a shared library is a different product
 
 - **Lane:** A if a server path is chosen; B for anything built on the QR payload.
+- **Gate:** owner
 - **Planning item** — the request contains two products and they resolve differently. Needs a
-  decision from the owner before implementation.
+  decision from the owner before implementation. **The `Gate:` field above is what makes that
+  legible to `next-item.js`** (added 2026-09-02): the prose said it from the day the entry was
+  filed, and the tool cannot read prose, so the entry sat at the head of Lane A's READY list
+  offering work that cannot start. What is owed is the A-or-B choice in the table below.
 - **Added:** 2026-08-31 · owner, with a library of eight meals: *"I've made a lot of meals now and I
   will continue to make meals. I would like to be able to share meals with my partner/friend. So some
   sort of way to share meals DB entries. Or sync between a group so you all have the same meals."*
