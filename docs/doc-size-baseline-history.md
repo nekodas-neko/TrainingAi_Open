@@ -6416,3 +6416,19 @@ claims nothing in JS reads the strap battery when a pairing screen reads and dis
 route. An implementer taking the entry at its word would build the strap half against a false picture
 of both ends. Git cannot arbitrate the first — history starts at the public snapshot, after the
 claimed date — so the correction states what is observable and stops there.
+
+## 2026-09-02 — `projectOverview.md` → 9220, `docs/implementation-backlog.md` → 15684 (Q-111)
+
++15 on the index, and most of it is a **correction to a claim the index itself would otherwise keep
+propagating**: Q-111 said its ring half was already on the Home header, and it was not. The next
+session to read that entry would have skipped the ring chip entirely. The strap correction is the
+same shape in the other direction — the entry said nothing read the strap battery when a pairing
+screen reads and displays it, so the real defect was two numbers in two screens rather than a
+missing read.
+
+The two owner items are the rest: the scale needs Kotlin BLE work that no lane here can do, and the
+manual refresh button question now carries its measurement — it does **not** bump `refreshTick`, so
+it is strictly narrower than pull-to-sync rather than redundant with it. Both were sitting inside a
+long entry where an owner would never find them.
+
+The backlog is flat on net: Q-111's shipped form replaced a body of roughly the same length.

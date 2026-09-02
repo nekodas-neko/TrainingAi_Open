@@ -21,7 +21,7 @@ import type { BodyMetaRow } from "@/app/api/body-metadata/route";
 import dynamic from "next/dynamic";
 import { CoachFab } from "@/components/coach/coach-fab";
 import Image from "next/image";
-const WeatherChip = dynamic(() => import("@/components/weather-chip").then(m => m.WeatherChip), { ssr: false });
+const HeaderChips = dynamic(() => import("@/components/home/header-chips").then(m => m.HeaderChips), { ssr: false });
 // Sheets: code-split, not statically bundled. Each renders nothing until its `open`/id prop says so,
 // so their code has no business in the initial parse — moving it to per-sheet chunks takes it off
 // the cold-start critical path, which the device profile put at JS parse/execute (Q-51 Task 1).
@@ -1062,7 +1062,7 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
               <p className="text-xs text-muted-foreground whitespace-nowrap shrink-0">
                 {formatInTimeZone(new Date(), tz, "EEEE d MMMM")}
               </p>
-              <WeatherChip />
+              <HeaderChips />
             </div>
             <h1 className="text-xl font-bold leading-tight line-clamp-2">
               {displayName ? getGreeting(displayName, tz) : "TrainingAI"}
