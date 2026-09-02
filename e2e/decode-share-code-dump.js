@@ -80,6 +80,9 @@ console.log(
   anyDecoded
     ? '\nAt least one configuration decoded the image the run refused. The image and the reader are\n'
       + 'both fine, so the fault is in HOW the decode is invoked in-run — that is LB-38\'s answer.'
-    : '\nNo configuration decoded it. The image itself is unreadable despite normal ink, so the fault\n'
-      + 'is in what was drawn rather than in the decode.',
+    : '\nNo configuration decoded it, so the fault is in what was drawn rather than in the decode.\n'
+      + 'Do NOT read the ink above as normal or abnormal without knowing which STYLE this dump came\n'
+      + 'from — it is per-style (Ingredients-centred 0.0800, Black band 0.1341, Plaque 0.0914, Big\n'
+      + 'code 0.1732 on a passing run), and the filename carries the style. Comparing one style\'s\n'
+      + 'ink against another\'s band is how a tornness theory got built and dropped (LB-38).',
 )

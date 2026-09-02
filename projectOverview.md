@@ -27,6 +27,19 @@
 **Version:** v1.431.2 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-09-02.
 
+**LB-38's dump was captured, it does not decode offline, and the reading I first gave it was wrong.**
+The share-code e2e flake has been open on one question: keep the pixels ZXing refuses and decode them
+offline, because a buffer that decodes offline would put the fault in *how* the decode is invoked. One
+was finally caught, on `Ingredients · centred`, and **no binarizer × `TRY_HARDER` combination decodes
+it** — so the fault is in the image, and the last unexamined mechanism is eliminated. **The follow-up
+was then wrong and one more measurement caught it:** the dump's ink of 0.0807 looked like half the
+recorded 0.172–0.179 band, a mid-repaint signature, and a canvas-settling gate was written for it —
+but ink is **per-style**, `Ingredients · centred` reads **0.0800 on a passing run**, and that band
+belongs to a different style. 0.0807 is normal. **The gate was reverted unshipped** rather than fix a
+cause that is not established. The four measured per-style figures are now in `darkFraction`'s comment,
+which previously said "~0.17" and is what made the error easy
+([journal](docs/overview/entries/2026-09-02-lb-38-dump-captured.md)).
+
 **The `Full` override told the user it had reverted a deload when it had not (LB-47).** The entry
 asked whether BF-64's override does anything on a real session-level deload; **its measurement was
 exactly right and its conclusion was not.** Re-measured: 5 prescriptions, 1 session-level deload

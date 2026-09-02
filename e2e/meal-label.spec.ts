@@ -209,8 +209,18 @@ async function shotOf(canvas: import('@playwright/test').Locator) {
   return { w, h, lum: Buffer.from(b64, 'base64') }
 }
 
-/** Fraction of the canvas that is dark. A drawn share code reads ~0.17; 0 or 1 means the buffer
- *  came back degenerate rather than merely blank (LB-38). */
+/**
+ * Fraction of the canvas that is dark. 0 or 1 means the buffer came back degenerate rather than
+ * merely blank (LB-38).
+ *
+ * **Ink is per-STYLE and reading it as one number costs a wrong conclusion.** Measured on a passing
+ * run, 2026-09-02: `Ingredients · centred` **0.0800**, `Black band` **0.1341**, `Plaque` **0.0914**,
+ * `Big code` **0.1732**. The "~0.17" this comment used to give is `Big code`'s, and the 0.172–0.179
+ * band LB-38 records is the share-code test's own style — so the one failing buffer ever captured,
+ * at **0.0807** on `Ingredients · centred`, reads as *half the normal ink* against either of those
+ * and as *exactly normal* against its own. It is normal. A tornness theory was built on the wrong
+ * comparison and dropped once these numbers existed; do not rebuild it from a single figure.
+ */
 function darkFraction({ lum }: { lum: Buffer }): number {
   let dark = 0
   for (let i = 0; i < lum.length; i++) if (lum[i] < 128) dark++
