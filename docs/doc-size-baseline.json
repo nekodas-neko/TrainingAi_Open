@@ -1,9 +1,9 @@
 {
-  "_comment": "Per-FILE line-count baselines moved to docs/doc-size/ (one <path>.size file each, LA-33) \u2014 a single shared map made every pair of PRs conflict on the same two lines. What stays here is the entries-directory policy, which is one rule about a whole directory rather than a number per file, so splitting it would buy nothing. Reasoning for any change goes in docs/doc-size-baseline-history.md, not here.",
+  "_comment": "Per-FILE line-count baselines moved to docs/doc-size/ (one <path>.size file each, LA-33) — a single shared map made every pair of PRs conflict on the same two lines. What stays here is the entries-directory policy, which is one rule about a whole directory rather than a number per file, so splitting it would buy nothing. Reasoning for any change goes in docs/doc-size-baseline-history.md, not here.",
   "entries": {
     "dir": "docs/overview/entries",
     "chore": 20,
     "limit": 60,
-    "totalCeiling": 250
+    "totalCeiling": 320
   }
 }

@@ -1872,37 +1872,6 @@ deletes nothing on tap, which is what makes an icon-only entry point defensible 
   sandbox** — the feature is off by default there, so the e2e has to switch it on to assert anything
   at all.
 
-### [nutrition] LB-49 — the meal-log scale argument, through the one shared write function
-
-- **Lane:** A — `packages/shared/src/nutrition/log-meal.ts`, plus the web route and the
-  `pushMutations` branch that both call it.
-- **Added:** 2026-09-01 · Lane B, splitting BF-104 so its surface half is startable. The letter
-  records who found it, not who ships it.
-
-**One optional argument, and the reason it is not Lane B's is the reason it is worth doing carefully:
-`logMealFromSaved` is the single shared write function both server paths call**, which is the
-Canonical-Runtime rule the push branch is CI-gated on. A scale threaded anywhere else would be a
-second write path.
-
-- **The change:** `logMealFromSaved(meal, …, scale = 1)` writing
-  `quantityMultiplier: item.quantityMultiplier * scale` at all three sites (`log-meal.ts:83, 96, 131`).
-  **No schema change** — `food_logs.quantity_multiplier` is already per-row.
-- **Scale at WRITE time; do not store the factor.** The rows are already point-in-time snapshots —
-  `logMealFromSaved` copies the definition's multipliers rather than referencing them — so a log
-  survives the meal being edited afterwards. A meal-level factor every reader had to remember to
-  apply would break that and put a second multiplier in the system (Q-401's two TDEE models,
-  BF-88's two meanings for one constant).
-- **The cost of that, stated so it is chosen rather than discovered:** *"I ate 1.5×"* is not
-  recoverable afterwards — only the scaled per-item amounts are. BF-3 went the other way for
-  supplement doses, because a titrating dose is the datum; here the datum is the food.
-- **The outbox payload carries it too**, or the APK logs 1× while the web logs 1.5× — the drift
-  class the sync rules exist for. Local table column, `queueMutation` payload, `pushMutations`
-  branch and pull mapping in the same PR.
-- **Verification:** `logMealFromSaved(cruskitPB, …, 1.5)` writes two rows whose per-item grams are
-  each 1.5× the definition and whose calories total **365** against 243 at 1×; `scale = 1` is
-  byte-identical to today's output; and the web route and the push branch produce the same rows for
-  the same payload.
-
 ### [nutrition][platform] LB-50 — the measured activity factor, and a prompt that tells the model something false
 
 - **Lane:** A — `app/api/nutrition-goals/recommend/route.ts` and the energy model.
