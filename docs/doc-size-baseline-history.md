@@ -6869,3 +6869,16 @@ sibling-sweep rule, and the next session narrows a safety net that nobody measur
 The `Keep:` also carries the caveat forward, because the headline invites the wrong claim: 64% is a
 share of back-off *triggers*, and the replay does not model `rm1Trend`, so the number of load cuts
 actually prevented is well below 25.
+
+## 2026-09-02 — `docs/implementation-backlog.md` → (see .size) (Q-515)
+
+Q-515 gains a block that contradicts its own recommendation, which is the expensive kind of line to
+omit: the entry currently tells the next implementer to swap in a 90-day trailing anchor, and doing
+that ships a **+3.42 bpm, 56-of-57-days level change** into two pillars under the heading of a
+stability fix. Deleting the recommendation instead of annotating it would lose why it looked right —
+the shape *is* right, and it becomes the correct fix the moment the owner also wants the level moved.
+
+Two of the lines are there to stop the measurement being re-run wrongly: the direction is
+**structural** (a longer window sits above a shorter one during an improving trend, so no window
+length separates the two effects), and there are only **74 days** of resting HR, so a 90-day window
+is not the slow anchor it reads as.
