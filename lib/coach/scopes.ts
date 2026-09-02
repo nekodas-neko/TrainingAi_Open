@@ -61,7 +61,10 @@ export const COACH_SCOPES = {
   },
   nutrition: {
     readTools: NUTRITION_READ_TOOLS,
-    widgetTools: ['renderChoiceList', 'proposeChange', 'handOff', 'askForNumber', 'renderChart'],
+    // `renderPlan` belongs here specifically (LA-47): meal planning IS this scope's job, and the
+    // general scope picks the tool up automatically from `WIDGET_TOOL_NAMES` while this list is
+    // explicit — so a widget added for nutrition is withheld from nutrition unless it is named.
+    widgetTools: ['renderChoiceList', 'proposeChange', 'handOff', 'askForNumber', 'renderChart', 'renderPlan'],
     choiceSources: ['grocery_stores', 'proteins', 'carbs', 'fats', 'vegetables', 'dietary_restrictions'],
     patchDomains: ['nutrition_targets', 'user_goals'],
     systemSection: `

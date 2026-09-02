@@ -9,6 +9,7 @@ import { Tier3Card } from "./tier3-card";
 import { HandoffCard } from "./handoff-card";
 import { NumberDial } from "./number-dial";
 import { CoachChart } from "./coach-chart";
+import { PlanCard } from "./plan-card";
 
 interface CoachWidgetViewProps {
   /** The tool call's arguments, straight off the stream. Validated here rather than trusted. */
@@ -70,6 +71,19 @@ export function CoachWidgetView({ input, toolCallId, onResult }: CoachWidgetView
   }
 
   if (widget.kind === "handoff") return <HandoffCard args={widget} />;
+
+  // LA-47. A branch is not optional here even to "ship the schema first": the fallthrough below
+  // reads `widget.patch`, so an unhandled member is a type error — and a branch rendering null
+  // would be worse than none, because a client-side tool call with no result wedges every
+  // following turn (the provider refuses a request containing an unanswered tool call).
+  if (widget.kind === "plan_card") {
+    return (
+      <PlanCard
+        args={widget}
+        onChoose={onResult ? c => onResult({ status: "chose", id: c.id, label: c.label }) : undefined}
+      />
+    );
+  }
 
   // The only widget that answers itself — see ChartSchema. `onResult` is absent on a rehydrated or
   // superseded turn, and there is nothing to resolve then either: the result was sent when it first

@@ -109,6 +109,33 @@ export const HandoffSchema = z.object({
 export type HandoffArgs = z.infer<typeof HandoffSchema>
 
 /**
+ * The meal plan the coach just produced, as a card with two actions (LA-47 / Q-407).
+ *
+ * **It carries no meals, deliberately.** The client already holds the plan it is about to render —
+ * the same reason `CHOICE_SOURCES` exists. A nine-row picker the model typed out cost ~554 output
+ * tokens, and output tokens are essentially all of Coach's latency, so a widget that restated the
+ * plan would pay that price for data already on the device.
+ *
+ * `planId` is optional because the plan the model just generated is the one on screen; an id is only
+ * needed when the card refers to a plan the client would otherwise have to guess at.
+ *
+ * **The two actions resolve as ordinary `chose` results** with the fixed ids `save_all` and `redo`,
+ * so this needs no new `WidgetResultSchema` member. A card with two buttons is a choice list with a
+ * rich body, and modelling it as a third thing would have meant a third result shape to keep in step.
+ */
+export const PlanCardSchema = z.object({
+  kind: z.literal('plan_card'),
+  title: z.string().min(1).max(60),
+  planId: z.string().max(64).optional(),
+})
+export type PlanCardArgs = z.infer<typeof PlanCardSchema>
+
+/** The fixed option ids a `plan_card` resolves with. Named rather than inline: the card sends them
+ *  and the system prompt tells the model what they mean, so a typo in either place would be a
+ *  silently dead button. */
+export const PLAN_CARD_ACTIONS = { saveAll: 'save_all', redo: 'redo' } as const
+
+/**
  * A single number, set on a dial rather than typed.
  *
  * For tier-1 values the dial IS the confirmation — there is no separate ChangePreview, because a
@@ -174,6 +201,7 @@ export type ChartArgs = z.infer<typeof ChartSchema>
  * no way to tell.
  */
 export const CoachWidgetSchema = z.discriminatedUnion('kind', [
+  PlanCardSchema,
   ChoiceListSchema,
   ChangePreviewSchema,
   HandoffSchema,
@@ -190,6 +218,7 @@ export const WIDGET_TOOL_NAMES = {
   handOff: 'handoff',
   askForNumber: 'number_dial',
   renderChart: 'chart',
+  renderPlan: 'plan_card',
 } as const satisfies Record<string, CoachWidgetKind>
 
 export type WidgetToolName = keyof typeof WIDGET_TOOL_NAMES

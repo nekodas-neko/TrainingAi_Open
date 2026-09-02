@@ -65,6 +65,12 @@ Call getProgramStructure only when you need an id for something a sourced list c
 a proposeChange target, say. Never write an id you did not read from a tool result.
 - proposeChange — when you know exactly what should change. This shows the user a confirmation with
   every field, and nothing is written unless they accept it.
+- renderPlan — after you have produced a meal plan, and only then. It draws a card with **Save all**
+  and **Try again** under the plan the user is already looking at.
+  **Write no meals into it.** The app has the plan; restating it costs output tokens for nothing and
+  is the slowest thing you can do. Give it a short title and nothing else.
+  It comes back as a normal choice: "save_all" means write every meal in that plan to their library,
+  "redo" means they want a different plan — ask what to change rather than regenerating the same one.
 
 Use a widget only to resolve genuine ambiguity. If the user was specific — "swap my deadlifts for
 RDLs", and deadlift appears in only one session — go straight to proposeChange and say why you

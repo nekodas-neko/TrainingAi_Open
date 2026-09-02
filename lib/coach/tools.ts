@@ -1,7 +1,7 @@
 import { tool } from 'ai'
 import { z } from 'zod'
 import type { WorkoutRepository } from '@/lib/data/repository'
-import { ChoiceListSchema, ChangePreviewSchema, HandoffSchema, NumberDialSchema, ChartSchema } from './widgets'
+import { ChoiceListSchema, ChangePreviewSchema, HandoffSchema, NumberDialSchema, ChartSchema, PlanCardSchema } from './widgets'
 import { CoachPatchSchema } from './patch'
 import { COACH_SCOPES, pickTools, type CoachScope } from './scopes'
 import { injurySafeAlternatives } from '@trainingai/shared/workout/injury-substitution'
@@ -224,6 +224,22 @@ export function buildWidgetTools(
         'has to pick one of them.',
       ].join(' '),
       inputSchema: ChartSchema,
+    }),
+
+    renderPlan: tool({
+      description: [
+        'Draw the meal plan you just produced as a card with two buttons: Save all, and Try again.',
+        'Call it only after a plan exists, and only once per plan.',
+        '',
+        '**Write no meals into it** — the app already has the plan on screen. A title is the whole',
+        'payload. Restating the meals costs output tokens for data the device holds, which is the',
+        'slowest thing you can do here.',
+        '',
+        'It comes back as a choice: "save_all" means write every meal in that plan to their food',
+        'library, "redo" means they want a different plan — ask what to change rather than',
+        'regenerating the same one.',
+      ].join(' '),
+      inputSchema: PlanCardSchema,
     }),
 
     handOff: tool({
