@@ -270,6 +270,14 @@ Live at the time of writing (2026-07-30):
   the offset is corrigible, the missing correlation is the finding. The sleep-stage mapping looks
   **swapped** (3 = REM, 4 = deep: combined MAE 70 vs 86, means 65/94 vs Oura 58/109) but **n = 4**,
   so do not rewrite the schema comment. Two nights were unusable because of PS-17's phantoms.
+- **[`../../reviews/2026-09-02-recovery-index-bin-occupancy.md`](../../reviews/2026-09-02-recovery-index-bin-occupancy.md)**
+  — 🆕 **Q-509, continued: two of the three remaining candidates are closed.** Bin occupancy does
+  **nothing** — across 575 night bins not one falls below `MIN_BEATS_PER_BIN`, the argmin carried
+  81–282 beats, and excluding sparse bins moved 0 of 8 nights. Degenerate windows are worth
+  **≈0.06 h**. So of the 0.933 h: smoothing 0.487, occupancy 0.000, window geometry ≈0.06 —
+  **≈0.39 h remains, in ordinary full-length nights.** Also retires the old reconstruction caveat:
+  decode the raw `0x80`/`0x60` frames, bin in **`ds`** not `measured_at`, and take the window from
+  `sleep_sessions` (already clamped) — it then reproduces the shipped number to within 0.03–0.21 h.
 - **[`../../reviews/2026-09-02-recovery-index-ble-smoothing-experiment.md`](../../reviews/2026-09-02-recovery-index-ble-smoothing-experiment.md)**
   — 🆕 **Q-509's pre-registered experiment, run 2026-09-02 — and it FAILED its pass test.**
   Smoothing the BLE overnight series before `computeRecoveryIndex`'s argmin recovers **0.487 h of
