@@ -388,6 +388,47 @@ below threshold and left in place for next time.
 > BF-29 (My meals), BF-30 (Meal detail), BF-31 (Edit meal) and BF-26 (Quantity). Two artboards need
 > no entry — `Tap targets` and the `srv/g` studies both shipped in Q-395a.
 
+### [sleep][platform] PS-17 — a phantom afternoon "sleep" replaced a real night in the daily summary, and it is scoring 🔴 LIVE
+
+- **Lane:** A (the rollup and the summary write)
+- **Added:** 2026-08-30, from the Colmi comparison — found by accident while validating a different device
+
+**This is a live scoring fault on the owner's own data.** `aggregateOuraRawSamples` is emitting
+daytime sessions into `sleep_sessions`, and where a day carries more than one, the wrong one reaches
+`oura_daily_summary`.
+
+| Date | Phantom session | Real night |
+|---|---|---|
+| 2026-08-27 | 11:35–16:52, 4.75 h, eff 89 | 23:02–06:37, 7.42 h, eff 98 |
+| 2026-08-29 | 15:25–17:17, 0.5 h, eff 26 | 21:55–06:50, 8.25 h |
+| 2026-08-30 | 18:24–18:54, 0 h, eff 0 | 21:59–06:39, 7.92 h |
+
+The 27th is the one that did damage. Its summary took the **phantom**:
+
+| Date | dur | hrv | rhr |
+|---|---|---|---|
+| 08-26 | 8.17 | 53 | 53 |
+| **08-27** | **4.75** | **26.5** | **64.1** |
+| 08-28 | 7.50 | 62 | 51 |
+| 08-29 | 8.25 | 71 | 50 |
+
+HRV at **half** the surrounding days and resting HR **13 bpm above** them, because those are awake
+daytime values. Readiness for the 27th was computed from a nap that did not happen.
+
+**Two defects, and both need fixing:**
+
+1. **The detector emits sessions during obvious wakefulness.** The 27th's window overlaps 468
+   logged steps and continuous daytime heart rate. A movement or step gate would have rejected it.
+2. **The summary picks the wrong session when a day has several.** Both the 27th's rows are dated
+   `2026-08-27`; the shorter, later one won. It should pick the night — longest, or the one starting
+   in the evening — and a day with two sessions should never silently drop the main one.
+
+**Do not fix only the summary.** The phantom rows are also read by anything that lists sleep, and a
+0-hour session with efficiency 0 is visible nonsense regardless of which row the summary takes.
+
+**Back-fill is required, not optional:** the 27th's stored summary is wrong on disk, so a corrective
+recompute has to run over the affected days once the selection is fixed.
+
 ### [nutrition] BF-109 — the Review sheet's macro/calorie cross-check (shipped; a real scan and the device owed)
 
 - **Lane:** B — `components/nutrition/review-step.tsx` and `macro-calorie-warning.tsx`. The shared
@@ -2003,103 +2044,70 @@ deletes nothing on tap, which is what makes an icon-only entry point defensible 
   diff unreadable.
 
 
-### [devices] PS-11 — FIRST OVERNIGHT SYNC: prove every metric actually landed ⭐ TOMORROW'S JOB
+### [devices] PS-11 — the overnight acceptance test, and what it left owing
 
 - **Lane:** A
-- **Gate:** device — needs the ring worn overnight 2026-08-26 and the app on the phone
+- **Added:** 2026-08-26 · **rewritten 2026-08-30** — the capture happened; this is now the remainder
 - **Plan:** [`2026-08-26-alternative-ring-colmi-testing.md`](superpowers/plans/2026-08-26-alternative-ring-colmi-testing.md)
   · matching reference: [`multi-device-comparison.md`](multi-device-comparison.md)
-- **Added:** 2026-08-26 · owner is wearing the ring tonight; this is the acceptance test for the
-  connector shipped the same evening.
 
-**Nothing in the connector has run against the physical ring.** The BLE layer is I/O against
-hardware and has no test coverage by nature; everything under it is pure and covered. So this entry
-is the first real evidence either way, and it is a *measurement* task, not a build task.
+Four nights are recorded. What the capture settled: sleep detection works (bedtime within 5 min of
+the Oura, wake within 6), overnight heart rate matches (bias −0.3 bpm over 252 samples, 72% within
+5), light-sleep duration agrees within 10 min. Daytime heart rate does not (r = 0.08 over 284
+samples, and aggregating the Oura across each 5-minute window does not rescue it — only 13% of
+Colmi daytime values fall inside the Oura's observed min–max for the same window).
 
-**FIRST RESULT, 2026-08-26 evening — the sync works and the night produced nothing.** The card
-showed all five switches on, battery 100%, and **"Read 1 samples"**. Confirmed against production:
-`colmi_readings` holds exactly one row, a battery reading; `colmi_sleep_segments` is empty. So the
-connection, the switch writes, the pref read-back, the ingest and the dedup all work end to end, and
-**no history came back at all**.
+- **Keep:** the remaining unknowns have their own entries — PS-16 (steps and calories), PS-19
+  (SpO₂, temperature, stage mapping), PS-20 (the 0x73 frames). What is still owed *here* is the one
+  thing none of them covers: **a workout wearing the Colmi and the Polar H10 together**. The H10 is
+  chest-strap ECG and the only ground truth available; ring-against-ring cannot say which of the two
+  is wrong during movement, which is the single open question about whether this device is usable
+  for training.
 
-Two causes remain and they are not distinguishable from what was captured:
 
-- **(A) There was nothing to sync.** The five switches are off from the factory; this sync is what
-  turned them on, and it enables *then* drains. If so, last night genuinely recorded nothing and
-  tonight is the first real night. Benign.
-- **(B) The history commands are not answering, or their answers are not being mapped.** The
-  weak counter-evidence for (A): steps come from the activity log (`0x43`), which is **not** gated by
-  those five switches, so some step history should have existed — though the ring spent most of
-  yesterday on a desk or a charger, so near-zero is also plausible.
+### [sleep][platform] PS-18 — an Oura sleep revision is undetectable after the fact
 
-**The number that separates them was being collected and not shown.** `framesSeen` and a per-command
-tally now surface in the card under "Sync detail", with the raw hex of anything that did not decode.
-If a history command's tag is absent, the ring never answered it — a different problem from
-answering and failing to map. Also raised the drain window 12s → 30s, since the heart-rate log alone
-can be 24 packets and a drain that ends early looks exactly like a ring with no history.
+- **Lane:** A (the rollup write)
+- **Needs:** PS-17
+- **Added:** 2026-08-30
 
-**SECOND SYNC, 21:02 — cause (A) confirmed, plus one real bug found.** Stored HRV 47, stress 31,
-**temperature 36.4 °C** and battery. All plausible, and the timing settles it: the switches were
-enabled at 20:48 and the first samples are stamped **21:00** — the ring's first 30-minute slot after
-being switched on. So there was genuinely nothing before, and it is recording now. `local_date`
-also resolved to 2026-08-27 for a 21:00 UTC sample, which is the right Brisbane day.
+The rollup **replaces** sleep rows rather than updating them. Measured 2026-08-27: at 06:18 the
+night read 22:14–05:23 / 6.83 h; at 06:51 it read 22:14–**06:19** / **7.5 h** — wake moved 56
+minutes and duration 40. Both reads showed `created_at == updated_at`, each equal to that read's
+own time.
 
-**The bug: the heart-rate log request was a bare `0x15` and the ring ignored it.** Gadgetbridge
-sends `[0x15, <int32 LE>]` where the int is the day's LOCAL midnight expressed as though it were UTC
-(`millis + ZONE_OFFSET + DST_OFFSET`). HRV, stress and temperature take no argument and worked; this
-one does and returned silence rather than an error — which is exactly why HR was the only enabled
-metric with nothing to show. Fixed with `localDayStartSeconds()` and one request per day walking
-back from today, so a sync after midnight still collects the night that just ended.
+**So `updated_at` can never reveal a revision** — a revision *is* a new row, and its creation time
+is the only timestamp there is. The change was caught only because the previous values happened to
+have been recorded half an hour earlier, by hand, in a chat.
 
-**Still outstanding after this fix, and expected rather than broken:** sleep and SpO2 need a night
-with the switches on (there has not been one yet); steps/calories/distance need the ring to have
-been worn and moving, and it has mostly sat on a desk or charger.
+For a week-long baseline that is a hole: any night's numbers can change and nothing in the database
+says so. The scoring rows derived from them are **not** recomputed in step (the project already
+knows this class — see the model-version rule in CLAUDE.md).
 
-**THIRD SYNC, 23:00 — steps, distance, calories and SpO2 all landed.** Stored across the three
-syncs: steps ×2 (485, 876), distance ×2 (328 m, 575 m), calories ×1 (1431), SpO2 ×2 (98),
-HRV, stress ×3, temperature ×3, battery ×3. Activity buckets resolved to 07:00 and 08:00 Brisbane,
-which is correct — the ring reports a quarter-of-day index and only the buckets with movement in
-them came back, the rest being zero and filtered.
+Options, in preference order: keep a `revision` counter and a `superseded_at` on the row rather than
+replacing it; or write a small append-only audit of (day, field, old, new) at rollup time. Either
+makes "did this night change?" answerable. Replacing rows silently does not.
 
-**Heart rate is still absent and that is expected, not a new fault:** the fix is in PR #566 and was
-not deployed when this sync ran.
+### [devices] PS-19 — three Colmi metrics have never been compared at all
 
-**OPEN QUESTION — `calories` may be a daily cumulative, or scaled by 10.** One bucket reported
-**1431** alongside 485 steps and 328 m. 485 steps is roughly 20–25 kcal, so 1431 is not
-per-bucket-kcal, and 143.1 (the ×10 reading the Python client warns about) is still too high for
-that bucket. A daily running total including BMR fits. **Do not sum this column until it is
-settled.** One sample cannot decide it; a full day will — a cumulative rises monotonically through
-the day and resets at midnight, a per-bucket value fluctuates. `decodeActivity` deliberately stores
-it raw for exactly this reason, so no data is lost either way and only the interpretation is
-pending.
+- **Lane:** A (analysis; no product code)
+- **Added:** 2026-08-30 · a gap in the validation, not in the ring
 
-**Next sync is the discriminator for HR.** Read "Sync detail" first.
+Four days of Colmi data exist and the comparison covered heart rate, sleep timing and stress. These
+were never looked at:
 
-**Do this, in order, and record the result in §11 of the plan:**
-
-1. **More → Devices → Pair ring**, then **Sync now**. Ring on the charger or worn — a still ring
-   sleeps its processor and answers nothing, and the card will say so (`reason: 'silent'`).
-2. **Read the "Recording automatically" row first.** Five switches: heart rate (with its interval),
-   HRV, blood oxygen, stress, temperature. The sync enables all five and then reads them back.
-   **A switch that reads OFF means that metric recorded nothing overnight** — and an empty history
-   from a disabled switch is indistinguishable from a ring that was not worn. If any is off after a
-   sync, that is the bug, and it is the highest-value thing this entry can find.
-3. **Check every metric has rows**, per kind:
-   `SELECT kind, count(*), min(measured_at), max(measured_at) FROM colmi_readings GROUP BY 1;`
-   Expect: `heart_rate`, `steps`, `calories`, `distance`, `hrv`, `stress`, `spo2`, `temperature`,
-   `battery`. **A kind with zero rows is a finding** — either its switch was off, its decoder is
-   wrong, or the ring does not populate it. Say which.
-4. **Check sleep**: `SELECT local_date, count(*), sum(minutes) FROM colmi_sleep_segments GROUP BY 1;`
-   Stages are 2 light / 3 deep / 4 REM / 5 awake. Sum of minutes should be close to the night's
-   length; a wild mismatch means the stage-span walk is drifting.
-5. **Sync a second time and confirm it stores 0.** Dedup is unit-tested and DB-tested, but not
-   against real ring output, where the timestamps come from `resolveRelative` rather than a fixture.
-6. **Check the day boundary.** A session that started before midnight must be keyed to the day it
-   *started* in. This is the most likely place for an off-by-one and the hardest to notice later.
-
-**Known gaps to confirm rather than rediscover:** the heart-rate log's continuation packets are
-dropped (only the timestamped packet carries an anchor — see `framesToPayload`), so HR coverage may
-be sparser than the ring's own history; and activity is requested for 3 days by default.
+- **SpO₂** — 47 Colmi readings across four days. The Oura's per-bucket table (`oura_bucket`) returns
+  **no rows for any date**, which is itself unexplained and blocks the comparison; `sleep_sessions`
+  carries no SpO₂ either. Find out where the Oura's SpO₂ actually lives before concluding anything.
+- **Temperature** — 95 Colmi readings. Oura has `oura_daily_summary.temp_mean_c` nightly only, so
+  the comparison is Colmi's nocturnal mean against one scalar. Worth doing; it is one number a night.
+- **Sleep stages** — Colmi 99 min deep / 72 REM against Oura 40 / 105 for the same night.
+  **The mapping is a guess**: `2 light, 3 deep, 4 REM, 5 awake` is written in the schema comment and
+  verified against nothing. Swapping 3 and 4 gives 72 deep / 99 REM against 40 / 105 — REM nearly
+  exact, deep still 1.8×. Light already agrees within 10 min (315 vs 305), which is what makes the
+  deep/REM split worth resolving rather than dismissing.
+  Colmi also emits **no awake stage at all** against Oura's 35 min, which accounts for much of the
+  duration gap.
 
 ### [devices] PS-15 — the comparison endpoint cannot pair the two rings' stress, and cannot see steps at all
 
@@ -2162,6 +2170,32 @@ Two related unknowns the same capture settles: three buckets (08:00, 09:00, 10:0
 distance but **no calories** while every other bucket carries all three; and the buckets arrive
 **hourly** although the decoder handles quarter-hours correctly and the ring is documented as
 recording at 15 minutes.
+
+### [devices] PS-20 — the ring pushes an unidentified 0x73 frame, and a busy radio reports as a missing ring
+
+- **Lane:** A (decode) plus a one-line copy fix
+- **Added:** 2026-08-30
+
+**Three `0x73` frames, archived and decodable without another sync** (`colmi_raw_frames`, tag 115,
+2026-08-29 07:27). All checksums valid, identical structure, and they appeared only after several
+days of continuous wear:
+
+```
+73 12 00 00 32 00 06 9c 00 00 26 00 00 00 00 7f
+73 12 00 00 3e 00 08 4c 00 00 30 00 00 00 00 47
+73 12 00 00 40 00 08 94 00 00 32 00 00 00 00 93
+```
+
+Byte 4 reads 50 / 62 / 64; bytes 6–7 as u16 read 1692 / 2124 / 2196; byte 10 reads 38 / 48 / 50.
+The middle over the first is ~34 in all three, and byte 10 over byte 4 is ~0.77 in all three — so
+they scale together and are one record type, not three. Shape suggests a session or activity
+summary (duration / steps / something derived). **Decode from the stored bytes; do not ask for
+another capture.**
+
+**Separately, a copy fix.** A BLE peripheral takes one connection, so a ring held by the scale's
+scanner presents as *not found* — the owner reported exactly this after weighing, and waiting fixed
+it. `connectHint` already mentions other apps; it should say plainly that another device is using
+the connection and to try again shortly, rather than implying the ring is absent or flat.
 
 ### [devices] PS-12 — baseline the three-device comparison, and write down what "agreement" was
 
