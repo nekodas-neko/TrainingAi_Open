@@ -2,7 +2,9 @@
 
 > **Lean index — orient here, then dive.** This file holds the current status, the live Known
 > Issues & Risks, and the What's Left To Do list. Nothing else. The per-session journal lives under
-> `docs/overview/`; the Document Map at the bottom routes everything else.
+> `docs/overview/`; the Document Map at the bottom routes everything else. **Anything the engine
+> cannot unblock itself is collected under 🔑 Waiting on the owner**, so it never has to be
+> reassembled from a chat.
 >
 > It is kept lean on purpose, and it has drifted twice. If you are about to append a dated summary
 > of what you just shipped, that belongs in your journal entry, not here.
@@ -1533,6 +1535,26 @@ window, then the newest `history-*.md`. The 157 dated status notes this section 
 [`docs/overview/status-archive.md`](docs/overview/status-archive.md), which records why.
 
 ---
+
+## 🔑 Waiting on the owner
+
+**One place to look for everything the engine cannot unblock itself.** Each row is verified against
+the code or against production data, not inferred, and each has a `Gate:` or `Verify:` field on its
+backlog entry so `next-item.js` parks it instead of handing it to the next implementer as ready work.
+Last swept **2026-09-02**.
+
+| What | Why it needs you | Where it is recorded |
+|---|---|---|
+| **Run a `fullHistory` rollup pass** | It is the only path that reaches the chronic-stress model, so `chronic_stress_granular_nights` (TN-1) stays NULL until one runs — and that column is the only thing that can say *why* chronic stress has never scored. **≥ 21 with a null score puts the fault inside the vendored model; < 21 names the granular stash.** | TN-1, Q-525 |
+| **Decide the rest/active HR anchor** | **Freeze at a dated constant (recommended) or move to a 90-day trailing mean.** The 90-day option moves the at-rest share **14.9% → 25.9% on 56 of 57 days** — a Body Battery re-levelling, not a stability fix. Structural: a longer window always sits above a shorter one while fitness improves. | Q-515, [review](docs/reviews/2026-09-02-hr-rest-anchor-level-shift.md) |
+| **An S25 smoke run** | Local SQLite **v34 + v35 + v36** have never been opened on a device. v35 and v36 are plain ADD COLUMNs, but they sit behind v34's table rebuild, so a device upgrading from v33 runs all three in one pass. | Known Issues, three rows |
+| **The PS-17 back-fill** | `POST /api/oura-ble/samples/redecode` is admin-session gated. Also recovers two of PS-19's seven nights. | PS-17, PS-19 |
+| **PS-20's counted-walk test** | The `0x73` cm-per-step hypothesis cannot be settled from stored data — it needs a walk with a known step count. | PS-20 |
+| **`worn_hours_ble` and `recovery_index_hours`** | Both **0 of 107 rows** on `oura_daily_derived` with no producer. Populate or drop — and dropping is destructive. | Q-510 `Keep:` |
+| **Zone minutes / active minutes re-band** | Tuning has proposed and measured it; it re-scores a contributor reading ~6/100 on 53 of 59 days. Your quoted instruction covers the **anchor** half only, not the WHO band shift. | Q-523 |
+| **The movement-per-hour boundary** | Same boundary as the anchor decision above, so it waits on it. Saturated at **856 of 857 waking hours** — it measures ring wear. | Q-522 |
+| **Body Battery's drain model** | The replacement is **already owner-confirmed and fitted** (goal-normalised `c`, BMR-proportional baseline). It is sequenced behind the anchor decision above, so that one release unblocks it. Today `0` means *"you wore the ring a long time"*, close to the opposite of what you asked for. | Q-521 |
+| **Where "Exercise detected" gets its data** | Its only writer was the Oura Cloud sync. Either the BLE classifier feeds the existing review UI, or the card and its route retire. Either branch is a different feature. | Q-231 |
 
 ## ⚠️ Known Issues & Risks With Recently Shipped Features
 
@@ -9503,7 +9525,8 @@ contributor bars render on a BLE night; confirm Body Battery no longer opens at 
 
 ## 🗂️ Document Map
 
-`projectOverview.md` is the lean index (current status + Known Issues & Risks + What's Left). The
+`projectOverview.md` is the lean index (current status + **Waiting on the owner** + Known Issues &
+Risks + What's Left). The
 append-only session journal and the batched archives live under `docs/`:
 
 | File | Contents |

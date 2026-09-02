@@ -6950,7 +6950,29 @@ reader who assumes the count rides along with an existing write will not find it
 `Gate: owner` is now a field on Q-525 rather than prose, so `next-item.js` parks it instead of
 handing it to the next implementer as ready work.
 
-## 2026-09-02 — `projectOverview.md` → 9557, `docs/implementation-backlog.md` → 15824 (BF-105)
+## 2026-09-02 — `projectOverview.md` → (see .size), `docs/implementation-backlog.md` → (see .size) (queue gates)
+
+The index gains a **🔑 Waiting on the owner** section and the backlog gains four blocked-reason
+blocks. Both are the same fix for the same failure: every one of these blockers was already written
+down, in prose, inside an entry `next-item.js` was handing to implementers as READY. A sentence
+saying "Do Q-515 first" is invisible to a parser that reads fields, so the entry kept surfacing at
+the top of the queue and the block had to be re-derived by whoever picked it up.
+
+The lines that earn their place are the ones a later session would otherwise re-litigate: Q-523's
+"same banding as Q-516" claim is **wrong** (`PEAK_BANDS` in one module, `ZONE_DEFS` in another), and
+Q-516 has now shipped without touching it, so "resolve them together" is void rather than pending —
+delete that and the next session waits for something that already happened. Q-214a's `Verify: device`
+quotes the entry's own closing paragraph rather than asserting it.
+
+The index section is a table, not prose, because its job is to be scanned by the owner and kept true
+by the next sweep. Each row names where the obligation actually lives, so the table can go stale
+without the entries going stale with it.
+
+Q-521 was added to the same sweep after the fact, when reading it turned up the identical prose-only
+*"Do Q-515 first"*. That is five instances of one class in the entries read in a single sitting,
+which is the argument for the fields over the sentences.
+
+## 2026-09-02 — `projectOverview.md` → 9580, `docs/implementation-backlog.md` → 15868 (BF-105)
 
 Both grow, and in both the lines that earn their cost are the two corrections to the entry's own
 plan. It says to delete the `workout-timers` channel as a dead row; `lib/notifications.ts:76` posts
