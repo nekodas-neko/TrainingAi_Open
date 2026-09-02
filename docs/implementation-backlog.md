@@ -10803,6 +10803,32 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 ### [heart-rate] Q-516 — `PEAK_BANDS` is calibrated for a heart-rate range strength training never reaches
 
 - **Branch:** `fix/hr-recovery-peak-bands`
+- **⚑ SHIPPED 2026-09-02, BUT NOT AS THE ENTRY WROTE IT — the proposed `<90 · 90–104 · 105–119 ·
+  120+` would have made the feature worse.** The entry measured `set_hr_stats` only, which is the
+  STRENGTH half. **HRP-2 is built**: `hr-episode-detection.ts` feeds workout cool-downs in as
+  `run_cooldown` episodes, and of 13 cardio workouts carrying HR, peaks run **96–168**, with 2 at
+  ≥130 and 1 at ≥150. So `130–149` and `150–169` are reachable, not "structurally unreachable", and
+  collapsing them into `120+` would have put a **168 bpm cool-down in the same bucket as a 120 bpm
+  lifting rest** — destroying the cross-modal comparison the module exists for. Only `170+` was
+  genuinely empty across both sources, and only it was removed. **The module's own header said
+  "Phase 1 seeds exclusively from set_hr_stats — zero new detection", and that stale line is what
+  the entry read**; it is corrected in the same diff, along with the §6 caveat that claimed the
+  cross-modal confound "doesn't yet bite".
+- **⚑ AND RE-BANDING DOES RECOVER SIGNAL, which the entry ruled out.** Its "mean drop 3.0 below 110
+  against 14.9 above" is a POOLED average that hides the boundary cutting through the informative
+  range: measured over 312 covered episodes, the mean 60-second drop is **−3.5** under 90 and **5.1**
+  at 90–104 — noise — against **12.2** at 105–119. **42 episodes peaking 105–109 shed 11.5 bpm in
+  their first minute and were dimmed as noise**, and dropped from the trend entirely. Shipped bands:
+  `<90 · 90–104 · 105–119 · 120–149 · 150+`, with `lowSignal` now a threshold
+  (`LOW_SIGNAL_MAX_BPM = 105`) rather than a label match, since "the low ones" is no longer one
+  string. `lib/ai-chat/tools.ts` named the old labels in a tool description and was updated with it.
+  [journal](overview/entries/2026-09-02-q516-peak-bands.md).
+- **Keep:** the honesty half, and it is now **Lane B's**. `aggregateHrRecoveryProfile` returns
+  `informativeShare` (the fraction of episodes above the low-signal threshold) precisely so the card
+  can say out loud that HR recovery informs a minority of lifting sets; nothing renders it yet.
+  **Four populated buckets look like a working feature whether or not they are** — that was the
+  entry's own warning and it still stands. Also still open, and the owner's: whether the feature is
+  targeted correctly at all, given the range it wants lives in cardio rather than strength sets.
 - **Plan:** none yet — re-banding is cheap; **the honesty change in "first action" is the real work.**
   Lane A implements; Tuning proposes only.
 - **Added:** 2026-08-18 · Tuning agent ·

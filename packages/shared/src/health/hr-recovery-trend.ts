@@ -5,7 +5,7 @@
 // shape). Median, not mean, per the same convention — one anomalous episode can't skew a period.
 import { formatInTimeZone } from 'date-fns-tz'
 import { median } from './daily-medians'
-import { bandForPeak, recoveryRateBpmPerMin, LOW_SIGNAL_BAND_LABEL, type RecoveryEpisode } from './hr-recovery-profile'
+import { bandForPeak, recoveryRateBpmPerMin, isLowSignalBand, type RecoveryEpisode } from './hr-recovery-profile'
 
 export interface BandTrendPoint {
   /** Local calendar month, 'yyyy-MM'. */
@@ -31,7 +31,7 @@ export function aggregateHrRecoveryTrend(episodes: RecoveryEpisode[], tz: string
   for (const ep of episodes) {
     if (ep.loggedAt == null) continue
     const band = bandForPeak(ep.peakBpm)
-    if (!band || band.label === LOW_SIGNAL_BAND_LABEL) continue
+    if (!band || isLowSignalBand(band)) continue
     const rate = recoveryRateBpmPerMin(ep)
     if (rate == null) continue
 

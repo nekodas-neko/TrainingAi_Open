@@ -3,16 +3,19 @@
 // an intensity-normalised, cross-modal fitness signal ("from 150 bpm you shed ~X bpm/min"), distinct
 // from the per-exercise Heart & Recovery card (which only compares sets of the SAME lift).
 //
-// Phase 1 seeds exclusively from the durable set_hr_stats rows (between-set rests during workouts) —
-// zero new detection. Later phases (HRP-2) add run/interval episodes via the same RecoveryEpisode
-// shape, detected directly from oura_heartrate. One Formula, One Place: episode-level math (drop
+// **HRP-2 IS BUILT — this module is no longer strength-only, and the comment that said so cost
+// Q-516 its conclusion.** `hr-episode-detection.ts` detects workout cool-downs from completed
+// workouts + oura_heartrate and feeds them in as `run_cooldown` episodes, so the profile pools
+// lifting rests AND cardio. Any claim about "the range this feature sees" measured over
+// set_hr_stats alone is a claim about half of it. One Formula, One Place: episode-level math (drop
 // curve, secToResting, recoveredResting) is NOT re-derived here — it comes from set-hr-stats.ts via
 // the already-persisted set_hr_stats columns. This module only buckets + aggregates.
 //
 // CAVEAT (spec §6, load-bearing — surface in any UI): recovery rate depends on what you're doing
 // during the rest (standing between sets vs. walking a cool-down) — cross-modal comparison is only
-// safe once posture/source is held constant or explicitly labelled. Phase 1 is ALL set_rest (standing
-// between-set rests), so this doesn't yet bite — it matters once HRP-2 mixes in run cool-downs.
+// safe once posture/source is held constant or explicitly labelled. **This DOES bite now**: cool-down
+// episodes are mixed in, and they are the only ones reaching the top bands, so a top-band figure is
+// a cardio figure. `bySource` on every band is what makes that visible; render it.
 import { median } from './daily-medians'
 
 export interface PeakBand {
@@ -22,18 +25,46 @@ export interface PeakBand {
   max: number
 }
 
-// Bands, not exact bpm, for stable per-bucket sample sizes (spec §3).
+// Bands sized to the range these episodes actually reach (Q-516). The spec's original five —
+// `<110 · 110–129 · 130–149 · 150–169 · 170+` — were justified as giving "stable per-bucket sample
+// sizes", which is an empirical claim, and it was wrong at the bottom: `<110` sat at the p75 of
+// strength peaks and held 75% of the data in the bucket the UI dims.
+//
+// **The `<110` boundary cut through the MIDDLE of the informative range.** Measured over 312 covered
+// `set_hr_stats` episodes, the mean 60-second drop is **−3.5** under 90 and **5.1** at 90–104 —
+// genuinely noise — against **12.2** at 105–119. So 42 episodes peaking 105–109 and shedding
+// **11.5 bpm** in their first minute were dimmed as noise. Splitting the old bottom band at 90 and
+// 105 is what this fixes; two of the three bottom bands stay marked low-signal, because they are.
+//
+// **The top bands stay, and Q-516's own proposal to collapse them into `120+` must not be shipped.**
+// That measurement was taken over `set_hr_stats` alone — strength only, max 132 — while this profile
+// ALSO ingests workout cool-downs (`hr-episode-detection.ts`, source `run_cooldown`), which reach
+// **168**. Of 13 cardio workouts carrying HR, 2 peak at ≥130 and 1 at ≥150, so `130–149` and
+// `150–169` are reachable, not unreachable; collapsing them would put a 168 bpm cool-down in the
+// same bucket as a 120 bpm lifting rest and destroy the cross-modal comparison this module exists
+// for. Only `170+` was genuinely empty across BOTH sources, and only it is removed.
+//
+// **Read `LOW_SIGNAL_MAX_BPM` before adding a band.** The bands and the low-signal rule are one
+// decision, and expressing "the low ones are noise" as a single label match is what made the old
+// version brittle. `lib/ai-chat/tools.ts` names these labels in a tool description — update it too.
 export const PEAK_BANDS: PeakBand[] = [
-  { label: '<110', min: 0, max: 110 },
-  { label: '110–129', min: 110, max: 130 },
-  { label: '130–149', min: 130, max: 150 },
-  { label: '150–169', min: 150, max: 170 },
-  { label: '170+', min: 170, max: Infinity },
+  { label: '<90', min: 0, max: 90 },
+  { label: '90–104', min: 90, max: 105 },
+  { label: '105–119', min: 105, max: 120 },
+  { label: '120–149', min: 120, max: 150 },
+  { label: '150+', min: 150, max: Infinity },
 ]
 
-// Below this peak, recovery is near-meaningless (barely elevated HR) and mostly measurement noise —
-// callers should de-emphasise this band rather than surface it with the same weight (spec §6).
-export const LOW_SIGNAL_BAND_LABEL = '<110'
+// At or below this peak, recovery is near-meaningless (barely elevated HR) and mostly measurement
+// noise — callers de-emphasise those bands rather than surface them with the same weight (spec §6).
+// 105 is where the measured 60-second drop roughly doubles; see the band comment above.
+export const LOW_SIGNAL_MAX_BPM = 105
+
+/** Whether a band sits entirely inside the range where recovery carries no signal. A threshold, not
+ *  a label match — with five bands "the low ones" is no longer expressible as one string. */
+export function isLowSignalBand(band: PeakBand): boolean {
+  return band.max <= LOW_SIGNAL_MAX_BPM
+}
 
 export function bandForPeak(peakBpm: number): PeakBand | null {
   return PEAK_BANDS.find(b => peakBpm >= b.min && peakBpm < b.max) ?? null
@@ -86,6 +117,16 @@ export interface BandSummary {
 export interface HrRecoveryProfile {
   bands: BandSummary[]
   totalEpisodes: number
+  /**
+   * Episodes peaking above `LOW_SIGNAL_MAX_BPM`, as a share of all banded episodes — the fraction of
+   * this profile that carries signal at all.
+   *
+   * Surfaced because the honest version of Q-516 is not the re-banding: it is saying out loud that
+   * HR recovery informs a MINORITY of lifting sets (39% of the owner's covered episodes). Four
+   * populated buckets look like a working feature whether or not they are, and a caller that renders
+   * them without this number is the failure mode the entry named.
+   */
+  informativeShare: number | null
 }
 
 /** Aggregate episodes into per-band medians. Bands with zero episodes are omitted entirely (never a
@@ -123,13 +164,19 @@ export function aggregateHrRecoveryProfile(episodes: RecoveryEpisode[]): HrRecov
         medianRateBpmMin: medianRate != null ? Math.round(medianRate * 10) / 10 : null,
         medianSecToResting: medianSec != null ? Math.round(medianSec) : null,
         recoveredPct: outcomes.length ? Math.round((outcomes.filter(Boolean).length / outcomes.length) * 100) : null,
-        lowSignal: b.label === LOW_SIGNAL_BAND_LABEL,
+        lowSignal: isLowSignalBand(b),
         bySource,
       }
     })
     .filter((b): b is BandSummary => b != null)
 
-  return { bands, totalEpisodes: episodes.length }
+  const banded = bands.reduce((sum, b) => sum + b.n, 0)
+  const informative = bands.filter(b => !b.lowSignal).reduce((sum, b) => sum + b.n, 0)
+  return {
+    bands,
+    totalEpisodes: episodes.length,
+    informativeShare: banded > 0 ? Math.round((informative / banded) * 100) / 100 : null,
+  }
 }
 
 /** Normalise a durable per-set HR row (set_hr_stats) into a recovery episode — Phase 1's only

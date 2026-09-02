@@ -8,7 +8,7 @@ function setRow(over: Partial<SetHrStatsRow>): SetHrStatsRow {
     setLogId: 'x', workoutSessionId: 'w', exerciseLogId: 'e', exerciseId: null, exerciseName: 'Bench',
     phaseType: null, setNumber: 1, intensityPct: 90, plannedPct: 90, restTakenSec: 90, plannedRestSec: 90,
     loggedAt: new Date('2026-05-10T00:00:00Z'),
-    peakBpm: 160, avgBpm: 150, bpmAtEnd: 158, drop30s: 10, drop60s: 20, drop90s: 28, drop120s: 34,
+    peakBpm: 130, avgBpm: 120, bpmAtEnd: 128, drop30s: 10, drop60s: 20, drop90s: 28, drop120s: 34,
     troughBpm: 120, secToPreset: 50, recoveredPreset: true, secToResting: null, recoveredResting: null,
     pctHrrAtRestEnd: 60, secToHrr50: 25, restAdequate: true, readingsCount: 40, coverageOk: true,
     computedAt: new Date(), ...over,
@@ -29,12 +29,12 @@ function stubRepo(over: Partial<WorkoutRepository>): WorkoutRepository {
 describe('computeHrRecoveryProfile', () => {
   it('merges set_hr_stats episodes into the profile and trend', async () => {
     const repo = stubRepo({
-      getSetHrStatsSince: async () => [setRow({}), setRow({ peakBpm: 165, drop120s: 44 })],
+      getSetHrStatsSince: async () => [setRow({}), setRow({ peakBpm: 140, drop120s: 44 })],
     })
     const { profile, trend } = await computeHrRecoveryProfile(repo, 'u1', 'Australia/Brisbane', 180)
     expect(profile.totalEpisodes).toBe(2)
-    expect(profile.bands.find(b => b.label === '150–169')?.n).toBe(2)
-    expect(trend.find(t => t.label === '150–169')?.points.length).toBeGreaterThan(0)
+    expect(profile.bands.find(b => b.label === '120–149')?.n).toBe(2)
+    expect(trend.find(t => t.label === '120–149')?.points.length).toBeGreaterThan(0)
   })
 
   it('detects and merges workout-cooldown episodes alongside set episodes', async () => {
@@ -58,7 +58,7 @@ describe('computeHrRecoveryProfile', () => {
       getUserById: async () => ({ dateOfBirth: null } as never),
     })
     const { profile } = await computeHrRecoveryProfile(repo, 'u1', 'Australia/Brisbane', 180)
-    const b170 = profile.bands.find(b => b.label === '170+')!
+    const b170 = profile.bands.find(b => b.label === '150+')!
     expect(b170.bySource.run_cooldown).toBe(1)
   })
 
