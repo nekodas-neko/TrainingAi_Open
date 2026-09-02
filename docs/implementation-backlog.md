@@ -13587,11 +13587,30 @@ per-field merge where an AI write has no honest source rank to claim.
   literals now on theme tokens. Readings older than 3h render muted and say "last seen Nh ago" in
   the aria-label rather than looking current. **The strap and scale halves below are untouched and
   are what keeps this entry open.**
+- **⚠ TWO CORRECTIONS, 2026-09-02, from reading the tree rather than the entry. Do not plan off the
+  two bullets above without them.**
+  1. **The ring half's stated outcome is not in the tree.** There is no `oura-battery-chip.tsx` and
+     **no battery chip on the Home header** — `session-select-content.tsx` renders `WeatherChip` and
+     nothing else beside the date. The ring battery renders on **Health** and **More**
+     (`components/health/oura-section.tsx`, `components/more/oura-section.tsx`), which is where the
+     v1.270.30 fix actually landed; the changelog's own wording — *"The chip existed but was reading
+     the Oura Cloud value"* — fits a chip in the Oura section rather than a new one on Home.
+     **Git cannot settle whether it regressed or never reached Home:** history begins at the public
+     snapshot (2026-08-16), after the 2026-08-08 claim. Either way the header is empty today, so
+     treat the ring half as **open** and re-read the plan's Task 26 before building.
+  2. **The strap battery IS already read and displayed — during pairing, by a different route.**
+     `components/settings/chest-strap-pairing.tsx:87-139` reads the standard Battery Service
+     characteristic over browser BLE and renders `Battery N%`. So the claim below ("no JS call site
+     reads it") is wrong as stated: what is true is that **nothing reads `PolarBleStatus.battery`**
+     — the native service's value, delivered by `getStatus()` and the `polarStatus` listener — and
+     nothing persists either number. **That is a second source for one value**, which is the class
+     this repo keeps paying for; the chip must take the native one, and the pairing screen should be
+     made to agree rather than left as a parallel read.
 - **Very different starting points per device.** Strap: a live `battery` value already exists natively
-  (`PolarStrapService.onBattery`, exposed via `getStatus()`) but **no JS call site reads it and
-  nothing persists it** — needs wiring + a "last seen" store, genuinely new work. Scale: **no
+  (`PolarStrapService.onBattery`, exposed via `getStatus()`), and **nothing reads it or persists it**
+  — needs wiring + a "last seen" store, genuinely new work (see correction 2). Scale: **no
   battery capability exists anywhere**, not even a one-shot native read — new BLE work, correctly
-  flagged by the owner as a stretch/"if that comes up" item.
+  flagged by the owner as a stretch/"if that comes up" item, and **native, so not Lane B's**.
 - **⚑ Concrete answer to the refresh-button question, not just an opinion**: checked what each
   does — pull-to-sync bumps `refreshTick`, which is what drives Body Battery/training-load/
   muscle-recovery/HR-chart refresh; the manual header button does **not** bump `refreshTick` at all,

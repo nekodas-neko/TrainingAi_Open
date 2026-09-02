@@ -66,3 +66,26 @@ half last week's is worse than none, because it gets trusted.
 
 Nothing device-verifiable shipped here. The device debt from this run is enumerated on the baton and
 is now roughly seventeen screens.
+
+### Q-111 — two corrections, from reading the tree rather than the entry
+
+Scoping the next item turned up an entry that describes code which is not there.
+
+1. **The ring half's stated outcome is not in the tree.** Q-111 says *"✅ RING HALF DONE … wired into
+   the Home header beside the weather chip"*, naming `oura-battery-chip.tsx`. **No such file exists,
+   and the Home header renders `WeatherChip` and nothing else beside the date.** The ring battery
+   renders on Health and More (`components/health/oura-section.tsx`, `components/more/oura-section.tsx`)
+   — which fits the v1.270.30 changelog's own wording, *"The chip existed but was reading the Oura
+   Cloud value"*. **Git cannot settle whether it regressed or never reached Home:** history begins at
+   the public snapshot on 2026-08-16, after the 2026-08-08 claim. Either way the header is empty
+   today, so the ring half is open.
+2. **The strap battery is already read and displayed — during pairing, by a different route.**
+   `components/settings/chest-strap-pairing.tsx:87-139` reads the standard Battery Service
+   characteristic over browser BLE and renders `Battery N%`. The entry's *"no JS call site reads it"*
+   is wrong as stated. What is true: **nothing reads `PolarBleStatus.battery`** — the native
+   service's value, delivered by `getStatus()` and the `polarStatus` listener — and nothing persists
+   either number. That is **a second source for one value**, the class this repo keeps paying for.
+
+Neither was built here. The point of recording them is that an implementer taking the entry at its
+word would build the strap half against a false picture of both ends — and would spend the first hour
+looking for a file that does not exist.
