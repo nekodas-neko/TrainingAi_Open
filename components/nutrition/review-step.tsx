@@ -6,6 +6,7 @@ import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import type { NutritionScanResult, NutritionIngredient } from '@trainingai/shared/types/nutrition'
 import { sumIngredientEntries } from '@trainingai/shared/nutrition/log-food'
+import { MacroCalorieWarning } from './macro-calorie-warning'
 
 interface EditableNutrition {
   name: string
@@ -149,6 +150,10 @@ export function ReviewStep({ result, value, ingredients, onIngredientsChange, on
         <div className="flex items-center gap-1">
           <input
             type="number" step={step} min={0}
+            // The label is a sibling `<span>`, so nothing tied it to the input — a screen reader
+            // read "spin button" and no more. It is also what lets a test address one of six
+            // otherwise identical number fields by name.
+            aria-label={label}
             value={value[key] as number}
             onChange={e => set(key, parseFloat(e.target.value) || 0)}
             className="w-20 rounded-lg border bg-background px-2 py-1 text-sm text-right tabular-nums"
@@ -252,6 +257,15 @@ export function ReviewStep({ result, value, ingredients, onIngredientsChange, on
           </div>
         </div>
         {numField('Calories', 'calories', 'kcal', 1)}
+        {/* BF-109. Directly under Calories, because that is the field it is about and the one the
+            user would otherwise accept without looking. */}
+        <MacroCalorieWarning
+          calories={value.calories}
+          proteinG={value.proteinG}
+          carbsG={value.carbsG}
+          fatG={value.fatG}
+          onUseMacroCalories={kcal => set('calories', kcal)}
+        />
         {numField('Protein', 'proteinG', 'g')}
         {numField('Carbohydrates', 'carbsG', 'g')}
         {numField('Fat', 'fatG', 'g')}

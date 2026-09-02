@@ -24,8 +24,20 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.430.1 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Version:** v1.431.1 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-09-02.
+
+**The Review sheet flags macros that disagree with their own calories (BF-109).** A scan read **173
+kcal** beside 45.7 P / 52.1 C / 13.6 F — **514** by Atwater. **The screen was right and the row is
+wrong at source:** OFF carries `energy-kcal_serving 173` on the same per-serving basis as every other
+field, so the mapper is correct, and `energy-kcal_100g` is that figure ÷ 3.5, so nothing in the row can
+be fallen back to. **The guard already existed** — `macroCalorieDisagreement` and the 15% limit have
+been in `scan-totals.ts` since they were written, for this failure against this source; the search list
+surfaces them and two routes sanitise, and this sheet did neither. It **warns and offers a one-tap
+correction, never rewriting silently**: Review exists for the user to decide, and fibre and alcohol put
+real foods 10–20% out. Photo-scan and manual share the sheet, so they get it too. **Not device-verified
+and no barcode was actually scanned** — the e2e reaches the identical sheet by the manual road, because
+a barcode needs a camera ([journal](docs/overview/entries/2026-09-02-fix-bf-109-macro-calorie-warning.md)).
 
 **Lane A session wrapped 2026-09-02 — ten PRs, and the finding is about the QUEUE rather than the
 code.** Handoff:

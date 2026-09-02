@@ -6578,3 +6578,17 @@ what a successor needs is now one link to the handoff.
 `projectOverview` grows by a block about entry quality rather than about any of the ten PRs, which
 is the right proportion: the code was mostly four-line fixes, and the reason they were four lines is
 that six of eight entries turned out to be wrong about something load-bearing.
+
+## 2026-09-02 — `projectOverview.md` → 9327, `docs/implementation-backlog.md` → 15583 (BF-109)
+
++12 on the index and **−46 on the backlog**, which is the more interesting half: BF-109's queue entry
+was long because it had to argue that the mapper was *correct* and the data wrong, against the obvious
+diagnosis an implementer would reach for first. Once that argument has been acted on it belongs in the
+journal, and what stays behind is the `Keep:` — a real barcode scan and the device — plus the note that
+the fix reaches the photo-scan and manual roads too. The ratchet is set to the new lower number rather
+than left at the old headroom, so the gain is locked in.
+
+The index lines are the ones a future reader cannot reconstruct: that OFF's per-100g figure is derived
+from the same bad number, so "prefer `_100g`" is not a fix; and that the check and its 15% limit already
+existed for this exact failure. Without those two, the next person to see a wrong calorie count starts
+from the mapper again.

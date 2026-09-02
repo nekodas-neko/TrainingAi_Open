@@ -247,6 +247,13 @@ Live at the time of writing (2026-07-30):
   taking a nutrition entry:** six of the eight entries examined were wrong about something
   load-bearing — including LB-18, which insisted on a migration that `listSavedMeals` had already
   made unnecessary by deriving `lastUsedAt` from `max(food_logs.logged_at)`.
+- **[`docs/overview/entries/2026-09-02-fix-bf-109-macro-calorie-warning.md`](../../overview/entries/2026-09-02-fix-bf-109-macro-calorie-warning.md)**
+  — **BF-109 (2026-09-02).** `MacroCalorieWarning` under the Calories field in `ReviewStep`, so the
+  barcode, photo-scan and manual roads all cross-check macros against stated calories. **Read this
+  before "fixing" a wrong calorie count in an OFF row**: the mapper is correct, and that row's
+  `energy-kcal_100g` is derived from the same bad number, so preferring `_100g` fixes nothing and
+  breaks the products where the per-serving figure is the accurate one. Warns and offers; never
+  rewrites. Applying `sanitiseNutrition` at save time is deliberately still open.
 - **[`docs/overview/entries/2026-09-02-recent-food-items-unscoped.md`](../../overview/entries/2026-09-02-recent-food-items-unscoped.md)**
   — **LB-18's source (2026-09-02).** `listRecentFoodItems` / `getRecentFoodItems`, and `mealTypeId`
   is now optional on `GET /api/nutrition/recent-for-meal`. Lane B's half is dropping the query param.
