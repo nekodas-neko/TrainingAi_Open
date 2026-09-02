@@ -6382,3 +6382,15 @@ The backlog grows by Q-187's shipped form plus **LB-51**, which records that the
 plan and no food logs — so the entire plan card, not just this feature, has no e2e reachable from the
 harness. That is worth its own entry rather than a line inside a shipped one, because it blocks four
 existing behaviours as well as this one.
+
+## 2026-09-02 — `projectOverview.md` → 9169, `docs/implementation-backlog.md` → 15652 (LB-51 + queue hygiene)
+
+The index grows by one block and it is a **question for the owner**, which is the one thing this file
+is unambiguously for: whether the E2E job becomes a required check. It carries the measurement that
+settles the half nobody had checked — E2E is *not* required today, proven by a PR merging with its
+E2E job still in progress — so the owner is deciding rather than investigating.
+
+The backlog **shrinks** on net despite three entries being rewritten: Q-297 lost most of its body to
+things that had shipped under other numbers, Q-138 became a `Reference:` with its stale line numbers
+flagged, and LB-51 went from a proposal to a shipped entry whose useful content is that its own
+proposed shape was wrong — a spec here can reach Postgres directly and does not need to stub a route.
