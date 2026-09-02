@@ -29,6 +29,16 @@
 **Version:** v1.436.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-09-02.
 
+**The database's growth is partly the archive its baseline predates (BF-55, Q-283).** Total re-read
+at **200 MB** — down from 206, because migration 249 took the 21 MB index on 09-01. `oura_raw_packed`
+holds 1,072 rows / 18 MB and its **first pack is dated 2026-08-18, the same day as the 171 MB
+baseline**, so it has grown ~**1.2 MB/day** since and is never pruned. That is **~62% of the excess,
+and the ~0.4 MB/day expectation cannot have included it** — the packing work that set the baseline
+created a permanent writer on the same day. **Q-283 is stale by ~14×:** its one real candidate was
+already dropped, and excluding primary keys and unique constraints the droppable remainder is
+**800 kB**, 0.4% of the database, for a destructive migration
+([journal](docs/overview/entries/2026-09-02-db-growth-archive-attribution.md)).
+
 **The chronic-stress refusal now leaves a number behind (TN-1).** `chronic_stress_score` has been
 NULL on every row since the model shipped — the third dormant score — and both gates countable from
 stored data pass, so the refusal is in the granular layer, which by design recomputes its
@@ -1554,6 +1564,7 @@ Last swept **2026-09-02**.
 | **Zone minutes / active minutes re-band** | Tuning has proposed and measured it; it re-scores a contributor reading ~6/100 on 53 of 59 days. Your quoted instruction covers the **anchor** half only, not the WHO band shift. | Q-523 |
 | **The movement-per-hour boundary** | Same boundary as the anchor decision above, so it waits on it. Saturated at **856 of 857 waking hours** — it measures ring wear. | Q-522 |
 | **Body Battery's drain model** | The replacement is **already owner-confirmed and fitted** (goal-normalised `c`, BMR-proportional baseline). It is sequenced behind the anchor decision above, so that one release unblocks it. Today `0` means *"you wore the ring a long time"*, close to the opposite of what you asked for. | Q-521 |
+| **Whether to close Q-283** | Its "~11 MB of unused indexes" is now **800 kB** once primary keys and unique constraints are excluded, and its one real candidate was already dropped. Implementing it means a destructive migration for 0.4% of the database. | Q-283 |
 | **Where "Exercise detected" gets its data** | Its only writer was the Oura Cloud sync. Either the BLE classifier feeds the existing review UI, or the card and its route retire. Either branch is a different feature. | Q-231 |
 
 ## ⚠️ Known Issues & Risks With Recently Shipped Features
