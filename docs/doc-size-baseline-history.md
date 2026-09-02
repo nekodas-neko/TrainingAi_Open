@@ -6897,9 +6897,22 @@ session that "restores" the addendum's version would regress it, so the reason i
 The `Keep:` carries the honest limit: this makes the estimate SAFE, not CORRECT, and within-day
 incompleteness detection is the feature that would make it correct.
 
-## 2026-09-02 — `projectOverview.md` → 9507, `docs/implementation-backlog.md` → 15713 (BF-108)
+## 2026-09-02 — `projectOverview.md` → (see .size), `docs/implementation-backlog.md` → (see .size) (Q-516)
 
-The index grows by 12 and the backlog shrinks. The line that earns its cost is the correction: **the
+Both grow, and the lines carrying the weight are the ones that say what was **not** shipped. Q-516's
+recommended `120+` top band is written into its own entry as the first action; without a block saying
+it was measured and rejected — cardio cool-downs reach 168 while the entry measured strength's 132 —
+the next session implements it and buckets a run cool-down with a lifting rest. The reason it was
+wrong is a stale comment in the module it was reading, so that correction is recorded beside the
+rejection rather than only in the diff.
+
+The `Keep:` re-lanes the honesty sentence to Lane B and names what Lane A left it: `informativeShare`,
+computed and unrendered. Four populated buckets look like a working feature whether or not they are,
+which is the entry's own warning and the reason the number exists at all.
+
+## 2026-09-02 — `projectOverview.md` → 9517, `docs/implementation-backlog.md` → 15739 (BF-108)
+
+The index grows by 13 and the backlog shrinks. The line that earns its cost is the correction: **the
 completion path was never the gap**, and an entry that says otherwise sends the next reader to
 `done-activity-screen.tsx`, which already does the right thing. The failure is an *abandoned* session,
 which is a different trigger and a different fix.
