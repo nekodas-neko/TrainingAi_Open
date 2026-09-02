@@ -24,9 +24,11 @@ const STARTERS = [
 
 interface CoachContentProps {
   tz: string;
+  /** Threaded to the widgets that write — the plan card saves meals local-first, which needs it. */
+  userId: string;
 }
 
-export function CoachContent({ tz }: CoachContentProps) {
+export function CoachContent({ tz, userId }: CoachContentProps) {
   const router = useRouter();
   const [input, setInput] = useState("");
   const [showHistory, setShowHistory] = useState(false);
@@ -197,6 +199,7 @@ export function CoachContent({ tz }: CoachContentProps) {
                 role={m.role}
                 parts={m.parts as never[]}
                 live={i === lastAssistantIndex && !busy}
+                userId={userId}
                 onWidgetResult={handleWidgetResult}
                 onReopen={handleReopen}
               />

@@ -9,12 +9,15 @@ import { Tier3Card } from "./tier3-card";
 import { HandoffCard } from "./handoff-card";
 import { NumberDial } from "./number-dial";
 import { CoachChart } from "./coach-chart";
+import { PlanCard } from "./plan-card";
 
 interface CoachWidgetViewProps {
   /** The tool call's arguments, straight off the stream. Validated here rather than trusted. */
   input: unknown;
   /** Needed to hand a tier-3 proposal to its own confirmation route. */
   toolCallId?: string;
+  /** Threaded from the page's session so the plan card's save writes local-first. */
+  userId?: string;
   /** Absent once a newer turn exists, which renders the widget inert. */
   onResult?: (result: WidgetResult) => void;
 }
@@ -29,7 +32,7 @@ interface CoachWidgetViewProps {
  * because a silently missing widget leaves a conversation that asked a question with no way to
  * answer it.
  */
-export function CoachWidgetView({ input, toolCallId, onResult }: CoachWidgetViewProps) {
+export function CoachWidgetView({ input, toolCallId, userId, onResult }: CoachWidgetViewProps) {
   const parsed = CoachWidgetSchema.safeParse(input);
 
   if (!parsed.success) {
@@ -77,6 +80,20 @@ export function CoachWidgetView({ input, toolCallId, onResult }: CoachWidgetView
   if (widget.kind === "chart") {
     return (
       <CoachChart args={widget} onShown={onResult ? () => onResult({ status: "shown" }) : undefined} />
+    );
+  }
+
+  // A card with two buttons is a choice list with a rich body, so its answers are ordinary `chose`
+  // results — see `PLAN_CARD_ACTIONS`. A branch that rendered nothing here would be worse than no
+  // widget at all: an unanswered client-side tool call wedges every following turn.
+  if (widget.kind === "plan_card") {
+    return (
+      <PlanCard
+        args={widget}
+        userId={userId}
+        onChose={onResult ? (id, label) => onResult({ status: "chose", id, label }) : undefined}
+        onUnavailable={onResult ? detail => onResult({ status: "stale", detail }) : undefined}
+      />
     );
   }
 

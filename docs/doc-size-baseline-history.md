@@ -6594,3 +6594,22 @@ Both numbers are higher than the ones this branch first recorded (9305 / 15603, 
 recent-food-items PR landed in between and this is the post-merge count, not a second raise. Its
 entry and this one add different blocks, so the merge kept both — the additions case, not the
 backlog's two-deletions trap.
+
+## 2026-09-02 — `projectOverview.md` 9328 → 9357 (LA-47)
+
+Raised by 29 for two entries, of which **12 lines were already inherited** — `main` stood at 9340
+against a 9328 baseline before this branch, so the previous PR's growth is folded in here rather
+than left for the next one to trip over.
+
+The 17 lines this branch actually adds are a Current Status paragraph and one Known-Issues row for
+LA-47's Coach plan card. Both are index material by the rules that govern this file: a shipped
+user-visible change gets a status paragraph, and a change that could not be exercised on the device
+gets a Known-Issues row (CLAUDE.md, Canonical Runtime — the row is the *alternative* to the device
+smoke run, so it is not optional prose). The detail that is not index material — the design argument,
+the verification transcript, the one correction made while building — is in
+[`docs/overview/entries/2026-09-02-la-47-coach-plan-card.md`](overview/entries/2026-09-02-la-47-coach-plan-card.md)
+and the paragraph links to it.
+
+Both entries shrink on their own terms rather than needing a sweep: the status paragraph is replaced
+by the next session's, and the Known-Issues row **moves whole** to `known-issues-resolved.md` the
+moment the S25 walk happens.

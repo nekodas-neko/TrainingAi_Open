@@ -4859,83 +4859,23 @@ place to start rendering pictures.
   reference drawings were never committed). Part 1 §8 has the file-by-file collision table and the
   carry-across rule. **Do not plan around that chain landing, and do not wait for it.**
 
-### [nutrition][platform] LA-47 — the meal-plan coach's engine half: a plan widget and a named nutrition scope
-
-- **⚑ PIECE 2 SHIPPED 2026-08-31; PIECE 1 IS NOT SEPARABLE BY LANE AND THIS ENTRY WAS WRONG ABOUT
-  THAT.** The scope record is in (`lib/coach/scopes.ts`, wired through `/api/coach`), enforced by
-  withholding exactly as the entry asks: the nutrition scope never receives the training read
-  tools, and `renderChoiceList`'s `source` enum and `proposeChange`'s `domain` enum are rebuilt
-  narrowed per request, so an out-of-scope call is a schema error the SDK retries the model on
-  rather than a request anything downstream has to refuse. Three mutation tests pin that.
-- **⚠ The plan widget cannot ship without its renderer — the split this entry proposes does not
-  compile.** *"Add a member to the union and a row in `WIDGET_TOOL_NAMES`; the registry row and the
-  component are Lane B's half"* was tried and reverted: `components/coach/widget-registry.tsx`
-  narrows by early return and falls through to `change_preview`, so a new union member is a
-  **type error** until a branch handles it. And a branch that renders `null` is worse than none —
-  `widgets.ts` says so itself: a client-side tool call with no result **wedges the whole thread**,
-  because the provider refuses a request containing an unanswered tool call. So piece 1 is one
-  change across two lanes, not two changes.
-  **The design is settled, so whoever takes it does not re-derive it:** the widget carries
-  `{ kind, title, planId? }` and **no meals** — the client renders from the plan it already holds,
-  for the same reason `CHOICE_SOURCES` exists (a nine-row picker the model typed out cost ~554
-  output tokens, and output tokens are essentially all of Coach's latency). The two actions resolve
-  as ordinary `chose` results with fixed ids `save_all` and `redo`, needing **no** new
-  `WidgetResultSchema` member — a card with two buttons is a choice list with a rich body.
-  Save-all calls `savePlanMealsToLibrary` (`@trainingai/shared/nutrition/save-plan-meal`), already
-  shipped and idempotent on `meal_plan_meals.saved_meal_id`.
-- **Lane:** A — `lib/coach/widgets.ts`, `lib/coach/` (the scope record), `app/api/coach/route.ts`
-  (the SYSTEM prompt's widget rules, lines 27–59), `app/api/coach/options/route.ts`.
-- **Added:** 2026-08-31 · split out of **Q-407** rather than newly discovered. Q-407's own Lane
-  bullet already says `lib/coach/**` is Lane A and that *"the schema change lands first"*; this is
-  that half as an entry someone can pick up, so Q-407 can carry a `Needs:` instead of a paragraph.
-- **Read Q-407 first** — it holds the design, the owner's words and the mockup; this entry is the
-  engine it names, not a second opinion about it. Written as prose deliberately: a `- **Reference:**`
-  bullet claims a FIELD that means *"there is nothing to build here"*, and this entry was drafted
-  with one — it printed under `REFERENCE (1) — read by other entries, not implemented. Never "next".`
-  A pointer to another entry is not the same as being one.
-
-**Measured against main on 2026-08-31, so the scope is evidence rather than a plan's memory:**
-`CoachWidgetSchema` is a discriminated union of `ChoiceList · ChangePreview · Handoff · NumberDial ·
-Chart` — **no plan card** — and `grep -rn scope lib/coach/*.ts` returns nothing, so **no named scope
-record exists**. Q-407's multi-select half *did* ship on 2026-08-27 (`multi`/`selectAll` are on
-`ChoiceListSchema` at lines 71–73, and `CHOICE_SOURCES` serves the six catalogues), which is exactly
-why what remains is the two pieces below.
-
-1. **A plan widget.** A card listing each meal with its calories and item count, plus **Save all as
-   meals** and **Redo**. The button calls Q-398's write path (shipped 2026-08-24), which is keyed on
-   `(plan id, plan item id)` so a repeat save is a no-op. **The owner's review is the acceptance
-   test and it is not polish:** *"I want it to make the meal plan; then add each item to the saved
-   meals/my foods"* — the conversation is finished when every meal is a row in `My Foods`,
-   indistinguishable from one built by hand. Add a member to the union and a row in
-   `WIDGET_TOOL_NAMES`; the registry row and the component are Lane B's half.
-2. **A named scope record** — prompt section + tool subset + patch domains + widget sources — so
-   entering from the Nutrition tab starts inside the nutrition scope. **Scope by withholding tools,
-   not by instructing:** a prompt saying "do not read workout data" is a request the model will
-   occasionally ignore; a tool it never receives is a boundary it cannot cross. A named record
-   rather than an inline filter, so a second coach costs no refactor. **This one line is all that
-   survives of Q-408** — do not re-derive that architecture; Q-407 records why it was removed.
-
-- **Flat fields, never a discriminated union of variants**, wherever a widget gains options.
-  `widgets.ts`'s own comment: *"Gemini's function-declaration schema is fussy about unions, and this
-  feature has already lost a day to one (`z.literal(false)`)."*
-- **`/api/coach/options` returns early with an empty list when there is no active program.** That is
-  right for `sessions` and wrong for a catalogue — a nutrition question must not fail on a training
-  precondition. The catalogue branches sit **above** that gate and a test pins it; keep them there.
-- **Verification.** The schema and the scope record are unit-testable. The conversation is not — it
-  needs a real Gemini turn, so run one plan end-to-end against `pnpm dev` and say plainly that the
-  on-device pass was not exercised unless it was.
-
 ### [nutrition][platform] Q-407 — the meal-plan wizard is seven screens for six answers, and the one piece the Coach lacks is multi-select
 
 - **Branch:** `feat/nutrition-coach-meal-plan`
-- **Needs:** LA-47 — **added 2026-08-31, and the entry already said so in prose.** Its Lane bullet
-  ends *"the schema change lands first — the component cannot render a flag the schema does not
-  carry"*, and every one of the three remaining parts starts in `lib/coach/**` or
-  `app/api/coach/**`, which are Lane A. Verified against current main the same day:
-  `CoachWidgetSchema` is a union of `ChoiceList · ChangePreview · Handoff · NumberDial · Chart` with
-  **no plan card**, and `grep -rn scope lib/coach/*.ts` finds **no named scope record**. So Lane B's
-  half has nothing to render yet. Stated as prose this served the item to Lane B at the head of its
-  queue — the same defect BF-82 had, and the reason `Needs:` is a field.
+- **✅ LA-47 SHIPPED 2026-09-02 AND ITS `Needs:` IS CLEARED — this entry is startable.** Both halves
+  it was waiting on exist: the named nutrition scope (`lib/coach/scopes.ts`, 2026-08-31) and now the
+  plan card (`plan_card` in `CoachWidgetSchema`, the `showMealPlan` tool, and
+  `components/coach/plan-card.tsx`). **`showMealPlan` takes a title and nothing else** — the card
+  reads the meals from the plan the app holds, and its Save-all button already puts every meal into
+  My Foods, which is the owner-review acceptance test below. So what is left here is the
+  *conversation*: the answers-as-widgets flow that replaces the seven-step sheet, and pointing the
+  Nutrition tab's entry at `/coach` with `scope: "nutrition"` (the route reads a `scope` in its body
+  and nothing sends one yet). Do not rebuild the plan card.
+- **The device pass this entry owes now covers the card too.** LA-47 was verified end-to-end against
+  `pnpm dev` with a real Gemini turn — the model called `getMealPlan` then `showMealPlan`, wrote no
+  meals, and Save-all wrote three saved meals with their ingredients and stamped all three plan
+  rows. **The web sandbox has no local store**, so that save took the API fallback and the
+  offline-first path (local SQLite write + outbox) is unexercised. See the Known-Issues row.
 - **Added:** 2026-08-19 · BugFix Intake, from the owner · mockup rendered in-session
 - **Lane:** B — classified 2026-08-30 by CLAUDE.md's path rule (*reached only from `app/**` and `components/**` → B*; this is a wizard's screens and a multi-select control, with no storage or route change).
 - **Placement:** in the nutrition cluster, after Q-398 — **which shipped 2026-08-24**, so the

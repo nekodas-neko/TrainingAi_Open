@@ -24,9 +24,22 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.431.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Version:** v1.432.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-09-02.
 
+**AI Coach draws the meal plan, and one button puts every meal in My Foods (LA-47).** The owner's
+review is the acceptance test — *"I want it to make the meal plan; then add each item to the saved
+meals/my foods"* — and nothing in a Coach thread could put one there until now. **`showMealPlan`
+takes a title and nothing else:** the card reads each meal from the plan the app holds, so the model
+cannot round a calorie figure or drop a meal, and it spends none of the output tokens that are
+essentially all of Coach's latency. Save-all goes through Q-398's write path, keyed on
+`meal_plan_meals.saved_meal_id`, so a second press is a no-op. Both buttons resolve as ordinary
+`chose` results — a card with two buttons is a choice list with a rich body, not a new result type.
+**Shipped as one PR across both lanes on purpose:** a new union member is a type error until
+`widget-registry.tsx` handles it, and a branch rendering `null` wedges the thread permanently.
+Verified with a real Gemini turn against `pnpm dev` (three saved meals, three stamped plan rows) and
+**not device-verified**. **Q-407's `Needs:` is cleared**, so the conversational wizard is startable
+for Lane B ([journal](docs/overview/entries/2026-09-02-la-47-coach-plan-card.md)).
 **A meal can be logged at ½×, 1× or 1½× (BF-104).** The owner's ask, and the second half of a split
 that paid off: BF-104 was parked behind LB-49 this morning and became startable the moment LB-49's
 engine argument merged. **The picker had to change the sheet's own figures**, which the entry did not
@@ -1384,6 +1397,22 @@ window, then the newest `history-*.md`. The 157 dated status notes this section 
 > An entry only leaves when **nothing is still owed**: no open work, no pending owner or device
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
+
+### [nutrition][devices] ⚠️ The Coach plan card's save took the web fallback, not the offline-first path (LA-47, 2026-09-02)
+
+**Shipped and exercised end-to-end; one half of the write is unseen.** A real Gemini turn called
+`getMealPlan` then `showMealPlan`, the card rendered three meals with their calories and ingredient
+counts, and Save-all wrote three `saved_meals` rows with their items and stamped all three
+`meal_plan_meals.saved_meal_id` values — confirmed in the database, not from a toast.
+- **`getLocalStore` returns null in the web sandbox**, so `savePlanMealsToLibrary` fell through to
+  `POST /api/nutrition/saved-meals`. The local SQLite write and the outbox mutation it queues on the
+  device were **never executed from this surface**. That path is shared with the Nutrition tab's own
+  Save button (Q-398, on `main` since 2026-08-24), so it is exercised code — but not from here, and
+  the widget is the only caller that runs inside the Coach thread.
+- **What to check on the S25:** open Coach, ask for the plan, tap **Save all to My Foods**, find
+  those meals under My Foods, then tap it again — the button must be disabled with no duplicate. The
+  card has only been seen at 412×891 in Chromium, never in Samsung's WebView; safe-area is not at
+  risk (it sits inside the thread's scroll region and the composer owns the bottom inset).
 
 ### [sleep] 🟡 A good night scored 63: the display curve, the duration curve, and one autonomic dip counted twice (TN-23, 2026-09-03)
 

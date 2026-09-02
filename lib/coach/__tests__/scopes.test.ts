@@ -62,6 +62,13 @@ describe('the nutrition scope', () => {
     expect(n.widgetTools).toContain('handOff')
   })
 
+  // The acceptance test for the whole meal-plan conversation is that it ends with the meals in My
+  // Foods (LA-47), and this is the only tool that gets them there.
+  it('can show a meal plan, which is how a planning conversation finishes', () => {
+    expect(n.widgetTools).toContain('showMealPlan')
+    expect(n.readTools).toContain('getMealPlan')
+  })
+
   it('names read tools, so it is not a Coach that can see nothing', () => {
     expect(n.readTools?.length).toBeGreaterThan(0)
   })

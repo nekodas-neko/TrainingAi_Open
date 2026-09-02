@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { CoachWidgetSchema, WIDGET_TOOL_NAMES, isWidgetToolName, WidgetResultSchema, ChoiceListSchema, CHOICE_SOURCES } from '../widgets'
+import { CoachWidgetSchema, WIDGET_TOOL_NAMES, isWidgetToolName, WidgetResultSchema, ChoiceListSchema, CHOICE_SOURCES, PLAN_CARD_ACTIONS } from '../widgets'
 import { GROCERY_CATALOGUE } from '@trainingai/shared/nutrition/grocery-catalogue'
 import { CoachPatchSchema, hasUniqueChangeIds } from '../patch'
 
@@ -49,6 +49,47 @@ describe('CoachWidgetSchema', () => {
   })
 })
 
+// LA-47 — the plan card. Its whole point is what it does NOT carry: the model names a plan and the
+// client renders the meals, so the calories on screen cannot disagree with the ones stored.
+describe('PlanCardSchema', () => {
+  it('accepts a title with no plan id — that is the active plan', () => {
+    expect(CoachWidgetSchema.safeParse({ kind: 'plan_card', title: 'Your plan' }).success).toBe(true)
+  })
+
+  it('accepts a named plan', () => {
+    const parsed = CoachWidgetSchema.safeParse({ kind: 'plan_card', title: 'Your plan', planId: VALID_UUID })
+    expect(parsed.success && parsed.data.kind === 'plan_card' && parsed.data.planId).toBe(VALID_UUID)
+  })
+
+  // The token argument and the honesty argument are the same field. A model that could write the
+  // meals could write different ones from the plan the app holds, and nothing downstream would
+  // notice — so there is nowhere to put them.
+  it('has no field for meals, calories or macros', () => {
+    const withMeals = {
+      kind: 'plan_card',
+      title: 'Your plan',
+      meals: [{ name: 'Invented breakfast', calories: 700 }],
+      targetCalories: 2400,
+    }
+    const parsed = CoachWidgetSchema.safeParse(withMeals)
+    expect(parsed.success).toBe(true)
+    expect(parsed.success && 'meals' in parsed.data).toBe(false)
+    expect(parsed.success && 'targetCalories' in parsed.data).toBe(false)
+  })
+
+  it('rejects an empty title rather than rendering a headerless card', () => {
+    expect(CoachWidgetSchema.safeParse({ kind: 'plan_card', title: '' }).success).toBe(false)
+  })
+
+  // Both buttons resolve through `chose`, which is why no `WidgetResultSchema` member was added.
+  // If that ever stops holding, this is what says so.
+  it('resolves its actions as ordinary chose results', () => {
+    for (const id of Object.values(PLAN_CARD_ACTIONS)) {
+      expect(WidgetResultSchema.safeParse({ status: 'chose', id, label: 'Saved 4 meals to My Foods' }).success).toBe(true)
+    }
+  })
+})
+
 describe('CoachPatchSchema', () => {
   it('requires `from` on a value change, so staleness is detectable', () => {
     const noFrom = {
@@ -85,7 +126,10 @@ describe('tool name mapping', () => {
   it('maps every widget tool to a kind in the union', () => {
     for (const [toolName, kind] of Object.entries(WIDGET_TOOL_NAMES)) {
       expect(isWidgetToolName(toolName)).toBe(true)
-      const sample = kind === 'choice_list' ? choiceList : changePreview
+      const sample =
+        kind === 'choice_list' ? choiceList
+        : kind === 'plan_card' ? { kind: 'plan_card', title: 'Your plan' }
+        : changePreview
       expect(CoachWidgetSchema.safeParse(sample).success).toBe(true)
     }
   })

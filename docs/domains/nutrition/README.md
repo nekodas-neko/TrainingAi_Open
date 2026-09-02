@@ -12,6 +12,7 @@ reminders, and the nutrition screen's editing surfaces.
 | Energy balance | `lib/health/energy-balance-service.ts` (the one server-side assembly — the route and the AI tool both call it), `packages/shared/src/nutrition/calorie-balance.ts` (bands), `packages/shared/src/nutrition/adaptive-tdee.ts` (calibrated maintenance) |
 | Tables | `food_logs`, `food_items`, saved meals, supplements + supplement logs, `meal_plans` + `meal_plan_variants` + `meal_plan_meals`, `dietary_restrictions` + `user_dietary_restrictions` |
 | Meal Plan | `lib/data/postgres/slices/meal-plans.ts`, `packages/shared/src/nutrition/meal-split.ts`, `components/nutrition/meal-plan-*.tsx`, `app/api/nutrition/meal-plans/` |
+| Meal plan in Coach | `lib/coach/widgets.ts` (`PlanCardSchema`, `PLAN_CARD_ACTIONS`), `lib/coach/tools.ts` (`showMealPlan`), `components/coach/plan-card.tsx`, `packages/shared/src/nutrition/save-plan-meal.ts` |
 
 **`app/nutrition/nutrition-content.tsx` is the canonical local-first read pattern** for the whole
 app — its supplements reads (`getLocalStore(userId)` → `store.getSupplements()`, API only as
@@ -247,6 +248,12 @@ Live at the time of writing (2026-07-30):
   taking a nutrition entry:** six of the eight entries examined were wrong about something
   load-bearing — including LB-18, which insisted on a migration that `listSavedMeals` had already
   made unnecessary by deriving `lastUsedAt` from `max(food_logs.logged_at)`.
+- **[`docs/overview/entries/2026-09-02-la-47-coach-plan-card.md`](../../overview/entries/2026-09-02-la-47-coach-plan-card.md)**
+  — 🆕 **LA-47's plan card (2026-09-02).** `showMealPlan` takes a title and nothing else; the card
+  reads the meals from the plan the app holds, and Save-all copies every one into My Foods through
+  Q-398's idempotent write path. Its two buttons are ordinary `chose` results, not a new result
+  type. **Q-407's `Needs:` is cleared by it** — the conversation itself is what is left, and the
+  plan card is not to be rebuilt.
 - **[`docs/overview/entries/2026-09-02-recent-food-items-unscoped.md`](../../overview/entries/2026-09-02-recent-food-items-unscoped.md)**
   — **LB-18's source (2026-09-02).** `listRecentFoodItems` / `getRecentFoodItems`, and `mealTypeId`
   is now optional on `GET /api/nutrition/recent-for-meal`. Lane B's half is dropping the query param.
@@ -424,7 +431,10 @@ Live at the time of writing (2026-07-30):
   `CoachWidgetSchema` member is a **type error** until `components/coach/widget-registry.tsx`
   handles it, and a branch that renders `null` is worse than none — an unanswered client-side tool
   call wedges the whole thread, because the provider refuses a request containing one. Schema and
-  renderer land together or not at all.
+  renderer land together or not at all. `plan_card` (LA-47, 2026-09-02) is the worked example, and
+  it also shows the other half of the pattern: **a widget carries a reference, never the data.**
+  `showMealPlan` names the plan and the client renders it, so the model cannot round a calorie
+  figure or drop a meal, exactly as `renderChoiceList`'s `source` stops it inventing an id.
 
 - **`food_logs` storing only a `food_item_id` was the #1 data-loss bug.** A log table must hold
   (or locally mirror) everything needed to *render* the row offline — the reference table has to be
