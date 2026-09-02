@@ -6855,3 +6855,16 @@ the 4.27-against-2.653 caveat rather than the measurement.
 The entry's `First action` becomes `Superseded first action` rather than being deleted: its
 pre-registered pass test is still the pass test for anything that touches the estimator, and losing
 that would let the next session re-open a question this one narrowed.
+
+## 2026-09-02 — `docs/implementation-backlog.md` → (see .size) (Q-515)
+
+Q-515 gains a block that contradicts its own recommendation, which is the expensive kind of line to
+omit: the entry currently tells the next implementer to swap in a 90-day trailing anchor, and doing
+that ships a **+3.42 bpm, 56-of-57-days level change** into two pillars under the heading of a
+stability fix. Deleting the recommendation instead of annotating it would lose why it looked right —
+the shape *is* right, and it becomes the correct fix the moment the owner also wants the level moved.
+
+Two of the lines are there to stop the measurement being re-run wrongly: the direction is
+**structural** (a longer window sits above a shorter one during an improving trend, so no window
+length separates the two effects), and there are only **74 days** of resting HR, so a 90-day window
+is not the slow anchor it reads as.

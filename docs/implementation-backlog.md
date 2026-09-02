@@ -10722,6 +10722,21 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 ### [heart-rate][body] Q-515 — the rest/active boundary shrank 3× because the owner got fitter
 
 - **Branch:** `fix/hr-rest-threshold-anchor`
+- **⚠ THE RECOMMENDED FIX DOES NOT FIX (a) ALONE — MEASURED 2026-09-02, DO NOT IMPLEMENT IT AS
+  WRITTEN.** [`review`](reviews/2026-09-02-hr-rest-anchor-level-shift.md). Swapping the 28-day
+  resting mean for a **90-day trailing** one moves the boundary **+3.42 bpm** and takes the at-rest
+  share of waking samples from **14.9% to 25.9%** — a **74% relative rise, on 56 of 57 days**. That
+  is the same order as the instability being fixed (26.5% → 8.2%) and points the other way, so it
+  **answers question (b) at the same time**, which this entry reserves for the owner.
+  **The direction is structural, not a quirk of this data:** during an improving trend the longer
+  window necessarily sits above the shorter one, because it still holds the older, higher values —
+  so no window length separates the two effects. **And the window is not doing the work:** there are
+  only **74 days** of resting HR in total, so a 90-day trailing window covers **72 of them** today.
+  **What does fix (a) alone is this entry's own second option** — freeze the anchor at a stated
+  constant with a date, so the boundary is unchanged on the switchover day and cannot drift after
+  it. Its cost, stated plainly: a frozen constant goes stale silently, and there is **no cron layer**
+  (`module-map.md` §0), so "re-derived quarterly" means a person remembers.
+- **Gate:** owner
 - **Plan:** none yet — a constant plus a baseline source. **Lane A implements; Tuning proposes only.**
 - **Added:** 2026-08-18 · Tuning agent ·
   [`docs/reviews/2026-08-18-hr-rest-threshold-calibration.md`](reviews/2026-08-18-hr-rest-threshold-calibration.md)
@@ -10753,8 +10768,9 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   of taste. *(b) Is 8.2% the right level?* **Unknown** — ~1.2 h of a 15 h day is not obviously wrong,
   and whether Body Battery should charge more in daylight is an owner question. **Fix (a) alone**; if
   the fraction is raised at the same time the two effects become inseparable and neither is verifiable.
-- **First action — recommendation:** anchor the boundary to a **slow-moving** resting baseline (90-day
-  trailing, or a fixed offset re-derived quarterly) so a month of fitness improvement cannot move the
+- **First action — recommendation, SUPERSEDED IN ITS FIRST HALF (see the measurement above):** anchor
+  the boundary to a **slow-moving** resting baseline (~~90-day trailing~~, or a fixed offset re-derived
+  quarterly) so a month of fitness improvement cannot move the
   classifier under its own data. Keeps personalisation, removes the month-scale feedback. Reversal cost
   is low and the effect is observable within a week of BLE data.
 - **Rejected alternative:** a percentile of the owner's own recent *waking* HR (trailing-28-day p25).
