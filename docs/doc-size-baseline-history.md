@@ -6798,3 +6798,15 @@ The index grows by 15, and the line that earns it is the **product note**: the a
 same decoder, so ~4% of labels may be unreadable upright by the app that printed them. It is untested
 on a camera and flagged rather than claimed, which is exactly the kind of thing that vanishes if it
 lives only in a journal entry nobody opens.
+
+## 2026-09-02 — `projectOverview.md` → 9455, `docs/implementation-backlog.md` → 15601 (BF-107)
+
+The index grows by 13 and the backlog shrinks. Two lines earn their place and both are corrections a
+reader would otherwise repeat: **the device path needs a forced pull**, because a push alone never
+returns the derived figure and the tile would be a dash forever on the only runtime that matters; and
+**the entry's sibling claim was false** — `done-activity-screen.tsx` navigates away on save, so its
+grid is a pre-save draft and a calories tile there is dead on arrival.
+
+Neither is inferable from the diff. The first looks like an over-engineered extra call unless you know
+what `pushMutations` does and does not do; the second looks like an oversight unless you know it was
+checked.

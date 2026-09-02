@@ -475,58 +475,38 @@ recompute has to run over the affected days once the selection is fixed.
   save time. That changes what is *stored* across every food surface, which is a different decision
   from one warning banner, and nothing here presumes it.
 
-### [activity] BF-107 — the walk summary has no calories tile, and the number it would show does not exist yet on that screen
+### [activity] BF-107 — the walk summary shows its calories (shipped; device owed)
 
-- **Lane:** B — **re-laned from A on 2026-09-02: there is no engine half.** The Lane A premise
-  ("the value has to reach the client before Lane B can render it") is false, and it was the only
-  thing making this Lane A. The derived kcal **already reaches the client both ways**: the web route
-  returns `{ activityLog }` carrying it (`app/api/activity-logs/route.ts:45` +
-  `adapter.ts:2121`) and `walk-summary.tsx` discards the response; on device the pull maps it
-  (`sync-engine.ts:337`) into a real local column (`sqlite-backend.ts:1678/1690`). The one nuance —
-  the outbox push only flips the row to `synced` (`sync-engine.ts:968-980`), so on device the number
-  lands on the **next pull**, not at first paint — is exactly the `—`-then-fill this entry wants, and
-  a component gets it by reading the local row. So the whole gap is
-  `walk-summary.tsx:239-241`: three hardcoded tiles, no read-back. Nothing fails to compile when the
-  halves are split (unlike LA-47), so there is no reason for a cross-lane PR. Evidence:
-  [journal](overview/entries/2026-09-02-bf-107-relane.md).
-- **The sibling has the same gap — checked, not assumed.** `done-activity-screen.tsx` passes
-  `caloriesBurned: null` at lines 210 and 242 and renders no energy tile either. Same one-tile change,
-  same PR.
-- **Added:** 2026-09-01 · owner, on a completed guided walk: *"the final screen doesnt show calories
-  burned."*
-
-**The walk is not missing its calories — the summary screen is.** `walk-summary.tsx:239-241` renders
-exactly three tiles, Duration / Avg HR / Max HR. The screenshot confirms it: 30m, 100, 117, and no
-energy anywhere on a screen that otherwise carries per-interval cadence, a heart-rate chart, time in
-zone and Session Load.
-
-**⚠ The reason is structural, and an implementer who just adds a `<Stat label="Calories">` will render
-a dash.** The client write passes `caloriesBurned: null` deliberately — `walk-summary.tsx:150-151`
-says so: *"Calories are derived server-side in saveActivityLog — the MET table behind `estWorkoutKcal`
-is read through `node:path`, so it cannot be imported into a client bundle."* And that is real:
-`adapter.ts:2121` reads `data.caloriesBurned ?? await this.deriveActivityKcal(...)`. So the number is
-computed, correctly, **after** the screen that wants to show it has already painted — and the walk
-summary never re-reads the saved row.
-
-- **Recommendation: return the derived kcal from the save and show it when it lands.** `saveActivityLog`
-  already computes it; having the write **return** the value costs nothing, and the summary can paint
-  the tile as `—` and fill it in, which is honest about a value that genuinely is not known at first
-  paint. Do not reach for the instant-paint cache-seed pattern here: there is no prior value to seed
-  from, the walk having just happened.
-- **The alternative, and why it loses:** port the MET table so `estWorkoutKcal` runs client-side. That
-  would make the tile instant and work offline — genuinely better on both counts — but it duplicates a
-  formula that One Formula, One Place says must live once, and the `node:path` read is exactly the
-  coupling that keeps it server-side. Not worth it for one tile; revisit only if a second surface needs
-  the same number before its write completes.
-- **⚠ Offline, there is no number at all.** The device write path queues through the outbox, so a walk
-  finished with no signal has no server-derived kcal until it syncs. The tile must render `—` rather
-  than `0` — a zero is a claim, a dash is not — and this is the case to check on device, because it is
-  the one the sandbox cannot produce.
-- **Sibling surfaces to check in the same PR:** `done-activity-screen.tsx` takes the same write path
-  (`walk-summary.tsx:155` says it mirrors that contract exactly), so if the free-activity done screen
-  shows calories today it is worth knowing how; if it does not, it has the same gap and should be fixed
-  with it rather than left as the next report.
-
+- **Lane:** B — `components/guided-walk/walk-summary.tsx`, `components/ui/stat-tile.tsx`.
+- **Verify:** device — two things the sandbox cannot produce. **(a) Offline**: finish a walk with no
+  signal and the tile must read `—`, never `0`; the push never happens, so nothing fills it.
+  **(b) The fill itself**: on a normal walk the tile should start `—` and become a number a moment
+  later, once the forced pull returns the derived row. Also check four tiles fit one row at 412 dp.
+- **✅ SHIPPED 2026-09-02** (`fix/bf-107-walk-calories`). A fourth `kcal` tile, fed by both write
+  paths, and `StatTile` extracted to `components/ui/`.
+- **The number was already reaching the client and the screen threw it away.** `POST
+  /api/activity-logs` answers `{ activityLog }` with the derived calories on it, and the web branch
+  checked `res.ok` and discarded the body.
+- **⚠ The device path needed more than reading a response, and the entry's own note pointed at it.**
+  `pushMutations` only flips the row to `synced` — the derived value lands on a **pull**. So the fix
+  forces one (`pullDelta(userId, true)`) inside `pushThenRevalidate`'s callback and reads the row
+  back. **Without that the tile is a dash forever on the canonical runtime**, which is the reported
+  bug left unfixed. It stays inside the callback rather than replacing it because that callback only
+  runs when something was actually pushed, and because revalidating *around* a local write instead of
+  after it is its own bug class with a CI rule attached.
+- **❌ THE SIBLING CLAIM WAS WRONG — `done-activity-screen.tsx` does NOT have the same gap.** The
+  entry says it takes the same write path and should be fixed in the same PR. It does take the same
+  write path, but it **navigates away the instant it saves** (`router.push('/workout-select')` at
+  lines 264 and 310), so its stat grid is a *pre-save draft summary*. A calories tile there would
+  render `—` and then the screen would vanish. Checked, not assumed — and worth recording so the next
+  reader does not add a dead tile.
+- **Keep:** `done-activity-screen.tsx` still holds inline copies of the stat markup, which had already
+  drifted from the walk summary's (`rounded-xl` against `rounded-2xl`) before `StatTile` existed.
+  Converting them is a pure refactor of a file whose behaviour this entry does not change, so it is
+  left rather than used to widen this diff.
+- **Not done, and it still loses:** porting the MET table so `estWorkoutKcal` runs client-side. It
+  would make the tile instant and work offline, but it duplicates a formula One Formula, One Place
+  says lives once, and the `node:path` read is the coupling that keeps it server-side.
 
 ### [activity] BF-108 — finishing a walk lands you on a pre-armed "start this activity" screen, titled from a walk you already did
 

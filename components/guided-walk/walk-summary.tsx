@@ -7,6 +7,8 @@ import { useTransitionRouter } from "@/lib/view-transition";
 import dynamic from 'next/dynamic'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
+import { StatTile } from '@/components/ui/stat-tile'
+import { pullDelta } from '@/lib/local-store/sync-engine'
 import { getLocalStore } from '@/lib/local-store'
 import { pushThenRevalidate } from '@/lib/local-store/push-then-revalidate'
 import { omitNullFields } from '@/lib/local-store/sync-helpers'
@@ -56,6 +58,15 @@ export function WalkSummary({ config, samples, cadence, startedAtMs, userId, onD
   const maxHr = bpms.length ? Math.max(...bpms) : null
   const savedRef = useRef(false)
   const [saved, setSaved] = useState(false)
+  /**
+   * The server-derived calories (BF-107), which do not exist when this screen first paints.
+   *
+   * `saveActivityLog` computes them — the MET table behind `estWorkoutKcal` is read through
+   * `node:path`, so it cannot run in a client bundle — and the two write paths deliver the result
+   * differently: the web POST returns the saved row, while the device queues through the outbox and
+   * only sees the number on a pull. Both are handled below; until one lands the tile shows a dash.
+   */
+  const [kcal, setKcal] = useState<number | null>(null)
   const [hrProfile, setHrProfile] = useState<{ maxHr: number; restingHr: number } | null>(null)
 
   // Per-segment HR/pace/distance/cadence — the same computation used for both the live
@@ -193,7 +204,17 @@ export function WalkSummary({ config, samples, cadence, startedAtMs, userId, onD
         })
         invalidateActivityWrites().catch(() => {})
         setSaved(true)
-        pushThenRevalidate(userId!, invalidateActivityWrites)
+        // BF-107. The push only flips the row to `synced`; the derived calories arrive on a PULL, so
+        // one is forced here and the row read back. It stays inside `pushThenRevalidate`'s callback
+        // rather than replacing it, because that callback runs only when something was actually
+        // pushed — and because revalidating around a local write instead of after it is its own bug.
+        pushThenRevalidate(userId!, async () => {
+          await invalidateActivityWrites()
+          await pullDelta(userId!, true)
+          const rows = await store.getActivityLogs(date)
+          const mine = rows.find(r => r.id === logId)
+          if (mine?.caloriesBurned != null) setKcal(mine.caloriesBurned)
+        })
         savedLocally = true
         } catch (e) {
           console.error('Walk SQLite write failed, falling back to API:', e)
@@ -221,6 +242,10 @@ export function WalkSummary({ config, samples, cadence, startedAtMs, userId, onD
         }),
       })
       if (!res.ok) throw new Error()
+      // BF-107. `POST /api/activity-logs` answers `{ activityLog }` with the derived calories on it,
+      // and this response was being thrown away.
+      const body = await res.json().catch(() => null) as { activityLog?: { caloriesBurned?: number | null } } | null
+      if (body?.activityLog?.caloriesBurned != null) setKcal(body.activityLog.caloriesBurned)
       await invalidateActivityWrites()
       setSaved(true)
     } catch {
@@ -235,10 +260,13 @@ export function WalkSummary({ config, samples, cadence, startedAtMs, userId, onD
   return (
     <div className="flex flex-col gap-4 px-6 pt-safe pb-safe-action-lg">
       <h2 className="text-2xl font-bold">Walk complete</h2>
-      <div className="grid grid-cols-3 gap-2 text-center">
-        <Stat label="Duration" value={`${durationMin}m`} />
-        <Stat label="Avg HR" value={avgHr != null ? `${avgHr}` : '—'} />
-        <Stat label="Max HR" value={maxHr != null ? `${maxHr}` : '—'} />
+      <div className="grid grid-cols-4 gap-2 text-center">
+        <StatTile label="Duration" value={`${durationMin}m`} />
+        <StatTile label="Avg HR" value={avgHr != null ? `${avgHr}` : '—'} />
+        <StatTile label="Max HR" value={maxHr != null ? `${maxHr}` : '—'} />
+        {/* BF-107. A dash until the derived figure lands, never a zero — a zero is a claim about a
+            walk that burned nothing, and the number genuinely is not known at first paint. */}
+        <StatTile label="kcal" value={kcal != null ? `${Math.round(kcal)}` : '—'} />
       </div>
 
       {rawPoints.length > 1 && (
@@ -286,15 +314,6 @@ export function WalkSummary({ config, samples, cadence, startedAtMs, userId, onD
         {saved ? 'Saved to your activity history.' : 'Saving…'}
       </p>
       <Button className="h-12" onClick={() => { onDone(); router.push('/activity') }}>Done</Button>
-    </div>
-  )
-}
-
-function Stat({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-2xl bg-muted/60 border border-border px-2 py-3">
-      <p className="text-lg font-bold tabular-nums">{value}</p>
-      <p className="text-[10px] text-muted-foreground">{label}</p>
     </div>
   )
 }
