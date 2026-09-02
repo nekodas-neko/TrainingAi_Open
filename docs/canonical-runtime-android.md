@@ -18,7 +18,7 @@ question is never re-litigated per change.
 > permanent premise when making architectural decisions. In particular: every write stays `user_id`
 > scoped, the sync engine is **maintained and extended rather than reduced**, and no user-visible
 > surface should assume the owner's own device or wearable. See
-> [`docs/device-agnostic-source-architecture.md`](docs/device-agnostic-source-architecture.md).
+> [`docs/device-agnostic-source-architecture.md`](device-agnostic-source-architecture.md).
 > A Play Store listing additionally requires a privacy policy, data-safety declarations, and a
 > **declared-use-case review for Health Connect access** — that last one gates real multi-user
 > support and is not a formality.
