@@ -6727,3 +6727,21 @@ bullet puts them back in READY (3); each entry already states its device require
 verification prose, which is where an unbuilt entry belongs. The script had been printing
 `Verify device: no note — say what to look at` against two of them the whole time — a complaint about
 a field that should not have been there at all.
+
+## 2026-09-02 — `docs/implementation-backlog.md` 15665 → 15694 (Q-509)
+
++29, and all of it is structured fields rather than prose. Six entries at the head of Lane A's READY
+list stated a real block — a scoring change needing owner sign-off, or a dependency — **in prose
+only**, so `next-item.js` served them as startable. Q-289's own Lane bullet says *"not an
+implementer's to take at all"* and it was the number-one item. Each now carries the `Gate:` or
+`Needs:` its own words already justified, plus one line saying which prose it replaces so the next
+reader does not think a field was invented.
+
+The remainder is Q-509's result: the pre-registered experiment ran and failed its pass test, which
+belongs in the entry because it changes what the entry is asking for. The argument, the table and
+the caveats are in
+[`docs/reviews/2026-09-02-recovery-index-ble-smoothing-experiment.md`](reviews/2026-09-02-recovery-index-ble-smoothing-experiment.md);
+the entry carries the verdict and the pointer, and was cut by half after this check first failed.
+
+**This is the file's own growth mechanism working as intended** — fields are what make readiness
+computable instead of prose, and they cost lines. The lines come back when these entries ship.

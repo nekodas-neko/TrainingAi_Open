@@ -10385,18 +10385,14 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 ### [devices][readiness] Q-509 — the BLE-era Recovery Index refit lands at 3.31 h against a shipped anchor of 5: the input moved, not the physiology
 
 - **Branch:** `fix/ble-recovery-index-hours-bias`
-- **⚠ THE PRE-REGISTERED EXPERIMENT WAS RUN 2026-09-02 AND IT FAILED ITS OWN PASS TEST.**
-  [`docs/reviews/2026-09-02-recovery-index-ble-smoothing-experiment.md`](reviews/2026-09-02-recovery-index-ble-smoothing-experiment.md).
-  Smoothing the BLE series before the argmin recovers **0.487 h of the 0.933 h gap (52%)** at its best
-  width (median window 21), plateaus, then reverses; the ratio reaches **0.875, not ~1.0**. So the
-  input DID need conditioning and that is **about half the answer** — **do not ship a wider
-  `MEDIAN_WINDOW` as the fix**, and do not read this as licence to move
-  `RECOVERY_INDEX_OPTIMAL_HOURS` either. **The mean shift is 4× the median (0.487 vs 0.167)**, which
-  is the signature of a minority of nights where a spurious late dip beat the true early minimum —
-  it supports the mechanism while showing it cannot carry the whole level shift. **Re-confirmed on
-  the way in:** n is now **57** nights at mean **2.653 h** against this entry's 2.657 at n=42, and
-  median |Δbpm| reproduces at exactly **2.00**. What is still owed is the other half: the review
-  names the three candidates it could not separate.
+- **⚠ THE PRE-REGISTERED EXPERIMENT RAN 2026-09-02 AND FAILED ITS OWN PASS TEST** —
+  [`review`](reviews/2026-09-02-recovery-index-ble-smoothing-experiment.md). Smoothing before the
+  argmin recovers **0.487 h of the 0.933 h gap (52%)**, then plateaus and reverses; the ratio reaches
+  **0.875, not ~1.0**. The input did need conditioning and that is **half the answer**: **do not ship
+  a wider `MEDIAN_WINDOW` as the fix** and do not move `RECOVERY_INDEX_OPTIMAL_HOURS`. Mean shift is
+  **4× the median**, the signature of a minority of nights where a spurious late dip beat the true
+  early minimum. Re-confirmed at **n=57, mean 2.653 h** (entry: 2.657 at n=42) and |Δbpm| **2.00**.
+  The other half is still owed; the review names the three candidates it could not separate.
 - **Plan:** none yet — **Lane A implements; Tuning proposes only.** This is a `devices` finding by the
   readiness code's own pre-registered rule, **not** a scoring change.
 - **Added:** 2026-08-18 · Tuning agent ·
