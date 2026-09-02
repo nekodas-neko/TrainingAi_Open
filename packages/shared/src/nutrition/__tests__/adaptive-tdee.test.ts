@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   estimateMaintenance, resolveMaintenance, maintenanceGapMessage,
-  MIN_LOGGED_DAYS, MIN_WEIGH_INS, DEFAULT_WINDOW_DAYS, MAX_WINDOW_DAYS,
+  MIN_LOGGED_DAYS, MIN_WEIGH_INS, DEFAULT_WINDOW_DAYS, MAX_WINDOW_DAYS, MIN_PLAUSIBLE_MAINTENANCE,
   type MaintenanceDay,
 } from '../adaptive-tdee'
 
@@ -244,5 +244,54 @@ describe('estimateMaintenance — partial days (Q-387)', () => {
     const r = estimateMaintenance(days, 14)
     expect(r.daysLogged).toBe(10)
     expect(r.maintenanceKcal).toBe(2600)
+  })
+})
+
+// Q-517: the universal 1000 kcal floor sits below the real artefact. The owner's worst window
+// computed 1052 — 495 kcal under a BMR of 1547 — and one tap turns that into a calorie goal.
+describe('the BMR floor', () => {
+  /** A window computing a maintenance of ~1050: logged at 1200/day, losing weight slowly. */
+  const artefact = () => window({ days: 14, intake: 1200, kgTotal: -0.27 })
+
+  it('reproduces the artefact when no BMR is supplied — this is the shipped behaviour', () => {
+    const e = estimateMaintenance(artefact(), 14)
+    expect(e.maintenanceKcal).not.toBeNull()
+    expect(e.maintenanceKcal!).toBeGreaterThan(MIN_PLAUSIBLE_MAINTENANCE)
+    expect(e.maintenanceKcal!).toBeLessThan(1547)
+  })
+
+  it('refuses the same window once the user\'s own BMR is the floor', () => {
+    const e = estimateMaintenance(artefact(), 14, 1547)
+    expect(e.maintenanceKcal).toBeNull()
+    expect(e.excludedReason).toBe('below_bmr')
+  })
+
+  it('rejects rather than clamps — resolveMaintenance falls back to the formula baseline', () => {
+    const r = resolveMaintenance(artefact(), 2397, 1547)
+    expect(r.source).toBe('formula')
+    expect(r.maintenanceKcal).toBe(2397)
+  })
+
+  it('leaves a healthy window alone', () => {
+    const ok = window({ days: 14, intake: 2400 })
+    expect(estimateMaintenance(ok, 14, 1547).maintenanceKcal)
+      .toBe(estimateMaintenance(ok, 14).maintenanceKcal)
+  })
+
+  it('never lowers the universal floor, whatever BMR it is handed', () => {
+    // A nonsense BMR must not weaken the guard that already exists.
+    const e = estimateMaintenance(window({ days: 14, intake: 2000, kgTotal: 5 }), 14, 200)
+    expect(e.maintenanceKcal).toBeNull()
+    expect(e.excludedReason).toBe('implausible_result')
+  })
+
+  it('still calls an out-of-range HIGH value implausible, not below_bmr', () => {
+    const e = estimateMaintenance(window({ days: 14, intake: 2000, kgTotal: -12 }), 14, 1547)
+    expect(e.excludedReason).toBe('implausible_result')
+  })
+
+  it('explains itself to the user without naming the internal gate', () => {
+    const e = estimateMaintenance(artefact(), 14, 1547)
+    expect(maintenanceGapMessage(e)).toMatch(/resting burn/i)
   })
 })

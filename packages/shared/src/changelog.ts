@@ -6,6 +6,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.434.2",
+    date: "2026-09-02",
+    changes: [
+      "Your calibrated maintenance calories can no longer come out below your own resting burn, which is not physically possible and was one tap from becoming your daily target.",
+      "When the numbers land there it now says so and falls back to the formula estimate, instead of quietly handing you a very low target built from part-logged days.",
+    ],
+  },
+  {
     version: "1.434.1",
     date: "2026-09-02",
     changes: [
