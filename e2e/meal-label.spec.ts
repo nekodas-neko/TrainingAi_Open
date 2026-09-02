@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test'
 import { Client } from 'pg'
 import { SEED_EMAIL, openSavedMeal, settleRouteBoundary } from './fixtures'
+import { decodeQrRotating as decodeQr } from './qr-decode'
 import { encodeMealLabelToken, decodeSharedMeal } from '@trainingai/shared/nutrition/label-payload'
 import { readPngDensity } from '@trainingai/shared/nutrition/png-density'
 import { readFileSync } from 'node:fs'
@@ -33,28 +34,6 @@ const escapeRe = (v: string) => v.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
  * `@zxing/browser` cannot be imported into the page (bare specifiers do not resolve there) and needs
  * a DOM anyway; its pure-JS core does neither, so the pixels come out and the decode happens here.
  */
-function decodeQr({ w, h, lum }: { w: number; h: number; lum: Buffer }): string | null {
-  /* eslint-disable @typescript-eslint/no-require-imports */
-  const {
-    RGBLuminanceSource, BinaryBitmap, HybridBinarizer, MultiFormatReader, BarcodeFormat, DecodeHintType,
-  } = require('@zxing/library')
-  // `RGBLuminanceSource` packs RGB down to luminance itself, so handing it a grey triple of the
-  // luminance the page already computed reaches the same value without shipping the colour.
-  const luminances = new Int32Array(w * h)
-  for (let p = 0; p < luminances.length; p++) {
-    const v = lum[p]
-    luminances[p] = (v << 16) | (v << 8) | v
-  }
-  const bitmap = new BinaryBitmap(new HybridBinarizer(new RGBLuminanceSource(luminances, w, h)))
-  const reader = new MultiFormatReader()
-  reader.setHints(new Map<unknown, unknown>([[DecodeHintType.POSSIBLE_FORMATS, [BarcodeFormat.QR_CODE]]]))
-  try {
-    return reader.decode(bitmap).getText()
-  } catch {
-    return null
-  }
-}
-
 /**
  * Keep the FAILING canvas, not just a measurement of it (LB-38).
  *

@@ -6787,6 +6787,17 @@ session re-running the same queries to decide whether the item is startable, and
 the caveats are in
 [`docs/reviews/2026-09-02-colmi-spo2-temp-stages.md`](reviews/2026-09-02-colmi-spo2-temp-stages.md).
 
+## 2026-09-02 — `projectOverview.md` → 9442, `docs/implementation-backlog.md` → 15621 (LB-38 root cause)
+
+The backlog **shrinks by ~120 lines**: LB-38 accumulated seven theories over several days and every one
+of them is now wrong, so the entry is replaced by the cause and its measurements rather than extended
+again. That is the shape a root-caused entry should take — the eliminations were only ever scaffolding
+for a question nobody had asked.
+
+The index grows by 15, and the line that earns it is the **product note**: the app's own scanner is the
+same decoder, so ~4% of labels may be unreadable upright by the app that printed them. It is untested
+on a camera and flagged rather than claimed, which is exactly the kind of thing that vanishes if it
+lives only in a journal entry nobody opens.
 ## 2026-09-02 — `docs/implementation-backlog.md` → (see .size) (PS-20)
 
 PS-20's copy half shipped and its decode half advanced without finishing, so the entry converts to a
