@@ -6438,3 +6438,16 @@ test) is the whole reason an hour failed to reproduce it.
 `projectOverview.md` grew 13. The line that cannot be cut is that **the file was passing on a race**,
 not that a flaky test was fixed: the same shape — an assertion whose setup depends on a fire-and-
 forget write from a previous test — is reachable anywhere else the pattern appears.
+
+## 2026-09-02 — `projectOverview.md` → 9245, `docs/implementation-backlog.md` → 15625 (LB-48 shipped)
+
+The backlog shrinks again — LB-48 removed, and an entry (LA-54) written during the same session
+withdrawn before it was ever pushed, because the premise it rested on was the one this work
+falsified.
+
+`projectOverview.md` grows by more than the fix deserves, and deliberately. The four-line change
+does not need a status block; the measurement does. An entry reasoned its way to "stale until the
+app is restarted" from a true premise about the tab shell, and the reasoning stopped one route
+short — the form that triggers the write is not in the shell. That shape (correct premise, correct
+inference, wrong scope) is the third premise failure of this session, and the block exists so the
+next reader sees the method rather than the four lines.

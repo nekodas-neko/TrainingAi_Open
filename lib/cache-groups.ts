@@ -176,6 +176,10 @@ export async function invalidateGoalRecommendations(): Promise<void> {
     invalidateCache('user-goals'),
     // fitnessGoal feeds the nutrition screen's TDEE-adaptation-card check
     invalidateCache('more-user-profile'),
+    // LB-48. Recommended calories route through `personalRmr`, so a saved RMR test changes them.
+    // The key belongs to this group rather than one of its own because saving an RMR is a goal
+    // input, not a separate domain — the same reason `body-metadata` is here.
+    invalidateCache('measured-rmr'),
   ])
 }
 

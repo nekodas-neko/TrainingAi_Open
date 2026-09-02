@@ -52,6 +52,8 @@ describe('cache group helpers', () => {
     await invalidateGoalRecommendations()
     expect(invalidated).toEqual(expect.arrayContaining([
       'nutrition-targets', 'body-metadata', 'progress-summary', 'user-goals', 'more-user-profile',
+      // LB-48. Recommended calories route through `personalRmr`, so a saved RMR test changes them.
+      'measured-rmr',
     ]))
     // nutrition-user-profile was collapsed into more-user-profile (CACHE-F13)
     expect(invalidated).not.toContain('nutrition-user-profile')
