@@ -6559,7 +6559,16 @@ The `projectOverview` block is longer than a one-string fix warrants because the
 interesting part. What is worth carrying is that the model was handed a number, a false account of
 how it was made, and enough context to "correct" for a multiplier that was not there.
 
-## 2026-09-02 — `projectOverview.md` → 9305, `docs/implementation-backlog.md` → 15603 (BF-104)
+## 2026-09-02 — `projectOverview.md` → 9304, `docs/implementation-backlog.md` → 15629 (LB-18's source shipped)
+
+Both grow. LB-18 stays queued with a `Keep:` for Lane B's swap, and its `Keep:` carries a
+correction rather than just a status: the entry's central claim — that ordering foods and meals by
+recency needs a Lane A schema change — was false, and `listSavedMeals` had already solved it by
+deriving from `max(food_logs.logged_at)`. That belongs in the entry because the next reader would
+otherwise plan the same migration; it is the fourth entry this session whose stated blocker did not
+survive being checked.
+
+## 2026-09-02 — `projectOverview.md` → 9317, `docs/implementation-backlog.md` → 15618 (BF-104)
 
 +13 on the index, and the line that earns it is the one about the sheet's own figures. The entry did
 not anticipate that shipping a portion picker forces the detail sheet's headline and macro columns to
@@ -6569,3 +6578,8 @@ scaling away would silently reintroduce a button that does not do what the numbe
 The 798-against-800 warning is the other half: `saved-meals-sheet.tsx` is not in the size baseline,
 so the next addition there fails as a new file over the limit rather than as a tracked hotspot, which
 is a confusing failure to meet cold.
+
+Both numbers are higher than the ones this branch first recorded (9305 / 15603, before the off-by-one between `wc -l` and the check's own count) because the
+recent-food-items PR landed in between and this is the post-merge count, not a second raise. Its
+entry and this one add different blocks, so the merge kept both — the additions case, not the
+backlog's two-deletions trap.

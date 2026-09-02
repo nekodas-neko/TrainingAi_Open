@@ -40,6 +40,18 @@ rather than a toast: logging at 1½× writes `quantity_multiplier` **1.5**. **No
 it is not in the size baseline, so the next addition there fails outright
 ([journal](docs/overview/entries/2026-09-02-feat-bf-104-meal-scale.md)).
 
+**`Recent` gets an unscoped source, and the migration LB-18 said it needed does not exist.** The
+owner settled the behaviour on the device — *"Recent doesnt need to be scoped to current meal
+bracket"* — and the entry said ordering foods and meals by recency **needs a Lane A schema change,
+not a Lane B sort**, because a saved meal has no last-used timestamp. **`listSavedMeals` already
+derives `lastUsedAt` from `max(food_logs.logged_at)`**, orders by it, and reads
+`idx_food_logs_saved_meal_recent` from migration 238 — deriving rather than storing, as the Stored
+Counters rule asks. The whole planned chain (migration, SQLite version, `RECONCILE_COLUMNS`, sync)
+was unnecessary; what was missing was a query without a `WHERE meal_type_id`. That shipped on both
+sides, sharing one body each so the de-dup and the 100-row window cannot drift, and `mealTypeId` is
+now optional on the route. **Lane B's half is dropping the query param**
+([journal](docs/overview/entries/2026-09-02-recent-food-items-unscoped.md)).
+
 **The goal-recommendation prompt claimed an activity-scaled TDEE it never had (LB-50).** It read
 *"Baseline (Katch-McArdle, lean mass Xkg, activity level 'moderate'): BMR X, TDEE X"* — which parses
 as *computed for that level*. `calculateBaseline` is `bmr × SEDENTARY_MULTIPLIER`, unconditionally,
