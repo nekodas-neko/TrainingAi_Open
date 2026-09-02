@@ -10845,6 +10845,30 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 ### [nutrition] Q-517 — adaptive-TDEE can hand the user a maintenance below their own BMR
 
 - **Branch:** `fix/adaptive-tdee-bmr-floor`
+- **⚑ SHIPPED 2026-09-02** — `estimateMaintenance` / `resolveMaintenance` take an optional
+  `minMaintenanceKcal`, and the floor is `max(MIN_PLAUSIBLE_MAINTENANCE, that)` so a nonsense BMR can
+  never weaken the guard that already existed. A window under it is **rejected, not clamped** — the
+  resolver then falls back to the formula baseline, where clamping would report a number the data
+  never supported. New `below_bmr` exclusion, separate from `implausible_result` on purpose: this one
+  means the intake log is incomplete, not that the arithmetic left human range.
+  **The addendum's source was improved on, deliberately.** It said to read `body_comp.bmr_kcal`;
+  `energy-balance-service.ts` already resolves a strictly better number two dozen lines above the
+  call — `personalRmr(measured) ?? comp.bmrKcal ?? mifflinStJeorBmr` — so the floor is the MEASURED
+  resting rate where one exists (BF-42) and needs no fallback ladder, no new read, and cannot drift
+  from what the body-composition card renders.
+  **What the entry did not say, and it sharpens the case:** the same file *already* floors
+  `restingBaseKcal` at BMR, one line below. That floor protects what the balance DISPLAYS; nothing
+  protected the maintenance itself — the number `targetFromMaintenance` turns into the
+  recommendation and `TdeeAdaptationCard` writes into the calorie goal. The right floor existed and
+  was applied to the wrong quantity.
+  [journal](overview/entries/2026-09-02-q517-tdee-bmr-floor.md).
+- **Keep:** two things, and neither is the floor.
+  1. **The durable fix — within-day incompleteness detection.** A day with only breakfast still
+     counts as fully logged, so a 50%-complete record clears a 70%-coverage gate. That is a feature,
+     not a constant, and it is what would make the estimate CORRECT rather than merely SAFE.
+  2. **`tdeeAdjustment` (`tdee-adaptation.ts`) is dead code** — referenced only by its own tests and
+     by a comment in `TdeeAdaptationCard` saying it was replaced. Same trap as `amrapScaleFactor`
+     (Q-514): do not calibrate it. Removing it is a Review-lane call.
 - **Plan:** none — one constant becomes a computed value. **Lane A implements; Tuning proposes only.**
 - **Added:** 2026-08-18 · Tuning agent ·
   [`docs/reviews/2026-08-18-nutrition-tdee-calibration.md`](reviews/2026-08-18-nutrition-tdee-calibration.md)

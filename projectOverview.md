@@ -24,8 +24,20 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.434.1 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Version:** v1.434.2 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-09-02.
+
+**The calibrated maintenance can no longer land below your own resting burn (Q-517).**
+`adaptive-tdee.ts` warns in its own header that an ungated estimate *"would tell the user their
+maintenance is 1200 kcal — actively harmful advice"*, then clamped at **1000**; the owner's worst
+window computed **1052** and slipped through the gap. The floor is now the user's BMR — the
+**measured** resting rate where one exists, since `energy-balance-service.ts` already resolves that
+better number two dozen lines above the call. Below it the window is **rejected, not clamped**, so
+the resolver falls back to the formula baseline rather than reporting a number the data never
+supported. **The right floor already existed one line below, applied to the wrong quantity:** it
+protected what the balance *displays*, not the maintenance that becomes the recommendation and then
+`users.calorie_goal`. **SAFE, not CORRECT** — survivors still sit under the formula's 2,397, which is
+under-logging showing through ([journal](docs/overview/entries/2026-09-02-q517-tdee-bmr-floor.md)).
 
 **A clamped expectation no longer cuts your load (Q-514).** `expectedRpe` clamps to the 5–10 slider,
 and on light accessory work the floor binds — 37 of 570 rated sets, hiding raw expectations as low as

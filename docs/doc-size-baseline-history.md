@@ -6882,3 +6882,17 @@ Two of the lines are there to stop the measurement being re-run wrongly: the dir
 **structural** (a longer window sits above a shorter one during an improving trend, so no window
 length separates the two effects), and there are only **74 days** of resting HR, so a 90-day window
 is not the slow anchor it reads as.
+
+## 2026-09-02 — `projectOverview.md` → (see .size), `docs/implementation-backlog.md` → (see .size) (Q-517)
+
+The index grows by 12 and the backlog by 22, and the lines doing the work in both are the two the
+entry did not have. **The right floor already existed one line below**, on `restingBaseKcal`, applied
+to what the balance *displays* rather than to the maintenance that becomes the calorie goal — without
+that sentence the fix reads as new machinery instead of an existing rule reaching the quantity it
+should always have covered. And **the addendum's recommended source was improved on deliberately**:
+it said to read `body_comp.bmr_kcal` with a fallback ladder for the 25 of 96 days that have no row,
+where the call site already resolves the measured resting rate and never returns null. A later
+session that "restores" the addendum's version would regress it, so the reason is on the record.
+
+The `Keep:` carries the honest limit: this makes the estimate SAFE, not CORRECT, and within-day
+incompleteness detection is the feature that would make it correct.
