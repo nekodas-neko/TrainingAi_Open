@@ -6715,3 +6715,15 @@ reader would weigh them against each other instead of reading one answer.
 The lines that earn their place are the two measurements: every style logs `len=22` with the same
 token, so interleaving cannot produce different data; and eleven clean start/resume/done triples per
 run, so it does not interleave anyway. Without them the mechanism reads plausible enough to rebuild.
+
+## 2026-09-02 — `projectOverview.md` → 9442, `docs/implementation-backlog.md` → 15535 (LB-38 root cause)
+
+The backlog **shrinks by ~120 lines**: LB-38 accumulated seven theories over several days and every one
+of them is now wrong, so the entry is replaced by the cause and its measurements rather than extended
+again. That is the shape a root-caused entry should take — the eliminations were only ever scaffolding
+for a question nobody had asked.
+
+The index grows by 15, and the line that earns it is the **product note**: the app's own scanner is the
+same decoder, so ~4% of labels may be unreadable upright by the app that printed them. It is untested
+on a camera and flagged rather than claimed, which is exactly the kind of thing that vanishes if it
+lives only in a journal entry nobody opens.
