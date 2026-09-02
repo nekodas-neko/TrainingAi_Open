@@ -111,6 +111,15 @@ jobs:
           cache: 'pnpm'
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
+      # LB-37. `tsconfig.json` excludes `**/__tests__/**`, so no spec has ever been typechecked and
+      # a clean `tsc` said nothing about any of them. Shrink-only per-file baseline: every NEW spec
+      # is checked immediately; the 320 recorded errors come down as files are touched.
+      #
+      # It lives HERE and not in Custom Rules because it needs `tsc`, and Custom Rules deliberately
+      # installs nothing — every step there is a dependency-free `node scripts/*.js`, which is what
+      # keeps that job at ~25 seconds. Build already installs and already typechecks.
+      - name: Test files typecheck (shrink-only)
+        run: node scripts/check-test-typecheck.js
 
   custom-rules:
     name: Custom Rules

@@ -38,7 +38,8 @@
     "test": "vitest run",
     "e2e": "playwright test",
     "typecheck": "tsc --noEmit",
-    "ci:local": "pnpm lint && pnpm check:rules && pnpm typecheck && pnpm test",
+    "typecheck:tests": "node scripts/check-test-typecheck.js",
+    "ci:local": "pnpm lint && pnpm check:rules && pnpm typecheck && pnpm typecheck:tests && pnpm test",
     "check:rules": "node scripts/run-custom-rules.js",
     "db:local": "bash scripts/local-db/setup.sh",
     "db:snapshot": "node scripts/local-db/snapshot.js"
