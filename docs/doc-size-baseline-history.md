@@ -6998,3 +6998,17 @@ would otherwise redo: 117 zero-scan indexes at 7,528 kB collapses to **30 / 800 
 keys and unique constraints come out, and its one real candidate was already taken by BF-55's own
 migration 249. The `stats_reset = NULL` line is there because it cuts the *opposite* way to how it
 reads — it strengthens "never scanned" while leaving constraint indexes exactly as undroppable.
+
+## 2026-09-02 — `projectOverview.md` → 9607, `docs/implementation-backlog.md` → 15955 (Q-529 + LB-53)
+
+The backlog carries two additions and the index one. What earns the space in all three is the same
+correction: **the entry's premise was stale, and the flag it asks for already existed.** Without that
+written down, the next reader of Q-529 goes looking for the missing server-side concept that
+`lib/sleep/provisional.ts` has provided since BF-83 — and the actual defect, four local `SleepRow`
+copies silently dropping a field the API was already sending, is invisible from the entry.
+
+LB-53's table is the whole of its length and is not compressible: four `computed_at` stamps with
+their row counts and day ranges is the evidence, and "scores are not recomputed nightly" without it
+is a claim rather than a measurement. Its own caveats are kept for the same reason — `claude_ro` is
+row-scoped, and scheduling is not visible from a query, so a later session knows what the read could
+not settle.
