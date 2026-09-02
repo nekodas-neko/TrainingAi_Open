@@ -24,8 +24,21 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.433.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Version:** v1.434.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-09-02.
+
+**The walk summary shows its calories (BF-107).** The owner: *"the final screen doesnt show calories
+burned."* **The number was already reaching the client and the screen threw it away** — `POST
+/api/activity-logs` answers `{ activityLog }` carrying it, and the web branch checked `res.ok` and
+discarded the body. **The device half is the one that mattered:** `pushMutations` only flips the row to
+`synced`, so the derived value lands on a **pull** — the fix forces one inside `pushThenRevalidate`'s
+callback and reads the row back, without which the tile is a dash forever on the canonical runtime.
+The tile reads `—` until a figure lands, never `0`, because a zero is a claim about a walk that burned
+nothing. **The entry's sibling claim was wrong:** `done-activity-screen.tsx` navigates away the instant
+it saves, so its grid is a pre-save draft and a tile there would vanish before filling. `StatTile` is
+now one primitive rather than two drifted copies. **Not device-verified**, and the device owns both
+interesting cases — offline, and the fill itself
+([journal](docs/overview/entries/2026-09-02-bf-107-walk-calories.md)).
 
 **LB-38 is root-caused: `@zxing/library` cannot read certain VALID QR symbols upright, and the flake
 was never in the app.** Over **3,000** meal tokens, encoded by the same `qrcode` call the label
