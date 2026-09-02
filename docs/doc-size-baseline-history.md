@@ -6548,3 +6548,14 @@ half they happen to hit first.
 The Q-51 gate note is the rest: it records **why** the measurement cannot be taken in the sandbox
 (`pnpm dev` compiles on first mount; `next start` forces SSL on the pg pool), because "needs a
 device" without the reason invites the next session to try anyway.
+
+## 2026-09-02 — `projectOverview.md` → 9293, `docs/implementation-backlog.md` → 15586 (BF-104)
+
++13 on the index, and the line that earns it is the one about the sheet's own figures. The entry did
+not anticipate that shipping a portion picker forces the detail sheet's headline and macro columns to
+follow it — that file documents them as what `Log this meal` writes — so a future reader tidying the
+scaling away would silently reintroduce a button that does not do what the number above it says.
+
+The 798-against-800 warning is the other half: `saved-meals-sheet.tsx` is not in the size baseline,
+so the next addition there fails as a new file over the limit rather than as a tracked hotspot, which
+is a confusing failure to meet cold.

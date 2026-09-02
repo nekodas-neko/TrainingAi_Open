@@ -24,8 +24,21 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.430.1 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Version:** v1.431.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-09-02.
+
+**A meal can be logged at ½×, 1× or 1½× (BF-104).** The owner's ask, and the second half of a split
+that paid off: BF-104 was parked behind LB-49 this morning and became startable the moment LB-49's
+engine argument merged. **The picker had to change the sheet's own figures**, which the entry did not
+anticipate — the detail sheet documents its headline and macros as *"per portion, that is what Log
+this meal writes"*, so a figure fixed at one portion would have stopped describing the button. They
+follow the picker now and the label says which portion it is showing. Discrete taps rather than a
+number field (the entry is explicit), reset to 1× whenever a different meal opens, and the scanned-
+label path deliberately keeps no picker because it is scan-and-go. Verified against the database
+rather than a toast: logging at 1½× writes `quantity_multiplier` **1.5**. **Not device-verified**, and
+**`saved-meals-sheet.tsx` now sits at 798 lines against the 800 limit** — two lines of headroom, and
+it is not in the size baseline, so the next addition there fails outright
+([journal](docs/overview/entries/2026-09-02-feat-bf-104-meal-scale.md)).
 
 **The journal directory's total ceiling is 320, up from 250 — `main` had reached it and every agent
 was one PR from a hard CI block.** The standing rule puts a journal entry in every PR, so the next
