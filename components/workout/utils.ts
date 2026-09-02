@@ -213,6 +213,36 @@ export function deloadRevertNames(
   return [...new Set([...perExerciseReverts, ...all])]
 }
 
+/**
+ * What a session-level `Full` override actually did, so the card can say it (LB-47).
+ *
+ * **`blocked.length === 0` is two different situations and the card was treating them as one.** It
+ * meant "every deloaded exercise reverted" *and* "no exercise was deloaded at all", and the copy
+ * said the first: *"Every exercise is back to its pre-deload weights and sets, and these sets count
+ * toward your 1RM."* On a **session-level** deload — where the low intensities are baked into the
+ * prescription's own `pct` values at generation and no exercise carries `deloaded`/`preDeload` —
+ * both `deloadRevertNames` and `deloadOverrideBlocked` return empty, so the user read a confirmation
+ * that the override had worked while the bar kept the deload weights. That is BF-8's complaint
+ * (*"I was under the assumption I was doing my full session"*) arriving from the other side.
+ *
+ * **Measured against production, 2026-09-01 (LB-47).** Of 5 stored prescriptions: 1 session-level
+ * deload carrying 0 exercises with `preDeload`, 2 with a per-exercise deload, 0 with both. So
+ * `nothing-to-revert` is the shape the only real session deload takes.
+ */
+export type DeloadOverrideOutcome = 'none' | 'all' | 'partial' | 'nothing-to-revert'
+
+export function deloadOverrideOutcome(
+  exercises: readonly Pick<WorkoutExercise, 'name' | 'deloaded' | 'preDeloadStyle'>[],
+  overrideFull: boolean,
+): DeloadOverrideOutcome {
+  if (!overrideFull) return 'none'
+  const deloaded = exercises.filter(ex => ex.deloaded)
+  if (deloaded.length === 0) return 'nothing-to-revert'
+  return deloaded.every(ex => ex.preDeloadStyle) ? 'all'
+    : deloaded.some(ex => ex.preDeloadStyle) ? 'partial'
+    : 'nothing-to-revert'
+}
+
 /** Deloaded exercises a session-level override could NOT revert, because the prescription carried
  *  no `preDeload` block for them. Named on the card: silently reverting some and not others, with
  *  nothing on screen saying which, is the failure the fix would otherwise introduce. */

@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@trainingai/shared/utils";
 import type { WorkoutExercise } from "@/app/api/workout-data/route";
 import type { SessionLogEntry } from "./types";
-import { formatSheetDate, mround125, modalWeight, avgReps } from "./utils";
+import { formatSheetDate, mround125, modalWeight, avgReps, deloadOverrideOutcome } from "./utils";
 import { displayOneRm } from "@trainingai/shared/1rm";
 import { RoleChip } from "./role-chip";
 import type { PrescriptionStatus } from "@trainingai/shared/types/ai-periodization";
@@ -270,6 +270,7 @@ export function PreWorkoutScreen({
                 onPhaseChanged={onPhaseChanged}
                 overrideFull={overrideFull}
                 overrideBlockedNames={overrideBlockedNames}
+                overrideOutcome={deloadOverrideOutcome(exercises, overrideFull)}
               />
               </>
             ) : null}

@@ -6608,3 +6608,16 @@ The index lines are the ones a future reader cannot reconstruct: that OFF's per-
 from the same bad number, so "prefer `_100g`" is not a fix; and that the check and its 15% limit already
 existed for this exact failure. Without those two, the next person to see a wrong calorie count starts
 from the mapper again.
+
+## 2026-09-02 — `projectOverview.md` → 9355, `docs/implementation-backlog.md` → 15574 (LB-47)
+
++15 on the index and −2 on the backlog. The index lines are unusually expensive for a copy change, and
+they are the ones a future reader cannot reconstruct: **that LB-47's measurement was right and its
+conclusion was not**, and specifically that the toggle is not rendered at all on a real session-level
+deload because `phase: 'deload'` sets `isDeloadActive`. Without that, the next reader repeats the
+entry's inference — the numbers genuinely support it — and ships the fix it proposed, which is already
+the behaviour.
+
+The other line worth its cost is that the reachable failure needs a prescription whose `deload` flag
+and `phase` disagree, 0 of 5 so far. It marks the fix as latent rather than as a live bug closed,
+which is what stops it being struck from Known Issues on the strength of having shipped.

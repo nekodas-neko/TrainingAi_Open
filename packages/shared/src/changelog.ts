@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.431.2",
+    date: "2026-09-02",
+    changes: [
+      "Fixed a case where turning on Full over a deload said \u0022every exercise is back to its pre-deload weights\u0022 when nothing had actually changed. It now says the deload is built into the whole session and that Full does not alter today's targets.",
+    ],
+  },
+  {
     version: "1.431.1",
     date: "2026-09-02",
     changes: [

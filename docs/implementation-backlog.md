@@ -3059,41 +3059,39 @@ owner has to re-describe in a wizard what the app already knows.
   worker.
 
 
-### [workouts] LB-47 — BF-64's `Full` override may do nothing on a REAL session-level deload
+### [workouts] LB-47 — the `Full` override CLAIMED a revert that had not happened (shipped; device owed)
 
-- **Lane:** B — `components/workout/utils.ts` (`deloadRevertNames`), and possibly Lane A if the
-  answer is that a session deload needs a revert target the prescription does not currently carry.
-- **Added:** 2026-09-01 by Lane B, against its own shipped work (BF-64, #764, v1.422.0).
-- **⚠ This questions a fix that has already merged. It is not a regression — nothing got worse — but
-  the central claim may not hold, and it was verified against a fixture that misrepresents
-  production.**
-- **What BF-64 shipped.** Picking `Full` over a deload prescription reverts every deloaded exercise
-  to its `preDeload` numbers. The entry's premise, quoted: *"Every deloaded prescription exercise
-  carries a `preDeload` block."*
-- **What production actually holds.** Of **5** stored prescriptions: **1** has a session-level
-  `deload: true`, **2** have per-exercise `deloaded: true`, and **0 have both**. So on the only real
-  session-level deload, no exercise carries `deloaded`/`preDeload` — `deloadRevertNames` returns an
-  empty list and **the override reverts nothing.** The toggle would behave exactly as it did before
-  BF-64, which is the defect BF-64 was filed to fix.
-- **Why the two do not overlap.** A **session** deload has its low intensities baked into the LLM's
-  own `pct` values at generation. A **per-exercise** deload is an overlay applied afterwards by
-  `reevaluateForToday`, which stores the original in `preDeload` precisely so it can be undone. Only
-  the second has anything to revert *to*. BF-64 reused the second mechanism to implement the first.
-- **So the open question is what `Full` should mean on a session deload**, and it is not obvious:
-  the pre-deload numbers were never computed, so there is nothing stored to go back to. Candidates —
-  regenerate via `/prescribe` (which BF-64 rejected on cost, and the route takes no intensity input
-  anyway); scale the pcts back up by a fixed factor (invents numbers the engine did not choose); or
-  **disable the toggle on a session deload and say why**, which is honest and cheap. That last one is
-  probably right and is a Lane B change.
-- **⚠ Do not revert BF-64.** Its per-exercise path is correct and does work: `applyDeloadReverts` and
-  the blocked-exercise card copy are exercised by the mixed case, which production does produce. What
-  is unproven is the session-level case, which is the one the owner reported.
-- **⚠ And re-read BF-64's verification with this in mind.** It was measured against a hand-built
-  fixture combining session-level and per-exercise deloads — a pair production has not produced (see
-  LB-46). The reverts observed were real; whether they can ever fire on the owner's own data is what
-  this entry asks.
-- **n = 5.** Small. Confirm against a larger sample, or by asking the owner to report the next time a
-  deload day appears, before designing around it.
+- **Lane:** B — `components/workout/utils.ts` and `ai-prescription-card.tsx`. No Lane A half was
+  needed, which the entry thought it might be.
+- **Verify:** device — the case needs a prescription whose `deload` flag is true while the server
+  reports `isDeloadActive` false, which production has not produced (0 of 5). Worth a look the next
+  time a deload day appears, alongside whether the toggle's absence on a real session deload should
+  itself carry a line of explanation (see the last bullet).
+- **✅ SHIPPED** (`fix/lb-47-deload-override-honesty`, 2026-09-02). `deloadOverrideOutcome` gives the
+  card a fourth state, `nothing-to-revert`, and the card no longer confirms an override that did not
+  occur.
+- **⚠ The entry's MEASUREMENT was exactly right and its CONCLUSION was not. Re-measured against
+  production 2026-09-02:** 5 stored prescriptions, 1 with a session-level `deload: true` carrying 0
+  exercises with `deloaded`/`preDeload`, 2 with a per-exercise deload, 0 with both — the entry's
+  figures to the row. What it did not check is what the *screen* does with that.
+- **On the owner's real session-level deload the toggle is not rendered at all**, so `Full` is not
+  "an override that does nothing" — it is not offerable. That prescription carries `phase: 'deload'`,
+  so `aiDynamicFallbackPhaseStatus` returns `isDeloadActive: true`, and `pre-workout-screen.tsx`
+  gates the whole `DeloadToggle` on `!phaseStatus?.isDeloadActive`.
+- **What IS reachable is worse than the entry described.** `deloadOverrideBlocked` returns empty in
+  that shape too, and the card read `blocked.length === 0` as *everything reverted* — rendering
+  **"Every exercise is back to its pre-deload weights and sets, and these sets count toward your
+  1RM."** Both clauses false. It needs `prescription.deload === true` while the server reports
+  `isDeloadActive` false — a prescription whose `deload` flag and `phase` disagree, which nothing
+  forbids and which production has not yet produced. Latent, not the owner's reported symptom.
+- **BF-64 was not reverted and its per-exercise path is untouched**, exactly as the entry insisted.
+  What changed is only the sentence shown when nothing was reverted.
+- **Still open, and deliberately not built here:** a real "run this at full intensity" path on a
+  session-level deload. It needs a regeneration `/prescribe` cannot do (the route takes no intensity
+  input), so it is a Lane A + owner question, not a copy change. **And the toggle's silent absence
+  is a smaller open question of its own** — the user who wants a full session sees no control and no
+  reason. One line of explanation where the toggle would be is cheap; whether it is wanted is the
+  owner's call, so it is not assumed here.
 
 ### [workouts] LB-46 — how a deload reaches the AI Prescription card, and why a hand-built fixture misleads
 
