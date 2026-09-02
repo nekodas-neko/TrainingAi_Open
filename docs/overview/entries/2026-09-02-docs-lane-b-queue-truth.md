@@ -49,3 +49,17 @@ says not to start until the measurement exists.
 deload, and LB-38, which needs its flake to recur with the dump instrumentation in place. Neither is
 a build. Every other item is `KEEP` (shipped, device check owed), `PARKED` behind another lane, or
 gated on the owner.
+
+### LB-38's sample, corrected upward
+
+Twelve more full-file runs after the canvas-transfer fix, all green. That takes the post-fix sample
+to **1 failure in 19 runs**, not the 1-in-10 the entry first recorded.
+
+**And no dump has been captured yet, for an ordinary reason: the one failure came before the dump was
+wired into the every-style loop.** So the offline decode — LB-38's actual open question — is still
+unanswered, and the entry now says so plainly with an instruction to keep the file before doing
+anything else.
+
+The pre- and post-fix rates also cannot be compared directly, and the entry now says that too. The
+old "roughly 1 run in 2 across eleven runs" was counting the every-style **timeout** alongside the
+decode failure; those are two different faults, and only one of them is left.

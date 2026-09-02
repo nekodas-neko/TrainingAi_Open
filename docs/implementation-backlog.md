@@ -15067,10 +15067,20 @@ a second failure nobody had separated from this one.**
 - **The fix: transfer one luminance byte per pixel, base64, computed in the page.** ZXing packs RGB
   down to luminance anyway and the ink fraction is a threshold, so nothing is lost. **The file went
   from 4.7–4.8 min to 1.8–2.0 min**, and that test from a 3.4-min timeout to **~49 s**.
-- **⚠ THE NULL DECODE IS STILL REAL — do not treat this as closed.** **1 of 10** post-fix runs failed,
-  and it failed in the **every-style loop**, on `Ingredients · centred` — not in the share-code test
-  this entry was filed against. That loop has **no retry**, which makes it the better reproduction:
-  it fails on the first attempt instead of the sixth, in ~52 s instead of ~4.8 min.
+- **⚠ THE NULL DECODE IS STILL REAL — do not treat this as closed.** **1 failure in 19 post-fix
+  runs**, and it failed in the **every-style loop**, on `Ingredients · centred` — not in the
+  share-code test this entry was filed against. That loop has **no retry**, which makes it the better
+  reproduction: it fails on the first attempt instead of the sixth, in ~52 s instead of ~4.8 min.
+- **⚠ NO DUMP HAS BEEN CAPTURED YET, and the reason is ordinary: the one failure came BEFORE the dump
+  was wired into that loop.** Twelve consecutive runs since have been green. So the offline decode —
+  this entry's actual open question — is still unanswered, and the next person to see a red here
+  should **keep the dump file** before doing anything else; it is the whole point of the
+  instrumentation.
+- **The rate changed as well as the cost.** Pre-fix the entry measured roughly 1 run in 2 across
+  eleven runs, but that sample cannot be compared directly: it was counting the every-style
+  **timeout** alongside the decode failure, and those are two different faults. Post-fix, with the
+  timeout gone, the decode alone is **~1 in 19**. Budget runs accordingly — this is now a rare flake
+  that is cheap to observe rather than a common one that was expensive.
 - **What is still established from before:** the ink at a failing attempt reads inside the normal
   0.172–0.179 band (0.1735 and 0.1775 on two captured failures), so the buffer is not degenerate; and
   a *passing* canvas decodes under all four binarizer/`TRY_HARDER` combinations, so decoder
@@ -15090,8 +15100,9 @@ a second failure nobody had separated from this one.**
   ~10%. It is a hypothesis, not a finding — the dump is what would settle it.
 - **If confirmed the fix is to reject a torn canvas in the gate, not another retry.** The retry is
   already at six attempts and the file's own comment says another one is the wrong answer.
-- **Reproduction:** run the **file**, not a single test. Post-fix it is roughly 1 run in 10, so budget
-  more runs than before — the failure got rarer as well as cheaper.
+- **Reproduction:** run the **file**, not a single test — but note the one observed post-fix failure
+  was in the every-style test, which now fails on its first attempt, so a single-test run of that one
+  may reproduce it too. Budget many runs: ~1 in 19.
 - **Piping a run through `grep` hides its output until it exits** — use `grep --line-buffered`.
 
 
