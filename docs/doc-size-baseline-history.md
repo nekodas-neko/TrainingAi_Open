@@ -6679,3 +6679,16 @@ would re-strand exactly the user it was put there for, and nothing in the code s
 
 The other is that the scope decides the **tool subset** rather than the prompt. Without it the next
 change to this entry point reads `?scope=nutrition` as cosmetic routing and drops it.
+
+## 2026-09-02 — `docs/implementation-backlog.md` → 15593 (Q-407 Keep field + lane re-route)
+
++4, and they are a **field the runner parses**, not prose. Q-407's Lane B half shipped and the entry
+said so in a bullet — but `next-item.js` reads `Keep:`, so without one it kept printing Q-407 at the
+head of Lane B's READY list as though nothing had been done. The same shape cost BF-109 a `Lane:` and
+a `Verify:` earlier the same day: an entry that describes its own state in prose is invisible to the
+tool an implementer is told to start from.
+
+The `Lane:` re-route is the same lesson one level up. The entry has carried a prose paragraph naming
+the split (*"`lib/coach/**` is Lane A"*) since 2026-08-30, and the runner never read it — it reads the
+`Lane:` field, which said B. With the B half shipped, the entry sat in **neither** queue as work: Lane
+B had nothing left to do and Lane A could not see it at all.
