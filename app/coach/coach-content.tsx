@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport, lastAssistantMessageIsCompleteWithToolCalls, type UIMessage } from "ai";
 import { useRouter } from "next/navigation";
@@ -26,9 +26,17 @@ interface CoachContentProps {
   tz: string;
   /** Threaded to the widgets that write — the plan card saves meals local-first, which needs it. */
   userId: string;
+  /**
+   * Which named coach this is (Q-407). Absent means the general one.
+   *
+   * It is sent as a request field rather than baked into the URL the transport posts to, because the
+   * API takes it in the body and treats it as optional — an unknown scope falls back to `general`
+   * instead of failing, so a link written by an older build still opens a working Coach.
+   */
+  scope?: string;
 }
 
-export function CoachContent({ tz, userId }: CoachContentProps) {
+export function CoachContent({ tz, userId, scope }: CoachContentProps) {
   const router = useRouter();
   const [input, setInput] = useState("");
   const [showHistory, setShowHistory] = useState(false);
@@ -37,8 +45,15 @@ export function CoachContent({ tz, userId }: CoachContentProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
+  // Memoised on the scope alone: `useChat` reads the transport it is given, and handing it a fresh
+  // instance on every render is how a chat quietly loses its in-flight request.
+  const transport = useMemo(
+    () => new DefaultChatTransport({ api: "/api/coach", body: scope ? { scope } : undefined }),
+    [scope],
+  );
+
   const { messages, sendMessage, addToolResult, setMessages, status, error } = useChat({
-    transport: new DefaultChatTransport({ api: "/api/coach" }),
+    transport,
     // A widget's answer must resume the turn, or the conversation stops dead the moment the user
     // taps an option.
     sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithToolCalls,

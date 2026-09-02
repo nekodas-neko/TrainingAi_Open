@@ -19,7 +19,7 @@ import { hourFromTzDatetime } from './plan-day-fill'
  */
 export function ActivePlanCard({
   plan, onPlanChanged, loading, mealTypes, logs, userId, tz, logDate, today, dateRef,
-  eaten, onLogged, onCreate, onViewPlan,
+  eaten, onLogged, onCreate, onStepByStep, onViewPlan,
 }: {
   plan: MealPlan | null
   onPlanChanged: (plan: MealPlan | null) => void
@@ -35,6 +35,7 @@ export function ActivePlanCard({
   eaten?: { calories: number; proteinG: number; carbsG: number; fatG: number }
   onLogged: (log: FoodLogWithItem) => void
   onCreate: () => void
+  onStepByStep: () => void
   onViewPlan: (planId: string) => void
 }) {
   const {
@@ -71,6 +72,7 @@ export function ActivePlanCard({
       onSaveAllMeals={saveMeals}
       savingPositions={savingPositions}
       onCreate={onCreate}
+      onStepByStep={onStepByStep}
       onViewPlan={onViewPlan}
     />
   )
