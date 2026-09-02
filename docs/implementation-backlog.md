@@ -659,51 +659,40 @@ The two-channel split is the second half and only pays off when the screen is of
   does not keep pinging.
 
 
-### [nutrition] BF-104 — log a meal at 0.5× / 1× / 1.5×; the storage supports it and nothing sets it
+### [nutrition] BF-104 — log a meal at ½× / 1× / 1½× (shipped; device check owed)
 
-- **Lane:** B — the picker on the meal sheet, and only that. **The engine argument it needs is
-  LB-49**, which is Lane A's: `logMealFromSaved` lives in `packages/shared` and is called from the
-  web route and the `pushMutations` branch, so a lane that cannot edit either cannot thread a
-  parameter through it. Split on 2026-09-01 by Lane B, which reached this entry at the top of its
-  queue and could not start it.
-- **Needs:** LB-49
+- **Keep:** the device check. Three segments join an already-full detail sheet at 412 dp, each on the
+  48 dp floor, directly above the action row — whether the sheet still fits without scrolling to
+  reach `Log this meal` is the only thing unchecked.
+- **Verify:** device.
+- **✅ SHIPPED** (`feat/bf-104-meal-scale`, 2026-09-02, v1.431.0). `MealPortionPicker` on the meal
+  detail sheet, with the values in `meal-portion-scale.ts` and `logMealItems`'s LB-49 `scale`
+  argument threaded through `quickLog`.
+- **⚠ The picker had to change the sheet's OWN figures, and that was not in the entry.** The detail
+  sheet's headline calories and macro columns are documented there as *"per portion — that is what
+  `Log this meal` writes"*. The moment the button can write 1.5 portions, a figure fixed at one stops
+  describing the button — the two-numbers-for-one-thing class LA-45 and BF-99 each closed. They now
+  scale with the picker, and the label under the headline says which portion it is showing.
+- **`SegmentedTabs`, not `QuantityEditor`.** The entry said to reuse rather than add a third quantity
+  control; `QuantityEditor` is the wrong one to reuse — it edits a **single food** in grams or
+  servings with a stepper, a unit toggle and macro tiles. The primitive `QuantityEditor` itself uses
+  for its own toggle is the one that fits a meal-level portion.
+- **The row's one-tap log is unchanged**, defaulting to 1. Only the detail sheet, where a portion is
+  actually chosen, passes anything else.
+- **The scale resets to 1× whenever a different meal opens.** A portion is a fact about one sitting;
+  a sheet that reopened on ½× would log half a meal silently.
+- **⚠ The scanned-label path deliberately has no picker.** `food-logger-sheet.tsx`'s
+  `handleScannedSavedMeal` is scan-and-go in a kitchen — interrupting it with a portion question is
+  the opposite of what that flow is for, and the owner's request was about deliberate logging.
+- **⚠ `saved-meals-sheet.tsx` is at 798 lines against the 800 limit.** Two lines of headroom. The
+  next thing added there has to extract something first; it is not in `check-component-size`'s
+  baseline, so it fails as a *new* file over the limit rather than as a tracked hotspot.
+- **Verification:** 11 unit tests (**seven mutations**) and `e2e/meal-portion-scale.spec.ts` — 2 tests
+  driving the real sheet, **three mutations**, asserting the headline moves 400 → 200 → 600 with the
+  picker and that logging at 1½× writes `quantity_multiplier` **1.5** in `food_logs`, read back from
+  the database rather than from a toast.
 - **Added:** 2026-09-01 · owner: *"when logging food/meals we should be able to choose how much of the
   meal; i.e full at 1x or 1.5 or 0.5 etc."*
-
-**Every food log already carries its own multiplier — the meal path just never scales it.**
-`logMealFromSaved` writes `quantityMultiplier: item.quantityMultiplier` (`log-meal.ts:83, 96, 131`),
-taking each item's factor straight from the saved definition. There is no meal-level factor anywhere
-between the "Log this meal" button and the rows it writes, so the button can only ever log exactly
-one portion.
-
-**⚠ This is NOT the "makes N portions" control, and conflating them would be the wrong fix.**
-`components/nutrition/meal-batch-size.tsx` sets *"how many portions a saved meal makes"* — a
-**definition-time** property that divides a recipe into servings (the screenshot's *"One portion · 2
-ingredients"* against Edamame Block's *"makes 2 portions"*). This request is **log-time**: how much
-of one portion was eaten today. A meal can make 4 portions and be eaten 1.5 at a sitting; the two
-numbers multiply, they do not substitute.
-
-- **The change is one argument, threaded.** `logMealFromSaved(meal, …, scale = 1)` writing
-  `quantityMultiplier: item.quantityMultiplier * scale`. No schema change — `food_logs.quantity_multiplier`
-  is already per-row.
-- **Recommendation: scale at WRITE time, do not store the factor separately.** The rows are already
-  point-in-time snapshots — `logMealFromSaved` copies the definition's multipliers rather than
-  referencing them — so a log survives the meal being edited afterwards. Adding a meal-level factor
-  that every reader must remember to apply would break that property and put a second multiplier in
-  the system, which is the shape this repo has been bitten by before (Q-401's two TDEE models,
-  BF-88's two meanings for one constant).
-- **The cost of that choice, stated so it is chosen rather than discovered:** "I ate 1.5×" is not
-  recoverable as a fact afterwards — only the scaled per-item amounts are. That is the same trade
-  BF-3 made for supplement doses and it went the other way there, because a titrating drug's dose is
-  the datum. Here the datum is the food eaten, and the factor is how it was entered.
-- **⚠ Whatever the picker is, it must not be a free-number field.** The owner named 0.5 / 1 / 1.5 —
-  discrete taps, not a keyboard. `components/nutrition/quantity-editor.tsx` already exists for
-  per-item amounts and its comment notes *"serving still needs qualifying against the meal's own
-  portions"*, so reuse rather than adding a third quantity control.
-- **Verification:** logging Cruskit + PB at 1.5× writes 243 → **365 kcal** across two rows whose
-  per-item grams are each 1.5× the definition; the diary groups them as one meal; editing the saved
-  meal afterwards leaves the logged rows unchanged; and 1× is byte-identical to today's behaviour.
-
 
 ### [nutrition] BF-103 — one label, `My Foods`, on every surface (owner decision, 2026-09-01)
 

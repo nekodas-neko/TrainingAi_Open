@@ -1,10 +1,12 @@
 'use client'
 
-import { useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { ChevronLeft, Loader2, Pencil, QrCode, Trash2 } from 'lucide-react'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { Button } from '@/components/ui/button'
 import { MACRO_COLORS } from '@trainingai/shared/nutrition/macro-colors'
+import { MealPortionPicker } from './meal-portion-picker'
+import { MEAL_SCALES, scaleToNumber, type MealScale } from './meal-portion-scale'
 import { macroKcal, macroShares } from './macro-energy'
 import { batchRows, portionRows, sumRows } from './saved-meal-totals'
 import { MealPhotoTile } from './meal-photo-tile'
@@ -21,7 +23,8 @@ interface Props {
   confirmingDelete: boolean
   onConfirmingDeleteChange: (confirming: boolean) => void
   onOpenChange: (open: boolean) => void
-  onLog: (meal: SavedMeal) => void
+  /** BF-104: `scale` is how much of one portion was eaten — 1.5 for a serving and a half. */
+  onLog: (meal: SavedMeal, scale: number) => void
   onEdit: (meal: SavedMeal) => void
   onDelete: (meal: SavedMeal) => void
   onLabel: (meal: SavedMeal) => void
@@ -65,8 +68,27 @@ export function MealDetailSheet({
   const shown = meal ?? lastMeal.current
 
   const servings = shown && shown.servings > 0 ? shown.servings : 1
-  const portion = sumRows(shown ? portionRows(shown) : [])
+  // BF-104. Reset per meal, never remembered: a portion is a fact about one sitting, and a sheet
+  // that opened on ½× because that is what you ate yesterday would log half a meal silently.
+  const [scale, setScale] = useState<MealScale>('1')
+  useEffect(() => { if (meal) setScale('1') }, [meal?.id])  // eslint-disable-line react-hooks/exhaustive-deps
+
+  const onePortion = sumRows(shown ? portionRows(shown) : [])
+  const factor = scaleToNumber(scale)
+  // **The headline and the macro columns follow the picker, and they have to.** This sheet's own
+  // note says those figures are "per portion — that is what `Log this meal` writes". Once the button
+  // can write 1.5 portions, a number that stayed at one is no longer describing what the button
+  // does, which is the two-numbers-for-one-thing defect this repo keeps paying for.
+  const portion = {
+    ...onePortion,
+    calories: onePortion.calories * factor,
+    proteinG: onePortion.proteinG * factor,
+    carbsG: onePortion.carbsG * factor,
+    fatG: onePortion.fatG * factor,
+  }
   const batch = shown ? batchRows(shown) : []
+  // Shares are ratios, so they are unchanged by the factor — computed off the scaled figures anyway
+  // so there is one source for what is on screen rather than two that happen to agree.
   const shares = macroShares(portion)
   const energy = macroKcal(portion).total
 
@@ -118,7 +140,7 @@ export function MealDetailSheet({
           <div className="mb-4 text-center">
             <p className="text-4xl font-bold tabular-nums leading-none">{Math.round(portion.calories)}</p>
             <p className="mt-1 text-[11px] font-semibold uppercase tracking-[0.05em] text-muted-foreground">
-              per portion
+              {factor === 1 ? 'per portion' : `${MEAL_SCALES.find(s => s.value === scale)!.label} portion`}
             </p>
           </div>
 
@@ -171,6 +193,8 @@ export function MealDetailSheet({
           )}
         </div>
 
+        {!confirmingDelete && <MealPortionPicker value={scale} onChange={setScale} />}
+
         {confirmingDelete ? (
           <div className="shrink-0 border-t border-destructive/30 bg-destructive/5 px-4 py-3">
             <p className="text-xs font-medium">Delete “{shown.name}”?</p>
@@ -189,7 +213,7 @@ export function MealDetailSheet({
           </div>
         ) : (
           <div className="flex shrink-0 items-center gap-2 pt-2">
-            <Button onClick={() => onLog(shown)} disabled={logging} className="h-12 flex-1 gap-1.5 font-semibold">
+            <Button onClick={() => onLog(shown, factor)} disabled={logging} className="h-12 flex-1 gap-1.5 font-semibold">
               {logging && <Loader2 className="h-4 w-4 animate-spin" />}
               Log this meal
             </Button>

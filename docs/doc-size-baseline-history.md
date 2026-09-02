@@ -6578,3 +6578,19 @@ what a successor needs is now one link to the handoff.
 `projectOverview` grows by a block about entry quality rather than about any of the ten PRs, which
 is the right proportion: the code was mostly four-line fixes, and the reason they were four lines is
 that six of eight entries turned out to be wrong about something load-bearing.
+
+## 2026-09-02 — `projectOverview.md` → 9328, `docs/implementation-backlog.md` → 15618 (BF-104)
+
++13 on the index, and the line that earns it is the one about the sheet's own figures. The entry did
+not anticipate that shipping a portion picker forces the detail sheet's headline and macro columns to
+follow it — that file documents them as what `Log this meal` writes — so a future reader tidying the
+scaling away would silently reintroduce a button that does not do what the number above it says.
+
+The 798-against-800 warning is the other half: `saved-meals-sheet.tsx` is not in the size baseline,
+so the next addition there fails as a new file over the limit rather than as a tracked hotspot, which
+is a confusing failure to meet cold.
+
+Both numbers are higher than the ones this branch first recorded (9305 / 15603, before two rounds of merging main and the off-by-one between `wc -l` and the check's own count) because the
+recent-food-items PR landed in between and this is the post-merge count, not a second raise. Its
+entry and this one add different blocks, so the merge kept both — the additions case, not the
+backlog's two-deletions trap.
