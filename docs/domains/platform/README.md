@@ -27,6 +27,7 @@ layer**) through §16. Read it before building any shared helper.
 
 ## Reference docs
 
+- [`docs/reviews/2026-09-02-db-growth-archive-attribution.md`](../../reviews/2026-09-02-db-growth-archive-attribution.md) — **the DB growth is partly the archive the baseline predates, 2026-09-02 (BF-55, Q-283).** Total re-read at **200 MB** (down from 206 — migration 249 took the 21 MB index). `oura_raw_packed`'s **first pack is dated 2026-08-18, the same day as the 171 MB baseline**, and it has grown **18 MB / ~1.2 MB/day** since, never pruned — **~62% of the excess, and the ~0.4 MB/day expectation cannot have included it.** **Q-283 is stale by ~14×**: its one real candidate was already dropped, and excluding PKs/unique constraints the droppable remainder is **30 indexes / 800 kB**, 0.4% of the database. `stats_reset` is NULL, so the counters are lifetime — which strengthens "never scanned" and still does not make a constraint droppable. Records a fresh recurrence of the `n_live_tup` trap (**76** vs **1,072** real).
 - [`docs/handoff-2026-08-18-platform-database-reclaim.md`](../../handoff-2026-08-18-platform-database-reclaim.md)
   — **the database reclaim, 2026-08-18.** 819 MB against a 500 MB target with an end-of-week deadline.
   Everything is built and merged — migration 193's index drop (136 MB, needs no press), the Q-541
