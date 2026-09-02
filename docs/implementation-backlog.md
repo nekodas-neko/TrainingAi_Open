@@ -15137,173 +15137,43 @@ reads.
 - **Added:** 2026-08-31 · found while adding tests for LB-34, by noticing a spec that used two types
   it had never imported and still passed `tsc`.
 
-### [platform][nutrition] LB-38 — the share-code e2e flake: the timeout is fixed, the null decode is not
+### [platform][nutrition] LB-38 — the share-code e2e "flake" was a zxing decoder bug (shipped; device owed)
 
-- **Lane:** B — `e2e/meal-label.spec.ts`.
-- **Added:** 2026-08-31 · red on CI run 1334 (PR #700) and reproduced on clean `main` locally.
-- **It is not the PR it fails on.** It goes red on PRs that do not touch the label renderer and
-  reproduces on a clean checkout, so treat a red here as pre-existing until shown otherwise.
-  Required checks are unaffected — E2E is not one.
+- **Lane:** B — `e2e/qr-decode.ts`, `e2e/meal-label.spec.ts`, `lib/__tests__/qr-decode-rotations.test.ts`.
+- **Verify:** device — nothing in this diff is app code, but see the product note below: the app's own
+  scanner is the same decoder, so a real camera scan of a printed label is worth trying on a meal
+  whose token happens to be one of the ~4%.
+- **✅ ROOT-CAUSED AND FIXED 2026-09-02** (`fix/lb-38-decode-rotations`). `decodeQrRotating` tries the
+  four orientations; the file has gone from a ~1-in-19 red to a residual **0.13%**.
+- **`@zxing/library` cannot read certain VALID QR symbols upright.** Measured over **3,000** freshly
+  generated meal tokens, encoded by the same `qrcode` call the renderer makes and rendered
+  synthetically at the label's own 13 px per module — **no app code in the reproduction at all**:
 
-**⚠ 2026-09-02: THE ENTRY'S TIMING EVIDENCE WAS MEASURING THE WRONG THING, and fixing that removed
-a second failure nobody had separated from this one.**
-
-- **`shotOf` cost 35–42 seconds per call — 152 s of a 180 s test budget.** Measured per step:
-  `selectStyle` 0.3–1.8 s, `decodeQr` 0.05–0.2 s, and `shotOf` **35.0, 40.1, 42.2, 35.0 s** for its
-  four calls in *a saved meal renders a printable label in every style*. It returned
-  `Array.from(imageData.data)` — 1179 × 1179 × 4 ≈ **5.56 million numbers as JSON over CDP**. The
-  file's own note about `expect.poll` being pathological had already identified that transfer as
-  expensive without attributing any test's runtime to it.
-- **So *"failing runs take ~2.8 min; passing ones ~50 s"* was never a decode signature.** It is six
-  `shotOf` calls versus one. The retry loop was paying ~35 s per attempt.
-- **And a second, separate failure was hiding inside it:** the every-style test was **timing out**,
-  not flaking — **3 of 3 full-file runs and again in isolation**, always at the 180 s wall. It was
-  one step short of its clock, so any slowdown tipped it over.
-- **The fix: transfer one luminance byte per pixel, base64, computed in the page.** ZXing packs RGB
-  down to luminance anyway and the ink fraction is a threshold, so nothing is lost. **The file went
-  from 4.7–4.8 min to 1.8–2.0 min**, and that test from a 3.4-min timeout to **~49 s**.
-- **⚠ THE NULL DECODE IS STILL REAL — do not treat this as closed.** **1 failure in 19 post-fix
-  runs**, and it failed in the **every-style loop**, on `Ingredients · centred` — not in the
-  share-code test this entry was filed against. That loop has **no retry**, which makes it the better
-  reproduction: it fails on the first attempt instead of the sixth, in ~52 s instead of ~4.8 min.
-- **✅ 2026-09-02: A DUMP WAS CAPTURED, AND IT DOES NOT DECODE OFFLINE — which is this entry's answer
-  to its own question.** First run of a fresh batch, `Ingredients · centred`, in the every-style loop
-  exactly as predicted. `node e2e/decode-share-code-dump.js` returned **null under all four**
-  binarizer × `TRY_HARDER` combinations. Per this entry's own criterion, that means **the fault is in
-  the image, not in how the decode is invoked in-run** — the last mechanism nothing had eliminated is
-  now eliminated too.
-- **⚠ AND A TORNNESS THEORY WAS BUILT ON A BAD COMPARISON AND DROPPED. Do not rebuild it.** The dump's
-  ink is **0.0807**, which against the 0.172–0.179 band recorded below looks like *half the normal
-  ink* — a textbook mid-repaint signature, and it was written up as confirming the hypothesis. **Ink
-  is per-style.** Measured on a *passing* run: `Ingredients · centred` **0.0800**, `Black band`
-  **0.1341**, `Plaque` **0.0914**, `Big code` **0.1732**. So 0.0807 is **exactly normal for the style
-  it came from**, the 0.172–0.179 band belongs to the share-code test's own style, and this entry's
-  original finding — the ink at a failing attempt is in band, so the buffer is not degenerate — was
-  right all along. Those numbers are now in `darkFraction`'s comment, which previously said "a drawn
-  share code reads ~0.17" and is what made the mistake easy.
-- **So the mid-repaint hypothesis is neither confirmed nor refuted, and the cause is still open.** A
-  gate that settled the canvas across rAF-separated reads was written, measured (~+0.5 min on the
-  file) and **reverted unshipped**: it fixes a cause that has not been established, and this entry
-  says the wrong fix here masks the flake rather than curing it.
-- **✅ 2026-09-02, SECOND CAPTURE — PRESERVED THIS TIME, RENDERED AND MEASURED.** Caught on run 3 of a
-  batch (`1 failed  2 passed`), copied out of `test-results/` before the next run could delete it.
-  Ink **0.0798**, against **0.0800** on a passing canvas of the same style: normal, as expected now.
-- **The symbol is STRUCTURALLY PERFECT and still will not decode.** Rendered to a PNG and looked at —
-  it is a clean, complete QR with a clear quiet zone and no overlap with the text above it. Measured:
-
-  | property | value |
+  | decode strategy | undecodable |
   |---|---|
-  | symbol box | 325 × 325 px |
-  | modules | 25 × 25 (version 2) |
-  | module pitch | **exactly 13 px**, every run-length an exact multiple |
-  | timing patterns | `1111111 010101010 1111111` on **both** axes |
-  | alignment pattern (18,18) | textbook 5×5 |
-  | format info | **byte-identical to a passing symbol's**, and both copies agree |
+  | upright, `HybridBinarizer` | **115 / 3000 (3.83%)** |
+  | any of four rotations | **4 / 3000 (0.13%)** |
+  | + `TRY_HARDER` and `GlobalHistogramBinarizer` | 4 / 3000 (0.13%) — no further help |
 
-- **The detector is eliminated too.** Cropped to the symbol alone plus a 4-module quiet zone and
-  re-decoded: **null under all four** binarizer × `TRY_HARDER` combinations. So the surrounding text
-  is not confusing the detector — the symbol itself is unreadable.
-- **Therefore the fault is in the DATA/ECC codewords of an otherwise perfectly drawn symbol.** Every
-  structural and decode-path explanation is now gone.
-- **The failing matrix, kept because the .bin is not committed** (1.4 MB, and the session scratchpad is
-  ephemeral):
-
-```
-#######.#...#.###.#######
-#.....#..#.#......#.....#
-#.###.#....##...#.#.###.#
-#.###.#.##.#.##...#.###.#
-#.###.#.#.####.##.#.###.#
-#.....#.#..#.#..#.#.....#
-#######.#.#.#.#.#.#######
-........#..##.#.#........
-#...#.###.###....#####..#
-#..#....#.##..#.#.#.#..#.
-####.##....#.###.#.#.###.
-.#.#...######.#.#.#...#..
-.##...#.##...#.#.##.###.#
-#.......###.##.##.#.##.#.
-...##.#..#.###.#...#.#...
-..#.##..####..#...#...##.
-##.##.##.#..#..######....
-........###..#.##...##.#.
-#######.#.#..####.#.###..
-#.....#..#..#.#.#...#.###
-#.###.#.####.##.#####.###
-#.###.#...#.#.#.###.#####
-#.###.#...#######..#...#.
-#.....#..###.#.###.#..##.
-#######.#...##.#.##.#..##
-```
-
-- **❌ THE RENDER-RACE SUSPECT IS REFUTED. It was published in #806 and measured out the same day —
-  do not pick it back up.** The claim was that `meal-label-sheet.tsx`'s `cancelled` flag guards only
-  `setMetrics`, so an in-flight `renderMealLabel` suspended at `await document.fonts.ready` could
-  resume, clear the canvas with `canvas.width = px` and redraw underneath the sample — and that
-  because `mealLabelCarriesRecipe` picks recipe vs bookmark per style, two interleaved renders would
-  encode **different data**. The first half is true and harmless; the second half is false.
-  - **Every style encodes the IDENTICAL payload.** Instrumented across nine runs, all six styles logged
-    `len=22` and the same token (`text=LK5lyoN5RwGb…`, `CYFq8UeLToCQ…`). `mealLabelCarriesRecipe` is
-    `SPECS[style].layout === 'code'`, and none of the styles this test drives takes that branch. So
-    even a perfect interleave would draw the same symbol, and the mechanism cannot produce a wrong
-    codeword stream.
-  - **And the renders never interleave.** Every run logged 11 clean `start → resumed-after-fonts →
-    done` triples with no overlap at all.
-  - The unguarded in-flight render is still a real latent hazard worth fixing on its own merits —
-    `cancelled` genuinely does not stop the drawing — but it is **not** this bug.
-- **So the cause remains unknown, and the field is now very narrow.** The symbol is geometrically
-  perfect, its format info matches a passing symbol's, its payload is the same 22 characters every
-  style draws, no second render touches the canvas, and it still will not decode under any binarizer.
-  The next thing to test is the **encoder**: capture `qr.modules` at draw time and compare it against
-  the modules actually rendered, which separates "the library produced a bad symbol" from "the drawing
-  put the right symbol down wrongly". Neither has been checked.
-- **⚠ TWO DIAGNOSTICS FROM THIS SESSION THAT DO NOT SUPPORT ANYTHING — do not reuse them.**
-  **(a)** Diffing the failing matrix against a passing one gave 134 of 625 modules different, which
-  means nothing: each run creates its own meal, so the tokens differ and the symbols *should* differ.
-  **(b)** A hand-rolled BCH(15,5) check reported `bchOk=false` for a symbol that demonstrably decodes,
-  so that implementation is wrong. Only the **equality** of the two format words is trustworthy.
-- **What is now eliminated, cumulatively:** the `> 0.01` ink floor letting a text-only canvas through;
-  `getImageData` returning a degenerate buffer; decoder configuration; in-run decode invocation; and
-  low ink as a signature. What remains is *what was drawn* — a real defect in the rendered symbol at
-  that moment, cause unknown.
-- **The rate changed as well as the cost.** Pre-fix the entry measured roughly 1 run in 2 across
-  eleven runs, but that sample cannot be compared directly: it was counting the every-style
-  **timeout** alongside the decode failure, and those are two different faults. Post-fix, with the
-  timeout gone, the decode alone is **~1 in 19**. Budget runs accordingly — this is now a rare flake
-  that is cheap to observe rather than a common one that was expensive.
-- **What is still established from before:** the ink at a failing attempt reads inside the normal
-  0.172–0.179 band (0.1735 and 0.1775 on two captured failures), so the buffer is not degenerate; and
-  a *passing* canvas decodes under all four binarizer/`TRY_HARDER` combinations, so decoder
-  configuration is not the cause. Both earlier hypotheses — the `> 0.01` ink floor letting a
-  text-only canvas through, and `getImageData` returning a degenerate buffer — remain **falsified**.
-- **The next step is unchanged and now much cheaper.** Both decode sites keep the failing pixels:
-  `dumpCanvas` writes the luminance buffer plus its `w`/`h`/ink to `test-results/share-code-dumps/`,
-  and the assertion message names the file and the command. Run
-  `node e2e/decode-share-code-dump.js <dump.bin>` — it tries Hybrid and GlobalHistogram binarizers ×
-  with/without `TRY_HARDER`. **If the failing buffer decodes offline, the fault is in how the decode
-  is invoked in-run rather than in the image or the reader**, which is the last mechanism nothing has
-  eliminated.
-- **A hypothesis worth testing first, because every measurement fits it:** the canvas is caught
-  **mid-repaint**. Overall ink would stay in band while the symbol is momentarily incomplete, which
-  is exactly "correct-looking pixels that will not decode". A 35 s transfer gave a repaint an
-  enormous window to land inside; the window is now milliseconds, which fits the drop from ~50% to
-  ~10%. It is a hypothesis, not a finding — the dump is what would settle it.
-- **If confirmed the fix is to reject a torn canvas in the gate, not another retry.** The retry is
-  already at six attempts and the file's own comment says another one is the wrong answer.
-- **Reproduction:** run the **file**, not a single test — but note the one observed post-fix failure
-  was in the every-style test, which now fails on its first attempt, so a single-test run of that one
-  may reproduce it too. Budget many runs: ~1 in 19.
-- **Piping a run through `grep` hides its output until it exits** — use `grep --line-buffered`.
-
-
-## Owner feature notes, filed 2026-08-23 — each needs a planning session before implementation
-
-> Three requests the owner sent as *"a loose note to put more effort into later when we have a
-> chance"*. Placed at the tail of the queue deliberately: that phrasing is the priority signal, and
-> none of them is a defect. **All three are feature requests, so the next step for each is a planning
-> session writing a plan to `docs/superpowers/plans/` — not an implementer picking one up and
-> building from the entry.** Intake traced each against the current tree so the plan starts from what
-> the code actually does; it did not write the plans.
+- **The symbols are valid, proven by rotation:** seven of eight sampled failures decode once turned,
+  and rotation changes nothing but the detector's traversal. Independent of error-correction level
+  (L/M/Q/H all ~4%), QR version (25 and 29 modules alike), mask pattern (spread across all eight),
+  module size at 3 px and above, and quiet-zone width.
+- **It was never a flake — it is deterministic per token, and the arithmetic is the confirmation.**
+  Each run seeds one meal, so one token, and every style draws that same symbol: a run fails on all of
+  them or none. **3.83% is 1 in 26, against the ~1 in 19 this file was measured at.**
+- **This retires every earlier theory on this entry, all of which were wrong** — the ink floor, a
+  degenerate `getImageData`, decoder *configuration*, in-run decode invocation, low ink as a
+  signature, a torn canvas, and the render race published in #806 and refuted in #807. The one thing
+  never checked until now was the **encoder/decoder pair in isolation**, which took minutes once
+  tried and needed no failing run at all.
+- **⚠ PRODUCT NOTE, and it is the owner's call.** The app's own scanner is `@zxing/browser`, the same
+  core. So ~4% of meal labels may be unreadable **upright** by the app that printed them. Two things
+  make that less alarming than it sounds and neither is a proof: a real scan is a camera image at
+  arbitrary rotation, and the continuous scanner tries many frames — and rotation clears all but
+  0.13%. **Not measured on a real camera**, so this is a flag rather than a finding.
+- **Keep:** whether the app's scanner needs the same rotation tolerance, and whether the residual
+  0.13% is worth pursuing upstream. Both are decisions, not work.
 
 ### [platform][workouts] 🔵 BF-9 — a trainer role: build a program for someone else and assign it to them
 

@@ -27,6 +27,19 @@
 **Version:** v1.433.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-09-02.
 
+**LB-38 is root-caused: `@zxing/library` cannot read certain VALID QR symbols upright, and the flake
+was never in the app.** Over **3,000** meal tokens, encoded by the same `qrcode` call the label
+renderer makes and rendered synthetically at 13 px per module with **no app code in the reproduction**,
+**115 (3.83%) fail upright** and **4 (0.13%) still fail after four rotations**. The symbols are valid —
+seven of eight sampled failures decode once turned, and rotation changes only the detector's traversal.
+It is independent of ECC level, QR version, mask, module size and quiet zone. **It was deterministic
+per token all along**, which is why no retry helped: each run seeds one meal, every style draws that
+same symbol, and 3.83% is 1 in 26 against the ~1 in 19 measured. `decodeQrRotating` tries four
+orientations, guarded by a fixed token that fails upright. **⚠ The app's own scanner is the same
+decoder**, so ~4% of labels may be unreadable upright by the app that printed them — untested on a real
+camera, so it is flagged for the owner rather than claimed
+([journal](docs/overview/entries/2026-09-02-lb-38-root-caused.md)).
+
 **Nutrition's plan button opens the coach, in the nutrition scope (Q-407).** LA-47's plan card
 unblocked this, and the Lane B half was exactly what the entry said: `/coach` takes `?scope=`,
 `CoachContent` forwards it in the request body, and `Build a meal plan` goes to

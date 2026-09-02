@@ -254,6 +254,12 @@ Live at the time of writing (2026-07-30):
   Q-398's idempotent write path. Its two buttons are ordinary `chose` results, not a new result
   type. **Q-407's `Needs:` is cleared by it** — the conversation itself is what is left, and the
   plan card is not to be rebuilt.
+- **[`docs/overview/entries/2026-09-02-lb-38-root-caused.md`](../../overview/entries/2026-09-02-lb-38-root-caused.md)**
+  — **LB-38, root cause (2026-09-02).** `@zxing/library` cannot read certain **valid** QR symbols
+  upright: 115 of 3,000 meal tokens (3.83%) fail, 4 (0.13%) still fail after four rotations, and no app
+  code is involved in the reproduction. **Read this before treating any label-decode failure as a
+  rendering bug** — seven earlier theories on that entry blamed the canvas and all were wrong. The
+  app's own scanner shares the decoder, which is flagged for the owner and untested on a camera.
 - **[`docs/overview/entries/2026-09-02-q-407-nutrition-coach-entry.md`](../../overview/entries/2026-09-02-q-407-nutrition-coach-entry.md)**
   — **Q-407, entry point + scope (2026-09-02).** `Build a meal plan` opens `/coach?scope=nutrition`;
   `CoachContent` forwards the scope in the request body. **The scope decides the coach's tool subset,
