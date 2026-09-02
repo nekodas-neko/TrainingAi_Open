@@ -388,6 +388,73 @@ below threshold and left in place for next time.
 > BF-29 (My meals), BF-30 (Meal detail), BF-31 (Edit meal) and BF-26 (Quantity). Two artboards need
 > no entry — `Tap targets` and the `srv/g` studies both shipped in Q-395a.
 
+### [nutrition] BF-109 — the barcode Review sheet is the one food surface with no macro/calorie cross-check, and the check already exists
+
+- **Lane:** B — `components/nutrition/review-step.tsx` (surface the warning) with
+  `packages/shared/src/nutrition/scan-totals.ts` already holding the logic. No new formula.
+- **Added:** 2026-09-01 · owner, on a barcode scan: *"seeing a big bug here — the calorie calculation
+  is way wrong from this why/how."*
+
+**The screen was right and the data is wrong, which is the opposite of how it reads.** The scan showed
+**173 kcal** beside **45.7 P / 52.1 C / 13.6 F** for a 350 g portion. Those macros come to **514 kcal**
+by Atwater — the stated figure is **341 kcal low**, a **197%** disagreement.
+
+**⚠ The obvious diagnosis is wrong and an implementer will reach for it first.** "Calories weren't
+scaled to the serving while the macros were" is the natural read and it is not what happened. The
+source row was fetched (OFF `9350167000490`) and it carries, on the **same** per-serving basis the app
+used for every field:
+
+    energy-kcal_serving 173      proteins_serving 45.7
+    energy-kcal_100g     49.30   carbohydrates_serving 52.1   fat_serving 13.6
+
+`offProductToNutrition` read `_serving` consistently for all of them. **The mapper is correct.** Note
+also that `energy-kcal_100g` is 49.30 — which is 173 ÷ 3.5, i.e. OFF *derived* the per-100g figure
+from the same bad number, so there is **no good field to fall back to in that row**. Open Food Facts
+is filled in field by field by different contributors and this product's energy is simply wrong at
+source.
+
+**What is actually missing is a guard this repo already wrote, for this exact failure, against this
+exact data source.** `scan-totals.ts` holds both halves:
+
+- `macroCalorieDisagreement()` — its own docstring says *"Open Food Facts is filled in field by field
+  by different contributors, so a product can state 96 kcal beside 5P/3C/10F… the row lands as-is and
+  the user picks it off a list believing both numbers"*, with `MACRO_MISMATCH_VISIBLE_LIMIT = 0.15`;
+- `sanitiseNutrition()` — rewrites calories to Atwater above a **40%** deviation and downgrades
+  `confidence`.
+
+This row is **13×** the visible limit and **5×** the rewrite threshold. It would have been flagged on
+sight anywhere either ran.
+
+**Where they run, and the one gap:** `food-database-results.tsx` (OFF text-search results) surfaces
+the disagreement; `/api/nutrition/scan` and `/api/nutrition/food-items` apply the sanitiser. The
+barcode path does neither — `/api/nutrition/barcode` returns the mapper's output unsanitised, and the
+Review sheet logs through `logFoodEntries`, which deliberately does not sanitise (`log-food.ts:80`
+says so). So the barcode is the **only** route from OFF into the diary with no cross-check on either
+end. Sibling-surface gap, not a new problem.
+
+- **Measured blast radius: none so far.** Of the owner's **11** saved `source='barcode'` items, **0**
+  disagree with their macros by more than 40% (1 of 226 `ai` items does). So this has not corrupted
+  history — the Review screen caught it, by the owner reading it. That is also the argument against
+  treating OFF as broken: most rows are fine, and this is a per-row data-quality problem.
+- **Recommendation: warn in the Review sheet, do not silently rewrite.** Use `macroCalorieDisagreement`
+  with the same 15% limit the search list uses, show what the macros come to, and offer a one-tap
+  "use 514 kcal". **Silent rewriting is the wrong call here specifically** — Review exists for the user
+  to decide, and a screen that shows one number while the store keeps another is a worse bug than the
+  one being fixed. It would also destroy the legitimate case: fibre and alcohol make some real foods
+  disagree with Atwater by 10–20%.
+- **⚠ Do not "fix" this by making the mapper prefer `_100g`.** That row's per-100g value is derived
+  from the same wrong figure, so the preference would change nothing here and would break every
+  product where the per-serving entry is the accurate one — which, on the evidence above, is most of
+  them.
+- **Consider the same treatment for `origin: 'barcode'` rows at save time**, but as a separate decision:
+  applying `sanitiseNutrition` to the log path would change what gets stored across every food surface,
+  which is a much larger blast radius than one warning banner.
+- **Verification:** scan `9350167000490` — the Review sheet shows the disagreement and offers ~514;
+  scan a product whose numbers agree (any of the sibling Core Powerfoods entries, all internally
+  consistent) and nothing is shown; a high-fibre food ~15–20% out reads as a note rather than an
+  alarm; and declining the correction still logs the label's own number.
+
+
 ### [activity] BF-107 — the walk summary has no calories tile, and the number it would show does not exist yet on that screen
 
 - **Lane:** A — the value has to reach the client before Lane B can render it; the tile itself is
