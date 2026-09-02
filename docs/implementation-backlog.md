@@ -4867,7 +4867,11 @@ place to start rendering pictures.
   rows. **The web sandbox has no local store**, so that save took the API fallback and the
   offline-first path (local SQLite write + outbox) is unexercised. See the Known-Issues row.
 - **Added:** 2026-08-19 · BugFix Intake, from the owner · mockup rendered in-session
-- **Lane:** B — classified 2026-08-30 by CLAUDE.md's path rule (*reached only from `app/**` and `components/**` → B*; this is a wizard's screens and a multi-select control, with no storage or route change).
+- **Lane:** A — **re-routed 2026-09-02 because the Lane B half shipped.** It was classified B on
+  2026-08-30 by the path rule (*reached only from `app/**` and `components/**` → B*), which was right
+  for the screens and the multi-select. What is left is the conversation's opening shape — prompt and
+  tool ordering in `lib/coach/**` and `app/api/coach/route.ts` — and the same path rule sends that to
+  A. Left as B it sat in neither queue as work: Lane B had nothing to do and Lane A could not see it.
 - **Placement:** in the nutrition cluster, after Q-398 — **which shipped 2026-08-24**, so the
   dependency is cleared. The plan's exit route in this design is "Save all as meals", and plan meals
   can now become ordinary saved meals; before that, a conversational plan had nowhere to land and
@@ -5010,6 +5014,10 @@ place to start rendering pictures.
   not behind it:** a `Prefer the step-by-step setup?` control sits under the same button, because
   Rebuild — the only other route to the sheet — does not exist until a plan does, so the no-plan user
   is exactly the one who would have been stranded.
+- **Keep:** the conversation's own opening shape, which is **Lane A's** (prompt + tool ordering in
+  `lib/coach/**` and `app/api/coach/route.ts`), plus the device pass. **Nothing here is Lane B's any
+  more** — the entry point, the scope and the fallback all shipped, and without this line the runner
+  kept printing Q-407 at the head of Lane B's READY list as though the whole entry were unstarted.
 - **Still owed here: the conversation's own shape.** Points 1 and 2 of *The conversation shape* are
   not built as flow — the widgets exist (`ChoiceList` multi-select, `plan_card`) and the model can now
   reach them inside the nutrition scope, but nothing yet makes the coach *open* by stating what it
