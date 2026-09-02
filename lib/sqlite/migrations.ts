@@ -245,6 +245,14 @@ export const RECONCILE_COLUMNS: { table: string; column: string; ddl: string }[]
   { table: 'supplement_logs',  column: 'dose_text',  ddl: `ALTER TABLE supplement_logs ADD COLUMN dose_text TEXT` },
   { table: 'supplements',      column: 'deleted_at',  ddl: `ALTER TABLE supplements ADD COLUMN deleted_at TEXT` },
   { table: 'supplements',      column: 'sync_status', ddl: `ALTER TABLE supplements ADD COLUMN sync_status TEXT NOT NULL DEFAULT 'synced'` },
+  // BF-69 — the contribution's provenance and the substance's presence window. Registered for the
+  // same reason as the BF-3 rows above: after a half-applied v34 this list is what a device's schema
+  // actually is, and `source` missing is not a cosmetic gap — every read and write below keys off it.
+  { table: 'supplement_logs',  column: 'source',     ddl: `ALTER TABLE supplement_logs ADD COLUMN source TEXT NOT NULL DEFAULT 'manual'` },
+  { table: 'supplement_logs',  column: 'source_ref', ddl: `ALTER TABLE supplement_logs ADD COLUMN source_ref TEXT` },
+  { table: 'supplements',      column: 'started_on', ddl: `ALTER TABLE supplements ADD COLUMN started_on TEXT` },
+  { table: 'supplements',      column: 'stopped_on', ddl: `ALTER TABLE supplements ADD COLUMN stopped_on TEXT` },
+  { table: 'supplements',      column: 'dose_prompt', ddl: `ALTER TABLE supplements ADD COLUMN dose_prompt INTEGER NOT NULL DEFAULT 0` },
   // Columns the local-store / sync inserts write but earlier migrations never added.
   { table: 'exercise_logs',    column: 'muscle_groups',          ddl: `ALTER TABLE exercise_logs ADD COLUMN muscle_groups TEXT` },
   { table: 'exercise_logs',    column: 'inter_exercise_rest_sec', ddl: `ALTER TABLE exercise_logs ADD COLUMN inter_exercise_rest_sec INTEGER` },
@@ -616,6 +624,10 @@ const CREATE_SUPPLEMENTS = `CREATE TABLE IF NOT EXISTS supplements (
   dose             TEXT,
   default_amount   REAL,
   unit             TEXT,
+  -- BF-69 presence window. Outside it is a true zero; inside it with no contribution is UNKNOWN.
+  started_on       TEXT,
+  stopped_on       TEXT,
+  dose_prompt      INTEGER NOT NULL DEFAULT 0,
   reminder_enabled INTEGER NOT NULL DEFAULT 0,
   reminder_time    TEXT,
   sort_order       INTEGER NOT NULL DEFAULT 0,
@@ -624,6 +636,12 @@ const CREATE_SUPPLEMENTS = `CREATE TABLE IF NOT EXISTS supplements (
   deleted_at       TEXT,
   sync_status      TEXT NOT NULL DEFAULT 'synced'
 )`;
+// BF-69 — one row is one ACT of taking something, not one day, so the old
+// `UNIQUE(supplement_id, log_date)` is gone: two doses on a day are independent events that add.
+// What holds the supplements page's tick idempotent is the PARTIAL index below, over manual
+// contributions only — meal contributions stay unconstrained, so the same meal logged twice counts
+// twice. The v34 upgrade rebuilds the table for devices that already have the old constraint,
+// because SQLite cannot drop an inline table constraint.
 const CREATE_SUPPLEMENT_LOGS = `CREATE TABLE IF NOT EXISTS supplement_logs (
   id            TEXT PRIMARY KEY,
   supplement_id TEXT NOT NULL,
@@ -631,10 +649,11 @@ const CREATE_SUPPLEMENT_LOGS = `CREATE TABLE IF NOT EXISTS supplement_logs (
   amount        REAL,
   unit          TEXT,
   dose_text     TEXT,
+  source        TEXT NOT NULL DEFAULT 'manual',
+  source_ref    TEXT,
   updated_at    TEXT NOT NULL,
   deleted_at    TEXT,
-  sync_status   TEXT NOT NULL DEFAULT 'pending',
-  UNIQUE(supplement_id, log_date)
+  sync_status   TEXT NOT NULL DEFAULT 'pending'
 )`;
 const CREATE_INJURIES = `CREATE TABLE IF NOT EXISTS injuries (
   id            TEXT PRIMARY KEY,
@@ -813,6 +832,13 @@ const RECONCILE_INDEXES: string[] = [
   `CREATE INDEX IF NOT EXISTS idx_activity_logs_date ON activity_logs (date)`,
   `CREATE INDEX IF NOT EXISTS idx_food_logs_date ON food_logs (date)`,
   `CREATE INDEX IF NOT EXISTS idx_supplement_logs_date ON supplement_logs (log_date)`,
+  // BF-69 — the replacement for the table's old whole-day UNIQUE, and the reason the tick stays
+  // idempotent: one MANUAL contribution per substance per day, ever, with meal contributions
+  // deliberately unconstrained. Soft-deleted rows stay inside the index so an untick-then-re-tick
+  // revives the same row instead of leaving two. In RECONCILE_INDEXES rather than only in the v34
+  // upgrade, because reconcileSchema is the real authority after a partial upgrade — without it a
+  // half-applied v34 leaves the tick able to double a dose.
+  `CREATE UNIQUE INDEX IF NOT EXISTS idx_supplement_logs_manual_day ON supplement_logs (supplement_id, log_date) WHERE source = 'manual'`,
   `CREATE INDEX IF NOT EXISTS idx_injuries_started ON injuries (started_date)`,
   `CREATE INDEX IF NOT EXISTS idx_exercise_logs_session ON exercise_logs (workout_session_id)`,
   `CREATE INDEX IF NOT EXISTS idx_set_logs_exercise ON set_logs (exercise_log_id)`,
@@ -1367,6 +1393,72 @@ export const MIGRATIONS: UpgradeStatement[] = [
       // fresh installs ONLY. This ALTER reaches everyone else; the RECONCILE_COLUMNS row is the
       // authority if this upgrade half-applies.
       `ALTER TABLE food_logs ADD COLUMN meal_group_name TEXT`,
+    ],
+  },
+  {
+    toVersion: 34,
+    statements: [
+      // BF-69 — the presence window, in the v30-v33 shape: `supplements` exists on every upgraded
+      // device, so the columns added to its `CREATE TABLE IF NOT EXISTS` body above reach fresh
+      // installs ONLY. These ALTERs reach everyone else; the RECONCILE_COLUMNS rows are the
+      // authority if this half-applies.
+      //
+      // `supplement_logs` gets NO ALTERs here on purpose — its two new columns arrive with the
+      // rebuild below, and adding them first would be a second, non-idempotent way for this version
+      // to fail on retry for nothing.
+      `ALTER TABLE supplements ADD COLUMN started_on TEXT`,
+      `ALTER TABLE supplements ADD COLUMN stopped_on TEXT`,
+      `ALTER TABLE supplements ADD COLUMN dose_prompt INTEGER NOT NULL DEFAULT 0`,
+
+      // ── The part that is NOT an ADD COLUMN, and the reason this version is written the way it is.
+      //
+      // `supplement_logs` was created with `UNIQUE(supplement_id, log_date)` in its table body, and
+      // SQLite cannot drop an inline table constraint — the only way off it is a rebuild. That
+      // constraint has to go: a day now holds several contributions, and under it a meal
+      // contribution and a hand-tick would collide, which is the data loss BF-69 exists to fix.
+      //
+      // The five statements below are written so that ANY prefix of them can be re-run to
+      // completion, because a local migration that throws on retry leaves `open()` throwing forever
+      // (#85) and this one has more ways to half-apply than an ADD COLUMN does:
+      //   - the first is a resurrection stub. If a previous attempt got as far as the DROP but not
+      //     the RENAME, `supplement_logs` is gone and the copy below would throw "no such table";
+      //     re-creating it empty makes that copy a harmless no-op, since the data is already in
+      //     `supplement_logs_new`.
+      //   - the copy is `INSERT OR IGNORE` keyed on the primary key, so re-running it duplicates
+      //     nothing.
+      //   - the SELECT names only columns that exist in BOTH shapes, so it is valid whether the
+      //     source table is the old one, the stub, or one `reconcileSchema()` rebuilt from the new
+      //     constant.
+      // Every existing row migrates forward as one `manual` contribution, preserving its BF-3 dose
+      // snapshot. No PRAGMAs here — the plugin wraps upgrades in a transaction and SQLite rejects
+      // journal-mode changes inside one. `supplement_logs` declares no foreign keys locally, so the
+      // rebuild needs none disabled.
+      `CREATE TABLE IF NOT EXISTS supplement_logs (
+         id TEXT PRIMARY KEY, supplement_id TEXT NOT NULL, log_date TEXT NOT NULL,
+         amount REAL, unit TEXT, dose_text TEXT,
+         updated_at TEXT NOT NULL, deleted_at TEXT,
+         sync_status TEXT NOT NULL DEFAULT 'pending'
+       )`,
+      `CREATE TABLE IF NOT EXISTS supplement_logs_new (
+         id TEXT PRIMARY KEY, supplement_id TEXT NOT NULL, log_date TEXT NOT NULL,
+         amount REAL, unit TEXT, dose_text TEXT,
+         source TEXT NOT NULL DEFAULT 'manual', source_ref TEXT,
+         updated_at TEXT NOT NULL, deleted_at TEXT,
+         sync_status TEXT NOT NULL DEFAULT 'pending'
+       )`,
+      `INSERT OR IGNORE INTO supplement_logs_new
+         (id, supplement_id, log_date, amount, unit, dose_text, source, source_ref, updated_at, deleted_at, sync_status)
+       SELECT id, supplement_id, log_date, amount, unit, dose_text, 'manual', NULL, updated_at, deleted_at, sync_status
+       FROM supplement_logs`,
+      `DROP TABLE supplement_logs`,
+      `ALTER TABLE supplement_logs_new RENAME TO supplement_logs`,
+
+      // The rebuild drops the table's indexes with it, so both are recreated here. The unique one
+      // is what replaces the constraint that just went: manual contributions only, so a double-tap
+      // or a replayed outbox mutation re-stamps rather than doubling the dose, while a meal
+      // contribution on the same day is unconstrained and adds.
+      `CREATE INDEX IF NOT EXISTS idx_supplement_logs_date ON supplement_logs (log_date)`,
+      `CREATE UNIQUE INDEX IF NOT EXISTS idx_supplement_logs_manual_day ON supplement_logs (supplement_id, log_date) WHERE source = 'manual'`,
     ],
   },
 ];

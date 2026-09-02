@@ -21,10 +21,18 @@ fallback) are what every offline-first domain should copy. See CLAUDE.md, "Offli
 
 - **[`docs/superpowers/plans/2026-09-01-dosed-substance-exposure.md`](../../superpowers/plans/2026-09-01-dosed-substance-exposure.md)**
   — 🆕 **BF-69**, the plan: dosed substances (creatine, retatrutide) as an analysable exposure
-  variable. Read it before touching `supplement_logs` — the unique constraint on
-  `(supplement_id, log_date)` is what has to go, a day's exposure is a **sum of contributions**
-  rather than a stored total, and `unknown` (inside the window, nothing logged) must be excluded
-  from aggregates rather than counted as zero.
+  variable. Read it before touching `supplement_logs` — a day's exposure is a **sum of
+  contributions** rather than a stored total, and `unknown` (inside the window, nothing logged) must
+  be excluded from aggregates rather than counted as zero. **Stage 1 shipped 2026-09-01**, so the
+  unique constraint it says has to go is already gone.
+
+- [`docs/overview/entries/2026-09-01-supplement-contributions.md`](../../overview/entries/2026-09-01-supplement-contributions.md)
+  — **a day's dose is a sum of contributions (BF-69 stage 1), 2026-09-01.** Migrations 254/255 and
+  local SQLite v34. `supplement_logs` is contribution rows now, with a *partial* unique over
+  `source = 'manual'` in place of the whole-day one — meal contributions add, the page's tick stays
+  idempotent, and unticking no longer wipes a dose a meal wrote. `supplements` carries
+  `started_on`/`stopped_on`/`dose_prompt`. **v34 rebuilds a table rather than adding a column and
+  no device has opened it**; nothing can write an amount until Lane B's stage 2.
 
 - [`docs/overview/entries/2026-09-01-blood-panel-storage.md`](../../overview/entries/2026-09-01-blood-panel-storage.md) — **blood panels are stored, de-identified (BF-1, engine half), 2026-09-01.** `blood_panels` + `blood_analytes` (migrations 250/251) with a schema written from the owner's real 63-row report: `<0.2` is a result that is not a number, ranges arrive one-sided in both directions and absent, the date is a month, and **out-of-range is derived from the bounds rather than read off the provider's flag**. The extraction route, the recommendation consumers and the whole UI are still owed.
 - [`docs/superpowers/plans/2026-08-25-unified-day-review.md`](../../superpowers/plans/2026-08-25-unified-day-review.md)

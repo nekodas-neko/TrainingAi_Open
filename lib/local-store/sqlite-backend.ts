@@ -1898,12 +1898,15 @@ export class SQLiteLocalStore implements LocalStore {
         // old value on the next pull. Same shape as the injuries arm above.
         await runSQL(
           `INSERT INTO supplements
-             (id, name, dose, default_amount, unit, reminder_enabled, reminder_time, sort_order, active,
+             (id, name, dose, default_amount, unit, started_on, stopped_on, dose_prompt,
+              reminder_enabled, reminder_time, sort_order, active,
               updated_at, deleted_at, sync_status)
-           VALUES (?,?,?,?,?,?,?,?,?,?,?,'synced')
+           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,'synced')
            ON CONFLICT(id) DO UPDATE SET
              name=excluded.name, dose=excluded.dose,
              default_amount=excluded.default_amount, unit=excluded.unit,
+             started_on=excluded.started_on, stopped_on=excluded.stopped_on,
+             dose_prompt=excluded.dose_prompt,
              reminder_enabled=excluded.reminder_enabled,
              reminder_time=excluded.reminder_time,
              sort_order=excluded.sort_order, active=excluded.active,
@@ -1912,6 +1915,7 @@ export class SQLiteLocalStore implements LocalStore {
            WHERE supplements.sync_status='synced'`,
           [
             r.id, r.name, r.dose, r.defaultAmount ?? null, r.unit ?? null,
+            r.startedOn ?? null, r.stoppedOn ?? null, r.dosePrompt ? 1 : 0,
             r.reminderEnabled ? 1 : 0, r.reminderTime,
             r.sortOrder, r.active ? 1 : 0, r.updatedAt, r.deletedAt ?? null,
           ],
@@ -1919,22 +1923,45 @@ export class SQLiteLocalStore implements LocalStore {
       }
     }
 
+    // BF-69 — a day can hold several contributions now, so this arm can no longer address "the row
+    // for that day". The two branches differ because the two kinds of contribution have different
+    // identities:
+    //
+    //   MANUAL keeps the natural key `(supplement_id, log_date)`, matching the partial unique index,
+    //   because a locally-created log and its server row have DIFFERENT ids — the server generates
+    //   its own — and the natural-key merge is what has always reconciled them. Keying it on id
+    //   instead would insert the server's row beside the local one and double the day.
+    //
+    //   MEAL has no natural key by construction (several can share a substance and a date, which is
+    //   the case the old constraint made impossible), so the server's row id IS its identity.
+    //
+    // The manual branch is safe to address by natural key because the partial unique index covers
+    // soft-deleted rows too: there is AT MOST ONE manual row per substance per day, ever, so a
+    // tombstone cannot take a sibling with it.
     for (const r of delta.supplementLogs ?? []) {
+      const isMeal = r.source === 'meal';
       if (r.deletedAt) {
         await runSQL(
-          `DELETE FROM supplement_logs WHERE supplement_id=? AND log_date=? AND sync_status='synced'`,
-          [r.supplementId, r.logDate],
+          isMeal
+            ? `DELETE FROM supplement_logs WHERE id=? AND sync_status='synced'`
+            : `DELETE FROM supplement_logs WHERE supplement_id=? AND log_date=? AND source='manual' AND sync_status='synced'`,
+          isMeal ? [r.id] : [r.supplementId, r.logDate],
         );
       } else {
         await runSQL(
-          `INSERT INTO supplement_logs (id, supplement_id, log_date, amount, unit, dose_text, updated_at, deleted_at, sync_status)
-           VALUES (?,?,?,?,?,?,?,?,'synced')
-           ON CONFLICT(supplement_id, log_date) DO UPDATE SET
-             id=excluded.id, amount=excluded.amount, unit=excluded.unit, dose_text=excluded.dose_text,
+          `INSERT INTO supplement_logs (id, supplement_id, log_date, amount, unit, dose_text, source, source_ref, updated_at, deleted_at, sync_status)
+           VALUES (?,?,?,?,?,?,?,?,?,?,'synced')
+           ${isMeal
+             ? `ON CONFLICT(id) DO UPDATE SET`
+             : `ON CONFLICT(supplement_id, log_date) WHERE source = 'manual' DO UPDATE SET
+             id=excluded.id,`}
+             amount=excluded.amount, unit=excluded.unit, dose_text=excluded.dose_text,
+             source=excluded.source, source_ref=excluded.source_ref,
              updated_at=excluded.updated_at,
              deleted_at=excluded.deleted_at, sync_status='synced'
            WHERE supplement_logs.sync_status='synced'`,
           [r.id, r.supplementId, r.logDate, r.amount ?? null, r.unit ?? null, r.doseText ?? null,
+           isMeal ? 'meal' : 'manual', r.sourceRef ?? null,
            r.updatedAt, r.deletedAt],
         );
       }
@@ -2608,6 +2635,9 @@ export class SQLiteLocalStore implements LocalStore {
       dose:            r.dose ? String(r.dose) : null,
       defaultAmount:   r.default_amount == null ? null : Number(r.default_amount),
       unit:            r.unit ? String(r.unit) : null,
+      startedOn:       r.started_on ? String(r.started_on) : null,
+      stoppedOn:       r.stopped_on ? String(r.stopped_on) : null,
+      dosePrompt:      Number(r.dose_prompt) === 1,
       reminderEnabled: Number(r.reminder_enabled) === 1,
       reminderTime:    r.reminder_time ? String(r.reminder_time) : null,
       sortOrder:       Number(r.sort_order),
@@ -2623,11 +2653,13 @@ export class SQLiteLocalStore implements LocalStore {
   async upsertSupplement(record: LocalSupplement): Promise<void> {
     await runSQL(
       `INSERT INTO supplements
-         (id, name, dose, default_amount, unit, reminder_enabled, reminder_time, sort_order, active, updated_at, sync_status)
-       VALUES (?,?,?,?,?,?,?,?,?,?,'pending')
+         (id, name, dose, default_amount, unit, started_on, stopped_on, dose_prompt, reminder_enabled, reminder_time, sort_order, active, updated_at, sync_status)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,'pending')
        ON CONFLICT(id) DO UPDATE SET
          name=excluded.name, dose=excluded.dose,
          default_amount=excluded.default_amount, unit=excluded.unit,
+         started_on=excluded.started_on, stopped_on=excluded.stopped_on,
+         dose_prompt=excluded.dose_prompt,
          reminder_enabled=excluded.reminder_enabled,
          reminder_time=excluded.reminder_time,
          sort_order=excluded.sort_order,
@@ -2636,6 +2668,7 @@ export class SQLiteLocalStore implements LocalStore {
       [
         record.id, record.name, record.dose,
         record.defaultAmount ?? null, record.unit ?? null,
+        record.startedOn ?? null, record.stoppedOn ?? null, record.dosePrompt ? 1 : 0,
         record.reminderEnabled ? 1 : 0, record.reminderTime,
         record.sortOrder, record.active ? 1 : 0, record.updatedAt,
       ],
@@ -2658,6 +2691,8 @@ export class SQLiteLocalStore implements LocalStore {
       amount:       r.amount == null ? null : Number(r.amount),
       unit:         r.unit ? String(r.unit) : null,
       doseText:     r.dose_text ? String(r.dose_text) : null,
+      source:       r.source === 'meal' ? 'meal' : 'manual',
+      sourceRef:    r.source_ref ? String(r.source_ref) : null,
       updatedAt:    String(r.updated_at),
       deletedAt:    r.deleted_at ? String(r.deleted_at) : null,
       syncStatus:   String(r.sync_status) as 'pending' | 'synced',
@@ -2683,27 +2718,42 @@ export class SQLiteLocalStore implements LocalStore {
         };
       }
     }
+    // BF-69 — the conflict target is the PARTIAL index over manual contributions
+    // (`idx_supplement_logs_manual_day`), not the table's old whole-day UNIQUE. A meal contribution
+    // on the same day is a separate row and is untouched; a re-tick of the manual one still revives
+    // the soft-deleted row rather than duplicating it, because the index covers soft-deleted rows
+    // too. `source` defaults to 'manual' because that is what every writer today is — the
+    // supplements page's tick.
+    const source = record.source ?? 'manual';
     await runSQL(
-      `INSERT INTO supplement_logs (id, supplement_id, log_date, amount, unit, dose_text, updated_at, deleted_at, sync_status)
-       VALUES (?,?,?,?,?,?,?,?,?)
-       ON CONFLICT(supplement_id, log_date) DO UPDATE SET
+      `INSERT INTO supplement_logs (id, supplement_id, log_date, amount, unit, dose_text, source, source_ref, updated_at, deleted_at, sync_status)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?)
+       ON CONFLICT(supplement_id, log_date) WHERE source = 'manual' DO UPDATE SET
          id=excluded.id, amount=excluded.amount, unit=excluded.unit, dose_text=excluded.dose_text,
-         updated_at=excluded.updated_at,
+         source_ref=excluded.source_ref, updated_at=excluded.updated_at,
          deleted_at=excluded.deleted_at, sync_status=excluded.sync_status`,
       [
         record.id, record.supplementId, record.logDate,
         dose.amount, dose.unit, dose.doseText,
+        source, record.sourceRef ?? null,
         record.updatedAt ?? now, record.deletedAt, record.syncStatus,
       ],
     );
   }
 
+  /**
+   * BF-69 — removes the MANUAL contribution only, mirroring `unlogSupplement` server-side.
+   *
+   * Before contributions this soft-deleted the day's row with no notion of who wrote it, so
+   * unticking on the supplements page would have wiped a dose a meal had contributed. That is the
+   * silent data loss the contribution rows exist to prevent.
+   */
   async deleteSupplementLog(supplementId: string, logDate: string): Promise<void> {
     const now = new Date().toISOString();
     await runSQL(
       `UPDATE supplement_logs
        SET deleted_at=?, sync_status='pending', updated_at=?
-       WHERE supplement_id=? AND log_date=?`,
+       WHERE supplement_id=? AND log_date=? AND source='manual'`,
       [now, now, supplementId, logDate],
     );
   }
