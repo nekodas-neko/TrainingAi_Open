@@ -254,6 +254,14 @@ Live at the time of writing (2026-07-30):
 
 
 
+
+- **[`../../reviews/2026-09-02-colmi-0x73-frame-structure.md`](../../reviews/2026-09-02-colmi-0x73-frame-structure.md)**
+  — 🆕 **PS-20's `0x73` frame, from 45 archived frames rather than 3 (2026-09-02).** It is a
+  **container**: byte 1 is a sub-type and only **18** carries a payload. **Byte 4 wraps at 256**,
+  which retires the entry's *"byte 10 over byte 4 is ~0.77"* — across all 45 that ratio spans
+  0.33–0.78. The real invariant is `u16(6,7)` exactly linear in the counter at **27 or 36** per
+  tick. **Semantics still unknown and no decoder shipped**; the cm-per-step hypothesis needs a
+  counted walk on the device.
 - **[`../../reviews/2026-09-02-colmi-spo2-temp-stages.md`](../../reviews/2026-09-02-colmi-spo2-temp-stages.md)**
   — 🆕 **PS-19's three uncompared Colmi metrics, measured 2026-09-02.** Oura's SpO₂ lives in
   `body_metrics.spo2_pct` (the `oura_bucket` blocker was a wrong table — that one is empty *by

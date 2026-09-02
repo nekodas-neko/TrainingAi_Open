@@ -428,7 +428,14 @@ const describe = (e: unknown) => e instanceof Error ? e.message : 'Unknown error
 
 function connectHint(e: unknown): string {
   // A peripheral takes exactly ONE connection and stops advertising while it is held, so a ring
-  // held by another app is invisible rather than busy — and that presents as "not found", which
+  // held by anything else is invisible rather than busy — and that presents as "not found", which
   // reads identically to out-of-range or a flat battery unless we say so (plan §11g).
-  return `${describe(e)} — if another app (Gadgetbridge, QRing, a BLE scanner) is connected to the ring, disconnect it first.`
+  //
+  // PS-20: the copy used to name third-party apps only, and the case the owner actually hit was
+  // **this app** — the ring read as missing right after weighing, and simply waiting fixed it. The
+  // scale runs its own foreground BLE scan (`lib/scale-ble/plugin.ts`), so "disconnect the other
+  // app" was advice that did not apply to the situation that produced the report. Say that
+  // something else may be holding it and that waiting usually resolves it, before naming apps the
+  // user may not even have installed.
+  return `${describe(e)} — the ring allows one connection at a time, so this usually means something else is using it. Wait a few seconds and try again; if it keeps failing, close any other app connected to the ring (Gadgetbridge, QRing, a BLE scanner).`
 }
