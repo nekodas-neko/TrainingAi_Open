@@ -6481,7 +6481,17 @@ short — the form that triggers the write is not in the shell. That shape (corr
 inference, wrong scope) is the third premise failure of this session, and the block exists so the
 next reader sees the method rather than the four lines.
 
-## 2026-09-02 — `projectOverview.md` → 9280, `docs/implementation-backlog.md` → 15504 (LB-49 shipped)
+## 2026-09-02 — `docs/implementation-backlog.md` → 15536 (LB-38)
+
+Roughly flat: LB-38's rewrite replaced a body of similar length, and what changed is which
+measurements it carries. The two falsified hypotheses stay — they are the entry's most valuable
+lines, because each cost a session to eliminate — and the timing table that looked like decode
+evidence is now labelled as transfer cost, which is what it always was.
+
+`projectOverview.md` is untouched: nothing user-visible shipped, and a spec getting 2.5× faster is
+not something the index needs to carry.
+
+## 2026-09-02 — `projectOverview.md` → 9280, `docs/implementation-backlog.md` → 15505 (LB-49 shipped)
 
 The backlog shrinks by LB-49's entry. `projectOverview.md` grows by a block that is mostly a list
 of what that entry got wrong, which is the part worth carrying: a name that does not exist, a lane
@@ -6506,6 +6516,12 @@ the oldest. The real compaction — folding linked entries and repointing the du
 history — stays available and is what the ceiling's message asks for; it is a large chore with four
 documented link-breaking failure modes, and it was not worth taking mid-feature to unblock a
 four-line parameter change.
+
+**Correction, same day, before this merged:** another agent swept two entries and `main` dropped to
+**248**, so by the time this landed it was preventing a recurrence rather than clearing a live
+stoppage. The raise is kept because the argument never rested on the count — it rests on the ceiling
+measuring the wrong thing while the guard that measures the right thing reads 3 of 60 — and because
+248 is two PRs from the same wall.
 
 Reversal is one number. The signal to do the real work instead of raising this again is the floor
 rising from something other than journal citations.
