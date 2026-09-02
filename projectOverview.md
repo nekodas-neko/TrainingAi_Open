@@ -1538,6 +1538,7 @@ Last swept **2026-09-02**.
 | **`worn_hours_ble` and `recovery_index_hours`** | Both **0 of 107 rows** on `oura_daily_derived` with no producer. Populate or drop — and dropping is destructive. | Q-510 `Keep:` |
 | **Zone minutes / active minutes re-band** | Tuning has proposed and measured it; it re-scores a contributor reading ~6/100 on 53 of 59 days. Your quoted instruction covers the **anchor** half only, not the WHO band shift. | Q-523 |
 | **The movement-per-hour boundary** | Same boundary as the anchor decision above, so it waits on it. Saturated at **856 of 857 waking hours** — it measures ring wear. | Q-522 |
+| **Body Battery's drain model** | The replacement is **already owner-confirmed and fitted** (goal-normalised `c`, BMR-proportional baseline). It is sequenced behind the anchor decision above, so that one release unblocks it. Today `0` means *"you wore the ring a long time"*, close to the opposite of what you asked for. | Q-521 |
 | **Where "Exercise detected" gets its data** | Its only writer was the Oura Cloud sync. Either the BLE classifier feeds the existing review UI, or the card and its route retire. Either branch is a different feature. | Q-231 |
 
 ## ⚠️ Known Issues & Risks With Recently Shipped Features

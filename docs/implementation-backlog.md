@@ -11675,6 +11675,12 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 ### [body] Q-521 — Body Battery's drain tracks how long the ring was worn, not what the owner did
 
 - **Branch:** `feat/exertion-integrated-battery-drain`
+- **Needs:** Q-515
+- **⚠ SEQUENCED IN PROSE ONLY UNTIL 2026-09-02 — the same reason Q-522 kept presenting as READY.**
+  The plan line has always said *"Do Q-515 first (see sequencing)"*, and `next-item.js` reads fields,
+  not sentences. **The model itself is owner-confirmed and fitted**, so this becomes actionable the
+  moment the Q-515 anchor decision lands — it is not waiting on a design, only on a constant it is
+  downstream of.
 - **Plan:** the design brief is
   [`docs/reviews/2026-08-19-body-battery-drain-and-roadmap.md`](reviews/2026-08-19-body-battery-drain-and-roadmap.md) §3.
   **Do Q-515 first** (see sequencing). Lane A implements; Tuning proposes only.

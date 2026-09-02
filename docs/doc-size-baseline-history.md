@@ -6967,3 +6967,7 @@ quotes the entry's own closing paragraph rather than asserting it.
 The index section is a table, not prose, because its job is to be scanned by the owner and kept true
 by the next sweep. Each row names where the obligation actually lives, so the table can go stale
 without the entries going stale with it.
+
+Q-521 was added to the same sweep after the fact, when reading it turned up the identical prose-only
+*"Do Q-515 first"*. That is five instances of one class in the entries read in a single sitting,
+which is the argument for the fields over the sentences.
