@@ -6,6 +6,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.431.1",
+    date: "2026-09-02",
+    changes: [
+      "When you scan or enter a food whose protein, carbs and fat do not add up to the calories it claims, the review screen now says so and offers to use the figure the macros come to. Food databases are filled in one field at a time by different people, so a single wrong number can sit beside three right ones.",
+      "It only offers \u2014 it never changes the number for you. High-fibre foods are legitimately a little out, and the label's own figure is what gets logged unless you tap the correction.",
+    ],
+  },
+  {
     version: "1.431.0",
     date: "2026-09-02",
     changes: [

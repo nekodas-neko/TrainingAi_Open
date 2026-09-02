@@ -6594,3 +6594,17 @@ Both numbers are higher than the ones this branch first recorded (9305 / 15603, 
 recent-food-items PR landed in between and this is the post-merge count, not a second raise. Its
 entry and this one add different blocks, so the merge kept both — the additions case, not the
 backlog's two-deletions trap.
+
+## 2026-09-02 — `projectOverview.md` → 9340, `docs/implementation-backlog.md` → 15576 (BF-109)
+
++12 on the index and **−46 on the backlog**, which is the more interesting half: BF-109's queue entry
+was long because it had to argue that the mapper was *correct* and the data wrong, against the obvious
+diagnosis an implementer would reach for first. Once that argument has been acted on it belongs in the
+journal, and what stays behind is the `Keep:` — a real barcode scan and the device — plus the note that
+the fix reaches the photo-scan and manual roads too. The ratchet is set to the new lower number rather
+than left at the old headroom, so the gain is locked in.
+
+The index lines are the ones a future reader cannot reconstruct: that OFF's per-100g figure is derived
+from the same bad number, so "prefer `_100g`" is not a fix; and that the check and its 15% limit already
+existed for this exact failure. Without those two, the next person to see a wrong calorie count starts
+from the mapper again.
