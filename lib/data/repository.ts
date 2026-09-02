@@ -864,6 +864,9 @@ export interface WorkoutRepository {
   // adherence metric — pairs with computeAdherenceRatio in lib/nutrition/adherence.ts.
   getRequiredMealTypeLogDays(userId: string, from: string, to: string): Promise<{ requiredMealTypeCount: number; loggedByDay: { date: string; requiredMealTypesLogged: number }[] }>
   listRecentFoodItemsForMealType(userId: string, mealTypeId: string, limit: number): Promise<FoodItem[]>
+  /** LB-18 — the same list without the meal-bucket filter. The owner asked for "all recently
+   *  entered foods/meals" rather than what fits the current bracket. */
+  listRecentFoodItems(userId: string, limit: number): Promise<FoodItem[]>
   createFoodLog(userId: string, data: Pick<FoodLog, 'date' | 'mealTypeId' | 'foodItemId' | 'quantityMultiplier'>
     & { id?: string; loggedAt?: Date; savedMealId?: string | null; mealGroupId?: string | null; mealGroupName?: string | null }): Promise<FoodLog>
   /** BF-39: `savedMealId` is optional and ownership-checked when present — a client-supplied row

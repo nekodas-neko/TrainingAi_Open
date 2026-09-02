@@ -515,11 +515,42 @@ export async function getRequiredMealTypeLogDays(db: Db, userId: string, from: s
 }
 
 export async function listRecentFoodItemsForMealType(db: Db, userId: string, mealTypeId: string, limit: number): Promise<FoodItem[]> {
+  return recentFoodItems(db, userId, limit, mealTypeId)
+}
+
+/**
+ * The same list, unfiltered by meal bucket (LB-18).
+ *
+ * The owner settled it on the device: *"Recent doesnt need to be scoped to current meal bracket; I
+ * think it should just be all recently entered foods/meals."* Until now there was no unfiltered
+ * recency query on either side, which is the only reason `RecentFoodsPanel` resolves a bucket at
+ * all — its own comment says so, and calls the absence a data limit rather than a design choice.
+ *
+ * **No schema change was needed for this, and LB-18 says one was.** It claims a saved meal has no
+ * last-used timestamp and that a recency ordering across foods and meals therefore needs a Lane A
+ * column. `listSavedMeals` below already derives `lastUsedAt` from `max(food_logs.logged_at)` and
+ * orders by it, with `idx_food_logs_saved_meal_recent` (migration 238) behind it — deriving rather
+ * than storing, exactly as the Stored Counters rule asks. Nothing here stores a timestamp either.
+ */
+export async function listRecentFoodItems(db: Db, userId: string, limit: number): Promise<FoodItem[]> {
+  return recentFoodItems(db, userId, limit)
+}
+
+/**
+ * One body for both, so the de-duplication and the 100-row scan window cannot drift apart. The
+ * window matters: the query reads the last 100 LOGS and collapses them to distinct items, so a
+ * bucket where the same three things are eaten repeatedly still yields three items rather than one.
+ */
+async function recentFoodItems(db: Db, userId: string, limit: number, mealTypeId?: string): Promise<FoodItem[]> {
   const rows = await db
     .select({ item: s.foodItems, loggedAt: s.foodLogs.loggedAt })
     .from(s.foodLogs)
     .innerJoin(s.foodItems, eq(s.foodLogs.foodItemId, s.foodItems.id))
-    .where(and(eq(s.foodLogs.userId, userId), eq(s.foodLogs.mealTypeId, mealTypeId), isNull(s.foodLogs.deletedAt)))
+    .where(and(
+      eq(s.foodLogs.userId, userId),
+      mealTypeId ? eq(s.foodLogs.mealTypeId, mealTypeId) : undefined,
+      isNull(s.foodLogs.deletedAt),
+    ))
     .orderBy(desc(s.foodLogs.loggedAt))
     .limit(100)
   const seen = new Set<string>()
