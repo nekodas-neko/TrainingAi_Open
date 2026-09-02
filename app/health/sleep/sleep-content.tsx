@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { HealthScoreDetail } from "@/components/health/health-score-detail";
+import { ProvisionalBadge } from "@/components/health/provisional-badge";
 import { Hypnogram } from "@/components/health/hypnogram";
 import { TrendSparkline } from "@/components/health/trend-sparkline-lazy";
 import { SleepTrendToggleCard } from "@/components/health/sleep-trend-toggle-card-lazy";
@@ -23,6 +24,9 @@ interface SleepSessionRow {
   remSleepHours: number | null;
   lightSleepHours: number | null;
   awakHours: number | null;
+  /** See the note on `SleepRow` in `health-sections.tsx`. Absent means "cannot tell", which reads
+   *  as final — the local-store fallback path has no rollup watermark to compute it from. */
+  provisional?: boolean;
 }
 
 export function SleepContent({ userId }: { userId?: string }) {
@@ -83,6 +87,26 @@ export function SleepContent({ userId }: { userId?: string }) {
       contributorsTitle="Sleep Contributors"
       extraCards={(_data, _color, trends) => (
         <>
+          {/* Q-529: this screen is where the Home chip's marked score leads, so the caveat has to
+              be here in full — the chip only has room for a glyph. The score above and every stage
+              figure below it are derived from a night the rollup has not finished reading. On
+              2026-08-20 the same night read 47 mid-sync and 62 once settled. */}
+          {latest?.provisional && (
+            <div
+              className="rounded-xl border p-4"
+              style={{
+                borderColor: 'color-mix(in oklch, var(--accent-amber) 40%, transparent)',
+                background: 'color-mix(in oklch, var(--accent-amber) 10%, transparent)',
+              }}
+            >
+              <ProvisionalBadge />
+              <p className="mt-2 text-xs text-muted-foreground">
+                Your ring is still sending last night through. The score and the stage times above
+                are what has arrived so far, and they will change once the night finishes syncing.
+              </p>
+            </div>
+          )}
+
           {latest && (
             <div className="rounded-xl border border-border bg-muted/20 p-4">
               <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-2">Sleep Stages</p>
