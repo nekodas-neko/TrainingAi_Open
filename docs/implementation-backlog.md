@@ -15150,17 +15150,27 @@ a second failure nobody had separated from this one.**
 #######.#...##.#.##.#..##
 ```
 
-- **⚠ LEADING SUSPECT, and it is concrete: TWO RENDERS SHARE ONE CANVAS AND NEITHER CANCELS THE
-  DRAWING.** `meal-label-sheet.tsx`'s effect sets `cancelled = true` in its cleanup, but that flag
-  guards only `setMetrics` and the toast — **it does not stop the in-flight `renderMealLabel`**.
-  That function suspends mid-render at `await document.fonts.ready` while holding the canvas, and
-  after resuming does `canvas.width = px`, **which clears it**, then redraws. The every-style test
-  changes `style` four times in a row. So a resumed render can clear and redraw the canvas underneath
-  the one the test is about to sample — and different styles encode **different payloads**
-  (`mealLabelCarriesRecipe` picks recipe vs the 22-char bookmark), so the two renders do not even
-  draw the same symbol. **This fits every measurement**: perfectly formed geometry from one complete
-  draw, codewords that belong to something else. It is a hypothesis with a named mechanism, not a
-  finding — proving it wants an instrumented run that logs render start/finish against each sample.
+- **❌ THE RENDER-RACE SUSPECT IS REFUTED. It was published in #806 and measured out the same day —
+  do not pick it back up.** The claim was that `meal-label-sheet.tsx`'s `cancelled` flag guards only
+  `setMetrics`, so an in-flight `renderMealLabel` suspended at `await document.fonts.ready` could
+  resume, clear the canvas with `canvas.width = px` and redraw underneath the sample — and that
+  because `mealLabelCarriesRecipe` picks recipe vs bookmark per style, two interleaved renders would
+  encode **different data**. The first half is true and harmless; the second half is false.
+  - **Every style encodes the IDENTICAL payload.** Instrumented across nine runs, all six styles logged
+    `len=22` and the same token (`text=LK5lyoN5RwGb…`, `CYFq8UeLToCQ…`). `mealLabelCarriesRecipe` is
+    `SPECS[style].layout === 'code'`, and none of the styles this test drives takes that branch. So
+    even a perfect interleave would draw the same symbol, and the mechanism cannot produce a wrong
+    codeword stream.
+  - **And the renders never interleave.** Every run logged 11 clean `start → resumed-after-fonts →
+    done` triples with no overlap at all.
+  - The unguarded in-flight render is still a real latent hazard worth fixing on its own merits —
+    `cancelled` genuinely does not stop the drawing — but it is **not** this bug.
+- **So the cause remains unknown, and the field is now very narrow.** The symbol is geometrically
+  perfect, its format info matches a passing symbol's, its payload is the same 22 characters every
+  style draws, no second render touches the canvas, and it still will not decode under any binarizer.
+  The next thing to test is the **encoder**: capture `qr.modules` at draw time and compare it against
+  the modules actually rendered, which separates "the library produced a bad symbol" from "the drawing
+  put the right symbol down wrongly". Neither has been checked.
 - **⚠ TWO DIAGNOSTICS FROM THIS SESSION THAT DO NOT SUPPORT ANYTHING — do not reuse them.**
   **(a)** Diffing the failing matrix against a passing one gave 134 of 625 modules different, which
   means nothing: each run creates its own meal, so the tokens differ and the symbols *should* differ.
