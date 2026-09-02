@@ -159,6 +159,12 @@ cause of one class was a posted step window coming from a *different stream* tha
 
 ## History
 
+- **[`docs/overview/entries/2026-09-02-bf-108-activity-store-stale.md`](../../overview/entries/2026-09-02-bf-108-activity-store-stale.md)**
+  — **BF-108 (2026-09-02).** `reconcileRehydratedActivity` clears the setup when a session is demoted
+  to `pre`. **Read this before touching the activity store's rehydrate path:** the completion path
+  already calls `resetSession()` and is not the gap — an *abandoned* session is; and a live `active`
+  session inside the 12-hour bound must keep its type (Q-450), with the bound `>` not `>=`, or a
+  recording is silently discarded.
 - **[`docs/overview/entries/2026-09-02-bf-107-walk-calories.md`](../../overview/entries/2026-09-02-bf-107-walk-calories.md)**
   — **BF-107 (2026-09-02).** The walk summary's calories tile. **Read this before adding any tile that
   shows a server-derived value:** `saveActivityLog` computes the figure (the MET table is read through

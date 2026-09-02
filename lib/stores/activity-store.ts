@@ -85,6 +85,66 @@ const INITIAL_STATE: ActivityState = {
   draftSummary: null,
 }
 
+/**
+ * The setup a `pre` screen would arm itself from (BF-108).
+ *
+ * **Demoting a session to `pre` without this is what put a finished walk's name on a Start button.**
+ * Both branches below already reset `mode`, and both left `activityType` and `title` behind — so
+ * `/activity` rendered `PreActivityScreen`, pre-armed and titled from an activity that was over.
+ * The owner met it after a guided walk: *"after closing it - it still opens with the activity naming
+ * screen"*. With the type cleared, `activity-screen.tsx` falls to `SelectActivityTypeScreen` instead.
+ *
+ * **The completion path was never the gap, and the entry said it was.** `done-activity-screen.tsx`
+ * calls `resetSession()` on both save paths and `pre-activity-screen.tsx` calls it on Back, so a
+ * saved or cancelled activity already leaves clean state. What survives is a session **abandoned**
+ * before saving — reached `done` and killed, or left `active` past the 12-hour recovery bound.
+ *
+ * **It only ever runs on a session being demoted to `pre`**, which is what keeps Q-450 intact: a live
+ * `active` session inside the bound is untouched and keeps its type, so it still returns to its own
+ * screen rather than being thrown back to a picker that would drop the recording.
+ */
+export function clearActivitySetup(state: ActivityState): void {
+  state.activityType = null
+  state.activityLabel = ''
+  state.activityIcon = ''
+  state.isDistanceBased = false
+  state.title = ''
+  state.prescribedRunId = null
+}
+
+/**
+ * What a rehydrated activity session is allowed to look like (BF-108, Q-450, and the runaway timer).
+ *
+ * **Exported so it can be driven directly.** It used to be an anonymous body inside
+ * `onRehydrateStorage`, which `persist` does not expose — so a test could only mirror it, and a
+ * mirror that drifts is a test of itself.
+ *
+ * Three rules, each from an observed failure:
+ * - **`done` never survives a reload.** Restoring it verbatim days later, with a stale
+ *   `draftSummary`, is the phantom-done-screen bug.
+ * - **An `active` session past the recovery bound is abandoned, not resumable.** Without this the
+ *   elapsed timer runs for as long as the store sits on disk — a Run review once showed 25,723.2
+ *   minutes for a 0.51 km route, an 18-day-old session.
+ * - **Anything demoted to `pre` loses its setup.** Otherwise `activityType` and `title` survive and
+ *   `/activity` renders a Start button titled from an activity that is over (BF-108).
+ *
+ * **A live `active` session inside the bound is untouched**, which is Q-450: it must keep its type so
+ * it returns to its own screen rather than a picker that would drop the recording.
+ */
+export function reconcileRehydratedActivity(state: ActivityState): void {
+  if (state.mode === 'done') {
+    state.mode = 'pre'
+    state.draftSummary = null
+    clearActivitySetup(state)
+  }
+  if (state.mode === 'active' && state.startMs != null && Date.now() - state.startMs > MAX_ACTIVE_RECOVERY_MS) {
+    state.mode = 'pre'
+    state.startMs = null
+    state.rawPoints = []
+    clearActivitySetup(state)
+  }
+}
+
 const PERSIST_DEBOUNCE_MS = 2000
 
 export const useActivityStore = create<ActivityStore>()(
@@ -183,26 +243,7 @@ export const useActivityStore = create<ActivityStore>()(
       name: 'ta_activity_state',
       storage: createJSONStorage(() => debouncedLocalStorage(PERSIST_DEBOUNCE_MS)),
       onRehydrateStorage: () => (state) => {
-        if (!state) return
-        // An in-progress (unsaved) activity is recoverable after a kill — keep
-        // startMs/rawPoints/etc. intact. But mode:'done' means the summary was
-        // already shown once; restoring it verbatim days later (with a stale
-        // draftSummary) is the "phantom done screen" bug, so it's the one mode
-        // that must not survive a reload.
-        if (state.mode === 'done') {
-          state.mode = 'pre'
-          state.draftSummary = null
-        }
-        // mode:'active' has no staleness bound otherwise: an abandoned session (app killed,
-        // never resumed) leaves startMs stamped from whenever `begin()` ran, and the elapsed
-        // timer runs away for as long as the store sits on disk (owner-observed: a "Run" review
-        // screen showing 25,723.2 minutes elapsed for a 0.51 km route — an 18-day-old session).
-        // Mirrors guided-walk-store.ts / auto-detection-store.ts, which already bound theirs.
-        if (state.mode === 'active' && state.startMs != null && Date.now() - state.startMs > MAX_ACTIVE_RECOVERY_MS) {
-          state.mode = 'pre'
-          state.startMs = null
-          state.rawPoints = []
-        }
+        if (state) reconcileRehydratedActivity(state)
       },
     }
   )

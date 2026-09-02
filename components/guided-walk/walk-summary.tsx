@@ -49,7 +49,12 @@ export function WalkSummary({ config, samples, cadence, startedAtMs, userId, onD
   const router = useTransitionRouter()
   // Done is the only way off this screen, and it always goes to /activity — warm it while
   // the user reads their summary. Button pushes get no automatic prefetch (#919).
-  useEffect(() => { router.prefetch('/activity') }, [router])
+  // BF-108. `/health` rather than `/activity`: the walk was just saved, and the activity tab is a
+  // screen for STARTING one — the app answering "you finished a 30-minute walk" with a Start button.
+  // Health carries the activity-history card, so the walk that just ended is on the screen it lands
+  // on. `/cardio`, where the walk was launched from, is the other candidate and loses for that
+  // reason: it is where you go to begin one, not where you see the one you did.
+  useEffect(() => { router.prefetch('/health') }, [router])
   const rawPoints = useGuidedWalkStore(s => s.rawPoints)
   const plan = buildIntervalPlan(config)
   const durationMin = Math.round(plan.totalSec / 60)
@@ -313,7 +318,7 @@ export function WalkSummary({ config, samples, cadence, startedAtMs, userId, onD
       <p className="text-[10px] text-muted-foreground">
         {saved ? 'Saved to your activity history.' : 'Saving…'}
       </p>
-      <Button className="h-12" onClick={() => { onDone(); router.push('/activity') }}>Done</Button>
+      <Button className="h-12" onClick={() => { onDone(); router.push('/health') }}>Done</Button>
     </div>
   )
 }

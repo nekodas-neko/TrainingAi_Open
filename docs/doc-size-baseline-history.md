@@ -6821,3 +6821,14 @@ grid is a pre-save draft and a calories tile there is dead on arrival.
 Neither is inferable from the diff. The first looks like an over-engineered extra call unless you know
 what `pushMutations` does and does not do; the second looks like an oversight unless you know it was
 checked.
+
+## 2026-09-02 — `projectOverview.md` → 9468, `docs/implementation-backlog.md` → 15613 (BF-108)
+
+The index grows by 12 and the backlog shrinks. The line that earns its cost is the correction: **the
+completion path was never the gap**, and an entry that says otherwise sends the next reader to
+`done-activity-screen.tsx`, which already does the right thing. The failure is an *abandoned* session,
+which is a different trigger and a different fix.
+
+The second is Q-450 and its boundary. A reader tidying `clearActivitySetup` into the `active` branch
+unconditionally would discard a live recording, and nothing in the diff says why the bound is `>`
+rather than `>=`.
