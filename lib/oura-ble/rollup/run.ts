@@ -1139,7 +1139,12 @@ export async function runOuraRollup(
         }, priorIndices)
 
         if (res.dailyIndices) indexByDay.set(day, res.dailyIndices)
-        if (res.dailyIndices || res.level != null) {
+        // Q-510: the coverage is written even when the day produces NEITHER an index NOR a level —
+        // which was previously the one case that wrote nothing at all, and is exactly the case the
+        // number exists to explain. A day that resilience skipped now records how many minutes of
+        // daytime stress it actually had, so the gate can be checked against
+        // `minDaytimeStressHours` from data instead of inferred.
+        if (res.dailyIndices || res.level != null || res.daytimeStressCoverageMin != null) {
           await io.upsertDailyDerived(day, {
             resilienceLevel: res.level,
             resilienceGranular: res.granular,
@@ -1147,6 +1152,7 @@ export async function runOuraRollup(
             resilienceDailyStress: res.dailyIndices?.dailyStress ?? null,
             resilienceDailyRestorativeTime: res.dailyIndices?.dailyRestorativeTime ?? null,
             resilienceDailySleepRecovery: res.dailyIndices?.dailySleepRecovery ?? null,
+            daytimeStressCoverageMin: res.daytimeStressCoverageMin,
           })
         }
       }

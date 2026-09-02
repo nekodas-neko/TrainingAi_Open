@@ -60,6 +60,7 @@ const ouraDerivedRow = {
   recoveryHighMinutes: 120, chronicStressScore: 25, chronicStressContributors: { load: 20 },
   resilienceLevel: 3, resilienceDailyStress: 40, resilienceDailyRestorativeTime: 300,
   resilienceDailySleepRecovery: 80, resilienceGranular: 2.5, resilienceConfidence: 0.9,
+  daytimeStressCoverageMin: 240,
   bdiDerived: 1.1, vascularAge: 32, pwv: 6.5, bodyComp: { ffm: 65 },
   syncStatus: 'synced' as const, updatedAt: '2026-07-01T09:00:00.000Z',
 }
@@ -632,7 +633,7 @@ describe('D2 prep — Oura local read/write accessors (Phase-1 Task 1)', () => {
       daytime_stress_scaled: 40, stress_high_minutes: 30, recovery_high_minutes: 120, chronic_stress_score: 25,
       chronic_stress_contributors: JSON.stringify({ load: 20 }), resilience_level: 3, resilience_daily_stress: 40,
       resilience_daily_restorative_time: 300, resilience_daily_sleep_recovery: 80, resilience_granular: 2.5,
-      resilience_confidence: 0.9, bdi_derived: 1.1, vascular_age: 32, pwv: 6.5,
+      resilience_confidence: 0.9, daytime_stress_coverage_min: 240, bdi_derived: 1.1, vascular_age: 32, pwv: 6.5,
       body_comp: JSON.stringify({ ffm: 65 }), sync_status: 'synced', updated_at: '2026-07-01T09:00:00.000Z',
     }])
     const [row] = await store.getOuraDailyDerived('2026-07-01', '2026-07-01')

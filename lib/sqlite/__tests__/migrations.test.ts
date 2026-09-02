@@ -5,7 +5,7 @@ describe('local schema', () => {
   // The describe and the title used to say v25 while the assertion said 27 — a stale label on a
   // guard whose whole job is to be the authority on the number. Named after what it checks now.
   it('tops out at the current version', () => {
-    expect(Math.max(...MIGRATIONS.map(m => m.toVersion))).toBe(34)
+    expect(Math.max(...MIGRATIONS.map(m => m.toVersion))).toBe(35)
   })
 
   // BF-39. The trap this file exists for: a column added to a `CREATE TABLE IF NOT EXISTS` body
