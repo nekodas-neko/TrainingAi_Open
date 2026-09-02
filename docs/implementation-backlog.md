@@ -477,8 +477,21 @@ recompute has to run over the affected days once the selection is fixed.
 
 ### [activity] BF-107 — the walk summary has no calories tile, and the number it would show does not exist yet on that screen
 
-- **Lane:** A — the value has to reach the client before Lane B can render it; the tile itself is
-  trivial once it does.
+- **Lane:** B — **re-laned from A on 2026-09-02: there is no engine half.** The Lane A premise
+  ("the value has to reach the client before Lane B can render it") is false, and it was the only
+  thing making this Lane A. The derived kcal **already reaches the client both ways**: the web route
+  returns `{ activityLog }` carrying it (`app/api/activity-logs/route.ts:45` +
+  `adapter.ts:2121`) and `walk-summary.tsx` discards the response; on device the pull maps it
+  (`sync-engine.ts:337`) into a real local column (`sqlite-backend.ts:1678/1690`). The one nuance —
+  the outbox push only flips the row to `synced` (`sync-engine.ts:968-980`), so on device the number
+  lands on the **next pull**, not at first paint — is exactly the `—`-then-fill this entry wants, and
+  a component gets it by reading the local row. So the whole gap is
+  `walk-summary.tsx:239-241`: three hardcoded tiles, no read-back. Nothing fails to compile when the
+  halves are split (unlike LA-47), so there is no reason for a cross-lane PR. Evidence:
+  [journal](overview/entries/2026-09-02-bf-107-relane.md).
+- **The sibling has the same gap — checked, not assumed.** `done-activity-screen.tsx` passes
+  `caloriesBurned: null` at lines 210 and 242 and renders no energy tile either. Same one-tile change,
+  same PR.
 - **Added:** 2026-09-01 · owner, on a completed guided walk: *"the final screen doesnt show calories
   burned."*
 
