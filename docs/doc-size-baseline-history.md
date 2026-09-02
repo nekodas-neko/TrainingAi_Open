@@ -6705,3 +6705,13 @@ lines by **eliminating** work: the table closes off geometry, timing, alignment,
 detector, and the suspect names a mechanism in a specific file rather than leaving the next reader to
 re-derive one. Two dead diagnostics are recorded too, because both look convincing and neither
 supports anything.
+
+## 2026-09-02 — `docs/implementation-backlog.md` → 15665 (LB-38 render race refuted)
+
+Roughly neutral: the refutation replaces the suspect it kills. That is the point — a lead published in
+the morning and measured out in the afternoon should not leave both texts standing, because the next
+reader would weigh them against each other instead of reading one answer.
+
+The lines that earn their place are the two measurements: every style logs `len=22` with the same
+token, so interleaving cannot produce different data; and eleven clean start/resume/done triples per
+run, so it does not interleave anyway. Without them the mechanism reads plausible enough to rebuild.
