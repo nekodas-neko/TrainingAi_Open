@@ -508,47 +508,39 @@ recompute has to run over the affected days once the selection is fixed.
   would make the tile instant and work offline, but it duplicates a formula One Formula, One Place
   says lives once, and the `node:path` read is the coupling that keeps it server-side.
 
-### [activity] BF-108 — finishing a walk lands you on a pre-armed "start this activity" screen, titled from a walk you already did
+### [activity] BF-108 — a finished walk no longer arms the Start screen (shipped; device owed)
 
-- **Lane:** B — `components/guided-walk/walk-summary.tsx:288`,
-  `components/activity/activity-screen.tsx:20-21`, `lib/stores/activity-store.ts`.
-- **Added:** 2026-09-01 · owner: *"after closing it - it still opens with the activity naming
-  screen"*, with a screenshot of the Walk / Title *"Walk Home From Train"* / **Start** screen.
-
-**Two stores, and the wrong one is driving the screen you land on.** `Done` on the walk summary runs
-`onDone()` — which resets the **guided-walk** store, correctly — and then
-`router.push('/activity')`. `/activity` renders from the **activity** store, a different store that
-the guided walk never touched: `activity-screen.tsx` shows `PreActivityScreen` whenever `mode` is
-`'pre'` and `activityType` is non-null. That store is `persist`ed with **no `partialize`**, so
-`activityType` and `title` survive from whenever a free-tracked activity was last set up.
-
-So the app's response to "you finished a 30-minute walk" is a screen offering to **start** a walk,
-pre-titled with one the owner already completed. Nothing is broken in the sense of a thrown error, and
-nothing about it is intentional either — it is where the router happens to point.
-
-- **⚠ This is the persisted-store class `CLAUDE.md` already names**, which is the argument for fixing
-  the store rather than only the destination: *"screen modes, in-flight flags, and per-screen payloads
-  never survive a reload."* A `title` the user typed for a finished activity is a per-screen payload.
-  Four incidents are listed under that rule; this is the fifth shape.
-- **Recommendation: fix both halves, they are different bugs wearing one symptom.**
-  1. **Destination** — `Done` should land on the activity's own record or the day view, not on a
-     start-a-new-activity screen. The walk was just saved; showing it is the useful ending and it is
-     what the summary's own `router.prefetch('/activity')` was reaching for.
-  2. **Stale title** — clear `title` (and reconsider `activityType`) once an activity reaches `done`
-     and is saved, so a genuine visit to `/activity` starts clean instead of inheriting last week's
-     name. `startActivity` already resets from `INITIAL_STATE`, so the gap is only on the completion
-     side.
-- **Fixing only the destination leaves the bug.** Opening `/activity` from the tab bar shows the same
-  pre-armed screen; the owner reached it via the walk, but that is the route, not the cause.
-- **⚠ Do not fix it by clearing the store on rehydrate wholesale.** `activity-screen.tsx:17-19` carries
-  a deliberate guard from Q-450 — an in-flight session with a missing type keeps its own screen rather
-  than being thrown back to the picker, because the picker would drop the recording. Anything that
-  resets `activityType` must not reach a session that is `'active'`.
-- **Verification:** finish a guided walk → Done lands somewhere that shows the walk, not a Start
-  button; open `/activity` cold from the tab bar → the type picker or an empty title, never a previous
-  walk's name; and an interrupted in-progress activity still returns to its own screen after an app
-  restart (the Q-450 case, which is the one a careless fix breaks).
-
+- **Lane:** B — `lib/stores/activity-store.ts`, `components/guided-walk/walk-summary.tsx`.
+- **Verify:** device — the three cases in the entry's own verification. Finish a guided walk → Done
+  lands on Health with the walk in Activity History, not on a Start button. Open `/activity` cold from
+  the tab bar → the type picker, never a previous walk's name. And **an activity interrupted mid-record
+  still returns to its own screen after an app restart** — the Q-450 case, which is the one a careless
+  fix breaks, and the only one that needs a real kill-and-relaunch.
+- **✅ SHIPPED 2026-09-02** (`fix/bf-108-activity-store-stale`). `reconcileRehydratedActivity` clears
+  the setup on both demotion branches; `Done` goes to `/health`.
+- **❌ THE ENTRY BLAMED THE WRONG PATH.** It says *"`startActivity` already resets from
+  `INITIAL_STATE`, so the gap is only on the completion side"*. **The completion side already
+  resets** — `done-activity-screen.tsx` calls `resetSession()` on both save paths (263, 309) and
+  `pre-activity-screen.tsx` calls it on Back. A saved or cancelled activity has always left clean
+  state.
+- **What actually survives is an ABANDONED session.** `onRehydrateStorage` demotes two shapes to
+  `pre` — a `done` session, and an `active` one past the 12-hour recovery bound — and **neither
+  cleared `activityType` or `title`**, so `activity-screen.tsx` rendered `PreActivityScreen` pre-armed
+  instead of falling through to `SelectActivityTypeScreen`. Reached by killing the app at the summary,
+  or leaving a recording running for half a day.
+- **The reconciler was lifted out of `onRehydrateStorage` so it can be driven directly.** `persist`
+  does not expose the hook, so the alternative was a test mirroring it — and a mirror that drifts is a
+  test of itself. `reconcileRehydratedActivity` and `clearActivitySetup` are exported and tested
+  against the real functions.
+- **Q-450 is intact and pinned.** A live `active` session inside the bound keeps its type and its
+  points, so it still returns to its own screen rather than a picker that would drop the recording.
+  The boundary itself is asserted (`>` not `>=`), because an off-by-one there silently discards a
+  recording.
+- **`Done` lands on `/health`, not `/activity`.** The walk was just saved and the activity tab is a
+  screen for *starting* one. Health carries the activity-history card, so the walk that just ended is
+  on the screen it lands on. **`/cardio` was the other candidate** — it is where the walk was launched
+  from — and loses for the same reason: it is where you go to begin one, not where you see the one you
+  did.
 
 ### [platform] BF-106 — press the `VACUUM FULL` on `oura_raw_samples`; the packer freed the space and nothing returned it
 

@@ -24,8 +24,21 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.434.3 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Version:** v1.435.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-09-02.
+
+**A finished walk no longer arms the Start screen (BF-108).** The owner: *"after closing it - it still
+opens with the activity naming screen"*, titled from a walk they had just done. **The entry blamed the
+completion path and that was wrong** — `done-activity-screen.tsx` calls `resetSession()` on both save
+paths and Back calls it too, so a saved or cancelled activity has always left clean state. **What
+survives is an ABANDONED session:** `onRehydrateStorage` demotes a `done` session, and a stale
+`active` one, to `pre` and neither cleared `activityType` or `title`, so the screen rendered pre-armed
+instead of falling to the type picker. That is the persisted-store class CLAUDE.md already names, and
+this is its fifth shape. **Q-450 is intact and pinned** — a live in-flight session keeps its type and
+returns to its own screen, and the 12-hour boundary is asserted as `>` because an off-by-one there
+discards a recording. `Done` now lands on `/health`, where the walk it just saved is visible.
+**Not device-verified**, and the device owns the Q-450 case, which needs a real kill and relaunch
+([journal](docs/overview/entries/2026-09-02-bf-108-activity-store-stale.md)).
 
 **HR-recovery peak bands re-cut, and the entry's own proposal rejected (Q-516).** The `<110`
 boundary cut through the middle of the informative range — mean 60-second drop **−3.5** under 90 and

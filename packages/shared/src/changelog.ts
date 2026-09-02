@@ -6,6 +6,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.435.0",
+    date: "2026-09-02",
+    changes: [
+      "Finishing a guided walk now takes you to Health, where the walk you just did is in your activity history, instead of a screen offering to start another one.",
+      "The activity tab no longer opens pre-filled with the name of an activity you already finished. It starts on the type picker, as it should.",
+    ],
+  },
+  {
     version: "1.434.3",
     date: "2026-09-02",
     changes: [

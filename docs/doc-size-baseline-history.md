@@ -6909,3 +6909,14 @@ rejection rather than only in the diff.
 The `Keep:` re-lanes the honesty sentence to Lane B and names what Lane A left it: `informativeShare`,
 computed and unrendered. Four populated buckets look like a working feature whether or not they are,
 which is the entry's own warning and the reason the number exists at all.
+
+## 2026-09-02 — `projectOverview.md` → 9517, `docs/implementation-backlog.md` → 15739 (BF-108)
+
+The index grows by 13 and the backlog shrinks. The line that earns its cost is the correction: **the
+completion path was never the gap**, and an entry that says otherwise sends the next reader to
+`done-activity-screen.tsx`, which already does the right thing. The failure is an *abandoned* session,
+which is a different trigger and a different fix.
+
+The second is Q-450 and its boundary. A reader tidying `clearActivitySetup` into the `active` branch
+unconditionally would discard a live recording, and nothing in the diff says why the bound is `>`
+rather than `>=`.
