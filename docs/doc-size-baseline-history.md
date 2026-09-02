@@ -6549,7 +6549,17 @@ The Q-51 gate note is the rest: it records **why** the measurement cannot be tak
 (`pnpm dev` compiles on first mount; `next start` forces SSL on the pg pool), because "needs a
 device" without the reason invites the next session to try anyway.
 
-## 2026-09-02 — `projectOverview.md` → 9293, `docs/implementation-backlog.md` → 15586 (BF-104)
+## 2026-09-02 — `projectOverview.md` → 9292, `docs/implementation-backlog.md` → 15610 (LB-50's prompt half shipped)
+
+The backlog grows rather than shrinks: LB-50 stays queued with a `Keep:` because only its first half
+is built, and the `Keep:` has to say which half and why the other one is not a small follow-on — an
+exposed activity factor without a not-enough-data state is a worse picker than the one it replaces.
+
+The `projectOverview` block is longer than a one-string fix warrants because the fix is not the
+interesting part. What is worth carrying is that the model was handed a number, a false account of
+how it was made, and enough context to "correct" for a multiplier that was not there.
+
+## 2026-09-02 — `projectOverview.md` → 9305, `docs/implementation-backlog.md` → 15603 (BF-104)
 
 +13 on the index, and the line that earns it is the one about the sheet's own figures. The entry did
 not anticipate that shipping a portion picker forces the detail sheet's headline and macro columns to

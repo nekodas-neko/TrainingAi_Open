@@ -1930,12 +1930,25 @@ deletes nothing on tap, which is what makes an icon-only entry point defensible 
 
 ### [nutrition][platform] LB-50 — the measured activity factor, and a prompt that tells the model something false
 
+- **Keep — THE PROMPT BUG IS FIXED (2026-09-02); the FACTOR is what is still owed.** The entry's
+  first claim was verified against the code before building and holds exactly:
+  `calculateBaseline` is `tdee = Math.round(bmr * SEDENTARY_MULTIPLIER)`
+  (`goal-recommendation.ts:188`), unconditionally, and `activityLevel` reaches only `waterMl` and
+  `stepsGoal`. The baseline line no longer names the level, and the prompt now says outright that
+  the TDEE is BMR × 1.2 and must not have an activity multiplier added. Four assertions pin it,
+  including the premise itself — if a multiplier is ever reintroduced the test fails rather than
+  quietly protecting a statement that has become false in reverse.
+- **Still owed: the exposed factor and its not-enough-data state**, which is the half BF-102's
+  picker needs. On the calibrated path `maintenanceKcal / bmr` is the activity factor; on the
+  formula path `(restingBase + avgActiveKcal) / bmr` is its measured equivalent. It needs the same
+  *"Log food on 8 more days to calibrate"* state the maintenance figure already has — a calibrated
+  factor that silently falls back to a guess is a worse picker than the one it replaces.
 - **Lane:** A — `app/api/nutrition-goals/recommend/route.ts` and the energy model.
 - **Added:** 2026-09-01 · Lane B, splitting BF-102 so its picker half has a number to show.
 
 **Two things, and the first should ship on its own whether or not the picker ever does.**
 
-- **⚠ A REAL BUG.** `app/api/nutrition-goals/recommend/route.ts:111-112` builds the prompt as
+- **✅ FIXED 2026-09-02 — was a real bug.** `app/api/nutrition-goals/recommend/route.ts:111-112` builds the prompt as
   *`Baseline (Katch-McArdle, lean mass Xkg, activity level "moderate"): BMR X, TDEE X…`* — which
   reads as though the TDEE were computed **for** that activity level. It was not: `calculateBaseline`
   computes `tdee = bmr × SEDENTARY_MULTIPLIER` regardless, because Q-401 deleted `ACTIVITY_MULTIPLIERS`
@@ -3645,8 +3658,12 @@ the match. `Gate: owner` when it is next picked up.
 ### [nutrition][platform] BF-77 — sharing meals with a partner: copies work today, a shared library is a different product
 
 - **Lane:** A if a server path is chosen; B for anything built on the QR payload.
+- **Gate:** owner
 - **Planning item** — the request contains two products and they resolve differently. Needs a
-  decision from the owner before implementation.
+  decision from the owner before implementation. **The `Gate:` field above is what makes that
+  legible to `next-item.js`** (added 2026-09-02): the prose said it from the day the entry was
+  filed, and the tool cannot read prose, so the entry sat at the head of Lane A's READY list
+  offering work that cannot start. What is owed is the A-or-B choice in the table below.
 - **Added:** 2026-08-31 · owner, with a library of eight meals: *"I've made a lot of meals now and I
   will continue to make meals. I would like to be able to share meals with my partner/friend. So some
   sort of way to share meals DB entries. Or sync between a group so you all have the same meals."*

@@ -107,9 +107,20 @@ function buildContext(c: ContextInput, tz: string): string {
     `Profile: sex=${c.sex}, age=${c.ageYears}, height=${c.heightCm}cm, current weight=${c.latestWeight}kg${c.weightGoalKg ? `, goal weight=${c.weightGoalKg}kg` : ''}.`,
     `Current activity level: ${c.activityLevel}. Fitness goal: ${c.fitnessGoal}.`,
     programLine,
+    // LB-50. The activity level used to be named inside this parenthesis, which read as though the
+    // TDEE had been computed FOR it. It was not, and has not been since Q-401 deleted
+    // `ACTIVITY_MULTIPLIERS`: `calculateBaseline` computes `tdee = bmr * SEDENTARY_MULTIPLIER`
+    // unconditionally, so a self-report cannot double-count against the measured movement the model
+    // is given separately below. The level still reaches `waterMl` and `stepsGoal`, and nothing
+    // else. Telling the model the baseline was activity-scaled invites it to adjust for a
+    // multiplier that is not in the number.
     c.baseline.leanMassKg != null
-      ? `Baseline (Katch-McArdle, lean mass ${c.baseline.leanMassKg}kg, activity level "${c.activityLevel}"): BMR ${c.baseline.bmr} kcal, TDEE ${c.baseline.tdee} kcal, baseline calorie target ${c.baseline.calories} kcal, protein ${c.baseline.proteinG}g (dosed per kg lean mass), carbs ${c.baseline.carbsG}g, fat ${c.baseline.fatG}g, water ${c.baseline.waterMl}ml, steps goal ${c.baseline.stepsGoal}.`
-      : `Baseline (Mifflin-St Jeor, activity level "${c.activityLevel}"): BMR ${c.baseline.bmr} kcal, TDEE ${c.baseline.tdee} kcal, baseline calorie target ${c.baseline.calories} kcal, protein ${c.baseline.proteinG}g, carbs ${c.baseline.carbsG}g, fat ${c.baseline.fatG}g, water ${c.baseline.waterMl}ml, steps goal ${c.baseline.stepsGoal}.`,
+      ? `Baseline (Katch-McArdle, lean mass ${c.baseline.leanMassKg}kg): BMR ${c.baseline.bmr} kcal, TDEE ${c.baseline.tdee} kcal, baseline calorie target ${c.baseline.calories} kcal, protein ${c.baseline.proteinG}g (dosed per kg lean mass), carbs ${c.baseline.carbsG}g, fat ${c.baseline.fatG}g, water ${c.baseline.waterMl}ml, steps goal ${c.baseline.stepsGoal}.`
+      : `Baseline (Mifflin-St Jeor): BMR ${c.baseline.bmr} kcal, TDEE ${c.baseline.tdee} kcal, baseline calorie target ${c.baseline.calories} kcal, protein ${c.baseline.proteinG}g, carbs ${c.baseline.carbsG}g, fat ${c.baseline.fatG}g, water ${c.baseline.waterMl}ml, steps goal ${c.baseline.stepsGoal}.`,
+    // Said plainly rather than left for the model to infer from the absence above: it is told the
+    // activity level on its own line, and it is told the measured steps and active calories, so
+    // without this it could still assume the TDEE embeds one of them.
+    `The TDEE above is BMR x 1.2 (sedentary) and is NOT scaled by the stated activity level — real movement is given separately as steps and active calories. Do not add an activity multiplier to it; the activity level affects only the water and steps goals.`,
     `Current goals: steps ${c.userGoals.stepsGoal ?? 'unset'} (${c.userGoals.stepsGoalType ?? 'daily'}), calories ${c.userGoals.calorieGoal ?? 'unset'} (${c.userGoals.calorieGoalType ?? 'daily'}), water ${c.userGoals.waterGoalMl ?? 'unset'}ml (${c.userGoals.waterGoalType ?? 'daily'}).`,
     `Current nutrition targets: ${c.nutritionTargets ? `${c.nutritionTargets.calories ?? '—'} kcal, protein ${c.nutritionTargets.proteinG ?? '—'}g, carbs ${c.nutritionTargets.carbsG ?? '—'}g, fat ${c.nutritionTargets.fatG ?? '—'}g` : 'none set'}.`,
     `14-day data completeness: ${daysWithData}/14 days with logged body metrics.`,
