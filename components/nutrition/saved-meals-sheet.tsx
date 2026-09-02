@@ -438,7 +438,9 @@ export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate,
     }
   }, [userId, tz])
 
-  const quickLog = useCallback(async (meal: SavedMeal) => {
+  // BF-104: `scale` is how much of one portion was eaten. The row's one-tap log leaves it at 1 —
+  // byte-identical to before — and only the detail sheet, where a portion is chosen, passes another.
+  const quickLog = useCallback(async (meal: SavedMeal, scale = 1) => {
     // Honour the bucket the user opened this sheet from; only fall back to the
     // current time-of-day bucket when the sheet was opened without one (the
     // bottom "Saved Meals" button, which isn't bucket-scoped).
@@ -448,7 +450,7 @@ export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate,
     setLogging(meal.id)
     const targetDate = logDate ?? todayInTz(tz)
     try {
-      const logs = await logMealItems(meal, targetDate, mealTypeId, userId, tz)
+      const logs = await logMealItems(meal, targetDate, mealTypeId, userId, tz, scale)
       toast.success(`${meal.name} logged`)
       for (const log of logs) onLogged(log)
     } catch (err) {
@@ -769,7 +771,7 @@ export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate,
         confirmingDelete={detailConfirmDelete}
         onConfirmingDeleteChange={setDetailConfirmDelete}
         onOpenChange={o => { if (!o) { setDetailMeal(null); setDetailConfirmDelete(false) } }}
-        onLog={async m => { await quickLog(m); setDetailMeal(null) }}
+        onLog={async (m, scale) => { await quickLog(m, scale); setDetailMeal(null) }}
         onEdit={m => { setDetailMeal(null); openBuild(m) }}
         onDelete={async m => { await deleteMeal(m); setDetailMeal(null) }}
         onLabel={m => setLabelMeal(m)}
