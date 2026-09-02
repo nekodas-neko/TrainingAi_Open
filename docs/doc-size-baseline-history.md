@@ -6692,3 +6692,16 @@ The `Lane:` re-route is the same lesson one level up. The entry has carried a pr
 the split (*"`lib/coach/**` is Lane A"*) since 2026-08-30, and the runner never read it — it reads the
 `Lane:` field, which said B. With the B half shipped, the entry sat in **neither** queue as work: Lane
 B had nothing left to do and Lane A could not see it at all.
+
+## 2026-09-02 — `docs/implementation-backlog.md` → 15655 (LB-38 second capture)
+
++62, and 26 of them are the failing symbol's 25×25 module matrix as text. That is unusual weight for a
+backlog entry and it is deliberate: the `.bin` is 1.4 MB and lives in an ephemeral session scratchpad,
+so the matrix is the only durable form of the evidence. The first dump was destroyed before anyone
+could re-read it; this is what stops that mattering a second time.
+
+The rest is the measurement table and the render race that is now the leading suspect. Both earn their
+lines by **eliminating** work: the table closes off geometry, timing, alignment, format info and the
+detector, and the suspect names a mechanism in a specific file rather than leaving the next reader to
+re-derive one. Two dead diagnostics are recorded too, because both look convincing and neither
+supports anything.

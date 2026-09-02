@@ -15099,11 +15099,73 @@ a second failure nobody had separated from this one.**
   gate that settled the canvas across rAF-separated reads was written, measured (~+0.5 min on the
   file) and **reverted unshipped**: it fixes a cause that has not been established, and this entry
   says the wrong fix here masks the flake rather than curing it.
-- **⚠ THE DUMP FILE ITSELF IS GONE, and that is on this session.** The batch loop `rm -rf`'d
-  `test-results/share-code-dumps` before every run, so the four green runs that followed destroyed
-  it. Both numbers that mattered were extracted first, so nothing above depends on it — but a
-  re-analysis needs a fresh capture. **The instruction below is now literal: copy the dump somewhere
-  outside `test-results/` before running anything else.**
+- **✅ 2026-09-02, SECOND CAPTURE — PRESERVED THIS TIME, RENDERED AND MEASURED.** Caught on run 3 of a
+  batch (`1 failed  2 passed`), copied out of `test-results/` before the next run could delete it.
+  Ink **0.0798**, against **0.0800** on a passing canvas of the same style: normal, as expected now.
+- **The symbol is STRUCTURALLY PERFECT and still will not decode.** Rendered to a PNG and looked at —
+  it is a clean, complete QR with a clear quiet zone and no overlap with the text above it. Measured:
+
+  | property | value |
+  |---|---|
+  | symbol box | 325 × 325 px |
+  | modules | 25 × 25 (version 2) |
+  | module pitch | **exactly 13 px**, every run-length an exact multiple |
+  | timing patterns | `1111111 010101010 1111111` on **both** axes |
+  | alignment pattern (18,18) | textbook 5×5 |
+  | format info | **byte-identical to a passing symbol's**, and both copies agree |
+
+- **The detector is eliminated too.** Cropped to the symbol alone plus a 4-module quiet zone and
+  re-decoded: **null under all four** binarizer × `TRY_HARDER` combinations. So the surrounding text
+  is not confusing the detector — the symbol itself is unreadable.
+- **Therefore the fault is in the DATA/ECC codewords of an otherwise perfectly drawn symbol.** Every
+  structural and decode-path explanation is now gone.
+- **The failing matrix, kept because the .bin is not committed** (1.4 MB, and the session scratchpad is
+  ephemeral):
+
+```
+#######.#...#.###.#######
+#.....#..#.#......#.....#
+#.###.#....##...#.#.###.#
+#.###.#.##.#.##...#.###.#
+#.###.#.#.####.##.#.###.#
+#.....#.#..#.#..#.#.....#
+#######.#.#.#.#.#.#######
+........#..##.#.#........
+#...#.###.###....#####..#
+#..#....#.##..#.#.#.#..#.
+####.##....#.###.#.#.###.
+.#.#...######.#.#.#...#..
+.##...#.##...#.#.##.###.#
+#.......###.##.##.#.##.#.
+...##.#..#.###.#...#.#...
+..#.##..####..#...#...##.
+##.##.##.#..#..######....
+........###..#.##...##.#.
+#######.#.#..####.#.###..
+#.....#..#..#.#.#...#.###
+#.###.#.####.##.#####.###
+#.###.#...#.#.#.###.#####
+#.###.#...#######..#...#.
+#.....#..###.#.###.#..##.
+#######.#...##.#.##.#..##
+```
+
+- **⚠ LEADING SUSPECT, and it is concrete: TWO RENDERS SHARE ONE CANVAS AND NEITHER CANCELS THE
+  DRAWING.** `meal-label-sheet.tsx`'s effect sets `cancelled = true` in its cleanup, but that flag
+  guards only `setMetrics` and the toast — **it does not stop the in-flight `renderMealLabel`**.
+  That function suspends mid-render at `await document.fonts.ready` while holding the canvas, and
+  after resuming does `canvas.width = px`, **which clears it**, then redraws. The every-style test
+  changes `style` four times in a row. So a resumed render can clear and redraw the canvas underneath
+  the one the test is about to sample — and different styles encode **different payloads**
+  (`mealLabelCarriesRecipe` picks recipe vs the 22-char bookmark), so the two renders do not even
+  draw the same symbol. **This fits every measurement**: perfectly formed geometry from one complete
+  draw, codewords that belong to something else. It is a hypothesis with a named mechanism, not a
+  finding — proving it wants an instrumented run that logs render start/finish against each sample.
+- **⚠ TWO DIAGNOSTICS FROM THIS SESSION THAT DO NOT SUPPORT ANYTHING — do not reuse them.**
+  **(a)** Diffing the failing matrix against a passing one gave 134 of 625 modules different, which
+  means nothing: each run creates its own meal, so the tokens differ and the symbols *should* differ.
+  **(b)** A hand-rolled BCH(15,5) check reported `bchOk=false` for a symbol that demonstrably decodes,
+  so that implementation is wrong. Only the **equality** of the two format words is trustworthy.
 - **What is now eliminated, cumulatively:** the `> 0.01` ink floor letting a text-only canvas through;
   `getImageData` returning a degenerate buffer; decoder configuration; in-run decode invocation; and
   low ink as a signature. What remains is *what was drawn* — a real defect in the rendered symbol at
