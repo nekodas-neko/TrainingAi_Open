@@ -167,6 +167,40 @@ export const ChartSchema = z.object({
 export type ChartArgs = z.infer<typeof ChartSchema>
 
 /**
+ * The meal plan, as a card rather than nine paragraphs of prose (LA-47).
+ *
+ * **It carries no meals.** Like `ChoiceListSchema`'s `source`, the model names the plan and the
+ * client renders it from the plan the app already holds — a nine-meal plan typed out by the model
+ * would be several hundred output tokens describing rows the database can hand over for nothing,
+ * and output tokens are essentially all of Coach's latency. It is also the only shape where the
+ * calories on screen are guaranteed to be the calories stored: a model retyping them can round,
+ * drop a meal, or quietly reconcile them to a target.
+ *
+ * **The two buttons are not a new result type.** They resolve as ordinary `chose` results with the
+ * fixed ids in `PLAN_CARD_ACTIONS`, because a card with two buttons is a choice list with a rich
+ * body. Adding a `WidgetResultSchema` member for it would have made every consumer handle a fourth
+ * status to learn nothing the label does not already say.
+ */
+export const PlanCardSchema = z.object({
+  kind: z.literal('plan_card'),
+  title: z.string().min(1).max(60),
+  /** Omit for the active plan, which is what the user means by "my plan". A plan id from
+   *  `getMealPlan` otherwise. Never a name — a plan's identity is its id. */
+  planId: z.string().optional(),
+})
+export type PlanCardArgs = z.infer<typeof PlanCardSchema>
+
+/**
+ * What the plan card's buttons resolve to.
+ *
+ * Fixed ids rather than free strings so both halves agree without a shared component: the renderer
+ * sends one of these and the model reads it back as the user's answer. `save_all` is the one the
+ * owner's review made the acceptance test — *"I want it to make the meal plan; then add each item
+ * to the saved meals/my foods"* — so the conversation is finished when it comes back.
+ */
+export const PLAN_CARD_ACTIONS = { saveAll: 'save_all', redo: 'redo' } as const
+
+/**
  * Note what is NOT here: consequences. The model proposes the patch and the client asks
  * `POST /api/coach/preview` what it costs, so a consequence is always a measurement rather than a
  * plausible sentence about someone's training. A model that could author "this drops your weekly
@@ -179,6 +213,7 @@ export const CoachWidgetSchema = z.discriminatedUnion('kind', [
   HandoffSchema,
   NumberDialSchema,
   ChartSchema,
+  PlanCardSchema,
 ])
 export type CoachWidget = z.infer<typeof CoachWidgetSchema>
 export type CoachWidgetKind = CoachWidget['kind']
@@ -190,6 +225,7 @@ export const WIDGET_TOOL_NAMES = {
   handOff: 'handoff',
   askForNumber: 'number_dial',
   renderChart: 'chart',
+  showMealPlan: 'plan_card',
 } as const satisfies Record<string, CoachWidgetKind>
 
 export type WidgetToolName = keyof typeof WIDGET_TOOL_NAMES

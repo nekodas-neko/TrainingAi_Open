@@ -10,5 +10,5 @@ export default async function CoachPage() {
   if (!session?.user?.id) redirect("/sign-in");
   // Threaded from the session, never read from the device — a date rendered in the phone's zone is
   // invisible until the phone leaves the zone the data was recorded in.
-  return <CoachContent tz={session.user.timezone ?? DEFAULT_TZ} />;
+  return <CoachContent tz={session.user.timezone ?? DEFAULT_TZ} userId={session.user.id} />;
 }

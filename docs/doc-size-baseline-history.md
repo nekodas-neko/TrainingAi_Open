@@ -6633,3 +6633,23 @@ produced a gate that was written, measured and reverted. The four measured figur
 The other line worth its cost is that the offline decode came back null under all four configurations,
 because it **eliminates** a mechanism rather than adding one — LB-38's list of what is ruled out is now
 the useful half of the entry, and the index is where a session decides whether to open it at all.
+## 2026-09-02 — `projectOverview.md` 9368 → 9397 (LA-47)
+
++29 on top of the three raises directly above (BF-109, LB-47, LB-38), all of which landed while this
+branch was open — four Current Status paragraphs written the same hour by four sessions. None
+displaces another, so each merge kept both sides and the baseline carries the sum rather than one of
+them. Re-derived from the file after each merge rather than added to the previous number; the
+arithmetic is what drifts, and this entry's own headline was wrong twice before it was measured.
+
+The lines this branch adds are a Current Status paragraph and one Known-Issues row for
+LA-47's Coach plan card. Both are index material by the rules that govern this file: a shipped
+user-visible change gets a status paragraph, and a change that could not be exercised on the device
+gets a Known-Issues row (CLAUDE.md, Canonical Runtime — the row is the *alternative* to the device
+smoke run, so it is not optional prose). The detail that is not index material — the design argument,
+the verification transcript, the one correction made while building — is in
+[`docs/overview/entries/2026-09-02-la-47-coach-plan-card.md`](overview/entries/2026-09-02-la-47-coach-plan-card.md)
+and the paragraph links to it.
+
+Both entries shrink on their own terms rather than needing a sweep: the status paragraph is replaced
+by the next session's, and the Known-Issues row **moves whole** to `known-issues-resolved.md` the
+moment the S25 walk happens.

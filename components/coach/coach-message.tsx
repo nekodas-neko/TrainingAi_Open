@@ -25,6 +25,8 @@ interface CoachMessageProps {
   parts: MessagePart[];
   /** False once a newer turn exists — widgets render inert rather than acting late. */
   live: boolean;
+  /** Threaded to the widgets that write; the plan card's save is local-first and needs it. */
+  userId?: string;
   onWidgetResult: (toolName: string, toolCallId: string, result: WidgetResult) => void;
   onReopen: (toolCallId: string) => void;
 }
@@ -37,7 +39,7 @@ function widgetToolName(type: string): string | null {
   return isWidgetToolName(name) ? name : null;
 }
 
-export function CoachMessage({ role, parts, live, onWidgetResult, onReopen }: CoachMessageProps) {
+export function CoachMessage({ role, parts, live, userId, onWidgetResult, onReopen }: CoachMessageProps) {
   if (role === "user") {
     const text = parts.filter(p => p.type === "text").map(p => p.text).join("");
     if (!text) return null;
@@ -79,6 +81,7 @@ export function CoachMessage({ role, parts, live, onWidgetResult, onReopen }: Co
               key={i}
               input={part.input}
               toolCallId={part.toolCallId}
+              userId={userId}
               onResult={
                 live && part.state === "input-available" && !part.output
                   ? result => onWidgetResult(toolName, part.toolCallId!, result)
@@ -101,6 +104,7 @@ export function CoachMessage({ role, parts, live, onWidgetResult, onReopen }: Co
               key={i}
               input={part.input}
               toolCallId={part.toolCallId}
+              userId={userId}
               onResult={
                 live && part.state === "input-available"
                   ? result => onWidgetResult(toolName, part.toolCallId!, result)

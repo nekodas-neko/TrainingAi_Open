@@ -1,7 +1,7 @@
 import { tool } from 'ai'
 import { z } from 'zod'
 import type { WorkoutRepository } from '@/lib/data/repository'
-import { ChoiceListSchema, ChangePreviewSchema, HandoffSchema, NumberDialSchema, ChartSchema } from './widgets'
+import { ChoiceListSchema, ChangePreviewSchema, HandoffSchema, NumberDialSchema, ChartSchema, PlanCardSchema } from './widgets'
 import { CoachPatchSchema } from './patch'
 import { COACH_SCOPES, pickTools, type CoachScope } from './scopes'
 import { injurySafeAlternatives } from '@trainingai/shared/workout/injury-substitution'
@@ -224,6 +224,25 @@ export function buildWidgetTools(
         'has to pick one of them.',
       ].join(' '),
       inputSchema: ChartSchema,
+    }),
+
+    showMealPlan: tool({
+      description: [
+        "Show the user their meal plan as a card, with a button that copies every meal into My",
+        'Foods. Use it when they ask what is on their plan, after you have helped them change it,',
+        'and whenever a planning conversation reaches its end — the plan is disposable and the',
+        'saved meals are what survives it, so this is how a meal-plan conversation finishes.',
+        '',
+        'Call getMealPlan first: if it returns available:false there is nothing to show, so say so',
+        'and offer to help them build one instead of calling this.',
+        '',
+        'Do NOT write the meals out. This tool takes a title and nothing else — the app fills in',
+        'every meal, its calories and its ingredient count from the plan it already holds, which is',
+        'faster than you typing them and cannot disagree with what is stored. Omit planId for their',
+        'active plan, which is what "my plan" means; pass one only when they asked about a',
+        'different plan you read from getMealPlan.',
+      ].join(' '),
+      inputSchema: PlanCardSchema,
     }),
 
     handOff: tool({

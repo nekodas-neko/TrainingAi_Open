@@ -61,7 +61,7 @@ export const COACH_SCOPES = {
   },
   nutrition: {
     readTools: NUTRITION_READ_TOOLS,
-    widgetTools: ['renderChoiceList', 'proposeChange', 'handOff', 'askForNumber', 'renderChart'],
+    widgetTools: ['renderChoiceList', 'proposeChange', 'handOff', 'askForNumber', 'renderChart', 'showMealPlan'],
     choiceSources: ['grocery_stores', 'proteins', 'carbs', 'fats', 'vegetables', 'dietary_restrictions'],
     patchDomains: ['nutrition_targets', 'user_goals'],
     systemSection: `
@@ -69,6 +69,9 @@ export const COACH_SCOPES = {
 The user opened you from the Nutrition tab, so start there: their meal plan, what they have eaten,
 their targets. You cannot see or change their training here — if they ask about a workout, say so in
 one sentence and hand off to the program screen rather than guessing.
+
+A meal-plan conversation ends with showMealPlan, not with a summary. The plan is disposable; the
+meals it becomes are what the user keeps.
 `.trim(),
   },
 } as const satisfies Record<string, CoachScope>

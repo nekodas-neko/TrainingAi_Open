@@ -6,6 +6,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.432.0",
+    date: "2026-09-02",
+    changes: [
+      "Ask AI Coach about your meal plan and it draws the plan as a card \u2014 every meal with its calories and how many ingredients it has \u2014 instead of writing it out in a paragraph.",
+      "One button on the card copies every meal into My Foods, where they log in one tap and can be edited like any other saved meal. Meals already saved show a tick and are skipped, so pressing it twice never makes duplicates.",
+      "The plan is meant to be disposable after that \u2014 what you keep is the meals.",
+    ],
+  },
+  {
     version: "1.431.2",
     date: "2026-09-02",
     changes: [
