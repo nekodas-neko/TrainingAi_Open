@@ -6716,7 +6716,37 @@ The lines that earn their place are the two measurements: every style logs `len=
 token, so interleaving cannot produce different data; and eleven clean start/resume/done triples per
 run, so it does not interleave anyway. Without them the mechanism reads plausible enough to rebuild.
 
-## 2026-09-02 — `projectOverview.md` → 9442, `docs/implementation-backlog.md` → 15535 (LB-38 root cause)
+## 2026-09-02 — `docs/implementation-backlog.md` shrinks by 3 lines (a `Verify:` misuse, corrected)
+
+No baseline raise; this is a removal. BF-105, BF-107 and BF-108 were filed with `- **Verify:** device`
+meaning *"this will need a device check once it is built"*. The field means the opposite — the
+protocol at the top of this file defines it as **shipped, and awaiting a look** — so `next-item.js`
+sorted three unbuilt entries into VERIFY, where an implementer reads them as completed residue and
+never starts them. Lane B read **READY (1)** with two of its own items hidden that way. Removing the
+bullet puts them back in READY (3); each entry already states its device requirement in its own
+verification prose, which is where an unbuilt entry belongs. The script had been printing
+`Verify device: no note — say what to look at` against two of them the whole time — a complaint about
+a field that should not have been there at all.
+
+## 2026-09-02 — `docs/implementation-backlog.md` 15665 → 15694 (Q-509)
+
++29, and all of it is structured fields rather than prose. Six entries at the head of Lane A's READY
+list stated a real block — a scoring change needing owner sign-off, or a dependency — **in prose
+only**, so `next-item.js` served them as startable. Q-289's own Lane bullet says *"not an
+implementer's to take at all"* and it was the number-one item. Each now carries the `Gate:` or
+`Needs:` its own words already justified, plus one line saying which prose it replaces so the next
+reader does not think a field was invented.
+
+The remainder is Q-509's result: the pre-registered experiment ran and failed its pass test, which
+belongs in the entry because it changes what the entry is asking for. The argument, the table and
+the caveats are in
+[`docs/reviews/2026-09-02-recovery-index-ble-smoothing-experiment.md`](reviews/2026-09-02-recovery-index-ble-smoothing-experiment.md);
+the entry carries the verdict and the pointer, and was cut by half after this check first failed.
+
+**This is the file's own growth mechanism working as intended** — fields are what make readiness
+computable instead of prose, and they cost lines. The lines come back when these entries ship.
+
+## 2026-09-02 — `projectOverview.md` → 9442, `docs/implementation-backlog.md` → 15564 (LB-38 root cause)
 
 The backlog **shrinks by ~120 lines**: LB-38 accumulated seven theories over several days and every one
 of them is now wrong, so the entry is replaced by the cause and its measurements rather than extended
