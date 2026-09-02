@@ -15028,56 +15028,57 @@ reads.
 - **Added:** 2026-08-31 · found while adding tests for LB-34, by noticing a spec that used two types
   it had never imported and still passed `tsc`.
 
-### [platform][nutrition] LB-38 — the share-code e2e decode fails intermittently on `main`, and the mechanism is not yet known
+### [platform][nutrition] LB-38 — the share-code e2e flake: the timeout is fixed, the null decode is not
 
 - **Lane:** B — `e2e/meal-label.spec.ts`.
 - **Added:** 2026-08-31 · red on CI run 1334 (PR #700) and reproduced on clean `main` locally.
-- **It is not the PR it fails on.** It went red on a nutrition PR that does not touch the label
-  renderer, and reproduces on a clean checkout of `main`, so treat a red here as pre-existing until
-  shown otherwise. Required checks are unaffected — E2E is not one.
-- **What is established:**
-  - The failing assertion is `the share code must decode off the rendered label` —
-    `decodeQr` returns null on all **six** attempts, one second apart.
-  - **Failing runs take ~2.8 min; passing ones ~50 s.** Same signature locally and in CI.
-  - The canvas from a *passing* run decodes under all four decoder configurations tried
-    (Hybrid/GlobalHistogram binarizer × with/without `TRY_HARDER`), so decoder configuration is
-    **not** the cause.
-  - A drawn share-code canvas measures **0.174** ink fraction.
-- **⚠ One hypothesis is already falsified — do not re-derive it.** *"`waitForSettledInk`'s
-  `> 0.01` floor lets a text-only canvas through"* is wrong: `renderMealLabel` is fully synchronous
-  (`QRCode.create` at `meal-label-render.ts:907` is a sync call, and `drawShareLabel` calls
-  `drawCode` immediately after `fillText`), so text and code land in the same pass and a text-only
-  canvas cannot exist.
-- **⚠ A SECOND hypothesis is now also falsified — measured 2026-08-31, and this is the useful
-  result.** The guess was that `getImageData` returns a **degenerate** buffer under pressure, making
-  the ink fraction 0 or 1 so the gate passes on a canvas that was never drawn. The spec now reports
-  the ink at the failing attempt, and two captured failures read **0.1735** and **0.1775** — both
-  inside the normal 0.172–0.179 band, on separate runs and separate commits. **The canvas is drawn correctly and the pixels arrive intact.** Capture is
-  eliminated; the fault is in the **decode**.
-- **What that leaves.** ZXing is handed a correct image and returns null. The next step is to keep
-  the *failing* canvas rather than measure it: dump the buffer on failure and decode it offline
-  against several binarizer/`TRY_HARDER` combinations, as was already done for a **passing** canvas
-  (which decoded under all four, so a passing image is not the one to test). If the failing buffer
-  also decodes offline, the fault is in how the decode is invoked in-run rather than in the image or
-  the reader.
-- **The geometry split (LB-33) did not touch it, verified against `main` at 59603ba9:** the file's
-  other three tests — *renders a printable label in every style* (all seven), *Save to gallery hands
-  over a PNG*, and *the chosen label style is remembered* — all pass while this one fails. So a red
-  here is this flake and never a regression in the label renderer.
-- **Reproduction, now understood well enough to trigger:** it passes **every** time in isolation and
-  fails intermittently when the whole file runs — roughly one run in two. Measured across eleven
-  runs. So run the file, not the test.
-- **The instrumentation now SHIPS, and that is the point.** `e2e/meal-label.spec.ts` measures the
-  ink at the last attempt and puts it in the assertion message, so **the next failure — in CI or
-  anywhere — carries its own diagnosis** instead of needing to be reproduced first. That is what
-  turned this entry from two guesses into one eliminated cause. A reading near 0.17 means the image
-  is intact; ~0 or ~1 would mean the buffer came back degenerate.
-- **Piping a run through `grep` hides its output until it exits** — `grep` block-buffers, so a
-  watched file stays empty for the whole run and a slow run is indistinguishable from a hung one.
-  Use `grep --line-buffered`. This cost two attempts before it was noticed.
-- **If confirmed the fix is to reject a degenerate canvas in the gate** — ink strictly between
-  bounds rather than merely above a floor — **not another retry.** The retry is already at six
-  attempts and the file's own comment says another one is the wrong answer.
+- **It is not the PR it fails on.** It goes red on PRs that do not touch the label renderer and
+  reproduces on a clean checkout, so treat a red here as pre-existing until shown otherwise.
+  Required checks are unaffected — E2E is not one.
+
+**⚠ 2026-09-02: THE ENTRY'S TIMING EVIDENCE WAS MEASURING THE WRONG THING, and fixing that removed
+a second failure nobody had separated from this one.**
+
+- **`shotOf` cost 35–42 seconds per call — 152 s of a 180 s test budget.** Measured per step:
+  `selectStyle` 0.3–1.8 s, `decodeQr` 0.05–0.2 s, and `shotOf` **35.0, 40.1, 42.2, 35.0 s** for its
+  four calls in *a saved meal renders a printable label in every style*. It returned
+  `Array.from(imageData.data)` — 1179 × 1179 × 4 ≈ **5.56 million numbers as JSON over CDP**. The
+  file's own note about `expect.poll` being pathological had already identified that transfer as
+  expensive without attributing any test's runtime to it.
+- **So *"failing runs take ~2.8 min; passing ones ~50 s"* was never a decode signature.** It is six
+  `shotOf` calls versus one. The retry loop was paying ~35 s per attempt.
+- **And a second, separate failure was hiding inside it:** the every-style test was **timing out**,
+  not flaking — **3 of 3 full-file runs and again in isolation**, always at the 180 s wall. It was
+  one step short of its clock, so any slowdown tipped it over.
+- **The fix: transfer one luminance byte per pixel, base64, computed in the page.** ZXing packs RGB
+  down to luminance anyway and the ink fraction is a threshold, so nothing is lost. **The file went
+  from 4.7–4.8 min to 1.8–2.0 min**, and that test from a 3.4-min timeout to **~49 s**.
+- **⚠ THE NULL DECODE IS STILL REAL — do not treat this as closed.** **1 of 10** post-fix runs failed,
+  and it failed in the **every-style loop**, on `Ingredients · centred` — not in the share-code test
+  this entry was filed against. That loop has **no retry**, which makes it the better reproduction:
+  it fails on the first attempt instead of the sixth, in ~52 s instead of ~4.8 min.
+- **What is still established from before:** the ink at a failing attempt reads inside the normal
+  0.172–0.179 band (0.1735 and 0.1775 on two captured failures), so the buffer is not degenerate; and
+  a *passing* canvas decodes under all four binarizer/`TRY_HARDER` combinations, so decoder
+  configuration is not the cause. Both earlier hypotheses — the `> 0.01` ink floor letting a
+  text-only canvas through, and `getImageData` returning a degenerate buffer — remain **falsified**.
+- **The next step is unchanged and now much cheaper.** Both decode sites keep the failing pixels:
+  `dumpCanvas` writes the luminance buffer plus its `w`/`h`/ink to `test-results/share-code-dumps/`,
+  and the assertion message names the file and the command. Run
+  `node e2e/decode-share-code-dump.js <dump.bin>` — it tries Hybrid and GlobalHistogram binarizers ×
+  with/without `TRY_HARDER`. **If the failing buffer decodes offline, the fault is in how the decode
+  is invoked in-run rather than in the image or the reader**, which is the last mechanism nothing has
+  eliminated.
+- **A hypothesis worth testing first, because every measurement fits it:** the canvas is caught
+  **mid-repaint**. Overall ink would stay in band while the symbol is momentarily incomplete, which
+  is exactly "correct-looking pixels that will not decode". A 35 s transfer gave a repaint an
+  enormous window to land inside; the window is now milliseconds, which fits the drop from ~50% to
+  ~10%. It is a hypothesis, not a finding — the dump is what would settle it.
+- **If confirmed the fix is to reject a torn canvas in the gate, not another retry.** The retry is
+  already at six attempts and the file's own comment says another one is the wrong answer.
+- **Reproduction:** run the **file**, not a single test. Post-fix it is roughly 1 run in 10, so budget
+  more runs than before — the failure got rarer as well as cheaper.
+- **Piping a run through `grep` hides its output until it exits** — use `grep --line-buffered`.
 
 
 ## Owner feature notes, filed 2026-08-23 — each needs a planning session before implementation

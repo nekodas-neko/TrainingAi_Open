@@ -6480,3 +6480,13 @@ app is restarted" from a true premise about the tab shell, and the reasoning sto
 short — the form that triggers the write is not in the shell. That shape (correct premise, correct
 inference, wrong scope) is the third premise failure of this session, and the block exists so the
 next reader sees the method rather than the four lines.
+
+## 2026-09-02 — `docs/implementation-backlog.md` → 15536 (LB-38)
+
+Roughly flat: LB-38's rewrite replaced a body of similar length, and what changed is which
+measurements it carries. The two falsified hypotheses stay — they are the entry's most valuable
+lines, because each cost a session to eliminate — and the timing table that looked like decode
+evidence is now labelled as transfer cost, which is what it always was.
+
+`projectOverview.md` is untouched: nothing user-visible shipped, and a spec getting 2.5× faster is
+not something the index needs to carry.

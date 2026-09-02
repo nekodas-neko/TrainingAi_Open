@@ -1645,3 +1645,164 @@ the open question, same as energy Phase B). The integration is defensive: no day
 no modifier → battery behaves exactly as before. On-device check + the `STRESS_DRAIN_RATE` 0.2 tuning are
 pending owner data. Surface (a visible stress indicator on the Body Battery card) is a follow-up — the
 signal is exposed in the response but not yet rendered.
+
+## 2026-09-01 · Lane A — `main` was red on a guard that matched itself
+
+Branch `fix/one-saved-list-label-self-match`. One file, two lines.
+
+## What was failing
+
+`components/nutrition/__tests__/one-saved-list-label.test.ts` scans `app`, `components` and `e2e` for
+the string `My Meals` and asserts nothing user-visible still says it. It reported **two hits, both
+inside itself**: its own matcher (`if (/My Meals/.test(line))`) and its own test name
+(`it('no user-visible string says "My Meals"', …)`).
+
+Neither is reachable by the comment-stripping the file already does, and correctly so — one is code
+and the other is a string argument, not a comment. So the guard fails on `main` for everyone.
+
+**Found by running the suite against a clean `origin/main` checkout**, while confirming an unrelated
+failure was not mine. It is the same day's second example of a source scan whose first finding is its
+own documentation — LA-53's lane-drift note did it twice this morning — and the third if you count
+the block-comment case this file's own comment already records.
+
+## The fix, and what it deliberately does not do
+
+The scanner skips its own path. Not a cleverer matcher: the next person to add a line here quoting
+the old name would hit it again, and a path exclusion says plainly that this one file is allowed to
+name what it forbids.
+
+**The guard keeps its value** — verified by adding `export const zzProbeLabel = "My Meals"` to
+`meal-card.tsx`, which it catches and names.
+
+## Verification
+
+Full suite green. `pnpm check:rules` — Ran 67 of 67. Nothing device-visible; no route or component
+changed.
+
+## 2026-09-01 — every owner gate swept; the queue now holds no unanswered owner question
+
+Branch `docs/owner-decisions-round2`. Docs-only. The owner asked for **every** question or check
+needed to unblock the lanes. There were eleven `Gate: owner` entries; two rounds of questions cleared
+the lot.
+
+## What came back
+
+| entry | decision |
+|---|---|
+| **Q-149** | Fit the HRR bar to the user, not a new constant. The owner wears the chest strap while training. |
+| **Q-294** | All four undefined failure behaviours decided — two by the owner, two defaulted. |
+| **Q-48 / F7** | Keep web-push; build the server-side scheduler. FCM deferred, not rejected. |
+| **Q-1b** | Keep deferred — but now with the measurement in front of them, which is what the entry said was missing. |
+| **LA-50** | Declined. No GitHub Actions write permission for pixel baselines. |
+| **Q-253** | Declined for now. Re-open when `Q-250` ships. |
+| **Q-4** | Accepted — one full night wearing the Polar H10. |
+
+`Q-11` (the per-set HR backfill) and `Q-71` (the historical redecode) were offered and not taken.
+That is a scheduling answer, not a refusal; both are annotated so the next session folds them into a
+batch rather than asking again.
+
+## The finding: Q-149's entry was wrong about its own data
+
+The entry argued that a measured HRR bar was unusable because the ring power-gates when idle, giving
+only ~7 verdicts. Re-measured against `claude_ro.set_hr_stats` on 2026-09-01, both halves fail:
+
+- **The chest strap is the dominant source and has been since 2026-08-05** — `chest_strap` **156**
+  rows against `ble` **39**, with `coverage_ok` on **137 of 156 (88%)** against **21 of 39 (54%)**.
+  The owner's own statement matched the data; the entry did not.
+- **"~7 verdicts" was a stale figure from 2026-08-08.** There are **84** strap rows carrying
+  `drop_60s`.
+
+And the number that explains the whole question:
+
+| strap rows with `drop_60s`, n = 84 | |
+|---|---|
+| median | **8 bpm** · p25 2 · p75 14 · p10 **−1** |
+| reach the 15 bpm bar | **20 of 84 — 24%** |
+| mean peak · trough | **99** · 79 bpm |
+
+**The textbook bar fails 76% of this owner's sets**, and the last row says why: at a mean peak of
+99 bpm, 15 bpm is a ~15% drawdown, where the textbook number assumes peaks of 150–180. The bar was
+never wrong in the abstract — it was calibrated for different physiology. That is what makes "fit it
+to me" the right answer rather than "pick a smaller integer".
+
+Q-149 is **re-gated on signing the fitted number**, which is a different gate from the one cleared:
+Tuning proposes, the owner signs, Lane A implements, because this re-scores months of history.
+
+## Two gates that were never the owner's
+
+- **Q-48** lost its gate without an owner answer. F1, F2, F3 and F7 are all answered and F8 was fixed
+  in its own PR; what remains is **planning work** — a table-residency matrix and a parity harness —
+  which had been invisible behind a decision field for weeks.
+- **Q-294** likewise: the decision *was* the work, and with all four cells decided it becomes a
+  `Reference:` for Q-249's E2E scenarios rather than an item of its own.
+
+## Where the gates went
+
+**11 → 7, and none of the 7 is an open question.** Two are decisions already made (`Q-1b`, `Q-149`),
+two are actions deferred to a later batch (`Q-11`, `Q-71`), one is an accepted action (`Q-4`), one
+the owner explicitly held (`Q-551` — do not re-ask until Q-545 ships), and one is a stop sign whose
+own text forbids asking (`TN-16`).
+
+## Not done
+
+Nothing was built or verified on a device. `Q-4`'s night has not happened yet — when it does, the
+check is one query, and it is written into the entry so nobody has to reconstruct it.
+
+## 2026-09-01 · Lane A — the test that wrote into `lib/` now writes into a temp repo (LB-44)
+
+Branch `lane-a/probe-out-of-tree`. Two files, no migration, no schema change.
+
+## A flake that pointed at the wrong file
+
+A full-suite run on an unrelated branch came back `1 failed | 553 passed`, and the failure named
+`lib/media/__tests__/no-data-url-fetch.test.ts`:
+
+```
+ENOENT: no such file or directory, open 'lib/zz-dead-repo-methods-probe.ts'
+```
+
+That path is written and deleted by `scripts/__tests__/dead-repo-methods.test.ts`, which proves
+`sourceFileList()` sees untracked files by making one. `no-data-url-fetch` walks `app`, `components`
+and `lib` at module scope and reads every file it finds — so in a parallel worker it listed the
+probe, the other test deleted it, and the read threw. Both files pass alone.
+
+**The cost is not the failure, it is the shape of it.** It surfaces in a file the branch never
+touched, with a message that reads like a missing source file, so the first move is to search the
+diff for something that was never there.
+
+## The entry's suggested fix did not match the code
+
+LB-44 proposed pointing the probe at a private directory, on the basis that *"`sourceFileList()`
+takes the directory it lists"*. It does not — it shells out to `git ls-files` with no path argument
+and inherits the process's working directory. Re-reading the function before building the fix is what
+caught that, and it changed the fix rather than the goal.
+
+Three other shapes were considered and rejected:
+
+- **Somewhere in the tree the walkers skip.** Every non-ignored path is fair game for some walker, and
+  a gitignored one would not be listed by `--exclude-standard` — which is the property under test.
+- **A name the readers exclude.** That is a change to every reader, and each new one has to know.
+- **Assert on the command string instead.** A source-level check cannot see behaviour, which is the
+  whole reason this test creates a real file.
+
+## A throwaway git repo proves the same property
+
+`sourceFileList(cwd?)` takes an optional working directory, used by the test and by nothing else. The
+test `git init`s a temp directory and puts three files in it — one tracked, one untracked, one
+gitignored — and asserts the first two are listed and the third is not.
+
+**That is a stronger test than the one it replaces.** The old version asserted only that an untracked
+file appears; this one pins both halves of `--cached --others --exclude-standard`, so dropping either
+flag now fails. Verified by dropping each:
+
+| mutation | result |
+|---|---|
+| `--others` removed | 1 failed — the untracked file is no longer listed |
+| `--exclude-standard` removed | 2 failed — the gitignored file leaks in |
+| the `cwd` argument ignored | 1 failed — the probe repo is not what gets listed |
+
+## It was the only one
+
+Every other test that writes files already uses `mkdtempSync` under `os.tmpdir()` —
+`doc-size-baselines`, `repository-user-scoping-check`, `required-models`, `sw/manifest`. Grepped
+rather than assumed: this was the last `writeFileSync` into the working tree, and there are now none.
