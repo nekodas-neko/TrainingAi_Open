@@ -13532,54 +13532,49 @@ per-field merge where an AI write has no honest source rank to claim.
   surfaces are `/health/day` (which already draws per-session volume) or Q-112b's read-through step
   — not the evening wrap-up, where it was one more chart nobody had asked for.
 
-### [devices][app-shell] Q-111 — Home header device-battery chips (ring/strap/scale); question whether the manual refresh button is still needed
+### [devices][app-shell] Q-111 — device battery chips on the Home header (ring + strap shipped; scale is native, and one owner question)
 
-- **Lane:** B
-- **Branch:** `feat/home-device-battery-chips`
-- **Plan:** [`docs/superpowers/plans/2026-08-05-owner-ui-bug-batch.md`](../docs/superpowers/plans/2026-08-05-owner-ui-bug-batch.md) Task 26
-- **Added:** 2026-08-06 · owner wants small icon+battery chips on Home for the ring, chest strap,
-  and scale (if available) — ring always-current, strap/scale live-when-connected +
-  last-seen-when-disconnected — and asked whether the header refresh button is still needed given
-  pull-to-sync exists.
-- **✅ RING HALF DONE (2026-08-08, v1.270.30).** `oura-battery-chip.tsx` now reads
-  `/api/oura-ble/battery-latest` instead of the frozen Cloud value, and is wired into the Home
-  header beside the weather chip. It reuses the `oura-ble-battery-latest` key + `cachedFetchToday`
-  variant that `health/oura-section.tsx` already owns (a second key for one endpoint causes
-  stale/blank first paints). Two latent bugs in the same file went with it: a `readCacheSync` in a
-  `useState` lazy initializer (the documented hydration-mismatch pattern) and five hardcoded `rgb()`
-  literals now on theme tokens. Readings older than 3h render muted and say "last seen Nh ago" in
-  the aria-label rather than looking current. **The strap and scale halves below are untouched and
-  are what keeps this entry open.**
-- **⚠ TWO CORRECTIONS, 2026-09-02, from reading the tree rather than the entry. Do not plan off the
-  two bullets above without them.**
-  1. **The ring half's stated outcome is not in the tree.** There is no `oura-battery-chip.tsx` and
-     **no battery chip on the Home header** — `session-select-content.tsx` renders `WeatherChip` and
-     nothing else beside the date. The ring battery renders on **Health** and **More**
-     (`components/health/oura-section.tsx`, `components/more/oura-section.tsx`), which is where the
-     v1.270.30 fix actually landed; the changelog's own wording — *"The chip existed but was reading
-     the Oura Cloud value"* — fits a chip in the Oura section rather than a new one on Home.
-     **Git cannot settle whether it regressed or never reached Home:** history begins at the public
-     snapshot (2026-08-16), after the 2026-08-08 claim. Either way the header is empty today, so
-     treat the ring half as **open** and re-read the plan's Task 26 before building.
-  2. **The strap battery IS already read and displayed — during pairing, by a different route.**
-     `components/settings/chest-strap-pairing.tsx:87-139` reads the standard Battery Service
-     characteristic over browser BLE and renders `Battery N%`. So the claim below ("no JS call site
-     reads it") is wrong as stated: what is true is that **nothing reads `PolarBleStatus.battery`**
-     — the native service's value, delivered by `getStatus()` and the `polarStatus` listener — and
-     nothing persists either number. **That is a second source for one value**, which is the class
-     this repo keeps paying for; the chip must take the native one, and the pairing screen should be
-     made to agree rather than left as a parallel read.
-- **Very different starting points per device.** Strap: a live `battery` value already exists natively
-  (`PolarStrapService.onBattery`, exposed via `getStatus()`), and **nothing reads it or persists it**
-  — needs wiring + a "last seen" store, genuinely new work (see correction 2). Scale: **no
-  battery capability exists anywhere**, not even a one-shot native read — new BLE work, correctly
-  flagged by the owner as a stretch/"if that comes up" item, and **native, so not Lane B's**.
-- **⚑ Concrete answer to the refresh-button question, not just an opinion**: checked what each
-  does — pull-to-sync bumps `refreshTick`, which is what drives Body Battery/training-load/
-  muscle-recovery/HR-chart refresh; the manual header button does **not** bump `refreshTick` at all,
-  so it's strictly narrower than pull-to-sync, not merely redundant with it. Supports removing it and
-  reusing the header slot, though discoverability of a gesture vs. a visible button is a real
-  counter-consideration — flagged as a decision to make, not resolved here.
+- **Keep — TWO things, neither of them ordinary implementation work:**
+  1. **The device pass.** Two chips join the weather chip in a header row that already compresses
+     badly — BF-96's whole finding was that this row is where a long date runs out of width at
+     412 dp. `whitespace-nowrap shrink-0` is on all three, but whether three pills plus
+     `EEEE d MMMM` fits is a hardware question. **And the strap's live path has never executed**: it
+     needs the APK and a Polar H10, because `getPolarBle()` returns null off-device.
+  2. **The scale, and the refresh-button question — the owner's.** The scale has **no battery
+     capability anywhere**, not even a one-shot native read: it is new BLE work in Kotlin, so **not
+     Lane B's**, and the owner flagged it a stretch. Separately he asked whether the header refresh
+     button is still needed. Measured: pull-to-sync bumps `refreshTick`, which drives Body Battery,
+     training-load, muscle-recovery and the HR chart; **the manual button does not bump it at all**,
+     so it is strictly narrower, not merely redundant. That supports removing it — against the real
+     counter-consideration that a visible button is discoverable and a gesture is not. **His call.**
+- **Gate:** owner
+- **Verify:** device
+- **✅ SHIPPED** (`feat/home-device-battery-chips`, 2026-09-02, v1.430.0). `components/home/header-chips.tsx`
+  renders the weather chip plus a ring chip and a strap chip, each drawn by the shared
+  `components/device-battery-chip.tsx`. The strap's last-seen value lives in
+  `lib/stores/strap-battery.ts` and is read through `lib/hooks/use-strap-battery.ts`.
+- **⚠ The entry's own "RING HALF DONE" claim was false and is why this took a correction pass
+  first.** There was no `oura-battery-chip.tsx` and no chip on the Home header — the ring battery
+  rendered on Health and More only. Git could not arbitrate (history starts at the public snapshot,
+  after the claimed date), so the ring chip was simply built.
+- **⚠ And the strap gap was not the one described.** The entry said no JS call site reads the strap
+  battery; `chest-strap-pairing.tsx` reads the Battery Service characteristic over browser BLE while
+  pairing and renders `Battery N%`. **That read stays** — at pairing time the native service is not
+  running, so it is the only source there is — but it now **writes into the same store**, so the two
+  are one value with two writers rather than two numbers in two screens. Nothing reads
+  `PolarBleStatus.battery` was the true half, and the hook does.
+- **A stale reading is shown muted, not hidden.** A chip that vanishes on disconnect reads as "no
+  strap" rather than "not connected right now", which is a chest strap's usual state. Age goes in the
+  accessible name; the pill has room for a number and not a sentence.
+- **⚠ The header could not grow.** `session-select-content.tsx` is shrink-only in
+  `check-component-size.js`, so the row was extracted: the one `WeatherChip` dynamic-import line and
+  its one usage became `HeaderChips`, net zero, and the new chips live inside it.
+- **`useCachedValue`, not a fetch-once effect** — the header is in the persistent tab shell, so a
+  `useEffect(…, [])` would hold its first payload until the app is killed (Q-402).
+  `check-fetch-once-effects` caught the first draft doing exactly that.
+- **Added:** 2026-08-06 · owner wants small icon+battery chips on Home for the ring, chest strap and
+  scale (if available) — ring always-current, strap/scale live-when-connected +
+  last-seen-when-disconnected.
 
 ### [devices][body] Q-104 — "Weighing you…" toast still fires on a plain Home-tab visit, despite the 2026-08-01 fix
 
