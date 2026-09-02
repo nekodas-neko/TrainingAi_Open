@@ -24,8 +24,19 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.434.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Version:** v1.434.1 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-09-02.
+
+**A clamped expectation no longer cuts your load (Q-514).** `expectedRpe` clamps to the 5–10 slider,
+and on light accessory work the floor binds — 37 of 570 rated sets, hiding raw expectations as low as
+−10. Those sets ran a **+1.89** mean delta against **−0.34** everywhere else, a 2.2-point offset in
+the direction the engine reads as "RPE ran high", and they produced **64% of all back-off triggers**
+while leaving the push arm untouched. They are now **dropped** from the autoregulation delta rather
+than neutralised: the model cannot state what it expected, so the gap to the reported RPE measures
+the clamp and not the athlete. `RPE_DEAD_BAND` does not move and the clamp does not widen — both were
+measured and both are correctly placed. **`rpeTrendFromSets` deliberately still sees every set**: it
+is the emergency-deload safety net, and the same bias makes it fire slightly early, which is the safe
+direction ([journal](docs/overview/entries/2026-09-02-q514-expected-rpe-clamp.md)).
 
 **The walk summary shows its calories (BF-107).** The owner: *"the final screen doesnt show calories
 burned."* **The number was already reaching the client and the screen threw it away** — `POST

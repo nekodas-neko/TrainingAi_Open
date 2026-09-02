@@ -2,7 +2,7 @@ import type { WorkoutRepository } from '@/lib/data/repository'
 import type { SessionPeriodization } from '@trainingai/shared/types/ai-periodization'
 import { todayInTz, todayMidnightUtc, toAestDay, startOfWeekInTz, shiftDateStr } from '@trainingai/shared/date-utils'
 import { confidenceFactors, computeConfidence } from '@trainingai/shared/ai-periodization/confidence'
-import { expectedRpe, rpeTrendFromSets } from '@trainingai/shared/ai-periodization/expected-rpe'
+import { perExerciseRpeDelta, rpeTrendFromSets } from '@trainingai/shared/ai-periodization/expected-rpe'
 import { computeVolumeAcwr } from '@trainingai/shared/ai-periodization/acwr'
 import { latestIllnessFromDerived, illnessZScores, type IllnessFlag } from '@trainingai/shared/health/illness-radar'
 import { liveReadinessForDay } from '@trainingai/shared/health/live-readiness'
@@ -284,23 +284,17 @@ export async function aggregateSignals(
   // RPE trend from last 3 program-scoped sessions — both a program-wide aggregate (for the
   // emergency-deload safety net) and a per-exercise delta (for RPE autoregulation).
   let rpeTrend: PrescriptionSignals['rpeTrend'] = null
-  const perExRpeDelta = new Map<string, number>()
+  let perExRpeDelta = new Map<string, number>()
   if (last5.length >= 1) {
     const last3Ids = last5.slice(0, 3).map(s => s.id)
     const setLogs = await repo.getSetLogsForSessions(last3Ids)
-    const withRpe = setLogs.filter(sl => sl.rpe != null && sl.intensityPct != null)
     rpeTrend = rpeTrendFromSets(setLogs)
-    // Per-exercise: reps-aware expected RPE so a hard AMRAP set (reps ≈ max) reads as ~on-target.
-    const byExercise = new Map<string, number[]>()
-    for (const sl of withRpe) {
-      const d = sl.rpe! - expectedRpe(sl.intensityPct!, sl.reps)
-      const arr = byExercise.get(sl.exerciseName) ?? []
-      arr.push(d)
-      byExercise.set(sl.exerciseName, arr)
-    }
-    for (const [name, deltas] of byExercise) {
-      if (deltas.length >= 3) perExRpeDelta.set(name, deltas.reduce((a, b) => a + b, 0) / deltas.length)
-    }
+    // Per-exercise: reps-aware expected RPE so a hard AMRAP set (reps ≈ max) reads as ~on-target,
+    // and (Q-514) floor-clamped sets dropped rather than neutralised — `expectedRpe` answers 5 for
+    // a set the model actually expects at ~0.6, so their delta measures the clamp, not the athlete.
+    // `rpeTrendFromSets` above deliberately keeps every set: it is the emergency-deload safety net,
+    // and the same bias makes it fire slightly EARLY, which is the safe direction.
+    perExRpeDelta = perExerciseRpeDelta(setLogs)
   }
 
   // Hours since last session
