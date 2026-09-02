@@ -24,7 +24,7 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.429.1 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Version:** v1.430.1 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-09-02.
 
 **A saved RMR test evicts the goal caches — and the entry's severity claim did not survive being
@@ -39,6 +39,21 @@ effect **3 times then 3 more**. It remounts, so this was a first-paint flash. A 
 conversion written for the claimed symptom was reverted, and a backlog entry filed on the same
 premise was withdrawn before it reached the queue
 ([journal](docs/overview/entries/2026-09-02-measured-rmr-invalidation.md)).
+
+**The ring and strap batteries reach the Home header (Q-111), and the entry was wrong about both
+halves.** It claimed the ring chip was already there — **it was not**; there was no
+`oura-battery-chip.tsx` and the header rendered only the weather chip, with the ring battery on
+Health and More. And it claimed nothing in JS read the strap battery — **`chest-strap-pairing.tsx`
+does**, over browser BLE while pairing. The true gap was that nothing read `PolarBleStatus.battery`
+and nothing persisted either number: **two numbers in two screens with no relationship**. Now one
+store with two writers, a shared chip, and a stale reading shown **muted rather than hidden** (a chip
+that vanishes reads as "no strap", which is a chest strap's state most of the day). The header could
+not grow — `session-select-content.tsx` is shrink-only — so the row was extracted at net-zero lines.
+**Not device-verified, and the strap's live path has never executed:** `getPolarBle()` returns null
+off-device, so every reading in every test came from the store. **Two things are the owner's:** the
+scale (new Kotlin BLE, flagged a stretch) and whether the header's manual refresh button should go —
+measured, it does **not** bump `refreshTick`, so it is strictly narrower than pull-to-sync
+([journal](docs/overview/entries/2026-09-02-feat-home-device-battery-chips.md)).
 
 **A day's dose is a sum of contributions, not a tick (BF-69 stage 1).** `supplement_logs` held one
 row per substance per day, enforced by a unique constraint — so a dose carried by a logged meal and

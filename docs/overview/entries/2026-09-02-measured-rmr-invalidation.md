@@ -1,6 +1,6 @@
 # 2026-09-02 — a saved RMR test evicts the goal caches (LB-48)
 
-**Lane A · branch `lane-a/measured-rmr-invalidation` · v1.429.1**
+**Lane A · branch `lane-a/measured-rmr-invalidation` · v1.430.1**
 
 `POST /api/measured-rmr` invalidated nothing and `measured-rmr` was in no cache group, so after
 saving an RMR test the Profile goals section painted the previous resting rate before the

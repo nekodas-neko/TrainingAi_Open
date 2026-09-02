@@ -6,10 +6,19 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: "1.429.1",
+    version: "1.430.1",
     date: "2026-09-02",
     changes: [
       "Saving an RMR test now updates the Recommended calories on your Profile straight away. They briefly showed the previous resting rate before catching up.",
+    ],
+  },
+  {
+    version: "1.430.0",
+    date: "2026-09-02",
+    changes: [
+      "Your ring's and chest strap's battery levels now show as small chips in the Home header, beside the weather. The ring's was only ever on the Health and More screens; the strap's was only ever shown for a moment while pairing and then forgotten.",
+      "The strap chip keeps showing its last reading when the strap is off, dimmed, and a screen reader says how long ago it was seen \u2014 a chip that disappeared would read as \u0022no strap\u0022 rather than \u0022not connected right now\u0022, which is what a chest strap is most of the day.",
+      "No chip for the scale: it has no way to report its battery at all yet.",
     ],
   },
   {
