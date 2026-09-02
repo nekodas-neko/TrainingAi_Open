@@ -249,7 +249,16 @@ export async function computeEnergyBalance(
     })
   }
 
-  const { maintenanceKcal, source, estimate } = resolveMaintenance(windowDays, formulaBaseline)
+  // Q-517: the BMR floor. A calibrated maintenance below the user's own resting burn is impossible
+  // by definition, and the universal 1000 kcal clamp inside the estimator does not catch it — the
+  // owner's worst artefact was 1052. `bmr` above is the right number to hand it: it is the MEASURED
+  // resting rate when one exists (BF-42), so the floor tracks the same value the body-composition
+  // card renders rather than a second prediction of it.
+  //
+  // This is not the floor two lines below on `restingBaseKcal`. That one protects what the balance
+  // DISPLAYS; this protects the maintenance itself — the number `targetFromMaintenance` turns into
+  // the recommendation, and that `TdeeAdaptationCard` writes into the user's calorie goal.
+  const { maintenanceKcal, source, estimate } = resolveMaintenance(windowDays, formulaBaseline, bmr)
 
   // A calibrated maintenance measures TOTAL expenditure, so it already contains however much the
   // user habitually moves. Expenditure is "resting base + today's measured movement", so habitual

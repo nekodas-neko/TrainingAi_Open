@@ -40,6 +40,30 @@ discards a recording. `Done` now lands on `/health`, where the walk it just save
 **Not device-verified**, and the device owns the Q-450 case, which needs a real kill and relaunch
 ([journal](docs/overview/entries/2026-09-02-bf-108-activity-store-stale.md)).
 
+
+**The calibrated maintenance can no longer land below your own resting burn (Q-517).**
+`adaptive-tdee.ts` warns in its own header that an ungated estimate *"would tell the user their
+maintenance is 1200 kcal — actively harmful advice"*, then clamped at **1000**; the owner's worst
+window computed **1052** and slipped through the gap. The floor is now the user's BMR — the
+**measured** resting rate where one exists, since `energy-balance-service.ts` already resolves that
+better number two dozen lines above the call. Below it the window is **rejected, not clamped**, so
+the resolver falls back to the formula baseline rather than reporting a number the data never
+supported. **The right floor already existed one line below, applied to the wrong quantity:** it
+protected what the balance *displays*, not the maintenance that becomes the recommendation and then
+`users.calorie_goal`. **SAFE, not CORRECT** — survivors still sit under the formula's 2,397, which is
+under-logging showing through ([journal](docs/overview/entries/2026-09-02-q517-tdee-bmr-floor.md)).
+
+**A clamped expectation no longer cuts your load (Q-514).** `expectedRpe` clamps to the 5–10 slider,
+and on light accessory work the floor binds — 37 of 570 rated sets, hiding raw expectations as low as
+−10. Those sets ran a **+1.89** mean delta against **−0.34** everywhere else, a 2.2-point offset in
+the direction the engine reads as "RPE ran high", and they produced **64% of all back-off triggers**
+while leaving the push arm untouched. They are now **dropped** from the autoregulation delta rather
+than neutralised: the model cannot state what it expected, so the gap to the reported RPE measures
+the clamp and not the athlete. `RPE_DEAD_BAND` does not move and the clamp does not widen — both were
+measured and both are correctly placed. **`rpeTrendFromSets` deliberately still sees every set**: it
+is the emergency-deload safety net, and the same bias makes it fire slightly early, which is the safe
+direction ([journal](docs/overview/entries/2026-09-02-q514-expected-rpe-clamp.md)).
+
 **The walk summary shows its calories (BF-107).** The owner: *"the final screen doesnt show calories
 burned."* **The number was already reaching the client and the screen threw it away** — `POST
 /api/activity-logs` answers `{ activityLog }` carrying it, and the web branch checked `res.ok` and

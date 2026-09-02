@@ -10652,6 +10652,19 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 ### [workouts] Q-514 — 64% of the engine's back-off load cuts are an expected-RPE clamp artefact
 
 - **Branch:** `fix/expected-rpe-clamp-exclusion`
+- **⚑ SHIPPED 2026-09-02** — the first action, exactly as scoped.
+  `isExpectedRpeRepresentable(pct, reps)` sits beside `expectedRpe` on the model's raw (pre-clamp)
+  expectation, and the per-exercise delta drops those sets instead of neutralising them. The loop
+  moved out of `signals.ts` into `perExerciseRpeDelta` in the same module, because the rule is only
+  testable without a 25-query repository mock once it is a pure function; `signals.ts` now calls it.
+  **`rpeTrendFromSets` deliberately still sees every set** — it is the emergency-deload safety net,
+  and the same +1.89 bias makes it fire slightly EARLY, which is the safe direction to be wrong in.
+  [journal](overview/entries/2026-09-02-q514-expected-rpe-clamp.md).
+- **Keep:** the re-measure, and it is **Tuning's, not Lane A's**. The entry's own next question —
+  *back-off 4.1% against push 7.9% is asymmetric the other way; is that right?* — can only be asked
+  now that the input is unbiased, and it needs the replay re-run, which is Tuning's instrument.
+  Read it with the caveat below: the counts are **triggers**, not issued cuts, because the replay
+  does not model `rm1Trend`, so the number of load cuts this prevents is well below 25.
 - **Plan:** none — a predicate plus a filter. **Lane A implements; Tuning proposes only.**
 - **Added:** 2026-08-18 · Tuning agent ·
   [`docs/reviews/2026-08-18-rpe-autoregulation-calibration.md`](reviews/2026-08-18-rpe-autoregulation-calibration.md)
@@ -10714,6 +10727,21 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 ### [heart-rate][body] Q-515 — the rest/active boundary shrank 3× because the owner got fitter
 
 - **Branch:** `fix/hr-rest-threshold-anchor`
+- **⚠ THE RECOMMENDED FIX DOES NOT FIX (a) ALONE — MEASURED 2026-09-02, DO NOT IMPLEMENT IT AS
+  WRITTEN.** [`review`](reviews/2026-09-02-hr-rest-anchor-level-shift.md). Swapping the 28-day
+  resting mean for a **90-day trailing** one moves the boundary **+3.42 bpm** and takes the at-rest
+  share of waking samples from **14.9% to 25.9%** — a **74% relative rise, on 56 of 57 days**. That
+  is the same order as the instability being fixed (26.5% → 8.2%) and points the other way, so it
+  **answers question (b) at the same time**, which this entry reserves for the owner.
+  **The direction is structural, not a quirk of this data:** during an improving trend the longer
+  window necessarily sits above the shorter one, because it still holds the older, higher values —
+  so no window length separates the two effects. **And the window is not doing the work:** there are
+  only **74 days** of resting HR in total, so a 90-day trailing window covers **72 of them** today.
+  **What does fix (a) alone is this entry's own second option** — freeze the anchor at a stated
+  constant with a date, so the boundary is unchanged on the switchover day and cannot drift after
+  it. Its cost, stated plainly: a frozen constant goes stale silently, and there is **no cron layer**
+  (`module-map.md` §0), so "re-derived quarterly" means a person remembers.
+- **Gate:** owner
 - **Plan:** none yet — a constant plus a baseline source. **Lane A implements; Tuning proposes only.**
 - **Added:** 2026-08-18 · Tuning agent ·
   [`docs/reviews/2026-08-18-hr-rest-threshold-calibration.md`](reviews/2026-08-18-hr-rest-threshold-calibration.md)
@@ -10745,8 +10773,9 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   of taste. *(b) Is 8.2% the right level?* **Unknown** — ~1.2 h of a 15 h day is not obviously wrong,
   and whether Body Battery should charge more in daylight is an owner question. **Fix (a) alone**; if
   the fraction is raised at the same time the two effects become inseparable and neither is verifiable.
-- **First action — recommendation:** anchor the boundary to a **slow-moving** resting baseline (90-day
-  trailing, or a fixed offset re-derived quarterly) so a month of fitness improvement cannot move the
+- **First action — recommendation, SUPERSEDED IN ITS FIRST HALF (see the measurement above):** anchor
+  the boundary to a **slow-moving** resting baseline (~~90-day trailing~~, or a fixed offset re-derived
+  quarterly) so a month of fitness improvement cannot move the
   classifier under its own data. Keeps personalisation, removes the month-scale feedback. Reversal cost
   is low and the effect is observable within a week of BLE data.
 - **Rejected alternative:** a percentile of the owner's own recent *waking* HR (trailing-28-day p25).
@@ -10808,6 +10837,30 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 ### [nutrition] Q-517 — adaptive-TDEE can hand the user a maintenance below their own BMR
 
 - **Branch:** `fix/adaptive-tdee-bmr-floor`
+- **⚑ SHIPPED 2026-09-02** — `estimateMaintenance` / `resolveMaintenance` take an optional
+  `minMaintenanceKcal`, and the floor is `max(MIN_PLAUSIBLE_MAINTENANCE, that)` so a nonsense BMR can
+  never weaken the guard that already existed. A window under it is **rejected, not clamped** — the
+  resolver then falls back to the formula baseline, where clamping would report a number the data
+  never supported. New `below_bmr` exclusion, separate from `implausible_result` on purpose: this one
+  means the intake log is incomplete, not that the arithmetic left human range.
+  **The addendum's source was improved on, deliberately.** It said to read `body_comp.bmr_kcal`;
+  `energy-balance-service.ts` already resolves a strictly better number two dozen lines above the
+  call — `personalRmr(measured) ?? comp.bmrKcal ?? mifflinStJeorBmr` — so the floor is the MEASURED
+  resting rate where one exists (BF-42) and needs no fallback ladder, no new read, and cannot drift
+  from what the body-composition card renders.
+  **What the entry did not say, and it sharpens the case:** the same file *already* floors
+  `restingBaseKcal` at BMR, one line below. That floor protects what the balance DISPLAYS; nothing
+  protected the maintenance itself — the number `targetFromMaintenance` turns into the
+  recommendation and `TdeeAdaptationCard` writes into the calorie goal. The right floor existed and
+  was applied to the wrong quantity.
+  [journal](overview/entries/2026-09-02-q517-tdee-bmr-floor.md).
+- **Keep:** two things, and neither is the floor.
+  1. **The durable fix — within-day incompleteness detection.** A day with only breakfast still
+     counts as fully logged, so a 50%-complete record clears a 70%-coverage gate. That is a feature,
+     not a constant, and it is what would make the estimate CORRECT rather than merely SAFE.
+  2. **`tdeeAdjustment` (`tdee-adaptation.ts`) is dead code** — referenced only by its own tests and
+     by a comment in `TdeeAdaptationCard` saying it was replaced. Same trap as `amrapScaleFactor`
+     (Q-514): do not calibrate it. Removing it is a Review-lane call.
 - **Plan:** none — one constant becomes a computed value. **Lane A implements; Tuning proposes only.**
 - **Added:** 2026-08-18 · Tuning agent ·
   [`docs/reviews/2026-08-18-nutrition-tdee-calibration.md`](reviews/2026-08-18-nutrition-tdee-calibration.md)

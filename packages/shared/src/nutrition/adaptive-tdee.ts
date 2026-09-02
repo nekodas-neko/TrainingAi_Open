@@ -39,7 +39,13 @@ export const MIN_WEIGHT_SPAN_DAYS = 10
  *  where a 28-day window clears MIN_LOGGED_DAYS on 10 days but 18 days are missing. */
 export const MIN_LOGGED_FRACTION = 0.7
 
-/** Sanity clamp — a human maintenance outside this is an artefact of bad data, not a metabolism. */
+/** Sanity clamp — a human maintenance outside this is an artefact of bad data, not a metabolism.
+ *
+ *  **This universal floor is the weak half and callers should not rely on it alone (Q-517).** It was
+ *  set at 1000 against this module's own header, which predicted the failure at 1200; the owner's
+ *  worst artefact landed at **1052** and slipped between the two. Pass the user's own BMR as
+ *  `minMaintenanceKcal` — a maintenance below BMR is impossible by definition, not implausible by
+ *  taste — and this constant becomes the backstop for a caller that has no BMR to offer. */
 export const MIN_PLAUSIBLE_MAINTENANCE = 1000
 export const MAX_PLAUSIBLE_MAINTENANCE = 6000
 
@@ -76,6 +82,9 @@ export type MaintenanceExclusion =
   | 'not_enough_weigh_ins'
   | 'weight_span_too_short'
   | 'implausible_result'
+  /** Below the caller's own BMR floor. Separate from `implausible_result` on purpose: this one
+   *  says the intake log is incomplete, not that the arithmetic went out of human range. */
+  | 'below_bmr'
 
 export interface MaintenanceEstimate {
   /** Calibrated maintenance kcal/day, or null when the window did not clear the gates. */
@@ -102,6 +111,9 @@ export interface MaintenanceEstimate {
 export function estimateMaintenance(
   days: MaintenanceDay[],
   windowDays: number = DEFAULT_WINDOW_DAYS,
+  /** The user's own BMR, when the caller knows it. Raises the floor from the universal
+   *  `MIN_PLAUSIBLE_MAINTENANCE` to something true of this person — see Q-517. */
+  minMaintenanceKcal?: number | null,
 ): MaintenanceEstimate {
   const sorted = [...days].sort((a, b) => a.date.localeCompare(b.date)).slice(-windowDays)
 
@@ -151,8 +163,13 @@ export function estimateMaintenance(
 
   // Losing weight (negative slope) means expenditure exceeded intake — hence the minus.
   const maintenanceKcal = Math.round(meanIntakeKcal! - (slopeKgPerDay! * KCAL_PER_KG))
-  if (maintenanceKcal < MIN_PLAUSIBLE_MAINTENANCE || maintenanceKcal > MAX_PLAUSIBLE_MAINTENANCE) {
-    return fail('implausible_result')
+  // Never below the universal floor, and never below this user's own BMR when the caller supplies
+  // one. Rejected rather than clamped up: `resolveMaintenance` then falls back to the formula
+  // baseline, where clamping would report a number the data never supported (Q-517).
+  const floorKcal = Math.max(MIN_PLAUSIBLE_MAINTENANCE, Math.round(minMaintenanceKcal ?? 0))
+  if (maintenanceKcal > MAX_PLAUSIBLE_MAINTENANCE) return fail('implausible_result')
+  if (maintenanceKcal < floorKcal) {
+    return fail(floorKcal > MIN_PLAUSIBLE_MAINTENANCE ? 'below_bmr' : 'implausible_result')
   }
 
   const coverage = logged.length / sorted.length
@@ -171,12 +188,14 @@ export function estimateMaintenance(
 export function resolveMaintenance(
   days: MaintenanceDay[],
   formulaBaselineKcal: number,
+  /** The user's own BMR — see `estimateMaintenance`. */
+  minMaintenanceKcal?: number | null,
 ): { maintenanceKcal: number; source: 'calibrated' | 'formula'; estimate: MaintenanceEstimate } {
-  const long = estimateMaintenance(days, MAX_WINDOW_DAYS)
+  const long = estimateMaintenance(days, MAX_WINDOW_DAYS, minMaintenanceKcal)
   if (long.maintenanceKcal != null) {
     return { maintenanceKcal: long.maintenanceKcal, source: 'calibrated', estimate: long }
   }
-  const short = estimateMaintenance(days, DEFAULT_WINDOW_DAYS)
+  const short = estimateMaintenance(days, DEFAULT_WINDOW_DAYS, minMaintenanceKcal)
   if (short.maintenanceKcal != null) {
     return { maintenanceKcal: short.maintenanceKcal, source: 'calibrated', estimate: short }
   }
@@ -197,6 +216,8 @@ export function maintenanceGapMessage(e: MaintenanceEstimate): string {
       return 'Weigh-ins need to span at least 10 days to calibrate'
     case 'implausible_result':
       return 'Calibration produced an implausible number — check for unlogged days'
+    case 'below_bmr':
+      return 'Calibration came out below your resting burn — some days are only part-logged'
     default:
       return 'Using the formula estimate'
   }

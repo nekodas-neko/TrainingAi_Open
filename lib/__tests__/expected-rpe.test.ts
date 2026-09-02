@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { expectedRpe, maxRepsAtPct, pctForExpectedRpe, rpeTrendFromSets } from '@trainingai/shared/ai-periodization/expected-rpe'
+import { EXPECTED_RPE_MAX, EXPECTED_RPE_MIN, expectedRpe, isExpectedRpeRepresentable, maxRepsAtPct, pctForExpectedRpe, perExerciseRpeDelta, rawExpectedRpe, rpeTrendFromSets } from '@trainingai/shared/ai-periodization/expected-rpe'
 
 describe('pctForExpectedRpe', () => {
   it('round-trips with expectedRpe (within 0.3 RPE) across rep ranges', () => {
@@ -89,5 +89,79 @@ describe('rpeTrendFromSets (reps-aware program-wide aggregate)', () => {
       { rpe: 9, intensityPct: 80, reps: 8 }, { rpe: null, intensityPct: 80, reps: 8 },
       { rpe: 9, intensityPct: null, reps: 8 }, { rpe: 9, intensityPct: 80, reps: 8 },
     ])).toBeNull() // only 2 usable
+  })
+})
+
+// Q-514: the floor clamp splits the set population in two, and only one half carries a signal.
+describe('rawExpectedRpe / isExpectedRpeRepresentable', () => {
+  it('agrees with expectedRpe wherever the clamp does not bind', () => {
+    for (const [pct, reps] of [[85, 5], [80, 6], [75, 8], [70, 8]] as const) {
+      expect(isExpectedRpeRepresentable(pct, reps)).toBe(true)
+      expect(rawExpectedRpe(pct, reps)).toBeCloseTo(expectedRpe(pct, reps), 6)
+    }
+  })
+
+  it('rejects the ordinary accessory work the entry measured — 49.6-66.7% at 7-13 reps', () => {
+    // Not warm-ups: the median case is 54.3% for 10 reps, ~19 reps to failure, so the model
+    // expects ~0.6 and can only say 5. The owner reports 6.9 and the delta reads +1.9.
+    expect(isExpectedRpeRepresentable(54.3, 10)).toBe(false)
+    expect(rawExpectedRpe(54.3, 10)!).toBeLessThan(EXPECTED_RPE_MIN)
+    expect(expectedRpe(54.3, 10)).toBe(EXPECTED_RPE_MIN)
+  })
+
+  it('goes negative where the clamp hides the most — the entry saw raw values near -10', () => {
+    const raw = rawExpectedRpe(30, 10)!
+    expect(raw).toBeLessThan(0)
+    expect(expectedRpe(30, 10)).toBe(EXPECTED_RPE_MIN)
+  })
+
+  it('never reports the ceiling as clamped — RIR is floored at 0, so raw tops out at 10', () => {
+    for (const [pct, reps] of [[100, 1], [95, 1], [90, 12]] as const) {
+      expect(rawExpectedRpe(pct, reps)!).toBeLessThanOrEqual(EXPECTED_RPE_MAX)
+    }
+  })
+
+  it('is null, and not representable, on inputs that cannot support an expectation', () => {
+    expect(rawExpectedRpe(0, 10)).toBeNull()
+    expect(rawExpectedRpe(70, 0)).toBeNull()
+    expect(isExpectedRpeRepresentable(0, 10)).toBe(false)
+    // expectedRpe keeps its own neutral for those, which callers still rely on.
+    expect(expectedRpe(0, 10)).toBe(7)
+  })
+})
+
+describe('perExerciseRpeDelta', () => {
+  const set = (exerciseName: string, intensityPct: number | null, reps: number, rpe: number | null) =>
+    ({ exerciseName, intensityPct, reps, rpe })
+
+  it('drops floor-clamped sets, which is what removes the false back-off trigger', () => {
+    // Three ordinary accessory sets at the entry's median case (54.3% × 10 reps, reported 6.9).
+    // Clamped, each reads +1.9 and the exercise crosses RPE_DEAD_BAND = 1.5 into back-off.
+    const clamped = [set('Lateral Raise', 54.3, 10, 6.9), set('Lateral Raise', 54.3, 10, 6.9), set('Lateral Raise', 54.3, 10, 6.9)]
+    expect(perExerciseRpeDelta(clamped).has('Lateral Raise')).toBe(false)
+
+    const naive = clamped.reduce((a, s) => a + (s.rpe! - expectedRpe(s.intensityPct!, s.reps)), 0) / 3
+    expect(naive).toBeGreaterThan(1.5)
+  })
+
+  it('leaves representable sets exactly as they were', () => {
+    const sets = [set('Bench Press', 80, 6, 9), set('Bench Press', 80, 6, 8), set('Bench Press', 80, 6, 8.5)]
+    const expected = (9 + 8 + 8.5) / 3 - expectedRpe(80, 6)
+    expect(perExerciseRpeDelta(sets).get('Bench Press')).toBeCloseTo(expected, 6)
+  })
+
+  it('applies the >=3 usable-set floor AFTER dropping, not before', () => {
+    const mixed = [set('Row', 80, 6, 9), set('Row', 80, 6, 9), set('Row', 54.3, 12, 7), set('Row', 54.3, 12, 7)]
+    expect(perExerciseRpeDelta(mixed).has('Row')).toBe(false)
+  })
+
+  it('ignores unrated sets and keeps exercises independent', () => {
+    const sets = [
+      set('Squat', 80, 6, 9), set('Squat', 80, 6, 9), set('Squat', 80, 6, 9), set('Squat', 80, 6, null),
+      set('Curl', 54.3, 10, 7), set('Curl', 54.3, 10, 7), set('Curl', 54.3, 10, 7),
+    ]
+    const out = perExerciseRpeDelta(sets)
+    expect(out.get('Squat')).toBeCloseTo(9 - expectedRpe(80, 6), 6)
+    expect(out.has('Curl')).toBe(false)
   })
 })
