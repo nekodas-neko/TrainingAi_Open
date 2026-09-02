@@ -289,3 +289,60 @@ skipped):
 **Honest limit:** events the ring's buffer already overwrote before the first successful
 ingest are gone — no procedure recovers what the ring no longer holds (R4). Everything
 since the last wrap is recoverable at any time by Full re-sync.
+
+## 6. Oura Cloud retirement — what's gone, what's kept, and why (owner, 2026-08-13)
+
+The Oura *Cloud* integration was removed on 2026-08-13 at the owner's instruction (*"get rid of
+oura cloud references we dont use it"*): no OAuth/PAT flow, no
+`/api/oura/{connect,callback,sync,token,webhook}`, no Oura HTTP client, no webhook receiver, no
+token storage. **Do not re-add a Cloud call.** It could not succeed anyway — the ring is on our
+key (§0 above), so every one of those requests earned a 401 — and re-onboarding the official Oura
+app to fix that would risk a firmware update that breaks the reverse-engineered BLE protocol this
+whole document exists to protect.
+
+**The v2 API reference tables that used to live here were deleted with the code.** They described
+endpoints nothing calls. If you ever need one, read the bundled OpenAPI spec — never memory, and
+never these docs for **BLE** field names, which come from the `open_oura` Rust source.
+
+**What is deliberately kept, and why:**
+
+- **The historical Cloud data.** `oura_daily`, `oura_daily_summary`, `oura_daily_derived`, and the
+  Cloud-era rows in `sleep_sessions` / `body_metrics` are the owner's health history from before the
+  re-key, read by `app/api/health-trends`, `app/api/day-timeline` and the sync engine. Removing the
+  integration is not removing the data. `oura_tokens` still exists too — dropping it is a data-losing
+  migration that buys nothing.
+- **`lib/oura/cloud-freshness.ts`** — the single `OURA_CLOUD_REKEY_DATE` constant. It makes no
+  network call; it is how two live readiness paths know a Cloud-dated value is a frozen snapshot.
+- **The six surviving routes under `app/api/oura/`** — `hr-data`, `hr-day`, `hr-sync`, `hr-window`,
+  `workouts`, `stats` — all local reads despite the `/oura/` prefix. `hr-sync` in particular is BLE
+  **attribution**, not a Cloud pull.
+
+**`oura_workouts` is read-only history now.** Its only writer was the Cloud sync; the owner's newest
+row is 2026-07-05 and the "Exercise detected" card's unreviewed query only looks back 30 days, so
+that card has already been permanently empty since ~2026-08-04. A BLE-side detector would be new
+work, not a restoration.
+
+### Health writes — the ranked per-field merge
+
+Health writes go through the **ranked per-field merge** in `lib/data/health-source.ts`, not a plain
+`COALESCE`. Sources are ranked `manual (5) > scale_ble (4) > oura_ble (3) > oura_cloud (2) >
+health_connect (1) > unknown (0)`; `mergeSet()` compares rank per column against the stored
+`source_map` and re-stamps provenance only for columns the write actually won. (`body_metrics`,
+`sleep_sessions` and `oura_daily` carry `source_map`.) This supersedes the older row-blind
+`COALESCE(EXCLUDED.col, table.col)` description — the difference is behavioural, not cosmetic:
+COALESCE was first-write-wins and could never let a better source correct a worse value; the rank
+merge can. `saveSleepSession` takes a **required** `source` and delegates to `upsertOuraSleep`, so
+both sleep writers share one function and the same per-field merge (Q-43, v1.250.0). Keep `source`
+required — a caller left on a default writes rank-0 and beats the ring forever. The `oura_cloud`
+rank stays in the ladder: nothing writes at it any more, but the stored `source_map` of every
+pre-re-key row still names it, and a live BLE write must out-rank those rows rather than tie them.
+
+### Oura-specific DB tables
+
+| Table | Purpose |
+|---|---|
+| `oura_tokens` | Dead Cloud credentials, kept rather than dropped (see above) |
+| `oura_daily` | Daily readiness / sleep / activity scores and JSONB contributors |
+
+`sleep_sessions` has Oura columns: `oura_id` (UNIQUE, dedup key), `efficiency`, `onset_latency_sec`, `average_hrv_ms`, `avg_heart_rate`, `lowest_heart_rate`, `restless_periods`, `sleep_score`.
+`body_metrics` has `active_calories` column (Oura activity calories burned, distinct from food `calories`).

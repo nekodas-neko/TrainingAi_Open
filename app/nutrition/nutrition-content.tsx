@@ -2,7 +2,7 @@
 
 import { useEffect, useLayoutEffect, useState, useCallback, useMemo, useRef } from "react";
 import { savePreference } from '@/lib/user/preferences-sync'
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useTabVisibility } from "@/components/shell/tab-visibility";
 import dynamic from "next/dynamic";
 import { useDrag } from "@use-gesture/react";
@@ -89,6 +89,7 @@ export default function NutritionContent({ userId }: { userId?: string }) {
   const tz = useUserTimezone();
   const todayStr = todayInTz(tz);
   const searchParams = useSearchParams();
+  const router = useRouter();
   const [selectedDate, setSelectedDate] = useState(todayStr);
   const selectedDateRef = useRef(selectedDate);
   useEffect(() => { selectedDateRef.current = selectedDate; }, [selectedDate]);
@@ -125,6 +126,10 @@ export default function NutritionContent({ userId }: { userId?: string }) {
   const dismissPlanReview = useCallback(() => setPlanReviewDismissed(true), []);
   const rebuildPlan = useCallback(() => { setPlanReviewDismissed(true); setPlanSetupOpen(true); }, []);
   const openPlanSetup = useCallback(() => setPlanSetupOpen(true), []);
+  // Q-407: the primary "build me a plan" action is the conversation now. `scope=nutrition` gives the
+  // coach the nutrition tool subset — a boundary it cannot cross, rather than a prompt asking it not
+  // to. The stepper stays one tap away beneath it.
+  const openPlanCoach = useCallback(() => router.push('/coach?scope=nutrition'), [router]);
   const openPlanManage = useCallback(() => setPlanManageOpen(true), []);
   const [planEditOpen, setPlanEditOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -631,7 +636,8 @@ export default function NutritionContent({ userId }: { userId?: string }) {
                 dateRef={selectedDateRef}
                 eaten={logs.length > 0 ? totals : undefined}
                 onLogged={handleFoodLogged}
-                onCreate={openPlanSetup}
+                onCreate={openPlanCoach}
+                onStepByStep={openPlanSetup}
                 onViewPlan={openPlanManage}
               />
             )}

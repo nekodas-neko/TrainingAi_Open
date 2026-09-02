@@ -6653,3 +6653,77 @@ and the paragraph links to it.
 Both entries shrink on their own terms rather than needing a sweep: the status paragraph is replaced
 by the next session's, and the Known-Issues row **moves whole** to `known-issues-resolved.md` the
 moment the S25 walk happens.
+
+## 2026-08-30 — `projectOverview.md` 9397 → 9420 (+23), PS-17 and the auto-sync device gate
+
+Two Known-Issues rows, both of which have to be in the file every session reads before it can start.
+
+The first is a live scoring fault: a phantom afternoon "sleep" reached `oura_daily_summary` over the
+real night, so 2026-08-27 scored from an HRV of 26.5 and a resting HR of 64 — awake daytime values.
+It is long because the row has to carry the evidence: the three phantom sessions, the summary values
+either side of the bad day, and the fact that a fix needs a corrective recompute rather than only a
+selection change. A shorter row would have been re-derived by whoever picked it up.
+
+The second is the device-verification gate on Colmi auto-sync, which the Canonical Runtime rule
+requires: it ships unexercised by any radio, and the row states the one observation that would
+confirm it.
+
+Raised to 9420 rather than the exact 9417 so the next small row does not need its own note.
+
+## 2026-09-02 — `projectOverview.md` → 9429, `docs/implementation-backlog.md` → 15585 (Q-407)
+
+Both grow. The index line that earns its cost is the one about the **fallback**: the entry says keep
+the stepper reachable, and the obvious way to satisfy that — leave Rebuild as the route back — does not
+work, because Rebuild only exists once a plan does. A future reader tidying the second control away
+would re-strand exactly the user it was put there for, and nothing in the code says so.
+
+The other is that the scope decides the **tool subset** rather than the prompt. Without it the next
+change to this entry point reads `?scope=nutrition` as cosmetic routing and drops it.
+
+## 2026-09-02 — `docs/implementation-backlog.md` → 15593 (Q-407 Keep field + lane re-route)
+
++4, and they are a **field the runner parses**, not prose. Q-407's Lane B half shipped and the entry
+said so in a bullet — but `next-item.js` reads `Keep:`, so without one it kept printing Q-407 at the
+head of Lane B's READY list as though nothing had been done. The same shape cost BF-109 a `Lane:` and
+a `Verify:` earlier the same day: an entry that describes its own state in prose is invisible to the
+tool an implementer is told to start from.
+
+The `Lane:` re-route is the same lesson one level up. The entry has carried a prose paragraph naming
+the split (*"`lib/coach/**` is Lane A"*) since 2026-08-30, and the runner never read it — it reads the
+`Lane:` field, which said B. With the B half shipped, the entry sat in **neither** queue as work: Lane
+B had nothing left to do and Lane A could not see it at all.
+
+## 2026-09-02 — `docs/implementation-backlog.md` → 15655 (LB-38 second capture)
+
++62, and 26 of them are the failing symbol's 25×25 module matrix as text. That is unusual weight for a
+backlog entry and it is deliberate: the `.bin` is 1.4 MB and lives in an ephemeral session scratchpad,
+so the matrix is the only durable form of the evidence. The first dump was destroyed before anyone
+could re-read it; this is what stops that mattering a second time.
+
+The rest is the measurement table and the render race that is now the leading suspect. Both earn their
+lines by **eliminating** work: the table closes off geometry, timing, alignment, format info and the
+detector, and the suspect names a mechanism in a specific file rather than leaving the next reader to
+re-derive one. Two dead diagnostics are recorded too, because both look convincing and neither
+supports anything.
+
+## 2026-09-02 — `docs/implementation-backlog.md` → 15665 (LB-38 render race refuted)
+
+Roughly neutral: the refutation replaces the suspect it kills. That is the point — a lead published in
+the morning and measured out in the afternoon should not leave both texts standing, because the next
+reader would weigh them against each other instead of reading one answer.
+
+The lines that earn their place are the two measurements: every style logs `len=22` with the same
+token, so interleaving cannot produce different data; and eleven clean start/resume/done triples per
+run, so it does not interleave anyway. Without them the mechanism reads plausible enough to rebuild.
+
+## 2026-09-02 — `docs/implementation-backlog.md` shrinks by 3 lines (a `Verify:` misuse, corrected)
+
+No baseline raise; this is a removal. BF-105, BF-107 and BF-108 were filed with `- **Verify:** device`
+meaning *"this will need a device check once it is built"*. The field means the opposite — the
+protocol at the top of this file defines it as **shipped, and awaiting a look** — so `next-item.js`
+sorted three unbuilt entries into VERIFY, where an implementer reads them as completed residue and
+never starts them. Lane B read **READY (1)** with two of its own items hidden that way. Removing the
+bullet puts them back in READY (3); each entry already states its device requirement in its own
+verification prose, which is where an unbuilt entry belongs. The script had been printing
+`Verify device: no note — say what to look at` against two of them the whole time — a complaint about
+a field that should not have been there at all.

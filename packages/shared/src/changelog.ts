@@ -6,6 +6,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.433.0",
+    date: "2026-09-02",
+    changes: [
+      "Building a meal plan now starts as a conversation with your coach instead of seven screens of questions. It opens knowing your calorie target and when you train, so there is less to answer.",
+      "The old step-by-step setup is still there, one tap under the same button, in case you would rather work through the screens.",
+    ],
+  },
+  {
     version: "1.432.0",
     date: "2026-09-02",
     changes: [

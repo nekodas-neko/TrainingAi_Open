@@ -17,6 +17,8 @@ interface Props {
   /** Whether today is a training day, from the user's schedule — never re-derived here. */
   isTrainingDay?: boolean
   onCreate: () => void
+  /** The seven-step sheet, still reachable beside the conversation (Q-407). */
+  onStepByStep: () => void
   onViewPlan: (planId: string) => void
   /** Log one planned meal as eaten. Absent while meal types are still loading. */
   onLogMeal?: (meal: MealPlanMeal) => void
@@ -86,7 +88,7 @@ const brandCardStyle: CSSProperties = {
  * food, not reading a plan. "View plan" is the escape hatch to the full screen.
  */
 export const MealPlanSection = memo(function MealPlanSection({
-  plan, loading, eaten, isTrainingDay, onCreate, onViewPlan,
+  plan, loading, eaten, isTrainingDay, onCreate, onStepByStep, onViewPlan,
   onLogMeal, loggingPosition, loggedPositions, declinedMealIds, onSetDeclined,
   onLogAll, mealTypes, logDate, today, nowHour, bulkLogging,
   onSaveMeal, onSaveAllMeals, savingPositions,
@@ -99,18 +101,34 @@ export const MealPlanSection = memo(function MealPlanSection({
 
   if (plan == null) {
     return (
-      <button
-        onClick={onCreate}
-        className="w-full min-h-[48px] flex items-center gap-3 rounded-2xl border border-dashed border-border bg-muted/40 px-4 py-4 text-left active:bg-muted/20 transition-colors"
-      >
-        <UtensilsCrossed className="w-4 h-4 text-muted-foreground flex-none" />
-        <span className="flex-1">
-          <span className="block text-sm font-semibold">Build a meal plan</span>
-          <span className="block text-[11px] text-muted-foreground">
-            Meals built around your calorie target and when you train
+      <div className="space-y-1.5">
+        <button
+          onClick={onCreate}
+          className="w-full min-h-[48px] flex items-center gap-3 rounded-2xl border border-dashed border-border bg-muted/40 px-4 py-4 text-left active:bg-muted/20 transition-colors"
+        >
+          <UtensilsCrossed className="w-4 h-4 text-muted-foreground flex-none" />
+          <span className="flex-1">
+            <span className="block text-sm font-semibold">Build a meal plan</span>
+            <span className="block text-[11px] text-muted-foreground">
+              Talk it through with your coach — it already knows your target and when you train
+            </span>
           </span>
-        </span>
-      </button>
+        </button>
+        {/**
+         * The stepper, kept beside the conversation rather than behind it (Q-407).
+         *
+         * The entry is explicit that a conversational flow which stalls mid-plan with no fallback is
+         * worse than seven screens that finish — and the only other route back to the stepper is
+         * Rebuild, which does not exist until a plan does. So the user with no plan, the one who
+         * would be stranded, is exactly the user this offers it to.
+         */}
+        <button
+          onClick={onStepByStep}
+          className="w-full min-h-[44px] px-4 text-[11px] text-muted-foreground underline underline-offset-2 active:opacity-70"
+        >
+          Prefer the step-by-step setup?
+        </button>
+      </div>
     )
   }
 

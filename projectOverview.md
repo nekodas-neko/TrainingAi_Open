@@ -24,8 +24,20 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.432.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Version:** v1.433.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-09-02.
+
+**Nutrition's plan button opens the coach, in the nutrition scope (Q-407).** LA-47's plan card
+unblocked this, and the Lane B half was exactly what the entry said: `/coach` takes `?scope=`,
+`CoachContent` forwards it in the request body, and `Build a meal plan` goes to
+`/coach?scope=nutrition`. **The scope is the point, not the navigation** — it decides the coach's tool
+subset, and *a tool it never receives is a boundary it cannot cross*, as against a prompt asking the
+model not to read workout data. **The stepper sits beside the conversation, not behind it:** the entry
+warns that a flow stalling with no fallback is worse than seven screens that finish, and Rebuild —
+the only other route to the sheet — does not exist until a plan does, so the no-plan user is the one
+who would have been stranded. **Still owed, and it is Lane A's:** the coach does not yet open by
+stating what it already knows instead of asking. **No real Gemini turn was made and the device is
+untouched** ([journal](docs/overview/entries/2026-09-02-q-407-nutrition-coach-entry.md)).
 
 **AI Coach draws the meal plan, and one button puts every meal in My Foods (LA-47).** The owner's
 review is the acceptance test — *"I want it to make the meal plan; then add each item to the saved
@@ -1437,6 +1449,26 @@ window, then the newest `history-*.md`. The 157 dated status notes this section 
 > An entry only leaves when **nothing is still owed**: no open work, no pending owner or device
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
+
+### [sleep][platform] 🔴 A phantom afternoon "sleep" is scoring as a real night (PS-17, 2026-08-30)
+
+`aggregateOuraRawSamples` emits daytime sessions into `sleep_sessions`, and where a day has more
+than one, the wrong one reaches `oura_daily_summary`. On 2026-08-27 the summary took an 11:35–16:52
+"nap" (4.75 h) over the real 23:02–06:37 night (7.42 h), so that day's HRV reads **26.5** against a
+surrounding 53–72 and resting HR **64** against 50–53 — awake daytime values scoring as sleep.
+Three such sessions exist across 27/29/30 Aug, one of them 0 hours at efficiency 0. Needs a
+wake gate on the detector, a night-picking rule in the summary, **and** a corrective recompute: the
+27th is already wrong on disk. Found while validating the Colmi ring, which is unrelated and
+isolated.
+
+### [devices] ⚠️ Colmi auto-sync is not device-verified (2026-08-30)
+
+v1.395.1 syncs the ring on app open, on resume and every 30 minutes, because four of its metrics are
+offered for the current day only and two days of daytime stress were already lost to a missed
+evening sync. BLE does not exist in the sandbox, so the timer, the visibility listener and the
+4-second resume delay are exercised by **unit tests and nothing else**. The check is one evening
+where Sync is not pressed and that day's stress still reaches the database past 18:00 — the previous
+days stop dead at 06:30 and 17:30.
 
 ### [nutrition][devices] ⚠️ The Coach plan card's save took the web fallback, not the offline-first path (LA-47, 2026-09-02)
 
