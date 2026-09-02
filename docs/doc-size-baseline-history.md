@@ -6608,11 +6608,25 @@ The index lines are the ones a future reader cannot reconstruct: that OFF's per-
 from the same bad number, so "prefer `_100g`" is not a fix; and that the check and its 15% limit already
 existed for this exact failure. Without those two, the next person to see a wrong calorie count starts
 from the mapper again.
-## 2026-09-02 — `projectOverview.md` 9340 → 9370 (LA-47)
 
-+30 on top of BF-109's raise directly above, which landed while this branch was open. Both are
-Current Status paragraphs and neither displaces the other, so the merge kept both and the baseline
-carries the sum rather than one of them.
+## 2026-09-02 — `projectOverview.md` → 9355, `docs/implementation-backlog.md` → 15574 (LB-47)
+
++15 on the index and −2 on the backlog. The index lines are unusually expensive for a copy change, and
+they are the ones a future reader cannot reconstruct: **that LB-47's measurement was right and its
+conclusion was not**, and specifically that the toggle is not rendered at all on a real session-level
+deload because `phase: 'deload'` sets `isDeloadActive`. Without that, the next reader repeats the
+entry's inference — the numbers genuinely support it — and ships the fix it proposed, which is already
+the behaviour.
+
+The other line worth its cost is that the reachable failure needs a prescription whose `deload` flag
+and `phase` disagree, 0 of 5 so far. It marks the fix as latent rather than as a live bug closed,
+which is what stops it being struck from Known Issues on the strength of having shipped.
+## 2026-09-02 — `projectOverview.md` 9355 → 9385 (LA-47)
+
++30 on top of the two raises directly above (BF-109, then LB-47), both of which landed while this
+branch was open. All three are Current Status paragraphs and none displaces another, so each merge
+kept both sides and the baseline carries the sum rather than one of them. Re-derived from the file
+after the second merge rather than added to the previous number — the arithmetic is what drifts.
 
 The lines this branch adds are a Current Status paragraph and one Known-Issues row for
 LA-47's Coach plan card. Both are index material by the rules that govern this file: a shipped

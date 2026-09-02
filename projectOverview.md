@@ -41,6 +41,21 @@ Verified with a real Gemini turn against `pnpm dev` (three saved meals, three st
 **not device-verified**. **Q-407's `Needs:` is cleared**, so the conversational wizard is startable
 for Lane B ([journal](docs/overview/entries/2026-09-02-la-47-coach-plan-card.md)).
 
+**The `Full` override told the user it had reverted a deload when it had not (LB-47).** The entry
+asked whether BF-64's override does anything on a real session-level deload; **its measurement was
+exactly right and its conclusion was not.** Re-measured: 5 prescriptions, 1 session-level deload
+carrying 0 exercises with `preDeload`, 2 per-exercise, 0 with both — the entry's figures to the row.
+But on that prescription the toggle **is not rendered at all** (`phase: 'deload'` → `isDeloadActive`
+→ `pre-workout-screen` gates the whole control on it), so `Full` is not an override that does nothing;
+it is not offerable, and the entry's proposed fix was already the behaviour. **What is reachable is
+worse:** `deloadRevertNames` and `deloadOverrideBlocked` both return empty in that shape, and the card
+read `blocked.length === 0` as *everything reverted* — rendering *"Every exercise is back to its
+pre-deload weights and sets, and these sets count toward your 1RM."* Both clauses false, which is
+BF-8's complaint arriving from inside the fix filed to prevent it. `deloadOverrideOutcome` gives the
+card a `nothing-to-revert` state and honest copy. **BF-64 is not reverted.** Latent rather than live —
+it needs a prescription whose `deload` flag and `phase` disagree, 0 of 5 so far — and **not
+device-verified** ([journal](docs/overview/entries/2026-09-02-lb-47-deload-override-honesty.md)).
+
 **The Review sheet flags macros that disagree with their own calories (BF-109).** A scan read **173
 kcal** beside 45.7 P / 52.1 C / 13.6 F — **514** by Atwater. **The screen was right and the row is
 wrong at source:** OFF carries `energy-kcal_serving 173` on the same per-serving basis as every other

@@ -10,7 +10,7 @@ import { cn } from "@trainingai/shared/utils";
 import type { AiPrescription, PrescriptionStatus, PeriodizationPhase } from "@trainingai/shared/types/ai-periodization";
 import { LOW_CONFIDENCE_THRESHOLD } from "@trainingai/shared/ai-periodization/confidence";
 import { explainExerciseChoice } from "@trainingai/shared/ai-periodization/explain";
-import { mroundStepUp, weightStepFor } from "@/components/workout/utils";
+import { mroundStepUp, weightStepFor, type DeloadOverrideOutcome } from "@/components/workout/utils";
 import { intensityZoneForPct } from "@trainingai/shared/workout/intensity-zone";
 import { RoleChip } from "./role-chip";
 import { invalidatePrescriptionChanged } from "@/lib/cache-groups";
@@ -44,6 +44,9 @@ interface AiPrescriptionCardProps {
   /** Deloaded exercises the override could not revert (the prescription carried no `preDeload` for
    *  them). Named, because silently reverting some and not others is what would mislead. */
   overrideBlockedNames?: string[];
+  /** What the override actually did (LB-47) — `blocked.length === 0` cannot tell
+   *  "everything reverted" from "there was nothing to revert". */
+  overrideOutcome?: DeloadOverrideOutcome;
   sessionId: string;
   onStatusChange: (newStatus: PrescriptionStatus) => void;
   onPhaseChanged?: () => void;
@@ -62,6 +65,7 @@ export function AiPrescriptionCard({
   onPhaseChanged,
   overrideFull = false,
   overrideBlockedNames = [],
+  overrideOutcome = 'none',
 }: AiPrescriptionCardProps) {
   const router = useTransitionRouter();
   const [expanded, setExpanded] = useState(prescriptionStatus === 'pending');
@@ -194,9 +198,20 @@ export function AiPrescriptionCard({
             <div className="flex items-start gap-1.5 rounded-lg border border-border bg-muted/40 px-2.5 py-2">
               <TrendingUpIcon className="h-3.5 w-3.5 flex-none mt-0.5 text-muted-foreground" />
               <div className="space-y-1">
-                <p className="text-[11px] font-semibold">Running full, overriding the deload</p>
+                <p className="text-[11px] font-semibold">
+                  {overrideOutcome === 'nothing-to-revert'
+                    ? "Full is on, but these weights are unchanged"
+                    : "Running full, overriding the deload"}
+                </p>
                 <p className="text-[11px] text-muted-foreground leading-relaxed">
-                  {overrideBlockedNames.length === 0
+                  {/* LB-47. `blocked.length === 0` used to render the "every exercise is back" line
+                      for BOTH "everything reverted" and "there was nothing to revert" — and the
+                      second is what a SESSION-level deload always looks like, because its low
+                      intensities are baked into the prescription's own pcts and no exercise carries
+                      a `preDeload` block. So the card confirmed an override that had not happened. */}
+                  {overrideOutcome === 'nothing-to-revert'
+                    ? "This prescription lowered the whole session rather than individual exercises, so there are no pre-deload numbers recorded to go back to. Turning Full on does not change today's targets — you would need a new prescription for that."
+                    : overrideBlockedNames.length === 0
                     ? "Every exercise is back to its pre-deload weights and sets, and these sets count toward your 1RM."
                     : `Most exercises are back to their pre-deload weights and sets. ${
                         overrideBlockedNames.length === 1
