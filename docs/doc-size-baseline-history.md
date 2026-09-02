@@ -6809,7 +6809,6 @@ artefact of those three sitting in one unwrapped run of a counter that wraps at 
 place would send the next session looking for a relationship that is not there. The measurement is in
 [`docs/reviews/2026-09-02-colmi-0x73-frame-structure.md`](reviews/2026-09-02-colmi-0x73-frame-structure.md).
 
-
 ## 2026-09-02 — `projectOverview.md` → 9455, `docs/implementation-backlog.md` → 15621 (BF-107)
 
 The index grows by 13 and the backlog shrinks. Two lines earn their place and both are corrections a
@@ -6822,7 +6821,29 @@ Neither is inferable from the diff. The first looks like an over-engineered extr
 what `pushMutations` does and does not do; the second looks like an oversight unless you know it was
 checked.
 
-## 2026-09-02 — `projectOverview.md` → 9468, `docs/implementation-backlog.md` → 15613 (BF-108)
+## 2026-09-02 — `docs/implementation-backlog.md` → (see .size) (Q-510)
+
+Q-510's first action shipped, so the entry converts to a `Keep:` naming the two things that are not
+the coverage: `worn_hours_ble`, still 0 of 107 rows and needing an owner decision to populate or
+drop; and whether `minDaytimeStressHours` is too strict, which is Tuning's and cannot be asked until
+real coverage numbers accumulate on the new column.
+
+The lines that are not the `Keep:` record two facts a later reader cannot reconstruct: that NULL in
+the new column means *not evaluated* rather than zero coverage, and that the resilience upsert used
+to be skipped entirely on exactly the days the number explains — so persisting the value without
+widening that condition would have written nothing.
+
+## 2026-09-02 — `projectOverview.md` → (see .size) (Q-510)
+
+A Known-Issues row for local SQLite **v35**, which is the alternative to a device smoke run and so is
+not optional prose (CLAUDE.md, Canonical Runtime). It states the one thing that makes this row
+different from the v34 row directly below it: v35 is a plain ADD COLUMN with nothing dropped, but it
+lands on top of v34's table rebuild, so a device upgrading from v33 runs both in one pass — which is
+the combination nobody has opened.
+
+The row leaves whole when the S25 walk happens.
+
+## 2026-09-02 — `projectOverview.md` → 9483, `docs/implementation-backlog.md` → 15631 (BF-108)
 
 The index grows by 12 and the backlog shrinks. The line that earns its cost is the correction: **the
 completion path was never the gap**, and an entry that says otherwise sends the next reader to

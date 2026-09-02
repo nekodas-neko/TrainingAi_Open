@@ -14,8 +14,8 @@ silently misdirecting the next session. Update them in the same PR that consumes
 
 | Pointer | Value | Source of truth |
 |---|---|---|
-| Next free Postgres migration | **256** | `lib/data/postgres/migrations/` |
-| Local SQLite schema version | **v34** | `lib/sqlite/migrations.ts`; `lib/sqlite/__tests__/migrations.test.ts` asserts the max |
+| Next free Postgres migration | **258** | `lib/data/postgres/migrations/` |
+| Local SQLite schema version | **v35** | `lib/sqlite/migrations.ts`; `lib/sqlite/__tests__/migrations.test.ts` asserts the max |
 
 > **There is no third pointer any more.** Entry IDs are not allocated from a shared counter and
 > never were safely: a next-free pointer is a *floor*, not an authority, because it cannot see an
@@ -10490,6 +10490,24 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 ### [devices][readiness] Q-510 — resilience's missing days are the daytime-stress coverage gate, and that coverage is not persisted anywhere
 
 - **Branch:** `feat/persist-daytime-stress-coverage`
+- **⚑ THE FIRST ACTION SHIPPED 2026-09-02** — migrations **256** (column) + **257** (regenerated
+  `claude_ro` views, without which the column is invisible to the audit endpoint that motivates it).
+  `oura_daily_derived.daytime_stress_coverage_min` now records `resolutionMinutes × non-NaN buckets`,
+  the LEFT side of `final_check_stress_coverage`, which `preprocessStress` computed and discarded.
+  **NULL means NOT EVALUATED** — a missing contributor makes the orchestrator feed an empty series on
+  purpose, so a 0 there would be an artefact of that gating and would send an auditor after the
+  coverage gate when the cause was elsewhere.
+  **One thing the entry did not mention and it mattered:** the resilience upsert was skipped entirely
+  when a day produced neither an index nor a level — the exact days this number explains — so the
+  write condition was widened too. [journal](overview/entries/2026-09-02-q510-stress-coverage.md).
+- **Keep:** two things, neither of which is the coverage.
+  1. **`worn_hours_ble` — populate it or drop it.** Still **0 of 107 rows** (was 0 of 96 when this
+     entry was filed, and 0 of 79 in the 2026-08-05 review). A column that has never held a value
+     reads as an available signal in every column-listing audit. **Not decided here**: populating it
+     needs a source and dropping it is destructive, so it wants the owner.
+  2. **Whether `minDaytimeStressHours` is too strict** — Tuning's, and explicitly **not** answerable
+     until real coverage numbers accumulate on the new column. **It must not be answered by lowering
+     the constant until the score fires** (the Q-506 mistake).
 - **Plan:** none yet — **Lane A implements; Tuning proposes only.** Closes the lead Q-508 left open.
 - **Added:** 2026-08-18 · Tuning agent ·
   [`docs/reviews/2026-08-18-ble-era-input-drift.md`](reviews/2026-08-18-ble-era-input-drift.md) §2
