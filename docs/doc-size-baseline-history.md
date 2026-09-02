@@ -6537,3 +6537,14 @@ measuring the wrong thing while the guard that measures the right thing reads 3 
 
 Reversal is one number. The signal to do the real work instead of raising this again is the floor
 rising from something other than journal citations.
+
+## 2026-09-02 — `docs/implementation-backlog.md` → 15597 (Q-48 F6, Q-48 lane, Q-51 gate)
+
+Small, and two thirds of it is one struck line plus the citation that justifies striking it. Q-1b
+asserted its downstream gates were released and, further down the same entry, that they were still
+blocked — so the strike needs both quotes beside it or the next reader restores the line from the
+half they happen to hit first.
+
+The Q-51 gate note is the rest: it records **why** the measurement cannot be taken in the sandbox
+(`pnpm dev` compiles on first mount; `next start` forces SSL on the pg pool), because "needs a
+device" without the reason invites the next session to try anyway.
