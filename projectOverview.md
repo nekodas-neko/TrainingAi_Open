@@ -27,6 +27,17 @@
 **Version:** v1.436.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-09-02.
 
+**The chronic-stress refusal now leaves a number behind (TN-1).** `chronic_stress_score` has been
+NULL on every row since the model shipped — the third dormant score — and both gates countable from
+stored data pass, so the refusal is in the granular layer, which by design recomputes its
+intermediates in memory and records no reason. `chronic_stress_granular_nights` counts the nights in
+the model's own 31-night window carrying a non-empty hypnogram, rMSSD series **and** skin-temp run
+(migrations **258 + 259**, local SQLite **v36**). **`CHRONIC_STRESS_MIN_DAYS` does not move and
+nothing consults the count** — relaxing a threshold before knowing its input distribution is the
+Q-504 mistake. **NULL means NOT EVALUATED**, and **only a hand-triggered `fullHistory` pass will ever
+write a value**, which is the owner's to run
+([journal](docs/overview/entries/2026-09-02-tn1-chronic-stress-count.md)).
+
 **A guided walk's phase change now lands on the screen (BF-105).** The owner, mid-walk: *"there isn't
 enough of a queue to indicate session phase changed."* The notification was firing correctly and on
 time — what did not exist was any in-app response: `walk-active.tsx` called `hapticSuccess()` once, at
@@ -1614,6 +1625,20 @@ counts, and Save-all wrote three `saved_meals` rows with their items and stamped
 **Measured for the first time** — TN-3a's persistence half shipped, so the per-bucket series exists: **230 buckets over 9 days**. [`review`](docs/reviews/2026-09-01-recompute-wipes-completed-days.md).
 - **The series covers all 24 hours** (every hour except 07:00) and **126 of 230 — 55% — fall between 22:00 and 06:00**. Night mean **+0.266** (recovered) against day **−0.413** (stressed): **opposite signs, night in the majority**, so any daily aggregate is governed by the night/day mix as much as by stress.
 - **A Q-507 mechanism candidate, and it is the REVERSE of the one already refuted**: `corr(total buckets, stress_high_minutes)` = **−0.784** (n=9) — *fewer* buckets produce *more* high-stress minutes, because each bucket is scored against the day's own median. **n = 9; treat as a lead, not a result.** The refuted hypothesis used *HR sample count* (r = −0.128); bucket count is the quantity the model actually divides by.
+
+### [readiness][devices] ⚠️ Local SQLite v36 needs a `fullHistory` pass to mean anything (TN-1, 2026-09-02)
+
+**Shipped, exercised in the sandbox, and it cannot produce its number without the owner.** TN-1
+persists `chronic_stress_granular_nights` so the reason chronic stress has never scored is visible
+from data (Postgres migrations **258 + 259**, local SQLite **v36**).
+- **Only a hand-triggered `fullHistory` rollup pass reaches the chronic-stress model at all**, so
+  until one is run the column is NULL on every row. That is the expected state, not a defect.
+- **What the number will say when it exists:** **≥ 21** with the score still null puts the fault
+  inside the vendored `cumulative_stress_1_2_2` model, and TN-1 has done its job by proving it;
+  **< 21** names the granular stash as the constraint — and what to do about it is Tuning's question
+  and then the owner's, never a unilateral threshold nudge (the Q-504 mistake).
+- **v36 is a plain ADD COLUMN**, but it now sits behind v35 *and* v34's table rebuild: a device
+  upgrading from v33 runs three migrations in one pass, which is the combination nobody has opened.
 
 ### [readiness][devices] ⚠️ Local SQLite v35 has not been opened on the S25 (Q-510, 2026-09-02)
 

@@ -6934,7 +6934,23 @@ The two remedies are ranked rather than listed, and the second is written down e
 is better, because the first is a setting only the owner can reach and the second is work the repo can
 do to itself.
 
-## 2026-09-02 — `projectOverview.md` → 9532, `docs/implementation-backlog.md` → 15796 (BF-105)
+## 2026-09-02 — `projectOverview.md` → (see .size), `docs/implementation-backlog.md` → (see .size) (TN-1)
+
+Both grow, and most of the growth is one sentence repeated where it will actually be read: **only a
+hand-triggered `fullHistory` pass will ever write this number.** It sits on TN-1, on Q-525, in the
+index status paragraph and in a Known-Issues row, because the failure mode is a session finding the
+column NULL on every row and filing that as a defect — which is exactly what it is not.
+
+The other lines that earn their place say what the change deliberately did NOT do. The gate does not
+move and nothing consults the count; relaxing a threshold before knowing its input distribution is
+the Q-504 mistake and the entry says so twice for a reason. And the write had to be added to a path
+that previously wrote nothing at all — the step skipped on `score == null`, which is always — so a
+reader who assumes the count rides along with an existing write will not find it.
+
+`Gate: owner` is now a field on Q-525 rather than prose, so `next-item.js` parks it instead of
+handing it to the next implementer as ready work.
+
+## 2026-09-02 — `projectOverview.md` → 9557, `docs/implementation-backlog.md` → 15824 (BF-105)
 
 Both grow, and in both the lines that earn their cost are the two corrections to the entry's own
 plan. It says to delete the `workout-timers` channel as a dead row; `lib/notifications.ts:76` posts

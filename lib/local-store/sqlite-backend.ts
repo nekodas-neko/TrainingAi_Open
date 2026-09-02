@@ -710,6 +710,7 @@ export class SQLiteLocalStore implements LocalStore {
       resilienceGranular:             (r.resilience_granular as number) ?? null,
       resilienceConfidence:           (r.resilience_confidence as number) ?? null,
       daytimeStressCoverageMin:       (r.daytime_stress_coverage_min as number) ?? null,
+      chronicStressGranularNights:    (r.chronic_stress_granular_nights as number) ?? null,
       bdiDerived:                     (r.bdi_derived as number) ?? null,
       vascularAge:                    (r.vascular_age as number) ?? null,
       pwv:                            (r.pwv as number) ?? null,
@@ -729,8 +730,8 @@ export class SQLiteLocalStore implements LocalStore {
           daytime_stress_scaled, stress_high_minutes, recovery_high_minutes, chronic_stress_score,
           chronic_stress_contributors, resilience_level, resilience_daily_stress,
           resilience_daily_restorative_time, resilience_daily_sleep_recovery, resilience_granular,
-          resilience_confidence, daytime_stress_coverage_min, bdi_derived, vascular_age, pwv, body_comp, updated_at, sync_status)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+          resilience_confidence, daytime_stress_coverage_min, chronic_stress_granular_nights, bdi_derived, vascular_age, pwv, body_comp, updated_at, sync_status)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
        ON CONFLICT(day) DO UPDATE SET
          source=excluded.source, model_versions=excluded.model_versions, sleep_score=excluded.sleep_score,
          sleep_contributors=excluded.sleep_contributors, readiness_score=excluded.readiness_score,
@@ -748,6 +749,7 @@ export class SQLiteLocalStore implements LocalStore {
          resilience_daily_sleep_recovery=excluded.resilience_daily_sleep_recovery,
          resilience_granular=excluded.resilience_granular, resilience_confidence=excluded.resilience_confidence,
          daytime_stress_coverage_min=excluded.daytime_stress_coverage_min,
+         chronic_stress_granular_nights=excluded.chronic_stress_granular_nights,
          bdi_derived=excluded.bdi_derived, vascular_age=excluded.vascular_age, pwv=excluded.pwv,
          body_comp=excluded.body_comp, updated_at=excluded.updated_at, sync_status=excluded.sync_status`,
       [
@@ -763,7 +765,7 @@ export class SQLiteLocalStore implements LocalStore {
         record.chronicStressContributors != null ? JSON.stringify(record.chronicStressContributors) : null,
         record.resilienceLevel, record.resilienceDailyStress, record.resilienceDailyRestorativeTime,
         record.resilienceDailySleepRecovery, record.resilienceGranular, record.resilienceConfidence,
-        record.daytimeStressCoverageMin,
+        record.daytimeStressCoverageMin, record.chronicStressGranularNights,
         record.bdiDerived, record.vascularAge, record.pwv,
         record.bodyComp != null ? JSON.stringify(record.bodyComp) : null,
         record.updatedAt, record.syncStatus,
@@ -1613,8 +1615,8 @@ export class SQLiteLocalStore implements LocalStore {
             daytime_stress_scaled, stress_high_minutes, recovery_high_minutes, chronic_stress_score,
             chronic_stress_contributors, resilience_level, resilience_daily_stress,
             resilience_daily_restorative_time, resilience_daily_sleep_recovery, resilience_granular,
-            resilience_confidence, daytime_stress_coverage_min, bdi_derived, vascular_age, pwv, body_comp, updated_at, sync_status)
-         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'synced')
+            resilience_confidence, daytime_stress_coverage_min, chronic_stress_granular_nights, bdi_derived, vascular_age, pwv, body_comp, updated_at, sync_status)
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'synced')
          ON CONFLICT(day) DO UPDATE SET
            source=excluded.source, model_versions=excluded.model_versions, sleep_score=excluded.sleep_score,
            sleep_contributors=excluded.sleep_contributors, readiness_score=excluded.readiness_score,
@@ -1633,6 +1635,7 @@ export class SQLiteLocalStore implements LocalStore {
            resilience_daily_sleep_recovery=excluded.resilience_daily_sleep_recovery,
            resilience_granular=excluded.resilience_granular, resilience_confidence=excluded.resilience_confidence,
            daytime_stress_coverage_min=excluded.daytime_stress_coverage_min,
+         chronic_stress_granular_nights=excluded.chronic_stress_granular_nights,
            bdi_derived=excluded.bdi_derived, vascular_age=excluded.vascular_age, pwv=excluded.pwv,
            body_comp=excluded.body_comp, updated_at=excluded.updated_at, sync_status='synced'
          WHERE oura_daily_derived.sync_status='synced'
@@ -1654,7 +1657,7 @@ export class SQLiteLocalStore implements LocalStore {
           r.chronicStressContributors != null ? JSON.stringify(r.chronicStressContributors) : null,
           r.resilienceLevel, r.resilienceDailyStress, r.resilienceDailyRestorativeTime,
           r.resilienceDailySleepRecovery, r.resilienceGranular, r.resilienceConfidence,
-          r.daytimeStressCoverageMin,
+          r.daytimeStressCoverageMin, r.chronicStressGranularNights,
           r.bdiDerived, r.vascularAge, r.pwv,
           r.bodyComp != null ? JSON.stringify(r.bodyComp) : null,
           r.updatedAt,

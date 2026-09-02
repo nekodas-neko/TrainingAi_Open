@@ -1,0 +1,13 @@
+-- TN-1: how many nights in the chronic-stress model's 31-night window carried granular signals it
+-- could actually use.
+--
+-- `chronic_stress_score` has been NULL on every row since the model shipped. Both gates countable
+-- from stored data pass (43 summary rows against a threshold of 21; 27 of 31 nights complete at the
+-- summary level), so the refusal is inside the granular layer — and those intermediates are
+-- recomputed in memory by design, so nothing outside the pass can see it.
+--
+-- NULL means NOT EVALUATED, never zero usable nights: the step returns before the model on any pass
+-- carrying fewer than CHRONIC_STRESS_MIN_DAYS summary rows, which is every routine incremental pass
+-- (window ~3 nights). Only a hand-triggered `fullHistory` pass reaches the model, so only such a
+-- pass leaves a number here.
+ALTER TABLE oura_daily_derived ADD COLUMN IF NOT EXISTS chronic_stress_granular_nights INTEGER;
