@@ -6945,52 +6945,6 @@ design decision. See the correction at the top of that entry.
 - **Keep:** the on-device check, against `/admin/oura-ble` in the APK with real ring data spanning
   less than a full day (SpO₂/temp night-only windows are the common case). `Gate: device`.
 
-### [nutrition][platform] 🟠 BF-4 — the photo scan feels slower; every hypothesis is measured, one scan settles it
-
-- **Lane:** A
-- **✅ Gate: owner CLEARED 2026-08-30 — the scan was run** (device queue S8). Owner: *"took about
-  4 seconds from analysing photo"*, reported without complaint.
-- **✅ MEASURED AND CLOSED 2026-09-01 — and the measurement contradicts this entry's own lever.**
-  Five image scans have now run since the 1024 px bound shipped, so `payload_bytes` is populated and
-  the two regimes can be compared directly (`ai_call_log`, `section = 'nutrition-scan'`,
-  `input_tokens > 1000`):
-
-  | | n | avg input tokens | avg latency | range | avg payload |
-  |---|---:|---:|---:|---|---:|
-  | before the bound | 17 | 1,280 | **4,146 ms** | 3,498–5,013 | — |
-  | after the bound | 5 | 1,460 | **2,671 ms** | 1,978–3,828 | 82.8 KB |
-
-  **Latency fell 36% while input tokens ROSE 14%.** So the `r = +0.958` this entry rests on does not
-  survive the intervention: it was measured *within* one regime, where image size moved both numbers
-  together, and across the change they moved in opposite directions. **Input tokens were not the
-  lever.** Same lesson as CLAUDE.md's *A Correlation Across a Model Change Is Not Evidence*, one
-  layer over — a correlation inside a regime is not a prediction about changing the regime.
-- **What is NOT claimed.** n = 5 against 17, and nothing here explains *why* input tokens rose under
-  a bound that shrinks pixels — worth a look if scan latency is ever raised again, but not worth
-  chasing now that the number the owner feels has halved. The owner's *"about 4 seconds"* is also
-  wall-clock and includes the upload and client work; the model call that day measured **2,346 ms**.
-  **It stopped rather than was fixed** in the sense this entry meant — no diff was ever traced to
-  the original slowdown — but the 1024 px bound is a real change and it is what the numbers moved
-  across.
-- **Branch:** `perf/scan-latency` · **Added:** 2026-08-23 from an owner report · re-measured 2026-08-25.
-- **📄 The full investigation is
-  [`docs/reviews/2026-08-25-nutrition-scan-latency.md`](reviews/2026-08-25-nutrition-scan-latency.md)** —
-  extracted 2026-08-25 because it is *answered*, not because it is long. Read it before proposing
-  anything here; it retires four hypotheses by measurement and one of them twice.
-- **What is settled.** The model call is not the regression (measured). `maxOutputTokens` changes
-  nothing — the model was never hitting a cap. `generateObject` costs ~10% over the `generateText` +
-  `JSON.parse` it replaced, not a regression, and reverting is barred by CLAUDE.md anyway. Retries
-  are ruled out. The provider uses native JSON mode, so the schema-strategy question is answered too.
-- **What the numbers actually say.** Across all 30 production scans, latency tracks **input** tokens
-  (r = **+0.958**) and not output (r = **−0.122**). So the lever is the image payload — which is
-  exactly what the Lane B 1024 px bound targets, and **that bound has never run**: it shipped
-  2026-08-23 and the newest image-shaped scan is 2026-08-21.
-- **➡️ One photo scan answers three questions at once:** whether `input_tokens` falls from its
-  near-constant ~1,280, whether `latency_ms` falls with it, and what the upload leg costs
-  (`payload_bytes` beside `latency_ms` is the subtraction this entry exists for). `payload_bytes` is
-  NULL everywhere for the same reason — no image scan since the column shipped — and is **not** a
-  wiring defect.
-
 ### [workouts][platform] LA-21 — ✅ SHIPPED 2026-08-24: implausible session durations are culled from statistics
 
 - **Lane:** A — `packages/shared/src/health/workout-energy.ts`, `app/api/health-trends`.
@@ -14768,45 +14722,6 @@ if the transition fix means blocks now actually cycle, the picture may change.
 Note the plan's stall escalation (an exercise held two transitions running needs a reset or a swap,
 not more holding) is part of scope, not a nice-to-have — without it the feature hides a stalled lift
 indefinitely.
-
-### [sleep][platform] 🟢 Q-156 — `sleep_sessions.sleep_score` is NULL in all 69 rows — TRACED, dead column, no fix warranted
-
-- **Lane:** A
-- **Added:** 2026-08-08 · found by the production data-vs-code audit that produced Q-149 and the
-  Year Review deload bug.
-- **The measurement:** `sleep_sessions.sleep_score` is **0 non-null of 69 rows** (2026-05-26 →
-  2026-08-08). `onset_latency_sec` (53), `average_hrv_ms` (50), `efficiency` (57) and
-  `respiratory_rate` (51) are all populated on the same rows, so this is one column, not a dead table.
-- **Why it is empty:** the Oura Cloud sync writes `daily_sleep.score` into **`oura_daily`**
-  (`app/api/oura/sync/route.ts:135-142`, via `dailyMap`), never into `sleep_sessions`. The column is
-  in `upsertOuraSleep`'s column map (`slices/oura.ts:41`) but no caller supplies it.
-- **Why it matters:** `GET /api/sleep-sessions` maps and serves it anyway
-  (`app/api/sleep-sessions/route.ts:40`, `sleepScore: r.sleepScore ?? null`), and three surfaces
-  consume that payload — `app/health/sleep/sleep-content.tsx`, `session-select-content.tsx`,
-  `app/health/day/day-detail-content.tsx`. **This is the same shape as the Year Review bug fixed
-  today** (a reader trusting a column nothing populates), which is why it is filed rather than
-  assumed harmless.
-- **✅ TRACED 2026-08-08 — it is dead-column cleanup, NOT a bug. No surface renders the null.**
-  Every consumer was followed to the component that paints:
-  - `app/health/sleep/sleep-content.tsx` passes `scoreField="sleepScore"` to `HealthScoreDetail`, but
-    that component reads its score from the **readiness-score** response and the local `oura_daily`
-    mirror (`health-score-detail.tsx:143-144`, `store.getOuraDaily`) — **not** from the
-    `/api/sleep-sessions` rows it also fetches. Those rows feed the list and hypnogram only.
-  - `app/session-select/session-select-content.tsx` fetches `sleep-sessions` but never references
-    `sleepScore` at all.
-  - `app/health/day/day-detail-content.tsx:154` reads it via `/api/day-log` **behind a fallback** —
-    `s?.sleep ?? data?.sleep?.sleepScore ?? null` — so the derived score wins and the null is
-    unreachable in practice.
-- **Consequently: no fix is warranted, and none was made.** The column is inert, not harmful. Two
-  routes (`sleep-sessions:40`, `day-log:229`) map it out of habit; deleting the column needs a
-  migration (destructive, owner sign-off) and removing it from the payloads risks an unknown offline
-  consumer for zero user-visible gain. **Left alone deliberately.**
-- **The one useful follow-up, if anyone ever wants a per-night score on those payloads:** source it
-  from `oura_daily.sleep_score` or `oura_daily_derived.sleep_score`, never from this column.
-- **Note when scoping the fix:** `oura_daily` only has a sleep score for **22 of the 69** nights, so
-  populating `sleep_sessions.sleep_score` from it would fill a third of the rows at best. The BLE
-  pipeline's own derived score (`oura_daily_derived.sleep_score`, 25/82) is the other candidate
-  source. Neither makes the column complete.
 
 ### [heart-rate][workouts] Q-149 — is 15 bpm the right HRR bar for this user?
 

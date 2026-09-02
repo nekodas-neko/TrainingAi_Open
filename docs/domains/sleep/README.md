@@ -243,6 +243,17 @@ curve). **Before writing anything that treats one row as one night, call the hel
   (score, trend, weekly digest, Body Battery).
 - **`ring_timestamp_ds` is not wall-clock.** BLE-sourced sleep timing needs the ring↔UTC anchor;
   see [`docs/oura-ble-operations.md`](../../oura-ble-operations.md).
+- **`sleep_sessions.sleep_score` is a dead column — never read it, and never populate it.** It was
+  **0 non-null of 69 rows** when measured (2026-05-26 → 2026-08-08), while `onset_latency_sec`,
+  `average_hrv_ms`, `efficiency` and `respiratory_rate` on the same rows were all populated. It is in
+  `upsertOuraSleep`'s column map and no caller has ever supplied it. Two routes still map it out of
+  habit (`sleep-sessions:40`, `day-log:229`), and every consumer was traced in 2026-08-08: none
+  renders the null, so it is inert rather than harmful and was deliberately left alone — deleting the
+  column is a destructive migration for no user-visible gain. **If you ever want a per-night score on
+  those payloads, source it from `oura_daily.sleep_score` or `oura_daily_derived.sleep_score`.**
+  Neither is complete either: `oura_daily` covers **22 of 69** nights and the BLE-derived score
+  **25 of 82**, so a per-night score is a partial series whichever source you pick. (Was backlog
+  entry Q-156, removed from the queue 2026-09-02 because nothing was owed.)
 - **The displayed sleep window's END is the end of the RECORDED session, not the moment you woke.**
   `lib/sleep/actual-window.ts` trims leading awake blocks off the start but deliberately does not
   trim the trailing ones — a stretch of lying in bed after waking is still part of the session, and
