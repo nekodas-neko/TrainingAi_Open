@@ -27,6 +27,17 @@
 **Version:** v1.430.1 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-09-02.
 
+**Lane A session wrapped 2026-09-02 — ten PRs, and the finding is about the QUEUE rather than the
+code.** Handoff:
+[`docs/handoff-2026-09-02-nutrition-lane-a-session.md`](docs/handoff-2026-09-02-nutrition-lane-a-session.md).
+**Six of the eight backlog entries examined were wrong about something load-bearing** — not stale,
+wrong at filing time: a function name that does not exist (`logMealFromSaved`), a severity that does
+not reproduce (LB-48's "until the app is restarted"), a missing `Gate:` that put owner-gated planning
+at the head of a build queue, and a migration LB-18 insisted on that `listSavedMeals` had already
+made unnecessary. **Line numbers were accurate every time; names and conclusions were not.** Another
+session hit the same class independently in #789. Worth Orchestrator's attention as a filing-quality
+pattern rather than six coincidences.
+
 **`Recent` gets an unscoped source, and the migration LB-18 said it needed does not exist.** The
 owner settled the behaviour on the device — *"Recent doesnt need to be scoped to current meal
 bracket"* — and the entry said ordering foods and meals by recency **needs a Lane A schema change,
