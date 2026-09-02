@@ -1941,12 +1941,25 @@ deletes nothing on tap, which is what makes an icon-only entry point defensible 
 
 ### [nutrition][platform] LB-50 — the measured activity factor, and a prompt that tells the model something false
 
+- **Keep — THE PROMPT BUG IS FIXED (2026-09-02); the FACTOR is what is still owed.** The entry's
+  first claim was verified against the code before building and holds exactly:
+  `calculateBaseline` is `tdee = Math.round(bmr * SEDENTARY_MULTIPLIER)`
+  (`goal-recommendation.ts:188`), unconditionally, and `activityLevel` reaches only `waterMl` and
+  `stepsGoal`. The baseline line no longer names the level, and the prompt now says outright that
+  the TDEE is BMR × 1.2 and must not have an activity multiplier added. Four assertions pin it,
+  including the premise itself — if a multiplier is ever reintroduced the test fails rather than
+  quietly protecting a statement that has become false in reverse.
+- **Still owed: the exposed factor and its not-enough-data state**, which is the half BF-102's
+  picker needs. On the calibrated path `maintenanceKcal / bmr` is the activity factor; on the
+  formula path `(restingBase + avgActiveKcal) / bmr` is its measured equivalent. It needs the same
+  *"Log food on 8 more days to calibrate"* state the maintenance figure already has — a calibrated
+  factor that silently falls back to a guess is a worse picker than the one it replaces.
 - **Lane:** A — `app/api/nutrition-goals/recommend/route.ts` and the energy model.
 - **Added:** 2026-09-01 · Lane B, splitting BF-102 so its picker half has a number to show.
 
 **Two things, and the first should ship on its own whether or not the picker ever does.**
 
-- **⚠ A REAL BUG.** `app/api/nutrition-goals/recommend/route.ts:111-112` builds the prompt as
+- **✅ FIXED 2026-09-02 — was a real bug.** `app/api/nutrition-goals/recommend/route.ts:111-112` builds the prompt as
   *`Baseline (Katch-McArdle, lean mass Xkg, activity level "moderate"): BMR X, TDEE X…`* — which
   reads as though the TDEE were computed **for** that activity level. It was not: `calculateBaseline`
   computes `tdee = bmr × SEDENTARY_MULTIPLIER` regardless, because Q-401 deleted `ACTIVITY_MULTIPLIERS`

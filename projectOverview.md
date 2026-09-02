@@ -27,6 +27,18 @@
 **Version:** v1.430.1 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-09-02.
 
+**The goal-recommendation prompt claimed an activity-scaled TDEE it never had (LB-50).** It read
+*"Baseline (Katch-McArdle, lean mass Xkg, activity level 'moderate'): BMR X, TDEE X"* — which parses
+as *computed for that level*. `calculateBaseline` is `bmr × SEDENTARY_MULTIPLIER`, unconditionally,
+since Q-401 deleted `ACTIVITY_MULTIPLIERS` precisely so a self-report cannot double-count against
+measured movement; the level reaches only `waterMl` and `stepsGoal`. The model was being handed a
+number, a false account of how it was made, an activity level and a step count — everything needed
+to "correct" for a multiplier that is not there. The prompt now says outright that the TDEE is
+BMR × 1.2 and must not be scaled, which beats merely deleting the claim: the level is still on its
+own line, so silence would leave the inference to the model. **Still owed: the exposed factor and
+its not-enough-data state**, which is what BF-102's picker needs
+([journal](docs/overview/entries/2026-09-02-recommend-prompt-tdee.md)).
+
 **The journal directory's total ceiling is 320, up from 250 — `main` had reached it and every agent
 was one PR from a hard CI block.** The standing rule puts a journal entry in every PR, so the next
 one took the count to 251 and failed. The raise is not a workaround: the check's *other* guard, the

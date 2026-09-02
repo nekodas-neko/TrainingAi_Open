@@ -6548,3 +6548,13 @@ half they happen to hit first.
 The Q-51 gate note is the rest: it records **why** the measurement cannot be taken in the sandbox
 (`pnpm dev` compiles on first mount; `next start` forces SSL on the pg pool), because "needs a
 device" without the reason invites the next session to try anyway.
+
+## 2026-09-02 — `projectOverview.md` → 9292, `docs/implementation-backlog.md` → 15610 (LB-50's prompt half shipped)
+
+The backlog grows rather than shrinks: LB-50 stays queued with a `Keep:` because only its first half
+is built, and the `Keep:` has to say which half and why the other one is not a small follow-on — an
+exposed activity factor without a not-enough-data state is a worse picker than the one it replaces.
+
+The `projectOverview` block is longer than a one-string fix warrants because the fix is not the
+interesting part. What is worth carrying is that the model was handed a number, a false account of
+how it was made, and enough context to "correct" for a multiplier that was not there.
