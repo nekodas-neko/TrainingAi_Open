@@ -388,6 +388,73 @@ below threshold and left in place for next time.
 > BF-29 (My meals), BF-30 (Meal detail), BF-31 (Edit meal) and BF-26 (Quantity). Two artboards need
 > no entry — `Tap targets` and the `srv/g` studies both shipped in Q-395a.
 
+### [nutrition] BF-109 — the barcode Review sheet is the one food surface with no macro/calorie cross-check, and the check already exists
+
+- **Lane:** B — `components/nutrition/review-step.tsx` (surface the warning) with
+  `packages/shared/src/nutrition/scan-totals.ts` already holding the logic. No new formula.
+- **Added:** 2026-09-01 · owner, on a barcode scan: *"seeing a big bug here — the calorie calculation
+  is way wrong from this why/how."*
+
+**The screen was right and the data is wrong, which is the opposite of how it reads.** The scan showed
+**173 kcal** beside **45.7 P / 52.1 C / 13.6 F** for a 350 g portion. Those macros come to **514 kcal**
+by Atwater — the stated figure is **341 kcal low**, a **197%** disagreement.
+
+**⚠ The obvious diagnosis is wrong and an implementer will reach for it first.** "Calories weren't
+scaled to the serving while the macros were" is the natural read and it is not what happened. The
+source row was fetched (OFF `9350167000490`) and it carries, on the **same** per-serving basis the app
+used for every field:
+
+    energy-kcal_serving 173      proteins_serving 45.7
+    energy-kcal_100g     49.30   carbohydrates_serving 52.1   fat_serving 13.6
+
+`offProductToNutrition` read `_serving` consistently for all of them. **The mapper is correct.** Note
+also that `energy-kcal_100g` is 49.30 — which is 173 ÷ 3.5, i.e. OFF *derived* the per-100g figure
+from the same bad number, so there is **no good field to fall back to in that row**. Open Food Facts
+is filled in field by field by different contributors and this product's energy is simply wrong at
+source.
+
+**What is actually missing is a guard this repo already wrote, for this exact failure, against this
+exact data source.** `scan-totals.ts` holds both halves:
+
+- `macroCalorieDisagreement()` — its own docstring says *"Open Food Facts is filled in field by field
+  by different contributors, so a product can state 96 kcal beside 5P/3C/10F… the row lands as-is and
+  the user picks it off a list believing both numbers"*, with `MACRO_MISMATCH_VISIBLE_LIMIT = 0.15`;
+- `sanitiseNutrition()` — rewrites calories to Atwater above a **40%** deviation and downgrades
+  `confidence`.
+
+This row is **13×** the visible limit and **5×** the rewrite threshold. It would have been flagged on
+sight anywhere either ran.
+
+**Where they run, and the one gap:** `food-database-results.tsx` (OFF text-search results) surfaces
+the disagreement; `/api/nutrition/scan` and `/api/nutrition/food-items` apply the sanitiser. The
+barcode path does neither — `/api/nutrition/barcode` returns the mapper's output unsanitised, and the
+Review sheet logs through `logFoodEntries`, which deliberately does not sanitise (`log-food.ts:80`
+says so). So the barcode is the **only** route from OFF into the diary with no cross-check on either
+end. Sibling-surface gap, not a new problem.
+
+- **Measured blast radius: none so far.** Of the owner's **11** saved `source='barcode'` items, **0**
+  disagree with their macros by more than 40% (1 of 226 `ai` items does). So this has not corrupted
+  history — the Review screen caught it, by the owner reading it. That is also the argument against
+  treating OFF as broken: most rows are fine, and this is a per-row data-quality problem.
+- **Recommendation: warn in the Review sheet, do not silently rewrite.** Use `macroCalorieDisagreement`
+  with the same 15% limit the search list uses, show what the macros come to, and offer a one-tap
+  "use 514 kcal". **Silent rewriting is the wrong call here specifically** — Review exists for the user
+  to decide, and a screen that shows one number while the store keeps another is a worse bug than the
+  one being fixed. It would also destroy the legitimate case: fibre and alcohol make some real foods
+  disagree with Atwater by 10–20%.
+- **⚠ Do not "fix" this by making the mapper prefer `_100g`.** That row's per-100g value is derived
+  from the same wrong figure, so the preference would change nothing here and would break every
+  product where the per-serving entry is the accurate one — which, on the evidence above, is most of
+  them.
+- **Consider the same treatment for `origin: 'barcode'` rows at save time**, but as a separate decision:
+  applying `sanitiseNutrition` to the log path would change what gets stored across every food surface,
+  which is a much larger blast radius than one warning banner.
+- **Verification:** scan `9350167000490` — the Review sheet shows the disagreement and offers ~514;
+  scan a product whose numbers agree (any of the sibling Core Powerfoods entries, all internally
+  consistent) and nothing is shown; a high-fibre food ~15–20% out reads as a note rather than an
+  alarm; and declining the correction still logs the label's own number.
+
+
 ### [activity] BF-107 — the walk summary has no calories tile, and the number it would show does not exist yet on that screen
 
 - **Lane:** A — the value has to reach the client before Lane B can render it; the tile itself is
@@ -13586,6 +13653,14 @@ per-field merge where an AI write has no honest source rank to claim.
 > being "readability" and becomes the thing the number actually implicates. Re-measure after, using
 > the same capture.
 
+- **Gate:** device — **added 2026-09-02 by Lane B, which reached this entry at the head of its queue
+  and could not start it.** Every number in this entry came off the S25, run by the owner (Task 3
+  says so outright: *"the owner ran it on the S25"*), and the entry's own closing instruction is
+  **"Do the measurement first"** on `/workout` first-mount. That measurement cannot be taken here:
+  against `pnpm dev` a first mount includes route compilation, and `next start` sets
+  `NODE_ENV=production`, which turns on SSL for the pg pool and cannot reach the local database.
+  So the next step is an owner capture, not a refactor — and without this field the entry sat at the
+  top of a work list offering a large refactor its own text says not to start yet.
 - **Branch:** `perf/home-nav-cold-start`
 - **Plan:** none — this entry is the spec. Task 3 is a measurement, not a build.
 - **Added:** 2026-08-02 · **renumbered from Q-50** — #1016 and #1015 both claimed 50 in parallel;
@@ -13984,7 +14059,7 @@ passes and the inventory is explicit rather than forgotten.
 | **F3** | Play Store + multi-user are stated requirements in `device-agnostic-source-architecture.md` and appear in no stage; `public-launch-checklist.md` holds one item while five launch-gating items sit in four other docs (HC declared-use-case review, privacy policy/data-safety, map attribution, one-owner BLE assumptions, `006_admin_flag.sql`) | ✅ **ANSWERED 2026-08-03: IN.** Owner: *"yes part of the plan. I want other people to be able to use this app as its really good."* So: **every write stays `user_id`-scoped, the sync engine is maintained and extended rather than reduced, and no surface may assume the owner's own device or ring.** Still to do — add Stage 8 to the goal layout and gather the five scattered launch-gating items into `public-launch-checklist.md`. The **Health Connect declared-use-case review is the long pole** (an external approval with a lead time nobody controls) and should be started well before the rest |
 | **F4** | Stage 1 is called "the spine" and defines no schema — 70 `pgTable` vs 37 local tables with no residency/ownership record. Stage 5 generates Room entities from it. Q-44 Phase 3's 22-table rename is unsequenced against it and must land *at* Stage 1 or never | Stage 1's deliverable becomes a table-by-table residency matrix (device/server/both, writer, retention tier, derived?) + the `oura_*` rename go/no-go |
 | **F5** | Stage 5 re-implements the subsystem with the worst incident history in the repo (#47/#74/#82) with no plan, no parity harness, an unowned native replacement for `scripts/check-push-mutations.js`, and a transitional *third* write path per domain | Stage 5 opens with a golden-vector parity harness driving both implementations; add the native one-write-path guard as a named task; add a "Stage 5 without Stage 6" off-ramp |
-| **F6** | Q-31/Q-32 gate on Q-1, which the owner deferred — so Stage 4 is transitively parked and nothing says so. The gate is a sequencing preference, not a technical dependency, and a Play Store listing does not require a public repo | State the deferral on Q-32; decide whether the Q-1 gate survives |
+| ~~**F6**~~ | ✅ **ANSWERED AND APPLIED 2026-09-02.** The gate is **released** — Q-49 did it (*"releases the Q-1 + Q-30 gates on Q-32, which were sequencing preferences rather than technical dependencies"*) and the public cut has happened. What was left was a stale line: **Q-1b contradicted itself**, saying the gates were released in a 2026-09-01 note and still carrying *"Q-31 and Q-32 stay ⛔ blocked behind it"* from 2026-08-02 further down. Struck, with both sides cited. There is no Q-32 *entry* to state a deferral on — it is referenced but not queued — so the edit landed where the contradiction actually was | Done |
 | ~~**F7**~~ | ✅ **ANSWERED by the owner 2026-09-01: keep web-push, build the scheduler.** The transport already works once the app has been opened; what is missing is the **server-side scheduler (E6)** that decides when to send, and that is needed under *either* transport — so it is the half that cannot be wasted. **FCM is deferred, not rejected:** it is the right answer for a Play Store listing and for reaching a closed app reliably, but migrating first would mean a Capacitor plugin, a Firebase project, native config and a new APK *and still leave the scheduler unbuilt*. Build E6, learn whether notifications earn their place, then revisit FCM with that evidence. **The gap stands and is not fixed by this decision** — until E6 exists nothing can notify anyone on a day they have not opened the app. | Build E6 (server-side scheduler) on the existing web-push transport; keep the FCM decision point at Stage 5/6, now with a stated default of "revisit after E6" |
 
 **F8 (five drifted doc claims) is already fixed in the same PR as this entry** — do not re-file it.
@@ -14176,7 +14251,13 @@ to ship *before* any native rewrite — "we can push it till we HAVE to do it."*
 - **Do not provision the second Railway `api/` service** and do not re-land the workspace split
   while other queue items exist. That infra spend stays unmade for now.
 - **Do not delete or retire this entry** as superseded — it remains on the roadmap.
-- Q-31 and Q-32 stay `⛔ blocked` behind it.
+- ~~Q-31 and Q-32 stay `⛔ blocked` behind it.~~ **Struck 2026-09-02 (Q-48 F6): this entry contradicted
+  itself.** Its own 2026-09-01 note above says *"Q-31 and Q-32 no longer wait on this — Q-49 released
+  those gates and the public cut has since happened"*, and Q-49's entry says the same from the other
+  side: it *"releases the Q-1 + Q-30 gates on Q-32, which were sequencing preferences rather than
+  technical dependencies."* The 2026-08-02 line survived the release and kept two entries reading as
+  blocked by a deferral that no longer holds. **Q-1b's own deferral stands** — only its downstream
+  gates are gone.
 
 The original framing and the research prompt for the rewrite question are still valid reading; see
 [`docs/handoff-2026-08-02-platform-offline-architecture-review.md`](../docs/handoff-2026-08-02-platform-offline-architecture-review.md)
@@ -15035,10 +15116,20 @@ a second failure nobody had separated from this one.**
 - **The fix: transfer one luminance byte per pixel, base64, computed in the page.** ZXing packs RGB
   down to luminance anyway and the ink fraction is a threshold, so nothing is lost. **The file went
   from 4.7–4.8 min to 1.8–2.0 min**, and that test from a 3.4-min timeout to **~49 s**.
-- **⚠ THE NULL DECODE IS STILL REAL — do not treat this as closed.** **1 of 10** post-fix runs failed,
-  and it failed in the **every-style loop**, on `Ingredients · centred` — not in the share-code test
-  this entry was filed against. That loop has **no retry**, which makes it the better reproduction:
-  it fails on the first attempt instead of the sixth, in ~52 s instead of ~4.8 min.
+- **⚠ THE NULL DECODE IS STILL REAL — do not treat this as closed.** **1 failure in 19 post-fix
+  runs**, and it failed in the **every-style loop**, on `Ingredients · centred` — not in the
+  share-code test this entry was filed against. That loop has **no retry**, which makes it the better
+  reproduction: it fails on the first attempt instead of the sixth, in ~52 s instead of ~4.8 min.
+- **⚠ NO DUMP HAS BEEN CAPTURED YET, and the reason is ordinary: the one failure came BEFORE the dump
+  was wired into that loop.** Twelve consecutive runs since have been green. So the offline decode —
+  this entry's actual open question — is still unanswered, and the next person to see a red here
+  should **keep the dump file** before doing anything else; it is the whole point of the
+  instrumentation.
+- **The rate changed as well as the cost.** Pre-fix the entry measured roughly 1 run in 2 across
+  eleven runs, but that sample cannot be compared directly: it was counting the every-style
+  **timeout** alongside the decode failure, and those are two different faults. Post-fix, with the
+  timeout gone, the decode alone is **~1 in 19**. Budget runs accordingly — this is now a rare flake
+  that is cheap to observe rather than a common one that was expensive.
 - **What is still established from before:** the ink at a failing attempt reads inside the normal
   0.172–0.179 band (0.1735 and 0.1775 on two captured failures), so the buffer is not degenerate; and
   a *passing* canvas decodes under all four binarizer/`TRY_HARDER` combinations, so decoder
@@ -15058,8 +15149,9 @@ a second failure nobody had separated from this one.**
   ~10%. It is a hypothesis, not a finding — the dump is what would settle it.
 - **If confirmed the fix is to reject a torn canvas in the gate, not another retry.** The retry is
   already at six attempts and the file's own comment says another one is the wrong answer.
-- **Reproduction:** run the **file**, not a single test. Post-fix it is roughly 1 run in 10, so budget
-  more runs than before — the failure got rarer as well as cheaper.
+- **Reproduction:** run the **file**, not a single test — but note the one observed post-fix failure
+  was in the every-style test, which now fails on its first attempt, so a single-test run of that one
+  may reproduce it too. Budget many runs: ~1 in 19.
 - **Piping a run through `grep` hides its output until it exits** — use `grep --line-buffered`.
 
 
