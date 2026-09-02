@@ -24,8 +24,19 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.434.2 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Version:** v1.434.3 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-09-02.
+
+**HR-recovery peak bands re-cut, and the entry's own proposal rejected (Q-516).** The `<110`
+boundary cut through the middle of the informative range — mean 60-second drop **−3.5** under 90 and
+**5.1** at 90–104 against **12.2** at 105–119 — so **42 episodes peaking 105–109 shed 11.5 bpm** and
+were dimmed as noise and dropped from the trend. **⛔ The proposed `120+` top band was not shipped:**
+it was measured over `set_hr_stats` (strength, max 132) while **HRP-2 is built** and cardio cool-downs
+reach **168**, so collapsing the top would bucket a 168 bpm cool-down with a 120 bpm lifting rest.
+Shipped `<90 · 90–104 · 105–119 · 120–149 · 150+`; only the genuinely empty `170+` went. The stale
+header comment that misled the entry (*"Phase 1 seeds exclusively from set_hr_stats"*) is corrected.
+**The honesty half is Lane B's and is NOT done** — `informativeShare` is computed and unrendered
+([journal](docs/overview/entries/2026-09-02-q516-peak-bands.md)).
 
 **The calibrated maintenance can no longer land below your own resting burn (Q-517).**
 `adaptive-tdee.ts` warns in its own header that an ungated estimate *"would tell the user their

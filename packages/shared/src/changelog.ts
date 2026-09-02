@@ -6,6 +6,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.434.3",
+    date: "2026-09-02",
+    changes: [
+      "Heart-rate recovery now counts the sets that peak in the 105-119 range instead of dimming them as noise \u2014 they shed about 11.5 bpm in the first minute, which is real recovery the chart was hiding.",
+      "The bands were also re-cut to the range your sessions actually reach, while keeping the higher bands that only cardio cooldowns get to, so a hard run and a heavy set are still compared separately.",
+    ],
+  },
+  {
     version: "1.434.2",
     date: "2026-09-02",
     changes: [
