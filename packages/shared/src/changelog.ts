@@ -6,6 +6,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.434.0",
+    date: "2026-09-02",
+    changes: [
+      "The screen you land on after a guided walk now shows the calories it burned, beside the duration and heart rate.",
+      "The figure is worked out after the walk is saved, so the tile shows a dash for a moment and then fills in \u2014 and stays a dash rather than showing zero if you finished the walk with no signal.",
+    ],
+  },
+  {
     version: "1.433.0",
     date: "2026-09-02",
     changes: [

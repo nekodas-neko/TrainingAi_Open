@@ -159,6 +159,13 @@ cause of one class was a posted step window coming from a *different stream* tha
 
 ## History
 
+- **[`docs/overview/entries/2026-09-02-bf-107-walk-calories.md`](../../overview/entries/2026-09-02-bf-107-walk-calories.md)**
+  — **BF-107 (2026-09-02).** The walk summary's calories tile. **Read this before adding any tile that
+  shows a server-derived value:** `saveActivityLog` computes the figure (the MET table is read through
+  `node:path` and cannot enter a client bundle), and on device `pushMutations` only flips the row to
+  `synced` — the value arrives on a **pull**, so a forced `pullDelta` plus a read-back is what makes it
+  appear at all. Also records that `done-activity-screen.tsx` does **not** share the gap: it navigates
+  away on save, so its grid is a pre-save draft.
 - **[`docs/overview/entries/2026-08-24-activity-log-delete-outbox.md`](../../overview/entries/2026-08-24-activity-log-delete-outbox.md)**
   — Q-328: deleting an activity was the one activity-log write with no outbox domain, so offline it
   simply failed while creating one already queued. The client writes a local tombstone and queues

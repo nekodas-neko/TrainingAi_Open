@@ -6808,3 +6808,16 @@ reasoned from were one sub-type of a container, and its central ratio ("~0.77 in
 artefact of those three sitting in one unwrapped run of a counter that wraps at 256. Leaving that in
 place would send the next session looking for a relationship that is not there. The measurement is in
 [`docs/reviews/2026-09-02-colmi-0x73-frame-structure.md`](reviews/2026-09-02-colmi-0x73-frame-structure.md).
+
+
+## 2026-09-02 — `projectOverview.md` → 9455, `docs/implementation-backlog.md` → 15621 (BF-107)
+
+The index grows by 13 and the backlog shrinks. Two lines earn their place and both are corrections a
+reader would otherwise repeat: **the device path needs a forced pull**, because a push alone never
+returns the derived figure and the tile would be a dash forever on the only runtime that matters; and
+**the entry's sibling claim was false** — `done-activity-screen.tsx` navigates away on save, so its
+grid is a pre-save draft and a calories tile there is dead on arrival.
+
+Neither is inferable from the diff. The first looks like an over-engineered extra call unless you know
+what `pushMutations` does and does not do; the second looks like an oversight unless you know it was
+checked.
