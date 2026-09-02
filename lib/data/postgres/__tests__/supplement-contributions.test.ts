@@ -15,7 +15,11 @@ const DAY = '2026-08-24'
 
 describe.skipIf(!canRun)('supplement contributions (BF-69)', () => {
   let pool: import('pg').Pool
-  let repo: import('@/lib/data/repository').Repository
+  // `WorkoutRepository`, not `Repository` — the latter does not exist, and the sibling tests that
+  // name it get away with it only because their errors predate LB-37's baseline. Typed properly
+  // here so `listSupplements` returns `SupplementWithStatus[]` rather than `any`, which is what
+  // makes the assertions below actually check anything.
+  let repo: import('@/lib/data/repository').WorkoutRepository
 
   beforeAll(async () => {
     const { getPool } = await import('@/lib/data/postgres/client')
@@ -142,7 +146,7 @@ describe.skipIf(!canRun)('supplement contributions (BF-69)', () => {
       expect(patched.stoppedOn).toBe('2026-08-30')
       expect(patched.startedOn).toBe('2026-08-01')
 
-      const delta = await repo.getSyncDelta(USER, new Date(0).toISOString())
+      const delta = await repo.getSyncDelta(USER, new Date(0))
       const row = (delta.supplements as Record<string, unknown>[]).find(r => r.id === sup.id)
       expect(row).toMatchObject({ startedOn: '2026-08-01', stoppedOn: '2026-08-30', dosePrompt: true })
     })
@@ -152,7 +156,7 @@ describe.skipIf(!canRun)('supplement contributions (BF-69)', () => {
       await repo.logSupplement(sup.id, USER, DAY)
       await addMealContribution(sup.id, 3, '00000000-0000-4000-8000-0000000f0005')
 
-      const delta = await repo.getSyncDelta(USER, new Date(0).toISOString())
+      const delta = await repo.getSyncDelta(USER, new Date(0))
       const rows = (delta.supplementLogs as Record<string, unknown>[])
         .filter(r => r.supplementId === sup.id)
       expect(rows.map(r => r.source).sort()).toEqual(['manual', 'meal'])

@@ -6417,7 +6417,18 @@ route. An implementer taking the entry at its word would build the strap half ag
 of both ends. Git cannot arbitrate the first — history starts at the public snapshot, after the
 claimed date — so the correction states what is observable and stops there.
 
-## 2026-09-01 — `projectOverview.md` → 9218, `docs/implementation-backlog.md` → 15652 (LB-31 shipped)
+## 2026-09-01 — `projectOverview.md` → 9067, `docs/implementation-backlog.md` → 15436 (LB-37 shipped)
+
+The backlog shrank: LB-37's entry carried the whole measurement argument — the method, the error-code
+breakdown, the case for a ratchet over a sweep — and that is now in the journal, where it is read
+once rather than on every queue scan. What stays is where to start, ordered by consequence.
+
+`projectOverview.md` grew 14, and the line that cannot be cut is the one about the gate itself:
+**"tsc clean" carried no information about any spec**, which is a sentence written in dozens of PR
+bodies in this repository, several of them from the same session that shipped this. A status block
+that said "test files are typechecked now" would read as a small hygiene win and lose why it matters.
+
+## 2026-09-01 — `projectOverview.md` → 9232, `docs/implementation-backlog.md` → 15645 (LB-31 shipped)
 
 The backlog shrank: LB-31 carried two findings and a long options list, and what is left is the merge
 queue plus the correction to its own mechanism. That correction is the part worth the lines — the
