@@ -240,6 +240,20 @@ Live at the time of writing (2026-07-30):
 
 ## History
 
+- **[`docs/handoff-2026-09-02-nutrition-lane-a-session.md`](../../handoff-2026-09-02-nutrition-lane-a-session.md)**
+  — 🆕 **Lane A session, 2026-09-02: ten PRs.** BF-69 stage 1 (supplement contributions, migrations
+  254/255, local SQLite v34), LB-48, LB-49's meal-log `scale`, LB-50's prompt fix, LB-18's unscoped
+  `Recent` source, plus three CI ratchets and the journal ceiling raise. **Read its Gotchas before
+  taking a nutrition entry:** six of the eight entries examined were wrong about something
+  load-bearing — including LB-18, which insisted on a migration that `listSavedMeals` had already
+  made unnecessary by deriving `lastUsedAt` from `max(food_logs.logged_at)`.
+- **[`docs/overview/entries/2026-09-02-recent-food-items-unscoped.md`](../../overview/entries/2026-09-02-recent-food-items-unscoped.md)**
+  — **LB-18's source (2026-09-02).** `listRecentFoodItems` / `getRecentFoodItems`, and `mealTypeId`
+  is now optional on `GET /api/nutrition/recent-for-meal`. Lane B's half is dropping the query param.
+- **[`docs/overview/entries/2026-09-02-meal-log-scale.md`](../../overview/entries/2026-09-02-meal-log-scale.md)**
+  — **LB-49 (2026-09-02).** `logMealItems` takes an optional `scale`, applied at write time across
+  **five** sites (the entry named three — it missed both optimistic pushes). The factor is not
+  stored, so *"I ate 1.5×"* is not recoverable afterwards; only the scaled per-item amounts are.
 - **[`docs/overview/entries/2026-09-01-scan-meal-group.md`](../../overview/entries/2026-09-01-scan-meal-group.md)**
   — 🆕 **BF-97, engine half**: a scanned meal gets a `meal_group_id` **and** its own
   `meal_group_name`, because BF-39's grouping names a group from its saved meal and a scan has none.
