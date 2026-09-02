@@ -6568,7 +6568,18 @@ deriving from `max(food_logs.logged_at)`. That belongs in the entry because the 
 otherwise plan the same migration; it is the fourth entry this session whose stated blocker did not
 survive being checked.
 
-## 2026-09-02 — `projectOverview.md` → 9317, `docs/implementation-backlog.md` → 15618 (BF-104)
+## 2026-09-02 — `projectOverview.md` → 9315, `docs/agents/state/implementation-lane-a.md` 193 → 92 (session wrap-up)
+
+The baton HALVES, and that is the rewrite rule working rather than a cut. A baton is rewritten in
+full each handover, never appended; the previous one had accreted a scan of which entries were
+startable on 2026-09-01, all of which had since moved. What replaces it is shorter because most of
+what a successor needs is now one link to the handoff.
+
+`projectOverview` grows by a block about entry quality rather than about any of the ten PRs, which
+is the right proportion: the code was mostly four-line fixes, and the reason they were four lines is
+that six of eight entries turned out to be wrong about something load-bearing.
+
+## 2026-09-02 — `projectOverview.md` → 9328, `docs/implementation-backlog.md` → 15618 (BF-104)
 
 +13 on the index, and the line that earns it is the one about the sheet's own figures. The entry did
 not anticipate that shipping a portion picker forces the detail sheet's headline and macro columns to
@@ -6579,7 +6590,7 @@ The 798-against-800 warning is the other half: `saved-meals-sheet.tsx` is not in
 so the next addition there fails as a new file over the limit rather than as a tracked hotspot, which
 is a confusing failure to meet cold.
 
-Both numbers are higher than the ones this branch first recorded (9305 / 15603, before the off-by-one between `wc -l` and the check's own count) because the
+Both numbers are higher than the ones this branch first recorded (9305 / 15603, before two rounds of merging main and the off-by-one between `wc -l` and the check's own count) because the
 recent-food-items PR landed in between and this is the post-merge count, not a second raise. Its
 entry and this one add different blocks, so the merge kept both — the additions case, not the
 backlog's two-deletions trap.
