@@ -6595,7 +6595,7 @@ recent-food-items PR landed in between and this is the post-merge count, not a s
 entry and this one add different blocks, so the merge kept both — the additions case, not the
 backlog's two-deletions trap.
 
-## 2026-09-02 — `projectOverview.md` → 9340, `docs/implementation-backlog.md` → 15572 (BF-109)
+## 2026-09-02 — `projectOverview.md` → 9340, `docs/implementation-backlog.md` → 15576 (BF-109)
 
 +12 on the index and **−46 on the backlog**, which is the more interesting half: BF-109's queue entry
 was long because it had to argue that the mapper was *correct* and the data wrong, against the obvious

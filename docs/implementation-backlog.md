@@ -390,12 +390,16 @@ below threshold and left in place for next time.
 
 ### [nutrition] BF-109 — the Review sheet's macro/calorie cross-check (shipped; a real scan and the device owed)
 
+- **Lane:** B — `components/nutrition/review-step.tsx` and `macro-calorie-warning.tsx`. The shared
+  check it calls is Lane A's and did not need touching.
 - **Keep:** two checks this branch could not make. **(a) A real barcode scan of `9350167000490`** —
   the e2e reaches the identical `ReviewStep` with the identical props by the manual road, because a
   barcode needs a camera, so what is proven is the sheet's behaviour given those numbers and not
   `/api/nutrition/barcode` delivering them. **(b) The device** — a new banner between the Calories
   field and Protein, inside a sheet that already scrolls.
-- **Verify:** device.
+- **Verify:** device — scan `9350167000490` and check the banner appears between Calories and
+  Protein without pushing `Log it` off-screen, that `Use 514 kcal` fills the field, and that a
+  sibling Core Powerfoods product (internally consistent) shows nothing.
 - **✅ SHIPPED** (`fix/bf-109-macro-calorie-warning`, 2026-09-02, v1.431.1). `MacroCalorieWarning`
   under the Calories field in `review-step.tsx`, reusing `macroCalorieDisagreement` and
   `MACRO_MISMATCH_VISIBLE_LIMIT` rather than a second copy of the 15%.
