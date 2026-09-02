@@ -6421,6 +6421,37 @@ because none of them is the change that review was for, and per **No orphaned fi
 without a queue entry is a dropped finding.*
 
 
+### [platform] LB-52 — `main` outpaces a CI cycle and auto-merge is unavailable, so every PR is a race
+
+- **Lane:** ? — neither. The fix is a repository *setting*, not code in either lane's paths.
+- **Gate:** owner — enabling branch-protection rules on `main` is the owner's call.
+- **Measured 2026-09-02, on BF-108 (#818): five merge rounds, four of them lost to the same race.**
+  `main` moved roughly every ten minutes with six agents running; a CI cycle takes five to seven. So
+  a PR opens green-in-waiting, `main` lands somebody else's merge, and the PR reads
+  `mergeable_state: dirty` before its own checks finish. Merge, resolve, push, and the next cycle can
+  lose again.
+- **It is every PR, not unlucky ones.** The conflicting files are the ones the process itself
+  requires: `package.json` and `packages/shared/src/changelog.ts` (the version bump), the two
+  `docs/doc-size/*.size` baselines, `docs/doc-size-baseline-history.md` and `projectOverview.md`.
+  Every feature PR touches all six by construction, so the collision surface is not the diff.
+- **The correct tool is unavailable.** `enable_pr_auto_merge` answers *"Protected branch rules not
+  configured for this branch."* GitHub gates auto-merge on the repo's *Allow auto-merge* setting plus
+  a branch-protection rule; `main` blocks direct pushes and requires five checks, but through a
+  mechanism this API does not see as a protection rule. Until it is available, an agent's only lever
+  is to poll and merge the instant checks go green, which is what CLAUDE.md's 2–3 minute check-in is
+  already for — and it does not close the window, it only narrows it.
+- **What to change, in order of value.** (1) Turn on *Allow auto-merge* and add a branch-protection
+  rule for `main` naming the five required checks, so `enable_pr_auto_merge` works and GitHub does the
+  waiting. (2) Failing that, take the version bump and the doc-size baselines out of the feature PR —
+  a changelog *fragment* per PR, folded by the compaction sweep, removes the two files that conflict
+  most, and CLAUDE.md already anticipates this (*"a future changelog-fragment change could remove that
+  too"*). Either one alone would have made BF-108 a single round.
+- **The cost is not correctness, it is throughput and risk.** Nothing unsound merged — the merges were
+  resolved by hand each time and the gate re-run. But each round is a full re-resolution of six files,
+  and `package.json`/`changelog.ts` are exactly the pair CLAUDE.md warns must be rebuilt whole rather
+  than spliced, because a spliced hunk silently drops the other side's entry. That has corrupted the
+  changelog before. Repeating that resolution N times per PR is where the real hazard sits.
+
 ### [platform] PS-4 — the batons are the cross-lane coordination mechanism and none of them fits on a screen
 
 - **Branch:** `docs/baton-compaction`

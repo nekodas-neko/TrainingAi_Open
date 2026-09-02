@@ -6920,3 +6920,16 @@ which is a different trigger and a different fix.
 The second is Q-450 and its boundary. A reader tidying `clearActivitySetup` into the `active` branch
 unconditionally would discard a live recording, and nothing in the diff says why the bound is `>`
 rather than `>=`.
+
+## 2026-09-02 — `docs/implementation-backlog.md` → 15770 (LB-52)
+
+The backlog grows by 31 for one entry, and the block that earns it is the one naming what was already
+tried: `enable_pr_auto_merge` is not merely unused here, it *answers with an error*, and without that
+sentence the next session's first move is to call it and lose the same ten minutes. The measurement
+belongs with it — five rounds, four lost, `main` moving faster than a CI cycle — because "merging is
+annoying" is not something an owner can act on and "the conflicting files are the six the process
+itself mandates" is.
+
+The two remedies are ranked rather than listed, and the second is written down even though the first
+is better, because the first is a setting only the owner can reach and the second is work the repo can
+do to itself.
