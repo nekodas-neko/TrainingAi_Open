@@ -6715,3 +6715,15 @@ reader would weigh them against each other instead of reading one answer.
 The lines that earn their place are the two measurements: every style logs `len=22` with the same
 token, so interleaving cannot produce different data; and eleven clean start/resume/done triples per
 run, so it does not interleave anyway. Without them the mechanism reads plausible enough to rebuild.
+
+## 2026-09-02 — `docs/implementation-backlog.md` shrinks by 3 lines (a `Verify:` misuse, corrected)
+
+No baseline raise; this is a removal. BF-105, BF-107 and BF-108 were filed with `- **Verify:** device`
+meaning *"this will need a device check once it is built"*. The field means the opposite — the
+protocol at the top of this file defines it as **shipped, and awaiting a look** — so `next-item.js`
+sorted three unbuilt entries into VERIFY, where an implementer reads them as completed residue and
+never starts them. Lane B read **READY (1)** with two of its own items hidden that way. Removing the
+bullet puts them back in READY (3); each entry already states its device requirement in its own
+verification prose, which is where an unbuilt entry belongs. The script had been printing
+`Verify device: no note — say what to look at` against two of them the whole time — a complaint about
+a field that should not have been there at all.

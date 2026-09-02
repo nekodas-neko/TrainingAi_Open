@@ -460,7 +460,6 @@ recompute has to run over the affected days once the selection is fixed.
   trivial once it does.
 - **Added:** 2026-09-01 · owner, on a completed guided walk: *"the final screen doesnt show calories
   burned."*
-- **Verify:** device
 
 **The walk is not missing its calories — the summary screen is.** `walk-summary.tsx:239-241` renders
 exactly three tiles, Duration / Avg HR / Max HR. The screenshot confirms it: 30m, 100, 117, and no
@@ -501,7 +500,6 @@ summary never re-reads the saved row.
   `components/activity/activity-screen.tsx:20-21`, `lib/stores/activity-store.ts`.
 - **Added:** 2026-09-01 · owner: *"after closing it - it still opens with the activity naming
   screen"*, with a screenshot of the Walk / Title *"Walk Home From Train"* / **Start** screen.
-- **Verify:** device
 
 **Two stores, and the wrong one is driving the screen you land on.** `Done` on the walk summary runs
 `onDone()` — which resets the **guided-walk** store, correctly — and then
@@ -590,7 +588,6 @@ while the file has not.
   note below, which is the part that looks like it needs one and doesn't.
 - **Added:** 2026-09-01 · owner, mid-walk screenshot: *"there isn't enough of a queue to indicate
   session phase changed. needs more sound and possible visually cues."*
-- **Verify:** device — notification sound, vibration and channel behaviour are all invisible in the
   web sandbox and in `pnpm dev`.
 
 **The cue exists and fires on time — this is not a missing feature or a timing bug, and an implementer
