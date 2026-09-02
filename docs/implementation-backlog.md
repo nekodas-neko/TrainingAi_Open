@@ -12002,70 +12002,33 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   Samsung's WebView — it is Chromium, so the compositor bugs (SVG wiping sibling gradients) stay
   invisible to it. See Q-252.
 
-### [platform] LB-31 — nothing runs the suite on `main`, so a defect that lands there has nothing to report it
+### [platform] LB-31 — a merge queue, if the nightly ever shows the gap is real
 
-- **Lane:** A — the fix is `.github/workflows/ci.yml` and, if the body-battery half is real,
-  `app/api/body-battery/` and `lib/health/`. Found by Lane B on #664.
+> **✅ BOTH HALVES SHIPPED 2026-09-01, and ① was diagnosed rather than hardened blind.**
+> The flaky test is fixed at its cause, and `ci.yml` gained a nightly `Tests` run against `main`
+> (`schedule: 0 17 * * *`; every other job skipped on that trigger, so a night costs one job).
+> [journal](overview/entries/2026-09-01-verify-main-nightly.md)
+>
+> - **Keep:** the merge queue, which is the real fix and much larger.
+
+- **Lane:** A
+- **⚠ The mechanism recorded here was HALF right, and the missing half is why it never reproduced.**
+  The entry said the second test's own sleep row makes the route build and persist readiness, out-
+  ranking the `sleep` rung it asserts. True — but the build is also gated on `!todaySnapshot`, and
+  **the route's snapshot write is fire-and-forget** (`repo.upsertBodyBatteryDaily(…).catch(…)`,
+  deliberately best-effort). So test 1's row usually lands before test 2 runs and gates the build
+  off; when it loses that race, the build runs and the anchor comes back `readiness`. **The whole
+  file was passing on a race between an unawaited write and the next test.**
+- **Reproduced on demand**, which the entry says an hour failed to do: run the second test alone on
+  the unstubbed file — test 1's snapshot never exists, and it fails with CI's exact message every
+  time. The fix stubs `buildReadinessPayload`, and the same isolated run then passes.
+- **The nightly is not a merge queue and does not pretend to be.** It names `main` and the merge
+  window when the combination of several independently-green PRs breaks; it does not stop that
+  combination landing. If it ever fires, that is the evidence for the larger change.
+- **⚠ Do not add a `push: [main]` trigger.** The reasoning against it in `ci.yml` is sound and this
+  deliberately does not touch it — ~11 billed minutes per merge for a result the PR run already
+  produced. Reversing the nightly is deleting the `schedule:` block and six `if:` lines.
 - **Added:** 2026-08-31 · Lane B, from a red `Tests` check that took an hour to place.
-
-**Two findings, and the second is the durable one.**
-
-**① `app/api/body-battery/__tests__/anchor-source.test.ts` failed on CI and passes everywhere else.**
-Two assertions: `anchors on our own computed sleep score when only a sleep session exists` got
-`readiness`, and `prefers today's persisted derived readiness` got **55** where it writes **77**.
-
-The mechanism is real whatever triggers it. The three tests are **cumulative on one user in
-escalating precedence**, and `route.ts:206` takes an on-demand `buildReadinessPayload` whenever
-`readinessPlausible` — `ouraToday != null || ownSleepScore != null || bodyMetrics.length > 0` — and
-**that call persists what it computes**, by design, with a comment saying so. So test 2's own sleep
-insert is enough to make `ownSleepScore` non-null, run the build, land a derived readiness in the
-row, and resolve the anchor to `readiness` instead of the `sleep` it asserts. **The test's
-precondition is destroyed by the thing it is testing.**
-
-Whether that fires depends on whether the builder judges the composite real enough to persist for a
-fixture with almost no history — and **#663 retired the Oura activity blend, which changes what goes
-into that composite.** Look there first.
-
-- **✅ It did not reproduce, and that is now measured rather than assumed.** The failed `Tests` job
-  was re-run on the identical commit and **passed** (run 33352464055, attempt 2). So the test is
-  **flaky**, not a standing defect — which retires the first reading of this, that `main` was red and
-  nobody could see it. It is not red. Say the weaker true thing.
-- **⚠ It does NOT reproduce outside CI either, and the negative results are the useful part.** Green
-  in isolation; green across the whole `app` suite; and green running the **full** suite
-  (`npx vitest run`, 677 files / 5,683 tests — CI's shape is 680) against a **freshly migrated
-  database created for the probe**. So the two obvious explanations are both dead: it is not a stale
-  local fixture, and it is not the fresh-CI-database difference. Do not spend the hour re-deriving
-  that.
-- **The test is worth hardening regardless of the trigger.** An assertion whose setup can be undone
-  by a persisting side effect of the route under test is fragile by construction. Either seed the
-  derived row the test wants and assert against that, or make the readiness build injectable so the
-  precedence ladder can be exercised one rung at a time.
-
-**② `ci.yml` has no `push: [main]` trigger, so `main` is never verified after a merge.** That is
-deliberate and its reasoning is sound and written down — `main` is protected, only reachable through
-an already-green PR, and re-running costs ~11 billed minutes per merge for a result the PR run
-already produced. **The gap it leaves is the one that bit here:** a PR is green against the `main` it
-was cut from, and nothing re-checks the *combination* after several land together. Five PRs merged
-during this one's CI runs.
-
-So a defect introduced by an interaction between two independently-green PRs would be invisible until
-the next PR merges `main` — where it surfaces as **that** PR's red check, on code its author never
-touched, with every incentive to be read as their own and re-diagnosed from scratch.
-
-**That is not what happened here** — ① turned out to be flaky, and the re-run proved it. The gap is
-still real, but this entry is evidence of the *cost of not being able to tell the two apart*, not of
-a defect on `main`. An hour went into distinguishing "flaky test" from "main is broken", and the only
-reason it took an hour is that there is no signal that would have answered it directly.
-
-- **Options, cheapest first.** A scheduled nightly run of `Tests` on `main` (no `push` trigger, so
-  no per-merge cost, and it names the merge window when something breaks). Or a merge-queue, which
-  is the real fix and much larger. Or accept it and write the symptom down where the next session
-  will look — which is the minimum this entry buys.
-- **Do not resolve this by deleting the reasoning in `ci.yml`.** The no-`push` decision is
-  well-argued; what is missing is anything that verifies `main` at all, and a nightly is not the
-  same thing as the per-merge run that was correctly rejected.
-- **Verification:** whatever ships, the check is that a deliberately broken `main` produces a red
-  signal that names `main`, rather than appearing on the next contributor's PR.
 
 ### [platform] Q-251 — a staging environment, so a migration's first real run is not production
 

@@ -42,6 +42,19 @@ number yet** — that is stage 2, Lane B's, and until it ships production still 
 1 log ever. **⚠ Not device-verified**, and the local v34 migration rebuilds a table rather than
 adding a column ([journal](docs/overview/entries/2026-09-01-supplement-contributions.md)).
 
+**A CI flake had a cause, and `main` gets a nightly (LB-31).** `anchor-source.test.ts` failed once
+on CI and nowhere else; an hour had already gone into it. The entry's diagnosis was half right — the
+second test's own sleep row does let the route build and persist a readiness that out-ranks the rung
+under test — and the missing half is what made it unreproducible: the build is also gated on
+`!todaySnapshot`, and **the route's snapshot write is fire-and-forget**, so the whole file was
+passing on a race between an unawaited write and the next test. **Reproduced on demand** by running
+the second test alone, where test 1's snapshot never exists. Separately, `ci.yml` now runs `Tests`
+against `main` nightly (every other job skipped on that trigger, so a night costs one job) — a PR is
+green against the `main` it was cut from, and nothing re-checked the combination after several
+landed; a failure now names `main` and the merge window instead of the next contributor's PR. **The
+no-`push` decision is untouched**
+([journal](docs/overview/entries/2026-09-01-verify-main-nightly.md)).
+
 **Test files are typechecked now, and they never were (LB-37).** `tsconfig.json` excluded
 `**/__tests__/**`, so across ~700 specs a test could reference a type that does not exist or assert
 against an interface that had since changed shape and `tsc` said nothing — which means the sentence
