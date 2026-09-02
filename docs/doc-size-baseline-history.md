@@ -6758,3 +6758,19 @@ first failed. The argument belongs in
 [`docs/overview/entries/2026-09-02-ps17-night-selection.md`](overview/entries/2026-09-02-ps17-night-selection.md);
 what the queue needs is that the summary does not read `sleep_sessions`, so the next person does not
 build the fix the entry originally described.
+
+## 2026-09-02 — `docs/implementation-backlog.md` 15715 → 15728 (BF-107 re-lane)
+
++13 to correct a lane. BF-107 was filed Lane A on the premise that the server-derived calorie value
+"has to reach the client before Lane B can render it"; it already reaches the client on both write
+paths, so there was no engine half and the entry sat at the head of the wrong queue.
+
+The lines are the evidence, not the argument: the four file:line references that establish the value
+already arrives, and the note that the outbox push confirms `synced` without applying the server row
+— which is why the number lands on the next pull rather than at first paint. Lane B needs those to
+avoid re-deriving them; the reasoning is in
+[`docs/overview/entries/2026-09-02-bf-107-relane.md`](overview/entries/2026-09-02-bf-107-relane.md),
+and this block was cut by a third after the check first failed.
+
+A mis-laned entry costs more than its lines: it is picked up, traced and put back by every session
+that reaches the top of that queue until someone writes down why.
