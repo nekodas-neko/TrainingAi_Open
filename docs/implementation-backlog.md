@@ -6461,6 +6461,41 @@ because none of them is the change that review was for, and per **No orphaned fi
 without a queue entry is a dropped finding.*
 
 
+### [sleep][platform] LB-53 — `oura_daily_derived` is written in occasional bulk passes, not per night
+
+- **Lane:** A — the rollup (`lib/oura-ble/rollup/**`) and whatever schedules it. Found from Lane B
+  while checking Q-529's own caveat; filing rather than building, per the lane rule.
+- **Added:** 2026-09-02 · measured against production while answering Q-529's *"re-read `computed_at`
+  the next day"*.
+- **The whole table carries four distinct `computed_at` stamps.** Not four per day — four in its
+  entire history:
+
+  | stamp (UTC) | rows | day range touched |
+  |---|---|---|
+  | 2026-09-02 21:55 | 85 | 2026-05-07 → 2026-09-03 |
+  | 2026-08-24 13:42 | 1 | 2026-08-22 |
+  | 2026-08-17 07:50 | 21 | 2026-07-08 → 2026-08-04 |
+  | 2026-07-30 03:30 | 1 | 2026-07-07 |
+
+- **Nine days with no write at all**, 2026-08-24 13:42 → 2026-09-02 21:55, across which every night
+  happened as usual. Rows exist for all of them and every one now carries the 21:55 stamp, so the
+  question this cannot answer from outside is whether those days held a stale score in the meantime
+  or no row at all. **That is the thing to measure first** — it is the difference between "scores go
+  stale" and "scores are absent until something triggers a pass".
+- **The 21:55 pass is suspicious in itself.** It landed minutes after a Railway deploy (#827) and
+  rewrote 85 rows spanning the whole history. If a *deploy* is what recomputes scores, then the
+  refresh cadence is release frequency rather than anything to do with the data — which no one would
+  choose, and which would explain the nine-day gap exactly.
+- **What it changes for the user:** Q-529 reported a score of 47 on 2026-08-20 that should have
+  settled higher. It now reads **62**. So the recompute is real, but on this evidence it is not
+  nightly, and a night's score can sit at its mid-sync value for a long time rather than the
+  ~9-minute window Q-529 assumed. **That makes Q-529's client-side marking more load-bearing, not
+  less** — the marked state may persist far longer than a few minutes.
+- **Not a duplicate of Q-529.** That is "the number on screen does not say it can still change", and
+  its Lane B half shipped 2026-09-02. This is "the number may not be recomputed for days".
+- **Caveats:** `claude_ro` is row-scoped to the owner, so this is one user's rows; and `computed_at`
+  is the only evidence available from outside — the scheduling itself is not visible from a query.
+
 ### [platform] LB-52 — `main` outpaces a CI cycle and auto-merge is unavailable, so every PR is a race
 
 - **Lane:** ? — neither. The fix is a repository *setting*, not code in either lane's paths.
@@ -11288,6 +11323,28 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   `active`/`extra_active` 12,000) are unmeasured here — only `moderate` was exercised.
 
 ### [sleep] Q-529 — a provisional sleep score is displayed as final while the night is still syncing
+
+- **✅ THE CLIENT HALF SHIPPED 2026-09-02** (`fix/mark-provisional-sleep-score`). Link 3 below — *"do
+  not render a number that will change"* — was the only part shippable without an APK, and it is
+  done on all three surfaces: the Home score chip (the existing `lowWear`/`limited` glyph, now
+  driven by a shared predicate rather than three copies of one condition), the Body tab's sleep card,
+  and the `/health/sleep` detail screen the chip leads to.
+- **⚠️ THE ENTRY'S CENTRAL CLAIM WAS STALE BY THE TIME IT WAS PICKED UP.** It says *"sleep stores no
+  equivalent [provisional flag], so partial and finished scores are indistinguishable"*. True on
+  2026-08-20; **`lib/sleep/provisional.ts` shipped for BF-83 on 2026-09-01**, and
+  `/api/sleep-sessions` has returned a per-night `provisional` flag ever since. The flag was reaching
+  the client in the JSON and being dropped by four local `SleepRow` interface copies that never
+  declared it. So the server work the entry asks for was already done and the job was the UI.
+- **The caveat is answered, and the answer is bigger than the entry expected.** It asked for a
+  re-read of `computed_at` for 2026-08-20: the score has moved **47 → 62**, so this is latency rather
+  than a missing recompute, as the caveat's alternative predicted. **But the recompute is not
+  nightly** — the whole table holds four `computed_at` stamps and there was a nine-day gap with no
+  write at all. Filed as **LB-53** (Lane A). It makes this entry's marking MORE load-bearing: the
+  provisional state may last far longer than the ~9-minute window assumed here.
+- **Keep:** links 1 and 2 — the on-open drain (native Kotlin, new APK) and the immediate re-score
+  after it. Both are Lane A, and doing 2 without 1 makes the app faster at showing stale data.
+- **Gate:** device — links 1 and 2 need an APK, and the shipped marking needs a morning where the
+  ring is genuinely mid-upload to be seen at all.
 
 - **⚠️ SCOPE CORRECTED 2026-08-20, hours after filing — the original claim was WRONG. Read this first.**
   This entry originally said the score is *never* recomputed. **It is.** Re-checked at 06:59:32:

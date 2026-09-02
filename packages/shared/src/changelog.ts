@@ -6,6 +6,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.436.1",
+    date: "2026-09-02",
+    changes: [
+      "Last night's sleep score now tells you when your ring is still sending the night through, instead of showing a number that quietly changes later. The sleep screen says what is happening; the Home tile marks it.",
+      "A night that has finished syncing is left unmarked, so the warning means something when you see it.",
+    ],
+  },
+  {
     version: "1.436.0",
     date: "2026-09-02",
     changes: [

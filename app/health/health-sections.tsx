@@ -90,6 +90,11 @@ export interface SleepRow {
   sleepPhase5Min: string | null;
   sleepStart: string | null;
   sleepEnd: string | null;
+  /** The rollup has not read far enough past this night's end to call it finished, so every figure
+   *  derived from it can still move (`lib/sleep/provisional.ts`). Optional because the local-store
+   *  fallback path has no watermark to compute it from — absent means "cannot tell", which reads
+   *  as final rather than badging every historical night. */
+  provisional?: boolean;
 }
 
 export interface HealthSectionsCtx {

@@ -80,6 +80,9 @@ interface SleepRow {
   phaseWindowStart?: string | null;
   phaseWindowEnd?: string | null;
   sleepTimeRecommendation?: string | null;
+  /** See the note on `SleepRow` in `health-sections.tsx` — absent means "cannot tell", not "still
+   *  filling", which is what the local-store fallback path returns. */
+  provisional?: boolean;
 }
 
 
