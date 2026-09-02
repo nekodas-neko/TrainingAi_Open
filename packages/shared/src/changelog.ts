@@ -6,13 +6,23 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: "1.428.0",
-    date: "2026-09-01",
+    version: "1.429.0",
+    date: "2026-09-02",
     changes: [
       "A supplement can be taken more than once in a day now, and the day adds them up instead of keeping only the last one. Until now a day held a single record, so a second dose overwrote the first.",
       "Removing one dose leaves the others alone. Before this, unticking a supplement cleared the whole day.",
       "A supplement can carry the dates you started and stopped taking it. That is what lets a day with no record mean \u0022not taking it\u0022 rather than \u0022forgot to log it\u0022 \u2014 the two used to look identical, and a run of forgotten days would read as a run of zeros.",
       "Nothing on screen has changed yet: entering an amount, and attaching a supplement to a meal, come next.",
+    ],
+  },
+  {
+    version: "1.428.0",
+    date: "2026-09-01",
+    changes: [
+      "Your meal plan now adjusts to what you have actually eaten. Log a big lunch and the meals still to come are scaled down to fit the rest of the day; eat light and they scale up. Each meal shows the new figure with the planned one beside it, so nothing is hidden and the plan itself is unchanged.",
+      "The overshoot is spread across every remaining meal rather than taken out of the next one \u2014 taking a 700 kcal lunch entirely out of dinner is honest arithmetic and produces a dinner nobody eats.",
+      "There is a floor. A meal that would drop under 250 kcal is left as planned instead, and the card says why \u2014 \u0022you're 400 kcal past today's target, so the remaining 3 meals are left as planned\u0022. A plan that tells you to eat 180 kcal for dinner gets ignored once and then always.",
+      "Nothing is logged or saved by any of this. It changes what is suggested, not what you ate.",
     ],
   },
   {
