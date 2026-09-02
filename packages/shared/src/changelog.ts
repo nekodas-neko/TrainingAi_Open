@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.430.1",
+    date: "2026-09-02",
+    changes: [
+      "Saving an RMR test now updates the Recommended calories on your Profile straight away. They briefly showed the previous resting rate before catching up.",
+    ],
+  },
+  {
     version: "1.430.0",
     date: "2026-09-02",
     changes: [

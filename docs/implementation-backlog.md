@@ -1872,26 +1872,6 @@ deletes nothing on tap, which is what makes an icon-only entry point defensible 
   sandbox** — the feature is off by default there, so the e2e has to switch it on to assert anything
   at all.
 
-### [nutrition][platform] LB-48 — saving a measured RMR does not evict the cache key two screens read
-
-- **Lane:** A — the fix is one key added to a group in `lib/cache-groups.ts`, which Lane A owns.
-- **Added:** 2026-09-01 · found while building BF-101, which made the key load-bearing on a second
-  screen.
-
-`POST /api/measured-rmr` (`components/more/clinical/measured-rmr-form.tsx`) invalidates nothing, and
-`measured-rmr` is in no group. Two screens read that key: the clinical console, which does not need
-the eviction because `onSaved(record)` updates it locally, and — since BF-101 — the Profile goals
-form, whose Recommended calories are computed from it via `personalRmr`.
-
-- **The blast radius is small and worth stating exactly, because it is smaller than the rule
-  implies.** Both reads revalidate over the network (neither passes `freshWithinTtl`), so this is
-  not hard staleness. What it costs is one app session: the goals section's fetch is keyed on
-  `user?.id` inside the persistent tab shell, so after saving an RMR test the Recommended calories
-  quote the previous resting rate until the app is restarted.
-- **The fix:** add `measured-rmr` to `invalidateGoalRecommendations()` and call that group from the
-  RMR form's success path. The group already exists and the form already has a success path.
-- **Do not "fix" it with a shorter TTL** — an effect that runs once never consults one.
-
 ### [nutrition] LB-49 — the meal-log scale argument, through the one shared write function
 
 - **Lane:** A — `packages/shared/src/nutrition/log-meal.ts`, plus the web route and the

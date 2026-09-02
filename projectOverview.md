@@ -24,8 +24,21 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.430.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Version:** v1.430.1 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-09-02.
+
+**A saved RMR test evicts the goal caches — and the entry's severity claim did not survive being
+measured (LB-48).** `measured-rmr` was in no cache group and its route invalidated nothing, so
+Profile's Recommended calories painted the previous resting rate before revalidating. The fix is the
+key joining `invalidateGoalRecommendations()` and the RMR form calling that group. **What the entry
+got wrong is worth more than the fix:** it said the stale value survived *"until the app is
+restarted"*, because the goals section fetches in a `useEffect(…, [user?.id])` inside the persistent
+tab shell. The shell does keep its five tabs mounted — but the RMR form lives at `/more/clinical`, a
+plain page outside it, and driving `/more` → `/more/clinical` → back in Chromium logged the goals
+effect **3 times then 3 more**. It remounts, so this was a first-paint flash. A `useCachedValue`
+conversion written for the claimed symptom was reverted, and a backlog entry filed on the same
+premise was withdrawn before it reached the queue
+([journal](docs/overview/entries/2026-09-02-measured-rmr-invalidation.md)).
 
 **The ring and strap batteries reach the Home header (Q-111), and the entry was wrong about both
 halves.** It claimed the ring chip was already there — **it was not**; there was no
