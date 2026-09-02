@@ -11491,6 +11491,14 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 ### [activity][heart-rate] Q-522 — the movement-per-hour contributor is saturated: it measures ring wear, not movement
 
 - **Branch:** `fix/move-hours-rest-boundary`
+- **Needs:** Q-515
+- **Gate:** owner
+- **⚠ BLOCKED IN PROSE ONLY UNTIL 2026-09-02, WHICH IS WHY IT KEPT PRESENTING AS READY.** The
+  plan line has said *"Do Q-515 first — same boundary, same root cause"* since it was filed, and
+  `next-item.js` reads fields, not sentences. Verified against the code: both consumers compute
+  `hrr = (bpm − restingHr) / reserve` and branch on `HR_REST_THRESHOLD`, so this is the same
+  boundary Q-515 is deciding — `body-battery/route.ts` and `hourly-movement.ts` line 54. It also
+  needs *"a candidate boundary, not just a code change"*, which is the owner's either way.
 - **Plan:** none yet — needs a candidate boundary, not just a code change. Evidence:
   [`docs/reviews/2026-08-19-zone-minutes-move-hours-coverage.md`](reviews/2026-08-19-zone-minutes-move-hours-coverage.md) §2.
   **Do Q-515 first** — same boundary, same root cause. Lane A implements; Tuning proposes only.
@@ -11540,6 +11548,24 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 ### [activity][heart-rate] Q-523 — zone minutes read 0 on 90% of days: the Zone 2 floor sits above where strength training lives
 
 - **Branch:** `fix/zone-minutes-floor-and-gap-cap`
+- **Gate:** owner
+- **⚠ ITS Q-516 PREMISE IS WRONG — CHECKED 2026-09-02, AND Q-516 HAS NOW SHIPPED.** This entry
+  says the Zone 2 floor is *"Q-516 in a second consumer of the same banding — resolve them
+  together or the two will drift apart"*. **They are not the same banding.** Q-516 is
+  `PEAK_BANDS` in `hr-recovery-profile.ts` (which HR you are recovering FROM); this is `ZONE_DEFS`
+  in `hr-zones.ts` (Karvonen `lowerFrac`, 0.6 for Zone 2). Different constants, different modules,
+  no shared code — they share only the observation that strength training does not reach high HR.
+  Q-516 shipped 2026-09-02 without touching anything here, so **the "resolve together"
+  instruction is void and this entry is independently actionable.**
+- **⚠ WHY IT IS OWNER-GATED ANYWAY.** Both halves of the proposed rule re-score the activity
+  pillar: re-anchoring active minutes on `targetAnchorMax` and shifting the WHO mapping to
+  moderate `[0.40, 0.60)` ×1 / vigorous `≥0.60` ×2 changes a contributor that reads ~6/100 today
+  on 53 of 59 days. **Tuning proposes; the owner signs off; Lane A implements** — and the owner's
+  quoted instruction covers the anchor half only, not the band shift.
+- **Both code premises re-verified 2026-09-02 and both hold.** `DEFAULT_MAX_GAP_SEC = 120` still
+  carries the comment *"A ring samples ~1/min"* against this ring's measured 300 s cadence, and
+  `activeMinutesFromZoneSeconds` still maps Zone 2 (≥60% reserve) to *"WHO moderate"* where
+  WHO/ACSM put moderate at 40–59%. The gap cap is the **separable** half and the cheaper one.
 - **Plan:** none yet — the threshold question needs the owner's labels (below). Evidence:
   [`docs/reviews/2026-08-19-zone-minutes-move-hours-coverage.md`](reviews/2026-08-19-zone-minutes-move-hours-coverage.md) §3–4.
   Lane A implements; Tuning proposes only.
@@ -12379,6 +12405,12 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 
 - **Lane:** A
 - **Branch:** `fix/detected-activity-has-no-source`
+- **Gate:** owner
+- **⚠ THE FIX IS A PRODUCT DECISION, NOT A CODE CHANGE (marked 2026-09-02).** The entry's own
+  Fix line asks whether detected activities should come from the BLE classifier — feeding them
+  into the existing review UI and retiring the Cloud-shaped `OuraWorkout` — or whether the card
+  and its route retire instead. Nothing in the repo can answer that, and either branch is a
+  different feature. It presented as READY because the decision lives in prose.
 - **Added:** 2026-08-14 · found while removing the Oura Cloud integration (Q-224), by checking which
   repository methods lost their last caller rather than only which ones lost their compile target.
 - **Measured, not inferred.** `upsertOuraWorkouts` had exactly one caller — the Cloud sync route. In
@@ -12574,6 +12606,12 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 
 - **Lane:** A
 - **Branch:** `perf/sync-pull-sqlite-connection-hold`
+- **Verify:** device
+- **⚠ THE ENTRY ITSELF SAYS THE SANDBOX CANNOT VERIFY IT (field added 2026-09-02).** Its closing
+  paragraph: the `_inTransaction` refactor *"lands in the file where a bad local migration has
+  twice made every read return empty, and native SQLite does not run in the sandbox"* — so it
+  *"needs the on-device smoke run in the same session, not a Known-Issues row"*. That is a
+  `Verify: device` requirement and it was stated only in prose.
 - **Added:** 2026-08-13 · found while fixing the check-in saves (#1292).
 - **⚠️ RENUMBERED `Q-214` → `Q-214a` on 2026-08-30, because the number was reused and the reuse
   was actively misleading.** `Q-214` had already shipped on 2026-08-12 — the `upsertOuraHeartrate`

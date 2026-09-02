@@ -6933,3 +6933,21 @@ itself mandates" is.
 The two remedies are ranked rather than listed, and the second is written down even though the first
 is better, because the first is a setting only the owner can reach and the second is work the repo can
 do to itself.
+
+## 2026-09-02 — `projectOverview.md` → (see .size), `docs/implementation-backlog.md` → (see .size) (queue gates)
+
+The index gains a **🔑 Waiting on the owner** section and the backlog gains four blocked-reason
+blocks. Both are the same fix for the same failure: every one of these blockers was already written
+down, in prose, inside an entry `next-item.js` was handing to implementers as READY. A sentence
+saying "Do Q-515 first" is invisible to a parser that reads fields, so the entry kept surfacing at
+the top of the queue and the block had to be re-derived by whoever picked it up.
+
+The lines that earn their place are the ones a later session would otherwise re-litigate: Q-523's
+"same banding as Q-516" claim is **wrong** (`PEAK_BANDS` in one module, `ZONE_DEFS` in another), and
+Q-516 has now shipped without touching it, so "resolve them together" is void rather than pending —
+delete that and the next session waits for something that already happened. Q-214a's `Verify: device`
+quotes the entry's own closing paragraph rather than asserting it.
+
+The index section is a table, not prose, because its job is to be scanned by the owner and kept true
+by the next sweep. Each row names where the obligation actually lives, so the table can go stale
+without the entries going stale with it.
