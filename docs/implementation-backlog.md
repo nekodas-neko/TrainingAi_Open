@@ -1872,26 +1872,6 @@ deletes nothing on tap, which is what makes an icon-only entry point defensible 
   sandbox** — the feature is off by default there, so the e2e has to switch it on to assert anything
   at all.
 
-### [nutrition][platform] LB-48 — saving a measured RMR does not evict the cache key two screens read
-
-- **Lane:** A — the fix is one key added to a group in `lib/cache-groups.ts`, which Lane A owns.
-- **Added:** 2026-09-01 · found while building BF-101, which made the key load-bearing on a second
-  screen.
-
-`POST /api/measured-rmr` (`components/more/clinical/measured-rmr-form.tsx`) invalidates nothing, and
-`measured-rmr` is in no group. Two screens read that key: the clinical console, which does not need
-the eviction because `onSaved(record)` updates it locally, and — since BF-101 — the Profile goals
-form, whose Recommended calories are computed from it via `personalRmr`.
-
-- **The blast radius is small and worth stating exactly, because it is smaller than the rule
-  implies.** Both reads revalidate over the network (neither passes `freshWithinTtl`), so this is
-  not hard staleness. What it costs is one app session: the goals section's fetch is keyed on
-  `user?.id` inside the persistent tab shell, so after saving an RMR test the Recommended calories
-  quote the previous resting rate until the app is restarted.
-- **The fix:** add `measured-rmr` to `invalidateGoalRecommendations()` and call that group from the
-  RMR form's success path. The group already exists and the form already has a success path.
-- **Do not "fix" it with a shorter TTL** — an effect that runs once never consults one.
-
 ### [nutrition] LB-49 — the meal-log scale argument, through the one shared write function
 
 - **Lane:** A — `packages/shared/src/nutrition/log-meal.ts`, plus the web route and the
@@ -6964,52 +6944,6 @@ design decision. See the correction at the top of that entry.
 - **Lane:** B
 - **Keep:** the on-device check, against `/admin/oura-ble` in the APK with real ring data spanning
   less than a full day (SpO₂/temp night-only windows are the common case). `Gate: device`.
-
-### [nutrition][platform] 🟠 BF-4 — the photo scan feels slower; every hypothesis is measured, one scan settles it
-
-- **Lane:** A
-- **✅ Gate: owner CLEARED 2026-08-30 — the scan was run** (device queue S8). Owner: *"took about
-  4 seconds from analysing photo"*, reported without complaint.
-- **✅ MEASURED AND CLOSED 2026-09-01 — and the measurement contradicts this entry's own lever.**
-  Five image scans have now run since the 1024 px bound shipped, so `payload_bytes` is populated and
-  the two regimes can be compared directly (`ai_call_log`, `section = 'nutrition-scan'`,
-  `input_tokens > 1000`):
-
-  | | n | avg input tokens | avg latency | range | avg payload |
-  |---|---:|---:|---:|---|---:|
-  | before the bound | 17 | 1,280 | **4,146 ms** | 3,498–5,013 | — |
-  | after the bound | 5 | 1,460 | **2,671 ms** | 1,978–3,828 | 82.8 KB |
-
-  **Latency fell 36% while input tokens ROSE 14%.** So the `r = +0.958` this entry rests on does not
-  survive the intervention: it was measured *within* one regime, where image size moved both numbers
-  together, and across the change they moved in opposite directions. **Input tokens were not the
-  lever.** Same lesson as CLAUDE.md's *A Correlation Across a Model Change Is Not Evidence*, one
-  layer over — a correlation inside a regime is not a prediction about changing the regime.
-- **What is NOT claimed.** n = 5 against 17, and nothing here explains *why* input tokens rose under
-  a bound that shrinks pixels — worth a look if scan latency is ever raised again, but not worth
-  chasing now that the number the owner feels has halved. The owner's *"about 4 seconds"* is also
-  wall-clock and includes the upload and client work; the model call that day measured **2,346 ms**.
-  **It stopped rather than was fixed** in the sense this entry meant — no diff was ever traced to
-  the original slowdown — but the 1024 px bound is a real change and it is what the numbers moved
-  across.
-- **Branch:** `perf/scan-latency` · **Added:** 2026-08-23 from an owner report · re-measured 2026-08-25.
-- **📄 The full investigation is
-  [`docs/reviews/2026-08-25-nutrition-scan-latency.md`](reviews/2026-08-25-nutrition-scan-latency.md)** —
-  extracted 2026-08-25 because it is *answered*, not because it is long. Read it before proposing
-  anything here; it retires four hypotheses by measurement and one of them twice.
-- **What is settled.** The model call is not the regression (measured). `maxOutputTokens` changes
-  nothing — the model was never hitting a cap. `generateObject` costs ~10% over the `generateText` +
-  `JSON.parse` it replaced, not a regression, and reverting is barred by CLAUDE.md anyway. Retries
-  are ruled out. The provider uses native JSON mode, so the schema-strategy question is answered too.
-- **What the numbers actually say.** Across all 30 production scans, latency tracks **input** tokens
-  (r = **+0.958**) and not output (r = **−0.122**). So the lever is the image payload — which is
-  exactly what the Lane B 1024 px bound targets, and **that bound has never run**: it shipped
-  2026-08-23 and the newest image-shaped scan is 2026-08-21.
-- **➡️ One photo scan answers three questions at once:** whether `input_tokens` falls from its
-  near-constant ~1,280, whether `latency_ms` falls with it, and what the upload leg costs
-  (`payload_bytes` beside `latency_ms` is the subtraction this entry exists for). `payload_bytes` is
-  NULL everywhere for the same reason — no image scan since the column shipped — and is **not** a
-  wiring defect.
 
 ### [workouts][platform] LA-21 — ✅ SHIPPED 2026-08-24: implausible session durations are culled from statistics
 
@@ -13532,54 +13466,49 @@ per-field merge where an AI write has no honest source rank to claim.
   surfaces are `/health/day` (which already draws per-session volume) or Q-112b's read-through step
   — not the evening wrap-up, where it was one more chart nobody had asked for.
 
-### [devices][app-shell] Q-111 — Home header device-battery chips (ring/strap/scale); question whether the manual refresh button is still needed
+### [devices][app-shell] Q-111 — device battery chips on the Home header (ring + strap shipped; scale is native, and one owner question)
 
-- **Lane:** B
-- **Branch:** `feat/home-device-battery-chips`
-- **Plan:** [`docs/superpowers/plans/2026-08-05-owner-ui-bug-batch.md`](../docs/superpowers/plans/2026-08-05-owner-ui-bug-batch.md) Task 26
-- **Added:** 2026-08-06 · owner wants small icon+battery chips on Home for the ring, chest strap,
-  and scale (if available) — ring always-current, strap/scale live-when-connected +
-  last-seen-when-disconnected — and asked whether the header refresh button is still needed given
-  pull-to-sync exists.
-- **✅ RING HALF DONE (2026-08-08, v1.270.30).** `oura-battery-chip.tsx` now reads
-  `/api/oura-ble/battery-latest` instead of the frozen Cloud value, and is wired into the Home
-  header beside the weather chip. It reuses the `oura-ble-battery-latest` key + `cachedFetchToday`
-  variant that `health/oura-section.tsx` already owns (a second key for one endpoint causes
-  stale/blank first paints). Two latent bugs in the same file went with it: a `readCacheSync` in a
-  `useState` lazy initializer (the documented hydration-mismatch pattern) and five hardcoded `rgb()`
-  literals now on theme tokens. Readings older than 3h render muted and say "last seen Nh ago" in
-  the aria-label rather than looking current. **The strap and scale halves below are untouched and
-  are what keeps this entry open.**
-- **⚠ TWO CORRECTIONS, 2026-09-02, from reading the tree rather than the entry. Do not plan off the
-  two bullets above without them.**
-  1. **The ring half's stated outcome is not in the tree.** There is no `oura-battery-chip.tsx` and
-     **no battery chip on the Home header** — `session-select-content.tsx` renders `WeatherChip` and
-     nothing else beside the date. The ring battery renders on **Health** and **More**
-     (`components/health/oura-section.tsx`, `components/more/oura-section.tsx`), which is where the
-     v1.270.30 fix actually landed; the changelog's own wording — *"The chip existed but was reading
-     the Oura Cloud value"* — fits a chip in the Oura section rather than a new one on Home.
-     **Git cannot settle whether it regressed or never reached Home:** history begins at the public
-     snapshot (2026-08-16), after the 2026-08-08 claim. Either way the header is empty today, so
-     treat the ring half as **open** and re-read the plan's Task 26 before building.
-  2. **The strap battery IS already read and displayed — during pairing, by a different route.**
-     `components/settings/chest-strap-pairing.tsx:87-139` reads the standard Battery Service
-     characteristic over browser BLE and renders `Battery N%`. So the claim below ("no JS call site
-     reads it") is wrong as stated: what is true is that **nothing reads `PolarBleStatus.battery`**
-     — the native service's value, delivered by `getStatus()` and the `polarStatus` listener — and
-     nothing persists either number. **That is a second source for one value**, which is the class
-     this repo keeps paying for; the chip must take the native one, and the pairing screen should be
-     made to agree rather than left as a parallel read.
-- **Very different starting points per device.** Strap: a live `battery` value already exists natively
-  (`PolarStrapService.onBattery`, exposed via `getStatus()`), and **nothing reads it or persists it**
-  — needs wiring + a "last seen" store, genuinely new work (see correction 2). Scale: **no
-  battery capability exists anywhere**, not even a one-shot native read — new BLE work, correctly
-  flagged by the owner as a stretch/"if that comes up" item, and **native, so not Lane B's**.
-- **⚑ Concrete answer to the refresh-button question, not just an opinion**: checked what each
-  does — pull-to-sync bumps `refreshTick`, which is what drives Body Battery/training-load/
-  muscle-recovery/HR-chart refresh; the manual header button does **not** bump `refreshTick` at all,
-  so it's strictly narrower than pull-to-sync, not merely redundant with it. Supports removing it and
-  reusing the header slot, though discoverability of a gesture vs. a visible button is a real
-  counter-consideration — flagged as a decision to make, not resolved here.
+- **Keep — TWO things, neither of them ordinary implementation work:**
+  1. **The device pass.** Two chips join the weather chip in a header row that already compresses
+     badly — BF-96's whole finding was that this row is where a long date runs out of width at
+     412 dp. `whitespace-nowrap shrink-0` is on all three, but whether three pills plus
+     `EEEE d MMMM` fits is a hardware question. **And the strap's live path has never executed**: it
+     needs the APK and a Polar H10, because `getPolarBle()` returns null off-device.
+  2. **The scale, and the refresh-button question — the owner's.** The scale has **no battery
+     capability anywhere**, not even a one-shot native read: it is new BLE work in Kotlin, so **not
+     Lane B's**, and the owner flagged it a stretch. Separately he asked whether the header refresh
+     button is still needed. Measured: pull-to-sync bumps `refreshTick`, which drives Body Battery,
+     training-load, muscle-recovery and the HR chart; **the manual button does not bump it at all**,
+     so it is strictly narrower, not merely redundant. That supports removing it — against the real
+     counter-consideration that a visible button is discoverable and a gesture is not. **His call.**
+- **Gate:** owner
+- **Verify:** device
+- **✅ SHIPPED** (`feat/home-device-battery-chips`, 2026-09-02, v1.430.0). `components/home/header-chips.tsx`
+  renders the weather chip plus a ring chip and a strap chip, each drawn by the shared
+  `components/device-battery-chip.tsx`. The strap's last-seen value lives in
+  `lib/stores/strap-battery.ts` and is read through `lib/hooks/use-strap-battery.ts`.
+- **⚠ The entry's own "RING HALF DONE" claim was false and is why this took a correction pass
+  first.** There was no `oura-battery-chip.tsx` and no chip on the Home header — the ring battery
+  rendered on Health and More only. Git could not arbitrate (history starts at the public snapshot,
+  after the claimed date), so the ring chip was simply built.
+- **⚠ And the strap gap was not the one described.** The entry said no JS call site reads the strap
+  battery; `chest-strap-pairing.tsx` reads the Battery Service characteristic over browser BLE while
+  pairing and renders `Battery N%`. **That read stays** — at pairing time the native service is not
+  running, so it is the only source there is — but it now **writes into the same store**, so the two
+  are one value with two writers rather than two numbers in two screens. Nothing reads
+  `PolarBleStatus.battery` was the true half, and the hook does.
+- **A stale reading is shown muted, not hidden.** A chip that vanishes on disconnect reads as "no
+  strap" rather than "not connected right now", which is a chest strap's usual state. Age goes in the
+  accessible name; the pill has room for a number and not a sentence.
+- **⚠ The header could not grow.** `session-select-content.tsx` is shrink-only in
+  `check-component-size.js`, so the row was extracted: the one `WeatherChip` dynamic-import line and
+  its one usage became `HeaderChips`, net zero, and the new chips live inside it.
+- **`useCachedValue`, not a fetch-once effect** — the header is in the persistent tab shell, so a
+  `useEffect(…, [])` would hold its first payload until the app is killed (Q-402).
+  `check-fetch-once-effects` caught the first draft doing exactly that.
+- **Added:** 2026-08-06 · owner wants small icon+battery chips on Home for the ring, chest strap and
+  scale (if available) — ring always-current, strap/scale live-when-connected +
+  last-seen-when-disconnected.
 
 ### [devices][body] Q-104 — "Weighing you…" toast still fires on a plain Home-tab visit, despite the 2026-08-01 fix
 
@@ -14793,45 +14722,6 @@ if the transition fix means blocks now actually cycle, the picture may change.
 Note the plan's stall escalation (an exercise held two transitions running needs a reset or a swap,
 not more holding) is part of scope, not a nice-to-have — without it the feature hides a stalled lift
 indefinitely.
-
-### [sleep][platform] 🟢 Q-156 — `sleep_sessions.sleep_score` is NULL in all 69 rows — TRACED, dead column, no fix warranted
-
-- **Lane:** A
-- **Added:** 2026-08-08 · found by the production data-vs-code audit that produced Q-149 and the
-  Year Review deload bug.
-- **The measurement:** `sleep_sessions.sleep_score` is **0 non-null of 69 rows** (2026-05-26 →
-  2026-08-08). `onset_latency_sec` (53), `average_hrv_ms` (50), `efficiency` (57) and
-  `respiratory_rate` (51) are all populated on the same rows, so this is one column, not a dead table.
-- **Why it is empty:** the Oura Cloud sync writes `daily_sleep.score` into **`oura_daily`**
-  (`app/api/oura/sync/route.ts:135-142`, via `dailyMap`), never into `sleep_sessions`. The column is
-  in `upsertOuraSleep`'s column map (`slices/oura.ts:41`) but no caller supplies it.
-- **Why it matters:** `GET /api/sleep-sessions` maps and serves it anyway
-  (`app/api/sleep-sessions/route.ts:40`, `sleepScore: r.sleepScore ?? null`), and three surfaces
-  consume that payload — `app/health/sleep/sleep-content.tsx`, `session-select-content.tsx`,
-  `app/health/day/day-detail-content.tsx`. **This is the same shape as the Year Review bug fixed
-  today** (a reader trusting a column nothing populates), which is why it is filed rather than
-  assumed harmless.
-- **✅ TRACED 2026-08-08 — it is dead-column cleanup, NOT a bug. No surface renders the null.**
-  Every consumer was followed to the component that paints:
-  - `app/health/sleep/sleep-content.tsx` passes `scoreField="sleepScore"` to `HealthScoreDetail`, but
-    that component reads its score from the **readiness-score** response and the local `oura_daily`
-    mirror (`health-score-detail.tsx:143-144`, `store.getOuraDaily`) — **not** from the
-    `/api/sleep-sessions` rows it also fetches. Those rows feed the list and hypnogram only.
-  - `app/session-select/session-select-content.tsx` fetches `sleep-sessions` but never references
-    `sleepScore` at all.
-  - `app/health/day/day-detail-content.tsx:154` reads it via `/api/day-log` **behind a fallback** —
-    `s?.sleep ?? data?.sleep?.sleepScore ?? null` — so the derived score wins and the null is
-    unreachable in practice.
-- **Consequently: no fix is warranted, and none was made.** The column is inert, not harmful. Two
-  routes (`sleep-sessions:40`, `day-log:229`) map it out of habit; deleting the column needs a
-  migration (destructive, owner sign-off) and removing it from the payloads risks an unknown offline
-  consumer for zero user-visible gain. **Left alone deliberately.**
-- **The one useful follow-up, if anyone ever wants a per-night score on those payloads:** source it
-  from `oura_daily.sleep_score` or `oura_daily_derived.sleep_score`, never from this column.
-- **Note when scoping the fix:** `oura_daily` only has a sleep score for **22 of the 69** nights, so
-  populating `sleep_sessions.sleep_score` from it would fill a third of the rows at best. The BLE
-  pipeline's own derived score (`oura_daily_derived.sleep_score`, 25/82) is the other candidate
-  source. Neither makes the column complete.
 
 ### [heart-rate][workouts] Q-149 — is 15 bpm the right HRR bar for this user?
 

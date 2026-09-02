@@ -6439,7 +6439,49 @@ test) is the whole reason an hour failed to reproduce it.
 not that a flaky test was fixed: the same shape — an assertion whose setup depends on a fire-and-
 forget write from a previous test — is reachable anywhere else the pattern appears.
 
-## 2026-09-02 — `docs/implementation-backlog.md` → 15646 (LB-38)
+## 2026-09-02 — `projectOverview.md` → 9247, `docs/implementation-backlog.md` → 15640 (Q-111)
+
++15 on the index, and most of it is a **correction to a claim the index itself would otherwise keep
+propagating**: Q-111 said its ring half was already on the Home header, and it was not. The next
+session to read that entry would have skipped the ring chip entirely. The strap correction is the
+same shape in the other direction — the entry said nothing read the strap battery when a pairing
+screen reads and displays it, so the real defect was two numbers in two screens rather than a
+missing read.
+
+The two owner items are the rest: the scale needs Kotlin BLE work that no lane here can do, and the
+manual refresh button question now carries its measurement — it does **not** bump `refreshTick`, so
+it is strictly narrower than pull-to-sync rather than redundant with it. Both were sitting inside a
+long entry where an owner would never find them.
+
+The backlog is flat on net: Q-111's shipped form replaced a body of roughly the same length.
+
+## 2026-09-02 — `docs/implementation-backlog.md` → 15560 (BF-4 and Q-156 removed; a ratchet DOWN)
+
+The first entry in this file that lowers a baseline rather than raising one, which is the direction
+it is supposed to move and rarely does. 85 lines came out: two entries that had concluded in their
+own text and stayed in the queue anyway — BF-4 measured and closed, Q-156 traced to "no fix is
+warranted, and none was made".
+
+Neither finding was deleted with its entry. Q-156's conclusion moved to the sleep pillar's Gotchas —
+that `sleep_sessions.sleep_score` is a dead column, and that a per-night score has to come from
+`oura_daily` or `oura_daily_derived`, neither of which is complete. BF-4's closing measurement was
+appended to its own investigation doc, where the `r = +0.958` it retracts is written down. Deleting
+a finding to shorten a queue is how it gets re-discovered in three months.
+
+## 2026-09-02 — `projectOverview.md` → 9260, `docs/implementation-backlog.md` → 15535 (LB-48 shipped)
+
+The backlog shrinks again — LB-48 removed, and an entry (LA-54) written during the same session
+withdrawn before it was ever pushed, because the premise it rested on was the one this work
+falsified.
+
+`projectOverview.md` grows by more than the fix deserves, and deliberately. The four-line change
+does not need a status block; the measurement does. An entry reasoned its way to "stale until the
+app is restarted" from a true premise about the tab shell, and the reasoning stopped one route
+short — the form that triggers the write is not in the shell. That shape (correct premise, correct
+inference, wrong scope) is the third premise failure of this session, and the block exists so the
+next reader sees the method rather than the four lines.
+
+## 2026-09-02 — `docs/implementation-backlog.md` → 15536 (LB-38)
 
 Roughly flat: LB-38's rewrite replaced a body of similar length, and what changed is which
 measurements it carries. The two falsified hypotheses stay — they are the entry's most valuable

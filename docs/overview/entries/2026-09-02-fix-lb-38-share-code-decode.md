@@ -65,3 +65,23 @@ fits the drop from roughly half of runs to roughly one in ten. The dump is what 
 
 Nothing device-visible changed. The remaining decode flake is unexplained and the entry stays open
 with the instrumentation that would explain it.
+
+### The journal directory crossed its ceiling, and this PR paid for it
+
+`docs/overview/entries/` hit **251** against a **250** total ceiling when this entry was added, so
+the gate failed here. Three unlinked entries were folded into `docs/overview/history-newest.md` and
+`git rm`'d, taking it to 249. They carried **no relative links at all**, so none of the five
+link-rewriting hazards the README warns about applied — worth recording, because the README's list
+makes a sweep sound heavier than this one was.
+
+**⚠ `history-newest.md` is 328 KB, already past the ~250 KB threshold at which the README says to
+start a new `history-*.md`.** Appending here made it larger rather than splitting it. Splitting means
+naming a fourth file in a set that is semantic rather than dated (`past` / `recent` / `newest`) and
+re-pointing the Document Map, which is Orchestrator-shaped work and not something to do inside a spec
+fix. **The next sweep should split it**, and it is recorded here rather than left for someone to
+rediscover from the file size.
+
+Also worth noting for whoever meets this next: the **total-ceiling** branch of the check does not do
+the BF-36 attribution that the foldable-limit branch does. The limit branch names whoever grew the
+directory; the ceiling branch fails whichever PR is open when the count crosses, which is the exact
+unfairness BF-36 was filed to remove — one level up.

@@ -7,6 +7,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { useUserTimezone } from '@/components/shell/user-timezone-provider'
 import { todayInTz } from '@trainingai/shared/date-utils'
 import { hapticSuccess } from '@/lib/haptics'
+import { invalidateGoalRecommendations } from '@/lib/cache-groups'
 import { CollapsibleSection } from '@/components/ui/collapsible-section'
 import { DateField, NumberField, TextField, toNullableNumber, toNullableText } from './clinical-fields'
 
@@ -71,6 +72,11 @@ export function MeasuredRmrForm({ onSaved }: { onSaved: (record: MeasuredRmrReco
       // therefore fail visibly rather than resolve into nothing — the standing rule is queue a
       // mutation *or* visibly fail, and a swallowed `.catch(() => {})` here would look like a save.
       if (!res.ok) throw new Error(String(res.status))
+      // LB-48. Through the named group, never a hand-rolled key list at the call site. This screen
+      // does not need the eviction itself — `onSaved(record)` updates it locally — but Profile's
+      // goals section reads `measured-rmr` to compute Recommended calories and would otherwise
+      // quote the previous resting rate for the rest of the app session.
+      void invalidateGoalRecommendations()
       void hapticSuccess()
       toast.success('RMR test saved')
       onSaved(record)
