@@ -6621,12 +6621,25 @@ the behaviour.
 The other line worth its cost is that the reachable failure needs a prescription whose `deload` flag
 and `phase` disagree, 0 of 5 so far. It marks the fix as latent rather than as a live bug closed,
 which is what stops it being struck from Known Issues on the strength of having shipped.
-## 2026-09-02 — `projectOverview.md` 9355 → 9385 (LA-47)
 
-+30 on top of the two raises directly above (BF-109, then LB-47), both of which landed while this
-branch was open. All three are Current Status paragraphs and none displaces another, so each merge
-kept both sides and the baseline carries the sum rather than one of them. Re-derived from the file
-after the second merge rather than added to the previous number — the arithmetic is what drifts.
+## 2026-09-02 — `projectOverview.md` → 9368, `docs/implementation-backlog.md` → 15597 (LB-38)
+
+Both grow, for a PR that ships no behaviour. The lines that earn it are the ones that stop the next
+reader repeating a mistake this session made and caught: **ink is per-style**, and comparing one
+style's figure against another's band turns a normal canvas into a mid-repaint signature. That is what
+produced a gate that was written, measured and reverted. The four measured figures live in
+`darkFraction`'s comment; the index carries only the fact that the comparison is the trap.
+
+The other line worth its cost is that the offline decode came back null under all four configurations,
+because it **eliminates** a mechanism rather than adding one — LB-38's list of what is ruled out is now
+the useful half of the entry, and the index is where a session decides whether to open it at all.
+## 2026-09-02 — `projectOverview.md` 9368 → 9397 (LA-47)
+
++29 on top of the three raises directly above (BF-109, LB-47, LB-38), all of which landed while this
+branch was open — four Current Status paragraphs written the same hour by four sessions. None
+displaces another, so each merge kept both sides and the baseline carries the sum rather than one of
+them. Re-derived from the file after each merge rather than added to the previous number; the
+arithmetic is what drifts, and this entry's own headline was wrong twice before it was measured.
 
 The lines this branch adds are a Current Status paragraph and one Known-Issues row for
 LA-47's Coach plan card. Both are index material by the rules that govern this file: a shipped

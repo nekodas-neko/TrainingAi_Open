@@ -15024,11 +15024,34 @@ a second failure nobody had separated from this one.**
   runs**, and it failed in the **every-style loop**, on `Ingredients · centred` — not in the
   share-code test this entry was filed against. That loop has **no retry**, which makes it the better
   reproduction: it fails on the first attempt instead of the sixth, in ~52 s instead of ~4.8 min.
-- **⚠ NO DUMP HAS BEEN CAPTURED YET, and the reason is ordinary: the one failure came BEFORE the dump
-  was wired into that loop.** Twelve consecutive runs since have been green. So the offline decode —
-  this entry's actual open question — is still unanswered, and the next person to see a red here
-  should **keep the dump file** before doing anything else; it is the whole point of the
-  instrumentation.
+- **✅ 2026-09-02: A DUMP WAS CAPTURED, AND IT DOES NOT DECODE OFFLINE — which is this entry's answer
+  to its own question.** First run of a fresh batch, `Ingredients · centred`, in the every-style loop
+  exactly as predicted. `node e2e/decode-share-code-dump.js` returned **null under all four**
+  binarizer × `TRY_HARDER` combinations. Per this entry's own criterion, that means **the fault is in
+  the image, not in how the decode is invoked in-run** — the last mechanism nothing had eliminated is
+  now eliminated too.
+- **⚠ AND A TORNNESS THEORY WAS BUILT ON A BAD COMPARISON AND DROPPED. Do not rebuild it.** The dump's
+  ink is **0.0807**, which against the 0.172–0.179 band recorded below looks like *half the normal
+  ink* — a textbook mid-repaint signature, and it was written up as confirming the hypothesis. **Ink
+  is per-style.** Measured on a *passing* run: `Ingredients · centred` **0.0800**, `Black band`
+  **0.1341**, `Plaque` **0.0914**, `Big code` **0.1732**. So 0.0807 is **exactly normal for the style
+  it came from**, the 0.172–0.179 band belongs to the share-code test's own style, and this entry's
+  original finding — the ink at a failing attempt is in band, so the buffer is not degenerate — was
+  right all along. Those numbers are now in `darkFraction`'s comment, which previously said "a drawn
+  share code reads ~0.17" and is what made the mistake easy.
+- **So the mid-repaint hypothesis is neither confirmed nor refuted, and the cause is still open.** A
+  gate that settled the canvas across rAF-separated reads was written, measured (~+0.5 min on the
+  file) and **reverted unshipped**: it fixes a cause that has not been established, and this entry
+  says the wrong fix here masks the flake rather than curing it.
+- **⚠ THE DUMP FILE ITSELF IS GONE, and that is on this session.** The batch loop `rm -rf`'d
+  `test-results/share-code-dumps` before every run, so the four green runs that followed destroyed
+  it. Both numbers that mattered were extracted first, so nothing above depends on it — but a
+  re-analysis needs a fresh capture. **The instruction below is now literal: copy the dump somewhere
+  outside `test-results/` before running anything else.**
+- **What is now eliminated, cumulatively:** the `> 0.01` ink floor letting a text-only canvas through;
+  `getImageData` returning a degenerate buffer; decoder configuration; in-run decode invocation; and
+  low ink as a signature. What remains is *what was drawn* — a real defect in the rendered symbol at
+  that moment, cause unknown.
 - **The rate changed as well as the cost.** Pre-fix the entry measured roughly 1 run in 2 across
   eleven runs, but that sample cannot be compared directly: it was counting the every-style
   **timeout** alongside the decode failure, and those are two different faults. Post-fix, with the
