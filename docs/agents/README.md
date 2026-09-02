@@ -347,8 +347,14 @@ form is still: **write the plan, file it at the top of a lane's queue, stop.** W
 
 ## 4. Identity and handoff
 
-Each agent is a continuing role, not a session. When a session's context runs long, or the owner
-calls a reset, the agent writes its baton and a successor picks it up **under the same name**.
+Each agent is a continuing role, and now **also one continuing session** — Claude Code's automatic
+context compaction summarizes the conversation as it grows, so ordinary work continues in the same
+session indefinitely and cached tokens carry forward, rather than resetting on a new session with
+every generation. A session ending on its own context length is no longer a normal event: it only
+happens when the owner calls a reset, when the role is handed to a different session for a real
+reason, or when the container is lost outside the agent's control (crash, reclaim after
+inactivity). In any of those cases the agent writes its baton and a successor picks it up **under
+the same name** — the mechanism below is a safety net for that, not the routine path.
 
 ### The names are fixed — copy them exactly
 
@@ -454,8 +460,11 @@ The pair stays as it is: cheap, set once at each end of a session's life, and ab
 
 ### The baton: `docs/agents/state/<agent>.md`
 
-One file per agent, at a stable path, **overwritten** at every handoff. This is the first thing a
-successor reads, and it answers only: where am I, what is in flight, what is next, what is blocked.
+One file per agent, at a stable path, **overwritten** at every handoff — and, now that a handoff is
+the exception rather than the routine end of a generation, also worth refreshing periodically
+(after a batch lands, at a natural pause) purely so the other agents can see current state without
+reading a running session's full transcript. This is the first thing a successor reads, and it
+answers only: where am I, what is in flight, what is next, what is blocked.
 
 It is deliberately not a narrative. The narrative goes in a dated handoff doc
 (`docs/handoff-YYYY-MM-DD-<domain>-<title>.md`, written with the `handoff` skill) when a session
@@ -477,7 +486,10 @@ just stops the drift going the other way.
 
 ### The handoff ritual
 
-Trigger it on context pressure, on an owner reset, or on finishing a cluster:
+**Do not trigger this on context pressure — let compaction handle it and keep working in the same
+session.** Trigger it only on an owner reset, on the container/session being lost for a reason
+outside the agent's control, or when a cluster of work is genuinely closing out and the role itself
+is changing hands:
 
 1. **Land everything first.** The container is ephemeral and the repo is re-cloned each session.
    An uncommitted baton is a lost baton. If a PR is open, fold the handoff into it.

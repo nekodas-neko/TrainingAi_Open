@@ -1,6 +1,6 @@
 ---
 name: handoff
-description: Write or update the session's handoff doc in docs/ so a fresh session (or a different agent) can pick up exactly where this one left off. Use when context is getting full, when switching sessions/agents, when the context-usage hook warns, when the user says the session is wrapping up, or when the user says "handoff", "hand this off", "write a handoff", or "save context before I switch".
+description: Write or update the session's handoff doc in docs/ so a fresh session (or a different agent) can pick up exactly where this one left off. Do NOT use this just because context is getting full — Claude Code's automatic compaction handles that, and the session should keep working rather than hand off. Use when the role is genuinely changing hands (a different session/agent taking over), when a session is ending for real (owner reset, crash/container loss), when the user says the session is wrapping up, or when the user says "handoff", "hand this off", or "write a handoff".
 version: 2.0.0
 ---
 
