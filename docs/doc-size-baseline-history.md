@@ -6774,3 +6774,15 @@ and this block was cut by a third after the check first failed.
 
 A mis-laned entry costs more than its lines: it is picked up, traced and put back by every session
 that reaches the top of that queue until someone writes down why.
+
+## 2026-09-02 — `docs/implementation-backlog.md` 15728 → (see .size) (PS-19)
+
+PS-19's three comparisons ran, so the entry converts from "these were never looked at" to a `Keep:`
+carrying what the measurement could not settle: a stage mapping that looks wrong on four nights, two
+feeds that do not track Oura, and an undocumented stage code.
+
+The numbers are in the entry rather than only the review on purpose — they are what stops the next
+session re-running the same queries to decide whether the item is startable, and two of them
+(**n = 4**, **n = 6**) are the reason it is a `Keep:` and not a completion. The tables, the method and
+the caveats are in
+[`docs/reviews/2026-09-02-colmi-spo2-temp-stages.md`](reviews/2026-09-02-colmi-spo2-temp-stages.md).
