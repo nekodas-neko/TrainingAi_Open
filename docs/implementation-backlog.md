@@ -587,11 +587,15 @@ while the file has not.
   fourth size reading confirming the trend line is flat, or a correction to `CLAUDE.md`'s 0.4 MB/day.
 
 
-### [activity][app-shell] BF-105 — the interval-walk phase change fires one generic ping and nothing in-app
+### [activity][app-shell] BF-105 — the interval-walk phase change fires one generic ping and nothing in-app (in-app half shipped; the channel split needs an APK)
 
 - **Lane:** B — `components/guided-walk/walk-active.tsx`, `lib/walk/walk-cues.ts`,
-  `components/capacitor-native-init.tsx` (channel definitions). **No APK needed** — see the native
-  note below, which is the part that looks like it needs one and doesn't.
+  `components/capacitor-native-init.tsx` (channel definitions).
+- **Keep:** the channel half, which is now known to need an APK, and the device verification below.
+  The in-app half — the reported failure — shipped 2026-09-02.
+- **Gate:** device — what is left needs a new APK (an audio file in `res/raw/`) and then a listening
+  test with the phone pocketed. Neither is reachable from the sandbox. The same gate carries the
+  in-app half's check: the four cases in the verification list at the end of this entry.
 - **Added:** 2026-09-01 · owner, mid-walk screenshot: *"there isn't enough of a queue to indicate
   session phase changed. needs more sound and possible visually cues."*
   web sandbox and in `pnpm dev`.
@@ -634,6 +638,28 @@ means **new channel ids** (`walk-cue-fast` / `walk-cue-slow`), not edited settin
 channel should be deleted so the app's notification settings don't accumulate a dead row. All of that
 is JS in `capacitor-native-init.tsx`, so despite being notification-channel work it **ships through a
 Railway deploy with no APK**.
+
+**✅ THE IN-APP HALF SHIPPED 2026-09-02** (`feat/bf-105-walk-phase-cue`). A haptic per boundary,
+keyed on `active.segment.index` so it fires once per change and never on mount — the mount case
+matters because the screen remounts when a walk already in progress is reopened, and buzzing there
+announces a change that did not happen. `hapticSuccess` for fast, `hapticLight` for slow. Plus a
+vignette wash of the incoming phase's colour (`phase-change-flash.tsx`) and the phase word scaling
+in rather than swapping. The wash is a vignette rather than a full overlay because it must be caught
+by peripheral vision — the eyes are on the path — and a centred wash would dim the readout it is
+pointing at. The `walk-cues.ts:44` comment is corrected.
+
+**THE CHANNEL SPLIT NEEDS AN APK, AND THE ENTRY'S PLAN FOR IT WOULD SILENCE THE REST TIMER.**
+Two corrections, both measured rather than reasoned:
+
+1. **Do NOT delete `workout-timers`.** The entry says the old channel "should be deleted so the app's
+   notification settings don't accumulate a dead row". It is not dead — `lib/notifications.ts:76`
+   posts the workout rest-timer alert to it. Deleting it silences every rest alert in the app.
+2. **Two channels cannot differ by feel without a sound file.** The pinned plugin's `Channel` type
+   (`@capacitor/local-notifications` `definitions.d.ts`) exposes `vibration?: boolean` — a flag, not
+   a pattern. So `walk-cue-fast` and `walk-cue-slow` could only differ by one of them not vibrating
+   at all, which is worse than today. Making them distinguishable needs `sound?: string` pointing at
+   a file in `android/app/src/main/res/raw/`, **which is an APK change** — so the whole second half
+   is APK-gated, not the JS-only work this entry describes. Two short tones, ~0.4 s, distinct pitch.
 
 **Recommendation — do the in-app half first; it is where the reported failure is and it is cheap.**
 Fire on `active.segment.index` change, not on a timer: a distinct haptic per kind (`hapticSuccess` for

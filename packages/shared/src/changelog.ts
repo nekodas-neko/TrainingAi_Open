@@ -6,6 +6,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.436.0",
+    date: "2026-09-02",
+    changes: [
+      "A guided walk now tells you the phase changed. Fast and slow each get their own vibration, so you can tell which way the pace just went without taking the phone out, and the screen washes the new phase's colour past the edges instead of only swapping a word.",
+      "The cue fires on the change itself, so reopening a walk that is already running no longer buzzes as if something just happened.",
+    ],
+  },
+  {
     version: "1.435.0",
     date: "2026-09-02",
     changes: [
