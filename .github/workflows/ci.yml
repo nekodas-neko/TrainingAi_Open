@@ -22,6 +22,20 @@ on:
   pull_request:
     branches: [main]
 
+  # LB-31. A nightly run of `Tests` against `main`, and nothing else.
+  #
+  # The no-`push` decision above is still right and is not being reversed: this does NOT run per
+  # merge. What it closes is the gap that decision leaves — a PR is green against the `main` it was
+  # cut from, and nothing re-checks the COMBINATION after several land together. Five PRs merged
+  # during one run in the case that produced this entry, and an hour went into telling "flaky test"
+  # from "`main` is broken" because no signal answers that directly.
+  #
+  # A failure here names `main` and the merge window, instead of surfacing on the next contributor's
+  # PR as a red check on code its author never touched. Every job except `test` is skipped on this
+  # trigger (see each job's `if:`), so a night costs one job rather than six.
+  schedule:
+    - cron: '0 17 * * *'   # 03:00 Australia/Brisbane, after the day's merges have landed.
+
 # Cancel an in-progress run when a newer commit is pushed to the same ref —
 # avoids burning CI minutes on superseded runs (e.g. rapid successive pushes).
 concurrency:
@@ -31,6 +45,8 @@ concurrency:
 jobs:
   lint:
     name: Lint
+    # LB-31: the nightly verifies `main`'s test suite only — see the `schedule` trigger.
+    if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -85,6 +101,8 @@ jobs:
 
   build:
     name: Build
+    # LB-31: the nightly verifies `main`'s test suite only — see the `schedule` trigger.
+    if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
     env:
       NODE_OPTIONS: --max-old-space-size=4096
@@ -111,9 +129,20 @@ jobs:
           cache: 'pnpm'
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
+      # LB-37. `tsconfig.json` excludes `**/__tests__/**`, so no spec has ever been typechecked and
+      # a clean `tsc` said nothing about any of them. Shrink-only per-file baseline: every NEW spec
+      # is checked immediately; the 320 recorded errors come down as files are touched.
+      #
+      # It lives HERE and not in Custom Rules because it needs `tsc`, and Custom Rules deliberately
+      # installs nothing — every step there is a dependency-free `node scripts/*.js`, which is what
+      # keeps that job at ~25 seconds. Build already installs and already typechecks.
+      - name: Test files typecheck (shrink-only)
+        run: node scripts/check-test-typecheck.js
 
   custom-rules:
     name: Custom Rules
+    # LB-31: the nightly verifies `main`'s test suite only — see the `schedule` trigger.
+    if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -439,6 +468,8 @@ jobs:
         run: node scripts/check-render-process-recovery.js
 
   migrations:
+    # LB-31: the nightly verifies `main`'s test suite only — see the `schedule` trigger.
+    if: github.event_name != 'schedule'
     name: Migration Check
     runs-on: ubuntu-latest
     services:
@@ -487,6 +518,8 @@ jobs:
     # (flake, timeout, a dev server that never came up) are different enough that mixing them makes
     # a red CI ambiguous. It is also the only job here that runs the actual application.
     name: E2E
+    # LB-31: the nightly verifies `main`'s test suite only — see the `schedule` trigger.
+    if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
     services:
       postgres:

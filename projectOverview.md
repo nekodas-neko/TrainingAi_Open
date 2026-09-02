@@ -24,7 +24,7 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.429.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Version:** v1.430.0 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-09-02.
 
 **The ring and strap batteries reach the Home header (Q-111), and the entry was wrong about both
@@ -56,6 +56,33 @@ contribution is *unknown* and must be excluded rather than counted as 0. **Nothi
 number yet** — that is stage 2, Lane B's, and until it ships production still holds 2 supplements and
 1 log ever. **⚠ Not device-verified**, and the local v34 migration rebuilds a table rather than
 adding a column ([journal](docs/overview/entries/2026-09-01-supplement-contributions.md)).
+
+**A CI flake had a cause, and `main` gets a nightly (LB-31).** `anchor-source.test.ts` failed once
+on CI and nowhere else; an hour had already gone into it. The entry's diagnosis was half right — the
+second test's own sleep row does let the route build and persist a readiness that out-ranks the rung
+under test — and the missing half is what made it unreproducible: the build is also gated on
+`!todaySnapshot`, and **the route's snapshot write is fire-and-forget**, so the whole file was
+passing on a race between an unawaited write and the next test. **Reproduced on demand** by running
+the second test alone, where test 1's snapshot never exists. Separately, `ci.yml` now runs `Tests`
+against `main` nightly (every other job skipped on that trigger, so a night costs one job) — a PR is
+green against the `main` it was cut from, and nothing re-checked the combination after several
+landed; a failure now names `main` and the merge window instead of the next contributor's PR. **The
+no-`push` decision is untouched**
+([journal](docs/overview/entries/2026-09-01-verify-main-nightly.md)).
+
+**Test files are typechecked now, and they never were (LB-37).** `tsconfig.json` excluded
+`**/__tests__/**`, so across ~700 specs a test could reference a type that does not exist or assert
+against an interface that had since changed shape and `tsc` said nothing — which means the sentence
+*"tsc clean"*, the first gate every session runs, **carried no information about any spec**. The
+split is exact: the base project reports **0** errors, the same project with the exclusion dropped
+reports **320 across 90 files**, and every one is in a test. Shipped as a shrink-only per-file
+ratchet (`tsconfig.tests.json` + `scripts/check-test-typecheck.js`), so every NEW spec is checked
+immediately and the 320 come down as files are touched. **A real broken reference is already
+confirmed** — `lib/__tests__/ai-dynamic.test.ts` imports `../types/program`, which does not exist,
+and the spec passes. Two placement calls: a **second tsconfig** rather than editing the one
+`next build` reads, and the step in **Build** rather than Custom Rules, which installs nothing and
+would have failed CI on the entry's own suggestion
+([journal](docs/overview/entries/2026-09-01-typecheck-tests.md)).
 
 **⚠ One decision is waiting on the owner: whether the E2E job becomes a required check (Q-297).**
 **Measured rather than read — it is NOT required today:** PR #776 merged while its E2E job was still

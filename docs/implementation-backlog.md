@@ -12002,70 +12002,33 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   Samsung's WebView — it is Chromium, so the compositor bugs (SVG wiping sibling gradients) stay
   invisible to it. See Q-252.
 
-### [platform] LB-31 — nothing runs the suite on `main`, so a defect that lands there has nothing to report it
+### [platform] LB-31 — a merge queue, if the nightly ever shows the gap is real
 
-- **Lane:** A — the fix is `.github/workflows/ci.yml` and, if the body-battery half is real,
-  `app/api/body-battery/` and `lib/health/`. Found by Lane B on #664.
+> **✅ BOTH HALVES SHIPPED 2026-09-01, and ① was diagnosed rather than hardened blind.**
+> The flaky test is fixed at its cause, and `ci.yml` gained a nightly `Tests` run against `main`
+> (`schedule: 0 17 * * *`; every other job skipped on that trigger, so a night costs one job).
+> [journal](overview/entries/2026-09-01-verify-main-nightly.md)
+>
+> - **Keep:** the merge queue, which is the real fix and much larger.
+
+- **Lane:** A
+- **⚠ The mechanism recorded here was HALF right, and the missing half is why it never reproduced.**
+  The entry said the second test's own sleep row makes the route build and persist readiness, out-
+  ranking the `sleep` rung it asserts. True — but the build is also gated on `!todaySnapshot`, and
+  **the route's snapshot write is fire-and-forget** (`repo.upsertBodyBatteryDaily(…).catch(…)`,
+  deliberately best-effort). So test 1's row usually lands before test 2 runs and gates the build
+  off; when it loses that race, the build runs and the anchor comes back `readiness`. **The whole
+  file was passing on a race between an unawaited write and the next test.**
+- **Reproduced on demand**, which the entry says an hour failed to do: run the second test alone on
+  the unstubbed file — test 1's snapshot never exists, and it fails with CI's exact message every
+  time. The fix stubs `buildReadinessPayload`, and the same isolated run then passes.
+- **The nightly is not a merge queue and does not pretend to be.** It names `main` and the merge
+  window when the combination of several independently-green PRs breaks; it does not stop that
+  combination landing. If it ever fires, that is the evidence for the larger change.
+- **⚠ Do not add a `push: [main]` trigger.** The reasoning against it in `ci.yml` is sound and this
+  deliberately does not touch it — ~11 billed minutes per merge for a result the PR run already
+  produced. Reversing the nightly is deleting the `schedule:` block and six `if:` lines.
 - **Added:** 2026-08-31 · Lane B, from a red `Tests` check that took an hour to place.
-
-**Two findings, and the second is the durable one.**
-
-**① `app/api/body-battery/__tests__/anchor-source.test.ts` failed on CI and passes everywhere else.**
-Two assertions: `anchors on our own computed sleep score when only a sleep session exists` got
-`readiness`, and `prefers today's persisted derived readiness` got **55** where it writes **77**.
-
-The mechanism is real whatever triggers it. The three tests are **cumulative on one user in
-escalating precedence**, and `route.ts:206` takes an on-demand `buildReadinessPayload` whenever
-`readinessPlausible` — `ouraToday != null || ownSleepScore != null || bodyMetrics.length > 0` — and
-**that call persists what it computes**, by design, with a comment saying so. So test 2's own sleep
-insert is enough to make `ownSleepScore` non-null, run the build, land a derived readiness in the
-row, and resolve the anchor to `readiness` instead of the `sleep` it asserts. **The test's
-precondition is destroyed by the thing it is testing.**
-
-Whether that fires depends on whether the builder judges the composite real enough to persist for a
-fixture with almost no history — and **#663 retired the Oura activity blend, which changes what goes
-into that composite.** Look there first.
-
-- **✅ It did not reproduce, and that is now measured rather than assumed.** The failed `Tests` job
-  was re-run on the identical commit and **passed** (run 33352464055, attempt 2). So the test is
-  **flaky**, not a standing defect — which retires the first reading of this, that `main` was red and
-  nobody could see it. It is not red. Say the weaker true thing.
-- **⚠ It does NOT reproduce outside CI either, and the negative results are the useful part.** Green
-  in isolation; green across the whole `app` suite; and green running the **full** suite
-  (`npx vitest run`, 677 files / 5,683 tests — CI's shape is 680) against a **freshly migrated
-  database created for the probe**. So the two obvious explanations are both dead: it is not a stale
-  local fixture, and it is not the fresh-CI-database difference. Do not spend the hour re-deriving
-  that.
-- **The test is worth hardening regardless of the trigger.** An assertion whose setup can be undone
-  by a persisting side effect of the route under test is fragile by construction. Either seed the
-  derived row the test wants and assert against that, or make the readiness build injectable so the
-  precedence ladder can be exercised one rung at a time.
-
-**② `ci.yml` has no `push: [main]` trigger, so `main` is never verified after a merge.** That is
-deliberate and its reasoning is sound and written down — `main` is protected, only reachable through
-an already-green PR, and re-running costs ~11 billed minutes per merge for a result the PR run
-already produced. **The gap it leaves is the one that bit here:** a PR is green against the `main` it
-was cut from, and nothing re-checks the *combination* after several land together. Five PRs merged
-during this one's CI runs.
-
-So a defect introduced by an interaction between two independently-green PRs would be invisible until
-the next PR merges `main` — where it surfaces as **that** PR's red check, on code its author never
-touched, with every incentive to be read as their own and re-diagnosed from scratch.
-
-**That is not what happened here** — ① turned out to be flaky, and the re-run proved it. The gap is
-still real, but this entry is evidence of the *cost of not being able to tell the two apart*, not of
-a defect on `main`. An hour went into distinguishing "flaky test" from "main is broken", and the only
-reason it took an hour is that there is no signal that would have answered it directly.
-
-- **Options, cheapest first.** A scheduled nightly run of `Tests` on `main` (no `push` trigger, so
-  no per-merge cost, and it names the merge window when something breaks). Or a merge-queue, which
-  is the real fix and much larger. Or accept it and write the symptom down where the next session
-  will look — which is the minimum this entry buys.
-- **Do not resolve this by deleting the reasoning in `ci.yml`.** The no-`push` decision is
-  well-argued; what is missing is anything that verifies `main` at all, and a nightly is not the
-  same thing as the per-merge run that was correctly rejected.
-- **Verification:** whatever ships, the check is that a deliberately broken `main` produces a red
-  signal that names `main`, rather than appearing on the next contributor's PR.
 
 ### [platform] Q-251 — a staging environment, so a migration's first real run is not production
 
@@ -13586,7 +13549,7 @@ per-field merge where an AI write has no honest source rank to claim.
      counter-consideration that a visible button is discoverable and a gesture is not. **His call.**
 - **Gate:** owner
 - **Verify:** device
-- **✅ SHIPPED** (`feat/home-device-battery-chips`, 2026-09-02, v1.429.0). `components/home/header-chips.tsx`
+- **✅ SHIPPED** (`feat/home-device-battery-chips`, 2026-09-02, v1.430.0). `components/home/header-chips.tsx`
   renders the weather chip plus a ring chip and a strap chip, each drawn by the shared
   `components/device-battery-chip.tsx`. The strap's last-seen value lives in
   `lib/stores/strap-battery.ts` and is read through `lib/hooks/use-strap-battery.ts`.
@@ -15139,43 +15102,36 @@ reads.
   closes the four that exist, it does not make future collisions safe.
 
 
-### [platform] LB-37 — `tsc` typechecks nothing under `__tests__`, so "TSC_OK" has never covered a spec
+### [platform] LB-37 — bring the 320 recorded test-file type errors down
 
-- **Lane:** A — settled 2026-09-01 by the measurement below, which is what the lane was waiting on.
+> **✅ THE RATCHET SHIPPED 2026-09-01.** `tsconfig.tests.json` extends the base config and drops the
+> `**/__tests__/**` exclusion; `scripts/check-test-typecheck.js` holds a **shrink-only per-file
+> baseline** of **320 errors across 90 files**; the step runs in the **Build** job and
+> `pnpm typecheck:tests` runs it locally (`ci:local` includes it).
+> [journal](overview/entries/2026-09-01-typecheck-tests.md)
+>
+> - **Keep:** the 320 themselves. Every NEW spec is typechecked from now on, which was the value;
+>   the recorded errors come down as files are touched.
+
+- **Lane:** A
+- **Where to start, by consequence rather than by count.** The shared write path and the local store
+  are where a drifted fixture is least affordable:
+  `packages/shared/src/workout/__tests__/log-exercise.test.ts` (25),
+  `lib/data/postgres/__tests__/energy-balance-service.test.ts` (24),
+  `lib/local-store/__tests__/sqlite-backend.test.ts` (16),
+  `components/nutrition/__tests__/save-meal-tags.test.ts` (13),
+  `lib/scale-ble/__tests__/apply-reading.test.ts` (12).
+- **⚠ A real broken reference is already confirmed, and it is the case this entry was opened on.**
+  `lib/__tests__/ai-dynamic.test.ts` uses `import('../types/program').MuscleAssignment` twice, and
+  **`lib/types/program.ts` does not exist**. The spec passes. Fix that one first — it is the proof
+  that these are defects rather than noise.
+- **The commonest shapes are all "the fixture drifted from the type it stands in for":** `TS2493`
+  (indexing an empty tuple), `TS2741`/`TS2739` (a mock missing required properties), `TS2345` (a
+  mismatched argument).
+- **⚠ Do not delete a baseline row to make a file pass** — a row must come out only when the file is
+  genuinely clean, which the check enforces by failing on a stale row.
 - **Added:** 2026-08-31 · found while adding tests for LB-34, by noticing a spec that used two types
   it had never imported and still passed `tsc`.
-- **Measured, not inferred.** `tsconfig.json` carries
-  `exclude: ["node_modules", ".claude", "**/__tests__/**"]`. Appending
-  `const deliberateTypeError: number = "not a number"` to
-  `components/nutrition/__tests__/shared-meal-round-trip.test.ts` and running
-  `npx tsc --noEmit -p tsconfig.json` produced **zero** errors mentioning that file.
-- **Why it matters more than it looks.** Every session in this repo treats a clean `tsc` as the
-  first gate, and CI's Build job runs the same project. So across ~700 unit-test files, a spec may
-  reference a type that does not exist, call a function with the wrong arity, or assert against an
-  interface that has since changed shape, and nothing says so — the test simply keeps passing on
-  whatever the runtime happens to do. That is the same class as a guard that cannot fail: a check
-  whose silence carries no information.
-- **`e2e/` is NOT excluded** and is typechecked normally. The gap is unit tests only.
-- **MEASURED 2026-09-01 — the count is 282, across 83 test files.** This entry asked for the number
-  before the shape was chosen; here it is, so nobody measures it a third time.
-  Method: neutralise the `"**/__tests__/**"` exclusion, `npx tsc --noEmit`, restore, re-run for a
-  baseline. **289 total − 7 baseline = 282, and the split is exact** — all 7 baseline errors are
-  missing type packages in this sandbox (`@sentry/nextjs` ×5, `qrcode`, one `any` following from
-  them) and **none is in a test file**, so there are no false positives to argue about.
-  - **The commonest failures are the shape this entry predicted:** `TS2493` (indexing an empty
-    tuple) ×50 and `TS2741`/`TS2739` (a mock missing required properties) ×53 are both *the fixture
-    drifted from the type it stands in for*; `TS2345` ×56 is a mismatched argument. And
-    `lib/__tests__/ai-dynamic.test.ts` imports `../types/program`, **a module that does not exist** —
-    exactly the case the entry was opened on.
-  - **Worst files:** `packages/shared/src/workout/__tests__/log-exercise.test.ts` (25),
-    `lib/local-store/__tests__/sqlite-backend.test.ts` (16), `save-meal-tags.test.ts` (13),
-    `lib/scale-ble/__tests__/apply-reading.test.ts` (12) — the shared write path and the local
-    store, where a drifted fixture is least affordable.
-- **So the shape is settled: a ratchet.** 282 across 83 files is too much for one diff, and the
-  errors sit in the highest-consequence areas, so leaving the exclusion is not defensible either.
-  Copy the hex-literal pattern — shrink-only per-file baselines, exclusion dropped, a Custom Rules
-  step. Every *new* spec is typechecked immediately, which is the value; the 282 come down as files
-  are touched. **Lane A**: the 83 files reach both lanes, and README §3 sends both to A.
 
 ### [platform][nutrition] LB-38 — the share-code e2e decode fails intermittently on `main`, and the mechanism is not yet known
 

@@ -1,4 +1,4 @@
-## 2026-09-02 — device battery chips on the Home header (Q-111, v1.429.0)
+## 2026-09-02 — device battery chips on the Home header (Q-111, v1.430.0)
 
 **Branch:** `feat/home-device-battery-chips` · **Lane:** B
 

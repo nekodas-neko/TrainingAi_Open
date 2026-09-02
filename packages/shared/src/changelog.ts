@@ -6,7 +6,7 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: "1.429.0",
+    version: "1.430.0",
     date: "2026-09-02",
     changes: [
       "Your ring's and chest strap's battery levels now show as small chips in the Home header, beside the weather. The ring's was only ever on the Health and More screens; the strap's was only ever shown for a moment while pairing and then forgotten.",
