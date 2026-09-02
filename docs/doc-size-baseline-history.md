@@ -6438,3 +6438,13 @@ test) is the whole reason an hour failed to reproduce it.
 `projectOverview.md` grew 13. The line that cannot be cut is that **the file was passing on a race**,
 not that a flaky test was fixed: the same shape — an assertion whose setup depends on a fire-and-
 forget write from a previous test — is reachable anywhere else the pattern appears.
+
+## 2026-09-02 — `docs/implementation-backlog.md` → 15646 (LB-38)
+
+Roughly flat: LB-38's rewrite replaced a body of similar length, and what changed is which
+measurements it carries. The two falsified hypotheses stay — they are the entry's most valuable
+lines, because each cost a session to eliminate — and the timing table that looked like decode
+evidence is now labelled as transfer cost, which is what it always was.
+
+`projectOverview.md` is untouched: nothing user-visible shipped, and a spec getting 2.5× faster is
+not something the index needs to carry.

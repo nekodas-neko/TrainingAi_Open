@@ -33,15 +33,17 @@ const escapeRe = (v: string) => v.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
  * `@zxing/browser` cannot be imported into the page (bare specifiers do not resolve there) and needs
  * a DOM anyway; its pure-JS core does neither, so the pixels come out and the decode happens here.
  */
-function decodeQr({ w, h, data }: { w: number; h: number; data: number[] }): string | null {
+function decodeQr({ w, h, lum }: { w: number; h: number; lum: Buffer }): string | null {
   /* eslint-disable @typescript-eslint/no-require-imports */
   const {
     RGBLuminanceSource, BinaryBitmap, HybridBinarizer, MultiFormatReader, BarcodeFormat, DecodeHintType,
   } = require('@zxing/library')
-  // RGBLuminanceSource wants one packed int per pixel, not the RGBA byte quad the canvas hands over.
+  // `RGBLuminanceSource` packs RGB down to luminance itself, so handing it a grey triple of the
+  // luminance the page already computed reaches the same value without shipping the colour.
   const luminances = new Int32Array(w * h)
-  for (let i = 0, p = 0; i < data.length; i += 4, p++) {
-    luminances[p] = (data[i] << 16) | (data[i + 1] << 8) | data[i + 2]
+  for (let p = 0; p < luminances.length; p++) {
+    const v = lum[p]
+    luminances[p] = (v << 16) | (v << 8) | v
   }
   const bitmap = new BinaryBitmap(new HybridBinarizer(new RGBLuminanceSource(luminances, w, h)))
   const reader = new MultiFormatReader()
@@ -51,6 +53,30 @@ function decodeQr({ w, h, data }: { w: number; h: number; data: number[] }): str
   } catch {
     return null
   }
+}
+
+/**
+ * Keep the FAILING canvas, not just a measurement of it (LB-38).
+ *
+ * The entry eliminated capture as the cause — two captured failures read 0.1735 and 0.1775, inside
+ * the normal band — which leaves ZXing being handed a correct image and returning null. The next
+ * question is whether that same image decodes *offline*, and the only way to ask it is to still
+ * have the image. A passing canvas was already tested that way and decoded under all four
+ * binarizer/`TRY_HARDER` combinations, so a passing image is not the one to test.
+ *
+ * Raw RGBA rather than a PNG: no encoder is needed on either end, and `scripts/decode-share-code-dump.js`
+ * is the other end.
+ */
+function dumpCanvas(shot: { w: number; h: number; lum: Buffer }, label: string): string {
+  /* eslint-disable @typescript-eslint/no-require-imports */
+  const fs = require('node:fs') as typeof import('node:fs')
+  const path = require('node:path') as typeof import('node:path')
+  const dir = path.join(process.cwd(), 'test-results', 'share-code-dumps')
+  fs.mkdirSync(dir, { recursive: true })
+  const stem = path.join(dir, `${label}-${Date.now()}`)
+  fs.writeFileSync(`${stem}.bin`, shot.lum)
+  fs.writeFileSync(`${stem}.json`, JSON.stringify({ w: shot.w, h: shot.h, ink: darkFraction(shot) }))
+  return `${stem}.bin`
 }
 
 test.setTimeout(180_000)
@@ -155,19 +181,40 @@ async function openLabelSheet(page: import('@playwright/test').Page) {
 
 /** The canvas pixels, for `decodeQr`. */
 async function shotOf(canvas: import('@playwright/test').Locator) {
-  return canvas.evaluate((el: HTMLCanvasElement) => {
+  const { w, h, b64 } = await canvas.evaluate((el: HTMLCanvasElement) => {
     const ctx = el.getContext('2d')!
-    const d = ctx.getImageData(0, 0, el.width, el.height)
-    return { w: el.width, h: el.height, data: Array.from(d.data) }
+    const d = ctx.getImageData(0, 0, el.width, el.height).data
+    // **One luminance byte per pixel, base64, computed in the page.** This used to return
+    // `Array.from(d.data)` — 1179 × 1179 × 4 ≈ 5.56 MILLION numbers as JSON over CDP — and that
+    // single line was 152 s of this test's 180 s budget: measured at 35.0, 40.1, 42.2 and 35.0
+    // seconds for its four calls, against `selectStyle` at under 2 s and `decodeQr` at under 0.2 s.
+    // The test was not flaky and not stuck; it was one step short of its clock, so any slowdown
+    // tipped it over. The file's own note about `expect.poll` being pathological had already
+    // identified this transfer as expensive without attributing the test's cost to it.
+    //
+    // Luminance is all either caller needs — ZXing packs RGB back down to it, and the ink fraction
+    // is a threshold — so this drops a byte quad to a byte and then base64s it: one string instead
+    // of millions of JSON numbers.
+    const lum = new Uint8Array(d.length / 4)
+    for (let i = 0, p = 0; i < d.length; i += 4, p++) {
+      lum[p] = (d[i] * 77 + d[i + 1] * 151 + d[i + 2] * 28) >> 8
+    }
+    let binary = ''
+    const CHUNK = 0x8000  // `apply` on the whole array blows the argument limit
+    for (let i = 0; i < lum.length; i += CHUNK) {
+      binary += String.fromCharCode.apply(null, Array.from(lum.subarray(i, i + CHUNK)))
+    }
+    return { w: el.width, h: el.height, b64: btoa(binary) }
   })
+  return { w, h, lum: Buffer.from(b64, 'base64') }
 }
 
 /** Fraction of the canvas that is dark. A drawn share code reads ~0.17; 0 or 1 means the buffer
  *  came back degenerate rather than merely blank (LB-38). */
-function darkFraction({ data }: { data: number[] }): number {
+function darkFraction({ lum }: { lum: Buffer }): number {
   let dark = 0
-  for (let i = 0; i < data.length; i += 4) if (data[i] < 128) dark++
-  return dark / (data.length / 4)
+  for (let i = 0; i < lum.length; i++) if (lum[i] < 128) dark++
+  return dark / lum.length
 }
 
 /**
@@ -278,8 +325,18 @@ test('a saved meal renders a printable label in every style', async ({ page }) =
   for (const style of ['Ingredients · centred', 'Black band', 'Plaque', 'Big code']) {
     await selectStyle(style)
 
-    const text = decodeQr(await shotOf(canvas))
-    expect(text, `${style}'s code must decode off the rendered label`).toBeTruthy()
+    // **No retry here, deliberately — and that is why this loop is the better place to catch the
+    // decode flake.** The share-code test retries six times, so it only fails when every attempt
+    // does; this one fails on the first, which is a cheaper and more faithful reproduction. Both
+    // keep the pixels ZXing refused (LB-38), so whichever fails carries its own evidence.
+    const shot = await shotOf(canvas)
+    const text = decodeQr(shot)
+    const dumped = text === null ? dumpCanvas(shot, `every-style-${style.replace(/\W+/g, '-')}`) : null
+    expect(
+      text,
+      `${style}'s code must decode off the rendered label (ink ${darkFraction(shot).toFixed(4)}`
+        + `${dumped ? `; failing canvas kept at ${dumped} — decode it with \`node e2e/decode-share-code-dump.js ${dumped}\`` : ''})`,
+    ).toBeTruthy()
     expect(text, `${style}'s code must resolve to this meal`).toBe(expectedToken)
   }
 
@@ -380,12 +437,18 @@ test('the share style carries the recipe, and the print styles say they do not',
   // `waitForSettledInk` would not already have caught.
   let text: string | null = null
   let lastInk = -1
+  let lastShot: { w: number; h: number; lum: Buffer } | null = null
   for (let attempt = 0; attempt < 6 && text === null; attempt++) {
     if (attempt > 0) await page.waitForTimeout(1_000)
     const shot = await shotOf(canvas)
+    lastShot = shot
     lastInk = darkFraction(shot)
     text = decodeQr(shot)
   }
+  // LB-38's next step, and it only ever runs on a failure: keep the pixels ZXing refused, so the
+  // question "does this same image decode offline?" can be asked without reproducing the flake
+  // first. Six attempts have already failed by here, so this costs nothing on the happy path.
+  const dump = text === null && lastShot !== null ? dumpCanvas(lastShot, 'share-code') : null
   // **The failure reports its own diagnosis, because it will not reproduce on demand** (LB-38).
   // Measured across nine runs: it passes alone every time and fails only sometimes under
   // file-level load, so the ink reading at the moment of failure has never been captured locally.
@@ -393,8 +456,11 @@ test('the share style carries the recipe, and the print styles say they do not',
   // handed back a degenerate buffer and the gate above passed on a canvas that was never drawn;
   // a failure reading ~0.17 means the pixels arrived intact and the cause is in the decode.
   // Those are different bugs with different fixes, and this line is what tells them apart.
-  expect(text, `the share code must decode off the rendered label (ink at last attempt: ${lastInk.toFixed(4)})`)
-    .toBeTruthy()
+  expect(
+    text,
+    `the share code must decode off the rendered label (ink at last attempt: ${lastInk.toFixed(4)}`
+      + `${dump ? `; failing canvas kept at ${dump} — decode it with \`node scripts/decode-share-code-dump.js ${dump}\`` : ''})`,
+  ).toBeTruthy()
   // Not the token: this is the assertion that the swap actually happened. A `share` label still
   // emitting `encodeMealLabelToken` would decode fine and be useless to everyone else.
   expect(text).not.toBe(expectedToken)
