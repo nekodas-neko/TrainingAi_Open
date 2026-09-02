@@ -6843,7 +6843,20 @@ the combination nobody has opened.
 
 The row leaves whole when the S25 walk happens.
 
-## 2026-09-02 — `projectOverview.md` → 9483, `docs/implementation-backlog.md` → 15631 (BF-108)
+## 2026-09-02 — `docs/implementation-backlog.md` → (see .size) (Q-509)
+
+Q-509 gains two blocks and loses none, which is the right trade only because both are *results*: bin
+occupancy is closed with a measured 0.000 h, and the reconstruction that produced it is validated
+against the shipped number for the first time. The second block is the one that earns its lines —
+the three rules (decode raw frames, bin in `ds`, take the already-clamped window from
+`sleep_sessions`) are what two previous sessions lacked, and a reader who does not have them repeats
+the 4.27-against-2.653 caveat rather than the measurement.
+
+The entry's `First action` becomes `Superseded first action` rather than being deleted: its
+pre-registered pass test is still the pass test for anything that touches the estimator, and losing
+that would let the next session re-open a question this one narrowed.
+
+## 2026-09-02 — `projectOverview.md` → 9483, `docs/implementation-backlog.md` → 15660 (BF-108)
 
 The index grows by 12 and the backlog shrinks. The line that earns its cost is the correction: **the
 completion path was never the gap**, and an entry that says otherwise sends the next reader to

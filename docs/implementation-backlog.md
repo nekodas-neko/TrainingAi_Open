@@ -10434,6 +10434,24 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 ### [devices][readiness] Q-509 — the BLE-era Recovery Index refit lands at 3.31 h against a shipped anchor of 5: the input moved, not the physiology
 
 - **Branch:** `fix/ble-recovery-index-hours-bias`
+- **⚑ TWO OF THE THREE REMAINING CANDIDATES ARE NOW CLOSED (2026-09-02)** —
+  [`review`](reviews/2026-09-02-recovery-index-bin-occupancy.md). **Bin occupancy does nothing**:
+  across 575 night bins not one falls below `MIN_BEATS_PER_BIN`, the argmin carried **81–282 beats**
+  on every night, and excluding sparse bins moved the settle time on **0 of 8** nights (mean shift
+  **0.000 h**). Overnight the ring streams hundreds of beats per 5-minute bin; sparse bins are a
+  daytime phenomenon. **Degenerate windows are real but cheap**: the 3 of 57 nights whose longest
+  window is under 6 h average **1.55 h** against **2.712 h** for the other 54, worth **≈0.06 h** of
+  the gap, and widening a window 2 h at the start moves only the 1 h one. So of the 0.933 h:
+  smoothing **0.487**, occupancy **0.000**, window geometry **≈0.06** — **≈0.39 h remains, and it is
+  in ordinary full-length nights**, which is where the next look goes. That raises the odds on
+  candidate 3 (a real change over the six weeks) and so **strengthens** both prohibitions below.
+- **⚑ THE RECONSTRUCTION IS NOW VALIDATED, AND THE OLD CAVEAT IS RETIRED.** The previous review's
+  4.27 h against a stored 2.653 h was the harness, not the estimator. Three rules fix it and the
+  review writes them down: decode the raw `0x80`/`0x60` frames rather than reading `oura_heartrate`;
+  bin and space in **`ds`**, never `measured_at` (an ingest stamp that drifts — it fitted 98 bins
+  into a 91-bin window); and take the window from `sleep_sessions`, which `run.ts` writes **after**
+  `clampToDenseSensing` mutates `w`, so it is already the clamped span. Reproduces three nights to
+  within 0.03–0.21 h. The fourth disagrees because the stored row is PS-17's phantom.
 - **⚠ THE PRE-REGISTERED EXPERIMENT RAN 2026-09-02 AND FAILED ITS OWN PASS TEST** —
   [`review`](reviews/2026-09-02-recovery-index-ble-smoothing-experiment.md). Smoothing before the
   argmin recovers **0.487 h of the 0.933 h gap (52%)**, then plateaus and reverses; the ratio reaches
@@ -10472,7 +10490,12 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 - **Do NOT move `RECOVERY_INDEX_OPTIMAL_HOURS`.** A second anchor change inside two days, same
   direction, fitted to an input that moved for measurement reasons, is how a scoring constant gets
   quietly re-purposed into a bias correction.
-- **First action:** treat the hours estimator's BLE behaviour as the work item. It is a global argmin
+- **Next action (supersedes the one below, which has run):** the residue is in well-detected nights,
+  so the mechanical explanations are spent — test candidate 3 before writing any more estimator
+  code. `recoveryIndexHours: last.recoveryIndexHours` (`run.ts`) searches only the night's FINAL
+  segment for the minimum and is worth fixing on its own terms, but it is **not** the gap:
+  fragmented nights average 2.719 h against 2.639 h for single-window nights.
+- **Superseded first action, kept because its pass test is still the pass test:** treat the hours estimator's BLE behaviour as the work item. It is a global argmin
   over an overnight HR series; at 2× the sample-to-sample noise it settles at a systematically
   different point. **Concrete experiment:** smooth the BLE series to Cloud-like noise *before* the
   argmin and re-measure the ratio — if it goes to ~1.0 the estimator is fine and the input needed
@@ -10501,7 +10524,13 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   when a day produced neither an index nor a level — the exact days this number explains — so the
   write condition was widened too. [journal](overview/entries/2026-09-02-q510-stress-coverage.md).
 - **Keep:** two things, neither of which is the coverage.
-  1. **`worn_hours_ble` — populate it or drop it.** Still **0 of 107 rows** (was 0 of 96 when this
+  1. **`worn_hours_ble` — and now `recovery_index_hours` — populate them or drop them.** Both are
+     **0 of 107 rows** on `oura_daily_derived`, and the second was found on 2026-09-02 while
+     measuring Q-509: no producer writes it, because the rollup puts `recoveryIndexHours` on the
+     night input, which lands in `oura_daily_summary` — where `readiness-payload.ts` reads it. The
+     dead derived column still carries a full local mirror (SQLite column, `RECONCILE_COLUMNS` row,
+     both upserts, the pull and sync mappers), which is what makes it read as a live signal.
+     `worn_hours_ble` is still **0 of 107 rows** (was 0 of 96 when this
      entry was filed, and 0 of 79 in the 2026-08-05 review). A column that has never held a value
      reads as an available signal in every column-listing audit. **Not decided here**: populating it
      needs a source and dropping it is destructive, so it wants the owner.
