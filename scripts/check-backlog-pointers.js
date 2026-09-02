@@ -37,6 +37,7 @@ const { verifyFromLines, verifyProblem } = require('./lib/verify');
 const { laneDrift } = require('./lib/lane-drift');
 const { keepFromLines } = require('./lib/keep');
 const { keepKind } = require('./lib/keep-kind');
+const { decoratedField } = require('./lib/decorated-field');
 
 const ROOT = path.resolve(__dirname, '..');
 const BACKLOG = path.join(ROOT, 'docs/implementation-backlog.md');
@@ -110,6 +111,18 @@ for (let i = 0; i < queue.length; i++) {
         failures.push(
           `${currentId}: a \`Gate:\`/\`Needs:\`/\`Verify:\` field is written inline and will be ` +
             `IGNORED — it must start its own bullet, or the entry stays READY:\n    ${line.trim().slice(0, 120)}`,
+        );
+      }
+
+      // The same failure wearing a warning sign — see `lib/decorated-field.js` for the entry that
+      // spent two weeks at the head of Lane A's queue because of it. Extracted so the classifying
+      // rule is unit-tested against the shapes that must NOT trip it.
+      const decorated = decoratedField(line);
+      if (decorated && !needs && !gate && !verify) {
+        failures.push(
+          `${currentId}: a \`${decorated.field}:\` field is prefixed with "${decorated.decoration}" and will ` +
+            `be IGNORED — the field name must come first, so put the marker after it ` +
+            `(\`- **Gate:** device — ⚠ …\`):\n    ${line.trim().slice(0, 120)}`,
         );
       }
 
