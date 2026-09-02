@@ -2321,15 +2321,31 @@ export class SQLiteLocalStore implements LocalStore {
   // Recent distinct food items logged to a meal type — mirrors the server route
   // (`listRecentFoodItemsForMealType`): scan the last 100 logs, dedup by item, take N.
   async getRecentFoodItemsForMeal(mealTypeId: string, limit: number): Promise<FoodItem[]> {
+    return this.recentFoodItems(limit, mealTypeId);
+  }
+
+  /**
+   * LB-18 — the same list unfiltered by meal bucket, which the owner asked for on the device:
+   * "Recent doesnt need to be scoped to current meal bracket; I think it should just be all
+   * recently entered foods/meals." The panel scoped to a bucket only because no unfiltered query
+   * existed on either side; this is the local half of removing that limit.
+   */
+  async getRecentFoodItems(limit: number): Promise<FoodItem[]> {
+    return this.recentFoodItems(limit);
+  }
+
+  /** One body for both, so the de-duplication and the 100-row window cannot drift from the
+   *  server's. Mirrors `recentFoodItems` in `slices/nutrition.ts`. */
+  private async recentFoodItems(limit: number, mealTypeId?: string): Promise<FoodItem[]> {
     const rows = await querySQL<Record<string, unknown>>(
       `SELECT fi.id, fi.name, fi.brand, fi.serving_size_g, fi.calories, fi.protein_g,
               fi.carbs_g, fi.fat_g, fi.fiber_g, fi.sugar_g, fi.sodium_mg, fi.sat_fat_g,
               fi.source, fi.updated_at
          FROM food_logs fl
          JOIN food_items fi ON fi.id = fl.food_item_id
-        WHERE fl.meal_type_id = ? AND fl.deleted_at IS NULL
+        WHERE ${mealTypeId ? 'fl.meal_type_id = ? AND ' : ''}fl.deleted_at IS NULL
         ORDER BY fl.logged_at DESC LIMIT 100`,
-      [mealTypeId],
+      mealTypeId ? [mealTypeId] : [],
     );
     const seen = new Set<string>();
     const items: FoodItem[] = [];

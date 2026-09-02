@@ -42,6 +42,9 @@ export interface LocalStore {
   findFoodItemsByCalories(calories: number): Promise<FoodItem[]>;
   // Recent distinct food items logged to a given meal type (the logger quick-pick).
   getRecentFoodItemsForMeal(mealTypeId: string, limit: number): Promise<FoodItem[]>;
+  /** LB-18 — the same list without the meal-bucket filter, for the unscoped `Recent` the owner
+   *  asked for. Local-first, so it works offline exactly as the scoped one does. */
+  getRecentFoodItems(limit: number): Promise<FoodItem[]>;
   // Saved meals (offline-first: create/edit/delete offline, read local-first).
   getSavedMeals(): Promise<SavedMeal[]>;
   /** `mealTypeIds` omitted = leave stored tags alone; `[]` = clear them (BF-11e). */

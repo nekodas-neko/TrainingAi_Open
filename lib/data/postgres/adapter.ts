@@ -3544,6 +3544,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   async getRequiredMealTypeLogDays(userId: string, from: string, to: string) { return n.getRequiredMealTypeLogDays(this.db, userId, from, to) }
   async listLatestMealTimes(userId: string, from: string, to: string) { return n.listLatestMealTimes(this.db, userId, from, to) }
   async listRecentFoodItemsForMealType(userId: string, mealTypeId: string, limit: number) { return n.listRecentFoodItemsForMealType(this.db, userId, mealTypeId, limit) }
+  async listRecentFoodItems(userId: string, limit: number) { return n.listRecentFoodItems(this.db, userId, limit) }
   async listSavedMeals(userId: string) { return n.listSavedMeals(this.db, userId) }
   async createSavedMeal(userId: string, name: string, items: { foodItemId: string; quantityMultiplier: number }[], id?: string, servings?: number, imageDataUri?: string | null, mealTypeIds?: string[]) { return n.createSavedMeal(this.db, userId, name, items, id, servings, imageDataUri, mealTypeIds) }
   async updateSavedMeal(id: string, userId: string, name: string, items: { foodItemId: string; quantityMultiplier: number }[], servings?: number, imageDataUri?: string | null, mealTypeIds?: string[]) { return n.updateSavedMeal(this.db, id, userId, name, items, servings, imageDataUri, mealTypeIds) }

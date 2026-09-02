@@ -6558,3 +6558,12 @@ exposed activity factor without a not-enough-data state is a worse picker than t
 The `projectOverview` block is longer than a one-string fix warrants because the fix is not the
 interesting part. What is worth carrying is that the model was handed a number, a false account of
 how it was made, and enough context to "correct" for a multiplier that was not there.
+
+## 2026-09-02 — `projectOverview.md` → 9304, `docs/implementation-backlog.md` → 15629 (LB-18's source shipped)
+
+Both grow. LB-18 stays queued with a `Keep:` for Lane B's swap, and its `Keep:` carries a
+correction rather than just a status: the entry's central claim — that ordering foods and meals by
+recency needs a Lane A schema change — was false, and `listSavedMeals` had already solved it by
+deriving from `max(food_logs.logged_at)`. That belongs in the entry because the next reader would
+otherwise plan the same migration; it is the fourth entry this session whose stated blocker did not
+survive being checked.

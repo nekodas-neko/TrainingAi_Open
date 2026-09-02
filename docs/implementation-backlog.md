@@ -4791,6 +4791,21 @@ place to start rendering pictures.
 > **which is a Lane A schema change, not a Lane B sort.** Say so in the plan rather than discovering
 > it mid-PR.
 
+- **Keep — THE LANE A SOURCE SHIPPED 2026-09-02; Lane B's swap is what remains.**
+  `listRecentFoodItems(userId, limit)` (repository + `slices/nutrition.ts`) and
+  `getRecentFoodItems(limit)` (local store) are the unfiltered queries whose absence was the only
+  reason `RecentFoodsPanel` resolves a bucket — its own comment said so. `mealTypeId` is now
+  **optional** on `GET /api/nutrition/recent-for-meal`; absent means every bucket and returns 12
+  rather than 5. **Lane B's half is dropping the query param**, which is exactly what that
+  component's comment predicts: *"the swap is this component's fetch and nothing else."*
+- **⚠ THIS ENTRY'S CENTRAL CLAIM WAS FALSE, and no schema change was made.** It said a saved meal
+  has no last-used timestamp, that this is why `My Foods` can only order by `createdAt DESC`, and
+  that ordering foods and meals together therefore needs a Lane A schema change. **`listSavedMeals`
+  already derives `lastUsedAt` from `max(food_logs.logged_at)`**, orders by
+  `lastUsedAt DESC NULLS LAST, createdAt DESC`, and reads `idx_food_logs_saved_meal_recent`
+  (migration 238) — deriving rather than storing, exactly as the Stored Counters rule asks. So there
+  was no migration, no SQLite version, and no sync chain in this: the only thing missing was a query
+  without a `WHERE meal_type_id`.
 - **Lane:** A (the source), B (the swap)
 - **Added:** 2026-08-26, from LB-16. **Not a defect** — it is the only thing the data supports today,
   recorded so it is a decision rather than a comment nobody re-reads.
