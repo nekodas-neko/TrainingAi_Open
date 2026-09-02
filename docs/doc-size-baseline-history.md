@@ -6745,3 +6745,16 @@ the entry carries the verdict and the pointer, and was cut by half after this ch
 
 **This is the file's own growth mechanism working as intended** — fields are what make readiness
 computable instead of prose, and they cost lines. The lines come back when these entries ship.
+
+## 2026-09-02 — `docs/implementation-backlog.md` 15694 → 15715 (PS-17)
+
++21 on one entry, and it is the shape the file is supposed to grow in: PS-17 shipped half of itself,
+so the entry now carries a `Keep:` naming the two things still owed — the detector that emits daytime
+sleep windows, and a corrective recompute that a read-only session structurally cannot run. Without
+those lines a later session reads a fixed entry and closes it with a live fault still on disk.
+
+The correction to the entry's diagnosis is four lines and a pointer, cut from twelve after this check
+first failed. The argument belongs in
+[`docs/overview/entries/2026-09-02-ps17-night-selection.md`](overview/entries/2026-09-02-ps17-night-selection.md);
+what the queue needs is that the summary does not read `sleep_sessions`, so the next person does not
+build the fix the entry originally described.

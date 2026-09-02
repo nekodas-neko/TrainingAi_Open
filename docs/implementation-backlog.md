@@ -392,6 +392,27 @@ below threshold and left in place for next time.
 
 - **Lane:** A (the rollup and the summary write)
 - **Added:** 2026-08-30, from the Colmi comparison — found by accident while validating a different device
+- **⚑ DEFECT 2 (the summary picking the wrong session) IS FIXED 2026-09-02 — defect 1 is not, and the
+  BACK-FILL HAS NOT RUN.** [journal](overview/entries/2026-09-02-ps17-night-selection.md).
+- **Keep:** two things, and the entry stays queued for them.
+  1. **Defect 1 — the detector still emits daytime sessions.** The phantom rows are unchanged on
+     disk and still list. Two separable causes were identified and neither was touched: the detector
+     emitting a sleep window over 468 logged steps, and `ALWAYS_NIGHT_MIN_HOURS = 4` in
+     `sleep-night.ts` short-circuiting the circadian check so a 4.75 h *daytime* window is classified
+     as night wherever it sat. **Do not just raise that constant** — it is the escape hatch that stops
+     a shift worker scoring nothing, and the shortest real night in this history is 5.33 h against a
+     longest nap of 1.42 h, so any new threshold is a calibration decision on n=1.
+  2. **The corrective recompute.** 2026-08-27's stored summary is still 4.75 h / HRV 26.5 / RHR 73.7
+     on disk — the fix changes what a *future* aggregate writes, not what is already there. The
+     re-aggregate is `POST /api/oura-ble/samples/redecode`, which is **session + admin gated with no
+     bearer path**, so a session with read-only DB access cannot run it: it needs the owner, after
+     this deploys.
+- **The entry's diagnosis was half right — the summary never reads `sleep_sessions`.** Verified on
+  production: on **08-29 and 08-30 the summary holds the correct night while `sleep_sessions` holds
+  only a phantom**, so they are two write paths. The real defect was a bare `.set()` per period in
+  the rollup's own one-night-per-date loop (**last-wins**), and `nightForDate` had the correct rule
+  all along, so the fix removes the duplication: `nightPeriodsByDate` in `sleep-night.ts`, called by
+  both. **Only 08-27's summary was ever wrong.** Detail in the journal.
 
 **This is a live scoring fault on the owner's own data.** `aggregateOuraRawSamples` is emitting
 daytime sessions into `sleep_sessions`, and where a day carries more than one, the wrong one reaches
