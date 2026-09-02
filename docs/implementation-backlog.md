@@ -13604,6 +13604,14 @@ per-field merge where an AI write has no honest source rank to claim.
 > being "readability" and becomes the thing the number actually implicates. Re-measure after, using
 > the same capture.
 
+- **Gate:** device — **added 2026-09-02 by Lane B, which reached this entry at the head of its queue
+  and could not start it.** Every number in this entry came off the S25, run by the owner (Task 3
+  says so outright: *"the owner ran it on the S25"*), and the entry's own closing instruction is
+  **"Do the measurement first"** on `/workout` first-mount. That measurement cannot be taken here:
+  against `pnpm dev` a first mount includes route compilation, and `next start` sets
+  `NODE_ENV=production`, which turns on SSL for the pg pool and cannot reach the local database.
+  So the next step is an owner capture, not a refactor — and without this field the entry sat at the
+  top of a work list offering a large refactor its own text says not to start yet.
 - **Branch:** `perf/home-nav-cold-start`
 - **Plan:** none — this entry is the spec. Task 3 is a measurement, not a build.
 - **Added:** 2026-08-02 · **renumbered from Q-50** — #1016 and #1015 both claimed 50 in parallel;
@@ -14002,7 +14010,7 @@ passes and the inventory is explicit rather than forgotten.
 | **F3** | Play Store + multi-user are stated requirements in `device-agnostic-source-architecture.md` and appear in no stage; `public-launch-checklist.md` holds one item while five launch-gating items sit in four other docs (HC declared-use-case review, privacy policy/data-safety, map attribution, one-owner BLE assumptions, `006_admin_flag.sql`) | ✅ **ANSWERED 2026-08-03: IN.** Owner: *"yes part of the plan. I want other people to be able to use this app as its really good."* So: **every write stays `user_id`-scoped, the sync engine is maintained and extended rather than reduced, and no surface may assume the owner's own device or ring.** Still to do — add Stage 8 to the goal layout and gather the five scattered launch-gating items into `public-launch-checklist.md`. The **Health Connect declared-use-case review is the long pole** (an external approval with a lead time nobody controls) and should be started well before the rest |
 | **F4** | Stage 1 is called "the spine" and defines no schema — 70 `pgTable` vs 37 local tables with no residency/ownership record. Stage 5 generates Room entities from it. Q-44 Phase 3's 22-table rename is unsequenced against it and must land *at* Stage 1 or never | Stage 1's deliverable becomes a table-by-table residency matrix (device/server/both, writer, retention tier, derived?) + the `oura_*` rename go/no-go |
 | **F5** | Stage 5 re-implements the subsystem with the worst incident history in the repo (#47/#74/#82) with no plan, no parity harness, an unowned native replacement for `scripts/check-push-mutations.js`, and a transitional *third* write path per domain | Stage 5 opens with a golden-vector parity harness driving both implementations; add the native one-write-path guard as a named task; add a "Stage 5 without Stage 6" off-ramp |
-| **F6** | Q-31/Q-32 gate on Q-1, which the owner deferred — so Stage 4 is transitively parked and nothing says so. The gate is a sequencing preference, not a technical dependency, and a Play Store listing does not require a public repo | State the deferral on Q-32; decide whether the Q-1 gate survives |
+| ~~**F6**~~ | ✅ **ANSWERED AND APPLIED 2026-09-02.** The gate is **released** — Q-49 did it (*"releases the Q-1 + Q-30 gates on Q-32, which were sequencing preferences rather than technical dependencies"*) and the public cut has happened. What was left was a stale line: **Q-1b contradicted itself**, saying the gates were released in a 2026-09-01 note and still carrying *"Q-31 and Q-32 stay ⛔ blocked behind it"* from 2026-08-02 further down. Struck, with both sides cited. There is no Q-32 *entry* to state a deferral on — it is referenced but not queued — so the edit landed where the contradiction actually was | Done |
 | ~~**F7**~~ | ✅ **ANSWERED by the owner 2026-09-01: keep web-push, build the scheduler.** The transport already works once the app has been opened; what is missing is the **server-side scheduler (E6)** that decides when to send, and that is needed under *either* transport — so it is the half that cannot be wasted. **FCM is deferred, not rejected:** it is the right answer for a Play Store listing and for reaching a closed app reliably, but migrating first would mean a Capacitor plugin, a Firebase project, native config and a new APK *and still leave the scheduler unbuilt*. Build E6, learn whether notifications earn their place, then revisit FCM with that evidence. **The gap stands and is not fixed by this decision** — until E6 exists nothing can notify anyone on a day they have not opened the app. | Build E6 (server-side scheduler) on the existing web-push transport; keep the FCM decision point at Stage 5/6, now with a stated default of "revisit after E6" |
 
 **F8 (five drifted doc claims) is already fixed in the same PR as this entry** — do not re-file it.
@@ -14194,7 +14202,13 @@ to ship *before* any native rewrite — "we can push it till we HAVE to do it."*
 - **Do not provision the second Railway `api/` service** and do not re-land the workspace split
   while other queue items exist. That infra spend stays unmade for now.
 - **Do not delete or retire this entry** as superseded — it remains on the roadmap.
-- Q-31 and Q-32 stay `⛔ blocked` behind it.
+- ~~Q-31 and Q-32 stay `⛔ blocked` behind it.~~ **Struck 2026-09-02 (Q-48 F6): this entry contradicted
+  itself.** Its own 2026-09-01 note above says *"Q-31 and Q-32 no longer wait on this — Q-49 released
+  those gates and the public cut has since happened"*, and Q-49's entry says the same from the other
+  side: it *"releases the Q-1 + Q-30 gates on Q-32, which were sequencing preferences rather than
+  technical dependencies."* The 2026-08-02 line survived the release and kept two entries reading as
+  blocked by a deferral that no longer holds. **Q-1b's own deferral stands** — only its downstream
+  gates are gone.
 
 The original framing and the research prompt for the rewrite question are still valid reading; see
 [`docs/handoff-2026-08-02-platform-offline-architecture-review.md`](../docs/handoff-2026-08-02-platform-offline-architecture-review.md)

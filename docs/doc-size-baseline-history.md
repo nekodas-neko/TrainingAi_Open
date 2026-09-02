@@ -6490,3 +6490,14 @@ evidence is now labelled as transfer cost, which is what it always was.
 
 `projectOverview.md` is untouched: nothing user-visible shipped, and a spec getting 2.5× faster is
 not something the index needs to carry.
+
+## 2026-09-02 — `docs/implementation-backlog.md` → 15550 (Q-48 F6, Q-48 lane, Q-51 gate)
+
+Small, and two thirds of it is one struck line plus the citation that justifies striking it. Q-1b
+asserted its downstream gates were released and, further down the same entry, that they were still
+blocked — so the strike needs both quotes beside it or the next reader restores the line from the
+half they happen to hit first.
+
+The Q-51 gate note is the rest: it records **why** the measurement cannot be taken in the sandbox
+(`pnpm dev` compiles on first mount; `next start` forces SSL on the pg pool), because "needs a
+device" without the reason invites the next session to try anyway.
