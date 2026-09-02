@@ -2209,6 +2209,26 @@ recording at 15 minutes.
 
 - **Lane:** A (decode) plus a one-line copy fix
 - **Added:** 2026-08-30
+- **⚑ THE COPY FIX SHIPPED 2026-09-02. The decode advanced and did NOT finish** —
+  [review](reviews/2026-09-02-colmi-0x73-frame-structure.md). There are **45 frames now, not 3**, and
+  the larger sample overturns this entry's central inference.
+- **Keep:** the semantics. Structure is established, meaning is not.
+  1. **`0x73` is a CONTAINER, not a record type.** Byte 1 is a sub-type: **18** carries the payload
+     (39 frames); **1, 4, 12, 43, 44** are all-zero (6 frames). The three frames this entry reasoned
+     from were all sub-type 18. A decoder must switch on byte 1 first.
+  2. **Byte 4 wraps at 256 — observed** (`… 254 255 1 3 4 6 …` on 08-31), and byte 5 does not carry.
+     **So this entry's *"byte 10 over byte 4 is ~0.77 in all three"* does not hold**: across all 45
+     the ratio spans **0.33–0.78**. The constancy was an artefact of three frames sitting in one
+     unwrapped run.
+  3. **The real invariant is that `u16(6,7)` is exactly linear in the counter** — **27** per tick in
+     three bursts, **36** in two, no residual, holding across the wrap. Byte 9 does *not* select
+     between them (it is 4 for one burst of each), so whatever does is not identified. Byte 10 tracks
+     at `u16`/42–44. Bytes 8, 11, 12, 13, 14 are always zero.
+  4. **What it means is still unknown, and it needs the device.** The values do not match Colmi's own
+     `colmi_readings` for those days. **Hypothesis, explicitly untested:** 27 and 36 are plausible
+     **cm per step**, making the counter steps and `u16` distance. The test is a walk of a counted
+     number of steps then a sync — the owner and the ring, not another database read. **No decoder
+     ships on a guess.**
 
 **Three `0x73` frames, archived and decodable without another sync** (`colmi_raw_frames`, tag 115,
 2026-08-29 07:27). All checksums valid, identical structure, and they appeared only after several
