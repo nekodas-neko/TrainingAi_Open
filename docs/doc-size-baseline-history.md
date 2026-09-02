@@ -6525,3 +6525,13 @@ measuring the wrong thing while the guard that measures the right thing reads 3 
 
 Reversal is one number. The signal to do the real work instead of raising this again is the floor
 rising from something other than journal citations.
+
+## 2026-09-02 — `projectOverview.md` → 9292, `docs/implementation-backlog.md` → 15518 (LB-50's prompt half shipped)
+
+The backlog grows rather than shrinks: LB-50 stays queued with a `Keep:` because only its first half
+is built, and the `Keep:` has to say which half and why the other one is not a small follow-on — an
+exposed activity factor without a not-enough-data state is a worse picker than the one it replaces.
+
+The `projectOverview` block is longer than a one-string fix warrants because the fix is not the
+interesting part. What is worth carrying is that the model was handed a number, a false account of
+how it was made, and enough context to "correct" for a multiplier that was not there.
