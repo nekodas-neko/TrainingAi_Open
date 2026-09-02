@@ -6621,3 +6621,15 @@ the behaviour.
 The other line worth its cost is that the reachable failure needs a prescription whose `deload` flag
 and `phase` disagree, 0 of 5 so far. It marks the fix as latent rather than as a live bug closed,
 which is what stops it being struck from Known Issues on the strength of having shipped.
+
+## 2026-09-02 — `projectOverview.md` → 9368, `docs/implementation-backlog.md` → 15597 (LB-38)
+
+Both grow, for a PR that ships no behaviour. The lines that earn it are the ones that stop the next
+reader repeating a mistake this session made and caught: **ink is per-style**, and comparing one
+style's figure against another's band turns a normal canvas into a mid-repaint signature. That is what
+produced a gate that was written, measured and reverted. The four measured figures live in
+`darkFraction`'s comment; the index carries only the fact that the comparison is the trap.
+
+The other line worth its cost is that the offline decode came back null under all four configurations,
+because it **eliminates** a mechanism rather than adding one — LB-38's list of what is ruled out is now
+the useful half of the entry, and the index is where a session decides whether to open it at all.
