@@ -12,7 +12,7 @@ import { breathingFromIbi } from '@trainingai/shared/health/breathing-rate'
 import { lfhfFromIbi } from '@trainingai/shared/health/hrv-frequency'
 import { spo2VariabilityFromSamples } from '@trainingai/shared/health/spo2-variability'
 import { nightlyTemperatureCentiC, temperatureFrameSeries } from '@trainingai/shared/health/temperature-baseline'
-import { groupSleepPeriods } from '@trainingai/shared/health/sleep-night'
+import { groupSleepPeriods, nightPeriodsByDate } from '@trainingai/shared/health/sleep-night'
 import { computeRecoveryIndex } from '@trainingai/shared/health/recovery-index'
 import { type ExclusionWindow } from '@trainingai/shared/health/daily-medians'
 import { metExclusionWindows, rmssdSamples, hrvMsFromSamples, nightlyHeartRate, HR_BIN_DS, numericField as numArr } from '@trainingai/shared/health/night-vitals'
@@ -235,6 +235,9 @@ export async function runOuraRollup(
   // One entry per sleep WINDOW; collapsed into one NightInput per night below.
   const nightCandidates: { sleepStart: Date; sleepEnd: Date; durationHours: number | null; input: NightInput }[] = []
   const bdiByDate = new Map<string, number>()
+  /** BDI per sleep WINDOW (keyed by sleepStart ms), collapsed to one per date once the night
+   *  resolution below has decided which period actually is that date's night. */
+  const bdiByWindowStart = new Map<number, number>()
   // Raw per-night signals for the chronic-stress model (the granular data not captured in the
   // DailySummaryRow). Populated in the night loop; consumed by the chronic_stress step below.
   const chronicStressSignalsByDate = new Map<string, ChronicStressNightSignals>()
@@ -470,9 +473,11 @@ export async function runOuraRollup(
     const averageHrvMs = hrvMsFromSamples(nightRmssd, metExclusion)
     const avgHeartRate = nightHr.averageHrBpm
     const wakeDate = toAestDay(toDate(w.endDs), timezone)
-    // A wake-day may see two windows (main night + evening fragment); keep the last non-null BDI,
-    // matching the last-window-wins semantics of nightInputsByDate below.
-    if (sleepNetBdi != null) bdiByDate.set(wakeDate, sleepNetBdi)
+    // Keyed by WINDOW, not by wake-day. A wake-day can see two windows and this used to keep the
+    // last non-null BDI "matching the last-window-wins semantics of nightInputsByDate below" — but
+    // those semantics were the PS-17 bug, so the two are resolved together now: the night resolution
+    // below picks a winning period per date and lifts that period's BDI out of this map.
+    if (sleepNetBdi != null) bdiByWindowStart.set(toDate(w.startDs).getTime(), sleepNetBdi)
 
     sleepRows.push({
       ouraId: `ble:${w.startDs}`,
@@ -584,10 +589,32 @@ export async function runOuraRollup(
   // not sleep-baseline material — their HRV/HR are measured awake) and a night broken by a wake-up
   // is reassembled rather than counted as two. Q-1: the previous last-window-wins `.set()` put a
   // 45-minute, zero-sleep evening fragment into 2026-07-26's baselines instead of a 7.00 h night.
-  for (const period of groupSleepPeriods(nightCandidates).nights) {
+  /**
+   * PS-17. This used to iterate every period and `.set()` per date, which is LAST-WINS — so on a
+   * wake-day carrying two night periods the later one won on recency. On 2026-08-27 that put a
+   * 4.75 h daytime window (11:35–16:52 local, HRV 26.5, RHR 74 — awake values) into the summary
+   * over the real 7.42 h night, and readiness for that day scored on a nap that did not happen.
+   *
+   * `nightPeriodsByDate` is that decision, in `sleep-night.ts` beside the classifier — the rule was
+   * never missing, this file just had its own wrong copy of it (One Formula, One Place, failing in
+   * the direction that is hardest to see).
+   *
+   * **Not fixed here, deliberately:** the phantom is called night at all because
+   * `ALWAYS_NIGHT_MIN_HOURS` short-circuits the circadian check, and the detector emitted a sleep
+   * window over 468 logged steps to begin with. Both stay open on PS-17 — this makes the summary
+   * pick the real night; it does not stop the phantom existing or being listed.
+   */
+  for (const period of nightPeriodsByDate(groupSleepPeriods(nightCandidates).nights).values()) {
     const parts = period.windows
     const durs = parts.map(p => p.durationHours ?? 0)
     const totalSleep = durs.reduce((a, b) => a + b, 0)
+
+    // This period is the date's night, so its BDI is the date's BDI. Last non-null across the
+    // period's own windows — a fragmented night legitimately has several.
+    for (const part of parts) {
+      const bdi = bdiByWindowStart.get(part.sleepStart.getTime())
+      if (bdi != null) bdiByDate.set(period.date, bdi)
+    }
     const wmean = (pick: (i: NightInput) => number | null) => {
       const v = parts.map((p, i) => ({ value: pick(p.input), w: durs[i] })).filter(x => x.value != null && x.w > 0)
       const wsum = v.reduce((a, b) => a + b.w, 0)

@@ -6746,7 +6746,36 @@ the entry carries the verdict and the pointer, and was cut by half after this ch
 **This is the file's own growth mechanism working as intended** — fields are what make readiness
 computable instead of prose, and they cost lines. The lines come back when these entries ship.
 
-## 2026-09-02 — `projectOverview.md` → 9442, `docs/implementation-backlog.md` → 15564 (LB-38 root cause)
+## 2026-09-02 — `docs/implementation-backlog.md` 15694 → 15715 (PS-17)
+
++21 on one entry, and it is the shape the file is supposed to grow in: PS-17 shipped half of itself,
+so the entry now carries a `Keep:` naming the two things still owed — the detector that emits daytime
+sleep windows, and a corrective recompute that a read-only session structurally cannot run. Without
+those lines a later session reads a fixed entry and closes it with a live fault still on disk.
+
+The correction to the entry's diagnosis is four lines and a pointer, cut from twelve after this check
+first failed. The argument belongs in
+[`docs/overview/entries/2026-09-02-ps17-night-selection.md`](overview/entries/2026-09-02-ps17-night-selection.md);
+what the queue needs is that the summary does not read `sleep_sessions`, so the next person does not
+build the fix the entry originally described.
+
+## 2026-09-02 — `docs/implementation-backlog.md` 15715 → 15728 (BF-107 re-lane)
+
++13 to correct a lane. BF-107 was filed Lane A on the premise that the server-derived calorie value
+"has to reach the client before Lane B can render it"; it already reaches the client on both write
+paths, so there was no engine half and the entry sat at the head of the wrong queue.
+
+The lines are the evidence, not the argument: the four file:line references that establish the value
+already arrives, and the note that the outbox push confirms `synced` without applying the server row
+— which is why the number lands on the next pull rather than at first paint. Lane B needs those to
+avoid re-deriving them; the reasoning is in
+[`docs/overview/entries/2026-09-02-bf-107-relane.md`](overview/entries/2026-09-02-bf-107-relane.md),
+and this block was cut by a third after the check first failed.
+
+A mis-laned entry costs more than its lines: it is picked up, traced and put back by every session
+that reaches the top of that queue until someone writes down why.
+
+## 2026-09-02 — `projectOverview.md` → 9442, `docs/implementation-backlog.md` → 15598 (LB-38 root cause)
 
 The backlog **shrinks by ~120 lines**: LB-38 accumulated seven theories over several days and every one
 of them is now wrong, so the entry is replaced by the cause and its measurements rather than extended

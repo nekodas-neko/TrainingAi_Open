@@ -142,6 +142,37 @@ export function groupSleepPeriods<T extends SleepWindow>(
   return { nights, naps }
 }
 
+/** Total sleep across a period's windows. */
+export function totalSleepHours<T extends SleepWindow>(period: SleepPeriod<T>): number {
+  return period.windows.reduce((s, w) => s + (w.durationHours ?? 0), 0)
+}
+
+/**
+ * One period per wake date — **the longer wins, total sleep rather than recency.**
+ *
+ * A wake-day can carry two night periods: a night that ended in the morning, and a later window the
+ * classifier also called night (`ALWAYS_NIGHT_MIN_HOURS` promotes anything over four hours wherever
+ * it sat on the clock). Which of the two is "that day's night" is one decision, and this is where it
+ * is made.
+ *
+ * **It is a function because it was a duplicated rule, and the copy was wrong (PS-17).** The BLE
+ * rollup resolved its own per-date map with a bare `.set()` in a loop, which is last-wins — so on
+ * 2026-08-27 a 4.75 h daytime window (HRV 26.5 and RHR 74, i.e. awake values) replaced the real
+ * 7.42 h night in `oura_daily_summary`, and readiness for that day scored on a nap that did not
+ * happen. `nightForDate` below had the correct rule the whole time. Both now call this.
+ */
+export function nightPeriodsByDate<T extends SleepWindow>(
+  periods: SleepPeriod<T>[],
+): Map<string, SleepPeriod<T>> {
+  const byDate = new Map<string, SleepPeriod<T>>()
+  for (const period of periods) {
+    const incumbent = byDate.get(period.date)
+    if (incumbent && totalSleepHours(incumbent) >= totalSleepHours(period)) continue
+    byDate.set(period.date, period)
+  }
+  return byDate
+}
+
 /**
  * The night belonging to a given wake day, or null. When a day somehow carries more than one night
  * period (a very early night plus a very late one), the longer wins — total sleep, not recency.
@@ -152,10 +183,7 @@ export function nightForDate<T extends SleepWindow>(
   tz: string = DEFAULT_TZ,
 ): SleepPeriod<T> | null {
   const { nights } = groupSleepPeriods(sessions, tz)
-  const onDay = nights.filter(n => n.date === date)
-  if (onDay.length === 0) return null
-  const total = (n: SleepPeriod<T>) => n.windows.reduce((s, w) => s + (w.durationHours ?? 0), 0)
-  return onDay.reduce((best, n) => (total(n) > total(best) ? n : best))
+  return nightPeriodsByDate(nights).get(date) ?? null
 }
 
 /** The most recent night at or before `date`, or null. Used where a caller wants "last night". */

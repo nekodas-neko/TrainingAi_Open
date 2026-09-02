@@ -392,6 +392,27 @@ below threshold and left in place for next time.
 
 - **Lane:** A (the rollup and the summary write)
 - **Added:** 2026-08-30, from the Colmi comparison — found by accident while validating a different device
+- **⚑ DEFECT 2 (the summary picking the wrong session) IS FIXED 2026-09-02 — defect 1 is not, and the
+  BACK-FILL HAS NOT RUN.** [journal](overview/entries/2026-09-02-ps17-night-selection.md).
+- **Keep:** two things, and the entry stays queued for them.
+  1. **Defect 1 — the detector still emits daytime sessions.** The phantom rows are unchanged on
+     disk and still list. Two separable causes were identified and neither was touched: the detector
+     emitting a sleep window over 468 logged steps, and `ALWAYS_NIGHT_MIN_HOURS = 4` in
+     `sleep-night.ts` short-circuiting the circadian check so a 4.75 h *daytime* window is classified
+     as night wherever it sat. **Do not just raise that constant** — it is the escape hatch that stops
+     a shift worker scoring nothing, and the shortest real night in this history is 5.33 h against a
+     longest nap of 1.42 h, so any new threshold is a calibration decision on n=1.
+  2. **The corrective recompute.** 2026-08-27's stored summary is still 4.75 h / HRV 26.5 / RHR 73.7
+     on disk — the fix changes what a *future* aggregate writes, not what is already there. The
+     re-aggregate is `POST /api/oura-ble/samples/redecode`, which is **session + admin gated with no
+     bearer path**, so a session with read-only DB access cannot run it: it needs the owner, after
+     this deploys.
+- **The entry's diagnosis was half right — the summary never reads `sleep_sessions`.** Verified on
+  production: on **08-29 and 08-30 the summary holds the correct night while `sleep_sessions` holds
+  only a phantom**, so they are two write paths. The real defect was a bare `.set()` per period in
+  the rollup's own one-night-per-date loop (**last-wins**), and `nightForDate` had the correct rule
+  all along, so the fix removes the duplication: `nightPeriodsByDate` in `sleep-night.ts`, called by
+  both. **Only 08-27's summary was ever wrong.** Detail in the journal.
 
 **This is a live scoring fault on the owner's own data.** `aggregateOuraRawSamples` is emitting
 daytime sessions into `sleep_sessions`, and where a day carries more than one, the wrong one reaches
@@ -456,8 +477,21 @@ recompute has to run over the affected days once the selection is fixed.
 
 ### [activity] BF-107 — the walk summary has no calories tile, and the number it would show does not exist yet on that screen
 
-- **Lane:** A — the value has to reach the client before Lane B can render it; the tile itself is
-  trivial once it does.
+- **Lane:** B — **re-laned from A on 2026-09-02: there is no engine half.** The Lane A premise
+  ("the value has to reach the client before Lane B can render it") is false, and it was the only
+  thing making this Lane A. The derived kcal **already reaches the client both ways**: the web route
+  returns `{ activityLog }` carrying it (`app/api/activity-logs/route.ts:45` +
+  `adapter.ts:2121`) and `walk-summary.tsx` discards the response; on device the pull maps it
+  (`sync-engine.ts:337`) into a real local column (`sqlite-backend.ts:1678/1690`). The one nuance —
+  the outbox push only flips the row to `synced` (`sync-engine.ts:968-980`), so on device the number
+  lands on the **next pull**, not at first paint — is exactly the `—`-then-fill this entry wants, and
+  a component gets it by reading the local row. So the whole gap is
+  `walk-summary.tsx:239-241`: three hardcoded tiles, no read-back. Nothing fails to compile when the
+  halves are split (unlike LA-47), so there is no reason for a cross-lane PR. Evidence:
+  [journal](overview/entries/2026-09-02-bf-107-relane.md).
+- **The sibling has the same gap — checked, not assumed.** `done-activity-screen.tsx` passes
+  `caloriesBurned: null` at lines 210 and 242 and renders no energy tile either. Same one-tile change,
+  same PR.
 - **Added:** 2026-09-01 · owner, on a completed guided walk: *"the final screen doesnt show calories
   burned."*
 
