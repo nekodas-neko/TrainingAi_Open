@@ -73,6 +73,11 @@ export interface ResilienceModelOutput {
   resilienceLevel: number       // 1-5 banded, or NaN when the window has <min_length valid days
   granularResilienceLevel: number
   confidence: number
+  /** Minutes of daytime stress coverage this day actually had — `resolutionMinutes × non-NaN
+   *  resampled buckets`, the LEFT side of `final_check_stress_coverage`. 0 when the series produced
+   *  no buckets at all. Reported on every branch, including the failing one: a day that produces no
+   *  index is exactly the day this number explains (Q-510). */
+  daytimeStressCoverageMin: number
 }
 
 const nansum = (a: number[]): number => a.reduce((s, v) => (Number.isNaN(v) ? s : s + v), 0)
@@ -92,7 +97,7 @@ function polyval(coefs: number[], x: number): number {
 // Remove stress samples that fall within any sleep period; resample the remainder into
 // resolution-minute buckets (mean per bucket, gaps → NaN). Returns null when there's no
 // daytime stress left (the "Insufficient stress" branch).
-function preprocessStress(i: ResilienceModelInput): { quantized: number[]; ok: boolean } | null {
+function preprocessStress(i: ResilienceModelInput): { quantized: number[]; ok: boolean; coverageBuckets: number } | null {
   const C = C_()
   // omit_sleep_values
   const kept: { s: number; ts: number }[] = []
@@ -151,7 +156,10 @@ function preprocessStress(i: ResilienceModelInput): { quantized: number[]; ok: b
   const moderate_recovery = count(v => v > rl + (sat_r - rl) * ltm && v <= rl + (sat_r - rl) * mth)
   const high_recovery = count(v => v > rl + (sat_r - rl) * mth)
   // order matches the .pt tuple: (high_stress, moderate_stress, low_stress, neutral, low_recovery, moderate_recovery, high_recovery)
-  return { quantized: [high_stress, moderate_stress, low_stress, neutral, low_recovery, moderate_recovery, high_recovery], ok }
+  // `coverageBuckets` is `nonNan.length` — the left side of the gate above, which was computed and
+  // then discarded. Q-510: without it "why did resilience produce nothing today" is unanswerable
+  // from data, because neither side of the inequality was persisted anywhere.
+  return { quantized: [high_stress, moderate_stress, low_stress, neutral, low_recovery, moderate_recovery, high_recovery], ok, coverageBuckets: nonNan.length }
 }
 
 // ── Stage 1 quantize bands (___torch_mangle_9 quantize_daily_indeces) ─────────────────
@@ -307,6 +315,7 @@ export function runStressResilience(i: ResilienceModelInput): ResilienceModelOut
     dailyQuantizedStress: qStress, dailyQuantizedRestorativeTime: qRestorative, dailyQuantizedSleepRecovery: qSleepRecovery,
     longTermRestorativeTime, longTermSleepRecovery, longTermRecovery, longTermStress,
     resilienceLevel, granularResilienceLevel: granular, confidence,
+    daytimeStressCoverageMin: C.resolutionMinutes * (pre?.coverageBuckets ?? 0),
   }
 }
 
@@ -346,6 +355,16 @@ export interface ResilienceComputeResult {
   /** today's three daily indices — persist these to fill the rolling window even on days the
    *  level itself can't yet be produced. null when today contributes no index. */
   dailyIndices: DailyIndices | null
+  /**
+   * Minutes of daytime stress coverage, against `minDaytimeStressHours × 60` (Q-510).
+   *
+   * **`null` means NOT EVALUATED, and that distinction is the point.** When a contributor is
+   * missing this function deliberately feeds the model an empty stress series, so a coverage of 0
+   * would be an artefact of that gating rather than a fact about the day — and it would send a
+   * later auditor after the coverage gate when the real cause was a missing contributor. A number
+   * here is always a real measurement of the day's own series.
+   */
+  daytimeStressCoverageMin: number | null
 }
 
 const nul = (v: number): number | null => (Number.isNaN(v) ? null : v)
@@ -393,7 +412,13 @@ export function computeResilienceForDay(today: ResilienceDayInput, priorIndices:
     dailyRestorativeTime: out.dailyRestorativeTime,
     dailySleepRecovery: out.dailySleepRecovery,
   }
-  return { level: nul(out.resilienceLevel), granular: nul(out.granularResilienceLevel), confidence: nul(out.confidence), dailyIndices }
+  return {
+    level: nul(out.resilienceLevel),
+    granular: nul(out.granularResilienceLevel),
+    confidence: nul(out.confidence),
+    dailyIndices,
+    daytimeStressCoverageMin: contributorsOk ? out.daytimeStressCoverageMin : null,
+  }
 }
 
 export type { ResilienceConstants }

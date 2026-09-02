@@ -25,6 +25,7 @@ const FULL_PAYLOAD = {
   chronicStressScore: 41, chronicStressContributors: JSON.stringify({ trend: 'flat' }),
   resilienceLevel: 3, resilienceDailyStress: 1.2, resilienceDailyRestorativeTime: 4.5,
   resilienceDailySleepRecovery: 2.1, resilienceGranular: 3.4, resilienceConfidence: 0.8,
+  daytimeStressCoverageMin: 240,
   bdiDerived: 5.5, vascularAge: null, pwv: null,
   bodyComp: JSON.stringify({ ffm: 62 }),
 }

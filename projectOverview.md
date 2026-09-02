@@ -1540,6 +1540,21 @@ counts, and Save-all wrote three `saved_meals` rows with their items and stamped
 - **The series covers all 24 hours** (every hour except 07:00) and **126 of 230 — 55% — fall between 22:00 and 06:00**. Night mean **+0.266** (recovered) against day **−0.413** (stressed): **opposite signs, night in the majority**, so any daily aggregate is governed by the night/day mix as much as by stress.
 - **A Q-507 mechanism candidate, and it is the REVERSE of the one already refuted**: `corr(total buckets, stress_high_minutes)` = **−0.784** (n=9) — *fewer* buckets produce *more* high-stress minutes, because each bucket is scored against the day's own median. **n = 9; treat as a lead, not a result.** The refuted hypothesis used *HR sample count* (r = −0.128); bucket count is the quantity the model actually divides by.
 
+### [readiness][devices] ⚠️ Local SQLite v35 has not been opened on the S25 (Q-510, 2026-09-02)
+
+**Shipped and fully exercised in the sandbox; the device has not seen it.** Q-510 persists the
+daytime-stress coverage minutes so "why did resilience produce nothing today" is answerable from data
+(Postgres migrations 256 + 257). The offline-sync tripwire required the column to ride the whole
+chain, so local SQLite went to **v35**.
+- **v35 is the mildest kind of local migration** — a plain `ALTER TABLE oura_daily_derived ADD COLUMN
+  daytime_stress_coverage_min REAL`, with the column also in the `CREATE` body for fresh installs and
+  a `RECONCILE_COLUMNS` row if the ALTER half-applies. Nothing is dropped or rebuilt.
+- **But it lands on top of v34, which is also unopened** (the row directly below). A device upgrading
+  from v33 now runs both in one pass, and that combination is what nobody has seen.
+- **What to check on the S25:** the app opens, the Home readiness card renders, and no
+  `oura_daily_derived` read throws. Nothing displays the new column, so there is no visual check —
+  the risk is the migration step, not the value.
+
 ### [nutrition][devices] ⚠️ Local SQLite v34 rebuilds a table, and no device has opened it (BF-69, 2026-09-01)
 
 **Shipped, and the riskiest statement in it is one a sandbox cannot run.** BF-69 stage 1 removed

@@ -1,7 +1,7 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, beforeAll } from 'vitest'
 import fs from 'node:fs'
 import path from 'node:path'
-import { runStressResilience, resilienceLevelToBand, computeResilienceForDay, type ResilienceModelInput, type DailyIndices } from '@/lib/health/stress-resilience'
+import { runStressResilience, resilienceLevelToBand, computeResilienceForDay, setResilienceConstants, type ResilienceModelInput, type DailyIndices, type ResilienceConstants } from '@/lib/health/stress-resilience'
 import { daytimeStressScalingParams } from '@/lib/health/daytime-stress'
 import { hasRealConstants } from '@/lib/oura-models/__fixtures__/real-constants'
 
@@ -112,5 +112,67 @@ describe('resilienceLevelToBand', () => {
     expect(resilienceLevelToBand(3)).toBe('adequate')
     expect(resilienceLevelToBand(4)).toBe('solid')
     expect(resilienceLevelToBand(5)).toBe('strong')
+  })
+})
+
+/**
+ * Q-510 — runnable WITHOUT the vendored constants, deliberately.
+ *
+ * The orchestrator suite above is `skipIf(!hasRealConstants())` because it compares against a
+ * captured golden vector, and those constants left the tree. These assertions are RELATIVE — a
+ * shorter series yields a smaller coverage, a missing contributor yields null — so they need only a
+ * self-consistent constant set, which `setResilienceConstants` accepts. Written this way because a
+ * test that silently skips is not verification, and this change would otherwise ship unexercised.
+ */
+describe('daytimeStressCoverageMin (synthetic constants)', () => {
+  const SYNTH: ResilienceConstants = {
+    highWeight: 1, moderateWeight: 0.5, lowWeight: 0.25, neutralWeight: 0.1,
+    sleepScoreWeight: 1, hrvBalanceWeight: 1, recoveryIndexWeight: 1, restingHeartRateWeight: 1,
+    sleepRecoveryScalerCoef: [0, 1], percentMultiplier: 100,
+    moderateToHighCoef: 0.33, lowToModerateCoef: 0.66,
+    daytimeRecoveryWeight: 0.5, sleepRecoveryWeight: 0.5,
+    todayWeight: 0.5, lastPeriodWeight: 0.5,
+    windowLength: 14, windowMinLength: 5,
+    planeFitCoef: [1, 1, 0], pcaMinorAxisLength: 1,
+    levelMultiplier: [0.2, 0.4, 0.6, 0.8],
+    minDaytimeStressHours: 4, resolutionMinutes: 10,
+  }
+  beforeAll(() => setResilienceConstants(SYNTH))
+
+  const prior = (n: number): DailyIndices[] =>
+    Array.from({ length: n }, () => ({ dailyStress: 30, dailyRestorativeTime: 38, dailySleepRecovery: 29 }))
+  const day = (stressSeries: { tMs: number; level: number }[], recoveryIndex: number | null = 58) => ({
+    sleepStartMs: [], sleepEndMs: [], sleepScore: 72, hrvBalance: 60, recoveryIndex,
+    restingHeartRate: 55, stressSeries, nightHrvBaselineMs: 50,
+  })
+  // 10-minute buckets from 08:00; 30 of them is 300 min, comfortably over the 4 h gate.
+  const series = Array.from({ length: 30 }, (_, k) => ({ tMs: 28_800_000 + k * 600_000, level: 0 }))
+
+  it('reports the minutes the gate actually saw: resolutionMinutes x non-NaN buckets', () => {
+    const res = computeResilienceForDay(day(series), prior(5))
+    expect(res.daytimeStressCoverageMin).toBe(30 * SYNTH.resolutionMinutes)
+  })
+
+  // The case the column exists for. Previously a day like this wrote NOTHING, so the coverage was
+  // unrecoverable after the fact and "why did resilience produce nothing" was unanswerable.
+  it('still reports a number on a short series that FAILS the gate', () => {
+    const res = computeResilienceForDay(day(series.slice(0, 3)), prior(5))
+    expect(res.daytimeStressCoverageMin).toBe(3 * SYNTH.resolutionMinutes)
+    expect(res.daytimeStressCoverageMin!).toBeLessThan(SYNTH.minDaytimeStressHours * 60)
+    expect(res.dailyIndices).toBeNull()
+  })
+
+  // NOT zero. A missing contributor makes the orchestrator feed an empty series on purpose, so a 0
+  // would be an artefact of that gating and would send an auditor after the coverage gate when the
+  // real cause was elsewhere.
+  it('is null — not 0 — when a contributor is missing, because coverage was never evaluated', () => {
+    const res = computeResilienceForDay(day(series, null), prior(5))
+    expect(res.dailyIndices).toBeNull()
+    expect(res.daytimeStressCoverageMin).toBeNull()
+  })
+
+  it('is 0 when the series is genuinely empty but contributors are present', () => {
+    const res = computeResilienceForDay(day([]), prior(5))
+    expect(res.daytimeStressCoverageMin).toBe(0)
   })
 })

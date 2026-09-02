@@ -317,6 +317,7 @@ export async function pullDelta(userId: string, force = false, fullResync = fals
     resilienceDailySleepRecovery:   (r.resilienceDailySleepRecovery as number) ?? null,
     resilienceGranular:             (r.resilienceGranular as number) ?? null,
     resilienceConfidence:           (r.resilienceConfidence as number) ?? null,
+    daytimeStressCoverageMin:       (r.daytimeStressCoverageMin as number) ?? null,
     bdiDerived:                     (r.bdiDerived as number) ?? null,
     vascularAge:                    (r.vascularAge as number) ?? null,
     pwv:                            (r.pwv as number) ?? null,

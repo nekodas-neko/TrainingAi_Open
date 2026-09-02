@@ -137,6 +137,7 @@ const CREATE_OURA_DAILY_DERIVED_LOCAL = `CREATE TABLE IF NOT EXISTS oura_daily_d
   resilience_daily_sleep_recovery   REAL,
   resilience_granular          REAL,
   resilience_confidence        REAL,
+  daytime_stress_coverage_min  REAL,
   bdi_derived                  REAL,
   vascular_age                 REAL,
   pwv                          REAL,
@@ -401,6 +402,7 @@ export const RECONCILE_COLUMNS: { table: string; column: string; ddl: string }[]
   { table: 'oura_daily_derived', column: 'resilience_daily_sleep_recovery',   ddl: `ALTER TABLE oura_daily_derived ADD COLUMN resilience_daily_sleep_recovery REAL` },
   { table: 'oura_daily_derived', column: 'resilience_granular',           ddl: `ALTER TABLE oura_daily_derived ADD COLUMN resilience_granular REAL` },
   { table: 'oura_daily_derived', column: 'resilience_confidence',         ddl: `ALTER TABLE oura_daily_derived ADD COLUMN resilience_confidence REAL` },
+  { table: 'oura_daily_derived', column: 'daytime_stress_coverage_min', ddl: `ALTER TABLE oura_daily_derived ADD COLUMN daytime_stress_coverage_min REAL` },
   { table: 'oura_daily_derived', column: 'vascular_age',                  ddl: `ALTER TABLE oura_daily_derived ADD COLUMN vascular_age REAL` },
   { table: 'oura_daily_derived', column: 'pwv',                          ddl: `ALTER TABLE oura_daily_derived ADD COLUMN pwv REAL` },
   { table: 'oura_daily_derived', column: 'body_comp',                     ddl: `ALTER TABLE oura_daily_derived ADD COLUMN body_comp TEXT` },
@@ -1459,6 +1461,19 @@ export const MIGRATIONS: UpgradeStatement[] = [
       // contribution on the same day is unconstrained and adds.
       `CREATE INDEX IF NOT EXISTS idx_supplement_logs_date ON supplement_logs (log_date)`,
       `CREATE UNIQUE INDEX IF NOT EXISTS idx_supplement_logs_manual_day ON supplement_logs (supplement_id, log_date) WHERE source = 'manual'`,
+    ],
+  },
+  {
+    toVersion: 35,
+    statements: [
+      // Q-510 — the daytime-stress coverage minutes, mirroring Postgres migration 256. The column
+      // is in `CREATE_OURA_DAILY_DERIVED_LOCAL` above, so fresh installs already have it; this
+      // ALTER reaches every upgraded device, and the RECONCILE_COLUMNS row is the authority if it
+      // half-applies.
+      //
+      // A plain ADD COLUMN, unlike v34's rebuild: nothing here drops a constraint, so there is no
+      // reason to copy the table.
+      `ALTER TABLE oura_daily_derived ADD COLUMN daytime_stress_coverage_min REAL`,
     ],
   },
 ];

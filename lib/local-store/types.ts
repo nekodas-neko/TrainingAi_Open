@@ -218,6 +218,8 @@ export interface LocalOuraDailyDerived {
   resilienceDailySleepRecovery:   number | null;
   resilienceGranular:             number | null;                   // REAL, not JSON
   resilienceConfidence:           number | null;
+  /** Q-510. NULL = not evaluated (a contributor was missing), never zero coverage. */
+  daytimeStressCoverageMin:       number | null;
   bdiDerived:                     number | null;
   vascularAge:                    number | null;
   pwv:                            number | null;

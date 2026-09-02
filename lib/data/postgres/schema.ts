@@ -1607,6 +1607,9 @@ export const ouraDailyDerived = pgTable('oura_daily_derived', {
   resilienceDailySleepRecovery:   doublePrecision('resilience_daily_sleep_recovery'),
   resilienceGranular:             doublePrecision('resilience_granular'),
   resilienceConfidence:           doublePrecision('resilience_confidence'),
+  /** Q-510: minutes of daytime stress coverage, against the model's own gate. NULL means NOT
+   *  evaluated (a contributor was missing), never zero coverage. */
+  daytimeStressCoverageMin:       doublePrecision('daytime_stress_coverage_min'),
 
   bdiDerived: doublePrecision('bdi_derived'),
 
