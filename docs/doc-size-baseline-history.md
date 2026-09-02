@@ -6491,6 +6491,18 @@ evidence is now labelled as transfer cost, which is what it always was.
 `projectOverview.md` is untouched: nothing user-visible shipped, and a spec getting 2.5× faster is
 not something the index needs to carry.
 
+## 2026-09-01 — `docs/implementation-backlog.md` → 15603 (BF-109, barcode calorie mismatch)
+
+One entry, and most of its length is the wrong answer being ruled out. "The calories weren't scaled to
+the serving" is what the screenshot looks like and it is what anyone will try first; the source row
+was fetched from Open Food Facts to show the app read `_serving` consistently for every field and the
+mapper is correct. Recording the actual row matters twice over, because its `energy-kcal_100g` turns
+out to be derived from the same bad figure — so the obvious remedy of preferring per-100g would fix
+nothing here and break the products that are fine. The rest is the sibling-surface trail: the guard
+exists, its docstring describes this exact Open Food Facts failure, it runs on the text-search list
+and the scan routes, and the barcode path is the only route from that database into the diary with no
+check on either end. The measured blast radius (0 of 11 saved barcode items mismatched) is what keeps
+the entry a warning-banner change rather than a data-repair project.
 ## 2026-09-02 — `projectOverview.md` → 9280, `docs/implementation-backlog.md` → 15505 (LB-49 shipped)
 
 The backlog shrinks by LB-49's entry. `projectOverview.md` grows by a block that is mostly a list
