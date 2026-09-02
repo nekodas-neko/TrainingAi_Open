@@ -1610,6 +1610,9 @@ export const ouraDailyDerived = pgTable('oura_daily_derived', {
   /** Q-510: minutes of daytime stress coverage, against the model's own gate. NULL means NOT
    *  evaluated (a contributor was missing), never zero coverage. */
   daytimeStressCoverageMin:       doublePrecision('daytime_stress_coverage_min'),
+  /** TN-1: nights in the model's 31-night window carrying usable granular signals. NULL means NOT
+   *  EVALUATED — only a `fullHistory` pass reaches the model at all. */
+  chronicStressGranularNights:    integer('chronic_stress_granular_nights'),
 
   bdiDerived: doublePrecision('bdi_derived'),
 

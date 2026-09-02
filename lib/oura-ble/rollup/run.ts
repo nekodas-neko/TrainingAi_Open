@@ -19,7 +19,7 @@ import { metExclusionWindows, rmssdSamples, hrvMsFromSamples, nightlyHeartRate, 
 import { clampToDenseSensing } from '@/lib/sleep/sensing-span'
 import { computeDailySummaries, type NightInput } from '@trainingai/shared/health/daily-summary'
 import { computeHrv5MinSeries } from '@trainingai/shared/health/hrv-5min'
-import { computeChronicStress, chronicStressScoreToInt, CHRONIC_STRESS_MIN_DAYS, type ChronicStressNightSignals } from '@trainingai/shared/health/chronic-stress-assembly'
+import { computeChronicStress, chronicStressScoreToInt, usableGranularNights, CHRONIC_STRESS_MIN_DAYS, type ChronicStressNightSignals } from '@trainingai/shared/health/chronic-stress-assembly'
 import { illnessFromSummaries, illnessZScores } from '@trainingai/shared/health/illness-radar'
 import { computeSleepScore, sleepScoreBaselines } from '@trainingai/shared/health/sleep-score'
 import { computeReadinessComposite } from '@trainingai/shared/health/readiness-composite'
@@ -1167,19 +1167,25 @@ export async function runOuraRollup(
     // requires a wide/full rollup pass covering ≥21 nights of real ring data (owner/device-gated).
     await step('chronic_stress', async () => {
       if (summaryRows.length < CHRONIC_STRESS_MIN_DAYS) return
+      // TN-1: record how many nights the pass could actually feed the model BEFORE running it, and
+      // write that even when the score comes back null — which it always has. The upsert COALESCEs,
+      // so writing the count alone never clobbers a prior good score, and the early return above
+      // keeps a routine incremental pass (window ~3 nights) from writing a meaningless one.
+      const granularNights = usableGranularNights(summaryRows, chronicStressSignalsByDate)
       const res = computeChronicStress(summaryRows, chronicStressSignalsByDate)
-      if (!res) return
-      const score = chronicStressScoreToInt(res.chronicStressScore)
-      if (score == null) return
+      const score = res ? chronicStressScoreToInt(res.chronicStressScore) : null
       await io.upsertDailyDerived(summaryRows[summaryRows.length - 1].date, {
-        chronicStressScore: score,
-        chronicStressContributors: {
-          fragmentation: res.uiFragmentation,
-          heart: res.uiHeart,
-          sleepMotions: res.uiSleepMotions,
-          activity: res.uiActivity,
-          temperature: res.uiTemperature,
-        },
+        chronicStressGranularNights: granularNights,
+        ...(res != null && score != null ? {
+          chronicStressScore: score,
+          chronicStressContributors: {
+            fragmentation: res.uiFragmentation,
+            heart: res.uiHeart,
+            sleepMotions: res.uiSleepMotions,
+            activity: res.uiActivity,
+            temperature: res.uiTemperature,
+          },
+        } : {}),
       })
     })
   }

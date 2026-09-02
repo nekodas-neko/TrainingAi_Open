@@ -1413,6 +1413,7 @@ export interface OuraDailyDerivedRow {
   resilienceConfidence: number | null
   /** Q-510. NULL = not evaluated (a contributor was missing), never zero coverage. */
   daytimeStressCoverageMin: number | null
+  chronicStressGranularNights: number | null
   bdiDerived: number | null
   vascularAge: number | null
   pwv: number | null
