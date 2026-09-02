@@ -9351,6 +9351,12 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 
 ### [workouts] Q-289 — `expectedRpe` misses by more than the autoregulation dead band at both ends of its own range
 
+- **Gate:** owner — a SCORING change, so the route is Tuning proposes → owner signs off → Lane A
+  implements (CLAUDE.md). This entry's own Lane bullet already said *"not an implementer's to take at
+  all"*; stated as prose it left the entry at the head of Lane A's READY list.
+- **Needs:** Q-290 — the input signal's own variance bounds what any calibration can achieve. Was
+  prose (*"Depends on Q-290"*) and therefore invisible to the queue tool.
+
 - **Lane: A — set 2026-08-25 (by Lane B, which the tool was serving it to).** `expectedRpe`,
   `autoregulation.ts` and `RPE_DEAD_BAND` all live in `packages/shared/src/ai-periodization/`, which
   the path rule assigns to Lane A. **And it is a SCORING change**, so the route is Tuning proposes →
@@ -9421,6 +9427,9 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 - **Depends on Q-290** — the input signal's own variance bounds what any calibration can achieve.
 
 ### [workouts] Q-290 — logged RPE carries almost no information: sd 0.87, and effectively two values
+
+- **Gate:** owner — a scoring question: Tuning proposes, the owner signs off, Lane A implements. The
+  entry said so in prose, which the queue tool cannot read.
 
 - **Lane: A — set 2026-08-25, same reasoning as Q-289.** The RPE signal and its consumers are in
   `packages/shared/src/ai-periodization/`, and this is a **scoring** question: Tuning proposes, the
@@ -9892,6 +9901,9 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 
 ### [readiness][workouts] Q-275 — readiness is structurally blind to training load, and every incumbent treats load as primary
 
+- **Gate:** owner — adding an input to the readiness composite re-scores every day, so it is a
+  scoring change: the owner signs off before Lane A implements. No proposal is written yet.
+
 - **Branch:** `feat/readiness-training-load-input`
 - **Plan:** none yet — this is a modelling change and wants a written plan before code
 - **Added:** 2026-08-15 · from the comprehensive review §1.8 (and §2.1's incumbent comparison)
@@ -9973,6 +9985,9 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 
 ### [readiness][body] Q-272 — Body Battery v5 drains 5× faster than it charges and ends at its daily low on 10 of 12 days
 
+- **Gate:** owner — changing the Body Battery model re-scores every day, so it is a scoring change
+  and wants an owner-signed proposal first. No proposal is written yet.
+
 - **Branch:** `fix/body-battery-daytime-recovery`
 - **Plan:** none yet · tuning notes live in [`docs/body-battery-tuning.md`](body-battery-tuning.md)
 - **Added:** 2026-08-15 · from the comprehensive review §1.5
@@ -10014,6 +10029,11 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   is back-loaded into the evening this biases the ratio upward — treat 5.6× as an upper bound.
 
 ### [activity] Q-505 — Activity Score: redesign as a daily effort meter with a target (decisions resolved, ready to build)
+
+- **Needs:** Q-523
+- The dependency above was prose (*"Depends on ... landing first"*) and so invisible to the queue
+  tool. Under today's shipped threshold the weekly total is near zero, so every figure in this entry
+  assumes the corrected WHO band.
 
 - **Branch:** `fix/activity-score-lane-weights` · **Lane:** A
 - **No longer blocked.** All three decisions were resolved 2026-08-18 — the owner delegated them
@@ -10306,6 +10326,10 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 
 ### [readiness] Q-508 — resilience has emitted exactly one value in its lifetime (level 5, granular pinned at the 5.99 clamp)
 
+- **Gate:** owner — the first action needs a decision *"this repo cannot settle"*: whether the
+  vendor sum is faithful. The vendor source is in the private archive, and that answer gates
+  everything else in the entry.
+
 - **Branch:** `fix/resilience-longterm-sleep-recovery`
 - **Plan:** none yet — **Lane A implements; Tuning proposes only.** Blocked on a question this repo
   cannot answer (see first action).
@@ -10361,6 +10385,14 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 ### [devices][readiness] Q-509 — the BLE-era Recovery Index refit lands at 3.31 h against a shipped anchor of 5: the input moved, not the physiology
 
 - **Branch:** `fix/ble-recovery-index-hours-bias`
+- **⚠ THE PRE-REGISTERED EXPERIMENT RAN 2026-09-02 AND FAILED ITS OWN PASS TEST** —
+  [`review`](reviews/2026-09-02-recovery-index-ble-smoothing-experiment.md). Smoothing before the
+  argmin recovers **0.487 h of the 0.933 h gap (52%)**, then plateaus and reverses; the ratio reaches
+  **0.875, not ~1.0**. The input did need conditioning and that is **half the answer**: **do not ship
+  a wider `MEDIAN_WINDOW` as the fix** and do not move `RECOVERY_INDEX_OPTIMAL_HOURS`. Mean shift is
+  **4× the median**, the signature of a minority of nights where a spurious late dip beat the true
+  early minimum. Re-confirmed at **n=57, mean 2.653 h** (entry: 2.657 at n=42) and |Δbpm| **2.00**.
+  The other half is still owed; the review names the three candidates it could not separate.
 - **Plan:** none yet — **Lane A implements; Tuning proposes only.** This is a `devices` finding by the
   readiness code's own pre-registered rule, **not** a scoring change.
 - **Added:** 2026-08-18 · Tuning agent ·
