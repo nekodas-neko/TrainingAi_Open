@@ -6480,3 +6480,10 @@ app is restarted" from a true premise about the tab shell, and the reasoning sto
 short — the form that triggers the write is not in the shell. That shape (correct premise, correct
 inference, wrong scope) is the third premise failure of this session, and the block exists so the
 next reader sees the method rather than the four lines.
+
+## 2026-09-02 — `projectOverview.md` → 9270, `docs/implementation-backlog.md` → 15504 (LB-49 shipped)
+
+The backlog shrinks by LB-49's entry. `projectOverview.md` grows by a block that is mostly a list
+of what that entry got wrong, which is the part worth carrying: a name that does not exist, a lane
+justified by a rule that does not apply, a sync chain its own decision made unnecessary, and two
+missed write sites.

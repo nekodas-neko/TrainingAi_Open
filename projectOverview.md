@@ -27,6 +27,16 @@
 **Version:** v1.430.1 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-09-02.
 
+**A scale argument on the meal log, and four things its entry got wrong (LB-49).** `logMealItems`
+takes an optional `scale`, applied at write time to each item's multiplier and defaulting to 1 — so
+nothing is user-visible until Lane B ships the control. The entry named a function that does not
+exist (`logMealFromSaved`), justified the lane by calling it *"the single shared write function both
+server paths call"* when it is client-side and neither an API route nor `pushMutations` touches it,
+demanded a sync chain its own **scale-at-write-time** decision makes unnecessary, and named three
+write sites where there are **five** — the two it missed are the optimistic pushes, the pair that
+decides whether the diary agrees with the database
+([journal](docs/overview/entries/2026-09-02-meal-log-scale.md)).
+
 **A saved RMR test evicts the goal caches — and the entry's severity claim did not survive being
 measured (LB-48).** `measured-rmr` was in no cache group and its route invalidated nothing, so
 Profile's Recommended calories painted the previous resting rate before revalidating. The fix is the
