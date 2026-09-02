@@ -6653,3 +6653,19 @@ and the paragraph links to it.
 Both entries shrink on their own terms rather than needing a sweep: the status paragraph is replaced
 by the next session's, and the Known-Issues row **moves whole** to `known-issues-resolved.md` the
 moment the S25 walk happens.
+
+## 2026-08-30 — `projectOverview.md` 9397 → 9420 (+23), PS-17 and the auto-sync device gate
+
+Two Known-Issues rows, both of which have to be in the file every session reads before it can start.
+
+The first is a live scoring fault: a phantom afternoon "sleep" reached `oura_daily_summary` over the
+real night, so 2026-08-27 scored from an HRV of 26.5 and a resting HR of 64 — awake daytime values.
+It is long because the row has to carry the evidence: the three phantom sessions, the summary values
+either side of the bad day, and the fact that a fix needs a corrective recompute rather than only a
+selection change. A shorter row would have been re-derived by whoever picked it up.
+
+The second is the device-verification gate on Colmi auto-sync, which the Canonical Runtime rule
+requires: it ships unexercised by any radio, and the row states the one observation that would
+confirm it.
+
+Raised to 9420 rather than the exact 9417 so the next small row does not need its own note.
