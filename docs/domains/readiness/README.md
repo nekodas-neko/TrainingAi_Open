@@ -257,6 +257,13 @@ Live at the time of writing (2026-07-30):
 
 ## History
 
+
+- **[`../../reviews/2026-09-02-recovery-index-ble-smoothing-experiment.md`](../../reviews/2026-09-02-recovery-index-ble-smoothing-experiment.md)**
+  — 🆕 **Q-509's pre-registered experiment, run 2026-09-02 — and it FAILED its pass test.**
+  Smoothing the BLE overnight series before `computeRecoveryIndex`'s argmin recovers **0.487 h of
+  the 0.933 h gap (52%)**; the ratio reaches **0.875, not ~1.0**. **Do not ship a wider
+  `MEDIAN_WINDOW` as the fix, and do not move `RECOVERY_INDEX_OPTIMAL_HOURS`.** Re-confirms the
+  level shift at n=57 (mean 2.653 h) and the 2.00 median |Δbpm|. Half the shift is still unexplained.
 - [`docs/handoff-2026-08-24-readiness-scores-owner-batch.md`](../../handoff-2026-08-24-readiness-scores-owner-batch.md)
   — **the owner's readiness/battery batch, 2026-08-24.** Four owner questions in one session
   (daytime stress, Body Battery flooring, score volatility, the temperature deload trigger) →
