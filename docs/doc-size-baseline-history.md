@@ -6454,3 +6454,16 @@ it is strictly narrower than pull-to-sync rather than redundant with it. Both we
 long entry where an owner would never find them.
 
 The backlog is flat on net: Q-111's shipped form replaced a body of roughly the same length.
+
+## 2026-09-02 — `docs/implementation-backlog.md` → 15560 (BF-4 and Q-156 removed; a ratchet DOWN)
+
+The first entry in this file that lowers a baseline rather than raising one, which is the direction
+it is supposed to move and rarely does. 85 lines came out: two entries that had concluded in their
+own text and stayed in the queue anyway — BF-4 measured and closed, Q-156 traced to "no fix is
+warranted, and none was made".
+
+Neither finding was deleted with its entry. Q-156's conclusion moved to the sleep pillar's Gotchas —
+that `sleep_sessions.sleep_score` is a dead column, and that a per-night score has to come from
+`oura_daily` or `oura_daily_derived`, neither of which is complete. BF-4's closing measurement was
+appended to its own investigation doc, where the `r = +0.958` it retracts is written down. Deleting
+a finding to shorten a queue is how it gets re-discovered in three months.
