@@ -10660,6 +10660,19 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 ### [workouts] Q-514 — 64% of the engine's back-off load cuts are an expected-RPE clamp artefact
 
 - **Branch:** `fix/expected-rpe-clamp-exclusion`
+- **⚑ SHIPPED 2026-09-02** — the first action, exactly as scoped.
+  `isExpectedRpeRepresentable(pct, reps)` sits beside `expectedRpe` on the model's raw (pre-clamp)
+  expectation, and the per-exercise delta drops those sets instead of neutralising them. The loop
+  moved out of `signals.ts` into `perExerciseRpeDelta` in the same module, because the rule is only
+  testable without a 25-query repository mock once it is a pure function; `signals.ts` now calls it.
+  **`rpeTrendFromSets` deliberately still sees every set** — it is the emergency-deload safety net,
+  and the same +1.89 bias makes it fire slightly EARLY, which is the safe direction to be wrong in.
+  [journal](overview/entries/2026-09-02-q514-expected-rpe-clamp.md).
+- **Keep:** the re-measure, and it is **Tuning's, not Lane A's**. The entry's own next question —
+  *back-off 4.1% against push 7.9% is asymmetric the other way; is that right?* — can only be asked
+  now that the input is unbiased, and it needs the replay re-run, which is Tuning's instrument.
+  Read it with the caveat below: the counts are **triggers**, not issued cuts, because the replay
+  does not model `rm1Trend`, so the number of load cuts this prevents is well below 25.
 - **Plan:** none — a predicate plus a filter. **Lane A implements; Tuning proposes only.**
 - **Added:** 2026-08-18 · Tuning agent ·
   [`docs/reviews/2026-08-18-rpe-autoregulation-calibration.md`](reviews/2026-08-18-rpe-autoregulation-calibration.md)

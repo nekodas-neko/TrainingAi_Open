@@ -6856,6 +6856,20 @@ The entry's `First action` becomes `Superseded first action` rather than being d
 pre-registered pass test is still the pass test for anything that touches the estimator, and losing
 that would let the next session re-open a question this one narrowed.
 
+## 2026-09-02 — `projectOverview.md` → (see .size), `docs/implementation-backlog.md` → (see .size) (Q-514)
+
+The index grows by 11 and the backlog by 13, and in both cases the lines that earn their place are
+the ones a reader would otherwise get wrong. On the index: **`RPE_DEAD_BAND` does not move and the
+clamp does not widen** — both were measured, and a session reading "the back-off arm is too eager"
+without them would reach for exactly those two knobs. On the backlog: **`rpeTrendFromSets`
+deliberately still sees every set**, because the same bias makes the emergency-deload net fire early
+rather than late; without that line the untouched sibling reads as a missed surface under the
+sibling-sweep rule, and the next session narrows a safety net that nobody measured.
+
+The `Keep:` also carries the caveat forward, because the headline invites the wrong claim: 64% is a
+share of back-off *triggers*, and the replay does not model `rm1Trend`, so the number of load cuts
+actually prevented is well below 25.
+
 ## 2026-09-02 — `docs/implementation-backlog.md` → (see .size) (Q-515)
 
 Q-515 gains a block that contradicts its own recommendation, which is the expensive kind of line to
