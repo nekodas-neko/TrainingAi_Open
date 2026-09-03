@@ -7058,3 +7058,18 @@ cut first: the sweep-40 narrative went to two bullets, the ID-trap paragraph los
 "where the sweeps live" section lost the parts the pillar indexes already answer, and the Now section
 was rewritten from four bullets to three. What is left is state — which lenses are closed, which are
 owed, and the four method notes that cost a sweep each to learn.
+
+## 2026-09-03 — `docs/implementation-backlog.md` 16095 → 16140 (+45), PS-21
+
+One entry: the Colmi background sync service. It is long for one reason worth keeping — the entry
+has to carry the decision **not** to port the decoders to Kotlin, and the evidence for it. Three of
+this week's Colmi defects were decoder defects, each fixed once in TypeScript and applied
+retroactively by re-reading archived frames; a Kotlin copy makes each a double fix gated on an APK
+install. An implementer who reads only the heading would build the obvious thing, which is the
+2,208-line shape the plan exists to avoid.
+
+The measurement that motivates the work is also in the entry rather than only in the plan: last
+reading 11:45, checked 17:59, six hours missing because the app was not opened — and the four
+current-day-only metrics would have gone at midnight rather than back-filling.
+
+Raised to 16140 rather than the exact 16135 so a small follow-up entry does not need its own note.
