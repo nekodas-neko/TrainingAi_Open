@@ -6833,6 +6833,25 @@ without a queue entry is a dropped finding.*
 
 ### [sleep][platform] LB-53 — `oura_daily_derived` is written in occasional bulk passes, not per night
 
+> **✅ THE QUESTION THIS ENTRY SAID TO MEASURE FIRST IS ANSWERED (2026-09-03): the scores go STALE,
+> they are not ABSENT.** `created_at` on `oura_daily_derived` runs one row per day, each created the
+> day after the night it describes — 2026-08-22 created day 08-23, 08-23 created 08-24, unbroken
+> through 2026-09-02 creating 09-03 — with one catch-up of 5 rows on 2026-08-17. So a row exists from
+> the morning after, and it then holds its first value until a bulk pass rewrites it. Nothing was
+> missing during the nine-day gap. **That settles which of the two failure modes this is**, and it is
+> the less alarming one: no screen was ever blank, but a screen could show a days-old score.
+>
+> **The "four stamps in the whole history" reading is stale and the shape is different now.** As of
+> 2026-09-03 there is a bulk pass at **07:00:15Z** rewriting ~30 days in a single ~50 ms burst, and a
+> single-row write at **08:00:09Z** for that day only. So both cadences exist — an incremental
+> per-day write and an occasional whole-history rewrite. Re-read the stamps before building; this
+> entry's table was one snapshot.
+>
+> **The deploy hypothesis is NOT confirmed and should not be carried as if it were.** The 21:55 pass
+> landing minutes after #827 is one coincidence, and today's 07:00:15 bulk pass does not line up with
+> a merge (#838 merged 07:49, #839 later). Whatever schedules the bulk pass, a deploy is not
+> obviously it. Establish the trigger before designing around it.
+
 - **Lane:** A — the rollup (`lib/oura-ble/rollup/**`) and whatever schedules it. Found from Lane B
   while checking Q-529's own caveat; filing rather than building, per the lane rule.
 - **Added:** 2026-09-02 · measured against production while answering Q-529's *"re-read `computed_at`
@@ -10908,6 +10927,47 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   the term that is currently saturating. See Q-501 for why stored rows have not moved yet.
 
 ### [platform][devices] LA-56 — the full-history redecode has never once completed, and "abandoned" is a guess
+
+> **⚠ MEASURED 2026-09-03 — "abandoned" is NO LONGER a guess, and the workaround does not work
+> either.** The entry hedged because `reapStaleRedecodeJobs` is a pure `started_at` age check with no
+> heartbeat, so a reaped job might have been slow rather than dead. Production settles it.
+>
+> **`replaceOuraDailySummary` — the full-history write path — is `DELETE` all rows + `INSERT` all
+> rows in one transaction.** So a completed full-history pass leaves every row sharing ONE
+> `created_at`. That is the measurement this entry was missing, and it needs no instrumentation.
+>
+> | reading, 2026-09-03 08:35Z | value |
+> |---|---|
+> | `min(created_at)` on `oura_daily_summary` | **2026-08-17 07:50:31Z** |
+> | distinct `created_at` stamps across 59 rows | **17**, not 1 |
+> | `max(updated_at)` | 2026-09-03 06:59:31Z — *before* the 08:00 attempt started |
+>
+> Seventeen stamps means the table has been assembled night by night by `upsertOuraDailySummary`
+> ever since. **The last full-history redecode that completed was 2026-08-17**, which is exactly the
+> pass Q-535 measured at `scanned=1098158`. Since then there have been **three attempts and three
+> nothings**: the async jobs of 2026-08-30 and 2026-09-03 03:00 (both reaped at 30 minutes, no rows),
+> and the owner's **synchronous** run at ~08:00 on 2026-09-03, which had written nothing 35 minutes
+> later. The synchronous path is the documented workaround, and it is now measured not to work.
+>
+> **⚠ This retires the standing advice.** Both this entry and `projectOverview.md`'s
+> **Waiting on the owner** row told the owner to run the synchronous path "once only" because its own
+> note recorded it completing behind the 502. That note was true **on 2026-08-17** and is not true
+> now. Do not send anyone to that workaround again until this is understood.
+>
+> **The regression window is one day wide, and there is a candidate.** The last success was
+> 2026-08-17; the packing work landed **2026-08-18** — `oura_raw_packed`'s first pack carries that
+> date, and Q-541 Task 7 made `measured_at`/`event_name` derived the same day, removing the row-walk
+> that used to dominate. So the re-aggregate now reads a store that did not exist when it last
+> succeeded. **State this as a lead, not a cause** — it is a correlation across a model change, which
+> is the trap `docs/data-layer-rules.md` names; nothing here has profiled the re-aggregate.
+> **The next step is a measurement, not a fix:** run the full-history re-aggregate against a copy
+> with timing per phase, or add phase timings behind the existing job row, and find where it stops.
+> The heartbeat this entry already owes would answer "is it alive?" for free, which is now the more
+> valuable half of it rather than the optional one.
+>
+> **Not yet checked:** whether the process is alive and slow, or dead. Distinguishing those is
+> precisely the heartbeat, and until it exists this measurement says only that the work does not
+> land, never why.
 
 - **Branch:** `fix/redecode-job-heartbeat` · **Lane:** A
 - **Added:** 2026-09-02 · found when the owner ran the pass TN-1 and Q-525 have been waiting on.

@@ -7182,3 +7182,33 @@ just deleting it is what stops a later session restoring it from the prose that 
 
 The `Math.round` note in the journal is the third thing worth its length: a surviving mutation that
 turned out to be a real off-by-one on some values, not a gap in the tests.
+
+---
+
+## 2026-09-03 — `docs/implementation-backlog.md` 16398 → 16458 (LA-56 + LB-53 measurements, Lane A)
+
+Two production measurements, onto two entries, on the same branch because they came from the same
+half-hour of queries and neither is code.
+
+**LA-56 (+43).** The entry hedged that "abandoned" was an inference, because the reaper is a pure
+start-age check with no heartbeat. It is now a measurement, and the lines that earn their space are
+the *method*: `replaceOuraDailySummary` deletes and reinserts every row, so a completed full-history
+pass leaves one shared `created_at`. There are 17, and the oldest is 2026-08-17. That is a way of
+dating the last successful pass that needs no instrumentation and would otherwise have to be
+rediscovered, and it is the reason the entry can now state three failed attempts rather than suspect
+them.
+
+The rest is a **retraction**, which is why it is emphatic rather than brief: both this entry and the
+owner-facing table told the owner to run the synchronous path as a workaround, on the strength of a
+note that was true on 2026-08-17 and is not true now. A workaround that silently does nothing is
+worse than none, because the 502 looks identical either way. Retractions get written at the length it
+takes for the next reader not to re-adopt the advice.
+
+**LB-53 (+17).** Its own "measure this first" question — stale scores or absent rows — is answered
+(stale; rows are created the morning after, unbroken). Also two corrections: its four-stamp table is a
+stale snapshot, and the deploy hypothesis it floats does not survive today's data. Recording that a
+hypothesis failed is worth more than the lines it costs, because the alternative is the next session
+building around it.
+
+`projectOverview.md` is unchanged in length — the **Waiting on the owner** row was rewritten in place
+from "run it once only" to "do not attempt".
