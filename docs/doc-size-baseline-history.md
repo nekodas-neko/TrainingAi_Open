@@ -7115,3 +7115,27 @@ so a run that completes after being reaped discards its own result — the work 
 says it was abandoned. And the synchronous workaround has **no in-flight guard**, so a second press
 is two concurrent full-history passes, which is the starvation that took production down on
 2026-08-13.
+
+## 2026-09-03 — Review sweep 44 (RV-41)
+
+`docs/implementation-backlog.md` 16227 → 16267 (+40), `projectOverview.md` 9683 → 9700 (+17),
+`docs/agents/state/review.md` 184 → 194 (+10).
+
+RV-41's length is one table and one quotation, and neither compresses. The quotation is the finding:
+the schema's own comment names *"set my calories to 26000"* as the thing its bound refuses, and the
+bound accepts it — without the sentence the entry is an opinion about a number, and with it the
+implementer can see the guarantee that was intended. The table is the seven fields with both
+validators' bounds side by side, which is what turns "the Coach bound is loose" into "one column has
+two validators and the LLM writes through the looser one" — a different fix, and the reason the entry
+says to import the user routes' bounds rather than pick new constants.
+
+Two lines exist to stop the wrong fix. One says not to widen the user routes to match, because the
+direction is not obvious from the numbers alone. The other records that `stepsGoal` is the single
+field where the Coach is *tighter*, so a sweep that assumes one direction throughout gets that one
+backwards.
+
+**The baton grew because it now carries four sweeps.** It was compressed at every previous raise this
+session, and this one folds rather than appends: the new method note absorbed the payload-assertion
+bullet, the contrast list took a seventh instance on the same line, and the "still owed" block merged
+three sentences into one. What remains is state — the five closed lenses, the surfaces that are
+unverified rather than clean, and the four method notes that each cost a sweep.

@@ -5,8 +5,8 @@
 > 🔴 handed on) and is the only part that moves. A session self-titles 🟢 on its first instruction and
 > flips itself to 🔴 as the last step of its handoff, after the baton and every PR have landed.
 
-**Updated:** 2026-09-03 · **By:** forty-three sweeps (2026-08-17 ×2, 2026-08-18 ×37, 2026-08-20 ×1,
-2026-09-03 ×3) · **Next ID: `RV-41`.**
+**Updated:** 2026-09-03 · **By:** forty-four sweeps (2026-08-17 ×2, 2026-08-18 ×37, 2026-08-20 ×1,
+2026-09-03 ×4) · **Next ID: `RV-42`.**
 
 > **Sweep 40's run is closed and nothing is owed from it** — RV-32, RV-33, RV-34 all shipped, verified
 > in source rather than taken from the closure note, and their `projectOverview.md` row is in
@@ -43,21 +43,23 @@ before the guard under test ran: `PATCH /api/activity-logs/<id>/metrics` (cross-
 unknown), and RV-40's `POST /api/complete-workout` and `POST /api/log-exercise` (malformed-id
 behaviour unknown). **A 4xx is not evidence the guard fired** — read which field it names.
 
-## Now — sweeps 41, 42, 43 filed (2026-09-03). **Next ID: `RV-41`.**
+## Now — sweeps 41–44 filed (2026-09-03). **Next ID: `RV-42`.**
 
-41 and 42 ran the owner's lens (mobile UI: safe area and back-and-return scroll; cache staleness);
-43 took the Next list's rule (a). **41** →
+41–42 ran the owner's lens (mobile UI: safe area, back-and-return scroll, cache staleness); 43 took
+rule (a); 44 the owner's nutrition/workouts/coach ask. **41** →
 [write-up](../../reviews/2026-09-03-nutrition-day-rollover-and-scroll-coverage.md), RV-35/36/37.
 **42** → [write-up](../../reviews/2026-09-03-first-run-honesty-and-instant-paint.md), RV-38/39.
 **43** → [write-up](../../reviews/2026-09-03-ownership-rule-a-and-body-supplied-ids.md), RV-40.
+**44** → [write-up](../../reviews/2026-09-03-coach-write-bounds-vs-user-routes.md), RV-41.
 
-- **A guard that exists is not a guard that reaches — all six findings are this.** `useLocalDay()`
+- **A guard that exists is not a guard that reaches — all seven findings are this.** `useLocalDay()`
   (BF-86) has 3 consumers; `useScrollRestoration` (BF-100) rides `pull-to-sync.tsx`, which 3 screens
   use; `tabs-instant-paint.spec.ts` guards the 5 screens that never unmount and none of the ~20 that
   do; the "Limited data" badge is gated on `hasData`, so the no-data case cannot reach it; and
   `invalidUuidResponse` is used by 27 route files, **27 of 27 of them dynamic `[id]` routes and zero
-  body-id routes**. **Grep the call sites, and read the guard's own comment for the population it
-  assumed** — that last one names its scope outright and nobody noticed the gap it implies.
+  body-id routes**; the Coach's goal bounds are a second validator on columns the user routes already
+  bound, five times looser. **Grep the call sites, and read the guard's own comment** — two of
+  these name their own scope or guarantee, and neither holds.
 - **The zero-data account reaches a state nothing else can** and was pointed at 2 screens. All 22 took
   one loop and found RV-38 at once. Re-run it whenever a scoring surface changes — the seeded user has
   data for everything, so a fabrication is invisible there.
@@ -65,23 +67,28 @@ behaviour unknown). **A 4xx is not evidence the guard fired** — read which fie
   shows 50" is not a finding; "the route says `hasData: false` and the card shows 50" is. Health
   reissued 11 requests on resume and only 3 carried the new day — a raw count would have been wrong
   three ways.
+- **Test the comment, not just the code, and send the same value to both surfaces.** RV-41 was a doc
+  comment's own worked example (*"set my calories to 26000"*) sent as a request. Where two paths write
+  one column, drive both in the same session — read from source, the divergence is invisible and its
+  direction easy to get backwards.
 
 **Closed clean, do not re-sweep:** the seven `freshWithinTtl` sites (every writer is in a group);
 `check-fetch-once-effects.js`'s CAN-BITE group (empty); instant paint on the sub-routes (13 of 14);
-the first-run render (21 of 22 routes); **and ownership rule (a) — all three rules now have
-evidence.** **Still owed:** RV-37 and RV-39 need the device, RV-38's stronger-treatment question needs
-the owner, and RV-40 leaves `POST /api/complete-workout` and `POST /api/log-exercise` **unverified,
-not clean**.
+the first-run render (21 of 22 routes); ownership rule (a) — **all three rules now have evidence**;
+and the Coach apply path's five domain handlers, now all driven end to end (write, undo, 404
+cross-user, 409 stale-with-drift). **Still owed:** RV-37 and RV-39 need the device; RV-38's and
+RV-41's bound questions need the owner; RV-40 leaves two routes **unverified, not clean**.
 
 ## Carried from sweep 40 ([write-up](../../reviews/2026-08-20-non-workout-write-surface-ownership.md))
 
 - **✅ All three write-path ownership rules now have evidence.** (b): 116 mutating routes, 325
   `.set()` sites, all built field by field (sweep 40). (c): produced RV-32. (a): 21 unscoped child
   deletes across 12 functions, all guarded, both source incidents reproduced and refused (sweep 43).
-- **A cheap contrast beats a long argument**, used six times now: *PUT 400, POST 201* (RV-32);
+- **A cheap contrast beats a long argument**, used seven times now: *PUT 400, POST 201* (RV-32);
   `/more` restores 840 and `/nutrition` returns 0; Home rolls the day over and Nutrition does not;
-  streak says `—` and Body Battery says 50; three routes say `400 Invalid id` and two say 500. Find
-  the surface that already does it right before arguing that it should.
+  streak says `—` and Body Battery says 50; three routes say `400 Invalid id` and two say 500; the
+  user's form refuses 26,000 kcal and the Coach stores it. Find the surface that already does it right
+  before arguing that it should.
 
 ## Next — in the order they are worth doing
 
@@ -100,6 +107,9 @@ left three CI checks behind (`check-known-issue-duplication`, `check-index-doc-p
   and Q-313 (no `next build` gate in the publish dry-run) is why it is worth doing.
 - **The sync/outbox under a server that fails mid-push, on the device half.** Sweep 10 drove the
   server half; the local SQLite outbox has never been exercised, and it needs hardware.
+- **`/api/coach/preview`, still unprobed** after three Coach sweeps — and **whether the model proposes
+  sane numbers**, which no sweep has touched because every patch has been hand-written. RV-41 makes
+  the second one matter more than it did.
 - **Q-452's siblings — partly done by sweep 42, and what remains is narrower.** All 22 routes were
   driven as the zero-data account and are honest bar RV-38, so the *rendering* half is swept. Still
   untouched: `weekly-digest` and the coach, neither of which produces output for a zero-data account
