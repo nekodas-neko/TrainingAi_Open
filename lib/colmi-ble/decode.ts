@@ -260,6 +260,10 @@ export function decodeBigData(value: ArrayLike<number> | null | undefined): Colm
   }
 }
 
+/** The ring's own stage encoding: 2 light, 3 deep, 4 REM, 5 awake. Nothing else is a stage, which
+ *  is what makes this the boundary check on a series whose declared length can over-count. */
+const SLEEP_STAGES = new Set([2, 3, 4, 5])
+
 function decodeSleep(v: number[], length: number): ColmiFrame {
   if (length < 2) return { kind: 'sleep', sessions: [] }   // the ring's "no sleep history" answer
   const dayCount = v[6]
@@ -272,14 +276,24 @@ function decodeSleep(v: number[], length: number): ColmiFrame {
     const startMinute = u16(v[i], v[i + 1]); i += 2
     const endMinute = u16(v[i], v[i + 1]); i += 2
     const stages: SleepStageSpan[] = []
-    // dayBytes counts the 4 start/end bytes plus 2 per stage span.
-    for (let j = 4; j < dayBytes; j += 2) {
-      if (i + 1 >= v.length) break
-      const stage = v[i]
-      const minutes = v[i + 1]
-      i += 2
+    // `dayBytes` counts the 4 start/end bytes plus 2 per stage span — but it can OVER-COUNT, and
+    // the over-count is not zeros. Captured 2026-09-02: two syncs of the same night, one declaring
+    // 42 stage-bytes and one declaring 60. The first 42 were byte-identical; the extra 18 were
+    // `00 ff 00 ff 00 ff 00 aa 03 01 00 ff 00 ff 00 02 02 06` — trailing junk that decoded to three
+    // spans of stage 0 for 255 minutes each and turned a 6.3-hour night into 19.1 hours.
+    //
+    // So the declared length bounds the block but does not vouch for its contents. The stage series
+    // is contiguous, so the first byte that is not a stage is the end of it — and 0 is not a stage.
+    const dayEnd = i + Math.max(0, dayBytes - 4)
+    for (let at = i; at + 1 < Math.min(dayEnd, v.length); at += 2) {
+      const stage = v[at]
+      const minutes = v[at + 1]
+      if (!SLEEP_STAGES.has(stage)) break                   // walked off the end of the real series
       if (minutes > 0) stages.push({ stage, minutes })      // a zero-length span is padding
     }
+    // Advance by the DECLARED length whatever the series did, so a junk tail cannot shift the day
+    // that follows it.
+    i = dayEnd
     sessions.push({ daysAgo, startMinute, endMinute, stages })
   }
   return { kind: 'sleep', sessions }

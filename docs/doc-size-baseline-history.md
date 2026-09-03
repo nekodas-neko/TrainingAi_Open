@@ -7072,4 +7072,18 @@ The measurement that motivates the work is also in the entry rather than only in
 reading 11:45, checked 17:59, six hours missing because the app was not opened — and the four
 current-day-only metrics would have gone at midnight rather than back-filling.
 
-Raised to 16140 rather than the exact 16135 so a small follow-up entry does not need its own note.
+Raised to 16185 rather than the exact 16180 so a small follow-up entry does not need its own note.
+
+## 2026-09-02 — `docs/implementation-backlog.md` → (see .size), `projectOverview.md` → (see .size) (LA-56)
+
+A new entry, filed the moment the owner ran the pass three docs had been waiting on and it failed.
+The lines that earn their place are the ones separating what was observed from what was inferred:
+both jobs stopped at the staleness window to within a poll interval, neither wrote a row, and the
+reaper's *"the process most likely restarted mid-run"* is a **guess** — it is a pure age check with
+no heartbeat. That sentence has now been read as a fact twice.
+
+Two warnings are load-bearing rather than cautious. `finishRedecodeJob` filters `isNull(finishedAt)`,
+so a run that completes after being reaped discards its own result — the work lands while the record
+says it was abandoned. And the synchronous workaround has **no in-flight guard**, so a second press
+is two concurrent full-history passes, which is the starvation that took production down on
+2026-08-13.
