@@ -835,6 +835,92 @@ clock until proven otherwise (Q-56), and it must not be relaxed to admit these.
   would make the tile instant and work offline, but it duplicates a formula One Formula, One Place
   says lives once, and the `node:path` read is the coupling that keeps it server-side.
 
+### [platform][workouts][nutrition] 🔵 BF-118 — "User Information": one place the app knows you from, and one assembler every AI route reads
+
+- **Lane:** A for the store and the assembler; B for the section itself. **Needs a plan document
+  before implementation** — this is a feature spanning five pillars, not a fix, and the backlog
+  protocol says plan first.
+- **Added:** 2026-09-04 · owner: *"I want to create a section called 'user information'… I could
+  upload documents or type etc and the ai will summarize it into important key notes… I will upload
+  my xray showing my lumbar issues — or I could say what days I have work or my schedule or injuries
+  or medical conditions. And when we use the workout generator or nutrition calculator or anything
+  that requires user information it will read from there and get context too… so say im making a
+  workout — it will read my personal info section; and not recommend heavy lower back lifts… user
+  awareness is what I want."*
+- **Needs:** BF-41 — the document intake pipeline. Not a blocker for the whole entry, only for the
+  upload half; the free-text half and the assembler can ship first and are the larger win.
+
+**Most of this exists, which changes what the work is.** Traced against `main` 2026-09-04:
+
+| the owner's ask | today |
+|---|---|
+| injuries | **`injuries` table, and the workout half of his exact example already ships** |
+| DEXA / RMR | `dexa_scans`, `measured_rmr` + typed forms (BF-71) |
+| blood tests | `blood_panels`, `blood_analytes` (BF-1) |
+| upload a document, have it fill itself in | **BF-41**, queued and promoted twice by the owner |
+| free text — work days, conditions, anything else | **nothing. No store, no surface.** |
+| "anything that requires user information reads from there" | **workouts only** |
+
+**The flagship example is already built and he has not seen it.** BF-68 shipped 2026-08-31 from a
+near-identical request (*"i have a sore lower back, so would rather not heavily loaded lower back
+exercises"*): `generate-program`, `builder-chat` and `coach/options` all read `repo.listInjuries()`,
+and — this is the part that matters — **the exclusion happens on the candidate list, not in the
+prompt**, via `excludeInjuredExercises`. It is a hard rule the model cannot talk itself out of. What
+BF-68 did *not* ship is the UI half: nothing on the wizard says the constraint is active, which is
+exactly why the owner is asking for a feature he partly has.
+
+**So the missing piece is not storage. It is one shared assembler.**
+`packages/shared/src/workout/injury-context.ts` — `formatInjuryContext` — is the prototype: a single
+formatter, exported so a second consumer imports it rather than re-writing it. There is no equivalent
+that gathers *everything* the app knows, and the proof is that **`app/api/nutrition/**` and
+`app/api/ai/**` read none of these stores** — not injuries, not DEXA, not blood, not RMR. Each new
+consumer today means a new hand-rolled gather.
+
+- **Recommendation, in three parts, in this order.**
+  1. **A `user_context` free-text store** — dated, titled, editable notes with a kind
+     (`condition` · `constraint` · `schedule` · `note`). This is the only genuinely new storage, it is
+     small, and it is what unblocks "type anything".
+  2. **A shared context assembler** — one module, the `formatInjuryContext` shape widened, that
+     returns the app's whole picture of the user, and which `generate-program`, `builder-chat`, the
+     nutrition recommender and the AI chat all import. **This is "user awareness"**, and it is glue
+     over stores that already exist rather than new data.
+  3. **The section itself** — a More → User Information screen showing what the app knows, per
+     source, editable. The screen is also the answer to BF-68's missing UI half: a constraint you can
+     see is one you can trust.
+- **⚠ The hard/soft split is the design decision this entry exists to force, and getting it wrong is
+  the failure mode.** A structured record (`injuries`) can be enforced by *filtering the candidate
+  list* — deadlifts are removed, and no phrasing brings them back. Free text can only ever be handed
+  to a model as prose, which BF-68 already found to be *"luck rather than a rule"*. So: **free text
+  and documents are summarised into structured records the owner reviews and can edit**, and it is
+  those records that constrain generation. Prose must never be the only thing standing between a
+  lumbar injury and a loaded deadlift.
+- **⚠ CROP BEFORE UPLOAD — the owner's own rule (BF-1), and an X-ray is the sharpest case yet.** The
+  extraction call sends the image to Google, so *redacting after extraction is too late*. His RMR
+  printouts carry a name and date of birth in the header band; imaging carries the same plus an
+  accession number and often the referrer. The crop step must be the **default path**, shown before
+  anything can be sent, never auto-sending a freshly-picked photo.
+- **⚠ An X-ray is not the same object as a report, and BF-41's pipeline does not cover it.** That
+  pipeline extracts *labelled numbers* from a results printout into an existing form. The useful
+  content of imaging is the **radiologist's findings text**, and what the app needs from it is one or
+  two constraints ("avoid axial loading"), not fields. **BF-41 also decided that no source document is
+  stored** — extract, confirm, save the fields, discard the file — so an image itself has no home
+  today, and giving it one is a separate decision with its own storage, retention and privacy weight.
+  **Do not quietly reverse that decision inside this entry.**
+- **⚠ "What days I have work" is not the existing `schedules` table.** That one is *"which session
+  runs on which day"* — training structure, user-defined, and load-bearing. Availability is a
+  different concept and must not be pushed into it.
+- **Out of scope, and worth stating because medical documents invite it:** the app records and applies
+  what the owner tells it. **No diagnosis, no interpretation of imaging, no medical advice.** A
+  summary of an uploaded report is a restatement for the owner to check, never a finding. The repo's
+  standing AI rule applies with force here — no model-reported value may gate an automatic action or
+  be shown as fact.
+- **Verification:** a typed constraint about the lumbar spine produces a program with no loaded
+  lower-back work *and* a visible reason on the wizard; the same constraint still applies weeks later
+  when the daily engine writes a session (BF-68's point — a builder-only constraint dies at save); the
+  nutrition recommender cites something from this section; and every summarised note is visible and
+  editable at its source rather than only inside a prompt.
+
+
 ### [app-shell] BF-117 — a day rollover re-prompts the check-in and refreshes nothing else; Home keeps yesterday until the app is killed
 
 - **Lane:** B — `app/session-select/session-select-content.tsx`. One effect. **No engine change.**
