@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import { withSentryConfig } from "@sentry/nextjs";
 import { buildCsp } from "./lib/security/csp";
 
 const isDev = process.env.NODE_ENV === 'development';
@@ -98,4 +99,33 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+// BF-92. Sentry was wired correctly and heard nothing from the browser for 13 days: `connect-src`
+// never got the ingest host, so every client event was refused before it left the page — while the
+// homegrown reporter, which POSTs same-origin to `/api/client-error`, landed 9 rows over the same
+// window on the same device. Same app, same errors, different origin, opposite outcome.
+//
+// **Tunnelling rather than opening `connect-src` to the ingest host, and the difference matters.**
+// `tunnelRoute` rewrites the browser's POST to a same-origin path that `connect-src 'self'` already
+// permits, and the server relays it — so this cannot be silently broken again by the next edit to
+// `lib/security/csp.ts`, which is exactly how it broke the first time. The alternative was a second
+// host in a header whose comments show it has been reasoned about host by host, defended by nothing
+// but a comment. `instrumentation-client.ts` carried precisely that comment, predicting precisely
+// this failure, and the host was never added: a comment describing a hazard is not a guard.
+//
+// A fixed path rather than `true` (a fresh random path per build): the route has to be named in
+// `middleware.ts`'s matcher to survive the auth gate, and a name that changes every deploy cannot be.
+export default withSentryConfig(nextConfig, {
+  tunnelRoute: '/monitoring',
+  // Our build data is not Sentry's to have. Consistent with `sendDefaultPii: false` and no replay —
+  // the reason this vendor was accepted at all was alerting.
+  telemetry: false,
+  // Uploading needs `SENTRY_AUTH_TOKEN`, which CI does not have and should not. Without this the
+  // plugin warns on every build about work it cannot do, and a warning nobody can action is noise
+  // that hides the ones that matter. `deleteSourcemapsAfterUpload` keeps the maps off the public
+  // origin when the token IS present, so a stack trace is readable in Sentry without shipping the
+  // sources to anyone who asks for them.
+  sourcemaps: {
+    disable: !process.env.SENTRY_AUTH_TOKEN,
+    deleteSourcemapsAfterUpload: true,
+  },
+});

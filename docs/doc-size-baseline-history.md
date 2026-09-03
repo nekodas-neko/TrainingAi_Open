@@ -7185,6 +7185,29 @@ turned out to be a real off-by-one on some values, not a gap in the tests.
 
 ---
 
+## 2026-09-03 — `docs/implementation-backlog.md` 16398 → 16432 (BF-92, Lane A)
+
+Thirty-four lines onto BF-92, recording that the code half of the Sentry client blackout shipped and
+what specifically is still owed. They earn the space because **the entry named one gate and there
+were three**: `connect-src`, then the auth matcher in `middleware.ts` (which would have 307'd an
+unauthenticated report to `/sign-in`), then the service worker's catch-all branch (which would have
+`cache.put()` a POST and raised an unhandled rejection on every successful report). Only the first
+had been found by reading. Recording all three is what stops the next session "fixing the CSP" and
+declaring it done, which is precisely the shape of the original failure.
+
+Two of those lines are the note that the tunnel rewrite lands in `routes-manifest.json` under
+**`afterFiles`**, not `beforeFiles`. The first verification here read the empty `beforeFiles` and
+concluded the change had not taken effect at all. A wrong "it didn't work" costs more than a wrong
+"it worked" in a repo that gates on device verification, because it invites reverting a correct fix.
+
+The owner-visible trade-off — excluding the tunnel path from the auth gate widens it to
+unauthenticated callers — is written on the entry rather than only in the journal, because that is
+the file a session reads before deciding whether the item is finished.
+
+Also `projectOverview.md` 9725 → 9726, for the **Waiting on the owner** row that carries the same
+trade-off. It belongs in that table rather than only on the entry because the widening is the one
+thing here a session must not decide on the owner's behalf, and that table is the place the owner
+reads rather than the queue.
 ## 2026-09-03 — `docs/implementation-backlog.md` 16398 → 16458 (LA-56 + LB-53 measurements, Lane A)
 
 Two production measurements, onto two entries, on the same branch because they came from the same
@@ -7467,6 +7490,24 @@ reachability check has always been advisory and has never once confirmed the hop
 Also recorded, because it caps anyone else's attempt the same way: the evidence needed next lives in
 the run artifact, and a session with no artifact download cannot open it.
 
+---
+
+## 2026-09-03 — BF-92's auth-gate decision, recorded on the entry and in the owner table
+
+The tunnel ships behind the auth gate. The lines are worth their space because the decision turns on
+something easy to miss and easy to re-litigate: **the reported defect is fixed either way.** A
+signed-in request falls through `middleware.ts` without a redirect, and BF-92's 13 days of silence
+happened while the owner was signed in — so excluding `/monitoring` would have bought errors from the
+sign-in screen, a bonus, not the fix.
+
+Recorded alongside it, because the risk is as easy to overstate as the benefit: an unauthenticated
+tunnel is bandwidth and reputation, **not** extra exposure of our own Sentry project, whose DSN
+already ships in every client bundle. Someone re-reading this in six months should not have to
+re-derive either half.
+
+The cost is written down too — sign-in-path errors remain uncaptured by anything, since
+`/api/client-error` requires auth — with the condition that would justify revisiting: a sign-in
+failure nobody can diagnose.
 ## 2026-09-04 — `docs/implementation-backlog.md` → 17087 (BF-117, the day-rollover refresh)
 
 One entry plus six lines onto BF-86. The owner re-reported something BF-86 had deliberately left

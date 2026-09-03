@@ -1778,6 +1778,61 @@ gates — and it is the reason the parked count still overstates blocking after 
 
 ### [platform] BF-92 — Sentry is connected, correctly written, and receiving nothing from the client
 
+> **✅ THE CODE HALF SHIPPED 2026-09-03 (Lane A). The device check is what remains, and it is the
+> whole gate.** `next.config.ts` now wraps the config in `withSentryConfig` with
+> `tunnelRoute: '/monitoring'`, so the browser POSTs **same-origin** — which `connect-src 'self'`
+> already permits — and Next rewrites it on to `*.ingest.sentry.io`. **No CSP edit**, per this
+> entry's own recommendation ①, so the next edit to `lib/security/csp.ts` cannot silently break it
+> again.
+>
+> **✅ THE AUTH-GATE QUESTION IS DECIDED (2026-09-03): the tunnel stays BEHIND the gate.** The owner
+> delegated the call. What settled it is that **the reported defect is fixed either way** — a
+> signed-in request falls through `middleware.ts` without a redirect, so the tunnel works for every
+> session, and BF-92's 13 days of silence happened while the owner was signed in. Excluding the path
+> would only have added errors from the **sign-in screen**, which is a bonus rather than the fix.
+>
+> Against that: exclusion makes `/monitoring` an unauthenticated relay. The SDK installs it as a Next
+> *rewrite*, so `?o=<org>&p=<project>` are caller-supplied and anyone could forward an envelope to
+> another Sentry project through this domain. ⚠ **Note what that is and is not** — it is bandwidth
+> and reputation, **not** extra exposure of our own project, whose DSN already ships in every client
+> bundle by design. Small either way, and one line either way; the deciding argument is that a new
+> unauthenticated surface should not be taken for a speculative bonus.
+>
+> **What this costs, stated plainly: errors on the sign-in path are still uncaptured** — by Sentry
+> now, and by `/api/client-error` always, since that route requires auth. The first-run APK flow that
+> `middleware.ts`'s own comment records as fragile therefore still has no reporting.
+> **To revisit, the evidence to look for is a sign-in failure nobody can diagnose**; adding
+> `monitoring|` to the matcher's negative lookahead is the whole change.
+> `sentry-tunnel-reachability.test.ts` now pins the gated state, so reintroducing the exclusion is a
+> deliberate decision rather than a tidy-up.
+
+> **The middleware was a second, undiscovered instance of the same bug.** `/monitoring` fell inside
+> `middleware.ts`'s matcher and is in no `PUBLIC_PATHS`, so an unauthenticated report would have
+> been 307'd to `/sign-in` and dropped — the identical silent drop, moved from the CSP to the auth
+> gate. It is excluded from the matcher now. That is a genuine **widening**: `/monitoring` is
+> reachable without a session. ⚠ **Owner-visible trade-off** — it buys the errors most worth having
+> (the sign-in path has no session by definition, and `/api/client-error` requires auth, so it has
+> never captured one), and it costs a relay that could forward an envelope to another Sentry project
+> via this domain. No data of ours, no auth surface, no database; the rewrite's destination host
+> pattern is fixed by the SDK. One line to revert if the owner would rather not.
+>
+> Also: recommendation ③ shipped — `sentry.server.config.ts` logs one line at boot naming whether
+> **each** DSN was found (the server process can read the `NEXT_PUBLIC_` one too, so one server log
+> covers the path that has no log of its own). The DSN value itself is never printed.
+>
+> **Verified in the sandbox, end to end at the artefact level, not by intent:** a real `pnpm build`
+> emits the tunnel rewrite into `routes-manifest.json` (`afterFiles`, with both the region and
+> non-region variants) and bakes `_sentryRewritesTunnelPath="/monitoring"` into the client chunks;
+> the built `middleware-manifest.json` regex carries the `monitoring` exclusion. ⚠ **The first read
+> of this said the rewrite had NOT landed — it was read from `beforeFiles`, which is empty. Check
+> `afterFiles`.** `lib/security/__tests__/sentry-tunnel-reachability.test.ts` holds all of it
+> (mutation-checked: reverting the matcher fails it), including an assertion that no Sentry host
+> reappears in `connect-src`, since that would mean somebody had reverted to the shape that broke.
+>
+> **NOT verified: that an event actually arrives.** That needs the APK and a deliberate throw — it is
+> the `Gate: device` below, unchanged, and it is still the only thing that proves this.
+> [`journal`](overview/entries/2026-09-03-sentry-client-tunnel.md).
+
 - **Lane:** A — `lib/security/csp.ts` and the Railway environment. No application code is wrong.
 - **Added:** 2026-09-01 · owner: *"have a look into sentry.io we did connect this and have it
   working. not sure if its being used."* The first half is right — it is connected and the

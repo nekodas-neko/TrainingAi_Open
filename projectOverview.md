@@ -1592,7 +1592,7 @@ window, then the newest `history-*.md`. The 157 dated status notes this section 
 **One place to look for everything the engine cannot unblock itself.** Each row is verified against
 the code or against production data, not inferred, and each has a `Gate:` or `Verify:` field on its
 backlog entry so `next-item.js` parks it instead of handing it to the next implementer as ready work.
-Last swept **2026-09-02**.
+Last swept **2026-09-03**.
 
 | What | Why it needs you | Where it is recorded |
 |---|---|---|
@@ -1606,6 +1606,7 @@ Last swept **2026-09-02**.
 | **The movement-per-hour boundary** | Same boundary as the anchor decision above, so it waits on it. Saturated at **856 of 857 waking hours** — it measures ring wear. | Q-522 |
 | **Body Battery's drain model** | The replacement is **already owner-confirmed and fitted** (goal-normalised `c`, BMR-proportional baseline). It is sequenced behind the anchor decision above, so that one release unblocks it. Today `0` means *"you wore the ring a long time"*, close to the opposite of what you asked for. | Q-521 |
 | **Whether to close Q-283** | Its "~11 MB of unused indexes" is now **800 kB** once primary keys and unique constraints are excluded, and its one real candidate was already dropped. Implementing it means a destructive migration for 0.4% of the database. | Q-283 |
+| ~~Approve the Sentry tunnel's widening~~ | ✅ **DECIDED 2026-09-03 — delegated, and reverted.** The tunnel ships behind the auth gate: a signed-in request falls through, so BF-92's reported defect (13 days of browser silence while signed in) is fixed without it. Exclusion would only have added sign-in-screen errors, at the cost of an unauthenticated relay to any Sentry project via this domain. **Still owed: the device check** — a deliberate throw from the APK appearing in the dashboard. | BF-92 |
 | **Where "Exercise detected" gets its data** | Its only writer was the Oura Cloud sync. Either the BLE classifier feeds the existing review UI, or the card and its route retire. Either branch is a different feature. | Q-231 |
 
 ## ⚠️ Known Issues & Risks With Recently Shipped Features
