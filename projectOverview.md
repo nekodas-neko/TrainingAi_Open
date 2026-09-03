@@ -26,8 +26,22 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.436.1 · **Branch:** `main` · Railway auto-deploys on push to `main`.
-**Last updated:** 2026-09-02.
+**Version:** v1.436.3 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Last updated:** 2026-09-03.
+
+**The HR Recovery Profile now says how much of it is signal (Q-516).** `aggregateHrRecoveryProfile`
+has returned `informativeShare` since the re-banding and **nothing rendered it** — the state the
+entry warned about in its own words: *four populated buckets look like a working feature whether or
+not they are.* The card states the share, emphasised below half, where it stops being a footnote
+about the dimmed rows and becomes the headline about the table. A share of 1 stays silent.
+**⚠ THE ENTRY WAS UNREACHABLE FROM EITHER QUEUE and that is the durable finding:** two bare lane
+mentions disagreed — the `Keep:` said Lane B, a stale line eleven lines below still said *"Lane A
+implements"* — so `laneFromLines` returned `?` and `next-item.js` filed it under UNCLASSIFIED, where
+neither lane looks. Found by auditing the queue, not by taking the next READY item.
+**BF-94's `Needs: BF-84` was also discharged** (that storage shipped 2026-09-01) while its real
+blocker, BF-61's device check, sat in prose the parser cannot read; it is a `Gate: device` now.
+**Not device-verified** — the seed has no `set_hr_stats`, so the emphasised branch has never been on
+a screen ([journal](docs/overview/entries/2026-09-03-q516-hr-recovery-honesty.md)).
 
 **A still-syncing sleep score now says so (Q-529).** The owner saw a night scored **47** at 06:46
 while the ring was still uploading; it settled at **62**. **The entry's central claim was already

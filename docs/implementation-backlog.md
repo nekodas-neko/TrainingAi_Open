@@ -1189,7 +1189,14 @@ computes that as `entries` (`:35`, from `groupDiaryEntries`). One group is one r
 
 - **Lane:** B — `app/session-select/components/recommendation-card.tsx:252-296` and
   `components/ui/swipe-actions.tsx`.
-- **Needs:** BF-84
+- **Gate:** device — BF-61's fast-tap check, per the warning further down this entry. It was stated
+  only in prose, so `next-item.js` could not see it while the `Needs:` it *could* see had already
+  been discharged.
+- **⚠ The `Needs: BF-84` this entry carried is DISCHARGED and has been removed (2026-09-03).** Its
+  stated reason was that BF-84 *"rewrites what `onRestDay` does"* and that rebuilding how it is
+  invoked first would touch the same call site twice. **That rewrite shipped 2026-09-01** (migration
+  247, `rest_days` stored + synced), so the hazard it named no longer exists. What still blocks this
+  is the device check below, which is a different thing and now says so as a field.
 - **Added:** 2026-09-01 · owner, with a screenshot of the Home training card: *"can we have the full
   button for workout; that lets you swipe it to turn it to rest? sort of like the swipe to delete
   button appearing but swipe to rest."*
@@ -11193,14 +11200,26 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   (`LOW_SIGNAL_MAX_BPM = 105`) rather than a label match, since "the low ones" is no longer one
   string. `lib/ai-chat/tools.ts` named the old labels in a tool description and was updated with it.
   [journal](overview/entries/2026-09-02-q516-peak-bands.md).
-- **Keep:** the honesty half, and it is now **Lane B's**. `aggregateHrRecoveryProfile` returns
-  `informativeShare` (the fraction of episodes above the low-signal threshold) precisely so the card
-  can say out loud that HR recovery informs a minority of lifting sets; nothing renders it yet.
-  **Four populated buckets look like a working feature whether or not they are** — that was the
-  entry's own warning and it still stands. Also still open, and the owner's: whether the feature is
-  targeted correctly at all, given the range it wants lives in cardio rather than strength sets.
-- **Plan:** none yet — re-banding is cheap; **the honesty change in "first action" is the real work.**
-  Lane A implements; Tuning proposes only.
+- **Lane:** B — the re-banding shipped from Lane A; what remained was rendering, in
+  `components/health/hr-recovery-profile-card.tsx`.
+- **✅ THE HONESTY HALF SHIPPED 2026-09-03** (`fix/q516-hr-recovery-honesty`).
+  `aggregateHrRecoveryProfile` had returned `informativeShare` since the re-banding and **nothing
+  rendered it** — the exact state this entry warned about, in its own words: *four populated buckets
+  look like a working feature whether or not they are.* The card now states the share, emphasised
+  once the informative rests are a minority, because at that point it is the headline about the
+  table rather than a footnote under it. `components/health/hr-recovery-honesty.ts` holds the
+  threshold and the "nothing to disclose" rule (a share of 1 stays silent — a *100% informative*
+  line on a clean table is noise, and noise trains a reader to skip the line that matters).
+- **⚠ THIS ENTRY WAS UNREACHABLE FROM EITHER QUEUE UNTIL 2026-09-03, and the cause is worth
+  keeping.** It carried two bare lane mentions that disagreed — the `Keep:` said *"it is now Lane
+  B's"* while a stale line eleven lines below still read *"Lane A implements; Tuning proposes only"*
+  from when the re-banding was a Tuning proposal. `laneFromLines` refuses to guess between
+  conflicting bare mentions and returns `?`, so `next-item.js` filed it under UNCLASSIFIED and
+  neither lane saw it. **That is the failure the lane module's own comment documents.** The stale
+  line is struck and the lane is a field now.
+- **Keep:** the owner's question, and only that — whether the feature is targeted correctly at all,
+  given the range it wants lives in cardio rather than strength sets. Nothing to build for it.
+- **Gate:** owner.
 - **Added:** 2026-08-18 · Tuning agent ·
   [`docs/reviews/2026-08-18-hr-rest-threshold-calibration.md`](reviews/2026-08-18-hr-rest-threshold-calibration.md) Part 2
 - **The claim under test.** `hr-recovery-profile.ts` justifies its bands as *"Bands, not exact bpm, for

@@ -7115,3 +7115,18 @@ so a run that completes after being reaped discards its own result — the work 
 says it was abandoned. And the synchronous workaround has **no in-flight guard**, so a second press
 is two concurrent full-history passes, which is the starvation that took production down on
 2026-08-13.
+
+## 2026-09-03 — `projectOverview.md` → 9697, `docs/implementation-backlog.md` → 16246 (Q-516 + BF-94)
+
+Both grow for one reason, and it is not the feature. The lines that earn their space record **how the
+entry became invisible**: two bare lane mentions that disagreed, so `laneFromLines` returned `?` and
+`next-item.js` filed real work under UNCLASSIFIED where neither lane looks. Without that written
+down, the next entry to grow a stale lane line does the same thing and nobody knows why the queue
+looked empty.
+
+BF-94's block is the same class in the other direction — an expired `Needs:` the parser could read,
+sitting above a live blocker it could not. Recording that the dependency was *discharged* rather than
+just deleting it is what stops a later session restoring it from the prose that still explains it.
+
+The `Math.round` note in the journal is the third thing worth its length: a surviving mutation that
+turned out to be a real off-by-one on some values, not a gap in the tests.
