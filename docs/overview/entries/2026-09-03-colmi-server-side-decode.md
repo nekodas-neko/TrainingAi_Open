@@ -67,6 +67,30 @@ still holding yesterday's tail) is a hypothesis from timestamps. This integratio
 diagnoses made from counts, of which three were wrong, so PS-22 says to answer it from the archived
 bytes instead.
 
+## The `claude_ro` view is a full regeneration, and finding that out cost a CI round
+
+Migration 264 was first written by hand: drop the one view, recreate it with the new column. It
+passed locally against a fresh database built from every migration in order, and CI failed with
+`Snapshot drift: column "colmi_raw_frames.seq" is in neither its claude_ro view nor
+_meta_withheld_columns`.
+
+The cause is a convention the generator's own header states and a hand-written file quietly opts out
+of. `claude-ro-readonly-role.test.ts` rebuilds the view schema by re-executing the newest file
+matching `^\d+_claude_ro_views.*\.sql`, because **every such migration drops and rebuilds all 95
+views**. `264_claude_ro_colmi_raw_frames_seq.sql` does not match that pattern — so the newest match
+was 262, generated before the column existed, and replaying it wiped the view the hand-written file
+had just created. The drift error then named the column correctly and the cause not at all.
+
+The fix is what the generator's header says: run `scripts/generate-claude-ro-views.js` against a
+database carrying the new column and commit its whole output as `264_claude_ro_views_colmi_frame_seq.sql`.
+
+**A wrong turn worth recording, because it nearly shipped as the diagnosis.** Running the two
+`claude_ro` test files together fails every time, and the first failures it prints are
+`permission denied for schema claude_ro` and a duplicate-role key — so the first read was "a
+pre-existing race between two files sharing one global role". That race **is real** and is now filed
+as PS-23, but it is not what CI hit: fixing it changed nothing, and regenerating the migration fixed
+everything. Two true things about the same test file, and the loud one was not the cause.
+
 ## Not verified
 
 Server decode ran against the local dev database only. **The route has not been exercised on the

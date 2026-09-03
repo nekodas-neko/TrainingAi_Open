@@ -7206,7 +7206,7 @@ state. **The next session that touches it should make a structural cut rather th
 incremental one**: the "Now" section's method bullets and the standing "Method notes" section are
 converging on the same list and should become one.
 
-## 2026-09-03 — `docs/implementation-backlog.md` 16429 → 16475 (+46), `projectOverview.md` 9742 → 9765 (+23), PS-21 Stage A / PS-22
+## 2026-09-03 — `docs/implementation-backlog.md` 16429 → 16500 (+71), `projectOverview.md` 9742 → 9765 (+23), PS-21 Stage A / PS-22 / PS-23
 
 Two additions and one edit. The new backlog entry is PS-22 — a fifth of every Colmi sync's
 heart-rate log is discarded as future-dated. The lines that earn their place are the ones separating
@@ -7224,5 +7224,11 @@ server decode was proved equivalent against the local database and has never run
 names the tell (`decodedBy`) rather than only the risk, because the failure it guards against — a
 WebView older than the deploy — looks like "the sync stored nothing" and is otherwise indistinguishable
 from a broken ring.
+
+A second entry, PS-23, was added after the first CI round: two test files create and drop the same
+global Postgres role, and the collision produces three different errors — one of which is a **false
+schema-drift report naming an innocent column**, because `information_schema` is privilege-filtered
+and a revoked grant reads as a missing column rather than an error. Those lines are the entry: the
+symptom is worth more than the fix, which is a rename.
 
 Both raised slightly above the exact count so a small follow-up does not need its own note.
