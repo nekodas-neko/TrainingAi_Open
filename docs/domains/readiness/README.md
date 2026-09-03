@@ -260,6 +260,16 @@ Live at the time of writing (2026-07-30):
 ## History
 
 
+- **[`../../reviews/2026-09-03-recovery-index-remainder-and-hrv-step.md`](../../reviews/2026-09-03-recovery-index-remainder-and-hrv-step.md)**
+  — 🆕 **Q-509's remainder is not a trend, and the inputs stepped at the re-key (LA-57).** Over 58
+  BLE-era nights `recovery_index_hours` is flat — OLS slope −0.0055 h/night, r = −0.060 — so the
+  ~0.39 h was there on the first BLE night and has not grown; that refutes *a gradual six-week
+  change*, though not a change that happened AT the re-key and held. Meanwhile `body_metrics` either
+  side of 2026-07-07: RHR 65.7 → 53.8 bpm and **HRV 26.9 → 55.9 ms** — pre-boundary nights run 20–39,
+  post-boundary 40–56, never returning. The RHR half is not clean (it was already falling through
+  late June); the HRV step is. The 2026-08-18 input-drift review checked HRV *presence*, never its
+  *scale*, which is how it survived. **Strengthens both Q-509 prohibitions** — do not widen
+  `MEDIAN_WINDOW`, do not move `RECOVERY_INDEX_OPTIMAL_HOURS`.
 - **[`../../reviews/2026-09-02-recovery-index-bin-occupancy.md`](../../reviews/2026-09-02-recovery-index-bin-occupancy.md)**
   — 🆕 **Q-509, continued: two of the three remaining candidates are closed.** Bin occupancy does
   **nothing** — across 575 night bins not one falls below `MIN_BEATS_PER_BIN`, the argmin carried
