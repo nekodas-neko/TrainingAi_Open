@@ -121,8 +121,6 @@ jobs:
       - name: Seed the test user and program
         run: psql "$DATABASE_URL" -f scripts/local-db/seed.sql
 
-      # 10.0.2.2 is the emulator's alias for the host loopback. cleartext is required because this
-      # is plain http; it is set only on this throwaway build and never on the shipped config.
       - name: Point the build at the host loopback instead of Railway
         run: |
           node - <<'EOF'
@@ -142,6 +140,8 @@ jobs:
           EOF
           grep -n "url:\|cleartext:" capacitor.config.ts
 
+      # Still built, because `npx cap sync` copies `www/` into the APK. The SERVER below is `pnpm
+      # dev`, not this build's output — see the step's own note.
       - name: Build the app
         run: pnpm build
 
@@ -153,21 +153,58 @@ jobs:
       # here that must not be used: it awaits lookupLatestApkRelease(), an outbound call to the
       # GitHub Releases API, before it responds. With no GITHUB_RELEASES_TOKEN in CI that call is
       # slow or hangs, so the probe timed out against a server that had been up for a minute.
+      # Q-250: `pnpm dev`, NOT `pnpm start`, and this is the load-bearing choice in the whole job.
+      #
+      # `next start` sets NODE_ENV=production, and `instrumentation-node.ts` has TWO gates that are
+      # fatal there: model constants, and model assets. The first has an honest local substitute
+      # (committed synthetic fixtures). **The second does not** — `checkModelAssets` asks object
+      # storage and has no tree fallback at all, so a production-mode server cannot boot on a runner
+      # with no bucket credentials. Measured across two runs: constants staged, assets still fatal.
+      #
+      # Both gates are correct and neither is relaxed. They key on NODE_ENV rather than on whether
+      # credentials are set, precisely so a production deploy that lost its storage variables fails
+      # instead of quietly serving degraded sleep staging — the fail-open shape CLAUDE.md forbids.
+      # Adding a CI escape hatch to `fatalOrLoud` would be exactly that shape and is not done here.
+      #
+      # A dev server sidesteps both without touching either: outside production the same gates say
+      # so loudly and continue, and `ensureConstantsAvailable` reaches its documented fixtures
+      # fallback on its own. Nothing this job asserts is affected — it checks that local SQLite
+      # migrations apply inside a real Android WebView, which is identical either way. The cost is a
+      # slower first paint, which the 120 s probe and the flow's 120 s waits already absorb.
       - name: Start the server
         run: |
-          pnpm start > /tmp/next-server.log 2>&1 &
+          pnpm dev > /tmp/next-server.log 2>&1 &
           SERVER_PID=$!
           for i in $(seq 1 120); do
             if ! kill -0 "$SERVER_PID" 2>/dev/null; then
               echo "server process exited during startup:"; cat /tmp/next-server.log; exit 1
             fi
             CODE=$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 http://localhost:3000/ || true)
-            if [ -n "$CODE" ] && [ "$CODE" != "000" ]; then
-              echo "server up after ${i}s (HTTP $CODE)"; exit 0
-            fi
+            # Q-250: 5xx is NOT up. This used to accept any status, so a server whose
+            # instrumentation hook had thrown reported "server up (HTTP 500)" and the job carried on
+            # to fail 8 minutes later inside the emulator, where it read as a UI-automation problem.
+            # A readiness probe that passes on 500 is worse than none — it moves the error away
+            # from its cause.
+            case "$CODE" in
+              ''|000|5*) ;;
+              *) echo "server up after ${i}s (HTTP $CODE)"; exit 0 ;;
+            esac
             sleep 1
           done
           echo "server never accepted a connection in 120s:"; cat /tmp/next-server.log; exit 1
+
+      # Q-250. `next dev` compiles routes ON FIRST REQUEST, and the probe above only ever asks for
+      # `/`, which 307s to /sign-in WITHOUT compiling it. So the emulator's very first page load was
+      # paying for that compile inside Maestro's wait — run 3 failed with the emulator up, the
+      # server up, and the form simply not painted within 120 s. Warming it here moves the compile
+      # onto the host, where it costs seconds and is visible, instead of into a UI timeout that
+      # reads as "Maestro cannot see the form".
+      - name: Warm the routes the flow will actually load
+        run: |
+          for path in / /sign-in; do
+            CODE=$(curl -s -o /dev/null -w '%{http_code}' --max-time 120 "http://localhost:3000$path" || true)
+            echo "warmed $path -> HTTP $CODE"
+          done
 
       - uses: actions/setup-java@v5
         with:
@@ -179,6 +216,13 @@ jobs:
           mkdir -p www
           npx cap sync android
           cd android && ./gradlew :app:assembleDebug --no-daemon
+
+      # Q-250. Maestro drives the sign-in the assertion depends on. Installed on the HOST, not in
+      # the emulator: it drives the device over adb from outside, the same way the smoke script does.
+      - name: Install Maestro
+        run: |
+          curl -fsSL "https://get.maestro.mobile.dev" | bash
+          echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
 
       # KVM has to be made available to the runner user before the emulator action runs.
       - name: Enable KVM
@@ -212,5 +256,6 @@ jobs:
             /tmp/next-server.log
             /tmp/logcat.txt
             /tmp/pulled-local.db
+            /tmp/maestro-report.xml
           retention-days: 7
           if-no-files-found: ignore

@@ -13244,6 +13244,52 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 
 ### [platform][devices] Q-250 — an Android emulator job in CI, to close the 17 rows that need an Android runtime and nothing else
 
+> **⚑ FOUR REAL RUNS, 2026-09-03 — three defects fixed, the job still does not pass, and the
+> remaining question is now NARROW. Read this before the notes below; it supersedes their account of
+> where the job stops.** The `pull_request` trigger is deliberately still commented out.
+>
+> | run | outcome | what it established |
+> |---|---|---|
+> | 1 (11 m) | failed in the emulator: *"Sign in with email" is not visible* | **A red herring.** The SERVER was dead — `next start` sets `NODE_ENV=production` and `instrumentation-node.ts` hard-fails there on missing model constants, so every request 500'd. Maestro was reading an error page correctly. |
+> | 2 (6.5 m) | failed at **Start the server**, 120 s probe timeout | The probe fix worked: the failure moved to its cause. Constants staged from the committed fixtures; a **second** gate then fired. |
+> | 3 (12.5 m) | **server boots in 8 s**; APK, Maestro, KVM all pass; fails in the emulator | The dev-server switch cleared the boot problem entirely. |
+> | 4 (13 m) | routes warmed in **11 s**; fails in the emulator after **180 s** | **Disproves the timing hypothesis.** Compilation was never the cost, and 180 s is not short. |
+>
+> **Three genuine defects fixed, none of them the one the entry expected:**
+> 1. **The readiness probe accepted ANY HTTP status, including 500** — it printed *"server up (HTTP
+>    500)"* and let the job march on to fail eight minutes later inside the emulator. A probe that
+>    passes on 5xx is worse than none: it moves the error away from its cause, and it is why run 1
+>    read as a UI-automation failure. Now refuses 5xx.
+> 2. **Two boot gates are production-hard, and only one has a local substitute.** Model constants can
+>    be satisfied honestly from the committed synthetic fixtures; **`checkModelAssets` asks object
+>    storage and has no tree fallback at all**, so a production-mode server can NEVER boot on a
+>    bucket-less runner. ⚠ **Neither gate was relaxed, and neither should be** — they key on
+>    `NODE_ENV` rather than on whether credentials exist, precisely so a production deploy that lost
+>    its storage variables fails instead of quietly serving degraded sleep staging. Adding a CI
+>    escape hatch to `fatalOrLoud` is that same fail-open shape. The job serves from **`pnpm dev`**
+>    instead, which sidesteps both without touching either and changes nothing this job asserts.
+> 3. **`next dev` compiles on first request and the probe only ever asked for `/`**, which 307s to
+>    `/sign-in` without compiling it — so the emulator paid that cost inside a UI wait. Warmed on the
+>    host now. (It turned out to be 11 s, not the 120 s guessed — the fix is still right, and
+>    measuring it is what killed the hypothesis.)
+>
+> **What remains, stated as the two candidates it is and not more:**
+> - **(a) Maestro may not be able to read text inside the WebView.** The app is a WebView and its
+>   accessibility tree may not be exposed to Maestro's view hierarchy at all. If so the fix is
+>   `WebView.setWebContentsDebuggingEnabled(true)` in the debug build plus Maestro's web-view
+>   selectors, not a longer timeout.
+> - **(b) The emulator may not be reaching the host.** `emulator-local-db-smoke.sh`'s reachability
+>   check is **advisory** — it prints `WARN: could not confirm host reachability (curl may be absent
+>   …); continuing` and has never once confirmed the hop. If `10.0.2.2:3000` is not reachable the
+>   WebView shows an error page and no form, which is indistinguishable from (a) at this level of
+>   evidence. **Settle this first — it is cheaper**: make the check assert instead of warn, using
+>   something present on the image (`nc`, or a `UiAutomator`-free `am start` of a URL), and re-run.
+>
+> **The diagnostics to read are in the `emulator-diagnostics` artifact** (`/tmp/logcat.txt`,
+> `/tmp/maestro-report.xml`, and Maestro's own screenshot under `~/.maestro/tests/`), which a session
+> with no artifact download could not open — that, not the emulator, is what capped this
+> investigation at four runs.
+
 - **Lane:** A
 - **The `Gate: device` was removed 2026-09-01, and it was circular.** This entry is the one that
   *closes* device-gated rows, and it was parked behind the very bottleneck it exists to relieve —
